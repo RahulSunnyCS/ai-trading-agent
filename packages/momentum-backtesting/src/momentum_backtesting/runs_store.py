@@ -451,7 +451,7 @@ def _limit_message() -> str:
 
 
 def annotate(con: duckdb.DuckDBPyConnection, run_id: str, **fields: Any) -> None:
-    """Write extra fields onto a saved run's summary (BL-056's `followed_by`). Nothing that
+    """Write extra fields onto a saved run's summary (BL-087's `followed_by`). Nothing that
     decides its result or favourite state."""
     loaded = _load(con, run_id)
     if loaded is not None:
@@ -461,7 +461,7 @@ def annotate(con: duckdb.DuckDBPyConnection, run_id: str, **fields: Any) -> None
 def ensure_followed_slot(
     con: duckdb.DuckDBPyConnection, exclude: set[str] | frozenset = frozenset()
 ) -> None:
-    """Raises `FavouriteError` when a Paper or Invested favourite could not be added (BL-056 asks
+    """Raises `FavouriteError` when a Paper or Invested favourite could not be added (BL-087 asks
     before it saves anything)."""
     if followed_count(con, exclude) >= MAX_FOLLOWED:
         raise FavouriteError(_limit_message())
@@ -924,7 +924,7 @@ def _strategy(runs: list[dict[str, Any]], changes: list[dict[str, Any]]) -> dict
         "status": status_of(summary),
         "group": summary.get("group"),
         "member_of": summary.get("member_of"),
-        # The group that follows this run on every Friday (BL-056); list/get keep it only while
+        # The group that follows this run on every Friday (BL-087); list/get keep it only while
         # that group still exists.
         "followed_by": summary.get("followed_by"),
         "overlay": any(bool(r["summary"].get("overlay")) for r in runs),

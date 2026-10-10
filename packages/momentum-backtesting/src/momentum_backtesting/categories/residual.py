@@ -1,4 +1,4 @@
-"""Residual momentum (BL-054 lever L6): momentum left after removing the market and sector move.
+"""Residual momentum (BL-085 lever L6): momentum left after removing the market and sector move.
 
 For each week t and stock, regress its weekly returns over the trailing 52 weeks (t-51..t, rows
 up to t only) on [1, market, group]:

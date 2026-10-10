@@ -1,4 +1,4 @@
-"""Daily moves for the daily stop-loss (BL-054 lever L4).
+"""Daily moves for the daily stop-loss (BL-085 lever L4).
 
 `engine.Config.stop_granularity="daily"` walks a holding day by day between two Friday closes.
 It needs, for every engine column, three daily tables on one trading-date index:

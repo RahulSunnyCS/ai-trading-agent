@@ -81,7 +81,7 @@ def test_run_tranches_accepts_any_runner():
     assert seen == [0, 1]
 
 
-# --- BL-056: the April-reset blend as one Result ------------------------------------------------
+# --- BL-087: the April-reset blend as one Result ------------------------------------------------
 
 
 def _phases(every: int = 4, **changes) -> list:

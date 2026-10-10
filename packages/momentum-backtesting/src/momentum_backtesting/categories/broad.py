@@ -518,7 +518,7 @@ def _apply_feature_tilt(
 
 
 def _residual_global_ranks(full_frame: pd.DataFrame) -> pd.DataFrame:
-    """BL-054 L6: rank every column on residual momentum (categories/residual.py), with Nifty 50
+    """BL-085 L6: rank every column on residual momentum (categories/residual.py), with Nifty 50
     TRI as the market and today's curated category tags as the groups."""
     from momentum_backtesting import reference_benchmarks as rb
 
@@ -1211,19 +1211,19 @@ def run_broad_backtest(
     # Capital-gains tax per sale (tax.py). None = pre-tax, exactly as before. Every stock is
     # taxed as listed equity; the atomics by what they are (see `_tax_classes`).
     tax: tax_mod.TaxRules | None = None,
-    # BL-053 stop-loss (engine.Config's fields of the same names). Off by default.
+    # BL-084 stop-loss (engine.Config's fields of the same names). Off by default.
     stop_from_buy: float | None = None,
     stop_from_peak: float | None = None,
     stop_proceeds: Literal["cash", "top"] = "cash",
     stop_delay: int = 0,
-    # BL-054 L1: engine.Config.tax_hold_band / tax_hold_weeks (inert without `tax`).
+    # BL-085 L1: engine.Config.tax_hold_band / tax_hold_weeks (inert without `tax`).
     tax_hold_band: int = 0,
     tax_hold_weeks: int = 0,
-    # BL-054 L4: "daily" checks the stop every day and sells at the next open; the daily moves are
+    # BL-085 L4: "daily" checks the stop every day and sells at the next open; the daily moves are
     # read from the daily bars here unless a caller passes them.
     stop_granularity: Literal["weekly", "daily"] = "weekly",
     daily: daily_moves.DailyMoves | None = None,
-    # BL-054 L5: engine.Config.weight_by / vol_window.
+    # BL-085 L5: engine.Config.weight_by / vol_window.
     weight_by: Literal["equal", "inverse_vol"] = "equal",
     vol_window: int = 26,
     # BL-050: (feature, weight). Inside the effective stock ranking (after the stock tilt, if

@@ -300,7 +300,7 @@ export function buildRebalanceTable(
 }
 
 // ---------------------------------------------------------------------------
-// A favourite group previewed as one account (BL-056)
+// A favourite group previewed as one account (BL-087)
 
 export interface GroupSleeveLine {
   id: string;

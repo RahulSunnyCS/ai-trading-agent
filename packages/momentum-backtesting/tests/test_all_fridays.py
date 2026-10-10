@@ -1,4 +1,4 @@
-"""BL-056 Phase 3: following a strategy on every rebalance Friday (`all_fridays.py`)."""
+"""BL-087 Phase 3: following a strategy on every rebalance Friday (`all_fridays.py`)."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -250,7 +250,7 @@ def test_a_failed_group_puts_the_old_favourite_back(client, monkeypatch):
     assert [r["id"] for r in saved if r["name"].endswith("of 4")] == []  # sleeves removed
 
 
-# --- BL-056 Phase 4: the Rebalance preview of a group ----------------------------------------
+# --- BL-087 Phase 4: the Rebalance preview of a group ----------------------------------------
 
 
 def _fake_model(week, target, value):

@@ -1,4 +1,4 @@
-# BL-053 — Weekly stop-loss on the Broad Momentum strategies
+# BL-084 — Weekly stop-loss on the Broad Momentum strategies
 
 | | |
 |---|---|
@@ -35,7 +35,7 @@ live weekly signal (a separate item if the stop is adopted).
 
 ### Phase 0 — Pre-register (committed before any run)
 
-The binding rule is `packages/momentum-backtesting/search_spaces/bl053_criteria.json`. In words:
+The binding rule is `packages/momentum-backtesting/search_spaces/bl084_criteria.json`. In words:
 
 - **Hypothesis:** a weekly stop on each holding (from the buy price, from the peak, or both)
   makes the falls of these strategies shallower while costing at most 2 points of CAGR.
@@ -69,13 +69,13 @@ The binding rule is `packages/momentum-backtesting/search_spaces/bl053_criteria.
 - **Done when:** the goldens are unchanged and `tests/test_stop_loss.py` passes.
 
 ### Phase 2 — The grid
-- **Tasks:** `scripts/bl053_stop_loss.py` runs baseline + 30 cells x 2 delays on the 11
+- **Tasks:** `scripts/bl084_stop_loss.py` runs baseline + 30 cells x 2 delays on the 11
   strategies, applies the rule and writes `data/search/round7_A/bl053/report.md`.
-- **Done when:** the verdict is recorded here and in `bl053_result.json`.
+- **Done when:** the verdict is recorded here and in `bl084_result.json`.
 
 ## Result (2026-10-08): killed, 0 of 30 cells pass
 
-`search_spaces/bl053_result.json`; per cell `data/search/round7_A/bl053/cells.csv`, per strategy
+`search_spaces/bl084_result.json`; per cell `data/search/round7_A/bl053/cells.csv`, per strategy
 `metrics.csv`. Pre-tax, Rs 2 lakh, point in time, 2017-01 to 2026-10.
 
 Baseline medians over the 11 strategies: CAGR 40.2%, worst fall -27.1%, Ulcer 9.2%, third-worst
@@ -126,3 +126,7 @@ safety net; nothing in the API or the weekly signal sets it.
   `535b17b4` 32.7% / -34.7% -> 30.8% / -36.6%; `bad83df3` 29.5% / -28.9% -> 30.1% / -28.4%.
   Average CAGR change +0.1 points, two sleeves better and one clearly worse: neutral, as the
   grid found. Bundles and studies in `data/search/round7_A/bl053/monday/`.
+- 2026-10-10 — renumbered from BL-053 to BL-084: BL-053 collided with the options item of that
+  number (VIX at 10:00) on `main`, and the owner kept the options numbers. `bl053_criteria.json`,
+  `bl053_result.json` and `scripts/bl053_stop_loss.py` became `bl084_*`; the JSON contents are
+  unchanged, so they still say BL-053. The generated output stays in `data/search/round7_A/bl053/`.

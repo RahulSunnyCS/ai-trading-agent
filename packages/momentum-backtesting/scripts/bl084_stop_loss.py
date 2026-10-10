@@ -1,7 +1,7 @@
-"""BL-053: the pre-registered stop-loss grid (search_spaces/bl053_criteria.json).
+"""BL-084: the pre-registered stop-loss grid (search_spaces/bl084_criteria.json).
 
-    uv run python scripts/bl053_stop_loss.py run      # every strategy x cell, resumable
-    uv run python scripts/bl053_stop_loss.py report   # apply the committed rule
+    uv run python scripts/bl084_stop_loss.py run      # every strategy x cell, resumable
+    uv run python scripts/bl084_stop_loss.py report   # apply the committed rule
 
 Each strategy's curves go to data/search/round7_A/bl053/curves-<id>.parquet (one column per
 cell), and its stop counts to stops-<id>.json. The rule is read from the criteria file, never
@@ -20,9 +20,10 @@ import pandas as pd
 
 PKG = Path(__file__).resolve().parent.parent
 SPACE = PKG / "search_spaces" / "round7_A.toml"
-CRITERIA = json.loads((PKG / "search_spaces" / "bl053_criteria.json").read_text())
+CRITERIA = json.loads((PKG / "search_spaces" / "bl084_criteria.json").read_text())
 FROZEN = json.loads((PKG / "search_spaces" / "bl010_phase6_frozen.json").read_text())
 RESULTS = PKG / "data" / "search" / "round7_A"
+# The output folder keeps the item's old number (BL-053, renumbered 2026-10-10).
 OUT = RESULTS / "bl053"
 END = CRITERIA["settings"]["end"]
 BASELINE = "baseline"

@@ -182,7 +182,7 @@ export type MomentumSectionName =
   | 'circuit_exposure'
   | 'friday_spread';
 
-/** One calendar phase's figures from an "All Fridays" run (BL-056); CAGR and drawdown are
+/** One calendar phase's figures from an "All Fridays" run (BL-087); CAGR and drawdown are
  * fractions, after tax when the run was taxed. */
 export interface MomentumFridayFigures {
   cagr: number;
@@ -356,7 +356,7 @@ export interface SavedStrategy {
   status: FavouriteStatus | null;
   group: string[] | null;
   member_of: string | null;
-  /** The group that follows this All Fridays run on every Friday (BL-056), while it exists. */
+  /** The group that follows this All Fridays run on every Friday (BL-087), while it exists. */
   followed_by?: string | null;
   overlay: boolean;
   runs: number;
@@ -559,7 +559,7 @@ export interface MomentumRebalanceResult {
     current_rebalance_date: string | null;
     next_rebalance_date: string;
   } | null;
-  /** Present when a favourite group was previewed (BL-056): its sleeves and what each holds. */
+  /** Present when a favourite group was previewed (BL-087): its sleeves and what each holds. */
   group?: MomentumRebalanceGroup;
   current_pct: Record<string, number>;
   target_pct: Record<string, number>;

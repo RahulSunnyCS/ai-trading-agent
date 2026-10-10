@@ -270,14 +270,14 @@ To confirm when this is started:
 ## Log
 
 - 2026-10-09 — owner answered the open questions before starting (to run overnight in the same
-  session, after BL-054's findings):
+  session, after BL-085's findings):
   1. **Tilt weight: both 25% and 50%** — every tilt (V1, V2, M2, T1) runs at
      `0.75 x momentum + 0.25 x feature` and at `0.5 x momentum + 0.5 x feature`. Gates (V3, R1,
      M1) are unchanged. Trial count: 4 tilts x 2 weights + 3 gates = **11** (PBO counts all 11).
   2. **Scope tonight: Phases 0-3, then report.** Phase 4 (shadow favourites in the Friday job)
      waits for the owner.
   3. **M2 stays as planned** (Nifty 500 TRI market, no sector factor, frozen ensemble
-     comparator); it is a different question from BL-054 L6.
+     comparator); it is a different question from BL-085 L6.
   4. **Shadow phase:** each survivor gets its own shadow arm, when Phase 4 is approved.
 - 2026-10-09 — Phase 0 committed: `search_spaces/bl050_criteria.json` (11 trials, both tilt
   weights, V3 added), before any BL-050 run.
@@ -286,8 +286,8 @@ To confirm when this is started:
   BL-050 run; the trial count is now seven. Context: the 2026-10-03 exploratory volume study
   (`data/backtests/volume/`) tested 2- and 4-week volume ratios and accumulation on the pool and
   found no predictive signal (information coefficients near 0, none passed); a 1-week measure
-  and this entry-gate shape were never tested. Also: BL-054 L6 (2026-10-09) tests residual
-  momentum on the 11 BL-053 strategies; when this item starts, M2 should cite that result and
+  and this entry-gate shape were never tested. Also: BL-085 L6 (2026-10-09) tests residual
+  momentum on the 11 BL-084 strategies; when this item starts, M2 should cite that result and
   run only if it adds something (it differs: Nifty 500 TRI as the market, no sector factor,
   the frozen ensemble as comparator).
 

@@ -1,8 +1,8 @@
-"""BL-054 L2, measured: each rebalance Friday alone (one pot, Rs 5 lakh) against all Fridays at
+"""BL-085 L2, measured: each rebalance Friday alone (one pot, Rs 5 lakh) against all Fridays at
 once (the same money split equally), after tax. Report only; no pass rule.
 
-    uv run python scripts/bl054_phase_split.py run      # single-Friday curves (resumable)
-    uv run python scripts/bl054_phase_split.py report   # the comparison table
+    uv run python scripts/bl085_phase_split.py run      # single-Friday curves (resumable)
+    uv run python scripts/bl085_phase_split.py report   # the comparison table
 
 The split curves are the L1 grid's `baseline__tax` (each strategy's own cadence, every phase,
 Rs 5 lakh divided across them)."""
@@ -15,7 +15,7 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent))
-import bl054_levers as b  # noqa: E402
+import bl085_levers as b  # noqa: E402
 
 OUT = b.OUT / "phase_split"
 

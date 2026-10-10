@@ -1,4 +1,4 @@
-# BL-054 — Six levers to improve the Broad Momentum strategies' return and falls
+# BL-085 — Six levers to improve the Broad Momentum strategies' return and falls
 
 | | |
 |---|---|
@@ -7,12 +7,12 @@
 | **Type** | research (+ opt-in engine features: daily stop, inverse-vol sizing, residual score) |
 | **Area** | momentum |
 | **Created** | 2026-10-09 |
-| **Depends on** | BL-053 (the 11 strategies, the stop machinery), BL-010 (criteria, scored curves) |
+| **Depends on** | BL-084 (the 11 strategies, the stop machinery), BL-010 (criteria, scored curves) |
 | **TODO.md row** | 3.13.7 |
 
 ## Context
 
-BL-053 killed the weekly stop-loss. The owner (2026-10-08) agreed to test the five improvement
+BL-084 killed the weekly stop-loss. The owner (2026-10-08) agreed to test the five improvement
 ideas from its write-up and added one more: a **daily** stop, checked every evening on the close
 and sold the next morning at the open. The owner asked what else is needed and how bad the 0.69
 probability of backtest overfitting is.
@@ -44,7 +44,7 @@ Combining levers; a finer search; the dashboard; the weekly signal; the 2012-201
 
 ### Phase 0 — Pre-register (committed before any run)
 
-The binding rule is `packages/momentum-backtesting/search_spaces/bl054_criteria.json`. In words:
+The binding rule is `packages/momentum-backtesting/search_spaces/bl085_criteria.json`. In words:
 
 | Lever | What is tested | Pass on FY2018-FY2022, after tax at Rs 5 lakh |
 |---|---|---|
@@ -63,29 +63,29 @@ must pass at both fill timings.
 - **Done when:** the two tables are in the result section.
 
 ### Phase 2 — Cadence and tax grid (L1)
-- `scripts/bl054_levers.py l1`: 11 strategies x 4 cadences x 2 tax-hold settings, every phase,
+- `scripts/bl085_levers.py l1`: 11 strategies x 4 cadences x 2 tax-hold settings, every phase,
   pre- and after-tax. Resumable.
 
 ### Phase 3 — Daily stop (L4)
 - Engine: `Config.stop_granularity="daily"` with a daily move table (close / prevclose) and next
   open table passed to `run_backtest` (data, not Config, like the lock masks); same stop fields
-  as BL-053; tests for no look-ahead, the next-open fill, a split day, a lower-circuit day.
-- `scripts/bl054_levers.py l4`.
+  as BL-084; tests for no look-ahead, the next-open fill, a split day, a lower-circuit day.
+- `scripts/bl085_levers.py l4`.
 
 ### Phase 4 — Inverse-vol sizing (L5)
 - Engine: `Config.weight_by="inverse_vol"` in the buffer rule's split loop; tests.
-- `scripts/bl054_levers.py l5`.
+- `scripts/bl085_levers.py l5`.
 
 ### Phase 5 — Residual momentum (L6)
 - A new score in `categories/broad.py`'s ranking (point-in-time regressions); tests; run.
 
 ### Phase 6 — Verdicts
-- `search_spaces/bl054_result.json`, this file's Result section, TODO row.
+- `search_spaces/bl085_result.json`, this file's Result section, TODO row.
 
 ## Result (2026-10-09): no lever adopted
 
-Full write-up: `packages/momentum-backtesting/docs/bl054-levers-2026-10-09.md`; verdicts in
-`search_spaces/bl054_result.json`. After tax at Rs 5 lakh, median of 11 strategies: baseline
+Full write-up: `packages/momentum-backtesting/docs/bl085-levers-2026-10-09.md`; verdicts in
+`search_spaces/bl085_result.json`. After tax at Rs 5 lakh, median of 11 strategies: baseline
 29.9% (FY2018-22) and 32.4% (FY2023-26); tax costs 8-9 points a year.
 
 | Lever | Verdict | Key numbers |
@@ -132,11 +132,17 @@ Full write-up: `packages/momentum-backtesting/docs/bl054-levers-2026-10-09.md`; 
   applied to an already-adjusted prevclose). L4 re-run on the fixed engine: medians moved by 0.1
   point or less, same three development passes, none confirmed; verdict unchanged.
 - 2026-10-10 — PR #152 research-gate review (G1). Deviation: the sealed FY2023-26 window was
-  computed for every lever, not only those that passed development, which `bl054_criteria.json`
+  computed for every lever, not only those that passed development, which `bl085_criteria.json`
   (`windows.confirmation`: "only for levers that pass development") requires; `report()` and
-  `final()` in `scripts/bl054_levers.py` read it for every cell. No verdict changes: every kill
+  `final()` in `scripts/bl085_levers.py` read it for every cell. No verdict changes: every kill
   rests on a development-window failure, and the three L4 cells that passed development were
   then killed on that window as registered. The write-up's "25% buy-price stop did no measurable
   harm" line is qualified: that cell failed development (2 of 11) and its FY2023-26 numbers were
   read outside the pre-registered gate. No criteria file or result number was edited.
-  override: The sealed FY2023-26 window was computed for every lever, not only those that passed development. Every kill rests on development-window failures by wide margins and nothing was adopted, so the conclusions stand; the window is treated as used up as a confirmation window (BL-055 reused it afterwards, disclosed there).
+  override: The sealed FY2023-26 window was computed for every lever, not only those that passed development. Every kill rests on development-window failures by wide margins and nothing was adopted, so the conclusions stand; the window is treated as used up as a confirmation window (BL-086 reused it afterwards, disclosed there).
+- 2026-10-10 — renumbered from BL-054 to BL-085: BL-054 collided with the options item of that
+  number (weekly slot rotation) on `main`, and the owner kept the options numbers. The criteria,
+  addendum and result JSON, `scripts/bl054_levers.py`, `scripts/bl054_phase_split.py` and
+  `docs/bl054-levers-2026-10-09.md` became `bl085_*` / `bl085-levers-2026-10-09.md`; the JSON
+  contents are unchanged, so they still say BL-054 (and BL-053, now BL-084, for the strategies).
+  The generated output stays in `data/search/round7_A/bl054/`.

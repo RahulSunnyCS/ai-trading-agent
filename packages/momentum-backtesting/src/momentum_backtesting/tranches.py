@@ -8,7 +8,7 @@ big it was; the blend is what the rule is worth without it (TODO 3.9.23, Step 0c
 
 Modelling choices, stated so nobody mistakes them for facts:
 - `blend` is the mean of the tranche curves: K equal pots at the start, never rebalanced
-  against each other (the research scripts, BL-054). `blend_reset` (BL-056: the dashboard's
+  against each other (the research scripts, BL-085). `blend_reset` (BL-087: the dashboard's
   "All Fridays" backtest and the followed group) restores equal capital at each April reset
   (`groups.reset_weeks`, the ensemble's convention) and returns a whole `Result`. The money moved
   between tranches at a reset is not traded in the log: no cost or tax is charged for it.

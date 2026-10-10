@@ -1,4 +1,4 @@
-"""Following a strategy on every rebalance Friday (BL-056).
+"""Following a strategy on every rebalance Friday (BL-087).
 
 A config that rebalances every K weeks has K possible trading calendars (`rebalance_offset`
 0..K-1), and which one it trades is luck. Followed on all Fridays it becomes one *group* (BL-051)

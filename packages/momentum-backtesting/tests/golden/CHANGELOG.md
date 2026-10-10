@@ -126,7 +126,7 @@ response.benchmarks[].reason added for indices that are unavailable for a run (n
 
 ## 2026-10-09 (on top of `874fe2f`)
 
-BL-056: new scenario for the All Fridays split; no existing scenario moved
+BL-087: new scenario for the All Fridays split; no existing scenario moved
 
 | Scenario | CAGR | Max drawdown |
 |---|---|---|
@@ -147,7 +147,7 @@ Broad results' This week section (latest) is now the engine's own decision for t
 
 ## 2026-10-10 (on top of `c0619d6`)
 
-BL-056 review: an All Fridays run has no combined signal. Its latest section is now a note with no rows (split: true) instead of signals judged against the union of every sleeve's holdings. No CAGR, drawdown or trade changes.
+BL-087 review: an All Fridays run has no combined signal. Its latest section is now a note with no rows (split: true) instead of signals judged against the union of every sleeve's holdings. No CAGR, drawdown or trade changes.
 
 | Scenario | CAGR | Max drawdown |
 |---|---|---|

@@ -1,4 +1,4 @@
-"""BL-054 L4: the daily stop (`Config.stop_granularity="daily"`).
+"""BL-085 L4: the daily stop (`Config.stop_granularity="daily"`).
 
 A fixed rank table keeps A the top name throughout, so A is only sold by the stop. A's daily path
 is built by hand so the day a stop must trigger and the morning it must fill on are known."""

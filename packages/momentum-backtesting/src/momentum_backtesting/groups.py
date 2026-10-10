@@ -66,7 +66,7 @@ def _mix(parts: list[tuple[float, dict[str, float]]]) -> dict[str, float]:
 
 def mix_targets(parts: list[tuple[float, dict[str, float]]]) -> dict[str, float]:
     """Sleeves' portfolios (name -> fraction, parked cash included) as one: each weighted by the
-    sleeve's value since the last reset. `combine`'s rule, for the Rebalance preview (BL-056)."""
+    sleeve's value since the last reset. `combine`'s rule, for the Rebalance preview (BL-087)."""
     return _mix(parts)
 
 

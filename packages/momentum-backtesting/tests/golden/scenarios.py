@@ -113,7 +113,7 @@ SCENARIOS: dict[str, dict] = {
             "slippage_bps": 15,
         },
     },
-    # BL-056: the same four-weekly config on all four Fridays, money split, reset each April.
+    # BL-087: the same four-weekly config on all four Fridays, money split, reset each April.
     "broad_one_category_three_picks_four_weekly_all_fridays": {
         "$meta": "broad",
         "with": {

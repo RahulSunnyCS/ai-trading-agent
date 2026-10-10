@@ -1,4 +1,4 @@
-# BL-056 — Momentum: backtest and follow a config with its money split across every rebalance Friday
+# BL-087 — Momentum: backtest and follow a config with its money split across every rebalance Friday
 
 | | |
 |---|---|
@@ -7,14 +7,14 @@
 | **Type** | feature |
 | **Area** | momentum / dashboard |
 | **Created** | 2026-10-09 |
-| **Depends on** | BL-051 (saved-run groups), BL-054 (the measurement below) |
+| **Depends on** | BL-051 (saved-run groups), BL-085 (the measurement below) |
 | **TODO.md row** | 3.12.19 |
 
 ## Context
 
 A config that rebalances every K weeks has K possible trading calendars (`Config.rebalance_offset`
-0..K-1). Which one you pick is luck. On the 10 top Broad configs (BL-054 L2,
-`packages/momentum-backtesting/docs/bl054-levers-2026-10-09.md`), pre-tax:
+0..K-1). Which one you pick is luck. On the 10 top Broad configs (BL-085 L2,
+`packages/momentum-backtesting/docs/bl085-levers-2026-10-09.md`), pre-tax:
 
 | Median over 10 configs | CAGR |
 |---|---|
@@ -24,11 +24,11 @@ A config that rebalances every K weeks has K possible trading calendars (`Config
 | Unluckiest single Friday | 35.1% |
 
 Five Sectors Monthly alone runs from 34.6% to 44.8% purely by calendar. Splitting removes the
-gamble; it does not raise the average. Every after-tax number in BL-054 already assumes the
+gamble; it does not raise the average. Every after-tax number in BL-085 already assumes the
 split. The owner (2026-10-09) wants it in the dashboard, both to backtest and to follow with
 money.
 
-**Measured after tax at Rs 5 lakh, 2017-2026** (`scripts/bl054_phase_split.py`, output
+**Measured after tax at Rs 5 lakh, 2017-2026** (`scripts/bl085_phase_split.py`, output
 `data/search/round7_A/bl054/phase_split/phase_split.csv`): the split's worst fall is shallower
 than the typical single Friday's in 10 of 10 configs (median -27.6% against -31.1%; the
 unluckiest Friday -35.7%) and its Ulcer index is lower in 10 of 10 (9.9% against 10.8%), in
@@ -39,7 +39,7 @@ measurement, not a pre-registered test, but consistent across every config and b
 - `packages/momentum-backtesting/src/momentum_backtesting/tranches.py`: K equal sub-portfolios on
   staggered offsets, `capital / K` each, curves averaged; separate tax ledgers (documented as
   slightly pessimistic).
-- `method._score_group` and `scripts/bl054_levers.py`: every phase, blended by
+- `method._score_group` and `scripts/bl085_levers.py`: every phase, blended by
   `pd.concat(phases, axis=1).mean(axis=1)`.
 - `api.py`: `BacktestRequest.rebalance_every` / `rebalance_offset`; background jobs with stages
   and lazily built sections (`analysis.payload_parts`, `run_parts.RunParts`,
@@ -128,7 +128,7 @@ Answered by the owner on 2026-10-09:
    The Rebalance page follows suit (Phase 4).
 2. **April reset:** yes, equal capital each April (the groups / ensemble convention), in both the
    backtest blend and the followed group. The split figures therefore move slightly from
-   BL-054's, which never rebalanced the sleeves.
+   BL-085's, which never rebalanced the sleeves.
 3. **Tax ledger:** separate ledgers per sleeve, as `tranches.py` does. `tax.py` models no LTCG
    exemption and carries losses forward without limit, so the gap from one shared ledger is only
    timing; labelled slightly pessimistic.
@@ -137,13 +137,13 @@ Answered by the owner on 2026-10-09:
 
 ## Log
 
-- 2026-10-09 — created at P0 by the owner, from the BL-054 L2 result.
+- 2026-10-09 — created at P0 by the owner, from the BL-085 L2 result.
 - 2026-10-09 — the split-against-single-Friday measurement landed (above): shallower falls in 10 of 10.
 - 2026-10-09 — started. Owner's answers recorded above; scope widened to every favourite and the
   Rebalance preview (Phase 4). Built on PR #152's branch (owner: do not wait for it). Number clash:
   an unpushed branch `research/bl-056-favourites-score-delay` also uses BL-056; the owner chose to
   keep this item's number and renumber that one when it is pushed. The phase-split fall-depth
-  measurement (`scripts/bl054_phase_split.py`) was still running at start; cite it when it lands.
+  measurement (`scripts/bl085_phase_split.py`) was still running at start; cite it when it lands.
 - 2026-10-09 — Phase 1 (API) and Phase 2 (dashboard) built. A real Broad favourite (Five Sectors,
   Rank Sum, every 4 weeks, Rs 2 lakh): one Friday reproduces its saved 37.27% CAGR exactly; All
   Fridays gives 40.6% with a 27.9% worst fall against 40.2% on its single Friday, in 3 s once the
@@ -163,6 +163,10 @@ Answered by the owner on 2026-10-09:
   and shows which sleeve trades this week. Tried on the live-data copy: Five Sectors, Rank Sum ·
   all Fridays previews in 33 s cold (Friday 2 of 4 trades, 6 rows, target sums to 100%). Cited the
   fall-depth measurement above.
+- 2026-10-10 — renumbered from BL-056 to BL-087: BL-056 collided with the options item of that
+  number (weekday, days-to-expiry and VIX breakdown) on `main`, and the owner kept the options
+  numbers. The 2026-10-09 clash with `research/bl-056-favourites-score-delay` no longer involves
+  this item.
 - **Left for the owner:** (1) run `uv run mbt saved split-fridays` on the live catalog once this is
   merged (10 favourites become 10 groups, 38 sleeves; the dry run lists them) and watch the next
   Friday's job, which now evaluates 38 favourites instead of 10; (2) mark this Done once that is

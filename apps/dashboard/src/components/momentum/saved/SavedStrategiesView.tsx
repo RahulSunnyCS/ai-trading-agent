@@ -303,7 +303,7 @@ export function SavedStrategiesView({
       toast(response.error, 'error');
       return false;
     }
-    // An All Fridays run is followed as a group of one sleeve per Friday (BL-056).
+    // An All Fridays run is followed as a group of one sleeve per Friday (BL-087).
     if (response.data?.id !== id && response.data?.group) {
       toast(
         `"${response.data.name}" follows all ${formatInt(response.data.group.length)} Fridays as one group`,

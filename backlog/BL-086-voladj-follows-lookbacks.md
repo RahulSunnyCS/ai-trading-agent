@@ -1,4 +1,4 @@
-# BL-055 — Volatility-adjusted score that follows the selected lookbacks and weights
+# BL-086 — Volatility-adjusted score that follows the selected lookbacks and weights
 
 | | |
 |---|---|
@@ -7,7 +7,7 @@
 | **Type** | research (+ an opt-in engine flag) |
 | **Area** | momentum |
 | **Created** | 2026-10-09 |
-| **Depends on** | BL-054 (runner, strategies, windows) |
+| **Depends on** | BL-085 (runner, strategies, windows) |
 | **TODO.md row** | 3.13.9 |
 
 ## Context
@@ -35,7 +35,7 @@ A new search; changing the default; the frozen ensemble's definition.
 ## Plan
 
 ### Phase 0 — Pre-register (committed before any run)
-`packages/momentum-backtesting/search_spaces/bl055_criteria.json`. In words: per selected
+`packages/momentum-backtesting/search_spaces/bl086_criteria.json`. In words: per selected
 lookback, return / 26-week volatility, z-scored, weighted by the selected weights; the 4-week
 skip only for lookbacks of 26 weeks or more (NSE's convention is for its 6- and 12-month
 returns). Ten strategies (the 11 less the rank-sum one, which is unaffected), after tax at Rs 5
@@ -47,11 +47,11 @@ more than 2 pts deeper; confirmed on FY2023-26: median change >= 0, not lower in
 `compute_universe_base` / `bias.Runner`; tests; goldens unchanged.
 
 ### Phase 2 — Run and verdict
-`scripts/bl054_levers.py l7`; result in this file and `search_spaces/bl055_result.json`.
+`scripts/bl085_levers.py l7`; result in this file and `search_spaces/bl086_result.json`.
 
 ## Result (2026-10-09): killed
 
-After tax at Rs 5 lakh, median of the 10 strategies (`search_spaces/bl055_result.json`):
+After tax at Rs 5 lakh, median of the 10 strategies (`search_spaces/bl086_result.json`):
 
 | Window | CAGR change | Strategies not worse | Worst fall change |
 |---|---|---|---|
@@ -92,7 +92,7 @@ the change would help.
 - 2026-10-09 — created and started (owner: "do both"); Phase 0 committed before any run.
 - 2026-10-09 — run (13 runs, 2 cells); killed. Diagnosed as short-term reversal, not a bug.
 - 2026-10-09 — owner: also test skipping the latest month on every lookback, and not skipping at
-  all. Addendum 1 (`search_spaces/bl055_criteria_addendum_1.json`) committed before any run; same
+  all. Addendum 1 (`search_spaces/bl086_criteria_addendum_1.json`) committed before any run; same
   strategies and rules, 3 variants in all.
 - 2026-10-09 — **bug found while building addendum 1, before any addendum run:** the default
   voladj score's "skip the latest month" does not skip. `_compute_ranks_voladj` computes
@@ -109,3 +109,8 @@ the change would help.
     `skip_all` and `skip_none`, all against today's default;
   - tests pin the default's actual behaviour and the corrected NSE formula.
 - 2026-10-09 — addendum 1 run (13 runs, 4 cells); all three variants killed.
+- 2026-10-10 — renumbered from BL-055 to BL-086: BL-055 collided with the options item of that
+  number (daily portfolio stop-loss) on `main`, and the owner kept the options numbers. The
+  criteria, addendum and result JSON became `bl086_*` with their contents unchanged, so they still
+  say BL-055 (and BL-053 / BL-054, now BL-084 / BL-085, for the strategies and settings). The runs
+  stay in `data/search/round7_A/bl054/l7/` and `l8/`.

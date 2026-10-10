@@ -1,4 +1,4 @@
-"""BL-055: the volatility-adjusted score that follows the selected lookbacks and weights."""
+"""BL-086: the volatility-adjusted score that follows the selected lookbacks and weights."""
 
 import numpy as np
 import pandas as pd
@@ -28,7 +28,7 @@ def test_off_by_default_and_ignores_lookbacks_as_before() -> None:
 
 def test_the_default_score_widens_the_window_instead_of_skipping() -> None:
     """Pins today's default as it is: 30- and 56-week returns to the latest close (the
-    'skip-month' widens the window), not 26/52 measured 4 weeks back. See BL-055's log."""
+    'skip-month' widens the window), not 26/52 measured 4 weeks back. See BL-086's log."""
     p = prices()
     _, classic = compute_ranks(p, Config(score="voladj", universe=tuple(p)))
     vol = p.pct_change().rolling(26).std()

@@ -1,4 +1,4 @@
-"""BL-053: the weekly stop-loss in the buffer rule (`Config.stop_from_buy` / `stop_from_peak`).
+"""BL-084: the weekly stop-loss in the buffer rule (`Config.stop_from_buy` / `stop_from_peak`).
 
 A fixed rank table keeps A the top name throughout, so A is only ever sold by the stop; prices
 are built so the week each stop must fire on is known in advance."""

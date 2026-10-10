@@ -201,7 +201,7 @@ export function MomentumRebalanceView({
       dataset === 'broad' ? apiGet<Scores>('/api/momentum/scores') : Promise.resolve(null),
     ]).then(([saved, metadata, scores]) => {
       if (!alive) return;
-      // A favourite group (BL-051, BL-056) is previewed as one account: its sleeves' targets
+      // A favourite group (BL-051, BL-087) is previewed as one account: its sleeves' targets
       // weighted by their value (the server does the mixing).
       // A sleeve follows its group, so only the group is offered.
       setRuns(saved.ok ? saved.data.filter((run) => !run.member_of) : []);

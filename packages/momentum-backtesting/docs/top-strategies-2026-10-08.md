@@ -26,9 +26,9 @@ that described them were renamed after what actually differs:
 | Sleeve C: Six Pairs Monthly, Short Lookbacks | Sleeve C: Six Pairs Monthly, Half Tilt |
 
 The saved runs carry the new names. Pre-registered files written before the change
-(`search_spaces/bl053_criteria.json`) keep the old labels; the config ids are what count.
+(`search_spaces/bl084_criteria.json`) keep the old labels; the config ids are what count.
 In the parameter tables below, the lookbacks and weights of a voladj config are shown as
-searched but have no effect on its ranking. Whether voladj should follow them is BL-055.
+searched but have no effect on its ranking. Whether voladj should follow them is BL-086.
 
 ## Naming scheme
 

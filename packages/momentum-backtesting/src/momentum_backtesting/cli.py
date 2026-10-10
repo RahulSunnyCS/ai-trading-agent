@@ -1814,7 +1814,7 @@ def saved_split_fridays(
         help="Make the groups. Without it, only list the favourites that would move.",
     ),
 ) -> None:
-    """BL-056: follow every favourite that rebalances every 2+ weeks on all its Fridays, as one
+    """BL-087: follow every favourite that rebalances every 2+ weeks on all its Fridays, as one
     group of sleeves (one per Friday, capital / K each) in place of the single-Friday favourite,
     which stays a saved run. Same status and headline. A dry run by default; deletes nothing."""
     from fastapi import HTTPException

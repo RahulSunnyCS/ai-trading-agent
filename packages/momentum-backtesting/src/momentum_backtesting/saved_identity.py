@@ -123,7 +123,7 @@ def normalise(dataset: str, config: dict[str, Any]) -> dict[str, Any] | None:
         return None
     settings = request.model_dump(mode="json", exclude=set(ignored | RUN_ONLY_FIELDS))
     settings["end"] = settings.get("end") or None
-    # BL-056: "All Fridays" is part of a strategy only where it does something, and a config saved
+    # BL-087: "All Fridays" is part of a strategy only where it does something, and a config saved
     # before it existed keeps its fingerprint. With it on, the calendar phase is not a setting.
     if (
         settings.get("split_fridays")

@@ -1,4 +1,4 @@
-"""BL-054 L5: inverse-volatility sizing of a buy week's money (`Config.weight_by`)."""
+"""BL-085 L5: inverse-volatility sizing of a buy week's money (`Config.weight_by`)."""
 
 import numpy as np
 import pandas as pd

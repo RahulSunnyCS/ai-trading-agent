@@ -2069,7 +2069,7 @@ def test_the_extended_tags_companion_reruns_on_the_same_ranking_with_extended_ta
 
 
 def test_an_all_fridays_companion_is_the_whole_accounts(broad_client, monkeypatch):
-    """BL-056 x BL-036: a split run's figures are the blend's, each sleeve re-run with the
+    """BL-087 x BL-036: a split run's figures are the blend's, each sleeve re-run with the
     extended tags and blended the same way, not the first sleeve's alone."""
     _write_wide_tags()
     req, ranking, outer, _outcome = _companion_fixture()
@@ -2266,7 +2266,7 @@ def test_the_stock_circuits_endpoint_reads_the_52_weeks_to_the_pages_last_week(c
     assert client.get("/api/momentum-scores/stock/S0/circuits").status_code == 503
 
 
-# --- BL-056: "All Fridays" ----------------------------------------------------------------------
+# --- BL-087: "All Fridays" ----------------------------------------------------------------------
 
 
 def _blend_of(phases: list[dict], dates: list[str]) -> np.ndarray:

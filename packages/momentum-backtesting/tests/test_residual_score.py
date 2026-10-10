@@ -1,4 +1,4 @@
-"""BL-054 L6: residual momentum (categories/residual.py).
+"""BL-085 L6: residual momentum (categories/residual.py).
 
 The regression has an intercept (as in Blitz, Huij and Martens 2011), so a constant
 outperformance is absorbed by it: the score measures how much better a stock did over the

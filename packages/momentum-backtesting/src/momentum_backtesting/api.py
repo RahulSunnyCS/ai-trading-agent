@@ -656,7 +656,7 @@ class BacktestRequest(BaseModel):
     # of waiting for the next cadence week; new buys and cap trims still wait (engine.Config's
     # own field of the same name). Harmless no-op when rebalance_every == 1.
     sell_every_week: bool = False
-    # rebalance="weekly" with rebalance_every > 1 only (BL-056, "All Fridays"): run every calendar
+    # rebalance="weekly" with rebalance_every > 1 only (BL-087, "All Fridays"): run every calendar
     # phase (offsets 0..K-1, capital / K each) and report them as one account, equal capital
     # restored each April (tranches.blend_reset); adds the `friday_spread` section.
     # `rebalance_offset` is then unused. Off by default; a no-op for a weekly cadence.
@@ -796,7 +796,7 @@ class SavedRunUpdate(BaseModel):
 
 
 class FollowAllFridaysBody(BaseModel):
-    """BL-056: follow a strategy run "All Fridays" as one group of sleeves."""
+    """BL-087: follow a strategy run "All Fridays" as one group of sleeves."""
 
     status: Literal["watching", "paper", "invested"] = "watching"
     active: bool = False
@@ -855,7 +855,7 @@ class RebalanceRequest(BacktestRequest):
     # When supplied it anchors the every-K-weeks cadence phase used by this preview.
     strategy_start_date: date | None = None
     auth_source: Literal["auto", "dashboard"] = "auto"
-    # BL-056: preview a favourite group (one sleeve per Friday, or the ensemble) as one account.
+    # BL-087: preview a favourite group (one sleeve per Friday, or the ensemble) as one account.
     # `dataset` is still needed; the group's sleeves bring their own settings, so the rest of the
     # strategy's fields are ignored (a placeholder `universe` is filled in).
     group: str | None = None
@@ -2342,7 +2342,7 @@ def _merge_held_categories(details: list[list[dict]], offsets: list[int] | None)
 
 
 def sleeve_summary(dataset: str, config: dict) -> dict:
-    """One sleeve of an all-Fridays favourite (BL-056), run for its saved-run record: what the
+    """One sleeve of an all-Fridays favourite (BL-087), run for its saved-run record: what the
     dashboard's save would send (`kpis`, `dates`, `strategy`) plus the run's data and code
     versions. Raises `HTTPException` as the backtest does for a config it refuses."""
     body = {**config, "dataset": dataset}
@@ -2852,7 +2852,7 @@ def _rebalance_response(
 
 
 def _rebalance_group_preview(req: RebalanceRequest, now: datetime) -> dict:
-    """The Rebalance preview of a favourite group as one account (BL-056): every sleeve's model
+    """The Rebalance preview of a favourite group as one account (BL-087): every sleeve's model
     target, mixed by the sleeve's value since the last April reset, against the supplied holdings.
     Sleeves keep their own calendar (`rebalance_offset`), so no strategy start date is used: the
     phase a person would have trading it from a start date is what All Fridays removes."""

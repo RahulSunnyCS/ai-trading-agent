@@ -159,11 +159,11 @@ class Config:
     # risk-adjusted 6m/12m z-score composite), or blend (average of the two ranks, re-ranked).
     score: Score = "ranksum"
     voladj_skip_recent_month: bool = True  # voladj/blend only
-    # voladj/blend only (BL-055). False (default): NSE's method, 26- and 52-week returns over
+    # voladj/blend only (BL-086). False (default): NSE's method, 26- and 52-week returns over
     # 26-week volatility, ignoring `lookbacks`/`weights`. True: one component per selected
     # lookback, weighted by `weights` (see _compute_ranks_voladj).
     voladj_lookbacks: bool = False
-    # voladj_lookbacks only (BL-055 addendum 1): which lookbacks skip the latest 4 weeks when
+    # voladj_lookbacks only (BL-086 addendum 1): which lookbacks skip the latest 4 weeks when
     # `voladj_skip_recent_month` is on: "long" (26 weeks or more, the first variant), "all", "none".
     voladj_skip: Literal["long", "all", "none"] = "long"
     # Trade only on the last week-in-`weeks` of each calendar month (rebalance="monthly"); the
@@ -194,7 +194,7 @@ class Config:
     # categories held) needs 1: with the default, those weeks are silently skipped - nothing is
     # sold or bought and the curve jumps several weeks at once (TODO 3.9.23).
     min_ranked: int = 0
-    # Buffer rule only (BL-053). A stop-loss checked EVERY week, whatever `rebalance_every` is:
+    # Buffer rule only (BL-084). A stop-loss checked EVERY week, whatever `rebalance_every` is:
     # a holding is sold once its weekly close is `stop_from_buy` or more below its average buy
     # price (0.20 = a 20% fall), or `stop_from_peak` or more below its highest weekly close since
     # it was first bought. None (default) = off; both None leaves the engine exactly as before.
@@ -209,11 +209,11 @@ class Config:
     # join that week's normal reinvestment.
     stop_proceeds: Literal["cash", "top"] = "cash"
     stop_delay: int = 0
-    # "daily" (BL-054 L4): the stop is checked on every trading day's close, and a triggered
+    # "daily" (BL-085 L4): the stop is checked on every trading day's close, and a triggered
     # stop sells at the NEXT session's open (a lower-circuit lock delays it). Needs `daily` moves
-    # passed to run_backtest and stop_delay 0. "weekly" is the BL-053 behaviour.
+    # passed to run_backtest and stop_delay 0. "weekly" is the BL-084 behaviour.
     stop_granularity: Literal["weekly", "daily"] = "weekly"
-    # Buffer rule only (BL-054 L5). How a buy week's money is split across the names that get
+    # Buffer rule only (BL-085 L5). How a buy week's money is split across the names that get
     # it: "equal" (default) or "inverse_vol", in proportion to 1 / the standard deviation of each
     # name's last `vol_window` weekly returns up to the signal week (a name without that history
     # gets the median weight). The position and group caps apply as before.
@@ -490,7 +490,7 @@ def _cross_zscore(component: pd.DataFrame) -> pd.DataFrame:
 def _compute_ranks_voladj_lookbacks(
     prices: pd.DataFrame, config: Config
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """BL-055 (`voladj_lookbacks=True`): one volatility-adjusted component per selected lookback
+    """BL-086 (`voladj_lookbacks=True`): one volatility-adjusted component per selected lookback
     L, the L-week return (measured 4 weeks back when L >= 26 and the skip-month flag is on, the
     NSE convention for its 6- and 12-month returns; else to the latest close) over the trailing
     26-week volatility, z-scored across names, summed with the lookback weights (equal when
@@ -504,7 +504,7 @@ def _compute_ranks_voladj_lookbacks(
         skip = 4 if config.voladj_skip_recent_month and skips else 0
         # A true skip: the return from (skip + lookback) weeks ago to `skip` weeks ago. (The
         # default voladj score above computes prices / prices.shift(skip + 26), a 30-week return
-        # that still includes the latest month; see BL-055's log.)
+        # that still includes the latest month; see BL-086's log.)
         rets.append(prices.shift(skip) / prices.shift(skip + lookback) - 1)
     eligible = functools.reduce(operator.and_, (r.notna() for r in (*rets, vol)))
     weights = config.weights or (1.0,) * len(rets)
@@ -618,7 +618,7 @@ class _Sim:
     # (default) leave the engine exactly as before.
     uc_locked: pd.DataFrame | None = None
     lc_locked: pd.DataFrame | None = None
-    # Daily stop only (BL-054): per-day moves, open gaps and lock flags. See DailyMoves.
+    # Daily stop only (BL-085): per-day moves, open gaps and lock flags. See DailyMoves.
     daily: "DailyMoves | None" = None
     # inverse_vol only: week x name, 1 / trailing weekly-return std at the signal week.
     inv_vol: pd.DataFrame | None = None
@@ -764,7 +764,7 @@ class _Sim:
 
     def split_weights(self, week: pd.Timestamp, names: list[str]) -> dict[str, float]:
         """Shares (summing to 1) of a buy week's money across `names`: equal, or inverse
-        volatility (BL-054 L5), where a name with no usable volatility gets the median weight."""
+        volatility (BL-085 L5), where a name with no usable volatility gets the median weight."""
         if self.inv_vol is None or not names:
             return {n: 1 / len(names) for n in names} if names else {}
         raw = {}
@@ -778,7 +778,7 @@ class _Sim:
         return {n: w / total for n, w in weights.items()}
 
     def best_unheld(self, week: pd.Timestamp, exclude: set[str] | frozenset[str]) -> str | None:
-        """BL-053 `stop_proceeds="top"`: the best-ranked name not in `exclude` that may be bought
+        """BL-084 `stop_proceeds="top"`: the best-ranked name not in `exclude` that may be bought
         this week (the same gates as `top_names`), down to `exit_rank` - a name ranked worse
         would be sold at the next rebalance. None when there is none."""
         ranks = self.ranks.loc[week].dropna().sort_values()
@@ -1408,7 +1408,7 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
     pending: dict[str, str] = {}  # ... stops triggered, awaiting a morning they can sell in
 
     def daily_walk(week, nxt) -> float:
-        """BL-054 L4. Walk the trading days in (week, nxt] over what is held after this week's
+        """BL-085 L4. Walk the trading days in (week, nxt] over what is held after this week's
         trades. Each day's close can trigger a stop, which sells at the next session's open (not
         on a locked day). The running price follows the exchange's daily moves and is re-anchored
         to the weekly price at nxt, so the weekly series stays authoritative. Returns the cash
@@ -1472,7 +1472,7 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         stopped: set[str] = set()
         stop_net = 0.0
         if config.has_stop and daily is None:
-            # 0. Stop-loss, every week (BL-053), before the rank exits.
+            # 0. Stop-loss, every week (BL-084), before the rank exits.
             for asset in [a for a in lots if a != _POOL]:
                 reason = stop_reason(asset, i)
                 if reason is None:
