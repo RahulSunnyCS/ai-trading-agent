@@ -9,7 +9,7 @@ import pandas as pd
 
 HERE = Path("research/bl091")
 sys.path.insert(0, str(HERE))
-from series import level, load_chain_day, rolling_straddle, splice
+from series import level, load_chain_day, rolling_straddle, splice  # noqa: E402
 
 e = pd.read_csv(HERE / "out/episodes.csv")
 d = pd.read_csv(HERE / "out/days.csv")
@@ -125,7 +125,7 @@ for k, x in a.groupby(G):
     pe = per_ep[(per_ep.period == k[0]) & (per_ep.underlying == k[1])]
     c = pe[pe.clean]
     r[lab[k]] = {
-        "held_rate": [round(h / nn, 3) for nn, h in zip(by.n, by.held)],
+        "held_rate": [round(h / nn, 3) for nn, h in zip(by.n, by.held, strict=True)],
         "attempts_n": [int(v) for v in by.n],
         "attempt_dist": [
             int(v) for v in pe.attempts.value_counts().reindex(range(1, 6), fill_value=0)
@@ -207,7 +207,8 @@ out["example_day"] = {
     "attempts": ea[["attempt", "entry_min", "exit_min", "outcome", "net0"]].to_dict("records"),
     "net": round(float(ex.net0), 0),
 }
-json.dump(out, open(str(HERE / "out" / "report_data.json"), "w"), default=float)
+with open(HERE / "out" / "report_data.json", "w") as fh:
+    json.dump(out, fh, default=float)
 print(
     json.dumps(
         {k: v for k, v in out.items() if k not in ("drift_example", "example_day", "monthly")},
