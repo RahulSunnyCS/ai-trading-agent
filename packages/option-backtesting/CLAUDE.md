@@ -163,6 +163,8 @@ Otherwise:
   day after a peak to the day back at it (or the last day, `open`) and is listed when at least `min_depth` per lot
   deep; each carries the fixed base's per-lot sum over the same peak-to-trough days (`base.base_per_lot`, missing
   days counted, never zero), the stops, and drivers by family x start band that add up to the depth.
+  `rotation/history.py` keeps the built daily log for 30 s per span (`P1`, `P2`, `recent` = P1's start to the
+  latest day) so a change of list or depth does not rebuild it; cards that read a list's history share it.
 - `rotation/basket.py` + `api/rotation_basket_routes.py` — the Correlation tab's "A day's basket" preset (BL-058
   Phase 4 widget 6; `GET /legwise/rotation/basket?list=A|B|C|REF|BASE&day=&window=P1|P2|last63|forward|custom`),
   read-only. A list's picks for a day are the journal entry's when there is one, else `daylog.reconstruction`'s

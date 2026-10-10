@@ -22,7 +22,7 @@ from fastapi.testclient import TestClient
 from option_backtesting.api import rotation_drawdowns_routes
 from option_backtesting.api.app import create_app
 from option_backtesting.rotation import base as base_mod
-from option_backtesting.rotation import daylog, drawdowns, readout, store
+from option_backtesting.rotation import daylog, drawdowns, history, readout, store
 
 from . import rotation_synth as syn
 
@@ -98,7 +98,7 @@ def world(built, tmp_path, monkeypatch):
     monkeypatch.setattr(daylog, "now_ist", lambda: syn.NOW)  # "now" is the last forward day
     daylog._recon_cache.clear()
     rotation_drawdowns_routes._cache.clear()
-    drawdowns._log_cache.clear()
+    history.clear()
     return root, sc
 
 
@@ -230,7 +230,7 @@ def test_bad_arguments_are_refused(world):
 def test_an_empty_store_gives_empty_series_not_an_error(tmp_path, monkeypatch):
     monkeypatch.setattr(daylog, "variant_names", lambda: syn.NAMES)
     daylog._recon_cache.clear()
-    drawdowns._log_cache.clear()
+    history.clear()
     out = drawdowns.build("A", "P1", 500.0, tmp_path)
     assert out["n_days"] == 0 and out["series"] == [] and out["episodes"] == []
     assert out["max_dd"] == 0.0 and out["current"] is None
@@ -286,7 +286,7 @@ def _row(day: str, per_lot: float, lots: int, source: str = "reconstructed", **e
 
 @pytest.fixture
 def crafted(monkeypatch, tmp_path):
-    drawdowns._log_cache.clear()
+    history.clear()
     rows = [
         _row("2025-11-20", 50, 6, source="recorded", status="late"),  # before P1: not counted
         _row("2026-03-02", 100, 6),
@@ -324,7 +324,7 @@ def test_changing_the_depth_does_not_rebuild_the_daily_log(crafted, monkeypatch)
     monkeypatch.setattr(
         drawdowns.daylog, "build_log", lambda *a, **k: calls.append(1) or inner(*a, **k)
     )
-    drawdowns._log_cache.clear()
+    history.clear()
     drawdowns.build("A", "P1", 0.0, crafted)
     drawdowns.build("A", "P1", 1000.0, crafted)
     drawdowns.build("A", "P1", 500.0, crafted)

@@ -26,8 +26,6 @@ Nothing here writes a file.
 
 from __future__ import annotations
 
-import threading
-import time
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -36,7 +34,7 @@ import numpy as np
 
 from ..fyers.daily import data_dir
 from . import base as base_mod
-from . import daylog
+from . import daylog, history
 from .lists import LISTS
 from .matrix import NAMED
 from .readout import max_drawdown
@@ -57,28 +55,6 @@ BAND_LABEL = {
     "C": "12:17–14:02",
     "D": "14:17–15:17",
 }
-
-
-#: the daily log is the expensive step and holds all four lists, so a change of list or depth
-#: should not rebuild it: kept per (root, window) for a short time
-LOG_SECONDS = 30.0
-_log_lock = threading.Lock()
-_log_cache: dict[tuple, tuple[float, dict]] = {}
-
-
-def _log(root: Path, window: str) -> dict:
-    key = (str(root), window)
-    now = time.monotonic()
-    with _log_lock:
-        hit = _log_cache.get(key)
-    if hit is not None and now - hit[0] < LOG_SECONDS:
-        return hit[1]
-    start = NAMED["P1"][0] if window in ("last63", "forward") else NAMED[window][0]
-    end = NAMED[window][1] if window in NAMED else None
-    value = daylog.build_log(root, start=start, end=end, source="all")
-    with _log_lock:
-        _log_cache[key] = (now, value)
-    return value
 
 
 class DrawdownError(Exception):
@@ -241,7 +217,7 @@ def build(
         raise DrawdownError(422, f"min_depth must be between 0 and {int(MAX_MIN_DEPTH)}")
     root = root or data_dir()
     try:
-        log = _log(root, window)
+        log = history.daily_log(root, "recent" if window in ("last63", "forward") else window)
     except ValueError as error:  # the journal cannot be read
         raise DrawdownError(500, str(error)) from error
     window_days, window_info = _window(window, _days_of(log["rows"], key))
