@@ -165,6 +165,14 @@ Otherwise:
   days counted, never zero), the stops, and drivers by family x start band that add up to the depth.
   `rotation/history.py` keeps the built daily log for 30 s per span (`P1`, `P2`, `recent` = P1's start to the
   latest day) so a change of list or depth does not rebuild it; cards that read a list's history share it.
+- `rotation/drift.py` + `api/rotation_drift_routes.py` — "Selection drift" (BL-058 Phase 4 widget 9;
+  `GET /legwise/rotation/drift?list=A|B|C|REF`), read-only over `history.daily_log(root, "recent")`. The list's core
+  picks (3 a day; a late entry or a day with no entry is not a session) counted by family (Widesl / Dir), index,
+  strike method (OTM1 / closest premium / Dir ATM / Dir ITM1) and start band, over P1 (re-scored), the last 63 and
+  the last 21 sessions; a last-21 share is flagged `above` / `below` only outside the 10th-90th percentile of the
+  list's own rolling 21-session shares over P1 (no band under 10 windows, nothing flagged under 21 sessions); the
+  concentration rows (distinct variants, most-picked, one-start-band days, Widesl-minimum days, Buy days) use the same
+  yardstick. Picks, not P&L; descriptive only.
 - `rotation/basket.py` + `api/rotation_basket_routes.py` — the Correlation tab's "A day's basket" preset (BL-058
   Phase 4 widget 6; `GET /legwise/rotation/basket?list=A|B|C|REF|BASE&day=&window=P1|P2|last63|forward|custom`),
   read-only. A list's picks for a day are the journal entry's when there is one, else `daylog.reconstruction`'s
