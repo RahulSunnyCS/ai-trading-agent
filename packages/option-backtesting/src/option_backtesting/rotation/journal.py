@@ -7,6 +7,7 @@ per day; a second entry for a recorded day is refused, never superseded.
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
@@ -36,18 +37,26 @@ def head(path: Path) -> str:
     return entries[-1]["hash"] if entries else GENESIS
 
 
+class AlreadyRecorded(ValueError):
+    """The day already has its entry (a retry after a success, or a second process)."""
+
+
 def append(path: Path, fields: dict) -> dict:
-    """Add an entry for fields['day']. Raises ValueError if that day is already recorded."""
-    entries = read(path)
-    if any(e["day"] == fields["day"] for e in entries):
-        raise ValueError(f"{fields['day']} is already in the journal")
-    entry = {**fields, "prev": entries[-1]["hash"] if entries else GENESIS}
-    entry["hash"] = entry_hash(entry)
+    """Add an entry for fields['day']. Raises AlreadyRecorded if that day is already recorded.
+    The read, the duplicate check and the write happen under an exclusive file lock, so two
+    processes cannot both append (or fork the chain)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a") as f:
-        f.write(json.dumps(entry, sort_keys=True) + "\n")
-        f.flush()
-        os.fsync(f.fileno())
+    with open(path.with_suffix(".lock"), "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        entries = read(path)
+        if any(e["day"] == fields["day"] for e in entries):
+            raise AlreadyRecorded(f"{fields['day']} is already in the journal")
+        entry = {**fields, "prev": entries[-1]["hash"] if entries else GENESIS}
+        entry["hash"] = entry_hash(entry)
+        with path.open("a") as f:
+            f.write(json.dumps(entry, sort_keys=True) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
     return entry
 
 

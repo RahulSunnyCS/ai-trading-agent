@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pytest
+from trading_data import lake
 
-from option_backtesting.rotation import journal, store
+from option_backtesting.rotation import journal, live, pick, store, update
 from option_backtesting.rotation.lists import LISTS
-from option_backtesting.rotation.pick import PickError, score_lists
+from option_backtesting.rotation.pick import PickError, previous_data_day, record, score_lists
 from option_backtesting.rotation.score import (
     composite,
     dte_matrix,
@@ -76,17 +78,6 @@ def _history(n=80, seed=3):
     return P, weekday, band, dn
 
 
-def test_the_target_days_own_result_never_enters_its_score():
-    P, wd, vb, dn = _history()
-    dmat = dte_matrix(dn, dn, NAMES)
-    fam = family_index(NAMES)
-    for lst in LISTS.values():
-        a = composite(P.copy(), wd, vb, dmat, NAMES, lst, fam)
-        P2 = P.copy()
-        P2[-1] = 1e9  # the day being picked, whatever it later does
-        assert np.allclose(a, composite(P2, wd, vb, dmat, NAMES, lst, fam))
-
-
 def test_a_later_day_does_not_change_an_earlier_days_picks():
     P, wd, vb, dn = _history()
     dmat = dte_matrix(dn, dn, NAMES)
@@ -139,45 +130,207 @@ def test_store_never_rewrites_a_stored_day_and_drops_weekends_and_incomplete_day
     assert all(d.weekday() < 5 for d in m.days)  # no Saturday / Sunday
 
 
-def test_pick_refuses_when_results_are_stale(tmp_path):
-    names = ["N_wide_0917", "N_dir_0947"]
-    start = date(2026, 6, 1)
-    d, n = start, 0
-    while n < 70:
+IST = ZoneInfo("Asia/Kolkata")
+ATTRS = {"vix_open": 14, "vix_band": "13-15", "dte_n": "1", "dte_s": "2"}
+
+
+def _weekdays(start: date, n: int) -> list[date]:
+    out, d = [], start
+    while len(out) < n:
         if d.weekday() < 5:
-            for name in names:
-                store.append_result(name, {"day": d.isoformat(), "net": float(n)}, tmp_path)
-            store.append_day(
-                {
-                    "day": d.isoformat(),
-                    "weekday": d.strftime("%a"),
-                    "vix_open": 14,
-                    "vix_band": "13-15",
-                    "dte_n": "1",
-                    "dte_s": "2",
-                },
-                tmp_path,
-            )
-            n += 1
+            out.append(d)
         d += timedelta(days=1)
-    stale_target = d + timedelta(days=5)  # results end days earlier than the previous trading day
-    with pytest.raises(PickError, match="previous trading day"):
-        score_lists(stale_target, 14.0, {"dte_n": "1", "dte_s": "2"}, tmp_path, names)
+    return out
 
 
-def test_vix_open_falls_back_to_angel_one_only_when_fyers_has_nothing(monkeypatch):
-    from option_backtesting.rotation import live
+def _collect(root, day):
+    """Mark `day` collected for both indices (empty files: only existence is read)."""
+    for u in ("NIFTY", "SENSEX"):
+        for asset in ("option", "index"):
+            p = lake.bars_1m_path(root, asset, u, day)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.touch()
 
-    day = date(2026, 10, 12)
-    monkeypatch.setattr(live, "vix_open_live", lambda d: 15.28)
+
+def _store(root, days, names=NAMES, seed=5):
+    rng = np.random.default_rng(seed)
+    for d in days:
+        for name in names:
+            store.append_result(
+                name, {"day": d.isoformat(), "net": float(rng.normal(0, 1500))}, root
+            )
+        store.append_day({"day": d.isoformat(), "weekday": d.strftime("%a"), **ATTRS}, root)
+        _collect(root, d)
+
+
+@pytest.fixture
+def seeded(tmp_path, monkeypatch):
+    days = _weekdays(date(2026, 6, 1), 70)
+    _store(tmp_path, days)
+    monkeypatch.setattr(pick, "variant_names", lambda: NAMES)
+    monkeypatch.setattr(pick, "code_commit", lambda: "test")
+    monkeypatch.setattr(
+        pick, "listed_dte_labels", lambda d: ({"dte_n": "1", "dte_s": "2"}, "master")
+    )
+    return tmp_path, days
+
+
+def _at(day, hh, mm):
+    return lambda: datetime(day.year, day.month, day.day, hh, mm, tzinfo=IST)
+
+
+def test_previous_data_day_skips_weekends_holidays_and_excluded_days(tmp_path, monkeypatch):
+    fri, mon_target = date(2026, 10, 9), date(2026, 10, 12)
+    for d in (date(2026, 10, 7), date(2026, 10, 8), fri):
+        _collect(tmp_path, d)
+    _collect(tmp_path, date(2026, 10, 10))  # a Saturday session
+    assert previous_data_day(tmp_path, mon_target) == fri
+    # Friday excluded by data_quality -> the Thursday before it
+    monkeypatch.setattr(pick.quality, "excluded_days", lambda root, asset, name: {fri: "bad"})
+    assert previous_data_day(tmp_path, mon_target) == date(2026, 10, 8)
+
+
+def test_pick_refuses_when_results_lag_the_last_collected_day(seeded):
+    root, days = seeded
+    collected, target = _weekdays(days[-1] + timedelta(days=1), 2)
+    _collect(root, collected)  # collected but never stored: the picks would be a day stale
+    with pytest.raises(PickError, match="last collected trading day"):
+        score_lists(target, 14.0, {"dte_n": "1", "dte_s": "2"}, root, NAMES)
+
+
+def test_picks_use_only_days_before_the_target(seeded):
+    root, days = seeded
+    target = days[-1] + timedelta(days=1)
+    while target.weekday() >= 5:
+        target += timedelta(days=1)
+    dte = {"dte_n": "1", "dte_s": "2"}
+    before = score_lists(target, 14.0, dte, root, NAMES)
+    # the target day and the day after get extreme stored results; neither may move the picks
+    for d in (target, target + timedelta(days=1)):
+        if d.weekday() >= 5:
+            continue
+        for name in NAMES:
+            store.append_result(name, {"day": d.isoformat(), "net": 1e7}, root)
+        store.append_day({"day": d.isoformat(), "weekday": d.strftime("%a"), **ATTRS}, root)
+    assert score_lists(target, 14.0, dte, root, NAMES) == before
+
+
+def test_record_writes_one_forward_entry_and_a_retry_is_refused(seeded):
+    root, days = seeded
+    target = days[-1] + timedelta(days=1)
+    while target.weekday() >= 5:
+        target += timedelta(days=1)
+    result = record(target, root, vix_open=14.2, now_fn=_at(target, 9, 16))
+    e = result.entry
+    assert e["before_first_entry"] is True
+    assert (e["vix_source"], e["dte_source"], e["commit"]) == ("given", "master", "test")
+    assert e["universe"]["variants"] == len(NAMES)
+    assert journal.verify(store.journal_path(root)) == []
+    with pytest.raises(journal.AlreadyRecorded):
+        record(target, root, vix_open=14.2, now_fn=_at(target, 9, 16))
+
+
+def test_a_late_entry_is_flagged_not_forward_and_a_past_day_is_refused(seeded):
+    root, days = seeded
+    target = days[-1] + timedelta(days=1)
+    while target.weekday() >= 5:
+        target += timedelta(days=1)
+    late = record(target, root, vix_open=14.2, now_fn=_at(target, 9, 40))
+    assert late.entry["before_first_entry"] is False
+    assert "NOT forward" in late.text
+    with pytest.raises(PickError, match="not today"):
+        record(target + timedelta(days=1), root, vix_open=14.2, now_fn=_at(target, 9, 16))
+    # a dry run may name any day
+    record(target + timedelta(days=1), root, vix_open=14.2, now_fn=_at(target, 9, 16), dry_run=True)
+
+
+def test_nothing_is_recorded_when_the_vix_open_cannot_be_read(seeded, monkeypatch):
+    root, days = seeded
+    target = days[-1] + timedelta(days=1)
+    while target.weekday() >= 5:
+        target += timedelta(days=1)
+    monkeypatch.setattr(pick, "vix_open_with_source", lambda d: (None, ""))
+    with pytest.raises(PickError, match="could not be read"):
+        record(target, root, now_fn=_at(target, 9, 16))
+    assert journal.read(store.journal_path(root)) == []
+
+
+def _fake_clock():
+    state = {"t": 0.0, "sleeps": 0}
+
+    def sleep(s):
+        state["t"] += s
+        state["sleeps"] += 1
+
+    return state, sleep, lambda: state["t"]
+
+
+def test_vix_open_polls_fyers_then_succeeds_without_calling_angel_one(monkeypatch):
+    answers = iter([None, None, 15.28])
+    monkeypatch.setattr(live, "_fyers_attempt", lambda d, client=None: next(answers))
     monkeypatch.setattr(
         live, "vix_open_angel", lambda d: pytest.fail("Angel One must not be called")
     )
-    assert live.vix_open_with_source(day) == (15.28, "fyers")
+    state, sleep, monotonic = _fake_clock()
+    got = live.vix_open_with_source(date(2026, 10, 12), sleep=sleep, monotonic=monotonic)
+    assert got == (15.28, "fyers") and state["sleeps"] == 2
 
-    monkeypatch.setattr(live, "vix_open_live", lambda d: None)
+
+def test_vix_open_goes_to_angel_one_at_once_without_a_fyers_token(monkeypatch):
+    def no_token(d, client=None):
+        raise live.FyersCredentialsError("no token")
+
+    monkeypatch.setattr(live, "_fyers_attempt", no_token)
     monkeypatch.setattr(live, "vix_open_angel", lambda d: 15.3)
-    assert live.vix_open_with_source(day) == (15.3, "angelone")
+    state, sleep, monotonic = _fake_clock()
+    got = live.vix_open_with_source(date(2026, 10, 12), sleep=sleep, monotonic=monotonic)
+    assert got == (15.3, "angelone") and state["sleeps"] == 0
 
+
+def test_vix_open_retries_through_fyers_errors_then_falls_back(monkeypatch):
+    def flaky(d, client=None):
+        raise ConnectionError("reset")
+
+    monkeypatch.setattr(live, "_fyers_attempt", flaky)
     monkeypatch.setattr(live, "vix_open_angel", lambda d: None)
-    assert live.vix_open_with_source(day) == (None, "")
+    state, sleep, monotonic = _fake_clock()
+    got = live.vix_open_with_source(
+        date(2026, 10, 12), wait_s=20, poll_s=5, sleep=sleep, monotonic=monotonic
+    )
+    assert got == (None, "") and state["sleeps"] == 4  # polled for the whole window, then gave up
+
+
+def test_cli_exits_zero_on_a_retry_and_alerts_then_exits_two_on_a_crash(monkeypatch):
+    from typer.testing import CliRunner
+
+    from option_backtesting import notify
+    from option_backtesting.rotation.cli import rotation_app
+
+    sent = []
+    monkeypatch.setattr(notify, "send", lambda n: sent.append(n))
+    runner = CliRunner()
+
+    def already(*a, **k):
+        raise journal.AlreadyRecorded("2026-10-12 is already in the journal")
+
+    monkeypatch.setattr(pick, "record", already)
+    r = runner.invoke(rotation_app, ["pick", "--day", "2026-10-12"])
+    assert r.exit_code == 0 and "already recorded" in r.output and sent == []
+
+    def boom(*a, **k):
+        raise KeyError("dte_n")
+
+    monkeypatch.setattr(pick, "record", boom)
+    r = runner.invoke(rotation_app, ["pick", "--day", "2026-10-12"])
+    assert r.exit_code == 2
+    assert len(sent) == 1 and "FAILED" in sent[0].title
+
+
+def test_update_default_day_is_the_newest_collected_day_not_yet_stored(tmp_path, monkeypatch):
+    monkeypatch.setattr(update, "variant_names", lambda: NAMES)
+    days = _weekdays(date(2026, 10, 1), 6)  # Thu 1 .. Thu 8 (Oct 2026)
+    _store(tmp_path, days[:-1])
+    _collect(tmp_path, days[-1])
+    assert update.default_day(tmp_path, today=days[-1] + timedelta(days=1)) == days[-1]
+    _store(tmp_path, [days[-1]])
+    assert update.default_day(tmp_path, today=days[-1] + timedelta(days=1)) is None

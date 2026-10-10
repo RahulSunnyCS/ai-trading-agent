@@ -8,10 +8,10 @@ so the history the ranking reads is the same here). A stored variant-day is neve
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
-from trading_data import quality
+from trading_data import lake, quality
 
 from ..data.reference.loader import MissingReferenceData, default_reference_data
 from ..fyers.daily import data_dir
@@ -24,6 +24,27 @@ from .lists import SIZING_DATE
 from .variants import strategy_path, underlying_of, variant_names
 
 UNDERLYINGS = ("NIFTY", "SENSEX")
+
+
+def default_day(root: Path | None = None, today: date | None = None) -> date | None:
+    """The newest weekday in the last two weeks (today first) with both indices collected and not
+    excluded whose variants are not all stored yet: what an unattended run should do. None when
+    everything collected is stored."""
+    root = root or data_dir()
+    d = today or date.today()
+    excluded = {u: quality.excluded_days(root, "option", u) or {} for u in UNDERLYINGS}
+    names = variant_names()
+    for _ in range(14):
+        collected = d.weekday() < 5 and all(
+            lake.bars_1m_path(root, "option", u, d).exists()
+            and lake.bars_1m_path(root, "index", u, d).exists()
+            and d not in excluded[u]
+            for u in UNDERLYINGS
+        )
+        if collected and any(d not in store.result_days(n, root) for n in names):
+            return d
+        d -= timedelta(days=1)
+    return None
 
 
 def update_day(

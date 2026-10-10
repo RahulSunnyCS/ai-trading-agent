@@ -22,9 +22,12 @@ def update(
     day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
 ) -> None:
     """Run all 248 variants over one collected day and store the results (idempotent)."""
-    from .update import update_day
+    from .update import default_day, update_day
 
-    d = _day(day)
+    d = _day(day) if day else default_day()
+    if d is None:
+        typer.echo("nothing to update: the latest collected day is already stored")
+        return
     r = update_day(d)
     if r["skipped"]:
         typer.echo(f"nothing written: {r['skipped']}", err=True)
@@ -46,30 +49,37 @@ def pick(
 ) -> None:
     """Record today's picks for every list (before 09:17), hash-chained, and Telegram them."""
     from ..notify import Notification, send
+    from .journal import AlreadyRecorded
     from .pick import PickError, record
 
     d = _day(day)
+
+    def alert(title: str, body: str) -> None:
+        if telegram and not dry_run:
+            send(Notification(source="options-rotation", severity="error", title=title, body=body))
+
     try:
         r = record(d, vix_open=vix_open, dry_run=dry_run)
+    except AlreadyRecorded as error:  # a retry after a success: the day has its entry
+        typer.echo(f"already recorded: {error}")
+        return
     except (PickError, ValueError) as error:
         typer.echo(f"not recorded: {error}", err=True)
-        if telegram and not dry_run:
-            send(
-                Notification(
-                    source="options-rotation",
-                    severity="error",
-                    title=f"Rotation pick NOT recorded for {d}",
-                    body=str(error),
-                )
-            )
+        alert(f"Rotation pick NOT recorded for {d}", str(error))
+        raise typer.Exit(2) from error
+    except Exception as error:  # noqa: BLE001 - an unexpected failure must still alert and retry
+        typer.echo(f"not recorded: {type(error).__name__}: {error}", err=True)
+        alert(f"Rotation pick FAILED for {d}", f"{type(error).__name__}: {str(error)[:300]}")
         raise typer.Exit(2) from error
     typer.echo(r.text)
-    if not r.entry["before_first_entry"] and not dry_run:
-        typer.echo("WARNING: recorded after 09:17 IST - this entry is not forward", err=True)
     if telegram and not dry_run:
+        severity = "info" if r.entry["before_first_entry"] else "warn"
         send(
             Notification(
-                source="options-rotation", severity="info", title=f"Rotation picks {d}", body=r.text
+                source="options-rotation",
+                severity=severity,
+                title=f"Rotation picks {d}",
+                body=r.text,
             )
         )
 

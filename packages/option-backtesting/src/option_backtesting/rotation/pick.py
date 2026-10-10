@@ -4,19 +4,21 @@ time."""
 
 from __future__ import annotations
 
+import hashlib
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import numpy as np
+from trading_data import lake, quality
 
-from ..data.reference.loader import default_reference_data
 from ..fyers.daily import data_dir
 from . import journal, store
 from .lists import LISTS, LOTS_PER, WARMUP
-from .live import calendar_dte_labels, vix_open_with_source
+from .live import listed_dte_labels, vix_open_with_source
 from .score import composite, dte_matrix, family_index, select, vix_band
 from .variants import variant_names
 
@@ -34,25 +36,60 @@ class PickResult:
     text: str
 
 
-def previous_trading_day(day: date) -> date:
-    ref = default_reference_data()
+def previous_data_day(root: Path, day: date) -> date:
+    """The latest weekday before `day` that both indices have collected and `data_quality` does not
+    exclude: the day whose results the pick must already have. Holiday-proof (a day the exchange
+    was shut simply has no file), unlike a calendar walk."""
+    excluded = {u: quality.excluded_days(root, "option", u) or {} for u in ("NIFTY", "SENSEX")}
     d = day - timedelta(days=1)
-    while d.weekday() >= 5 or ref.is_holiday(d):
+    for _ in range(14):
+        if d.weekday() < 5 and all(
+            lake.bars_1m_path(root, "option", u, d).exists()
+            and lake.bars_1m_path(root, "index", u, d).exists()
+            and d not in excluded[u]
+            for u in ("NIFTY", "SENSEX")
+        ):
+            return d
         d -= timedelta(days=1)
-    return d
+    raise PickError(f"no collected trading day in the 14 days before {day}")
 
 
 def code_commit() -> str:
+    """Short HEAD, with `+dirty` when the code this entry ran has uncommitted changes."""
+    repo = Path(__file__).resolve().parents[3]
     try:
-        return subprocess.run(
+        head = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
             capture_output=True,
             text=True,
-            cwd=Path(__file__).parent,
+            cwd=repo,
             check=True,
         ).stdout.strip()
+        dirty = subprocess.run(
+            [
+                "git",
+                "status",
+                "--porcelain",
+                "--untracked-files=no",
+                "--",
+                "src",
+                "strategies/rotation",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=repo,
+            check=True,
+        ).stdout.strip()
+        return head + ("+dirty" if dirty else "")
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
+
+
+def universe_fingerprint(names: list[str]) -> dict:
+    return {
+        "variants": len(names),
+        "sha": hashlib.sha256("\n".join(sorted(names)).encode()).hexdigest()[:12],
+    }
 
 
 def score_lists(
@@ -72,11 +109,11 @@ def score_lists(
     days = [d for d in m.days if d in attrs]
     if len(days) < WARMUP:
         raise PickError(f"only {len(days)} days of results (need {WARMUP})")
-    prev = previous_trading_day(day)
+    prev = previous_data_day(root, day)
     if days[-1] != prev:
         raise PickError(
-            f"results end {days[-1]} but the previous trading day is {prev}: "
-            "run `obt rotation update`"
+            f"results end {days[-1]} but the last collected trading day is {prev}: "
+            f"run `obt rotation update --day {prev}`"
         )
     keep = [i for i, d in enumerate(m.days) if d in attrs]
     cols = list(m.names)
@@ -104,33 +141,38 @@ def record(
     day: date,
     root: Path | None = None,
     vix_open: float | None = None,
-    now: datetime | None = None,
+    now_fn: Callable[[], datetime] = lambda: datetime.now(IST),
     dry_run: bool = False,
 ) -> PickResult:
     root = root or data_dir()
-    now = now or datetime.now(IST)
+    if not dry_run and day != now_fn().astimezone(IST).date():
+        raise PickError(f"{day} is not today (IST): an entry can only be recorded on its own day")
     source = "given"
     if vix_open is None:
         vix_open, source = vix_open_with_source(day)
     if vix_open is None:
         raise PickError(f"the 09:15 India VIX open for {day} could not be read; nothing recorded")
-    dte = calendar_dte_labels(day)
-    lists = score_lists(day, vix_open, dte, root)
+    dte, dte_source = listed_dte_labels(day)
+    names = variant_names()
+    lists = score_lists(day, vix_open, dte, root, names)
     fields = {
-        "v": 1,
+        "v": 2,
         "day": day.isoformat(),
         "weekday": day.strftime("%a"),
         "vix_open": round(vix_open, 4),
         "vix_source": source,
         "vix_band": vix_band(vix_open),
         "dte": {"NIFTY": dte["dte_n"], "SENSEX": dte["dte_s"]},
+        "dte_source": dte_source,
         "lists": lists,
         "commit": code_commit(),
-        "recorded_at": now.isoformat(timespec="seconds"),
-        "before_first_entry": now.astimezone(IST).time() < FIRST_ENTRY,
+        "universe": universe_fingerprint(names),
         "lots_per_strategy": LOTS_PER,
     }
     path = store.journal_path(root)
+    stamp = now_fn().astimezone(IST)  # taken right before the write, so the flag describes it
+    fields["recorded_at"] = stamp.isoformat(timespec="seconds")
+    fields["before_first_entry"] = stamp.time() < FIRST_ENTRY
     if dry_run:
         entry = {**fields, "prev": journal.head(path), "hash": "(dry run)"}
     else:
@@ -148,4 +190,6 @@ def render(entry: dict) -> str:
         picked = ", ".join(p["core"]) + (f" + Buy {', '.join(p['buy'])}" if p["buy"] else "")
         lines.append(f"{key}: {picked}")
     lines.append(f"chain {entry['hash'][:12]}  recorded {entry['recorded_at'][11:19]} IST")
+    if not entry["before_first_entry"]:
+        lines.append("LATE: recorded after 09:17 IST, this entry is NOT forward")
     return "\n".join(lines)
