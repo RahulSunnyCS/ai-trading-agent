@@ -6,12 +6,15 @@ import {
   autoName,
   cagrMove,
   changeSentence,
+  extendedKpis,
+  extendedSentence,
   matchesStrategy,
   saveToast,
   shortVersion,
   strategyCounts,
   strategyDifferences,
   strategyName,
+  universeTag,
 } from '../momentumSaved';
 
 const BROAD_DEFAULTS = {
@@ -203,5 +206,52 @@ describe('the toast after saving', () => {
 
   it('says a new strategy was saved', () => {
     expect(saveToast({ ...saved, outcome: 'new' }).tone).toBe('success');
+  });
+});
+
+describe('universeTag', () => {
+  it('names the universe of a Broad strategy, and nothing for another dataset', () => {
+    const base = { config: {}, config_full: {} };
+    expect(universeTag({ dataset: 'broad', ...base })).toBe("Today's list");
+    expect(
+      universeTag({
+        dataset: 'broad',
+        config: {},
+        config_full: { broad_universe: 'turnover_rank' },
+      }),
+    ).toBe('Point in time');
+    expect(
+      universeTag({ dataset: 'broad', config: {}, config_full: { broad_universe: 'all_liquid' } }),
+    ).toBe('Whole NSE market');
+    expect(universeTag({ dataset: 'etf', ...base })).toBeNull();
+  });
+
+  it('reads the fully spelled-out config, so an old run with no stored universe is today’s list', () => {
+    const old = {
+      dataset: 'broad',
+      config: { top_n: 5 },
+      config_full: { broad_universe: 'total_market' },
+    };
+    expect(universeTag(old)).toBe("Today's list");
+  });
+});
+
+describe('extendedKpis', () => {
+  it('reads the figure saved beside a run, and is null for one saved before it existed', () => {
+    expect(extendedKpis({ cagr: 0.45 })).toBeNull();
+    expect(
+      extendedKpis({ cagr: 0.45, extended_cagr: 0.334, extended_max_drawdown: -0.386 }),
+    ).toEqual({
+      cagr: 0.334,
+      maxDrawdown: -0.386,
+    });
+    expect(extendedKpis({ extended_cagr: 0.3 })).toEqual({ cagr: 0.3, maxDrawdown: null });
+  });
+
+  it('says it in one sentence', () => {
+    expect(extendedSentence({ cagr: 0.334, maxDrawdown: -0.386 })).toContain(
+      'With extended tags: 33.4% CAGR',
+    );
+    expect(extendedSentence({ cagr: 0.334, maxDrawdown: null })).not.toContain('max DD');
   });
 });

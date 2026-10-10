@@ -224,6 +224,19 @@ def test_same_result_ignores_float_noise_only():
     assert not saved_identity.same_result(_run(A), _run(B))
 
 
+def test_the_extended_tags_companion_never_makes_a_run_a_new_result():
+    """A run saved before BL-036 Phase 1 has no extended_* keys; its re-run has them."""
+    before = _run(A)
+    after = _run(A)
+    after["kpis"] = {**after.get("kpis", {}), "extended_cagr": 0.33, "extended_max_drawdown": -0.38}
+    assert saved_identity.same_result(before, after)
+    assert saved_identity.same_result(after, before)
+    # A headline number that moved still does.
+    moved = _run(A)
+    moved["kpis"] = {**moved.get("kpis", {}), "cagr": 0.5, "extended_cagr": 0.33}
+    assert not saved_identity.same_result(before, moved)
+
+
 def test_a_commit_that_is_not_a_plain_id_never_reaches_git(monkeypatch):
     calls = []
     monkeypatch.setattr(saved_identity, "_git", lambda *args: calls.append(args) or CHANGELOG_DIFF)

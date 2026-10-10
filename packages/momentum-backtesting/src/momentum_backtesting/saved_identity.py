@@ -90,6 +90,10 @@ IGNORED_FIELDS: dict[str, frozenset[str]] = {
 RUN_ONLY_FIELDS = frozenset({"fresh"})
 
 _TOLERANCE = 1e-9
+#: KPI keys the dashboard adds beside a saved run for display only (BL-036 Phase 1: the extended-
+#: tags companion). A run saved before they existed lacks them, so counting them would record every
+#: strategy's next re-run as a moved result, which would be false.
+_DISPLAY_ONLY_KPIS = frozenset({"extended_cagr", "extended_max_drawdown"})
 
 
 def _hash(value: Any, size: int = 12) -> str:
@@ -226,7 +230,8 @@ def same_result(a: dict[str, Any], b: dict[str, Any]) -> bool:
     if len(curve_a) != len(curve_b) or not all(map(_close, curve_a, curve_b)):
         return False
     kpis_a, kpis_b = a.get("kpis") or {}, b.get("kpis") or {}
-    return all(_close(kpis_a.get(k), kpis_b.get(k)) for k in set(kpis_a) | set(kpis_b))
+    keys = (set(kpis_a) | set(kpis_b)) - _DISPLAY_ONLY_KPIS
+    return all(_close(kpis_a.get(k), kpis_b.get(k)) for k in keys)
 
 
 def first_difference(a: dict[str, Any], b: dict[str, Any]) -> str | None:
