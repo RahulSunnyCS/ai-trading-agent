@@ -221,6 +221,40 @@ const BASE_JOBS: Job[] = [
     fixHint: 'Log in to Fyers, then: cd packages/option-backtesting && uv run obt daily',
   },
   {
+    id: 'options-rotation-nightly',
+    description:
+      "Run all 248 rotation variants over the day's collected data and store the results (BL-058)",
+    // Needs the day in the lake, so it follows options-daily (same group: never at the same time)
+    // and keeps trying until 23:00. Idempotent: a stored variant-day is never rewritten.
+    schedule: { at: '19:45', on: tradingDays, label: 'trading days 19:45' },
+    steps: [['uv', 'run', 'obt', 'rotation', 'update']],
+    cwd: OPTIONS,
+    timeoutMinutes: 20,
+    retries: 3,
+    retryDelayMinutes: 45, // 19:45, 20:30, 21:15, 22:00
+    catchUpHours: 3.25, // until 23:00
+    group: 'catalog',
+    fixHint: 'cd packages/option-backtesting && uv run obt rotation update',
+  },
+  {
+    id: 'options-rotation-pick',
+    description:
+      "Record the day's rotation picks (lists A, B, C, REF) before 09:17 and Telegram them (BL-058)",
+    // Needs the 09:15 VIX bar, which Fyers serves from 09:16, and yesterday's results (the nightly
+    // job above). A late entry is flagged (before_first_entry: false), never silently accepted,
+    // and a missed slot is not caught up: it would not be forward.
+    schedule: { at: '09:16', on: tradingDays, label: 'trading days 09:16' },
+    steps: [['uv', 'run', 'obt', 'rotation', 'pick']],
+    cwd: OPTIONS,
+    timeoutMinutes: 3,
+    retries: 2,
+    retryDelayMinutes: 1,
+    catchUpHours: 0,
+    alertsItself: true,
+    fixHint:
+      'cd packages/option-backtesting && uv run obt rotation pick  (a late entry is flagged, not forward)',
+  },
+  {
     id: 'options-derived',
     description:
       'Catch up the derived 5-minute snapshots and IV tables for any day options-daily left unbuilt',
