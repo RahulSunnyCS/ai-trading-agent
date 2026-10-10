@@ -5,8 +5,9 @@
 Leads: T1 -> Dir and T4 -> Dir. On an event day the earliest lead trigger (either index) fires a Dir on its
 own index at the trigger entry minute and replaces the next not-yet-started core pick of the list (start >=
 entry + 15 min), lots conserved (2 lots), skipped if the Widesl minimum would break or no pick is pending.
-Controls: (a) random time = the same Dir on the same day and index at a random minute 10:31..13:45 (200 draws);
-(b) random day = the event day's replaced pick, with the Dir P&L of a random non-event day at the same minute (200 draws).
+Controls: (a) random time = the same Dir on the same day and index at a random minute 10:31..14:00 (200 draws);
+(b) random day = the same entry minute on a random non-event day of the set, replacing THAT day's own next
+pending pick (200 draws).
 Needs out/ck/prep_<set>_<list>.npz from `research/bl081/ck_prepare.py <set> <list>` for the four lists. Explore set decides,
 confirmation (NIFTY 2022-24) is information. Writes out/override_<set>.csv.
 """
@@ -109,7 +110,7 @@ def main() -> None:
                 if d not in by_day:
                     continue
                 und, entry, stamp = by_day[d]
-                rt = [f"{(555 + int(m)) // 60:02d}:{(555 + int(m)) % 60:02d}" for m in rng.integers(76, 291, N_DRAWS)]
+                rt = [f"{(555 + int(m)) // 60:02d}:{(555 + int(m)) % 60:02d}" for m in rng.integers(76, 286, N_DRAWS)]
                 rd = list(rng.choice(nonev, N_DRAWS)) if nonev else []
                 rows.append((k, d, und, entry, rt, rd))
                 plan_tasks.setdefault((und, d), set()).add(("dir", entry))
@@ -130,6 +131,7 @@ def main() -> None:
     out = []
     for (st, lst), (env, rows) in prepared.items():
         n_ok, ov_sum, rep_sum = 0, 0.0, 0.0
+        day_ix = {env.days[i]: k for k, i in enumerate(env.sel)}
         pnl = env.plain.copy()
         rt_tot = np.zeros(N_DRAWS)
         rd_tot = np.zeros(N_DRAWS)
@@ -147,10 +149,10 @@ def main() -> None:
                 bb = basket(env, k, und, rt[j], x) if x is not None else None
                 rt_tot[j] += (bb[0] - env.plain[k]) if bb else 0.0
                 if rd:
+                    k2 = day_ix[rd[j]]  # the random day's own picks: its own next pending pick is replaced
                     x2 = sims.get((und, rd[j], "dir", entry))
-                    # the random day's own next pending pick would be replaced; use this list's pick of day k
-                    bb2 = basket(env, k, und, entry, x2) if x2 is not None else None
-                    rd_tot[j] += (bb2[0] - env.plain[k]) if bb2 else 0.0
+                    bb2 = basket(env, k2, und, entry, x2) if x2 is not None else None
+                    rd_tot[j] += (bb2[0] - env.plain[k2]) if bb2 else 0.0
         gain = pnl.sum() - env.plain.sum()
         out.append(dict(set=st, list=lst, events=len(rows), applied=n_ok, plain=env.plain.sum(), gross=pnl.sum(),
                         gain=gain, dd=mdd(pnl), plain_dd=mdd(env.plain), override_pnl=ov_sum, replaced_pnl=rep_sum,

@@ -4,7 +4,7 @@
 
 Read-out registered in backlog/BL-083-event-triggered-intraday-entries.md: a (trigger, template) is a lead if
 the event-minus-placebo difference has |t| >= 3 in the exploration set and the same sign with |t| >= 2 in
-the confirmation set (NIFTY 2022-24). t = mean of the per-event differences / its standard error.
+the confirmation set (NIFTY 2022-24). t = mean of the per-day mean differences / its standard error (day-clustered).
 """
 
 from __future__ import annotations
@@ -40,9 +40,10 @@ def main() -> None:
 
     def agg(g):
         n = len(g)
-        sd = g["diff"].std(ddof=1)
-        return pd.Series(dict(n=n, event=g.event.mean(), placebo=g.placebo.mean(), diff=g["diff"].mean(),
-                              t=g["diff"].mean() / (sd / np.sqrt(n)) if n > 4 and sd > 0 else np.nan,
+        dm = g.groupby("day")["diff"].mean()  # one observation per day: same-day events share their market
+        sd = dm.std(ddof=1)
+        return pd.Series(dict(n=n, days=len(dm), event=g.event.mean(), placebo=g.placebo.mean(), diff=g["diff"].mean(),
+                              t=dm.mean() / (sd / np.sqrt(len(dm))) if len(dm) > 4 and sd > 0 else np.nan,
                               win_event=100 * (g.event > 0).mean(), win_placebo=100 * (g.placebo > 0).mean()))
 
     pd.set_option("display.width", 220)

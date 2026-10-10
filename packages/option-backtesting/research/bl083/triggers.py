@@ -26,6 +26,8 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent / "bl081"))
 import state as S  # noqa: E402
 
+S.START = "2020-09-01"  # 252 sessions of history before 2022-01-03 (T3's median needs them)
+
 OUT = HERE / "out"
 J0, J1 = 75, 285  # 10:30 .. 14:00
 J_1000, J_EXIT = 45, 373  # 10:00, 15:28
@@ -138,6 +140,7 @@ def build() -> pd.DataFrame:
                     fired["T4"] = (j, "from_over70" if a >= 70 else "from_under30")
                     break
             for trig, (j, extra) in fired.items():
+                assert J0 <= j <= J1 and j + 1 < S.N_BARS, (und, d, trig, j)  # entry minute exists, inside the window
                 st_entry = sres[0][j + 1] if sres is not None else np.nan
                 rows.append(dict(
                     set=st_name, underlying=und, day=d, trigger=trig, stamp=j, entry=f"{(S.OPEN_MIN + j + 1) // 60:02d}:{(S.OPEN_MIN + j + 1) % 60:02d}",

@@ -137,8 +137,10 @@ def validate() -> int:
     """A template at 11:32 must reproduce the stored 11:32 variant (BL-054 / BL-056 results)."""
     sys.path.insert(0, str(ROOT / "research" / "common"))
     bad = 0
-    for und, fam, stem in (("NIFTY", "wide", "wide_1132"), ("NIFTY", "dir", "dir_1132"), ("NIFTY", "buy", "buy_1132")):
-        stored = pd.read_csv(ROOT / "research" / "bl054" / "results" / f"{stem}.csv").set_index("day").net
+    for und, fam, folder, stem in (("NIFTY", "wide", "bl054", "wide_1132"), ("NIFTY", "dir", "bl054", "dir_1132"),
+                                   ("NIFTY", "buy", "bl054", "buy_1132"), ("SENSEX", "wide", "bl056", "wide_1132"),
+                                   ("SENSEX", "dir", "bl056", "dir_1132"), ("SENSEX", "buy", "bl056", "buy_1132")):
+        stored = pd.read_csv(ROOT / "research" / folder / "results" / f"{stem}.csv").set_index("day").net
         days = [d for d in stored.index if "2025-03-03" <= d <= "2025-03-28"][:12]
         got = {}
         for d in days:
