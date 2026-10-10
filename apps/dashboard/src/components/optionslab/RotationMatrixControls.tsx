@@ -241,6 +241,12 @@ export function RotationMatrixControls({
             aria-label="Start time"
           >
             <option value={ANY}>Any start time</option>
+            {f.slot.includes(',') ? (
+              // a band opened from the Rotation page's Family pulse: several start times at once
+              <option value={f.slot}>
+                {`${slotLabel(f.slot.split(',')[0] ?? '')} to ${slotLabel(f.slot.split(',').pop() ?? '')} (${f.slot.split(',').length} start times)`}
+              </option>
+            ) : null}
             {(meta?.slots ?? []).map((s) => (
               <option key={s} value={s}>
                 {slotLabel(s)}
