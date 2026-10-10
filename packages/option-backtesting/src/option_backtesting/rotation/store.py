@@ -10,6 +10,9 @@ on this job).
 from __future__ import annotations
 
 import csv
+import fcntl
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -38,6 +41,17 @@ def journal_path(root: Path | None = None) -> Path:
     return rotation_dir(root) / "journal.jsonl"
 
 
+@contextmanager
+def _write_lock(root: Path | None) -> Iterator[None]:
+    """One exclusive lock for every write to rotation/results and days.csv: the check for an
+    existing day and the append are one step, so two runs cannot both add the same day."""
+    directory = rotation_dir(root)
+    directory.mkdir(parents=True, exist_ok=True)
+    with open(directory / ".store.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
 def read_net(name: str, root: Path | None = None) -> dict[date, float]:
     """{day: net P&L} of one variant."""
     path = results_dir(root) / f"{name}.csv"
@@ -56,14 +70,15 @@ def append_result(name: str, row: dict, root: Path | None = None) -> bool:
     already there: a stored day is never rewritten."""
     path = results_dir(root) / f"{name}.csv"
     path.parent.mkdir(parents=True, exist_ok=True)
-    if str(row["day"]) in {d.isoformat() for d in read_net(name, root)}:
-        return False
-    new = not path.exists()
-    with path.open("a", newline="") as f:
-        w = csv.writer(f)
-        if new:
-            w.writerow(RESULT_COLUMNS)
-        w.writerow([row.get(c, "") for c in RESULT_COLUMNS])
+    with _write_lock(root):
+        if str(row["day"]) in {d.isoformat() for d in read_net(name, root)}:
+            return False
+        new = not path.exists()
+        with path.open("a", newline="") as f:
+            w = csv.writer(f)
+            if new:
+                w.writerow(RESULT_COLUMNS)
+            w.writerow([row.get(c, "") for c in RESULT_COLUMNS])
     return True
 
 
@@ -99,12 +114,13 @@ def read_days(root: Path | None = None) -> dict[date, dict[str, str]]:
 def append_day(row: dict, root: Path | None = None) -> bool:
     path = days_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    if date.fromisoformat(str(row["day"])) in read_days(root):
-        return False
-    new = not path.exists()
-    with path.open("a", newline="") as f:
-        w = csv.writer(f)
-        if new:
-            w.writerow(DAY_COLUMNS)
-        w.writerow([row.get(c, "") for c in DAY_COLUMNS])
+    with _write_lock(root):
+        if date.fromisoformat(str(row["day"])) in read_days(root):
+            return False
+        new = not path.exists()
+        with path.open("a", newline="") as f:
+            w = csv.writer(f)
+            if new:
+                w.writerow(DAY_COLUMNS)
+            w.writerow([row.get(c, "") for c in DAY_COLUMNS])
     return True

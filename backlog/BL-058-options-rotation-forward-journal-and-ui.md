@@ -215,7 +215,8 @@ Supersedes the 66-variant rule of Phase 0 for the forward test; Phase 0's discip
   | **REF** | 33 | 25 | 25 | 17 | 0 | the live baseline, lookbacks 5:40, 21:30, 63:30 |
 - **Entry (one per trading day, 09:16 IST):** the day, weekday, 09:15 India VIX open and band,
   days to expiry per index, each list's three strategies and Buy strategy (with their composite
-  scores), the code commit, the time written, the previous entry's hash and its own SHA-256. Appended
+  scores), the code commit, the universe size and hash, a digest of the stored results it was scored
+  on (`inputs_sha`), the time written, the previous entry's hash and its own SHA-256. Appended
   to an insert-only hash-chained log under `TRADING_DATA_ROOT/rotation/`; `obt rotation verify`
   re-computes the chain. The picks are Telegrammed with the chain head. If the 09:15 VIX open cannot
   be read by 09:20 nothing is recorded for that day and an alert is sent (a late entry is not forward).

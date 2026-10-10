@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from trading_data import lake
 
-from option_backtesting.rotation import journal, live, pick, store, update
+from option_backtesting.rotation import attrs, journal, live, pick, store, update
 from option_backtesting.rotation.lists import LISTS
 from option_backtesting.rotation.pick import PickError, previous_data_day, record, score_lists
 from option_backtesting.rotation.score import (
@@ -186,7 +186,7 @@ def test_previous_data_day_skips_weekends_holidays_and_excluded_days(tmp_path, m
     _collect(tmp_path, date(2026, 10, 10))  # a Saturday session
     assert previous_data_day(tmp_path, mon_target) == fri
     # Friday excluded by data_quality -> the Thursday before it
-    monkeypatch.setattr(pick.quality, "excluded_days", lambda root, asset, name: {fri: "bad"})
+    monkeypatch.setattr(attrs.quality, "excluded_days", lambda root, asset, name: {fri: "bad"})
     assert previous_data_day(tmp_path, mon_target) == date(2026, 10, 8)
 
 
@@ -334,3 +334,186 @@ def test_update_default_day_is_the_newest_collected_day_not_yet_stored(tmp_path,
     assert update.default_day(tmp_path, today=days[-1] + timedelta(days=1)) == days[-1]
     _store(tmp_path, [days[-1]])
     assert update.default_day(tmp_path, today=days[-1] + timedelta(days=1)) is None
+
+
+def test_a_torn_journal_line_is_reported_not_crashed_on_and_nothing_is_appended(tmp_path):
+    path = tmp_path / "journal.jsonl"
+    journal.append(path, {"day": "2026-10-12", "lists": {}})
+    with path.open("a") as f:
+        f.write('{"day": "2026-10-13", "lis')  # killed mid-write
+    problems = journal.verify(path)
+    assert len(problems) == 1 and "line 2" in problems[0]
+    with pytest.raises(journal.JournalCorrupt):
+        journal.append(path, {"day": "2026-10-14", "lists": {}})
+    assert path.read_text().count("\n") == 1  # untouched
+
+
+def test_an_entry_carries_a_digest_of_the_history_it_was_scored_on(seeded):
+    root, days = seeded
+    target = _weekdays(days[-1] + timedelta(days=1), 1)[0]
+    first = record(target, root, vix_open=14.2, now_fn=_at(target, 9, 16), dry_run=True).entry
+    again = record(target, root, vix_open=14.2, now_fn=_at(target, 9, 16), dry_run=True).entry
+    assert first["inputs_sha"] == again["inputs_sha"] and first["inputs_days"] == len(days)
+    # editing one stored result changes the digest
+    path = store.results_dir(root) / f"{NAMES[0]}.csv"
+    lines = path.read_text().splitlines()
+    cells = lines[5].split(",")
+    cells[1] = "123456.0"
+    lines[5] = ",".join(cells)
+    path.write_text("\n".join(lines) + "\n")
+    edited = record(target, root, vix_open=14.2, now_fn=_at(target, 9, 16), dry_run=True).entry
+    assert edited["inputs_sha"] != first["inputs_sha"]
+
+
+def test_the_slow_reads_happen_before_the_vix_poll(seeded, monkeypatch):
+    root, days = seeded
+    target = _weekdays(days[-1] + timedelta(days=1), 1)[0]
+    order = []
+    monkeypatch.setattr(
+        pick,
+        "listed_dte_labels",
+        lambda d: (order.append("dte") or {"dte_n": "1", "dte_s": "2"}, "master"),
+    )
+    monkeypatch.setattr(pick, "code_commit", lambda: order.append("commit") or "test")
+    monkeypatch.setattr(
+        pick, "vix_open_with_source", lambda d: (order.append("vix") or 14.2, "fyers")
+    )
+    record(target, root, now_fn=_at(target, 9, 16), dry_run=True)
+    assert order == ["dte", "commit", "vix"]
+
+
+def test_two_writers_cannot_both_append_the_same_variant_day(tmp_path):
+    import threading
+
+    wrote = []
+    barrier = threading.Barrier(6)
+
+    def go():
+        barrier.wait()
+        wrote.append(
+            store.append_result("N_wide_0917", {"day": "2026-10-12", "net": 1.0}, tmp_path)
+        )
+
+    threads = [threading.Thread(target=go) for _ in range(6)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert wrote.count(True) == 1
+    assert (tmp_path / "rotation" / "results" / "N_wide_0917.csv").read_text().count(
+        "2026-10-12"
+    ) == 1
+
+
+def _parquet(path, rows, columns):
+    import duckdb
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    con = duckdb.connect()
+    con.execute(f"CREATE TABLE t ({columns})")
+    for r in rows:
+        con.execute("INSERT INTO t VALUES (" + ",".join("?" * len(r)) + ")", list(r))
+    con.execute(f"COPY t TO '{path}' (FORMAT parquet)")
+    con.close()
+
+
+def test_vix_open_is_the_0915_bar_and_a_gap_gives_none_not_a_later_bar(tmp_path):
+    day = date(2026, 10, 12)
+    vix = lake.bars_1m_path(tmp_path, "index", "INDIAVIX", day)
+    t0915 = datetime(2026, 10, 12, 9, 15, tzinfo=IST)
+    cols = "ts TIMESTAMPTZ, open DOUBLE"
+    _parquet(vix, [(t0915, 15.28), (t0915 + timedelta(minutes=1), 15.31)], cols)
+    assert attrs.vix_open_from_lake(tmp_path, day) == 15.28
+    _parquet(
+        vix, [(t0915 + timedelta(minutes=1), 15.31), (t0915 + timedelta(minutes=5), 15.4)], cols
+    )
+    assert attrs.vix_open_from_lake(tmp_path, day) is None  # 09:15 missing: not the 09:16 open
+    row = attrs.day_attributes(tmp_path, day)
+    assert row["vix_band"] == "unknown" and row["dte_n"] == "unknown"
+
+
+def test_day_attributes_reads_the_nearest_listed_expiry_with_bars(tmp_path):
+    day = date(2026, 10, 12)
+    cols = "ts TIMESTAMPTZ, open DOUBLE, expiry DATE"
+    ts = datetime(2026, 10, 12, 9, 15, tzinfo=IST)
+    rows = [
+        (ts, 1.0, date(2026, 10, 9)),  # already expired: not an upcoming expiry
+        (ts, 1.0, date(2026, 10, 13)),
+        (ts, 1.0, date(2026, 10, 20)),
+    ]
+    _parquet(lake.bars_1m_path(tmp_path, "option", "NIFTY", day), rows, cols)
+    _parquet(
+        lake.bars_1m_path(tmp_path, "option", "SENSEX", day), [(ts, 1.0, date(2026, 10, 15))], cols
+    )
+    _parquet(
+        lake.bars_1m_path(tmp_path, "index", "INDIAVIX", day),
+        [(ts, 14.0)],
+        "ts TIMESTAMPTZ, open DOUBLE",
+    )
+    row = attrs.day_attributes(tmp_path, day)
+    assert (row["dte_n"], row["dte_s"], row["vix_band"], row["weekday"]) == (
+        "1",
+        "3",
+        "13-15",
+        "Mon",
+    )
+
+
+def test_listed_dte_labels_reads_the_symbol_master(monkeypatch):
+    from types import SimpleNamespace
+
+    def master(segment):
+        return segment
+
+    def parse(text, names):
+        exp = {"NSE_FO": date(2026, 10, 13), "BSE_FO": date(2026, 10, 15)}[text]
+        return [
+            SimpleNamespace(expiry=exp, option_type="CE"),
+            SimpleNamespace(expiry=date(2026, 10, 9), option_type="PE"),
+            SimpleNamespace(expiry=date(2026, 11, 26), option_type="FUT"),
+        ]
+
+    monkeypatch.setattr(live, "download_master", master)
+    monkeypatch.setattr(live, "parse_master", parse)
+    labels, source = live.listed_dte_labels(date(2026, 10, 12))
+    assert (labels, source) == ({"dte_n": "1", "dte_s": "3"}, "master")
+
+
+def test_update_day_writes_every_variant_once_and_the_day_row_last(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    day = date(2026, 10, 12)
+    _collect(tmp_path, day)
+    ts = datetime(2026, 10, 12, 9, 15, tzinfo=IST)
+    _parquet(
+        lake.bars_1m_path(tmp_path, "index", "INDIAVIX", day),
+        [(ts, 15.0)],
+        "ts TIMESTAMPTZ, open DOUBLE",
+    )
+    for u, e in (("NIFTY", date(2026, 10, 13)), ("SENSEX", date(2026, 10, 15))):
+        _parquet(
+            lake.bars_1m_path(tmp_path, "option", u, day),
+            [(ts, 1.0, e)],
+            "ts TIMESTAMPTZ, open DOUBLE, expiry DATE",
+        )
+    monkeypatch.setattr(update, "load_day", lambda root, u, d: u)
+    monkeypatch.setattr(update, "load_legwise", lambda p: p.stem)
+    monkeypatch.setattr(update, "default_reference_data", lambda: None)
+    monkeypatch.setattr(
+        update,
+        "simulate_day",
+        lambda strat, loaded, ref, sizing: SimpleNamespace(
+            gross=100.0, costs=13.0, worst_mtm=-5.0, stopped_by=None, trades=[1, 2]
+        ),
+    )
+    first = update.update_day(day, tmp_path, log=lambda s: None, names=NAMES)
+    assert (first["written"], first["already"], first["errors"]) == (len(NAMES), 0, [])
+    assert store.read_net("N_wide_0917", tmp_path) == {day: 87.0}
+    assert store.read_days(tmp_path)[day]["dte_n"] == "1"
+    again = update.update_day(day, tmp_path, log=lambda s: None, names=NAMES)
+    assert (again["written"], again["already"]) == (0, len(NAMES))
+
+
+def test_update_day_skips_a_day_either_index_lacks(tmp_path):
+    day = date(2026, 10, 12)  # nothing in the lake
+    r = update.update_day(day, tmp_path, log=lambda s: None, names=NAMES)
+    assert r["skipped"] and r["written"] == 0
+    assert store.read_days(tmp_path) == {}

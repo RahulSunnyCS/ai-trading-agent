@@ -28,7 +28,12 @@ from pathlib import Path
 import duckdb
 
 NAME = re.compile(r"^([A-Z]+)_(\d+(?:\.\d+)?)_(CE|PE)_(\d{2})_([A-Z]{3})_(\d{2})$")
-MONTHS = {m: i for i, m in enumerate("JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC".split(), 1)}
+MONTHS = {
+    m: i
+    for i, m in enumerate(
+        ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"], 1
+    )
+}
 
 
 def list_folders(src: Path, lo: date, hi: date) -> list[tuple[date, Path]]:
@@ -65,7 +70,7 @@ def convert_folder(expiry: date, folder: Path, out_dir: Path) -> dict:
     if target.exists():
         return {"expiry": str(expiry), "status": "exists"}
     files, skipped = contract_files(folder)
-    rows_in, empty = 0, 0
+    rows_in, empty, errors = 0, 0, []
     con = duckdb.connect()
     con.execute("SET TimeZone='Asia/Kolkata'")
     con.execute(
@@ -88,26 +93,30 @@ def convert_folder(expiry: date, folder: Path, out_dir: Path) -> dict:
                 """,
                 [u, f.stem, float(strike), typ, contract_expiry, str(f)],
             ).fetchone()[0]
-        except duckdb.Error:
+        except duckdb.Error as error:  # one bad row fails the whole file: say which and why
             n = 0
+            errors.append({"file": f.name, "error": str(error).splitlines()[0][:160]})
         if n == 0:
             empty += 1
         rows_in += n
     rows = con.execute("SELECT count(*) FROM bars").fetchone()[0]
-    dups = con.execute(
-        "SELECT count(*) - count(DISTINCT (contract, ts)) FROM bars"
-    ).fetchone()[0]
+    dups = con.execute("SELECT count(*) - count(DISTINCT (contract, ts)) FROM bars").fetchone()[0]
     if rows:
         con.execute("CREATE TEMP TABLE out AS SELECT * FROM bars ORDER BY contract, ts")
         tmp = target.with_suffix(".tmp")
         con.execute("COPY out TO ? (FORMAT PARQUET, COMPRESSION ZSTD)", [str(tmp)])
         tmp.rename(target)
     con.close()
+    status = "written" if rows else "empty"
+    if errors:  # never reported as a clean day: the run prints it and the log keeps the files
+        status += "_with_errors"
     return {
         "expiry": str(expiry),
-        "status": "written" if rows else "empty",
+        "status": status,
         "files": len(files),
         "files_empty": empty,
+        "files_errored": len(errors),
+        "errors": errors[:20],
         "rows": rows,
         "duplicate_rows": dups,
         "skipped": skipped,

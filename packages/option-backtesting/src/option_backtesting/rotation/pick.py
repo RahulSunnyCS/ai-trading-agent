@@ -13,10 +13,10 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import numpy as np
-from trading_data import lake, quality
 
 from ..fyers.daily import data_dir
 from . import journal, store
+from .attrs import last_collected_before
 from .lists import LISTS, LOTS_PER, WARMUP
 from .live import listed_dte_labels, vix_open_with_source
 from .score import composite, dte_matrix, family_index, select, vix_band
@@ -37,21 +37,12 @@ class PickResult:
 
 
 def previous_data_day(root: Path, day: date) -> date:
-    """The latest weekday before `day` that both indices have collected and `data_quality` does not
-    exclude: the day whose results the pick must already have. Holiday-proof (a day the exchange
-    was shut simply has no file), unlike a calendar walk."""
-    excluded = {u: quality.excluded_days(root, "option", u) or {} for u in ("NIFTY", "SENSEX")}
-    d = day - timedelta(days=1)
-    for _ in range(14):
-        if d.weekday() < 5 and all(
-            lake.bars_1m_path(root, "option", u, d).exists()
-            and lake.bars_1m_path(root, "index", u, d).exists()
-            and d not in excluded[u]
-            for u in ("NIFTY", "SENSEX")
-        ):
-            return d
-        d -= timedelta(days=1)
-    raise PickError(f"no collected trading day in the 14 days before {day}")
+    """The latest collected, non-excluded weekday before `day`: the day whose results the pick must
+    already have."""
+    prev = last_collected_before(root, day)
+    if prev is None:
+        raise PickError(f"no collected trading day in the 14 days before {day}")
+    return prev
 
 
 def code_commit() -> str:
@@ -92,21 +83,29 @@ def universe_fingerprint(names: list[str]) -> dict:
     }
 
 
-def score_lists(
-    day: date,
-    vix_open: float | None,
-    dte: dict[str, str],
-    root: Path | None = None,
-    names: list[str] | None = None,
-) -> dict:
-    """{list: {core, buy, overridden, composite}} for `day`, from the stored results before it."""
-    root = root or data_dir()
-    names = names or variant_names()
+@dataclass
+class History:
+    """The stored results and day attributes a pick ranks on, as arrays, plus a digest of them."""
+
+    days: list[date]
+    cols: list[str]
+    values: np.ndarray  # days x variants, net P&L (history only: no row for the target day)
+    weekday: list[str]
+    band: list[str]
+    dte_n: list[str]
+    dte_s: list[str]
+    digest: str
+
+
+def load_history(day: date, root: Path, names: list[str]) -> History:
+    """Everything the pick reads from disk. Raises PickError when the history is short or does not
+    reach the last collected trading day."""
     if not names:
         raise PickError("no variant strategy files found")
     m = store.load_matrix(names, root, through=day - timedelta(days=1))
     attrs = store.read_days(root)
-    days = [d for d in m.days if d in attrs]
+    keep = [i for i, d in enumerate(m.days) if d in attrs]
+    days = [m.days[i] for i in keep]
     if len(days) < WARMUP:
         raise PickError(f"only {len(days)} days of results (need {WARMUP})")
     prev = previous_data_day(root, day)
@@ -115,13 +114,35 @@ def score_lists(
             f"results end {days[-1]} but the last collected trading day is {prev}: "
             f"run `obt rotation update --day {prev}`"
         )
-    keep = [i for i, d in enumerate(m.days) if d in attrs]
-    cols = list(m.names)
-    weekday = np.array([attrs[d]["weekday"] for d in days] + [day.strftime("%a")])
-    band = np.array([attrs[d]["vix_band"] for d in days] + [vix_band(vix_open)])
-    dn = np.array([attrs[d]["dte_n"] for d in days] + [dte["dte_n"]])
-    ds = np.array([attrs[d]["dte_s"] for d in days] + [dte["dte_s"]])
-    Pv = np.vstack([m.values[keep], np.zeros((1, len(cols)))])
+    values = m.values[keep]
+    h = hashlib.sha256()
+    for i, d in enumerate(days):
+        a = attrs[d]
+        h.update(
+            f"{d}|{a['weekday']}|{a['vix_band']}|{a['dte_n']}|{a['dte_s']}|".encode()
+            + ",".join(f"{v:.2f}" for v in values[i]).encode()
+            + b"\n"
+        )
+    return History(
+        days,
+        list(m.names),
+        values,
+        [attrs[d]["weekday"] for d in days],
+        [attrs[d]["vix_band"] for d in days],
+        [attrs[d]["dte_n"] for d in days],
+        [attrs[d]["dte_s"] for d in days],
+        h.hexdigest(),
+    )
+
+
+def score_history(hist: History, day: date, vix_open: float | None, dte: dict[str, str]) -> dict:
+    """{list: {core, buy, overridden, composite}} for `day`."""
+    weekday = np.array([*hist.weekday, day.strftime("%a")])
+    band = np.array([*hist.band, vix_band(vix_open)])
+    dn = np.array([*hist.dte_n, dte["dte_n"]])
+    ds = np.array([*hist.dte_s, dte["dte_s"]])
+    cols = hist.cols
+    Pv = np.vstack([hist.values, np.zeros((1, len(cols)))])
     dmat = dte_matrix(dn, ds, cols)
     fam = family_index(cols)
     out = {}
@@ -137,6 +158,19 @@ def score_lists(
     return out
 
 
+def score_lists(
+    day: date,
+    vix_open: float | None,
+    dte: dict[str, str],
+    root: Path | None = None,
+    names: list[str] | None = None,
+) -> dict:
+    """{list: {core, buy, overridden, composite}} for `day`, from the stored results before it."""
+    root = root or data_dir()
+    hist = load_history(day, root, names or variant_names())
+    return score_history(hist, day, vix_open, dte)
+
+
 def record(
     day: date,
     root: Path | None = None,
@@ -147,16 +181,20 @@ def record(
     root = root or data_dir()
     if not dry_run and day != now_fn().astimezone(IST).date():
         raise PickError(f"{day} is not today (IST): an entry can only be recorded on its own day")
+    # everything slow and VIX-independent first: the 09:15 bar is served a few seconds after the
+    # job starts, and only the band depends on it
+    names = variant_names()
+    dte, dte_source = listed_dte_labels(day)
+    commit = code_commit()
+    hist = load_history(day, root, names)
     source = "given"
     if vix_open is None:
         vix_open, source = vix_open_with_source(day)
     if vix_open is None:
         raise PickError(f"the 09:15 India VIX open for {day} could not be read; nothing recorded")
-    dte, dte_source = listed_dte_labels(day)
-    names = variant_names()
-    lists = score_lists(day, vix_open, dte, root, names)
+    lists = score_history(hist, day, vix_open, dte)
     fields = {
-        "v": 2,
+        "v": 3,
         "day": day.isoformat(),
         "weekday": day.strftime("%a"),
         "vix_open": round(vix_open, 4),
@@ -165,8 +203,10 @@ def record(
         "dte": {"NIFTY": dte["dte_n"], "SENSEX": dte["dte_s"]},
         "dte_source": dte_source,
         "lists": lists,
-        "commit": code_commit(),
+        "commit": commit,
         "universe": universe_fingerprint(names),
+        "inputs_sha": hist.digest,
+        "inputs_days": len(hist.days),
         "lots_per_strategy": LOTS_PER,
     }
     path = store.journal_path(root)

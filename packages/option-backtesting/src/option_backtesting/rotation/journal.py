@@ -26,10 +26,25 @@ def entry_hash(entry: dict) -> str:
     return hashlib.sha256((entry["prev"] + _canonical(entry)).encode()).hexdigest()
 
 
+class JournalCorrupt(ValueError):
+    """A line of the journal is not valid JSON (a torn write or a hand edit)."""
+
+
 def read(path: Path) -> list[dict]:
     if not path.exists():
         return []
-    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    entries = []
+    for n, line in enumerate(path.read_text().splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            entries.append(json.loads(line))
+        except json.JSONDecodeError as error:
+            raise JournalCorrupt(
+                f"{path.name} line {n} is not valid JSON ({error.msg}): a torn write or an edit; "
+                "nothing was appended"
+            ) from error
+    return entries
 
 
 def head(path: Path) -> str:
@@ -49,6 +64,8 @@ def append(path: Path, fields: dict) -> dict:
     with open(path.with_suffix(".lock"), "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         entries = read(path)
+        if path.exists() and path.stat().st_size and not path.read_bytes().endswith(b"\n"):
+            raise JournalCorrupt(f"{path.name} does not end with a newline (torn write)")
         if any(e["day"] == fields["day"] for e in entries):
             raise AlreadyRecorded(f"{fields['day']} is already in the journal")
         entry = {**fields, "prev": entries[-1]["hash"] if entries else GENESIS}
@@ -65,7 +82,11 @@ def verify(path: Path) -> list[str]:
     problems: list[str] = []
     prev = GENESIS
     seen: set[str] = set()
-    for n, e in enumerate(read(path), 1):
+    try:
+        entries = read(path)
+    except JournalCorrupt as error:
+        return [str(error)]
+    for n, e in enumerate(entries, 1):
         if e.get("prev") != prev:
             problems.append(
                 f"entry {n} ({e.get('day')}): prev hash does not match the entry before it"

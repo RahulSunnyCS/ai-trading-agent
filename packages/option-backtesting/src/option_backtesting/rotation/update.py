@@ -11,19 +11,15 @@ from collections.abc import Callable
 from datetime import date, timedelta
 from pathlib import Path
 
-from trading_data import lake, quality
-
 from ..data.reference.loader import MissingReferenceData, default_reference_data
 from ..fyers.daily import data_dir
 from ..legwise.engine import simulate_day
 from ..legwise.market import load_day
 from ..legwise.schema import load_legwise
 from . import store
-from .attrs import day_attributes
+from .attrs import UNDERLYINGS, day_attributes, excluded_map, is_collected
 from .lists import SIZING_DATE
 from .variants import strategy_path, underlying_of, variant_names
-
-UNDERLYINGS = ("NIFTY", "SENSEX")
 
 
 def default_day(root: Path | None = None, today: date | None = None) -> date | None:
@@ -32,16 +28,12 @@ def default_day(root: Path | None = None, today: date | None = None) -> date | N
     everything collected is stored."""
     root = root or data_dir()
     d = today or date.today()
-    excluded = {u: quality.excluded_days(root, "option", u) or {} for u in UNDERLYINGS}
+    excluded = excluded_map(root)
     names = variant_names()
     for _ in range(14):
-        collected = d.weekday() < 5 and all(
-            lake.bars_1m_path(root, "option", u, d).exists()
-            and lake.bars_1m_path(root, "index", u, d).exists()
-            and d not in excluded[u]
-            for u in UNDERLYINGS
-        )
-        if collected and any(d not in store.result_days(n, root) for n in names):
+        if is_collected(root, d, excluded) and any(
+            d not in store.result_days(n, root) for n in names
+        ):
             return d
         d -= timedelta(days=1)
     return None
@@ -58,10 +50,10 @@ def update_day(
     names = names or variant_names()
     out: dict = {"written": 0, "already": 0, "skipped": None, "errors": []}
     loaded = {}
+    excluded = excluded_map(root)
     for u in UNDERLYINGS:
-        excluded = quality.excluded_days(root, "option", u) or {}
-        if day in excluded:
-            out["skipped"] = f"{u} {day}: excluded by data_quality ({excluded[day]})"
+        if day in excluded[u]:
+            out["skipped"] = f"{u} {day}: excluded by data_quality ({excluded[u][day]})"
             return out
         try:
             loaded[u] = load_day(root, u, day)

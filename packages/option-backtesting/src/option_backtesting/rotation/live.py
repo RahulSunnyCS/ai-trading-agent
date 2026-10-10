@@ -1,14 +1,14 @@
-"""What the 09:16 pick can know: the 09:15 India VIX open (read live from Fyers, because the
-lake only has it after the evening collection) and each index's days to expiry from the
-reference calendar."""
+"""What the 09:16 pick can know: the 09:15 India VIX open (read live, because the lake only has
+it after the evening collection: Fyers first, Angel One when Fyers has no usable token) and each
+index's days to the nearest listed expiry (Fyers' symbol master, the reference calendar as the
+fallback)."""
 
 from __future__ import annotations
 
 import sys
 import time
 from collections.abc import Callable
-from datetime import UTC, date, datetime
-from zoneinfo import ZoneInfo
+from datetime import date
 
 from ..data.reference.loader import default_reference_data
 from ..fyers.auth import FyersCredentialsError, resolve_credentials
@@ -16,9 +16,8 @@ from ..fyers.client import FyersClient
 from ..fyers.daily import VIX_SYMBOL
 from ..fyers.symbols import download_master, parse_master
 from ..legwise.anatomy import dte_for
+from .attrs import vix_bar_epoch
 from .score import dte_label
-
-IST = ZoneInfo("Asia/Kolkata")
 
 
 def _fyers_attempt(day: date, client: FyersClient | None = None) -> float | None:
@@ -26,22 +25,15 @@ def _fyers_attempt(day: date, client: FyersClient | None = None) -> float | None
     Raises FyersCredentialsError when there is no usable token (not worth polling) and lets
     network / API errors through (the caller treats them as transient)."""
     client = client or FyersClient(resolve_credentials())
-    first = int(
-        datetime(day.year, day.month, day.day, 9, 15, tzinfo=IST).astimezone(UTC).timestamp()
-    )
-    for candle in client.minute_candles(VIX_SYMBOL, day):
+    return _open_at_0915(client.minute_candles(VIX_SYMBOL, day), day)
+
+
+def _open_at_0915(candles, day: date) -> float | None:
+    first = vix_bar_epoch(day)
+    for candle in candles:
         if candle.epoch == first:
             return float(candle.open)
     return None
-
-
-def vix_open_live(day: date, client: FyersClient | None = None) -> float | None:
-    """Open of today's 09:15 India VIX bar from Fyers, or None for any reason it cannot be read."""
-    try:
-        return _fyers_attempt(day, client)
-    except Exception as error:  # noqa: BLE001 - the caller only needs "not available"
-        print(f"Fyers VIX read failed: {type(error).__name__}: {str(error)[:160]}", file=sys.stderr)
-        return None
 
 
 def vix_open_angel(day: date) -> float | None:
@@ -57,15 +49,8 @@ def vix_open_angel(day: date) -> float | None:
     try:
         client = AngelClient(login(load_credentials()))
         client.targets = build_targets(download_master(), [], {VIX_SYMBOL: "INDIAVIX"})
-        first = int(
-            datetime(day.year, day.month, day.day, 9, 15, tzinfo=IST).astimezone(UTC).timestamp()
-        )
-        for candle in client.minute_candles(VIX_SYMBOL, day):
-            if candle.epoch == first:
-                return float(candle.open)
+        return _open_at_0915(client.minute_candles(VIX_SYMBOL, day), day)
     except Exception as error:  # noqa: BLE001 - a fallback must never raise into the pick
-        import sys
-
         print(
             f"Angel One VIX fallback failed: {type(error).__name__}: {str(error)[:160]}",
             file=sys.stderr,
