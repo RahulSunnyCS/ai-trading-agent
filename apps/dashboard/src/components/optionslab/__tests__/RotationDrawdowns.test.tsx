@@ -60,6 +60,40 @@ describe('RotationDrawdowns', () => {
     expect(screen.getByText('Widesl · 09:17–10:02')).toBeTruthy();
   });
 
+  it('forgets the chosen episode when the list changes', () => {
+    hook.state.data = response({
+      episodes: [
+        episode({ n: 1, depth: -700 }),
+        episode({
+          n: 2,
+          depth: -1500,
+          drivers: [
+            { kind: 'dir', band: 'C', label: 'Dir · 12:17–14:02', total: -1500, pick_days: 5 },
+          ],
+        }),
+      ],
+    });
+    const { rerender } = render(<RotationDrawdowns list="A" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show what drove episode 1' }));
+    expect(screen.getByText('Widesl · 09:17–10:02')).toBeTruthy();
+    hook.state.data = response({
+      list: 'REF',
+      episodes: [
+        episode({ n: 1, depth: -700 }),
+        episode({
+          n: 2,
+          depth: -1500,
+          drivers: [
+            { kind: 'dir', band: 'C', label: 'Dir · 12:17–14:02', total: -1500, pick_days: 5 },
+          ],
+        }),
+      ],
+    });
+    rerender(<RotationDrawdowns list="REF" />);
+    // back to the deepest episode, not REF's episode 1 that the user never chose
+    expect(screen.getByText('Dir · 12:17–14:02')).toBeTruthy();
+  });
+
   it('marks an episode that never got back as open', () => {
     hook.state.data = response({
       episodes: [episode({ open: true, end_day: null, sessions_back: null })],

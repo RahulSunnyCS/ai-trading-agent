@@ -98,6 +98,7 @@ def world(built, tmp_path, monkeypatch):
     monkeypatch.setattr(daylog, "now_ist", lambda: syn.NOW)  # "now" is the last forward day
     daylog._recon_cache.clear()
     rotation_drawdowns_routes._cache.clear()
+    drawdowns._log_cache.clear()
     return root, sc
 
 
@@ -229,6 +230,7 @@ def test_bad_arguments_are_refused(world):
 def test_an_empty_store_gives_empty_series_not_an_error(tmp_path, monkeypatch):
     monkeypatch.setattr(daylog, "variant_names", lambda: syn.NAMES)
     daylog._recon_cache.clear()
+    drawdowns._log_cache.clear()
     out = drawdowns.build("A", "P1", 500.0, tmp_path)
     assert out["n_days"] == 0 and out["series"] == [] and out["episodes"] == []
     assert out["max_dd"] == 0.0 and out["current"] is None
@@ -249,3 +251,85 @@ def test_the_route_answers_validates_and_writes_nothing(world):
         r = c.get(url)
         assert r.status_code == 422 and "error" in r.json(), url
     assert _fingerprint(root) == before
+
+
+# --- review fixes: crafted log rows -----------------------------------------------------------
+
+
+def _row(day: str, per_lot: float, lots: int, source: str = "reconstructed", **extra) -> dict:
+    n = lots // 2
+    return {
+        "day": day,
+        "source": source,
+        "status": "scored",
+        "lists": {
+            "A": {
+                "scored": True,
+                "per_lot_day": per_lot,
+                "gross": per_lot * lots,
+                "lots": lots,
+                "stops": 0,
+                "picks": [
+                    {
+                        "name": f"N_wide_09{i}7",
+                        "kind": "wide",
+                        "band": "A",
+                        "result": {"gross": per_lot * 2},
+                    }
+                    for i in range(n)
+                ],
+            }
+        },
+        **extra,
+    }
+
+
+@pytest.fixture
+def crafted(monkeypatch, tmp_path):
+    drawdowns._log_cache.clear()
+    rows = [
+        _row("2025-11-20", 50, 6, source="recorded", status="late"),  # before P1: not counted
+        _row("2026-03-02", 100, 6),
+        _row("2026-03-03", -300, 6),
+        _row("2026-03-04", -500, 8),  # a Buy day: 8 lots
+        _row("2026-03-05", -400, 6),
+        _row("2026-03-06", 2000, 6),
+        {"day": "2026-03-09", "source": "recorded", "status": "late", "lists": {}},
+        {"day": "2026-03-10", "source": "missing", "status": "not_recorded", "lists": {}},
+    ]
+    monkeypatch.setattr(drawdowns.daylog, "build_log", lambda *a, **k: {"rows": rows})
+    return tmp_path
+
+
+def test_the_basket_depth_is_what_the_lots_lost_over_the_same_days(crafted):
+    out = drawdowns.build("A", "P1", 0.0, crafted)
+    (e,) = out["episodes"]
+    # cumulative 100, -200, -700, -1100, 900 against a peak of 100: trough on the 5th of March
+    assert e["depth"] == -1200 and e["peak_day"] == "2026-03-02" and e["trough_day"] == "2026-03-05"
+    # 6 + 8 + 6 lots over the three days: -1800 - 4000 - 2400, not -1200 x 8
+    assert e["depth_basket"] == -8200
+
+
+def test_left_out_counts_only_what_falls_inside_the_window(crafted):
+    out = drawdowns.build("A", "P1", 0.0, crafted)
+    # the late entry before P1 is not P1's; the late and missing rows in March are
+    assert out["left_out"] == {"late": 1, "waiting": 0, "no_entry": 1}
+    p2 = drawdowns.build("A", "P2", 0.0, crafted)
+    assert p2["left_out"] == {"late": 0, "waiting": 0, "no_entry": 0}
+
+
+def test_changing_the_depth_does_not_rebuild_the_daily_log(crafted, monkeypatch):
+    calls = []
+    inner = drawdowns.daylog.build_log
+    monkeypatch.setattr(
+        drawdowns.daylog, "build_log", lambda *a, **k: calls.append(1) or inner(*a, **k)
+    )
+    drawdowns._log_cache.clear()
+    drawdowns.build("A", "P1", 0.0, crafted)
+    drawdowns.build("A", "P1", 1000.0, crafted)
+    drawdowns.build("A", "P1", 500.0, crafted)
+    assert len(calls) == 1
+
+
+def test_max_drawdown_is_the_read_outs_own_function():
+    assert drawdowns.max_drawdown is readout.max_drawdown

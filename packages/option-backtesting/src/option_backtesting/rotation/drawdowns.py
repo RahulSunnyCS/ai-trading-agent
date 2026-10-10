@@ -26,6 +26,8 @@ Nothing here writes a file.
 
 from __future__ import annotations
 
+import threading
+import time
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -37,6 +39,7 @@ from . import base as base_mod
 from . import daylog
 from .lists import LISTS
 from .matrix import NAMED
+from .readout import max_drawdown
 
 KEYS = tuple(LISTS)
 WINDOWS = ("P1", "P2", "last63", "forward")
@@ -56,6 +59,28 @@ BAND_LABEL = {
 }
 
 
+#: the daily log is the expensive step and holds all four lists, so a change of list or depth
+#: should not rebuild it: kept per (root, window) for a short time
+LOG_SECONDS = 30.0
+_log_lock = threading.Lock()
+_log_cache: dict[tuple, tuple[float, dict]] = {}
+
+
+def _log(root: Path, window: str) -> dict:
+    key = (str(root), window)
+    now = time.monotonic()
+    with _log_lock:
+        hit = _log_cache.get(key)
+    if hit is not None and now - hit[0] < LOG_SECONDS:
+        return hit[1]
+    start = NAMED["P1"][0] if window in ("last63", "forward") else NAMED[window][0]
+    end = NAMED[window][1] if window in NAMED else None
+    value = daylog.build_log(root, start=start, end=end, source="all")
+    with _log_lock:
+        _log_cache[key] = (now, value)
+    return value
+
+
 class DrawdownError(Exception):
     def __init__(self, status: int, message: str) -> None:
         super().__init__(message)
@@ -67,18 +92,11 @@ class Day:
     day: date
     source: str  # recorded | reconstructed
     per_lot: float
+    #: the list's basket gross for the day (its real lots), for the basket column
+    gross: float
     lots: int
     picks: list[dict] = field(default_factory=list)
     stops: int = 0
-
-
-def max_drawdown(daily: np.ndarray) -> float:
-    """Largest fall of the cumulative series from its running peak, the peak starting at zero."""
-    if daily.size == 0:
-        return 0.0
-    cum = np.cumsum(daily)
-    peak = np.maximum.accumulate(np.maximum(cum, 0.0))
-    return float(np.min(cum - peak).clip(max=0.0))
 
 
 def episodes_of(daily: np.ndarray, min_depth: float) -> list[dict]:
@@ -119,33 +137,54 @@ def episodes_of(daily: np.ndarray, min_depth: float) -> list[dict]:
     return out
 
 
-def _days_of(rows: list[dict], key: str) -> tuple[list[Day], dict]:
-    """The scored, on-time days of one list from daylog rows, and a count of what was left out."""
+def _usable(r: dict, key: str) -> dict | None:
+    """The list's scored block of a row that counts as a session, else None."""
+    if r["source"] == "missing" or (r["source"] == "recorded" and r.get("status") == "late"):
+        return None
+    block = (r.get("lists") or {}).get(key)
+    if block is None or not block["scored"] or block["per_lot_day"] is None:
+        return None
+    return block
+
+
+def _days_of(rows: list[dict], key: str) -> list[Day]:
+    """The scored, on-time days of one list from daylog rows, in date order."""
     kept: list[Day] = []
-    left = {"late": 0, "waiting": 0, "no_entry": 0}
     for r in rows:
-        if r["source"] == "missing":
-            left["no_entry"] += 1
-            continue
-        if r["source"] == "recorded" and r.get("status") == "late":
-            left["late"] += 1
-            continue
-        block = (r.get("lists") or {}).get(key)
-        if block is None or not block["scored"] or block["per_lot_day"] is None:
-            left["waiting"] += 1
+        block = _usable(r, key)
+        if block is None:
             continue
         kept.append(
             Day(
                 day=date.fromisoformat(r["day"]),
                 source=r["source"],
                 per_lot=float(block["per_lot_day"]),
+                gross=float(block["gross"]),
                 lots=int(block["lots"]),
                 picks=block["picks"],
                 stops=int(block["stops"]),
             )
         )
     kept.sort(key=lambda d: d.day)
-    return kept, left
+    return kept
+
+
+def _left_out(rows: list[dict], key: str, lo: date | None, hi: date | None) -> dict:
+    """What the log had inside [lo, hi] that is not in the series, and why."""
+    left = {"late": 0, "waiting": 0, "no_entry": 0}
+    for r in rows:
+        d = date.fromisoformat(r["day"])
+        if (lo is not None and d < lo) or (hi is not None and d > hi):
+            continue
+        if _usable(r, key) is not None:
+            continue
+        if r["source"] == "missing":
+            left["no_entry"] += 1
+        elif r["source"] == "recorded" and r.get("status") == "late":
+            left["late"] += 1
+        else:
+            left["waiting"] += 1
+    return left
 
 
 def _window(window: str, days: list[Day]) -> tuple[list[Day], dict]:
@@ -201,14 +240,22 @@ def build(
     if not (0 <= min_depth <= MAX_MIN_DEPTH):
         raise DrawdownError(422, f"min_depth must be between 0 and {int(MAX_MIN_DEPTH)}")
     root = root or data_dir()
-    start = NAMED["P1"][0] if window in ("last63", "forward") else NAMED[window][0]
-    end = NAMED[window][1] if window in NAMED else None
     try:
-        log = daylog.build_log(root, start=start, end=end, source="all")
+        log = _log(root, window)
     except ValueError as error:  # the journal cannot be read
         raise DrawdownError(500, str(error)) from error
-    days, left = _days_of(log["rows"], key)
-    window_days, window_info = _window(window, days)
+    window_days, window_info = _window(window, _days_of(log["rows"], key))
+    if window in NAMED:
+        left = _left_out(log["rows"], key, NAMED[window][0], NAMED[window][1])
+    elif window_days:
+        left = _left_out(
+            log["rows"],
+            key,
+            daylog.REGISTERED_FIRST_DAY if window == "forward" else window_days[0].day,
+            None,
+        )
+    else:
+        left = {"late": 0, "waiting": 0, "no_entry": 0}
 
     daily = np.array([d.per_lot for d in window_days], dtype=float)
     base_per_lot = base_mod.base_per_lot(root)
@@ -225,8 +272,10 @@ def build(
         else None
     )
 
+    every = episodes_of(daily, 0.01)
+    shown = [e for e in every if -e["depth"] >= min_depth]
     episodes = []
-    for n, e in enumerate(episodes_of(daily, min_depth), 1):
+    for n, e in enumerate(shown, 1):
         lo, hi = e["peak"] + 1, e["trough"]
         seg_base = base_days[lo : hi + 1]
         missing = sum(1 for v in seg_base if v is None)
@@ -235,7 +284,8 @@ def build(
             if not have_base or missing == len(seg_base)
             else round(sum(v for v in seg_base if v is not None), 2)
         )
-        lots = max((d.lots for d in window_days[lo : hi + 1]), default=0)
+        # the rupees the list's lots lost over the same days (6 lots, or 8 on a Buy day)
+        basket = sum(d.gross for d in window_days[lo : hi + 1])
         episodes.append(
             {
                 "n": n,
@@ -244,7 +294,7 @@ def build(
                 "end_day": None if e["end"] is None else window_days[e["end"]].day.isoformat(),
                 "open": e["end"] is None,
                 "depth": round(e["depth"], 2),
-                "depth_basket": round(e["depth"] * lots, 2) if lots else None,
+                "depth_basket": round(basket, 2),
                 "sessions_down": e["sessions_down"],
                 "sessions_back": e["sessions_back"],
                 "base_change": base_change,
@@ -295,7 +345,7 @@ def build(
         "base_lots": BASE_LOTS,
         "series": series,
         "episodes": episodes,
-        "all_episodes": len(episodes_of(daily, 0.01)),
+        "all_episodes": len(every),
         "max_dd": round(max_drawdown(daily), 2),
         "base_max_dd": round(max_drawdown(base_daily), 2) if have_base else None,
         "base_days": sum(1 for v in base_days if v is not None),

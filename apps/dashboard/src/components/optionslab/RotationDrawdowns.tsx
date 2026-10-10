@@ -271,7 +271,11 @@ export function RotationDrawdowns({ list }: { list: RotationListKey }) {
   const d = res.data;
   const current =
     d !== null && d.list === list && d.window.id === window && d.min_depth === minDepth;
-  const [picked, setPicked] = useState<number | null>(null);
+  // The chosen episode belongs to one list, window and depth: another choice starts afresh.
+  const choice = `${list}|${window}|${minDepth}`;
+  const [pick, setPick] = useState<{ choice: string; n: number } | null>(null);
+  const picked = pick && pick.choice === choice ? pick.n : null;
+  const setPicked = (n: number) => setPick({ choice, n });
   const deepest = d?.episodes.reduce<DrawdownEpisode | null>(
     (m, e) => (m === null || e.depth < m.depth ? e : m),
     null,
