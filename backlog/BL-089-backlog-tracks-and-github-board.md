@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Priority** | P2 — the backlog has outgrown a hand-kept table (50 open rows, 8 of them finished); the owner wants one place that shows what needs doing |
-| **Status** | Planned |
+| **Priority** | P0 — set by the owner (2026-10-10): the backlog has outgrown a hand-kept table (50 open rows, 8 of them finished); one place that shows what needs doing comes before more items are added |
+| **Status** | Ready (questions 1–3 and 5 answered 2026-10-10; not started: the owner will say when) |
 | **Type** | chore |
 | **Area** | cross-cutting |
 | **Created** | 2026-10-10 |
@@ -160,16 +160,16 @@ than one push.
 
 ## Open questions
 
-1. Tracks as proposed (research / product / platform, by definition of done), or the owner's
-   original backend / frontend cut? The plan assumes the proposed three.
-2. Generated index with a pre-push check (Phase 2), or keep hand-editing and only do Phase 1?
-   The plan assumes generated; the measured churn is the argument.
-3. User-level project (works for a personal repo; the owner creates it) or an organisation
-   project if the repo moves to an org later? The script takes the project's node id either way.
+Answered by the owner on 2026-10-10 (1, 2, 3, 5); 4 stays open until after Phase 3.
+
+1. **Tracks: by definition of done** — research / product / platform, as proposed. Area stays
+   the second axis.
+2. **Generated index: yes** — Phase 2 as planned, with the pre-push check.
+3. **User-level project**, created by the owner, with the fine-grained token stored as the
+   repository secret `BACKLOG_PROJECT_TOKEN` (the Phase 3 prerequisite; not yet done).
 4. After Phase 3: should `TODO.md`'s 3.13.x rows be replaced by the generated "Now" view, with
-   `TODO.md` keeping only the frozen-engine history (§3.1–3.7)?
-5. Should the friends who follow the Momentum results see the board? A public project on a
-   private repo is possible; the default is private.
+   `TODO.md` keeping only the frozen-engine history (§3.1–3.7)? **Open.**
+5. **Visibility: private**, the owner only; can be opened to the friends later.
 
 ## Log
 
@@ -177,3 +177,8 @@ than one push.
   (no connector, a second source of truth, research pre-registration must stay in git) and
   Notion weighed (better fit than Jira, still a second copy); **owner chose GitHub Issues plus a
   Projects board.** Facts measured and recorded in Context. Status `Planned`, P2.
+- 2026-10-10 — owner answered the questions (tracks by definition of done; generated index;
+  user-level private project with the `BACKLOG_PROJECT_TOKEN` secret), re-prioritised P2 → P0
+  and asked for it to be pushed, **not started yet**: "we will take it up later". Status `Ready`.
+  When started: add the `TODO.md` row, then Phases 1–2 can run without the token; Phase 3 waits
+  for the project and the secret.
