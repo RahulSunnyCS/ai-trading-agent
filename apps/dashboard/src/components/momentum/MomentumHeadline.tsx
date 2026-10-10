@@ -113,7 +113,7 @@ function Headline({
         ) : null}
       </p>
       {note ? (
-        <p className="mt-0.5 truncate text-xs text-faint" title={note.title}>
+        <p className="mt-0.5 break-words text-xs text-faint" title={note.title}>
           {note.text}
         </p>
       ) : null}

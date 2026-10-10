@@ -411,9 +411,9 @@ describe('companionLine', () => {
       max_drawdown: -0.386,
       cagr_impact: -0.052,
     });
-    expect(line?.text).toContain('With extended category tags: 33.4% CAGR');
-    expect(line?.text).toContain('38.6% max DD');
-    expect(line?.text).toContain('5.2 pp');
+    expect(line?.text).toBe('33.4% with extended tags (-5.2 pp)');
+    expect(line?.title).toContain('33.4% CAGR');
+    expect(line?.title).toContain('38.6% max drawdown');
     expect(line?.title).toMatch(/today's classification/);
   });
 

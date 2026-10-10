@@ -488,13 +488,16 @@ export function companionLine(
   if (!companion) return null;
   if (companion.status === 'computed') {
     const impact = companion.cagr_impact;
-    const text = `With extended category tags: ${formatPct(companion.cagr ?? null)} CAGR · ${formatPct(
-      companion.max_drawdown ?? null,
-    )} max DD${typeof impact === 'number' ? ` (${formatPp(impact)})` : ''}`;
+    // The figure leads: the card is narrow and the line must still say it. The drawdown and the
+    // definition are in the hover.
+    const text = `${formatPct(companion.cagr ?? null)} with extended tags${
+      typeof impact === 'number' ? ` (${formatPp(impact)})` : ''
+    }`;
     return {
       text,
-      title:
-        "The same run with every liquid NSE stock tagged by BSE's current classification, not just today's 755 index members. Closer to an expected return than the headline; the tags are still today's classification applied to every year.",
+      title: `With extended category tags: ${formatPct(companion.cagr ?? null)} CAGR · ${formatPct(
+        companion.max_drawdown ?? null,
+      )} max drawdown. The same run with every liquid NSE stock tagged by BSE's current classification, not just today's 755 index members. Closer to an expected return than the headline; the tags are still today's classification applied to every year.`,
     };
   }
   if (companion.status === 'this_run') {
