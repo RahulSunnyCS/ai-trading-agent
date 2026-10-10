@@ -165,6 +165,49 @@ def test_the_change_log_is_not_part_of_the_data_version(tmp_path):
     assert db_read.table_fingerprints(tmp_path) == before
 
 
+def test_your_orders_state_is_not_part_of_the_data_version(tmp_path):
+    from trading_data.db import connect
+
+    from momentum_backtesting import holdings_store
+
+    for table in (
+        "momentum_holdings",
+        "momentum_holding_rules",
+        "momentum_owner_settings",
+        "momentum_orders",
+    ):
+        assert table in db_read.RUN_RECORD_TABLES
+    with connect(tmp_path):
+        pass
+    before = db_read.table_fingerprints(tmp_path)
+    with connect(tmp_path) as con:
+        # Saving settings, syncing holdings, setting a rule and the 14:15 orders job.
+        holdings_store.save_settings(con, "rahul", min_trade_rs=5000)
+        holdings_store.save_holdings(
+            con, "rahul", "paste", [{"symbol": "SBIN", "quantity": 10, "avg_price": 800.0}]
+        )
+        holdings_store.set_rule(con, "rahul", "LIQUIDBEES", "cash")
+        holdings_store.save_orders(
+            con,
+            "rahul",
+            week="2026-10-09",
+            trigger="scheduled",
+            favourite_id="f1",
+            holdings_source="paper",
+            payload={"rows": []},
+        )
+        for table in (
+            "momentum_holdings",
+            "momentum_holding_rules",
+            "momentum_owner_settings",
+            "momentum_orders",
+        ):
+            assert con.execute(f"SELECT count(*) FROM {table}").fetchone()[0] == 1
+    # Otherwise saving settings or syncing holdings would empty the caches and could make a
+    # rerun read as "data revised".
+    assert db_read.table_fingerprints(tmp_path) == before
+
+
 # --- why it moved -----------------------------------------------------------------------------
 
 
