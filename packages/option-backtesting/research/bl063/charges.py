@@ -46,9 +46,18 @@ PICKS = {  # rotation -> (daily picks file, lots traded in each picked strategy)
     "DRB-6W3L2/G30": ("daily_picks_min3_core6_buy2L2_whole_day_grid30.csv", 2),
 }
 
-# BL-067: every weight combination's picks file (rotate.py --weights R,W,D,V) joins the charges run
+# BL-067: every weight combination's picks file (rotate.py --weights R,W,D,V), exactly the
+# `_wR_W_D_V.csv` names; BL-075's cells carry more suffixes and are listed explicitly below
+import re as _re  # noqa: E402
+
 for _f in sorted((HERE.parent / "bl057").glob("daily_picks_min3_core6_buy2L2_whole_day_w*.csv")):
-    PICKS["BL067/" + _f.stem.rsplit("_w", 1)[1].replace("_", "-")] = (_f.name, 2)
+    if _re.search(r"_w\d+_\d+_\d+_\d+\.csv$", _f.name):
+        PICKS["BL067/" + _f.stem.rsplit("_w", 1)[1].replace("_", "-")] = (_f.name, 2)
+
+# BL-075: journal lists A, B, C on the main year (stage-1 cells)
+_LB = "fitlb5x30_21x25_63x25_126x20_fband"
+for _k, _w in (("A", "5_34_33_23_0_5"), ("B", "0_36_35_24_0_5"), ("C", "15_30_30_20_0_5")):
+    PICKS["BL075/" + _k] = (f"daily_picks_min3_core6_buy2L2_whole_day_w{_w}_{_LB}.csv", 2)
 
 
 def stt_rate(day: str) -> float:

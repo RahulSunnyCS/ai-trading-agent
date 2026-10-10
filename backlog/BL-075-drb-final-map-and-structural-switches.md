@@ -163,6 +163,22 @@ whatever it finds.
     nothing is adopted; the map is the result: *a rule with a real, small edge in a narrow region (low
     own-recent, family-band 5%, baseline fit split, VIX band kept, 5/21/63/126 lookbacks)*.
 
+- **Result, charges pass (2026-10-10 14:30; flat ₹13 an order, BL-063 model, 2025-12-03 → 2026-10-08,
+  202 days, ₹13 lakh base):**
+
+  | List | Gross | Charges | Net | Net % | Net max DD | Months positive | Worst month |
+  |---|---|---|---|---|---|---|---|
+  | REF (live baseline, 33/25/25/17, 5/21/63) | 4,30,868 | 80,461 | 3,50,407 | +27.0% | −84,469 | 8 / 11 | −1.74% |
+  | **A** (5/34/33/23/5) | 3,89,900 | 80,819 | **3,09,081** | **+23.8%** | −80,958 | 8 / 11 | **−1.21%** |
+  | B (0/36/35/24/5) | 3,52,327 | 80,630 | 2,71,698 | +20.9% | −97,361 | 8 / 11 | −3.32% |
+  | C (15/30/30/20/5) | 4,27,782 | 80,603 | 3,47,179 | +26.7% | −80,510 | **10 / 11** | −2.38% |
+
+  - Charges are the same ₹80–81k for all four (3.2 strategies a day, 2 lots each).
+  - **In the year the rule was built on the live baseline still has the best net** (₹3.50 lakh); A gives
+    up ₹41k of net for a slightly shallower drawdown and the best worst month; C is within ₹3k of REF
+    with 10 of 11 months positive. The reason to prefer A or C over REF is the other two periods (REF
+    ₹1.70 lakh in Jan–Aug 2025, below chance), not this year.
+
 ## Log
 
 - 2026-10-10 — created and registered before any run.
@@ -171,3 +187,4 @@ whatever it finds.
 - 2026-10-10 — stage 2 done (13:50): no switch adopted. Stage 3 (shuffles on the top 10 cells) launched; journal lists A, B, C (all in the top 10) are fixed from stage 1.
 - 2026-10-10 — block 2 (combined A+B+C) ran: a hedge, not an improvement; not adopted.
 - 2026-10-10 — stage 3 done: 3 of the top 10 cells are real (list A among them); B and C are not. No cell meets the 0.85 adoption bar. Charges pass for A, B and C next.
+- 2026-10-10 — charges pass for A, B, C recorded.
