@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; the afternoon holds about half of the basket's picks |
-| **Status** | Planned (block 3): step 1 negative recorded; the owner asked for both cases to be tested, so the adjustment rule runs under override |
+| **Status** | Done: step 1 negative; block 3 run under the owner's override, nothing kept, one forward-shadow candidate |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
@@ -278,6 +278,111 @@ ran the rule itself. Block 2's exploratory diagnostic (registered above, not run
 - **Cost:** state table exists; live-P&L clue ≈ 20 min of engine time; the rule runs ≈ 2 h (12 versions ×
   4 lists × 2 sets plus controls). Runs after BL-083 phase 1 or alongside it, the owner's call.
 
+## Result, block 3: the adjustment rule (2026-10-10; run under the owner's override)
+
+Setup as registered above: at 10:30 / 11:30 / 12:30 / 13:30 the not-yet-started picks are re-scored with a pooled
+fit (strategy type × start band × index, 21 / 63 / 126 / 252-day windows, ≥ 5 matching days) blended with the
+09:16 score at m = 25% or 50%, then swapped (free or family-preserving) and/or dropped. 7 state variables × 10
+versions × 4 lists × 2 sets = 560 rule runs, plus the state-blind twin of each version. Explore = 422 selection days
+(2025-01-10 → 2026-10-08, both indices); confirm = 618 selection days (NIFTY 2022-04-05 → 2024-10-08). Each list's
+picks reproduce `rotate.py`'s printed gross exactly (plain 8,00,921 / 8,08,532 / 8,40,846 / 7,20,873 and, in
+confirm, 12,20,482 / 12,39,935 / 11,58,525 / 10,13,627).
+
+**Headline.** Market state does not add to a state-blind re-timing on the last two years, and the re-timing itself
+is a one-half-year effect that reverses in 2022–24. Nothing is kept under the registered rule (0 of 280 state
+versions), and under the owner's rule (the last two years decide) only two tiny versions pass.
+
+### 1. The state-blind family-preserving swap (no market state at all)
+
+At each hour a pending pick is swapped for the better-scoring pending strategy of the same type and index, using
+that group's recent P&L. Gain over the plain list; the random columns do the same number of swaps per day and hour
+at random (1,000 runs); free swaps (any type or index) are the last control.
+
+| set | list | blend m | gain | random family swaps, median | random family swaps, P90 | random free swaps, P90 | max DD (plain) |
+|---|---|---|---|---|---|---|---|
+| explore | A | 25% | +96k (+12.0%) | +43k | +87k | +73k | -74,147 (-72,667) |
+| explore | A | 50% | +56k (+7.0%) | +35k | +89k | +67k | -76,002 (-72,667) |
+| explore | B | 25% | +58k (+7.2%) | +36k | +80k | +58k | -79,824 (-82,706) |
+| explore | B | 50% | +32k (+4.0%) | +20k | +73k | +39k | -100,464 (-82,706) |
+| explore | C | 25% | +88k (+10.4%) | +3k | +51k | +36k | -88,644 (-83,817) |
+| explore | C | 50% | +75k (+9.0%) | -1k | +59k | +35k | -71,431 (-83,817) |
+| explore | REF | 25% | +38k (+5.2%) | +7k | +50k | +46k | -77,142 (-88,366) |
+| explore | REF | 50% | +100k (+13.9%) | +16k | +78k | +55k | -78,501 (-88,366) |
+| confirm | A | 25% | -65k (-5.3%) | -75k | -33k | -41k | -70,928 (-66,632) |
+| confirm | A | 50% | -20k (-1.6%) | -103k | -55k | -61k | -67,665 (-66,632) |
+| confirm | B | 25% | -62k (-5.0%) | -73k | -29k | -34k | -67,782 (-64,402) |
+| confirm | B | 50% | -18k (-1.5%) | -90k | -43k | -44k | -65,663 (-64,402) |
+| confirm | C | 25% | -1k (-0.1%) | -48k | -8k | -8k | -68,094 (-55,282) |
+| confirm | C | 50% | -13k (-1.1%) | -96k | -47k | -41k | -61,588 (-55,282) |
+| confirm | REF | 25% | +15k (+1.5%) | +4k | +44k | +44k | -65,162 (-56,329) |
+| confirm | REF | 50% | +35k (+3.5%) | -30k | +22k | +16k | -53,066 (-56,329) |
+
+- **Last two years: +4% to +14% in every list, and about half of it is available to random swaps.** The random
+  family swaps' median gains −₹1k to +₹43k by themselves (+₹35k to +₹43k for A and +₹20k to +₹36k for B), so the scored gain beats the random P90 only for A at
+  25% (+96k vs +87k), C at both blends and REF at 50%.
+- **2022–24 it loses: −5% to −1.5% for A, B, C, and +1.5% / +3.5% for REF; random family swaps' median is −₹48k to −₹103k for A, B, C and +₹4k / −₹30k for REF.**
+  Free swaps (across types and indices) lose in explore for B, C and REF at both blends and for A at 25%; A at 50% gains +₹15k.
+- **One half-year carries the whole gain** (family swap, m = 25%, ₹ per half-year):
+
+| half-year | A | B | C | REF |
+|---|---|---|---|---|
+| 2022H1 | -13,377 | -2,346 | -3,412 | +30,160 |
+| 2022H2 | -20,202 | -11,668 | -13,689 | -6,461 |
+| 2023H1 | +2,626 | -9,080 | +9,295 | +17,608 |
+| 2023H2 | -7,676 | +3,614 | -3,471 | -2,236 |
+| 2024H1 | -22,009 | -33,534 | +19,916 | -5,506 |
+| 2024H2 | -3,998 | -9,100 | -9,789 | -18,350 |
+| 2025H1 | +90,124 | +57,526 | +92,347 | +60,082 |
+| 2025H2 | +12,562 | +7,108 | +10,212 | -19,238 |
+| 2026H1 | -4,254 | -1,255 | -23,319 | -11,762 |
+| 2026H2 | -2,446 | -5,165 | +8,412 | +8,584 |
+
+  2025H1 is +₹58k to +₹92k in every list; every other half-year is within about ±₹34k and the sign is mixed.
+
+### 2. The state-based versions
+
+- **Explore, per version:** 93 of 280 beat the plain list; 39 also beat their own state-blind twin; the mean gross
+  difference to the blind twin is negative for every variable (VIX since open −₹71k, live Widesl −₹60k, live Dir
+  −₹54k, range ÷ ATR −₹40k, trend ÷ ATR −₹20k, VIX × live Widesl −₹19k, RSI −₹7k): conditioning on the state mostly
+  costs money against the blind rule in 2024–26, because the blind rule's gain is the 2025H1 half-year.
+- **Owner's rule on the explore set (above plain, blind twin, 10 shuffles, random-action P90, drawdown ≤ 10% worse,
+  dropped picks lost):** 3 version rows pass, 2 distinct: list A, VIX since open, drop-only: +₹18k (+2.3%); list C,
+  VIX × live Widesl, free swap, m = 50%: +₹10k (+1.2%). Both are inside the shuffle noise of the rule.
+- **Registered rule (explore and confirm both):** 0 of 280.
+- **Versions that gain in both periods (the 2022–24 gain is what the blind rule lacks):**
+
+| list | state variable | blend m | swaps | gain 2024–26 | gain 2022–24 | over its blind twin (24–26 / 22–24) | vs best of 10 shuffles (24–26 / 22–24) |
+|---|---|---|---|---|---|---|---|
+| A | trend_atr | 50% | family both | +77k | +67k | +18k / +89k | -13,006 / +44,220 |
+| REF | rsi | 50% | family both | +56k | +59k | -48k / +22k | n/a / n/a |
+| REF | rsi | 50% | family swap | +53k | +58k | -47k / +23k | n/a / n/a |
+| A | trend_atr | 50% | family swap | +72k | +52k | +16k / +72k | -16,827 / +30,738 |
+| REF | trend_atr | 25% | family both | +69k | +50k | +29k / +39k | -44,698 / -20,111 |
+| REF | trend_atr | 50% | family both | +74k | +47k | -30k / +10k | n/a / n/a |
+
+- **The strongest candidate is list A with trend ÷ ATR and family swaps (+ drops):** +₹77k (+9.6%) in 2024–26 and
+  +₹67k (+5.5%) in 2022–24, beating its blind twin in both (+₹18k / +₹89k) and, in 2022–24, the shuffles by ₹44k and
+  the random actions by ₹102k. It fails one control: in 2024–26 the best of 10 label shuffles earns ₹13k more than
+  the real labels, so by the exploration set alone the trend ÷ ATR state is not distinguishable from any other
+  pooled fit. Max drawdown −77k vs −73k (2024–26) and −62k vs −67k (2022–24).
+
+### Read-out
+
+| question | answer |
+|---|---|
+| Does an hourly market state improve the not-yet-started picks? | **Not shown.** Best state versions are within the shuffle noise in 2024–26 and the state-blind twin does as well or better in 2024–26. |
+| Does re-timing within the same type and index help? | **In 2024–26 yes, in 2022–24 no.** +4% to +14% vs −5% to +3.5%; one half-year (2025H1) is the whole gain; random swaps gain half as much. |
+| Do free (cross-type) swaps help? | **No**: they lose in explore for B, C and REF at both blends and for A at 25% (A at 50% +₹15k). |
+| Is dropping a pending pick useful? | **No**: drop-only gains ₹3k to ₹6k for A, B, C and loses ₹5k for REF. |
+| Anything to take forward under the owner's rule? | List A + trend ÷ ATR family swaps as a **forward shadow candidate only**; it fails the shuffle control on the last two years and passes it out of period. |
+
+Not run (by registration): other bands, other blends, other lookbacks, three-variable states. Files:
+`research/bl081/ck_prepare.py`, `ck_mtm.py`, `ck_rule.py`, `ck_blind.py`, `ck_halves.py`, `ck_report.py`. Outputs
+(`out/ck/`, git-ignored): `rule_<set>_<list>.csv`, `blind_<set>_<list>.csv`, `report.csv`.
+
+**Corrections.** The first blind-control output contained a half-year column with a precedence bug in its H2 mask;
+`ck_halves.py` replaces it and the table above is from that script. The gains and controls were unaffected.
+
 ## Risks
 
 - Many variables × hours × periods: controlled by the all-periods-and-two-hours bar and the published
@@ -334,3 +439,4 @@ None blocking. The VWAP follow-up (BL-082) waits for six months of futures bars.
   10% worse, and (for drop versions) the dropped picks lost money. The controls stay: they are what measures
   how many of ~85 versions per list win by luck. Winners are journal candidates for a forward shadow run,
   not live changes; the journal's lists stay as registered.
+- 2026-10-10 — block 3 run (560 rule runs + controls); Result recorded above. Nothing kept under the registered rule; list A + trend ÷ ATR family swaps is the single forward-shadow candidate.
