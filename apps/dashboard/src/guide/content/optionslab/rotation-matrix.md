@@ -53,6 +53,7 @@ DTE is each strategy's **own** index's days to expiry: a SENSEX variant uses SEN
 | Period | P1 (Dec 2025 – Oct 2026), P2 (Jan – Aug 2025), P3, Forward (recorded days), or a custom range. "P1 and P2" shows both on one colour scale, with a Difference view. |
 | Index, Family | Which strategies. "Widesl (all)" includes the closest-premium variants. |
 | Start time, Weekday, Days to expiry, Opening VIX band | Keep only those days or start times. |
+| Start time (from the Family pulse) | A row clicked on the Rotation page's Family pulse opens the Pulse view with the family set and Start time showing a band, for example "09:17 to 10:02 (4 start times)". Choose Any start time to clear it. |
 | Minimum sessions | Below this a cell is thin. |
 | Recorded picks of list | Marks the cells list A, B, C or REF picked, as the journal recorded them. |
 | Cells show | **All opportunities** uses every day. **Selected only** keeps just the strategy-days the list picked. A cell then reads, for example, "2 of 56 sessions" and its tooltip and drawer give the all-opportunities figure beside it; the two cover different days. |

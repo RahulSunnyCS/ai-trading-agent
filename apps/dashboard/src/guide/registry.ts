@@ -43,6 +43,7 @@ import optionsRotationDrawdowns from './content/optionslab/rotation-drawdowns.md
 import optionsRotationDrift from './content/optionslab/rotation-drift.md?raw';
 import optionsRotationExplain from './content/optionslab/rotation-explain.md?raw';
 import optionsRotationMatrix from './content/optionslab/rotation-matrix.md?raw';
+import optionsRotationPulse from './content/optionslab/rotation-pulse.md?raw';
 import optionsRotationRegime from './content/optionslab/rotation-regime.md?raw';
 import optionsRotationShadow from './content/optionslab/rotation-shadow.md?raw';
 import optionsRotation from './content/optionslab/rotation.md?raw';
@@ -353,6 +354,16 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     summary: 'Ideas kept for forward observation, each against the pick it would have replaced.',
     kind: 'Screen',
     body: optionsRotationShadow,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-pulse',
+    title: 'Rotation: the Family pulse',
+    summary:
+      'Is morning short-premium working right now: the twelve family-band cells, what the ranking sees, where the picks fall.',
+    kind: 'Screen',
+    body: optionsRotationPulse,
     screen: { tab: 'optionslab', rest: ['rotation'] },
   },
   {

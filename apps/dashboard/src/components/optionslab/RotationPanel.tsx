@@ -34,6 +34,7 @@ import { RotationDailyLog } from './RotationDailyLog';
 import { RotationDrawdowns } from './RotationDrawdowns';
 import { RotationDrift } from './RotationDrift';
 import { RotationExplain } from './RotationExplain';
+import { RotationPulse } from './RotationPulse';
 import { RotationRegime } from './RotationRegime';
 import { RotationShadowScoreboard } from './RotationShadowScoreboard';
 import { RotationBaskets } from './rotation/RotationBaskets';
@@ -236,6 +237,8 @@ export function RotationPanel() {
       ) : null}
 
       {/* ---- widget slots: one line each, in page order; other rotation widgets mount here ---- */}
+      {/* slot:pulse */}
+      <RotationPulse focus={focus} />
       {/* slot:explain */}
       <RotationExplain list={focus} onList={setFocus} />
       {/* slot:daily-log */}

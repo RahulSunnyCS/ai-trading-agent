@@ -79,6 +79,18 @@ export function slotLabel(slot: string): string {
   return /^\d{4}$/.test(slot) ? `${slot.slice(0, 2)}:${slot.slice(2)}` : slot;
 }
 
+/**
+ * A comma list of start times (what a Family pulse row passes for a start band) as one option
+ * label: "09:17 to 10:02 (4 start times)".
+ */
+export function slotListLabel(slot: string): string {
+  const times = slot.split(',').filter(Boolean);
+  const first = times[0];
+  const last = times[times.length - 1];
+  if (first === undefined || last === undefined || times.length === 1) return slotLabel(slot);
+  return `${slotLabel(first)} to ${slotLabel(last)} (${times.length} start times)`;
+}
+
 // --- the request ------------------------------------------------------------------------------
 
 export interface MatrixFilters {
