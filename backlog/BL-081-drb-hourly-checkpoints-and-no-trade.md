@@ -281,3 +281,14 @@ None blocking. The VWAP follow-up (BL-082) waits for six months of futures bars.
   that. The registered permutation-only pass is still reported. This only makes the bar harder.
 - 2026-10-10 — block 1 and step 1 run (state table built, calibration matches rotate.py). Result recorded
   above: no variable counts, no-trade inert; the item closes at its registered gate. Step 2 not run.
+- 2026-10-10 — **Block 2, exploratory diagnostic (registered before running).** The owner asked for a wider
+  look for an intraday edge after step 1's narrow negative. Design: pooled, not per strategy. Unit = a
+  day; for each (hour, variable, strategy type, start band) the mean P&L per strategy-day of the pending
+  strategies is compared across the variable's states with day-clustered standard errors (a t-statistic
+  on day means). Also: the unconditional P&L by start band and type per calendar year, the "oracle"
+  stake at each hour (best pending strategy minus the picked one), and a state-blind re-rank control.
+  **Exploration set** = 2024-10-09 → 2026-10-08 (both indices, the main results). **Confirmation set** =
+  NIFTY 2022-01-03 → 2024-10-08, read only for cells the exploration set flags (|t| ≥ 3). A cell is a
+  *lead* if it is flagged in exploration and has the same sign with |t| ≥ 2 in confirmation. Leads are
+  hypotheses for a separately registered rule test, not results; nothing is adopted from this block.
+
