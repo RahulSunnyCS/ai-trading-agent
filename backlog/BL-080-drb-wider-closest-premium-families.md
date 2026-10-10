@@ -176,7 +176,15 @@ The owner (2026-10-10) asked to add the next two premiums further out on each in
   (B and C gain in P1 and lose in P2, REF the reverse, A loses in both). **The second clause fails outright:** C's
   Jan–Aug 2025 drops below the random P90 (3,10,874 vs 3,40,651) where it was above on the 298 list.
   So the pruned list is not used; the journal universe question (248 vs 298) is unaffected by it.
-- **Result (a), the 298 map:** pending (running; `research/bl080/map_extdir.log`).
+- **Result (a), the 298 map (2026-10-10 19:10, gross; 100 weightings × 3 periods = 300 runs):**
+  **ITM1 is fragility-reducing.** 58 of 100 cells are above the random P90 in all three periods (58%),
+  against 19% on the 248 list and 5% on the 348 list; 39 cells are in the robust region (min relative
+  score ≥ 0.85 band as in BL-075) against 0 on the 248 list. By split: baseline 19 of 25, equal 21 of 25,
+  dteheavy 16 of 25, no-VIX 2 of 25 (the VIX criterion is still what the rest hangs on). Best worst-period
+  cell is own 0 / family 10 (min_rel 0.861); the journal's A (own 5 / fam 5) is 0.849 and C (15 / 5) 0.846,
+  both in the robust region. Best period grosses on the 298 list: P1 ₹5,61,480, P2 ₹3,93,740,
+  P3 ₹13,67,159. Together with block 4(b) (pruning rejected) the universe stays at 298; nothing in the
+  journal changes.
 
 ## Log
 
