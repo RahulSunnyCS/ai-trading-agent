@@ -32,6 +32,7 @@ import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
 import { RotationDailyLog } from './RotationDailyLog';
 import { RotationExplain } from './RotationExplain';
+import { RotationPulse } from './RotationPulse';
 import { RotationShadowScoreboard } from './RotationShadowScoreboard';
 import { RotationBaskets } from './rotation/RotationBaskets';
 import { RotationHeadline } from './rotation/RotationHeadline';
@@ -233,6 +234,8 @@ export function RotationPanel() {
       ) : null}
 
       {/* ---- widget slots: one line each, in page order; other rotation widgets mount here ---- */}
+      {/* slot:pulse */}
+      <RotationPulse focus={focus} />
       {/* slot:explain */}
       <RotationExplain list={focus} onList={setFocus} />
       {/* slot:daily-log */}

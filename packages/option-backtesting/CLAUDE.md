@@ -170,6 +170,17 @@ Otherwise:
   Saturday / Sunday sessions are left out and counted (`weekend_excluded`), as in `store.load_matrix`. A cell and its
   drill-down both come from `pool_mask`, so they cannot disagree. The pulse is as of one day (period id `asof`),
   its windows are the last N sessions that match the conditions, and `n_trades == 0` days are counted (`zt`), not dropped.
+- `rotation/pulse.py` + `api/rotation_pulse_routes.py` — the Rotation page's Family pulse (widget 11, read-only):
+  `GET /legwise/rotation/pulse?as_of=&list=&index=`. The 12 cells the family-band criterion pools ({Widesl incl.
+  closest-premium, Dir incl. Dir ITM1, Buy} x start band), grouped by `score.family_index` (a run-time check refuses to
+  answer if `pulse.cell_of` and `family_index` ever disagree). Cell means are `matrix.pool_mask` / `summarise` over the
+  matrix's cached cube (last 5 / 21 / 63 sessions, P1, P2; gross, one lot, a mean, sessions and variants beside it);
+  "ranking sees" is `score.recent_score` of the NET history averaged by `family_index`, the value `score.composite` makes
+  `crit["rfam"]`, ranked 1-12 (equal to Why this pick's Family-band recent; a test holds them equal). The flag is
+  last-21 outside the P10-P90 of the cell's own rolling-21 means whose windows lie inside P1 (needs 20). Chips are the
+  next pick's recorded entry (else the latest; trusted chain only; a late entry is labelled) or, with no entry,
+  `daylog.reconstruction`'s picks labelled reconstructed; the focus list's share is over its last 21 recorded on-time
+  sessions, else the last 21 reconstructed ones, never mixed. `index` narrows the means, never the rank.
 - `analytics/correlation.py` — BL-090: Pearson / Spearman of strategies' daily 1-lot P&L, loss-day
   overlap and loss-day correlation, equal-lot basket drawdown against the sum of the parts, rolling
   drift, a leaf order that clusters look-alikes, and `pick_diverse` (a basket under a correlation cap).

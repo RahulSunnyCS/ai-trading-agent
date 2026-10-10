@@ -42,6 +42,9 @@
  *                                                 and the recorded picks overlay. requireAccess
  *  GET  /api/backtest/legwise/rotation/matrix/cell  — the daily values, curve and variants behind one
  *                                                 cell. requireAccess
+ *  GET  /api/backtest/legwise/rotation/pulse        — the Family pulse: the 12 family-band cells' recent
+ *                                                 gross, the ranking's rank for each, today's picks.
+ *                                                 requireAccess
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
  *  GET  /api/backtest/legwise/daily             — that run's state/log. requireAccess
@@ -913,6 +916,35 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation daily log -----------------------------------------------------------
+
+  // --- rotation pulse ---
+  // The Family pulse card (rotation/pulse.py, read-only): three optional parameters, validated
+  // here and again by the Python side. `index` takes the names the Python parser accepts.
+  fastify.get(
+    '/api/backtest/legwise/rotation/pulse',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            as_of: { type: 'string', pattern: DATE_RE },
+            list: { type: 'string', enum: ['A', 'B', 'C', 'REF'] },
+            index: { type: 'string', enum: ['both', 'NIFTY', 'SENSEX'] },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/pulse${upstreamQuery(q, ['as_of', 'list', 'index'])}`,
+      );
+    },
+  );
+  // --- end rotation pulse ---
 
   fastify.post(
     '/api/backtest/legwise/daily',
