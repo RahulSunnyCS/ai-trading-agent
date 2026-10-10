@@ -194,3 +194,12 @@ None blocking. The VWAP follow-up (BL-082) waits for six months of futures bars.
   checks of not-yet-started picks) and the owner's additions: hourly not only 10:30, more variables
   (VWAP, ATR, RSI, pivots), free swaps as well as family-preserving, a 50 / 50 blend as well as 25 / 75,
   real VWAP deferred to BL-082.
+- 2026-10-10 — clarifications written before any run (nothing in the registered rules changes): (1) a
+  state "at h" uses bars stamped up to and including h (complete at h+1 minute) and is acted on at h+1;
+  (2) the straddle-VWAP "near" band is ±2% (the spot bands are in the table); (3) its straddle is the
+  09:20-ATM call + put close of the nearest expiry with bars, weighted by call + put volume; the 2022–24
+  option bars carry volume, so it is available in all three periods and may count; (4) ATR is the mean
+  true range of the previous 14 completed sessions of the index; (5) the 5-minute RSI uses the last
+  1-minute close of each 5-minute block completed by h and runs Wilder smoothing over the continuous
+  series of sessions; (6) the straddle-change and ATM-IV rows read `derived/straddle_series_5m` (2024-10→),
+  nearest expiry, first bucket's open vs the last completed bucket, so they stay supporting only.
