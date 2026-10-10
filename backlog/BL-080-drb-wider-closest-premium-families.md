@@ -160,7 +160,23 @@ The owner (2026-10-10) asked to add the next two premiums further out on each in
   lists' gross is ≥ their 298-list gross in at least 2 of 3 periods **and** no list falls below chance
   in a period where it was above it on the 298 list.
 - **Will not run:** other prunings (S_wide, the Buy families), pairs, other lists.
-- **Result:** pending.
+- **Result (b), pruned universe (2026-10-10 18:20, gross; pruned = 298 minus S_p250, S_p320):**
+  **NOT ADOPTED.** Pruned vs the 298 list:
+
+  | List | P1 2025-12→2026-10 | P2 Jan–Aug 2025 | P3 2022–24 | Above P90 (P1 / P2 / P3) |
+  |---|---|---|---|---|
+  | A | 4,50,415 vs 4,76,560 (−26,145) | 3,35,332 vs 3,54,513 (−19,181) | 12,23,256 (same) | yes / yes / yes |
+  | B | 4,57,578 vs 4,38,310 (+19,268) | 3,45,885 vs 3,49,400 (−3,515) | 13,67,159 (same) | yes / yes / yes |
+  | C | 5,12,655 vs 4,94,715 (+17,940) | 3,10,874 vs 3,51,497 (−40,623) | 11,56,788 (same) | yes / **no** / yes |
+  | REF | 3,62,506 vs 4,08,368 (−45,862) | 3,20,206 vs 2,22,000 (+98,206) | 10,80,967 (same) | yes / no / yes |
+
+  P3 is NIFTY-only, so removing SENSEX variants cannot change it: the two lists are identical there and
+  that tie counts as "≥" under the registered rule without being evidence. Counting it, B, C and REF each
+  reach 2 of 3 periods; on P1 and P2, the only periods that can differ, only one of A, B, C, REF is ≥ in
+  both (REF's P1 falls by ₹45,862, A's falls in both). **The second clause fails outright:** C's
+  Jan–Aug 2025 drops below the random P90 (3,10,874 vs 3,40,651) where it was above on the 298 list.
+  So the pruned list is not used; the journal universe question (248 vs 298) is unaffected by it.
+- **Result (a), the 298 map:** pending (running; `research/bl080/map_extdir.log`).
 
 ## Log
 
