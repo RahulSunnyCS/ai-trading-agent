@@ -23,8 +23,8 @@ Why this is a different test from BL-081. BL-081 asked "given the state at 10:30
 variant is best" and found nothing that repeats. The variants start on a 15-minute grid, so an 11:38
 entry does not exist in the stored results. Entry timing can only be tested by re-simulating each day
 with the engine from the trigger minute (`legwise` `simulate_day`, `entry_time` set per day), which costs
-about 0.2 s per day-strategy and is well within reach: about 1,160 days × 2 strategy templates ×
-(trigger + placebo entries) ≈ 10,000 simulations ≈ 40 minutes.
+about 0.2 s per day-strategy and is well within reach: about 1,160 days × 3 strategy templates ×
+(trigger + placebo entries) ≈ 14,000 simulations ≈ 1 hour.
 
 What is already in the repo: 1-minute NIFTY / SENSEX / India VIX bars (2015 / 2018 / 2015 →), NIFTY option
 bars 2022-01 → and SENSEX 2024-10 → (so the ATM straddle at any minute is computable), the BL-081 state
@@ -56,7 +56,7 @@ variations of the templates, the combined score before the single triggers have 
 
 ### Phase 0 — Pre-register (before any run)
 
-**Templates (2 in phase 1, the live shapes, 1 lot each in simulation; Buy deferred, see Open questions):** Widesl = the `N_wide_*` / `S_wide_*`
+**Templates (3, the live shapes, 1 lot each in simulation):** Widesl = the `N_wide_*` / `S_wide_*`
 strangle (OTM1, 115% SL trailed 15/10, ₹2,500 overall); Dir = the `*_dir_*` ATM pair (21% SL, one
 re-entry at cost, ₹3,000 overall); Buy = the `*_buy_*` template. Entry = the minute after the trigger
 bar completes (trigger on bar t means entry at the open of t+1); exit 15:28; `lot_sizing: current`,
@@ -172,13 +172,15 @@ templates other than the three, per-variant fits, any live use before phase 3's 
 
 ## Open questions
 
-None. Both were settled on 2026-10-10 (owner: "take your call; basic things first, more once it works"):
-- **T1 levels: P, R1, S1 only.** R2 / S2 and yesterday's high / low are a dated block 2 if T1 is a lead.
-- **Templates: Widesl and Dir only in phase 1.** Buy is the add-on, not a core pick, and it is the one the
-  09:16 rule fires least (about 1 day in 4); it joins as a template only if a trigger's forward index move
-  is large enough to suggest it (reported in the event study either way).
+None. Settled on 2026-10-10:
+- **T1 levels: P, R1, S1 only** (my call, owner delegated). R2 / S2 and yesterday's high / low are a dated
+  block 2 if T1 is a lead.
+- **Templates: Widesl, Dir and Buy, all three from phase 1** (owner's call: there are situations where a
+  trigger would point to Buy, so it is tested from the start). Buy as an override replaces a pending core
+  pick like the other two, lots conserved; the Widesl minimum still applies.
 
 ## Log
 
 - 2026-10-10 — created from the owner's event-triggered idea (plan only; Fable designs, Sonnet runs).
 - 2026-10-10 — open questions settled (P / R1 / S1 only; Widesl and Dir templates first).
+- 2026-10-10 — owner: keep Buy as a third template from phase 1 (reverses my earlier call).
