@@ -35,6 +35,7 @@ import numpy as np
 from ..fyers.daily import data_dir
 from . import base as base_mod
 from . import daylog, history
+from .history import BAND_LABEL
 from .lists import LISTS
 from .matrix import NAMED
 from .readout import max_drawdown
@@ -49,12 +50,6 @@ MAX_MIN_DEPTH = 100_000.0
 BASE_LOTS = 6
 
 KIND_LABEL = {"wide": "Widesl", "dir": "Dir", "buy": "Buy"}
-BAND_LABEL = {
-    "A": "09:17–10:02",
-    "B": "10:17–12:02",
-    "C": "12:17–14:02",
-    "D": "14:17–15:17",
-}
 
 
 class DrawdownError(Exception):
@@ -115,7 +110,7 @@ def episodes_of(daily: np.ndarray, min_depth: float) -> list[dict]:
 
 def _usable(r: dict, key: str) -> dict | None:
     """The list's scored block of a row that counts as a session, else None."""
-    if r["source"] == "missing" or (r["source"] == "recorded" and r.get("status") == "late"):
+    if not history.is_session(r):
         return None
     block = (r.get("lists") or {}).get(key)
     if block is None or not block["scored"] or block["per_lot_day"] is None:

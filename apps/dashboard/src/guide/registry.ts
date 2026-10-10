@@ -40,6 +40,7 @@ import optionsHowItWorks from './content/optionslab/how-it-works.md?raw';
 import optionsRegimes from './content/optionslab/regimes.md?raw';
 import optionsRotationDailyLog from './content/optionslab/rotation-daily-log.md?raw';
 import optionsRotationDrawdowns from './content/optionslab/rotation-drawdowns.md?raw';
+import optionsRotationDrift from './content/optionslab/rotation-drift.md?raw';
 import optionsRotationExplain from './content/optionslab/rotation-explain.md?raw';
 import optionsRotationMatrix from './content/optionslab/rotation-matrix.md?raw';
 import optionsRotationPulse from './content/optionslab/rotation-pulse.md?raw';
@@ -335,6 +336,15 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     summary: 'Each fall of a list: how deep, how long, how fast back, and what it was holding.',
     kind: 'Screen',
     body: optionsRotationDrawdowns,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-drift',
+    title: 'Rotation: selection drift',
+    summary: 'What a list has been holding, by family, index, strike method and start band.',
+    kind: 'Screen',
+    body: optionsRotationDrift,
     screen: { tab: 'optionslab', rest: ['rotation'] },
   },
   {
