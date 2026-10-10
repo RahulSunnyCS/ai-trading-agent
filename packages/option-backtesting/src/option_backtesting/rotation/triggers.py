@@ -40,10 +40,11 @@ OPEN_MIN = 555  # 09:15
 N_BARS = 375
 J0, J1 = 75, 285  # stamps 10:30 .. 14:00 (minutes after 09:15)
 J_1000, J_EXIT = 45, 373
-HISTORY = 330  # sessions loaded: 252 (T3's median) + 60 recent (placebo choice) + warm-up
-MIN_SESSIONS = (
-    312  # fewer than this and a day is skipped (the median needs 252 before each session)
-)
+PLACEBO_WINDOW = 120  # earlier sessions scanned for placebo days (T4 fires on ~60% of sessions)
+HISTORY = 400  # sessions loaded: 252 (T3's median) + 120 (placebo scan) + warm-up
+MIN_SESSIONS = 372  # fewer than this and an index is skipped
+CATCH_UP_DAYS = 14  # calendar days an unattended run looks back for unscored collected days
+CATCH_UP_MAX = 5  # at most this many days per run (newest first), so a run stays short
 PLACEBO_DAYS = 20
 STEP = {"NIFTY": 50, "SENSEX": 100}
 EVENT_COLUMNS = [
@@ -153,7 +154,7 @@ def first_firings(
             fired["T2"] = (j, "")
             break
     if straddle is not None and i >= 252:
-        med = np.nanmedian(r30[i - 252 : i], axis=0)
+        med = np.nanmedian(r30[i - 252 : i, J0 : J1 + 1], axis=0)  # stamps J0..J1
         base = straddle[J_1000]
         for j in range(J0, J1 + 1):
             hi = np.nanmax(straddle[J_1000 + 1 : j + 1])
@@ -161,8 +162,8 @@ def first_firings(
                 hi >= 1.05 * base
                 and straddle[j] <= 0.97 * hi
                 and not np.isnan(r30[i, j])
-                and not np.isnan(med[j])
-                and r30[i, j] < med[j]
+                and not np.isnan(med[j - J0])
+                and r30[i, j] < med[j - J0]
             ):
                 fired["T3"] = (j, "")
                 break
@@ -218,7 +219,9 @@ def load_grid(
     epoch0 = {(x - date(1970, 1, 1)).days: x for x in days}
     per: dict[date, dict[int, tuple]] = {}
     for dnum, m, o, h, lo, c in rows:
-        per.setdefault(epoch0[int(dnum)], {})[int(m) - OPEN_MIN] = (o, h, lo, c)
+        x = epoch0.get(int(dnum))
+        if x is not None:
+            per.setdefault(x, {})[int(m) - OPEN_MIN] = (o, h, lo, c)
     keep, O, H, L, C = [], [], [], [], []  # noqa: E741, N806
     for x in days:
         bars = per.get(x, {})
@@ -303,28 +306,33 @@ def make_strategy(underlying: str, template: str, entry: str):
     return LegwiseStrategy.model_validate(d)
 
 
-def simulate(root: Path, underlying: str, day: date, entries: dict[str, str], cache: dict) -> dict:
+def simulate(
+    root: Path,
+    underlying: str,
+    day: date,
+    entries: dict[str, str],
+    loader: Callable[[str, date], object] | None = None,
+) -> dict:
     """{(template, entry): (net, worst_mtm, stopped_by)} for the wanted (template -> entry) pairs on
-    one day; the day is loaded once, lazily."""
+    one day. `loader(underlying, day)` returns the day's data or None (default: load_day)."""
     from ..data.reference.loader import MissingReferenceData, default_reference_data
     from ..legwise.engine import simulate_day
     from ..legwise.market import load_day
     from .lists import SIZING_DATE
 
+    def default_loader(u: str, d: date):
+        try:
+            return load_day(root, u, d)
+        except FileNotFoundError:
+            return None
+
+    data = (loader or default_loader)(underlying, day)
+    if data is None:
+        return {}
     out = {}
-    data = None
     ref = default_reference_data()
     sizing = date.fromisoformat(SIZING_DATE)
     for template, entry in entries.items():
-        key = (underlying, day.isoformat(), template, entry)
-        if key in cache:
-            out[(template, entry)] = cache[key]
-            continue
-        if data is None:
-            try:
-                data = load_day(root, underlying, day)
-            except FileNotFoundError:
-                return out
         try:
             r = simulate_day(make_strategy(underlying, template, entry), data, ref, sizing)
         except MissingReferenceData:
@@ -355,18 +363,42 @@ def read_sims(root: Path | None = None) -> list[dict]:
     return _read(triggers_dir(root) / "sims.csv")
 
 
-def _append(path: Path, columns: list[str], rows: list[dict], root: Path | None) -> None:
+EVENT_KEY = ("underlying", "day", "trigger")
+SIM_KEY = ("kind", "ref_day", "trigger", "underlying", "day", "template", "entry")
+SCORED_COLUMNS = ["underlying", "day"]
+
+
+def _append_unique(
+    path: Path, columns: list[str], key: tuple[str, ...], rows: list[dict], root: Path | None
+) -> int:
+    """Append the rows whose key is not stored yet; the check and the write are one locked step, so
+    two runs cannot both add a row. Returns how many were written."""
     if not rows:
-        return
+        return 0
     path.parent.mkdir(parents=True, exist_ok=True)
     with store._write_lock(root):  # noqa: SLF001 - the one lock for every rotation write
+        have = {tuple(r[c] for c in key) for r in _read(path)}
+        fresh = []
+        for r in rows:
+            k = tuple(str(r.get(c, "")) for c in key)
+            if k not in have:
+                have.add(k)
+                fresh.append(r)
+        if not fresh:
+            return 0
         new = not path.exists()
         with path.open("a", newline="") as f:
             w = csv.writer(f)
             if new:
                 w.writerow(columns)
-            for r in rows:
+            for r in fresh:
                 w.writerow([r.get(c, "") for c in columns])
+    return len(fresh)
+
+
+def read_scored(root: Path | None = None) -> set[tuple[str, str]]:
+    """{(index, day)} already scored: a day that fired nothing is recorded too."""
+    return {(r["underlying"], r["day"]) for r in _read(triggers_dir(root) / "scored_days.csv")}
 
 
 @dataclass
@@ -387,7 +419,7 @@ def prepare(grid: Grid, vix: Grid) -> Prepared:
 def session_firings(
     root: Path, underlying: str, grid: Grid, vix: Grid, prep: Prepared, k: int
 ) -> dict[str, tuple[int, str]]:
-    """The triggers' first firings on session k of `grid` (needs 253 sessions before it for T3;
+    """The triggers' first firings on session k of `grid` (needs 252 sessions before it for T3;
     fewer gives T1, T2, T4 only). {} when the VIX has no bars that session."""
     vk = prep.vix_ix.get(grid.days[k])
     if vk is None or k < 14:
@@ -414,29 +446,48 @@ def session_firings(
 # ---- the nightly step ----
 
 
+def _usable_days(root: Path, underlying: str, grid: Grid) -> set[str]:
+    """Sessions that can serve as placebo days: option bars exist and data_quality does not exclude
+    them (the study's backtest_days)."""
+    from trading_data import lake
+
+    from .attrs import excluded_map
+
+    excluded = excluded_map(root).get(underlying, {})
+    return {
+        d
+        for d in grid.days
+        if lake.bars_1m_path(root, "option", underlying, date.fromisoformat(d)).exists()
+        and date.fromisoformat(d) not in excluded
+    }
+
+
 def score_day(day: date, root: Path | None = None, log: Callable[[str], None] = print) -> dict:
     """Find the day's trigger events for both indices and simulate event and placebo entries.
-    Idempotent: an (index, day, trigger) already stored is not touched. Returns counts."""
+    Idempotent and safe to run twice at once: a stored row is never rewritten or duplicated, and an
+    index whose day was scored is recorded in scored_days.csv. Returns counts and skip reasons."""
+    from functools import lru_cache
+
     from ..fyers.daily import data_dir
     from .attrs import UNDERLYINGS
 
     root = root or data_dir()
-    out = {"events": 0, "sims": 0, "skipped": []}
-    have_events = {(r["underlying"], r["day"], r["trigger"]) for r in read_events(root)}
-    have_sims = {
-        (
-            r["kind"],
-            r["ref_day"],
-            r["trigger"],
-            r["underlying"],
-            r["day"],
-            r["template"],
-            r["entry"],
-        )
-        for r in read_sims(root)
-    }
+    out: dict = {"events": 0, "sims": 0, "skipped": []}
+    scored = read_scored(root)
     vix = load_grid(root, "INDIAVIX", day)
+
+    @lru_cache(maxsize=64)
+    def day_data(und: str, d: date):
+        from ..legwise.market import load_day
+
+        try:
+            return load_day(root, und, d)
+        except FileNotFoundError:
+            return None
+
     for und in UNDERLYINGS:
+        if (und, day.isoformat()) in scored:
+            continue
         grid = load_grid(root, und, day)
         if (
             grid is None
@@ -450,52 +501,43 @@ def score_day(day: date, root: Path | None = None, log: Callable[[str], None] = 
             out["skipped"].append(f"{und}: only {len(grid.days)} sessions of history")
             continue
         prep = prepare(grid, vix)
-
-        def fired_on(k: int, grid=grid, prep=prep, und=und) -> dict:
-            return session_firings(root, und, grid, vix, prep, k)
-
         i = len(grid.days) - 1
-        today = fired_on(i)
+        today = session_firings(root, und, grid, vix, prep, i)
         st_today = None
         try:
             st_today = straddle_series(root, und, day, grid.C[i, 5])
         except Exception:  # noqa: BLE001
             st_today = None
-        # the fired sets of the previous 60 sessions, to choose placebo days without events
-        recent = {k: fired_on(k) for k in range(i - 60, i)}
+        # placebo candidates: the previous PLACEBO_WINDOW sessions that have option bars, are not
+        # excluded by data_quality, and where T3 could be evaluated; their own firings decide
+        usable = _usable_days(root, und, grid)
+        window = [k for k in range(max(i - PLACEBO_WINDOW, 252), i) if grid.days[k] in usable]
+        recent = {k: session_firings(root, und, grid, vix, prep, k) for k in window}
         new_events, new_sims = [], []
         for trig, (j, detail) in today.items():
             entry = f"{(OPEN_MIN + j + 1) // 60:02d}:{(OPEN_MIN + j + 1) % 60:02d}"
-            if (und, day.isoformat(), trig) not in have_events:
-                st = st_today[0] if st_today else None
-                new_events.append(
-                    dict(
-                        day=day.isoformat(),
-                        underlying=und,
-                        trigger=trig,
-                        stamp=j,
-                        entry=entry,
-                        detail=detail,
-                        expiry_day=bool(st_today and st_today[1] == day),
-                        fwd_spot=round(float(grid.C[i, J_EXIT] / grid.O[i, j + 1] - 1), 6),
-                        fwd_straddle=""
-                        if st is None or not st[j + 1] > 0
-                        else round(float(st[J_EXIT] / st[j + 1] - 1), 6),
-                    )
+            st = st_today[0] if st_today else None
+            new_events.append(
+                dict(
+                    day=day.isoformat(),
+                    underlying=und,
+                    trigger=trig,
+                    stamp=j,
+                    entry=entry,
+                    detail=detail,
+                    expiry_day=bool(st_today and st_today[1] == day),
+                    fwd_spot=round(float(grid.C[i, J_EXIT] / grid.O[i, j + 1] - 1), 6),
+                    fwd_straddle=""
+                    if st is None or not st[j + 1] > 0
+                    else round(float(st[J_EXIT] / st[j + 1] - 1), 6),
                 )
-            placebo = [
-                grid.days[k] for k in range(i - 1, -1, -1) if k in recent and trig not in recent[k]
-            ][:PLACEBO_DAYS]
-            targets = [("event", day.isoformat())] + [("placebo", p) for p in placebo]
-            for kind, sim_day in targets:
-                want = {
-                    t: entry
-                    for t in TEMPLATES
-                    if (kind, day.isoformat(), trig, und, sim_day, t, entry) not in have_sims
-                }
-                if not want:
-                    continue
-                res = simulate(root, und, date.fromisoformat(sim_day), want, {})
+            )
+            placebo = [grid.days[k] for k in reversed(window) if trig not in recent[k]][
+                :PLACEBO_DAYS
+            ]
+            for kind, sim_day in [("event", day.isoformat()), *[("placebo", p) for p in placebo]]:
+                want = dict.fromkeys(TEMPLATES, entry)
+                res = simulate(root, und, date.fromisoformat(sim_day), want, loader=day_data)
                 for (t, e), (net, worst, stopped) in res.items():
                     new_sims.append(
                         dict(
@@ -511,15 +553,54 @@ def score_day(day: date, root: Path | None = None, log: Callable[[str], None] = 
                             stopped_by=stopped,
                         )
                     )
-        _append(triggers_dir(root) / "events.csv", EVENT_COLUMNS, new_events, root)
-        _append(triggers_dir(root) / "sims.csv", SIM_COLUMNS, new_sims, root)
-        out["events"] += len(new_events)
-        out["sims"] += len(new_sims)
+        n_ev = _append_unique(
+            triggers_dir(root) / "events.csv", EVENT_COLUMNS, EVENT_KEY, new_events, root
+        )
+        n_sim = _append_unique(
+            triggers_dir(root) / "sims.csv", SIM_COLUMNS, SIM_KEY, new_sims, root
+        )
+        _append_unique(
+            triggers_dir(root) / "scored_days.csv",
+            SCORED_COLUMNS,
+            tuple(SCORED_COLUMNS),
+            [dict(underlying=und, day=day.isoformat())],
+            root,
+        )
+        out["events"] += n_ev
+        out["sims"] += n_sim
         log(
-            f"{day} {und}: events {sorted(today)}, {len(new_events)} new, "
-            f"{len(new_sims)} simulations"
+            f"{day} {und}: events {sorted(today)}, {n_ev} new, {n_sim} simulations, "
+            f"{len(placebo) if today else 0} placebo days"
         )
     return out
+
+
+def score_pending(
+    today: date, root: Path | None = None, log: Callable[[str], None] = print
+) -> list[dict]:
+    """Score `today` and any collected day of the last CATCH_UP_DAYS calendar days that is not
+    scored for both indices (newest first, at most CATCH_UP_MAX), so a failed or skipped night is
+    retried by the next run instead of being lost. Skip reasons are logged."""
+    from ..fyers.daily import data_dir
+    from .attrs import UNDERLYINGS, excluded_map, is_collected
+
+    root = root or data_dir()
+    scored = read_scored(root)
+    excluded = excluded_map(root)
+    days = []
+    d = today
+    for _ in range(CATCH_UP_DAYS + 1):
+        done = all((u, d.isoformat()) in scored for u in UNDERLYINGS)
+        if not done and (d == today or is_collected(root, d, excluded)):
+            days.append(d)
+        d -= timedelta(days=1)
+    results = []
+    for d in days[:CATCH_UP_MAX]:
+        r = score_day(d, root, log=log)
+        for reason in r["skipped"]:
+            log(f"{d} skipped: {reason}")
+        results.append(r)
+    return results
 
 
 # ---- reporting ----

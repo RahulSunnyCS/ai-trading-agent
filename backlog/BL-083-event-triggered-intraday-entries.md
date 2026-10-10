@@ -299,4 +299,12 @@ None. Settled on 2026-10-10:
   wrong sentence in the Result), non-blocking items applied (day-clustered t, registered random-day control,
   random minutes to 14:00, SENSEX in the 11:32 check, corrected random-time text); the pipeline was re-run and
   the Result rewritten, with the mechanism analysis added.
-- 2026-10-10 — the nightly scoring step (the "cheaper first step" above) is built: `obt rotation triggers`, run by `obt rotation update` and isolated from it; parity with this study's trigger table is exact over 1,063 events (2025-06 → 2026-10); the forward store is `rotation/triggers/`. Reading the first verdict needs months of days: about 14 pivot events and 37 RSI events per index every three months.
+- 2026-10-10 — the nightly scoring step (the "cheaper first step" above) is built: `obt rotation triggers`,
+  run by `obt rotation update` (isolated; catches up unscored collected days of the last 14, newest first, at
+  most 5 a run) with a forward store in `rotation/triggers/`. Parity with this study's trigger table is exact
+  over 1,063 events (2025-06 → 2026-10) when sessions with bars before 09:15 are dropped as the study did. The
+  production default keeps them (about a dozen Angel One days since 2025): over the same window it differs by
+  2 missing, 7 extra and 5 moved events, all on or after those days (the extra session enters the 252-session
+  median and the RSI chain). Placebo days are earlier sessions with option bars, not excluded by data_quality,
+  scanned over the previous 120 sessions. Reading the first verdict needs months of days: about 14 pivot
+  events and 37 RSI events per index every three months.

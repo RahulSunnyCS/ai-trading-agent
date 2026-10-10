@@ -39,9 +39,9 @@ def update(
         raise typer.Exit(1)
     # BL-083: score the day's intraday triggers. Isolated: a failure here never fails the update.
     try:
-        from .triggers import score_day
+        from .triggers import score_pending
 
-        score_day(d, log=typer.echo)
+        score_pending(d, log=typer.echo)
     except Exception as error:  # noqa: BLE001
         typer.echo(
             f"trigger scoring skipped ({type(error).__name__}: {error}); the update is stored",

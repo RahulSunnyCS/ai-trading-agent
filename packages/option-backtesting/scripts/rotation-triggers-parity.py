@@ -4,9 +4,11 @@
         [--research /path/to/research/bl083/out/triggers.csv]
 
 Prints PARITY OK when every (index, day, trigger) the research found in the window is found at the
-same stamp, and no extra event appears. The module loads with strict_open=True here: the study
-dropped every session that has a bar before 09:15 (about a dozen days since 2025, Angel One
-collections), the production default keeps them. RSI is seeded from 700 sessions here, 2020-09
+same stamp, and no extra event appears. By default the module loads with strict_open=True: the
+study dropped every session that has a bar before 09:15 (about a dozen days since 2025, Angel One
+collections) and the production default keeps them. `--production` compares with the production
+default: it differs from the study only on those days and, through the 252-session median and the
+RSI chain, on a few later T3 / T4 stamps. RSI is seeded from 700 sessions here, 2020-09
 in the research; the difference is far below any threshold crossing.
 """
 
@@ -29,6 +31,7 @@ def main() -> int:
         if "--research" in argv
         else "research/bl083/out/triggers.csv"
     )
+    strict = "--production" not in argv
     research: dict[tuple, int] = {}
     with path.open() as f:
         for r in csv.DictReader(f):
@@ -36,10 +39,10 @@ def main() -> int:
                 research[(r["underlying"], r["day"], r["trigger"])] = int(r["stamp"])
     last = max(d for _, d, _ in research)
     root = data_dir()
-    vix = T.load_grid(root, "INDIAVIX", date.fromisoformat(last), sessions=700, strict_open=True)
+    vix = T.load_grid(root, "INDIAVIX", date.fromisoformat(last), sessions=700, strict_open=strict)
     mine: dict[tuple, int] = {}
     for und in ("NIFTY", "SENSEX"):
-        grid = T.load_grid(root, und, date.fromisoformat(last), sessions=700, strict_open=True)
+        grid = T.load_grid(root, und, date.fromisoformat(last), sessions=700, strict_open=strict)
         prep = T.prepare(grid, vix)
         for k, d in enumerate(grid.days):
             if d < start or d > last or k < 253:  # T3 needs 252 sessions before a session

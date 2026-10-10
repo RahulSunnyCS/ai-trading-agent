@@ -245,7 +245,144 @@ def test_a_trigger_scoring_failure_never_fails_the_nightly_update(monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("lake unreadable")
 
-    monkeypatch.setattr(trig, "score_day", boom)
+    monkeypatch.setattr(trig, "score_pending", boom)
     r = CliRunner().invoke(rotation_app, ["update"])
     assert r.exit_code == 0
     assert "trigger scoring skipped" in r.output and "lake unreadable" in r.output
+
+
+# ---- score_day / score_pending on synthetic bars (no lake, no engine) -------------------------------
+
+from datetime import date, timedelta  # noqa: E402
+
+
+def _sessions(n: int, end: date) -> list[date]:
+    out, d = [], end
+    while len(out) < n:
+        if d.weekday() < 5:
+            out.append(d)
+        d -= timedelta(days=1)
+    return out[::-1]
+
+
+def _flat(days: list[date]) -> T.Grid:
+    n = len(days)
+    c = np.full((n, T.N_BARS), 20000.0)
+    h, lo = c.copy(), c.copy()
+    h[:, 100] += 100
+    lo[:, 101] -= 100
+    return T.Grid([d.isoformat() for d in days], c.copy(), h, lo, c)
+
+
+@pytest.fixture
+def scoring(tmp_path, monkeypatch):
+    """Both indices flat for 400 sessions; the VIX turns (T2) on the last one only. Every simulation
+    returns 1.0 per template so the stored rows can be counted."""
+    from trading_data import lake
+
+    from option_backtesting.rotation import attrs
+
+    end = date(2026, 10, 8)
+    days = _sessions(400, end)
+    grid = _flat(days)
+    vgrid = _flat(days)
+    vgrid.O[:, 0] = 15.0
+    vgrid.C[:, :] = 15.0
+    vgrid.C[-1, :] = 15.6
+    vgrid.C[-1, 101:] = 15.35  # +2.3% on the open, -1.6% on 30 minutes before: T2 at stamp 101
+
+    def fake_load_grid(root, symbol, end_day, sessions=T.HISTORY, strict_open=False):
+        g = vgrid if symbol == "INDIAVIX" else grid
+        k = g.days.index(end_day.isoformat()) + 1 if end_day.isoformat() in g.days else None
+        if k is None:
+            return None
+        return T.Grid(g.days[:k], g.O[:k], g.H[:k], g.L[:k], g.C[:k])
+
+    calls = []
+
+    def fake_simulate(root, und, day, entries, loader=None):
+        calls.append((und, day.isoformat()))
+        return {(t, e): (1.0, 0.0, "") for t, e in entries.items()}
+
+    # option files exist for every session except two; one more session is excluded by data_quality
+    no_option = {days[-5].isoformat(), days[-9].isoformat()}
+    excluded_day = days[-3]
+    for d in days:
+        if d.isoformat() not in no_option:
+            f = lake.bars_1m_path(tmp_path, "option", "NIFTY", d)
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.touch()
+            g = lake.bars_1m_path(tmp_path, "option", "SENSEX", d)
+            g.parent.mkdir(parents=True, exist_ok=True)
+            g.touch()
+    monkeypatch.setattr(T, "load_grid", fake_load_grid)
+    monkeypatch.setattr(T, "straddle_series", lambda *a, **k: None)
+    monkeypatch.setattr(T, "simulate", fake_simulate)
+    monkeypatch.setattr(
+        attrs, "excluded_map", lambda root: {"NIFTY": {excluded_day: "thin"}, "SENSEX": {}}
+    )
+    return tmp_path, days, no_option, excluded_day, calls
+
+
+def test_score_day_stores_events_and_20_placebos_from_usable_days_only(scoring):
+    root, days, no_option, excluded_day, _ = scoring
+    r = T.score_day(days[-1], root, log=lambda s: None)
+    assert r["events"] == 2 and r["skipped"] == []  # T2 on both indices
+    events = T.read_events(root)
+    assert {(e["underlying"], e["trigger"], e["stamp"]) for e in events} == {
+        ("NIFTY", "T2", "101"),
+        ("SENSEX", "T2", "101"),
+    }
+    sims = T.read_sims(root)
+    nifty = [s for s in sims if s["underlying"] == "NIFTY"]
+    placebo_days = {s["day"] for s in nifty if s["kind"] == "placebo"}
+    assert len(placebo_days) == T.PLACEBO_DAYS
+    assert not placebo_days & no_option and excluded_day.isoformat() not in placebo_days
+    assert all(d < days[-1].isoformat() for d in placebo_days)  # earlier sessions only
+    assert len(nifty) == (1 + T.PLACEBO_DAYS) * len(T.TEMPLATES)
+    assert T.read_scored(root) == {
+        ("NIFTY", days[-1].isoformat()),
+        ("SENSEX", days[-1].isoformat()),
+    }
+
+
+def test_a_repeat_run_and_a_second_writer_add_no_rows(scoring):
+    root, days, *_ = scoring
+    T.score_day(days[-1], root, log=lambda s: None)
+    n_ev, n_sim = len(T.read_events(root)), len(T.read_sims(root))
+    again = T.score_day(days[-1], root, log=lambda s: None)
+    assert (again["events"], again["sims"]) == (0, 0)
+    # a writer that read the store before the first run finished: its rows are dropped under the lock
+    rows = [
+        dict(day=days[-1].isoformat(), underlying="NIFTY", trigger="T2", stamp=101, entry="10:54")
+    ]
+    assert (
+        T._append_unique(
+            T.triggers_dir(root) / "events.csv", T.EVENT_COLUMNS, T.EVENT_KEY, rows, root
+        )
+        == 0
+    )
+    assert (len(T.read_events(root)), len(T.read_sims(root))) == (n_ev, n_sim)
+
+
+def test_a_day_with_no_event_is_recorded_as_scored(scoring):
+    root, days, *_ = scoring
+    quiet = days[-2]  # the VIX never turns on this session
+    r = T.score_day(quiet, root, log=lambda s: None)
+    assert r["events"] == 0 and r["sims"] == 0 and r["skipped"] == []
+    assert ("NIFTY", quiet.isoformat()) in T.read_scored(root)
+
+
+def test_score_pending_retries_an_unscored_collected_day_and_respects_the_cap(scoring, monkeypatch):
+    from option_backtesting.rotation import attrs
+
+    root, days, *_ = scoring
+    today = days[-1]
+    monkeypatch.setattr(attrs, "is_collected", lambda root, d, excluded=None: d.weekday() < 5)
+    seen = []
+    monkeypatch.setattr(
+        T, "score_day", lambda d, root=None, log=print: seen.append(d) or {"skipped": []}
+    )
+    T.score_pending(today, root, log=lambda s: None)
+    assert seen[0] == today and len(seen) == T.CATCH_UP_MAX  # newest first, capped
+    assert seen == sorted(seen, reverse=True)
