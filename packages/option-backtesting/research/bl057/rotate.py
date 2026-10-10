@@ -278,6 +278,9 @@ def whole_day_columns(underlying: str, pfx: str) -> pd.DataFrame:
                 e = read_net(early)
                 cols[name] = pd.concat([e[e.index < s.index.min()], s]).sort_index()
     df = pd.DataFrame(cols).sort_index()
+    if ext_names:  # BL-080: the new series run beyond the main results; keep the main results' days
+        base = [c for c in df.columns if c not in ext_names]
+        df = df.loc[df[base].dropna(how="all").index]
     if EARLY_DIR is not None:  # a variant that did not trade a day has no row: keep common days
         before = len(df)
         df = df.dropna()
