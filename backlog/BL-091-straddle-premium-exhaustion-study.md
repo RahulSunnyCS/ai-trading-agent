@@ -563,8 +563,9 @@ until one rule is frozen.
 - **Hold:** the straddle must stay at least the threshold above the low for 5 consecutive minutes.
   The spike is known when the 5th minute completes; any entry is the next minute. Brief jumps that
   do not hold are not traded (about half of all spikes).
-- **VIX regime at the 09:15 open:** below 13, and 13 and above. Below 11 alone had 5 NIFTY spikes
-  in the learning periods, too few for its own cut points.
+- **VIX regime at the 09:15 open:** reported both ways, as the owner decided (2026-10-11): two
+  regimes (below 13, 13 and above) and three (below 11, 11–13, 13 and above). Below 11 had 5 NIFTY
+  spikes in the learning periods, so its cells will be inconclusive.
 - **Size category,** from the level above the low when the hold completes (known at entry), with
   cut points per index and regime from P2 + P3:
 
@@ -581,13 +582,26 @@ until one rule is frozen.
 
 ### Stage 1 — the trading test, no hindsight
 
-- **Widesl** (live shape, ₹650 MTM stop per strategy), first entry the minute after the hold, and
-  after each stop one of: R0 re-enter at once (the owner's habit, up to five attempts); R2 wait for
+- **Widesl** (live shape), first entry the minute after the hold, at three MTM stops per strategy:
+  ₹650, ₹1,300 and ₹1,950 (1×, 2× and 3×, owner 2026-10-11), and after each stop one of: R0 re-enter at once (the owner's habit, up to five attempts); R2 wait for
   a give-back of 15 points (SENSEX 54); R3 no entry before 13:30; R4 a stop sized to the premium's
   recent one-minute swings; R5 a 20-minute cooldown; R6 stop after three losing attempts. R1 (wait
   for the signal) is the rule Stage 2 produces.
 - **Directional** (live `*_dir_*` shape: ATM straddle sold, one re-entry at cost per leg, exit
-  15:28), entered once the minute after the hold, leg stop 21 % (live), 25 % and 30 %.
+  15:28), leg stop 21 % (live), 25 % and 30 %, overall stop scaled with it for this study (₹3,000,
+  ₹3,600, ₹4,300; the owner would not use the wider ones live). Two entry categories:
+  - **D1, every held spike:** entered once, the minute after the hold.
+  - **D2, at a support or resistance level only:** during a held spike, enter when the index reacts
+    at a level: in an uptrend it reaches a resistance and is rejected, in a downtrend it reaches a
+    support and bounces; and, as a separate variant, when it breaks through the level. Levels (all
+    computed from data before the day or before the minute): classic pivots (P, R1, R2, S1, S2);
+    previous 1-, 2- and 3-day high and low; daily 20, 50, 100 and 200-day moving averages; the
+    first 30 minutes' high and low; round numbers (NIFTY 500s, SENSEX 1,000s); the call and put
+    strikes with the most open interest; and the expected move from the 09:20 straddle (open ±
+    straddle). Proposed definitions: a touch is within 0.1 % of the level; a rejection is a 1-minute
+    close back on the near side within 3 minutes of the touch; a break is a 5-minute close beyond
+    the level. Every level's touch count is reported, because with many levels the index is near
+    one most of the time.
 - **Comparator:** the same strategy entered at random minutes matched on time of day.
 - **Read-out:** per index × VIX regime × size category, expiry days separately; cells with fewer
   than 20 spikes reported as inconclusive; rupees at cost 0 and at ₹20 per order; R0's ladders that
@@ -609,10 +623,15 @@ until one rule is frozen.
   5. Far out-of-the-money options, strike fixed at the spike's start: 8 strikes out, and the nearest
      round strike (multiple of 500 NIFTY, 1,000 SENSEX). Call and put separately: change since the
      spike began (points and percent), velocity, acceleration.
-  6. Open-interest change of the ATM and far options (exchange snapshot about every 3 minutes).
-  7. Other indices: Bank Nifty, Fin Nifty and Midcap Nifty index moves (all periods); their rolling
+  6. Open-interest change of the ATM and far options (exchange snapshot about every 3 minutes),
+     including at the reversal: does OI keep rising as the straddle turns (writers adding)?
+  7. Option volume at the reversal: ATM call and put volume and the whole nearest-expiry chain's
+     volume in the minutes around the candidate, against the spike's own average. Index bars carry
+     no volume and futures start only in September 2026, so option volume is the measure.
+  8. Other indices: Bank Nifty, Fin Nifty and Midcap Nifty index moves (all periods); their rolling
      straddles (2025 only, monthly expiry).
-  8. Context: time of day, days to expiry, VIX regime, size category.
+  9. Context: time of day, days to expiry, VIX regime, size category, and whether the index is at
+     one of the D2 levels.
 - **Method:** one table per parameter, true tops against false; a parameter that looks the same in
   both is dropped; parameters are added one at a time, never all combinations. Discover on 2022–24,
   check on 2025; parameters that exist only in 2025 are discovered on January–April and checked on
@@ -629,15 +648,21 @@ until one rule is frozen.
 | Their index bars, 1 minute | yes (Midcap from July 2022) | yes |
 | India VIX, 1 minute | yes | yes |
 | Far OTM strikes (NIFTY ±400/500, SENSEX ±800/1,000) | traded every minute on samples | yes |
+| Option volume, 1 minute | yes | yes (zero-volume carried bars excluded) |
+| Index volume / futures | no / no | no / no (futures from 2026-09-23) |
+| Daily closes for moving averages | from 2015 (built from 1-minute bars) | yes |
 
-### Open points for the owner
+### Decided and open (2026-10-11)
 
-1. VIX regimes: two (below 13, 13+) as recommended, or three with below 11 as its own?
-2. Directional overall stop: ₹3,000 for all three leg stops, or scaled (about ₹3,600 at 25 %,
-   ₹4,300 at 30 %)?
-3. Breakdown: the last 10 minutes' low or high on 1- and 5-minute bars, or another definition?
-4. True top: both conditions (no higher high, and the Widesl sold next is not stopped), or one?
-5. Order: Stage 1 first, then Stage 2, as the owner said.
+Decided: VIX regimes reported both two and three ways; Widesl stops ₹650 / ₹1,300 / ₹1,950;
+Directional overall stop scaled with the leg stop for the study; Directional categories D1 and D2;
+option volume and OI change at the reversal added to Stage 2.
+
+Open:
+1. Breakdown: the last 10 minutes' low or high on 1- and 5-minute bars, or another definition?
+2. True top: both conditions (no higher high, and the Widesl sold next is not stopped), or one?
+3. D2 level list and the touch / rejection / break definitions above, or a shorter list?
+4. Order: Stage 1 first, then Stage 2, as the owner said.
 
 ## Log
 
@@ -760,3 +785,8 @@ until one rule is frozen.
 - 2026-10-11 — Consolidated the post-Phase-1 discussion into "Next stages — consolidated draft";
   cut points for VIX below 13 computed (NIFTY 32 / 36 on 32 spikes). Five open points listed for
   the owner. Not registered.
+- 2026-10-11 — Owner decisions folded into the draft: Widesl at three stops (₹650 / ₹1,300 /
+  ₹1,950); VIX reported with two and three regimes; Directional overall stop scaled for the study;
+  Directional second category D2 (enter on a rejection at, or a break of, a support / resistance
+  level); option volume and OI change at the spike's reversal added to Stage 2. Data check: index
+  bars have no volume in any period, futures start 2026-09-23, option volume exists 2022–25.
