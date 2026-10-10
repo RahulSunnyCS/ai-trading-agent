@@ -38,6 +38,7 @@ import optionsCorrelation from './content/optionslab/correlation.md?raw';
 import optionsDailyResults from './content/optionslab/daily-results.md?raw';
 import optionsHowItWorks from './content/optionslab/how-it-works.md?raw';
 import optionsRegimes from './content/optionslab/regimes.md?raw';
+import optionsRotationExplain from './content/optionslab/rotation-explain.md?raw';
 import optionsRuns from './content/optionslab/runs.md?raw';
 import optionsStrategies from './content/optionslab/strategies.md?raw';
 import optionsLosingDays from './content/optionslab/walkthrough-losing-days.md?raw';
@@ -288,6 +289,17 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     kind: 'Screen',
     body: optionsCorrelation,
     screen: { tab: 'optionslab', rest: ['correlation'] },
+  },
+  {
+    // Documents two widgets of the Rotation page, so it has no screen of its own (the Rotation
+    // page's guide page owns that route).
+    chapter: 'optionslab',
+    slug: 'rotation-explain',
+    title: 'Rotation: why a pick, and does rank predict results',
+    summary:
+      'Why each list picked what it did, criterion by criterion, and whether the morning ranking orders the day.',
+    kind: 'Screen',
+    body: optionsRotationExplain,
   },
   {
     chapter: 'optionslab',
