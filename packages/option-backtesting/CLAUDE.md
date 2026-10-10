@@ -122,6 +122,18 @@ Otherwise:
   `rotation/series.py`, so a figure is computed in exactly one place. Selectors are validated by pattern and
   matched only against enumerated strategy names; at most 80 strategies per request; the strategy list is
   cached for 30 s. Errors are `{"error": ...}`.
+- `rotation/matrix.py` + `api/rotation_matrix_routes.py` — the Options Lab's Matrix tab (the Strategy Matrix, read-only):
+  `GET /legwise/rotation/matrix` (views `family_slot` / `date_slot` / `dte_slot` / `vix_family` / `weekday_family` /
+  `pulse`; metrics `avg` / `win_rate` / `stop_rate` / `worst` / `selection`; periods P1, P2, P3 (returned as
+  `unavailable`: not in the store), `forward`, `custom`; `compare=P1,P2` returns both grids on one scale plus the
+  difference) and `GET /legwise/rotation/matrix/cell` (daily values, running total, pooled variants with their
+  settings). Reads `rotation/results/*.csv`, `days.csv` and the journal and writes nothing. Gross per ONE-lot
+  strategy-day, pooled as mean / rate / worst, never summed; `n` is distinct sessions, a cell under `min_n`
+  (default 20) is flagged `thin`, never hidden; a missing value is `missing` / `excluded` / `na`, never zero.
+  The selection overlay is journal entries only (late entries excluded from selection statistics); picks are never
+  reconstructed. Rows of `family_slot` are the 12 index x family tags found in the store (NIFTY wide / p80 / p100 /
+  dir / ditm1 / buy, SENSEX wide / p250 / p320 / dir / ditm1 / buy); `wide` is OTM1 on NIFTY and OTM2 on SENSEX,
+  read from the strategy file for the label. The loaded cube is cached on the files' size and mtime.
 - `analytics/correlation.py` — BL-090: Pearson / Spearman of strategies' daily 1-lot P&L, loss-day
   overlap and loss-day correlation, equal-lot basket drawdown against the sum of the parts, rolling
   drift, a leaf order that clusters look-alikes, and `pick_diverse` (a basket under a correlation cap).
