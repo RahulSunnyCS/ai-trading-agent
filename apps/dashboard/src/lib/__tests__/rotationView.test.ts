@@ -102,7 +102,7 @@ describe('headline', () => {
     expect(byId.drawdownLot?.gap).toBe(0);
     expect(byId.drawdownLot?.tone).toBe('default');
     expect(byId.total?.gap).toBeNull();
-    expect(byId.total?.caption).toContain('6 lots a day');
+    expect(byId.total?.caption).toBe('6 lots a day here, 6 for REF');
     expect(byId.sessions?.value).toBe(2);
     expect(byId.sessions?.benchmark).toBe(60);
   });

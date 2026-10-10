@@ -128,7 +128,7 @@ export function headline(
   const totalCaption =
     b.total === null
       ? undefined
-      : `${b.label} at ${lots(b.lotsPerDay)} lots a day; this list ${lots(f.lots_per_day)}`;
+      : `${lots(f.lots_per_day)} lots a day here, ${lots(b.lotsPerDay)} for ${b.label}`;
   return [
     {
       id: 'perLotDay',

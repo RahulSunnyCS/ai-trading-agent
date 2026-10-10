@@ -24,6 +24,12 @@ const STROKE: Record<RotationListKey, string> = {
   C: 'stroke-series-3',
   REF: 'stroke-series-4',
 };
+const FILL: Record<RotationListKey, string> = {
+  A: 'fill-series-1',
+  B: 'fill-series-2',
+  C: 'fill-series-3',
+  REF: 'fill-series-4',
+};
 const SWATCH: Record<RotationListKey, string> = {
   A: 'bg-series-1',
   B: 'bg-series-2',
@@ -243,7 +249,7 @@ export function RotationHero({
                   cx={x(i)}
                   cy={y(v)}
                   r={k === focus ? 3.2 : 2.4}
-                  className={`${STROKE[k].replace('stroke-', 'fill-')}`}
+                  className={FILL[k]}
                 />
               );
             }),
