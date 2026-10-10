@@ -244,18 +244,21 @@ comparator for its own question. Nothing in the lists, the ranking or the 298-va
   - Widesl OTM1 09:17 is the rotation variant `N_wide_0917` (OTM1 strikes, ₹2,500 overall stop), identical
     to the live `strategies/legwise/nifty_widesl_917_otm1.yaml`.
   - Dir ATM 09:24 is a new file: the live `nifty_dir_924_itm1_sl21_recost.yaml` with the strike changed from
-    ITM1 to ATM and nothing else (09:24 entry, per-leg stop, RE COST ×1, 15:28 exit). The owner chose ATM;
+    ITM1 to ATM and nothing else (09:24 entry, 21% stop per leg, ₹3,000 overall stop, RE COST ×1, 15:28 exit). The owner chose ATM;
     the live file and the earlier benchmarks B1–B3 use ITM1.
   - 2 lots per strategy, so 6 lots a day, lots sized at `SIZING_DATE` exactly like the lists.
 - **Unit:** ₹ per lot-day is the headline unit for every comparison with the base and with REF. A list holds
   6 lots, or 8 when the Buy add-on fires, so totals would reward holding more lots; totals at the stated lots
   are reported beside.
 - **Read-out addition, per list (A, B, C and REF):** the daily series list minus base in ₹ per lot-day; its
-  mean and a 90% interval from the same 5-day block bootstrap as the REF comparison (same seed and resample
-  count). **A list "beats the base" when the interval's lower bound is above zero and the list's max drawdown
+  mean and a two-sided 90% percentile interval from a circular 5-day block bootstrap, 2,000 resamples,
+  seed 20261012. **The REF comparison uses the same parameters;** Phase 0b named the bootstrap but not its
+  settings, and fixing them here, before the first entry, keeps both from being chosen after the data. **A list "beats the base" when the interval's lower bound is above zero and the list's max drawdown
   per lot (of the cumulative ₹-per-lot-day series) is no worse than the base's.** No minimum size: the owner
   chose "reliably ahead, any size" over a fixed 10% or 20% margin. The base's own gross, drawdown and ₹ per
-  lot-day are reported with the lists.
+  lot-day are reported with the lists. All four lists are reported against the base; with four tries, one
+  list passing alone is read as weaker evidence than several passing. Sixty days give twelve 5-day blocks, so
+  the interval will be wide: only a clear edge passes, which is the point of the rule.
 - **Scoring:** the base is scored nightly with the lists from the same results store. Its strategy files
   live outside `strategies/rotation/` (proposed `strategies/rotation_base/`) so the universe, its hash and the
   morning pick are untouched. The Dir ATM 09:24 history over the stored period (2024-10-09 onward) is run
