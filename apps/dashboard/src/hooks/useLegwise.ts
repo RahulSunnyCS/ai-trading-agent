@@ -68,9 +68,13 @@ export function useDayForensics(
   day: string,
   sha: string | undefined,
   cuts: readonly string[] = DEFAULT_CUTS,
+  /** `strategy` is a rotation variant name (N_wide_0917), not a saved strategy's id. */
+  rotationVariant = false,
 ) {
   return usePolledResource<DayForensics>(
-    `${BASE}/day${query({ strategy, day, sha, cuts: cuts.join(',') })}`,
+    rotationVariant
+      ? `${BASE}/rotation/forensics${query({ variant: strategy, day, cuts: cuts.join(',') })}`
+      : `${BASE}/day${query({ strategy, day, sha, cuts: cuts.join(',') })}`,
   );
 }
 

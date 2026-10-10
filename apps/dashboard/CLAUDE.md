@@ -15,6 +15,14 @@ running P&L, EOD retrospection charts, pricing/payment UI, and an "Options Lab" 
 strategies on the Fyers 1-minute data: saved `obt daily` results, the evening
 run button, and an AlgoTest-style strategy builder that validates, backtests
 and saves `strategies/legwise/*.yaml`, all via `/api/backtest/legwise/*`. Clicking a day replays it (`DayForensics.tsx`: MTM vs index, markers, per-leg attribution, via `/legwise/day`); the day grid carries per-segment anatomy chips (`/legwise/anatomy`); stats are ₹ per lot with sample-size guards (`lib/legwiseStats.ts` — keep that maths out of components). A "Market regimes" tab studies whether QUIET/CHOP/TREND periods persist (`RegimesPanel.tsx`; permutation-tested in `lib/regimeStats.ts` — new statistics belong there, seeded and unit-tested, never `Math.random`). Strategy P&L is joined to day type in `DayTypeCard.tsx` (`lib/legwiseJoin.ts`: same-day vs previous-day lenses); the builder diffs an edit against the saved version's stored results rather than re-running it (a re-run costs a credit). Use `lib/plotly.ts` for Plotly. A "Correlation" tab (BL-090, `CorrelationPanel.tsx` + `correlation/`) shows how alike strategies are: a heatmap of daily-P&L correlation read through `/legwise/correlation*` (the numbers come from the Python package's `analytics/correlation.py`, the code behind `obt rotation corr`; `lib/correlationView.ts` only builds the selector text, the colour bands and the plain-words summaries). Its filters live in the URL query (`hooks/useCorrelationFilters.ts`), strategies are listed from whatever has saved results (nothing is a fixed list), and a heatmap colour is a band of the correlation, never a profit or loss colour.
+The rotation workspace's daily log (BL-058 Phase 4) is `components/optionslab/RotationDailyLog.tsx`
+(+ `RotationDailyLogCalendar|Table|Drawer.tsx`, `hooks/useRotationDailyLog.ts`,
+`types/rotationDailyLog.ts`, the pure functions in `lib/rotationDailyLogView.ts`): a calendar, a dense
+day table, a day drawer and the owner's placement record, via `/api/backtest/legwise/rotation/*`.
+A pick's *Replay* opens the existing `DayForensics` with `rotationVariant` (the variants are not saved
+strategies, so `/legwise/day` cannot open them; `/legwise/rotation/forensics` re-runs the variant's file). It
+is self-contained (no props); it goes in the rotation section's panel (`RotationPanel.tsx`) as the
+Daily log slot.
 The Momentum view is the sole Momentum frontend. Its Saved runs section (BL-052,
 `components/momentum/saved/SavedStrategiesView.tsx`) lists one row per saved *strategy* across
 every dataset from `/api/momentum/saved-strategies`, sets each favourite's status, makes the

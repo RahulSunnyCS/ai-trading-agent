@@ -137,6 +137,7 @@ uv run obt rotation triggers [--day D]  # BL-083: score the day's intraday trigg
 uv run obt rotation triggers-show        # event minus placebo per trigger and template over every scored day (forward, unseen days only)
 uv run obt rotation corr [slot:0917 | N_*_0917 | family:dir kind:legwise | all]  # BL-090: correlation of the strategies' daily P&L, loss-day overlap, basket drawdown, rolling drift; any strategy with results is found, no list to edit (--json/--csv, --from/--to)
 uv run obt rotation corr-list | corr-pick slot:0917 --k 3 --max-corr 0.6 [--require N_wide_0917]  # what has results | a basket none of whose members are alike (diagnostic, in-sample)
+uv run python scripts/rotation-daylog-demo.py [--root DIR --port 8123 --no-serve]  # BL-058 Phase 4: a SYNTHETIC rotation store (298 variants, genuine hash-chained entries, every day state) served on :8123, to look at the Daily log before the journal has entries; pin dashboard to it with OBT_DIRECT=1 OBT_DIRECT_API_URL=http://127.0.0.1:8123
 uv run obt daily            # the evening routine: fetch the last closed session (+ nearest/next futures), judge it (data_quality), build its derived tables, run every strategies/legwise/*.yaml, save, summarise + Telegram with verdicts and IV percentile (--no-telegram)
 uv run pytest tests/golden/test_legwise_scenarios.py  # 30 frozen-input exact-output scenarios
 uv run python scripts/update-legwise-goldens.py       # check-only; --accept-results after reviewing an intentional correction

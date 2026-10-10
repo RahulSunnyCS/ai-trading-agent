@@ -315,6 +315,7 @@ export function DayForensics({
   onClose,
   fallback,
   embedded = false,
+  rotationVariant = false,
 }: {
   strategy: string;
   day: string;
@@ -325,9 +326,11 @@ export function DayForensics({
   fallback?: ReactNode;
   /** Render without the card frame, for use inside another surface (an expanded table row). */
   embedded?: boolean;
+  /** `strategy` is a rotation variant name, replayed from its file in `strategies/rotation/`. */
+  rotationVariant?: boolean;
 }) {
   const cuts = useRegimeCuts();
-  const res = useDayForensics(strategy, day, sha, cuts);
+  const res = useDayForensics(strategy, day, sha, cuts, rotationVariant);
   const f = res.data;
   const title = `${strategy} · ${formatDay(day)}`;
 
