@@ -849,3 +849,11 @@ comes later, once, on P1.
   draft's defaults. Cut points frozen from spike sizes only (no outcomes read). R4 dropped in favour
   of the three fixed stops. Stage 1a (Widesl × 3 stops × 5 rules, Directional D1 × 3) runs first;
   Stage 1b (D2 levels) after its level code is checked.
+- 2026-10-11 — Stage 1a run (49,824 runs, 0 errors; checks passed, Directional at 11:32 reproduces
+  the stored results). No arm passes the screening bar: in 2025 every arm did worse after a held
+  spike than at the same minute on the 10 nearest non-spike days (NIFTY −₹166 to −₹1,259 per spike,
+  several t ≤ −2; SENSEX the same direction); 2022–24 small and mixed. Among spike-day choices,
+  R3 (no re-entry before 13:30) was best or near best in all three groups (₹650: +₹846 NIFTY 2025,
+  +₹628 2022–24, +₹735 SENSEX) with the smallest worst spike; R6 (cap at 3 attempts) was worst in
+  NIFTY 2025 (+₹39). Wider Widesl stops cut attempts but deepened the worst spikes. Directional D1
+  lost in 2025 at 21 %. Full tables: `research/bl091/out/stage1.md`; the owner's report follows.
