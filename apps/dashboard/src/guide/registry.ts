@@ -39,6 +39,7 @@ import optionsDailyResults from './content/optionslab/daily-results.md?raw';
 import optionsHowItWorks from './content/optionslab/how-it-works.md?raw';
 import optionsRegimes from './content/optionslab/regimes.md?raw';
 import optionsRotationExplain from './content/optionslab/rotation-explain.md?raw';
+import optionsRotationShadow from './content/optionslab/rotation-shadow.md?raw';
 import optionsRotation from './content/optionslab/rotation.md?raw';
 import optionsRuns from './content/optionslab/runs.md?raw';
 import optionsStrategies from './content/optionslab/strategies.md?raw';
@@ -311,6 +312,15 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
       'Why each list picked what it did, criterion by criterion, and whether the morning ranking orders the day.',
     kind: 'Screen',
     body: optionsRotationExplain,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-shadow',
+    title: 'Rotation: Shadow scoreboard',
+    summary: 'Ideas kept for forward observation, each against the pick it would have replaced.',
+    kind: 'Screen',
+    body: optionsRotationShadow,
     screen: { tab: 'optionslab', rest: ['rotation'] },
   },
   {

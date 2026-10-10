@@ -649,6 +649,33 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
   );
   // --- end rotation ---
 
+  // --- rotation shadow --- the Shadow scoreboard (rotation/shadow.py, read-only). Only the two
+  // optional dates are forwarded; the Python side raises a `from` before the forward window.
+  fastify.get(
+    '/api/backtest/legwise/rotation/shadow',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', pattern: DATE_RE },
+            to: { type: 'string', pattern: DATE_RE },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/shadow${upstreamQuery(q, ['from', 'to'])}`,
+      );
+    },
+  );
+  // --- end rotation shadow ---
+
   fastify.post(
     '/api/backtest/legwise/daily',
     {
