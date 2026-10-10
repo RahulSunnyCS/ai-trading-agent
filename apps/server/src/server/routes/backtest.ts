@@ -37,6 +37,11 @@
  *  GET  /api/backtest/legwise/rotation/overview — the Rotation page: data health, the latest baskets, the lists.
  *  GET  /api/backtest/legwise/rotation/summary  — the 60-day read-out: lists against REF, the base and random baskets.
  *                                                 requireAccess
+ *  GET  /api/backtest/legwise/rotation/matrix       — the Strategy Matrix: one view, period (or two
+ *                                                 compared) of the rotation variants' gross results
+ *                                                 and the recorded picks overlay. requireAccess
+ *  GET  /api/backtest/legwise/rotation/matrix/cell  — the daily values, curve and variants behind one
+ *                                                 cell. requireAccess
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
  *  GET  /api/backtest/legwise/daily             — that run's state/log. requireAccess
@@ -675,6 +680,107 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation shadow ---
+
+  // --- rotation matrix ---
+  // The Strategy Matrix (packages/option-backtesting rotation/matrix.py). Read-only. Every value
+  // is a token list the Python side parses again; "+" and "<" occur in DTE and VIX-band labels
+  // ("7+", "<10.5"), so they are allowed here and the client sends them percent-encoded.
+  const PERIOD_ENUM = ['P1', 'P2', 'P3', 'forward', 'custom'];
+  const MATRIX_FILTERS = {
+    index: { type: 'string', enum: ['NIFTY', 'SENSEX', 'both'] },
+    family: { type: 'string', pattern: '^[A-Za-z0-9_,]{1,80}$' },
+    slot: { type: 'string', pattern: '^[0-9:,]{1,200}$' },
+    weekday: { type: 'string', pattern: '^[A-Za-z,]{1,40}$' },
+    dte: { type: 'string', pattern: '^[0-9a-z+,]{1,40}$' },
+    vix_band: { type: 'string', pattern: '^[0-9a-z<+.,-]{1,100}$' },
+    list: { type: 'string', enum: ['A', 'B', 'C', 'REF'] },
+    basis: { type: 'string', enum: ['all', 'selected'] },
+    view: {
+      type: 'string',
+      enum: ['family_slot', 'date_slot', 'dte_slot', 'vix_family', 'weekday_family', 'pulse'],
+    },
+    period: { type: 'string', enum: PERIOD_ENUM },
+    from: { type: 'string', pattern: DATE_RE },
+    to: { type: 'string', pattern: DATE_RE },
+  } as const;
+  const MATRIX_FILTER_KEYS = [
+    'view',
+    'period',
+    'from',
+    'to',
+    'index',
+    'family',
+    'slot',
+    'weekday',
+    'dte',
+    'vix_band',
+    'list',
+    'basis',
+  ];
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/matrix',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            ...MATRIX_FILTERS,
+            metric: {
+              type: 'string',
+              enum: ['avg', 'win_rate', 'stop_rate', 'worst', 'selection'],
+            },
+            compare: {
+              type: 'string',
+              pattern: '^(P1|P2|P3|forward|custom),(P1|P2|P3|forward|custom)$',
+            },
+            min_n: { type: 'string', pattern: '^\\d{1,4}$' },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/matrix${upstreamQuery(q, [
+          ...MATRIX_FILTER_KEYS,
+          'metric',
+          'compare',
+          'min_n',
+        ])}`,
+      );
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/matrix/cell',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            ...MATRIX_FILTERS,
+            row: { type: 'string', pattern: '^[A-Za-z0-9_:.+<>-]{1,40}$' },
+            col: { type: 'string', pattern: '^[A-Za-z0-9_:.+<>-]{1,40}$' },
+          },
+          required: ['row', 'col'],
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/matrix/cell${upstreamQuery(q, [...MATRIX_FILTER_KEYS, 'row', 'col'])}`,
+      );
+    },
+  );
+  // --- end rotation matrix ---
 
   fastify.post(
     '/api/backtest/legwise/daily',
