@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; a new object (entry timing), not another weighting of the fixed grid |
-| **Status** | Planned |
+| **Status** | Done (phases 1–2): two Dir leads on the last two years; phase 3 (live poller) not started |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
@@ -159,6 +159,67 @@ templates other than the three, per-variant fits, any live use before phase 3's 
 7. **Sample size.** Expect each trigger to fire on 15–40% of days: 70–190 events in exploration. Enough
    for pooled means, not for per-variant fits. If a trigger fires on < 30 days it is reported, not judged.
 
+## Result (2026-10-10, phases 1 and 2)
+
+**Triggers** (first firing per day, 10:30–14:00; entry the next minute). Explore = 2024-10-09 → 2026-10-08,
+both indices; confirm = NIFTY 2022-01-03 → 2024-10-08.
+
+| trigger | explore NIFTY | explore SENSEX | confirm NIFTY | median entry |
+|---|---|---|---|---|
+| T1 pivot cross with trend | 109 | 99 | 118 | 12:07 |
+| T2 VIX turn | 148 | 149 | 145 | 11:09 |
+| T3 straddle turn + range stabilising | 272 | 249 | 262 | 11:21 |
+| T4 RSI exhaustion | 292 | 283 | 291 | 11:40 |
+
+Sanity checks passed: a template simulated at 11:32 reproduces the stored 11:32 variants exactly (36 of 36
+days); trigger inputs read bars up to the firing minute only.
+
+**Event study** (event minus the same template at the same minute on the 20 nearest non-event days; ₹ per
+lot; t = mean difference ÷ its standard error):
+
+| | explore diff (t) | confirm diff (t) |
+|---|---|---|
+| T1 → Dir | +754 (4.3) | +282 (1.5) |
+| T4 → Dir | +403 (4.5) | +86 (0.8) |
+| T4 → Buy | +84 (2.3) | +319 (3.7) |
+| T2 → Widesl | −215 (−1.7) | −159 (−1.1) |
+| T4 → Widesl | +108 (1.3) | −217 (−2.6) |
+| the other 7 cells | |t| < 1.5 | |t| < 1.5 |
+
+Under the registered bar (|t| ≥ 3 and the same sign with |t| ≥ 2 in confirm) there is **no lead**. Under the
+owner's decision (the last two years decide; confirmation is information) the leads are **T1 → Dir and
+T4 → Dir**. Dir after both is positive on expiry and non-expiry days. What the triggers catch: mean absolute
+forward move to 15:28 of 0.34–0.42%, and an ATM straddle that falls 1.2–1.6% after T1, T3 and T4 and rises
+2.3% after T2.
+
+**Override rule** (phase 2): the earliest lead event of the day fires a Dir on its index at the entry minute
+and replaces the next not-yet-started core pick (lots conserved, Widesl minimum kept; 54–57 of 302 explore
+events could be applied, the rest had no pending pick or would break the minimum).
+
+| set | list | plain | with override | gain | max DD | random-time P90 | random-day P90 | above both |
+|---|---|---|---|---|---|---|---|---|
+| explore | A | 8,00,921 | 8,20,902 | +19,981 (+2.5%) | −72,667 (same) | +29,766 | −40,106 | no |
+| explore | B | 8,08,532 | 8,87,921 | +79,389 (+9.8%) | −82,706 (same) | +45,106 | −12,937 | **yes** |
+| explore | C | 8,40,846 | 8,62,340 | +21,494 (+2.6%) | −74,104 (better) | +39,124 | −5,258 | no |
+| explore | REF | 7,20,873 | 7,75,428 | +54,556 (+7.6%) | −86,485 (better) | +26,127 | −5,290 | **yes** |
+| confirm | A | 12,20,482 | 12,21,930 | +1,448 | −64,181 | +18,084 | +17,324 | no |
+| confirm | B | 12,39,935 | 12,40,362 | +428 | −63,238 | +15,493 | +11,199 | no |
+| confirm | C | 11,58,525 | 11,54,104 | −4,421 | −53,755 | +20,387 | +24,544 | no |
+| confirm | REF | 10,13,627 | 10,31,215 | +17,588 | −53,378 | +33,144 | +48,614 | no |
+
+**Read-out under the owner's rule.** On the last two years the override beats both controls for list B
+(+₹79k) and REF (+₹55k) and does not clear the random-time control for A and C. In 2022–24 the gain is
+about zero for A, B and C and +₹18k for REF, below the controls everywhere. Two cautions: a random-minute
+Dir replacing the same pick also gains (random-time median +₹0.9k … +₹13.7k), so part of the gain is
+"swap a pending core pick for a Dir", not the timing; and the two leads were picked from 12 cells in the
+same two years they are judged on. A journal candidate for a forward shadow run, not an adoption.
+
+**Next (not done):** phase 3 (a minute-poller that records the trigger before any alert) is the way to get
+unseen days; a cheaper first step is to score the triggers each evening from the day's bars in the nightly
+update, so events accumulate without any live process.
+
+Files: `research/bl083/triggers.py`, `simulate.py`, `event_study.py`, `override.py`.
+
 ## Risks
 
 - **Many definitions, one chance.** Four triggers × three templates × two sets is already 24 cells;
@@ -190,3 +251,4 @@ None. Settled on 2026-10-10:
   +₹403 per lot, t 4.3 and 4.5; confirmation +₹282 / +₹86, t 1.5 / 0.8). Phase 2 (override rule on lists A /
   B / C / REF) therefore runs for those two on the exploration set, against the random-time and random-day
   controls; the confirmation set is run alongside as information.
+- 2026-10-10 — phases 1 and 2 run (results above).
