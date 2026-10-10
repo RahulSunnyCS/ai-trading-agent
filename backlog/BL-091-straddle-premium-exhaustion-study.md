@@ -935,3 +935,9 @@ small decisions taken and logged.
   Decisions put to the owner: take R3 (after a stop on a spike day, nothing before 13:30) to the P1
   test as a narrower registered question; test expiry-day spikes on their own; or close the
   Directional and level ideas.
+- 2026-10-11 — PR #174 review of the Stage 1 / 2 code: 7 findings, all fixed (status / INDEX / TODO
+  rows; comparator reads filtered for ERR and duplicates; the open ± straddle level now uses the
+  09:20 straddle itself; OI idxmax over all-NaN rows; flat or missing trend no longer counted as
+  down; a chained mask; daily bars built once). Stage 1b entries, all 1,130 Stage 2 candidates, the
+  AUC table and R1 were re-run and are identical, so no reported number changed. Report sentence on
+  the secondary view corrected: ₹650 R3 is +₹74 / +₹341 / −₹1, not at or above zero in all three.
