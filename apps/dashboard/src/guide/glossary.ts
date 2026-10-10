@@ -343,7 +343,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     term: 'Survivorship bias',
     group: 'Momentum',
     short:
-      'The flattering error of testing only companies that still exist or are in an index today. The stock data here uses who was really listed and in the index on each past date.',
+      'The flattering error of testing only companies that still exist or are in an index today. The stock data here uses who was really listed and in the index on each past date. Broad Momentum\'s "As each year saw it" universe does the same for the Total Market pool; "Today\'s index list" does not, and its result flatters.',
   },
   {
     id: 'circuit',

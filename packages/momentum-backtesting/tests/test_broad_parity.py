@@ -452,11 +452,20 @@ def test_the_weekly_result_for_broad_uses_the_engine_rows_not_the_advisory_panel
         "target_weights": {"INFY": 1.0},
     }
     monkeypatch.setattr(api.DATA, "get_stock", lambda: Stock())
-    monkeypatch.setattr(api, "_broad_parts", lambda req: ({"latest": advisory}, {}))
+    asked = {}
+
+    def parts(req, **kwargs):
+        asked.update(kwargs)
+        return {"latest": advisory}, {}
+
+    monkeypatch.setattr(api, "_broad_parts", parts)
     monkeypatch.setattr(api, "_broad_engine_signal", lambda req: engine)
     favourite = {"name": "Broad", "config": {"dataset": "broad", "universe": ["x"]}}
     result, blocked = api._research_weekly_result(favourite, pd.Timestamp("2026-10-09"))
     assert blocked is None
+    # BL-036 Phase 1: the Friday job runs every Broad favourite and stores no extended-tags
+    # figure, so it must not pay the extra engine pass.
+    assert asked == {"companion": False}
     assert result.signal["rows"] == engine["rows"]
     assert "No trades this week." in result.notification.body
     assert "BUY" not in result.notification.body

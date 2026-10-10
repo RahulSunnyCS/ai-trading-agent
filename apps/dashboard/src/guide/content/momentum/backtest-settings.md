@@ -28,9 +28,9 @@ a one-line reminder.
 | Control | What it does |
 |---|---|
 | Instrument groups (ETF) | Which kinds of ETF may be ranked: Broad, Sector, Thematic, Commodity, International, Debt. |
-| Universe (Broad) | *Nifty Total Market* (about 750 stocks) or *Whole NSE market (liquid only)*. |
+| Universe (Broad) | Which stocks may be ranked. **As each year saw it** (the default for a new run) uses each year's 750 most-traded stocks, delisted names included in the ranking. In the default category mode a stock is bought only if it carries a category tag, and a company that later failed rarely does (none carries a curated tag, most carry no extended one), so it can be ranked but not bought; *Rank stocks directly* buys any ranked stock. **Today's index list (survivors only)** applies today's Total Market list to every year, which flatters the result. **Whole NSE market (liquid only)** ranks every listed equity that passes the tradability filter. The categories are still today's themes whichever you pick. |
 | Pool top N / Pool exit rank (Broad) | How many of the strongest stocks form the pool (default 200), and how far a pool stock may slip before it leaves (250). Refreshed quarterly. |
-| Tradability filter | Keeps only stocks with enough daily turnover to buy and sell, that are not stuck at a [circuit limit](glossary:circuit). Uses only data known on each date. |
+| Tradability filter | Keeps only stocks with enough daily turnover to buy and sell, that are not stuck at a [circuit limit](glossary:circuit). Uses only data known on each date. Always on for the *As each year saw it* and *Whole NSE market* universes. |
 | Respect circuit locks | When on, the backtest cannot buy a stock locked at the upper circuit or sell one locked at the lower circuit. More realistic. |
 
 ### Period

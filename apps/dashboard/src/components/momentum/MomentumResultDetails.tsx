@@ -17,6 +17,7 @@ import {
   formatPp,
 } from '../../lib/format';
 import { describeConfig, hindsightWarning } from '../../lib/momentumConfig';
+import { BROAD_UNIVERSES, broadUniverse, isGatedUniverse } from '../../lib/momentumUniverse';
 import type { MomentumLatest, MomentumResult, MomentumSavedRun } from '../../types/momentum';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -267,9 +268,9 @@ export function assumptionChips(config: Record<string, unknown>): string[] {
     dataset === 'broad' && Number(config.broad_reversal_tilt ?? 0) > 0
       ? `Beaten-down tilt ${Math.round(Number(config.broad_reversal_tilt) * 100)}%`
       : null,
-    dataset === 'broad' && config.broad_universe === 'all_liquid' ? 'Whole NSE market' : null,
+    dataset === 'broad' ? BROAD_UNIVERSES[broadUniverse(config)].short : null,
     dataset === 'broad' && config.broad_respect_circuits ? 'Circuit locks respected' : null,
-    dataset === 'broad' && (config.broad_universe === 'all_liquid' || config.broad_liquidity_filter)
+    dataset === 'broad' && (isGatedUniverse(broadUniverse(config)) || config.broad_liquidity_filter)
       ? `Tradable: ≥ ₹${Number(config.broad_liq_min_turnover_cr ?? 1)} Cr/day${
           config.broad_liq_circuit === false ? '' : ', no circuit lock'
         }${

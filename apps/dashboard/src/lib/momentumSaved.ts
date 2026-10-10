@@ -12,8 +12,9 @@ import type {
   SavedStrategy,
   StrategyTrust,
 } from '../types/momentum';
-import { formatDay, formatPp } from './format';
+import { formatDay, formatPct, formatPp } from './format';
 import { type SettingDifference, completeConfig, differingSettings } from './momentumCompare';
+import { BROAD_UNIVERSES, broadUniverse, isGatedUniverse } from './momentumUniverse';
 
 export const DATASET_SHORT: Record<string, string> = {
   etf: 'ETF',
@@ -47,7 +48,12 @@ export function strategyDifferences(
   const keep = (source: Record<string, unknown>) =>
     Object.fromEntries(Object.entries(source).filter(([key]) => !skip.has(key)));
   const base = keep(defaults);
-  return differingSettings([keep(completeConfig(base, config)), base]);
+  const completed = completeConfig(base, config);
+  // The server runs a point-in-time or whole-market universe with the tradability filter on
+  // whatever was stored (`saved_identity.normalise`), so a stored `false` is not a difference.
+  // Only a universe the run names counts: a run with none ran on Today's list.
+  const filtered = isGatedUniverse(broadUniverse(config)) ? { broad_liquidity_filter: true } : {};
+  return differingSettings([keep({ ...completed, ...filtered }), base]);
 }
 
 /** "Broad · Liquidity filter Off · Respect circuits Off", or "Broad · defaults". */
@@ -255,4 +261,36 @@ export function saveToast(saved: MomentumSaveOutcome): {
     };
   }
   return { message: 'Saved as a new strategy in Saved runs.', tone: 'success' };
+}
+
+/**
+ * Which stocks a Broad strategy ranks, as a short tag for the Saved runs list: two strategies
+ * with the same CAGR on different universes are not the same claim. `config_full` has every
+ * request default spelled out, so an old run with no stored universe reads as today's list.
+ */
+export function universeTag(
+  strategy: Pick<SavedStrategy, 'dataset' | 'config' | 'config_full'>,
+): string | null {
+  if (strategy.dataset !== 'broad') return null;
+  return BROAD_UNIVERSES[broadUniverse(strategy.config_full ?? strategy.config)].short;
+}
+
+export interface ExtendedFigure {
+  cagr: number;
+  maxDrawdown: number | null;
+}
+
+/** The extended-tags figure stored beside a run's KPIs; null on a run saved before it existed. */
+export function extendedKpis(kpis: Record<string, number | null>): ExtendedFigure | null {
+  const cagr = kpis.extended_cagr;
+  if (typeof cagr !== 'number') return null;
+  const drawdown = kpis.extended_max_drawdown;
+  return { cagr, maxDrawdown: typeof drawdown === 'number' ? drawdown : null };
+}
+
+/** "With extended tags: 33.4% CAGR · -38.6% max DD", for a title or the drawer. */
+export function extendedSentence(figure: ExtendedFigure): string {
+  return `With extended tags: ${formatPct(figure.cagr)} CAGR${
+    figure.maxDrawdown === null ? '' : ` · ${formatPct(figure.maxDrawdown)} max DD`
+  }`;
 }

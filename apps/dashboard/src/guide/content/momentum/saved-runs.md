@@ -13,9 +13,9 @@ and choose which ones the Friday signal follows.
 | Paper + Invested n of 8 | How many of the eight places for followed favourites are used, across every dataset. |
 | ☐ | Tick up to four to compare; the bar below says how many settings they differ in. |
 | ★ | A star makes it a favourite (Watching). Its status is then set on the right. |
-| Strategy | Its name: the one you typed, or one made from what differs from the dataset's defaults ("Broad · Tradability filter Off"). **Headline** marks the one sent to Telegram; **Group** a group of strategies. |
+| Strategy | Its name: the one you typed, or one made from what differs from the dataset's defaults ("Broad · Tradability filter Off"). **Headline** marks the one sent to Telegram; **Group** a group of strategies. A Broad row ends with a faint tag for the stocks it ranks: *Point in time*, *Today's list* or *Whole NSE market*. A strategy saved on today's list now has its universe in an automatic name, because that is no longer the default for a new run. |
 | Runs | How many times these settings were run (×3). Repeats with the same result add no row. |
-| CAGR · Edge · Max DD · Sharpe | The latest run's numbers (Edge: CAGR over the benchmark, in points). A group shows its members' CAGR range. |
+| CAGR · Edge · Max DD · Sharpe | The latest run's numbers (Edge: CAGR over the benchmark, in points). A group shows its members' CAGR range. A faint figure after a Broad CAGR is the same run with extended category tags (hover for the sentence). Runs saved before 2026-10-10 show none until they are run again from the dashboard; it never counts as a moved result. |
 | Trust | How far the result can be trusted: [Validated, In-sample, Not tradable, Old data](glossary:strategy-trust). **↻** with the CAGR move, in points, when the latest run changed the result. |
 | Status | Not a favourite, Watching, Paper or Invested. **Blocked this week** when its data is not ready. |
 | Last run | When it was last run. |
@@ -26,7 +26,7 @@ the newest 10 per dataset; a star keeps one for good. Click a row to open its dr
 ## The drawer
 
 - **Header:** rename it, set its status, make it the [headline](glossary:headline).
-- **Result:** the latest run's numbers and equity curve.
+- **Result:** the latest run's numbers and equity curve. For a Broad strategy, a line under the numbers names its universe and, when stored, the extended-tags figure.
 - **Different from the defaults:** only the settings that differ. Settings the dataset never
   reads are not compared, which is why some runs that looked different are one strategy.
 - **Run history:** every run of these settings, newest first, with the code and data it ran on
@@ -101,7 +101,9 @@ that each trade on their own weeks. Tick them and choose **Group as one favourit
 up and the toast said so. Each strategy keeps its last three repeats and every changed result.
 
 **Why is my highest CAGR marked Not tradable?** It was run with the tradability filter or the
-circuit rule off, so it holds stocks you could not have bought.
+circuit rule off, so it holds stocks you could not have bought. The filter is always on for the
+*As each year saw it* and *Whole NSE market* universes, so only *Today's index list* can be marked
+for it.
 
 ## What it does not tell you
 

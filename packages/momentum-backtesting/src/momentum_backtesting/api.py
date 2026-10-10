@@ -3,6 +3,7 @@
 import contextlib
 import inspect
 import json
+import logging
 import math
 import os
 import threading
@@ -1607,7 +1608,11 @@ def _broad_meta() -> dict:
             "broad_off_top_n": 10,
             "broad_off_exit_rank": 20,
             "broad_every_week": True,
-            "broad_universe": "total_market",
+            # A new Broad run uses each year's own 750 most-traded stocks (owner decision
+            # 2026-10-10, BL-029 Phase 2 / BL-036 Phase 1): the survivor-only list inflates the
+            # CAGR (BL-010 F1). The gate below is forced on for this universe. The request model
+            # keeps "total_market", so a saved run (which carries its own value) re-runs unchanged.
+            "broad_universe": "turnover_rank",
             # A new Broad run starts realistic (owner decision 2026-10-05, BL-010 §3.13.2): only
             # stocks that trade enough, and no fills on a circuit-locked day. Together they cut
             # the default run from 53% to 40% CAGR. The request model keeps False, so a saved
@@ -1637,8 +1642,10 @@ def _liquidity_preview_payload(
             members = broad.total_market_members_by_year(DATA_DIR / "categories")
     except (ValueError, broad.TotalMarketDataNotFoundError) as error:
         raise HTTPException(422, str(error)) from None
-    latest_year = max(members)
-    symbols = sorted(members[latest_year])
+    # The run gates its newest weeks with the list for the last bar's calendar year. `max(members)`
+    # is wrong for `turnover_rank` from late September, when the next year's part-year list exists.
+    year = liquidity_mod.member_year_in_force(members, liquidity_mod.latest_bar_year())
+    symbols = sorted(members[year])
     return liquidity_mod.preview(cfg, symbols)
 
 
@@ -1898,6 +1905,17 @@ def _run_broad(
     )
 
 
+def _equity_summary(result: Result) -> dict:
+    """The four figures two "same run, one setting changed" comparisons report."""
+    equity = result.equity
+    return {
+        "cagr": float(metrics.cagr(equity)),
+        "max_drawdown": float(metrics.max_drawdown(equity)[0]),
+        "total_return": float(equity.iloc[-1] - 1),
+        "trades": int(len(result.trades)),
+    }
+
+
 def _circuit_realism(
     req: BacktestRequest,
     ranking: broad.UniverseRanking,
@@ -1909,21 +1927,12 @@ def _circuit_realism(
     `outer_prices` is what the run itself used: this can be asked for after the run, when newer
     data may have been loaded."""
 
-    def summary(result: Result) -> dict:
-        equity = result.equity
-        return {
-            "cagr": float(metrics.cagr(equity)),
-            "max_drawdown": float(metrics.max_drawdown(equity)[0]),
-            "total_return": float(equity.iloc[-1] - 1),
-            "trades": int(len(result.trades)),
-        }
-
     other = _run_broad(
         req.model_copy(update={"broad_respect_circuits": not req.broad_respect_circuits}),
         ranking,
         outer_prices,
     )
-    this_run, alternative = summary(outcome.result), summary(other.result)
+    this_run, alternative = _equity_summary(outcome.result), _equity_summary(other.result)
     ignoring, respecting = (
         (alternative, this_run)
         if req.broad_respect_circuits
@@ -1938,6 +1947,52 @@ def _circuit_realism(
         "respecting_locks": respecting,
         "cagr_impact": respecting["cagr"] - ignoring["cagr"],
     }
+
+
+def _extended_tags_companion(
+    req: BacktestRequest,
+    ranking: broad.UniverseRanking,
+    outcome: broad.BroadBacktestResult,
+    outer_prices: pd.DataFrame,
+) -> dict:
+    """The same run with `broad_category_tags="extended"` (BL-036 Phase 1): the curated tags name
+    only today's 755 index members, so a stock that later left the index can be ranked but never
+    picked through a category. The extended tags (BSE's current classification, which covers many
+    more NSE stocks) reduce that, but `stock_groups_wide.csv` leaves NSE-only and delisted names
+    untagged, so most later-failed companies still cannot be bought and the figure still
+    flatters. The gap is the closest figure to an expected return this engine can give. The tags
+    do not touch the ranking, so the run's own `ranking` is reused: one extra engine pass. Never
+    raises; a failure is reported in the payload instead."""
+    if req.broad_category_mode != "on":
+        return {"status": "not_applicable", "reason": "no category layer"}
+
+    try:
+        this_run = _equity_summary(outcome.result)
+        if req.broad_category_tags == "extended":
+            return {
+                "status": "this_run",
+                "tags": "extended",
+                "cagr": this_run["cagr"],
+                "max_drawdown": this_run["max_drawdown"],
+            }
+        other = _run_broad(
+            req.model_copy(update={"broad_category_tags": "extended"}), ranking, outer_prices
+        )
+        extended = _equity_summary(other.result)
+        return {
+            "status": "computed",
+            "tags": "extended",
+            **extended,
+            "cagr_impact": extended["cagr"] - this_run["cagr"],
+        }
+    except Exception:  # noqa: BLE001 - a companion figure must never fail the run
+        # The exception text can carry a filesystem path and is shown in a hover, so the payload
+        # gets a fixed sentence and the detail goes to the server log.
+        logging.getLogger(__name__).exception("extended-tags companion failed")
+        return {
+            "status": "failed",
+            "reason": "The extended tags could not be applied to this run (see the server log).",
+        }
 
 
 #: Universes that are only meaningful behind the tradability gate: the whole market (the gate is
@@ -2007,7 +2062,9 @@ def _broad_backtest(req: BacktestRequest) -> dict:
     return _full(*_broad_parts(req))
 
 
-def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
+def _broad_parts(
+    req: BacktestRequest, report: Report = _no_report, *, companion: bool = True
+) -> Parts:
     report("loading")
     on = req.broad_category_mode == "on"
     if on and req.broad_category_top_n > req.broad_category_exit_rank:
@@ -2040,6 +2097,13 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
     groups = dict.fromkeys(prices.columns, "Stock")
     for name in broad.ATOMIC_NAMES:
         groups[name] = "Atomic"
+    # In `core`, not a lazy section: the headline shows it without a second fetch. The weekly job
+    # skips it (it stores no such figure, and runs every Broad favourite).
+    companion_figure = (
+        _extended_tags_companion(req, ranking, outcome, outer_prices)
+        if companion
+        else {"status": "skipped", "reason": "weekly run"}
+    )
     report("analysing")
     core, lazy = analysis.payload_parts(
         result,
@@ -2065,6 +2129,7 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         picks_per_category=req.broad_picks_per_category,
     )
     core["missing_symbols"] = outcome.ranking.missing_symbols
+    core["companion"] = companion_figure
     base_trades = lazy["trades"]
 
     def trades() -> object:
@@ -3918,7 +3983,7 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
     elif req.dataset == "custom_index":
         payload = _custom_index_backtest(req)
     elif req.dataset == "broad":
-        core, lazy = _broad_parts(req)
+        core, lazy = _broad_parts(req, companion=False)
         # The engine's own decision for the newest STORED week (a lagging outer-market series can
         # end the run itself a week earlier), so the run's own `latest` is not built at all.
         lazy.pop("latest", None)

@@ -196,6 +196,23 @@ export interface MomentumLatest {
   }>;
 }
 
+/**
+ * Broad Momentum only (BL-036 Phase 1): the same run with `extended` category tags, so a reader
+ * sees how much of the headline leans on today's 755-name tag list. `computed` carries the
+ * figures; the other statuses say why there are none.
+ */
+export interface MomentumCompanion {
+  status: 'computed' | 'this_run' | 'not_applicable' | 'failed' | 'skipped';
+  tags?: 'extended';
+  cagr?: number;
+  max_drawdown?: number;
+  total_return?: number;
+  trades?: number;
+  /** The extended figure's CAGR minus this run's. */
+  cagr_impact?: number;
+  reason?: string;
+}
+
 export interface MomentumResult {
   benchmark_name: string;
   kpis: Record<string, number | string | null>;
@@ -223,6 +240,8 @@ export interface MomentumResult {
   crashes: Array<Record<string, unknown>>;
   held_categories?: Array<{ position: number; status: string; category: string; picks: string[] }>;
   missing_symbols?: string[];
+  /** Broad Momentum only; absent on results computed before 2026-10-10. */
+  companion?: MomentumCompanion | null;
   /** Broad Momentum only; null when it couldn't be computed. */
   circuit_exposure?: MomentumCircuitExposure | null;
   skipped_categories?: string[];

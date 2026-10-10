@@ -46,6 +46,33 @@ time in cash. **All metrics** opens the full set, the assumptions behind the run
 notes and a one-sentence summary. Hover the (i) by a number for what it means and how it
 changed from your previous run.
 
+### Which stocks the number was made on
+
+For a Broad run the card's title names the universe after the dataset: *Point in time* (each
+year's 750 most-traded stocks, delisted names included), *Today's list* (today's Total Market
+index applied to every year, which flatters) or *Whole NSE market*. The same name is in the
+run bar's chips and in Saved runs.
+
+Under the CAGR, a muted line shows **the same run with extended category tags**: stocks
+that BSE's current classification covers get a tag, not only today's 755 index members, so more of the stocks that later left the index can be bought through a category. NSE-only and
+delisted names are still left untagged: no later-delisted name carries a curated tag and most
+carry no extended one, so this figure still flatters. It is usually a few points below the
+headline. Treat it as the closer reading of what the rule would have done, not as a
+point-in-time result.
+It is computed for every Broad run that ranks by category; hover it for the definition. It
+still uses today's classification for every year, so it is closer to an expected return, not a
+point-in-time one.
+
+Below the cards, one note says what the result is. It opens with the reminder that this CAGR is
+an upper bound, not an expected return, and why: for a point-in-time run the 2026 themes and the
+stocks that carry no category tag are left to blame, for today's list the stock list too. Then comes the in-sample warning: what the
+review measured for a typical config, for the best of a search, and for the four frozen configs on
+years nobody tuned on. The link opens the full
+[evaluation review](https://github.com/RahulSunnyCS/ai-trading-agent/blob/main/packages/momentum-backtesting/docs/evaluation-review.md).
+
+The note is calm grey. It turns amber only when the run left circuit locks or the tradability
+filter off, and then says what turning them on is worth, because that is the part you can act on.
+
 ## The equity chart
 
 The portfolio's value week by week against the benchmark, about two-thirds of the first
