@@ -44,6 +44,7 @@
  *                                                 cell. requireAccess
  *  GET  /api/backtest/legwise/rotation/basket   — one list's (or the fixed base's) picks for a day,
  *                                                 correlated over a window. requireAccess
+ *  GET  /api/backtest/legwise/rotation/regime   — the forward window's market mix beside P1, P2 and P3.
  *  GET  /api/backtest/legwise/rotation/drawdowns — a list's drawdown episodes against the fixed base.
  *                                                 requireAccess
  *  GET  /api/backtest/legwise/rotation/drift    — what a list has held, by family, index, strike method and
@@ -716,6 +717,19 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation basket ---
+  // --- rotation regime --- "Forward days vs research periods" (rotation/regime.py, read-only).
+  // No parameters: the periods are the registered ones, so nothing from the query is forwarded.
+  fastify.get(
+    '/api/backtest/legwise/rotation/regime',
+    {
+      preHandler: requireAccess,
+      schema: { querystring: { type: 'object', properties: {}, additionalProperties: false } },
+    },
+    async (_request, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/rotation/regime');
+    },
+  );
+  // --- end rotation regime ---
 
   // --- rotation drawdowns --- the Rotation page's "Drawdown episodes" card
   // (rotation/drawdowns.py, read-only). List and window are enums; min_depth is a plain number.
