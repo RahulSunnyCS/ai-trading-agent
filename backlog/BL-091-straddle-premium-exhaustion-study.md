@@ -550,6 +550,95 @@ strike from its last close including the vendor's zero-volume carried bars, whil
 refuses a leg whose last real trade is more than 5 minutes old; 44 SENSEX attempts entered one leg
 only. This is the engine convention behind every stored result and is left as is.
 
+## Next stages — consolidated draft (2026-10-11), not registered
+
+Everything the owner decided or proposed after Phase 1, in one place. Nothing here has run. It
+becomes the registration once the owner confirms the open points at the end; P1 stays unread
+until one rule is frozen.
+
+### What a tradable spike is
+
+- **Series:** the rolling ATM straddle (E.1, as corrected after the smoke run).
+- **Threshold:** NIFTY 25 points, SENSEX 90 points above the spike's low.
+- **Hold:** the straddle must stay at least the threshold above the low for 5 consecutive minutes.
+  The spike is known when the 5th minute completes; any entry is the next minute. Brief jumps that
+  do not hold are not traded (about half of all spikes).
+- **VIX regime at the 09:15 open:** below 13, and 13 and above. Below 11 alone had 5 NIFTY spikes
+  in the learning periods, too few for its own cut points.
+- **Size category,** from the level above the low when the hold completes (known at entry), with
+  cut points per index and regime from P2 + P3:
+
+  | Index, regime | Held spikes | Below 60th | 60th–85th | 85th and above |
+  |---|---|---|---|---|
+  | NIFTY, VIX 13+ | 168 | under 35 (101) | 35–45 (41) | 45+ (26) |
+  | NIFTY, VIX below 13 | 32 | under 32 (19) | 32–36 (8) | 36+ (5) |
+  | SENSEX, VIX 13+ | 85 | under 126 (51) | 126–171 (21) | 171+ (13) |
+  | SENSEX, VIX below 13 | 4 | too few | | |
+
+  The owner's "5 minutes after the peak" size is kept for description only, because the peak is not
+  known at entry; the category at entry matched the after-peak category for 54 % (NIFTY) and 57 %
+  (SENSEX) of spikes.
+
+### Stage 1 — the trading test, no hindsight
+
+- **Widesl** (live shape, ₹650 MTM stop per strategy), first entry the minute after the hold, and
+  after each stop one of: R0 re-enter at once (the owner's habit, up to five attempts); R2 wait for
+  a give-back of 15 points (SENSEX 54); R3 no entry before 13:30; R4 a stop sized to the premium's
+  recent one-minute swings; R5 a 20-minute cooldown; R6 stop after three losing attempts. R1 (wait
+  for the signal) is the rule Stage 2 produces.
+- **Directional** (live `*_dir_*` shape: ATM straddle sold, one re-entry at cost per leg, exit
+  15:28), entered once the minute after the hold, leg stop 21 % (live), 25 % and 30 %.
+- **Comparator:** the same strategy entered at random minutes matched on time of day.
+- **Read-out:** per index × VIX regime × size category, expiry days separately; cells with fewer
+  than 20 spikes reported as inconclusive; rupees at cost 0 and at ₹20 per order; R0's ladders that
+  overlap on the same day are counted once.
+
+### Stage 2 — reverse engineering the true top
+
+- **Candidates:** every new higher high of the straddle during a held spike.
+- **Label, with hindsight:** a true top if the straddle makes no higher high before giving back 15
+  points (SENSEX 54) and a Widesl sold the next minute with the ₹650 stop is not stopped. The owner
+  expects 60–70 % of candidates to be false.
+- **Parameters at each candidate,** from data up to that minute only:
+  1. Straddle: velocity, acceleration, minutes the rise has been slowing, give-back from the high,
+     rise so far, minutes since the spike began, number of higher highs so far.
+  2. Opposite breakdown on NIFTY, Bank Nifty and VIX: if the index rose during the spike, a break
+     of its last 10-minute low; if it fell, of its last 10-minute high; on 1- and 5-minute bars.
+  3. Direction of the expiry's ATM implied volatility over the last minutes.
+  4. Neighbour straddles one strike either side turning with it.
+  5. Far out-of-the-money options, strike fixed at the spike's start: 8 strikes out, and the nearest
+     round strike (multiple of 500 NIFTY, 1,000 SENSEX). Call and put separately: change since the
+     spike began (points and percent), velocity, acceleration.
+  6. Open-interest change of the ATM and far options (exchange snapshot about every 3 minutes).
+  7. Other indices: Bank Nifty, Fin Nifty and Midcap Nifty index moves (all periods); their rolling
+     straddles (2025 only, monthly expiry).
+  8. Context: time of day, days to expiry, VIX regime, size category.
+- **Method:** one table per parameter, true tops against false; a parameter that looks the same in
+  both is dropped; parameters are added one at a time, never all combinations. Discover on 2022–24,
+  check on 2025; parameters that exist only in 2025 are discovered on January–April and checked on
+  May–August, and their evidence is labelled weaker. One rule is frozen, becomes R1 in Stage 1, runs
+  once on P1, then as trigger T5 in the nightly scoring.
+
+### Data coverage
+
+| Input | 2022–24 | 2025 |
+|---|---|---|
+| NIFTY options, 1 minute, with OI | yes | yes |
+| SENSEX options | no near expiry | yes |
+| Bank Nifty, Fin Nifty, Midcap Nifty options | no near expiry | monthly expiry only |
+| Their index bars, 1 minute | yes (Midcap from July 2022) | yes |
+| India VIX, 1 minute | yes | yes |
+| Far OTM strikes (NIFTY ±400/500, SENSEX ±800/1,000) | traded every minute on samples | yes |
+
+### Open points for the owner
+
+1. VIX regimes: two (below 13, 13+) as recommended, or three with below 11 as its own?
+2. Directional overall stop: ₹3,000 for all three leg stops, or scaled (about ₹3,600 at 25 %,
+   ₹4,300 at 30 %)?
+3. Breakdown: the last 10 minutes' low or high on 1- and 5-minute bars, or another definition?
+4. True top: both conditions (no higher high, and the Widesl sold next is not stopped), or one?
+5. Order: Stage 1 first, then Stage 2, as the owner said.
+
 ## Log
 
 - 2026-10-10 — Owner requested adding premium-momentum parameters to the widget proposal and
@@ -668,3 +757,6 @@ only. This is the engine convention behind every stored result and is left as is
   25 % and 30 %, all three reported. Open point: whether the ₹3,000 overall stop stays when the leg
   stops widen. Context: BL-083 found Dir gained after trend triggers in 2024–26 but not in 2022–24.
   Not registered yet.
+- 2026-10-11 — Consolidated the post-Phase-1 discussion into "Next stages — consolidated draft";
+  cut points for VIX below 13 computed (NIFTY 32 / 36 on 32 spikes). Five open points listed for
+  the owner. Not registered.
