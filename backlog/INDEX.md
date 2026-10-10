@@ -73,11 +73,8 @@ Sorted by priority (P0 first), then ID.
 | [BL-081](BL-081-drb-hourly-checkpoints-and-no-trade.md) | Hourly checkpoints for picks that have not started yet (state at 10:30–13:30: VIX, trend, VWAP, ATR, RSI, pivots) and a no-trade option | P2 | Planned (block 3): step 1 negative; the adjustment rule runs under the owner's override | research | options |
 | [BL-083](BL-083-event-triggered-intraday-entries.md) | Event-triggered intraday entries: fire Widesl / Dir / Buy the minute a pivot, VIX, straddle or RSI condition is met, overriding the next scheduled pick | P2 | Planned | research | options |
 | [BL-057](BL-057-daily-four-criteria-rotation.md) | Daily four-criteria rotation (recent P&L, weekday, days-to-expiry, VIX fit) over the 66 NIFTY + SENSEX variants (POC) | P2 | Done: inconclusive | research | options |
-<<<<<<< HEAD
 | [BL-088](BL-088-own-history-sector-relative-strength.md) | Sector scoring on its own relative strength: time-series RS (continuation and reversal) as a replace or tilt on the ETF rotation, then Broad's category layer | P2 | Idea | research | momentum |
-=======
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
->>>>>>> origin/main
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
