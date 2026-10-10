@@ -32,7 +32,7 @@ from pathlib import Path
 import pandas as pd
 import pyarrow.parquet as pq
 from periods import M_1512, M_1513, assert_learning_day
-from series import level, load_chain_day, rolling_straddle
+from series import load_chain_day, rolling_straddle
 from trading_data import lake
 
 from option_backtesting.fyers.daily import data_dir
@@ -98,7 +98,8 @@ def max_oi_strikes(root: Path, und: str, day: date, expiry: date) -> dict[int, t
               .reindex(range(N_MINUTES)).ffill() for k, g in df.groupby("option_type")}  # fmt: skip
     if "CE" not in piv or "PE" not in piv:
         return out
-    ce, pe = piv["CE"].idxmax(axis=1), piv["PE"].idxmax(axis=1)
+    ce = piv["CE"].dropna(how="all").idxmax(axis=1).reindex(range(N_MINUTES))
+    pe = piv["PE"].dropna(how="all").idxmax(axis=1).reindex(range(N_MINUTES))
     for m in range(N_MINUTES):
         if (
             isinstance(ce.iloc[m], float)
@@ -123,7 +124,7 @@ def find_entries(ev: dict, root: Path, daily: pd.DataFrame) -> dict:
         return out
     up = move > 0
     chain = load_chain_day(root, und, day)
-    x = level(rolling_straddle(chain)).x
+    s0920 = rolling_straddle(chain).s[5]  # the 09:20 straddle itself; None if unpriced
     fixed = day_levels(daily, day, chain.step)
     oi = max_oi_strikes(root, und, day, chain.expiry)
     or_hi, or_lo = max(hi[0:30]), min(lo[0:30])
@@ -138,8 +139,8 @@ def find_entries(ev: dict, root: Path, daily: pd.DataFrame) -> dict:
         lv["round_below"] = math.floor(base / rnd) * rnd
         if m - 1 in oi:
             lv["max_oi_call"], lv["max_oi_put"] = oi[m - 1]
-        if m >= 6:
-            lv["expected_up"], lv["expected_down"] = spot.open[0] + x[5], spot.open[0] - x[5]
+        if m >= 6 and s0920 is not None:
+            lv["expected_up"], lv["expected_down"] = spot.open[0] + s0920, spot.open[0] - s0920
         return lv
 
     ref = cl[held]

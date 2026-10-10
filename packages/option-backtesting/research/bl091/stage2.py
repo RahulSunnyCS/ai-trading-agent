@@ -98,9 +98,9 @@ def _pct(a: float, b: float) -> float:
     return float("nan") if not (a and b) or math.isnan(a) or math.isnan(b) else (a / b - 1) * 100
 
 
-def broke(b: dict | None, t: int, up: bool) -> float:
+def broke(b: dict | None, t: int, up: bool | None) -> float:
     """1 if a 1-minute close in t-2..t broke the previous 10 minutes' low (up) / high (down)."""
-    if b is None or t < 12:
+    if b is None or up is None or t < 12:
         return float("nan")
     for m in range(t - 2, t + 1):
         if up and b["close"][m] < np.nanmin(b["low"][m - 10 : m]):
@@ -110,8 +110,8 @@ def broke(b: dict | None, t: int, up: bool) -> float:
     return 0.0
 
 
-def broke5(b: dict | None, t: int, up: bool) -> float:
-    if b is None:
+def broke5(b: dict | None, t: int, up: bool | None) -> float:
+    if b is None or up is None:
         return float("nan")
     e = t - ((t - 4) % 5)
     if e < 14:
@@ -121,7 +121,7 @@ def broke5(b: dict | None, t: int, up: bool) -> float:
 
 
 def day_work(task) -> list[dict]:
-    period, und, day_s, vix_open, spikes = task
+    period, und, day_s, vix_open, spikes, daily = task
     day = date.fromisoformat(day_s)
     assert_learning_day(und, day)
     root, ref = data_dir(), _ref()
@@ -141,7 +141,7 @@ def day_work(task) -> list[dict]:
     others = {o: _bars(root, o, day) for o in OTHERS}
     vol, oi, chain_vol = option_arrays(root, und, day, chain.expiry)
     step, rnd, g = chain.step, ROUND[und], GIVE[und]
-    lv_fixed = day_levels(daily_bars_cached(root, und), day, step)
+    lv_fixed = day_levels(daily, day, step)
     oi_max = max_oi_strikes(root, und, day, chain.expiry)
     rows = []
     for idx, held_min, at_held in spikes:
@@ -176,7 +176,8 @@ def day_work(task) -> list[dict]:
                     break
             res = simulate_day(wide_strategy(und, minute_label(t + 1), 650.0), data, ref, SIZING)
             label_b = int(classify(res) != "OVERALL_SL")
-            up = (chain.spot[t] or 0) > (chain.spot[start] or 0)
+            s_t, s_0 = chain.spot[t], chain.spot[start]
+            up = None if s_t is None or s_0 is None or s_t == s_0 else s_t > s_0
             d1 = [x[m] - x[m - 1] for m in range(t - 5, t + 1)]
             slow = 0
             for i in range(len(d1) - 1, 0, -1):
@@ -253,7 +254,7 @@ def day_work(task) -> list[dict]:
             av = vol.get((k, "CE"), np.zeros(N_MINUTES)) + vol.get((k, "PE"), np.zeros(N_MINUTES))
             abase = np.mean(av[start : t + 1]) if t > start else float("nan")
             row["atm_vol_ratio"] = av[t - 2 : t + 1].sum() / (3 * abase) if abase else float("nan")
-            sign = 1 if up else -1
+            sign = float("nan") if up is None else (1 if up else -1)
             for o, b in others.items():
                 row[f"{o.lower()}_move3"] = (
                     sign * _pct(b["close"][t], b["close"][t - 3]) if b is not None else float("nan")
@@ -273,15 +274,6 @@ def day_work(task) -> list[dict]:
     return rows
 
 
-_DAILY: dict = {}
-
-
-def daily_bars_cached(root: Path, und: str) -> pd.DataFrame:
-    if und not in _DAILY:
-        _DAILY[und] = daily_bars(root, und)
-    return _DAILY[und]
-
-
 def build(workers: int) -> None:
     s = pd.read_csv(HERE / "out" / "sustained.csv")
     days = (
@@ -291,9 +283,10 @@ def build(workers: int) -> None:
     )
     h = s[s.held_min.notna()]
     tasks = []
+    daily = {u: daily_bars(data_dir(), u) for u in h.underlying.unique()}
     for (per, und, day), g in h.groupby(["period", "underlying", "day"]):
         tasks.append((per, und, day, days[(per, und, day)],
-                      [(int(r.episode_idx), int(r.held_min), float(r.at_held)) for r in g.itertuples()]))  # fmt: skip
+                      [(int(r.episode_idx), int(r.held_min), float(r.at_held)) for r in g.itertuples()], daily[und]))  # fmt: skip
     rows: list[dict] = []
     with ProcessPoolExecutor(max_workers=workers) as pool:
         for i, r in enumerate(pool.map(day_work, tasks, chunksize=2)):
@@ -532,7 +525,11 @@ def r1(workers: int) -> None:
             w = _csv.DictWriter(f, fieldnames=SIM_COLUMNS, extrasaction="ignore")
             for res in pool.map(sim_day, [(u, d, x) for (u, d), x in by_day.items()], chunksize=2):
                 w.writerows(res)
-    have = pd.read_csv(SIMS).set_index(["underlying", "day", "arm", "entry_min"]).net0
+    have = pd.read_csv(SIMS)
+    have = have[~have.notes.fillna("").str.startswith("ERR")].drop_duplicates(
+        ["underlying", "day", "arm", "entry_min"], keep="last"
+    )
+    have = have.set_index(["underlying", "day", "arm", "entry_min"]).net0
     pl = []
     for r in evr.itertuples(index=False):
         if r.entry_min <= 0:

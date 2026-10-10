@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — evidence for the proposed Live premium-momentum view; useful before adding more signal parameters |
-| **Status** | In progress (Phase 1 done: census + R0 on P2 + P3; next steps wait for the owner; P1 unread) |
+| **Status** | In progress (Phase 1, Stage 1a / 1b and Stage 2 done on P2 + P3; no arm passed; owner to decide the P1 question; P1 unread) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |

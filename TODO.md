@@ -640,6 +640,10 @@ should be re-entered; P2 + P3 first, P1 once the rule is frozen.
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.25.1 | Phase 1: episode census (≥ 25-point rises of the rolling ATM straddle) and the R0 re-entry replay on P2 + P3 | claude | **Done 2026-10-11.** 1,450 episodes on 932 index-days; R0 replayed on 1,318 (counts in the BL-091 Result section); next steps wait for the owner |
+| 3.25.2 | Stage 1a: Widesl (3 stops × 5 re-entry rules) and Directional D1 (3 stops) after a held spike, against a time-matched comparator | claude | **Done 2026-10-11.** No arm passes; every 2025 arm worse than on normal days; R3 (nothing before 13:30) least bad |
+| 3.25.3 | Stage 1b: Directional D2 at support / resistance (rejection and break) | claude | **Done 2026-10-11.** No arm passes; level reactions fire almost at once |
+| 3.25.4 | Stage 2: true vs false tops over 32 parameters; rule R1 through the trading test | claude | **Done 2026-10-11.** IV change separates; R1 does not pass |
+| 3.25.5 | Owner decision: register R3 (or expiry-day spikes) as one question for the held-back year, or close | owner | **Open** |
 
 ## Reference — where detail lives
 

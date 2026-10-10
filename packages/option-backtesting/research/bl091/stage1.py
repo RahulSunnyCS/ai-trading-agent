@@ -352,7 +352,7 @@ def read() -> None:
         "## Screening bar (registered): diff > 0 with t ≥ 2 in NIFTY 2025, same sign in 2022–24, mean at ₹20 > 0",
         "",
     ]
-    a = table(prim[prim.period == "P2"][prim.underlying == "NIFTY"], ["arm"])
+    a = table(prim[(prim.period == "P2") & (prim.underlying == "NIFTY")], ["arm"])
     b = table(prim[prim.period == "P3"], ["arm"])
     passing = [arm for arm in a.index if a.loc[arm, "diff"] > 0 and a.loc[arm, "t"] >= 2
                and b.loc[arm, "diff"] > 0 and a.loc[arm, "mean20"] > 0]  # fmt: skip
