@@ -183,6 +183,42 @@ equal-weight, live mix, lots per window.
 ### Phase 5 — Review at 60 trading days
 - Score once against the Phase 0 rule; write the Result here and in BL-057's Log.
 
+### Phase 0b — what the journal records (dated 2026-10-10, registered before the first entry)
+Supersedes the 66-variant rule of Phase 0 for the forward test; Phase 0's discipline (picks before
+09:17, scored after, no change from reports) stands.
+- **Lists (all DRB-6W3L2 shape):** 3 strategies × 2 lots from the 248-variant whole-day list, at
+  least 2 Widesl strategies, the Buy add-on (one 2-lot Buy strategy) when a Buy variant ranks in the
+  overall top 10; per-strategy stops as in the variant files; every list ranks with fit lookbacks
+  5:30, 21:25, 63:25, 126:20 except REF. Weights are own-recent / weekday / dte / VIX / family-band
+  recent (BL-074 type × start-band family):
+
+  | List | Own | Weekday | DTE | VIX | Family | Notes |
+  |---|---|---|---|---|---|---|
+  | **A** | 5 | 34 | 33 | 23 | 5 | BL-075 stage 1, safest cell |
+  | **B** | 0 | 36 | 35 | 24 | 5 | BL-075, best Jan–Aug 2025 |
+  | **C** | 15 | 30 | 30 | 20 | 5 | BL-075, best in the 2025-26 regime |
+  | **REF** | 33 | 25 | 25 | 17 | 0 | the live baseline, lookbacks 5:40, 21:30, 63:30 |
+- **Entry (one per trading day, 09:16 IST):** the day, weekday, 09:15 India VIX open and band,
+  days to expiry per index, each list's three strategies and Buy strategy (with their composite
+  scores), the code commit, the time written, the previous entry's hash and its own SHA-256. Appended
+  to an insert-only hash-chained log under `TRADING_DATA_ROOT/rotation/`; `obt rotation verify`
+  re-computes the chain. The picks are Telegrammed with the chain head. If the 09:15 VIX open cannot
+  be read by 09:20 nothing is recorded for that day and an alert is sent (a late entry is not forward).
+- **Scoring (every evening, after `options-daily`):** the day's result for all 248 variants is
+  computed (one-day `run_legwise` per variant, same strategy files), stored, and each list's recorded
+  picks scored: gross for the day, the random-pick percentile for that day, and the running totals
+  and drawdowns per list.
+- **Evaluation point:** 60 trading days from 2026-10-12. Per list: gross, max drawdown, and the share
+  of random same-shape picks it beats (cumulative), with REF as the comparator and a 5-day
+  block-bootstrap interval of each list minus REF. Weekly read-only reports; nothing changes.
+- **Will not:** change a list's weights, add a list, drop one, or switch the rule after seeing
+  results; start from a later date.
+- **Deviation from Phase 1–2 as written:** the journal is a hash-chained JSONL file, not a catalog
+  table, and the results store is per-variant CSV files under the same directory: the catalog
+  allows one writer, the migration ledger is mid-repair (see BL-071 Log), and the file form keeps
+  `obt daily` unaffected. The variant YAMLs now live in `packages/option-backtesting/strategies/
+  rotation/` (committed), not under `research/`.
+
 ## Risks
 
 - **Two minutes between the VIX criterion and the first entry (09:15 → 09:17).** Fine for a paper
@@ -215,3 +251,4 @@ equal-weight, live mix, lots per window.
   analysis discussion needs; owner asked that the discussion's UI needs be added here.
 - 2026-10-09 — created from the owner's request; P0 with a Monday 2026-10-12 09:15 deadline for
   Phases 0–3.
+- 2026-10-10 — owner chose lists A, B and C (BL-075 stage 1) plus the live baseline as REF; Phase 0b registered; build started.
