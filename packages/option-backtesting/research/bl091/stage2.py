@@ -12,6 +12,7 @@ analyse -> out/stage2.md: true vs false tops per parameter (medians, AUC, day-bl
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import random
 import sys
@@ -399,13 +400,186 @@ def analyse() -> None:
     print("\n".join(lines[-3:]))
 
 
+# --- R1: the rule Stage 2 produces, run through the Stage 1 machinery (registered) -----------------
+
+
+def youden(v: np.ndarray, y: np.ndarray, higher: bool) -> float:
+    best, thr = -1.0, float("nan")
+    ok = ~np.isnan(v)
+    v, y = v[ok], y[ok]
+    for x in np.unique(v):
+        k = v >= x if higher else v <= x
+        j = (k & (y == 1)).sum() / max((y == 1).sum(), 1) - (k & (y == 0)).sum() / max(
+            (y == 0).sum(), 1
+        )
+        if j > best:
+            best, thr = j, float(x)
+    return thr
+
+
+def r1_rule() -> dict:
+    """Thresholds from NIFTY 2022–24 only: first parameter, then a second among the kept candidates."""
+    c = pd.read_csv(OUT)
+    a = pd.read_csv(HERE / "out" / "stage2_auc.csv")
+    sep = a[a["NIFTY separates"]].copy()
+    sep["dist"] = (sep["NIFTY discover 2022–24 AUC"] - 0.5).abs()
+    f1 = sep.sort_values("dist", ascending=False).iloc[0]
+    dis = c[(c.underlying == "NIFTY") & (c.period == "P3")]
+    chk = c[(c.underlying == "NIFTY") & (c.period == "P2")]
+    hi1 = f1["NIFTY discover 2022–24 AUC"] > 0.5
+    t1 = youden(dis[f1.parameter].to_numpy(float), dis.true_top.to_numpy(), hi1)
+    keep = (lambda df: df[f1.parameter] >= t1) if hi1 else (lambda df: df[f1.parameter] <= t1)
+    kd, kc = dis[keep(dis)], chk[keep(chk)]
+    rule = {"p1": f1.parameter, "higher1": bool(hi1), "t1": t1, "p2": None}
+    best = 0.0
+    for g in FEATURES:
+        if g == f1.parameter:
+            continue
+        ad = auc(kd[g].to_numpy(float), kd.true_top.to_numpy())
+        ac = auc(kc[g].to_numpy(float), kc.true_top.to_numpy())
+        if math.isnan(ad) or math.isnan(ac) or not (ad >= 0.6 or ad <= 0.4):
+            continue
+        if perm_p(kd, g, ad) >= 0.05 or (ac - 0.5) * (ad - 0.5) <= 0 or abs(ac - 0.5) < 0.05:
+            continue
+        if abs(ad - 0.5) > best:
+            best = abs(ad - 0.5)
+            rule.update(p2=g, higher2=bool(ad > 0.5), auc2=ad, auc2_check=ac)
+    if rule["p2"]:
+        rule["t2"] = youden(kd[rule["p2"]].to_numpy(float), kd.true_top.to_numpy(), rule["higher2"])
+    return rule
+
+
+def fires(df: pd.DataFrame, rule: dict) -> pd.Series:
+    k = (df[rule["p1"]] >= rule["t1"]) if rule["higher1"] else (df[rule["p1"]] <= rule["t1"])
+    if rule["p2"]:
+        k &= (df[rule["p2"]] >= rule["t2"]) if rule["higher2"] else (df[rule["p2"]] <= rule["t2"])
+    return k.fillna(False)
+
+
+def r1_day(task) -> list[dict]:
+    und, day_s, events = task  # events: [(key, [fire minutes])]
+    from r0 import attempt_row
+    from stage1 import summarise
+
+    day = date.fromisoformat(day_s)
+    assert_learning_day(und, day)
+    root, ref = data_dir(), _ref()
+    data = load_day(root, und, day)
+    out = []
+    for key, ts in events:
+        for stop in (650.0, 1300.0, 1950.0):
+            rows, i = [], 0
+            while i < len(ts) and len(rows) < 5:
+                entry = ts[i] + 1
+                if entry >= 358:
+                    break
+                res = simulate_day(wide_strategy(und, minute_label(entry), stop), data, ref, SIZING)
+                row = attempt_row(len(rows) + 1, entry, res)
+                rows.append(row)
+                if row["outcome"] != "OVERALL_SL" or row["exit_min"] is None:
+                    break
+                i = next((j for j, t in enumerate(ts) if t >= row["exit_min"]), len(ts))
+            r = summarise(und, day_s, f"W{int(stop)}_R1", ts[0] + 1 if ts else -1, rows)
+            out.append({**r, "key": key})
+    return out
+
+
+def r1(workers: int) -> None:
+    from stage1 import PLAN, SIMS, sim_day, tstat
+
+    rule = r1_rule()
+    c = pd.read_csv(OUT)
+    c = c[c.underlying == "NIFTY"]
+    c["fire"] = fires(c, rule)
+    plan = pd.read_csv(PLAN)
+    ev = plan[(plan.role == "event") & (plan.underlying == "NIFTY")]
+    tasks: dict[tuple[str, str], list] = {}
+    for r in ev.itertuples(index=False):
+        ts = sorted(
+            c[
+                (c.period == r.period)
+                & (c.day == r.event_day)
+                & (c.episode_idx == r.episode_idx)
+                & c.fire
+            ].t.tolist()
+        )
+        tasks.setdefault((r.underlying, r.event_day), []).append(
+            ((r.period, r.event_day, r.episode_idx), ts)
+        )
+    rows: list[dict] = []
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        for rr in pool.map(r1_day, [(u, d, e) for (u, d), e in tasks.items()], chunksize=2):
+            rows += rr
+    evr = pd.DataFrame(rows)
+    evr[["period", "event_day", "episode_idx"]] = pd.DataFrame(evr.key.tolist(), index=evr.index)
+    # comparator: the same stop with R0 from R1's first entry on each event's comparison days
+    need = []
+    for r in evr[evr.entry_min > 0].itertuples(index=False):
+        days = plan[(plan.role == "placebo") & (plan.period == r.period) & (plan.event_day == r.event_day)
+                    & (plan.episode_idx == r.episode_idx)].day  # fmt: skip
+        need += [("NIFTY", d, r.arm.replace("_R1", "_R0"), int(r.entry_min)) for d in days]
+    have = pd.read_csv(SIMS)
+    done = set(zip(have.underlying, have.day, have.arm, have.entry_min, strict=True))
+    by_day: dict = {}
+    for u, d, a, e in set(need) - done:
+        by_day.setdefault((u, d), []).append((a, e))
+    if by_day:
+        import csv as _csv
+
+        from stage1 import SIM_COLUMNS
+
+        with open(SIMS, "a", newline="") as f, ProcessPoolExecutor(max_workers=workers) as pool:
+            w = _csv.DictWriter(f, fieldnames=SIM_COLUMNS, extrasaction="ignore")
+            for res in pool.map(sim_day, [(u, d, x) for (u, d), x in by_day.items()], chunksize=2):
+                w.writerows(res)
+    have = pd.read_csv(SIMS).set_index(["underlying", "day", "arm", "entry_min"]).net0
+    pl = []
+    for r in evr.itertuples(index=False):
+        if r.entry_min <= 0:
+            pl.append(float("nan"))
+            continue
+        days = plan[(plan.role == "placebo") & (plan.period == r.period) & (plan.event_day == r.event_day)
+                    & (plan.episode_idx == r.episode_idx)].day  # fmt: skip
+        vals = [have.get(("NIFTY", d, r.arm.replace("_R1", "_R0"), int(r.entry_min))) for d in days]
+        vals = [v for v in vals if v is not None and not (isinstance(v, float) and math.isnan(v))]
+        pl.append(float(np.mean(vals)) if vals else float("nan"))
+    evr["pl_net0"] = pl
+    evr["diff0"] = evr.net0 - evr.pl_net0
+    evr = evr.merge(
+        ev[["period", "event_day", "episode_idx", "first_of_day", "dte"]],
+        on=["period", "event_day", "episode_idx"],
+    )
+    evr.drop(columns=["key"]).to_csv(HERE / "out" / "stage2_r1_events.csv", index=False)
+    s1 = pd.read_csv(HERE / "out" / "stage1_events.csv")
+    s1 = s1[(s1.underlying == "NIFTY") & s1.first_of_day]
+    res = {"rule": rule, "rows": []}
+    prim = evr[evr.first_of_day]
+    for (per, arm), g in prim.groupby(["period", "arm"]):
+        traded = g[g.entry_min > 0]
+        stop = arm.split("_")[0]
+        base = {
+            x: s1[(s1.period == per) & (s1.arm == f"{stop}_{x}")].net0.mean() for x in ("R0", "R3")
+        }
+        res["rows"].append({"period": per, "arm": arm, "events": int(len(g)), "traded": int(len(traded)),
+                            "mean_all": float(g.net0.mean()), "mean_traded": float(traded.net0.mean()),
+                            "placebo": float(traded.pl_net0.mean()), "diff": float(traded.diff0.mean()),
+                            "t": float(tstat(traded.diff0)), "held": float(traded.held.mean()),
+                            "attempts": float(traded.attempts.mean()), "worst": float(g.net0.min()),
+                            "mean20_all": float(g.net20.mean()), "r0_mean": float(base["R0"]),
+                            "r3_mean": float(base["R3"])})  # fmt: skip
+    (HERE / "out" / "stage2_r1.json").write_text(json.dumps(res, default=float, indent=1))
+    print(json.dumps(res, default=float, indent=1))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("step", choices=["build", "analyse"])
+    ap.add_argument("step", choices=["build", "analyse", "r1"])
     ap.add_argument("--workers", type=int, default=7)
     a = ap.parse_args()
     if a.step == "build":
         build(a.workers)
+    elif a.step == "r1":
+        r1(a.workers)
     else:
         analyse()
     return 0
