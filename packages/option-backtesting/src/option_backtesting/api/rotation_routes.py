@@ -18,9 +18,11 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 from ..rotation import overview, readout
+from ..rotation.journal import JournalCorrupt
 
 router = APIRouter(prefix="/legwise/rotation")
 
+MAX_CACHED = 16
 CACHE_SECONDS = 30.0  # results are written nightly; a page refresh should not re-run 1,000 baskets
 _cache: dict[tuple, tuple[float, Any]] = {}
 
@@ -44,6 +46,8 @@ def _cached(key: tuple, build):
     if hit is not None and now - hit[0] < CACHE_SECONDS:
         return hit[1]
     value = build()
+    if len(_cache) >= MAX_CACHED:  # a few dozen keys at most; drop the oldest rather than grow
+        _cache.pop(min(_cache, key=lambda k: _cache[k][0]))
     _cache[key] = (now, value)
     return value
 
@@ -82,4 +86,7 @@ def get_summary(
     from ..fyers.daily import data_dir
 
     root = data_dir()
-    return _cached(("summary", root, start, end), lambda: readout.build(root, start, end))
+    try:
+        return _cached(("summary", root, start, end), lambda: readout.build(root, start, end))
+    except JournalCorrupt as error:
+        return _error(409, f"the journal cannot be read: {error}")

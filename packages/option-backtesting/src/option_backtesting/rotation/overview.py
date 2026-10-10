@@ -17,12 +17,15 @@ from ..fyers.daily import data_dir
 from . import base as base_mod
 from . import journal, store
 from .lists import LISTS, LOTS_PER, WARMUP
+from .pick import FIRST_ENTRY
 from .variants import is_buy, is_dir, is_wide, parts, variant_names
 
 IST = ZoneInfo("Asia/Kolkata")
 FIRST_ENTRY_DAY = date(2026, 10, 12)  # registered, BL-058 Phase 0
 READOUT_DAYS = 60
-ENTRY_DEADLINE = time(9, 17)
+ENTRY_DEADLINE = FIRST_ENTRY  # the same 09:17 the journal marks late entries by
+UPDATE_DUE = time(19, 45)  # the nightly options-rotation-nightly job
+UPDATE_OVERDUE = time(20, 30)  # past this a missing session is a problem, not a wait
 
 FAMILY_LABEL = {
     "wide": "Widesl",
@@ -63,6 +66,27 @@ def lists_spec() -> dict:
     }
 
 
+def _trading_days(start: date, end: date, ref) -> list[date]:
+    """Every exchange trading day in [start, end]."""
+    out, d = [], start
+    while d <= end:
+        if ref.is_trading_day(d):
+            out.append(d)
+        d += timedelta(days=1)
+    return out
+
+
+def expected_session(now: datetime, ref) -> date:
+    """The latest trading day whose session the nightly update should have stored by `now`: today
+    once 19:45 has passed on a trading day, else the trading day before."""
+    d = now.date()
+    if not (ref.is_trading_day(d) and now.time() >= UPDATE_DUE):
+        d -= timedelta(days=1)
+    while not ref.is_trading_day(d):
+        d -= timedelta(days=1)
+    return d
+
+
 def _check(id_: str, label: str, value: str, state: str, detail: str = "") -> dict:
     return {"id": id_, "label": label, "value": value, "state": state, "detail": detail}
 
@@ -73,27 +97,35 @@ def health(root: Path | None = None, now: datetime | None = None) -> dict:
     now = (now or datetime.now(IST)).astimezone(IST)
     today = now.date()
     names = variant_names()
-    entries = journal.read(store.journal_path(root))
-    days = store.read_days(root)
+    ref = default_reference_data()
     checks: list[dict] = []
+    try:
+        entries = journal.read(store.journal_path(root))
+        unreadable = ""
+    except journal.JournalCorrupt as error:
+        entries, unreadable = [], str(error)
+    days = store.read_days(root)
 
-    # the latest session the nightly update stored, and how complete its results are
+    # the latest session the nightly update stored, judged against the trading calendar: the last
+    # finished session must be there, whatever the weekday arithmetic of calendar days says
+    want = expected_session(now, ref)
     if days:
         last = max(days)
-        age = (today - last).days
-        have = sum(1 for n in names if last in store.result_days(n, root))
-        state = "ok" if age <= 3 else "warn" if age <= 6 else "bad"
-        checks.append(
-            _check(
-                "session",
-                "Latest session",
-                f"{last:%a %-d %b}",
-                state,
-                f"{age} day(s) ago; check the 19:45 `options-rotation-nightly` job"
-                if state != "ok"
-                else "",
+        behind = [d for d in _trading_days(last + timedelta(days=1), want, ref)]
+        if not behind:
+            state, note = "ok", ""
+        elif now.date() == want and now.time() < UPDATE_OVERDUE:
+            state, note = "info", f"{want} is stored by the 19:45 update"
+        else:
+            state = "bad"
+            note = (
+                f"no stored results for {', '.join(str(d) for d in behind[:3])}"
+                f"{'...' if len(behind) > 3 else ''}: the 19:45 `options-rotation-nightly` job did "
+                f"not store them (or data_quality excluded the day); run "
+                f"`obt rotation update --day {behind[0]}`"
             )
-        )
+        checks.append(_check("session", "Latest session", f"{last:%a %-d %b}", state, note))
+        have = sum(1 for n in names if last in store.result_days(n, root))
         checks.append(
             _check(
                 "results",
@@ -112,7 +144,6 @@ def health(root: Path | None = None, now: datetime | None = None) -> dict:
         checks.append(_check("session", "Latest session", "none", "bad", "no stored results"))
 
     # today's entry: expected on a trading day once 09:17 has passed
-    ref = default_reference_data()
     trading = ref.is_trading_day(today)
     have_today = next((e for e in entries if e["day"] == today.isoformat()), None)
     if not entries and today < FIRST_ENTRY_DAY:
@@ -145,7 +176,13 @@ def health(root: Path | None = None, now: datetime | None = None) -> dict:
             )
         )
 
-    if entries:
+    if unreadable:
+        checks.append(
+            _check(
+                "chain", "Chain", "UNREADABLE", "bad", f"{unreadable}: run `obt rotation verify`"
+            )
+        )
+    elif entries:
         e = entries[-1]
         src = e.get("vix_source", "?")
         fallback = src not in ("fyers", "given")
@@ -171,6 +208,28 @@ def health(root: Path | None = None, now: datetime | None = None) -> dict:
     else:
         checks.append(_check("chain", "Chain", "0 entries", "info"))
 
+    # a trading day, from the first entry on, that has no entry at all: never a zero, never silent
+    if entries or today >= FIRST_ENTRY_DAY:
+        through = today if now.time() >= ENTRY_DEADLINE else today - timedelta(days=1)
+        have_days = {e["day"] for e in entries}
+        missing = [
+            d
+            for d in _trading_days(FIRST_ENTRY_DAY, through, ref)
+            if d.isoformat() not in have_days and d <= through
+        ]
+        if missing and not unreadable:
+            checks.append(
+                _check(
+                    "missing",
+                    "Entries",
+                    f"{len(missing)} day(s) not recorded",
+                    "bad",
+                    "no entry for "
+                    + ", ".join(str(d) for d in missing[-5:])
+                    + ": those sessions are not part of the forward test",
+                )
+            )
+
     pending_base = base_mod.pending_days(root)
     checks.append(
         _check(
@@ -195,8 +254,12 @@ def baskets(root: Path | None = None, day: date | None = None) -> dict:
     """The picks of one journal entry (default the latest), per list, with each pick's composite,
     how many lists hold it, and what changed since the entry before."""
     root = root or data_dir()
-    entries = journal.read(store.journal_path(root))
     out: dict = {"entry": None, "lists": {}, "changed": {}, "readout_days": READOUT_DAYS}
+    try:
+        entries = journal.read(store.journal_path(root))
+    except journal.JournalCorrupt as error:
+        out["error"] = str(error)
+        return out
     if day is not None:
         entries = [e for e in entries if e["day"] <= day.isoformat()]
     if not entries:
@@ -234,11 +297,3 @@ def baskets(root: Path | None = None, day: date | None = None) -> dict:
             out["changed"][k] = {"added": sorted(now_ - before), "removed": sorted(before - now_)}
     out["warmup_days"] = WARMUP
     return out
-
-
-def next_entry_day(today: date) -> date:
-    d = max(today, FIRST_ENTRY_DAY)
-    ref = default_reference_data()
-    while not ref.is_trading_day(d):
-        d += timedelta(days=1)
-    return d
