@@ -39,7 +39,7 @@ with no event of that trigger. The table shows:
 | Event days | Days on which the trigger fired on either index, and were scored. Both indices on one day count once. |
 | Event avg, Placebo avg | The template's mean result per lot on event days, and on the matching placebo days. |
 | Difference | Event minus placebo, per lot, gross. This is the figure to read. |
-| t | The difference over its day-to-day noise. Shown only from 5 event days; below that the row says n < 5 and shows none. |
+| t | The difference over its day-to-day noise. Shown only from 10 event days; below that the row says n < 10 and shows none. |
 | Research columns | The same difference found in the research, over the last two years and over 2022 to 2024. T3 is quoted by its bound, because it showed no edge in any template. |
 
 Highlighted rows with the Candidate badge are Dir after T1 and Dir after T4, the two ideas the
@@ -65,11 +65,14 @@ list's next core pick that starts at least 15 minutes later, and reports:
 An event is not applied when no core pick starts 15 minutes or more later, or when replacing the
 pick would leave fewer than two Widesl strategies. A day whose displaced pick has no stored result
 yet is pending: it is never a zero, and it is not on the chart. A late journal entry is not a
-forward entry and is left out of every total.
+forward entry and is left out of the override rows; the trigger table, which does not depend on
+the journal, still counts that session.
 
 The chart is the running total of the difference, with the placebo line dashed. The gap between
 the two lines is what the trigger's timing adds. What is left above or below zero is "a Dir in
-place of that pick on that day", which may have nothing to do with the trigger.
+place of that pick on that day", which may have nothing to do with the trigger. The placebo line
+is drawn only on days with enough earlier non-event days, and the page says when it covers fewer
+days than the solid line.
 
 Switch lists with the control above: all four are shown, and B and REF are marked as candidates
 because those were the two the research found above both of its controls.

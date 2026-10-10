@@ -93,6 +93,7 @@ export interface ShadowListSummary {
   mean_lot: number | null;
   beat_share: number | null;
   control_days: number;
+  control_complete?: boolean;
   control_total_basket: number | null;
   series: ShadowSeriesPoint[];
 }

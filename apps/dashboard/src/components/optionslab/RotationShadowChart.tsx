@@ -124,16 +124,16 @@ export function RotationShadowChart({ series }: { series: readonly ShadowSeriesP
             fill="none"
             strokeWidth={2}
             strokeDasharray="5 4"
-            className="stroke-accent"
+            className="stroke-series-2"
           />
         ) : null}
-        <path d={model.eventPath} fill="none" strokeWidth={2.5} className="stroke-primary" />
+        <path d={model.eventPath} fill="none" strokeWidth={2.5} className="stroke-series-1" />
         {model.points.map((p) => (
           <g key={p.day}>
             {p.controlY !== null ? (
-              <circle cx={p.x} cy={p.controlY} r={2.5} className="fill-accent" />
+              <circle cx={p.x} cy={p.controlY} r={2.5} className="fill-series-2" />
             ) : null}
-            <circle cx={p.x} cy={p.y} r={shown?.day === p.day ? 5 : 3} className="fill-primary" />
+            <circle cx={p.x} cy={p.y} r={shown?.day === p.day ? 5 : 3} className="fill-series-1" />
           </g>
         ))}
         {model.xTicks.map((t) => (

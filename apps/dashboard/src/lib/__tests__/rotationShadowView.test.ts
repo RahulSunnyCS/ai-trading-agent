@@ -218,7 +218,7 @@ describe('emptyState', () => {
 
 describe('triggerCells', () => {
   it('shows no t and flags the row below five event days', () => {
-    expect(THIN_DAYS).toBe(5);
+    expect(THIN_DAYS).toBe(10);
     const c = triggerCells(
       triggerRow({
         days: 4,
@@ -231,7 +231,7 @@ describe('triggerCells', () => {
       }),
     );
     expect(c.t).toBe('—');
-    expect(c.flag).toBe('n < 5');
+    expect(c.flag).toBe('n < 10');
     expect(c.diff).toBe('+₹600');
     expect(c.diffTone).toBe('positive');
   });

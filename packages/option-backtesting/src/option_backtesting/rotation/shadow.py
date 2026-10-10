@@ -24,8 +24,8 @@ Three parts, every figure an event minus a comparator, never a standalone profit
    nightly scoring for them. They are returned `not_scored` with their registered definitions.
 
 "Forward" is the BL-058 window: sessions from 2026-10-12. A journal entry recorded after 09:17
-(`before_first_entry` false) is not forward and is listed as `late_entry`, excluded from every
-total.
+(`before_first_entry` false) is not forward and is listed as `late_entry`, left out of the override
+totals; the trigger event study does not depend on the journal and still counts that session.
 """
 
 from __future__ import annotations
@@ -45,8 +45,10 @@ JUDGED_AT = 60
 #: last day BL-083's exploration set covers (2024-10-09 -> 2026-10-08); nothing later was seen.
 RESEARCH_END = date(2026, 10, 8)
 
-#: `triggers.summary()` shows t only from 5 event days (its `len(dm) > 4`); fewer is flagged thin.
-MIN_T_DAYS = 5
+#: A t statistic is shown only from this many event days. `triggers.summary()` itself computes it
+#: from 5 (df 4), but at 5 a t above 3 appears within a week of a trigger that fires on most days,
+#: next to a research bar set on 130 to 312 days: the repo's own interval guard is 10.
+MIN_T_DAYS = 10
 #: ... and an event counts only with at least this many placebo days (the same bar, inline there).
 MIN_PLACEBO_DAYS = 10
 
@@ -268,7 +270,7 @@ def trigger_table(root: Path, since: str, until: str | None) -> list[dict]:
                     "event_avg": s["event"] if s else None,
                     "placebo_avg": s["placebo"] if s else None,
                     "diff": s["diff"] if s else None,
-                    "t": s["t"] if s else None,
+                    "t": s["t"] if s and days >= MIN_T_DAYS else None,
                     "thin": days < MIN_T_DAYS,
                     "unscored_events": len(seen) - (s["events"] if s else 0),
                     "research": RESEARCH_EVENT_STUDY.get((trig, tpl)),
@@ -483,6 +485,7 @@ def list_summary(key: str, rows: list[dict], forward_days: int) -> dict:
         "mean_lot": round(sum(r["diff_lot"] for r in scored) / len(scored), 2) if scored else None,
         "beat_share": sum(r["diff_basket"] > 0 for r in scored) / len(scored) if scored else None,
         "control_days": n_ctrl,
+        "control_complete": n_ctrl == len(scored),
         "control_total_basket": round(cum_ctrl, 2) if n_ctrl else None,
         "series": series,
     }

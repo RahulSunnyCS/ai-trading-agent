@@ -268,6 +268,9 @@ function OverrideCard({ r }: { r: RotationShadowResponse }) {
           <span className="font-medium text-foreground">What the dashed line is: </span>
           {placebo.reason} The gap between the two lines is the trigger's timing; what is left above
           or below zero is "a Dir in place of that pick on that day".
+          {list.control_days < list.scored
+            ? ` The control exists on ${list.control_days} of ${list.scored} scored days only, so the two lines are not like for like.`
+            : ''}
         </p>
       </div>
 
@@ -320,9 +323,10 @@ function OverrideCard({ r }: { r: RotationShadowResponse }) {
                       {c.control}
                     </Td>
                     <Td dense className="whitespace-nowrap">
-                      <span title={c.reason || undefined}>
-                        <Badge tone={c.tone}>{c.status}</Badge>
-                      </span>
+                      <Badge tone={c.tone}>{c.status}</Badge>
+                      {c.reason ? (
+                        <span className="ml-2 text-xs text-faint">{c.reason}</span>
+                      ) : null}
                     </Td>
                   </TRow>
                 );
@@ -331,7 +335,7 @@ function OverrideCard({ r }: { r: RotationShadowResponse }) {
           </Table>
           <p className="mt-2 text-xs text-faint">
             Pending means the displaced pick's result or the Dir simulation is not stored yet; it
-            fills in after the evening update. Hover a status for the reason.
+            fills in after the evening update. The reason is shown beside each status.
           </p>
         </div>
       ) : null}

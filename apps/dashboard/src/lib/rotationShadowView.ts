@@ -19,7 +19,7 @@ import type {
 import { EMPTY, formatDay, formatInr, formatInt, formatNumber } from './format';
 
 /** A trigger row with fewer event days than this shows no t (the API's own bar). */
-export const THIN_DAYS = 5;
+export const THIN_DAYS = 10;
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 

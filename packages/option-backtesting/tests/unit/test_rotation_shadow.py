@@ -316,25 +316,25 @@ def _trigger_days(world, n, trigger="T4", template="dir", event=900.0, placebo=3
                        placebo=placebo)  # fmt: skip
 
 
-def test_the_trigger_table_is_summary_over_the_forward_window_and_t_needs_five_days(world):
-    _trigger_days(world, 4)
+def test_the_trigger_table_is_summary_over_the_forward_window_and_t_needs_ten_days(world):
+    _trigger_days(world, 9)
     world.save()
     row = next(
         t
         for t in shadow.report(world.root)["triggers"]
         if (t["trigger"], t["template"]) == ("T4", "dir")
     )
-    assert row["days"] == 4 and row["thin"] is True and row["t"] is None
-    assert row["candidate"] is True and row["event_avg"] == pytest.approx(915.0)
+    assert row["days"] == 9 and row["thin"] is True and row["t"] is None
+    assert row["candidate"] is True and row["event_avg"] == pytest.approx(940.0)
     assert row["placebo_avg"] == pytest.approx(300.0)
-    assert row["diff"] == pytest.approx(615.0)
+    assert row["diff"] == pytest.approx(640.0)
 
     world2 = World(world.root)
-    _trigger_days(world2, 6)
+    _trigger_days(world2, 12)
     world2.save()
     rows = shadow.report(world.root)["triggers"]
     row = next(t for t in rows if (t["trigger"], t["template"]) == ("T4", "dir"))
-    assert row["days"] == 6 and row["thin"] is False and row["t"] is not None
+    assert row["days"] == 12 and row["thin"] is False and row["t"] is not None
     # equal to triggers.summary(): nothing re-implemented
     s = next(x for x in T.summary(world.root, since="2026-10-12") if x["trigger"] == "T4")
     assert (row["event_avg"], row["placebo_avg"], row["diff"], row["t"]) == (

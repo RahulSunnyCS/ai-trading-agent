@@ -251,7 +251,7 @@ describe('RotationShadowScoreboard', () => {
     });
     hook.state = { data, loading: false, error: null, refetch: vi.fn() };
     render(<RotationShadowScoreboard />);
-    expect(screen.getByText('n < 5')).toBeTruthy();
+    expect(screen.getByText('n < 10')).toBeTruthy();
     expect(screen.getByText('1.50')).toBeTruthy();
     expect(screen.getAllByText('Candidate').length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText('No forward session has been scored yet')).toBeNull();

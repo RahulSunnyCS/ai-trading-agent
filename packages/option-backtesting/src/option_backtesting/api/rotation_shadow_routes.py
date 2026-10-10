@@ -22,6 +22,7 @@ from ..rotation import shadow
 router = APIRouter(prefix="/legwise/rotation/shadow")
 
 CACHE_SECONDS = 30.0  # the files change once a night; a page refresh should not re-read them
+MAX_CACHED = 16
 _cache: dict[tuple, tuple[float, Any]] = {}
 
 
@@ -58,5 +59,7 @@ def get_shadow(
     if hit is not None and now - hit[0] < CACHE_SECONDS:
         return hit[1]
     value = shadow.report(root, start, end)
+    if len(_cache) >= MAX_CACHED:  # bounded: a script looping over dates must not grow it
+        _cache.pop(min(_cache, key=lambda k: _cache[k][0]))
     _cache[key] = (now, value)
     return value
