@@ -254,3 +254,20 @@ def test_a_base_failure_never_fails_the_nightly_update(monkeypatch):
     result = CliRunner().invoke(cli.rotation_app, ["update"])
     assert result.exit_code == 0
     assert "base scoring skipped" in (result.output + (result.stderr or ""))
+
+
+def test_the_readout_carries_daily_totals_the_base_total_and_the_random_band(tmp_path):
+    days = [
+        d for d in (date(2026, 10, 12) + timedelta(days=i) for i in range(10)) if d.weekday() < 5
+    ][:5]
+    _seed(tmp_path, lambda n, d: 100.0, days=days)
+    _write(tmp_path, base.DIR_NAME, {d: 100.0 for d in days}, where="base")
+    core = ["N_wide_0932", "N_wide_1017", "N_dir_0947"]
+    for d in days:
+        _entry(tmp_path, d, _all_lists(core))
+    r = readout.build(tmp_path, runs=100)
+    assert r["base"]["total"] == pytest.approx(2 * 3 * 100.0 * 5)  # 6 lots, 5 days
+    a = r["lists"]["A"]["random_path"]
+    assert len(a["p50"]) == 5 and a["p10"][-1] <= a["p50"][-1] <= a["p90"][-1]
+    assert r["days"][0]["A_total"] == pytest.approx(2 * 300.0)
+    assert r["days"][-1]["base_total"] == pytest.approx(2 * 3 * 100.0)
