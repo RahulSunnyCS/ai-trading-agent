@@ -30,6 +30,7 @@ import { RefreshButton } from '../ui/RefreshButton';
 import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
+import { RotationShadowScoreboard } from './RotationShadowScoreboard';
 import { RotationBaskets } from './rotation/RotationBaskets';
 import { RotationHeadline } from './rotation/RotationHeadline';
 import { RotationHealthStrip } from './rotation/RotationHealth';
@@ -233,6 +234,7 @@ export function RotationPanel() {
       {/* slot:explain */}
       {/* slot:daily-log */}
       {/* slot:shadow */}
+      <RotationShadowScoreboard />
     </div>
   );
 }

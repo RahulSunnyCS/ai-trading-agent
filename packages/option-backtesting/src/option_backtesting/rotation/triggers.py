@@ -606,11 +606,22 @@ def score_pending(
 # ---- reporting ----
 
 
-def summary(root: Path | None = None) -> list[dict]:
+def summary(
+    root: Path | None = None, since: str | None = None, until: str | None = None
+) -> list[dict]:
     """Event minus placebo per trigger x template: events, days, mean event / placebo / difference
-    and the day-clustered t (same-day events of the two indices are one observation)."""
+    and the day-clustered t (same-day events of the two indices are one observation).
+    `since` / `until` (ISO days, inclusive) keep only the events of those days and their
+    simulations: the shadow scoreboard reads only the forward window with it."""
     events = read_events(root)
     sims = read_sims(root)
+    if since or until:
+
+        def inside(day: str) -> bool:
+            return (not since or day >= since) and (not until or day <= until)
+
+        events = [e for e in events if inside(e["day"])]
+        sims = [r for r in sims if inside(r["ref_day"])]
     ev: dict[tuple, float] = {}
     pl: dict[tuple, list[float]] = {}
     for r in sims:
