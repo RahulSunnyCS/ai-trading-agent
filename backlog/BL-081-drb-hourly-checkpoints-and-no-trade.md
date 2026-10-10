@@ -327,4 +327,10 @@ None blocking. The VWAP follow-up (BL-082) waits for six months of futures bars.
   hypotheses for a separately registered rule test, not results; nothing is adopted from this block.
 - 2026-10-10 — owner: "both should be checked" (clues adjusting upcoming picks; dynamic tracking → BL-083).
   Recorded as the override of the step-1 gate; block 3 registered above, plan only, not run.
-
+- 2026-10-10 — **Owner's decision: "whatever wins in the last 2 years can be taken."** The 2024-10-09 →
+  2026-10-08 set decides; the 2022–24 confirmation is reported as information, not a gate. Rule for block 3:
+  a version is a *winner* if in the exploration set its gross is above the plain list, the state-blind
+  control, the largest of the 10 label shuffles and the random-action P90, its max drawdown is not more than
+  10% worse, and (for drop versions) the dropped picks lost money. The controls stay: they are what measures
+  how many of ~85 versions per list win by luck. Winners are journal candidates for a forward shadow run,
+  not live changes; the journal's lists stay as registered.

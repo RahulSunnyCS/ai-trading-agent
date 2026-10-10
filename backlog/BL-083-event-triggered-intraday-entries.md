@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; a new object (entry timing), not another weighting of the fixed grid |
-| **Status** | Planned |
+| **Status** | Done (phases 1–2): two Dir leads on the last two years, not in 2022–24; phase 3 (live poller) not started |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
@@ -159,6 +159,107 @@ templates other than the three, per-variant fits, any live use before phase 3's 
 7. **Sample size.** Expect each trigger to fire on 15–40% of days: 70–190 events in exploration. Enough
    for pooled means, not for per-variant fits. If a trigger fires on < 30 days it is reported, not judged.
 
+## Result (2026-10-10, phases 1 and 2; re-run after the code review of PR 163)
+
+**Review corrections applied.** The first run evaluated the confirmation set only from 2022-09-09 (the 252-session
+history T3's median needs was not loaded before 2022-01-03); the history now starts 2020-09 and the confirmation
+set is the full 2022-01-03 → 2024-10-08. t is now day-clustered as registered (same-day NIFTY and SENSEX events
+are one observation); the random-day control is the registered one (the random day's own pending pick is
+replaced); random minutes run 10:31–14:00; the SENSEX 11:32 reproduction was added to the sanity check.
+
+**Triggers** (first firing per day, 10:30–14:00; entry the next minute):
+
+| trigger | explore NIFTY | explore SENSEX | confirm NIFTY | median entry |
+|---|---|---|---|---|
+| T1 pivot cross with trend | 109 | 99 | 152 | 12:07 |
+| T2 VIX turn | 148 | 149 | 193 | 11:08 |
+| T3 straddle turn + range stabilising | 272 | 249 | 347 | 11:22 |
+| T4 RSI exhaustion | 292 | 283 | 396 | 11:40 |
+
+Sanity checks passed: each template simulated at 11:32 reproduces the stored 11:32 variant on 12 days for both
+indices and all three families (72 of 72); trigger inputs are slices that end at the firing minute (by
+construction, and the entry minute is asserted to exist).
+
+**Event study** (event minus the same template at the same minute on the 20 nearest non-event days; ₹ per lot;
+t day-clustered). Explore = 2024-10-09 → 2026-10-08, both indices; confirm = NIFTY 2022-01-03 → 2024-10-08.
+
+| trigger → template | explore diff (t) | confirm diff (t) |
+|---|---|---|
+| T1 → Dir | **+754 (3.5)**, 130 days; NIFTY only +631 (2.6) | −20 (−0.1) |
+| T4 → Dir | **+403 (3.95)**, 312 days; NIFTY only +440 (3.4) | +156 (1.7) |
+| T4 → Buy | +84 (1.8) | **+287 (4.0)** |
+| T1 → Buy | +58 (0.7) | −209 (−2.5) |
+| T2 → Widesl | −215 (−1.3) | −139 (−1.1) |
+| T2 → Dir / Buy | +76 (0.4) / −34 (−0.6) | −210 (−1.4) / −157 (−1.6) |
+| T4 → Widesl | +108 (1.3) | −199 (−2.5) |
+| T3, all templates | |t| ≤ 0.6 | |t| ≤ 1.4 |
+| T1 → Widesl | +199 (1.1) | +58 (0.4) |
+
+Registered bar (|t| ≥ 3 in explore, same sign with |t| ≥ 2 in confirm): **no lead**. Owner's rule (the last two
+years decide, confirmation is information): the leads are **T1 → Dir and T4 → Dir**.
+
+### Why some worked and some did not (analysis.py)
+
+| trigger | range after entry vs placebo (explore / confirm) | what it catches |
+|---|---|---|
+| T1 pivot with trend | ×1.20 / ×1.19 | a trend day that is continuing |
+| T2 VIX turn | ×1.27 / ×1.09 | a volatility day: the straddle rises 2.3% afterwards |
+| T4 RSI exhaustion | ×1.21 / ×1.13 | a stretched move that keeps going |
+| T3 straddle turn | ×1.03 / ×1.03 | nothing: same range as ordinary days |
+
+- **The triggers that work as detectors find more movement, not less.** After T1, T2 and T4 the index's
+  realised range to 15:28 is 9–27% larger than on placebo days; T3 is indistinguishable (×1.03), which is why
+  it shows no edge in any template. The failure of T3 is a failure of the trigger, not of the templates.
+- **Whether a strategy gains from that movement depends on its shape.** Dir (ATM straddle sold with 21% stops
+  and one re-entry) behaves as a trend harvester: it gained +754 / +403 per lot after T1 / T4 in explore, with
+  the stop-out share no higher than on ordinary days (T1 5% vs 8%, T4 8% vs 10%) and a milder worst excursion
+  (−946 vs −1,005; −1,025 vs −1,081). The OTM1 Widesl (115% stops) is the short-volatility shape the extra
+  movement hurts: after T2 it is stopped out 27% of the time against 15% (worst excursion −1,305 vs −1,016) and
+  loses −215; after T4 it is stopped out 15% vs 10%. Buy is a long-movement shape: it gains after T4 in both sets
+  (+84, +287) because its placebo is poor (12–25% of ordinary entries win).
+- **Where the Dir gain comes from (T1).** Continuations through the level: S1 broken downward +1,166 per lot
+  (71 events), R1 broken upward +782 (63), P broken downward +621 (28); crosses against the day's direction
+  are small (S1 up +55 on 9 events, P up +92 on 27). Timing: entries 10:31–11:30 +882 and 12:31–13:30 +1,394; after
+  13:30 about 0. It is a broad effect, not a few days: 67% of T1 events and 57% of T4 events beat their
+  placebo, the top five events are 29% and 20% of the total, and the mean without them is +549 and +326.
+- **Why the confirmation failed.** The Dir edge is regime-dependent. T1 → Dir by half-year (₹ per event):
+  2022H1 −1,162, 2022H2 +30, 2023H1 −84, 2023H2 +24, 2024H1 +686, 2024H2 +1,355, 2025H1 +1,169, 2025H2 +238,
+  2026H1 +577. It appears from mid-2024. T4 → Dir is positive in 7 of 10 half-years but small before 2024H2.
+  Ordinary Widesl entries also changed character: the 2022–24 placebo for T4 → Widesl won 91% of the time,
+  so any event entry looked worse (−199), while in 2024–26 it won 88% and the event still beat it (+108).
+- **What this does not show.** It does not show a timing edge as such. A Dir placed at a random minute
+  10:31–14:00 replacing the same pick also gains for some lists in explore (median −₹1k A, +₹13k B, +₹11k C,
+  −₹4k REF), so part of the gain is "a Dir in place of that Widesl or Buy in this regime", not the trigger minute. The two leads were
+  chosen from 12 cells in the same two years they are judged on.
+
+**Override rule** (phase 2): the earliest lead event of the day fires a Dir on its index at the entry minute and
+replaces the next not-yet-started core pick (lots conserved, Widesl minimum kept; 54–57 of 302 explore events and
+56–64 of 395 confirm events could be applied, the rest had no pending pick or would break the minimum). Random
+controls: 200 draws each; random time = a random minute 10:31–14:00 on the same days; random day = the same
+minute on a random non-event day, replacing that day's own next pending pick.
+
+| set | list | plain | with override | gain | max DD (plain) | random-time P90 | random-day P90 | above both |
+|---|---|---|---|---|---|---|---|---|
+| explore | A | 8,00,921 | 8,20,902 | +19,981 (+2.5%) | −72,667 (−72,667) | +30,383 | +14,562 | no |
+| explore | B | 8,08,532 | 8,87,921 | +79,389 (+9.8%) | −82,706 (−82,706) | +45,514 | +9,604 | **yes** |
+| explore | C | 8,40,846 | 8,62,340 | +21,494 (+2.6%) | −74,104 (−83,817) | +39,352 | +19,822 | no |
+| explore | REF | 7,20,873 | 7,75,428 | +54,556 (+7.6%) | −86,485 (−88,366) | +27,457 | +23,301 | **yes** |
+| confirm | A | 12,20,482 | 12,10,009 | −10,473 | −64,181 (−66,632) | +18,416 | +7,124 | no |
+| confirm | B | 12,39,935 | 12,13,186 | −26,749 | −63,238 (−64,402) | +14,340 | +10,848 | no |
+| confirm | C | 11,58,525 | 11,48,553 | −9,972 | −53,755 (−55,282) | +20,366 | +9,425 | no |
+| confirm | REF | 10,13,627 | 10,29,895 | +16,268 | −53,378 (−56,329) | +43,828 | +15,424 | no |
+
+**Read-out under the owner's rule.** On the last two years the override beats both controls for list B (+₹79k)
+and REF (+₹55k) and does not clear the random-time control for A and C. In 2022–24 it loses −₹10k to −₹27k for A,
+B and C and gains +₹16k for REF, below the controls everywhere. A journal candidate for a forward shadow run
+(B and REF), not an adoption: the evidence is two years of one regime.
+
+**Next (not done):** phase 3 (a minute-poller that records the trigger before any alert) is the way to get
+unseen days; a cheaper first step is to score the triggers each evening from the day's bars in the nightly
+update, so events accumulate without any live process.
+
+Files: `research/bl083/triggers.py`, `simulate.py`, `event_study.py`, `override.py`, `analysis.py`.
+
 ## Risks
 
 - **Many definitions, one chance.** Four triggers × three templates × two sets is already 24 cells;
@@ -184,3 +285,17 @@ None. Settled on 2026-10-10:
 - 2026-10-10 — created from the owner's event-triggered idea (plan only; Fable designs, Sonnet runs).
 - 2026-10-10 — open questions settled (P / R1 / S1 only; Widesl and Dir templates first).
 - 2026-10-10 — owner: keep Buy as a third template from phase 1 (reverses my earlier call).
+- 2026-10-10 — **Owner's decision: "whatever wins in the last 2 years can be taken."** Leads are read on the
+  exploration set alone (|t| >= 3), the 2022–24 confirmation is information only. That makes **Dir after
+  T1 (pivot with trend)** and **Dir after T4 (RSI exhaustion)** the two leads (event minus placebo +₹754 and
+  +₹403 per lot, t 4.3 and 4.5; confirmation +₹282 / +₹86, t 1.5 / 0.8). Phase 2 (override rule on lists A /
+  B / C / REF) therefore runs for those two on the exploration set, against the random-time and random-day
+  controls; the confirmation set is run alongside as information.
+- 2026-10-10 — phases 1 and 2 run (results above).
+- 2026-10-10 — `override: the owner (2026-10-10) decided that whatever wins in the last two years can be taken; the
+  registered keep rule (explore AND confirm) is relaxed to the exploration set, confirmation is information.`
+  Phase 2 ran past the registered lead bar under this override.
+- 2026-10-10 — code review of PR 163 (Opus): 2 blocking findings fixed (confirmation set started 2022-09-09; a
+  wrong sentence in the Result), non-blocking items applied (day-clustered t, registered random-day control,
+  random minutes to 14:00, SENSEX in the 11:32 check, corrected random-time text); the pipeline was re-run and
+  the Result rewritten, with the mechanism analysis added.
