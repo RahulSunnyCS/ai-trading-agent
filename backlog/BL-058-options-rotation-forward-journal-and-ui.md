@@ -452,8 +452,8 @@ reference and answers "did the new weights beat the old rotation?". Nothing in t
     last 5 / 21 / 63, P1 and P2 means, rolling-21 sparkline, the rank the ranking gives each cell for the next
     pick, where today's picks fall and a drift flag. It was reviewed there (Codex and an independent review,
     ten findings, all fixed); this session re-ran its tests, checked its numbers on the real store against the
-    plan page's table (Dir 09:17–10:02 ₹676 last 21 and rank 1 of 12; Buy 14:17–15:17 rank 12 of 12), merged main
-    into it and merged it on green. Its drift flag uses the same rule form as the selection-drift card (a
+    plan page's table (Dir 09:17–10:02 ₹676 last 21 and rank 1 of 12; Buy 14:17–15:17 rank 12 of 12) and
+    merged main into it twice; it merged on green CI. Its drift flag uses the same rule form as the selection-drift card (a
     last-21 value outside the 10th to 90th percentile of the rolling-21 values in P1, at least 10 windows),
     applied to cell means instead of pick shares.
   - **10. Paper vs real is not built.** It needs the placement record (exists, from widget 3), the BL-063
