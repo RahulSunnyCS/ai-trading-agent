@@ -152,3 +152,15 @@ BL-056 review: an All Fridays run has no combined signal. Its latest section is 
 | Scenario | CAGR | Max drawdown |
 |---|---|---|
 | broad_one_category_three_picks_four_weekly_all_fridays | 17.88% -> 17.88% | -35.50% -> -35.50% |
+## 2026-10-10 (on top of `3c31f81`)
+
+BL-036 Phase 1: every category-mode Broad result carries the extended-tags companion (response.companion); the six Broad scenarios pin broad_universe=total_market now that a fresh dashboard run defaults to turnover_rank; no CAGR, drawdown or trade moved
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_default | 18.67% -> 18.67% | -26.72% -> -26.72% |
+| broad_category_mode_off | 36.99% -> 36.99% | -28.58% -> -28.58% |
+| broad_one_category_three_picks_four_weekly | 32.13% -> 32.13% | -35.20% -> -35.20% |
+| broad_eight_categories_one_pick | 26.32% -> 26.32% | -27.29% -> -27.29% |
+| broad_gates_loosened_and_tilted | 9.34% -> 9.34% | -27.78% -> -27.78% |
+| broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 13.94% | -18.09% -> -18.09% |

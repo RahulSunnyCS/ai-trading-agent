@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — a default Broad run still shows a number inflated by hindsight; BL-010 Phase 3 measured the inflation at a median 22–25 points for the best configs |
-| **Status** | Planned |
+| **Status** | Done (delivered by BL-036 Phase 1) |
 | **Type** | feature |
 | **Area** | momentum, dashboard |
 | **Created** | 2026-10-06 |
@@ -76,3 +76,9 @@ universe it used.
 
 - 2026-10-06 — created from the BL-010 Phase 3 discussion; the owner chose to plan it now and
   build it later.
+- 2026-10-10 — folded into BL-036 Phase 1 and delivered there: Phase 1 (the choice: a third universe
+  card, the universe on the result and in Saved runs, a warning that no longer blames the stock list)
+  and Phase 2 (the default). Open question 1 answered: point in time is the default; a default run
+  went from 41.4% to 33.3% a year. Open question 2 answered: curated tags stay the request default,
+  and the extended-tags figure is always computed beside it (BL-036). The golden-scenario deliverable
+  is dropped: the fixture cannot build a turnover rank (see BL-036).

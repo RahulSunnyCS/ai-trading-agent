@@ -3,12 +3,14 @@
 import contextlib
 import inspect
 import json
+import logging
 import math
 import os
 import threading
 import urllib.parse
 from collections import OrderedDict
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from time import perf_counter
@@ -1699,7 +1701,11 @@ def _broad_meta() -> dict:
             "broad_off_top_n": 10,
             "broad_off_exit_rank": 20,
             "broad_every_week": True,
-            "broad_universe": "total_market",
+            # A new Broad run uses each year's own 750 most-traded stocks (owner decision
+            # 2026-10-10, BL-029 Phase 2 / BL-036 Phase 1): the survivor-only list inflates the
+            # CAGR (BL-010 F1). The gate below is forced on for this universe. The request model
+            # keeps "total_market", so a saved run (which carries its own value) re-runs unchanged.
+            "broad_universe": "turnover_rank",
             # A new Broad run starts realistic (owner decision 2026-10-05, BL-010 §3.13.2): only
             # stocks that trade enough, and no fills on a circuit-locked day. Together they cut
             # the default run from 53% to 40% CAGR. The request model keeps False, so a saved
@@ -1729,8 +1735,10 @@ def _liquidity_preview_payload(
             members = broad.total_market_members_by_year(DATA_DIR / "categories")
     except (ValueError, broad.TotalMarketDataNotFoundError) as error:
         raise HTTPException(422, str(error)) from None
-    latest_year = max(members)
-    symbols = sorted(members[latest_year])
+    # The run gates its newest weeks with the list for the last bar's calendar year. `max(members)`
+    # is wrong for `turnover_rank` from late September, when the next year's part-year list exists.
+    year = liquidity_mod.member_year_in_force(members, liquidity_mod.latest_bar_year())
+    symbols = sorted(members[year])
     return liquidity_mod.preview(cfg, symbols)
 
 
@@ -1775,6 +1783,123 @@ def _momentum_scores_payload() -> dict:
         membership_quality=_membership_quality(),
         rotation=rotation,
     )
+
+
+#: Live scores (BL-051 Phase 3): Fridays, during market hours (IST).
+LIVE_SCORES_OPEN, LIVE_SCORES_CLOSE = time(9, 15), time(15, 30)
+_LIVE_SCORES_CACHE: dict[tuple, dict] = {}
+_LIVE_SCORES_LOCK = threading.Lock()
+LIVE_SCORES_TTL_MINUTES = 5
+# A live price outside this band of the last close is not used: the stored prices are adjusted only
+# for confirmed corporate actions, so a 1:1 bonus or 1:2 split effective this week shows as ~0.5x
+# (a +2% day on top makes 0.51). Real weekly moves of index stocks stay well inside it.
+LIVE_SCORES_PRICE_BAND = (0.6, 1 / 0.6)
+
+
+def live_scores_universe(
+    universe: broad.StockUniverseFrame, quotes: dict[str, float], week: pd.Timestamp
+) -> tuple[broad.StockUniverseFrame, dict]:
+    """The scores' price frame with a provisional row for `week` (this Friday) from live prices
+    (`quotes`: base symbol -> last traded price). In memory only, never stored: the 19:30 closes
+    replace it by recomputation. Membership and the liquidity gate keep the last stored week's,
+    since a day's turnover is not complete until the close. A price outside `LIVE_SCORES_PRICE_BAND`
+    of the last close (an unadjusted split or bonus, a bad tick) keeps the last close and is
+    reported, not used."""
+    frame = universe.frame.copy()
+    last = frame.index[-1]
+    row = frame.loc[last].copy()
+    raw = universe.raw_frame.copy() if universe.raw_frame is not None else None
+    raw_row = raw.loc[last].copy() if raw is not None else None
+    used, missing, suspect = 0, [], []
+    for column, base in universe.column_to_base_symbol.items():
+        if column in universe.stale_columns or pd.isna(row.get(column)):
+            continue
+        price = quotes.get(base)
+        if price is None or not math.isfinite(price) or price <= 0:
+            missing.append(base)
+            continue
+        if not LIVE_SCORES_PRICE_BAND[0] <= price / float(row[column]) <= LIVE_SCORES_PRICE_BAND[1]:
+            suspect.append(base)
+            continue
+        row[column] = price
+        if raw_row is not None:
+            raw_row[column] = price
+        used += 1
+
+    def with_row(table: pd.DataFrame | None, value: pd.Series | None) -> pd.DataFrame | None:
+        if table is None:
+            return None
+        table = table.copy()
+        table.loc[week] = value if value is not None else table.loc[last]
+        return table.sort_index()
+
+    live = replace(
+        universe,
+        frame=with_row(frame, row),
+        raw_frame=with_row(raw, raw_row) if raw is not None else None,
+        weeks=sorted({*universe.weeks, week}),
+        stock_membership=with_row(universe.stock_membership, None),
+        liquidity_gate=with_row(universe.liquidity_gate, None),
+    )
+    return live, {"used": used, "missing": sorted(missing), "suspect": sorted(suspect)}
+
+
+def _momentum_scores_live_payload(now: datetime | None = None) -> dict:
+    """GET /api/momentum-scores/live (BL-051 Phase 3): every score and rank on live Fyers prices,
+    Fridays in market hours. Provisional; cached for a few minutes."""
+    from .weekly import week_ending_on_or_before
+
+    now = (now or datetime.now(IST)).astimezone(IST)
+    if now.weekday() != 4 or not LIVE_SCORES_OPEN <= now.time() <= LIVE_SCORES_CLOSE:
+        raise HTTPException(409, "Live scores are available on Fridays from 09:15 to 15:30 IST.")
+    week = pd.Timestamp(week_ending_on_or_before(now.date()))
+    try:
+        universe = DATA.get_momentum_universe()
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    last = pd.Timestamp(universe.frame.index[-1]).normalize()
+    # `last == week` is normal here: a sync during the week stores the partial week under this
+    # Friday's date, and `live_scores_universe` overwrites that row. Friday's real closes only
+    # arrive after the live window ends.
+    if last < week - pd.Timedelta(days=7):
+        raise HTTPException(
+            409, f"The stored prices end {last:%d %b}; refresh the stock data first."
+        )
+    slot = (week, now.hour, now.minute // LIVE_SCORES_TTL_MINUTES)
+    with _LIVE_SCORES_LOCK:
+        if slot in _LIVE_SCORES_CACHE:
+            return _LIVE_SCORES_CACHE[slot]
+    bases = sorted(set(universe.column_to_base_symbol.values()))
+    try:
+        quoted = fyers.quotes([f"NSE:{base}-EQ" for base in bases], fyers.resolve_credentials())
+    except fyers.FyersCredentialsError as error:
+        raise HTTPException(409, f"No valid Fyers login: {error}") from error
+    except (RuntimeError, OSError) as error:
+        raise HTTPException(502, f"Fyers quotes failed: {error}") from error
+    quotes = {fyers.nse_symbol(symbol): price for symbol, price in quoted.items()}
+    live, info = live_scores_universe(universe, quotes, week)
+    group_info = momentum_scores_mod.load_stock_group_info(CATEGORIES_CURATED_DIR)
+    group_members = broad.load_stock_groups(CATEGORIES_CURATED_DIR)
+    stock_snapshot = momentum_scores_mod.compute_stock_momentum_scores(live, group_info)
+    payload = momentum_scores_mod.to_payload(
+        stock_snapshot,
+        momentum_scores_mod.compute_sector_momentum_scores(stock_snapshot, group_members),
+        missing_symbols=universe.missing_symbols,
+        membership_quality=_membership_quality(),
+        rotation=momentum_scores_mod.compute_rotation(live, group_members),
+    )
+    payload["live"] = {
+        "provisional": True,
+        "as_of": now.isoformat(timespec="seconds"),
+        "week": journal_week_string(week),
+        "priced": info["used"],
+        "missing": info["missing"],
+        "suspect": info["suspect"],
+    }
+    with _LIVE_SCORES_LOCK:
+        _LIVE_SCORES_CACHE.clear()
+        _LIVE_SCORES_CACHE[slot] = payload
+    return payload
 
 
 def _momentum_stock_payload(symbol: str) -> dict:
@@ -1873,6 +1998,17 @@ def _run_broad(
     )
 
 
+def _equity_summary(result: Result) -> dict:
+    """The four figures two "same run, one setting changed" comparisons report."""
+    equity = result.equity
+    return {
+        "cagr": float(metrics.cagr(equity)),
+        "max_drawdown": float(metrics.max_drawdown(equity)[0]),
+        "total_return": float(equity.iloc[-1] - 1),
+        "trades": int(len(result.trades)),
+    }
+
+
 def _circuit_realism(
     req: BacktestRequest,
     ranking: broad.UniverseRanking,
@@ -1884,21 +2020,12 @@ def _circuit_realism(
     `outer_prices` is what the run itself used: this can be asked for after the run, when newer
     data may have been loaded."""
 
-    def summary(result: Result) -> dict:
-        equity = result.equity
-        return {
-            "cagr": float(metrics.cagr(equity)),
-            "max_drawdown": float(metrics.max_drawdown(equity)[0]),
-            "total_return": float(equity.iloc[-1] - 1),
-            "trades": int(len(result.trades)),
-        }
-
     other = _run_broad(
         req.model_copy(update={"broad_respect_circuits": not req.broad_respect_circuits}),
         ranking,
         outer_prices,
     )
-    this_run, alternative = summary(outcome.result), summary(other.result)
+    this_run, alternative = _equity_summary(outcome.result), _equity_summary(other.result)
     ignoring, respecting = (
         (alternative, this_run)
         if req.broad_respect_circuits
@@ -1913,6 +2040,62 @@ def _circuit_realism(
         "respecting_locks": respecting,
         "cagr_impact": respecting["cagr"] - ignoring["cagr"],
     }
+
+
+def _extended_tags_companion(
+    req: BacktestRequest,
+    ranking: broad.UniverseRanking,
+    outcome: broad.BroadBacktestResult,
+    outer_prices: pd.DataFrame,
+    *,
+    split: tuple[Result, list[BacktestRequest]] | None = None,
+) -> dict:
+    """The same run with `broad_category_tags="extended"` (BL-036 Phase 1): the curated tags name
+    only today's 755 index members, so a stock that later left the index can be ranked but never
+    picked through a category. The extended tags (BSE's current classification, which covers many
+    more NSE stocks) reduce that, but `stock_groups_wide.csv` leaves NSE-only and delisted names
+    untagged, so most later-failed companies still cannot be bought and the figure still
+    flatters. The gap is the closest figure to an expected return this engine can give. The tags
+    do not touch the ranking, so the run's own `ranking` is reused: one extra engine pass. Never
+    raises; a failure is reported in the payload instead.
+
+    `split` is an All Fridays run's (blended result, sleeve requests): both figures are then the
+    whole account's, every sleeve re-run with the extended tags and blended as the run itself is
+    (`tranches.blend_reset`), one extra engine pass per sleeve."""
+    if req.broad_category_mode != "on":
+        return {"status": "not_applicable", "reason": "no category layer"}
+
+    try:
+        this_run = _equity_summary(split[0] if split else outcome.result)
+        if req.broad_category_tags == "extended":
+            return {
+                "status": "this_run",
+                "tags": "extended",
+                "cagr": this_run["cagr"],
+                "max_drawdown": this_run["max_drawdown"],
+            }
+        sleeves = split[1] if split else [req]
+        others = [
+            _run_broad(
+                r.model_copy(update={"broad_category_tags": "extended"}), ranking, outer_prices
+            ).result
+            for r in sleeves
+        ]
+        extended = _equity_summary(tranches.blend_reset(others) if split else others[0])
+        return {
+            "status": "computed",
+            "tags": "extended",
+            **extended,
+            "cagr_impact": extended["cagr"] - this_run["cagr"],
+        }
+    except Exception:  # noqa: BLE001 - a companion figure must never fail the run
+        # The exception text can carry a filesystem path and is shown in a hover, so the payload
+        # gets a fixed sentence and the detail goes to the server log.
+        logging.getLogger(__name__).exception("extended-tags companion failed")
+        return {
+            "status": "failed",
+            "reason": "The extended tags could not be applied to this run (see the server log).",
+        }
 
 
 #: Universes that are only meaningful behind the tradability gate: the whole market (the gate is
@@ -1982,7 +2165,9 @@ def _broad_backtest(req: BacktestRequest) -> dict:
     return _full(*_broad_parts(req))
 
 
-def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
+def _broad_parts(
+    req: BacktestRequest, report: Report = _no_report, *, companion: bool = True
+) -> Parts:
     report("loading")
     on = req.broad_category_mode == "on"
     if on and req.broad_category_top_n > req.broad_category_exit_rank:
@@ -2027,6 +2212,19 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
     groups = dict.fromkeys(prices.columns, "Stock")
     for name in broad.ATOMIC_NAMES:
         groups[name] = "Atomic"
+    # In `core`, not a lazy section: the headline shows it without a second fetch. The weekly job
+    # skips it (it stores no such figure, and runs every Broad favourite).
+    companion_figure = (
+        _extended_tags_companion(
+            req,
+            ranking,
+            outcome,
+            outer_prices,
+            split=(result, phase_reqs) if phases else None,
+        )
+        if companion
+        else {"status": "skipped", "reason": "weekly run"}
+    )
     report("analysing")
     core, lazy = analysis.payload_parts(
         result,
@@ -2058,6 +2256,7 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         [r.rebalance_offset for r in phase_reqs] if phases else None,
     )
     core["missing_symbols"] = outcome.ranking.missing_symbols
+    core["companion"] = companion_figure
     base_trades = lazy["trades"]
 
     def trades() -> object:
@@ -4097,7 +4296,7 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
     elif req.dataset == "custom_index":
         payload = _custom_index_backtest(req)
     elif req.dataset == "broad":
-        core, lazy = _broad_parts(req)
+        core, lazy = _broad_parts(req, companion=False)
         if split_every(req) > 1:
             # An All Fridays config: its `latest` is the split note (no combined signal), and the
             # engine is never asked to decide the blend as if it were one portfolio.
@@ -4271,6 +4470,10 @@ def create_app() -> FastAPI:
         if dataset == "broad":
             return _broad_meta()
         return _etf_meta()
+
+    @app.get("/api/momentum-scores/live")
+    def momentum_scores_live() -> dict:
+        return _momentum_scores_live_payload()
 
     @app.get("/api/momentum-scores")
     def momentum_scores() -> dict:

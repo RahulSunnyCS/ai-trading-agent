@@ -81,10 +81,14 @@ SCENARIOS: dict[str, dict] = {
         "with": {"inner_top_n": 3, "inner_exit_rank": 4, "commodity_copies": 2, "debt_copies": 2},
     },
     # --- Broad Momentum -----------------------------------------------------------------------
-    "broad_default": {"$meta": "broad"},
+    # Every Broad scenario pins `broad_universe`: the dashboard's default for a fresh run is the
+    # point-in-time `turnover_rank` universe (BL-036 Phase 1), which needs the whole stock lake;
+    # the frozen fixture holds 170 stocks. The pin keeps each frozen request what it was.
+    "broad_default": {"$meta": "broad", "with": {"broad_universe": "total_market"}},
     "broad_category_mode_off": {
         "$meta": "broad",
         "with": {
+            "broad_universe": "total_market",
             "broad_category_mode": "off",
             "broad_off_top_n": 8,
             "broad_off_exit_rank": 16,
@@ -96,6 +100,7 @@ SCENARIOS: dict[str, dict] = {
     "broad_one_category_three_picks_four_weekly": {
         "$meta": "broad",
         "with": {
+            "broad_universe": "total_market",
             "broad_category_top_n": 1,
             "broad_category_exit_rank": 3,
             "broad_picks_per_category": 3,
@@ -112,6 +117,7 @@ SCENARIOS: dict[str, dict] = {
     "broad_one_category_three_picks_four_weekly_all_fridays": {
         "$meta": "broad",
         "with": {
+            "broad_universe": "total_market",
             "broad_category_top_n": 1,
             "broad_category_exit_rank": 3,
             "broad_picks_per_category": 3,
@@ -128,6 +134,7 @@ SCENARIOS: dict[str, dict] = {
     "broad_eight_categories_one_pick": {
         "$meta": "broad",
         "with": {
+            "broad_universe": "total_market",
             "broad_category_top_n": 8,
             "broad_category_exit_rank": 12,
             "broad_picks_per_category": 1,
@@ -140,6 +147,7 @@ SCENARIOS: dict[str, dict] = {
     "broad_gates_loosened_and_tilted": {
         "$meta": "broad",
         "with": {
+            "broad_universe": "total_market",
             "broad_liquidity_filter": True,
             "broad_liq_min_turnover_cr": 5,
             "broad_liq_floor_ratio": 0.5,
@@ -158,6 +166,7 @@ SCENARIOS: dict[str, dict] = {
     "broad_two_categories_three_picks_fortnightly_taxed": {
         "$meta": "broad",
         "with": {
+            "broad_universe": "total_market",
             "broad_category_top_n": 2,
             "broad_category_exit_rank": 6,
             "broad_picks_per_category": 3,

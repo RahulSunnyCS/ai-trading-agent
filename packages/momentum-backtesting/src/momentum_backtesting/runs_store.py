@@ -877,13 +877,14 @@ def _frozen_fingerprints() -> frozenset[str]:
 
 def _trust(strategy: dict[str, Any], validated: frozenset[str], newest: str | None) -> str:
     """How far the strategy's result can be trusted: validated (passed BL-010), not tradable
-    (Broad with the liquidity filter or the circuit rule off), old data (more than a week behind
-    the newest saved data), else in-sample (the best of what was tried on the same data)."""
+    (Broad with the liquidity filter or the circuit rule off; a universe that forces the filter
+    on counts as on), old data (more than a week behind the newest saved data), else in-sample
+    (the best of what was tried on the same data)."""
     if strategy["fingerprint"] in validated:
         return "validated"
     config = strategy["config"]
     if strategy["dataset"] == "broad" and not (
-        config.get("broad_liquidity_filter", False) and config.get("broad_respect_circuits", False)
+        saved_identity.liquidity_filter_on(config) and config.get("broad_respect_circuits", False)
     ):
         return "not_tradable"
     through = strategy["latest"]["data_through"]

@@ -90,6 +90,10 @@ IGNORED_FIELDS: dict[str, frozenset[str]] = {
 RUN_ONLY_FIELDS = frozenset({"fresh"})
 
 _TOLERANCE = 1e-9
+#: KPI keys the dashboard adds beside a saved run for display only (BL-036 Phase 1: the extended-
+#: tags companion). A run saved before they existed lacks them, so counting them would record every
+#: strategy's next re-run as a moved result, which would be false.
+_DISPLAY_ONLY_KPIS = frozenset({"extended_cagr", "extended_max_drawdown"})
 
 
 def _hash(value: Any, size: int = 12) -> str:
@@ -129,11 +133,26 @@ def normalise(dataset: str, config: dict[str, Any]) -> dict[str, Any] | None:
         settings.pop("rebalance_offset", None)
     else:
         settings.pop("split_fridays", None)
+    if "broad_liquidity_filter" in settings:
+        # A gated universe runs with the filter on whatever was sent (`api._liquidity_config`), so
+        # the stored flag is not a setting there: both spellings are the same strategy.
+        settings["broad_liquidity_filter"] = liquidity_filter_on(settings)
     if settings.get("score") != "ranksum":
         settings.pop("weights", None)
     elif not settings.get("weights"):
         settings["weights"] = [1.0] * len(settings["lookbacks"])
     return settings
+
+
+def liquidity_filter_on(config: dict[str, Any]) -> bool:
+    """Whether a Broad run applies the tradability filter: the flag, or a universe that forces it
+    on (`api.GATED_BROAD_UNIVERSES`). A config with no `broad_universe` ran on Total Market (the
+    request model's default), where the flag alone decides."""
+    from .api import GATED_BROAD_UNIVERSES
+
+    return bool(config.get("broad_liquidity_filter", False)) or (
+        config.get("broad_universe", "total_market") in GATED_BROAD_UNIVERSES
+    )
 
 
 def identity(dataset: str, config: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
@@ -236,7 +255,8 @@ def same_result(a: dict[str, Any], b: dict[str, Any]) -> bool:
     if len(curve_a) != len(curve_b) or not all(map(_close, curve_a, curve_b)):
         return False
     kpis_a, kpis_b = a.get("kpis") or {}, b.get("kpis") or {}
-    return all(_close(kpis_a.get(k), kpis_b.get(k)) for k in set(kpis_a) | set(kpis_b))
+    keys = (set(kpis_a) | set(kpis_b)) - _DISPLAY_ONLY_KPIS
+    return all(_close(kpis_a.get(k), kpis_b.get(k)) for k in keys)
 
 
 def first_difference(a: dict[str, Any], b: dict[str, Any]) -> str | None:

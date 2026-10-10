@@ -15,11 +15,12 @@ export type Decision =
 /**
  * What to do about a job right now. Driven entirely by the run history, so a
  * laptop that slept through a slot simply finds it unserved on the next tick —
- * no separate wake detection is needed.
+ * no separate wake detection is needed. Slots before `since` (when the scheduler first
+ * saw this job, `History.jobFirstSeen`) are neither run nor reported.
  */
-export function decide(job: Job, now: Date, history: History, firstStart: Date): Decision {
+export function decide(job: Job, now: Date, history: History, since: Date): Decision {
   const slot = previousDue(job.schedule, now);
-  if (!slot || slot.getTime() < firstStart.getTime()) return { kind: 'idle' };
+  if (!slot || slot.getTime() < since.getTime()) return { kind: 'idle' };
   if (history.forSlot(job.id, slot)) return { kind: 'idle' };
   const late = now.getTime() - slot.getTime();
   if (late <= ON_TIME_MS) return { kind: 'run', slot, trigger: 'schedule' };
@@ -61,14 +62,20 @@ export interface LoopOptions {
  */
 export function startLoop({ ctx, jobs, alerts, tickMs = 30_000 }: LoopOptions): () => void {
   const now = ctx.now ?? (() => new Date());
-  const firstStart = ctx.history.firstStart(now());
+  ctx.history.firstStart(now());
+  // Per job, not the scheduler's first start: a job added since then has no slots to miss
+  // from before it was added.
+  const watched = jobs.map((job) => ({
+    job,
+    since: ctx.history.jobFirstSeen(job.id, now(), job.catchUpHours),
+  }));
   const inFlight = new Set<string>();
 
   const tick = () => {
-    for (const job of jobs) {
+    for (const { job, since } of watched) {
       if (inFlight.has(job.id)) continue;
       try {
-        handle(job);
+        handle(job, since);
       } catch (error) {
         // A bookkeeping failure (say a locked database) must not take the whole scheduler down.
         console.error(`${job.id}: tick failed: ${String(error)}`);
@@ -76,8 +83,8 @@ export function startLoop({ ctx, jobs, alerts, tickMs = 30_000 }: LoopOptions): 
     }
   };
 
-  const handle = (job: Job) => {
-    const decision = decide(job, now(), ctx.history, firstStart);
+  const handle = (job: Job, since: Date) => {
+    const decision = decide(job, now(), ctx.history, since);
     if (decision.kind === 'missed') {
       const reason = `missed: the scheduler was not running at ${formatIst(decision.slot)} IST`;
       ctx.history.recordMissed(job.id, decision.slot, now(), reason);

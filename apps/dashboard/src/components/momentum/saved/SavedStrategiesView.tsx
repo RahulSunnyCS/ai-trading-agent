@@ -46,9 +46,12 @@ import {
   TRUST,
   asSavedRun,
   cagrMove,
+  extendedKpis,
+  extendedSentence,
   matchesStrategy,
   strategyCounts,
   strategyName,
+  universeTag,
 } from '../../../lib/momentumSaved';
 import {
   hydrateMomentumSavedFromStorage,
@@ -388,6 +391,8 @@ export function SavedStrategiesView({
     const isGroup = strategy.group !== null;
     const isOpen = expanded.includes(strategy.id);
     const ticked = selectedIds.includes(strategy.id);
+    const universe = universeTag(strategy);
+    const extended = isGroup ? null : extendedKpis(kpis);
     const memberCagrs = (strategy.members ?? [])
       .map((m) => m.latest.kpis.cagr)
       .filter((v): v is number => typeof v === 'number');
@@ -484,6 +489,11 @@ export function SavedStrategiesView({
                 {DATASET_SHORT[strategy.dataset] ?? strategy.dataset}
               </span>
             ) : null}
+            {universe && !isGroup ? (
+              <span className="shrink-0 text-xs text-faint" title="Which stocks this ranks">
+                · {universe}
+              </span>
+            ) : null}
           </span>
         </Td>
         <Td
@@ -497,10 +507,16 @@ export function SavedStrategiesView({
         <Td dense className="whitespace-nowrap">
           {isGroup ? null : <SavedRunSparkline values={strategy.latest.strategy} name={name} />}
         </Td>
-        <Td dense align="right" numeric>
+        <Td dense align="right" numeric className="whitespace-nowrap">
           {isGroup && memberCagrs.length
             ? `${formatPct(Math.min(...memberCagrs), 0)}–${formatPct(Math.max(...memberCagrs), 0)}`
             : formatPct(kpis.cagr)}
+          {extended ? (
+            <span className="text-faint" title={extendedSentence(extended)}>
+              {' '}
+              · {formatPct(extended.cagr, 0)}
+            </span>
+          ) : null}
         </Td>
         <Td
           align="right"

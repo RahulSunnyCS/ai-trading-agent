@@ -233,7 +233,7 @@ def test_an_all_fridays_broad_favorite_never_gets_an_engine_decision(monkeypatch
     # A single Broad run's weekly signal is the engine's own decision (`_broad_engine_signal`);
     # an All Fridays one is a blend of sleeves, so it keeps its split note instead.
     note = {"week": "2026-09-25", "rows": [], "split": True, "explain": "n/a"}
-    monkeypatch.setattr(api, "_broad_parts", lambda req: ({}, {"latest": lambda: note}))
+    monkeypatch.setattr(api, "_broad_parts", lambda req, **_: ({}, {"latest": lambda: note}))
 
     def engine(*args, **kwargs):
         raise AssertionError("the engine was asked to decide a split run")

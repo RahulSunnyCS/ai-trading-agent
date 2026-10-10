@@ -91,6 +91,25 @@ def test_broad_needs_no_universe_and_a_refused_config_keeps_its_raw_hash():
     assert fingerprint("etf", {"top_n": 99}) == saved_identity.raw_hash({"top_n": 99})
 
 
+@pytest.mark.parametrize("universe", ["turnover_rank", "all_liquid"])
+def test_a_universe_that_forces_the_tradability_filter_on_ignores_the_stored_flag(universe):
+    """The filter is forced on for these universes, so a run saved with it left off is the same
+    strategy as the identical run saved with it on (it used to be a second strategy)."""
+    on = {"broad_universe": universe, "broad_liquidity_filter": True}
+    off = {"broad_universe": universe, "broad_liquidity_filter": False}
+    assert fingerprint("broad", off) == fingerprint("broad", on)
+    assert normalise("broad", off) == normalise("broad", on)
+    assert normalise("broad", off)["broad_liquidity_filter"] is True
+
+
+def test_the_tradability_flag_still_counts_on_todays_list():
+    on = {"broad_universe": "total_market", "broad_liquidity_filter": True}
+    off = {"broad_universe": "total_market", "broad_liquidity_filter": False}
+    assert fingerprint("broad", off) != fingerprint("broad", on)
+    # A config that names no universe ran on Total Market, where the flag alone decides.
+    assert fingerprint("broad", {"broad_liquidity_filter": False}) == fingerprint("broad", off)
+
+
 def test_scenarios_with_different_golden_results_have_different_fingerprints():
     import importlib.util
 
@@ -222,6 +241,19 @@ def test_only_a_golden_change_of_the_same_dataset_explains_a_move(monkeypatch):
 def test_same_result_ignores_float_noise_only():
     assert saved_identity.same_result(_run(A), _run([100.0, 101.0, 102.0 + 1e-12]))
     assert not saved_identity.same_result(_run(A), _run(B))
+
+
+def test_the_extended_tags_companion_never_makes_a_run_a_new_result():
+    """A run saved before BL-036 Phase 1 has no extended_* keys; its re-run has them."""
+    before = _run(A)
+    after = _run(A)
+    after["kpis"] = {**after.get("kpis", {}), "extended_cagr": 0.33, "extended_max_drawdown": -0.38}
+    assert saved_identity.same_result(before, after)
+    assert saved_identity.same_result(after, before)
+    # A headline number that moved still does.
+    moved = _run(A)
+    moved["kpis"] = {**moved.get("kpis", {}), "cagr": 0.5, "extended_cagr": 0.33}
+    assert not saved_identity.same_result(before, moved)
 
 
 def test_a_commit_that_is_not_a_plain_id_never_reaches_git(monkeypatch):

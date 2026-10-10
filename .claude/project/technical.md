@@ -19,7 +19,7 @@
 | VIX Data | NSE public API endpoint (polling fallback) + Fyers tick (`NSE:INDIAVIX-INDEX`) |
 | Deployment | Docker Compose (dev) → Railway / Fly.io (prod) |
 | Options Backtesting | Python 3.12 + `uv`, in `packages/option-backtesting` — Parquet + DuckDB cache, pydantic-validated YAML strategy DSL, bar-by-bar event engine (golden-fixture-verified to the rupee), FastAPI service + MCP server, fronted by a Fastify proxy and a React dashboard tab; walk-forward, parameter sweeps, a CSCV/PBO + deflated-Sharpe overfitting guard, a margin model, regime bucketing, and personality export are all built (M-5) — the epic is feature-complete |
-| Momentum Backtesting | Python 3.12 + `uv` research engine and private FastAPI service (`mbt serve`) in `packages/momentum-backtesting`; the shared Next.js dashboard owns the Momentum frontend. Weekly index, stock, Custom Index and Broad Momentum rotation use Fyers/public-source prices and the shared local research database (`packages/trading-data`). The CLI supports fetching, backtesting, weekly signals and rebalance previews. |
+| Momentum Backtesting | Python 3.12 + `uv` research engine and private FastAPI service (`mbt serve`) in `packages/momentum-backtesting`; the shared Next.js dashboard owns the Momentum frontend. Weekly index, stock, Custom Index and Broad Momentum rotation use Fyers/public-source prices and the shared local research database (`packages/trading-data`). The CLI supports fetching, backtesting, weekly signals and rebalance previews. A new Broad run defaults to the point-in-time `turnover_rank` universe (BL-036 Phase 1) and carries an extended-tags companion figure. |
 
 ## Package Manager & Runtime
 

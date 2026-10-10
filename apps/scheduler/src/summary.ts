@@ -29,12 +29,18 @@ export function formatSummary(day: string, checks: Check[]): { ok: boolean; text
 export function jobChecks(ctx: BuiltinContext): Check[] {
   const now = ctx.now();
   const today = istDay(now);
-  const firstStart = ctx.history.firstStart(now); // slots before it belonged to launchd
   const checks: Check[] = [];
   for (const job of ctx.jobs ?? JOBS) {
     if (job.builtin === 'morning-summary') continue;
     const slot = previousDue(job.schedule, now);
-    if (!slot || istDay(slot) !== today || slot < firstStart) continue;
+    // Slots before the scheduler first saw the job belonged to launchd, or to no one.
+    if (
+      !slot ||
+      istDay(slot) !== today ||
+      slot < ctx.history.jobFirstSeen(job.id, now, job.catchUpHours)
+    ) {
+      continue;
+    }
     const run = ctx.history.forSlot(job.id, slot);
     if (!run) checks.push({ ok: false, label: job.id, detail: 'has not run yet' });
     else if (run.ended_at === null) checks.push({ ok: true, label: job.id, detail: 'running' });

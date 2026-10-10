@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { alertMissed, alertResult, telegramSink } from '../alerts.js';
 import { History } from '../history.js';
 import type { Job } from '../jobs.js';
-import { decide, skippedToday } from '../loop.js';
+import { decide, skippedToday, startLoop } from '../loop.js';
 import { type RunResult, runJob } from '../runner.js';
 import { istAt } from '../schedule.js';
 import { formatSummary, jobChecks, morningSummary } from '../summary.js';
@@ -45,6 +45,70 @@ describe('decide', () => {
   it('reports a slot as missed once it is too late to catch up', () => {
     const d = decide(job, istAt('2026-10-06', '10:30'), history, longAgo);
     expect(d.kind).toBe('missed');
+  });
+
+  /** One tick of the real loop at `at`, returning the alerts it sent. */
+  const tickAt = (jobs: Job[], at: Date): string[] => {
+    const sent: string[] = [];
+    const stop = startLoop({
+      ctx: { repoRoot: '.', env: {}, logDir: tmpdir(), history, now: () => at },
+      jobs,
+      alerts: async (text) => {
+        sent.push(text);
+      },
+    });
+    stop();
+    return sent;
+  };
+
+  it('does not report a slot from before a newly added job existed', () => {
+    history.firstStart(longAgo); // the scheduler has been running for months
+    const added: Job = { ...job, id: 'new-job' };
+    expect(tickAt([added], istAt('2026-10-06', '10:30'))).toEqual([]);
+    expect(history.forSlot('new-job', istAt('2026-10-06', '08:00'))).toBeNull();
+    // Once seen, a slot it then sleeps through is reported like any other job's.
+    const sent = tickAt([added], istAt('2026-10-07', '10:30'));
+    expect(sent[0]).toContain('⚠️ new-job was missed');
+  });
+
+  it('lets a newly added job catch up a slot that has only just passed', () => {
+    history.firstStart(longAgo);
+    const since = (at: Date) => history.jobFirstSeen('new-job', at, job.catchUpHours);
+    const added: Job = { ...job, id: 'new-job' };
+    // First seen at 09:30, inside the 2 h window of the 08:00 slot: it runs as a catch-up...
+    const first = since(istAt('2026-10-06', '09:30'));
+    expect(decide(added, istAt('2026-10-06', '09:30'), history, first)).toMatchObject({
+      kind: 'run',
+      trigger: 'catch-up',
+    });
+    // The record is made once, not moved later.
+    expect(since(istAt('2026-10-06', '12:00')).getTime()).toBe(first.getTime());
+    // A job first seen after the slot's window closed stays silent about that slot.
+    const late: Job = { ...job, id: 'later-job' };
+    const lateSince = history.jobFirstSeen('later-job', istAt('2026-10-06', '10:30'), 2);
+    expect(decide(late, istAt('2026-10-06', '10:30'), history, lateSince).kind).toBe('idle');
+  });
+
+  it('does not treat a manual try-out as history for a newly added job', () => {
+    history.firstStart(longAgo);
+    const added: Job = { ...job, id: 'new-job' };
+    // The owner tries the new job once by hand at 09:00, before the scheduler has seen it...
+    const manual = history.start('new-job', 'manual', null, '', istAt('2026-10-06', '09:00'));
+    history.finish(manual, 0, 1, istAt('2026-10-06', '09:00'));
+    // ...then the scheduler restarts after the 08:00 slot and its catch-up window.
+    expect(tickAt([added], istAt('2026-10-06', '10:30'))).toEqual([]);
+    expect(history.forSlot('new-job', istAt('2026-10-06', '08:00'))).toBeNull();
+  });
+
+  it('still reports a missed slot of a job with history, after a restart', () => {
+    history.firstStart(longAgo);
+    const monday = istAt('2026-10-05', '08:00');
+    const run = history.start('login', 'schedule', monday, '', monday);
+    history.finish(run, 0, 1, monday);
+    // The scheduler was down over Tuesday's 08:00 and restarted at 10:30.
+    const sent = tickAt([job], istAt('2026-10-06', '10:30'));
+    expect(sent[0]).toContain('⚠️ login was missed');
+    expect(history.forSlot('login', istAt('2026-10-06', '08:00'))?.error).toContain('missed');
   });
 
   it('does nothing for a slot that already has a run, ok or not', () => {
@@ -133,6 +197,7 @@ describe('morning summary', () => {
     const late = { ...job, id: 'late', schedule: { ...job.schedule, at: '08:30' } };
     const jobs = [job, { ...job, id: 'broken' }, late];
     history.firstStart(longAgo); // the scheduler was already running at 08:00
+    history.jobFirstSeen('late', longAgo); // and already knew the job that has no runs yet
     const okRun = history.start('login', 'schedule', istAt('2026-10-06', '08:00'), '', now);
     history.finish(okRun, 0, 1, now);
     const badRun = history.start('broken', 'schedule', istAt('2026-10-06', '08:00'), '', now);
