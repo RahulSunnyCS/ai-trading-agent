@@ -200,6 +200,43 @@ equal-weight, live mix, lots per window.
     read-only folder the morning pick never reads.
   - Today's baskets and the other rotation screens are **owner-only** on the hosted dashboard until
     showing daily picks to friends has been checked against the signal-sharing note in `business.md`.
+- **Widgets 6–10, 2026-10-10** (owner: add them here, recommended options taken; design in the plan page
+  https://claude.ai/artifact/KF4EvYf9f63uNco3MZ4oKm). Built after the five above, one reviewed PR each:
+  - **6. Today's basket on the Correlation tab** (BL-090). A preset that fills the tab with one list's
+    picks for one day, with a list toggle that includes the fixed base (its doubled Widesl drawn as one
+    4-lot line), windows P1 / P2 / last 63 / Forward, and a link from the Daily log drawer. No new maths:
+    `GET /legwise/correlation?selectors=<the three picks>`. Muted below 20 common days; a pick without
+    results is listed, never zero. Done when it equals `obt rotation corr` for the same names and window.
+    Starts straight after the rotation page. Example from the stored results: N_wide_0932, S_dir_1202,
+    S_wide_1347 correlate −0.05 to +0.17 in P1 and P2, and together their worst drawdown is 28% (P1) and
+    59% (P2) shallower than the three run alone.
+  - **7. Forward days vs research periods.** A panel showing the forward window's mix of opening VIX band,
+    NIFTY and SENSEX DTE and weekday against P1, P2 and P3 (after the import), with VIX open and each
+    index's day range as P10 / median / P90, and the total-variation distance to each period. Needs a
+    day-range column in `days.csv`, written by the nightly update from the lake's 1-minute index bars, and
+    `GET /legwise/rotation/regime`. **Lands before the 60-day read-out**, so the read-out can say what kind
+    of market it tested. Already visible in the real columns: NIFTY and SENSEX swapped expiry weekdays
+    between P2 and P1, so a DTE fit from one period describes a different weekday in the other.
+  - **8. Drawdown episodes.** Underwater chart per list against the fixed base (per lot or basket), an
+    episode table (peak, trough, back, depth per lot, sessions down, sessions to recover, the base over the
+    same days, stops) and the peak-to-trough loss by family × start band. **An episode is a fall of at least
+    ₹500 per lot below the running peak.** `GET /legwise/rotation/drawdowns`, a pure function in
+    `rotation/report.py`. Readable from about 60 sessions; before that it lists without ranking.
+  - **9. Selection drift.** Share of core picks by family, index, strike method and start band for history
+    (P1, reconstructed), last 63 and last 21, plus a concentration table (distinct variants, most-picked
+    variant, single-band baskets, Widesl minimum and Buy counts). **A share is flagged when the last 21
+    sessions fall outside that list's own rolling 21-session P10–P90 in P1**, not a fixed number of points.
+    Descriptive only; nothing changes. `GET /legwise/rotation/drift`. Readable from about 60 sessions.
+  - **10. Paper vs real.** A waterfall from paper gross through charges, days not placed, the owner's
+    changes and execution to the real P&L, a day table, and a Real column in the Daily log. Waits for three
+    things: the placement record; **the BL-063 charge model applied to stored results in the nightly update,
+    as its own registered change** (the `costs` column is zero today, so net equals gross); and the
+    contract-notes cutover (TODO §2). **The rotation trades on one broker account used for nothing else**, so
+    its contract notes are the real figure without filtering; until that holds, a day whose rotation
+    contracts cannot be told apart is marked "mixed" and left out of the gap.
+  - Not scheduled: basket-level day replay (built when a real losing day raises a question; the Daily log
+    drawer opens Day forensics per pick until then) and the two premium widgets (wait for BL-091 and an
+    intraday collector).
 
 ### Phase 5 — Review at 60 trading days
 - Score once against the Phase 0 rule; write the Result here and in BL-057's Log.
@@ -359,3 +396,8 @@ reference and answers "did the new weights beat the old rotation?". Nothing in t
   updated, before the first entry). View decisions recorded under Phase 4: base as headline benchmark, focus
   list A, placement record allowed (append-only, separate file), 2022–24 matrix import after the first
   version, rotation screens owner-only on the hosted dashboard.
+- 2026-10-10 — Widgets 6–10 added under Phase 4 (today's basket on the Correlation tab, forward days vs
+  research periods, drawdown episodes, selection drift, paper vs real), with the recommended choices: ₹500
+  per lot as the smallest episode, drift flagged against the list's own P1 band, the BL-063 charge model as
+  its own registered change, one broker account used only for the rotation. UI only; nothing about the
+  journal, the lists or the read-out changes.
