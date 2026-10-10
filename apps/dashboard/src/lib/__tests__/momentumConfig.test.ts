@@ -154,8 +154,21 @@ describe('describeConfig chips', () => {
       },
       'broad',
     );
-    expect(chips[1]).toEqual(['universe', 'Nifty Total Market', 'universe']);
+    expect(chips[1]).toEqual(['universe', "Today's list", 'universe']);
     expect(chips[2]).toEqual(['selection', 'top 10 stocks / exit >20', 'selection']);
+  });
+
+  it('names the point-in-time universe, which is always tradability-filtered', () => {
+    const chips = pairs(
+      {
+        ...BASE,
+        broad_universe: 'turnover_rank',
+        broad_liq_min_turnover_cr: 1,
+        broad_category_mode: 'on',
+      },
+      'broad',
+    );
+    expect(chips[1]).toEqual(['universe', 'Point in time · ≥ ₹1 Cr/day', 'universe']);
   });
 
   it('names an every-N cadence, with its phase, in the cadence chip', () => {
@@ -348,6 +361,24 @@ describe('hindsightWarning', () => {
       broad_universe: 'all_liquid',
     });
     expect(w?.realismOff).toEqual([]);
+  });
+
+  it("says today's list flatters, and points at the point-in-time universe", () => {
+    const w = hindsightWarning({ dataset: 'broad', broad_universe: 'total_market' });
+    expect(w?.detail).toMatch(/today's stock list/);
+    expect(w?.detail).toMatch(/As each year saw it/);
+  });
+
+  it('counts the point-in-time universe as filtered and stops blaming the stock list', () => {
+    const w = hindsightWarning({
+      dataset: 'broad',
+      broad_respect_circuits: true,
+      broad_universe: 'turnover_rank',
+    });
+    expect(w?.realismOff).toEqual([]);
+    expect(w?.headline).toMatch(/upper bound/);
+    expect(w?.detail).not.toMatch(/today's stock list/);
+    expect(w?.detail).toMatch(/2026 themes/);
   });
 
   it('warns on Custom Index, and not on ETF Rotation or the Nifty 50 stock set', () => {

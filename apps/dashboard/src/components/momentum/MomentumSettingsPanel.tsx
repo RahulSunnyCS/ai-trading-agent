@@ -7,6 +7,12 @@ import { type LiquidityPreviewParams, useLiquidityPreview } from '../../hooks/us
 import { cn } from '../../lib/cn';
 import { formatInr, formatInt, formatNumber } from '../../lib/format';
 import type { MomentumSettingsSection } from '../../lib/momentumConfig';
+import {
+  BROAD_UNIVERSES,
+  BROAD_UNIVERSE_ORDER,
+  broadUniverse,
+  isGatedUniverse,
+} from '../../lib/momentumUniverse';
 import { Badge } from '../ui/Badge';
 import { InfoTooltip } from '../ui/InfoTooltip';
 import { Input, Select, NumberField as UiNumberField } from '../ui/Input';
@@ -689,9 +695,9 @@ function LiquidityPreviewCard({
 }
 
 /**
- * Broad Momentum's universe choice and tradability filter. The filter is optional on the
- * Total Market pool and mandatory on the whole-market universe, where it is what narrows
- * ~2,500 listed stocks down to the ones you could really buy and sell.
+ * Broad Momentum's universe choice and tradability filter. The filter is optional on today's
+ * Total Market list and mandatory on the point-in-time and whole-market universes, where it is
+ * what narrows the listed stocks down to the ones you could really buy and sell.
  */
 function BroadUniverseControls({
   values,
@@ -702,8 +708,9 @@ function BroadUniverseControls({
 }) {
   const num = (key: string, fallback: number) =>
     typeof values[key] === 'number' ? (values[key] as number) : fallback;
-  const wholeMarket = values.broad_universe === 'all_liquid';
-  const active = wholeMarket || Boolean(values.broad_liquidity_filter);
+  const universe = broadUniverse(values);
+  const gated = isGatedUniverse(universe);
+  const active = gated || Boolean(values.broad_liquidity_filter);
   const minTurnover = num('broad_liq_min_turnover_cr', 1);
   const maxCircuitRaw = values.broad_liq_max_circuit_days;
   const maxCircuitDays = typeof maxCircuitRaw === 'number' ? maxCircuitRaw : null;
@@ -713,29 +720,18 @@ function BroadUniverseControls({
     <div className="space-y-3">
       <RadioCards
         name="broad_universe"
-        value={wholeMarket ? 'all_liquid' : 'total_market'}
+        value={universe}
         onChange={(value) => onChange('broad_universe', value)}
-        options={[
-          {
-            value: 'total_market',
-            label: 'Nifty Total Market',
-            description:
-              "about 750 stocks from NSE's own Total Market index. Category ranking covers all of them.",
-          },
-          {
-            value: 'all_liquid',
-            label: 'Whole NSE market (liquid only)',
-            description:
-              'every listed NSE equity, narrowed each week to the ones you could really trade. Only stocks with a category tag can be picked in category mode, so "Rank stocks directly" uses it fully.',
-          },
-        ]}
+        options={BROAD_UNIVERSE_ORDER.map((id) => ({
+          value: id,
+          label: BROAD_UNIVERSES[id].label,
+          description: BROAD_UNIVERSES[id].description,
+        }))}
       />
       <Toggle
-        label={
-          wholeMarket ? 'Tradability filter (always on for the whole market)' : 'Tradability filter'
-        }
-        disabled={wholeMarket}
-        help="Each week, keep only stocks with enough daily turnover to buy and sell your position, that are not pinned at a circuit limit. Uses only data available at that date. Always on for the whole-market universe."
+        label={gated ? 'Tradability filter (always on for this universe)' : 'Tradability filter'}
+        disabled={gated}
+        help="Each week, keep only stocks with enough daily turnover to buy and sell your position, that are not pinned at a circuit limit. Uses only data available at that date. Always on for the point-in-time and whole-market universes."
         checked={active}
         onChange={(value) => onChange('broad_liquidity_filter', value)}
       />
@@ -836,7 +832,7 @@ function BroadUniverseControls({
               circuit: values.broad_liq_circuit !== false,
               circuit_run: num('broad_liq_circuit_run', 3),
               max_circuit_days: maxCircuitDays,
-              universe: wholeMarket ? 'all_liquid' : 'total_market',
+              universe,
             }}
             positionRupees={positionRupees}
             poolTopN={num('broad_pool_top_n', 200)}
@@ -893,7 +889,7 @@ const SETTINGS_FALLBACKS: Values = {
   broad_picks_per_category: 2,
   broad_off_top_n: 10,
   broad_off_exit_rank: 20,
-  broad_universe: 'total_market',
+  broad_universe: 'turnover_rank',
   broad_liquidity_filter: true,
   broad_respect_circuits: true,
   broad_liq_min_turnover_cr: 1,
@@ -1012,16 +1008,12 @@ export function MomentumSettingsPanel({
           <Section
             id="universe"
             title="Universe &amp; tradability"
-            description={
-              str('broad_universe', 'total_market') === 'all_liquid'
-                ? 'Whole NSE market'
-                : 'Nifty Total Market pool'
-            }
+            description={BROAD_UNIVERSES[broadUniverse(values)].short}
           >
             <Hint>
-              Stocks in the Nifty Total Market universe are screened using available membership data
-              and the pool is refreshed quarterly; each pool member&apos;s own rank still updates
-              weekly.
+              The pool is refreshed quarterly from the universe you pick; each pool member&apos;s
+              own rank still updates weekly. &quot;As each year saw it&quot; removes the survivor
+              bias of today&apos;s list; the categories are still today&apos;s themes.
             </Hint>
             <BroadUniverseControls values={values} onChange={onChange} />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

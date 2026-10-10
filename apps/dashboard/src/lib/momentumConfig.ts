@@ -8,6 +8,7 @@
  */
 
 import { formatNumber } from './format';
+import { BROAD_UNIVERSES, broadUniverse, isGatedUniverse } from './momentumUniverse';
 
 /**
  * The settings accordions, by id. The settings panel renders one accordion per id, the summary
@@ -101,11 +102,11 @@ export function describeConfig(
 
   const chips: MomentumConfigChip[] = [{ id: 'period', label: period, section: 'period' }];
   if (broad) {
-    const wholeMarket = config.broad_universe === 'all_liquid';
-    const filtered = wholeMarket || config.broad_liquidity_filter === true;
+    const universe = broadUniverse(config);
+    const filtered = isGatedUniverse(universe) || config.broad_liquidity_filter === true;
     chips.push({
       id: 'universe',
-      label: `${wholeMarket ? 'Whole NSE market' : 'Nifty Total Market'}${
+      label: `${BROAD_UNIVERSES[universe].short}${
         filtered ? ` · ≥ ₹${count(config.broad_liq_min_turnover_cr)} Cr/day` : ''
       }`,
       section: 'universe',
@@ -424,16 +425,22 @@ export interface HindsightWarning {
 export function hindsightWarning(config: Record<string, unknown>): HindsightWarning | null {
   const dataset = config.dataset;
   if (dataset === 'broad') {
+    const universe = broadUniverse(config);
     const realismOff = [
       config.broad_respect_circuits === true ? null : 'circuit locks',
-      config.broad_liquidity_filter === true || config.broad_universe === 'all_liquid'
+      config.broad_liquidity_filter === true || isGatedUniverse(universe)
         ? null
         : 'the tradability filter',
     ].filter((item): item is string => item !== null);
+    const detail =
+      universe === 'turnover_rank'
+        ? 'Each year ranks the 750 stocks most traded before it began, delisted names included, so the stock list carries no hindsight. The categories still come from 2026 themes, which flatter earlier years: the extended-tags figure under the CAGR is the closer reading.'
+        : universe === 'all_liquid'
+          ? 'Each week ranks every liquid NSE stock, so the stock list carries little hindsight. The categories still come from 2026 themes, which flatter earlier years.'
+          : 'Every year since 2017 uses today\'s stock list, so most stocks that later fell out or were delisted are missing, and the categories come from 2026 themes. BL-010 measured the loss at about 5 points a year for a typical config and 22 to 25 for the best of a search: choose "As each year saw it" to see it.';
     return {
       headline: 'Treat this CAGR as an upper bound, not an expected return.',
-      detail:
-        "Every year since 2017 uses today's stock list, so most stocks that later fell out or were delisted are missing, and the categories come from 2026 themes. Real returns are likely well below this until BL-010 re-measures it point-in-time.",
+      detail,
       realismOff,
     };
   }
