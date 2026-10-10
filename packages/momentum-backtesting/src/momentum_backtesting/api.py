@@ -1691,6 +1691,10 @@ LIVE_SCORES_OPEN, LIVE_SCORES_CLOSE = time(9, 15), time(15, 30)
 _LIVE_SCORES_CACHE: dict[tuple, dict] = {}
 _LIVE_SCORES_LOCK = threading.Lock()
 LIVE_SCORES_TTL_MINUTES = 5
+# A live price outside this band of the last close is not used: the stored prices are adjusted only
+# for confirmed corporate actions, so a 1:1 bonus or 1:2 split effective this week shows as ~0.5x
+# (a +2% day on top makes 0.51). Real weekly moves of index stocks stay well inside it.
+LIVE_SCORES_PRICE_BAND = (0.6, 1 / 0.6)
 
 
 def live_scores_universe(
@@ -1699,8 +1703,9 @@ def live_scores_universe(
     """The scores' price frame with a provisional row for `week` (this Friday) from live prices
     (`quotes`: base symbol -> last traded price). In memory only, never stored: the 19:30 closes
     replace it by recomputation. Membership and the liquidity gate keep the last stored week's,
-    since a day's turnover is not complete until the close. A price more than 50% from the last
-    close (an unadjusted split, a bad tick) keeps the last close and is reported, not used."""
+    since a day's turnover is not complete until the close. A price outside `LIVE_SCORES_PRICE_BAND`
+    of the last close (an unadjusted split or bonus, a bad tick) keeps the last close and is
+    reported, not used."""
     frame = universe.frame.copy()
     last = frame.index[-1]
     row = frame.loc[last].copy()
@@ -1714,7 +1719,7 @@ def live_scores_universe(
         if price is None or not math.isfinite(price) or price <= 0:
             missing.append(base)
             continue
-        if not 0.5 <= price / float(row[column]) <= 1.5:
+        if not LIVE_SCORES_PRICE_BAND[0] <= price / float(row[column]) <= LIVE_SCORES_PRICE_BAND[1]:
             suspect.append(base)
             continue
         row[column] = price
@@ -1754,10 +1759,9 @@ def _momentum_scores_live_payload(now: datetime | None = None) -> dict:
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
     last = pd.Timestamp(universe.frame.index[-1]).normalize()
-    if last >= week:
-        raise HTTPException(
-            409, "This Friday's closes are already in: the normal scores are final."
-        )
+    # `last == week` is normal here: a sync during the week stores the partial week under this
+    # Friday's date, and `live_scores_universe` overwrites that row. Friday's real closes only
+    # arrive after the live window ends.
     if last < week - pd.Timedelta(days=7):
         raise HTTPException(
             409, f"The stored prices end {last:%d %b}; refresh the stock data first."

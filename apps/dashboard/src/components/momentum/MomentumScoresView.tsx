@@ -157,7 +157,7 @@ export function MomentumScoresView() {
               ? `${formatInt(data.live.missing.length)} had no live price and keep last week's close. `
               : ''}
             {data.live.suspect.length
-              ? `${formatInt(data.live.suspect.length)} moved more than 50% and keep last week's close until checked: ${data.live.suspect.join(', ')}.`
+              ? `${formatInt(data.live.suspect.length)} moved more than 40% and keep last week's close until checked: ${data.live.suspect.join(', ')}.`
               : ''}
           </p>
         ) : null}
@@ -167,7 +167,11 @@ export function MomentumScoresView() {
         <StateMessage
           variant="error"
           title={live ? "Couldn't load live scores" : "Couldn't load momentum scores"}
-          description={live && data ? `${error} Showing the last close's scores.` : error}
+          description={
+            live && data
+              ? `${error} Showing ${data.live ? 'the last live read' : "the last close's scores"}.`
+              : error
+          }
         />
       ) : null}
       {loading && !data && !error ? <MomentumScoresSkeleton /> : null}

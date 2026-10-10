@@ -64,17 +64,17 @@ def test_live_scores_are_only_for_friday_market_hours(when):
     assert error.value.status_code == 409 and "Fridays" in error.value.detail
 
 
-def test_live_scores_quote_every_base_symbol_and_say_they_are_provisional(monkeypatch):
-    monkeypatch.setattr(api.DATA, "get_momentum_universe", lambda: _universe())
+def _patch_live_payload(monkeypatch, universe, prices):
+    """Stub the live endpoint's surroundings; returns what Fyers was asked and the frame scored."""
+    monkeypatch.setattr(api.DATA, "get_momentum_universe", lambda: universe)
     monkeypatch.setattr(fyers, "resolve_credentials", lambda: object())
-    asked = []
+    asked, seen = [], {}
 
     def quotes(symbols, creds):
         asked.extend(symbols)
-        return {"NSE:AAA-EQ": 111.0, "NSE:BBB-EQ": 53.0, "NSE:DDD-EQ": 83.0}
+        return prices
 
     monkeypatch.setattr(fyers, "quotes", quotes)
-    seen = {}
 
     def stock_scores(universe, group_info):
         seen["frame"] = universe.frame
@@ -90,6 +90,15 @@ def test_live_scores_quote_every_base_symbol_and_say_they_are_provisional(monkey
     monkeypatch.setattr(api.momentum_scores_mod, "to_payload", lambda *a, **k: {"stocks": []})
     monkeypatch.setattr(api, "_membership_quality", lambda: None)
     api._LIVE_SCORES_CACHE.clear()
+    return asked, seen
+
+
+def test_live_scores_quote_every_base_symbol_and_say_they_are_provisional(monkeypatch):
+    asked, seen = _patch_live_payload(
+        monkeypatch,
+        _universe(),
+        {"NSE:AAA-EQ": 111.0, "NSE:BBB-EQ": 53.0, "NSE:DDD-EQ": 83.0},
+    )
     payload = api._momentum_scores_live_payload(now=_now("2026-10-09T13:05:00"))
     assert sorted(asked) == ["NSE:AAA-EQ", "NSE:BBB-EQ", "NSE:CCC-EQ", "NSE:DDD-EQ"]
     assert payload["live"]["provisional"] is True and payload["live"]["week"] == "2026-10-09"
@@ -101,10 +110,30 @@ def test_live_scores_quote_every_base_symbol_and_say_they_are_provisional(monkey
     assert asked == []
 
 
-def test_once_fridays_closes_are_in_the_normal_scores_are_final(monkeypatch):
+def test_a_sync_during_the_week_does_not_turn_live_scores_off(monkeypatch):
+    """The weekly prices label a partial week with its Friday, so a Wednesday sync stores a row
+    dated this Friday. Live scores must still work, and overwrite that row."""
     universe = _universe()
-    universe.frame.loc[pd.Timestamp("2026-10-09")] = universe.frame.iloc[-1]
-    monkeypatch.setattr(api.DATA, "get_momentum_universe", lambda: universe)
-    with pytest.raises(HTTPException) as error:
-        api._momentum_scores_live_payload(now=_now("2026-10-09T15:00:00"))
-    assert "already in" in error.value.detail
+    friday = pd.Timestamp("2026-10-09")
+    for table in (universe.frame, universe.raw_frame, universe.stock_membership):
+        table.loc[friday] = (
+            table.iloc[-1] * 1.01 if table is not universe.stock_membership else True
+        )
+    universe.weeks.append(friday)
+    _, seen = _patch_live_payload(monkeypatch, universe, {"NSE:AAA-EQ": 111.0})
+    payload = api._momentum_scores_live_payload(now=_now("2026-10-09T11:00:00"))
+    assert payload["live"]["week"] == "2026-10-09"
+    assert list(seen["frame"].index).count(friday) == 1
+    assert seen["frame"].at[friday, "AAA"] == 111.0
+
+
+def test_a_price_about_half_the_last_close_is_held_back_as_an_unadjusted_split():
+    universe = _universe()
+    friday = pd.Timestamp("2026-10-09")
+    # A 1:2 split effective this week plus a +2% day is a ratio of 0.51: inside the old 0.5 band.
+    live, info = api.live_scores_universe(
+        universe, {"AAA": 102.0 * 0.51, "BBB": 52.0 * 0.95}, friday
+    )
+    assert info["suspect"] == ["AAA"] and info["used"] == 1
+    assert live.frame.at[friday, "AAA"] == 102.0  # kept at the last close
+    assert live.frame.at[friday, "BBB#2"] == pytest.approx(52.0 * 0.95)  # an ordinary -5% week

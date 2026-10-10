@@ -29,8 +29,8 @@ the close. It needs a valid Fyers login.
 - It is **provisional**: nothing is saved, and once this evening's closes are stored the normal
   scores replace it. The subtitle shows the time the prices were read; they are re-read every
   five minutes.
-- A stock with no live price keeps last week's close, and so does one that moved more than 50%
-  (usually an unadjusted split or a bad tick); the card says how many and names the second kind.
+- A stock with no live price keeps last week's close, and so does one that fell more than 40% or
+  rose more than 67% (usually an unadjusted split or bonus, or a bad tick); the card says how many and names the second kind.
 - Membership and the liquidity gate stay as of last week: a day's turnover is not complete until
   the close.
 - A stock's drawer still shows its closing history.
