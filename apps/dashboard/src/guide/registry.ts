@@ -41,6 +41,7 @@ import optionsRegimes from './content/optionslab/regimes.md?raw';
 import optionsRotationDailyLog from './content/optionslab/rotation-daily-log.md?raw';
 import optionsRotationExplain from './content/optionslab/rotation-explain.md?raw';
 import optionsRotationMatrix from './content/optionslab/rotation-matrix.md?raw';
+import optionsRotationRegime from './content/optionslab/rotation-regime.md?raw';
 import optionsRotationShadow from './content/optionslab/rotation-shadow.md?raw';
 import optionsRotation from './content/optionslab/rotation.md?raw';
 import optionsRuns from './content/optionslab/runs.md?raw';
@@ -314,6 +315,15 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
       'Why each list picked what it did, criterion by criterion, and whether the morning ranking orders the day.',
     kind: 'Screen',
     body: optionsRotationExplain,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-regime',
+    title: 'Rotation: forward days vs research periods',
+    summary: 'What kind of market the forward window tested, beside P1, P2 and P3.',
+    kind: 'Screen',
+    body: optionsRotationRegime,
     screen: { tab: 'optionslab', rest: ['rotation'] },
   },
   {

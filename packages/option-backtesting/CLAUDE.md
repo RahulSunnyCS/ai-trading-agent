@@ -155,6 +155,13 @@ Otherwise:
   displaced pick's stored result is pending, never zero), with the time-matched placebo Dir as its control line
   (BL-083's random-minute control is not in the trigger files, so it is reported `not_recorded`); and BL-081's two
   forward candidates returned `not_scored` with their definitions (no nightly scoring exists for them).
+- `rotation/regime.py` + `api/rotation_regime_routes.py` — "Forward days vs research periods" (BL-058 Phase 4
+  widget 7; `GET /legwise/rotation/regime`), read-only. Per period (P1, P2 from `matrix.NAMED`; the forward window =
+  the on-time journal entries' own recorded attributes; P3 reported `unavailable` with the reason): the share of
+  weekday sessions by opening VIX band, NIFTY and SENSEX days to expiry (0..3, 4+) and weekday; the VIX open and each
+  index's day range ((high - low) / open, from the lake's 1-minute index bars, computed at request time, cached in
+  process, never written) as P10 / P50 / P90; and the total-variation distance from forward to each research period
+  per row, with a 0.05 tie band. A bar file that cannot be read costs that day's range only. Describes; tests nothing.
 - `rotation/matrix.py` + `api/rotation_matrix_routes.py` — the Options Lab's Matrix tab (the Strategy Matrix, read-only):
   `GET /legwise/rotation/matrix` (views `family_slot` / `date_slot` / `dte_slot` / `vix_family` / `weekday_family` /
   `pulse`; metrics `avg` / `win_rate` / `stop_rate` / `worst` / `selection`; periods P1, P2, P3 (returned as

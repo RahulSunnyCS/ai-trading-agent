@@ -42,6 +42,8 @@
  *                                                 and the recorded picks overlay. requireAccess
  *  GET  /api/backtest/legwise/rotation/matrix/cell  — the daily values, curve and variants behind one
  *                                                 cell. requireAccess
+ *  GET  /api/backtest/legwise/rotation/regime   — the forward window's market mix beside P1, P2 and P3.
+ *                                                 requireAccess
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
  *  GET  /api/backtest/legwise/daily             — that run's state/log. requireAccess
@@ -680,6 +682,20 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation shadow ---
+
+  // --- rotation regime --- "Forward days vs research periods" (rotation/regime.py, read-only).
+  // No parameters: the periods are the registered ones, so nothing from the query is forwarded.
+  fastify.get(
+    '/api/backtest/legwise/rotation/regime',
+    {
+      preHandler: requireAccess,
+      schema: { querystring: { type: 'object', properties: {}, additionalProperties: false } },
+    },
+    async (_request, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/rotation/regime');
+    },
+  );
+  // --- end rotation regime ---
 
   // --- rotation matrix ---
   // The Strategy Matrix (packages/option-backtesting rotation/matrix.py). Read-only. Every value
