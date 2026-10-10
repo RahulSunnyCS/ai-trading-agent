@@ -39,6 +39,7 @@ import optionsDailyResults from './content/optionslab/daily-results.md?raw';
 import optionsHowItWorks from './content/optionslab/how-it-works.md?raw';
 import optionsRegimes from './content/optionslab/regimes.md?raw';
 import optionsRotationShadow from './content/optionslab/rotation-shadow.md?raw';
+import optionsRotation from './content/optionslab/rotation.md?raw';
 import optionsRuns from './content/optionslab/runs.md?raw';
 import optionsStrategies from './content/optionslab/strategies.md?raw';
 import optionsLosingDays from './content/optionslab/walkthrough-losing-days.md?raw';
@@ -292,12 +293,22 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
   },
   {
     chapter: 'optionslab',
+    slug: 'rotation',
+    title: 'Rotation',
+    summary:
+      'The four forward lists against REF, the fixed base and random baskets, and today’s picks.',
+    kind: 'Screen',
+    body: optionsRotation,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
     slug: 'rotation-shadow',
     title: 'Rotation: Shadow scoreboard',
     summary: 'Ideas kept for forward observation, each against the pick it would have replaced.',
     kind: 'Screen',
     body: optionsRotationShadow,
-    // `screen` is set when the Rotation section mounts this widget (it has no route of its own).
+    screen: { tab: 'optionslab', rest: ['rotation'] },
   },
   {
     chapter: 'optionslab',
