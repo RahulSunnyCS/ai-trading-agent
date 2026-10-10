@@ -19,6 +19,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-034](BL-034-options-history-lake.md) | Options history lake: two years of vendor 1-minute data in `trading-data`, derived tables for straddle backtests, daily top-up | P0 | In progress | feature | trading-data |
 | [BL-058](BL-058-options-rotation-forward-journal-and-ui.md) | Options rotation: forward paper journal from Mon 12 Oct (picks recorded before 09:17, scored nightly) and the Options Lab screens it needs | P0 | In progress: journal built, first entry Mon 12 Oct 09:16 (lists A, B, C, REF); UI view in Phase 4 | feature | options |
 | [BL-087](BL-087-momentum-all-fridays-split.md) | Momentum: backtest and follow a config split across every rebalance Friday | P0 | Built; live migration pending | feature | momentum |
+| [BL-089](BL-089-backlog-tracks-and-github-board.md) | Backlog restructure: research / product / platform tracks, a generated index and `DONE.md`, one issue per item and a GitHub Projects board with a "Needs me" view | P0 | Ready | chore | cross-cutting |
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-015](BL-015-research-gate.md) | Research gate: pre-register every experiment, log every override | P1 | In progress | chore | cross-cutting |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
@@ -72,6 +73,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-081](BL-081-drb-hourly-checkpoints-and-no-trade.md) | Hourly checkpoints for picks that have not started yet (state at 10:30–13:30: VIX, trend, VWAP, ATR, RSI, pivots) and a no-trade option | P2 | Planned (block 3): step 1 negative; the adjustment rule runs under the owner's override | research | options |
 | [BL-083](BL-083-event-triggered-intraday-entries.md) | Event-triggered intraday entries: fire Widesl / Dir / Buy the minute a pivot, VIX, straddle or RSI condition is met, overriding the next scheduled pick | P2 | Planned | research | options |
 | [BL-057](BL-057-daily-four-criteria-rotation.md) | Daily four-criteria rotation (recent P&L, weekday, days-to-expiry, VIX fit) over the 66 NIFTY + SENSEX variants (POC) | P2 | Done: inconclusive | research | options |
+| [BL-088](BL-088-own-history-sector-relative-strength.md) | Sector scoring on its own relative strength: time-series RS (continuation and reversal) as a replace or tilt on the ETF rotation, then Broad's category layer | P2 | Idea | research | momentum |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
