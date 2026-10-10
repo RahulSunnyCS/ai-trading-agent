@@ -28,6 +28,10 @@ app.add_typer(fyers_app, name="fyers")
 legwise_app = typer.Typer(no_args_is_help=True, help="AlgoTest-style leg-wise backtests.")
 app.add_typer(legwise_app, name="legwise")
 
+from .rotation.cli import rotation_app  # noqa: E402  (BL-058: the forward paper journal)
+
+app.add_typer(rotation_app, name="rotation")
+
 
 @app.callback()
 def _load_env() -> None:
@@ -167,13 +171,15 @@ def run(
         typer.echo("")
         typer.echo(render_margin(margin))
 
-    from .features.regime import regime_bucket_report
+    from .features.regime import regime_bucket_status
 
-    regime_buckets = regime_bucket_report(sessions, loaded.strategy.universe.underlying)
-    if regime_buckets is not None:
+    regime = regime_bucket_status(sessions, loaded.strategy.universe.underlying)
+    if regime.buckets is not None:
         typer.echo("\nRegime breakdown (lag-1):")
-        for regime_name in sorted(regime_buckets):
-            typer.echo(f"  {regime_name}: {regime_buckets[regime_name]:.0f}")
+        for regime_name in sorted(regime.buckets):
+            typer.echo(f"  {regime_name}: {regime.buckets[regime_name]:.0f}")
+    elif regime.message:
+        typer.echo(f"\n(regime breakdown not computed: {regime.status} — {regime.message})")
 
     with connect(views=()) as con:
         run_id = record_run(con, loaded.strategy, start, end, result, strategy_path.read_text())

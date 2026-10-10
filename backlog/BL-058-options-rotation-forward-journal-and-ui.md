@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — owner, 2026-10-09: the forward record must start before Monday 2026-10-12 09:15 |
-| **Status** | Planned |
+| **Status** | In progress — journal built 2026-10-10 (Phases 0b, 1, 2); UI waits (Phase 4) |
 | **Type** | feature |
 | **Area** | options / dashboard / scheduler |
 | **Created** | 2026-10-09 |
@@ -179,9 +179,61 @@ equal-weight, live mix, lots per window.
 
 ### Phase 4 — Build the rotation view (after Monday; not part of the P0 deadline)
 - Endpoints, the view, Guide page, hide the "hide" items. Separate review.
+- **Added 2026-10-10 (owner: any UI change goes to the backlog; none is built with the journal):** the
+  view must show the four forward lists (A, B, C, REF) side by side, not one rule: per list the day's
+  three strategies and Buy strategy with their composite scores, the running gross and max drawdown, the
+  share of random same-shape picks it has beaten, and the difference to REF with its bootstrap
+  interval; a single "chain intact" badge from `obt rotation verify` and the chain head; the days
+  waiting on results (nightly update not yet run) and any day not recorded because the VIX open could
+  not be read. Data comes from `rotation/` files via new `/legwise/rotation/*` endpoints (the files are
+  read-only to the API). Also a per-list "what changed since yesterday" strip (members swapped) for the
+  effort of re-setting AlgoTest.
 
 ### Phase 5 — Review at 60 trading days
 - Score once against the Phase 0 rule; write the Result here and in BL-057's Log.
+
+### Phase 0b — what the journal records (dated 2026-10-10, registered before the first entry)
+**Amendment 2026-10-10 (owner, before the first entry): the universe is 298 variants, not 248** — the 248
+below plus the 50 Dir ITM1 variants (`N_ditm1_*`, `S_ditm1_*`, BL-080; family "dir" for the Widesl minimum
+and the family-band recent score). BL-080's read-out passed (A / B / C ≥ their 248 gross in 2 of 3
+periods, all above random P90; REF unchanged). Weights, lookbacks and rule are untouched; the journal
+records the universe size and a hash in every entry. Parity (`scripts/rotation-parity.py --ext-dir`)
+reproduces `rotate.py --ext-dir` on 202 of 202 days for each list.
+Supersedes the 66-variant rule of Phase 0 for the forward test; Phase 0's discipline (picks before
+09:17, scored after, no change from reports) stands.
+- **Lists (all DRB-6W3L2 shape):** 3 strategies × 2 lots from the whole-day list (298 variants, see the amendment above), at
+  least 2 Widesl strategies, the Buy add-on (one 2-lot Buy strategy) when a Buy variant ranks in the
+  overall top 10; per-strategy stops as in the variant files; every list ranks with fit lookbacks
+  5:30, 21:25, 63:25, 126:20 except REF. Weights are own-recent / weekday / dte / VIX / family-band
+  recent (BL-074 type × start-band family):
+
+  | List | Own | Weekday | DTE | VIX | Family | Notes |
+  |---|---|---|---|---|---|---|
+  | **A** | 5 | 34 | 33 | 23 | 5 | BL-075 stage 1, safest cell |
+  | **B** | 0 | 36 | 35 | 24 | 5 | BL-075, best Jan–Aug 2025 |
+  | **C** | 15 | 30 | 30 | 20 | 5 | BL-075, best in the 2025-26 regime |
+  | **REF** | 33 | 25 | 25 | 17 | 0 | the live baseline, lookbacks 5:40, 21:30, 63:30 |
+- **Entry (one per trading day, 09:16 IST):** the day, weekday, 09:15 India VIX open and band,
+  days to expiry per index, each list's three strategies and Buy strategy (with their composite
+  scores), the code commit, the universe size and hash, a digest of the stored results it was scored
+  on (`inputs_sha`), the time written, the previous entry's hash and its own SHA-256. Appended
+  to an insert-only hash-chained log under `TRADING_DATA_ROOT/rotation/`; `obt rotation verify`
+  re-computes the chain. The picks are Telegrammed with the chain head. If the 09:15 VIX open cannot
+  be read by 09:20 nothing is recorded for that day and an alert is sent (a late entry is not forward).
+- **Scoring (every evening, after `options-daily`):** the day's result for all 298 variants is
+  computed (one-day `run_legwise` per variant, same strategy files), stored, and each list's recorded
+  picks scored: gross for the day, the random-pick percentile for that day, and the running totals
+  and drawdowns per list.
+- **Evaluation point:** 60 trading days from 2026-10-12. Per list: gross, max drawdown, and the share
+  of random same-shape picks it beats (cumulative), with REF as the comparator and a 5-day
+  block-bootstrap interval of each list minus REF. Weekly read-only reports; nothing changes.
+- **Will not:** change a list's weights, add a list, drop one, or switch the rule after seeing
+  results; start from a later date.
+- **Deviation from Phase 1–2 as written:** the journal is a hash-chained JSONL file, not a catalog
+  table, and the results store is per-variant CSV files under the same directory: the catalog
+  allows one writer, the migration ledger is mid-repair (see BL-071 Log), and the file form keeps
+  `obt daily` unaffected. The variant YAMLs now live in `packages/option-backtesting/strategies/
+  rotation/` (committed), not under `research/`.
 
 ## Risks
 
@@ -215,3 +267,24 @@ equal-weight, live mix, lots per window.
   analysis discussion needs; owner asked that the discussion's UI needs be added here.
 - 2026-10-09 — created from the owner's request; P0 with a Monday 2026-10-12 09:15 deadline for
   Phases 0–3.
+- 2026-10-10 — owner chose the 298 universe (Dir ITM1 added) before the first entry; 50 variant files + results seeded, parity 202/202 on all four lists.
+- 2026-10-10 — owner chose lists A, B and C (BL-075 stage 1) plus the live baseline as REF; Phase 0b registered; build started.
+- 2026-10-10 — journal build is backend-only (CLI + two scheduler jobs + files); UI needs for the four lists added to Phase 4.
+- 2026-10-10 — **Built:** `obt rotation update|pick|verify|show` (`src/option_backtesting/rotation/`),
+  the 248 variant files committed under `strategies/rotation/` (5 of 5 sampled reproduce their stored
+  2026-10-08 result to the rupee), scheduler jobs `options-rotation-nightly` (19:45, retries to 23:00,
+  catalog group) and `options-rotation-pick` (09:16, no catch-up), 15 unit tests, and
+  `scripts/rotation-parity.py`: lists A, B, C and REF pick **202 of 202** selection days identically to
+  rotate.py (a weekend session — the Budget Sunday 2026-02-01 — had to be excluded from the history to
+  get there). Store seeded from the research results (248 files, 487 days) and 2026-10-09 run through
+  the nightly path (248 variants in 4.6 s, idempotent). The live VIX fetch returned 15.28 for
+  2026-10-09, equal to the lake. Dry run for Monday: A/B pick N_dir_0947, N_wide_1347, N_wide_1317.
+  **Before Monday:** the scheduler process must be restarted to load the two jobs; the code lives on this
+  branch only, so the main checkout must stay on it (or PR #154 merge first); the Fyers token for the
+  09:16 read depends on the 08:05 login.
+- 2026-10-10 — **Amendment (before the first entry): the 09:15 VIX open's source.** Fyers needs a human
+  login each day (BL-076 / BL-077 / BL-079), so a morning without it would leave no entry. The pick now
+  reads the same quantity (the open of the 09:15 India VIX 1-minute bar) from Fyers first and from Angel
+  One (unattended login, BL-078 / BL-079's module) when Fyers has no token or no bar; the entry records
+  `vix_source` (fyers / angelone / given). Checked on 2026-10-09: both return 15.28. If neither source
+  answers by 09:20 nothing is recorded and an alert is sent, as before.

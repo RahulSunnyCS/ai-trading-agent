@@ -20,11 +20,53 @@ sys.path.insert(0, str(HERE.parent / "common"))
 import analyse as A  # noqa: E402  (day_features, load, VIX bands, WD)
 import varlib  # noqa: E402  (live_csv: the comparator inputs)
 
-WINDOW_FROM = "2025-09-01"
+# BL-071: `--window-from 2024-10-09` scores the rule from the start of the per-variant results (the
+# default is the owner's "last year" window, 2025-09-01); the selection days start 63 days later
+WINDOW_FROM = (
+    sys.argv[sys.argv.index("--window-from") + 1] if "--window-from" in sys.argv else "2025-09-01"
+)
+# BL-075: `--window-to D` ends the series at D, so rotate's own random comparator / E / conditions
+# apply to exactly that slice; `--no-buy` switches the Buy add-on off
+WINDOW_TO = sys.argv[sys.argv.index("--window-to") + 1] if "--window-to" in sys.argv else None
+NO_BUY = "--no-buy" in sys.argv
+# BL-081 block 1: `--no-trade` adds one zero-P&L column per index to the core pool (1a); `--rupee-gate` trades a
+# core pick only if the list-weighted sum of its raw rupee criteria is above zero, nothing replaces it (1b)
+NO_TRADE = "--no-trade" in sys.argv
+RUPEE_GATE = "--rupee-gate" in sys.argv
 WARMUP = 63
 LOOKBACKS = [(5, 0.4), (21, 0.3), (63, 0.3)]
 W_CRIT = {"recent": 0.33, "weekday": 0.25, "dte": 0.25, "vix": 0.17}
 BUY_TOP = 10
+
+
+# Named baskets (BL-064): `--basket DRB-6W2` = the whole-day Daily Ranked Basket, 6 core lots, at least
+# 2 Widesl, up to 2 Buy. DRB-<core lots>W<minimum Widesl>; DRB-5W2 is the BL-062 run.
+# DRB-6W2L2 = the same 6 core lots as 3 strategies of 2 lots each (BL-065).
+BASKETS = {
+    f"DRB-{core}W{wide}" + (f"L{per}" if per > 1 else ""): [
+        "--whole-day",
+        "--core",
+        str(core),
+        "--min-wide",
+        str(wide),
+        "--buy-max",
+        "2",
+        "--lots-per",
+        str(per),
+    ]
+    for core in (3, 4, 5, 6, 7, 8)
+    for wide in (0, 1, 2, 3, 4)
+    for per in (1, 2, 3)
+    if core % per == 0
+}
+if "--basket" in sys.argv:
+    _i = sys.argv.index("--basket")
+    _name = sys.argv[_i + 1].upper()
+    if _name not in BASKETS:
+        raise SystemExit(
+            f"unknown basket {_name}; choose from DRB-<3..8>W<0..4>[L<2|3>], e.g. DRB-6W2L2"
+        )
+    sys.argv[_i : _i + 2] = BASKETS[_name]
 
 
 def _arg(name, default):
@@ -33,12 +75,222 @@ def _arg(name, default):
 
 CORE = _arg("--core", 5)  # 5 = first block; 3 = small-book block
 BUY_MAX = _arg("--buy-max", 2)  # 2 = first block; 1 = small-book block
+LOTS_PER = _arg("--lots-per", 1)  # BL-065: lots traded in each picked strategy (1 = one lot each)
+assert CORE % LOTS_PER == 0, "--core must be a multiple of --lots-per"
+N_CORE = CORE // LOTS_PER  # core strategies a day
+N_BUY = 0 if NO_BUY else max(1, BUY_MAX // LOTS_PER)  # Buy strategies a day (2 Buy lots = 1 Buy strategy of 2 lots)
 N_RUNS, SEED = 1000, 57
 # BL-061: add the closest-premium Widesl (NIFTY 80 / 100, SENSEX 250 / 320) to the candidate list
-CLOSEST = "--closest" in sys.argv
-CLOSEST_FAMILIES = ("p80", "p100", "p250", "p320")
+WHOLE_DAY = "--whole-day" in sys.argv  # BL-062: every start time 09:17..15:17 (248 variants)
+# BL-065 (second block): drop the closest-premium Widesl from the list, leaving the OTM-strike
+# Widesl, Dir and Buy (148 variants whole-day)
+NO_CLOSEST = "--no-closest" in sys.argv
+CLOSEST = ("--closest" in sys.argv or WHOLE_DAY) and not NO_CLOSEST
+CLOSEST_FAMILIES = ("p80", "p100", "p250", "p320", "p40", "p60", "p120", "p200")
+# BL-065 (third block): `--prefilter 25` keeps, in each family (Widesl incl. closest-premium, Dir,
+# Buy), the top 25% of variants by total P&L, winning-day % and max drawdown over the warm-up days
+# only (the 63 days before the first selection day); the pool is fixed after that
+PREFILTER = _arg("--prefilter", 0)
+# BL-065 (fourth block): `--prefilter-window 42` re-ranks the families every selection day on the
+# trailing 42 sessions (2 months) instead of fixing the pool on the warm-up days
+PREFILTER_WINDOW = _arg("--prefilter-window", 0)
+# BL-065 (fifth block): `--grid 30` keeps only the start times on a 30-minute grid from 09:17
+# (09:17, 09:47, ... 15:17): half the whole-day list, 128 variants
+GRID = _arg("--grid", 0)
+# BL-067: `--weights R,W,D,V` overrides the criteria weights (recent, weekday, days to expiry, VIX
+# band; whole percents summing to 100). Unset = the BL-057 weights 33/25/25/17
+WEIGHTS = None
+# BL-068: controls on the "recent" criterion and a placebo on the fit labels.
+#   --recent-window N   recent = plain sum of the last N days (unset: 2/3 x last 5 + 1/3 x the 5 before)
+#   --recent-lag L      recent reads the window ending L days before the day (skips the latest L days)
+#   --reverse           pick the LOWEST composite instead of the highest (bottom-ranked basket)
+#   --shuffle-labels S  permute the days' weekday / VIX band / days-to-expiry labels with seed S
+RECENT_WINDOW = _arg("--recent-window", 0)
+RECENT_LAG = _arg("--recent-lag", 0)
+REVERSE = "--reverse" in sys.argv
+SHUFFLE = _arg("--shuffle-labels", -1)
+# BL-069 ingredients (each pre-registered in backlog/BL-069-drb-new-ingredients.md):
+#   --recent-family F    recent = (1-F) x the variant's own + F x its family's mean (F in 0.5, 1.0)
+#   --recent-shape S     tiers | ewm3 | accel: other shapes of the recent criterion
+#   --fit-lookbacks L    fit-criteria lookbacks as n:w pairs, e.g. 21:50,63:50 (default 5:40,21:30,63:30)
+#   --min-gap M          no two core picks of the same index + family start within M minutes
+#   --require-positive-recent   a core pick whose recent score is <= 0 is not traded (none = sit out)
+#   --streak-gate N      half size (1 lot per strategy) when the ungated basket's last N days < 0
+RECENT_FAMILY = (
+    float(sys.argv[sys.argv.index("--recent-family") + 1]) if "--recent-family" in sys.argv else 0.0
+)
+RECENT_SHAPE = (
+    sys.argv[sys.argv.index("--recent-shape") + 1] if "--recent-shape" in sys.argv else ""
+)
+MIN_GAP = _arg("--min-gap", 0)
+REQUIRE_POS_RECENT = "--require-positive-recent" in sys.argv
+STREAK_GATE = _arg("--streak-gate", 0)
+FIT_LB = sys.argv[sys.argv.index("--fit-lookbacks") + 1] if "--fit-lookbacks" in sys.argv else ""
+if FIT_LB:
+    LOOKBACKS = [(int(a), int(b) / 100) for a, b in (x.split(":") for x in FIT_LB.split(","))]
+    assert abs(sum(w for _, w in LOOKBACKS) - 1) < 1e-9, LOOKBACKS
+#   --dd-ladder C1,C2,B1,B2  the owner's rupee ladder (BL-069 B7b): drawdown >= C1 -> N_CORE-1
+#                        strategies, >= C2 -> 1 strategy and no Buy; back to full after a gain of B1
+#                        from the low, from level 2 back to level 1 at drawdown <= B2
+#   --dd-basis shadow    track the ungated full-size equity instead of the traded equity
+DD_LADDER = (
+    tuple(int(x) for x in sys.argv[sys.argv.index("--dd-ladder") + 1].split(","))
+    if "--dd-ladder" in sys.argv
+    else None
+)
+DD_BASIS = sys.argv[sys.argv.index("--dd-basis") + 1] if "--dd-basis" in sys.argv else "actual"
+
+
+class DrawdownLadder:
+    """The basket's own equity and the size level it implies (0 full, 1 one strategy fewer, 2 one
+    strategy). Decided from equity through the previous day."""
+
+    def __init__(self, cut1: float, cut2: float, back1: float, back2: float):
+        self.cut1, self.cut2, self.back1, self.back2 = cut1, cut2, back1, back2
+        self.state, self.equity, self.peak, self.trough = 0, 0.0, 0.0, 0.0
+
+    def update(self, pnl: float) -> None:
+        self.equity += pnl
+        self.peak = max(self.peak, self.equity)
+        dd = self.peak - self.equity
+        if self.state == 0:
+            if dd >= self.cut2:
+                self.state, self.trough = 2, self.equity
+            elif dd >= self.cut1:
+                self.state, self.trough = 1, self.equity
+        elif self.state == 1:
+            self.trough = min(self.trough, self.equity)
+            if dd >= self.cut2:
+                self.state, self.trough = 2, self.equity
+            elif self.equity - self.trough >= self.back1:
+                self.state = 0
+        elif dd <= self.back2:
+            self.state, self.trough = 1, self.equity
+
+
+#   --nifty-only         the 124 NIFTY variants only (BL-071 part B; SENSEX options are not in the lake
+#                        before 2024-10)
+#   --early-results DIR  per-variant results for the days before the main results start
+#                        (research/bl071/results/<variant yaml stem>.csv), prepended to each series
+#   --results DIR        read every variant's per-day results from DIR/<variant name>.csv instead of
+#                        the research folders (BL-070: the no-stop re-runs)
+#   --family-key band    BL-074: the family for the rfam criterion is strategy type x start-time band
+#                        (Widesl incl. closest-premium / Dir / Buy; 09:17-10:02, 10:17-12:02, 12:17-14:02,
+#                        14:17-15:17), pooled across index and strike
+FAMILY_KEY = sys.argv[sys.argv.index("--family-key") + 1] if "--family-key" in sys.argv else "index"
+RESULTS_DIR = Path(sys.argv[sys.argv.index("--results") + 1]) if "--results" in sys.argv else None
+#   --ensemble "w;w;w"  BL-075 block 2: every variant is ranked under each weight vector (R,W,D,V,G,RF
+#                        as --weights, separated by semicolons) and the composite is the mean of the
+#                        percentile ranks; selection as usual
+ENSEMBLE = (
+    [tuple(int(x) for x in v.split(",")) for v in sys.argv[sys.argv.index("--ensemble") + 1].split(";")]
+    if "--ensemble" in sys.argv
+    else None
+)
+#   --ext-closest       BL-080: add the closest-premium families NIFTY 40 / 60 and SENSEX 120 / 200
+#                        (100 variants, results in research/bl080/results): 348 variants
+EXT_CLOSEST = "--ext-closest" in sys.argv
+#   --ext-dir           BL-080 block 2: add Dir at ITM1 (N_ditm1_*, S_ditm1_*; 50 variants)
+#   --drop T[,T...]     BL-080 block 3: leave categories out. T = N_p80 / S_p250 (one index-family),
+#                        p80 (a family on both indices), closest (every closest-premium family),
+#                        wide_otm, dir_atm, dir_itm, buy, NIFTY, SENSEX
+EXT_DIR = "--ext-dir" in sys.argv
+DROP = sys.argv[sys.argv.index("--drop") + 1].split(",") if "--drop" in sys.argv else []
+NIFTY_ONLY = "--nifty-only" in sys.argv
+EARLY_DIR = (
+    Path(sys.argv[sys.argv.index("--early-results") + 1]) if "--early-results" in sys.argv else None
+)
+_STATE: dict = {}  # per-run arrays set in main: family index per variant, gap label per day x variant
+if "--weights" in sys.argv:
+    WEIGHTS = tuple(int(x) for x in sys.argv[sys.argv.index("--weights") + 1].split(","))
+    assert len(WEIGHTS) in (4, 5, 6) and sum(WEIGHTS) == 100, WEIGHTS
+    # a fifth value is the overnight-gap fit criterion (BL-069 B2), a sixth the family mean of the
+    # recent score as its own criterion (BL-072)
+    W_CRIT = {
+        k: w / 100
+        for k, w in zip(["recent", "weekday", "dte", "vix", "gap", "rfam"], WEIGHTS, strict=False)
+    }
+    # an optional criterion with weight 0 is simply absent (the four base criteria are always computed)
+    W_CRIT = {k: w for k, w in W_CRIT.items() if w or k in ("recent", "weekday", "dte", "vix")}
+
+
+def on_grid(name: str) -> bool:
+    """True when the variant's start time lies on the --grid minute grid from 09:17."""
+    if not GRID:
+        return True
+    tag = name.split("_")[2]
+    minutes = int(tag[:2]) * 60 + int(tag[2:]) - (9 * 60 + 17)
+    return minutes % GRID == 0
 # Case A's Widesl minimum: 2 is the first pre-registered block; 3 is the later block (BL-057).
 MIN_WIDE = int(sys.argv[sys.argv.index("--min-wide") + 1]) if "--min-wide" in sys.argv else 2
+MIN_WIDE_N = -(-MIN_WIDE // LOTS_PER)  # the minimum in whole strategies, rounded up
+
+
+def read_net(path) -> pd.Series:
+    return pd.read_csv(path, parse_dates=["day"]).set_index("day").net
+
+
+def whole_day_columns(underlying: str, pfx: str) -> pd.DataFrame:
+    """BL-062: every variant of one index at the 25 start times 09:17..15:17: Widesl, Dir and Buy
+    (no Buy at 15:17: it exits 15:14) with the OTM strike, and the closest-premium Widesl (NIFTY 80 /
+    100, SENSEX 250 / 320). Per-day results come from the folder of the item that ran each start time."""
+    research = HERE.parent
+    nifty = underlying == "NIFTY"
+    morning = research / ("bl054" if nifty else "bl056") / "results"
+    premiums = () if NO_CLOSEST else ((80, 100) if nifty else (250, 320))
+    cols = {}
+    for slot in varlib.SLOTS_MORNING + varlib.SLOTS_LATE + [varlib.SLOT_LAST]:
+        tag = slot.replace(":", "")
+        early, last = slot in varlib.SLOTS_MORNING, slot == varlib.SLOT_LAST
+        for fam in ("wide", "dir", "buy"):
+            if fam == "buy" and last:
+                continue
+            folder = morning if early else research / ("bl062" if last else "bl059") / "results"
+            name = f"{fam}_{tag}.csv" if early else f"{pfx}{fam}_{tag}.csv"
+            cols[f"{pfx}{fam}_{tag}"] = read_net(folder / name)
+        for premium in premiums:
+            if early:
+                path = (
+                    research / ("bl061" if nifty else "bl060") / "results" / f"p{premium}_{tag}.csv"
+                )
+            elif last or nifty:
+                path = research / "bl062" / "results" / f"{pfx}p{premium}_{tag}.csv"
+            else:
+                path = research / "bl060" / "results" / f"p{premium}_{tag}.csv"
+            cols[f"{pfx}p{premium}_{tag}"] = read_net(path)
+    ext_names: set[str] = set()
+    if EXT_CLOSEST:
+        for slot in varlib.SLOTS_MORNING + varlib.SLOTS_LATE + [varlib.SLOT_LAST]:
+            tag = slot.replace(":", "")
+            for premium in (40, 60) if nifty else (120, 200):
+                name = f"{pfx}p{premium}_{tag}"
+                cols[name] = read_net(HERE.parent / "bl080" / "results" / f"{name}.csv")
+                ext_names.add(name)
+    if EXT_DIR:
+        for slot in varlib.SLOTS_MORNING + varlib.SLOTS_LATE + [varlib.SLOT_LAST]:
+            name = f"{pfx}ditm1_{slot.replace(':', '')}"
+            cols[name] = read_net(HERE.parent / "bl080" / "results" / f"{name}.csv")
+            ext_names.add(name)
+    if RESULTS_DIR is not None:
+        cols = {name: read_net(RESULTS_DIR / f"{name}.csv") for name in cols}
+    if EARLY_DIR is not None:
+        for name, s in list(cols.items()):
+            if name in ext_names:  # BL-080's series already spans the whole window
+                continue
+            early = EARLY_DIR / f"{varlib.variant_file(name, 'variants').stem}.csv"
+            if early.exists():
+                e = read_net(early)
+                cols[name] = pd.concat([e[e.index < s.index.min()], s]).sort_index()
+    df = pd.DataFrame(cols).sort_index()
+    if ext_names:  # BL-080: the new series run beyond the main results; keep the main results' days
+        base = [c for c in df.columns if c not in ext_names]
+        df = df.loc[df[base].dropna(how="all").index]
+    if EARLY_DIR is not None:  # a variant that did not trade a day has no row: keep common days
+        before = len(df)
+        df = df.dropna()
+        print(f"{underlying}: {before - len(df)} days dropped for a variant with no row")
+    assert not df.isna().any().any(), f"{underlying}: whole-day variants do not cover the same days"
+    return df
 
 
 def closest_columns(underlying: str, pfx: str, days: pd.DatetimeIndex) -> pd.DataFrame:
@@ -58,27 +310,93 @@ def closest_columns(underlying: str, pfx: str, days: pd.DatetimeIndex) -> pd.Dat
     return pd.DataFrame(cols, index=days)
 
 
+def _dropped(name: str, token: str) -> bool:
+    """Does `--drop token` leave this variant out?"""
+    index, family, _tag = name.split("_")
+    if token in ("NIFTY", "SENSEX"):
+        return index == token[0]
+    if token == "closest":
+        return family in CLOSEST_FAMILIES
+    return token == {"wide": "wide_otm", "dir": "dir_atm", "ditm1": "dir_itm", "buy": "buy"}.get(
+        family, ""
+    ) or token in (family, f"{index}_{family}")
+
+
+def lake_features(underlying: str, days: pd.DatetimeIndex) -> pd.DataFrame:
+    """weekday / VIX band / days-to-expiry for any day the lake holds (BL-071 part B). bl056's
+    `day_features` reads the derived contracts table, which starts 2024-10-01; this reads the same
+    quantities from the day files: the 09:15 INDIAVIX open, and the nearest expiry that has bars on
+    the day. Same labels: '0'..'6', '7+', 'unknown'."""
+    import duckdb
+
+    con = duckdb.connect()
+    con.execute("SET TimeZone='Asia/Kolkata'")
+    vix = con.execute(
+        f"""select date, arg_min(open, ts) filter (where hour(ts) * 60 + minute(ts) >= 555) v
+            from read_parquet('{A.LAKE}/bars_1m/asset=index/symbol=INDIAVIX/**/*.parquet', hive_partitioning=true)
+            where date >= '2015-01-01' group by date"""
+    ).fetchall()
+    exp = con.execute(
+        f"""select date, min(expiry) from (
+              select distinct date, expiry
+              from read_parquet('{A.LAKE}/bars_1m/asset=option/underlying={underlying}/**/*.parquet',
+                                hive_partitioning=true)) t
+            where expiry >= date group by date"""
+    ).fetchall()
+    vix_s = pd.Series({pd.Timestamp(d): v for d, v in vix})
+    exp_s = pd.Series({pd.Timestamp(d): pd.Timestamp(e) for d, e in exp})
+    f = pd.DataFrame(index=days)
+    f["weekday"] = days.day_name().str[:3]
+    f["vix_open"] = vix_s.reindex(days)
+    f["vix_band"] = pd.cut(f.vix_open, A.VIX_BINS, labels=A.VIX_LABELS).astype(object).fillna("unknown")
+    dte = (exp_s.reindex(days) - days).dt.days
+    f["dte_label"] = dte.map(lambda v: "unknown" if pd.isna(v) else (str(int(v)) if v <= 6 else "7+"))
+    return f
+
+
 def load_all():
     frames, feats = [], {}
     for u, pfx in (("NIFTY", "N_"), ("SENSEX", "S_")):
-        df = A.load(u)
+        if NIFTY_ONLY and u == "SENSEX":
+            continue
+        df = whole_day_columns(u, pfx) if WHOLE_DAY else A.load(u)
         df = df[df.index >= pd.Timestamp(WINDOW_FROM)]
-        f = A.day_features(u, df.index)
+        if WINDOW_TO:
+            df = df[df.index <= pd.Timestamp(WINDOW_TO)]
+        f = lake_features(u, df.index) if NIFTY_ONLY else A.day_features(u, df.index)
         wk = f.weekday.isin(A.WD).values
         df, f = df[wk], f[wk]
-        df.columns = [pfx + c for c in df.columns]
-        if CLOSEST:
+        if not WHOLE_DAY:
+            df.columns = [pfx + c for c in df.columns]
+        if CLOSEST and not WHOLE_DAY:
             df = df.join(closest_columns(u, pfx, df.index))
         frames.append(df)
         feats[u] = f
     # keep only the days both indices have (two days each side are missing one index's data)
-    common = frames[0].index.intersection(frames[1].index)
-    dropped = sorted(set(frames[0].index.symmetric_difference(frames[1].index)).difference(common))
-    print("days in one index only, dropped:", [d.strftime("%d-%b-%y") for d in dropped])
-    frames = [x.loc[common] for x in frames]
-    feats = {u: x.loc[common] for u, x in feats.items()}
-    P = pd.concat(frames, axis=1)
-    assert P.shape[1] == (110 if CLOSEST else 66) and not P.isna().any().any()
+    if NIFTY_ONLY:
+        P = frames[0]
+        feats["SENSEX"] = feats["NIFTY"]  # unused: every variant is NIFTY
+    else:
+        common = frames[0].index.intersection(frames[1].index)
+        dropped = sorted(
+            set(frames[0].index.symmetric_difference(frames[1].index)).difference(common)
+        )
+        print("days in one index only, dropped:", [d.strftime("%d-%b-%y") for d in dropped])
+        frames = [x.loc[common] for x in frames]
+        feats = {u: x.loc[common] for u, x in feats.items()}
+        P = pd.concat(frames, axis=1)
+    expected = (148 if NO_CLOSEST else 248) if WHOLE_DAY else (110 if CLOSEST else 66)
+    if EXT_CLOSEST:
+        expected += 100
+    if EXT_DIR:
+        expected += 50
+    if NIFTY_ONLY:
+        expected = expected // 2
+    assert P.shape[1] == expected and not P.isna().any().any(), (P.shape[1], expected)
+    if DROP:
+        keep = [c for c in P.columns if not any(_dropped(c, tok) for tok in DROP)]
+        print(f"--drop {','.join(DROP)}: {P.shape[1] - len(keep)} variants left out, {len(keep)} remain")
+        P = P[keep]
     assert feats["NIFTY"].index.equals(feats["SENSEX"].index)
     f = feats["NIFTY"][["weekday", "vix_band"]].copy()
     f["dte_N"] = feats["NIFTY"].dte_label
@@ -93,9 +411,10 @@ def skewed_fit(P: np.ndarray, match: np.ndarray, i: int) -> np.ndarray:
     num = np.zeros(P.shape[1])
     den = np.zeros(P.shape[1])
     for n, w in LOOKBACKS:
-        m = match[i - n : i]
+        lo = max(0, i - n)  # a lookback longer than the history uses all of it (never wraps)
+        m = match[lo:i]
         cnt = m.sum(axis=0)
-        avg = np.where(cnt > 0, (P[i - n : i] * m).sum(axis=0) / np.maximum(cnt, 1), 0.0)
+        avg = np.where(cnt > 0, (P[lo:i] * m).sum(axis=0) / np.maximum(cnt, 1), 0.0)
         num += w * avg * (cnt > 0)
         den += w * (cnt > 0)
     return np.where(den > 0, num / np.maximum(den, 1e-12), 0.0)
@@ -116,10 +435,52 @@ def variant_masks(names):
     fam = [n.split("_")[1] for n in names]
     return (
         np.array([x == "wide" or x in CLOSEST_FAMILIES for x in fam]),
-        np.array([x == "dir" for x in fam]),
+        np.array([x in ("dir", "ditm1") for x in fam]),
         np.array([x == "buy" for x in fam]),
         np.array([n.startswith("N_") for n in names]),
     )
+
+
+def pool_mask(window: np.ndarray, names, pct: int, verbose: str = "") -> np.ndarray:
+    """True for the top `pct` % of each family (Widesl incl. closest-premium, Dir, Buy) ranked on the
+    rows of `window` (days x variants): the mean of the within-family percentile ranks of total P&L,
+    winning-day % and max drawdown (shallower ranks higher). Rounded up: a family of 50 keeps 13 at 25%."""
+    fam = pd.Series(
+        ["wide" if n.split("_")[1] in CLOSEST_FAMILIES else n.split("_")[1] for n in names],
+        index=list(names),
+    )
+    stats = pd.DataFrame(
+        {
+            "total": window.sum(axis=0),
+            "win": (window > 0).mean(axis=0),
+            "mdd": [mdd(window[:, v]) for v in range(window.shape[1])],
+        },
+        index=list(names),
+    )
+    keep = set()
+    for f in ("wide", "dir", "buy"):
+        s = stats[fam == f]
+        score = s.rank(pct=True).mean(axis=1)  # every column: higher is better (mdd is <= 0)
+        n = -(-len(s) * pct // 100)
+        chosen = score.sort_values(ascending=False).index[:n]
+        keep.update(chosen)
+        if verbose:
+            print(f"prefilter {f}: {n} of {len(s)} kept on {verbose} -> " + ", ".join(chosen))
+    return np.array([n in keep for n in names])
+
+
+def prefilter(P: pd.DataFrame, pct: int) -> pd.DataFrame:
+    """The pool fixed once on the first WARMUP days (BL-065 third block)."""
+    mask = pool_mask(P.iloc[:WARMUP].to_numpy(), P.columns, pct, f"the {WARMUP} warm-up days")
+    return P[P.columns[mask]]
+
+
+def masked_composite(crit, allowed: np.ndarray) -> np.ndarray:
+    """The composite scored within the pool only (percentile ranks over the allowed variants);
+    -inf outside it, so select_picks never chooses an excluded variant."""
+    comp = np.full(len(allowed), -np.inf)
+    comp[allowed] = sum(W_CRIT[k] * pct_rank(crit[k][allowed]) for k in W_CRIT)
+    return comp
 
 
 def closest_mask(names):
@@ -137,6 +498,33 @@ def day_inputs(f, names):
     return wd, vb, dte
 
 
+def recent_score(Pv: np.ndarray, i: int) -> np.ndarray:
+    """The recent criterion for the day at row i: 2/3 x the last 5 days + 1/3 x the 5 before (BL-057),
+    or the plain sum of the last RECENT_WINDOW days; both end RECENT_LAG days before the day."""
+    end = i - RECENT_LAG
+    if RECENT_WINDOW:
+        r = Pv[max(0, end - RECENT_WINDOW) : end].sum(axis=0)  # never wraps (BL-068 126-day fix)
+    elif RECENT_SHAPE == "tiers":  # 50% last 5, 30% days 6-10, 20% days 11-21
+        r = (
+            0.5 * Pv[end - 5 : end].sum(axis=0)
+            + 0.3 * Pv[end - 10 : end - 5].sum(axis=0)
+            + 0.2 * Pv[max(0, end - 21) : end - 10].sum(axis=0)
+        )
+    elif RECENT_SHAPE == "ewm3":  # exponential weights, half-life 3 sessions, last 21 days
+        k = np.arange(min(21, end))
+        w = 0.5 ** (k / 3)
+        r = (Pv[end - len(k) : end][::-1] * w[:, None]).sum(axis=0)
+    elif RECENT_SHAPE == "accel":  # last 5 days minus the 5 before: is the variant accelerating
+        r = Pv[end - 5 : end].sum(axis=0) - Pv[end - 10 : end - 5].sum(axis=0)
+    else:
+        r = (2 / 3) * Pv[end - 5 : end].sum(axis=0) + (1 / 3) * Pv[end - 10 : end - 5].sum(axis=0)
+    if RECENT_FAMILY and "family_idx" in _STATE:
+        idx = _STATE["family_idx"]
+        mean = np.bincount(idx, weights=r) / np.bincount(idx)
+        r = (1 - RECENT_FAMILY) * r + RECENT_FAMILY * mean[idx]
+    return r
+
+
 def score_day(Pv, wd, vb, dte, i):
     """The four criteria and the composite for the day at row i.
 
@@ -144,27 +532,88 @@ def score_day(Pv, wd, vb, dte, i):
     and days to expiry (known before the first entry). Pv[i] itself is never used, so a caller
     scoring a day that has no results yet can pass a zero row there."""
     crit = {
-        "recent": (2 / 3) * Pv[i - 5 : i].sum(axis=0) + (1 / 3) * Pv[i - 10 : i - 5].sum(axis=0),
+        "recent": recent_score(Pv, i),
         "weekday": skewed_fit(Pv, (wd[:, None] == wd[i]).repeat(Pv.shape[1], axis=1), i),
         "dte": skewed_fit(Pv, dte == dte[i][None, :], i),
         "vix": skewed_fit(Pv, (vb[:, None] == vb[i]).repeat(Pv.shape[1], axis=1), i),
     }
+    if W_CRIT.get("rfam"):  # BL-072: the family's mean recent score as its own criterion
+        idx = _STATE["family_idx"]
+        crit["rfam"] = (np.bincount(idx, weights=crit["recent"]) / np.bincount(idx))[idx]
+    if W_CRIT.get("gap"):  # BL-069 B2: overnight gap band of the variant's own index
+        gp = _STATE["gap"]
+        crit["gap"] = skewed_fit(Pv, gp == gp[i][None, :], i)
     comp = sum(W_CRIT[k] * pct_rank(crit[k]) for k in W_CRIT)
-    return crit, comp
+    if ENSEMBLE:
+        keys = ["recent", "weekday", "dte", "vix", "gap", "rfam"]
+        members = []
+        for vec in ENSEMBLE:
+            w = dict(zip(keys, (x / 100 for x in vec), strict=False))
+            members.append(sum(w[k] * pct_rank(crit[k]) for k in w if w[k]))
+        comp = np.mean([pct_rank(c) for c in members], axis=0)
+    return crit, (-comp if REVERSE else comp)
+
+
+def _minutes(tag: str) -> int:
+    """Minutes since midnight of a start-time tag like '1117'."""
+    return int(tag[:2]) * 60 + int(tag[2:])
+
+
+def gap_labels(days: pd.DatetimeIndex, names) -> np.ndarray:
+    """days x variants of str: the overnight gap band of the variant's own index. gap = |09:15 open -
+    previous collected close| / previous close, bands g0 < 0.3% <= g1 < 0.7% <= g2; 'unknown' when the
+    day or its predecessor has no bars. Known before any entry (09:15 open)."""
+    import duckdb
+
+    con = duckdb.connect()
+    con.execute("SET TimeZone='Asia/Kolkata'")
+    per_index = {}
+    for u in ("NIFTY", "SENSEX"):
+        df = con.sql(
+            f"""select date, arg_min(open, ts) filter (where hour(ts) * 60 + minute(ts) >= 555) o,
+                       arg_max(close, ts) c
+                from read_parquet('{A.LAKE}/bars_1m/asset=index/symbol={u}/**/*.parquet', hive_partitioning=true)
+                where date >= '2025-06-01' group by date order by date"""
+        ).df()
+        df["date"] = pd.to_datetime(df.date)
+        df = df.set_index("date")
+        gap = ((df.o - df.c.shift(1)) / df.c.shift(1) * 100).abs()
+        lab = pd.cut(gap, [-1, 0.3, 0.7, 1e9], labels=["g0", "g1", "g2"]).astype(object)
+        per_index[u] = lab.reindex(days).fillna("unknown").to_numpy()
+    nifty = np.array([n.startswith("N_") for n in names])
+    return np.where(nifty[None, :], per_index["NIFTY"][:, None], per_index["SENSEX"][:, None])
 
 
 def select_picks(comp, names, masks, min_wide=None, core=None, buy_max=None):
     """(core_a, core_b, buy, overridden): the top `core` Widesl/Dir variants, case A with at
     least `min_wide` Widesl (lowest-scoring Dir swapped for the next-best Widesl), case B with no
     minimum, plus up to `buy_max` Buy variants that are in the overall top BUY_TOP.
-    Defaults are the module settings (--min-wide / --core / --buy-max)."""
-    min_wide = MIN_WIDE if min_wide is None else min_wide
-    core = CORE if core is None else core
-    buy_max = BUY_MAX if buy_max is None else buy_max
+    Defaults are the module settings (--min-wide / --core / --buy-max / --lots-per), counted in
+    strategies: with 2 lots per strategy a core of 6 lots is 3 strategies."""
+    min_wide = MIN_WIDE_N if min_wide is None else min_wide
+    core = N_CORE if core is None else core
+    buy_max = N_BUY if buy_max is None else buy_max
     is_wide, is_dir, is_buy, _ = masks
-    pool = np.where(~is_buy)[0]
+    pool = np.where(~is_buy & np.isfinite(comp))[0]  # -inf = outside the day's pool
     order = sorted(pool, key=lambda v: (-comp[v], names[v]))
-    core_b = order[:core]
+
+    def clash(v, chosen):
+        """BL-069 B4: same index + family and start times within MIN_GAP minutes of a chosen pick."""
+        if not MIN_GAP:
+            return False
+        pv, fv, tv = names[v].split("_")
+        return any(
+            names[c].split("_")[:2] == [pv, fv]
+            and abs(_minutes(tv) - _minutes(names[c].split("_")[2])) < MIN_GAP
+            for c in chosen
+        )
+
+    core_b: list = []
+    for v in order:
+        if len(core_b) == core:
+            break
+        if not clash(v, core_b):
+            core_b.append(v)
     core_a = list(core_b)
     overridden = False
     n_wide = int(is_wide[core_a].sum())
@@ -174,11 +623,23 @@ def select_picks(comp, names, masks, min_wide=None, core=None, buy_max=None):
         while n_wide < min_wide:
             drop = min((v for v in core_a if is_dir[v]), key=lambda v: (comp[v], names[v]))
             core_a.remove(drop)
-            core_a.append(spare.pop(0))
+            pick = next(v for v in spare if not clash(v, core_a))
+            spare.remove(pick)
+            core_a.append(pick)
             n_wide += 1
-    top = sorted(range(len(names)), key=lambda v: (-comp[v], names[v]))[:BUY_TOP]
+    top = sorted(np.where(np.isfinite(comp))[0], key=lambda v: (-comp[v], names[v]))[:BUY_TOP]
     buy = [v for v in top if is_buy[v]][:buy_max]
     return core_a, core_b, buy, overridden
+
+
+START_WINDOWS = ["09:17-09:47", "10:02-10:47", "11:02-11:47", "12:02-13:47", "14:02-15:17"]
+
+
+def start_window(slot: str) -> str:
+    for label, edge in zip(START_WINDOWS[:-1], ("10:02", "11:02", "12:02", "14:02"), strict=True):
+        if slot < edge:
+            return label
+    return START_WINDOWS[-1]
 
 
 def closest_report(picks_a, names, Pv, wd, vb, dte, days):
@@ -253,6 +714,17 @@ def closest_report(picks_a, names, Pv, wd, vb, dte, days):
             t.closest, "closest-premium Widesl", np.where(t.widesl, "OTM Widesl", "Dir ATM")
         )
     )
+    pl["slot"] = pl.variant.str.split("_").str[2].map(lambda x: f"{x[:2]}:{x[2:]}")
+    pl["window"] = pl.slot.map(start_window)
+    wins = [w_ for w_ in START_WINDOWS if w_ in set(pl.window)]
+    share = pl.groupby(["window", "kind"]).size().unstack(fill_value=0).reindex(wins)
+    total_lots = share.to_numpy().sum()
+    print("\nshare of core lots by start-time window and strike rule (% of all core lots):")
+    print((100 * share / total_lots).round(1).to_string(float_format=lambda x: f"{x:,.1f}"))
+    print("  window totals:", {w_: f"{100 * share.loc[w_].sum() / total_lots:.0f}%" for w_ in wins})
+    avg = pl.groupby(["window", "kind"]).pnl.mean().unstack().reindex(wins)
+    print("average P&L per lot by start-time window and strike rule (1 lot, before charges):")
+    print(avg.round(0).to_string(float_format=lambda x: f"{x:,.0f}"))
     g = pl.groupby("kind").agg(
         lots=("pnl", "size"),
         avg_pnl=("pnl", "mean"),
@@ -265,12 +737,51 @@ def closest_report(picks_a, names, Pv, wd, vb, dte, days):
 
 def main() -> None:
     P, f = load_all()
+    if GRID:
+        P = P[[c for c in P.columns if on_grid(c)]]
+        print(f"grid {GRID} min from 09:17: {P.shape[1]} variants kept")
+    if PREFILTER and not PREFILTER_WINDOW:
+        P = prefilter(P, PREFILTER)
+    if NO_TRADE:  # BL-081 1a: the "no-trade strategy" of each index, worth 0 every day
+        for _pfx in ("N",) if NIFTY_ONLY else ("N", "S"):
+            P[f"{_pfx}_zero_0917"] = 0.0
     names = list(P.columns)
     Pv = P.to_numpy()
+    is_zero = np.array([n.split("_")[1] == "zero" for n in names])
     masks = variant_masks(names)
     is_wide, is_dir, is_buy, is_nifty = masks
     core_pool = np.where(~is_buy)[0]
     wd, vb, dte = day_inputs(f, names)
+    if (RECENT_FAMILY or W_CRIT.get("rfam")) and FAMILY_KEY == "band":
+
+        def _band(tag: str) -> str:
+            m = _minutes(tag)
+            return "A" if m <= _minutes("1002") else "B" if m <= _minutes("1202") else "C" if m <= _minutes("1402") else "D"
+
+        def _type(fam: str) -> str:
+            if fam in ("dir", "ditm1"):
+                return "dir"
+            return "wide" if fam == "wide" or fam in CLOSEST_FAMILIES else fam
+
+        keys = [f"{_type(n.split('_')[1])}_{_band(n.split('_')[2])}" for n in names]
+        _STATE["family_idx"] = np.unique(keys, return_inverse=True)[1]
+        print(f"family key = type x start band: {len(set(keys))} families")
+    elif RECENT_FAMILY or W_CRIT.get("rfam"):
+        _STATE["family_idx"] = np.unique(
+            ["_".join(n.split("_")[:2]) for n in names], return_inverse=True
+        )[1]
+    if W_CRIT.get("gap"):
+        _STATE["gap"] = gap_labels(P.index, names)
+        gl = pd.Series(_STATE["gap"][:, 0]).value_counts().to_dict()
+        print(f"gap labels (NIFTY): {gl}")
+    if SHUFFLE >= 0:
+        # placebo: every day keeps its P&L but takes another day's labels (one permutation for all
+        # three, over every row including the warm-up)
+        perm = np.random.default_rng(SHUFFLE).permutation(len(wd))
+        wd, vb, dte = wd[perm], vb[perm], dte[perm]
+        if "gap" in _STATE:
+            _STATE["gap"] = _STATE["gap"][perm]
+        print(f"labels shuffled with seed {SHUFFLE}")
     days = P.index
     print(
         f"{len(names)} variants, {len(days)} weekdays {days[0].date()} -> {days[-1].date()}; selection from day {WARMUP + 1} = {days[WARMUP].date()}"
@@ -279,53 +790,111 @@ def main() -> None:
     crit_names = list(W_CRIT)
     pers = {k: [] for k in crit_names + ["composite"]}
     picks_A, picks_B, buy_days, rows = [], [], [], []
+    raw_hist: list = []  # the ungated basket's daily P&L, for --streak-gate
+    ladder = DrawdownLadder(*DD_LADDER) if DD_LADDER else None
+    allowed_days = []  # per selection day: the variants in that day's pool
     for i in range(WARMUP, len(days)):
         crit, comp = score_day(Pv, wd, vb, dte, i)
+        if PREFILTER and PREFILTER_WINDOW:
+            # rolling pool: the top PREFILTER % of each family on the PREFILTER_WINDOW sessions
+            # before this day (rows i-W .. i-1 only; never row i)
+            allowed = pool_mask(Pv[i - PREFILTER_WINDOW : i], names, PREFILTER)
+            comp = masked_composite(crit, allowed)
+        else:
+            allowed = np.ones(len(names), bool)
+        allowed_days.append(allowed)
         today = Pv[i]
         for k in crit_names:
             pers[k].append(pd.Series(crit[k]).rank().corr(pd.Series(today).rank()))
         pers["composite"].append(pd.Series(comp).rank().corr(pd.Series(today).rank()))
         core_a, core_b, buy, overridden = select_picks(comp, names, masks)
+        # BL-069 B7: size by conviction. raw = the ungated basket; the gates only scale / drop picks
+        raw_pnl = LOTS_PER * (today[core_a].sum() + today[buy].sum())
+        use_core, use_buy, scale = core_a, buy, 1.0
+        if REQUIRE_POS_RECENT:
+            use_core = [v for v in core_a if crit["recent"][v] > 0]
+            if not use_core:
+                use_buy = []  # no qualifying core pick: sit the whole day out
+        if RUPEE_GATE:
+            use_core = [v for v in core_a if sum(w * crit[k][v] for k, w in W_CRIT.items()) > 0]
+            if not use_core:
+                use_buy = []
+        if STREAK_GATE and len(raw_hist) >= STREAK_GATE and sum(raw_hist[-STREAK_GATE:]) < 0:
+            scale = 0.5  # losing streak: 1 lot per strategy instead of 2
+        level = ladder.state if ladder else 0
+        if ladder:
+            keep = max(1, N_CORE - level)
+            use_core = sorted(use_core, key=lambda v: (-comp[v], names[v]))[:keep]
+            if level >= 2:
+                use_buy = []
+        raw_hist.append(raw_pnl)
         picks_A.append(core_a)
         picks_B.append(core_b)
         buy_days.append(buy)
         rows.append(
             dict(
                 day=days[i],
-                pnl_A=today[core_a].sum() + today[buy].sum(),
-                pnl_B=today[core_b].sum() + today[buy].sum(),
-                lots=CORE + len(buy),
+                pnl_A=scale * LOTS_PER * (today[use_core].sum() + today[use_buy].sum()),
+                pnl_B=LOTS_PER * (today[core_b].sum() + today[buy].sum()),
+                raw_pnl=raw_pnl,
+                dd_level=level,
+                lots=scale * LOTS_PER * (len(use_core) + len(use_buy)),
                 n_buy=len(buy),
-                buy_pnl=today[buy].sum(),
-                buy_alt=today[
-                    [v for v in sorted(np.where(is_buy)[0], key=lambda v: -comp[v])][:BUY_MAX]
+                buy_pnl=LOTS_PER * today[buy].sum(),
+                buy_alt=LOTS_PER
+                * today[
+                    [v for v in sorted(np.where(is_buy)[0], key=lambda v: -comp[v])][:N_BUY]
                 ].sum(),
                 wide_A=int(is_wide[core_a].sum()),
                 wide_B=int(is_wide[core_b].sum()),
                 nifty_A=int(is_nifty[core_a].sum()),
                 overridden=overridden,
                 changes_A=np.nan if len(picks_A) < 2 else len(set(core_a) ^ set(picks_A[-2])) / 2,
+                zero_picked=int(is_zero[core_a].sum()),
+                n_dropped=len(core_a) - len(use_core) + len(buy) - len(use_buy),
+                dropped_pnl=LOTS_PER
+                * (today[core_a].sum() + today[buy].sum() - today[use_core].sum() - today[use_buy].sum()),
             )
         )
+        if ladder:  # the next day's size level is decided from equity through today
+            ladder.update(rows[-1]["raw_pnl"] if DD_BASIS == "shadow" else rows[-1]["pnl_A"])
     R = pd.DataFrame(rows).set_index("day")
+    if NO_TRADE:
+        print(f"NO-TRADE: a zero column was picked on {int((R.zero_picked > 0).sum())} of {len(R)} selection days")
+    if RUPEE_GATE:
+        aff = R[R.n_dropped > 0]
+        print(
+            f"RUPEE GATE: {len(aff)} of {len(R)} days affected, {int(R.n_dropped.sum())} picks dropped, "
+            f"their P&L {R.dropped_pnl.sum():,.0f} (positive = the gate cut winners)"
+        )
     sel = np.arange(WARMUP, len(days))
     today_all = Pv[sel]
 
     # comparators
     buy_lots = R.n_buy.to_numpy()
-    E = CORE * today_all[:, ~is_buy].mean(axis=1) + buy_lots * today_all[:, is_buy].mean(axis=1)
+    # E and R draw from each day's pool (the whole list unless a rolling prefilter is on)
+    day_pools = [np.where(m & ~is_buy & ~is_zero)[0] for m in allowed_days]
+    day_pools_b = [np.where(m & is_buy)[0] for m in allowed_days]
+    E = np.array(
+        [
+            CORE * today_all[j, day_pools[j]].mean()
+            + LOTS_PER * buy_lots[j] * today_all[j, day_pools_b[j]].mean()
+            for j in range(len(sel))
+        ]
+    )
     b54 = HERE.parent / "bl054" / "results"
     live_w = varlib.live_csv(b54, "nifty_widesl_917_otm1")
     live_d = varlib.live_csv(b54, "nifty_dir_924_itm1_sl21_recost")
-    nw, nd = {5: (3, 2), 3: (2, 1)}[
-        CORE
-    ]  # the live mix at this size: 3W+2D (5 lots) or 2W+1D (3 lots)
+    # the live mix at this size (60 / 40 Widesl / Dir, rounded): 5 lots 3W+2D, 3 lots 2W+1D, 6 lots 4W+2D
+    live_sizes = {3: (2, 1), 4: (2, 2), 5: (3, 2), 6: (4, 2), 7: (4, 3), 8: (5, 3)}
+    nw, nd = live_sizes[CORE]
     B2 = (nw * live_w + nd * live_d).reindex(R.index).to_numpy()
-    # a selection day missing from the live-strategy CSVs would make every comparison with B2 False
-    assert not np.isnan(B2).any(), "live-mix CSVs do not cover every selection day"
+    if EARLY_DIR is None:
+        # a selection day missing from the live-strategy CSVs would make every comparison with B2 False
+        assert not np.isnan(B2).any(), "live-mix CSVs do not cover every selection day"
+    else:  # the live mix has no results before 2024-10-09: condition (3) is not available here
+        B2 = np.zeros(len(R))
     rng = np.random.default_rng(SEED)
-    pool_all = core_pool
-    pool_b = np.where(is_buy)[0]
 
     def random_total(min_wide: int):
         tot, dd = np.empty(N_RUNS), np.empty(N_RUNS)
@@ -333,13 +902,13 @@ def main() -> None:
             d = np.empty(len(sel))
             for j, i in enumerate(sel):
                 while True:
-                    ix = rng.choice(pool_all, CORE, replace=False)
+                    ix = rng.choice(day_pools[j], N_CORE, replace=False)
                     if is_wide[ix].sum() >= min_wide:
                         break
                 v = Pv[i, ix].sum()
                 if buy_lots[j]:
-                    v += Pv[i, rng.choice(pool_b, buy_lots[j], replace=False)].sum()
-                d[j] = v
+                    v += Pv[i, rng.choice(day_pools_b[j], buy_lots[j], replace=False)].sum()
+                d[j] = LOTS_PER * v
             tot[r], dd[r] = d.sum(), mdd(d)
         return tot, dd
 
@@ -361,8 +930,13 @@ def main() -> None:
         f"({int((R.n_buy == 1).sum())} with 1 lot, {int((R.n_buy == 2).sum())} with 2); lots/day avg {lots_avg:.2f}"
     )
     print("per-lot-day = avg/day divided by that line's avg lots/day")
-    cases = [(f"A (>={MIN_WIDE} Widesl)", "pnl_A", MIN_WIDE)]
-    if MIN_WIDE > 0:  # with no minimum, case B is case A: do not simulate the baseline twice
+    label_a = (
+        f"A (>={MIN_WIDE} Widesl lots = {MIN_WIDE_N} strategies)"
+        if LOTS_PER > 1
+        else f"A (>={MIN_WIDE} Widesl)"
+    )
+    cases = [(label_a, "pnl_A", MIN_WIDE_N)]
+    if MIN_WIDE_N > 0:  # with no minimum, case B is case A: do not simulate the baseline twice
         cases.append(("B (no minimum)", "pnl_B", 0))
     for case, col, min_w in cases:
         tot, dd = random_total(min_w)
@@ -376,7 +950,7 @@ def main() -> None:
         S["lots/day"] = [lots_avg, lots_avg, CORE]
         S["per-lot-day"] = S.avg_day / S["lots/day"]
         print(
-            f"\n{'=' * 100}\nCASE {case}{'   <- VERDICT CASE' if min_w == MIN_WIDE else '   (reported only)'}\n{'=' * 100}"
+            f"\n{'=' * 100}\nCASE {case}{'   <- VERDICT CASE' if min_w == MIN_WIDE_N else '   (reported only)'}\n{'=' * 100}"
         )
         print(S.to_string(float_format=lambda x: f"{x:,.0f}" if abs(x) >= 100 else f"{x:,.2f}"))
         p90, p50 = np.percentile(tot, 90), np.percentile(tot, 50)
@@ -392,7 +966,7 @@ def main() -> None:
         print(
             f"(1) total >= R P90: {c1} | (2) beats E on total and DD: {c2} | (3) beats B2 on total and DD: {c3}"
         )
-        if min_w == MIN_WIDE:
+        if min_w == MIN_WIDE_N:
             print(
                 "VERDICT:", "PASS" if (c1 and c2 and c3) else ("KILL" if not c1 else "INCONCLUSIVE")
             )
@@ -410,8 +984,8 @@ def main() -> None:
         f"case B Widesl count {R.wide_B.value_counts().sort_index().to_dict()}"
     )
     print(
-        f"    NIFTY share of core picks (case A): {100 * R.nifty_A.sum() / (CORE * len(R)):.0f}%; "
-        f"core members changed per day (case A): avg {R.changes_A.mean():.2f} of {CORE}"
+        f"    NIFTY share of core picks (case A): {100 * R.nifty_A.sum() / (N_CORE * len(R)):.0f}%; "
+        f"core members changed per day (case A): avg {R.changes_A.mean():.2f} of {N_CORE}"
     )
     fired = R[R.n_buy > 0]
     idle = R[R.n_buy == 0]
@@ -425,21 +999,23 @@ def main() -> None:
     )
     if CLOSEST:
         closest_report(picks_A, names, Pv, wd, vb, dte, days)
-    hind = sorted(core_pool, key=lambda v: -today_all[:, v].sum())[:CORE]
+    hind = sorted(core_pool, key=lambda v: -today_all[:, v].sum())[:N_CORE]
     print(
-        f"    HINDSIGHT ceiling (look-ahead, best fixed {CORE} over the selection days): {today_all[:, hind].sum():,.0f} -> {[names[v] for v in hind]}"
+        f"    HINDSIGHT ceiling (look-ahead, best fixed {N_CORE} over the selection days): {LOTS_PER * today_all[:, hind].sum():,.0f} -> {[names[v] for v in hind]}"
+    )
+    picks_path = (
+        HERE
+        / (
+            "daily_picks.csv"
+            if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}{('_ddl' + '_'.join(map(str, DD_LADDER)) + ('_shadow' if DD_BASIS == 'shadow' else '')) if DD_LADDER else ''}{f'_from{WINDOW_FROM}' if WINDOW_FROM != '2025-09-01' else ''}{'_fband' if FAMILY_KEY == 'band' else ''}{'_ens' if ENSEMBLE else ''}{'_ext' if EXT_CLOSEST else ''}{'_extdir' if EXT_DIR else ''}{('_drop' + '-'.join(DROP)) if DROP else ''}{'_nifty' if NIFTY_ONLY else ''}{'_early' if EARLY_DIR else ''}{('_res' + RESULTS_DIR.name) if RESULTS_DIR else ''}{f'_to{WINDOW_TO}' if WINDOW_TO else ''}{'_nobuy' if NO_BUY else ''}{'_notrade' if NO_TRADE else ''}{'_rgate' if RUPEE_GATE else ''}.csv"
+        )
     )
     R.assign(
         core_A=[",".join(names[v] for v in c) for c in picks_A],
         buy=[",".join(names[v] for v in b) for b in buy_days],
-    ).to_csv(
-        HERE
-        / (
-            "daily_picks.csv"
-            if (MIN_WIDE, CORE, BUY_MAX, CLOSEST) == (2, 5, 2, False)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{'_closest' if CLOSEST else ''}.csv"
-        )
-    )
+    ).to_csv(picks_path)
+    print(f"picks file: {picks_path}")
 
 
 if __name__ == "__main__":

@@ -39,6 +39,9 @@ SLOTS_LATE = [
     "15:02",
 ]
 
+# the last 15-minute start before 15:30 (BL-062); Widesl and Dir exit 15:28, Buy exits 15:14 and has none
+SLOT_LAST = "15:17"
+
 
 def plus(hhmm: str, minutes: int) -> str:
     h, m = map(int, hhmm.split(":"))
@@ -132,6 +135,29 @@ def with_premium(text: str, premium: int) -> str:
     return sub(
         r"strike: \{ strike_type: OTM\d+ \}", f"strike: {{ closest_premium: {premium} }}", text, 2
     )
+
+
+def variant_file(name: str, kind: str) -> Path:
+    """Where a rotation variant's files live. `name` is like N_wide_0917 or S_p250_1202 (index, family,
+    start time); `kind` is "results" (per-day net P&L, .csv) or "variants" (the strategy YAML, .yaml).
+    Which folder holds a variant depends on which research item ran its start time."""
+    research = Path(__file__).resolve().parents[1]
+    prefix, family, tag = name.split("_")
+    slot = f"{tag[:2]}:{tag[2:]}"
+    nifty = prefix == "N"
+    early, last = slot in SLOTS_MORNING, slot == SLOT_LAST
+    if family in ("wide", "dir", "buy"):
+        if early:
+            folder, stem = ("bl054" if nifty else "bl056"), f"{family}_{tag}"
+        else:
+            folder, stem = ("bl062" if last else "bl059"), f"{prefix}_{family}_{tag}"
+    elif early:  # closest-premium Widesl: p80 / p100 (NIFTY), p250 / p320 (SENSEX)
+        folder, stem = ("bl061" if nifty else "bl060"), f"{family}_{tag}"
+    elif last or nifty:
+        folder, stem = "bl062", f"{prefix}_{family}_{tag}"
+    else:
+        folder, stem = "bl060", f"{family}_{tag}"
+    return research / folder / kind / f"{stem}.{'csv' if kind == 'results' else 'yaml'}"
 
 
 def out_dir(default: Path) -> Path:

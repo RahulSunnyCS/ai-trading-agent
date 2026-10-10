@@ -1,0 +1,31 @@
+# AlgoTest "Nifty buy range breakout" (export 2026-09-29). At 09:35 pick the CE
+# and PE whose premium is closest to ₹50; track each option's own high from
+# 09:35 to 09:45; buy a leg when its premium breaks that high. SL 25%, trailed
+# 1/1; ₹2,000 overall max loss; out at 15:14.
+strategy:
+  id: bl056_buy_1017
+  underlying: SENSEX
+  entry_time: "10:17"
+  exit_time: "15:14"
+  square_off: partial
+  legs:
+    - id: ce
+      lots: 1
+      position: buy
+      option_type: CE
+      expiry: weekly
+      strike: { closest_premium: 50 }
+      stop_loss: { percent: 25 }
+      trail_sl: { points: [1, 1] }
+      range_breakout: { until: "10:27", side: high, source: instrument }
+    - id: pe
+      lots: 1
+      position: buy
+      option_type: PE
+      expiry: weekly
+      strike: { closest_premium: 50 }
+      stop_loss: { percent: 25 }
+      trail_sl: { points: [1, 1] }
+      range_breakout: { until: "10:27", side: high, source: instrument }
+  overall:
+    stop_loss_inr: 2000

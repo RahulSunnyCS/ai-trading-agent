@@ -158,8 +158,10 @@ export function YamlResult({
               <SectionTitle>By the previous session's regime</SectionTitle>
               {regimes.length === 0 ? (
                 <p className="text-sm text-muted">
-                  No regime tags for this window. They come from the trading database, which the
-                  backtest service reads only when it is given a database URL.
+                  {result?.regime_status === 'connect_failed' ||
+                  result?.regime_status === 'missing_table'
+                    ? `Regime tags could not be read: ${result.regime_message ?? result.regime_status}.`
+                    : 'No regime tags for this window. They come from the trading database, which the backtest service reads only when it is given a database URL.'}
                 </p>
               ) : (
                 <Table>

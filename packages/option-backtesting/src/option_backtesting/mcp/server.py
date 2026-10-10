@@ -40,7 +40,7 @@ from ..engine.registry import get_run, record_run
 from ..engine.registry import list_runs as _list_runs
 from ..engine.result import aggregate, bootstrap_ci
 from ..export.personality import export_personality as _export_personality
-from ..features.regime import regime_bucket_report as _regime_bucket_report
+from ..features.regime import regime_bucket_status as _regime_bucket_status
 from ..presets import STRATEGIES_DIR, preset_names
 from ..strategy.loader import StrategyValidationError, load_strategy_from_source
 from ..strategy.mutate import deep_merge
@@ -176,9 +176,13 @@ def run_backtest(
             "return_on_peak_margin": margin.return_on_peak_margin,
         }
 
-    regime_buckets = _regime_bucket_report(sessions, loaded.strategy.universe.underlying)
-    if regime_buckets is not None:
-        out["regime_buckets"] = regime_buckets
+    regime = _regime_bucket_status(sessions, loaded.strategy.universe.underlying)
+    if regime.buckets is not None:
+        out["regime_buckets"] = regime.buckets
+    elif regime.message:
+        # Absent for a reason worth stating (database down / table missing);
+        # plain "DATABASE_URL unset" and "no tag in window" stay silent as before.
+        out["regime_status"] = {"status": regime.status, "message": regime.message}
     return out
 
 
