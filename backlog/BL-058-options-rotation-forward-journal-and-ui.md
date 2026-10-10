@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — owner, 2026-10-09: the forward record must start before Monday 2026-10-12 09:15 |
-| **Status** | In progress — journal built 2026-10-10 (Phases 0b, 1, 2); UI waits (Phase 4) |
+| **Status** | In progress — journal built 2026-10-10 (Phases 0b, 1, 2); Phase 4 view built 2026-10-11 (widgets 1–9 and 11; widget 10 paper vs real waits for the charge model and the contract-notes cutover); day-60 read-out pending |
 | **Type** | feature |
 | **Area** | options / dashboard / scheduler |
 | **Created** | 2026-10-09 |
@@ -451,7 +451,7 @@ reference and answers "did the new weights beat the old rotation?". Nothing in t
   - **11. Family pulse** (#181, written in the "top 5 widget" session): the 12 family-band cells with their
     last 5 / 21 / 63, P1 and P2 means, rolling-21 sparkline, the rank the ranking gives each cell for the next
     pick, where today's picks fall and a drift flag. It was reviewed there (Codex and an independent review,
-    ten findings, all fixed); this session re-ran its tests, checked its numbers on the real store against the
+    nine findings, all fixed); this session re-ran its tests, checked its numbers on the real store against the
     plan page's table (Dir 09:17–10:02 ₹676 last 21 and rank 1 of 12; Buy 14:17–15:17 rank 12 of 12) and
     merged main into it twice; it merged on green CI. Its drift flag uses the same rule form as the selection-drift card (a
     last-21 value outside the 10th to 90th percentile of the rolling-21 values in P1, at least 10 windows),
