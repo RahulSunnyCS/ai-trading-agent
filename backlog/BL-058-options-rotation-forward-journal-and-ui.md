@@ -235,6 +235,37 @@ Supersedes the 66-variant rule of Phase 0 for the forward test; Phase 0's discip
   `obt daily` unaffected. The variant YAMLs now live in `packages/option-backtesting/strategies/
   rotation/` (committed), not under `research/`.
 
+**Amendment 2026-10-10 (owner, before the first entry): a second reference, the fixed base.** REF answers
+"did the new weights beat the old rotation?". The owner's base answers the more basic question: does rotating
+at all beat the simple rule that would otherwise be traded? It is added beside REF; REF stays the registered
+comparator for its own question. Nothing in the lists, the ranking or the 298-variant universe changes.
+
+- **Base:** 2 × NIFTY Widesl OTM1 at 09:17 + 1 × NIFTY Dir ATM at 09:24, every trading day, no ranking.
+  - Widesl OTM1 09:17 is the rotation variant `N_wide_0917` (OTM1 strikes, ₹2,500 overall stop), identical
+    to the live `strategies/legwise/nifty_widesl_917_otm1.yaml`.
+  - Dir ATM 09:24 is a new file: the live `nifty_dir_924_itm1_sl21_recost.yaml` with the strike changed from
+    ITM1 to ATM and nothing else (09:24 entry, per-leg stop, RE COST ×1, 15:28 exit). The owner chose ATM;
+    the live file and the earlier benchmarks B1–B3 use ITM1.
+  - 2 lots per strategy, so 6 lots a day, lots sized at `SIZING_DATE` exactly like the lists.
+- **Unit:** ₹ per lot-day is the headline unit for every comparison with the base and with REF. A list holds
+  6 lots, or 8 when the Buy add-on fires, so totals would reward holding more lots; totals at the stated lots
+  are reported beside.
+- **Read-out addition, per list (A, B, C and REF):** the daily series list minus base in ₹ per lot-day; its
+  mean and a 90% interval from the same 5-day block bootstrap as the REF comparison (same seed and resample
+  count). **A list "beats the base" when the interval's lower bound is above zero and the list's max drawdown
+  per lot (of the cumulative ₹-per-lot-day series) is no worse than the base's.** No minimum size: the owner
+  chose "reliably ahead, any size" over a fixed 10% or 20% margin. The base's own gross, drawdown and ₹ per
+  lot-day are reported with the lists.
+- **Scoring:** the base is scored nightly with the lists from the same results store. Its strategy files
+  live outside `strategies/rotation/` (proposed `strategies/rotation_base/`) so the universe, its hash and the
+  morning pick are untouched. The Dir ATM 09:24 history over the stored period (2024-10-09 onward) is run
+  once for context; the verdict uses forward days only.
+- **If the scoring code lands after the first entry,** the base is scored from 2026-10-12 retroactively. That
+  is allowed because the base is a fixed rule with no discretion and this block is committed before the
+  first entry; the margin rule above cannot change after it.
+- **Will not:** change the base's legs, strikes, times or lots; add a minimum margin; or swap the base for
+  another mix after the first entry.
+
 ## Risks
 
 - **Two minutes between the VIX criterion and the first entry (09:15 → 09:17).** Fine for a paper
@@ -288,3 +319,10 @@ Supersedes the 66-variant rule of Phase 0 for the forward test; Phase 0's discip
   One (unattended login, BL-078 / BL-079's module) when Fyers has no token or no bar; the entry records
   `vix_source` (fyers / angelone / given). Checked on 2026-10-09: both return 15.28. If neither source
   answers by 09:20 nothing is recorded and an alert is sent, as before.
+- 2026-10-10 — **Amendment (before the first entry): the fixed base as a second reference.** Owner: the
+  reference should be the basic rule, 2 × Widesl OTM1 09:17 + 1 × Dir ATM 09:24, and the lists should beat
+  it. Decisions: Dir leg ATM at 09:24 (a new file; the live one is ITM1); added beside REF, not replacing
+  it; compared in ₹ per lot-day because the lists carry 6 or 8 lots; "beats the base" = block-bootstrap
+  90% lower bound of list minus base above zero with drawdown per lot no worse, no minimum size. Not yet
+  built: the Dir ATM 09:24 file, the base's nightly scoring and its history run. Also not yet built, though
+  registered above in Phase 0b: the daily random-pick percentile and the bootstrap itself.
