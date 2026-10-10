@@ -15,9 +15,8 @@ import pandas as pd
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "common"))
-from rotparse import parse_case_a  # noqa: E402
-
 import run_all as S  # noqa: E402
+from rotparse import parse_case_a  # noqa: E402
 
 ENS = "5,34,33,23,0,5;0,36,35,24,0,5;15,30,30,20,0,5"
 CELLS = {"A": "o5_f5_baseline", "B": "o0_f5_baseline", "C": "o15_f5_baseline"}
