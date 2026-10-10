@@ -274,3 +274,9 @@ Supersedes the 66-variant rule of Phase 0 for the forward test; Phase 0's discip
   **Before Monday:** the scheduler process must be restarted to load the two jobs; the code lives on this
   branch only, so the main checkout must stay on it (or PR #154 merge first); the Fyers token for the
   09:16 read depends on the 08:05 login.
+- 2026-10-10 — **Amendment (before the first entry): the 09:15 VIX open's source.** Fyers needs a human
+  login each day (BL-076 / BL-077 / BL-079), so a morning without it would leave no entry. The pick now
+  reads the same quantity (the open of the 09:15 India VIX 1-minute bar) from Fyers first and from Angel
+  One (unattended login, BL-078 / BL-079's module) when Fyers has no token or no bar; the entry records
+  `vix_source` (fyers / angelone / given). Checked on 2026-10-09: both return 15.28. If neither source
+  answers by 09:20 nothing is recorded and an alert is sent, as before.

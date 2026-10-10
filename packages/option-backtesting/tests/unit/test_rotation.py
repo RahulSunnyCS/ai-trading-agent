@@ -163,3 +163,21 @@ def test_pick_refuses_when_results_are_stale(tmp_path):
     stale_target = d + timedelta(days=5)  # results end days earlier than the previous trading day
     with pytest.raises(PickError, match="previous trading day"):
         score_lists(stale_target, 14.0, {"dte_n": "1", "dte_s": "2"}, tmp_path, names)
+
+
+def test_vix_open_falls_back_to_angel_one_only_when_fyers_has_nothing(monkeypatch):
+    from option_backtesting.rotation import live
+
+    day = date(2026, 10, 12)
+    monkeypatch.setattr(live, "vix_open_live", lambda d: 15.28)
+    monkeypatch.setattr(
+        live, "vix_open_angel", lambda d: pytest.fail("Angel One must not be called")
+    )
+    assert live.vix_open_with_source(day) == (15.28, "fyers")
+
+    monkeypatch.setattr(live, "vix_open_live", lambda d: None)
+    monkeypatch.setattr(live, "vix_open_angel", lambda d: 15.3)
+    assert live.vix_open_with_source(day) == (15.3, "angelone")
+
+    monkeypatch.setattr(live, "vix_open_angel", lambda d: None)
+    assert live.vix_open_with_source(day) == (None, "")

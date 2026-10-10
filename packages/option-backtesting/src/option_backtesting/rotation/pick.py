@@ -16,7 +16,7 @@ from ..data.reference.loader import default_reference_data
 from ..fyers.daily import data_dir
 from . import journal, store
 from .lists import LISTS, LOTS_PER, WARMUP
-from .live import calendar_dte_labels, vix_open_live
+from .live import calendar_dte_labels, vix_open_with_source
 from .score import composite, dte_matrix, family_index, select, vix_band
 from .variants import variant_names
 
@@ -109,8 +109,9 @@ def record(
 ) -> PickResult:
     root = root or data_dir()
     now = now or datetime.now(IST)
+    source = "given"
     if vix_open is None:
-        vix_open = vix_open_live(day)
+        vix_open, source = vix_open_with_source(day)
     if vix_open is None:
         raise PickError(f"the 09:15 India VIX open for {day} could not be read; nothing recorded")
     dte = calendar_dte_labels(day)
@@ -120,6 +121,7 @@ def record(
         "day": day.isoformat(),
         "weekday": day.strftime("%a"),
         "vix_open": round(vix_open, 4),
+        "vix_source": source,
         "vix_band": vix_band(vix_open),
         "dte": {"NIFTY": dte["dte_n"], "SENSEX": dte["dte_s"]},
         "lists": lists,
