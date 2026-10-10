@@ -46,6 +46,28 @@ time in cash. **All metrics** opens the full set, the assumptions behind the run
 notes and a one-sentence summary. Hover the (i) by a number for what it means and how it
 changed from your previous run.
 
+### Which stocks the number was made on
+
+For a Broad run the card's title names the universe after the dataset: *Point in time* (each
+year's 750 most-traded stocks, delisted names included), *Today's list* (today's Total Market
+index applied to every year, which flatters) or *Whole NSE market*. The same name is in the
+run bar's chips and in Saved runs.
+
+Under the CAGR, a muted line shows **the same run with extended category tags**: every liquid
+NSE stock is tagged by BSE's current classification, not only today's 755 index members, so a
+stock that later left the index can still be bought through a category. It is usually a few
+points below the headline. Treat it as the closer reading of what the rule would have done.
+It is computed for every Broad run that ranks by category; hover it for the definition. It
+still uses today's classification for every year, so it is closer to an expected return, not a
+point-in-time one.
+
+Below the cards, a short note says what the result is: an in-sample number from a search, with
+what the review measured for a typical config, the best of a search, and the four frozen
+configs on years nobody tuned on. The link opens the full
+[evaluation review](https://github.com/RahulSunnyCS/ai-trading-agent/blob/main/packages/momentum-backtesting/docs/evaluation-review.md).
+The warning above the cards still says this CAGR is an upper bound; for a point-in-time run it
+no longer blames the stock list, only the 2026 themes.
+
 ## The equity chart
 
 The portfolio's value week by week against the benchmark, about two-thirds of the first

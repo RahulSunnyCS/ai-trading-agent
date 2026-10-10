@@ -7,8 +7,9 @@
  * selection comes from the `broad_*` keys, which differ by category mode.
  */
 
-import { formatNumber } from './format';
+import { formatNumber, formatPct, formatPp } from './format';
 import { BROAD_UNIVERSES, broadUniverse, isGatedUniverse } from './momentumUniverse';
+import type { MomentumCompanion } from '../types/momentum';
 
 /**
  * The settings accordions, by id. The settings panel renders one accordion per id, the summary
@@ -450,6 +451,63 @@ export function hindsightWarning(config: Record<string, unknown>): HindsightWarn
       detail:
         "The categories and their member stocks come from 2026 themes and today's lists, so earlier years benefit from hindsight (BL-010).",
       realismOff: [],
+    };
+  }
+  return null;
+}
+
+/**
+ * What a Broad or Custom Index result is, in the owner's words (BL-036 Phase 1, wording as
+ * written in the backlog item). Shown under the KPI cards with a link to the review.
+ */
+export const TRUST_NOTE =
+  'In-sample. On a point-in-time list the typical config loses about 5 points a year and the best of a search about 22–25; the four frozen configs made 32% in 2017–2026 and 20% in the unseen 2012–2016.';
+
+export const EVALUATION_REVIEW_URL =
+  'https://github.com/RahulSunnyCS/ai-trading-agent/blob/main/packages/momentum-backtesting/docs/evaluation-review.md';
+
+/** The trust note for a dataset whose result is an in-sample search outcome; null elsewhere. */
+export function trustNote(config: Record<string, unknown>): string | null {
+  const dataset = config.dataset;
+  return dataset === 'broad' || dataset === 'custom_index' ? TRUST_NOTE : null;
+}
+
+export interface CompanionLine {
+  text: string;
+  /** Hover text: the full sentence, or the reason there is no figure. */
+  title: string;
+}
+
+/**
+ * The muted line under the headline CAGR: the same run with extended category tags. Null when
+ * there is nothing to say (no category layer, or the weekly job skipped it).
+ */
+export function companionLine(
+  companion: MomentumCompanion | null | undefined,
+): CompanionLine | null {
+  if (!companion) return null;
+  if (companion.status === 'computed') {
+    const impact = companion.cagr_impact;
+    const text = `With extended category tags: ${formatPct(companion.cagr ?? null)} CAGR · ${formatPct(
+      companion.max_drawdown ?? null,
+    )} max DD${typeof impact === 'number' ? ` (${formatPp(impact)})` : ''}`;
+    return {
+      text,
+      title:
+        "The same run with every liquid NSE stock tagged by BSE's current classification, not just today's 755 index members. Closer to an expected return than the headline; the tags are still today's classification applied to every year.",
+    };
+  }
+  if (companion.status === 'this_run') {
+    return {
+      text: 'This run already uses extended category tags',
+      title:
+        'The extended tags are the setting of this run, so the headline is the extended figure.',
+    };
+  }
+  if (companion.status === 'failed') {
+    return {
+      text: 'Extended-tags figure unavailable',
+      title: companion.reason ?? 'The extended-tags run failed.',
     };
   }
   return null;

@@ -22,7 +22,14 @@ import {
   yearToDate,
   yearlyRows,
 } from '../../lib/momentumBenchmark';
-import { hindsightWarning } from '../../lib/momentumConfig';
+import {
+  type CompanionLine,
+  EVALUATION_REVIEW_URL,
+  companionLine,
+  hindsightWarning,
+  trustNote,
+} from '../../lib/momentumConfig';
+import { BROAD_UNIVERSES, broadUniverse } from '../../lib/momentumUniverse';
 import { useMomentumRunsStore } from '../../store/momentumRuns';
 import { useMomentumViewStore } from '../../store/momentumView';
 import type { MomentumResult, MomentumSeries } from '../../types/momentum';
@@ -69,6 +76,7 @@ function Headline({
   benchmark,
   gap,
   gapTone = 'neutral',
+  note = null,
 }: {
   label: string;
   help: string;
@@ -77,6 +85,8 @@ function Headline({
   benchmark: string;
   gap: string | null;
   gapTone?: Tone;
+  /** A muted third line, for a companion figure (never wraps). */
+  note?: CompanionLine | null;
 }) {
   return (
     <div className="min-w-0 border-border px-4 py-3 sm:px-5 lg:border-l lg:first:border-l-0">
@@ -102,6 +112,11 @@ function Headline({
           </Badge>
         ) : null}
       </p>
+      {note ? (
+        <p className="mt-0.5 truncate text-xs text-faint" title={note.title}>
+          {note.text}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -190,7 +205,13 @@ export function MomentumHeadline({
   const dates = series.dates;
   const notes = dataNotes(result);
   const warning = hindsightWarning(config);
-  const label = DATASET_LABELS[String(config.dataset)] ?? 'Backtest';
+  const baseLabel = DATASET_LABELS[String(config.dataset)] ?? 'Backtest';
+  const label =
+    config.dataset === 'broad'
+      ? `${baseLabel} · ${BROAD_UNIVERSES[broadUniverse(config)].short}`
+      : baseLabel;
+  const trust = trustNote(config);
+  const companion = companionLine(result.companion);
 
   const since = (key: string, now: number | null, digits = 'pp'): string => {
     const before = num(previous?.result?.kpis[key]);
@@ -277,6 +298,7 @@ export function MomentumHeadline({
           benchmark={formatPct(view.cagr)}
           gap={view.excessCagr === null ? null : formatPp(view.excessCagr)}
           gapTone={toneOf(view.excessCagr)}
+          note={companion}
         />
         <Headline
           label="Max drawdown"
@@ -315,6 +337,22 @@ export function MomentumHeadline({
           gap={ytd === null ? null : `YTD ${formatPct(ytd, 1, { sign: true })}`}
         />
       </div>
+      {trust ? (
+        <p
+          role="note"
+          className="border-t border-border bg-surface-2/50 px-4 py-2 text-xs text-muted sm:px-5"
+        >
+          {trust}{' '}
+          <a
+            href={EVALUATION_REVIEW_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            Evaluation review
+          </a>
+        </p>
+      ) : null}
       {view.replaced ? (
         <p className="border-t border-border bg-warning/10 px-4 py-1.5 text-xs text-muted sm:px-5">
           {view.replaced.label} has no usable data for this run

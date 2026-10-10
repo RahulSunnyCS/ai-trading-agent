@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import {
   MOMENTUM_SETTING_LABELS,
+  TRUST_NOTE,
+  companionLine,
   describeConfig,
   diffConfigs,
   hindsightWarning,
   modifiedSections,
   settingsSectionOf,
+  trustNote,
 } from '../momentumConfig';
 
 const BASE = {
@@ -385,5 +388,48 @@ describe('hindsightWarning', () => {
     expect(hindsightWarning({ dataset: 'custom_index' })).not.toBeNull();
     expect(hindsightWarning({ dataset: 'etf' })).toBeNull();
     expect(hindsightWarning({ dataset: 'stock' })).toBeNull();
+  });
+});
+
+describe('trustNote', () => {
+  it('is the owner’s wording for Broad and Custom Index, and absent elsewhere', () => {
+    expect(trustNote({ dataset: 'broad' })).toBe(TRUST_NOTE);
+    expect(trustNote({ dataset: 'custom_index' })).toBe(TRUST_NOTE);
+    expect(trustNote({ dataset: 'etf' })).toBeNull();
+    expect(trustNote({ dataset: 'stock' })).toBeNull();
+    expect(TRUST_NOTE).toMatch(/^In-sample\./);
+    expect(TRUST_NOTE).toMatch(/22–25/);
+  });
+});
+
+describe('companionLine', () => {
+  it('shows the extended-tags figures with the gap to the headline', () => {
+    const line = companionLine({
+      status: 'computed',
+      tags: 'extended',
+      cagr: 0.334,
+      max_drawdown: -0.386,
+      cagr_impact: -0.052,
+    });
+    expect(line?.text).toContain('With extended category tags: 33.4% CAGR');
+    expect(line?.text).toContain('38.6% max DD');
+    expect(line?.text).toContain('5.2 pp');
+    expect(line?.title).toMatch(/today's classification/);
+  });
+
+  it('says when the run already uses extended tags, and why a figure is missing', () => {
+    expect(companionLine({ status: 'this_run', cagr: 0.3, max_drawdown: -0.3 })?.text).toMatch(
+      /already uses extended/,
+    );
+    const failed = companionLine({ status: 'failed', reason: 'FileNotFoundError: wide' });
+    expect(failed?.text).toBe('Extended-tags figure unavailable');
+    expect(failed?.title).toBe('FileNotFoundError: wide');
+  });
+
+  it('is silent with no category layer, on a weekly run, or on an old result', () => {
+    expect(companionLine({ status: 'not_applicable', reason: 'no category layer' })).toBeNull();
+    expect(companionLine({ status: 'skipped', reason: 'weekly run' })).toBeNull();
+    expect(companionLine(undefined)).toBeNull();
+    expect(companionLine(null)).toBeNull();
   });
 });
