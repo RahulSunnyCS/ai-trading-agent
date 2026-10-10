@@ -96,11 +96,16 @@ Otherwise:
   which strategies have daily results now — variant CSVs plus saved legwise results at the file's current
   version — and the selectors `slot:` / `family:` / `index:` / `kind:` / globs / `a+b` that name them; nothing
   is a fixed list, so a new strategy is found once it has results), `cli.py`
-  (`obt rotation update|pick|verify|show|triggers|triggers-show|corr|corr-list|corr-pick`), `triggers.py` (BL-083: the four intraday triggers scored forward each evening from the day's bars,
+  (`obt rotation update|pick|verify|show|readout|base|triggers|triggers-show|corr|corr-list|corr-pick`), `triggers.py` (BL-083: the four intraday triggers scored forward each evening from the day's bars,
   event and placebo simulations in `rotation/triggers/`; run by `obt rotation update`, isolated so a
   failure never fails it, and `obt rotation triggers|triggers-show`;
   `scripts/rotation-triggers-parity.py` must print PARITY OK). Weekend sessions are excluded from the ranking history, as
   in the research (the Budget Sunday once shifted every later pick).
+- `rotation/base.py`, `rotation/readout.py` — the owner's fixed base reference (BL-058 amendment 2026-10-10: 2 x
+  Widesl OTM1 09:17 = the variant `N_wide_0917`, plus 1 x Dir ATM 09:24 from `strategies/rotation_base/`, outside
+  the 298 universe; its Dir results in `rotation/base/`) and the read-out (per list ₹ per lot-day, drawdown,
+  random same-shape percentile, list minus REF and minus base by a circular 5-day block bootstrap, 2,000
+  resamples, seed 20261012). Read-only over the journal; `obt rotation readout | base`.
 - `legwise/` — AlgoTest-style leg-wise engine over the Fyers data (`obt legwise run
   strategies/legwise/*.yaml`): `schema.py` (one field per AlgoTest setting), `market.py`
   (a day on the 375-minute grid), `engine.py` (the state machine — its docstring lists every
