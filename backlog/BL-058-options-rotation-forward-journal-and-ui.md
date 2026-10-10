@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — owner, 2026-10-09: the forward record must start before Monday 2026-10-12 09:15 |
-| **Status** | In progress — journal built 2026-10-10 (Phases 0b, 1, 2); UI waits (Phase 4) |
+| **Status** | In progress — journal built 2026-10-10 (Phases 0b, 1, 2); Phase 4 view built 2026-10-11 (widgets 1–9 and 11; widget 10 paper vs real waits for the charge model and the contract-notes cutover); day-60 read-out pending |
 | **Type** | feature |
 | **Area** | options / dashboard / scheduler |
 | **Created** | 2026-10-09 |
@@ -431,3 +431,37 @@ reference and answers "did the new weights beat the old rotation?". Nothing in t
   superseded by the matrix's own. **Not done:** the live launchd checkout is not synced (the rotation files
   there carry other sessions' uncommitted edits), so base scoring and the page reach the running stack only
   after the owner syncs or merges; no nightly scoring job yet for the BL-081 forward candidates.
+- 2026-10-11 — **Widgets 6–9 built (PRs #179, #180, #182, #183), widget 10 not; widget 11 (Family pulse, #181) finished.** Each PR was reviewed
+  independently with inline comments, fixed and merged on green CI; nothing changed the journal, a list, a
+  weight, the 298 universe, the base, `days.csv` or any stored result (owner's answer: no change to anything the
+  scheduler runs). What differs from the plan above:
+  - **6. Today's basket** is a second mode of the Correlation tab (`?mode=basket`), not a preset in its picker:
+    list A / B / C / REF / Base, a day, P1 / P2 / last 63 / Forward. The base's Widesl is listed twice
+    (2 W + D as traded) and that pair, 1.00 by construction, is left out of the average and the most-alike
+    pair. A forward window is the on-time days themselves (a late or missing day between two is not forward).
+    No link from the Daily log drawer yet.
+  - **7. Forward days vs research periods**: the day range is read from the lake's 1-minute index bars when
+    the card loads and stored nowhere (the planned `days.csv` column would have changed the nightly update).
+    P3 is drawn unavailable, never filled in.
+  - **8. Drawdown episodes** as written (₹500 per lot below the running peak by default; the owner can choose
+    ₹250 to ₹2,500). The basket column is what the list's actual lots lost over the peak-to-trough days.
+    `rotation/history.py` keeps the built daily log for 30 s so a change of list or depth does not rebuild it.
+  - **9. Selection drift** as written: a last-21 share is flagged only outside the list's own rolling-21 10th to
+    90th percentile in P1.
+  - **11. Family pulse** (#181, written in the "top 5 widget" session): the 12 family-band cells with their
+    last 5 / 21 / 63, P1 and P2 means, rolling-21 sparkline, the rank the ranking gives each cell for the next
+    pick, where today's picks fall and a drift flag. It was reviewed there (Codex and an independent review,
+    nine findings, all fixed); this session re-ran its tests, checked its numbers on the real store against the
+    plan page's table (Dir 09:17–10:02 ₹676 last 21 and rank 1 of 12; Buy 14:17–15:17 rank 12 of 12) and
+    merged main into it twice; it merged on green CI. Its drift flag uses the same rule form as the selection-drift card (a
+    last-21 value outside the 10th to 90th percentile of the rolling-21 values in P1, at least 10 windows),
+    applied to cell means instead of pick shares.
+  - **10. Paper vs real is not built.** It needs the placement record (exists, from widget 3), the BL-063
+    charge model applied to stored results (a change to the nightly update, not allowed in this run) and the
+    contract-notes cutover (TODO §2). Until then there is no real figure to set against the paper one.
+  - Real-data readings on 11 Oct (a description of the research history, not a result): list A, P1: 20
+    drawdown episodes of at least ₹500 per lot, worst −₹11,073 per lot against −₹30,365 for the base; the
+    last 21 sessions are outside the list's own P1 range on the share of picks starting 09:17–10:02 (25%
+    against 27%–59%), distinct variants (49 against 36–44) and Buy-qualified days (7 against 0–6). The three
+    picks the rule gave on Fri 9 Oct (N_p100_0917, N_p80_0932, N_ditm1_1202) correlate −0.15 to +0.69 over P1;
+    the base's Widesl and Dir ATM 09:24 +0.28 over P2.
