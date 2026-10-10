@@ -201,6 +201,8 @@ export interface MomentumFridaySpread {
 export interface MomentumLatest {
   week: string;
   explain: string;
+  /** True for an All Fridays run: there are no rows, `explain` says why (no combined signal). */
+  split?: boolean;
   rows: Array<{
     asset: string;
     rank: number | null;
@@ -333,6 +335,8 @@ export interface SavedStrategy {
   status: FavouriteStatus | null;
   group: string[] | null;
   member_of: string | null;
+  /** The group that follows this All Fridays run on every Friday (BL-056), while it exists. */
+  followed_by?: string | null;
   overlay: boolean;
   runs: number;
   repeats: number;

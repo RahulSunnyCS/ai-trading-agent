@@ -1133,11 +1133,14 @@ def _run_phases(
 def _with_spread(
     lazy: dict[str, Callable[[], object]], result: Result, phases: list[Result] | None
 ) -> dict[str, Callable[[], object]]:
-    """Adds the "Friday luck" section (each phase against the blend) to a split run."""
+    """Adds the "Friday luck" section (each phase against the blend) to a split run, and swaps its
+    `latest` for a note: the blend sums every sleeve's holdings under the first sleeve's config,
+    so `analysis.latest_signal` would judge each name against the wrong portfolio."""
     if phases is None:
         return lazy
     return {
         **lazy,
+        "latest": lambda: analysis._clean(analysis.split_signal(result)),
         "friday_spread": lambda: analysis._clean(tranches.friday_spread(phases, result)),
     }
 
@@ -3470,6 +3473,8 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
         return None, f"Unsupported weekly dataset {req.dataset!r}."
 
     latest = payload.get("latest", {})
+    if latest.get("split"):  # an All Fridays config: no combined signal, never "No trades"
+        return None, analysis.SPLIT_SIGNAL_NOTE
     rows = latest.get("rows", [])
     actionable = [
         row
@@ -3809,7 +3814,12 @@ def create_app() -> FastAPI:
         """Follow the strategy `run_id` belongs to on every Friday, if it is a split run that no
         one follows yet: the group's strategy record, or None when it is not (the caller then
         treats the request as an ordinary favourite change). The K sleeve backtests run with no
-        catalog connection open."""
+        catalog connection open. The record carries `followed_by`, the group that follows the
+        run asked about, so a caller can tell a run that was already followed.
+
+        A run already followed only ever raises its group (`all_fridays.raise_only`): the
+        dashboard's star on the split run asks for "watching" and must not demote a Paper or
+        Invested group or drop its headline."""
         try:
             with read_catalog() as con:
                 plan = all_fridays.plan_for_new(con, run_id)
@@ -3818,12 +3828,20 @@ def create_app() -> FastAPI:
         if plan is None:
             return None
         try:
-            if plan.group:  # followed already: the change goes to its group
+            if plan.group:  # followed already: only a raise goes to its group
                 with open_catalog() as con:
-                    runs_store.update_run(
-                        con, plan.group, status=status, active=True if active else None
+                    found = runs_store.strategy_anchor(con, plan.group)
+                    summary = found[1] if found else {}
+                    raised, headline = all_fridays.raise_only(
+                        runs_store.status_of(summary),
+                        bool(summary.get("active", False)),
+                        status,
+                        active,
                     )
-                    return runs_store.get_strategy(con, plan.group)
+                    if raised is not None or headline is not None:
+                        runs_store.update_run(con, plan.group, status=raised, active=headline)
+                    group_strategy = runs_store.get_strategy(con, plan.group)
+                    return {**group_strategy, "followed_by": plan.group} if group_strategy else None
             if status in runs_store.FOLLOWED:
                 with read_catalog() as con:
                     runs_store.ensure_followed_slot(con)
@@ -3832,7 +3850,10 @@ def create_app() -> FastAPI:
                 group = all_fridays.follow(
                     con, plan, sleeves, status=status, active=active, name=name
                 )
-                return runs_store.get_strategy(con, group["id"]) or group
+                return {
+                    **(runs_store.get_strategy(con, group["id"]) or group),
+                    "followed_by": group["id"],
+                }
         except runs_store.FavouriteError as error:
             raise HTTPException(409, str(error)) from error
 

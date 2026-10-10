@@ -923,6 +923,9 @@ def _strategy(runs: list[dict[str, Any]], changes: list[dict[str, Any]]) -> dict
         "status": status_of(summary),
         "group": summary.get("group"),
         "member_of": summary.get("member_of"),
+        # The group that follows this run on every Friday (BL-056); list/get keep it only while
+        # that group still exists.
+        "followed_by": summary.get("followed_by"),
         "overlay": any(bool(r["summary"].get("overlay")) for r in runs),
         "runs": len(runs),
         "repeats": sum(1 for r in runs if r["summary"].get("outcome") == "repeat"),
@@ -966,6 +969,9 @@ def list_strategies(
     for strategy in strategies:
         if strategy["group"]:
             strategy["members"] = [by_anchor[m] for m in strategy["group"] if m in by_anchor]
+        holder = by_anchor.get(strategy["followed_by"] or "")
+        if holder is None or not holder["group"]:
+            strategy["followed_by"] = None
     top = [s for s in strategies if not s["member_of"]]
     top.sort(key=lambda s: s["last_run"], reverse=True)
     top.sort(key=lambda s: s["status"] not in FOLLOWED)
@@ -1008,6 +1014,10 @@ def get_strategy(con: duckdb.DuckDBPyConnection, run_id: str) -> dict[str, Any] 
         return None
     changes = list_changes(con, version_id=runs[0]["version_id"])
     strategy = _strategy(runs, changes)
+    if strategy["followed_by"]:
+        holder = _load(con, strategy["followed_by"])
+        if holder is None or not holder[1].get("group"):
+            strategy["followed_by"] = None
     strategy["trust"] = (
         None if strategy["group"] else _trust(strategy, _frozen_fingerprints(), _newest_data(con))
     )

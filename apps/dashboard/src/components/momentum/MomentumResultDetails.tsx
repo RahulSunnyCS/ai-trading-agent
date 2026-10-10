@@ -17,6 +17,7 @@ import {
   formatPp,
 } from '../../lib/format';
 import { describeConfig, hindsightWarning } from '../../lib/momentumConfig';
+import { isAllFridays } from '../../lib/momentumFridays';
 import type { MomentumLatest, MomentumResult, MomentumSavedRun } from '../../types/momentum';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -335,9 +336,47 @@ export function Loaded<T>({
   return <>{children(section.data)}</>;
 }
 
+/** Why an All Fridays run shows no signals: its sleeves trade on different Fridays. */
+function NoCombinedSignal() {
+  return (
+    <ResultSection padded={false} title="Signals">
+      <p className="text-sm text-muted">
+        A split (All Fridays) run has no combined signal. Each Friday's sleeve trades its own week
+        with its own share of the money, so one list of buys and sells for the whole account would
+        be wrong. Follow the run on all Fridays to see each sleeve's signal under This week.
+      </p>
+    </ResultSection>
+  );
+}
+
+/** The Signals half of This week: a fetched section (`latest`). */
+function SignalsHalf({ runId, config }: { runId: string; config: Record<string, unknown> }) {
+  const latest = useRunSection(runId, 'latest');
+  return (
+    <Loaded section={latest} label="this week's signals">
+      {(week) =>
+        week.split ? (
+          <NoCombinedSignal />
+        ) : (
+          <ResultSection
+            padded={false}
+            title={`Signals · ${formatDay(week.week)}`}
+            description={week.explain}
+          >
+            <SignalsTable
+              rows={week.rows.map((row) => ({ ...row, reason: signalReason(row, config) }))}
+            />
+          </ResultSection>
+        )
+      }
+    </Loaded>
+  );
+}
+
 /**
  * This week: the latest signals beside what the portfolio holds now. Signals is a fetched
- * section (`latest`); the open positions and held categories come with the core result.
+ * section (`latest`), left out for an All Fridays run, which has none of its own; the open
+ * positions and held categories come with the core result.
  */
 export function WeekPanel({
   runId,
@@ -348,22 +387,9 @@ export function WeekPanel({
   result: MomentumResult;
   config: Record<string, unknown>;
 }) {
-  const latest = useRunSection(runId, 'latest');
   return (
     <div className="grid gap-x-6 gap-y-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-      <Loaded section={latest} label="this week's signals">
-        {(week) => (
-          <ResultSection
-            padded={false}
-            title={`Signals · ${formatDay(week.week)}`}
-            description={week.explain}
-          >
-            <SignalsTable
-              rows={week.rows.map((row) => ({ ...row, reason: signalReason(row, config) }))}
-            />
-          </ResultSection>
-        )}
-      </Loaded>
+      {isAllFridays(config) ? <NoCombinedSignal /> : <SignalsHalf runId={runId} config={config} />}
       <div className="min-w-0 space-y-4">
         <ResultSection padded={false} title="Open positions">
           <DataTable

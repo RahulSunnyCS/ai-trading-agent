@@ -211,6 +211,20 @@ def test_bhavcopy_backed_favorite_uses_saved_start_and_builds_signal(monkeypatch
     assert "NSE bhavcopy" in result.notification.body
 
 
+def test_an_all_fridays_favorite_is_not_told_no_trades(monkeypatch):
+    class Stock:
+        last_week = pd.Timestamp("2026-09-25")
+
+    monkeypatch.setattr(api.DATA, "get_stock", lambda: Stock())
+    # What `_with_spread` puts in `latest` for a split run: no rows because there is no signal.
+    split = {"latest": {"week": "2026-09-25", "rows": [], "split": True, "explain": "n/a"}}
+    monkeypatch.setattr(api, "_stock_backtest", lambda req: split)
+    favorite = {"name": "Split", "config": {"dataset": "stock", "universe": ["C0001"]}}
+    result, blocked = api._research_weekly_result(favorite, pd.Timestamp("2026-09-25"))
+    assert result is None
+    assert "no combined signal" in blocked
+
+
 def test_weekly_endpoint_sends_only_the_active_favorite(client, monkeypatch):
     active = client.post("/api/saved-runs", json=_payload("Active")).json()
     inactive = client.post("/api/saved-runs", json=_payload("Dashboard only")).json()

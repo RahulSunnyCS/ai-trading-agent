@@ -131,3 +131,11 @@ BL-056: new scenario for the All Fridays split; no existing scenario moved
 | Scenario | CAGR | Max drawdown |
 |---|---|---|
 | broad_one_category_three_picks_four_weekly_all_fridays | n/a -> 17.88% | n/a -> -35.50% |
+
+## 2026-10-10 (on top of `c0619d6`)
+
+BL-056 review: an All Fridays run has no combined signal. Its latest section is now a note with no rows (split: true) instead of signals judged against the union of every sleeve's holdings. No CAGR, drawdown or trade changes.
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_one_category_three_picks_four_weekly_all_fridays | 17.88% -> 17.88% | -35.50% -> -35.50% |

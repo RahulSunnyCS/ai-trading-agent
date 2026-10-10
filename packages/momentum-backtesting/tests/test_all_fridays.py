@@ -108,6 +108,62 @@ def test_the_same_request_through_the_run_route_and_the_explicit_route(client):
     assert len(groups_now) == 1
 
 
+def test_the_star_on_a_followed_all_fridays_run_never_demotes_its_group(client):
+    run = _save(client)
+    group = client.patch(
+        f"/api/saved-strategies/{run['id']}", json={"status": "invested", "active": True}
+    ).json()
+    assert group["status"] == "invested" and group["active"] is True
+    # The dashboard's empty star on the still-unfavourited split run sends "watching".
+    again = client.patch(f"/api/saved-strategies/{run['id']}", json={"status": "watching"})
+    assert again.status_code == 200
+    result = again.json()
+    assert result["id"] == group["id"]
+    assert result["status"] == "invested" and result["active"] is True
+    assert result["followed_by"] == group["id"]
+    # The same through the run route, with a plain `favorite`, a lower status and the headline.
+    for url, body in (
+        (f"/api/saved-runs/{run['id']}", {"favorite": True}),
+        (f"/api/saved-strategies/{run['id']}", {"status": "paper"}),
+        (f"/api/saved-strategies/{run['id']}", {"active": True}),
+    ):
+        got = client.patch(url, json=body).json()
+        assert got["status"] == "invested" and got["active"] is True, body
+    explicit = client.post(
+        f"/api/saved-strategies/{run['id']}/follow-all-fridays", json={"status": "watching"}
+    ).json()
+    assert explicit["status"] == "invested" and explicit["active"] is True
+    assert len(client.ran) == 4
+
+
+def test_a_paper_group_is_kept_by_a_watching_request_and_still_upgraded_by_a_higher_one(client):
+    run = _save(client)
+    first = client.patch(f"/api/saved-strategies/{run['id']}", json={"status": "paper"}).json()
+    kept = client.patch(f"/api/saved-strategies/{run['id']}", json={"status": "watching"}).json()
+    assert kept["id"] == first["id"] and kept["status"] == "paper"
+    higher = client.patch(f"/api/saved-strategies/{run['id']}", json={"status": "invested"}).json()
+    assert higher["status"] == "invested"
+    headline = client.patch(f"/api/saved-strategies/{run['id']}", json={"active": True}).json()
+    # Asking for the headline never lowers an Invested group to Paper.
+    assert headline["status"] == "invested" and headline["active"] is True
+
+
+def test_the_split_run_says_which_group_follows_it(client):
+    run = _save(client)
+
+    def split_record() -> dict:
+        strategies = client.get("/api/saved-strategies?dataset=etf").json()["strategies"]
+        return next(s for s in strategies if s["id"] == run["id"])
+
+    assert split_record()["followed_by"] is None
+    group = client.patch(f"/api/saved-strategies/{run['id']}", json={"status": "watching"}).json()
+    assert split_record()["followed_by"] == group["id"]
+    assert client.get(f"/api/saved-strategies/{run['id']}").json()["followed_by"] == group["id"]
+    # A deleted group no longer follows it.
+    assert client.delete(f"/api/saved-strategies/{group['id']}").status_code == 200
+    assert split_record()["followed_by"] is None
+
+
 def test_a_run_on_one_friday_is_favourited_as_before(client):
     run = _save(client, split_fridays=False, cost_pct=0.12)
     result = client.patch(f"/api/saved-runs/{run['id']}", json={"favorite": True}).json()

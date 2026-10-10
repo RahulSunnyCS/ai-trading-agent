@@ -2190,6 +2190,20 @@ def test_all_fridays_is_the_april_reset_blend_of_every_friday(client):
     assert "friday_spread" not in one and all("friday" not in t for t in one["trades"])
 
 
+def test_all_fridays_has_no_combined_signal(client):
+    body = {"universe": core(client), "start": "2017-01-06", "rebalance_every": 4}
+    split = client.post("/api/backtest", json={**body, "split_fridays": True}).json()
+    # One list of buys and sells for the whole account would judge every sleeve against the
+    # union of holdings; the panel says so instead of showing it.
+    assert split["latest"]["split"] is True and split["latest"]["rows"] == []
+    assert "no combined signal" in split["latest"]["explain"].lower()
+    assert split["latest"]["week"] == split["series"]["dates"][-1]
+    # The account's open positions are still there.
+    assert "open_positions" in split
+    one = client.post("/api/backtest", json=body).json()
+    assert "split" not in one["latest"] and one["latest"]["rows"]
+
+
 def test_all_fridays_is_a_no_op_on_a_weekly_cadence(client):
     body = {"universe": core(client), "start": "2017-01-06"}
     plain = client.post("/api/backtest", json=body).json()

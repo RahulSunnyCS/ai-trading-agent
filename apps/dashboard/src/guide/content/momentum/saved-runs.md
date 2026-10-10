@@ -87,8 +87,10 @@ trades is luck (see [All Fridays](glossary:all-fridays)). Run it with **Fridays:
 the Backtest settings, then set its status (Watching, Paper or Invested) here: it is followed as
 **one group with one sleeve per Friday**, each with an equal share of the money, named like
 *Five Sectors · all Fridays · Friday 2 of 4*. The run itself stays a saved run, as the record of
-what was tested. Setting its status again changes the group; it never makes a second one. A
-strategy run on one Friday is favourited as before.
+what was tested. Setting its status again changes the group; it never makes a second one, and
+it never lowers the group: a star on the run itself cannot demote a Paper or Invested group or
+take away its headline (change that on the group's own row). The run's row shows its star filled
+and *followed on all Fridays*. A strategy run on one Friday is favourited as before.
 
 The favourites that followed a single Friday before this existed can be moved to all Fridays in
 one step with `mbt saved split-fridays` (it lists them first; `--apply` makes the groups). The

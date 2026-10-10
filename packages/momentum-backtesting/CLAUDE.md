@@ -331,7 +331,10 @@ contract, not a shared service).
   charges no cost or tax). Trade rows and `closed` trades carry `friday` (the sleeve's offset);
   the lazy `friday_spread` section (`tranches.friday_spread`) holds each Friday's CAGR, max
   drawdown and Ulcer next to the blend's. Broad shares one ranking across the K runs, and a
-  split run has no `circuit_exposure` section. In `saved_identity` the flag is dropped when off or
+  split run has no `circuit_exposure` section. Its `latest` section is `analysis.split_signal`
+  (`split: true`, no rows, a note), not `latest_signal`: the blend's positions and idle cash are
+  summed over the sleeves under the first sleeve's config, so signals would be judged against the
+  wrong portfolio. The dashboard hides the Signals half of This week for it. In `saved_identity` the flag is dropped when off or
   meaningless (no existing fingerprint moves) and replaces `rebalance_offset` when on.
 - **Following on all Fridays (BL-056 Phase 3):** `all_fridays.py`. Favouriting (PATCH
   `/api/saved-strategies/{id}` or `/api/saved-runs/{id}`, or POST
@@ -340,7 +343,11 @@ contract, not a shared service).
   (`api.sleeve_summary`, no catalog connection open), saves them as runs named `<group> · Friday
   n of K` and `runs_store.create_group`s them as `<name> · all Fridays`. The split run stays a
   saved run with `followed_by` set (`runs_store.annotate`), so a second request changes that group
-  instead of making another. A full Paper/Invested list is refused before anything is saved.
+  instead of making another; a request on an already-followed run only ever raises that group
+  (`all_fridays.raise_only`: a higher status, or the headline when it is not one), so the
+  dashboard's "watching" star cannot demote it. Strategy records carry `followed_by` while the
+  group exists, and the follow responses carry it too. A full Paper/Invested list is refused
+  before anything is saved.
   `mbt saved split-fridays [--apply]` does the same for every favourite on one Friday of a slower
   cadence, releasing the old favourite (kept as a saved run; restored if the group fails). The
   weekly run needs no change: members are journalled one by one and `groups.combine` weights them

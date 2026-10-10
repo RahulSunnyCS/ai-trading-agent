@@ -131,3 +131,12 @@ Full write-up: `packages/momentum-backtesting/docs/bl054-levers-2026-10-09.md`; 
   waiting cash; daily mode could re-buy a stock with a pending stop; a confirmed factor could be
   applied to an already-adjusted prevclose). L4 re-run on the fixed engine: medians moved by 0.1
   point or less, same three development passes, none confirmed; verdict unchanged.
+- 2026-10-10 — PR #152 research-gate review (G1). Deviation: the sealed FY2023-26 window was
+  computed for every lever, not only those that passed development, which `bl054_criteria.json`
+  (`windows.confirmation`: "only for levers that pass development") requires; `report()` and
+  `final()` in `scripts/bl054_levers.py` read it for every cell. No verdict changes: every kill
+  rests on a development-window failure, and the three L4 cells that passed development were
+  then killed on that window as registered. The write-up's "25% buy-price stop did no measurable
+  harm" line is qualified: that cell failed development (2 of 11) and its FY2023-26 numbers were
+  read outside the pre-registered gate. No criteria file or result number was edited.
+  override: The sealed FY2023-26 window was computed for every lever, not only those that passed development. Every kill rests on development-window failures by wide margins and nothing was adopted, so the conclusions stand; the window is treated as used up as a confirmation window (BL-055 reused it afterwards, disclosed there).

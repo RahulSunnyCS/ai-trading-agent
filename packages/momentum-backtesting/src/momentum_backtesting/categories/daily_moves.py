@@ -64,8 +64,17 @@ def daily_moves(
     column_to_base: dict[str, str], start: str, end: str, *, root: Path | None = None
 ) -> DailyMoves:
     symbols = sorted(set(column_to_base.values()))
-    key = (data_version(root), tuple(symbols), str(start), str(end))
-    hit = _cache.get(key)
+    # The result is built per engine column, so the mapping is part of the key: the same symbols
+    # under other column names (a `legacy` vs `verified` series break, `SYM` vs `SYM#2`) must not
+    # get another run's columns.
+    cache_key = (
+        data_version(root),
+        tuple(symbols),
+        tuple(sorted(column_to_base.items())),
+        str(start),
+        str(end),
+    )
+    hit = _cache.get(cache_key)
     if hit is not None:
         return hit
     first = (pd.Timestamp(start) - pd.Timedelta(days=60)).date()
@@ -84,16 +93,16 @@ def daily_moves(
     raw = pd.Series(raw, index=divisor.index)
     for symbol, events in factors.items():
         for ex_date, factor in events:
-            key = (symbol, ex_date)
-            if not (factor and factor > 0 and key in divisor.index):
+            at = (symbol, ex_date)
+            if not (factor and factor > 0 and at in divisor.index):
                 continue
             # Only an unadjusted prevclose shows the factor's jump: apply it when the day's raw
             # close/prevclose is nearer (in log terms) to 1/factor than to 1, so a source row
             # that is already adjusted is not divided twice into a phantom move.
-            ratio = raw.loc[key]
+            ratio = raw.loc[at]
             ratio = float(ratio.iloc[0]) if isinstance(ratio, pd.Series) else float(ratio)
             if ratio > 0 and abs(np.log(ratio * factor)) < abs(np.log(ratio)):
-                divisor[key] = factor
+                divisor[at] = factor
     prev = (frame["prevclose"] / divisor.to_numpy()).where(frame["prevclose"] > 0)
     frame["move"] = frame["close"] / prev - 1
     frame["gap"] = frame["open"] / prev - 1
@@ -123,5 +132,5 @@ def daily_moves(
     )
     if len(_cache) > 3:
         _cache.clear()
-    _cache[key] = result
+    _cache[cache_key] = result
     return result

@@ -368,6 +368,27 @@ def latest_signal(
     return {"week": week, "rows": rows, "explain": explain + delay}
 
 
+#: What the This week panel says for an "All Fridays" run instead of signals.
+SPLIT_SIGNAL_NOTE = (
+    "An All Fridays run has no combined signal. Each Friday's sleeve trades its own week with "
+    "its own share of the money, so one list of buys and sells for the whole account would be "
+    "wrong. Follow the run on all Fridays and each sleeve's signal is shown under This week."
+)
+
+
+def split_signal(result: Result) -> dict:
+    """The `latest` section of an "All Fridays" run: no rows, and why. `latest_signal` reads one
+    portfolio (its open positions, idle cash and cap shares), but a blended run's are summed over
+    every sleeve while its config is the first sleeve's, so it would call a name another sleeve
+    holds HOLD and never show a sleeve's cap trim."""
+    return {
+        "week": result.ranks.index[-1],
+        "rows": [],
+        "explain": SPLIT_SIGNAL_NOTE,
+        "split": True,
+    }
+
+
 def _proxied(proxy: pd.DataFrame | None, asset: str, *weeks) -> bool:
     """True if any of `weeks` priced `asset` on its index because the ETF didn't exist yet."""
     if proxy is None or asset not in proxy:

@@ -429,20 +429,38 @@ export function SavedStrategiesView({
             <button
               type="button"
               aria-label={
-                strategy.favorite ? `${name} is a favourite` : `Make ${name} a favourite (Watching)`
+                strategy.favorite
+                  ? `${name} is a favourite`
+                  : strategy.followed_by
+                    ? `${name} is followed on all Fridays`
+                    : `Make ${name} a favourite (Watching)`
               }
               title={
                 strategy.favorite
                   ? 'A favourite: set its status on the right'
-                  : 'Make it a favourite (Watching)'
+                  : strategy.followed_by
+                    ? 'Followed on all Fridays as a group: set its status on the group'
+                    : 'Make it a favourite (Watching)'
               }
-              className={strategy.favorite ? 'text-warning' : 'text-faint hover:text-foreground'}
+              className={
+                strategy.favorite || strategy.followed_by
+                  ? 'text-warning'
+                  : 'text-faint hover:text-foreground'
+              }
               onClick={(event) => {
                 event.stopPropagation();
-                if (!strategy.favorite) void patchStrategy(strategy.id, { status: 'watching' });
+                if (!strategy.favorite && !strategy.followed_by) {
+                  void patchStrategy(strategy.id, { status: 'watching' });
+                }
               }}
             >
-              <Star className={cn('h-4 w-4', strategy.favorite && 'fill-current')} aria-hidden />
+              <Star
+                className={cn(
+                  'h-4 w-4',
+                  (strategy.favorite || strategy.followed_by) && 'fill-current',
+                )}
+                aria-hidden
+              />
             </button>
           )}
         </Td>
@@ -538,7 +556,9 @@ export function SavedStrategiesView({
               ) : null}
             </span>
           ) : (
-            <span className="text-xs text-faint">☆ to follow</span>
+            <span className="text-xs text-faint">
+              {strategy.followed_by ? 'followed on all Fridays' : '☆ to follow'}
+            </span>
           )}
         </Td>
         <Td dense className="text-xs text-muted" title={formatIstDateTimeShort(strategy.last_run)}>

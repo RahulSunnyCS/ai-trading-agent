@@ -87,6 +87,20 @@ def plan_for_new(con: duckdb.DuckDBPyConnection, run_id: str) -> Plan | None:
     return Plan(anchor_id, dataset, str(summary.get("name") or anchor_id[:8]), config, None, still)
 
 
+def raise_only(
+    current_status: str | None, current_active: bool, status: str | None, active: bool
+) -> tuple[str | None, bool | None]:
+    """What a request may change on a group that already follows the strategy: `(status,
+    active)` for `update_run`, each None when it changes nothing. A request made through the
+    all-Fridays run only ever raises the group: a status above its current one, or the headline
+    when it is not one. Never a lower status and never clearing the headline, so a star click
+    ("watching") on an already-followed run cannot demote a Paper or Invested group."""
+    order = runs_store.STATUSES
+    rank = order.index(current_status) if current_status in order else -1
+    raised = status if status in order and order.index(status) > rank else None
+    return raised, True if active and not current_active else None
+
+
 def _summary(con: duckdb.DuckDBPyConnection, run_id: str) -> dict[str, Any] | None:
     found = runs_store.strategy_anchor(con, run_id)
     return found[1] if found else None

@@ -208,3 +208,71 @@ def test_a_pending_stop_is_not_bought_again_at_the_friday_rebalance() -> None:
     rebought = (t["week"] == WEEKS[4]) & (t["asset"] == "A") & t["action"].isin(["BUY", "ADD"])
     assert not rebought.any()
     assert len(daily_sells(result)) == 1
+
+
+@pytest.fixture
+def fake_lake(monkeypatch):
+    """`daily_moves.daily_moves` over one in-memory symbol, counting how often it reads bars."""
+    from contextlib import contextmanager
+
+    from momentum_backtesting.categories import daily_moves as module
+
+    frame = pd.DataFrame(
+        {
+            "symbol": ["AAA"] * 3,
+            "date": pd.to_datetime(["2020-01-01", "2020-01-02", "2020-01-03"]),
+            "open": [100.0, 99.0, 98.0],
+            "close": [100.0, 98.0, 97.0],
+            "prevclose": [100.0, 100.0, 98.0],
+        }
+    )
+    reads = {"bars": 0}
+
+    class Result:
+        def df(self) -> pd.DataFrame:
+            return frame.copy()
+
+    class Connection:
+        def execute(self, *_args) -> Result:
+            reads["bars"] += 1
+            return Result()
+
+    @contextmanager
+    def fake_connection(*_args, **_kwargs):
+        yield Connection()
+
+    module._cache.clear()
+    monkeypatch.setattr(module, "data_version", lambda root=None: ("v1",))
+    monkeypatch.setattr(module, "stock_bars", fake_connection)
+    monkeypatch.setattr(module, "open_catalog", fake_connection)
+    monkeypatch.setattr(module, "confirmed_factors", lambda con, symbols: {})
+    yield module, reads
+    module._cache.clear()
+
+
+def test_daily_moves_cache_is_keyed_on_the_column_mapping(fake_lake) -> None:
+    module, reads = fake_lake
+    first = module.daily_moves({"AAA": "AAA"}, "2020-01-01", "2020-01-03")
+    second = module.daily_moves({"AAA#2": "AAA"}, "2020-01-01", "2020-01-03")
+    # Same symbols, same window, other engine column names: not the first run's columns.
+    assert list(first.move.columns) == ["AAA"]
+    assert list(second.move.columns) == ["AAA#2"]
+    assert second.move["AAA#2"].iloc[1] == pytest.approx(-0.02)
+    # The same mapping again is a cache hit.
+    reads_before = reads["bars"]
+    assert module.daily_moves({"AAA": "AAA"}, "2020-01-01", "2020-01-03") is first
+    assert reads["bars"] == reads_before
+
+
+def test_daily_moves_cache_still_hits_when_a_split_factor_is_applied(
+    fake_lake, monkeypatch
+) -> None:
+    module, reads = fake_lake
+    # A confirmed factor on a day in the data used to rebind the cache key to (symbol, date),
+    # so the result was stored under a key no later call could ask for.
+    factors = {"AAA": [(pd.Timestamp("2020-01-02"), 2.0)]}
+    monkeypatch.setattr(module, "confirmed_factors", lambda con, symbols: factors)
+    first = module.daily_moves({"AAA": "AAA"}, "2020-01-01", "2020-01-03")
+    reads_before = reads["bars"]
+    assert module.daily_moves({"AAA": "AAA"}, "2020-01-01", "2020-01-03") is first
+    assert reads["bars"] == reads_before
