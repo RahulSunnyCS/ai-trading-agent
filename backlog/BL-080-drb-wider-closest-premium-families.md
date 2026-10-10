@@ -46,6 +46,28 @@ The owner (2026-10-10) asked to add the next two premiums further out on each in
 - **Will not run:** other premiums, other strategy shapes, other weightings.
 - **Result:** pending.
 
+### Block 2 — Dir at ITM1 (2026-10-10, registered before its runs)
+- **Why:** the live directional strategy is `nifty_dir_924_itm1_sl21_recost` (ITM1), but the research
+  family `dir` was run at ATM only (BL-054 / 056 / 059 / 062). The owner asked to run ITM as well.
+- **New variants (50):** `N_ditm1` and `S_ditm1` × the 25 start times 09:17 .. 15:17, each the ATM sibling
+  with both legs' strike set to ITM1 and nothing else changed (21% SL per leg, one re-entry at cost,
+  overall ₹3,000 per lot, exit 15:28). Committed in `strategies/rotation_ext/`. ITM2 is not run.
+- **Same method, windows and validation** as block 1; the new family counts as Dir (it is a candidate
+  for the Dir slots and for the Widesl-minimum swap) and is pooled with ATM Dir in the family-band
+  recent criterion (type × start band).
+- **Universe tested:** 248 + 50 = 298 (ITM only) and 248 + 100 + 50 = 398 (everything). `rotate.py
+  --ext-dir [--ext-closest]`.
+- **Experiments (fixed):** (E4) the ITM1 family's own totals by calendar year beside Dir ATM and the
+  closest-premium families (1 lot, per variant mean), NIFTY 2022-2026, SENSEX 2024-2026; (E5) lists A,
+  B, C, REF on P1 / P2 / P3 with the 298 list and the 398 list beside the 248 list; (E6) the share of
+  core slots taken by ITM1 per period and list.
+- **Read-out (registered):** ITM1 is *useful* only if, on the 298 list, for at least 2 of A, B, C the
+  gross is ≥ the 248-list gross in at least 2 of 3 periods with no list pushed below the random P90 in
+  a period where it was above it, **and** the family takes ≥ 10% of the core slots in P1 on at least 2
+  lists. Otherwise inert or harmful. Nothing goes live; it would be a dated decision to extend the
+  journal universe.
+- **Result:** pending.
+
 ## Log
 
 - 2026-10-10 — created and registered before any run.
