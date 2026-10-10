@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; the afternoon holds about half of the basket's picks |
-| **Status** | In progress |
+| **Status** | Done: closed at the step-1 gate; no state variable passes, no-trade gate inert |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
@@ -175,6 +175,75 @@ The forward journal is the only unseen data; a kept rule would be measured there
   record.
 - **Done when:** every version's read-out is recorded in this file with the keep / drop verdict.
 
+## Result (2026-10-10)
+
+**Verdict.** None of the 17 hourly state variables (14 + 3 pairs) carries pick-value for the pending
+strategies beyond what the 09:16 fit already has, under the registered bar. The gate fails, so step 2
+(the checkpoint rule) is not run and stage 2 is not registered. The no-trade column and the rupee gate are
+inert. Nothing changes in lists A / B / C or the journal.
+
+### Block 1 — the no-trade column (lists A / B / C / REF x P1 / P2 / P3, DRB-6W3L2)
+
+| | what happened |
+|---|---|
+| 1a zero column per index | picked on **0 of 202 / 157 / 618 days** in every list and period, as predicted. Gross still moved by −₹19k … +₹11k because two extra zero columns shift every other variant's percentile ranks (not a decision to sit out) |
+| 1b rupee gate (threshold 0) | fires on **0–4 days a period** (P2: never, for every list). The dropped picks lost money in 11 of 12 cells (−₹1.6k … −₹10.2k, REF P3 +₹195) but the effect is ₹0 … +₹10k of gross and ≤ 6% on drawdown, only on P1 |
+| keep rule (per-lot-day up, drawdown ≥ 20% better, picks dropped lost, **every** period) | **fails for A, B, C and REF**: it does not fire in P2 and the drawdown gain is 0–6% |
+
+Why it cannot do much: the top three of a ranked list almost always have a positive rupee expectation
+(weighted sum of raw recent / weekday / DTE / VIX / family means), so there is rarely anything to sit out.
+This matches BL-069 B7, and with weights 100 / 0 / 0 / 0 the flag reproduces B7(a) on the recent-only list
+exactly (₹3,12,773 / −₹1,04,024 / 58.4% over 202 days). Recorded list grosses are reproduced by the code
+without the flags (list A P1 ₹3,89,900 / −₹71,672; REF P1 ₹4,30,868 / −₹68,294).
+
+### Step 1 — hourly state and the pending strategies
+
+**Calibration (the judging code on the criteria already in use, all 248 variants):** weekday / DTE / VIX
+band = +0.036 / +0.028 / +0.041 (P1), +0.025 / +0.029 / +0.035 (P2), +0.081 / +0.083 / +0.042 (P3).
+P1 and P2 equal what `rotate.py` prints for list A to three places.
+
+**The null is high.** Even with shuffled labels the state fit scores +0.06 … +0.20 on the pending
+universe, because a trailing mean of each variant over matching days already ranks persistent variants
+(Dir over Buy, one start band over another) well. So the question is only whether the *state* adds to that,
+and the bar is above all 20 permutations **and** all 20 circular shifts.
+
+| (variable × acted hour) cells, 72 per period | P1 | P2 | P3 |
+|---|---|---|---|
+| above all 20 label permutations (luck expects about 3.4) | 2 | 15 | 6 |
+| above permutations **and** circular shifts (the bar used) | 1 | 7 | 3 |
+| cells that pass in **two** periods at the same hour | 0 | | |
+| cells that pass in all **three** | 0 | | |
+
+No variable counts: none passes at even one acted hour in all three periods, so none reaches two hours.
+Closest: pivot zone at 13:30 and 14:30 (passes P2, and P1 / P2 at 14:30), ATR-so-far at 13:30 (P2 only),
+pivot lines at 10:30 / 11:30 (P3 only). 14:30 is measured and not acted on. The permutation-only passes in
+P2 (15 of 72) are well above luck, but they do not repeat in P1 or P3, which is the point of the bar.
+
+**The owner's example, VIX up more than 2% since the morning** (mean P&L per pending strategy-day, ₹):
+
+| 10:30 | state | Widesl | Dir | Buy |
+|---|---|---|---|---|
+| P1 | up > +2% / flat / down | −44 / 223 / 74 | 307 / 246 / 307 | 33 / −3 / 53 |
+| P2 | up / flat / down | 262 / 175 / 96 | 206 / 276 / 97 | −44 / 11 / −7 |
+| P3 | up / flat / down | 226 / 167 / 25 | 154 / 246 / 362 | 16 / 23 / 87 |
+
+So a VIX rise that hurts pending Widesl in P1 is the best state for them in P2 and P3; the direction flips
+between periods, which is what a conditional fit fed with it would trade on. At 11:30 the picture is the
+same (Widesl up-state P1 +90, P2 +165, P3 +216 against flat +218 / +247 / +187).
+
+**What this does and does not say.** It says that, with 1-minute index and VIX bars, 14 single variables
+and 3 pairs, at four hours, over 2022–2026, nothing survives the three-period bar once the null includes
+the labels' own persistence. It does not say the afternoon strategies cannot be timed: the real VWAP is
+untested (BL-082), the started picks' live P&L (stage 2) is untested, and the bar was set to be hard.
+Not run, by registration: other bands, other thresholds, three-variable states, other blend weights.
+
+**Follow-up (cost-free, BL-058's call, not done here):** record each checkpoint's state snapshot in the
+forward journal so the same question can be asked on genuinely unseen days.
+
+Files: `research/bl081/state.py` (state table, bars <= h asserted by a SQL truncation check on 14 random
+rows, 0 mismatches), `stage0.py`, `run_block1.py`; `rotate.py --no-trade --rupee-gate`; outputs under
+`research/bl081/out/` (git-ignored; the tables above are the record).
+
 ## Risks
 
 - Many variables × hours × periods: controlled by the all-periods-and-two-hours bar and the published
@@ -203,3 +272,12 @@ None blocking. The VWAP follow-up (BL-082) waits for six months of futures bars.
   1-minute close of each 5-minute block completed by h and runs Wilder smoothing over the continuous
   series of sessions; (6) the straddle-change and ATM-IV rows read `derived/straddle_series_5m` (2024-10→),
   nearest expiry, first bucket's open vs the last completed bucket, so they stay supporting only.
+- 2026-10-10 — comparator tightened after the P2 smoke run (which printed only that 21 of 90 variable-hour
+  cells beat all 20 permutations, about 23% against the 5% luck expects) and before P1 / P3 ran: random
+  permutations break the labels' own day-to-day persistence (a low-VIX regime lasts weeks), so a real
+  label can beat them just by being persistent. Added a second comparator, **20 circular shifts** of the
+  label rows by a random offset of 21 days or more (seeds 1000–1019), which keeps persistence and breaks
+  only the link to the P&L. A variable *passes* only above **both** comparators; *counts* is judged on
+  that. The registered permutation-only pass is still reported. This only makes the bar harder.
+- 2026-10-10 — block 1 and step 1 run (state table built, calibration matches rotate.py). Result recorded
+  above: no variable counts, no-trade inert; the item closes at its registered gate. Step 2 not run.

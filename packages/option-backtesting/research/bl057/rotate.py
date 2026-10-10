@@ -29,6 +29,10 @@ WINDOW_FROM = (
 # apply to exactly that slice; `--no-buy` switches the Buy add-on off
 WINDOW_TO = sys.argv[sys.argv.index("--window-to") + 1] if "--window-to" in sys.argv else None
 NO_BUY = "--no-buy" in sys.argv
+# BL-081 block 1: `--no-trade` adds one zero-P&L column per index to the core pool (1a); `--rupee-gate` trades a
+# core pick only if the list-weighted sum of its raw rupee criteria is above zero, nothing replaces it (1b)
+NO_TRADE = "--no-trade" in sys.argv
+RUPEE_GATE = "--rupee-gate" in sys.argv
 WARMUP = 63
 LOOKBACKS = [(5, 0.4), (21, 0.3), (63, 0.3)]
 W_CRIT = {"recent": 0.33, "weekday": 0.25, "dte": 0.25, "vix": 0.17}
@@ -738,8 +742,12 @@ def main() -> None:
         print(f"grid {GRID} min from 09:17: {P.shape[1]} variants kept")
     if PREFILTER and not PREFILTER_WINDOW:
         P = prefilter(P, PREFILTER)
+    if NO_TRADE:  # BL-081 1a: the "no-trade strategy" of each index, worth 0 every day
+        for _pfx in ("N",) if NIFTY_ONLY else ("N", "S"):
+            P[f"{_pfx}_zero_0917"] = 0.0
     names = list(P.columns)
     Pv = P.to_numpy()
+    is_zero = np.array([n.split("_")[1] == "zero" for n in names])
     masks = variant_masks(names)
     is_wide, is_dir, is_buy, is_nifty = masks
     core_pool = np.where(~is_buy)[0]
@@ -807,6 +815,10 @@ def main() -> None:
             use_core = [v for v in core_a if crit["recent"][v] > 0]
             if not use_core:
                 use_buy = []  # no qualifying core pick: sit the whole day out
+        if RUPEE_GATE:
+            use_core = [v for v in core_a if sum(w * crit[k][v] for k, w in W_CRIT.items()) > 0]
+            if not use_core:
+                use_buy = []
         if STREAK_GATE and len(raw_hist) >= STREAK_GATE and sum(raw_hist[-STREAK_GATE:]) < 0:
             scale = 0.5  # losing streak: 1 lot per strategy instead of 2
         level = ladder.state if ladder else 0
@@ -838,18 +850,30 @@ def main() -> None:
                 nifty_A=int(is_nifty[core_a].sum()),
                 overridden=overridden,
                 changes_A=np.nan if len(picks_A) < 2 else len(set(core_a) ^ set(picks_A[-2])) / 2,
+                zero_picked=int(is_zero[core_a].sum()),
+                n_dropped=len(core_a) - len(use_core) + len(buy) - len(use_buy),
+                dropped_pnl=LOTS_PER
+                * (today[core_a].sum() + today[buy].sum() - today[use_core].sum() - today[use_buy].sum()),
             )
         )
         if ladder:  # the next day's size level is decided from equity through today
             ladder.update(rows[-1]["raw_pnl"] if DD_BASIS == "shadow" else rows[-1]["pnl_A"])
     R = pd.DataFrame(rows).set_index("day")
+    if NO_TRADE:
+        print(f"NO-TRADE: a zero column was picked on {int((R.zero_picked > 0).sum())} of {len(R)} selection days")
+    if RUPEE_GATE:
+        aff = R[R.n_dropped > 0]
+        print(
+            f"RUPEE GATE: {len(aff)} of {len(R)} days affected, {int(R.n_dropped.sum())} picks dropped, "
+            f"their P&L {R.dropped_pnl.sum():,.0f} (positive = the gate cut winners)"
+        )
     sel = np.arange(WARMUP, len(days))
     today_all = Pv[sel]
 
     # comparators
     buy_lots = R.n_buy.to_numpy()
     # E and R draw from each day's pool (the whole list unless a rolling prefilter is on)
-    day_pools = [np.where(m & ~is_buy)[0] for m in allowed_days]
+    day_pools = [np.where(m & ~is_buy & ~is_zero)[0] for m in allowed_days]
     day_pools_b = [np.where(m & is_buy)[0] for m in allowed_days]
     E = np.array(
         [
@@ -984,7 +1008,7 @@ def main() -> None:
         / (
             "daily_picks.csv"
             if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}{('_ddl' + '_'.join(map(str, DD_LADDER)) + ('_shadow' if DD_BASIS == 'shadow' else '')) if DD_LADDER else ''}{f'_from{WINDOW_FROM}' if WINDOW_FROM != '2025-09-01' else ''}{'_fband' if FAMILY_KEY == 'band' else ''}{'_ens' if ENSEMBLE else ''}{'_ext' if EXT_CLOSEST else ''}{'_extdir' if EXT_DIR else ''}{('_drop' + '-'.join(DROP)) if DROP else ''}{'_nifty' if NIFTY_ONLY else ''}{'_early' if EARLY_DIR else ''}{('_res' + RESULTS_DIR.name) if RESULTS_DIR else ''}{f'_to{WINDOW_TO}' if WINDOW_TO else ''}{'_nobuy' if NO_BUY else ''}.csv"
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}{('_ddl' + '_'.join(map(str, DD_LADDER)) + ('_shadow' if DD_BASIS == 'shadow' else '')) if DD_LADDER else ''}{f'_from{WINDOW_FROM}' if WINDOW_FROM != '2025-09-01' else ''}{'_fband' if FAMILY_KEY == 'band' else ''}{'_ens' if ENSEMBLE else ''}{'_ext' if EXT_CLOSEST else ''}{'_extdir' if EXT_DIR else ''}{('_drop' + '-'.join(DROP)) if DROP else ''}{'_nifty' if NIFTY_ONLY else ''}{'_early' if EARLY_DIR else ''}{('_res' + RESULTS_DIR.name) if RESULTS_DIR else ''}{f'_to{WINDOW_TO}' if WINDOW_TO else ''}{'_nobuy' if NO_BUY else ''}{'_notrade' if NO_TRADE else ''}{'_rgate' if RUPEE_GATE else ''}.csv"
         )
     )
     R.assign(
