@@ -603,6 +603,17 @@ The owner's numbers, written before the first rupee; nothing here trades.
 | 3.22.1 | Phase 1: rules file (`live_rules.toml`): paper first; cut half at 20%, exit at 30%; review at 5 pts behind over 13 weeks | owner→claude | **Done 2026-10-07**: signed off by the owner |
 | 3.22.2 | Phase 2: weekly check after the Friday final run → Telegram alert naming the rule and its action | claude | **Built 2026-10-07** (`mbt live-rules check`, job `momentum-live-rules` Fri 21:30). Drawdown and money gate measured on the paper model portfolio; the trailing rule says "not measurable" until BL-024 Phase 2 scores the journal |
 
+### 3.23 Momentum dashboard: what BL-010 changes on screen — [BL-036](backlog/BL-036-momentum-ui-from-bl010.md)
+
+The plan and the owner's decisions live in the backlog item; this table only tracks where each phase stands.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.23.1 | Phase 1 tasks 1–2 and the extended-tags companion: point-in-time universe as the default and a three-way choice, the universe on the result and in Saved runs, the trust note, the muted extended-tags figure | claude | **Built 2026-10-10** (branch `feat/bl-036-phase1-universe-and-companion`, PR pending). Default run 41.4% → 33.3%; extended tags 24.2% |
+| 3.23.2 | Phase 1 tasks 3–4: Midcap 150 / Smallcap 250 / Nifty 500 comparison lines, the rebalance cadence line on the Rebalance view | claude | Open: next PR |
+| 3.23.3 | Point-in-time categories from NSE Basic Industry — [BL-074](backlog/BL-074-point-in-time-categories-nse-basic-industry.md) | claude | Planned: starts after 3.23.1 merges; first check is delisted-company coverage |
+| 3.23.4 | Phases 2–4: execution realism, follow the frozen four, optional | claude | Planned; Phase 3 waits for the owner's paper-tracking decision (BL-010) |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

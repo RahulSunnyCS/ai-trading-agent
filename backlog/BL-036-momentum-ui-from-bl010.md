@@ -2,13 +2,13 @@
 
 | | |
 |---|---|
-| **Priority** | P2 — the dashboard still shows one number per Broad run without saying how much to trust it; BL-029 (the universe choice) stays P1 and is part of this |
-| **Status** | Planned |
+| **Priority** | P1 — the dashboard still shows one number per Broad run without saying how much to trust it; raised from P2 on 2026-10-10 because it now carries BL-029 (the universe choice) |
+| **Status** | In progress (Phase 1 tasks 1–2 and the extended-tags companion built; tasks 3–4 next PR) |
 | **Type** | improvement |
 | **Area** | dashboard, momentum |
 | **Created** | 2026-10-07 |
 | **Depends on** | BL-010 (done to Phase 6); BL-029 (Phase 1 here); BL-024 (journal); BL-001 (every new request field needs a frozen scenario) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.23 |
 
 ## Context
 
@@ -72,8 +72,10 @@ doing against its pre-set fail lines.
   4. Cadence on screen: show the `explain` line on the weekly signal and the Rebalance view
      ("Not a rebalance week: every 4 weeks, phase 3"), "next rebalance Friday", and a tooltip on
      "Which Fridays (phase)" giving the rule (weeks since 2016-01-01, mod the interval).
-- **Deliverables:** dashboard changes and tests (`__tests__`), one accepted golden scenario for
-  `turnover_rank` (BL-029's), docs (`technical.md`).
+- **Deliverables:** dashboard changes and tests (`__tests__`), docs (`technical.md`). A golden
+  scenario for `turnover_rank` is not possible: the frozen fixture holds 170 stocks and cannot build
+  a turnover rank, so the exemption in `tests/golden/test_coverage.py` stays, the Broad scenarios
+  pin `total_market`, and `tests/test_broad_parity.py` covers the plumbing (decided 2026-10-10).
 - **Done when:** a dashboard run on the new universe matches `mbt search pit-rerun` for the
   same config; the legend offers the four lines; an off-week signal says so.
 
@@ -117,9 +119,9 @@ doing against its pre-set fail lines.
 
 ## Open questions
 
-1. **Default universe for a new Broad run** (BL-029 question 1): today's list or point in time.
-   Recommended: point in time, since the warning exists because of it; a default run's CAGR
-   drops by roughly 20 points and saved runs keep their own universe.
+1. **Answered 2026-10-10: point in time is the default** for a new Broad run (BL-029 question 1).
+   A default run's CAGR went from 41.4% to 33.3% (same engine, data and settings); saved runs keep
+   their own universe.
 2. **Which comparison lines are on by default?** Recommended: Nifty200 Momentum 30 and Midcap
    150; the rest one click away.
 3. **The default for the trade delay and the Monday-open option.** New Broad runs trade on the
@@ -133,3 +135,26 @@ doing against its pre-set fail lines.
 - 2026-10-07 — created as BL-010's last task: the owner asked for a UI plan once the analysis
   was complete. The current UI was read (settings panel, config summaries, result details,
   comparison lines, journal page) and each finding above is tied to a file.
+- 2026-10-10 — started, scoped by the owner: Phase 1 tasks 1 and 2 plus a new item, an
+  **extended-tags companion figure** (the same run with `broad_category_tags="extended"`, shown
+  muted under the headline CAGR and in Saved runs). Tasks 3 (comparison lines) and 4 (cadence) are
+  the next PR. Owner decisions: point in time is the default; the companion is always computed for a
+  category-mode Broad run; trust-note wording as written above. NSE Basic Industry point-in-time
+  categories are a separate item, BL-074.
+- 2026-10-10 — built (branch `feat/bl-036-phase1-universe-and-companion`). **Default run, before and
+  after** (2017-01-06 → 2026-10-09, pre-tax, all default settings, circuit locks and the tradability
+  filter on): today's list 41.4% a year, worst fall −29.3%, Sharpe 1.28, extended tags 26.3%;
+  point in time 33.3%, −33.6%, Sharpe 1.09, extended tags 24.2% (−9.1 points) and −24.3%. First
+  point-in-time run 27 s including the companion pass; a cached repeat 0.4 s.
+  **Done-when check:** the API's Broad path reproduces `pit_rerun`'s own runner to two decimals on
+  three round 7 configs today (headline 50.92, 33.45, 28.22%; extended 32.39, 5.16, 31.08%). Against
+  the 2026-10-06 `pit_rerun.jsonl` file the headline sits about 2 points higher for each (48.99,
+  31.37, 26.22%) and the drawdowns match: that is the data fixes applied after that file was written,
+  not a path difference.
+  **Found on the way:** (1) the look-ahead test, now running the dashboard default, flipped
+  `win_rate` by one trade between a whole run and a truncated copy: a flat trade came out as 0.0 in
+  one and 2.2e-16 in the other. `analysis.split_wins_losses` now treats |return| ≤ 1e-9 as not a win;
+  no golden moved. (2) A saved run compares every KPI key, so the two new `extended_*` keys would
+  have recorded every strategy's next re-run as a moved result; `saved_identity.same_result` ignores
+  them. (3) The companion's text truncated to "With extended category ..." at a card width of 142 px;
+  it now leads with the figure and wraps.
