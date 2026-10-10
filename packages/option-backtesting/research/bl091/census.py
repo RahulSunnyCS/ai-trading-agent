@@ -30,6 +30,7 @@ from series import (
     ChainDay,
     Rolling,
     Spliced,
+    first_priced,
     level,
     load_chain_day,
     rolling_straddle,
@@ -116,9 +117,9 @@ def episode_row(
         "stale_minutes": sum(stale[m] for m in span),
         "missing_minutes": sum(sp.missing[m] for m in span),
         "late_trigger": ep.trigger_min >= M_1512,
-        # expiry day from 15:00: options price the settlement average, not the live index, so the
+        # expiry day, trigger or high from 15:00: options price the settlement average, not the live index, so the
         # index-ATM pair is not at the money (SENSEX 2025-01-14 15:21: 76600 PE at 98, index 76580)
-        "settlement_window": attrs["dte"] == 0 and ep.trigger_min >= M_1500,
+        "settlement_window": attrs["dte"] == 0 and max(ep.trigger_min, ep.high_min) >= M_1500,
     }  # fmt: skip
     return row
 
@@ -149,7 +150,7 @@ def day_work(task: tuple[str, str, str]) -> tuple[dict, list[dict]]:
     if defined == 0:
         return {**base, **{k: attrs[k] for k in ("expiry", "dte", "vix_open", "vix_band")},
                 "status": "skipped", "reason": "no priced ATM pair all day"}, []  # fmt: skip
-    episodes = scan_episodes(sp.x)
+    episodes = scan_episodes(sp.x, start=first_priced(rolling))  # never before the first price
     rows = [episode_row(period, chain, rolling, sp, stale, ep, i, attrs)
             for i, ep in enumerate(episodes)]  # fmt: skip
     summary = {

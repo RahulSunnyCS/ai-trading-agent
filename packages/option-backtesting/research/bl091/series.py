@@ -185,8 +185,13 @@ def splice(rolling: Rolling, chain: ChainDay, start: int = M_0920, end: int = M_
     return Spliced(x=x, switch=switch, fallback=fallback, missing=missing)
 
 
+def first_priced(rolling: Rolling, start: int = M_0920, end: int = M_1528) -> int | None:
+    return next((m for m in range(start, end + 1) if rolling.s[m] is not None), None)
+
+
 def level(rolling: Rolling, start: int = M_0920, end: int = M_1528) -> Spliced:
-    """The rolling ATM straddle held over unpriced minutes, as the episode series."""
+    """The rolling ATM straddle held over unpriced minutes, as the episode series. Minutes before
+    the first priced one carry its value only as padding: scan episodes from `first_priced`."""
     n = N_MINUTES
     x = [0.0] * n
     switch = [False] * n

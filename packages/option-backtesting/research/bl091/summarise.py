@@ -206,7 +206,8 @@ def r0_summary(eps: pd.DataFrame, att: pd.DataFrame) -> str:
         out += ["## Episodes with a held attempt: loss before the winner", "", md(hb), ""]
     # overlapping ladders on a multi-episode day
     per_ep = per_ep.sort_values([*GROUP, "day", "episode_idx"])
-    prev_end = per_ep.groupby([*GROUP, "day"]).last_exit.shift()
+    # the latest exit of every earlier ladder that day, not only the previous one
+    prev_end = per_ep.groupby([*GROUP, "day"]).last_exit.transform(lambda s: s.cummax().shift())
     per_ep["overlaps_prev"] = per_ep.first_entry <= prev_end
     day_raw = per_ep.groupby([*GROUP, "day"]).net0.sum()
     day_clean = per_ep[~per_ep.overlaps_prev].groupby([*GROUP, "day"]).net0.sum()
@@ -217,6 +218,18 @@ def r0_summary(eps: pd.DataFrame, att: pd.DataFrame) -> str:
         "overlapping_episodes": per_ep.groupby(GROUP).overlaps_prev.sum(),
     })  # fmt: skip
     out += ["## Days", "", md(worst), ""]
+    clean = (
+        per_ep[~per_ep.overlaps_prev]
+        .groupby(GROUP)
+        .agg(
+            episodes=("held", "size"),
+            with_a_held_attempt=("held", "sum"),
+            mean_net0=("net0", "mean"),
+            median_net0=("net0", "median"),
+            mean_net20=("net20", "mean"),
+        )
+    )
+    out += ["## Per episode, non-overlapping ladders only", "", md(clean), ""]
     held = att[att.outcome == "HELD"]
     if len(held):
         hm = held.groupby(GROUP).held_minutes.describe(percentiles=[0.25, 0.5, 0.75])

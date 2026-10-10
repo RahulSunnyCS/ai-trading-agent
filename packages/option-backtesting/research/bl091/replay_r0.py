@@ -26,8 +26,9 @@ from option_backtesting.legwise.market import load_day
 HERE = Path(__file__).parent
 EPISODES = HERE / "out" / "episodes.csv"
 RESULTS = HERE / "results" / "r0_attempts.csv"
-KEY = ["period", "underlying", "day", "episode_idx"]
-COLUMNS = [*KEY, "trigger_min", *ATTEMPT_COLUMNS]
+# trigger_min is part of the key: a re-run census with another definition must not reuse old ladders
+KEY = ["period", "underlying", "day", "episode_idx", "trigger_min"]
+COLUMNS = [*KEY, *ATTEMPT_COLUMNS]
 
 
 def _early_reference():
@@ -75,7 +76,13 @@ def main() -> int:
         done = {tuple(r) for r in ok[KEY].astype(str).itertuples(index=False)}
     by_day: dict[tuple[str, str, str], list[tuple[int, int]]] = {}
     for r in eps.itertuples(index=False):
-        if (str(r.period), str(r.underlying), str(r.day), str(r.episode_idx)) in done:
+        if (
+            str(r.period),
+            str(r.underlying),
+            str(r.day),
+            str(r.episode_idx),
+            str(r.trigger_min),
+        ) in done:
             continue
         by_day.setdefault((r.period, r.underlying, r.day), []).append(
             (int(r.episode_idx), int(r.trigger_min))

@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 from episodes import scan_episodes
-from periods import ForbiddenDay, assert_learning_day, learning_days
+from periods import SIZING, ForbiddenDay, assert_learning_day, learning_days
 from r0 import ladder, wide_strategy
 from series import (
     FRESH_MINUTES,
@@ -31,6 +31,7 @@ from series import (
 from trading_data import derived
 
 from option_backtesting.fyers.daily import data_dir
+from option_backtesting.legwise.engine import simulate_day
 from option_backtesting.legwise.market import N_MINUTES, DayData, Series, _minutes, load_day
 from option_backtesting.rotation.store import read_net
 
@@ -245,10 +246,6 @@ def reproduce_1132(root: Path) -> None:
         for d in days:
             assert_learning_day(und, d)
             data = load_day(root, und, d)
-            from periods import SIZING
-
-            from option_backtesting.legwise.engine import simulate_day
-
             res = simulate_day(wide_strategy(und, "11:32", 2500.0), data, ref, SIZING)
             n += 1
             if abs((res.gross - res.costs) - stored[d]) > 0.01:

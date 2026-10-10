@@ -527,16 +527,28 @@ Episodes with a held attempt: losses before the winner averaged −₹929 / −�
 in 81 of 117 / 644 of 893 / 110 of 152. Held attempts ran a median 156 / 153 / 123 minutes. Of the
 overall stops, 8 / 98 / 29 hit on the entry bar itself.
 
-Worst day (sum of a day's episodes): −₹9,367 / −₹10,185 / −₹5,093 per strategy counting only ladders
-that do not overlap; −₹24,882 / −₹99,748 / −₹6,234 raw, because a day with several episodes runs
-several ladders at once (67 / 839 / 48 overlapping episodes), which the owner would not.
+The table above adds ladders that overlap in time on days with several episodes (68 / 843 / 49
+episodes start before an earlier ladder that day has ended), which the owner would not run. Counting
+only episodes whose ladder starts after every earlier one has ended:
+
+| period | index | episodes | with a held attempt | mean ₹ per episode | median | at ₹20/order mean |
+|---|---|---|---|---|---|---|
+| P2 | NIFTY | 77 | 62 | +425 | +478 | +212 |
+| P2 | SENSEX | 159 | 136 | +395 | +503 | +203 |
+| P3 | NIFTY | 122 | 111 | +496 | +514 | +318 |
+
+Worst day (sum of a day's episodes): −₹9,211 / −₹10,185 / −₹5,093 per strategy without overlapping
+ladders; −₹24,882 / −₹99,748 / −₹6,234 raw.
 
 **What this does not show.** There is no comparator in this phase: R0's rupees include the plain
 theta of a strangle held to 15:28, and nothing here says an episode-triggered entry beats the same
 Widesl entered at another minute. That is the time-matched random re-entry comparator of the R arms
 (E.6), not run. SENSEX's counts are dominated by the 25-point threshold being small for its straddle.
-Expiry-day episodes from 15:00 (13 / 52 / 41) price against the settlement average, not the live
-index (Log, 2026-10-11).
+Expiry-day episodes whose trigger or high is at 15:00 or later (14 / 57 / 42) price against the
+settlement average, not the live index (Log, 2026-10-11). R0 fills through the engine, which prices a
+strike from its last close including the vendor's zero-volume carried bars, while the episode series
+refuses a leg whose last real trade is more than 5 minutes old; 44 SENSEX attempts entered one leg
+only. This is the engine convention behind every stored result and is left as is.
 
 ## Log
 
@@ -588,3 +600,8 @@ index (Log, 2026-10-11).
   smoke-run episodes. All self-checks pass again (12 with the new 5b).
 - 2026-10-11 — Phase 1 census and R0 replay run on P2 + P3 (932 index-days, 1,450 episodes, 1,318
   replayed, 0 errors). Counts only, in the Result section; no rule chosen; P1 unread.
+- 2026-10-11 — PR #174 review: the replay's resume key now includes the trigger minute; the overlap
+  check uses the latest exit of every earlier ladder; episodes are scanned from the first priced
+  minute; the settlement flag covers a high at or after 15:00; a non-overlapping per-episode table
+  added. Census unchanged (1,450 episodes), R0 unchanged; overlap counts and the settlement count
+  moved slightly (numbers above updated). R0's stale-price fills recorded as a limitation.
