@@ -904,6 +904,10 @@ def test_broad_meta_reports_no_instrument_picker_and_broad_defaults(broad_client
     # A new Broad run starts realistic: tradability gate and circuit-lock fills on (BL-010).
     assert meta["defaults"]["broad_liquidity_filter"] is True
     assert meta["defaults"]["broad_respect_circuits"] is True
+    # BL-036 Phase 1: a new run uses each year's own most-traded stocks; the request model itself
+    # keeps total_market, so a saved run that carries no value re-runs unchanged.
+    assert meta["defaults"]["broad_universe"] == "turnover_rank"
+    assert api.BacktestRequest(**_broad_request()).broad_universe == "total_market"
 
 
 def test_broad_meta_membership_warning_follows_file_provenance(broad_client, tmp_path):
@@ -2021,6 +2025,88 @@ def test_circuit_realism_runs_the_opposite_setting_on_the_prices_it_is_given(
     assert realism["cagr_impact"] == pytest.approx(
         realism["respecting_locks"]["cagr"] - realism["ignoring_locks"]["cagr"]
     )
+
+
+def _write_wide_tags(extra_symbol: str = BROAD_ORPHAN_SYMBOL) -> None:
+    """The extended tags file beside the fixture's curated one: one stock outside every curated
+    category gets a tag, so the extended run can differ from the curated one."""
+    (api.CATEGORIES_CURATED_DIR / "stock_groups_wide.csv").write_text(
+        "parent_group,subgroup,symbol,company_name,note\n"
+        f"Test Parent,Alpha,{extra_symbol},{extra_symbol} Ltd,wide\n"
+    )
+
+
+def _companion_fixture():
+    req = api.BacktestRequest(
+        **_broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
+    )
+    ranking = api._broad_ranking(req)
+    outer = api.DATA.get()
+    return req, ranking, outer, api._run_broad(req, ranking, outer)
+
+
+def test_the_extended_tags_companion_reruns_on_the_same_ranking_with_extended_tags(
+    broad_client, monkeypatch
+):
+    """The real second engine run, spied: the tags change, the ranking object does not."""
+    _write_wide_tags()
+    req, ranking, outer, outcome = _companion_fixture()
+    calls = []
+    real = api._run_broad
+
+    def spy(request, ranked, prices):
+        calls.append((request.broad_category_tags, ranked))
+        return real(request, ranked, prices)
+
+    monkeypatch.setattr(api, "_run_broad", spy)
+    companion = api._extended_tags_companion(req, ranking, outcome, outer)
+    assert [tags for tags, _ in calls] == ["extended"]
+    assert calls[0][1] is ranking
+    assert companion["status"] == "computed" and companion["tags"] == "extended"
+    assert set(companion) >= {"cagr", "max_drawdown", "total_return", "trades", "cagr_impact"}
+    this_run = float(api.metrics.cagr(outcome.result.equity))
+    assert companion["cagr_impact"] == pytest.approx(companion["cagr"] - this_run)
+
+
+def test_the_extended_tags_companion_is_skipped_where_there_is_nothing_to_compare(
+    broad_client, monkeypatch
+):
+    req, ranking, outer, outcome = _companion_fixture()
+
+    def forbidden(*_a, **_k):
+        raise AssertionError("no second engine pass expected")
+
+    monkeypatch.setattr(api, "_run_broad", forbidden)
+    off = api._extended_tags_companion(
+        req.model_copy(update={"broad_category_mode": "off"}), ranking, outcome, outer
+    )
+    assert off == {"status": "not_applicable", "reason": "no category layer"}
+    already = api._extended_tags_companion(
+        req.model_copy(update={"broad_category_tags": "extended"}), ranking, outcome, outer
+    )
+    assert already["status"] == "this_run"
+    assert already["cagr"] == pytest.approx(float(api.metrics.cagr(outcome.result.equity)))
+
+
+def test_a_missing_extended_tags_file_fails_the_companion_not_the_run(broad_client):
+    """The fixture's curated folder has no stock_groups_wide.csv, as on a fresh clone."""
+    body = _broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
+    result = _job(broad_client, body, fresh=True)["result"]
+    assert result["kpis"]["cagr"] is not None
+    assert result["companion"]["status"] == "failed"
+    assert "stock_groups_wide.csv" in result["companion"]["reason"]
+
+
+def test_the_weekly_build_skips_the_companion(broad_client, monkeypatch):
+    def forbidden(*_a, **_k):
+        raise AssertionError("the weekly job must not run the companion pass")
+
+    monkeypatch.setattr(api, "_extended_tags_companion", forbidden)
+    req = api.BacktestRequest(
+        **_broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
+    )
+    core, _lazy = api._broad_parts(req, companion=False)
+    assert core["companion"] == {"status": "skipped", "reason": "weekly run"}
 
 
 def test_the_circuit_section_builds_the_real_realism_comparison(broad_client, monkeypatch):

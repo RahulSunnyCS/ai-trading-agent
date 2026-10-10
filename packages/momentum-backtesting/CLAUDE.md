@@ -330,6 +330,10 @@ contract, not a shared service).
   gate, but the API refuses the whole-market and `turnover_rank` universes there (they preview from the
   latest stored close). Keep new Broad request fields in
   `get_broad_ranking`'s cache key, or stale rankings will be served.
+  **`turnover_rank` is the dashboard's default for a new Broad run since 2026-10-10** (BL-036 Phase 1:
+  `_broad_meta`'s `broad_universe`); `BacktestRequest.broad_universe` itself stays `total_market`, so a saved
+  run that carries no value re-runs unchanged and the golden scenarios pin `total_market` (the fixture's 170
+  stocks cannot build a turnover rank).
 - `categories/circuit_exposure.py` — post-hoc, display-only: walks a Broad backtest's holding periods
   (`holding_periods`) over the daily bars and reports the worst lower/upper-circuit runs it held
   through (`circuit_exposure`, payload key `circuit_exposure`). An open position has a `NaT` sell
@@ -481,6 +485,12 @@ contract, not a shared service).
   Opt in per run with `category_tags="extended"` (`run_broad_backtest`, `BacktestRequest.broad_category_tags`;
   search arm C1 only, `search.EXTENDED_TAG_ARMS`); the default keeps every existing result unchanged. Tags are the
   CURRENT classification applied to all years. Stocks BSE does not list (NSE-only, delisted) stay untagged.
+  Every category-mode Broad result also carries `core["companion"]` (`api._extended_tags_companion`, BL-036
+  Phase 1): the same run with `extended` tags, one extra engine pass that reuses the run's cached ranking
+  (tags do not enter the ranking). It never raises (`status` is `computed`, `this_run`, `not_applicable`,
+  `failed` with a reason, or `skipped`) and the weekly job skips it (`_broad_parts(..., companion=False)`).
+  The dashboard shows it muted under the CAGR; it is the closest figure to an expected return, not a
+  point-in-time one (the tags are still today's classification: BL-074).
 - `categories/exit_reasons.py` — display-only: for Broad Momentum closed trades the engine records as
   "ineligible" (rank NaN: the stock stopped being selected), fills the blank `exit_rank` (pool rank, else
   momentum rank) and sets a specific `reason` + `exit_cause` (`liquidity` with the failing gate test and its

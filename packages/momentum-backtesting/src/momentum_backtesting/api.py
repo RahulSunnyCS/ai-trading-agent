@@ -1606,7 +1606,11 @@ def _broad_meta() -> dict:
             "broad_off_top_n": 10,
             "broad_off_exit_rank": 20,
             "broad_every_week": True,
-            "broad_universe": "total_market",
+            # A new Broad run uses each year's own 750 most-traded stocks (owner decision
+            # 2026-10-10, BL-029 Phase 2 / BL-036 Phase 1): the survivor-only list inflates the
+            # CAGR (BL-010 F1). The gate below is forced on for this universe. The request model
+            # keeps "total_market", so a saved run (which carries its own value) re-runs unchanged.
+            "broad_universe": "turnover_rank",
             # A new Broad run starts realistic (owner decision 2026-10-05, BL-010 §3.13.2): only
             # stocks that trade enough, and no fills on a circuit-locked day. Together they cut
             # the default run from 53% to 40% CAGR. The request model keeps False, so a saved
@@ -1822,6 +1826,53 @@ def _circuit_realism(
     }
 
 
+def _extended_tags_companion(
+    req: BacktestRequest,
+    ranking: broad.UniverseRanking,
+    outcome: broad.BroadBacktestResult,
+    outer_prices: pd.DataFrame,
+) -> dict:
+    """The same run with `broad_category_tags="extended"` (BL-036 Phase 1): the curated tags name
+    only today's 755 index members, so a stock that later left the index can be ranked but never
+    picked through a category. The extended tags (BSE's current classification, every liquid NSE
+    stock) remove that, and the gap is the closest figure to an expected return this engine can
+    give. The tags do not touch the ranking, so the run's own `ranking` is reused: one extra
+    engine pass. Never raises; a failure is reported in the payload instead."""
+    if req.broad_category_mode != "on":
+        return {"status": "not_applicable", "reason": "no category layer"}
+
+    def summary(result: Result) -> dict:
+        equity = result.equity
+        return {
+            "cagr": float(metrics.cagr(equity)),
+            "max_drawdown": float(metrics.max_drawdown(equity)[0]),
+            "total_return": float(equity.iloc[-1] - 1),
+            "trades": int(len(result.trades)),
+        }
+
+    try:
+        this_run = summary(outcome.result)
+        if req.broad_category_tags == "extended":
+            return {
+                "status": "this_run",
+                "tags": "extended",
+                "cagr": this_run["cagr"],
+                "max_drawdown": this_run["max_drawdown"],
+            }
+        other = _run_broad(
+            req.model_copy(update={"broad_category_tags": "extended"}), ranking, outer_prices
+        )
+        extended = summary(other.result)
+        return {
+            "status": "computed",
+            "tags": "extended",
+            **extended,
+            "cagr_impact": extended["cagr"] - this_run["cagr"],
+        }
+    except Exception as error:  # noqa: BLE001 - a companion figure must never fail the run
+        return {"status": "failed", "reason": f"{type(error).__name__}: {error}"[:200]}
+
+
 #: Universes that are only meaningful behind the tradability gate: the whole market (the gate is
 #: what narrows it) and the point-in-time turnover rank (every search that used it gated).
 GATED_BROAD_UNIVERSES = ("all_liquid", "turnover_rank")
@@ -1889,7 +1940,9 @@ def _broad_backtest(req: BacktestRequest) -> dict:
     return _full(*_broad_parts(req))
 
 
-def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
+def _broad_parts(
+    req: BacktestRequest, report: Report = _no_report, *, companion: bool = True
+) -> Parts:
     report("loading")
     on = req.broad_category_mode == "on"
     if on and req.broad_category_top_n > req.broad_category_exit_rank:
@@ -1922,6 +1975,13 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
     groups = dict.fromkeys(prices.columns, "Stock")
     for name in broad.ATOMIC_NAMES:
         groups[name] = "Atomic"
+    # In `core`, not a lazy section: the headline shows it without a second fetch. The weekly job
+    # skips it (it stores no such figure, and runs every Broad favourite).
+    companion_figure = (
+        _extended_tags_companion(req, ranking, outcome, outer_prices)
+        if companion
+        else {"status": "skipped", "reason": "weekly run"}
+    )
     report("analysing")
     core, lazy = analysis.payload_parts(
         result,
@@ -1947,6 +2007,7 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         picks_per_category=req.broad_picks_per_category,
     )
     core["missing_symbols"] = outcome.ranking.missing_symbols
+    core["companion"] = companion_figure
     base_trades = lazy["trades"]
 
     def trades() -> object:
@@ -3800,7 +3861,7 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
     elif req.dataset == "custom_index":
         payload = _custom_index_backtest(req)
     elif req.dataset == "broad":
-        core, lazy = _broad_parts(req)
+        core, lazy = _broad_parts(req, companion=False)
         # The engine's own decision for the newest STORED week (a lagging outer-market series can
         # end the run itself a week earlier), so the run's own `latest` is not built at all.
         lazy.pop("latest", None)
