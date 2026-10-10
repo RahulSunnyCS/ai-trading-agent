@@ -50,6 +50,13 @@ def census(days: pd.DataFrame, eps: pd.DataFrame) -> str:
     cov["episodes"] = eps.groupby(GROUP).size()
     cov["episodes_per_day"] = cov.episodes / cov.loaded
     out += ["## Coverage", "", md(cov), ""]
+    drift = loaded.groupby(GROUP).agg(
+        switches_per_day=("n_switches", "median"),
+        median_level_change=("level_change", "median"),
+        median_spliced_change=("spliced_change", "median"),
+    )
+    out += ["Rolling ATM straddle 09:20 -> 15:28 (points), and the spliced diagnostic that was dropped:", "",
+            md(drift), ""]  # fmt: skip
     reasons = days[days.status != "loaded"].groupby([*GROUP, "reason"]).size().rename("days")
     if len(reasons):
         out += ["Skipped days by reason:", "", md(reasons.to_frame()), ""]
@@ -113,10 +120,10 @@ def census(days: pd.DataFrame, eps: pd.DataFrame) -> str:
     qual = eps.groupby(GROUP).agg(
         episodes=("day", "count"),
         with_stale=("stale_minutes", lambda s: int((s > 0).sum())),
-        with_fallback=("n_fallbacks", lambda s: int((s > 0).sum())),
         with_missing=("missing_minutes", lambda s: int((s > 0).sum())),
         median_switches=("n_switches", "median"),
         late_trigger=("late_trigger", lambda s: int(s.astype(bool).sum())),
+        settlement_window=("settlement_window", lambda s: int(s.astype(bool).sum())),
     )
     out += ["## Data quality inside episodes", "", md(qual), ""]
     return "\n".join(out)

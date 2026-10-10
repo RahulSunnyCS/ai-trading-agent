@@ -3,12 +3,20 @@
 Rolling ATM (E.1): at minute m the ATM strike is the index's close of bar m rounded half-up to the
 strike step (the same rounding as the engine's resolve_strike and derived.straddle_series_5m), on the
 nearest expiry present in the day's file (min expiry >= day). The straddle is that pair's CE + PE
-close of bar m, forward-filled as the engine's Series do. Everything at m uses bars stamped <= m.
+at m, each leg priced at its last real trade (a bar with volume > 0) if that trade is at most
+FRESH_MINUTES old, else unpriced. The vendor files repeat a contract's last close as zero-volume bars
+all day, so without this a strike that last traded hours earlier keeps its old price and an ATM
+switch onto it looks like a spike (SENSEX expiry day 2025-01-14: 6 -> 98 at 15:21). Everything at m
+uses bars stamped <= m.
 
-Spliced (E.1, review fix): episodes are measured on the running total of within-strike minute
-changes. At a strike switch the jump between the old and the new pair is dropped: the change is the
-new pair's own move from its previous-minute close. If the new pair has no close yet, the change is 0
-and the minute is flagged `fallback`.
+Level (the episode series since 2026-10-11): the rolling ATM straddle itself, as the owner defined it
+("the 24,000 straddle at 159 ... the 24,100 straddle at 180"), so a strike switch counts as movement.
+A minute with no priced pair holds the last value and is flagged `missing`.
+
+Spliced (kept as a diagnostic only): the running total of within-strike minute changes, dropping the
+jump at each switch. The smoke run showed it drifts down at every switch (the pair left behind is the
+nearer one, so the dropped gap has one sign): SENSEX 2025-01-10 fell 261 points spliced against 143
+in the rolling straddle by 14:11. It is therefore not the episode series.
 """
 
 from __future__ import annotations
@@ -27,6 +35,7 @@ from option_backtesting.data.resolver import _round_half_up
 from option_backtesting.legwise.market import N_MINUTES, _load_bars, _minutes
 
 Key = tuple[float, str]  # (strike, "CE" | "PE")
+FRESH_MINUTES = 5  # a leg's last real trade must be this recent to price it
 
 
 @dataclass
@@ -36,18 +45,22 @@ class ChainDay:
     expiry: date
     step: float
     spot: list[float | None]  # index close per minute, forward-filled
-    close: dict[Key, list[float | None]]  # nearest expiry only, forward-filled
+    close: dict[Key, list[float | None]]  # nearest expiry; last real trade within FRESH_MINUTES
     real: dict[Key, list[bool]]  # a bar exists at m and its volume is not 0
     n_rows: int = 0
 
 
-def _ffill(values: list[float | None]) -> list[float | None]:
+def _ffill(values: list[float | None], max_age: int | None = None) -> list[float | None]:
+    """Forward-fill; with max_age a value older than max_age minutes becomes None."""
     out: list[float | None] = []
     last: float | None = None
+    age = 0
     for v in values:
         if v is not None:
-            last = v
-        out.append(last)
+            last, age = v, 0
+        else:
+            age += 1
+        out.append(last if max_age is None or age <= max_age else None)
     return out
 
 
@@ -81,15 +94,17 @@ def load_chain_day(root: Path, underlying: str, day: date) -> ChainDay:
         if key not in raw:
             raw[key] = [None] * N_MINUTES
             real[key] = [False] * N_MINUTES
-        raw[key][m] = closes[r]
-        real[key][m] = volumes[r] is None or volumes[r] > 0
+        traded = volumes[r] is None or volumes[r] > 0
+        if traded:
+            raw[key][m] = closes[r]
+        real[key][m] = real[key][m] or traded
     return ChainDay(
         day=day,
         underlying=underlying,
         expiry=expiry,
         step=STEP[underlying],
         spot=list(spot_series.close),
-        close={k: _ffill(v) for k, v in raw.items()},
+        close={k: _ffill(v, FRESH_MINUTES) for k, v in raw.items()},
         real=real,
         n_rows=table.num_rows,
     )
@@ -168,6 +183,30 @@ def splice(rolling: Rolling, chain: ChainDay, start: int = M_0920, end: int = M_
     for m in range(end + 1, n):
         x[m] = x[end]
     return Spliced(x=x, switch=switch, fallback=fallback, missing=missing)
+
+
+def level(rolling: Rolling, start: int = M_0920, end: int = M_1528) -> Spliced:
+    """The rolling ATM straddle held over unpriced minutes, as the episode series."""
+    n = N_MINUTES
+    x = [0.0] * n
+    switch = [False] * n
+    missing = [False] * n
+    first = next((rolling.s[m] for m in range(start, end + 1) if rolling.s[m] is not None), 0.0)
+    last = first
+    for m in range(start, end + 1):
+        v = rolling.s[m]
+        if v is None:
+            missing[m] = True
+            v = last
+        last = v
+        x[m] = v
+        if m > start and rolling.atm[m] is not None and rolling.atm[m - 1] is not None:
+            switch[m] = rolling.atm[m] != rolling.atm[m - 1]
+    for m in range(start):
+        x[m] = x[start]
+    for m in range(end + 1, n):
+        x[m] = x[end]
+    return Spliced(x=x, switch=switch, fallback=[False] * n, missing=missing)
 
 
 def stale_mask(pair_real: list[bool], run: int = 3) -> list[bool]:

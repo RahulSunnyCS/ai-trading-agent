@@ -17,8 +17,25 @@ from datetime import date
 from pathlib import Path
 
 from episodes import Episode, scan_episodes
-from periods import M_1512, M_1528, UNDERLYINGS, assert_learning_day, learning_days, period_of
-from series import ChainDay, Rolling, Spliced, load_chain_day, rolling_straddle, splice, stale_mask
+from periods import (
+    M_1500,
+    M_1512,
+    M_1528,
+    UNDERLYINGS,
+    assert_learning_day,
+    learning_days,
+    period_of,
+)
+from series import (
+    ChainDay,
+    Rolling,
+    Spliced,
+    level,
+    load_chain_day,
+    rolling_straddle,
+    splice,
+    stale_mask,
+)
 
 from option_backtesting.fyers.daily import data_dir
 from option_backtesting.legwise.market import minute_label
@@ -30,7 +47,8 @@ OUT = HERE / "out"
 
 DAY_COLUMNS = [
     "period", "underlying", "day", "status", "reason", "expiry", "dte", "vix_open", "vix_band",
-    "n_episodes", "n_switches", "n_fallbacks", "stale_minutes", "missing_minutes", "defined_minutes",
+    "n_episodes", "n_switches", "stale_minutes", "missing_minutes", "defined_minutes", "level_change",
+    "spliced_change",
 ]  # fmt: skip
 EPISODE_COLUMNS = [
     "period", "underlying", "day", "episode_idx", "expiry", "dte", "dte_label", "vix_open",
@@ -39,8 +57,8 @@ EPISODE_COLUMNS = [
     "end_reason", "outcome", "n_pauses", "low_x", "high_x", "rise", "rise_at_trigger", "trough_x",
     "giveback", "end_x", "straddle_start", "straddle_trigger", "straddle_high", "straddle_end",
     "atm_trigger", "spot_start", "spot_trigger", "spot_high", "spot_1528", "rise_dir",
-    "spot_move_rise", "spot_move_after", "spot_path", "n_switches", "n_fallbacks",
-    "stale_minutes", "missing_minutes", "late_trigger",
+    "spot_move_rise", "spot_move_after", "spot_path", "n_switches",
+    "stale_minutes", "missing_minutes", "late_trigger", "settlement_window",
 ]  # fmt: skip
 
 
@@ -95,10 +113,12 @@ def episode_row(
         "spot_high": chain.spot[ep.high_min], "spot_1528": chain.spot[M_1528],
         **spot_path(chain.spot, ep, chain.step),
         "n_switches": sum(sp.switch[m] for m in span),
-        "n_fallbacks": sum(sp.fallback[m] for m in span),
         "stale_minutes": sum(stale[m] for m in span),
         "missing_minutes": sum(sp.missing[m] for m in span),
         "late_trigger": ep.trigger_min >= M_1512,
+        # expiry day from 15:00: options price the settlement average, not the live index, so the
+        # index-ATM pair is not at the money (SENSEX 2025-01-14 15:21: 76600 PE at 98, index 76580)
+        "settlement_window": attrs["dte"] == 0 and ep.trigger_min >= M_1500,
     }  # fmt: skip
     return row
 
@@ -117,7 +137,8 @@ def day_work(task: tuple[str, str, str]) -> tuple[dict, list[dict]]:
     except (FileNotFoundError, LookupError) as e:
         return {**base, "status": "skipped", "reason": f"{type(e).__name__}: {e}"}, []
     rolling = rolling_straddle(chain)
-    sp = splice(rolling, chain)
+    sp = level(rolling)
+    spliced = splice(rolling, chain)  # diagnostic only: its drift is why `level` is the series
     stale = stale_mask(rolling.pair_real)
     vix = vix_open_from_lake(root, day)
     dte = (chain.expiry - day).days
@@ -135,7 +156,8 @@ def day_work(task: tuple[str, str, str]) -> tuple[dict, list[dict]]:
         **base, **{k: attrs[k] for k in ("expiry", "dte", "vix_open", "vix_band")},
         "status": "loaded", "reason": "", "n_episodes": len(episodes),
         "n_switches": sum(sp.switch[m] for m in window),
-        "n_fallbacks": sum(sp.fallback[m] for m in window),
+        "level_change": round(sp.x[M_1528] - sp.x[5], 2),
+        "spliced_change": round(spliced.x[M_1528], 2),
         "stale_minutes": sum(stale[m] for m in window),
         "missing_minutes": sum(sp.missing[m] for m in window),
         "defined_minutes": defined,
@@ -163,7 +185,7 @@ def tasks(limit: int | None) -> tuple[list[tuple[str, str, str]], list[dict]]:
 def show_day(underlying: str, day: date) -> None:
     chain = load_chain_day(data_dir(), underlying, day)
     rolling = rolling_straddle(chain)
-    sp = splice(rolling, chain)
+    sp = level(rolling)
     print(f"{underlying} {day} expiry {chain.expiry} rows {chain.n_rows}")
     print("time  spot      atm      straddle  x       flags")
     for m in range(5, M_1528 + 1):

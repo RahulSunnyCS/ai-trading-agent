@@ -357,11 +357,13 @@ substance; these are the settings the start-time freeze will use unless the owne
 1. **The series is the rolling (dynamic) ATM straddle.** Whatever strike is ATM at that minute, that
    straddle: NIFTY at 24,000 with the 24,000 straddle at 159; NIFTY moves to 24,100 and the 24,100
    straddle is now the series, at 180 or so. Detection reads this rolling series, built minute by
-   minute from the lake's one-minute contract bars (B.10). Every strike switch is marked. For
-   episodes (the ≥ 25-point rise and ≥ 15-point decay of E.2) the series is **spliced**: the
-   running total of within-strike minute changes, so a rise that crosses a switch is one episode and
-   the jump between the old and new straddle's values is dropped. For derivatives (velocity,
-   acceleration, persistence) the Phase 0 rule stands: **reset** at the switch and warm up for the
+   minute from the lake's one-minute contract bars (B.10). Every strike switch is marked. Episodes
+   (the ≥ 25-point rise and ≥ 15-point decay of E.2) are measured on the rolling ATM straddle itself,
+   so a switch counts as movement, as in the owner's example (corrected 2026-10-11; a spliced series
+   was registered first and dropped, see the Log). Each leg is priced from its last real trade at most
+   5 minutes old; a minute with no priced pair holds the last value and is flagged. For derivatives
+   (velocity, acceleration, persistence) the Phase 0 rule stands: **reset** at the switch and warm up
+   for the
    window length (A.7); no derivative is read inside the warm-up. The outcome of a trade is measured on the
    pair actually sold at the entry minute, which is then held fixed (the Phase 0 "freeze that pair"
    rule). NIFTY first; SENSEX where the same bars exist.
@@ -492,3 +494,18 @@ substance; these are the settings the start-time freeze will use unless the owne
   fills at the 15:27 bar's close. Rupees reported at the engine's cost 0 and at an assumed ₹20 per
   order. P1 and 2025-08-30 → 2025-12-02 are refused by `periods.assert_learning_day`; self-check 10
   tests it.
+- 2026-10-11 — Smoke run (3 days per period, 9 index-days; census only, no outcome table read) found
+  two construction problems, fixed before the full run. (1) **The spliced series drifts down at
+  every strike switch.** The pair just left is the nearer one, so the dropped gap has one sign; over
+  30–90 switches a day it adds up (SENSEX 2025-01-10: rolling straddle −143 points to 14:11, spliced
+  −261; NIFTY 2025-01-13 −69 against −110). Episodes therefore use the rolling ATM straddle itself
+  (`series.level`), which is also the owner's definition ("the 24,000 straddle at 159 … the 24,100
+  straddle at 180"); the spliced total stays in `days.csv` as a diagnostic. E.1 and self-checks 3, 4,
+  5 and 7 updated. (2) **Expiry-day settlement window.** From 15:00 on an expiry day the options price
+  the settlement average, not the live index, so the index-ATM pair is not at the money (SENSEX
+  2025-01-14 15:21: index 76,580, the 76,600 put trading at 97–100, i.e. settlement near 76,500); the
+  rolling straddle then jumps at a switch on real trades. The ATM rule is unchanged (engine, AlgoTest
+  and the 5-minute derived series all use the index); such episodes are flagged `settlement_window`
+  and counted separately. Also added, as A.7 asked: each leg is priced from its last real trade at
+  most 5 minutes old (the vendor files repeat old closes as zero-volume bars); it did not change the
+  smoke-run episodes. All self-checks pass again (12 with the new 5b).

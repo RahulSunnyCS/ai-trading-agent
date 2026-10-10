@@ -21,6 +21,7 @@ STOP_INR = 650.0  # owner, 2026-10-10: the live Widesl with a ₹650 MTM stop
 RISE = 25.0  # E.2: an episode is a rise of at least 25 points
 DECAY = 15.0  # E.2: decayed = gave back at least 15 points from the high
 M_0920 = 5  # observation starts 09:20
+M_1500 = 345  # expiry-day settlement window starts
 M_1512 = 357  # a trigger here or later gets no attempt (entry would be 15:13)
 M_1513 = 358  # no entry at or after 15:13
 M_1528 = 373  # horizon: the completed 15:28 bar

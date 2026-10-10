@@ -2,7 +2,7 @@
 
     uv run --with pandas python research/bl091/selfcheck.py
 
-1-6 synthetic (episodes, splice, stale flag), 7 truncation on real P2/P3 days, 8 the 1-minute
+1-6 synthetic (episodes, the level series across a switch and over gaps, stale flag), 7 truncation on real P2/P3 days, 8 the 1-minute
 rolling series against derived.straddle_series_5m at window closes, 9 the R0 template at 11:32 with
 its own ₹2,500 stop reproduces the stored N_/S_wide_1132 results, 10 the period guard, 11 the R0
 ladder on a synthetic day.
@@ -18,7 +18,16 @@ import pyarrow.parquet as pq
 from episodes import scan_episodes
 from periods import ForbiddenDay, assert_learning_day, learning_days
 from r0 import ladder, wide_strategy
-from series import ChainDay, load_chain_day, rolling_straddle, splice, stale_mask
+from series import (
+    FRESH_MINUTES,
+    ChainDay,
+    _ffill,
+    level,
+    load_chain_day,
+    rolling_straddle,
+    splice,
+    stale_mask,
+)
 from trading_data import derived
 
 from option_backtesting.fyers.daily import data_dir
@@ -72,8 +81,8 @@ def synthetic() -> None:
     check("2 ramp 30 -> 1 episode", ok and eps[0].outcome == "no_pause", str(eps[:1]))
 
     spot = [24020.0 if m < 21 else 24030.0 for m in range(N_MINUTES)]
-    s_old = [100 + max(0, min(m, 20) - 5) for m in range(N_MINUTES)]
-    s_new = [140 + max(0, min(m, 35) - 5) for m in range(N_MINUTES)]
+    s_old = [100 + max(0, min(m, 20) - 5) for m in range(N_MINUTES)]  # 100 -> 115 by 09:35
+    s_new = [115 + max(0, min(m, 35) - 20) for m in range(N_MINUTES)]  # 116 at the switch -> 130
     t = [True] * N_MINUTES
 
     def halves(s):
@@ -82,47 +91,60 @@ def synthetic() -> None:
     ch = synth_chain(spot, {24000.0: (halves(s_old), halves(s_old), t, t),
                             24050.0: (halves(s_new), halves(s_new), t, t)})  # fmt: skip
     r = rolling_straddle(ch)
+    lv = level(r)
+    eps = scan_episodes(lv.x)
     sp = splice(r, ch)
-    eps = scan_episodes(sp.x)
-    ok = (len(eps) == 1 and abs(eps[0].high_x - eps[0].low_x - 30) < 1e-9
-          and sum(sp.switch) == 1 and not any(sp.fallback) and r.s[21] - r.s[20] > 40)  # fmt: skip
-    check(
-        "3 switch jump dropped",
-        ok,
-        f"rise={eps[0].high_x - eps[0].low_x if eps else None} raw jump={r.s[21] - r.s[20]}",
-    )
+    ok = (len(eps) == 1 and abs(eps[0].high_x - eps[0].low_x - 30) < 1e-9 and sum(lv.switch) == 1
+          and lv.x[21] == 116 and abs(sp.x[35] - 30) < 1e-9)  # fmt: skip
+    check("3 level follows the rolling pair across a switch", ok,
+          f"rise={eps[0].high_x - eps[0].low_x if eps else None}")  # fmt: skip
 
-    s_new_late = [None if m < 21 else v for m, v in enumerate(s_new)]
-    ch = synth_chain(spot, {24000.0: (halves(s_old), halves(s_old), t, t),
-                            24050.0: (halves(s_new_late), halves(s_new_late), t, t)})  # fmt: skip
+    gap = [None if 15 <= m <= 18 else v for m, v in enumerate(s_old)]
+    ch = synth_chain(spot, {24000.0: (halves(gap), halves(gap), t, t),
+                            24050.0: (halves(s_new), halves(s_new), t, t)})  # fmt: skip
     r = rolling_straddle(ch)
-    sp = splice(r, ch)
-    eps = scan_episodes(sp.x)
-    ok = (
-        sp.fallback[21]
-        and abs(sp.x[21] - 15) < 1e-9
-        and len(eps) == 1
-        and abs(eps[0].high_x - 29) < 1e-9
+    lv = level(r)
+    eps = scan_episodes(lv.x)
+    ok = (sum(lv.missing) == 4 and lv.x[16] == lv.x[14] and len(eps) == 1
+          and abs(eps[0].high_x - eps[0].low_x - 30) < 1e-9)  # fmt: skip
+    check(
+        "4 unpriced minutes hold the last value and are flagged", ok, f"missing={sum(lv.missing)}"
     )
-    check("4 switch without previous close -> fallback, delta 0", ok, f"x21={sp.x[21]}")
 
     spot = [24000.0] * N_MINUTES
-    stale = [m < 5 for m in range(N_MINUTES)]  # PE trades only before 09:20, then ffilled
     ce_flat = [50.0] * N_MINUTES
     pe_flat = [50.0] * N_MINUTES
-    ch = synth_chain(spot, {24000.0: (ce_flat, pe_flat, t, stale)})
+    sparse = [m % 4 == 0 for m in range(N_MINUTES)]  # PE trades every 4th minute
+    ch = synth_chain(spot, {24000.0: (ce_flat, pe_flat, t, sparse)})
     r = rolling_straddle(ch)
-    sp = splice(r, ch)
+    sp = level(r)
     st = stale_mask(r.pair_real)
-    ok_a = scan_episodes(sp.x) == [] and sum(st) > 0
+    ok_a = scan_episodes(sp.x) == [] and sum(st) > 0 and not any(sp.missing)
     ce_up = [50.0 + max(0, min(m, 35) - 5) for m in range(N_MINUTES)]
-    ch = synth_chain(spot, {24000.0: (ce_up, pe_flat, t, stale)})
+    ch = synth_chain(spot, {24000.0: (ce_up, pe_flat, t, sparse)})
     r = rolling_straddle(ch)
-    sp = splice(r, ch)
+    sp = level(r)
     st = stale_mask(r.pair_real)
     eps = scan_episodes(sp.x)
     ok_b = len(eps) == 1 and sum(st[m] for m in range(eps[0].start_min, eps[0].end_min + 1)) > 0
-    check("5 stale leg flagged, never invents a rise", ok_a and ok_b)
+    check("5 sparse trading is flagged stale, still priced, never invents a rise", ok_a and ok_b)
+
+    # the expiry-day artifact: the ATM switches onto a strike whose last real trade is hours old
+    spot = [24000.0 if m < 50 else 24060.0 for m in range(N_MINUTES)]
+    old_real = [m <= 20 for m in range(N_MINUTES)]
+    pairs = {24000.0: ([20.0] * N_MINUTES, [20.0] * N_MINUTES, t, t),
+             24050.0: ([50.0] * N_MINUTES, [50.0] * N_MINUTES, old_real, old_real)}  # fmt: skip
+    close, real = {}, {}
+    for k, (ce, pe, rc, rp) in pairs.items():
+        for kind, vals, rr in (("CE", ce, rc), ("PE", pe, rp)):
+            raw = [v if rr[m] else None for m, v in enumerate(vals)]
+            close[(k, kind)] = _ffill(raw, FRESH_MINUTES)
+            real[(k, kind)] = rr
+    ch = ChainDay(D0, "NIFTY", EXP0, 50.0, spot, close, real)
+    r = rolling_straddle(ch)
+    sp = level(r)
+    ok = scan_episodes(sp.x) == [] and sp.x[60] == 40.0 and sp.missing[60]
+    check("5b a stale price on the new ATM pair does not make a spike", ok, f"x60={sp.x[60]}")
 
     eps = scan_episodes(ramp([(5, 0), (45, 40), (65, 20), (95, 50)]))
     ok_a = (len(eps) == 1 and eps[0].n_pauses == 1 and eps[0].outcome == "resumed_open"
@@ -152,14 +174,14 @@ def truncation(root: Path) -> None:
     for und, day in sample_days(root):
         ch = load_chain_day(root, und, day)
         r = rolling_straddle(ch)
-        sp = splice(r, ch)
+        sp = level(r)
         full = scan_episodes(sp.x)
         for T in (120, 200, 300, 373):
             cut = ChainDay(ch.day, ch.underlying, ch.expiry, ch.step,
                            ch.spot[: T + 1] + [ch.spot[T]] * (N_MINUTES - T - 1),
                            {k: v[: T + 1] + [v[T]] * (N_MINUTES - T - 1) for k, v in ch.close.items()},
                            ch.real)  # fmt: skip
-            sp_cut = splice(rolling_straddle(cut), cut)
+            sp_cut = level(rolling_straddle(cut))
             if sp_cut.x[: T + 1] != sp.x[: T + 1]:
                 bad.append((und, day, T, "series"))
             part = scan_episodes(sp.x, end=T)
@@ -200,7 +222,7 @@ def derived_cross(root: Path) -> None:
                 if shown < 10:
                     shown += 1
                     print(f"   atm {und} {day} m={m} ours={r.atm[m]} derived={a}")
-            if s is not None and (r.s[m] is None or abs(r.s[m] - s) > 0.01):
+            if s is not None and r.s[m] is not None and abs(r.s[m] - s) > 0.01:
                 mism_s += 1
                 if shown < 10:
                     shown += 1
