@@ -7,9 +7,9 @@
  * selection comes from the `broad_*` keys, which differ by category mode.
  */
 
+import type { MomentumCompanion } from '../types/momentum';
 import { formatNumber, formatPct, formatPp } from './format';
 import { BROAD_UNIVERSES, broadUniverse, isGatedUniverse } from './momentumUniverse';
-import type { MomentumCompanion } from '../types/momentum';
 
 /**
  * The settings accordions, by id. The settings panel renders one accordion per id, the summary
