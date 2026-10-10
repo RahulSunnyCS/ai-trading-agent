@@ -13,12 +13,14 @@
 import { useMemo, useState } from 'react';
 
 import { useRotationOverview, useRotationSummary } from '../../hooks/useRotation';
+import { formatIstTime, istToday } from '../../lib/format';
 import {
   BENCHMARK_LABEL,
   BENCHMARK_NOTE,
   LIST_KEYS,
   type RotationBenchmark,
   benchmarkFigures,
+  verdict as buildVerdict,
   headline,
   heroSeries,
 } from '../../lib/rotationView';
@@ -33,6 +35,7 @@ import { RotationHeadline } from './rotation/RotationHeadline';
 import { RotationHealthStrip } from './rotation/RotationHealth';
 import { RotationHero } from './rotation/RotationHero';
 import { RotationReadoutBanner } from './rotation/RotationReadout';
+import { RotationVerdict } from './rotation/RotationVerdict';
 
 const FOCUS_OPTIONS: SegmentedOption<RotationListKey>[] = LIST_KEYS.map((value) => ({
   value,
@@ -60,6 +63,7 @@ export function RotationPanel() {
     [s, focus, benchmark, readoutDays],
   );
   const points = useMemo(() => (s ? heroSeries(s, focus) : []), [s, focus]);
+  const verdictFor = useMemo(() => (s ? buildVerdict(s, focus) : null), [s, focus]);
   const bench = s ? benchmarkFigures(s, benchmark, focus) : null;
 
   const reload = () => {
@@ -109,6 +113,21 @@ export function RotationPanel() {
       </div>
       <p className="text-xs text-faint">{BENCHMARK_NOTE[benchmark]}</p>
 
+      {overview.error && overview.data ? (
+        <StateMessage
+          variant="error"
+          title="The journal could not be re-read"
+          description={`Showing what was read at ${formatIstTime(overview.data.health.as_of)} IST; the last request failed: ${overview.error}`}
+        />
+      ) : null}
+      {summary.error && s ? (
+        <StateMessage
+          variant="error"
+          title="The read-out could not be refreshed"
+          description={`The figures below are the last ones received. ${summary.error}`}
+        />
+      ) : null}
+
       {overview.error && !overview.data ? (
         <StateMessage
           variant="error"
@@ -119,7 +138,7 @@ export function RotationPanel() {
         <>
           <RotationHealthStrip health={overview.data.health} />
           <RotationReadoutBanner
-            scoredDays={s?.n_days ?? 0}
+            scoredDays={s ? s.n_days : null}
             total={readoutDays}
             firstDay={s?.first_day ?? null}
             lastDay={s?.last_day ?? null}
@@ -141,6 +160,7 @@ export function RotationPanel() {
       ) : (
         <>
           <RotationHeadline figures={figures} benchmarkLabel={bench?.label ?? ''} />
+          {verdictFor && s.n_days > 0 ? <RotationVerdict verdict={verdictFor} /> : null}
           <Card>
             <CardHeader
               title="Cumulative gross by list"
@@ -156,7 +176,9 @@ export function RotationPanel() {
                 title="No scored forward sessions yet"
                 description={
                   Object.values(s.pending_reasons)[0] ??
-                  'The first entry is recorded at 09:16 and scored by the 19:45 update the same evening.'
+                  (s.late_entries.length > 0
+                    ? `${s.late_entries.length} entr${s.late_entries.length === 1 ? 'y was' : 'ies were'} recorded after 09:17 and do not count: ${s.late_entries.join(', ')}.`
+                    : 'The first entry is recorded at 09:16 and scored by the 19:45 update the same evening.')
                 }
               />
             ) : (
@@ -169,6 +191,11 @@ export function RotationPanel() {
                 onToggleBase={() => setShowBase((v) => !v)}
               />
             )}
+            {s.n_days > 0 && s.late_entries.length > 0 ? (
+              <p className="mt-3 text-xs text-warning">
+                Left out as late (recorded after 09:17, not forward): {s.late_entries.join(', ')}.
+              </p>
+            ) : null}
             {s.n_days > 0 && Object.keys(s.pending_reasons).length > 0 ? (
               <ul className="mt-3 space-y-0.5 text-xs text-muted">
                 {Object.entries(s.pending_reasons).map(([day, why]) => (
@@ -185,8 +212,14 @@ export function RotationPanel() {
       {overview.data ? (
         <Card>
           <CardHeader
-            title="Today's baskets"
-            description="What each list holds, why it holds it, and what changed since yesterday."
+            title={
+              overview.data.baskets.entry?.day === istToday() ? "Today's baskets" : 'Latest baskets'
+            }
+            description={
+              overview.data.baskets.entry && overview.data.baskets.entry.day !== istToday()
+                ? 'Not today’s: no entry for today has been recorded (yet). These are the latest ones.'
+                : 'What each list holds and what changed since the entry before.'
+            }
           />
           <RotationBaskets
             baskets={overview.data.baskets}

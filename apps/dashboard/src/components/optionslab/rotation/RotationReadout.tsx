@@ -14,21 +14,26 @@ export function RotationReadoutBanner({
   lastDay,
   firstEntryDay,
 }: {
-  scoredDays: number;
+  scoredDays: number | null;
   total: number;
   firstDay: string | null;
   lastDay: string | null;
   firstEntryDay: string;
 }) {
-  const p = readoutProgress(scoredDays, total);
-  const started = scoredDays > 0;
+  const p = readoutProgress(scoredDays ?? 0, total);
+  const loading = scoredDays === null;
+  const started = (scoredDays ?? 0) > 0;
   return (
     <section
       aria-label="Read-out progress"
       className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-info/30 bg-info/10 px-3 py-2 text-xs"
     >
       <span className="font-medium text-foreground">
-        {started ? `Day ${p.n} of ${p.total}` : `Starts ${formatDay(firstEntryDay)}`}
+        {loading
+          ? 'Reading the read-out…'
+          : started
+            ? `Day ${p.n} of ${p.total}`
+            : `Starts ${formatDay(firstEntryDay)}`}
       </span>
       <div
         className="h-1.5 min-w-24 flex-1 overflow-hidden rounded-full bg-surface-2"

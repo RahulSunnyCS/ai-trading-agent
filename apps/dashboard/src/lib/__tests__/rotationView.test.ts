@@ -8,7 +8,7 @@ import {
   nearestIndex,
   niceTicks,
   readoutProgress,
-  tooltipPlacement,
+  verdict,
 } from '../rotationView';
 
 function stats(over: Partial<RotationListStats> = {}): RotationListStats {
@@ -50,7 +50,13 @@ function summary(): RotationSummary {
     short: true,
     lists: {
       A: stats(),
-      REF: stats({ total: 19000, max_drawdown: -8800, per_lot_day: 170, beats_random_pct: 52 }),
+      REF: stats({
+        total: 19000,
+        max_drawdown: -8800,
+        per_lot_day: 170,
+        beats_random_pct: 52,
+        vs_ref: null,
+      }),
     },
     base: {
       definition: 'base',
@@ -87,20 +93,55 @@ describe('benchmarkFigures', () => {
 });
 
 describe('headline', () => {
-  it('sets each figure against the benchmark and signs the drawdown tone correctly', () => {
+  it('compares per lot, and shows lots instead of a gap for totals', () => {
     const h = headline(summary(), 'A', 'REF', 60);
     const byId = Object.fromEntries(h.map((x) => [x.id, x]));
-    expect(byId.total?.gap).toBe(11000);
-    expect(byId.total?.tone).toBe('positive');
-    // -8000 against -8800 is a smaller drawdown: better, although the number is larger
-    expect(byId.drawdown?.gap).toBe(800);
-    expect(byId.drawdown?.tone).toBe('positive');
+    expect(byId.perLotDay?.gap).toBe(80);
+    expect(byId.perLotDay?.tone).toBe('positive');
+    // -1300 per lot against REF's -1300: not better, not worse
+    expect(byId.drawdownLot?.gap).toBe(0);
+    expect(byId.drawdownLot?.tone).toBe('default');
+    expect(byId.total?.gap).toBeNull();
+    expect(byId.total?.caption).toContain('6 lots a day');
     expect(byId.sessions?.value).toBe(2);
     expect(byId.sessions?.benchmark).toBe(60);
   });
 
+  it('a smaller drawdown per lot is better even though the number is larger', () => {
+    const s = summary();
+    s.lists.A = stats({ max_drawdown_per_lot: -1000 });
+    const dd = headline(s, 'A', 'REF', 60).find((x) => x.id === 'drawdownLot');
+    expect(dd?.gap).toBe(300);
+    expect(dd?.tone).toBe('positive');
+  });
+
+  it('is not fooled by more lots: a bigger rupee drawdown on 8-lot days is no gap at all', () => {
+    const s = summary();
+    s.lists.A = stats({ max_drawdown: -12000, max_drawdown_per_lot: -1300, lots_per_day: 8 });
+    const h = headline(s, 'A', 'REF', 60);
+    expect(h.find((x) => x.id === 'drawdownLot')?.tone).toBe('default');
+    expect(h.some((x) => x.id === 'total' && x.gap !== null)).toBe(false);
+  });
+
   it('is empty when the focus list has no figures yet', () => {
     expect(headline({ ...summary(), lists: {} }, 'A', 'REF', 60)).toEqual([]);
+  });
+});
+
+describe('verdict', () => {
+  it('lists REF and the base with the base carrying the pass rule', () => {
+    const v = verdict(summary(), 'A');
+    expect(v.lines.map((l) => l.label)).toEqual([
+      'List A minus REF',
+      'List A minus the fixed base',
+    ]);
+    expect(v.lines[0]?.rule).toBeNull();
+    expect(v.lines[1]?.rule).toEqual({ drawdownNoWorse: true, beats: false });
+    expect(v.readable).toBe(false); // 2 days
+  });
+
+  it('REF has only the base line', () => {
+    expect(verdict(summary(), 'REF').lines).toHaveLength(1);
   });
 });
 
@@ -124,15 +165,6 @@ describe('small helpers', () => {
     expect(readoutProgress(18, 60).fraction).toBeCloseTo(0.3);
     expect(readoutProgress(75, 60)).toMatchObject({ fraction: 1, done: true });
     expect(readoutProgress(0, 0).fraction).toBe(0);
-  });
-
-  it('tooltipPlacement sits below, flips above near the bottom and clamps the sides', () => {
-    const tip = { w: 120, h: 60 };
-    const box = { w: 600, h: 300 };
-    expect(tooltipPlacement({ x: 300, y: 50 }, tip, box)).toEqual({ left: 240, top: 90 });
-    expect(tooltipPlacement({ x: 300, y: 280 }, tip, box).top).toBe(180);
-    expect(tooltipPlacement({ x: 5, y: 50 }, tip, box).left).toBe(4);
-    expect(tooltipPlacement({ x: 598, y: 50 }, tip, box).left).toBe(476);
   });
 
   it('nearestIndex snaps a pixel to its day', () => {

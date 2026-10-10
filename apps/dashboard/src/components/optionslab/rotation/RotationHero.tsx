@@ -3,19 +3,15 @@
  * them, the band of 1,000 random same-shape baskets for the focus list. Hand-drawn SVG, like the
  * Correlation tab's heatmap, so nothing here pulls in a chart library.
  *
- * Follow tooltip below the cursor; a click pins a day (Esc or a second click closes, ← → step).
+ * Follow tooltip below the cursor. A click pins a day; the slider under the chart does the same
+ * from the keyboard (arrow keys), and Clear releases it.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { formatDay, formatInr } from '../../../lib/format';
-import {
-  type HeroPoint,
-  LIST_KEYS,
-  nearestIndex,
-  niceTicks,
-  tooltipPlacement,
-} from '../../../lib/rotationView';
+import { tooltipPlacement } from '../../../lib/momentumResult';
+import { type HeroPoint, LIST_KEYS, nearestIndex, niceTicks } from '../../../lib/rotationView';
 import type { RotationListKey } from '../../../types/rotation';
 
 const W = 860;
@@ -81,25 +77,26 @@ export function RotationHero({
     [scale],
   );
 
-  useEffect(() => {
-    if (pinned === null) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPinned(null);
-      else if (e.key === 'ArrowLeft') setPinned((i) => (i === null ? i : Math.max(0, i - 1)));
-      else if (e.key === 'ArrowRight') setPinned((i) => (i === null ? i : Math.min(n - 1, i + 1)));
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [pinned, n]);
-
   if (n === 0) return null;
 
+  const frame = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
+    },
+    [],
+  );
   const onMove = (e: React.MouseEvent) => {
     const r = box.current?.getBoundingClientRect();
     if (!r) return;
     const px = e.clientX - r.left;
-    const svgX = (px / r.width) * W;
-    setHover({ i: nearestIndex(svgX, PAD.l, W - PAD.r, n), x: px, y: e.clientY - r.top });
+    const py = e.clientY - r.top;
+    if (frame.current !== null) cancelAnimationFrame(frame.current);
+    frame.current = requestAnimationFrame(() => {
+      frame.current = null;
+      const svgX = (px / r.width) * W;
+      setHover({ i: nearestIndex(svgX, PAD.l, W - PAD.r, n), x: px, y: py });
+    });
   };
 
   const active = pinned ?? hover?.i ?? null;
@@ -110,8 +107,8 @@ export function RotationHero({
     const t = tip.current?.getBoundingClientRect();
     return tooltipPlacement(
       { x: hover.x, y: hover.y },
-      { w: t?.width ?? 180, h: t?.height ?? 110 },
-      { w: r.width, h: r.height },
+      { width: t?.width ?? 192, height: t?.height ?? 110 },
+      { left: 0, top: 0, right: r.width, bottom: r.height },
     );
   })();
 
@@ -167,13 +164,13 @@ export function RotationHero({
           random baskets, P10 to P90
         </span>
       </div>
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: pointer shortcut for the day slider below, which is the keyboard path to the same pin */}
       <div
         ref={box}
         className="relative"
         onMouseMove={onMove}
         onMouseLeave={() => setHover(null)}
         onClick={() => setPinned((p) => (p === null ? (hover?.i ?? null) : null))}
-        onKeyDown={undefined}
       >
         <svg
           viewBox={`0 0 ${W} ${H}`}
@@ -235,6 +232,22 @@ export function RotationHero({
               className={STROKE[k]}
             />
           ))}
+          {LIST_KEYS.filter((k) => shown.has(k)).map((k) =>
+            points.map((p, i) => {
+              const v = p.lists[k];
+              // every point on a short series (a single session draws no line), the last on a long one
+              if (v === undefined || (n > 30 && i !== n - 1)) return null;
+              return (
+                <circle
+                  key={`${k}-${p.day}`}
+                  cx={x(i)}
+                  cy={y(v)}
+                  r={k === focus ? 3.2 : 2.4}
+                  className={`${STROKE[k].replace('stroke-', 'fill-')}`}
+                />
+              );
+            }),
+          )}
           {active !== null ? (
             <line
               x1={x(active)}
@@ -273,10 +286,36 @@ export function RotationHero({
           </div>
         ) : null}
       </div>
+      <div className="flex items-center gap-3 text-xs text-muted">
+        <label htmlFor="rotation-hero-day" className="shrink-0">
+          Inspect a day
+        </label>
+        <input
+          id="rotation-hero-day"
+          type="range"
+          min={0}
+          max={n - 1}
+          step={1}
+          value={pinned ?? n - 1}
+          onChange={(e) => setPinned(Number(e.target.value))}
+          className="min-w-0 flex-1"
+          aria-valuetext={formatDay(points[pinned ?? n - 1]?.day)}
+        />
+        {pinned !== null ? (
+          <button
+            type="button"
+            onClick={() => setPinned(null)}
+            className="rounded border border-border px-2 py-0.5 text-foreground hover:bg-surface-2"
+          >
+            Clear
+          </button>
+        ) : (
+          <span className="text-faint">or click the chart</span>
+        )}
+      </div>
       {pinned !== null && point ? (
         <div className="rounded-md border border-border bg-surface-2 px-3 py-2 text-xs">
           <span className="font-medium text-foreground">{formatDay(point.day)}</span>
-          <span className="ml-2 text-faint">← → step, Esc closes</span>
           <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 font-mono text-muted">
             {LIST_KEYS.filter((k) => point.lists[k] !== undefined).map((k) => (
               <span key={k}>

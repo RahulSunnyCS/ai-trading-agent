@@ -6,7 +6,7 @@
  * Before the first entry it shows the registered lists and when they start recording.
  */
 
-import { formatDay, formatIstTime } from '../../../lib/format';
+import { formatDay, formatIstTime, formatNumber } from '../../../lib/format';
 import { LIST_KEYS } from '../../../lib/rotationView';
 import type {
   RotationBaskets as Baskets,
@@ -38,15 +38,17 @@ function Pick({ pick, highlight }: { pick: RotationPick; highlight?: boolean }) 
         highlight ? 'bg-primary/10' : ''
       }`}
       title={`${pick.index} · ${pick.family} · starts ${pick.start}${
-        pick.composite !== null ? ` · composite ${pick.composite}` : ''
+        pick.composite !== null ? ` · composite ${formatNumber(pick.composite, 3)}` : ''
       }`}
     >
       <span className="w-10 shrink-0 font-mono text-faint">{pick.start}</span>
       <span className="min-w-0 flex-1 truncate font-mono text-foreground">{pick.name}</span>
       <span className="font-mono text-muted">
-        {pick.composite === null ? '' : pick.composite.toFixed(3)}
+        {pick.composite === null ? '' : formatNumber(pick.composite, 3)}
       </span>
       <span
+        role="img"
+        aria-label={`held by ${pick.shared_by} of 4 lists`}
         className="font-mono text-[10px] tracking-tighter text-faint"
         title={`held by ${pick.shared_by} of 4 lists`}
       >
@@ -142,7 +144,7 @@ export function RotationBaskets({
           {e.weekday} {formatDay(e.day)}
         </span>
         <span>
-          VIX {e.vix_open} ({e.vix_band})
+          VIX {formatNumber(e.vix_open, 2)} ({e.vix_band})
         </span>
         <span>
           DTE NIFTY {e.dte.NIFTY} / SENSEX {e.dte.SENSEX}

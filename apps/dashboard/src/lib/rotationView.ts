@@ -33,7 +33,11 @@ export interface BenchmarkFigures {
   label: string;
   total: number | null;
   maxDrawdown: number | null;
+  /** The drawdown of the per-lot series: what the registered rule compares. */
+  maxDrawdownPerLot: number | null;
   perLotDay: number | null;
+  /** Lots the benchmark holds a day (a list: 6, or 8 on Buy days; the base: 6). */
+  lotsPerDay: number | null;
   /** Share of random baskets the benchmark itself beats; null where that does not apply. */
   beatsRandom: number | null;
 }
@@ -50,7 +54,9 @@ export function benchmarkFigures(
       label: 'REF',
       total: ref?.total ?? null,
       maxDrawdown: ref?.max_drawdown ?? null,
+      maxDrawdownPerLot: ref?.max_drawdown_per_lot ?? null,
       perLotDay: ref?.per_lot_day ?? null,
+      lotsPerDay: ref?.lots_per_day ?? null,
       beatsRandom: ref?.beats_random_pct ?? null,
     };
   }
@@ -60,7 +66,9 @@ export function benchmarkFigures(
       label: 'Base',
       total: b?.total ?? null,
       maxDrawdown: b?.max_drawdown ?? null,
+      maxDrawdownPerLot: b?.max_drawdown_per_lot ?? null,
       perLotDay: b?.per_lot_day ?? null,
+      lotsPerDay: b?.lots_per_day ?? null,
       beatsRandom: null,
     };
   }
@@ -70,6 +78,8 @@ export function benchmarkFigures(
     label: 'Random median',
     total: f?.random.p50 ?? null,
     maxDrawdown: null,
+    maxDrawdownPerLot: null,
+    lotsPerDay: f?.lots_per_day ?? null,
     perLotDay: f && f.lots_per_day > 0 && days > 0 ? f.random.p50 / (f.lots_per_day * days) : null,
     beatsRandom: 50,
   };
@@ -78,25 +88,33 @@ export function benchmarkFigures(
 export type HeadlineTone = 'positive' | 'negative' | 'default';
 
 export interface HeadlineFigure {
-  id: 'total' | 'drawdown' | 'perLotDay' | 'random' | 'sessions';
+  id: 'total' | 'perLotDay' | 'drawdownLot' | 'random' | 'sessions';
   label: string;
   value: number;
   unit: 'inr' | 'pct' | 'count';
   /** The benchmark's own figure, or null where there is none to compare. */
   benchmark: number | null;
-  /** value - benchmark, in the figure's unit. */
+  /** value - benchmark, in the figure's unit; null where the two are not comparable. */
   gap: number | null;
-  /** Whether a positive gap is good: a drawdown nearer zero is, so the sign flips there. */
   tone: HeadlineTone;
   hint: string;
+  /** Shown instead of a gap where a total cannot be compared: the lots behind each figure. */
+  caption?: string;
 }
 
-function toneOf(gap: number | null, higherIsBetter = true): HeadlineTone {
+function toneOf(gap: number | null): HeadlineTone {
   if (gap === null || gap === 0) return 'default';
-  return gap > 0 === higherIsBetter ? 'positive' : 'negative';
+  return gap > 0 ? 'positive' : 'negative';
 }
 
-/** The five numbers that say whether the focus list is good, each against the benchmark. */
+const lots = (v: number | null): string => (v === null ? '' : `${Math.round(v * 10) / 10}`);
+
+/**
+ * The numbers that say whether the focus list is good, each against the benchmark. Lists hold 6
+ * lots, or 8 on a Buy day, and the base 6, so a total or a drawdown in rupees is not comparable:
+ * those two show the lots behind them instead of a gap, and the gap badges sit on the per-lot
+ * figures, which is what the registered rule compares.
+ */
 export function headline(
   summary: RotationSummary,
   focus: RotationListKey,
@@ -107,28 +125,11 @@ export function headline(
   if (!f) return [];
   const b = benchmarkFigures(summary, pick, focus);
   const gap = (v: number, ref: number | null) => (ref === null ? null : v - ref);
+  const totalCaption =
+    b.total === null
+      ? undefined
+      : `${b.label} at ${lots(b.lotsPerDay)} lots a day; this list ${lots(f.lots_per_day)}`;
   return [
-    {
-      id: 'total',
-      label: 'Cumulative gross',
-      value: f.total,
-      unit: 'inr',
-      benchmark: b.total,
-      gap: gap(f.total, b.total),
-      tone: toneOf(gap(f.total, b.total)),
-      hint: `At ${f.lots_per_day} lots a day on average. Totals are not comparable across lists that hold different lots; use per lot-day for that.`,
-    },
-    {
-      id: 'drawdown',
-      label: 'Max drawdown',
-      value: f.max_drawdown,
-      unit: 'inr',
-      benchmark: b.maxDrawdown,
-      gap: gap(f.max_drawdown, b.maxDrawdown),
-      // drawdowns are negative: a larger (nearer zero) value is the better one
-      tone: toneOf(gap(f.max_drawdown, b.maxDrawdown)),
-      hint: 'The largest fall of the cumulative gross from its running peak, the peak starting at zero.',
-    },
     {
       id: 'perLotDay',
       label: '₹ per lot-day',
@@ -137,7 +138,29 @@ export function headline(
       benchmark: b.perLotDay,
       gap: gap(f.per_lot_day, b.perLotDay),
       tone: toneOf(gap(f.per_lot_day, b.perLotDay)),
-      hint: 'Average gross per lot per day: the fair way to compare a 6-lot and an 8-lot day.',
+      hint: 'Average gross per lot per day: the fair way to compare a 6-lot and an 8-lot day, and the unit the registered rule uses.',
+    },
+    {
+      id: 'drawdownLot',
+      label: 'Max drawdown per lot',
+      value: f.max_drawdown_per_lot,
+      unit: 'inr',
+      benchmark: b.maxDrawdownPerLot,
+      gap: gap(f.max_drawdown_per_lot, b.maxDrawdownPerLot),
+      // drawdowns are negative: a larger (nearer zero) value is the better one
+      tone: toneOf(gap(f.max_drawdown_per_lot, b.maxDrawdownPerLot)),
+      hint: 'The largest fall of the cumulative gross per lot from its running peak, the peak starting at zero. Per lot so that holding more lots does not look like a worse drawdown.',
+    },
+    {
+      id: 'total',
+      label: 'Cumulative gross',
+      value: f.total,
+      unit: 'inr',
+      benchmark: b.total,
+      gap: null,
+      tone: 'default',
+      hint: `Total over the scored sessions at 2 lots per strategy (max drawdown ${Math.round(f.max_drawdown)} ₹ in rupees). Totals depend on how many lots a list held, so they are shown, not compared.`,
+      ...(totalCaption ? { caption: totalCaption } : {}),
     },
     {
       id: 'random',
@@ -147,7 +170,7 @@ export function headline(
       benchmark: b.beatsRandom,
       gap: gap(f.beats_random_pct, b.beatsRandom),
       tone: toneOf(gap(f.beats_random_pct, b.beatsRandom)),
-      hint: 'Share of 1,000 random same-shape baskets (3 strategies, at least 2 Widesl, the list’s own Buy add-on) this list’s cumulative gross is above.',
+      hint: 'Share of 1,000 random same-shape baskets (3 strategies, at least 2 Widesl, the list’s own Buy add-on) that this list’s cumulative gross is above.',
     },
     {
       id: 'sessions',
@@ -160,6 +183,40 @@ export function headline(
       hint: 'Scored forward sessions against the registered read-out point.',
     },
   ];
+}
+
+export interface VerdictLine {
+  /** What is being compared, e.g. "List A minus the fixed base". */
+  label: string;
+  mean: number;
+  lower: number;
+  upper: number;
+  /** Only the base has a pass rule; REF is shown as a difference. */
+  rule: null | { drawdownNoWorse: boolean; beats: boolean };
+}
+
+export interface Verdict {
+  readable: boolean;
+  nDays: number;
+  minDays: number;
+  lines: VerdictLine[];
+}
+
+/** The registered comparisons for the focus list, in ₹ per lot-day with their 90% intervals. */
+export function verdict(summary: RotationSummary, focus: RotationListKey, minDays = 10): Verdict {
+  const f = summary.lists[focus];
+  const lines: VerdictLine[] = [];
+  if (f) {
+    if (f.vs_ref) lines.push({ label: `List ${focus} minus REF`, ...f.vs_ref, rule: null });
+    lines.push({
+      label: `List ${focus} minus the fixed base`,
+      mean: f.vs_base.mean,
+      lower: f.vs_base.lower,
+      upper: f.vs_base.upper,
+      rule: { drawdownNoWorse: f.vs_base.drawdown_no_worse, beats: f.vs_base.beats_base },
+    });
+  }
+  return { readable: summary.n_days >= minDays, nDays: summary.n_days, minDays, lines };
 }
 
 /** How far through the registered read-out the forward test is. */
@@ -203,29 +260,11 @@ export function heroSeries(summary: RotationSummary, focus: RotationListKey): He
   });
 }
 
-/** Tooltip placement: centred about 40 px below the cursor, flipped above near the bottom edge,
- *  clamped at the sides (Analytics page pattern, rule 7). All numbers are in the chart's box. */
-export function tooltipPlacement(
-  cursor: { x: number; y: number },
-  tip: { w: number; h: number },
-  box: { w: number; h: number },
-  gap = 40,
-): { left: number; top: number } {
-  const left = Math.min(Math.max(cursor.x - tip.w / 2, 4), Math.max(4, box.w - tip.w - 4));
-  const below = cursor.y + gap;
-  const top = below + tip.h > box.h ? Math.max(4, cursor.y - gap - tip.h) : below;
-  return { left, top };
-}
-
 /** The index of the point nearest to x in a series of `n` evenly spaced points over [x0, x1]. */
 export function nearestIndex(x: number, x0: number, x1: number, n: number): number {
   if (n <= 1) return 0;
   const t = (x - x0) / (x1 - x0);
   return Math.min(n - 1, Math.max(0, Math.round(t * (n - 1))));
-}
-
-export function startLabel(start: string): string {
-  return start;
 }
 
 /** Axis ticks at round rupee values covering [min, max], at most about `count` of them. */

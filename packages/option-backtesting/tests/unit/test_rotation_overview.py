@@ -179,3 +179,59 @@ def test_routes_return_the_overview_and_the_summary_and_reject_bad_dates(tmp_pat
     assert s["n_days"] == len(days) and set(s["lists"]) == {"A", "B", "C", "REF"}
     assert c.get("/legwise/rotation/summary?from=nope").status_code == 422
     assert c.get("/legwise/rotation/overview?day=2026-13-40").json()["error"]
+
+
+# --- review fixes: the session check follows the trading calendar --------------------------------
+
+D12, D13, D14, D15 = (date(2026, 10, 12) + timedelta(days=i) for i in range(4))  # Mon..Thu
+FRI16, MON19, WED21 = date(2026, 10, 16), date(2026, 10, 19), date(2026, 10, 21)  # 20 Oct: Dussehra
+
+
+def test_a_skipped_nightly_run_is_a_problem_even_inside_three_calendar_days(tmp_path):
+    _results(tmp_path, [D12])
+    h = overview.health(tmp_path, now=_now(D15, 10, 0))  # Tue 13 and Wed 14 never stored
+    s = _state(h, "session")
+    assert s["state"] == "bad"
+    assert "2026-10-13" in s["detail"] and "2026-10-14" in s["detail"]
+    assert "obt rotation update --day 2026-10-13" in s["detail"]
+
+
+def test_a_weekend_or_a_holiday_is_not_a_missing_session(tmp_path):
+    _results(tmp_path, [D12, D13, D14, D15, FRI16])
+    assert _state(overview.health(tmp_path, now=_now(MON19, 10, 0)), "session")["state"] == "ok"
+    _results(tmp_path, [D12, D13, D14, D15, FRI16, MON19])
+    # Tue 20 Oct is an exchange holiday: on Wed morning the last finished session is Mon 19
+    assert _state(overview.health(tmp_path, now=_now(WED21, 8, 0)), "session")["state"] == "ok"
+
+
+def test_tonights_session_is_awaited_until_the_update_is_overdue(tmp_path):
+    _results(tmp_path, [D12])
+    waiting = overview.health(tmp_path, now=_now(D13, 19, 50))
+    assert _state(waiting, "session")["state"] == "info"
+    assert _state(overview.health(tmp_path, now=_now(D13, 21, 0)), "session")["state"] == "bad"
+    # before 19:45 the session still owed is yesterday's, which is stored
+    assert _state(overview.health(tmp_path, now=_now(D13, 12, 0)), "session")["state"] == "ok"
+
+
+def test_days_with_no_entry_are_named_never_silent(tmp_path):
+    _results(tmp_path, [D12, D13, D14])
+    _entry(tmp_path, D12, _picks())
+    _entry(tmp_path, D14, _picks())
+    h = overview.health(tmp_path, now=_now(D15, 10, 0))
+    m = _state(h, "missing")
+    assert m["state"] == "bad" and "2026-10-13" in m["detail"] and "2026-10-15" in m["detail"]
+    assert "2026-10-12" not in m["detail"]
+    assert not any(
+        c["id"] == "missing" for c in overview.health(tmp_path, now=_now(D12, 9, 5))["checks"]
+    )
+
+
+def test_an_unreadable_journal_is_a_finding_not_a_crash(tmp_path):
+    _results(tmp_path, [D12])
+    path = store.journal_path(tmp_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text('{"day": "2026-10-12", "hash": \n')
+    h = overview.health(tmp_path, now=_now(D12, 20, 0))
+    assert _state(h, "chain")["state"] == "bad" and "UNREADABLE" in _state(h, "chain")["value"]
+    assert h["state"] == "bad"
+    assert "error" in overview.baskets(tmp_path)

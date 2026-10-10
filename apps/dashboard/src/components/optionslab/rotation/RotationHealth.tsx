@@ -3,6 +3,7 @@
  * A problem expands into a sentence that names its fix (the server writes the sentence).
  */
 
+import { formatIstTime } from '../../../lib/format';
 import type { RotationCheck, RotationCheckState, RotationHealth } from '../../../types/rotation';
 
 const DOT: Record<RotationCheckState, string> = {
@@ -44,6 +45,9 @@ export function RotationHealthStrip({ health }: { health: RotationHealth }) {
         {health.checks.map((c) => (
           <Chip key={c.id} check={c} />
         ))}
+        <li className="ml-auto whitespace-nowrap text-faint">
+          checked {formatIstTime(health.as_of)} IST
+        </li>
       </ul>
       {problems.length > 0 ? (
         <ul className="mt-2 space-y-1 border-t border-border pt-2">

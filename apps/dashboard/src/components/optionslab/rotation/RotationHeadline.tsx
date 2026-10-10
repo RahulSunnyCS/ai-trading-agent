@@ -54,9 +54,19 @@ export function RotationHeadline({
             </div>
             {f.id !== 'sessions' ? (
               <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
-                <span>
-                  {benchmarkLabel} <span className="font-mono">{show(f.benchmark, f.unit)}</span>
-                </span>
+                {f.caption ? (
+                  <span>
+                    {f.caption}
+                    <span className="font-mono">
+                      {' '}
+                      · {benchmarkLabel} {show(f.benchmark, f.unit)}
+                    </span>
+                  </span>
+                ) : (
+                  <span>
+                    {benchmarkLabel} <span className="font-mono">{show(f.benchmark, f.unit)}</span>
+                  </span>
+                )}
                 {gap ? (
                   <span className={`rounded px-1.5 py-0.5 font-mono ${GAP_TONE[f.tone]}`}>
                     {gap}

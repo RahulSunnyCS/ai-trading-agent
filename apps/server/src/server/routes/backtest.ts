@@ -30,6 +30,8 @@
  *  GET  /api/backtest/legwise/correlation       — how the chosen strategies' daily P&L move together
  *                                                 (matrices, basket drawdown, drift). requireAccess
  *  GET  /api/backtest/legwise/correlation/pick  — a basket under a correlation cap (in-sample).
+ *  GET  /api/backtest/legwise/rotation/overview — the Rotation page: data health, the latest baskets, the lists.
+ *  GET  /api/backtest/legwise/rotation/summary  — the 60-day read-out: lists against REF, the base and random baskets.
  *                                                 requireAccess
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
