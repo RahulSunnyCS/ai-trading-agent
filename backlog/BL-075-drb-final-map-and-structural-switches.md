@@ -101,6 +101,22 @@ whatever it finds.
     family 5, baseline split, 0.772; no minimum, own 15 / family 5, 0.723; no minimum + closest out,
     own 5 / family 5, 0.763 (only 9 of 19 cells above chance everywhere).
 
+### Block 2 — the combined A+B+C ranking (2026-10-10, registered before its runs)
+- **Why:** the owner asked what a strategy that ranks every variant under A, B and C and sums the ranks
+  would do (a rank-aggregation of the three journal lists).
+- **Rule:** each variant's composite under A, B and C is turned into a percentile rank among the 248
+  variants; the combined score is the mean of the three ranks; selection as DRB-6W3L2 (top 3 strategies
+  × 2 lots, at least 2 Widesl, Buy add-on when a Buy ranks in the top 10). `rotate.py --ensemble
+  "5,34,33,23,0,5;0,36,35,24,0,5;15,30,30,20,0,5"` with the lists' lookbacks 5:30,21:25,63:25,126:20 and
+  the band family.
+- **Periods and read-out:** BL-075's three periods; the combined row's gross, max drawdown and win %
+  beside A, B and C (stage-1 cells o5_f5, o0_f5, o15_f5 on the baseline split) and the mean of the
+  three. It is *worth a journal list* only if its gross is ≥ the mean of A, B, C in every period **and**
+  it is above the random P90 in every period. Reported: the share of days its three strategies differ
+  from each member's.
+- **Will not run:** other combinations, other aggregations (median, product).
+- **Result:** pending.
+
 ## Log
 
 - 2026-10-10 — created and registered before any run.
