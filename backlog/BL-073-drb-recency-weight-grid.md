@@ -64,6 +64,18 @@ on every period, and the winner declared by its *worst* period.
     evidence we have for a middle weighting; adding it to the forward journal as a fourth list costs
     nothing and lets unseen days judge it. Not a live change.
 
+### Block 2 — the 5-day fit window at 0% (2026-10-10, registered before its runs)
+- **Why:** the owner asked what happens if the 5-day window is dropped from the fit lookbacks. Known:
+  with recency 33% (BL-069 B3) it helped on 2025–26 and Jan–Aug 2025 and failed the 2022–24 hold-out.
+  Unknown: with recency 10%, the row block 1 singled out.
+- **Rows (fixed, 2):** recent 10 (10/34/33/23) and recent 20 (20/30/30/20), fit lookbacks
+  21:36,63:36,126:28 (block 1's 25/25/20 for 21/63/126 rescaled to 100, the 5-day window at 0); the
+  three periods as block 1.
+- **Read-out:** block 1's rule (minimum relative score vs the eight block-1 rows plus these two; adopt only
+  if ≥ 0.85 and ≥ P90 everywhere). Read beside the same recency weight with the 5-day window kept.
+- **Will not run:** other splits of the remaining weight.
+- **Result:** pending.
+
 ## Log
 
 - 2026-10-10 — created and registered before any run.
