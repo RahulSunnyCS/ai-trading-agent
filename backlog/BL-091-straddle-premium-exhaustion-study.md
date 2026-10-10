@@ -661,3 +661,10 @@ only. This is the engine convention behind every stored result and is left as is
   spike (writers adding positions as premium is sold), at 3-minute resolution. Not registered yet.
   Disclosure: this data check also counted OI presence in two P1 files (2026-09-25, 2026-10-08);
   only row and OI counts were read, no prices or outcomes.
+- 2026-10-11 — Owner added the Directional template to Stage 1: if the move continues after the
+  spike, the threatened leg stops and the other keeps decaying. Proposed arms: the live `*_dir_*`
+  shape (ATM straddle sold, 1 lot per leg, one re-entry at cost per leg, ₹3,000 overall stop, exit
+  15:28) entered once, the minute after the 5-minute hold completes, with the leg stop at 21 % (live),
+  25 % and 30 %, all three reported. Open point: whether the ₹3,000 overall stop stays when the leg
+  stops widen. Context: BL-083 found Dir gained after trend triggers in 2024–26 but not in 2022–24.
+  Not registered yet.
