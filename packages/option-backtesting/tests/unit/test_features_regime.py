@@ -9,9 +9,10 @@ from datetime import date
 
 import pytest
 
+from option_backtesting.analytics.regime_source import RegimeSourceUnavailable
 from option_backtesting.engine.result import SessionResult
 from option_backtesting.features import regime as regime_mod
-from option_backtesting.features.regime import regime_bucket_report
+from option_backtesting.features.regime import regime_bucket_report, regime_bucket_status
 
 
 def _session(d: date, net: float) -> SessionResult:
@@ -113,3 +114,47 @@ def test_query_window_covers_lookback_buffer_before_first_session(
     assert captured["underlying"] == "BANKNIFTY"
     assert captured["date_from"] < date(2026, 8, 18)
     assert captured["date_to"] == date(2026, 8, 18)
+
+
+@pytest.mark.parametrize("status", ["unreachable", "missing_table"])
+def test_source_unavailable_omits_buckets_and_reports_status(
+    monkeypatch: pytest.MonkeyPatch, status: str
+) -> None:
+    monkeypatch.setattr(regime_mod, "regime_data_available", lambda: True)
+
+    def _unavailable(*_a, **_k):
+        raise RegimeSourceUnavailable(status, f"why: {status}")
+
+    monkeypatch.setattr(regime_mod, "fetch_regimes", _unavailable)
+    sessions = [_session(date(2026, 8, 17), 100.0)]
+
+    assert regime_bucket_report(sessions, "NIFTY") is None
+    report = regime_bucket_status(sessions, "NIFTY")
+    assert report.buckets is None
+    assert report.status == status
+    assert report.message == f"why: {status}"
+
+
+def test_genuine_query_error_is_not_swallowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(regime_mod, "regime_data_available", lambda: True)
+
+    def _broken(*_a, **_k):
+        raise RuntimeError("syntax error at or near FROM")
+
+    monkeypatch.setattr(regime_mod, "fetch_regimes", _broken)
+    with pytest.raises(RuntimeError, match="syntax error"):
+        regime_bucket_report([_session(date(2026, 8, 17), 100.0)], "NIFTY")
+
+
+def test_status_ok_unavailable_and_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    sessions = [_session(date(2026, 8, 18), 50.0)]
+    monkeypatch.setattr(regime_mod, "regime_data_available", lambda: False)
+    assert regime_bucket_status(sessions, "NIFTY").status == "unavailable"
+
+    monkeypatch.setattr(regime_mod, "regime_data_available", lambda: True)
+    monkeypatch.setattr(regime_mod, "fetch_regimes", lambda *a, **k: {})
+    assert regime_bucket_status(sessions, "NIFTY").status == "empty"
+
+    monkeypatch.setattr(regime_mod, "fetch_regimes", lambda *a, **k: {date(2026, 8, 17): "RANGING"})
+    ok = regime_bucket_status(sessions, "NIFTY")
+    assert (ok.status, ok.buckets) == ("ok", {"RANGING": 50.0})

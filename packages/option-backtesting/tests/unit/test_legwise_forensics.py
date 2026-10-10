@@ -196,3 +196,21 @@ def test_anatomy_overlays_t33_tags_and_reports_why_when_it_cannot(client, root, 
     assert broken.status_code == 200  # the page still loads...
     assert broken.json()["t33"]["status"] == "error"  # ...and says why
     assert "connection refused" in broken.json()["t33"]["message"]
+
+
+@pytest.mark.parametrize("status", ["unreachable", "missing_table"])
+def test_anatomy_reports_unavailable_regime_source_by_status(client, root, monkeypatch, status):
+    from option_backtesting.analytics.regime_source import RegimeSourceUnavailable
+
+    write_index(root, DAY, "NIFTY", lambda i: 22000.0 + i)
+    write_index(root, DAY, "INDIAVIX", lambda i: 14.0)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example/none")
+
+    def unavailable(*_a):
+        raise RegimeSourceUnavailable(status, f"because {status}")
+
+    monkeypatch.setattr(legwise_routes.regime_source, "fetch_regimes", unavailable)
+    resp = client.get("/legwise/anatomy")
+    assert resp.status_code == 200
+    assert resp.json()["t33"] == {"status": status, "message": f"because {status}"}
+    assert all(d["t33"] is None for d in resp.json()["days"])

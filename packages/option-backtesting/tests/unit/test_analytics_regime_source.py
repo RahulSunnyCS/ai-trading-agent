@@ -12,7 +12,11 @@ from datetime import date
 
 import pytest
 
-from option_backtesting.analytics.regime_source import fetch_regimes, regime_data_available
+from option_backtesting.analytics.regime_source import (
+    RegimeSourceUnavailable,
+    fetch_regimes,
+    regime_data_available,
+)
 
 
 class _FakeCursor:
@@ -116,3 +120,90 @@ class TestFetchRegimes:
         fake_module = _FakePsycopgModule([])
         monkeypatch.setitem(sys.modules, "psycopg", fake_module)
         assert fetch_regimes("NIFTY", date(2026, 8, 1), date(2026, 8, 31)) == {}
+
+
+class _FakeOperationalError(Exception):
+    pass
+
+
+class _FakeUndefinedTable(Exception):
+    pass
+
+
+class _FakeSyntaxError(Exception):
+    pass
+
+
+class _FailingPsycopgModule:
+    """A psycopg stand-in whose connect() or execute() raises `error`."""
+
+    OperationalError = _FakeOperationalError
+
+    class errors:  # noqa: N801 - mirrors psycopg.errors
+        UndefinedTable = _FakeUndefinedTable
+
+    def __init__(self, *, connect_error=None, execute_error=None) -> None:
+        self._connect_error = connect_error
+        self._execute_error = execute_error
+
+    def connect(self, database_url: str):
+        if self._connect_error is not None:
+            raise self._connect_error
+        module = self
+
+        class _Cursor(_FakeCursor):
+            def execute(self, query: str, params: tuple) -> None:
+                raise module._execute_error
+
+        class _Conn(_FakeConnection):
+            def __init__(self) -> None:
+                self._cursor = _Cursor([])
+
+            def cursor(self) -> _Cursor:
+                return self._cursor
+
+        return _Conn()
+
+
+class TestFetchRegimesWhenSourceCannotSupplyTags:
+    def test_unreachable_database_raises_unavailable_with_status(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DATABASE_URL", "postgresql://localhost:1/none")
+        fake = _FailingPsycopgModule(
+            connect_error=_FakeOperationalError("connection refused\nIs the server running?")
+        )
+        monkeypatch.setitem(sys.modules, "psycopg", fake)
+        with pytest.raises(RegimeSourceUnavailable) as raised:
+            fetch_regimes("NIFTY", date(2026, 8, 1), date(2026, 8, 31))
+        assert raised.value.status == "unreachable"
+        assert "connection refused" in str(raised.value)
+
+    def test_missing_table_raises_unavailable_with_status(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DATABASE_URL", "postgresql://localhost/test")
+        fake = _FailingPsycopgModule(execute_error=_FakeUndefinedTable("no such relation"))
+        monkeypatch.setitem(sys.modules, "psycopg", fake)
+        with pytest.raises(RegimeSourceUnavailable) as raised:
+            fetch_regimes("NIFTY", date(2026, 8, 1), date(2026, 8, 31))
+        assert raised.value.status == "missing_table"
+        assert "daily_regime_tags" in str(raised.value)
+
+    def test_genuine_query_error_still_raises_loudly(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DATABASE_URL", "postgresql://localhost/test")
+        fake = _FailingPsycopgModule(execute_error=_FakeSyntaxError("bad column"))
+        monkeypatch.setitem(sys.modules, "psycopg", fake)
+        with pytest.raises(_FakeSyntaxError):
+            fetch_regimes("NIFTY", date(2026, 8, 1), date(2026, 8, 31))
+
+    def test_real_psycopg_against_a_closed_port_is_unreachable(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pytest.importorskip("psycopg")
+        monkeypatch.setenv("DATABASE_URL", "postgresql://127.0.0.1:1/none?connect_timeout=2")
+        with pytest.raises(RegimeSourceUnavailable) as raised:
+            fetch_regimes("NIFTY", date(2026, 8, 1), date(2026, 8, 31))
+        assert raised.value.status == "unreachable"

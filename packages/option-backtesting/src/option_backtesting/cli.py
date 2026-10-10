@@ -167,13 +167,15 @@ def run(
         typer.echo("")
         typer.echo(render_margin(margin))
 
-    from .features.regime import regime_bucket_report
+    from .features.regime import regime_bucket_status
 
-    regime_buckets = regime_bucket_report(sessions, loaded.strategy.universe.underlying)
-    if regime_buckets is not None:
+    regime = regime_bucket_status(sessions, loaded.strategy.universe.underlying)
+    if regime.buckets is not None:
         typer.echo("\nRegime breakdown (lag-1):")
-        for regime_name in sorted(regime_buckets):
-            typer.echo(f"  {regime_name}: {regime_buckets[regime_name]:.0f}")
+        for regime_name in sorted(regime.buckets):
+            typer.echo(f"  {regime_name}: {regime.buckets[regime_name]:.0f}")
+    elif regime.message:
+        typer.echo(f"\n(regime breakdown not computed: {regime.status} — {regime.message})")
 
     with connect(views=()) as con:
         run_id = record_run(con, loaded.strategy, start, end, result, strategy_path.read_text())
