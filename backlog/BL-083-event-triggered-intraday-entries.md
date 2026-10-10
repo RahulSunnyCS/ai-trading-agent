@@ -299,3 +299,4 @@ None. Settled on 2026-10-10:
   wrong sentence in the Result), non-blocking items applied (day-clustered t, registered random-day control,
   random minutes to 14:00, SENSEX in the 11:32 check, corrected random-time text); the pipeline was re-run and
   the Result rewritten, with the mechanism analysis added.
+- 2026-10-10 — the nightly scoring step (the "cheaper first step" above) is built: `obt rotation triggers`, run by `obt rotation update` and isolated from it; parity with this study's trigger table is exact over 1,063 events (2025-06 → 2026-10); the forward store is `rotation/triggers/`. Reading the first verdict needs months of days: about 14 pivot events and 37 RSI events per index every three months.

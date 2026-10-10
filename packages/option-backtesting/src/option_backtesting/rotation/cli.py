@@ -1,4 +1,4 @@
-"""`obt rotation …`: update | pick | verify | show (BL-058)."""
+"""`obt rotation …`: update | pick | verify | show | triggers | triggers-show (BL-058, BL-083)."""
 
 from __future__ import annotations
 
@@ -36,6 +36,16 @@ def update(
         for e in r["errors"][:10]:
             typer.echo(f"  {e}", err=True)
         raise typer.Exit(1)
+    # BL-083: score the day's intraday triggers. Isolated: a failure here never fails the update.
+    try:
+        from .triggers import score_day
+
+        score_day(d, log=typer.echo)
+    except Exception as error:  # noqa: BLE001
+        typer.echo(
+            f"trigger scoring skipped ({type(error).__name__}: {error}); the update is stored",
+            err=True,
+        )
 
 
 @rotation_app.command()
@@ -121,3 +131,35 @@ def show(last: int = typer.Option(5, "--last", help="How many recent entries."))
                 row = m.values[m.days.index(day)]
                 pnl = f"  P&L {LOTS_PER * sum(row[m.names.index(n)] for n in picked):>9,.0f}"
             typer.echo(f"  {key:3s} {', '.join(picked)}{pnl}")
+
+
+@rotation_app.command()
+def triggers(
+    day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
+) -> None:
+    """Score one collected day's intraday triggers (BL-083): events and placebo simulations."""
+    from .triggers import score_day
+
+    r = score_day(_day(day), log=typer.echo)
+    for s in r["skipped"]:
+        typer.echo(f"skipped: {s}", err=True)
+
+
+@rotation_app.command("triggers-show")
+def triggers_show() -> None:
+    """Event minus placebo per trigger and template over every scored day (BL-083, forward only)."""
+    from .triggers import summary
+
+    rows = summary()
+    if not rows:
+        typer.echo("no scored trigger events yet")
+        return
+    typer.echo(
+        f"{'trigger':8s}{'template':9s}{'events':>7s}{'days':>6s}{'event':>9s}{'placebo':>9s}{'diff':>9s}{'t':>7s}"
+    )
+    for r in rows:
+        t = "n/a" if r["t"] is None else f"{r['t']:.1f}"
+        typer.echo(
+            f"{r['trigger']:8s}{r['template']:9s}{r['events']:>7d}{r['days']:>6d}"
+            f"{r['event']:>9,.0f}{r['placebo']:>9,.0f}{r['diff']:>9,.0f}{t:>7s}"
+        )

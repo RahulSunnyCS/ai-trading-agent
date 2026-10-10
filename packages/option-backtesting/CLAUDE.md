@@ -93,7 +93,10 @@ Otherwise:
   (per-variant CSVs and `days.csv` under `TRADING_DATA_ROOT/rotation/`, not the catalog),
   `journal.py` (insert-only SHA-256 chain, one entry per day), `pick.py` / `live.py` (the 09:16 entry
   from the 09:15 VIX open read live from Fyers, polled, with Angel One as the unattended fallback, and the days to expiry of the listed contracts from Fyers' symbol master, calendar as fallback; the entry records `vix_source` / `dte_source`, the universe size + hash and `inputs_sha`, a digest of the stored results and day rows it was scored on), `cli.py`
-  (`obt rotation update|pick|verify|show`). Weekend sessions are excluded from the ranking history, as
+  (`obt rotation update|pick|verify|show|triggers|triggers-show`), `triggers.py` (BL-083: the four
+  intraday triggers scored forward each evening from the day's bars, event and placebo simulations in
+  `rotation/triggers/`; run by `obt rotation update`, isolated so a failure never fails it;
+  `scripts/rotation-triggers-parity.py` must print PARITY OK). Weekend sessions are excluded from the ranking history, as
   in the research (the Budget Sunday once shifted every later pick).
 - `legwise/` — AlgoTest-style leg-wise engine over the Fyers data (`obt legwise run
   strategies/legwise/*.yaml`): `schema.py` (one field per AlgoTest setting), `market.py`
