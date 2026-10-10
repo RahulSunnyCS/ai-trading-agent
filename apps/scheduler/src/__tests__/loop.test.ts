@@ -71,6 +71,17 @@ describe('decide', () => {
     expect(sent[0]).toContain('⚠️ new-job was missed');
   });
 
+  it('does not treat a manual try-out as history for a newly added job', () => {
+    history.firstStart(longAgo);
+    const added: Job = { ...job, id: 'new-job' };
+    // The owner tries the new job once by hand at 09:00, before the scheduler has seen it...
+    const manual = history.start('new-job', 'manual', null, '', istAt('2026-10-06', '09:00'));
+    history.finish(manual, 0, 1, istAt('2026-10-06', '09:00'));
+    // ...then the scheduler restarts after the 08:00 slot and its catch-up window.
+    expect(tickAt([added], istAt('2026-10-06', '10:30'))).toEqual([]);
+    expect(history.forSlot('new-job', istAt('2026-10-06', '08:00'))).toBeNull();
+  });
+
   it('still reports a missed slot of a job with history, after a restart', () => {
     history.firstStart(longAgo);
     const monday = istAt('2026-10-05', '08:00');
