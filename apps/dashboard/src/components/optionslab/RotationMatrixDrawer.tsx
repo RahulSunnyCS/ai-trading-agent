@@ -22,9 +22,10 @@ import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { FollowTip, OverlayStatus } from './RotationMatrixParts';
 
 export interface DrawerRequest {
-  params: Record<string, string>;
   title: string;
   subtitle: string;
+  /** One section per request: a difference cell opens both periods, each under its own heading. */
+  sections: { heading?: string; params: Record<string, string> }[];
 }
 
 export function RotationMatrixDrawer({
@@ -40,7 +41,18 @@ export function RotationMatrixDrawer({
       title={request?.title ?? ''}
       subtitle={request?.subtitle}
     >
-      {request ? <DrawerBody params={request.params} /> : null}
+      {request ? (
+        <div className="space-y-8">
+          {request.sections.map((section) => (
+            <section key={section.heading ?? 'only'} className="space-y-3">
+              {section.heading ? (
+                <h2 className="text-sm font-semibold text-foreground">{section.heading}</h2>
+              ) : null}
+              <DrawerBody params={section.params} />
+            </section>
+          ))}
+        </div>
+      ) : null}
     </Drawer>
   );
 }
@@ -94,7 +106,11 @@ function Detail({ d }: { d: MatrixCellDetail }) {
             <Fact
               label="Sessions"
               value={formatInt(s.sessions)}
-              note={`${formatInt(s.variant_days)} strategy-days`}
+              note={
+                s.all_opportunities
+                  ? `of ${formatInt(s.all_opportunities.sessions)} (selected only)`
+                  : `${formatInt(s.variant_days)} strategy-days`
+              }
             />
             <Fact label="Average" value={valueText(s.avg, 'inr')} note="per strategy-day" />
             <Fact label="Win rate" value={formatPct(s.win_rate, 0)} />
@@ -120,6 +136,19 @@ function Detail({ d }: { d: MatrixCellDetail }) {
               note="of that running total"
             />
           </dl>
+          {s.all_opportunities ? (
+            <p className="text-xs text-muted">
+              Selected only: {formatInt(s.sessions)} of {formatInt(s.all_opportunities.sessions)}{' '}
+              sessions, average {valueText(s.avg, 'inr')}. Over every opportunity the average is{' '}
+              {valueText(s.all_opportunities.avg, 'inr')}. The two cover different days.
+            </p>
+          ) : null}
+          {s.zero_trade_days ? (
+            <p className="text-xs text-faint">
+              {formatInt(s.zero_trade_days)} of these strategy-days had no trades and are counted as
+              zero, as the research does.
+            </p>
+          ) : null}
           <section>
             <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-faint">
               Running total by session
@@ -180,7 +209,7 @@ function Curve({ d }: { d: MatrixCellDetail }) {
         ref={box}
         viewBox={`0 0 ${W} ${H}`}
         role="img"
-        aria-label={`Running total of the daily gross over ${d.cumulative.length} sessions`}
+        aria-label={`Running total of the daily gross over ${formatInt(d.cumulative.length)} sessions`}
         className="h-auto w-full cursor-crosshair rounded-md bg-surface-2/40"
         onPointerMove={move}
         onPointerLeave={() => setAt(null)}
@@ -272,7 +301,7 @@ function Histogram({ days }: { days: readonly MatrixCellDay[] }) {
                 negative ? 'fill-negative/40' : b.lo >= 0 ? 'fill-positive/40' : 'fill-series-1/40'
               }
             >
-              <title>{`${valueText(b.lo, 'inr')} to ${valueText(b.hi, 'inr')}: ${b.count} sessions`}</title>
+              <title>{`${valueText(b.lo, 'inr')} to ${valueText(b.hi, 'inr')}: ${formatInt(b.count)} sessions`}</title>
             </rect>
           );
         })}
@@ -319,9 +348,11 @@ function Variants({ d }: { d: MatrixCellDetail }) {
                 {v.settings?.strike ? (
                   <span className="ml-2 text-[11px] text-muted">
                     {v.settings.entry}-{v.settings.exit} · {v.settings.strike}
-                    {v.settings.leg_stop_percent ? ` · leg SL ${v.settings.leg_stop_percent}%` : ''}
+                    {v.settings.leg_stop_percent
+                      ? ` · leg SL ${formatPct(v.settings.leg_stop_percent, 0, { unit: 'percent' })}`
+                      : ''}
                     {v.settings.overall_stop_inr
-                      ? ` · overall SL ₹${v.settings.overall_stop_inr}`
+                      ? ` · overall SL ${formatInr(v.settings.overall_stop_inr)}`
                       : ''}
                   </span>
                 ) : null}
@@ -376,7 +407,7 @@ function Days({ days }: { days: readonly MatrixCellDay[] }) {
               <span className="block max-w-[10rem] truncate text-xs text-muted">
                 {single
                   ? x.stopped_by || EMPTY
-                  : `${x.n_variants}${x.n_stopped ? `, ${x.n_stopped} stopped` : ''}`}
+                  : `${formatInt(x.n_variants)}${x.n_stopped ? `, ${formatInt(x.n_stopped)} stopped` : ''}`}
               </span>
             </Td>
             <Td dense>

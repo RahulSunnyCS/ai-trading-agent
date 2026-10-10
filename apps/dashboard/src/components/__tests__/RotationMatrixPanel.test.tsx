@@ -162,12 +162,14 @@ describe('RotationMatrixPanel', () => {
   it('prints signed values, dashes a missing cell and mutes a thin one', async () => {
     stub(() => ok(matrixResponse()));
     render(<RotationMatrixPanel />);
-    const wide = await screen.findByLabelText('NIFTY Widesl OTM1, 09:17: +₹148');
+    const wide = await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17: \+₹148/);
     expect(wide.textContent).toBe('+148');
-    const thin = screen.getByLabelText('NIFTY Widesl OTM1, 15:17: -₹60');
-    expect(thin.className).toContain('opacity-50');
+    const thin = screen.getByLabelText(/NIFTY Widesl OTM1, 15:17: -₹60/);
+    expect(thin.className).toContain('italic');
+    expect(thin.getAttribute('aria-label')).toContain('thin sample');
+    expect(thin.getAttribute('aria-label')).toContain('9 sessions');
     const missing = screen.getByLabelText(
-      'NIFTY Buy closest premium 50, 09:17: no stored result in this period',
+      /NIFTY Buy closest premium 50, 09:17: missing, no stored result in this period/,
     );
     expect(missing.textContent).toBe('—');
     expect(missing.className).toContain('border-dashed');
@@ -235,7 +237,7 @@ describe('RotationMatrixPanel', () => {
       url.includes('/matrix/cell') ? ok(detail) : ok(matrixResponse()),
     );
     render(<RotationMatrixPanel />);
-    fireEvent.click(await screen.findByLabelText('NIFTY Widesl OTM1, 09:17: +₹148'));
+    fireEvent.click(await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17: \+₹148/));
     expect(await screen.findByText(/one strategy: each value is its gross/)).toBeTruthy();
     const cellCall = fetchMock.mock.calls
       .map(([u]) => String(u))
@@ -249,12 +251,106 @@ describe('RotationMatrixPanel', () => {
   it('asks the API for both periods when compare is on', async () => {
     const fetchMock = stub(() => ok(matrixResponse()));
     render(<RotationMatrixPanel />);
-    await screen.findByLabelText('NIFTY Widesl OTM1, 09:17: +₹148');
+    await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17: \+₹148/);
     fireEvent.click(screen.getByText('P1 and P2'));
     await waitFor(() =>
       expect(
         fetchMock.mock.calls.map(([u]) => String(u)).some((u) => u.includes('compare=P1%2CP2')),
       ).toBe(true),
     );
+  });
+  it('keeps one tab stop on a cell that can take focus', async () => {
+    stub(() => ok(matrixResponse()));
+    render(<RotationMatrixPanel />);
+    await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17/);
+    const stops = screen
+      .getAllByRole('button')
+      .filter((b) => b.hasAttribute('data-r') && b.getAttribute('tabindex') === '0');
+    expect(stops).toHaveLength(1);
+    expect((stops[0] as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('says so when a later request fails and the old grid is still on screen', async () => {
+    let fail = false;
+    stub(() =>
+      fail ? ok({ error: 'selection frequency needs a list' }, 422) : ok(matrixResponse()),
+    );
+    render(<RotationMatrixPanel />);
+    await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17/);
+    fail = true;
+    fireEvent.click(screen.getByLabelText('Refresh the matrix'));
+    expect(
+      await screen.findByText('The latest request failed; this is the previous result'),
+    ).toBeTruthy();
+    expect(screen.getByText(/selection frequency needs a list/)).toBeTruthy();
+    expect(screen.getByLabelText(/NIFTY Widesl OTM1, 09:17/)).toBeTruthy();
+  });
+
+  it('opens both periods for a difference cell and forgets the difference when compare ends', async () => {
+    const base = matrixResponse();
+    const g1 = base.matrices[0];
+    const two = matrixResponse({
+      periods: [
+        {
+          id: 'P1',
+          label: 'P1 · Dec 2025 to Oct 2026',
+          from: null,
+          to: null,
+          status: 'ok',
+          reason: null,
+          sessions: 207,
+          waiting_on_results: null,
+        },
+        {
+          id: 'P2',
+          label: 'P2 · Jan to Aug 2025',
+          from: null,
+          to: null,
+          status: 'ok',
+          reason: null,
+          sessions: 158,
+          waiting_on_results: null,
+        },
+      ],
+      matrices: g1 ? [g1, { ...g1, period: 'P2' }] : [],
+      difference: {
+        status: 'ok',
+        minuend: 'P1',
+        subtrahend: 'P2',
+        unit: 'inr',
+        note: 'the first period minus the second',
+        scale: { kind: 'diverging', min: -50, max: 50, limit: 50, clipped: false },
+        cells: [
+          [
+            { v: 10, n: [205, 158] },
+            { st: 'missing', reason: 'one of the periods has no value here' },
+          ],
+          [{ st: 'missing', reason: 'one of the periods has no value here' }, { st: 'na' }],
+        ],
+      },
+    });
+    const fetchMock = stub((url) =>
+      url.includes('/matrix/cell') ? ok(detail) : ok(url.includes('compare=') ? two : base),
+    );
+    render(<RotationMatrixPanel />);
+    await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17/);
+    fireEvent.click(screen.getByText('P1 and P2'));
+    fireEvent.click(await screen.findByText('Difference'));
+    fireEvent.click(
+      await screen.findByLabelText(
+        /NIFTY Widesl OTM1, 09:17: \+10 pp|NIFTY Widesl OTM1, 09:17: \+₹10/,
+      ),
+    );
+    await waitFor(() => {
+      const cells = fetchMock.mock.calls
+        .map(([u]) => String(u))
+        .filter((u) => u.includes('/matrix/cell'));
+      expect(cells.some((u) => u.includes('period=P1'))).toBe(true);
+      expect(cells.some((u) => u.includes('period=P2'))).toBe(true);
+    });
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    fireEvent.click(screen.getByText('One period'));
+    await waitFor(() => expect(screen.queryByText('Difference')).toBeNull());
+    expect(document.body.textContent).not.toContain('minus P2');
   });
 });

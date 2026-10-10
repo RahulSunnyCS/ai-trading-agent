@@ -70,6 +70,7 @@ export const PERIOD_LABEL: Record<MatrixPeriodId, string> = {
   P3: 'P3 · 2022 – Oct 2024',
   forward: 'Forward',
   custom: 'Custom',
+  asof: 'As of one day',
 };
 
 export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as const;
@@ -153,7 +154,8 @@ function filterParams(f: MatrixFilters): Record<string, string> {
   put(p, 'vix_band', f.vix);
   if (f.list !== ANY) {
     p.list = f.list;
-    if (f.basis === 'selected') p.basis = 'selected';
+    // selection frequency is already about the picks: the API refuses "selected only" with it
+    if (f.basis === 'selected' && f.metric !== 'selection') p.basis = 'selected';
   }
   return p;
 }
@@ -184,7 +186,9 @@ export function cellParams(
   col: string,
   period: MatrixPeriodId,
 ): Record<string, string> {
-  const p: Record<string, string> = { ...filterParams(f), row, col, period };
+  const p: Record<string, string> = { ...filterParams(f), row, col };
+  // the pulse is as of one day: it has no period to send
+  if (f.view !== 'pulse') p.period = period;
   if (period === 'custom') {
     if (f.from) p.from = f.from;
     if (f.to) p.to = f.to;
@@ -509,4 +513,92 @@ export function curveGeometry(
     .filter((s): s is string => s !== null)
     .join(' ');
   return { path, zeroY: y(0), min, max };
+}
+
+// --- keyboard and screen readers --------------------------------------------------------------
+
+/**
+ * The cell that holds the grid's single tab stop: `active` clamped into the grid, and moved
+ * forward to the next cell that can take focus when it lands on a not-applicable one (a
+ * disabled button cannot be focused, which would leave the grid with no tab stop at all).
+ */
+export function settleActive(
+  active: readonly [number, number],
+  kinds: readonly (readonly CellKind[])[],
+): [number, number] {
+  const rows = kinds.length;
+  const cols = kinds[0]?.length ?? 0;
+  if (rows === 0 || cols === 0) return [0, 0];
+  const r0 = Math.min(Math.max(active[0], 0), rows - 1);
+  const c0 = Math.min(Math.max(active[1], 0), cols - 1);
+  for (let k = 0; k < rows * cols; k++) {
+    const i = r0 * cols + c0 + k;
+    const r = Math.floor(i / cols) % rows;
+    const c = i % cols;
+    if (kinds[r]?.[c] !== 'na') return [r, c];
+  }
+  return [r0, c0];
+}
+
+/** The next focusable cell from (r, c) one arrow step away, skipping not-applicable cells. */
+export function stepActive(
+  from: readonly [number, number],
+  d: readonly [number, number],
+  kinds: readonly (readonly CellKind[])[],
+): [number, number] {
+  const rows = kinds.length;
+  const cols = kinds[0]?.length ?? 0;
+  let r = from[0];
+  let c = from[1];
+  for (;;) {
+    r += d[0];
+    c += d[1];
+    if (r < 0 || c < 0 || r >= rows || c >= cols) return [from[0], from[1]];
+    if (kinds[r]?.[c] !== 'na') return [r, c];
+  }
+}
+
+/** A cell's accessible name: the value, the sample, the thin state, and who picked it. */
+export function cellLabel(
+  rowLabel: string,
+  colLabel: string,
+  cell: MatrixCell | MatrixDiffCell | null | undefined,
+  unit: MatrixUnit,
+  difference: boolean,
+  picks?: readonly string[] | undefined,
+): string {
+  const head = `${rowLabel}, ${colLabel}`;
+  const kind = cellKind(cell);
+  if (!cell || kind === 'na') return `${head}: not applicable`;
+  if (kind !== 'value')
+    return `${head}: ${cell.st === 'excluded' ? 'excluded' : 'missing'}, ${cell.reason ?? 'no value'}`;
+  const d = cell as MatrixDiffCell;
+  const c = cell as MatrixCell;
+  const sample =
+    d.n && Array.isArray(d.n) ? `${d.n[0]} and ${d.n[1]} sessions` : `${c.n ?? 0} sessions`;
+  const parts = [`${valueText(cell.v, unit, difference)}`, sample];
+  if (cell.thin) parts.push('thin sample');
+  if (c.all && c.all.n !== c.n) parts.push(`of ${c.all.n} sessions`);
+  if (picks && picks.length > 0) parts.push(`picked by ${picks.join(' and ')}`);
+  else if (c.sel) {
+    const named = Object.entries(c.sel).map(([k, v]) => `${k} ${v} times`);
+    if (named.length > 0) parts.push(`picked: ${named.join(', ')}`);
+  }
+  return `${head}: ${parts.join(', ')}`;
+}
+
+/** What the legend must say about the scale: which cells did not set it and what is clipped. */
+export function scaleNotes(scale: MatrixScale | null, unit: MatrixUnit): string[] {
+  if (!scale) return [];
+  const notes: string[] = [];
+  const top = valueText(scale.limit, unit);
+  if (scale.clipped && scale.percentile) {
+    notes.push(
+      `Scale clipped at the ${scale.percentile}th percentile of |value| (${top}): a darker cell can be larger.`,
+    );
+  }
+  if (scale.thin_excluded) {
+    notes.push('Thin cells do not set the scale, so they can exceed it.');
+  }
+  return notes;
 }

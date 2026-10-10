@@ -39,7 +39,15 @@ def gross_of(name: str, i: int) -> float:
     return float((seed % 2001) - 900)
 
 
-def write(root: Path, name: str, days=DAYS, gross=gross_of, stops=lambda n, i: "", blank=False):
+def write(
+    root: Path,
+    name: str,
+    days=DAYS,
+    gross=gross_of,
+    stops=lambda n, i: "",
+    blank=False,
+    trades=lambda n, i: 2,
+):
     for i, d in enumerate(days):
         g = gross(name, i)
         store.append_result(
@@ -51,7 +59,7 @@ def write(root: Path, name: str, days=DAYS, gross=gross_of, stops=lambda n, i: "
                 "costs": 0.0,
                 "worst_mtm": g - 100,
                 "stopped_by": stops(name, i),
-                "n_trades": 2,
+                "n_trades": trades(name, i),
             },
             root,
         )
@@ -671,3 +679,274 @@ def test_the_cell_route_returns_the_daily_values(client):
         ).status_code
         == 422
     )
+
+
+# --- review fixes: weekends, one pooling path, labels, denominators ------------------------------
+
+SAT = date(2025, 2, 1)  # the Budget Saturday, inside P2
+SUN = date(2026, 2, 1)  # the Budget Sunday, inside P1
+
+
+def _independent_mean(root: Path, name: str, lo: str, hi: str) -> tuple[float, int]:
+    """Mean gross of one variant file over Monday to Friday days in [lo, hi]."""
+    rows = (store.results_dir(root) / f"{name}.csv").read_text().splitlines()[1:]
+    vals = [
+        float(r.split(",")[2])
+        for r in rows
+        if lo <= r.split(",")[0] <= hi
+        and date.fromisoformat(r.split(",")[0]).weekday() < 5
+        and r.split(",")[2] != ""
+    ]
+    return float(np.mean(vals)), len(vals)
+
+
+@pytest.fixture
+def with_weekend(root) -> Path:
+    for n in NAMES:
+        for d, v in ((SAT, 9000.0), (SUN, -9000.0)):
+            store.append_result(
+                n,
+                {
+                    "day": d.isoformat(),
+                    "net": v,
+                    "gross": v,
+                    "costs": 0,
+                    "worst_mtm": v,
+                    "n_trades": 2,
+                },
+                root,
+            )
+    return root
+
+
+def test_weekend_sessions_are_left_out_counted_and_never_become_rows(with_weekend):
+    resp = run(with_weekend, view="family_slot", period="P2")
+    c = cell(resp, "N:wide", "0917")
+    mean, n = _independent_mean(with_weekend, "N_wide_0917", "2025-01-10", "2025-08-29")
+    assert c["v"] == pytest.approx(round(mean, 2)) and c["n"] == n == 56
+    assert resp["periods"][0]["weekend_excluded"] == [SAT.isoformat()]
+    assert resp["meta"]["store"]["weekend_excluded"] == [SAT.isoformat(), SUN.isoformat()]
+    wk = run(
+        with_weekend,
+        view="weekday_family",
+        period="custom",
+        lo=date(2025, 1, 1),
+        hi=date(2026, 12, 31),
+    )
+    assert [r["key"] for r in wk["rows"]] == ["Mon", "Tue", "Wed", "Thu", "Fri"]
+    assert run(with_weekend, view="date_slot", period="P2")["rows"][0]["key"] == "2025-01-10"
+    with pytest.raises(m.MatrixError, match="weekday"):
+        m.parse_filters(weekday="Sat")
+
+
+def test_a_weekend_journal_entry_is_not_a_forward_day(root):
+    path = store.journal_path(root)
+    journal.append(path, entry(SAT, {"A": ["N_wide_0917"], "B": [], "C": [], "REF": []}))
+    jr = m.load_journal(root)
+    assert jr.forward == [] and jr.weekend == [SAT]
+
+
+def test_p1_ends_on_8_october_and_a_day_on_the_boundary_is_in(tmp_path):
+    days = [date(2026, 10, 7), date(2026, 10, 8), date(2026, 10, 9)]
+    write(tmp_path, "N_wide_0917", days=days, gross=lambda n, i: [100.0, 200.0, 9000.0][i])
+    write_days(tmp_path, days)
+    c = cell(run(tmp_path, view="family_slot", period="P1"), "N:wide", "0917")
+    assert c["n"] == 2 and c["v"] == 150.0
+
+
+def test_a_dte_bucket_that_never_occurred_is_missing_not_excluded(root):
+    # a "7+" day exists in the store, but not in P2
+    far = date(2026, 1, 5)
+    write(root, "N_wide_0917", days=[far])
+    store.append_day(
+        {
+            "day": far.isoformat(),
+            "weekday": "Mon",
+            "vix_open": 14.0,
+            "vix_band": "13-15",
+            "dte_n": "7+",
+            "dte_s": "2",
+        },
+        root,
+    )
+    resp = run(
+        root, view="dte_slot", period="P2", filters=m.parse_filters(index="NIFTY", family="wide")
+    )
+    c = cell(resp, "7+", "0917")
+    assert c["st"] == "missing" and "filter" not in c["reason"]
+    # a user's condition that empties a cell is excluded, and says which one
+    f = m.parse_filters(index="NIFTY", family="wide", weekday="Mon")
+    resp = run(root, view="weekday_family", period="P2", filters=f)
+    tue = cell(resp, "Tue", "N:wide")
+    assert tue["st"] == "excluded" and tue["reason"] == "removed by the weekday filter"
+
+
+def test_the_cell_and_its_drawer_always_agree(journaled):
+    cube, jr = m._read_cube(journaled), m.load_journal(journaled)
+    cases = [
+        {"view": "family_slot", "period": "P2"},
+        {"view": "vix_family", "period": "P2"},
+        {"view": "weekday_family", "period": "P2"},
+        {"view": "date_slot", "period": "P2"},
+        {"view": "pulse"},
+        {"view": "pulse", "filters": m.parse_filters(weekday="Mon,Tue")},
+        {
+            "view": "dte_slot",
+            "period": "P2",
+            "filters": m.parse_filters(index="NIFTY", family="wide"),
+        },
+        {
+            "view": "family_slot",
+            "period": "P2",
+            "filters": m.parse_filters(weekday="Mon,Tue,Wed", dte="0,1", vix_band="13-15,15-18"),
+        },
+        {"view": "family_slot", "period": "P2", "list_id": "A", "basis": "selected"},
+        {"view": "vix_family", "period": "P2", "list_id": "REF", "basis": "selected"},
+        {"view": "family_slot", "period": "forward"},
+    ]
+    checked = 0
+    for kw in cases:
+        resp = m.compute(cube, jr, min_n=1, **kw)
+        grid = resp["matrices"][0]
+        for ri, row in enumerate(resp["rows"]):
+            for ci, col in enumerate(resp["cols"]):
+                c = grid["cells"][ri][ci]
+                if c.get("v") is None:
+                    continue
+                d = m.drill(
+                    cube,
+                    jr,
+                    view=kw["view"],
+                    row=row["key"],
+                    col=col["key"],
+                    period=kw.get("period", "P1"),
+                    filters=kw.get("filters"),
+                    list_id=kw.get("list_id"),
+                    basis=kw.get("basis", "all"),
+                )
+                where = (kw, row["key"], col["key"])
+                assert d["stats"]["sessions"] == c["n"], where
+                assert d["stats"]["variant_days"] == c["nv"], where
+                assert d["stats"]["avg"] == c["m"]["avg"], where
+                assert d["stats"]["stop_rate"] == c["m"]["stop_rate"], where
+                assert sum(x["n_variants"] for x in d["days"]) == c["nv"], where
+                checked += 1
+    assert checked > 150
+
+
+def test_the_drawer_running_total_is_the_sum_of_the_daily_means(root):
+    d = m.drill(
+        m._read_cube(root),
+        m.load_journal(root),
+        view="vix_family",
+        row="13-15",
+        col="N:wide",
+        period="P2",
+    )
+    assert d["stats"]["cumulative"] == pytest.approx(
+        round(sum(x["gross"] for x in d["days"]), 2), abs=0.05
+    )
+    assert d["cumulative"][-1]["cum"] == pytest.approx(d["stats"]["cumulative"])
+
+
+def test_the_pulse_is_labelled_for_what_it_is_with_its_real_session_count(root):
+    resp = run(root, view="pulse", period="P1")
+    p = resp["periods"][0]
+    assert p["id"] == "asof" and "P1" not in p["label"]
+    assert p["label"].startswith(f"As of {DAYS[-1].isoformat()}")
+    assert p["sessions"] == 60 and resp["matrices"][0]["sessions"] == 60
+    assert resp["matrices"][0]["period"] == "asof"
+
+
+def test_the_pulse_window_is_the_last_n_sessions_that_match_the_conditions(root):
+    f = m.parse_filters(weekday="Mon", index="NIFTY", family="wide", slot="0917")
+    resp = run(root, view="pulse", filters=f)
+    mondays = [i for i, d in enumerate(DAYS) if d.weekday() == 0]
+    c5 = cell(resp, "N:wide", "5")
+    assert c5["n"] == 5
+    assert c5["v"] == pytest.approx(
+        round(float(np.mean([gross_of("N_wide_0917", i) for i in mondays[-5:]])), 2)
+    )
+    assert "matching" in resp["window_rule"] or "match" in resp["window_rule"]
+    d = m.drill(
+        m._read_cube(root), m.load_journal(root), view="pulse", row="N:wide", col="5", filters=f
+    )
+    assert [x["day"] for x in d["days"]] == [DAYS[i].isoformat() for i in mondays[-5:]]
+
+
+def test_selected_only_keeps_the_all_opportunities_denominator_beside_it(journaled):
+    sel = run(journaled, view="family_slot", period="P2", list_id="A", basis="selected")
+    c = cell(sel, "N:wide", "0917")
+    assert c["n"] == 2
+    assert c["all"]["n"] == 56 and c["all"]["nv"] == 56
+    keep = [i for i, d in enumerate(DAYS) if d >= date(2025, 1, 10)]
+    assert c["all"]["v"] == pytest.approx(
+        round(float(np.mean([gross_of("N_wide_0917", i) for i in keep])), 2)
+    )
+    assert c["rec"] == 2 and c["sel"] == {"A": 2, "REF": 1}  # of the recorded days that were scored
+    d = m.drill(
+        m._read_cube(journaled),
+        m.load_journal(journaled),
+        view="family_slot",
+        row="N:wide",
+        col="0917",
+        period="P2",
+        list_id="A",
+        basis="selected",
+    )
+    assert d["stats"]["all_opportunities"]["sessions"] == 56
+    assert "all" not in cell(run(journaled, view="family_slot", period="P2"), "N:wide", "0917")
+
+
+def test_zero_trade_days_are_counted_not_dropped(tmp_path):
+    write(
+        tmp_path,
+        "N_wide_0917",
+        gross=lambda n, i: 0.0 if i % 10 == 0 else 100.0,
+        trades=lambda n, i: 0 if i % 10 == 0 else 2,
+    )
+    write_days(tmp_path)
+    resp = run(tmp_path, view="family_slot", period="P2")
+    c = cell(resp, "N:wide", "0917")
+    keep = [i for i, d in enumerate(DAYS) if d >= date(2025, 1, 10)]
+    assert c["zt"] == len([i for i in keep if i % 10 == 0])
+    assert c["n"] == len(keep)  # still pooled as zeros, like the research
+    d = m.drill(
+        m._read_cube(tmp_path),
+        m.load_journal(tmp_path),
+        view="family_slot",
+        row="N:wide",
+        col="0917",
+        period="P2",
+    )
+    assert d["stats"]["zero_trade_days"] == c["zt"]
+    assert sum(x["n_no_trade"] for x in d["days"]) == c["zt"]
+
+
+def test_thin_cells_do_not_set_the_colour_scale_and_the_date_view_says_it_clips(tmp_path):
+    write(tmp_path, "N_wide_0917", gross=lambda n, i: 100.0)
+    write(tmp_path, "N_wide_0932", days=DAYS[10:13], gross=lambda n, i: 9000.0)  # 3 sessions: thin
+    write_days(tmp_path)
+    resp = run(tmp_path, view="family_slot", period="P2")
+    assert cell(resp, "N:wide", "0932")["thin"] is True
+    assert resp["scale"]["limit"] == 100.0 and resp["scale"]["thin_excluded"] is True
+    only_thin = run(tmp_path, view="family_slot", period="P2", min_n=1000)
+    assert only_thin["scale"]["limit"] == 9000.0  # nothing solid: the scale falls back to all
+    date_view = run(tmp_path, view="date_slot", period="P2")
+    assert date_view["scale"]["percentile"] == 95.0
+
+
+def test_the_stop_rate_denominator_is_the_strategy_days_it_has_results_for(tmp_path):
+    # results on 12 of the 30 days only; 3 of them stopped: the rate is 3 / 12, not 3 / 30
+    days = DAYS[10:40]
+    have = days[::2][:12]
+    write(
+        tmp_path,
+        "N_wide_0917",
+        days=have,
+        stops=lambda n, i: "overall SL at 10:00" if i < 3 else "",
+    )
+    write(tmp_path, "N_wide_0932", days=days)  # defines the other days
+    write_days(tmp_path)
+    c = cell(run(tmp_path, view="family_slot", period="P2"), "N:wide", "0917")
+    assert c["n"] == 12 and c["m"]["stop_rate"] == pytest.approx(0.25)

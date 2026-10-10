@@ -6,7 +6,10 @@ import { cn } from '../../lib/cn';
 import {
   type CellKind,
   cellKind,
+  cellLabel,
   cellText,
+  settleActive,
+  stepActive,
   toneClass,
   valueText,
 } from '../../lib/rotationMatrixView';
@@ -86,7 +89,8 @@ const Cell = memo(function Cell({
             : kind === 'na'
               ? 'cursor-default bg-transparent text-faint'
               : 'border border-dashed border-border bg-transparent text-faint',
-          thin && 'opacity-50',
+          // thin: muted text, italic and a dotted underline (not colour alone, not low contrast)
+          thin && 'italic text-muted underline decoration-dotted underline-offset-2',
         )}
       >
         {text}
@@ -99,6 +103,15 @@ const Cell = memo(function Cell({
     </td>
   );
 });
+
+/** `:focus-visible` where the engine knows it; an engine that does not is treated as keyboard. */
+function isKeyboardFocus(el: HTMLElement): boolean {
+  try {
+    return el.matches(':focus-visible');
+  } catch {
+    return true;
+  }
+}
 
 function markerFor(
   cell: AnyCell,
@@ -136,11 +149,14 @@ export function RotationMatrixTable({
   onOpen,
   scrollRows = 24,
 }: Props) {
-  const [active, setActive] = useState<[number, number]>([0, 0]);
+  const [wanted, setActive] = useState<[number, number]>([0, 0]);
   const [hover, setHover] = useState<{ r: number; c: number; x: number; y: number } | null>(null);
   const frame = useRef<number | null>(null);
   const root = useRef<HTMLTableElement>(null);
   const withSummary = rowSummary !== undefined && rowSummary !== null && !difference;
+  const kinds = useMemo(() => cells.map((line) => line.map((c) => cellKind(c))), [cells]);
+  // exactly one tab stop, always on a cell that can take focus, even after the view changed
+  const active = useMemo(() => settleActive(wanted, kinds), [wanted, kinds]);
 
   const onPointerMove = useCallback((event: React.PointerEvent<HTMLTableElement>) => {
     const target = (event.target as HTMLElement).closest<HTMLElement>('[data-r]');
@@ -191,11 +207,14 @@ export function RotationMatrixTable({
                   difference={difference}
                   marker={markerFor(cell, overlayList, slotPicks)}
                   active={active[0] === r && active[1] === c}
-                  label={`${row.label}, ${colHeader(col.key, col.label)}: ${
-                    cellKind(cell) === 'value'
-                      ? valueText(cell.v, unit, difference)
-                      : (cell.reason ?? 'no value')
-                  }`}
+                  label={cellLabel(
+                    row.label,
+                    colHeader(col.key, col.label),
+                    cell,
+                    unit,
+                    difference,
+                    slotPicks,
+                  )}
                 />
               );
             })}
@@ -229,8 +248,7 @@ export function RotationMatrixTable({
     const here = (event.target as HTMLElement).closest<HTMLElement>('[data-r]');
     if (!here) return;
     event.preventDefault();
-    const r = Math.min(rows.length - 1, Math.max(0, Number(here.dataset.r) + d[0]));
-    const c = Math.min(cols.length - 1, Math.max(0, Number(here.dataset.c) + d[1]));
+    const [r, c] = stepActive([Number(here.dataset.r), Number(here.dataset.c)], d, kinds);
     setActive([r, c]);
     requestAnimationFrame(() =>
       root.current?.querySelector<HTMLElement>(`[data-r="${r}"][data-c="${c}"]`)?.focus(),
@@ -251,6 +269,19 @@ export function RotationMatrixTable({
         className="border-separate border-spacing-0"
         onPointerMove={onPointerMove}
         onPointerLeave={() => setHover(null)}
+        onFocus={(event) => {
+          // keyboard users get the same readout the pointer gets
+          const t = (event.target as HTMLElement).closest<HTMLElement>('[data-r]');
+          if (!t || !isKeyboardFocus(t)) return;
+          const box = t.getBoundingClientRect();
+          setHover({
+            r: Number(t.dataset.r),
+            c: Number(t.dataset.c),
+            x: box.left + box.width / 2,
+            y: box.bottom - 40,
+          });
+        }}
+        onBlur={() => setHover(null)}
         onKeyDown={onKeyDown}
         onClick={(event) => {
           const t = (event.target as HTMLElement).closest<HTMLElement>('[data-r]');

@@ -81,30 +81,35 @@ export function Legend({
   unit,
   difference = false,
   shared,
+  notes = [],
 }: {
   scale: MatrixScale | null;
   unit: MatrixUnit;
   difference?: boolean;
   /** "Both periods use this scale". */
   shared?: boolean;
+  /** What did not set the scale, what is clipped: stated, never silent. */
+  notes?: string[];
 }) {
   const swatches = legendSwatches(scale, unit, difference);
   if (swatches.length === 0) return null;
-  const first = swatches[0];
-  const last = swatches[swatches.length - 1];
   const diverging = scale?.kind === 'diverging' || difference;
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted">
       <div className="flex items-center gap-2">
         <span className="font-mono text-faint">
-          {diverging ? valueText(first?.edge, unit, difference) : valueText(0, unit, difference)}
+          {diverging
+            ? `≤ ${valueText(scale?.min, unit, difference)}`
+            : valueText(0, unit, difference)}
         </span>
         <span className="flex overflow-hidden rounded-sm border border-border">
           {swatches.map((s) => (
             <span key={s.edge} className={`h-3 w-6 ${s.className}`} aria-hidden="true" />
           ))}
         </span>
-        <span className="font-mono text-faint">{valueText(last?.edge, unit, difference)}</span>
+        <span className="font-mono text-faint">
+          {`≥ ${valueText(scale?.max, unit, difference)}`}
+        </span>
         {shared ? <span className="text-faint">· one scale for both periods</span> : null}
       </div>
       <ul className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -123,6 +128,13 @@ export function Legend({
           no result, or filtered out
         </li>
       </ul>
+      {notes.length > 0 ? (
+        <ul className="basis-full space-y-0.5 text-faint">
+          {notes.map((n) => (
+            <li key={n}>{n}</li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -177,6 +189,17 @@ export function CellReadout({
             <p className="font-mono text-muted">
               avg {valueText(c.m.avg, 'inr')} · win {valueText(c.m.win_rate, 'fraction')} · stop{' '}
               {valueText(c.m.stop_rate, 'fraction')} · worst {valueText(c.m.worst, 'inr')}
+            </p>
+          ) : null}
+          {c?.all ? (
+            <p className="text-muted">
+              Selected only: {formatInt(c.n)} of {formatInt(c.all.n)} sessions. All opportunities{' '}
+              {valueText(c.all.v, unit)} over {formatInt(c.all.n)} sessions.
+            </p>
+          ) : null}
+          {c?.zt ? (
+            <p className="text-faint">
+              {formatInt(c.zt)} strategy-day{c.zt === 1 ? '' : 's'} with no trades, counted as zero.
             </p>
           ) : null}
           {c?.sel ? (

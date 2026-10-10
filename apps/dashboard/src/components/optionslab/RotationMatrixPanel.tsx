@@ -11,7 +11,7 @@
  */
 
 import { RefreshCw } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useRotationMatrix } from '../../hooks/useRotationMatrix';
 import { useRotationMatrixFilters } from '../../hooks/useRotationMatrixFilters';
@@ -22,6 +22,7 @@ import {
   insightLines,
   matrixParams,
   okMatrices,
+  scaleNotes,
 } from '../../lib/rotationMatrixView';
 import type { MatrixGrid, MatrixResponse } from '../../types/rotationMatrix';
 import { Button } from '../ui/Button';
@@ -69,18 +70,30 @@ export function RotationMatrixPanel() {
   const meta = data ? data.meta : undefined;
   const overlayList = filters.list === ANY ? null : filters.list;
 
+  // the previous grid stays on screen when a later request fails: say so, never show it as current
+  const stale = result.error !== null && data !== null;
+  const hasDifference = r?.difference != null;
+  useEffect(() => {
+    if (!hasDifference) setShown('both');
+  }, [hasDifference]);
+  const showDiff = shown === 'difference' && r?.difference?.status === 'ok';
+
+  /** Open the drawer for one cell: one section per period it is made of. */
   const open = (
     row: string,
     col: string,
-    periodId: MatrixGrid['period'],
+    periodIds: MatrixGrid['period'][],
     rowLabel: string,
     colLabel: string,
-    periodLabel: string,
+    heading: string,
   ) =>
     setDrawer({
-      params: cellParams(filters, row, col, periodId),
       title: `${rowLabel} · ${colLabel}`,
-      subtitle: `${periodLabel} · gross per one-lot strategy-day`,
+      subtitle: `${heading} · gross per one-lot strategy-day`,
+      sections: periodIds.map((id) => ({
+        ...(periodIds.length > 1 && r ? { heading: periodLabelOf(r, id) } : {}),
+        params: cellParams(filters, row, col, id),
+      })),
     });
 
   return (
@@ -108,7 +121,19 @@ export function RotationMatrixPanel() {
         />
       ) : (
         <>
-          <Card>
+          {stale ? (
+            <div className="space-y-2">
+              <StateMessage
+                variant="error"
+                title="The latest request failed; this is the previous result"
+                description={`${result.error}. The grid below does not match the controls above.`}
+              />
+              <Button size="sm" onClick={result.refetch}>
+                Retry
+              </Button>
+            </div>
+          ) : null}
+          <Card className={stale ? 'opacity-60' : ''}>
             <CardHeader
               title={r.metric_label}
               description={`Pooling: ${r.aggregation}.`}
@@ -130,10 +155,15 @@ export function RotationMatrixPanel() {
             />
             <p className="text-xs text-muted">
               {okMatrices(r)
-                .map((g) => `${formatInt(g.sessions)} sessions in ${g.period}`)
-                .join(' · ')}
+                .map((g) => `${formatInt(g.sessions)} sessions · ${periodTitle(r, g)}`)
+                .join(' | ')}
               {` · minimum ${formatInt(r.min_n)} sessions (fewer is muted, not hidden) · stored results ${r.meta.store.first ?? '—'} to ${r.meta.store.last ?? '—'}`}
             </p>
+            {weekendNotes(r).map((n) => (
+              <p key={n} className="text-xs text-faint">
+                {n}
+              </p>
+            ))}
             {(() => {
               const lines = insightLines(r);
               return lines.length > 0 ? (
@@ -158,17 +188,17 @@ export function RotationMatrixPanel() {
           )}
 
           {okMatrices(r).length > 0 ? (
-            <Card>
+            <Card className={stale ? 'opacity-60' : ''}>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <Legend
-                  scale={
-                    shown === 'difference' && r.difference?.status === 'ok'
-                      ? (r.difference.scale ?? null)
-                      : r.scale
-                  }
+                  scale={showDiff ? (r.difference?.scale ?? null) : r.scale}
                   unit={r.unit}
-                  difference={shown === 'difference'}
-                  shared={r.matrices.length === 2 && shown === 'both'}
+                  difference={showDiff}
+                  shared={r.matrices.length === 2 && !showDiff}
+                  notes={[
+                    ...scaleNotes(showDiff ? (r.difference?.scale ?? null) : r.scale, r.unit),
+                    ...(r.window_rule ? [r.window_rule] : []),
+                  ]}
                 />
                 {r.difference ? (
                   <SegmentedControl
@@ -194,12 +224,12 @@ export function RotationMatrixPanel() {
               ) : null}
               <div
                 className={
-                  r.matrices.length === 2 && shown === 'both' && r.cols.length <= 14
+                  r.matrices.length === 2 && !showDiff && r.cols.length <= 14
                     ? 'grid gap-6 2xl:grid-cols-2'
                     : 'space-y-6'
                 }
               >
-                {shown === 'difference' && r.difference?.status === 'ok' ? (
+                {showDiff && r.difference?.status === 'ok' ? (
                   <div>
                     <h3 className="mb-2 text-sm font-semibold text-foreground">
                       {r.difference.minuend} minus {r.difference.subtrahend}
@@ -219,14 +249,15 @@ export function RotationMatrixPanel() {
                       caption={`${r.metric_label}, ${r.difference.minuend} minus ${r.difference.subtrahend}`}
                       onOpen={(row, col) => {
                         const a = r.difference?.minuend;
-                        if (a)
+                        const b = r.difference?.subtrahend;
+                        if (a && b)
                           open(
                             row,
                             col,
-                            a,
+                            [a, b],
                             labelOf(r.rows, row),
                             labelOf(r.cols, col),
-                            periodLabelOf(r, a),
+                            `${a} minus ${b}`,
                           );
                       }}
                     />
@@ -255,7 +286,7 @@ export function RotationMatrixPanel() {
                           open(
                             row,
                             col,
-                            g.period,
+                            [g.period],
                             labelOf(r.rows, row),
                             labelOf(r.cols, col),
                             periodTitle(r, g),
@@ -289,4 +320,16 @@ function labelOf(items: { key: string; label: string }[], key: string): string {
 
 function periodLabelOf(r: MatrixResponse, id: string): string {
   return r.periods.find((p) => p.id === id)?.label ?? id;
+}
+
+/** "1 weekend session left out of P1 (2026-02-01), as in the ranking history." */
+function weekendNotes(r: MatrixResponse): string[] {
+  return okMatrices(r).flatMap((g) => {
+    const p = r.periods.find((x) => x.id === g.period);
+    const days = p?.weekend_excluded ?? [];
+    if (days.length === 0) return [];
+    return [
+      `${formatInt(days.length)} weekend session${days.length === 1 ? '' : 's'} left out of ${g.period} (${days.join(', ')}), as in the ranking history.`,
+    ];
+  });
 }

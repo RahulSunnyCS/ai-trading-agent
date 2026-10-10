@@ -4,11 +4,13 @@ import type { MatrixCell, MatrixResponse, MatrixScale } from '../../types/rotati
 import {
   ANY,
   BAND_EDGES,
+  type CellKind,
   DEFAULT_FILTERS,
   type MatrixFilters,
   bandOf,
   canCompare,
   cellKind,
+  cellLabel,
   cellParams,
   cellText,
   curveGeometry,
@@ -17,6 +19,9 @@ import {
   isThin,
   legendSwatches,
   matrixParams,
+  scaleNotes,
+  settleActive,
+  stepActive,
   stoppedShare,
   thinnest,
   toQuery,
@@ -393,5 +398,76 @@ describe('the drawer helpers', () => {
     });
     expect(stoppedShare([day(0), day(1), day(0), day(2)])).toBe(0.5);
     expect(stoppedShare([])).toBeNull();
+  });
+});
+
+describe('request details the review found', () => {
+  it('never sends "selected only" with the selection metric', () => {
+    const p = matrixParams(f({ metric: 'selection', list: 'A', basis: 'selected' }));
+    expect(p.metric).toBe('selection');
+    expect(p.basis).toBeUndefined();
+    expect(
+      cellParams(f({ metric: 'selection', list: 'A', basis: 'selected' }), 'r', 'c', 'P1').basis,
+    ).toBeUndefined();
+    expect(matrixParams(f({ list: 'A', basis: 'selected' })).basis).toBe('selected');
+  });
+
+  it('sends the pulse cell no period (the pulse is not a period)', () => {
+    const p = cellParams(f({ view: 'pulse', to: '2026-10-09' }), 'N:wide', '5', 'asof');
+    expect(p.period).toBeUndefined();
+    expect(p.to).toBe('2026-10-09');
+    expect(cellParams(f(), 'N:wide', '0917', 'P2').period).toBe('P2');
+  });
+});
+
+describe('keyboard and screen readers', () => {
+  const k = (rows: string[]): CellKind[][] =>
+    rows.map((r) => r.split('').map((ch) => (ch === 'x' ? 'na' : 'value')) as CellKind[]);
+
+  it('settles the tab stop on a focusable cell inside the grid', () => {
+    expect(settleActive([0, 0], k(['xv', 'vv']))).toEqual([0, 1]);
+    expect(settleActive([9, 9], k(['vv', 'vv']))).toEqual([1, 1]); // view changed: clamp
+    expect(settleActive([0, 0], k(['xx', 'xv']))).toEqual([1, 1]);
+    expect(settleActive([3, 3], [])).toEqual([0, 0]);
+  });
+
+  it('skips not-applicable cells when arrowing and stays put at an edge', () => {
+    const kinds = k(['vxv', 'vvv']);
+    expect(stepActive([0, 0], [0, 1], kinds)).toEqual([0, 2]);
+    expect(stepActive([0, 2], [0, 1], kinds)).toEqual([0, 2]);
+    expect(stepActive([0, 0], [1, 0], kinds)).toEqual([1, 0]);
+  });
+
+  it('names a cell by value, sample, thin state and picks', () => {
+    const label = cellLabel(
+      'NIFTY Widesl OTM1',
+      '09:17',
+      { v: 148, n: 9, nv: 9, thin: true, sel: { A: 2 }, all: { v: 120, n: 40, nv: 40 } },
+      'inr',
+      false,
+    );
+    expect(label).toContain('+₹148');
+    expect(label).toContain('9 sessions');
+    expect(label).toContain('thin sample');
+    expect(label).toContain('of 40 sessions');
+    expect(label).toContain('A 2 times');
+    expect(
+      cellLabel(
+        'r',
+        'c',
+        { st: 'excluded', reason: 'removed by the weekday filter' },
+        'inr',
+        false,
+      ),
+    ).toBe('r, c: excluded, removed by the weekday filter');
+    expect(cellLabel('r', 'c', { st: 'na' }, 'inr', false)).toBe('r, c: not applicable');
+  });
+
+  it('states what the colour scale left out and what it clipped', () => {
+    expect(
+      scaleNotes({ ...DIVERGING, thin_excluded: true, percentile: 95, clipped: true }, 'inr'),
+    ).toHaveLength(2);
+    expect(scaleNotes({ ...DIVERGING, clipped: false, thin_excluded: false }, 'inr')).toEqual([]);
+    expect(scaleNotes(null, 'inr')).toEqual([]);
   });
 });

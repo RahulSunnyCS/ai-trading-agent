@@ -49,7 +49,7 @@ BASES = ("all", "selected")
 PERIOD_IDS = ("P1", "P2", "P3", "forward", "custom")
 INDEX_NAMES = {"N": "NIFTY", "S": "SENSEX"}
 FAMILY_ORDER = ("wide", *CLOSEST, "dir", "ditm1", "buy")
-WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri")
 DTE_ORDER = ("0", "1", "2", "3", "4", "5", "6", "7+", "unknown")
 BAND_ORDER = (*VIX_LABELS, "unknown")
 PULSE_WINDOWS = (5, 21, 63)
@@ -135,6 +135,8 @@ class Cube:
     dte_n: np.ndarray  # D
     dte_s: np.ndarray  # D
     has_attrs: np.ndarray  # D bool: the day is in days.csv
+    NTRADES: np.ndarray  # V x D trades taken (NaN when the file does not say)
+    weekend_days: list[date] = field(default_factory=list)  # Sat/Sun sessions left out
 
     @property
     def n_variants(self) -> int:
@@ -191,21 +193,29 @@ def load_cube(root: Path | None = None) -> Cube:
 
 def _read_cube(root: Path) -> Cube:
     results = store.results_dir(root)
-    rows: dict[str, dict[date, tuple[float, float, str]]] = {}
+    rows: dict[str, dict[date, tuple[float, float, str, float]]] = {}
+    weekend: set[date] = set()
     for path in sorted(results.glob("*.csv")) if results.exists() else []:
         if _split_name(path.stem) is None:
             continue
-        by_day: dict[date, tuple[float, float, str]] = {}
+        by_day: dict[date, tuple[float, float, str, float]] = {}
         with path.open(newline="") as f:
             for r in csv.DictReader(f):
                 try:
                     d = date.fromisoformat(r["day"])
                 except (KeyError, ValueError):
                     continue
+                if d.weekday() >= 5:
+                    # as in the ranking history (store.load_matrix): a Saturday or Sunday
+                    # special session (the Budget Sunday once shifted every later pick) is left
+                    # out of every figure, and counted so the page can say so
+                    weekend.add(d)
+                    continue
                 by_day[d] = (
                     _float(r.get("gross")),
                     _float(r.get("worst_mtm")),
                     (r.get("stopped_by") or "").strip(),
+                    _float(r.get("n_trades")),
                 )
         if by_day:
             rows[path.stem] = by_day
@@ -214,12 +224,13 @@ def _read_cube(root: Path) -> Cube:
     pos = {d: i for i, d in enumerate(days)}
     G = np.full((len(names), len(days)), np.nan)
     W = np.full((len(names), len(days)), np.nan)
+    NT = np.full((len(names), len(days)), np.nan)
     S = np.zeros((len(names), len(days)), dtype=bool)
     T = np.full((len(names), len(days)), "", dtype=object)
     for v, name in enumerate(names):
-        for d, (g, w, s) in rows[name].items():
+        for d, (g, w, s, nt) in rows[name].items():
             c = pos[d]
-            G[v, c], W[v, c], S[v, c], T[v, c] = g, w, bool(s), s
+            G[v, c], W[v, c], S[v, c], T[v, c], NT[v, c] = g, w, bool(s), s, nt
     attrs = store.read_days(root)
     parts = [_split_name(n) for n in names]
     unknown = "unknown"
@@ -243,6 +254,8 @@ def _read_cube(root: Path) -> Cube:
         dte_n=attr("dte_n"),
         dte_s=attr("dte_s"),
         has_attrs=np.array([d in attrs for d in days], dtype=bool),
+        NTRADES=NT,
+        weekend_days=sorted(weekend),
     )
 
 
@@ -255,6 +268,7 @@ class Journal:
     entries: dict[date, dict] = field(default_factory=dict)  # every entry by day
     forward: list[date] = field(default_factory=list)  # on-time entries, ascending
     late: list[date] = field(default_factory=list)
+    weekend: list[date] = field(default_factory=list)  # Sat/Sun entries, left out like results
 
     def picks(self, day: date, list_id: str) -> list[str]:
         p = ((self.entries.get(day) or {}).get("lists") or {}).get(list_id) or {}
@@ -278,9 +292,13 @@ def load_journal(root: Path | None = None) -> Journal:
         except (KeyError, ValueError):
             continue
         out.entries[d] = e
+        if d.weekday() >= 5:
+            out.weekend.append(d)
+            continue
         (out.forward if e.get("before_first_entry") is True else out.late).append(d)
     out.forward.sort()
     out.late.sort()
+    out.weekend.sort()
     return out
 
 
@@ -548,11 +566,12 @@ class Source:
     valid: np.ndarray  # V x T bool: there is a value to pool
     STOP: np.ndarray | None = None
     kind: str = "perf"  # perf | selection
+    NT: np.ndarray | None = None  # V x T trades taken (perf only)
 
 
 def perf_source(cube: Cube) -> Source:
     axis = TimeAxis(cube.days, cube.ordinal, cube.weekday, cube.band, cube.dte_n, cube.dte_s)
-    return Source(axis, cube.G, ~np.isnan(cube.G), cube.STOP, "perf")
+    return Source(axis, cube.G, ~np.isnan(cube.G), cube.STOP, "perf", cube.NTRADES)
 
 
 def selection_source(cube: Cube, jr: Journal, list_id: str) -> Source:
@@ -758,9 +777,29 @@ def _round(x: float | None, nd: int = 2) -> float | None:
     return None if x is None or not np.isfinite(x) else round(float(x), nd)
 
 
-def pool(ctx: Ctx, vmask: np.ndarray, items: tuple[Item, ...]) -> dict:
-    """Pool the variant-days at the intersection of `vmask`, the period and the items' day / DTE
-    masks. `pre` is how many existed before the conditions, `nv` after, `n` distinct sessions."""
+@dataclass
+class Pooled:
+    """The variant-days one cell (or drawer) reads, as masks over the same sub-grid.
+
+    `base` is what exists for the cell's period and dimensions (a DTE row's days are its identity,
+    so they count here); `cond` is what is left after the user's conditions (weekday, VIX band,
+    own-index DTE, and for the pulse the last-N-sessions window); `post` is `cond` restricted to
+    the strategy-days the list picked when "selected only" is on."""
+
+    vi: np.ndarray
+    ti: np.ndarray
+    base: np.ndarray
+    cond: np.ndarray
+    post: np.ndarray
+
+    @property
+    def ix(self) -> tuple[np.ndarray, np.ndarray]:
+        return np.ix_(self.vi, self.ti)
+
+
+def pool_mask(ctx: Ctx, vmask: np.ndarray, items: tuple[Item, ...]) -> Pooled:
+    """THE pooling rule. A matrix cell and its drawer both call this and nothing else decides
+    which strategy-days belong to a cell, so the two cannot disagree."""
     src = ctx.src
     tm = ctx.t_period.copy()
     for it in items:
@@ -768,48 +807,80 @@ def pool(ctx: Ctx, vmask: np.ndarray, items: tuple[Item, ...]) -> dict:
             tm &= it.tfn(src.axis)
     vi, ti = np.flatnonzero(vmask), np.flatnonzero(tm)
     if vi.size == 0 or ti.size == 0:
-        return {"pre": 0, "nv": 0, "n": 0}
+        none = np.zeros((vi.size, ti.size), dtype=bool)
+        return Pooled(vi, ti, none, none, none)
     ix = np.ix_(vi, ti)
-    pre = src.valid[ix]
-    for it in items:
-        if it.windowed and it.window is not None:
-            # the last N sessions these variants have a value on, not the last N calendar rows
-            have = np.flatnonzero(pre.any(axis=0))
-            keep = np.zeros(ti.size, dtype=bool)
-            keep[have[-it.window :]] = True
-            pre = pre & keep[None, :]
-    post = pre & ctx.t_cond[ti][None, :]
+    base = src.valid[ix].copy()
     wanted = [it.dte for it in items if it.dte is not None]
+    own = None
     if wanted or ctx.f.dte:
         # each variant's own index days-to-expiry on each day (NIFTY variants: dte_n, SENSEX: dte_s)
         nifty = (ctx.cube.index[vi] == "N")[:, None]
         own = np.where(nifty, src.axis.dte_n[ti][None, :], src.axis.dte_s[ti][None, :])
         for w in wanted:
-            post &= own == w
-        if ctx.f.dte:
-            post &= np.isin(own, ctx.f.dte)
-    if ctx.basis_mask is not None:
-        post &= ctx.basis_mask[ix]
-    out: dict[str, Any] = {"pre": int(pre.sum()), "nv": int(post.sum())}
-    out["n"] = int(post.any(axis=0).sum()) if out["nv"] else 0
+            base &= own == w
+    cond = base & ctx.t_cond[ti][None, :]
+    if ctx.f.dte and own is not None:
+        cond &= np.isin(own, ctx.f.dte)
+    for it in items:
+        if it.windowed and it.window is not None:
+            # the last N sessions that match the conditions and that these variants have a value
+            # on: "the last five Mondays" with a weekday filter, not five days then Mondays
+            have = np.flatnonzero(cond.any(axis=0))
+            keep = np.zeros(ti.size, dtype=bool)
+            keep[have[-it.window :]] = True
+            cond &= keep[None, :]
+    post = cond if ctx.basis_mask is None else cond & ctx.basis_mask[ix]
+    return Pooled(vi, ti, base, cond, post)
+
+
+def _perf(src: Source, ix, mask: np.ndarray) -> dict:
+    """Figures of the masked strategy-days: n sessions, nv strategy-days, avg / win / stop / worst
+    and how many were days on which nothing traded."""
+    vals = src.M[ix][mask]
+    stop = src.STOP[ix][mask] if src.STOP is not None else np.zeros(vals.shape, dtype=bool)
+    out: dict[str, Any] = {
+        "n": int(mask.any(axis=0).sum()),
+        "nv": int(mask.sum()),
+        "avg": float(vals.mean()),
+        "win_rate": float((vals > 0).mean()),
+        "stop_rate": float(stop.mean()),
+        "worst": float(vals.min()),
+    }
+    if src.NT is not None:
+        out["zero_trade"] = int((src.NT[ix][mask] == 0).sum())
+    return out
+
+
+def summarise(ctx: Ctx, pl: Pooled) -> dict:
+    """The numbers of a pooled cell. `pre` / `cond_nv` say how many strategy-days survived each
+    stage, so an empty cell can say whether nothing exists or the filters removed it."""
+    src = ctx.src
+    out: dict[str, Any] = {
+        "pre": int(pl.base.sum()),
+        "cond_nv": int(pl.cond.sum()),
+        "nv": int(pl.post.sum()),
+    }
+    out["n"] = int(pl.post.any(axis=0).sum()) if out["nv"] else 0
     if out["nv"] == 0:
         return out
-    vals = src.M[ix][post]
+    ix = pl.ix
     if src.kind == "selection":
-        out["sel"] = float(vals.mean())
+        out["sel"] = float(src.M[ix][pl.post].mean())
         return out
-    stop = src.STOP[ix][post] if src.STOP is not None else np.zeros(vals.shape, dtype=bool)
-    out.update(
-        avg=float(vals.mean()),
-        win_rate=float((vals > 0).mean()),
-        stop_rate=float(stop.mean()),
-        worst=float(vals.min()),
-    )
+    out.update(_perf(src, ix, pl.post))
+    if ctx.basis_mask is not None:
+        # selected only: keep the all-opportunities figures beside the selected ones
+        out["all"] = _perf(src, ix, pl.cond) if pl.cond.any() else None
     if ctx.overlay is not None and ctx.rec_cols is not None:
-        rec = ctx.rec_cols[ti][None, :] & post
+        rec = ctx.rec_cols[pl.ti][None, :] & pl.cond
         out["rec"] = int(rec.sum())
         out["by"] = {k: int((m[ix] & rec).sum()) for k, m in ctx.overlay.items()}
     return out
+
+
+def pool(ctx: Ctx, vmask: np.ndarray, items: tuple[Item, ...]) -> dict:
+    return summarise(ctx, pool_mask(ctx, vmask, items))
 
 
 def cell_dict(
@@ -819,14 +890,18 @@ def cell_dict(
     *,
     observation: bool = False,
     reason_missing: str = "no stored result",
-    excluded_reason: str = "removed by the filters",
+    reason_conditions: str = "removed by the filters",
+    reason_selected: str = "the list did not pick it on these days",
 ) -> dict:
     """One cell as the API returns it. `v` is the chosen metric; `n` distinct sessions, `nv`
-    variant-days; `m` every metric (for the tooltip); `st` is omitted when the cell is ok."""
+    variant-days; `m` every metric (for the tooltip); `st` is omitted when the cell is ok.
+    Missing (nothing exists), excluded (it exists and a filter removed it) and a real zero stay
+    three different things."""
     if stats["nv"] == 0:
-        if stats["pre"] > 0:
-            return {"st": "excluded", "reason": excluded_reason, "n": 0, "nv": 0}
-        return {"st": "missing", "reason": reason_missing, "n": 0, "nv": 0}
+        if stats["pre"] == 0:
+            return {"st": "missing", "reason": reason_missing, "n": 0, "nv": 0}
+        why = reason_conditions if stats["cond_nv"] == 0 else reason_selected
+        return {"st": "excluded", "reason": why, "n": 0, "nv": 0}
     key = "sel" if metric == "selection" else metric
     digits = 2 if metric in ("avg", "worst") else 4
     c: dict[str, Any] = {"v": _round(stats.get(key), digits), "n": stats["n"], "nv": stats["nv"]}
@@ -834,6 +909,20 @@ def cell_dict(
         c["m"] = {"avg": _round(stats["avg"], 2), "stop_rate": _round(stats["stop_rate"], 4)}
         if not observation:
             c["m"].update(win_rate=_round(stats["win_rate"], 4), worst=_round(stats["worst"], 2))
+        if stats.get("zero_trade"):
+            c["zt"] = stats["zero_trade"]
+    if "all" in stats:
+        a = stats["all"]
+        # both denominators: the selected strategy-days above, every opportunity here
+        c["all"] = (
+            None
+            if a is None
+            else {
+                "v": _round(a.get(key), digits),
+                "n": a["n"],
+                "nv": a["nv"],
+            }
+        )
     if not observation and stats["n"] < min_n:
         c["thin"] = True
     if stats.get("by") and any(stats["by"].values()):
@@ -846,26 +935,34 @@ NA_CELL = {"st": "na", "reason": "this strategy does not exist here"}
 
 
 def _scale(cells: list[dict], kind: str, percentile: float | None = None) -> dict:
-    vals = [c["v"] for c in cells if c.get("v") is not None and not c.get("thin")]
+    """The colour limit. Thin cells do not set it (a 5-session outlier must not stretch the
+    scale), so they may exceed it; the date view clips at a percentile because single sessions
+    spread widely. Both rules are returned so the legend can state them."""
+    valued = [c for c in cells if c.get("v") is not None]
+    solid = [c["v"] for c in valued if not c.get("thin")]
+    vals = solid or [c["v"] for c in valued]
+    thin_left_out = bool(solid) and len(solid) < len(valued)
+    base = {"thin_excluded": thin_left_out, "percentile": percentile}
     if not vals:
-        vals = [c["v"] for c in cells if c.get("v") is not None]
-    if not vals:
-        return {"kind": kind, "min": 0.0, "max": 0.0, "limit": 0.0, "clipped": False}
+        return {"kind": kind, "min": 0.0, "max": 0.0, "limit": 0.0, "clipped": False, **base}
     if kind == "diverging":
         a = np.abs(np.array(vals, dtype=float))
         limit = float(np.percentile(a, percentile)) if percentile else float(a.max())
+        clipped = bool(percentile) and bool((a > limit).any())
         return {
             "kind": kind,
             "min": -limit,
             "max": limit,
             "limit": limit,
-            "clipped": bool(percentile),
+            "clipped": clipped,
+            **base,
         }
     top = float(max(vals))
-    return {"kind": kind, "min": 0.0, "max": top, "limit": top, "clipped": False}
+    return {"kind": kind, "min": 0.0, "max": top, "limit": top, "clipped": False, **base}
 
 
-def _excluded_reason(ctx: Ctx) -> str:
+def _reasons(ctx: Ctx) -> tuple[str, str]:
+    """(removed by the conditions, not picked) as sentences for an excluded cell."""
     parts = []
     if ctx.f.weekdays:
         parts.append("weekday")
@@ -873,9 +970,8 @@ def _excluded_reason(ctx: Ctx) -> str:
         parts.append("VIX band")
     if ctx.f.dte:
         parts.append("days-to-expiry")
-    if ctx.basis_mask is not None:
-        parts.append("selected-only")
-    return "removed by the " + (" / ".join(parts) if parts else "filters") + " filter"
+    cond = "removed by the " + " / ".join(parts) + " filter" if parts else "removed by the filters"
+    return cond, "the list recorded no pick of it on these days"
 
 
 def _union(items: list[Item]) -> np.ndarray | None:
@@ -901,7 +997,7 @@ def matrix_for(
         if ctx.src.kind == "selection"
         else "no stored result in this period"
     )
-    why = _excluded_reason(ctx)
+    why_cond, why_sel = _reasons(ctx)
 
     def make(vm: np.ndarray, items: tuple[Item, ...], obs: bool) -> dict:
         if not vm.any():
@@ -912,7 +1008,8 @@ def matrix_for(
             ctx.min_n,
             observation=obs,
             reason_missing=miss,
-            excluded_reason=why,
+            reason_conditions=why_cond,
+            reason_selected=why_sel,
         )
 
     cells: list[list[dict]] = []
@@ -950,6 +1047,12 @@ def matrix_for(
 # --- the public entry points --------------------------------------------------------------
 
 
+def _within(p: PeriodSel, d: date) -> bool:
+    if p.explicit is not None:
+        return d in p.explicit
+    return (p.lo is None or d >= p.lo) and (p.hi is None or d <= p.hi)
+
+
 def period_meta(cube: Cube, jr: Journal, p: PeriodSel) -> dict:
     sessions = None
     waiting = None
@@ -960,9 +1063,11 @@ def period_meta(cube: Cube, jr: Journal, p: PeriodSel) -> dict:
         if p.id == "forward":
             have = {cube.days[i] for i in np.flatnonzero(m)[scored]}
             waiting = [d.isoformat() for d in jr.forward if d not in have]
+    weekend = [d for d in cube.weekend_days if p.status == "ok" and _within(p, d)]
     return {
         "id": p.id,
         "label": p.label,
+        "weekend_excluded": [d.isoformat() for d in weekend],
         "from": p.lo.isoformat() if p.lo else None,
         "to": p.hi.isoformat() if p.hi else None,
         "status": p.status,
@@ -1019,6 +1124,7 @@ def meta_for(cube: Cube, jr: Journal) -> dict:
             "first": cube.days[0].isoformat() if cube.days else None,
             "last": cube.days[-1].isoformat() if cube.days else None,
             "sessions": len(cube.days),
+            "weekend_excluded": [d.isoformat() for d in cube.weekend_days],
             "days_without_attributes": [
                 d.isoformat() for d, ok in zip(cube.days, cube.has_attrs, strict=True) if not ok
             ],
@@ -1068,6 +1174,69 @@ def _as_of(view: str, hi: date | None, cube: Cube) -> date | None:
     return hi or (cube.days[-1] if cube.days else None)
 
 
+def _periods_for(
+    view: str,
+    period: str,
+    compare: tuple[str, str] | None,
+    jr: Journal,
+    lo: date | None,
+    hi: date | None,
+    as_of: date | None,
+) -> list[PeriodSel]:
+    """The periods a request reads. The pulse is as of one day whatever period was asked for, so
+    it gets a period of its own, named for what it is rather than passed off as P1."""
+    if view == "pulse":
+        windows = ", ".join(str(n) for n in PULSE_WINDOWS)
+        day = as_of.isoformat() if as_of else "latest"
+        label = f"As of {day} · last {windows} sessions, and all stored days"
+        return [PeriodSel("asof", label, None, as_of)]
+    return [resolve_period(p, jr, lo, hi) for p in (compare or (period,))]
+
+
+def _overlay_masks(cube: Cube, jr: Journal) -> tuple[dict[str, np.ndarray], np.ndarray | None]:
+    """({list: V x D picked}, D recorded-on-time) for the cells' overlay; empty without entries."""
+    if not (jr.available and jr.forward):
+        return {}, None
+    return {k: pick_matrix(cube, jr, k) for k in LIST_IDS}, np.isin(cube.days, jr.forward)
+
+
+def _make_ctx(
+    cube: Cube,
+    jr: Journal,
+    p: PeriodSel,
+    f: Filters,
+    *,
+    selection: bool,
+    min_n: int,
+    basis: str,
+    list_id: str | None,
+    masks: tuple[dict[str, np.ndarray], np.ndarray | None],
+) -> Ctx:
+    """The one place a matrix (and a drawer) is set up: which source, which days, which
+    conditions, which basis. A cell and its drill-down are both built from this."""
+    sel_masks, rec_cols = masks
+    if selection:
+        src = selection_source(cube, jr, list_id or "A")
+        return Ctx(cube, src, p.mask(src.axis.ordinal), _cond_mask(src.axis, f), f, min_n)
+    src = perf_source(cube)
+    basis_mask = None
+    if basis == "selected":
+        basis_mask = sel_masks.get(
+            list_id or "A", np.zeros((cube.n_variants, len(cube.days)), dtype=bool)
+        )
+    return Ctx(
+        cube,
+        src,
+        p.mask(src.axis.ordinal),
+        _cond_mask(src.axis, f),
+        f,
+        min_n,
+        basis_mask,
+        sel_masks or None,
+        rec_cols,
+    )
+
+
 def compute(
     cube: Cube,
     jr: Journal,
@@ -1100,16 +1269,11 @@ def compute(
             "meta": meta_for(cube, jr),
         }
     f = effective_filters(view, filters or Filters())
-    periods = [resolve_period(p, jr, lo, hi) for p in (compare or (period,))]
-    info = METRIC_INFO[metric]
-
-    overlay = rec_cols = None
-    sel_masks: dict[str, np.ndarray] = {}
-    if jr.available and jr.forward:
-        sel_masks = {k: pick_matrix(cube, jr, k) for k in LIST_IDS}
-        overlay, rec_cols = sel_masks, np.isin(cube.days, jr.forward)
-
     as_of = _as_of(view, hi, cube)
+    periods = _periods_for(view, period, compare, jr, lo, hi, as_of)
+    info = METRIC_INFO[metric]
+    masks = _overlay_masks(cube, jr)
+
     dates = _date_rows(cube, jr, periods[0]) if view == "date_slot" else None
     rows, cols, base_v = build_axes(cube, view, f, dates=dates, as_of=as_of, directory=directory)
     perf = perf_source(cube)
@@ -1119,35 +1283,25 @@ def compute(
         if p.status != "ok":
             matrices.append({"period": p.id, "status": "unavailable", "reason": p.reason})
             continue
+        if metric == "selection" and not (jr.available and jr.forward):
+            reason = jr.reason or "no on-time entry has been recorded yet"
+            matrices.append({"period": p.id, "status": "unavailable", "reason": reason})
+            continue
+        ctx = _make_ctx(
+            cube,
+            jr,
+            p,
+            f,
+            selection=metric == "selection",
+            min_n=min_n,
+            basis=basis,
+            list_id=list_id,
+            masks=masks,
+        )
         if metric == "selection":
-            if not (jr.available and jr.forward):
-                reason = jr.reason or "no on-time entry has been recorded yet"
-                matrices.append({"period": p.id, "status": "unavailable", "reason": reason})
-                continue
-            src = selection_source(cube, jr, list_id or "A")
-            ctx = Ctx(
-                cube, src, _t_period(view, p, src.axis, as_of), _cond_mask(src.axis, f), f, min_n
-            )
             sessions = int(ctx.t_period.sum())
         else:
-            t_period = _t_period(view, p, perf.axis, as_of)
-            basis_mask = None
-            if basis == "selected":
-                basis_mask = sel_masks.get(
-                    list_id or "A", np.zeros((cube.n_variants, len(cube.days)), dtype=bool)
-                )
-            ctx = Ctx(
-                cube,
-                perf,
-                t_period,
-                _cond_mask(perf.axis, f),
-                f,
-                min_n,
-                basis_mask,
-                overlay,
-                rec_cols,
-            )
-            sessions = int((perf.valid[base_v][:, t_period]).any(axis=0).sum())
+            sessions = int(perf.valid[base_v][:, ctx.t_period].any(axis=0).sum())
         built = matrix_for(ctx, view, metric, rows, cols, base_v)
         matrices.append(
             {"period": p.id, "status": "ok", "reason": None, "sessions": sessions, **built}
@@ -1175,6 +1329,11 @@ def compute(
             if metric == "selection"
             else None
         ),
+        "window_rule": (
+            "Each window is the last N sessions that match the conditions set above."
+            if view == "pulse"
+            else None
+        ),
         "filters": filters_echo(f),
         "min_n": min_n,
         "rows": [{"key": r.key, "label": r.label, **r.meta} for r in rows],
@@ -1193,13 +1352,6 @@ def compute(
         ],
         "notes": NOTES,
     }
-
-
-def _t_period(view: str, p: PeriodSel, axis: TimeAxis, as_of: date | None) -> np.ndarray:
-    """Which of the axis' days the matrix reads. The pulse is as of one day, whatever the period."""
-    if view == "pulse":
-        return axis.ordinal <= (as_of.toordinal() if as_of else 10**9)
-    return p.mask(axis.ordinal)
 
 
 def _difference(matrices: list[dict], unit: str) -> dict:
@@ -1281,20 +1433,23 @@ def drill(
     filters: Filters | None = None,
     list_id: str | None = None,
     basis: str = "all",
+    min_n: int = DEFAULT_MIN_N,
     directory: Path | None = None,
 ) -> dict:
     """The daily values behind one cell: per session the mean gross of the variants the cell
     pools (the value itself for a one-strategy cell), the running total of those, the
-    contributing variants with their settings, and the sessions the lists recorded a pick in."""
-    _validate(view, "avg", basis, list_id, DEFAULT_MIN_N)
+    contributing variants with their settings, and the sessions the lists recorded a pick in.
+
+    The strategy-days come from `pool_mask`, the same call the cell makes, so the drawer's
+    sessions, strategy-days and average are the cell's own."""
+    _validate(view, "avg", basis, list_id, min_n)
     if cube.n_variants == 0:
         raise MatrixError("no strategy has stored results yet")
     f = effective_filters(view, filters or Filters())
-    p = resolve_period(period, jr, lo, hi)
+    as_of = _as_of(view, hi, cube)
+    p = _periods_for(view, period, None, jr, lo, hi, as_of)[0]
     if p.status != "ok":
         raise MatrixError(p.reason or "that period is not available")
-    perf = perf_source(cube)
-    as_of = _as_of(view, hi, cube)
     dates = _date_rows(cube, jr, p) if view == "date_slot" else None
     rows, cols, base_v = build_axes(cube, view, f, dates=dates, as_of=as_of, directory=directory)
     r = next((x for x in rows if x.key == row), None)
@@ -1307,30 +1462,21 @@ def drill(
             vm &= it.v
     if not vm.any():
         raise MatrixError("this strategy does not exist here")
-    tm = _t_period(view, p, perf.axis, as_of) & _cond_mask(perf.axis, f)
-    for it in (r, c):
-        if it.tfn is not None:
-            tm &= it.tfn(perf.axis)
-    vi, ti = np.flatnonzero(vm), np.flatnonzero(tm)
-    ix = np.ix_(vi, ti)
-    valid = perf.valid[ix].copy()
-    nifty = (cube.index[vi] == "N")[:, None]
-    own = np.where(nifty, cube.dte_n[ti][None, :], cube.dte_s[ti][None, :])
-    for it in (r, c):
-        if it.dte is not None:
-            valid &= own == it.dte
-    if f.dte:
-        valid &= np.isin(own, f.dte)
-    picks = {k: pick_matrix(cube, jr, k) for k in LIST_IDS} if jr.available and jr.forward else {}
-    if basis == "selected":
-        valid &= picks[list_id][ix] if list_id in picks else False
+    masks = _overlay_masks(cube, jr)
+    ctx = _make_ctx(
+        cube, jr, p, f, selection=False, min_n=min_n, basis=basis, list_id=list_id, masks=masks
+    )
+    pl = pool_mask(ctx, vm, (r, c))
+    vi, ti, valid, ix = pl.vi, pl.ti, pl.post, pl.ix
+    picks = masks[0]
     G = cube.G[ix]
+    NT = cube.NTRADES[ix]
 
     daily: list[dict] = []
     curve: list[dict] = []
     cum = peak = max_dd = 0.0
     for k, ci in enumerate(ti):
-        ok = np.flatnonzero(valid[:, k])
+        ok = np.flatnonzero(valid[:, k]) if valid.size else np.array([], dtype=int)
         if ok.size == 0:
             continue
         vals = G[ok, k]
@@ -1348,37 +1494,48 @@ def drill(
             "gross": _round(float(vals.mean()), 2),
             "n_variants": int(vals.size),
             "n_stopped": len(stopped),
+            "n_no_trade": int((NT[ok, k] == 0).sum()),
         }
         if vals.size == 1:
             item["stopped_by"] = stopped[0] if stopped else ""
             item["worst_mtm"] = _round(float(cube.WORST[int(variant_rows[0]), int(ci)]), 2)
+            nt = NT[ok[0], k]
+            item["n_trades"] = None if np.isnan(nt) else int(nt)
         who = [k2 for k2, pm in picks.items() if pm[variant_rows, int(ci)].any()]
         if who:
             item["picked_by"] = who
         daily.append(item)
         curve.append({"day": d.isoformat(), "cum": _round(cum, 2)})
 
-    all_vals = G[valid]
     stats: dict[str, Any] = {"sessions": len(daily), "variant_days": int(valid.sum())}
-    if all_vals.size:
+    if valid.any():
+        perf = _perf(ctx.src, ix, valid)
+        all_vals = G[valid]
         per_day = np.array([x["gross"] for x in daily], dtype=float)
+        low = np.unravel_index(np.argmin(np.where(valid, G, np.inf)), G.shape)[1]
+        high = np.unravel_index(np.argmax(np.where(valid, G, -np.inf)), G.shape)[1]
         stats.update(
-            avg=_round(float(all_vals.mean()), 2),
-            win_rate=_round(float((all_vals > 0).mean()), 4),
-            stop_rate=_round(float(cube.STOP[ix][valid].mean()), 4),
-            worst=_round(float(all_vals.min()), 2),
+            avg=_round(perf["avg"], 2),
+            win_rate=_round(perf["win_rate"], 4),
+            stop_rate=_round(perf["stop_rate"], 4),
+            worst=_round(perf["worst"], 2),
             best=_round(float(all_vals.max()), 2),
             median_day=_round(float(np.median(per_day)), 2),
             # the sessions the single worst / best strategy-day fell on (not the daily mean)
-            worst_day=cube.days[
-                int(ti[np.unravel_index(np.argmin(np.where(valid, G, np.inf)), G.shape)[1]])
-            ].isoformat(),
-            best_day=cube.days[
-                int(ti[np.unravel_index(np.argmax(np.where(valid, G, -np.inf)), G.shape)[1]])
-            ].isoformat(),
+            worst_day=cube.days[int(ti[low])].isoformat(),
+            best_day=cube.days[int(ti[high])].isoformat(),
             cumulative=_round(cum, 2),
             max_drawdown=_round(max_dd, 2),
+            zero_trade_days=perf.get("zero_trade", 0),
         )
+        if ctx.basis_mask is not None and pl.cond.any():
+            # selected only: the all-opportunities sample beside it
+            a = _perf(ctx.src, ix, pl.cond)
+            stats["all_opportunities"] = {
+                "sessions": a["n"],
+                "variant_days": a["nv"],
+                "avg": _round(a["avg"], 2),
+            }
     variants = []
     for j, v in enumerate(vi):
         if not valid[j].any():

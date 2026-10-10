@@ -13,7 +13,8 @@ export type MatrixView =
   | 'pulse';
 
 export type MatrixMetric = 'avg' | 'win_rate' | 'stop_rate' | 'worst' | 'selection';
-export type MatrixPeriodId = 'P1' | 'P2' | 'P3' | 'forward' | 'custom';
+/** `asof` is the pulse: as of one day, not a period you pick. */
+export type MatrixPeriodId = 'P1' | 'P2' | 'P3' | 'forward' | 'custom' | 'asof';
 export type MatrixListId = 'A' | 'B' | 'C' | 'REF';
 export type MatrixBasis = 'all' | 'selected';
 export type MatrixUnit = 'inr' | 'fraction';
@@ -42,6 +43,10 @@ export interface MatrixCell {
   sel?: Partial<Record<MatrixListId, number>>;
   /** Scored recorded variant-days in this cell (the denominator of `sel`). */
   rec?: number;
+  /** Selected only: the same cell over every opportunity, so both denominators are visible. */
+  all?: { v: number | null; n: number; nv: number } | null;
+  /** Strategy-days in the cell on which nothing traded (pooled as zeros, like the research). */
+  zt?: number;
 }
 
 export interface MatrixDiffCell {
@@ -72,6 +77,10 @@ export interface MatrixScale {
   max: number;
   limit: number;
   clipped: boolean;
+  /** Thin cells were left out of the limit, so they may exceed it. */
+  thin_excluded?: boolean;
+  /** The date view clips at this percentile of |value|. */
+  percentile?: number | null;
 }
 
 export interface MatrixPeriodMeta {
@@ -83,6 +92,8 @@ export interface MatrixPeriodMeta {
   reason: string | null;
   sessions: number | null;
   waiting_on_results: string[] | null;
+  /** Saturday / Sunday sessions inside the period, left out as in the ranking history. */
+  weekend_excluded?: string[];
 }
 
 export interface MatrixGrid {
@@ -130,6 +141,7 @@ export interface MatrixMeta {
     first: string | null;
     last: string | null;
     sessions: number;
+    weekend_excluded?: string[];
     days_without_attributes: string[];
   };
   lists: Record<MatrixListId, string>;
@@ -155,6 +167,8 @@ export interface MatrixResponse {
   metric_label: string;
   aggregation: string;
   selection_denominator: string | null;
+  /** How the pulse's windows meet the conditions (pulse only). */
+  window_rule?: string | null;
   filters: MatrixFiltersEcho;
   min_n: number;
   rows: MatrixAxisItem[];
@@ -186,6 +200,8 @@ export interface MatrixCellDay {
   gross: number;
   n_variants: number;
   n_stopped: number;
+  n_no_trade?: number;
+  n_trades?: number | null;
   stopped_by?: string;
   worst_mtm?: number | null;
   picked_by?: MatrixListId[];
@@ -232,6 +248,9 @@ export interface MatrixCellDetail {
     best_day?: string;
     cumulative?: number | null;
     max_drawdown?: number | null;
+    zero_trade_days?: number;
+    /** Selected only: the sample over every opportunity. */
+    all_opportunities?: { sessions: number; variant_days: number; avg: number | null };
   };
   days: MatrixCellDay[];
   cumulative: { day: string; cum: number | null }[];

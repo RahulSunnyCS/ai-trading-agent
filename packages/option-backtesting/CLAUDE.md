@@ -139,6 +139,9 @@ Otherwise:
   reconstructed. Rows of `family_slot` are the 12 index x family tags found in the store (NIFTY wide / p80 / p100 /
   dir / ditm1 / buy, SENSEX wide / p250 / p320 / dir / ditm1 / buy); `wide` is OTM1 on NIFTY and OTM2 on SENSEX,
   read from the strategy file for the label. The loaded cube is cached on the files' size and mtime.
+  Saturday / Sunday sessions are left out and counted (`weekend_excluded`), as in `store.load_matrix`. A cell and its
+  drill-down both come from `pool_mask`, so they cannot disagree. The pulse is as of one day (period id `asof`),
+  its windows are the last N sessions that match the conditions, and `n_trades == 0` days are counted (`zt`), not dropped.
 - `analytics/correlation.py` — BL-090: Pearson / Spearman of strategies' daily 1-lot P&L, loss-day
   overlap and loss-day correlation, equal-lot basket drawdown against the sum of the parts, rolling
   drift, a leaf order that clusters look-alikes, and `pick_diverse` (a basket under a correlation cap).
