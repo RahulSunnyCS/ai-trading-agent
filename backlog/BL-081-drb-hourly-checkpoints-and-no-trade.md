@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; the afternoon holds about half of the basket's picks |
-| **Status** | Done: closed at the step-1 gate; no state variable passes, no-trade gate inert |
+| **Status** | Planned (block 3): step 1 negative recorded; the owner asked for both cases to be tested, so the adjustment rule runs under override |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
@@ -244,6 +244,40 @@ Files: `research/bl081/state.py` (state table, bars <= h asserted by a SQL trunc
 rows, 0 mismatches), `stage0.py`, `run_block1.py`; `rotate.py --no-trade --rupee-gate`; outputs under
 `research/bl081/out/` (git-ignored; the tables above are the record).
 
+### Block 3 — the adjustment rule, tested fairly (registered 2026-10-10, not yet run)
+
+`override: the owner (2026-10-10) wants both cases checked — early clues adjusting the upcoming picks (this
+block) and event-triggered entries (BL-083) — so the step-2 rule runs although step 1's gate failed.`
+
+Why step 1 was a weak test of the owner's idea: it fitted each strategy on its own history in the matching
+state (about 14 matching days in 63, 1–2 in the 5-day window), demanded a per-variant ordering, and never
+ran the rule itself. Block 2's exploratory diagnostic (registered above, not run) is folded in here.
+
+**Design.**
+- **Pooled state fit.** For a pending strategy v at hour h, `state_fit_h(v)` = the mean P&L per strategy-day
+  of v's *pool* (type × start band × index) on past days in today's state at h, lookbacks 21 / 63 / 126 /
+  252 (25 % each; the 5-day window is dropped — too thin for a pooled conditional mean), rows before today
+  only. Cells have hundreds of observations instead of tens.
+- **A fifth clue: the started picks' live P&L.** The MTM at h of list A's picks that have already started,
+  from the engine's per-minute curve (re-simulate only the picked day-strategies: ≈ 1 per day, ≈ 1,200
+  simulations). States: the running Widesl is up / flat / down by ₹1,000 at h; likewise Dir. This is the
+  most direct "clue from the early stage" and was untested.
+- **Variables.** The four of step 1 with the clearest economic reading (VIX since open, trend ÷ ATR, range
+  so far ÷ ATR, RSI) plus the live-P&L clue; bands as registered. Pairs: VIX × live Widesl P&L.
+- **The rule.** As registered in step 2: re-score the pending universe with `(1 − m) × list score +
+  m × pct(state fit)`, m ∈ {25 %, 50 %}; swap breadth free / family-preserving; actions swap / drop / both;
+  12 versions per list; one override chain across 10:30 → 13:30.
+- **Sets.** Exploration = 2024-10-09 → 2026-10-08 (P1 and P2 together, both indices); confirmation = NIFTY
+  2022-01-03 → 2024-10-08, read only for versions that beat the plain list in exploration.
+- **Controls (as step 2):** state-blind re-rank (same rule, one label for every day), 1,000 random-action
+  runs matched on the number of swaps / drops, 10 label shuffles.
+- **Keep (unchanged from step 2):** gross above the plain list in both sets; above the random-action P90,
+  the state-blind control and the shuffle maximum in both; max drawdown not more than 10 % worse; for drop
+  versions the dropped picks' P&L negative in both sets. Kept = journal candidate, never an adoption.
+- **Will not run:** other bands, other m, other lookbacks, three-variable states.
+- **Cost:** state table exists; live-P&L clue ≈ 20 min of engine time; the rule runs ≈ 2 h (12 versions ×
+  4 lists × 2 sets plus controls). Runs after BL-083 phase 1 or alongside it, the owner's call.
+
 ## Risks
 
 - Many variables × hours × periods: controlled by the all-periods-and-two-hours bar and the published
@@ -291,4 +325,6 @@ None blocking. The VWAP follow-up (BL-082) waits for six months of futures bars.
   NIFTY 2022-01-03 → 2024-10-08, read only for cells the exploration set flags (|t| ≥ 3). A cell is a
   *lead* if it is flagged in exploration and has the same sign with |t| ≥ 2 in confirmation. Leads are
   hypotheses for a separately registered rule test, not results; nothing is adopted from this block.
+- 2026-10-10 — owner: "both should be checked" (clues adjusting upcoming picks; dynamic tracking → BL-083).
+  Recorded as the override of the step-1 gate; block 3 registered above, plan only, not run.
 
