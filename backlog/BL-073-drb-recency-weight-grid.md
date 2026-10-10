@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; closes the BL-067 → BL-072 series |
-| **Status** | In progress |
+| **Status** | Done — nothing meets the adoption bar; recent 10% with 5/21/63/126 is the only row above chance in all three periods (journal candidate) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
@@ -35,8 +35,36 @@ on every period, and the winner declared by its *worst* period.
   row beats the random P90 in all three periods. Drawdown is reported, not scored. No other ranking of
   the rows is read.
 - **Will not run:** other weights, other lookbacks, any row added after seeing a result.
-- **Result:** pending.
+- **Result (2026-10-10, gross):** **no row meets the adoption bar; recent 10% with 5/21/63/126 comes
+  closest and is the only row above chance in all three periods.** Relative score = gross ÷ the best row's
+  gross in that period; P90 = random picks of the same shape.
+
+  | Recent | Lookbacks | P1 2025-12→2026-10 (202 d) | P2 Jan–Aug 2025 (157 d) | P3 2022-04→2024-10 (618 d) | Min rel | Mean rel | ≥ P90 everywhere |
+  |---|---|---|---|---|---|---|---|
+  | 0 | 5/21/63 | 2,18,410 (0.50) ✗ | 2,80,604 (0.89) ✗ | 12,36,724 (0.97) ✓ | 0.50 | 0.79 | no |
+  | 0 | 5/21/63/126 | 2,63,442 (0.61) ✓ | 2,69,734 (0.86) ✗ | 12,57,862 (0.99) ✓ | 0.61 | 0.82 | no |
+  | **10** | **5/21/63/126** | 3,47,323 (0.80) ✓ | **3,14,099 (1.00)** ✓ | **12,72,319 (1.00)** ✓ | **0.80** | **0.93** | **yes** |
+  | 10 | 5/21/63 | 2,98,733 (0.69) ✓ | 2,71,086 (0.86) ✗ | 12,58,993 (0.99) ✓ | 0.69 | 0.85 | no |
+  | 20 | 5/21/63/126 | 3,94,053 (0.91) ✓ | 2,63,941 (0.84) ✗ | 11,62,457 (0.91) ✓ | 0.84 | 0.89 | no |
+  | 20 | 5/21/63 | 3,23,611 (0.74) ✓ | 2,19,640 (0.70) ✗ | 11,33,148 (0.89) ✓ | 0.70 | 0.78 | no |
+  | 33 | 5/21/63/126 | **4,34,745 (1.00)** ✓ | 2,10,304 (0.67) ✗ | 9,93,269 (0.78) ✓ | 0.67 | 0.82 | no |
+  | 33 (baseline) | 5/21/63 | 4,30,868 (0.99) ✓ | 1,70,015 (0.54) ✗ | 10,13,627 (0.80) ✓ | 0.54 | 0.78 | no |
+
+  Drawdowns (reported, not scored): recent 10 / 126 has −74,842 / −67,030 / −48,841 across the periods,
+  the shallowest hold-out drawdown of the eight; the baseline −68,294 / −88,366 / −56,329.
+  - **Adoption rule:** min ≥ 0.85 **and** ≥ P90 everywhere. Recent 20 / 126 has the highest minimum
+    (0.84) but is below P90 on Jan–Aug 2025; recent 10 / 126 is the only row ≥ P90 in all three periods
+    but its minimum is 0.80 (in-sample it makes 80% of the best). **Nothing is adopted by the rule.**
+  - **Two regularities, read after the fact and therefore not conclusions:** (i) the 126-day window
+    helps at every recency weight (mean relative score up 0.03–0.08 in each pair) — the owner's 5/21/63/126
+    suggestion was right; (ii) recency is monotone across periods: more recent weight is better in
+    2025–26 and worse in both other periods, which is why only a low, non-zero weight is above chance
+    everywhere.
+  - **Recommendation to the owner, outside the rule:** recent 10 / 5:30,21:25,63:25,126:20 is the best
+    evidence we have for a middle weighting; adding it to the forward journal as a fourth list costs
+    nothing and lets unseen days judge it. Not a live change.
 
 ## Log
 
 - 2026-10-10 — created and registered before any run.
+- 2026-10-10 — 24 runs done; Result above. Series BL-067 → BL-073 closed; next evidence is the forward journal (BL-058).
