@@ -45,6 +45,8 @@
  *  GET  /api/backtest/legwise/rotation/pulse        — the Family pulse: the 12 family-band cells' recent
  *                                                 gross, the ranking's rank for each, today's picks.
  *                                                 requireAccess
+ *  GET  /api/backtest/legwise/rotation/basket   — one list's (or the fixed base's) picks for a day,
+ *                                                 correlated over a window. requireAccess
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
  *  GET  /api/backtest/legwise/daily             — that run's state/log. requireAccess
@@ -683,6 +685,36 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation shadow ---
+
+  // --- rotation basket --- the Correlation tab's "Today's basket" preset (rotation/basket.py,
+  // read-only). The list and window are enums, the dates are validated, nothing else is forwarded.
+  fastify.get(
+    '/api/backtest/legwise/rotation/basket',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            list: { type: 'string', enum: ['A', 'B', 'C', 'REF', 'BASE'] },
+            day: { type: 'string', pattern: DATE_RE },
+            window: { type: 'string', enum: ['P1', 'P2', 'last63', 'forward', 'custom'] },
+            from: { type: 'string', pattern: DATE_RE },
+            to: { type: 'string', pattern: DATE_RE },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/basket${upstreamQuery(q, ['list', 'day', 'window', 'from', 'to'])}`,
+      );
+    },
+  );
+  // --- end rotation basket ---
 
   // --- rotation matrix ---
   // The Strategy Matrix (packages/option-backtesting rotation/matrix.py). Read-only. Every value

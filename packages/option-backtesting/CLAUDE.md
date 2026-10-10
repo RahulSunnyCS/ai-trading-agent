@@ -155,6 +155,14 @@ Otherwise:
   displaced pick's stored result is pending, never zero), with the time-matched placebo Dir as its control line
   (BL-083's random-minute control is not in the trigger files, so it is reported `not_recorded`); and BL-081's two
   forward candidates returned `not_scored` with their definitions (no nightly scoring exists for them).
+- `rotation/basket.py` + `api/rotation_basket_routes.py` — the Correlation tab's "A day's basket" preset (BL-058
+  Phase 4 widget 6; `GET /legwise/rotation/basket?list=A|B|C|REF|BASE&day=&window=P1|P2|last63|forward|custom`),
+  read-only. A list's picks for a day are the journal entry's when there is one, else `daylog.reconstruction`'s
+  (the same `pick.score_history` the 09:16 job calls), labelled `recorded` / `reconstructed`; `BASE` is
+  2 x `N_wide_0917` + the Dir ATM 09:24 leg from `rotation/base/` (the Widesl listed twice, so the basket is
+  2 W + D). The figures are `analytics/correlation.analyse`'s, over one window; a Forward window is the on-time
+  days themselves, not the date range they span (a late or missing day between two is not forward). Under 5
+  common days there are no figures (the reason says how many days), under 20 they are flagged thin.
 - `rotation/matrix.py` + `api/rotation_matrix_routes.py` — the Options Lab's Matrix tab (the Strategy Matrix, read-only):
   `GET /legwise/rotation/matrix` (views `family_slot` / `date_slot` / `dte_slot` / `vix_family` / `weekday_family` /
   `pulse`; metrics `avg` / `win_rate` / `stop_rate` / `worst` / `selection`; periods P1, P2, P3 (returned as
