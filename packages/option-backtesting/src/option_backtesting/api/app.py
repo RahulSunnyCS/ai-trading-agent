@@ -23,6 +23,7 @@ from .rotation_basket_routes import router as rotation_basket_router
 from .rotation_explain_routes import router as rotation_explain_router
 from .rotation_log_routes import router as rotation_log_router
 from .rotation_matrix_routes import router as rotation_matrix_router
+from .rotation_regime_routes import router as rotation_regime_router
 from .rotation_routes import router as rotation_router
 from .rotation_shadow_routes import router as rotation_shadow_router
 from .routes import router
@@ -54,6 +55,7 @@ def create_app(cache_dir: Path | None = None) -> FastAPI:
     app.include_router(rotation_router)
     app.include_router(rotation_shadow_router)
     app.include_router(rotation_basket_router)
+    app.include_router(rotation_regime_router)
     app.include_router(rotation_matrix_router)
     return app
 

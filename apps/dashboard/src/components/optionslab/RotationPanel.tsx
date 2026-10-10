@@ -32,6 +32,7 @@ import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
 import { RotationDailyLog } from './RotationDailyLog';
 import { RotationExplain } from './RotationExplain';
+import { RotationRegime } from './RotationRegime';
 import { RotationShadowScoreboard } from './RotationShadowScoreboard';
 import { RotationBaskets } from './rotation/RotationBaskets';
 import { RotationHeadline } from './rotation/RotationHeadline';
@@ -239,6 +240,8 @@ export function RotationPanel() {
       <RotationDailyLog focus={focus} />
       {/* slot:shadow */}
       <RotationShadowScoreboard />
+      {/* slot:regime */}
+      <RotationRegime />
     </div>
   );
 }
