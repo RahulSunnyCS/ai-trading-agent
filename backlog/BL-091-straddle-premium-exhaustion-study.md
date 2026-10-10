@@ -84,8 +84,11 @@ unsupported, or insufficient data.
 ### Phase 0 — Pre-register
 
 **Draft protocol, not run-ready.** Resolve the finite settings below and commit this block plus
-the experiment configuration before any outcome exploration, comparison or sweep. No run has
-occurred. This task adds a planned item only; start-time questions belong to the normal
+the experiment configuration before any outcome comparison or sweep on P1 or forward. No run has
+occurred. The gate has two stages since 2026-10-10 (section E): the exploration on P2 + P3 is
+registered by section E (what an episode is, what is recorded, which parameters are read) and may
+read those periods' outcomes to learn the thresholds; the single P1 run and the T5 shadow are gated
+by this block, frozen with the learned thresholds before P1 is read. This task adds a planned item only; start-time questions belong to the normal
 "Start BL-091" workflow. Previous research overrides are not inherited by this item.
 
 - **Hypothesis:** Persistence and realised retracement following meaningful premium expansion
@@ -110,11 +113,12 @@ occurred. This task adds a planned item only; start-time questions belong to the
   on a common eligible sample. Do not select days by profitable or complete-looking paths.
   Unavailable future bars are missing outcomes, not zero returns. Quote-spread analysis is
   omitted where only traded-price bars exist; never fabricate historical quotes.
-- **Historical periods:** Proposed development 2024-10-09 through 2025-08-29; chronological
-  evaluation 2025-09-01 through 2026-10-09, subject to coverage. NIFTY 2022-01-03 through
-  2024-10-08 is a separate older-regime check where eligible data exists. These periods have
-  been used by prior research; none is a pristine unseen hold-out. Freeze exact eligible dates
-  and source versions in the manifest before analysis. Report half-year and index results.
+- **Historical periods (E.3):** learn on P2 (2025-01-10 → 2025-08-29) and the NIFTY-only P3
+  (2022-04-05 → 2024-10-08); test once on P1 (2025-12-03 → 2026-10-08), subject to coverage.
+  These periods have been used by prior research (BL-081, BL-083 and the rotation lists); none
+  is a pristine unseen hold-out, and P1 is untouched only by this item's exploration. Freeze exact
+  eligible dates and source versions in the manifest before analysis. Report half-year and index
+  results.
 - **True hold-out:** If a historical lead merits a forward shadow, register its exact rule
   before its first future event and evaluate after 60 trading sessions. The actual start is
   the first eligible session after that registration, not automatically 12 October. No live
@@ -172,8 +176,11 @@ confirmation rather than comparing only unrelated event averages.
 
 - **Tasks:** Audit historical input coverage without ranking outcomes; freeze the manifest and
   complete Phase 0. Implement research-only event extraction under
-  `packages/option-backtesting/research/bl084/`, sharing generic helpers through
-  `research/common/` if needed. Preserve immutable source data.
+  `packages/option-backtesting/research/bl091/`, sharing generic helpers through
+  `research/common/` if needed. Preserve immutable source data. Then the registered exploration
+  on P2 + P3 (E.3): build the episode table (E.2, E.4), replay the re-entry habit R0 to label held
+  and stopped minutes (E.6, E.7), and write the one detection rule and trade mapping into this item
+  before P1 is read.
 - **Deliverables:** Versioned finite configuration, coverage/missingness table, timestamp and
   strike-continuity audit, events with observable inputs and contract identity, and synthetic
   checks for constant/rising/turning series, ATM-switch jumps, gaps and causal derivatives.
@@ -185,7 +192,8 @@ confirmation rather than comparing only unrelated event averages.
 
 - **Tasks:** Evaluate the frozen arms and matched controls; report 30-minute contraction and
   adverse expansion, secondary 15/60-minute paths, contraction-threshold frequencies, event
-  counts and early/late detection trade-offs. Include block uncertainty and multiplicity
+  counts and early/late detection trade-offs. Run the re-entry ladder R0–R5 (E.6) on P1 with
+  stops and costs against random re-entry minutes. Include block uncertainty and multiplicity
   handling, chronological-period results and the older-regime context check.
 - **Deliverables:** Full results table for all arms, event-path examples including failures,
   data exclusions, lead/fail/inconclusive verdicts and a comparison with earlier T3 evidence.
@@ -219,14 +227,23 @@ confirmation rather than comparing only unrelated event averages.
 
 ## Open questions
 
-Resolve when the owner starts the item, before freezing Phase 0:
+Resolve when the owner starts the item, before freezing Phase 0. Questions 1 and 3 were answered on
+2026-10-10 (section E below); question 2 is settled in part (one-minute bars, B.10 and E.1) and is
+confirmed at the freeze; question 4 is open.
 
-1. Accept the proposed 30-minute primary horizon, sample floor and pass rule, or specify a
-   different practical contraction/adverse-expansion trade-off?
+1. ~~Accept the proposed 30-minute primary horizon, sample floor and pass rule, or specify a
+   different practical contraction/adverse-expansion trade-off?~~ **Answered (E.2, E.6):** the
+   episode and outcome definitions are in points (rise ≥ 25, decay ≥ 15), and the practical trade-off
+   is measured as the rupee result of the owner's re-entry habit with its stop, not as a premium
+   horizon alone. The 30-minute premium horizon stays as the secondary, descriptive measure.
 2. Use one-minute observations with causal smoothing, or completed five-minute observations
    as the primary cadence? Freeze one; do not choose after evaluation results. Amendment B.10
-   proposes one-minute fixed-strike paths from the lake's contract bars.
-3. Which exact expansion, persistence and retracement definitions should the finite study use?
+   proposes one-minute fixed-strike paths from the lake's contract bars; E.1 uses one-minute
+   bars for the rolling series. Confirm at the freeze.
+3. ~~Which exact expansion, persistence and retracement definitions should the finite study use?~~
+   **Answered (E.3):** they are learned from the episodes in the older data, written down once, and
+   then run on the untouched latest year. The owner does not know them in advance and does not
+   want them guessed.
 4. Confirm historical manifest/cut-offs and eligible DTE coverage without requiring unsupported
    SENSEX history; freeze how low-premium/IV-quality cases are handled.
 
@@ -332,6 +349,112 @@ change to Phase 0–3; none is frozen until the owner starts the item. Nothing h
     C6–C9 on their common samples. Report the achievable floor per arm from the coverage audit before
     Phase 2, and declare in advance which arms are inconclusive by construction.
 
+### E. Owner's answers (2026-10-10): learn the rule from the episodes, then test it
+
+The owner answered open questions 1 and 3 in conversation on 2026-10-10. Recorded here verbatim in
+substance; these are the settings the start-time freeze will use unless the owner changes them.
+
+1. **The series is the rolling (dynamic) ATM straddle.** Whatever strike is ATM at that minute, that
+   straddle: NIFTY at 24,000 with the 24,000 straddle at 159; NIFTY moves to 24,100 and the 24,100
+   straddle is now the series, at 180 or so. Detection reads this rolling series, built minute by
+   minute from the lake's one-minute contract bars (B.10). Every strike switch is marked. For
+   episodes (the ≥ 25-point rise and ≥ 15-point decay of E.2) the series is **spliced**: the
+   running total of within-strike minute changes, so a rise that crosses a switch is one episode and
+   the jump between the old and new straddle's values is dropped. For derivatives (velocity,
+   acceleration, persistence) the Phase 0 rule stands: **reset** at the switch and warm up for the
+   window length (A.7); no derivative is read inside the warm-up. The outcome of a trade is measured on the
+   pair actually sold at the entry minute, which is then held fixed (the Phase 0 "freeze that pair"
+   rule). NIFTY first; SENSEX where the same bars exist.
+2. **Episodes and outcomes are in points, not percent.** An episode starts when the rolling ATM
+   straddle rises at least **25 points** from a running low (example: 150 decaying to 135, then up
+   to 160 or beyond; the owner's typical spike is up to about 100 points). Every such rise in the
+   learning data is an episode, whether or not it later fell. An episode **decayed** when the series
+   fell at least **15 points** from its running high without making a new high inside the horizon;
+   otherwise it **paused and resumed**. No percent rule anywhere. The premium level at the start of
+   each episode is recorded as a column only, so it can later be seen whether a 25-point rise behaves
+   the same at 120 as at 300.
+3. **Learn on the older data, test once on the latest year, then forward.** The exploration that
+   finds the rule runs on P2 (2025-01-10 → 2025-08-29) and the NIFTY-only P3 (2022-04-05 →
+   2024-10-08). Its output is **one** detection rule and one trade mapping, written into this item
+   with every alternative that was looked at (a smoothing window, a persistence count, a retracement
+   size each get a Log line, so the number of looks is known). Only then does the rule run, once, on
+   P1 (2025-12-03 → 2026-10-08), which this exploration does not read. P1 is not pristine: the
+   rotation lists, BL-081 and BL-083 were built with it in view, so a P1 pass is evidence, and the
+   T5 shadow (C.12) is the only unseen test. A rule that holds on P1 is registered as T5. The exploration is itself registered before
+   it runs: this section fixes what an episode is, what is recorded per episode and which parameters
+   are read; it does not fix thresholds, which are the exploration's output. "The last two years
+   decide" is kept by not reading P1 until the rule is frozen.
+4. **What is recorded for every episode.** Start minute and the running low; the high and its
+   minute; rise in points; decayed or paused-and-resumed, and the minute decay began; time of day of
+   the high; what NIFTY did from the high over the horizon (kept going, stalled, reversed, with the
+   size in points); premium level at the start; days to expiry; opening VIX band; data-quality flags.
+   At every candidate minute (see 6 and 7) the parameters: velocity and acceleration of the rolling
+   series with causal smoothing, how many minutes the slowing has lasted, give-back from the running
+   high in points, expiry-IV direction, NIFTY's own speed over the last minutes, agreement of the two
+   neighbouring straddles (A.8), premium percentile against comparable sessions (A.2), time of day.
+   All from bars stamped at or before that minute.
+5. **Three owner observations become registered questions, not assumptions.**
+   - *A peak is often not the peak.* The series falls, then rises again. The exploration's first
+     job is to find what, at the moment of slowing, separated the episodes that decayed from the
+     ones that resumed. If nothing separates them, that is the finding.
+   - *Decay usually comes late, around 14:30 to 15:00.* If most true decays start after 14:30, the
+     finding is time of day, not exhaustion, and the honest rule is "sell at 14:30". The base-rate
+     table by time of day (A.1) is the control; any exhaustion rule must beat it on the same minutes.
+   - *Decay sometimes comes with a move the other way.* NIFTY reverses and the straddle falls. For
+     those peaks a directional trade may work; for a stall only the sell works. Each episode's NIFTY
+     path (item 4) says which, and the trade mapping may differ by kind of peak: Widesl, Dir (the
+     BL-083 templates, C.13) or both.
+6. **The re-entry ladder: the owner's habit as the baseline trade test (Phase 2).** The owner's
+   experience: on a drastic rise the running wide sell's rupee stop is hit; the owner re-enters the
+   OTM wide sell at the new ATM with a small stop, which is hit again, typically three or four times,
+   until an attempt holds and the decay that follows can cover the earlier losses. The stop is
+   **₹2,000 on a four-lot position, ₹500 per lot** (the owner quoted ₹500 to ₹650 per lot; the
+   ₹2,000 total is what the arms use). On today's NIFTY lot of 65 that is about 8 points of combined
+   premium, which the premium moves in a minute or two during a 25 to 100 point rise: the early
+   attempts are stopped by normal wobble, not because the call about the top was wrong. The engine
+   runs with its default `lot_sizing: current` (today's lot on every historical day), so ₹500 is the
+   same number of points in P3 (when the lot was 25 or 50) as in P1; a historical-lot run is not an
+   arm. The aim is to remove the losing attempts without losing the one that holds. Arms:
+
+   | Arm | Rule after a stop-out |
+   |---|---|
+   | R0 | The habit: re-enter the OTM wide sell at the new ATM at once, same stop, up to five attempts. Baseline. |
+   | R1 | Re-enter only when the detection rule from item 3 fires. Same stop. |
+   | R2 | Re-enter only after the rolling series has given back ≥ 15 points from its running high. |
+   | R3 | No re-entry before 13:30 (the late-decay observation). |
+   | R4 | Re-enter at will, but the stop must be at least a frozen multiple of the premium's recent one-minute swings; if that stop is larger than the owner would carry, do not enter. |
+   | R5 | No re-entry within 20 minutes of a stop-out. |
+
+   One rule per arm, no sweep. All arms run on the same episodes through the legwise engine (its
+   stops and costs; a ladder of attempts is a sequence of its single entries, built under
+   `research/bl091/`), with a comparator of 1,000 runs of random re-entry minutes inside the episode,
+   drawn from the same time-of-day distribution as the arm's own entries, so R3 and R5 cannot win by
+   entering later in a late-decay market. Per episode and per attempt number: stopped or held,
+   rupees, attempts before the winner, worst day. Episodes where **no** attempt held are in the
+   tally, since memory keeps the days the fifth attempt paid for the first four and drops the rest.
+   Learned on P2 + P3, confirmed once on P1. **Keep rule (freeze before P1):** on P1, the arm's net
+   rupees per episode after costs is above R0's and above the comparator's P90, its session-block
+   resampled 95 % lower bound of the improvement over R0 is above zero, its worst day is not worse
+   than R0's, and it has at least 40 episodes with at least one attempt; fewer episodes is
+   inconclusive, not a pass. Reported alongside: attempts removed and winners removed, so the owner
+   sees what was given up.
+7. **The attempts label the minutes; the parameters are judged against the labels.** Each attempt's
+   entry minute in R0 is labelled *held* (true peak) or *stopped* (false peak), measured in rupees with
+   the owner's stop. The parameters in item 4 are read at every such minute. One table per parameter:
+   its distribution at held versus stopped minutes. A parameter that looks the same in both groups
+   does not help, whatever it is called; one that separates them is a candidate. Combinations are the
+   ladder C2 → C3 → C5 → C6–C9: add one parameter at a time. Two stages, two rules: **during the
+   P2 + P3 exploration** a parameter stays on the ladder if it removes stopped attempts without
+   removing held ones (a screening rule, counted in the Log); **on P1** the surviving ladder is judged
+   by the Phase 0 pass rule (matched controls, Holm, lower confidence bound) and, as a trade, by the
+   R-arm keep rule in item 6. The P1 verdict stands. No search over every combination. The result is reported as
+   a win rate per rule with the number of attempts behind it, never as a confidence percentage, because
+   parameters that agree often carry the same information and are not independent votes.
+8. **Assumption to confirm at start.** The wide sell that is re-entered is the OTM wide strangle of
+   the A / B / C lists, four lots, with the rupee stop on the whole position. Also to confirm: the
+   horizon for "decayed" versus "paused" (proposed: to 15:15 or the next 25-point rise, whichever
+   first) and the start of the day's observation window.
+
 ## Log
 
 - 2026-10-10 — Owner requested adding premium-momentum parameters to the widget proposal and
@@ -343,3 +466,12 @@ change to Phase 0–3; none is frozen until the owner starts the item. Nothing h
   protocol remain unchanged. No study or product implementation started.
 - 2026-10-10 — Renumbered BL-084 → BL-091 (number taken on `main`); amendments A–D appended from the two
   Live widget sections of the proposal. Still Planned; nothing run.
+- 2026-10-10 — Owner answered open questions 1 and 3 (section E): rolling ATM series, episodes of
+  ≥ 25 points and decay of ≥ 15 points in points only, learn on P2 + P3 and test once on P1, the
+  re-entry habit (₹500–650 per lot, four lots) as the baseline trade test with arms R0–R5, and the
+  attempts as the labels the parameters are judged against. Still Planned; nothing run.
+- 2026-10-10 — PR #169 review: Phase 0 gate split into exploration (section E) and P1/forward
+  stages; periods bullet replaced by the E.3 split; P1 described as not pristine; switch handling
+  fixed (spliced series for episodes, reset for derivatives); stop restated as ₹2,000 on four lots
+  with `lot_sizing: current`; R-arm keep rule given a floor, a bound and a time-matched comparator;
+  C-arm rules assigned to stages.
