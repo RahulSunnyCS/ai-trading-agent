@@ -654,3 +654,10 @@ only. This is the engine convention behind every stored result and is left as is
   2022–24; in 2025 only monthly expiries exist (weeklies ended November 2024), nearest 0–30 days
   out. Their 1-minute index bars cover all periods (Bank Nifty from 2015, Fin Nifty 2017, Midcap
   Nifty July 2022). Not registered yet.
+- 2026-10-11 — Owner asked whether open-interest change can be tested. It can: every option bar
+  carries OI in 2022–25 (vendor) and in the Fyers collection, and on the ATM contracts checked it
+  changes on 123–124 of 375 minutes, i.e. the exchange's snapshot about every 3 minutes. Proposed
+  parameter for Stage 2: OI change of the ATM and far out-of-the-money calls and puts during the
+  spike (writers adding positions as premium is sold), at 3-minute resolution. Not registered yet.
+  Disclosure: this data check also counted OI presence in two P1 files (2026-09-25, 2026-10-08);
+  only row and OI counts were read, no prices or outcomes.
