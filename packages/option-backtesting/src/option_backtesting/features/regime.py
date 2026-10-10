@@ -45,7 +45,7 @@ class RegimeBuckets:
     """The regime section of a run, with why it is absent when it is.
     `status`: `ok` (buckets present), `unavailable` (no DATABASE_URL in this
     process, or nothing to bucket), `empty` (queried, no tag applies to this
-    window), `unreachable` (DATABASE_URL set, database down) or
+    window), `connect_failed` (DATABASE_URL set, cannot connect) or
     `missing_table` (reachable, no `daily_regime_tags`)."""
 
     buckets: dict[str, float] | None
@@ -85,7 +85,7 @@ def regime_bucket_status(sessions: list[SessionResult], underlying: str) -> Regi
 def regime_bucket_report(sessions: list[SessionResult], underlying: str) -> dict[str, float] | None:
     """{regime: summed net_inr} across `sessions`, bucketed by each
     session's lag-1 regime tag. Returns None if regime data isn't
-    available (DATABASE_URL unset, database unreachable or without the
+    available (DATABASE_URL unset, database not connectable or without the
     table) or no regime row applies to any session in this window — see
     `regime_bucket_status` for which."""
     return regime_bucket_status(sessions, underlying).buckets

@@ -313,7 +313,8 @@ def _overlay_t33(underlying: str, days: list[dict]) -> dict[str, str | None]:
     """Attach apps/server's T-33 whole-day regime tag (`daily_regime_tags`) to each day as
     `t33`, so the dashboard can show how the two classifiers agree. Optional enrichment:
     reported as a status, never silently dropped — `unavailable` (no DATABASE_URL in THIS
-    process), `unreachable` (database down), `missing_table` (no `daily_regime_tags`),
+    process), `connect_failed` (cannot connect: down, bad credentials or no such database),
+    `missing_table` (no `daily_regime_tags`),
     `empty` (connected, nothing tagged in range), `ok`, or `error` with the message."""
     for d in days:
         d["t33"] = None

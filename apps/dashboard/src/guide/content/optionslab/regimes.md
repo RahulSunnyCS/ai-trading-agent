@@ -31,7 +31,7 @@ VIX implied:
 | Do regimes persist? | For each label today, how often tomorrow had each label, against a shuffled baseline. If tomorrow looks like the baseline, today's label tells you nothing. |
 | Rolling share | Over a recent window, the share of trend days and of days that moved less than implied. The second above 50% is roughly a premium-selling climate. |
 | Which style suited the period? | Stand-in measures (not real P&L) of how short premium and directional styles fared over time. |
-| Comparison with the live regime tagger | How these labels line up with the paused live engine's tags. Expect partial agreement. |
+| Comparison with the live regime tagger | How these labels line up with the paused live engine's tags. Expect partial agreement. When the trading database cannot be connected to, or has no daily regime table, a card says so instead of the comparison. |
 | Within the day | Whether one part of the day predicts another, such as a trending open followed by a quiet close. |
 
 > [!NOTE]

@@ -116,7 +116,7 @@ def test_query_window_covers_lookback_buffer_before_first_session(
     assert captured["date_to"] == date(2026, 8, 18)
 
 
-@pytest.mark.parametrize("status", ["unreachable", "missing_table"])
+@pytest.mark.parametrize("status", ["connect_failed", "missing_table"])
 def test_source_unavailable_omits_buckets_and_reports_status(
     monkeypatch: pytest.MonkeyPatch, status: str
 ) -> None:

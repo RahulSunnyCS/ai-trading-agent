@@ -12,10 +12,11 @@ guess" convention as every other optional data source in this codebase.
 
 Two further situations are "this source has no regime data", not "the query
 is wrong", and raise `RegimeSourceUnavailable` (carrying a `status` the
-callers report): the database cannot be reached (`unreachable`), or it is
-reachable but has no `daily_regime_tags` table (`missing_table` — e.g. a
-Postgres that only holds `broker_tokens`). Any other failure of a query
-against a database that does have the table still raises as before.
+callers report): no connection can be made (`connect_failed`: the server is
+down, bad credentials, no such database), or the database is reachable but has
+no `daily_regime_tags` table (`missing_table`, e.g. a Postgres that only holds
+`broker_tokens`). Any other failure of a query against a database that does
+have the table still raises as before.
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ _QUERY = (
 
 class RegimeSourceUnavailable(RuntimeError):
     """The regime database is configured but cannot supply regime tags.
-    `status` is `unreachable` or `missing_table`; `str(error)` says why."""
+    `status` is `connect_failed` or `missing_table`; `str(error)` says why."""
 
     def __init__(self, status: str, message: str) -> None:
         super().__init__(message)
@@ -60,7 +61,7 @@ def fetch_regimes(underlying: str, date_from: date, date_to: date) -> dict[date,
         conn = psycopg.connect(database_url)
     except psycopg.OperationalError as error:
         raise RegimeSourceUnavailable(
-            "unreachable", f"cannot connect to DATABASE_URL: {_short(error)}"
+            "connect_failed", f"cannot connect to DATABASE_URL: {_short(error)}"
         ) from error
 
     try:

@@ -198,7 +198,7 @@ def test_anatomy_overlays_t33_tags_and_reports_why_when_it_cannot(client, root, 
     assert "connection refused" in broken.json()["t33"]["message"]
 
 
-@pytest.mark.parametrize("status", ["unreachable", "missing_table"])
+@pytest.mark.parametrize("status", ["connect_failed", "missing_table"])
 def test_anatomy_reports_unavailable_regime_source_by_status(client, root, monkeypatch, status):
     from option_backtesting.analytics.regime_source import RegimeSourceUnavailable
 

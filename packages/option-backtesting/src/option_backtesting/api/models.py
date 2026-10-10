@@ -79,7 +79,7 @@ class RunResponse(BaseModel):
     # None when regime data isn't available (DATABASE_URL unset, database
     # down or without daily_regime_tags) or no regime row applies to this
     # window — never fabricated. `regime_status` says which (ok |
-    # unavailable | empty | unreachable | missing_table).
+    # unavailable | empty | connect_failed | missing_table).
     regime_buckets: dict[str, float] | None = None
     regime_status: str | None = None
     regime_message: str | None = None

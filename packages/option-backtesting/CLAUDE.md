@@ -106,7 +106,7 @@ Otherwise:
   gated on `DATABASE_URL` being exported in *this process* specifically (not
   just present in a `.env` the server reads) — see the root `technical.md`
   Gotchas for the exact silent-omission failure mode. With it set, a database
-  that is down (`unreachable`) or lacks the table (`missing_table`) raises
+  that is down (`connect_failed`) or lacks the table (`missing_table`) raises
   `RegimeSourceUnavailable`; `features/regime.py::regime_bucket_status` turns that
   into an absent regime section plus a status (CLI line, `regime_status` /
   `regime_message` on `POST /runs`, `regime_status` in the MCP `run_backtest`
