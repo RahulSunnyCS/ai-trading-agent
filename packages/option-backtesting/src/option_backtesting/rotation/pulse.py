@@ -57,7 +57,8 @@ MATRIX_FAMILY = {"wide": "widesl", "dir": "dirs", "buy": "buy"}
 WINDOWS = mx.PULSE_WINDOWS  # (5, 21, 63)
 ROLL = 21  # the sparkline's and the flag's rolling window
 SPARK_SESSIONS = 126
-MIN_FLAG_WINDOWS = 20  # fewer rolling windows in P1 than this: no P10-P90 to speak of
+MIN_FLAG_WINDOWS = 10  # fewer rolling windows in P1 than this: no P10-P90 to speak of
+EPS = 1e-9  # a value must clear the band by more than this to be flagged (the drift card's rule)
 SHARE_SESSIONS = 21
 RANK_OF = len(KINDS) * len(BANDS)
 INDEX_CHOICES = {"both": "both", "nifty": "N", "n": "N", "sensex": "S", "s": "S"}
@@ -112,13 +113,21 @@ def check_grouping(names: list[str]) -> dict[int, str]:
             )
     if len(set(out.values())) != len(out):
         raise PulseError("the family grouping drifted: two ranking groups share one cell key")
+    outside = sorted(set(out.values()) - set(cell_keys()))
+    if outside:
+        raise PulseError(
+            f"the ranking has a group outside the twelve cells ({', '.join(outside)}): a new "
+            "strategy kind or start band needs pulse.py to know it"
+        )
     return out
 
 
 # --- the ranking's view -----------------------------------------------------------------------
 
 
-def ranking_sees(snap: Snapshot, as_of: date) -> dict[str, Any]:
+def ranking_sees(
+    snap: Snapshot, as_of: date, groups: dict[int, str] | None = None
+) -> dict[str, Any]:
     """{cell: criterion value} and the competition rank 1-12, for the pick whose history is every
     stored session up to and including `as_of` (what Why this pick calls "Family-band recent")."""
     rows = [i for i, d in enumerate(snap.days) if d <= as_of and d in snap.attrs]
@@ -133,7 +142,7 @@ def ranking_sees(snap: Snapshot, as_of: date) -> dict[str, Any]:
             "cells": {},
         }
     names = snap.names
-    groups = check_grouping(names)
+    groups = groups if groups is not None else check_grouping(names)
     values = snap.net[rows]
     P = np.vstack([values, np.zeros((1, len(names)))])  # the target row is never read
     recent = recent_score(P, len(rows))
@@ -208,8 +217,11 @@ def rolling_means(G: np.ndarray, vmask: np.ndarray, tmask: np.ndarray, size: int
 
 
 def _spark_and_flag(
-    cube: mx.Cube, vmask: np.ndarray, as_of: date, p1: tuple[date, date], last21: float | None
+    cube: mx.Cube, vmask: np.ndarray, as_of: date, p1: tuple[date, date]
 ) -> tuple[dict, dict]:
+    """The rolling-21 line and the drift flag. The flag compares the cell's latest FULL 21-session
+    window (unrounded) with the P10-P90 of its own rolling-21 windows that lie inside P1, the
+    rule the selection-drift card uses: at least MIN_FLAG_WINDOWS windows, a tolerance of EPS."""
     upto = cube.ordinal <= as_of.toordinal()
     cols, means = rolling_means(cube.G, vmask, upto)
     spark_days: list[str] = []
@@ -227,19 +239,20 @@ def _spark_and_flag(
     p1_mean = _round(float(p1_all.mean())) if p1_all.size else None
     spark = {"days": spark_days, "values": spark_vals, "p1_mean": p1_mean}
     flag: dict[str, Any] = {"state": "unknown", "windows": int(p1_means.size)}
-    if last21 is None:
-        flag["reason"] = "no last-21 mean to compare"
+    if means.size == 0:
+        flag["reason"] = f"fewer than {ROLL} sessions of this cell are stored, so no full window"
     elif p1_means.size < MIN_FLAG_WINDOWS:
         flag["reason"] = (
             f"only {p1_means.size} rolling-{ROLL} windows in P1 (the rule needs {MIN_FLAG_WINDOWS})"
         )
     else:
+        last = float(means[-1])  # the unrounded value, the window the figure column shows
         p10, p90 = (float(x) for x in np.percentile(p1_means, [10, 90]))
         flag.update(
             p10=_round(p10),
             p90=_round(p90),
-            last21=_round(last21),
-            state="above" if last21 > p90 else "below" if last21 < p10 else "inside",
+            last21=_round(last),
+            state="above" if last > p90 + EPS else "below" if last < p10 - EPS else "inside",
         )
     return spark, flag
 
@@ -333,16 +346,32 @@ def compute(
             "reason": "no strategy has stored results yet",
             "basis": "gross",
         }
-    stored = [d for d in cube.days]
+    # the grouping is checked before anything else, so a drift is loud even while the ranking is
+    # still short of its warm-up
+    groups = check_grouping(snap.names)
+    stored = list(cube.days)
+    # a session counts once EVERY variant has its result (what the ranking reads): the windows,
+    # the flag and the rank then describe the same day while the nightly update is part-way
+    complete = set(snap.days)
+    usable = [d for d in stored if d in complete] or stored
     if as_of is None:
-        eff = stored[-1]
+        eff = usable[-1]
     else:
-        before = [d for d in stored if d <= as_of]
+        before = [d for d in usable if d <= as_of]
         if not before:
             raise PulseError(
-                f"no stored session on or before {as_of}; the store starts {stored[0]}"
+                f"no stored session on or before {as_of}; the store starts {usable[0]}"
             )
         eff = before[-1]
+    partial = [
+        {
+            "day": d.isoformat(),
+            "variants": int((~np.isnan(cube.G[:, i])).sum()),
+            "of": int(cube.n_variants),
+        }
+        for i, d in enumerate(cube.days)
+        if d > eff and d not in complete
+    ]
     ordinal = eff.toordinal()
     upto = cube.ordinal <= ordinal
 
@@ -350,7 +379,9 @@ def compute(
     forward_days = {
         date.fromisoformat(k).toordinal()
         for k, e in snap.trusted_entries().items()
-        if e.get("before_first_entry") is True and date.fromisoformat(k).weekday() < 5
+        if e.get("before_first_entry") is True
+        and date.fromisoformat(k).weekday() < 5
+        and date.fromisoformat(k) <= eff
     }
     base_ctx = mx.Ctx(cube, src, upto, np.ones(len(cube.days), dtype=bool), mx.Filters(), 1)
     p1_lo, p1_hi, p1_label = mx.NAMED["P1"]
@@ -362,14 +393,19 @@ def compute(
 
     p1_ctx, p2_ctx = period_ctx(p1_lo, p1_hi), period_ctx(p2_lo, p2_hi)
     cell_by_variant = np.array([cell_of(n) for n in cube.names])
+    # a stored variant none of the twelve cells holds (a family this module does not know) is
+    # left out of every cell, and said so in the response rather than dropped silently
+    unplaced = [n for n, k in zip(cube.names, cell_by_variant, strict=True) if k not in cell_keys()]
     sub_index = np.ones(cube.n_variants, dtype=bool) if index == "both" else cube.index == index
 
-    rank = ranking_sees(snap, eff)
+    rank = ranking_sees(snap, eff, groups)
     chain = snap.chain()
 
-    # which lists picked where: the entry for the next pick when recorded, else the latest entry
+    # which lists picked where: the entry for the next pick when recorded, else the latest entry.
+    # The next pick is the day after the last session the ranking actually read.
     is_trading_fn = is_trading or (lambda d: d.weekday() < 5)
-    next_day = _next_trading_day(eff, is_trading_fn)
+    history_end = date.fromisoformat(rank["history_to"]) if rank.get("history_to") else eff
+    next_day = _next_trading_day(history_end, is_trading_fn)
     entries = snap.trusted_entries()
     picks_block: dict[str, Any] = {"source": None, "day": None, "late": False, "lists": {}}
     chosen: str | None = None
@@ -445,8 +481,7 @@ def compute(
         }
         p1 = _stat(p1_ctx, vmask, (), forward_days)
         p2 = _stat(p2_ctx, vmask, (), forward_days)
-        last21 = windows["21"]["avg"]
-        spark, flag = _spark_and_flag(cube, vmask, eff, (p1_lo, p1_hi), last21)
+        spark, flag = _spark_and_flag(cube, vmask, eff, (p1_lo, p1_hi))
         r = rank["cells"].get(key)
         fam = MATRIX_FAMILY[meta["kind"]]
         cell.update(
@@ -471,12 +506,16 @@ def compute(
         )
         cells.append(cell)
 
+    # what existed as of `eff`: an entry after it is not part of this snapshot (the next pick's
+    # own entry is reported in `picks`)
+    known = {k: e for k, e in entries.items() if date.fromisoformat(k) <= eff}
     on_time = sorted(
         k
-        for k, e in entries.items()
+        for k, e in known.items()
         if e.get("before_first_entry") is True and date.fromisoformat(k).weekday() < 5
     )
-    late = sorted(k for k, e in entries.items() if e.get("before_first_entry") is not True)
+    late = sorted(k for k, e in known.items() if e.get("before_first_entry") is not True)
+    entries_known = sum(1 for k in snap.entries if date.fromisoformat(k) <= eff)
     return {
         "available": True,
         "basis": "gross",
@@ -487,6 +526,11 @@ def compute(
             "last": stored[-1].isoformat(),
             "sessions": len(stored),
             "weekend_excluded": [d.isoformat() for d in cube.weekend_days],
+            # sessions after `as_of` that some variants have and others do not (the nightly
+            # update is part-way): left out of every window and of the rank
+            "partial": partial,
+            "unplaced": unplaced[:20],
+            "unplaced_count": len(unplaced),
         },
         "next_pick_day": next_day.isoformat() if next_day else None,
         "list": list_id,
@@ -520,15 +564,16 @@ def compute(
             ),
         },
         "journal": {
-            "entries": len(snap.entries),
+            "entries": entries_known,
+            "through": eff.isoformat(),
             "on_time": len(on_time),
             "late": late,
             "chain": chain,
         },
         "flag_rule": (
-            f"A cell is flagged when its last-21 mean sits outside the P10 to P90 of its own "
-            f"rolling-{ROLL}-session means in P1 (windows entirely inside P1; at least "
-            f"{MIN_FLAG_WINDOWS} of them)."
+            f"A cell is flagged when its latest full {ROLL}-session mean sits outside the P10 to "
+            f"P90 of its own rolling-{ROLL}-session means in P1 (windows entirely inside P1; at "
+            f"least {MIN_FLAG_WINDOWS} of them)."
         ),
         "cells": cells,
     }

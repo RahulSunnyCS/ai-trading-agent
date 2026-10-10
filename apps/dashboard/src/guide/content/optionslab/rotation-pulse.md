@@ -25,7 +25,9 @@ A cell is a strategy kind in a start band, across both indices and every strike:
 | 14:17–15:17 | 14:17 to 15:17 (Buy has no 15:17) |
 
 These are exactly the groups the ranking averages for its family-band criterion. The page checks
-that on every request and refuses to answer if the two ever disagree.
+that on every request, before anything else, and refuses to answer if the two ever disagree or the
+ranking has a group outside the twelve cells. A stored strategy that belongs to none of them is left
+out of every cell and named under the table, never dropped silently.
 
 ## The columns
 
@@ -49,7 +51,13 @@ Click a row to open the Strategy Matrix's pulse view, filtered to that kind and 
   are never added together.
 - **A dash is a missing figure, not zero.** A window with no stored result shows a dash and says why
   when hovered. A real zero shows as ₹0.
-- **A star** next to a count marks a window shorter than its name, because fewer sessions exist.
+- **A star** next to a count marks a window shorter than its name, because fewer sessions exist. On
+  the share column it marks a recorded share over fewer than 21 sessions.
+- **The card is as of the last complete session.** A session counts once every strategy has its
+  result. While the nightly update is part-way through a day, that day is named under the table
+  ("stored only in part") and left out of the windows and of the rank, so both describe the same day.
+- **The date is a snapshot.** Entries, late entries and picks counted are those that existed as of
+  that session, and the next pick's own entry is shown separately in the Picks column.
 - **Weekend sessions** (a special Saturday or Sunday session) are left out, as in the Matrix.
 - **The index filter** (Both, NIFTY, SENSEX) narrows the means only. It is not what the ranking
   uses: "Ranking sees" is always the pooled cell across both indices.
@@ -72,19 +80,26 @@ because that is the unit of every other figure here.
 
 - **Recorded** chips are the journal's entry for the next pick when it exists, otherwise the latest
   entry. An entry recorded after 09:17 is shown with a note and counted nowhere.
-- **Reconstructed** chips appear only before any entry exists. They are the picks the rule gives for
-  the latest day with attributes, from the results before it: what it would have picked, not a record.
+- **Reconstructed** chips appear when there is no entry to show: before the first entry, or while the
+  journal's hash chain is broken or unreadable (its entries are then not trusted, and the card says
+  so beside the red badge). They are the picks the rule gives for the latest day with attributes, from
+  the results before it: what it would have picked, not a record.
 - **Share of A** counts the focus list's core picks (three a day) that landed in the cell, over the
   last 21 recorded on-time sessions. With no entry yet it uses the last 21 reconstructed sessions and
-  says so. The two are never mixed. A Buy cell has no core picks by construction, so it shows the days
+  says so. The two are never mixed. A recorded share over fewer than 21 sessions carries a star and
+  its tooltip gives the reconstructed 21-session figure beside it, because "100% of 3 picks" is a
+  thin sample, not a signal. A Buy cell has no core picks by construction, so it shows the days
   the Buy add-on sat there instead.
 
 ### The flag
 
-A cell shows Above its P1 range or Below its P1 range when its last-21 mean sits outside the P10 to
-P90 of its own rolling 21-session means in P1. It is a description of drift, the same rule
-planned for the selection-drift card. It needs at least 20 rolling windows in P1; below that the row
-says "no range yet". Nothing changes when a cell is flagged.
+A cell shows Above or Below when its latest full 21-session mean sits outside the P10 to P90 of its
+own rolling 21-session means in P1: windows that lie entirely inside P1, at least 10 of them, the
+value compared unrounded with a tiny tolerance. A cell with fewer than 21 stored sessions has no full
+window and no flag; below 10 windows in P1 the row says "no range yet". This is the rule the planned
+selection-drift card is written to use (the figures there are shares of picks; here they are rupees).
+It is a description of drift; nothing changes when a cell is flagged. When the as-of date is still
+inside P1, the window being tested is one of the windows that make the band.
 
 ## What it is not
 

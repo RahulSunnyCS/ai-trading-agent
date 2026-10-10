@@ -442,13 +442,13 @@ def test_a_cell_above_its_own_p1_band_is_flagged_and_inside_is_not(env):
 
 def test_too_few_p1_windows_give_no_flag_and_say_why(env):
     root, days, values = env
-    stop = days.index(date(2025, 12, 3)) + 30  # 30 P1 sessions: 10 rolling windows
+    stop = days.index(date(2025, 12, 3)) + 25  # 25 P1 sessions: 5 rolling windows
     root2 = root / "young"
     store.rotation_dir(root2).mkdir(parents=True)
     write_results(root2, days[:stop], values[:stop])
     write_days(root2, days[:stop])
     f = by_key(run(root2))["wide_A"]["flag"]
-    assert f["state"] == "unknown" and f["windows"] == 10 and "only 10" in f["reason"]
+    assert f["state"] == "unknown" and f["windows"] == 5 and "only 5" in f["reason"]
 
 
 def test_the_sparkline_is_the_rolling_21_session_mean_and_ends_on_the_last_21(env):
@@ -496,7 +496,10 @@ def test_chips_are_the_recorded_entry_of_the_next_pick_and_a_late_entry_is_label
     # the late day's entry is shown, labelled, when it is the one for the next pick
     late = run(root, as_of=days[-30])
     assert late["picks"]["day"] == d_late.isoformat() and late["picks"]["late"] is True
-    assert d_late.isoformat() in late["journal"]["late"]
+    # as of days[-30] the late entry (days[-29]) did not exist yet: it is the next pick's, in `picks`
+    assert late["journal"]["late"] == [] and late["journal"]["on_time"] == 1
+    now = run(root)
+    assert now["journal"]["late"] == [d_late.isoformat()] and now["journal"]["on_time"] == 1
 
 
 def test_share_counts_recorded_on_time_core_picks_only_and_never_mixes_in_reconstructed(
@@ -604,6 +607,102 @@ def test_picks_after_as_of_are_not_counted_in_the_share(env, monkeypatch):
     assert out["share"]["recorded"]["to"] == days[-3].isoformat()
 
 
+# --- as of one session: the journal, partial days, short windows, grouping ---------------
+
+
+def test_journal_figures_describe_what_existed_as_of_the_session(env, monkeypatch):
+    root, days, _ = env
+    record(root, days[-5], monkeypatch)
+    record(root, days[-4], monkeypatch)
+    record(root, days[-3], monkeypatch, hh=9, mm=41)  # late
+    out = run(root, as_of=days[-5])
+    assert out["journal"]["on_time"] == 1 and out["journal"]["late"] == []
+    assert out["journal"]["entries"] == 1 and out["journal"]["through"] == days[-5].isoformat()
+    # the next pick's own entry is still reported, in `picks`
+    assert out["picks"]["day"] == days[-4].isoformat() and out["picks"]["late"] is False
+    now = run(root)
+    assert now["journal"]["on_time"] == 2 and now["journal"]["late"] == [days[-3].isoformat()]
+    assert now["journal"]["entries"] == 3
+
+
+def test_a_part_stored_session_is_not_the_default_as_of_and_is_reported(env):
+    root, days, values = env
+    names_with = NAMES[:30]  # only these variants have the last session stored
+    vals = values.copy()
+    for j, n in enumerate(NAMES):
+        if n not in names_with:
+            vals[-1, j] = np.nan
+    root2 = root / "partial"
+    store.rotation_dir(root2).mkdir(parents=True)
+    write_results(root2, days, vals)
+    write_days(root2, days)
+    out = run(root2)
+    assert out["as_of"] == days[-2].isoformat()
+    assert out["rank"]["history_to"] == days[-2].isoformat()
+    assert out["next_pick_day"] == out["rank"]["for"] == days[-1].isoformat()
+    assert out["store"]["partial"] == [
+        {"day": days[-1].isoformat(), "variants": 30, "of": len(NAMES)}
+    ]
+    # an explicit as_of on the part-stored day snaps to the last complete session before it
+    assert run(root2, as_of=days[-1])["as_of"] == days[-2].isoformat()
+    # the windows end where the rank's history ends
+    w = by_key(out)["wide_A"]["windows"]["5"]
+    assert w["last"] == days[-2].isoformat()
+
+
+def test_a_short_window_gives_no_flag_and_the_figure_is_not_a_full_window(env):
+    root, days, values = env
+    root2 = root / "fifteen"
+    store.rotation_dir(root2).mkdir(parents=True)
+    write_results(root2, days[:15], values[:15])
+    write_days(root2, days[:15])
+    c = by_key(run(root2))["wide_A"]
+    assert c["windows"]["21"]["n"] == 15
+    assert c["flag"]["state"] == "unknown" and "fewer than 21 sessions" in c["flag"]["reason"]
+
+
+def test_the_flag_compares_the_unrounded_full_window(env):
+    root, days, _ = env
+    c = by_key(run(root))["dir_B"]
+    assert c["windows"]["21"]["n"] == 21
+    f = c["flag"]
+    assert f["last21"] == c["windows"]["21"]["avg"]  # the same window the figure column shows
+    assert f["state"] in ("above", "below", "inside")
+
+
+def test_the_grouping_is_checked_before_the_ranking_has_its_warm_up(env):
+    root, days, values = env
+    odd = ["N_xyz_0917"]
+    names = [*NAMES, *odd]
+    n = 30  # far short of the 63-session warm-up
+    root2 = root / "odd"
+    store.rotation_dir(root2).mkdir(parents=True)
+    vals = np.hstack([values[:n], values[:n, :1]])
+    write_results(root2, days[:n], vals, names)
+    write_days(root2, days[:n])
+    cube = mx._read_cube(root2)
+    snap = ex.load_snapshot(root2, names)
+    with pytest.raises(pl.PulseError, match="outside the twelve cells"):
+        pl.compute(cube, snap)
+
+
+def test_a_stored_variant_outside_the_twelve_cells_is_left_out_and_counted(env):
+    root, days, values = env
+    names = [*NAMES, "N_xyz_0917"]  # a result file the universe does not hold
+    vals = np.hstack([values, values[:, :1]])
+    root2 = root / "stray"
+    store.rotation_dir(root2).mkdir(parents=True)
+    write_results(root2, days, vals, names)
+    write_days(root2, days)
+    out = pl.compute(mx._read_cube(root2), ex.load_snapshot(root2, NAMES))
+    assert out["store"]["unplaced"] == ["N_xyz_0917"] and out["store"]["unplaced_count"] == 1
+    base = run(root)
+    assert [c["windows"]["21"]["avg"] for c in out["cells"]] == [
+        c["windows"]["21"]["avg"] for c in base["cells"]
+    ]
+    assert run(root)["store"]["unplaced_count"] == 0
+
+
 # --- the route --------------------------------------------------------------------------
 
 
@@ -614,7 +713,7 @@ def client(env, monkeypatch):
     monkeypatch.setattr(rotation_pulse_routes, "variant_names", lambda: NAMES)
     monkeypatch.setattr(rotation_explain_routes, "variant_names", lambda: NAMES)
     monkeypatch.setattr(daylog, "variant_names", lambda: NAMES)
-    rotation_pulse_routes._snap_cache.update(at=0.0, root=None, value=None)
+    rotation_pulse_routes._snap_cache.update(root=None, cube=None, journal=None, value=None)
     mx._CUBE_CACHE.update(key=None, cube=None)
     return TestClient(create_app(root / "cache")), root, days
 
@@ -653,3 +752,48 @@ def test_the_route_writes_nothing_under_the_rotation_store(client):
         if p.is_file()
     }
     assert before == after
+
+
+def test_a_new_session_and_a_new_entry_move_the_windows_the_rank_and_the_picks_together(
+    client, monkeypatch
+):
+    c, root, days = client
+    first = c.get("/legwise/rotation/pulse").json()
+    assert first["as_of"] == days[-1].isoformat()
+    assert first["rank"]["history_to"] == days[-1].isoformat()
+
+    # the nightly update lands one more session (results for every variant, then days.csv)
+    new = weekdays(days[-1] + timedelta(days=1), 2)
+    rng = np.random.default_rng(99)
+    for name in NAMES:
+        store.append_result(
+            name,
+            {
+                "day": new[0].isoformat(),
+                "net": round(float(rng.normal(0, 800)), 2),
+                "gross": 0.0,
+                "costs": 0.0,
+                "worst_mtm": -50.0,
+                "stopped_by": "",
+                "n_trades": 2,
+            },
+            root,
+        )
+    store.append_day(attrs_of(len(days), new[0]), root)
+    store.append_day(attrs_of(len(days) + 1, new[1]), root)
+    collect(root, new[0])
+    second = c.get("/legwise/rotation/pulse").json()
+    # no waiting for any cache: all three describe the same, new, session
+    assert second["as_of"] == new[0].isoformat()
+    assert second["rank"]["history_to"] == new[0].isoformat()
+    assert second["next_pick_day"] == second["rank"]["for"] == new[1].isoformat()
+    assert second["store"]["partial"] == []
+
+    # a pick recorded at 09:16 shows at once
+    entry = record(root, new[1], monkeypatch)
+    third = c.get("/legwise/rotation/pulse").json()
+    assert third["picks"]["source"] == "recorded" and third["picks"]["day"] == new[1].isoformat()
+    chips = [chip["variant"] for cell in third["cells"] for chip in cell["chips"]]
+    assert sorted(chips) == sorted(
+        v for k in LISTS for v in [*entry["lists"][k]["core"], *entry["lists"][k]["buy"]]
+    )

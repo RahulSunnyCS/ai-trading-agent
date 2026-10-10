@@ -69,7 +69,15 @@ function data(over: Partial<PulseAvailable> = {}): PulseAvailable {
     basis: 'gross',
     as_of: '2026-10-09',
     as_of_requested: null,
-    store: { first: '2024-10-09', last: '2026-10-09', sessions: 490, weekend_excluded: [] },
+    store: {
+      first: '2024-10-09',
+      last: '2026-10-09',
+      sessions: 490,
+      weekend_excluded: [],
+      partial: [],
+      unplaced: [],
+      unplaced_count: 0,
+    },
     next_pick_day: '2026-10-12',
     list: 'A',
     index: 'both',
@@ -108,6 +116,7 @@ function data(over: Partial<PulseAvailable> = {}): PulseAvailable {
     },
     journal: {
       entries: 0,
+      through: '2026-10-09',
       on_time: 0,
       late: [],
       chain: { intact: true, problems: [], error: null },
@@ -141,15 +150,45 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('RotationPulse', () => {
-  it('asks for the focus list and the chosen index', () => {
-    hook.state.data = data();
-    render(<RotationPulse focus="B" />);
+  it('asks for the focus list and the chosen index, and notes the index filter', () => {
+    hook.state.data = data({ list: 'B' });
+    const view = render(<RotationPulse focus="B" />);
     expect(hook.lastArgs).toEqual(['B', 'both']);
     fireEvent.click(screen.getByRole('radio', { name: 'NIFTY' }));
     expect(hook.lastArgs).toEqual(['B', 'NIFTY']);
+    hook.state.data = data({ list: 'B', index: 'NIFTY' });
+    view.rerender(<RotationPulse focus="B" />);
     expect(
       screen.getByText(/narrows the means only; it is not what the ranking uses/),
     ).toBeTruthy();
+  });
+
+  it('never shows a held response under other controls: the skeleton instead', () => {
+    // the hook still returns the list-A, both-indices payload after the controls moved on
+    hook.state.data = data();
+    const view = render(<RotationPulse focus="A" />);
+    expect(screen.getByText('Ranking sees')).toBeTruthy();
+
+    view.rerender(<RotationPulse focus="B" />);
+    expect(screen.queryByText('Ranking sees')).toBeNull();
+    expect(screen.queryByText('₹676')).toBeNull();
+
+    view.rerender(<RotationPulse focus="A" />);
+    expect(screen.getByText('Ranking sees')).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: 'NIFTY' }));
+    expect(screen.queryByText('Ranking sees')).toBeNull();
+
+    // the matching response arrives: shown again
+    hook.state.data = data({ index: 'NIFTY' });
+    view.rerender(<RotationPulse focus="A" />);
+    expect(screen.getByText('Ranking sees')).toBeTruthy();
+  });
+
+  it('shows the error with Retry, not the held mismatched response, when the new request fails', () => {
+    hook.state = { data: data(), loading: false, error: 'HTTP 502', refetch: vi.fn() };
+    render(<RotationPulse focus="C" />);
+    expect(screen.getByText('Could not load the Family pulse')).toBeTruthy();
+    expect(screen.queryByText('₹676')).toBeNull();
   });
 
   it('shows the figures, the rank, the drift flag, the chips and the share', () => {
@@ -197,6 +236,7 @@ describe('RotationPulse', () => {
       },
       journal: {
         entries: 1,
+        through: '2026-10-09',
         on_time: 0,
         late: ['2026-10-12'],
         chain: { intact: true, problems: [], error: null },
@@ -208,10 +248,11 @@ describe('RotationPulse', () => {
     expect(screen.getByText(/1 late entry excluded/)).toBeTruthy();
   });
 
-  it('says so when the journal chain is broken', () => {
+  it('with a broken chain the badge and the texts agree: entries exist but are not trusted', () => {
     hook.state.data = data({
       journal: {
         entries: 2,
+        through: '2026-10-09',
         on_time: 0,
         late: [],
         chain: { intact: false, problems: ['hash mismatch'], error: null },
@@ -219,6 +260,10 @@ describe('RotationPulse', () => {
     });
     render(<RotationPulse focus="A" />);
     expect(screen.getByText(/Journal chain broken/)).toBeTruthy();
+    expect(
+      screen.getByText(/hash chain is broken, so its entries are not trusted and none/),
+    ).toBeTruthy();
+    expect(screen.queryByText(/No entry has been recorded/)).toBeNull();
   });
 
   it('explains a ranking that cannot be rebuilt yet, with dashes in the column', () => {
@@ -272,6 +317,32 @@ describe('RotationPulse', () => {
     render(<RotationPulse focus="A" />);
     expect(screen.getByText('The latest request failed; this is the previous result')).toBeTruthy();
     expect(screen.getByText('₹676')).toBeTruthy();
+  });
+
+  it('names a part-stored session and marks a thin recorded share', () => {
+    hook.state.data = data({
+      store: {
+        first: '2024-10-09',
+        last: '2026-10-10',
+        sessions: 491,
+        weekend_excluded: [],
+        partial: [{ day: '2026-10-10', variants: 120, of: 298 }],
+        unplaced: [],
+        unplaced_count: 0,
+      },
+      share: {
+        list: 'A',
+        sessions: 21,
+        recorded: { sessions: 3, core_total: 9, list: 'A', from: '2026-10-12', to: '2026-10-14' },
+        reconstructed: null,
+      },
+      cells: [
+        cell({ share: { recorded: { core: 9, share: 1, buy_days: 0 }, reconstructed: null } }),
+      ],
+    });
+    render(<RotationPulse focus="A" />);
+    expect(screen.getByText(/120 of 298 variants/)).toBeTruthy();
+    expect(screen.getByText('100% · 9/9*')).toBeTruthy();
   });
 
   it('shows a cell the store has no variants for as not applicable, not as zero', () => {

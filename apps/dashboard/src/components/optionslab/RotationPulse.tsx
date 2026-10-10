@@ -33,12 +33,14 @@ import {
   isShort,
   matrixHref,
   nearestIndex,
+  partialNote,
   picksHeader,
   rankView,
   shareView,
   sourceLine,
   sparkGeometry,
   unavailableView,
+  unplacedNote,
 } from '../../lib/rotationPulseView';
 import type {
   PulseAvailable,
@@ -259,8 +261,16 @@ function Row({ cell, r, focus }: { cell: PulseCell; r: PulseAvailable; focus: Pu
 export function RotationPulse({ focus }: { focus: PulseListKey }) {
   const [index, setIndex] = useState<PulseIndex>('both');
   const result = useRotationPulse(focus, index);
-  const data = result.data;
+  // The polled hook keeps the previous response while a new one loads and after a failure, so a
+  // response is only shown when it is the one these controls asked for (the response echoes the
+  // list and index it was built for).
+  const held = result.data;
+  const current =
+    held !== null && (!held.available || (held.list === focus && held.index === index));
+  const data = current ? held : null;
   const picks = data?.available ? picksHeader(data) : null;
+  const partial = data?.available ? partialNote(data) : null;
+  const unplaced = data?.available ? unplacedNote(data) : null;
   const stale = result.error !== null && data !== null;
 
   return (
@@ -406,15 +416,18 @@ export function RotationPulse({ focus }: { focus: PulseListKey }) {
             <p className="text-xs text-muted">Ranking sees: {data.rank.reason}</p>
           ) : data.rank.history_to !== null && data.rank.history_to !== data.as_of ? (
             <p className="text-xs text-warning">
-              The ranking's history ends {formatDay(data.rank.history_to)}, before the latest stored
-              session: some variants have no result for {formatDay(data.as_of)} yet.
+              The ranking's history ends {formatDay(data.rank.history_to)}, before{' '}
+              {formatDay(data.as_of)}: that session has no day attributes (weekday, VIX band, days
+              to expiry) yet.
             </p>
           ) : null}
+          {partial ? <p className="text-xs text-warning">{partial}</p> : null}
+          {unplaced ? <p className="text-xs text-warning">{unplaced}</p> : null}
           <p className="text-xs text-faint">
             Each figure is a mean over the cell's strategy-days, one lot each, before charges: not a
             list's P&amp;L (a list trades two lots a strategy) and never summed across cells. Counts
-            read sessions·variants; * marks a window shorter than its name. Click a row to open it
-            in the Strategy Matrix's pulse view. {data.flag_rule}
+            read sessions·variants; * marks a window, or a recorded share, over fewer sessions than
+            asked for. Click a row to open it in the Strategy Matrix's pulse view. {data.flag_rule}
           </p>
         </div>
       )}

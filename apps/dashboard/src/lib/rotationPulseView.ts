@@ -93,6 +93,13 @@ export function sourceLine(r: PulseAvailable): string {
     0,
     ...r.cells.flatMap((c) => (c.windows ? [c.windows['63'].forward ?? 0] : [])),
   );
+  const j = r.journal;
+  if (!j.chain.intact) {
+    return `${j.chain.error ? 'The journal could not be read' : "The journal's hash chain is broken"}, so its entries are not trusted and none counts as forward: the windows read the stored research results.`;
+  }
+  if (forward === 0 && j.late.length > 0) {
+    return `Windows read the stored research results: the ${formatInt(j.late.length)} ${j.late.length === 1 ? 'entry' : 'entries'} recorded so far ${j.late.length === 1 ? 'was' : 'were'} late, so none is a forward session.`;
+  }
   if (forward === 0) {
     return 'Windows read the stored research results: no forward session has been recorded yet.';
   }
@@ -202,6 +209,8 @@ export function shareSource(r: PulseAvailable): ShareSource | null {
 export interface ShareView {
   text: string;
   title: string;
+  /** a recorded share over fewer sessions than the share window asks for */
+  short: boolean;
 }
 
 /**
@@ -211,25 +220,48 @@ export interface ShareView {
 export function shareView(cell: PulseCell, r: PulseAvailable): ShareView {
   const source = shareSource(r);
   if (source === null) {
-    return { text: EMPTY, title: 'No pick has been recorded or can be reconstructed yet.' };
+    return {
+      text: EMPTY,
+      title: 'No pick has been recorded or can be reconstructed yet.',
+      short: false,
+    };
   }
   const summary = r.share[source];
   const one: PulseShareCell | null | undefined = cell.share?.[source];
-  if (!summary || !one) return { text: EMPTY, title: 'No pick figure for this cell.' };
+  if (!summary || !one)
+    return { text: EMPTY, title: 'No pick figure for this cell.', short: false };
   const basis =
     `${source === 'recorded' ? 'Recorded' : 'Reconstructed'} picks of list ${summary.list}, ` +
     `${formatInt(summary.sessions)} ${summary.sessions === 1 ? 'session' : 'sessions'} ` +
     `(${formatDay(summary.from)} to ${formatDay(summary.to)}).`;
+  const short = source === 'recorded' && summary.sessions < r.share.sessions;
+  const shortNote = short
+    ? ` Only ${formatInt(summary.sessions)} of ${formatInt(r.share.sessions)} sessions have been recorded, so this is a thin sample.${reconstructedNote(cell, r)}`
+    : '';
   if (cell.kind === 'buy') {
     return {
-      text: `${formatInt(one.buy_days)} of ${formatInt(summary.sessions)} d`,
-      title: `${basis} The Buy add-on was in this cell on ${formatInt(one.buy_days)} of them.`,
+      text: `${formatInt(one.buy_days)} of ${formatInt(summary.sessions)} d${short ? '*' : ''}`,
+      title: `${basis} The Buy add-on was in this cell on ${formatInt(one.buy_days)} of them.${shortNote}`,
+      short,
     };
   }
   return {
-    text: `${formatPct(one.share, 0)} · ${formatInt(one.core)}/${formatInt(summary.core_total)}`,
-    title: `${basis} ${formatInt(one.core)} of ${formatInt(summary.core_total)} core picks landed here.`,
+    text: `${formatPct(one.share, 0)} · ${formatInt(one.core)}/${formatInt(summary.core_total)}${short ? '*' : ''}`,
+    title: `${basis} ${formatInt(one.core)} of ${formatInt(summary.core_total)} core picks landed here.${shortNote}`,
+    short,
   };
+}
+
+/** The reconstructed 21-session figure, for a tooltip beside a thin recorded one. */
+function reconstructedNote(cell: PulseCell, r: PulseAvailable): string {
+  const summary = r.share.reconstructed;
+  const one = cell.share?.reconstructed;
+  if (!summary || !one) return '';
+  const figure =
+    cell.kind === 'buy'
+      ? `the Buy add-on in this cell on ${formatInt(one.buy_days)} of ${formatInt(summary.sessions)} days`
+      : `${formatPct(one.share, 0)} · ${formatInt(one.core)}/${formatInt(summary.core_total)}`;
+  return ` For comparison, the reconstructed ${formatInt(summary.sessions)}-session figure is ${figure}.`;
 }
 
 export interface PicksHeader {
@@ -241,18 +273,26 @@ export interface PicksHeader {
 
 export function picksHeader(r: PulseAvailable): PicksHeader {
   const p = r.picks;
+  const broken = !r.journal.chain.intact;
+  const why = r.journal.chain.error
+    ? 'The journal could not be read, so its entries are not trusted.'
+    : "The journal's hash chain is broken, so its entries are not trusted.";
   if (!p.source || !p.day) {
     return {
       label: null,
       source: null,
-      note: 'No entry has been recorded yet and no day can be reconstructed.',
+      note: broken
+        ? `${why} No day can be reconstructed either.`
+        : 'No entry has been recorded yet and no day can be reconstructed.',
     };
   }
   if (p.source === 'reconstructed') {
     return {
       label: `Reconstructed ${formatDay(p.day)}`,
       source: 'reconstructed',
-      note: `No entry has been recorded. These are the picks the rule gives for ${formatDay(p.day)} from the results before it, not a record.`,
+      note: broken
+        ? `${why} These are the picks the rule gives for ${formatDay(p.day)} from the results before it, reconstructed, not a record.`
+        : `No entry has been recorded. These are the picks the rule gives for ${formatDay(p.day)} from the results before it, not a record.`,
     };
   }
   return {
@@ -376,4 +416,26 @@ export function matrixHref(cell: PulseCell): string | null {
   const q = new URLSearchParams({ view: m.view, family: m.family, slot: m.slot });
   if (m.index) q.set('index', m.index);
   return `/optionslab/matrix?${q.toString()}`;
+}
+
+// ---------------------------------------------------------------------------
+// Store notes
+// ---------------------------------------------------------------------------
+
+/** Sessions after the card's as-of day that some variants have and others do not yet. */
+export function partialNote(r: PulseAvailable): string | null {
+  const p = r.store.partial;
+  if (p.length === 0) return null;
+  const parts = p.map(
+    (d) => `${formatDay(d.day)} (${formatInt(d.variants)} of ${formatInt(d.of)} variants)`,
+  );
+  return `Stored only in part and left out until every variant has it: ${parts.join(', ')}. The card is as of ${formatDay(r.as_of)}, the last complete session.`;
+}
+
+/** Stored variants that belong to none of the twelve cells, which no figure here includes. */
+export function unplacedNote(r: PulseAvailable): string | null {
+  if (r.store.unplaced_count === 0) return null;
+  const shown = r.store.unplaced.slice(0, 5).join(', ');
+  const more = r.store.unplaced_count > 5 ? ' and more' : '';
+  return `${formatInt(r.store.unplaced_count)} stored ${r.store.unplaced_count === 1 ? 'strategy belongs' : 'strategies belong'} to none of the twelve cells and ${r.store.unplaced_count === 1 ? 'is' : 'are'} left out: ${shown}${more}.`;
 }

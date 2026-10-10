@@ -102,7 +102,17 @@ export interface PulseAvailable {
   basis: 'gross';
   as_of: string;
   as_of_requested: string | null;
-  store: { first: string; last: string; sessions: number; weekend_excluded: string[] };
+  store: {
+    first: string;
+    last: string;
+    sessions: number;
+    weekend_excluded: string[];
+    /** sessions after `as_of` that only some variants have stored */
+    partial: Array<{ day: string; variants: number; of: number }>;
+    /** stored variants none of the twelve cells holds */
+    unplaced: string[];
+    unplaced_count: number;
+  };
   next_pick_day: string | null;
   list: PulseListKey;
   index: PulseIndex;
@@ -131,7 +141,14 @@ export interface PulseAvailable {
     recorded: PulseShareSummary | null;
     reconstructed: PulseShareSummary | null;
   };
-  journal: { entries: number; on_time: number; late: string[]; chain: PulseChain };
+  /** entries on or before `through` (= as_of): what existed as of that session */
+  journal: {
+    entries: number;
+    through: string;
+    on_time: number;
+    late: string[];
+    chain: PulseChain;
+  };
   flag_rule: string;
   cells: PulseCell[];
 }

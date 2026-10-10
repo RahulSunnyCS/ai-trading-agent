@@ -12,14 +12,15 @@ means only, never the rank. Errors come back as `{"error": ...}`.
 
 from __future__ import annotations
 
-import time
+import threading
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from ..rotation import daylog, pulse
+from ..rotation import daylog, pulse, store
 from ..rotation import explain as ex
 from ..rotation import matrix as mx
 from ..rotation.lists import LISTS
@@ -27,25 +28,40 @@ from ..rotation.variants import variant_names
 
 router = APIRouter(prefix="/legwise/rotation/pulse")
 
-CACHE_SECONDS = 30.0  # results are written nightly; a page refresh should not re-read 298 files
-_snap_cache: dict[str, Any] = {"at": 0.0, "root": None, "value": None}
+# The snapshot is the slow read (298 files); it is reused only while the files it was built from are
+# the ones the cube was built from, so the windows, the rank and the picks cannot describe two
+# different stores. The key is the cube object itself (`load_cube` returns the same one while the
+# result files and days.csv are unchanged) and the journal file's stat.
+_snap_cache: dict[str, Any] = {"root": None, "cube": None, "journal": None, "value": None}
+_snap_lock = threading.Lock()
 
 
 def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": message})
 
 
-def _snapshot(root) -> ex.Snapshot:
-    now = time.monotonic()
-    if (
-        _snap_cache["value"] is not None
-        and _snap_cache["root"] == root
-        and now - _snap_cache["at"] < CACHE_SECONDS
-    ):
-        return _snap_cache["value"]
-    value = ex.load_snapshot(root, variant_names())
-    _snap_cache.update(at=now, root=root, value=value)
-    return value
+def _journal_stat(root: Path) -> tuple[int, int] | None:
+    try:
+        st = store.journal_path(root).stat()
+    except OSError:
+        return None
+    return (st.st_mtime_ns, st.st_size)
+
+
+def _snapshot(root: Path, cube: mx.Cube) -> ex.Snapshot:
+    with _snap_lock:
+        journal_key = _journal_stat(root)
+        c = _snap_cache
+        if (
+            c["value"] is not None
+            and c["root"] == root
+            and c["cube"] is cube
+            and c["journal"] == journal_key
+        ):
+            return c["value"]
+        value = ex.load_snapshot(root, variant_names())
+        c.update(root=root, cube=cube, journal=journal_key, value=value)
+        return value
 
 
 @router.get("")
@@ -69,7 +85,7 @@ def get_pulse(
         idx = pulse.parse_index(index)
         root = data_dir()
         cube = mx.load_cube(root)
-        snap = _snapshot(root)
+        snap = _snapshot(root, cube)
         rec = daylog.reconstruction(root)
         return pulse.compute(
             cube,

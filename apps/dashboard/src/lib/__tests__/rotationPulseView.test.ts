@@ -13,12 +13,14 @@ import {
   isShort,
   matrixHref,
   nearestIndex,
+  partialNote,
   picksHeader,
   rankView,
   shareSource,
   shareView,
   sourceLine,
   sparkGeometry,
+  unplacedNote,
 } from '../rotationPulseView';
 
 const stat = (over: Partial<PulseStat> = {}): PulseStat => ({
@@ -62,7 +64,15 @@ function pulse(over: Partial<PulseAvailable> = {}): PulseAvailable {
     basis: 'gross',
     as_of: '2026-10-09',
     as_of_requested: null,
-    store: { first: '2024-10-09', last: '2026-10-09', sessions: 490, weekend_excluded: [] },
+    store: {
+      first: '2024-10-09',
+      last: '2026-10-09',
+      sessions: 490,
+      weekend_excluded: [],
+      partial: [],
+      unplaced: [],
+      unplaced_count: 0,
+    },
     next_pick_day: '2026-10-12',
     list: 'A',
     index: 'both',
@@ -85,6 +95,7 @@ function pulse(over: Partial<PulseAvailable> = {}): PulseAvailable {
     share: { list: 'A', sessions: 21, recorded: null, reconstructed: null },
     journal: {
       entries: 0,
+      through: '2026-10-09',
       on_time: 0,
       late: [],
       chain: { intact: true, problems: [], error: null },
@@ -279,6 +290,7 @@ describe('header texts and links', () => {
     const some = pulse({
       journal: {
         entries: 2,
+        through: '2026-10-09',
         on_time: 2,
         late: [],
         chain: { intact: true, problems: [], error: null },
@@ -288,6 +300,7 @@ describe('header texts and links', () => {
     const scored = pulse({
       journal: {
         entries: 3,
+        through: '2026-10-09',
         on_time: 3,
         late: [],
         chain: { intact: true, problems: [], error: null },
@@ -358,5 +371,122 @@ describe('sparkline geometry', () => {
     expect(nearestIndex(50, 100, 3)).toBe(1);
     expect(nearestIndex(500, 100, 3)).toBe(2);
     expect(nearestIndex(10, 100, 1)).toBe(0);
+  });
+});
+
+describe('broken chain wording', () => {
+  const broken = pulse({
+    journal: {
+      entries: 2,
+      through: '2026-10-09',
+      on_time: 0,
+      late: [],
+      chain: { intact: false, problems: ['hash mismatch'], error: null },
+    },
+    picks: { source: 'reconstructed', day: '2026-10-09', late: false, lists: {} },
+  });
+
+  it('does not say nothing has been recorded when the entries exist but are not trusted', () => {
+    const line = sourceLine(broken);
+    expect(line).toContain('hash chain is broken');
+    expect(line).toContain('not trusted');
+    expect(line).not.toContain('no forward session has been recorded yet');
+    const picks = picksHeader(broken);
+    expect(picks.note).toContain('hash chain is broken');
+    expect(picks.note).toContain('reconstructed, not a record');
+    expect(picks.note).not.toContain('No entry has been recorded');
+  });
+
+  it('says the journal could not be read when it is unreadable', () => {
+    const unreadable = pulse({
+      journal: {
+        entries: 0,
+        through: '2026-10-09',
+        on_time: 0,
+        late: [],
+        chain: { intact: false, problems: [], error: 'line 3 is not JSON' },
+      },
+    });
+    expect(sourceLine(unreadable)).toContain('could not be read');
+  });
+
+  it('names late-only journals, not "none recorded"', () => {
+    const lateOnly = pulse({
+      journal: {
+        entries: 1,
+        through: '2026-10-09',
+        on_time: 0,
+        late: ['2026-10-08'],
+        chain: { intact: true, problems: [], error: null },
+      },
+    });
+    expect(sourceLine(lateOnly)).toContain('was late');
+  });
+});
+
+describe('a thin recorded share', () => {
+  const summary = (sessions: number, coreTotal: number) => ({
+    sessions,
+    core_total: coreTotal,
+    list: 'A' as const,
+    from: '2026-10-12',
+    to: '2026-10-14',
+  });
+  const r = pulse({
+    share: {
+      list: 'A',
+      sessions: 21,
+      recorded: summary(3, 9),
+      reconstructed: { ...summary(21, 63), from: '2026-09-09', to: '2026-10-09' },
+    },
+  });
+
+  it('carries the short marker and shows the reconstructed figure beside it', () => {
+    const v = shareView(
+      cell({
+        share: {
+          recorded: { core: 3, share: 1, buy_days: 0 },
+          reconstructed: { core: 3, share: 0.0476, buy_days: 0 },
+        },
+      }),
+      r,
+    );
+    expect(v.short).toBe(true);
+    expect(v.text).toBe('100% · 3/9*');
+    expect(v.title).toContain('Only 3 of 21 sessions have been recorded');
+    expect(v.title).toContain('reconstructed 21-session figure is 5% · 3/63');
+  });
+
+  it('a full 21-session recorded share is not marked', () => {
+    const full = pulse({
+      share: { list: 'A', sessions: 21, recorded: summary(21, 63), reconstructed: null },
+    });
+    const v = shareView(
+      cell({ share: { recorded: { core: 6, share: 0.0952, buy_days: 0 }, reconstructed: null } }),
+      full,
+    );
+    expect(v.short).toBe(false);
+    expect(v.text).toBe('10% · 6/63');
+  });
+});
+
+describe('store notes', () => {
+  it('names a part-stored session and the unplaced strategies', () => {
+    const r = pulse({
+      store: {
+        first: '2024-10-09',
+        last: '2026-10-10',
+        sessions: 491,
+        weekend_excluded: [],
+        partial: [{ day: '2026-10-10', variants: 120, of: 298 }],
+        unplaced: ['N_xyz_0917'],
+        unplaced_count: 1,
+      },
+    });
+    expect(partialNote(r)).toContain('10 Oct 2026 (120 of 298 variants)');
+    expect(partialNote(r)).toContain('last complete session');
+    expect(unplacedNote(r)).toContain('N_xyz_0917');
+    expect(partialNote(pulse())).toBeNull();
+    expect(unplacedNote(pulse())).toBeNull();
   });
 });
