@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; the owner's variant of BL-069 B1 |
-| **Status** | In progress |
+| **Status** | Done — row (a) is above chance in all three periods (second such row); nothing meets the adoption bar; journal candidate |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
@@ -31,8 +31,31 @@ information the earlier pooling erased and pools what shares a regime.
   ≥ 0.85 and the row beats the random P90 in all three periods). Read beside the BL-073 candidate
   (10/—/34/33/23).
 - **Will not run:** other bands, other weights, family pooling of the fit criteria.
-- **Result:** pending.
+- **Result (2026-10-10, gross; relative to the best of all fifteen rows per period — P1 ₹4,86,802,
+  P2 now ₹3,45,861 (row a), P3 ₹12,72,319):** **row (a) is a second row above chance in all three
+  periods; nothing meets the adoption bar.**
+
+  | Row (own / family-band / weekday / dte / VIX) | P1 2025-12→2026-10 | P2 Jan–Aug 2025 | P3 2022-04→2024-10 | Min rel | Mean rel | ≥ P90 everywhere |
+  |---|---|---|---|---|---|---|
+  | **(a) 0 / 10 / 34 / 33 / 23** | 3,19,785 (0.66) ✓ | **3,45,861 (1.00)** ✓ | 11,44,736 (0.90) ✓ | 0.66 | 0.85 | **yes** |
+  | (b) 10 / 10 / 30 / 30 / 20 | 4,57,784 (0.94) ✓ | 2,69,764 (0.78) ✗ | 11,16,990 (0.88) ✓ | 0.78 | 0.87 | no |
+  | (c) 10 / 20 / 26 / 26 / 18 | 4,56,030 (0.94) ✓ | 2,34,195 (0.68) ✗ | 10,47,141 (0.82) ✓ | 0.68 | 0.81 | no |
+  | BL-073 candidate 10 / — / 34 / 33 / 23 | 3,47,323 (0.71) ✓ | 3,14,099 (0.91) ✓ | 12,72,319 (1.00) ✓ | 0.71 | 0.87 | yes |
+
+  Drawdowns: (a) −91,790 / −70,347 / −51,909; (b) −78,095 / −75,993 / −56,258; candidate −74,842 /
+  −67,030 / −48,841.
+  - The owner's family (type × start band, index- and strike-agnostic) **travels where BL-069's family
+    (index × strike rule) did not**: with own-recent at 0 and the family at 10% it is above chance in
+    all three periods and sets the best Jan–Aug 2025 result of the series (₹3,45,861 vs the slice's
+    random P90 ₹2,94,240). Its weakness is the in-sample year (0.66), where own-recent carries more.
+  - Adding own-recent back (rows b, c) buys the in-sample year (₹4.57 lakh, 0.94) and loses the slice
+    (below P90 by ₹24k and ₹60k) — the recency pattern again.
+  - Against the BL-073 candidate: same mean score (0.85 vs 0.87), the candidate better on the hold-out
+    (1.00 vs 0.90) and drawdowns, (a) better on the slice. Neither reaches a 0.85 minimum. Both are
+    journal candidates; (a) is the one that carries the owner's regime question ("is morning
+    short-premium working?") and is worth a journal list for that reason.
 
 ## Log
 
 - 2026-10-10 — created and registered before any run.
+- 2026-10-10 — 9 runs done; Result above.

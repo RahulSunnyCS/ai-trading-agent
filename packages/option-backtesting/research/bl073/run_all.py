@@ -24,6 +24,9 @@ LOOKBACKS = {"5/21/63": "5:40,21:30,63:30", "5/21/63/126": "5:30,21:25,63:25,126
 if "--block2" in sys.argv:  # the 5-day window at 0% (block 2)
     WEIGHTS = {10: "10,34,33,23", 20: "20,30,30,20"}
     LOOKBACKS = {"21/63/126": "21:36,63:36,126:28"}
+if "--bl074" in sys.argv:  # BL-074: family by type x start band (own/family/weekday/dte/vix -> rotate's R,W,D,V,G,RF)
+    WEIGHTS = {"a 0/10": "0,34,33,23,0,10", "b 10/10": "10,30,30,20,0,10", "c 10/20": "10,26,26,18,0,20"}
+    LOOKBACKS = {"5/21/63/126 band": "5:30,21:25,63:25,126:20"}
 if "--block3" in sys.argv:  # a 10-day first window instead of 5 (block 3)
     WEIGHTS = {10: "10,34,33,23", 20: "20,30,30,20"}
     LOOKBACKS = {"10/21/63/126": "10:30,21:25,63:25,126:20"}
@@ -43,10 +46,12 @@ def mdd(s) -> float:
 
 def run(item):
     (r, lk), (pname, (pargs, _, _)) = item
-    tag = f"R{r}_{lk.replace('/', '-')}_{pname.split()[0]}"
+    tag = re.sub(r"[^A-Za-z0-9]+", "_", f"R{r}_{lk}_{pname.split()[0]}")
     cache = HERE / "out" / f"run_{tag}.txt"
     cache.parent.mkdir(exist_ok=True)
     args = ["--weights", WEIGHTS[r], "--fit-lookbacks", LOOKBACKS[lk], *pargs]
+    if "--bl074" in sys.argv:
+        args += ["--family-key", "band"]
     if cache.exists() and "picks file:" in cache.read_text():
         out = cache.read_text()
     else:
@@ -73,7 +78,7 @@ def main() -> None:
         rows = list(pool.map(run, items))
     d = pd.DataFrame(rows)
     d["rel"] = d.gross / d.groupby("period").gross.transform("max")
-    d.to_csv(HERE / "out" / ("summary_block2.csv" if "--block2" in sys.argv else "summary_block3.csv" if "--block3" in sys.argv else "summary.csv"), index=False)
+    d.to_csv(HERE / "out" / ("summary_block2.csv" if "--block2" in sys.argv else "summary_block3.csv" if "--block3" in sys.argv else "summary_bl074.csv" if "--bl074" in sys.argv else "summary.csv"), index=False)
     pd.set_option("display.width", 220)
     print(d.to_string(index=False, float_format=lambda x: f"{x:,.0f}" if abs(x) >= 10 else f"{x:.2f}"))
     g = d.groupby(["recent", "lookbacks"]).agg(min_rel=("rel", "min"), mean_rel=("rel", "mean"), all_beat_p90=("beats_p90", "all")).reset_index().sort_values("min_rel", ascending=False)

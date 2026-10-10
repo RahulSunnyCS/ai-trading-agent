@@ -166,6 +166,10 @@ class DrawdownLadder:
 #                        (research/bl071/results/<variant yaml stem>.csv), prepended to each series
 #   --results DIR        read every variant's per-day results from DIR/<variant name>.csv instead of
 #                        the research folders (BL-070: the no-stop re-runs)
+#   --family-key band    BL-074: the family for the rfam criterion is strategy type x start-time band
+#                        (Widesl incl. closest-premium / Dir / Buy; 09:17-10:02, 10:17-12:02, 12:17-14:02,
+#                        14:17-15:17), pooled across index and strike
+FAMILY_KEY = sys.argv[sys.argv.index("--family-key") + 1] if "--family-key" in sys.argv else "index"
 RESULTS_DIR = Path(sys.argv[sys.argv.index("--results") + 1]) if "--results" in sys.argv else None
 NIFTY_ONLY = "--nifty-only" in sys.argv
 EARLY_DIR = (
@@ -672,7 +676,19 @@ def main() -> None:
     is_wide, is_dir, is_buy, is_nifty = masks
     core_pool = np.where(~is_buy)[0]
     wd, vb, dte = day_inputs(f, names)
-    if RECENT_FAMILY or W_CRIT.get("rfam"):
+    if (RECENT_FAMILY or W_CRIT.get("rfam")) and FAMILY_KEY == "band":
+
+        def _band(tag: str) -> str:
+            m = _minutes(tag)
+            return "A" if m <= _minutes("1002") else "B" if m <= _minutes("1202") else "C" if m <= _minutes("1402") else "D"
+
+        def _type(fam: str) -> str:
+            return "wide" if fam == "wide" or fam in CLOSEST_FAMILIES else fam
+
+        keys = [f"{_type(n.split('_')[1])}_{_band(n.split('_')[2])}" for n in names]
+        _STATE["family_idx"] = np.unique(keys, return_inverse=True)[1]
+        print(f"family key = type x start band: {len(set(keys))} families")
+    elif RECENT_FAMILY or W_CRIT.get("rfam"):
         _STATE["family_idx"] = np.unique(
             ["_".join(n.split("_")[:2]) for n in names], return_inverse=True
         )[1]
@@ -898,7 +914,7 @@ def main() -> None:
         / (
             "daily_picks.csv"
             if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}{('_ddl' + '_'.join(map(str, DD_LADDER)) + ('_shadow' if DD_BASIS == 'shadow' else '')) if DD_LADDER else ''}{f'_from{WINDOW_FROM}' if WINDOW_FROM != '2025-09-01' else ''}{'_nifty' if NIFTY_ONLY else ''}{'_early' if EARLY_DIR else ''}{('_res' + RESULTS_DIR.name) if RESULTS_DIR else ''}.csv"
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}{('_ddl' + '_'.join(map(str, DD_LADDER)) + ('_shadow' if DD_BASIS == 'shadow' else '')) if DD_LADDER else ''}{f'_from{WINDOW_FROM}' if WINDOW_FROM != '2025-09-01' else ''}{'_fband' if FAMILY_KEY == 'band' else ''}{'_nifty' if NIFTY_ONLY else ''}{'_early' if EARLY_DIR else ''}{('_res' + RESULTS_DIR.name) if RESULTS_DIR else ''}.csv"
         )
     )
     R.assign(
