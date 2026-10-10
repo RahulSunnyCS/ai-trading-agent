@@ -21,8 +21,10 @@ The rotation workspace's daily log (BL-058 Phase 4) is `components/optionslab/Ro
 day table, a day drawer and the owner's placement record, via `/api/backtest/legwise/rotation/*`.
 A pick's *Replay* opens the existing `DayForensics` with `rotationVariant` (the variants are not saved
 strategies, so `/legwise/day` cannot open them; `/legwise/rotation/forensics` re-runs the variant's file). It
-is self-contained (no props); it goes in the rotation section's panel (`RotationPanel.tsx`) as the
-Daily log slot.
+takes one optional prop, `focus` (the page's focus list; without it the widget shows its own
+"Shade by list" control), and sits in the rotation section's panel (`RotationPanel.tsx`) at the
+`slot:daily-log` line. A response is shown only for the source and window it was asked for
+(`logMatches`), because `usePolledResource` keeps the previous one while a new URL loads.
 The Momentum view is the sole Momentum frontend. Its Saved runs section (BL-052,
 `components/momentum/saved/SavedStrategiesView.tsx`) lists one row per saved *strategy* across
 every dataset from `/api/momentum/saved-strategies`, sets each favourite's status, makes the

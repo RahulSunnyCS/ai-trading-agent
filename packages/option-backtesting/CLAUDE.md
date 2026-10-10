@@ -137,11 +137,14 @@ Otherwise:
   with `pick.score_history` (the function the 09:16 job calls), labelled and never counted as
   forward. The only write is `placements.append`: a row to the separate append-only
   `rotation/placements.jsonl` (`{day, list, status, note, at}`, a later row supersedes in the view,
-  earlier rows kept, validated against the journal), a file nothing else reads. A day with a pick
+  earlier rows kept, validated against the journal; a row identical to the list's current one is a
+  no-op and `POST` answers `written: false`; an unreadable line is skipped and counted), a file
+  nothing else reads. A day with a pick
   lacking a stored result is `waiting` and its gross is withheld, never zero. Tests build a store
   through the real `pick.record` (`tests/unit/rotation_synth.py`);
   `scripts/rotation-daylog-demo.py` serves the same synthetic store on :8123 for a look at the
-  dashboard before the journal has real entries.
+  dashboard before the journal has real entries; it refuses the real data root and any root with a
+  `rotation/` directory it did not build (marker file).
 - `analytics/correlation.py` — BL-090: Pearson / Spearman of strategies' daily 1-lot P&L, loss-day
   overlap and loss-day correlation, equal-lot basket drawdown against the sum of the parts, rolling
   drift, a leaf order that clusters look-alikes, and `pick_diverse` (a basket under a correlation cap).

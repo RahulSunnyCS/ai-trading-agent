@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { addDays } from '../regimeTags';
 import {
   ALL_FROM,
   NOTE_MAX,
-  addDays,
   applyFilter,
+  cellDescription,
   counterParts,
   defaultWindow,
   emptyHeadline,
@@ -12,12 +13,14 @@ import {
   focusStopped,
   initialMonth,
   isFlagged,
+  logMatches,
   monthGrid,
   monthOf,
   monthTitle,
   pickLabel,
   placementProblem,
   placementTally,
+  replayStatus,
   rowFlags,
   shadeClass,
   shadeScale,
@@ -260,5 +263,80 @@ describe('counters and the empty state', () => {
       'First entry Monday 12 October, 09:16',
     );
     expect(emptyHeadline(log({ today: '2026-10-13' }))).toMatch(/due Monday 12 October, 09:16/);
+  });
+});
+
+describe('a response is only shown for the request it answers', () => {
+  const r = { source: 'recorded' as const, from: null, to: null };
+  it('matches the same source and window, and nothing else', () => {
+    expect(logMatches(r, 'recorded', {})).toBe(true);
+    expect(logMatches(r, 'reconstructed', {})).toBe(false);
+    expect(logMatches(r, 'recorded', { from: '2026-04-01' })).toBe(false);
+    expect(logMatches({ ...r, from: '2026-04-01' }, 'recorded', { from: '2026-04-01' })).toBe(true);
+    expect(logMatches({ ...r, source: 'reconstructed' }, 'recorded', {})).toBe(false);
+  });
+});
+
+describe('calendar cell wording', () => {
+  const cells = monthGrid(
+    { year: 2026, month: 10 },
+    ROWS,
+    [{ day: '2026-10-20', name: 'Dussehra' }],
+    'A',
+    '2026-10-19',
+  )
+    .flat()
+    .filter((c) => c.kind !== 'outside');
+  const of = (d: string) => {
+    const c = cells.find((x) => x.day === d);
+    if (!c) throw new Error(d);
+    return cellDescription(c, 'A');
+  };
+
+  it('says a late entry is late and not forward in words, not by colour', () => {
+    expect(of('2026-10-14')).toMatch(/late entry, not a forward day/);
+    expect(of('2026-10-14')).toMatch(/gross per lot-day/);
+  });
+  it('carries the figure, the stop and the fallback input for a scored day', () => {
+    const t = of('2026-10-16');
+    expect(t).toMatch(/scored/);
+    expect(t).toMatch(/\+₹1,267|₹/);
+    expect(t).toMatch(/overall stop-loss fired in list A/);
+    expect(t).toMatch(/VIX: Angel One/);
+  });
+  it('gives the reason for a day with no figure, a holiday and a day to come', () => {
+    expect(of('2026-10-15')).toMatch(/not recorded.*no journal entry/);
+    expect(of('2026-10-19')).toMatch(/waiting for results/);
+    expect(of('2026-10-20')).toMatch(/exchange holiday, Dussehra/);
+    expect(of('2026-10-21')).toMatch(/not yet/);
+  });
+});
+
+describe('replay against the stored result', () => {
+  it('says it matches, differs (with both figures) or has nothing to compare with', () => {
+    expect(
+      replayStatus({
+        variant: 'N_wide_0917',
+        stored_gross: 1200,
+        simulated_gross: 1200,
+        matches_stored: true,
+      }),
+    ).toEqual({ matches: true, text: 'Matches the stored result.' });
+    const d = replayStatus({
+      variant: 'N_wide_0917',
+      stored_gross: 1200,
+      simulated_gross: 700,
+      matches_stored: false,
+    });
+    expect(d.matches).toBe(false);
+    expect(d.text).toMatch(/Differs from the stored result/);
+    expect(d.text).toMatch(/\+₹1,200 stored, \+₹700 replayed/);
+    const none = replayStatus({
+      variant: 'N_wide_0917',
+      stored_gross: null,
+      simulated_gross: 700,
+      matches_stored: false,
+    });
+    expect(none.text).toMatch(/No stored result/);
   });
 });

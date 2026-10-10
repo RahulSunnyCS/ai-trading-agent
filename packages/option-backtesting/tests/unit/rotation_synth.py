@@ -188,3 +188,34 @@ def forward_scenario(
         "entries": entries,
         "now": NOW,
     }
+
+
+MARKER = ".synthetic-store"
+
+
+class UnsafeDemoRoot(ValueError):
+    """The demo would write synthetic entries into a store that is not its own."""
+
+
+def refuse_unless_synthetic(root: Path, real_roots: Iterable[Path]) -> None:
+    """The demo script builds random results and hash-chained entries (12-22 Oct 2026) through the
+    real `pick.record`: written into the pre-registered store they would corrupt the forward test
+    beyond repair (a stored day is never rewritten). So a root is accepted only when it is none of
+    the real data roots (nor inside or above one) AND either has no `rotation/` directory yet or
+    carries this script's marker."""
+    resolved = root.expanduser().resolve()
+    for real in real_roots:
+        r = real.expanduser().resolve()
+        if resolved == r or r in resolved.parents or resolved in r.parents:
+            raise UnsafeDemoRoot(f"{root} is, contains or sits inside the real data root {real}")
+    rotation = resolved / "rotation"
+    if rotation.exists() and not (rotation / MARKER).exists():
+        raise UnsafeDemoRoot(
+            f"{root} already has a rotation/ directory that this script did not build "
+            f"(no {MARKER}); refusing to write synthetic entries beside real data"
+        )
+
+
+def mark_synthetic(root: Path) -> None:
+    (root / "rotation").mkdir(parents=True, exist_ok=True)
+    (root / "rotation" / MARKER).write_text("built by scripts/rotation-daylog-demo.py: synthetic\n")

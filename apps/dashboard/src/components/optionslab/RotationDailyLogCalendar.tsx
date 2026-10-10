@@ -9,12 +9,13 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMemo } from 'react';
 
 import { cn } from '../../lib/cn';
-import { formatDay, formatInr } from '../../lib/format';
+import { formatInr } from '../../lib/format';
 import {
   type CalendarCell,
   HATCH_STYLE,
   type Month,
   WEEKDAYS,
+  cellDescription,
   focusStopped,
   isFlagged,
   monthGrid,
@@ -32,19 +33,6 @@ const KIND_NOTE: Partial<Record<CalendarCell['kind'], string>> = {
   late: 'late',
   not_recorded: 'not recorded',
 };
-
-function cellTitle(cell: CalendarCell, focus: RotationListKey): string {
-  const when = formatDay(cell.day);
-  if (cell.kind === 'holiday')
-    return `${when}: exchange holiday${cell.holiday ? `, ${cell.holiday}` : ''}`;
-  if (cell.kind === 'future') return `${when}: not yet`;
-  if (cell.kind === 'none') return `${when}: no entry in this view`;
-  const row = cell.row;
-  if (row === null) return when;
-  const head = `${when}: ${row.status_detail || row.status.replace('_', ' ')}`;
-  if (cell.value === null) return head;
-  return `${when}: list ${focus} ${formatInr(cell.value, { sign: true })} gross per lot-day`;
-}
 
 function Cell({
   cell,
@@ -70,9 +58,14 @@ function Cell({
         <span className={cn('metric text-sm', pnlClass(cell.value))}>
           {formatInr(cell.value, { sign: true })}
         </span>
-      ) : KIND_NOTE[cell.kind] ? (
+      ) : null}
+      {KIND_NOTE[cell.kind] ? (
         <span
-          className={cn('text-xs', cell.kind === 'not_recorded' ? 'text-negative' : 'text-muted')}
+          className={cn(
+            'text-xs',
+            cell.kind === 'not_recorded' ? 'text-negative' : 'text-muted',
+            cell.kind === 'late' && 'font-medium text-warning',
+          )}
         >
           {KIND_NOTE[cell.kind]}
         </span>
@@ -98,7 +91,7 @@ function Cell({
   const style = cell.kind === 'holiday' ? HATCH_STYLE : undefined;
   if (!openable) {
     return (
-      <div className={className} style={style} title={cellTitle(cell, focus)}>
+      <div className={className} style={style} title={cellDescription(cell, focus)}>
         {body}
       </div>
     );
@@ -107,8 +100,8 @@ function Cell({
     <button
       type="button"
       onClick={() => onOpen(cell.day)}
-      title={cellTitle(cell, focus)}
-      aria-label={`${formatDay(cell.day)}: open the day`}
+      title={cellDescription(cell, focus)}
+      aria-label={`${cellDescription(cell, focus)}. Open the day.`}
       aria-pressed={selected}
       className={cn(
         className,

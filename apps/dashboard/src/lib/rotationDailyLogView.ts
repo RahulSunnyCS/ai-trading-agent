@@ -7,6 +7,7 @@
  * A day that has no figure shows its reason; nothing here turns a missing value into zero.
  */
 
+import type { RotationReplay } from '../types/legwise';
 import type {
   PlacementStatus,
   RotationCounters,
@@ -18,6 +19,8 @@ import type {
   RotationRow,
   RotationStatus,
 } from '../types/rotationDailyLog';
+import { formatDay, formatInr } from './format';
+import { addDays } from './regimeTags';
 
 export const LIST_KEYS: readonly RotationListKey[] = ['A', 'B', 'C', 'REF'];
 
@@ -47,12 +50,6 @@ function iso(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function addDays(day: string, n: number): string {
-  const date = toUtc(day);
-  date.setUTCDate(date.getUTCDate() + n);
-  return iso(date);
-}
-
 /** The `from` / `to` to ask for. The recorded journal is short, so it defaults to all of it; the
  * reconstructed history is long, so it defaults to the last 6 months. A choice is a count of
  * trading days, converted to calendar days back from `today` (63 trading days is 89). */
@@ -65,6 +62,19 @@ export function windowRange(
     return { from: source === 'recorded' ? undefined : ALL_FROM, to: undefined };
   const trading = Number(choice);
   return { from: addDays(today, -Math.ceil((trading * 7) / 5)), to: undefined };
+}
+
+/** Is `log` the answer to THIS request? `usePolledResource` keeps the previous response while a
+ * new URL loads, so after a switch of source or window the old rows would sit under the new
+ * label. A reconstructed row read as a forward day is the one mistake this screen must not make. */
+export function logMatches(
+  log: Pick<RotationLog, 'source' | 'from' | 'to'>,
+  source: RotationLogSource,
+  range: { from?: string | undefined; to?: string | undefined },
+): boolean {
+  return (
+    log.source === source && log.from === (range.from ?? null) && log.to === (range.to ?? null)
+  );
 }
 
 export function defaultWindow(source: RotationLogSource): WindowChoice {
@@ -536,4 +546,52 @@ export function emptyHeadline(log: Pick<RotationLog, 'registered' | 'today'>): s
   return log.today < first
     ? `First entry ${label}, ${at}`
     : `The first entry was due ${label}, ${at}, and none is recorded`;
+}
+
+// --- what a calendar cell says in words (also its accessible name) -----------------------------
+
+/** One sentence for a cell: the day, its state, the focus list's figure, a stop, a late entry.
+ * Colour is never the only carrier of any of it. */
+export function cellDescription(cell: CalendarCell, focus: RotationListKey): string {
+  const when = formatDay(cell.day);
+  if (cell.kind === 'outside') return when;
+  if (cell.kind === 'holiday')
+    return `${when}: exchange holiday${cell.holiday ? `, ${cell.holiday}` : ''}`;
+  if (cell.kind === 'future') return `${when}: not yet`;
+  const row = cell.row;
+  if (row === null) return `${when}: no entry in this view`;
+  const parts: string[] = [];
+  if (row.status === 'late') parts.push('late entry, not a forward day');
+  else if (row.status === 'not_recorded') parts.push('not recorded');
+  else if (row.status === 'waiting') parts.push('waiting for results');
+  else parts.push('scored');
+  if (row.source === 'reconstructed') parts.push('reconstructed, not recorded');
+  if (cell.value !== null) {
+    parts.push(`list ${focus} ${formatInr(cell.value, { sign: true })} gross per lot-day`);
+  }
+  if (focusStopped(row, focus)) parts.push(`overall stop-loss fired in list ${focus}`);
+  const flags = rowFlags(row).filter((f) => f.id !== 'late' && f.id !== 'reconstructed');
+  for (const f of flags) if (f.id !== 'stop') parts.push(f.label);
+  if (row.status !== 'scored' && row.status_detail) parts.push(row.status_detail);
+  return `${when}: ${parts.join('; ')}`;
+}
+
+// --- the replay against the stored result ------------------------------------------------------
+
+export interface ReplayStatus {
+  matches: boolean;
+  text: string;
+}
+
+/** Does the replayed gross equal the stored one? A mismatch means the day's data was repaired
+ * after the nightly update or the strategy file was edited: say so, with both figures. */
+export function replayStatus(r: RotationReplay): ReplayStatus {
+  if (r.stored_gross === null) {
+    return { matches: false, text: 'No stored result for this day to compare the replay with.' };
+  }
+  if (r.matches_stored) return { matches: true, text: 'Matches the stored result.' };
+  return {
+    matches: false,
+    text: `Differs from the stored result (${formatInr(r.stored_gross, { sign: true })} stored, ${formatInr(r.simulated_gross, { sign: true })} replayed): the day's data was repaired or the strategy file was edited since.`,
+  };
 }

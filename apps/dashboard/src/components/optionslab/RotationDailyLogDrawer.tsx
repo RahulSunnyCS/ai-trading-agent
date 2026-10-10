@@ -207,22 +207,34 @@ function PlacementRow({
 }: {
   day: string;
   listKey: RotationListKey;
+  /** The row the day's last read gave for this list. */
   saved: RotationPlacement | undefined;
   onSaved: () => void;
 }) {
-  const [status, setStatus] = useState<PlacementStatus | ''>(saved?.status ?? '');
-  const [note, setNote] = useState(saved?.note ?? '');
+  // The saved state is what the server last answered: the day's read, or the POST's own reply,
+  // whichever is newer, so a failed re-read after a successful save cannot offer the same Save
+  // again (a second click would append a duplicate).
+  const [answered, setAnswered] = useState<RotationPlacement | undefined>(saved);
+  const current = latest(saved, answered);
+  const [status, setStatus] = useState<PlacementStatus | ''>(current?.status ?? '');
+  const [note, setNote] = useState(current?.note ?? '');
   const [error, setError] = useState<string | null>(null);
   const { save, saving } = useSavePlacement();
   const problem = placementProblem(status, note);
-  const unchanged = saved !== undefined && saved.status === status && saved.note === note.trim();
+  const unchanged =
+    current !== undefined && current.status === status && current.note === note.trim();
 
   async function submit() {
     if (status === '' || problem !== null) return;
     setError(null);
     const result = await save({ day, list: listKey, status, note: note.trim() });
     if (result.ok) {
-      toast(`List ${listKey}: ${PLACEMENT_LABEL[result.data.row.status].toLowerCase()} saved`);
+      setAnswered(result.data.row);
+      toast(
+        result.data.written === false
+          ? `List ${listKey}: already marked ${PLACEMENT_LABEL[result.data.row.status].toLowerCase()}`
+          : `List ${listKey}: ${PLACEMENT_LABEL[result.data.row.status].toLowerCase()} saved`,
+      );
       onSaved();
     } else {
       setError(result.error);
@@ -234,32 +246,45 @@ function PlacementRow({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-semibold text-foreground">List {listKey}</span>
         <span className="text-xs text-faint">
-          {saved
-            ? `saved: ${PLACEMENT_LABEL[saved.status]}, ${formatIstDateTimeShort(saved.at)}`
+          {current
+            ? `saved: ${PLACEMENT_LABEL[current.status]}, ${formatIstDateTimeShort(current.at)}`
             : 'not marked yet'}
         </span>
       </div>
       <SegmentedControl
         value={status as PlacementStatus}
         options={PLACEMENT_OPTIONS}
-        onChange={(v) => setStatus(v)}
+        onChange={(v) => {
+          setStatus(v);
+          setError(null);
+        }}
         ariaLabel={`Placement of list ${listKey}`}
         size="sm"
       />
       <Input
         value={note}
         maxLength={NOTE_MAX + 50}
-        onChange={(e) => setNote(e.target.value)}
+        onChange={(e) => {
+          setNote(e.target.value);
+          setError(null);
+        }}
         placeholder={status === 'changed' ? 'What was changed (required)' : 'Note (optional)'}
         aria-label={`Note for list ${listKey}`}
       />
-      <div className="flex items-center justify-between gap-2">
-        <span className={cn('text-xs', problem && status !== '' ? 'text-negative' : 'text-faint')}>
-          {error ??
-            (status === ''
+      <div className="flex items-start justify-between gap-2">
+        {error ? (
+          <span role="alert" className="text-xs font-medium text-negative">
+            Not saved: {error}
+          </span>
+        ) : (
+          <span
+            className={cn('text-xs', problem && status !== '' ? 'text-negative' : 'text-faint')}
+          >
+            {status === ''
               ? 'Choose one to enable Save.'
-              : (problem ?? `${note.trim().length}/${NOTE_MAX}`))}
-        </span>
+              : (problem ?? `${note.trim().length}/${NOTE_MAX}`)}
+          </span>
+        )}
         <Button
           size="sm"
           variant="primary"
@@ -274,14 +299,27 @@ function PlacementRow({
   );
 }
 
+/** The newer of two placement rows for the same list (ISO stamps in one zone compare as text). */
+function latest(
+  a: RotationPlacement | undefined,
+  b: RotationPlacement | undefined,
+): RotationPlacement | undefined {
+  if (a === undefined) return b;
+  if (b === undefined) return a;
+  return b.at > a.at ? b : a;
+}
+
 function DayBody({
   d,
   onChanged,
   onReplay,
+  refreshError,
 }: {
   d: RotationDay;
   onChanged: () => void;
   onReplay: (variant: string, day: string) => void;
+  /** The latest re-read of the day failed: what is shown is from before it. */
+  refreshError: string | null;
 }) {
   const flags = rowFlags(d);
   const keys = LIST_KEYS.filter((k) => d.lists[k] !== undefined);
@@ -294,6 +332,13 @@ function DayBody({
   const rescore = d.rescore;
   return (
     <div className="space-y-5">
+      {refreshError ? (
+        <StateMessage
+          variant="error"
+          title="The day could not be re-read"
+          description={`What is shown may be out of date; anything you saved was written. ${refreshError}`}
+        />
+      ) : null}
       <div className="space-y-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge tone={STATUS_TONE[d.status]}>{STATUS_LABEL[d.status]}</Badge>
@@ -434,7 +479,7 @@ function DayBody({
           <div className="space-y-3">
             {keys.map((k) => (
               <PlacementRow
-                key={`${k}-${d.placement[k]?.at ?? 'none'}`}
+                key={k}
                 day={d.day}
                 listKey={k}
                 saved={d.placement[k]}
@@ -442,14 +487,14 @@ function DayBody({
               />
             ))}
           </div>
-          {d.placement_history.length > 2 ? (
+          {d.placement_history.length > Object.keys(d.placement).length ? (
             <details className="text-xs text-muted">
               <summary className="cursor-pointer">
                 History ({d.placement_history.length} rows)
               </summary>
               <ul className="mt-1 space-y-0.5">
-                {d.placement_history.map((p) => (
-                  <li key={`${p.list}-${p.at}`}>
+                {d.placement_history.map((p, i) => (
+                  <li key={`${i}-${p.list}-${p.at}`}>
                     {formatIstDateTimeShort(p.at)}: {p.list}{' '}
                     {PLACEMENT_LABEL[p.status].toLowerCase()}
                     {p.note ? ` (${p.note})` : ''}
@@ -530,6 +575,7 @@ function DayLoader({
   return (
     <DayBody
       d={res.data}
+      refreshError={res.error}
       onReplay={onReplay}
       onChanged={() => {
         res.refetch();

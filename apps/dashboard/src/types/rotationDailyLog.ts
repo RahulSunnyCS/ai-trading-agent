@@ -180,4 +180,6 @@ export interface RotationDay extends RotationRow {
 
 export interface PlacementWriteResult {
   row: RotationPlacement;
+  /** False when the list already had exactly this mark and nothing was appended. */
+  written?: boolean;
 }

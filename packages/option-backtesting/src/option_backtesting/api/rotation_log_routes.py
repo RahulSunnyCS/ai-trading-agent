@@ -138,10 +138,11 @@ def placement_write(body: PlacementBody) -> Any:
     if body.list not in LISTS:
         return _error(422, f"list must be one of {', '.join(LISTS)}")
     try:
-        row = placements.append(body.day, body.list, body.status, body.note)
+        row, written = placements.append_checked(body.day, body.list, body.status, body.note)
     except placements.PlacementError as error:
         return _error(422, str(error))
-    return {"row": row}
+    # `written` is false when the list already had exactly this mark: nothing was appended
+    return {"row": row, "written": written}
 
 
 _HHMM_RE = re.compile(r"^\d{2}:\d{2}$")

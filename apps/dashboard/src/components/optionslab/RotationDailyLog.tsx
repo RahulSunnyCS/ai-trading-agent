@@ -31,6 +31,7 @@ import {
   defaultWindow,
   emptyHeadline,
   initialMonth,
+  logMatches,
   monthOf,
   windowRange,
 } from '../../lib/rotationDailyLogView';
@@ -128,7 +129,9 @@ export function RotationDailyLog({ focus: focusProp }: { focus?: RotationListKey
     [windowChoice, today, source],
   );
   const res = useRotationLog(source, range);
-  const log = res.data;
+  // `usePolledResource` keeps the previous response while a new URL loads: only an answer to THIS
+  // request is shown, so reconstructed rows never sit under a Recorded label or the reverse.
+  const log = res.data !== null && logMatches(res.data, source, range) ? res.data : null;
 
   function pickSource(next: RotationLogSource) {
     setSource(next);
@@ -225,6 +228,13 @@ export function RotationDailyLog({ focus: focusProp }: { focus?: RotationListKey
         </output>
       ) : (
         <>
+          {log.placement_skipped_lines > 0 ? (
+            <StateMessage
+              variant="error"
+              title="Part of the placement record could not be read"
+              description={`${log.placement_skipped_lines} line${log.placement_skipped_lines === 1 ? '' : 's'} of rotation/placements.jsonl ${log.placement_skipped_lines === 1 ? 'is' : 'are'} not a valid row (torn or edited by hand) and ${log.placement_skipped_lines === 1 ? 'is' : 'are'} left out of the Placed column.`}
+            />
+          ) : null}
           {res.error ? (
             <StateMessage
               variant="error"

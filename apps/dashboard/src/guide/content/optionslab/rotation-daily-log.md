@@ -28,8 +28,9 @@ registered lists. The Reconstructed view is there to look around in meanwhile.
 
 ## The calendar
 
-One cell a trading day, Monday to Friday. The shading is the *shade by list* choice's gross per
-lot-day: green gained, red lost, scaled to the largest day in view.
+One cell a trading day, Monday to Friday. The shading is the focus list's gross per lot-day:
+green gained, red lost, scaled to the largest day in view. The focus list is the Rotation page's
+Focus choice; when this log is used on its own it has its own *Shade by list* control.
 
 | Cell | Meaning |
 |---|---|
@@ -39,7 +40,9 @@ lot-day: green gained, red lost, scaled to the largest day in view.
 | "stop" under the figure | An overall stop-loss fired on the shaded list that day |
 | "waiting" or "not recorded" | There is no figure, and this says why |
 
-A stop is a result, not a record problem, so it does not get the red outline.
+A stop is a result, not a record problem, so it does not get the red outline. Every cell also
+says its state in words (late, not recorded, waiting, a stop) for a screen reader and for anyone
+who cannot see the outline colour.
 
 ## The days table
 
@@ -100,14 +103,20 @@ verifies, and whether re-scoring today's stored results gives the same picks.
 *Replay* beside a pick re-runs that strategy's file on that day and shows it minute by minute: the
 mark-to-market against the index, entries, exits and stops, and each leg's premium. It uses the
 same strategy file and lot sizing as the nightly update that stored the result, so the figures
-match the one in the drawer. It needs the day's 1-minute bars on the machine running the API.
+match the one in the drawer, and the replay says so under its title ("Matches the stored result").
+If it does not, it says "Differs from the stored result" with both figures: the day's data was
+repaired after the nightly update, or the strategy file was edited since. It needs the day's
+1-minute bars on the machine running the API.
 
 ### Marking what you placed
 
 For each list choose *Placed*, *Changed* or *Not placed* and add a note ("changed" needs one, up
 to 300 characters). Save writes one new row to its own file. A later mark for the same list
-replaces the earlier one in the view; the earlier rows are kept. What the drawer shows after a
-save is what the server read back, not what you typed.
+replaces the earlier one in the view; the earlier rows are kept and listed under *History* once
+a mark has been corrected. Saving exactly the mark a list already has writes nothing. What the
+drawer shows after a save is what the server answered, not what you typed; a refused save says
+why in red and the message goes away when you edit the field. If a line of the placement file
+cannot be read (a hand edit, a torn write) the log says how many are left out.
 
 A placement can only be marked on a day with a recorded entry.
 

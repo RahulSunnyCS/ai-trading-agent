@@ -6,6 +6,7 @@ import { clearPolledResourceCache } from '../../../hooks/usePolledResource';
 import { COUNTERS, ROWS, log, placement } from '../../../lib/__tests__/rotationDailyLogFixture';
 import type { RotationDay, RotationLog, RotationPlacement } from '../../../types/rotationDailyLog';
 import { RotationDailyLog } from '../RotationDailyLog';
+import { RotationReplayStatus } from '../RotationReplayStatus';
 
 type Handler = (url: string, init?: RequestInit) => { status?: number; body: unknown };
 
@@ -232,22 +233,175 @@ describe('RotationDailyLog', () => {
   });
 
   it('labels reconstructed history as not recorded', async () => {
-    const recon = log({
-      source: 'reconstructed',
-      rows: ROWS.filter((r) => r.status === 'scored').map((r) => ({
-        ...r,
-        source: 'reconstructed' as const,
-        recorded: null,
-        vix: r.vix ? { ...r.vix, source: 'history' } : null,
-      })),
+    stubFetch((url) => {
+      if (!url.includes('source=reconstructed')) return { body: log() };
+      // the API echoes the window it was asked for
+      const from = new URL(url, 'http://x').searchParams.get('from');
+      return {
+        body: log({
+          source: 'reconstructed',
+          from,
+          rows: ROWS.filter((r) => r.status === 'scored').map((r) => ({
+            ...r,
+            source: 'reconstructed' as const,
+            recorded: null,
+            vix: r.vix ? { ...r.vix, source: 'history' } : null,
+          })),
+        }),
+      };
     });
-    stubFetch((url) => ({
-      body: url.includes('source=reconstructed') ? recon : (log() as RotationLog),
-    }));
     render(<RotationDailyLog />);
     await screen.findByRole('table');
     fireEvent.click(screen.getByRole('radio', { name: 'Reconstructed' }));
     expect(await screen.findByText(/Reconstructed, not recorded/)).toBeTruthy();
     expect(screen.getByText(/not evidence that it works/)).toBeTruthy();
+  });
+
+  it('never shows the previous source under the new label while the new one loads or fails', async () => {
+    let release: (() => void) | null = null;
+    let fail = false;
+    const recon = log({ source: 'reconstructed', rows: [], journal_entries: 5 });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('source=reconstructed')) {
+          await new Promise<void>((r) => {
+            release = r;
+          });
+          return fail
+            ? new Response(JSON.stringify({ error: 'history unreadable' }), { status: 500 })
+            : new Response(JSON.stringify(recon), { status: 200 });
+        }
+        return new Response(JSON.stringify(log()), { status: 200 });
+      }),
+    );
+    render(<RotationDailyLog />);
+    await screen.findByRole('table');
+    fireEvent.click(screen.getByRole('radio', { name: 'Reconstructed' }));
+    // the recorded rows are gone at once: a skeleton, not recorded rows under a new banner
+    await waitFor(() => expect(screen.queryByRole('table')).toBeNull());
+    expect(screen.getByLabelText('Loading the daily log')).toBeTruthy();
+    expect(screen.queryByLabelText('Counters')).toBeNull();
+    fail = true;
+    await waitFor(() => expect(release).not.toBeNull());
+    (release as unknown as () => void)();
+    // a failure does not bring the recorded rows back under the Reconstructed banner
+    expect(await screen.findByText(/history unreadable/)).toBeTruthy();
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  it('shows a failed save in the alert role, and clears it when the field is edited', async () => {
+    stubFetch((url, init) => {
+      if (init?.method === 'POST') {
+        return { status: 422, body: { error: 'note is 320 characters; at most 300' } };
+      }
+      if (url.includes('/day/')) return { body: dayBody('2026-10-13') };
+      return { body: log() };
+    });
+    render(<RotationDailyLog />);
+    await screen.findByRole('table');
+    fireEvent.click(within(screen.getByRole('table')).getByText('13 Oct 2026'));
+    const dialog = await screen.findByRole('dialog');
+    const groups = await within(dialog).findAllByRole('radiogroup', { name: /Placement of list/ });
+    fireEvent.click(within(groups[0] as HTMLElement).getByRole('radio', { name: 'Placed' }));
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Save' })[0] as HTMLElement);
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert.textContent).toMatch(/Not saved: note is 320 characters; at most 300/);
+    expect(alert.className).toMatch(/text-negative/);
+    fireEvent.change(within(dialog).getAllByLabelText(/Note for list A/)[0] as HTMLElement, {
+      target: { value: 'x' },
+    });
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+  });
+
+  it('does not offer the same Save again when the save worked but the re-read failed', async () => {
+    let posted = 0;
+    let dayCalls = 0;
+    stubFetch((url, init) => {
+      if (init?.method === 'POST') {
+        posted += 1;
+        return { body: { row: placement('2026-10-13', 'A', 'placed'), written: true } };
+      }
+      if (url.includes('/day/')) {
+        dayCalls += 1;
+        return dayCalls === 1
+          ? { body: dayBody('2026-10-13') }
+          : { status: 500, body: { error: 'service restarting' } };
+      }
+      return { body: log() };
+    });
+    render(<RotationDailyLog />);
+    await screen.findByRole('table');
+    fireEvent.click(within(screen.getByRole('table')).getByText('13 Oct 2026'));
+    const dialog = await screen.findByRole('dialog');
+    const groups = await within(dialog).findAllByRole('radiogroup', { name: /Placement of list/ });
+    fireEvent.click(within(groups[0] as HTMLElement).getByRole('radio', { name: 'Placed' }));
+    const save = within(dialog).getAllByRole('button', { name: 'Save' })[0] as HTMLButtonElement;
+    fireEvent.click(save);
+    expect(await within(dialog).findByText(/The day could not be re-read/)).toBeTruthy();
+    expect(await within(dialog).findByText(/saved: Placed/)).toBeTruthy();
+    const after = within(dialog).getAllByRole('button', { name: 'Save' })[0] as HTMLButtonElement;
+    expect(after.disabled).toBe(true);
+    expect(after).toBe(save); // the row was not remounted: focus stays where the owner put it
+    expect(posted).toBe(1);
+  });
+
+  it('keeps the earlier mark visible once it has been corrected', async () => {
+    const first = placement('2026-10-13', 'A', 'placed');
+    const second = {
+      ...placement('2026-10-13', 'A', 'changed', 'dropped the Buy'),
+      at: '2026-10-13T09:40:00+05:30',
+    };
+    stubFetch((url) =>
+      url.includes('/day/')
+        ? { body: { ...dayBody('2026-10-13', [second]), placement_history: [first, second] } }
+        : { body: log() },
+    );
+    render(<RotationDailyLog />);
+    await screen.findByRole('table');
+    fireEvent.click(within(screen.getByRole('table')).getByText('13 Oct 2026'));
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText(/History \(2 rows\)/)).toBeTruthy();
+  });
+
+  it('names each calendar day by its state and warns about unreadable placement lines', async () => {
+    stubFetch(() => ({ body: log({ placement_skipped_lines: 2 }) }));
+    render(<RotationDailyLog />);
+    await screen.findByRole('table');
+    const late = screen.getByRole('button', { name: /14 Oct 2026: late entry, not a forward day/ });
+    expect(late.textContent).toMatch(/late/);
+    expect(
+      screen.getByText(/2 lines of rotation\/placements.jsonl are not a valid row/),
+    ).toBeTruthy();
+  });
+});
+
+describe('RotationReplayStatus', () => {
+  afterEach(cleanup);
+  it('shows a mismatch as a status with both figures, and a match quietly', () => {
+    render(
+      <RotationReplayStatus
+        r={{
+          variant: 'N_wide_0917',
+          stored_gross: 1200,
+          simulated_gross: 700,
+          matches_stored: false,
+        }}
+      />,
+    );
+    expect(screen.getByRole('status').textContent).toMatch(/Differs from the stored result/);
+    cleanup();
+    render(
+      <RotationReplayStatus
+        r={{
+          variant: 'N_wide_0917',
+          stored_gross: 1200,
+          simulated_gross: 1200,
+          matches_stored: true,
+        }}
+      />,
+    );
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByText('Matches the stored result.')).toBeTruthy();
   });
 });

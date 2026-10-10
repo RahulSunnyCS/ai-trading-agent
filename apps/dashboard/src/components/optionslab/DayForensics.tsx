@@ -24,6 +24,7 @@ import { InfoTooltip } from '../ui/InfoTooltip';
 import { Skeleton } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
+import { RotationReplayStatus } from './RotationReplayStatus';
 import { LABEL_TEXT, LABEL_TONE, describeSegment } from './anatomy';
 import { TradeLog, pnlClass } from './shared';
 
@@ -388,6 +389,7 @@ export function DayForensics({
             <Badge tone="neutral">Replayed with the older version that produced this result</Badge>
           ) : null}
         </div>
+        {f.rotation ? <RotationReplayStatus r={f.rotation} /> : null}
       </Header>
       <div className="space-y-5">
         <div>

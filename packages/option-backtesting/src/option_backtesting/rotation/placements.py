@@ -27,6 +27,7 @@ from zoneinfo import ZoneInfo
 
 from ..fyers.daily import data_dir
 from . import journal, store
+from .lists import LISTS
 
 IST = ZoneInfo("Asia/Kolkata")
 STATUSES = ("placed", "changed", "not_placed")
@@ -59,9 +60,22 @@ class Read:
     skipped: int  # lines that are not a valid row (a torn write or a hand edit)
 
 
+def _valid_row(row: object) -> bool:
+    """A row that every reader can use: five text columns, a known status and list, a real day."""
+    if not isinstance(row, dict) or not all(isinstance(row.get(c), str) for c in COLUMNS):
+        return False
+    if row["status"] not in STATUSES or row["list"] not in LISTS:
+        return False
+    try:
+        return date.fromisoformat(row["day"]).isoformat() == row["day"]
+    except ValueError:
+        return False
+
+
 def read(root: Path | None = None) -> Read:
-    """Every row of the file. A line that is not a valid row is counted and skipped, so one bad
-    line never hides the rest of the record."""
+    """Every usable row of the file. A line that is not a valid row (torn, hand-edited, an
+    impossible day or an unknown list) is counted and skipped, so one bad line never hides the
+    rest of the record or breaks a reader."""
     path = placements_path(root)
     if not path.exists():
         return Read([], 0)
@@ -75,11 +89,7 @@ def read(root: Path | None = None) -> Read:
         except json.JSONDecodeError:
             skipped += 1
             continue
-        if (
-            isinstance(row, dict)
-            and all(isinstance(row.get(c), str) for c in COLUMNS)
-            and row["status"] in STATUSES
-        ):
+        if _valid_row(row):
             rows.append({c: row[c] for c in COLUMNS})
         else:
             skipped += 1
@@ -136,6 +146,42 @@ def validate(
     return {"day": day, "list": list_key, "status": status, "note": note}
 
 
+def append_checked(
+    day: str,
+    list_key: str,
+    status: str,
+    note: str = "",
+    root: Path | None = None,
+    now: datetime | None = None,
+) -> tuple[dict, bool]:
+    """Validate and append one row; returns (row, written). A row identical in status and note to
+    the list's current one for that day is a no-op: the existing row is returned and nothing is
+    written, so a double click or a retry after a lost response does not grow the file. Never
+    touches the journal or the results."""
+    root = root or data_dir()
+    path = placements_path(root)
+    with _write_lock(root):
+        fields = validate(day, list_key, status, note, root)
+        existing = current(read(root).rows).get((day, list_key))
+        if existing is not None and (existing["status"], existing["note"]) == (
+            fields["status"],
+            fields["note"],
+        ):
+            return existing, False
+        stamp = (now or datetime.now(IST)).astimezone(IST)
+        row = {**fields, "at": stamp.isoformat(timespec="seconds")}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and path.stat().st_size and not path.read_bytes().endswith(b"\n"):
+            # a torn last line: start on a fresh line so the new row is not glued to it
+            with path.open("a") as f:
+                f.write("\n")
+        with path.open("a") as f:
+            f.write(json.dumps({c: row[c] for c in COLUMNS}) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+    return row, True
+
+
 def append(
     day: str,
     list_key: str,
@@ -144,22 +190,5 @@ def append(
     root: Path | None = None,
     now: datetime | None = None,
 ) -> dict:
-    """Validate and append one row; returns it. Never touches the journal or the results."""
-    root = root or data_dir()
-    path = placements_path(root)
-    with _write_lock(root):
-        fields = validate(day, list_key, status, note, root)
-        row = {
-            **fields,
-            "at": (now or datetime.now(IST)).astimezone(IST).isoformat(timespec="seconds"),
-        }
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if path.exists() and path.stat().st_size and not path.read_bytes().endswith(b"\n"):
-            # a torn last line: start on a fresh line so the new row is not glued to it
-            with path.open("a") as f:
-                f.write("\n")
-        with path.open("a") as f:
-            f.write(json.dumps({c: row[c] for c in COLUMNS}, sort_keys=False) + "\n")
-            f.flush()
-            os.fsync(f.fileno())
-    return row
+    """`append_checked` without the flag: the row that is now current for the list."""
+    return append_checked(day, list_key, status, note, root, now)[0]

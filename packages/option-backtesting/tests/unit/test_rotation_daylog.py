@@ -680,3 +680,222 @@ def test_the_forensics_route_names_a_variant_by_its_enumerated_file_only(client,
     monkeypatch.setattr(routes, "load_day", missing)
     r = c.get("/legwise/rotation/forensics", params={"variant": "N_wide_0917", **ok})
     assert r.status_code == 404 and "no collected NIFTY data" in r.json()["error"]
+
+
+# --- review round: tests that must fail on the mutation they guard against ---------------------
+
+
+def test_reconstructed_days_never_enter_the_forward_counters_under_source_all(world):
+    root, _ = world
+    only = daylog.build_log(root, now=NOW, source="recorded")
+    both = daylog.build_log(root, now=NOW, source="all")
+    assert any(r["source"] == "reconstructed" for r in both["rows"])
+    assert both["counters"]["recorded"] == only["counters"]["recorded"]
+    assert both["counters"]["recorded"]["days"] == 6
+    assert both["counters"]["reconstructed"]["days"] == 7
+    assert both["counters"]["reconstructed"]["not_recorded"] == 0
+
+
+def test_an_entry_without_the_before_first_entry_flag_is_not_counted_as_forward(tmp_path):
+    from option_backtesting.rotation import journal as j
+
+    day = date(2026, 10, 12)
+    j.append(
+        store.journal_path(tmp_path),
+        {
+            "day": day.isoformat(),
+            "weekday": "Mon",
+            "vix_open": 14.0,
+            "vix_band": "13-15",
+            "lists": {
+                "A": {"core": ["N_wide_0917"], "buy": [], "overridden": False, "composite": {}}
+            },
+        },
+    )
+    now = datetime(2026, 10, 12, 20, 0, tzinfo=syn.IST)
+    log = daylog.build_log(tmp_path, now=now, names=syn.NAMES)
+    row = _row(log, day)
+    assert row["status"] == "late" and row["recorded"]["on_time"] is False
+    assert log["counters"]["recorded"]["days"] == 0 and log["counters"]["recorded"]["late"] == 1
+
+
+def test_identical_concurrent_placements_write_one_row_only_because_of_the_lock(world, monkeypatch):
+    """Validate-then-append must be one step: with validation slowed, every thread is inside it
+    at once, so without the lock each would see "no current row" and append its own."""
+    import time
+
+    root, _ = world
+    real = placements.validate
+
+    def slow(*a, **k):
+        out = real(*a, **k)
+        time.sleep(0.05)
+        return out
+
+    monkeypatch.setattr(placements, "validate", slow)
+    barrier = threading.Barrier(12)
+    outcomes = []
+
+    def go():
+        barrier.wait()
+        outcomes.append(placements.append_checked("2026-10-12", "A", "changed", "same", root)[1])
+
+    threads = [threading.Thread(target=go) for _ in range(12)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert outcomes.count(True) == 1 and outcomes.count(False) == 11
+    lines = placements.placements_path(root).read_text().splitlines()
+    assert len(lines) == 1
+
+
+def test_an_identical_consecutive_placement_is_a_no_op_but_a_change_is_appended(world):
+    root, _ = world
+    t0 = datetime(2026, 10, 12, 9, 31, tzinfo=syn.IST)
+    first, written = placements.append_checked("2026-10-12", "A", "placed", "", root, now=t0)
+    again, written_again = placements.append_checked(
+        "2026-10-12", "A", "placed", "  ", root, now=t0 + timedelta(minutes=1)
+    )
+    assert written and not written_again and again == first  # the note is stripped before comparing
+    placements.append("2026-10-12", "A", "changed", "swapped", root)
+    placements.append("2026-10-12", "A", "placed", "", root)  # back to the first state: new row
+    assert len(placements.read(root).rows) == 3
+
+
+def test_a_hand_edited_row_is_skipped_and_counted_not_fatal(client):
+    c, root = client
+    placements.append("2026-10-12", "A", "placed", "", root)
+    with placements.placements_path(root).open("a") as f:
+        f.write(
+            json.dumps({"day": "2026-10-1", "list": "A", "status": "placed", "note": "", "at": "x"})
+            + "\n"
+        )
+        f.write(
+            json.dumps(
+                {"day": "2026-10-12", "list": "Z", "status": "placed", "note": "", "at": "x"}
+            )
+            + "\n"
+        )
+        f.write(
+            json.dumps({"day": "2026-10-12", "list": "A", "status": "maybe", "note": "", "at": "x"})
+            + "\n"
+        )
+    read = placements.read(root)
+    assert len(read.rows) == 1 and read.skipped == 3
+    got = c.get("/legwise/rotation/placement", params={"from": "2026-10-01", "to": "2026-10-31"})
+    assert got.status_code == 200 and got.json()["skipped_lines"] == 3
+    log = c.get("/legwise/rotation/log").json()
+    assert log["placement_skipped_lines"] == 3
+
+
+def test_the_post_says_when_nothing_was_written(client):
+    c, root = client
+    body = {"day": "2026-10-12", "list": "B", "status": "placed"}
+    first = c.post("/legwise/rotation/placement", json=body).json()
+    second = c.post("/legwise/rotation/placement", json=body).json()
+    assert first["written"] is True and second["written"] is False
+    assert first["row"] == second["row"]
+    assert len(placements.read(root).rows) == 1
+
+
+def _replay_setup(client, monkeypatch, lot_by_date: bool):
+    """Store `N_wide_0917` for the replay day through `update_day`, with a reference whose lot
+    size depends on the sizing date (65 on the registered sizing date, 75 on any other)."""
+    from option_backtesting.api import rotation_log_routes as routes
+    from option_backtesting.data.reference.loader import ReferenceData
+    from option_backtesting.rotation import update
+    from option_backtesting.rotation.lists import SIZING_DATE
+
+    from .test_legwise_engine import DAY
+
+    c, root = client
+    data = _replay_day()
+    monkeypatch.setattr(update, "load_day", lambda r, u, d: data)
+    monkeypatch.setattr(update, "day_attributes", lambda r, d: syn.attrs_for(d))
+    monkeypatch.setattr(routes, "load_day", lambda r, u, d: data)
+    if lot_by_date:
+
+        class Ref(ReferenceData):
+            def lot_size(self, underlying, expiry):
+                return 65 if expiry == date.fromisoformat(SIZING_DATE) else 75
+
+        ref = Ref()
+        monkeypatch.setattr(update, "default_reference_data", lambda: ref)
+        monkeypatch.setattr(routes, "default_reference_data", lambda: ref)
+    name = "N_wide_0917"
+    path = store.results_dir(root) / f"{name}.csv"
+    kept = [ln for ln in path.read_text().splitlines() if not ln.startswith(DAY.isoformat())]
+    path.write_text("\n".join(kept) + "\n")
+    out = update.update_day(DAY, root, log=lambda _m: None, names=[name])
+    assert out["written"] == 1 and not out["errors"]
+    return c, root, name, DAY, routes
+
+
+def test_the_replay_uses_the_lot_sizing_date_the_stored_result_used(client, monkeypatch):
+    c, root, name, day, _ = _replay_setup(client, monkeypatch, lot_by_date=True)
+    body = c.get(
+        "/legwise/rotation/forensics", params={"variant": name, "day": day.isoformat()}
+    ).json()
+    assert body["rotation"]["matches_stored"] is True
+    # and the sizing date matters: the same file on another date's lot gives a different gross
+    from option_backtesting.legwise.engine import simulate_day
+    from option_backtesting.legwise.schema import load_legwise
+    from option_backtesting.rotation.variants import strategy_path
+
+    other = simulate_day(
+        load_legwise(strategy_path(name)), _replay_day(), _ref_for(monkeypatch), day
+    )
+    assert round(other.gross, 2) != body["rotation"]["simulated_gross"]
+
+
+def _ref_for(monkeypatch):
+    from option_backtesting.api import rotation_log_routes as routes
+
+    return routes.default_reference_data()
+
+
+def test_a_replay_that_differs_from_the_stored_result_says_so(client, monkeypatch):
+    c, root, name, day, _ = _replay_setup(client, monkeypatch, lot_by_date=False)
+    path = store.results_dir(root) / f"{name}.csv"
+    stored = daylog.read_rows(name, root)[day]["gross"]
+    lines = path.read_text().splitlines()
+    for i, ln in enumerate(lines):
+        if ln.startswith(day.isoformat()):
+            cells = ln.split(",")
+            cells[1] = cells[2] = str(stored + 500.0)  # a repaired day / an edited file
+            lines[i] = ",".join(cells)
+    path.write_text("\n".join(lines) + "\n")
+    r = c.get("/legwise/rotation/forensics", params={"variant": name, "day": day.isoformat()})
+    rot = r.json()["rotation"]
+    assert rot["matches_stored"] is False
+    assert rot["stored_gross"] == pytest.approx(stored + 500.0)
+    assert rot["simulated_gross"] == pytest.approx(stored)
+
+
+def test_a_replay_of_a_day_with_no_stored_result_is_not_a_match(client, monkeypatch):
+    c, root, name, day, _ = _replay_setup(client, monkeypatch, lot_by_date=False)
+    path = store.results_dir(root) / f"{name}.csv"
+    kept = [ln for ln in path.read_text().splitlines() if not ln.startswith(day.isoformat())]
+    path.write_text("\n".join(kept) + "\n")
+    rot = c.get(
+        "/legwise/rotation/forensics", params={"variant": name, "day": day.isoformat()}
+    ).json()["rotation"]
+    assert rot["stored_gross"] is None and rot["matches_stored"] is False
+
+
+# --- the demo script must not be able to write into the real store -----------------------------
+
+
+def test_the_demo_refuses_the_real_root_or_any_rotation_dir_it_did_not_build(tmp_path):
+    real = tmp_path / "TradingData"
+    (real / "rotation" / "results").mkdir(parents=True)
+    for root in (real, real / "demo", tmp_path):
+        with pytest.raises(syn.UnsafeDemoRoot):
+            syn.refuse_unless_synthetic(root, [real])
+    other = tmp_path / "elsewhere"
+    (other / "rotation").mkdir(parents=True)  # a rotation/ nobody marked: real data until proven
+    with pytest.raises(syn.UnsafeDemoRoot, match="did not build"):
+        syn.refuse_unless_synthetic(other, [real])
+    fresh = tmp_path / "fresh"
+    syn.refuse_unless_synthetic(fresh, [real])  # nothing there yet: fine
+    syn.mark_synthetic(fresh)
+    syn.refuse_unless_synthetic(fresh, [real])  # its own marked store: fine to reuse

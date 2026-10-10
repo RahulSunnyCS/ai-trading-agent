@@ -123,8 +123,10 @@ def stop_kind(stopped_by: str) -> str | None:
 
 
 def start_band(tag: str) -> str:
-    """The start-time band the family-band criterion pools by (score.family_index): A 09:17-10:02,
-    B 10:17-12:02, C 12:17-14:02, D 14:17-15:17."""
+    """The start-time band the family-band criterion pools by: A 09:17-10:02, B 10:17-12:02,
+    C 12:17-14:02, D 14:17-15:17. A display copy of the nested `band` in
+    `score.family_index` (not importable: it is a closure there); a test pins the two together,
+    so change them in the same commit."""
     m = int(tag[:2]) * 60 + int(tag[2:])
     return "A" if m <= 602 else "B" if m <= 722 else "C" if m <= 842 else "D"
 

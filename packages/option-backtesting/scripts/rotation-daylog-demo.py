@@ -4,7 +4,9 @@ journal has real entries (the first one is Monday 12 October 2026, 09:16).
     uv run python scripts/rotation-daylog-demo.py            # build in a temp dir, serve on :8123
     uv run python scripts/rotation-daylog-demo.py --root /tmp/rot --port 8124 --no-serve
 
-It writes only under --root (never TRADING_DATA_ROOT), builds the 298-variant universe with random
+It writes only under --root and REFUSES a root that is, contains or sits inside the real
+TRADING_DATA_ROOT, or that already has a rotation/ directory this script did not build (it leaves
+a marker file). It builds the 298-variant universe with random
 results and genuine hash-chained entries through `pick.record` (so every state a day can be in is
 there: scored, late, not recorded, waiting, a VIX read from Angel One, a holiday), pins the API's
 clock to 22 Oct 2026 12:00 IST, and serves the same routes `obt-api` does. Point the dashboard at
@@ -42,6 +44,39 @@ def build(root: Path, history: int) -> dict:
     return scenario
 
 
+def real_data_roots() -> list[Path]:
+    """Every place TRADING_DATA_ROOT could point on this machine: the environment, the default,
+    and the `.env` of this checkout and of the main one the worktree belongs to."""
+    import subprocess
+
+    from option_backtesting.fyers.daily import data_dir
+
+    roots = [data_dir()]
+    if os.environ.get("TRADING_DATA_ROOT"):
+        roots.append(Path(os.environ["TRADING_DATA_ROOT"]))
+    repos = [ROOT.parents[1]]
+    try:
+        common = subprocess.run(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            cwd=ROOT,
+            check=True,
+        ).stdout.strip()
+        repos.append(Path(common).parent)
+    except (OSError, subprocess.CalledProcessError):
+        pass
+    for repo in repos:
+        env = repo / ".env"
+        if not env.exists():
+            continue
+        for line in env.read_text().splitlines():
+            key, _, value = line.partition("=")
+            if key.strip() == "TRADING_DATA_ROOT" and value.strip():
+                roots.append(Path(value.strip().strip("\"'")))
+    return roots
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--root", type=Path, default=None, help="where to build (default: temp)")
@@ -52,10 +87,16 @@ def main() -> None:
     parser.add_argument("--no-serve", action="store_true")
     args = parser.parse_args()
 
-    root = args.root or Path(tempfile.mkdtemp(prefix="rotation-daylog-demo-"))
-    root.mkdir(parents=True, exist_ok=True)
-    os.environ["TRADING_DATA_ROOT"] = str(root)
     import rotation_synth as syn
+
+    root = args.root or Path(tempfile.mkdtemp(prefix="rotation-daylog-demo-"))
+    try:
+        syn.refuse_unless_synthetic(root, real_data_roots())
+    except syn.UnsafeDemoRoot as error:
+        sys.exit(f"refused: {error}")
+    root.mkdir(parents=True, exist_ok=True)
+    syn.mark_synthetic(root)
+    os.environ["TRADING_DATA_ROOT"] = str(root)
 
     if (root / "rotation" / "journal.jsonl").exists():
         print(f"synthetic store (already built): {root}")
