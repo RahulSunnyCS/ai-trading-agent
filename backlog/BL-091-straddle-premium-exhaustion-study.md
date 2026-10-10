@@ -623,3 +623,9 @@ only. This is the engine convention behind every stored result and is left as is
   minutes (58 days), 2022–24 108 of 212 (80 days), SENSEX 2025 89 of 132 (55 days). P90 of the
   post-peak size: NIFTY 73 (2025), 63 (2022–24), 68 both; SENSEX 269. Band edges for Phase 2 are the
   owner's to confirm; nothing registered yet.
+- 2026-10-11 — Owner chose three categories by percentile of held spikes: below the 60th, 60th–85th,
+  85th and above, and noted that the peak is not known at entry. Look taken: P60 / P85 of the level
+  when the 5-minute hold completes (known live) and of the post-peak size, pooled per index. Live
+  measure: NIFTY P60 35, P85 44 points; SENSEX 127 and 170. Post-peak: NIFTY 37 / 59, SENSEX 131 /
+  209. The live category equals the after-peak category for 54 % of NIFTY and 57 % of SENSEX spikes,
+  so the size at entry says little about the size the spike will reach. Not registered yet.
