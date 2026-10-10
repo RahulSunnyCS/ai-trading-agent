@@ -140,7 +140,8 @@ def _windows(common: list[date], forward: list[date]) -> dict[str, dict]:
         "to": tail[-1].isoformat() if tail else None,
         "n_days": len(tail),
     }
-    fwd_common = [d for d in common if d in set(forward)]
+    forward_set = set(forward)
+    fwd_common = [d for d in common if d in forward_set]
     out["forward"] = {
         "id": "forward",
         "label": "Forward · recorded days",
@@ -210,8 +211,6 @@ def build(
         p["n_days"] = len(v) if v else 0
 
     usable = [n for n in series_names if n in have]
-    if key == "BASE":
-        have.setdefault(BASE_SECOND_WIDE, have.get(base_mod.WIDE_NAME, {}))
     common = (
         sorted(d for d in set.intersection(*(set(have[n]) for n in usable)) if d.weekday() < 5)
         if usable

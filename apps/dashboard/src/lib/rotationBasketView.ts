@@ -13,6 +13,7 @@ import type {
   RotationBasketResponse,
 } from '../types/rotationBasket';
 import { type PairRef, diversificationNote } from './correlationView';
+import { formatNumber } from './format';
 
 export const BASKET_LIST_OPTIONS: { value: BasketListKey; label: string }[] = [
   { value: 'A', label: 'A' },
@@ -186,10 +187,7 @@ export function readingLine(b: RotationBasketResponse): string {
 }
 
 function signed(v: number): string {
-  const text = Math.abs(v).toFixed(2);
-  if (v > 0) return `+${text}`;
-  if (v < 0) return `−${text}`;
-  return text;
+  return formatNumber(v, 2, { sign: true });
 }
 
 /** The names the Correlation tab's picker can take: a rotation variant, not the base's Dir leg. */

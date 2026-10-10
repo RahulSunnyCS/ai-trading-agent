@@ -12,6 +12,7 @@ come back as `{"error": ...}`, as in `correlation_routes.py`.
 
 from __future__ import annotations
 
+import threading
 import time
 from datetime import date
 from typing import Any
@@ -26,6 +27,7 @@ router = APIRouter(prefix="/legwise/rotation/basket")
 CACHE_SECONDS = 30.0  # the files change once a night
 MAX_CACHED = 32
 _cache: dict[tuple, tuple[float, Any]] = {}
+_lock = threading.Lock()  # the route runs in worker threads: the cache is shared
 
 
 def _error(status: int, message: str) -> JSONResponse:
@@ -64,14 +66,16 @@ def get_basket(
     root = data_dir()
     key = (root, list_, d, window, start, end)
     now = time.monotonic()
-    hit = _cache.get(key)
+    with _lock:
+        hit = _cache.get(key)
     if hit is not None and now - hit[0] < CACHE_SECONDS:
         return hit[1]
     try:
         value = basket.build(list_, d, window, start, end, root)
     except basket.BasketError as error:
         return _error(error.status, str(error))
-    if len(_cache) >= MAX_CACHED:  # bounded: a script looping over dates must not grow it
-        _cache.pop(min(_cache, key=lambda k: _cache[k][0]))
-    _cache[key] = (now, value)
+    with _lock:
+        if len(_cache) >= MAX_CACHED:  # bounded: a script looping over dates must not grow it
+            _cache.pop(min(_cache, key=lambda k: _cache[k][0]))
+        _cache[key] = (now, value)
     return value

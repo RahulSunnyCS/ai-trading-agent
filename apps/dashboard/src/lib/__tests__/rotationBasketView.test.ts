@@ -245,7 +245,7 @@ describe('readingLine', () => {
   it('calls near-zero correlations independent and gives the saving and the caveat', () => {
     const text = readingLine(basket());
     expect(text).toContain('close to independent');
-    expect(text).toContain('−0.05 to +0.16');
+    expect(text).toContain('-0.05 to +0.16');
     expect(text).toContain('40% less');
     expect(text).toContain('does not forecast');
   });

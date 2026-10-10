@@ -284,7 +284,14 @@ export function CorrelationBasket({
   const window = asBasketWindow(winQ);
   const res = useRotationBasket({ list, day: dayQ ?? undefined, window });
   const b = res.data;
-  const names = b ? customNames(b) : null;
+  // The polled hook keeps the previous response while a new one loads and after a failure, so
+  // a response is only shown when it is the one these controls asked for.
+  const current =
+    b !== null &&
+    b.list === list &&
+    b.window.id === window &&
+    (list === 'BASE' || !dayQ || b.day === dayQ);
+  const names = b && current ? customNames(b) : null;
 
   return (
     <div className="space-y-5">
@@ -325,7 +332,7 @@ export function CorrelationBasket({
           <Button
             size="sm"
             variant="ghost"
-            disabled={names === null || !b}
+            disabled={names === null || !b || !current}
             title={
               names === null
                 ? 'The fixed base’s Dir leg is not one of the strategies the picker lists'
@@ -345,9 +352,9 @@ export function CorrelationBasket({
         </div>
       </Card>
 
-      {res.error && b === null ? (
+      {res.error ? (
         <StateMessage variant="error" title="No basket to show" description={res.error} />
-      ) : b === null ? (
+      ) : b === null || !current ? (
         <SkeletonRows rows={6} />
       ) : (
         <>
@@ -360,7 +367,7 @@ export function CorrelationBasket({
               description={b.reason ?? 'There are too few common days to correlate.'}
             />
           ) : (
-            <Figures b={b} r={b.correlation} />
+            <Figures key={`${b.list}|${b.day}|${b.window.id}`} b={b} r={b.correlation} />
           )}
         </>
       )}

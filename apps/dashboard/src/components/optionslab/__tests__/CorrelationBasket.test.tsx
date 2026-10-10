@@ -206,6 +206,26 @@ describe('CorrelationBasket', () => {
     expect(hook.lastArgs).toMatchObject({ list: 'BASE' });
   });
 
+  it('does not show the previous list under controls that ask for another', () => {
+    hook.state.data = basket(); // List A's response is still held
+    window.history.replaceState(null, '', '/?blist=BASE');
+    render(<CorrelationBasket onOpenCustom={() => undefined} />);
+    expect(screen.queryByText('N_wide_0932')).toBeNull();
+    expect(screen.queryByText('Recorded')).toBeNull();
+    expect(
+      (screen.getByRole('button', { name: 'Open as custom' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it('shows the error, not the held basket, when the new request failed', () => {
+    hook.state.data = basket();
+    hook.state.error = '404: 2025-01-02 cannot be re-scored';
+    render(<CorrelationBasket onOpenCustom={() => undefined} />);
+    expect(screen.getByText('No basket to show')).toBeTruthy();
+    expect(screen.getByText('404: 2025-01-02 cannot be re-scored')).toBeTruthy();
+    expect(screen.queryByText('N_wide_0932')).toBeNull();
+  });
+
   it('shows a request error when there is nothing to fall back on', () => {
     hook.state.error = '404: no basket';
     render(<CorrelationBasket onOpenCustom={() => undefined} />);
