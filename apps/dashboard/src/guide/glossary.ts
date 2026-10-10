@@ -423,6 +423,13 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       'Several saved runs of one dataset kept as one favourite, such as the Phase 6 ensemble. Each run is a sleeve with its own share of the money and its own rebalance weeks; the group has one status and one combined signal.',
   },
   {
+    id: 'all-fridays',
+    term: 'All Fridays (split)',
+    group: 'Momentum',
+    short:
+      'A strategy that trades every 2 or 4 weeks has 2 or 4 possible sets of Fridays, and which one you pick is luck. All Fridays runs every set with an equal share of the money, evens the shares out again each April, and adds them into one account. It removes the gamble; it does not raise the average.',
+  },
+  {
     id: 'forward-journal',
     term: 'Forward journal',
     group: 'Momentum',

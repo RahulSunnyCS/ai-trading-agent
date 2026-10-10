@@ -15,6 +15,7 @@ import {
   selectedCard,
   sleeveLabel,
   timeline,
+  tradingSleeves,
 } from '../momentumWeek';
 
 function status(patch: Partial<MomentumWeeklyStatus> = {}): MomentumWeeklyStatus {
@@ -241,5 +242,32 @@ describe('a favourite’s rows', () => {
       '08c4307d (4w, ph1)',
     );
     expect(sleeveLabel('Other', 'Phase 6 ensemble')).toBe('Other');
+  });
+});
+
+describe('tradingSleeves', () => {
+  const sleeve = (name: string, on_cadence: boolean) => ({
+    id: name,
+    name,
+    value: 1,
+    on_cadence,
+    every: 4,
+    next: null,
+  });
+
+  it('names the Friday that trades in an all-Fridays group', () => {
+    const card = {
+      name: 'Five Sectors · all Fridays',
+      sleeves: [
+        sleeve('Five Sectors · all Fridays · Friday 1 of 4', false),
+        sleeve('Five Sectors · all Fridays · Friday 2 of 4', true),
+      ],
+    };
+    expect(tradingSleeves(card)).toEqual(['Friday 2 of 4']);
+  });
+
+  it('is empty for a favourite that is not a group, or a week nothing trades', () => {
+    expect(tradingSleeves({ name: 'X' })).toEqual([]);
+    expect(tradingSleeves({ name: 'G', sleeves: [sleeve('G · a', false)] })).toEqual([]);
   });
 });

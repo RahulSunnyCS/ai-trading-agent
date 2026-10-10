@@ -99,9 +99,10 @@ benchmark, not the one picked on the headline.
 
 | Section | What it shows |
 |---|---|
-| This week | The run's last week: each candidate's rank, score and action, beside the open positions. On a slower cadence a week the strategy does not trade says "Not a rebalance week" and names the next trading Friday. For Broad the actions are the engine's own, so a stock above "Max price to buy ₹" is never shown as a buy: one that ranks high enough to be bought shows **SKIP (above max price)** with its price, and the next-best stock takes its slot. |
+| This week | The run's last week: each candidate's rank, score and action, beside the open positions. On a slower cadence a week the strategy does not trade says "Not a rebalance week" and names the next trading Friday. For Broad the actions are the engine's own, so a stock above "Max price to buy ₹" is never shown as a buy: one that ranks high enough to be bought shows **SKIP (above max price)** with its price, and the next-best stock takes its slot. Not for an **All (split)** run: it shows the open positions only (see below). |
 | Yearly returns | Each calendar year against the benchmark. Count the losing years. |
 | Rolling 1-year return | The return over every trailing 52 weeks, and how often the strategy was ahead. |
+| Friday luck | Only for an **All (split)** run. Each Friday set on its own (CAGR, max drawdown, Ulcer) next to the whole account, and the gap between the luckiest and unluckiest. |
 | Drawdowns | The deepest falls: when, how deep, how long, and what the benchmark did then. |
 | Monthly returns | A month-by-month heatmap with each year's total. |
 | Trades | Every closed trade, newest first, filterable. |
@@ -110,6 +111,20 @@ benchmark, not the one picked on the headline.
 | Holdings timeline | What was held, when, and in what share. |
 | Circuit exposure | Broad Momentum only: the circuit-lock situations the strategy ran into. |
 | Instrument attribution | How each instrument made or lost the money. |
+
+## An All (split) run
+
+With **Fridays: All (split)** on a slower cadence, the headline, chart and tables are for the
+whole account: every Friday set holds an equal share of the money, evened out each April. The
+trade list says which Friday set made each trade. The **Friday luck** section shows what each set
+would have earned alone. **This week** has no signals for it: each set trades its own Friday, so
+one list of buys and sells for the whole account would be wrong. It says so and shows the open
+positions; follow the run on all Fridays (see [Saved runs](guide:momentum/saved-runs)) to get each
+set's signal on This week. Splitting removes the gamble of picking a Friday; it does not raise the
+average. Tax is counted separately for each set (a loss in one never offsets a gain in another),
+so after-tax figures are slightly pessimistic. The run takes about as many times longer as there
+are sets, and Broad Momentum's circuit exposure card is not shown for it. The extended-tags line
+under the CAGR is the whole account's too: every Friday set is run again with the extended tags.
 
 ## Reading a result honestly
 

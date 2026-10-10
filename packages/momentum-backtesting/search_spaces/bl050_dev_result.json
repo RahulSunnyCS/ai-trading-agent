@@ -1,0 +1,153 @@
+{
+  "pbo": {
+    "splits": 12870,
+    "configs": 12,
+    "weeks_used": 608,
+    "pbo": 0.7226107226107226,
+    "picked_oos_negative": 0.0002331002331002331,
+    "slope": -0.9775818177604507,
+    "picked_oos_median": 1.4240415428312252,
+    "picked_is_median": 1.531170600476345
+  },
+  "baseline": {
+    "cagr": 0.29745153211555886,
+    "mdd": -0.31399206643067645,
+    "avg_holdings": 10.155637254901961,
+    "avg_idle_share": 0.0
+  },
+  "trials": {
+    "V1@0.25": {
+      "screen_pass": true,
+      "cagr": 0.2998226829762307,
+      "baseline_cagr": 0.29745153211555886,
+      "median_rolling_dcagr": 0.0029218086904442275,
+      "rolling_win_share": 0.9722222222222222,
+      "mdd": -0.3139528545325361,
+      "baseline_mdd": -0.31399206643067645,
+      "avg_holdings": 10.152369281045752,
+      "avg_idle_share": 0.0,
+      "passes": false
+    },
+    "V1@0.5": {
+      "screen_pass": true,
+      "cagr": 0.2982036079097905,
+      "baseline_cagr": 0.29745153211555886,
+      "median_rolling_dcagr": 0.000912919770961973,
+      "rolling_win_share": 0.5833333333333334,
+      "mdd": -0.3138071615141591,
+      "baseline_mdd": -0.31399206643067645,
+      "avg_holdings": 10.13684640522876,
+      "avg_idle_share": 0.0,
+      "passes": false
+    },
+    "V2@0.25": {
+      "screen_pass": true,
+      "cagr": 0.29712568966745745,
+      "baseline_cagr": 0.29745153211555886,
+      "median_rolling_dcagr": -0.00030244077923202717,
+      "rolling_win_share": 0.3333333333333333,
+      "mdd": -0.3139020854062863,
+      "baseline_mdd": -0.31399206643067645,
+      "avg_holdings": 10.153186274509805,
+      "avg_idle_share": 0.0,
+      "passes": false
+    },
+    "V2@0.5": {
+      "screen_pass": true,
+      "cagr": 0.2989805632980067,
+      "baseline_cagr": 0.29745153211555886,
+      "median_rolling_dcagr": 0.002235350206298836,
+      "rolling_win_share": 0.8333333333333334,
+      "mdd": -0.314058946266654,
+      "baseline_mdd": -0.31399206643067645,
+      "avg_holdings": 10.11315359477124,
+      "avg_idle_share": 0.0,
+      "passes": false
+    },
+    "M2@0.25": {
+      "screen_pass": false,
+      "cagr": 0.2972110260806975,
+      "baseline_cagr": 0.29745153211555886,
+      "median_rolling_dcagr": 0.0005152712264732129,
+      "rolling_win_share": 0.5277777777777778,
+      "mdd": -0.3141495859341875,
+      "baseline_mdd": -0.31399206643067645,
+      "avg_holdings": 10.133578431372548,
+      "avg_idle_share": 0.0,
+      "passes": false
+    },
+    "M2@0.5": {
+      "screen_pass": false,
+      "cagr": 0.2965363787165951,
+      "baseline_cagr": 0.29745153211555886,
+      "median_rolling_dcagr": 0.0008465453775678977,
+      "rolling_win_share": 0.5277777777777778,
+      "mdd": -0.30835988551272897,
+      "baseline_mdd": -0.31399206643067645,
+      "avg_holdings": 10.09109477124183,
+      "avg_idle_share": 0.0,
+      "passes": false
+    },
+    "T1@0.25": {
+      "screen_pass": true,
+      "cagr": 0.29522872273961887,
+      "baseline_cagr": 0.29745153211555886,
+      "median_rolling_dcagr": -0.0021523155868394817,
+      "rolling_win_share": 0.3611111111111111,
+      "mdd": -0.31398049310333176,
+      "baseline_mdd": -0.31399206643067645,
+      "avg_holdings": 10.147467320261438,
+      "avg_idle_share": 0.0,
+      "passes": false
+    },
+    "T1@0.5": {
+      "screen_pass": true,
+      "cagr": 0.29506609358123037,
+      "baseline_cagr": 0.29745153211555886,
+      "median_rolling_dcagr": -0.0012642194404007823,
+      "rolling_win_share": 0.4166666666666667,
+      "mdd": -0.31412518476075146,
+      "baseline_mdd": -0.31399206643067645,
+      "avg_holdings": 10.09436274509804,
+      "avg_idle_share": 0.0,
+      "passes": false
+    },
+    "V3": {
+      "screen_pass": false,
+      "cagr": 0.28775519684632545,
+      "baseline_cagr": 0.29745153211555886,
+      "median_rolling_dcagr": 0.0034799359733443946,
+      "rolling_win_share": 0.5277777777777778,
+      "mdd": -0.24543147387773456,
+      "baseline_mdd": -0.31399206643067645,
+      "avg_holdings": 6.241830065359477,
+      "avg_idle_share": 0.04303444958043014,
+      "passes": false
+    },
+    "R1": {
+      "screen_pass": true,
+      "cagr": 0.2964325970668267,
+      "baseline_cagr": 0.29745153211555886,
+      "median_rolling_dcagr": -0.001351768740781245,
+      "rolling_win_share": 0.08333333333333333,
+      "mdd": -0.31400618906912936,
+      "baseline_mdd": -0.31399206643067645,
+      "avg_holdings": 10.096813725490197,
+      "avg_idle_share": 0.0,
+      "passes": false
+    },
+    "M1": {
+      "screen_pass": false,
+      "cagr": 0.29333995692681647,
+      "baseline_cagr": 0.29745153211555886,
+      "median_rolling_dcagr": -0.0037725200648418555,
+      "rolling_win_share": 0.4166666666666667,
+      "mdd": -0.29454410404972453,
+      "baseline_mdd": -0.31399206643067645,
+      "avg_holdings": 9.453839869281046,
+      "avg_idle_share": 0.0004207435663608526,
+      "passes": false
+    }
+  },
+  "survivors": []
+}

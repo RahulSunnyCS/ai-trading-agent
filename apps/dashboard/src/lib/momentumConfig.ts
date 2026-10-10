@@ -38,7 +38,8 @@ export interface MomentumConfigDescription {
   period: string;
   /** Lower-case cadence for a sentence: "weekly", "every 2 weeks", "monthly". */
   cadence: string;
-  /** Standalone chip: "Weekly rebalance", "Every 2 weeks (phase 1)", "Monthly rebalance". */
+  /** Standalone chip: "Weekly rebalance", "Every 2 weeks (phase 1)", "Every 4 weeks (all 4
+   * Fridays)", "Monthly rebalance". */
   cadenceChip: string;
   /** "top 5, exit after rank 10" */
   selection: string;
@@ -70,12 +71,19 @@ export function describeConfig(
   const every = Number(config.rebalance_every ?? 1);
   const monthly = config.rebalance === 'monthly';
   const everyN = !monthly && Number.isFinite(every) && every > 1;
-  const cadence = monthly ? 'monthly' : everyN ? `every ${every} weeks` : 'weekly';
+  const allFridays = everyN && config.split_fridays === true;
+  const cadence = monthly
+    ? 'monthly'
+    : everyN
+      ? `every ${every} weeks${allFridays ? ', all Fridays' : ''}`
+      : 'weekly';
   const cadenceChip = monthly
     ? 'Monthly rebalance'
-    : everyN
-      ? `Every ${every} weeks (phase ${Number(config.rebalance_offset ?? 0) + 1})`
-      : 'Weekly rebalance';
+    : allFridays
+      ? `Every ${every} weeks (all ${every} Fridays)`
+      : everyN
+        ? `Every ${every} weeks (phase ${Number(config.rebalance_offset ?? 0) + 1})`
+        : 'Weekly rebalance';
 
   let selection: string;
   let selectionShort: string;
@@ -258,6 +266,7 @@ const KEYS: Record<string, KeyInfo> = {
   rebalance: { section: 'portfolio', label: 'Rebalance' },
   rebalance_every: { section: 'portfolio', label: 'Rebalance every (weeks)' },
   rebalance_offset: { section: 'portfolio', label: 'Which Fridays (phase)' },
+  split_fridays: { section: 'portfolio', label: 'Fridays: one or all (split)' },
   sell_every_week: { section: 'portfolio', label: 'Sell exits weekly' },
   momentum_sizing: { section: 'portfolio', label: 'Win-rate position sizing' },
   momentum_sizing_window: { section: 'portfolio', label: 'Sizing window (trades)' },

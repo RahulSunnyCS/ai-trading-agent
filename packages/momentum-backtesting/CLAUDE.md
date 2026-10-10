@@ -316,6 +316,66 @@ contract, not a shared service).
   buffer/fixed-slots portfolio rules, hysteresis (`top_n`/`exit_rank`). Every
   dataset mode (ETF, Stock, Custom Index, Broad Momentum) ultimately calls
   into this — see its own docstrings before adding a new portfolio rule.
+- **Weekly stop-loss (BL-084):** `engine.Config.stop_from_buy` / `stop_from_peak` (fractions,
+  None = off), `stop_proceeds` (`cash` waits for the next rebalance, `top` buys
+  `_Sim.best_unheld`, the best buyable unheld name down to `exit_rank`) and `stop_delay` (0 sells
+  at the close the fall is seen on, 1 a week later). Buffer rule only, checked every week before
+  the rank exits, blocked by a lower-circuit lock; a stopped name is not re-bought that week.
+  `run_broad_backtest` takes the same four arguments; nothing in the API or the weekly signal
+  sets them. Pre-registered test: `search_spaces/bl084_criteria.json`,
+  `scripts/bl084_stop_loss.py`.
+- **BL-085 engine options (all off by default, none adopted):** `Config.stop_granularity="daily"`
+  (the stop is checked on each day's close and sells at the next open; daily moves from
+  `categories/daily_moves.py`, which divides the stored, unadjusted `prevclose` by confirmed
+  split/bonus factors); `Config.weight_by="inverse_vol"` / `vol_window`; `score="residual"`
+  (`categories/residual.py`, Broad's global ranking only; `engine.compute_ranks` refuses it).
+  `run_broad_backtest` also takes `tax_hold_band`/`tax_hold_weeks` (inert in category mode: every
+  sale is an "ineligible" exit) and `feature_tilt=(frame, weight)` (BL-050). Runners:
+  `scripts/bl085_levers.py`, `scripts/bl050_filters.py`; features in `filters.py`.
+- **All Fridays (BL-087):** `BacktestRequest.split_fridays` (off by default; a no-op unless
+  `rebalance="weekly"` and `rebalance_every > 1`) runs every `rebalance_offset` 0..K-1 with
+  `capital / K` and returns one `Result` of the whole account (`tranches.blend_reset`: equal
+  capital restored each April via `groups.reset_weeks`, the same rule as `choose.ensemble_curve`
+  and a followed group; separate tax ledgers per sleeve, slightly pessimistic; the reset itself
+  charges no cost or tax). Trade rows and `closed` trades carry `friday` (the sleeve's offset);
+  the lazy `friday_spread` section (`tranches.friday_spread`) holds each Friday's CAGR, max
+  drawdown and Ulcer next to the blend's. Broad shares one ranking across the K runs, and a
+  split run has no `circuit_exposure` section; its extended-tags `companion` (BL-036) is the
+  blend's, every sleeve re-run with the extended tags. Its `latest` section is `analysis.split_signal`
+  (`split: true`, no rows, a note), not `latest_signal`: the blend's positions and idle cash are
+  summed over the sleeves under the first sleeve's config, so signals would be judged against the
+  wrong portfolio. For Broad this replaces the engine decision a single run's `latest` gets
+  (`_broad_decide`), and the weekly signal, the 14:40 live preview and Your orders report
+  `SPLIT_SIGNAL_NOTE` for such a config instead of asking the engine to decide the blend. The dashboard hides the Signals half of This week for it. In `saved_identity` the flag is dropped when off or
+  meaningless (no existing fingerprint moves) and replaces `rebalance_offset` when on.
+- **Following on all Fridays (BL-087 Phase 3):** `all_fridays.py`. Favouriting (PATCH
+  `/api/saved-strategies/{id}` or `/api/saved-runs/{id}`, or POST
+  `/api/saved-strategies/{id}/follow-all-fridays`) a run whose config has `split_fridays` plans
+  K sleeve configs (`rebalance_offset` 0..K-1, `split_fridays` off, `capital / K`), runs each
+  (`api.sleeve_summary`, no catalog connection open), saves them as runs named `<group> · Friday
+  n of K` and `runs_store.create_group`s them as `<name> · all Fridays`. The split run stays a
+  saved run with `followed_by` set (`runs_store.annotate`), so a second request changes that group
+  instead of making another; a request on an already-followed run only ever raises that group
+  (`all_fridays.raise_only`: a higher status, or the headline when it is not one), so the
+  dashboard's "watching" star cannot demote it. Strategy records carry `followed_by` while the
+  group exists, and the follow responses carry it too. A full Paper/Invested list is refused
+  before anything is saved.
+  `mbt saved split-fridays [--apply]` does the same for every favourite on one Friday of a slower
+  cadence, releasing the old favourite (kept as a saved run; restored if the group fails). The
+  weekly run needs no change: members are journalled one by one and `groups.combine` weights them
+  by value since the April reset. Deleting a group keeps its sleeves.
+- **Rebalance preview of a group (BL-087 Phase 4):** `POST /api/rebalance-preview` (and `/jobs`)
+  takes `group: <id>` (a placeholder `universe` is filled in). `_rebalance_group_preview` runs
+  `_rebalance_model` once per sleeve (`rebalance_preview` is that plus `_rebalance_response`),
+  without a `strategy_start_date`: a sleeve's own `rebalance_offset` fixes its Fridays. Targets are
+  mixed by `groups.mix_targets` weighted by each sleeve's value since the April reset (from the
+  model's own equity curve), prices come from all sleeves, and the response carries `group`
+  (sleeves with `share`, `on_cadence`, `next`) and no `rebalance_schedule`.
+- **voladj ignores `lookbacks` and `weights` by default** (NSE's method: 26- and 52-week returns,
+  4 weeks back, over 26-week volatility). For a voladj config those two search settings only reach
+  the stock tilt; weights never matter. `Config.voladj_lookbacks=True` (BL-086, a heavy key in the
+  rank-cache key) makes it follow them; tested and killed (short lookbacks without the skip-month
+  chase reversing spikes), so it stays off.
 - `categories/broad.py` — Broad Momentum's category-selection funnel
   (`compute_universe_ranking`, `compute_category_selection*`,
   `run_broad_backtest`) — a pure, no-P&L ranking layer that feeds `engine.py`

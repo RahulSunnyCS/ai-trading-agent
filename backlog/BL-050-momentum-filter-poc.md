@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — set by the owner (2026-10-08); research only, so nothing live is at risk |
-| **Status** | Planned |
+| **Status** | Phases 0-3 done: no survivor; Phase 4 not applicable |
 | **Type** | research |
 | **Area** | momentum |
 | **Created** | 2026-10-07 |
 | **Depends on** | BL-015 (pre-registration); BL-010 Phase 6 (the frozen ensemble is the comparator); BL-024 (the journal carries the Phase 4 shadow arm); BL-001 (goldens prove the default output is unchanged) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.13.8 |
 | **Handoff** | [`docs/handover-bl050-filter-poc.md`](../docs/handover-bl050-filter-poc.md): paste-ready planning and working prompts, and which steps need the laptop |
 
 ## Context
@@ -60,7 +60,7 @@ to `stock_tilt`, and two of the four frozen configs already use that (1.0 and 0.
 
 ## Goal
 
-A pre-registered, kill-early answer for six specific filters on the frozen Broad ensemble:
+A pre-registered, kill-early answer for seven specific filters on the frozen Broad ensemble:
 does any of them improve it after costs, robustly across rolling windows and without
 overfitting? Any survivor then runs as a shadow arm in the forward journal before it can be
 proposed for real money (through BL-025).
@@ -78,7 +78,7 @@ proposed for real money (through BL-025).
 
 ### Phase 0 — Pre-register (`search_spaces/bl050_criteria.json`, committed before any run)
 
-- **Hypothesis:** at least one of the six features below, applied the same way to all four frozen
+- **Hypothesis:** at least one of the seven features below, applied the same way to all four frozen
   configs, raises the ensemble's after-cost CAGR robustly, without worsening its drawdown.
 - **Universe:** Broad Momentum on the point-in-time `turnover_rank` universe, curated category
   tags, frozen liquidity gate (₹2 cr / ₹30 / 0.25, circuit gate on). Delisted names stay in their
@@ -86,13 +86,14 @@ proposed for real money (through BL-025).
 - **Comparator:** the BL-010 Phase 6 ensemble exactly as frozen
   (`search_spaces/bl010_phase6_frozen.json`: four configs, equal capital reset each April,
   `signal_delay=1`, itemised costs + 15 bps slippage).
-- **The six trials** (one shape, one setting each, fixed here; feature tilts use
+- **The seven trials** (one shape, one setting each, fixed here; feature tilts use
   `rank = 0.75 × momentum rank + 0.25 × feature rank`):
 
   | ID | Family | Feature (weekly, point-in-time) | Shape | Pre-registered direction |
   |---|---|---|---|---|
   | V1 | Volume | Median daily **turnover (₹)** over the last 4 weeks ÷ median over 26 weeks. Turnover, not share volume: it is not distorted by splits and bonuses | Tilt | Higher is better |
   | V2 | Volume | Up-week turnover ÷ down-week turnover over 13 weeks (accumulation; the `reversal.py` definition) | Tilt | Higher is better |
+  | V3 | Volume | Quiet-or-building entry (owner, 2026-10-09): last week's turnover ≤ its 26-week median (quiet), **or** turnover rose in each of the last 3 weeks (building). Fails = a one-week spike or a choppy, rising-then-falling pattern | Gate (no new buy if it fails) | Names that fail are worse |
   | R1 | Relative strength | 26-week return must beat Nifty 500 TRI's 26-week return | Gate (no new buy if it fails) | Names that fail are worse |
   | M1 | Momentum | Overextension: close ÷ 10-week average in the top 5% of that week's universe | Gate (no new buy if overextended) | Overextended names are worse |
   | M2 | Momentum | Residual momentum: 26-week sum of residuals from a trailing 52-week regression of weekly returns on Nifty 500 TRI, skipping the last 4 weeks | Tilt | Higher is better |
@@ -119,7 +120,7 @@ proposed for real money (through BL-025).
     - median ΔCAGR ≥ +2.0 pts across rolling 3-year windows stepped quarterly;
     - CAGR win share ≥ 70%;
     - full-period MaxDD no more than 3 pts worse;
-    - PBO < 0.5 across all six trials plus the baseline (CSCV). Every trial's ensemble curve is
+    - PBO < 0.5 across all seven trials plus the baseline (CSCV). Every trial's ensemble curve is
       built for the PBO matrix, including features killed in Phase 2. A killed feature cannot
       pass; its curve only keeps the trial count honest.
 - **Hold-out:** 2024-01-01 → 2026-09-25 stays sealed for **one** confirmation run of Phase 3
@@ -196,6 +197,48 @@ proposed for real money (through BL-025).
 - **Done when:** 26 recorded weeks and a verdict. Adoption is a separate owner decision under
   BL-025 (paper first, then money), never automatic.
 
+## Result (2026-10-09): no feature survives
+
+`search_spaces/bl050_screen_result.json`, `bl050_dev_result.json`; curves in
+`data/search/round7_A/bl050/dev/`. The sealed 2024-26 window was **not read** (no survivor).
+
+**Phase 2 screen** (13-week forward spread inside each config's top momentum quintile, net of
+0.3%, Newey-West t; pass = mean t >= 2 and 3 of 4 right sign):
+
+| Feature | Mean t | Right sign | Screen |
+|---|---|---|---|
+| V1 turnover expansion | 4.76 | 4 of 4 | pass |
+| T1 trend quality | 3.31 | 4 of 4 | pass |
+| V2 accumulation | 3.07 | 4 of 4 | pass |
+| R1 beats Nifty 500 | 2.11 | 4 of 4 | pass |
+| M2 residual sum | 1.24 | 4 of 4 | kill |
+| V3 quiet-or-building gate (owner) | -1.20 | 0 of 4 | kill (wrong way: blocked names did better) |
+| M1 overextension gate | -2.41 | 0 of 4 | kill (wrong way: stretched names did better) |
+
+**Phase 3 engine** (frozen ensemble, 2012-01-01 to 2023-12-29, pre-tax Rs 2 lakh; baseline
+29.7% a year, worst fall -31.4%, 10.2 holdings). PBO over the 11 trials plus baseline: **0.72**
+(limit 0.5), so no trial can pass.
+
+| Trial | CAGR | Median 3-year dCAGR | Win share | Worst fall | Holdings |
+|---|---|---|---|---|---|
+| V1 @ 0.25 / 0.5 | 30.0% / 29.8% | +0.3 / +0.1 | 97% / 58% | -31.4% | 10.2 / 10.1 |
+| V2 @ 0.25 / 0.5 | 29.7% / 29.9% | 0.0 / +0.2 | 33% / 83% | -31.4% | 10.2 / 10.1 |
+| T1 @ 0.25 / 0.5 | 29.5% / 29.5% | -0.2 / -0.1 | 36% / 42% | -31.4% | 10.1 |
+| M2 @ 0.25 / 0.5 | 29.7% / 29.7% | +0.1 / +0.1 | 53% / 53% | -31.4% / -30.8% | 10.1 |
+| R1 gate | 29.6% | -0.1 | 8% | -31.4% | 10.1 |
+| V3 gate (owner) | 28.8% | +0.3 | 53% | -24.5% | 6.2 (4% cash) |
+| M1 gate | 29.3% | -0.4 | 42% | -29.5% | 9.5 |
+
+- The screen's signal is real among top-momentum names (V1 at t = 4.8), but the tilt as
+  pre-registered acts only inside the categories already chosen, where few names compete, so it
+  changed few decisions (dCAGR within +/-0.3 points). A tilt on the wider pool or the category
+  choice is a different question and needs its own pre-registration.
+- V3 (the owner's gate) cut the worst fall from -31.4% to -24.5% for 0.9 points of CAGR, but
+  by holding about 6 stocks instead of 10: blocked buys concentrated the money in fewer names.
+  Its screen was the wrong way round and it fails the engine rule, so it is not evidence; a
+  drawdown effect from concentration is not what the filter was meant to test.
+- Phase 4 (shadow arms) has nothing to track.
+
 ## Risks
 
 - **Low statistical power.** 26 forward weeks cannot prove an edge. They can catch an
@@ -226,6 +269,28 @@ To confirm when this is started:
 
 ## Log
 
+- 2026-10-09 — owner answered the open questions before starting (to run overnight in the same
+  session, after BL-085's findings):
+  1. **Tilt weight: both 25% and 50%** — every tilt (V1, V2, M2, T1) runs at
+     `0.75 x momentum + 0.25 x feature` and at `0.5 x momentum + 0.5 x feature`. Gates (V3, R1,
+     M1) are unchanged. Trial count: 4 tilts x 2 weights + 3 gates = **11** (PBO counts all 11).
+  2. **Scope tonight: Phases 0-3, then report.** Phase 4 (shadow favourites in the Friday job)
+     waits for the owner.
+  3. **M2 stays as planned** (Nifty 500 TRI market, no sector factor, frozen ensemble
+     comparator); it is a different question from BL-085 L6.
+  4. **Shadow phase:** each survivor gets its own shadow arm, when Phase 4 is approved.
+- 2026-10-09 — Phase 0 committed: `search_spaces/bl050_criteria.json` (11 trials, both tilt
+  weights, V3 added), before any BL-050 run.
+
+- 2026-10-09 — owner added V3 (quiet-or-building 1-week turnover as an entry gate) before any
+  BL-050 run; the trial count is now seven. Context: the 2026-10-03 exploratory volume study
+  (`data/backtests/volume/`) tested 2- and 4-week volume ratios and accumulation on the pool and
+  found no predictive signal (information coefficients near 0, none passed); a 1-week measure
+  and this entry-gate shape were never tested. Also: BL-085 L6 (2026-10-09) tests residual
+  momentum on the 11 BL-084 strategies; when this item starts, M2 should cite that result and
+  run only if it adds something (it differs: Nifty 500 TRI as the market, no sector factor,
+  the frozen ensemble as comparator).
+
 - 2026-10-07 — Created from the owner's "five filters" idea. Repo check of all five families
   recorded in Context. Owner decisions: Broad only, fundamentals not required, forward shadow
   tracking as the deciding test. RS-momentum candidate withdrawn (it reduces to a lookback).
@@ -235,3 +300,12 @@ To confirm when this is started:
 - 2026-10-08 — Review fixes, before any run (PR #129, Codex). The Phase 2 screen is now
   pre-registered per frozen config, on each config's own score and calendar, with a fixed rule
   for combining the four. Phase 3 builds all six curves for PBO, and only survivors get verdicts.
+- 2026-10-09 — **bug found and fixed before the verdict was published:** the weekly table's
+  liquid-fund price starts in 2016, so money a gate parked in 2012-2015 was valued at NaN and
+  that sleeve's curve stayed NaN (V3: 2 of 4 sleeves, M1: 1 of 4; the ensemble silently averaged
+  the rest). The runner now applies the backcast's committed patch
+  (`holdout.patched_outer_prices`, BL-010 addendum 5: the stock layer's cash series before 2016)
+  and all 12 dev trials were re-run; baseline, tilts and R1 never parked cash and are unchanged.
+  The unpatched curves are kept in `data/search/round7_A/bl050/dev_unpatched/`.
+- 2026-10-09 — Phases 1-3 run overnight (features 02:42, screen 02:45, engine 02:49 IST): four
+  features pass the screen, none passes the engine test (PBO 0.74 before the cash fix below, 0.72 after); the hold-out stays sealed.

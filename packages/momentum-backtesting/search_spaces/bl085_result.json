@@ -1,0 +1,41 @@
+{
+  "committed_rules": ["bl054_criteria.json", "bl054_criteria_addendum_1.json"],
+  "l1": {
+    "lever": "l1",
+    "dev_pass": [],
+    "confirmed": [],
+    "verdict": "kill"
+  },
+  "l4": {
+    "lever": "l4",
+    "dev_pass": ["b0_p25__tax", "b20_p25__tax", "b25_p25__tax"],
+    "confirmed": [],
+    "verdict": "kill"
+  },
+  "l5": {
+    "lever": "l5",
+    "dev_pass": [],
+    "confirmed": [],
+    "verdict": "kill"
+  },
+  "l6": {
+    "lever": "l6",
+    "dev_pass": [],
+    "confirmed": [],
+    "verdict": "kill"
+  },
+  "L2_phase_blend": "report only, see docs/bl054-levers-2026-10-09.md",
+  "L3_etf_blend": {
+    "verdict": "kill",
+    "development_75pct": {
+      "median_cagr_change": -0.058,
+      "less_pain": 11
+    },
+    "confirmation_75pct": {
+      "median_cagr_change": -0.014,
+      "less_pain": 11
+    },
+    "note": "pre-tax from stored curves; fails the -2 point floor on development"
+  },
+  "trials_after_tax_cells": 21
+}

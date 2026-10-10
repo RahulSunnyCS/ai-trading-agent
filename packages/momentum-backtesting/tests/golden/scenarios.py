@@ -113,6 +113,24 @@ SCENARIOS: dict[str, dict] = {
             "slippage_bps": 15,
         },
     },
+    # BL-087: the same four-weekly config on all four Fridays, money split, reset each April.
+    "broad_one_category_three_picks_four_weekly_all_fridays": {
+        "$meta": "broad",
+        "with": {
+            "broad_universe": "total_market",
+            "broad_category_top_n": 1,
+            "broad_category_exit_rank": 3,
+            "broad_picks_per_category": 3,
+            "rebalance_every": 4,
+            "split_fridays": True,
+            "signal_delay": 1,
+            "max_position": 0.5,
+            "max_category": None,
+            "cost_model": "itemised",
+            "capital": 200000,
+            "slippage_bps": 15,
+        },
+    },
     "broad_eight_categories_one_pick": {
         "$meta": "broad",
         "with": {

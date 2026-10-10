@@ -3,7 +3,8 @@
  * pasted holdings list, and building the full current → target table from a preview result.
  */
 
-import type { MomentumRebalanceResult } from '../types/momentum';
+import type { MomentumRebalanceGroup, MomentumRebalanceResult } from '../types/momentum';
+import { sleeveLabel } from './momentumWeek';
 
 /** The engine's name for unallocated money (`IDLE` in momentum_backtesting/engine.py). */
 export const IDLE_CASH = 'Idle cash';
@@ -296,4 +297,45 @@ export function buildRebalanceTable(
       holds: count('HOLD'),
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// A favourite group previewed as one account (BL-087)
+
+export interface GroupSleeveLine {
+  id: string;
+  label: string;
+  /** Share of the whole group, a fraction. */
+  share: number;
+  trades: boolean;
+  next: string | null;
+}
+
+export interface GroupPreviewSummary {
+  lines: GroupSleeveLine[];
+  /** Labels of the sleeves that rebalance this week. */
+  trading: string[];
+  /** One sentence saying who trades and what the target is. */
+  sentence: string;
+}
+
+/** What a previewed group says about its sleeves: who trades this week, each one's share. */
+export function summariseGroup(
+  group: MomentumRebalanceGroup,
+  firstAllocation = false,
+): GroupPreviewSummary {
+  const lines = group.sleeves.map((sleeve) => ({
+    id: sleeve.id,
+    label: sleeveLabel(sleeve.name, group.name),
+    share: sleeve.share,
+    trades: sleeve.on_cadence,
+    next: sleeve.next,
+  }));
+  const trading = lines.filter((line) => line.trades).map((line) => line.label);
+  const sentence = firstAllocation
+    ? 'First allocation: every sleeve invests now, each with an equal share. From then on one sleeve trades each week.'
+    : trading.length === 0
+      ? 'No sleeve rebalances this week. The target below is the whole group as it stands.'
+      : `${trading.join(' and ')} ${trading.length === 1 ? 'trades' : 'trade'} this week; the other sleeves hold. The target is the whole group: every sleeve, weighted by its value since the April reset.`;
+  return { lines, trading, sentence };
 }

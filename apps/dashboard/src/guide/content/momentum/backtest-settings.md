@@ -70,7 +70,8 @@ researching that idea.
 | Wait / Make room | When a new name enters the top N but nothing was sold: wait for cash (default) or trim everything to buy it now. |
 | Top N / Sell when rank > | How many to buy, and the [exit rank](glossary:exit-rank). The ETF default is 5 and 10. |
 | Rebalance | Every week, every 2 or 4 weeks, or monthly. |
-| Which Fridays | For a slower cadence, which set of Fridays. Try both: if they differ a lot, the result owes much to calendar luck. |
+| Fridays: One / All (split) | For a slower cadence (every 2 or 4 weeks). **One** trades a single set of Fridays; **All (split)** runs every set with an equal share of the money each, evens the shares out again each April, and adds them into one account. See [All Fridays](glossary:all-fridays). |
+| Which Fridays | With **One**: which set of Fridays. Try each: if they differ a lot, the result owes much to calendar luck. Hidden for **All (split)**, which holds every set. |
 | Sell exits weekly, buy only on the cadence | Sell a fallen name the week it falls, but only buy on cadence Fridays. |
 | Win-rate position sizing | Buy smaller after a losing streak. Off by default; on its own tests it cost return without cutting risk. |
 
