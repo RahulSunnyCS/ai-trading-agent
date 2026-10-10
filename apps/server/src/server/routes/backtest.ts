@@ -25,6 +25,10 @@
  *  GET  /api/backtest/legwise/day               — re-simulate one saved day (MTM curve, markers,
  *                                                  per-leg attribution). requireAccess
  *  GET  /api/backtest/legwise/anatomy           — per-day, per-segment index shape. requireAccess
+ *  GET  /api/backtest/legwise/rotation/explain  — why a list picked what it picked on a day, rebuilt
+ *                                                 and checked against the journal. requireAccess
+ *  GET  /api/backtest/legwise/rotation/ic       — daily rank correlation of the morning ranking
+ *                                                 with the day's results. requireAccess
  *  GET  /api/backtest/legwise/correlation/available — strategies with daily results + picker groups.
  *                                                  requireAccess
  *  GET  /api/backtest/legwise/correlation       — how the chosen strategies' daily P&L move together
@@ -467,6 +471,63 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
       );
     },
   );
+
+  // --- rotation explain ---
+  // "Why this pick?" and "Does rank predict results?": read-only, params whitelisted and
+  // validated here, ranges checked again by the Python side.
+  const ROTATION_LIST = { type: 'string', enum: ['A', 'B', 'C', 'REF'] } as const;
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/explain',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            day: { type: 'string', pattern: DATE_RE },
+            list: ROTATION_LIST,
+            top: { type: 'string', pattern: '^\\d{1,2}$' },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/explain${upstreamQuery(q, ['day', 'list', 'top'])}`,
+      );
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/ic',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', pattern: DATE_RE },
+            to: { type: 'string', pattern: DATE_RE },
+            list: ROTATION_LIST,
+            mode: { type: 'string', enum: ['forward', 'research'] },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/ic${upstreamQuery(q, ['from', 'to', 'list', 'mode'])}`,
+      );
+    },
+  );
+  // --- end rotation explain ---
 
   // Correlation (BL-090). Selectors are comma-separated tokens; the Python side matches them only
   // against enumerated strategy names. Numbers stay strings here so upstreamQuery forwards them
