@@ -46,6 +46,8 @@ def get_regime() -> Any:
         value = regime.build(root)
     except journal.JournalCorrupt as error:
         return _error(500, f"the journal cannot be read: {error}")
+    except (ValueError, KeyError, OSError) as error:  # a torn days.csv row, an unreadable file
+        return _error(500, f"the stored rotation files cannot be read: {error}")
     with _lock:
         _cache.update(at=now, root=root, value=value)
     return value

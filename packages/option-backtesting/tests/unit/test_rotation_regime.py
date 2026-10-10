@@ -7,8 +7,11 @@ the module never writes: checked by hashing every file before and after.
 
 from __future__ import annotations
 
+import csv
 import hashlib
+import os
 import shutil
+from collections import Counter
 from datetime import date
 from pathlib import Path
 
@@ -19,7 +22,7 @@ from trading_data import lake
 
 from option_backtesting.api import rotation_regime_routes
 from option_backtesting.api.app import create_app
-from option_backtesting.rotation import regime
+from option_backtesting.rotation import regime, store
 
 from . import rotation_synth as syn
 
@@ -208,3 +211,69 @@ def test_the_route_answers_and_nothing_is_written(world):
     assert [p["id"] for p in body["periods"]] == ["P1", "P2", "P3", "forward"]
     assert body["basis"] == "sessions" and "open" in body["range_definition"]
     assert _fingerprint(root) == before
+
+
+# --- review fixes ----------------------------------------------------------------------------
+
+
+def test_dte_labels_map_to_the_same_four_plus_bucket():
+    for raw in ("0", "1", "2", "3"):
+        assert regime._dte_key(raw) == raw
+    for raw in ("4", "5", "6", "7+", "10", "12+"):
+        assert regime._dte_key(raw) == "4+"
+    for raw in ("unknown", "", None, "x", "+"):
+        assert regime._dte_key(raw) == "unknown"
+
+
+def _rewrite_days(root: Path, change) -> None:
+    path = store.days_path(root)
+    with path.open() as f:
+        rows = list(csv.DictReader(f))
+    for r in rows:
+        change(r)
+    with path.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=store.DAY_COLUMNS)
+        w.writeheader()
+        w.writerows(rows)
+
+
+def test_the_weekday_comes_from_the_date_and_a_seven_plus_label_is_four_plus(world):
+    root, _ = world
+    base = regime.build(root)
+    p1_before = _period(base, "P1")
+    sixth = [d for d in store.read_days(root) if date(2025, 12, 3) <= d <= date(2026, 10, 8)]
+
+    def mess(r: dict) -> None:
+        r["weekday"] = "garbled"  # the stored text is not trusted for the weekday
+        if r["day"] == sixth[0].isoformat():
+            r["dte_n"] = "7+"
+
+    _rewrite_days(root, mess)
+    regime._range_cache.clear()
+    after = _period(regime.build(root), "P1")
+    want = Counter(d.strftime("%a") for d in sixth if d.weekday() < 5)
+    assert _mix(after, "weekday") == {k: want.get(k, 0) for k in regime.WEEKDAYS}
+    assert _mix(after, "dte_n")["unknown"] == 0
+    assert _mix(after, "dte_n")["4+"] >= _mix(p1_before, "dte_n")["4+"]
+
+
+def test_a_repaired_bar_file_is_re_read(world):
+    root, _ = world
+    day = date(2026, 10, 12)
+    _bars(root, "NIFTY", day, 100.0, 101.0, 99.0)  # 2 %
+    first = _period(regime.build(root), "forward")["range"]["NIFTY"]
+    assert first["p50"] == pytest.approx(2.0, abs=0.01)
+    path = lake.bars_1m_path(root, "index", "NIFTY", day)
+    old = path.stat()
+    _bars(root, "NIFTY", day, 100.0, 103.0, 99.0)  # repaired: 4 %
+    os.utime(path, ns=(old.st_atime_ns, old.st_mtime_ns + 5_000_000_000))
+    again = _period(regime.build(root), "forward")["range"]["NIFTY"]
+    assert again["p50"] == pytest.approx(4.0, abs=0.01)
+
+
+def test_a_torn_days_row_is_a_json_error_not_a_bare_500(world):
+    root, _ = world
+    path = store.days_path(root)
+    path.write_text(path.read_text() + "not-a-date,Mon,13,13-15,1,2\n")
+    r = TestClient(create_app(), raise_server_exceptions=False).get("/legwise/rotation/regime")
+    assert r.status_code == 500 and "cannot be read" in r.json()["error"]

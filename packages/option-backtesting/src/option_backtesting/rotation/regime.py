@@ -60,23 +60,26 @@ ROWS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 )
 
 _range_lock = threading.Lock()
-_range_cache: dict[tuple[str, str], dict[date, float | None]] = {}
+#: {(root, underlying): {day: ((mtime_ns, size), range)}}: a repaired file is re-read
+_range_cache: dict[tuple[str, str], dict[date, tuple[tuple[int, int], float | None]]] = {}
 
 
 def _dte_key(raw: object) -> str:
+    """0..3 as themselves; 4 or more (including score.dte_label's '7+') as '4+'."""
     text = str(raw).strip() if raw is not None else ""
-    if not text.isdigit():
+    digits = text[:-1] if text.endswith("+") else text
+    if not digits.isdigit():
         return "unknown"
-    return str(int(text)) if int(text) <= 3 else "4+"
+    return str(int(digits)) if int(digits) <= 3 and digits == text else "4+"
 
 
 def _key(row: str, value: object) -> str:
+    """The category a stored value belongs to; anything unreadable is 'unknown'. (The weekday is
+    not read from text at all: a session's weekday is its date's.)"""
     text = str(value).strip() if value is not None else ""
     if row == "vix_band":
         return text if text in VIX_LABELS else "unknown"
-    if row in ("dte_n", "dte_s"):
-        return _dte_key(value)
-    return text if text in WEEKDAYS else "other"
+    return _dte_key(value)
 
 
 def _number(raw: object) -> float | None:
@@ -90,26 +93,38 @@ def _number(raw: object) -> float | None:
 # --- the day range, read from the lake ----------------------------------------------------------
 
 
+def _signature(path: Path) -> tuple[int, int] | None:
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    return (st.st_mtime_ns, st.st_size)
+
+
 def day_ranges(root: Path, underlying: str, days: set[date]) -> dict[date, float | None]:
     """(high - low) / open x 100 over each day's 1-minute index bars. A day without a bar file is
-    absent; a file with no usable bars is None. Read once per day per process (the bars of a
-    closed session do not change), never written anywhere."""
+    absent; a file with no usable bars is None. Cached per process against the file's mtime and
+    size, so a day repaired by a later `obt daily` is re-read; never written anywhere."""
     key = (str(root), underlying)
+    sigs: dict[date, tuple[int, int]] = {}
+    for d in days:
+        sig = _signature(lake.bars_1m_path(root, "index", underlying, d))
+        if sig is not None:
+            sigs[d] = sig
     with _range_lock:
         have = _range_cache.setdefault(key, {})
-        missing = sorted(d for d in days if d not in have)
-    files = {d: lake.bars_1m_path(root, "index", underlying, d) for d in missing}
-    present = {d: p for d, p in files.items() if p.exists()}
+        stale = sorted(d for d, sig in sigs.items() if d not in have or have[d][0] != sig)
     got: dict[date, float | None] = {}
-    if present:
+    if stale:
+        paths = {d: lake.bars_1m_path(root, "index", underlying, d) for d in stale}
         con = duckdb.connect()
         try:
             try:
-                got = _read_ranges(con, list(present.values()))
+                got = _read_ranges(con, list(paths.values()))
             except duckdb.Error:
                 # one unreadable file (a torn write) must not blank every other day: read them
                 # one at a time and call the bad one "no usable bars"
-                for d, p in present.items():
+                for d, p in paths.items():
                     try:
                         got.update(_read_ranges(con, [p]))
                     except duckdb.Error:
@@ -117,10 +132,10 @@ def day_ranges(root: Path, underlying: str, days: set[date]) -> dict[date, float
         finally:
             con.close()
         with _range_lock:
-            for d in present:
-                have[d] = got.get(d)
+            for d in stale:
+                have[d] = (sigs[d], got.get(d))
     with _range_lock:
-        return {d: have[d] for d in days if d in have}
+        return {d: have[d][1] for d in sigs if d in have}
 
 
 def _read_ranges(con: duckdb.DuckDBPyConnection, paths: list[Path]) -> dict[date, float | None]:
@@ -152,7 +167,7 @@ def _period(
     lo: date | None,
     hi: date | None,
     rows: dict[date, dict],
-    root: Path,
+    ranges_by_index: dict[str, dict[date, float | None]],
 ) -> dict:
     """One period's mix from `rows` ({day: {weekday, vix_open, vix_band, dte_n, dte_s}})."""
     days = sorted(d for d in rows if d.weekday() < 5)
@@ -160,13 +175,13 @@ def _period(
     for key, _label, cats in ROWS:
         counts = dict.fromkeys(cats, 0)
         for d in days:
-            k = _key(key, rows[d].get(key))
+            k = d.strftime("%a") if key == "weekday" else _key(key, rows[d].get(key))
             counts[k if k in counts else cats[-1]] += 1
         mix[key] = {"categories": list(cats), "counts": [counts[c] for c in cats], "n": len(days)}
     vix = [v for d in days if (v := _number(rows[d].get("vix_open"))) is not None]
     ranges = {}
     for u in UNDERLYINGS:
-        got = day_ranges(root, u, set(days))
+        got = ranges_by_index[u]
         ranges[u] = _quantiles([v for d in days if (v := got.get(d)) is not None])
     return {
         "id": pid,
@@ -237,10 +252,17 @@ def build(root: Path | None = None) -> dict:
     root = root or data_dir()
     attrs = store.read_days(root)
     entries = journal.read(store.journal_path(root))
-    periods: list[dict] = []
-    for pid, (lo, hi, label) in NAMED.items():
-        rows = {d: a for d, a in attrs.items() if lo <= d <= hi}
-        periods.append(_period(pid, label, lo, hi, rows, root))
+    named = {
+        pid: (lo, hi, label, {d: a for d, a in attrs.items() if lo <= d <= hi})
+        for pid, (lo, hi, label) in NAMED.items()
+    }
+    forward_rows = _forward_rows(entries)
+    # every period's days, read once per index
+    wanted = {d for *_, rows in named.values() for d in rows} | set(forward_rows)
+    ranges = {u: day_ranges(root, u, {d for d in wanted if d.weekday() < 5}) for u in UNDERLYINGS}
+    periods = [
+        _period(pid, label, lo, hi, rows, ranges) for pid, (lo, hi, label, rows) in named.items()
+    ]
     periods.append(
         {
             "id": "P3",
@@ -255,7 +277,7 @@ def build(root: Path | None = None) -> dict:
             "range": None,
         }
     )
-    fwd = _period("forward", "Forward · recorded days", None, None, _forward_rows(entries), root)
+    fwd = _period("forward", "Forward · recorded days", None, None, forward_rows, ranges)
     if fwd["status"] == "empty":
         fwd["reason"] = "No on-time entry has been recorded yet (the first is Mon 12 Oct, 09:16)."
     periods.append(fwd)
