@@ -918,3 +918,15 @@ small decisions taken and logged.
   slightly positive (t ≤ 0.9). Looks taken and recorded: results by the level family that fired
   (D2 at 21 %): previous-day high / low did best (rejection +₹1,213 on 16, break +₹3,283 on 11),
   the opening range worst (−₹698 on 20, −₹997 on 17); samples too small to act on.
+- 2026-10-11 — Stage 2 run. 1,130 candidates (new highs from the hold) on 193 index-days; true tops
+  9.0 % (NIFTY 2025), 12.9 % (2022–24), 10.3 % (SENSEX). Of 32 parameters, one separates for NIFTY:
+  the 5-minute change of the ATM IV approximation (AUC 0.627 discover, p 0.020; 0.603 check; true
+  tops come after a sharper IV rise). SENSEX (weaker, within 2025): minutes of slowing (0.618 /
+  0.589) and Fin Nifty's 3-minute move with the trend (0.673 / 0.550). None of the breakdowns, far
+  options, OI, volume or level proximity separates. With 32 parameters tested per index, about 1–2
+  discovery passes are expected by chance; the check set is the guard. Second parameter among the
+  kept candidates: number of new highs so far (0.336, p 0.020; check 0.438). R1 = IV change ≥ 2.75 %
+  and at most 6 new highs, thresholds from 2022–24. R1 through the trading test (NIFTY, first spike
+  of the day): 2025 traded 35 of 54, −₹70 per traded spike at ₹650, −₹1,234 against the comparator
+  (t −3.6), below R0 (+₹372) and R3 (+₹846); 2022–24 +₹568, +₹185 against the comparator (t 0.6).
+  R1 does not pass. Stage 2 ends here as registered.
