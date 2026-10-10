@@ -35,6 +35,7 @@ import numpy as np
 from ..fyers.daily import data_dir
 from . import base as base_mod
 from . import daylog, history
+from .history import BAND_LABEL
 from .lists import LISTS
 from .matrix import NAMED
 from .readout import max_drawdown
@@ -49,12 +50,6 @@ MAX_MIN_DEPTH = 100_000.0
 BASE_LOTS = 6
 
 KIND_LABEL = {"wide": "Widesl", "dir": "Dir", "buy": "Buy"}
-BAND_LABEL = {
-    "A": "09:17–10:02",
-    "B": "10:17–12:02",
-    "C": "12:17–14:02",
-    "D": "14:17–15:17",
-}
 
 
 class DrawdownError(Exception):

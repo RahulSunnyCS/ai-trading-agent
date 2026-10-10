@@ -20,6 +20,8 @@ from . import daylog
 from .matrix import NAMED
 
 SPANS = ("P1", "P2", "recent")
+#: the start bands the family-band criterion pools by (`daylog.start_band`), as clock ranges
+BAND_LABEL = {"A": "09:17–10:02", "B": "10:17–12:02", "C": "12:17–14:02", "D": "14:17–15:17"}
 #: how long a built log is reused; the files change once a night and at 09:16
 LOG_SECONDS = 30.0
 _lock = threading.Lock()

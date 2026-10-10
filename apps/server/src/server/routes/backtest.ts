@@ -46,6 +46,8 @@
  *                                                 correlated over a window. requireAccess
  *  GET  /api/backtest/legwise/rotation/drawdowns — a list's drawdown episodes against the fixed base.
  *                                                 requireAccess
+ *  GET  /api/backtest/legwise/rotation/drift    — what a list has held, by family, index, strike method and
+ *                                                 start band, against its own past. requireAccess
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
  *  GET  /api/backtest/legwise/daily             — that run's state/log. requireAccess
@@ -742,6 +744,27 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation drawdowns ---
+
+  // --- rotation drift --- the Rotation page's "Selection drift" card (rotation/drift.py,
+  // read-only). Only the list is forwarded, as an enum.
+  fastify.get(
+    '/api/backtest/legwise/rotation/drift',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { list: { type: 'string', enum: ['A', 'B', 'C', 'REF'] } },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(reply, `/legwise/rotation/drift${upstreamQuery(q, ['list'])}`);
+    },
+  );
+  // --- end rotation drift ---
 
   // --- rotation matrix ---
   // The Strategy Matrix (packages/option-backtesting rotation/matrix.py). Read-only. Every value
