@@ -271,24 +271,6 @@ export function MomentumHeadline({
         ) : null}
         <BenchmarkPicker options={options} view={view} onPick={setBenchmark} />
       </div>
-      {warning ? (
-        <div
-          role="note"
-          className="mx-4 mt-3 flex items-start gap-2.5 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm sm:mx-5"
-        >
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
-          <div className="space-y-1">
-            <p className="font-medium text-foreground">{warning.headline}</p>
-            <p className="text-muted">{warning.detail}</p>
-            {warning.realismOff.length ? (
-              <p className="text-muted">
-                This run also ignores {warning.realismOff.join(' and ')}. On the default Broad
-                settings, turning both on takes about 13 points off the CAGR.
-              </p>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
       <div className="mt-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         <Headline
           label="CAGR"
@@ -337,21 +319,43 @@ export function MomentumHeadline({
           gap={ytd === null ? null : `YTD ${formatPct(ytd, 1, { sign: true })}`}
         />
       </div>
-      {trust ? (
-        <p
+      {warning || trust ? (
+        <div
           role="note"
-          className="border-t border-border bg-surface-2/50 px-4 py-2 text-xs text-muted sm:px-5"
+          className={cn(
+            'space-y-1 border-t px-4 py-2 text-xs text-muted sm:px-5',
+            // Amber only when this run left a realism switch off: that is the part to act on.
+            warning?.realismOff.length
+              ? 'border-warning/30 bg-warning/10'
+              : 'border-border bg-surface-2/50',
+          )}
         >
-          {trust}{' '}
-          <a
-            href={EVALUATION_REVIEW_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="underline underline-offset-2 hover:text-foreground"
-          >
-            Evaluation review
-          </a>
-        </p>
+          {warning ? (
+            <p>
+              <span className="font-medium text-foreground">{warning.headline}</span>{' '}
+              {warning.detail}
+            </p>
+          ) : null}
+          {warning?.realismOff.length ? (
+            <p>
+              This run also ignores {warning.realismOff.join(' and ')}. On the default Broad
+              settings, turning both on takes about 13 points off the CAGR.
+            </p>
+          ) : null}
+          {trust ? (
+            <p>
+              {trust}{' '}
+              <a
+                href={EVALUATION_REVIEW_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                Evaluation review
+              </a>
+            </p>
+          ) : null}
+        </div>
       ) : null}
       {view.replaced ? (
         <p className="border-t border-border bg-warning/10 px-4 py-1.5 text-xs text-muted sm:px-5">

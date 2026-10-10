@@ -61,12 +61,15 @@ It is computed for every Broad run that ranks by category; hover it for the defi
 still uses today's classification for every year, so it is closer to an expected return, not a
 point-in-time one.
 
-Below the cards, a short note says what the result is: an in-sample number from a search, with
-what the review measured for a typical config, the best of a search, and the four frozen
-configs on years nobody tuned on. The link opens the full
+Below the cards, one note says what the result is. It opens with the reminder that this CAGR is
+an upper bound, not an expected return, and why: for a point-in-time run only the 2026 themes are
+left to blame, for today's list the stock list too. Then comes the in-sample warning: what the
+review measured for a typical config, for the best of a search, and for the four frozen configs on
+years nobody tuned on. The link opens the full
 [evaluation review](https://github.com/RahulSunnyCS/ai-trading-agent/blob/main/packages/momentum-backtesting/docs/evaluation-review.md).
-The warning above the cards still says this CAGR is an upper bound; for a point-in-time run it
-no longer blames the stock list, only the 2026 themes.
+
+The note is calm grey. It turns amber only when the run left circuit locks or the tradability
+filter off, and then says what turning them on is worth, because that is the part you can act on.
 
 ## The equity chart
 

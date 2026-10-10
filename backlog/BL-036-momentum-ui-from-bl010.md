@@ -158,3 +158,9 @@ doing against its pre-set fail lines.
   have recorded every strategy's next re-run as a moved result; `saved_identity.same_result` ignores
   them. (3) The companion's text truncated to "With extended category ..." at a card width of 142 px;
   it now leads with the figure and wraps.
+- 2026-10-10 — owner: the amber upper-bound banner is merged into the trust note. One grey note
+  under the KPI cards now carries the upper-bound sentence and its universe-specific reason, the
+  in-sample sentence and the review link; it turns amber only when the run left circuit locks or the
+  tradability filter off. The banner stays until BL-074 puts the categories on NSE's classification.
+  A cold first run on a fresh API process took 88 s (ranking built from scratch, plus the companion
+  pass); the 27 s figure above was with a warm ranking cache.
