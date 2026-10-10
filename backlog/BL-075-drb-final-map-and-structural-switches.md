@@ -115,7 +115,25 @@ whatever it finds.
   it is above the random P90 in every period. Reported: the share of days its three strategies differ
   from each member's.
 - **Will not run:** other combinations, other aggregations (median, product).
-- **Result:** pending.
+- **Result (2026-10-10 15:10, gross; random P90 of each combined run in brackets):** **not worth a
+  separate journal list under the registered rule, but it behaves as a hedge: never the worst of the
+  three lists and never the best.**
+
+  | Period | A | B | C | Mean of A, B, C | **Combined A+B+C** | Max DD (combined) | ≥ P90 |
+  |---|---|---|---|---|---|---|---|
+  | P1 2025-12 → 2026-10 | 3,89,900 | 3,52,327 | 4,27,782 | 3,90,003 | **3,52,816** | −72,509 | yes (2,65,362) |
+  | P2 Jan–Aug 2025 | 3,18,652 | 3,51,201 | 2,98,124 | 3,22,659 | **3,37,046** | −67,738 | yes (2,91,083) |
+  | P3 2022-04 → 2024-10 | 12,20,482 | 12,39,935 | 11,58,525 | 12,06,314 | **12,30,836** | −68,042 | yes (8,76,076) |
+
+  - **Rule (gross ≥ the mean of A, B, C in every period):** passes P2 (+₹14,387) and P3 (+₹24,522), fails
+    P1 (−₹37,187). Not adopted as a fourth list.
+  - **Against the best list in each period:** 0.82 (P1, C), 0.96 (P2, B), 0.99 (P3, B). **Against the
+    worst:** at or above it in all three (P1 level with B, P2 and P3 above C). Drawdowns −72,509 /
+    −67,738 / −68,042: the middle of the three lists in each period, with no period deeper than −73k.
+  - So combining removes the choice between A, B and C rather than improving on them: the ensemble's
+    worst case is better than the average member's worst case and its best case is worse than the best
+    member's. The journal already records A, B and C separately, so the combination can be computed
+    afterwards from their picks if wanted; nothing is lost by not recording it.
 
 ## Log
 
@@ -123,3 +141,4 @@ whatever it finds.
 - 2026-10-10 — before any BL-075 result was read: rounding made explicit (largest remainder), so the cells (10, 0, baseline) and (0, 10, baseline) are exactly BL-073's 10/34/33/23 and BL-074 (a)'s 0/10/34/33/23. Regressions: P1 baseline ₹4,30,868 / P90 ₹2,70,198; P2 through `--window-to` ₹1,70,015 / P50 ₹1,98,170 / P90 ₹2,94,240 (identical to BL-071 part A). Stage 1 launched 12:21 IST, chained into stage 2.
 - 2026-10-10 — stage 1 done (13:05): 19 of 100 cells above chance everywhere, 0 robust; stage 2 running on those 19 cells.
 - 2026-10-10 — stage 2 done (13:50): no switch adopted. Stage 3 (shuffles on the top 10 cells) launched; journal lists A, B, C (all in the top 10) are fixed from stage 1.
+- 2026-10-10 — block 2 (combined A+B+C) ran: a hedge, not an improvement; not adopted.
