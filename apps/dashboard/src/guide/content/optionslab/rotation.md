@@ -37,6 +37,10 @@ composite score, and how many lists hold it. "Widesl min" marks a list where the
 least two Widesl strategies replaced a higher-ranked Dir pick. The line under the baskets says what
 changed since the entry before, which is the work list for re-setting AlgoTest by hand.
 
+**Family pulse.** Below the baskets: the twelve strategy-kind by start-band cells the ranking pools,
+with their recent gross per lot-day, the rank the ranking gives each, and where the lists' picks
+fall. See [the Family pulse](guide:optionslab/rotation-pulse).
+
 ## How to read it
 
 - **Gross only.** The stored costs are zero. Net figures need the charge model applied first.

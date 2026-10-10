@@ -10,6 +10,7 @@ import {
   canCompare,
   needsStrategy,
   slotLabel,
+  slotListLabel,
 } from '../../lib/rotationMatrixView';
 import type { MatrixListId, MatrixMeta, MatrixPeriodId } from '../../types/rotationMatrix';
 import { Card } from '../ui/Card';
@@ -241,6 +242,10 @@ export function RotationMatrixControls({
             aria-label="Start time"
           >
             <option value={ANY}>Any start time</option>
+            {f.slot.includes(',') ? (
+              // a band opened from the Rotation page's Family pulse: several start times at once
+              <option value={f.slot}>{slotListLabel(f.slot)}</option>
+            ) : null}
             {(meta?.slots ?? []).map((s) => (
               <option key={s} value={s}>
                 {slotLabel(s)}
