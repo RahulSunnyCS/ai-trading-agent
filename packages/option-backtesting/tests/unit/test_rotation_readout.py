@@ -219,7 +219,7 @@ def test_an_unscored_day_says_why_it_is_waiting(tmp_path):
     r = readout.build(tmp_path, runs=20)
     assert r["n_days"] == 0
     assert "Dir ATM 09:24" in r["pending_reasons"][d1.isoformat()]
-    assert "no result yet for" in r["pending_reasons"][d2.isoformat()]
+    assert "variants have no result" in r["pending_reasons"][d2.isoformat()]
     assert "waiting:" in readout.render(r)
 
 
@@ -271,3 +271,164 @@ def test_the_readout_carries_daily_totals_the_base_total_and_the_random_band(tmp
     assert len(a["p50"]) == 5 and a["p10"][-1] <= a["p50"][-1] <= a["p90"][-1]
     assert r["days"][0]["A_total"] == pytest.approx(2 * 300.0)
     assert r["days"][-1]["base_total"] == pytest.approx(2 * 3 * 100.0)
+
+
+# --- review fixes: the registered settings, the pass rule, partial days, the chain ---------------
+
+
+def _forward(root, n=12, value=lambda name, d: 100.0):
+    days = [
+        d for d in (date(2026, 10, 12) + timedelta(days=i) for i in range(40)) if d.weekday() < 5
+    ][:n]
+    _seed(root, value, days=days)
+    _write(root, base.DIR_NAME, {d: 0.0 for d in days}, where="base")
+    return days
+
+
+def test_the_bootstrap_settings_are_pinned_by_golden_values():
+    # 2,000 circular 5-day blocks, seed 20261012, 90% percentile interval. These numbers were
+    # checked against an explicit-loop implementation; a changed seed, level, block or wrap moves them.
+    x = np.array([50.0, 40.0, 60.0, 55.0, 45.0, 52.0, 48.0, 58.0, 44.0, 51.0, 47.0, 53.0])
+    assert readout.block_bootstrap_mean(x) == pytest.approx((50.25, 49.0, 51.5875))
+    y = np.array(
+        [120.0, -80.0, 300.0, -40.0, 90.0, 10.0, -150.0, 260.0, 40.0, -20.0, 75.0, 5.0, 180.0]
+    )
+    assert readout.block_bootstrap_mean(y) == pytest.approx(
+        (60.76923076923077, 36.92307692307692, 85.38461538461539)
+    )
+    assert (readout.BOOT_RESAMPLES, readout.BOOT_BLOCK, readout.BOOT_SEED, readout.BOOT_LEVEL) == (
+        2000, 5, 20261012, 0.9,
+    )  # fmt: skip
+
+
+def test_a_one_day_series_never_passes(tmp_path):
+    d = DAYS[0]
+    _seed(tmp_path, lambda n, day: 500.0, days=[d])
+    _write(tmp_path, base.DIR_NAME, {d: 0.0}, where="base")
+    core = ["N_wide_0932", "N_wide_1017", "N_dir_0947"]
+    _entry(tmp_path, d, _all_lists(core))
+    a = readout.build(tmp_path, runs=20)["lists"]["A"]["vs_base"]
+    assert a["lower"] > 0  # the interval of one day is the day...
+    assert a["beats_base"] is False  # ...and a window too short to read cannot pass
+
+
+def test_a_better_mean_with_a_worse_drawdown_does_not_beat_the_base(tmp_path):
+    days = _forward(tmp_path)
+    # base earns 0 per lot every day (drawdown 0); list A earns +500 except two -100 days
+    bad = {days[3], days[7]}
+    for n in ("N_wide_0932", "N_wide_1017", "N_dir_0947"):
+        _write(tmp_path, n, {d: (-100.0 if d in bad else 500.0) for d in days})
+    _write(tmp_path, base.WIDE_NAME, {d: 0.0 for d in days})
+    for d in days:
+        _entry(tmp_path, d, _all_lists(["N_wide_0932", "N_wide_1017", "N_dir_0947"]))
+    a = readout.build(tmp_path, runs=20)["lists"]["A"]["vs_base"]
+    assert a["lower"] > 0
+    assert a["drawdown_no_worse"] is False
+    assert a["beats_base"] is False
+
+
+def test_beating_random_points_the_right_way(tmp_path):
+    days = _forward(tmp_path, n=10, value=lambda n, d: 0.0)
+    hi, lo = (
+        ["N_wide_0932", "N_wide_1017", "N_dir_0947"],
+        ["S_wide_1002", "S_wide_1017", "S_dir_0947"],
+    )
+    for n in hi:
+        _write(tmp_path, n, {d: 1000.0 for d in days})
+    for n in lo:
+        _write(tmp_path, n, {d: -1000.0 for d in days})
+    for d in days:
+        _entry(tmp_path, d, {"A": hi, "B": lo, "C": hi, "REF": lo})
+    r = readout.build(tmp_path, runs=200)["lists"]
+    assert r["A"]["beats_random_pct"] > 95
+    assert r["B"]["beats_random_pct"] < 5
+    assert r["A"]["mean_daily_random_percentile"] > 90
+
+
+def test_the_buy_add_on_is_added_only_on_a_list_s_own_buy_days(tmp_path):
+    days = _forward(tmp_path, n=10, value=lambda n, d: 5000.0 if "buy" in n else 0.0)
+    core = ["N_wide_0932", "N_wide_1017", "N_dir_0947"]
+    for d in days:
+        _entry(tmp_path, d, _all_lists(core), buy={"A": ["N_buy_0932"]})
+    r = readout.build(tmp_path, runs=100)["lists"]
+    # a random Buy is worth 5,000 x 2 lots on A's 10 buy days and nothing on B's: the baskets differ by 100k
+    assert r["A"]["random"]["p50"] - r["B"]["random"]["p50"] == pytest.approx(100_000, abs=1)
+
+
+def test_vs_ref_and_vs_base_are_different_comparisons(tmp_path):
+    days = _forward(tmp_path, n=12, value=lambda n, d: 0.0)
+    for n, v in (("N_wide_0932", 300.0), ("N_wide_1017", 300.0), ("N_dir_0947", 300.0)):
+        _write(tmp_path, n, {d: v for d in days})
+    for n in ("S_wide_0917", "S_dir_0947"):
+        _write(tmp_path, n, {d: 100.0 for d in days})
+    _write(tmp_path, "N_wide_0947", {d: 100.0 for d in days})
+    for d in days:
+        _entry(
+            tmp_path,
+            d,
+            {
+                "A": ["N_wide_0932", "N_wide_1017", "N_dir_0947"],
+                "B": ["N_wide_0932", "N_wide_1017", "N_dir_0947"],
+                "C": ["N_wide_0932", "N_wide_1017", "N_dir_0947"],
+                "REF": ["N_wide_0947", "S_wide_0917", "S_dir_0947"],
+            },
+        )
+    a = readout.build(tmp_path, runs=20)["lists"]["A"]
+    assert a["vs_base"]["mean"] == pytest.approx(300.0)  # base earns 0
+    assert a["vs_ref"]["mean"] == pytest.approx(200.0)  # REF earns 100
+
+
+def test_a_tampered_journal_is_reported_in_the_readout(tmp_path):
+    days = _forward(tmp_path, n=3)
+    for d in days:
+        _entry(tmp_path, d, _all_lists(["N_wide_0932", "N_wide_1017", "N_dir_0947"]))
+    path = store.journal_path(tmp_path)
+    path.write_text(path.read_text().replace('"weekday": "Mon"', '"weekday": "Fri"', 1))
+    r = readout.build(tmp_path, runs=20)
+    assert r["chain"]["intact"] is False and r["chain"]["problems"]
+    assert "CHAIN BROKEN" in readout.render(r)
+
+
+def test_a_partly_stored_day_is_not_scored(tmp_path):
+    days = _forward(tmp_path, n=3)
+    # one variant the picks do not use has no result on the last day: the random pool would shrink
+    _write(tmp_path, "S_buy_1102", {d: 100.0 for d in days[:-1]})
+    for d in days:
+        _entry(tmp_path, d, _all_lists(["N_wide_0932", "N_wide_1017", "N_dir_0947"]))
+    r = readout.build(tmp_path, runs=20)
+    assert r["n_days"] == 2
+    assert "variants have no result" in r["pending_reasons"][days[-1].isoformat()]
+
+
+def test_the_registered_window_is_marked_and_can_be_asked_for(tmp_path, monkeypatch):
+    days = _forward(tmp_path, n=6)
+    for d in days:
+        _entry(tmp_path, d, _all_lists(["N_wide_0932", "N_wide_1017", "N_dir_0947"]))
+    monkeypatch.setattr(readout, "READOUT_DAYS", 4)
+    all_ = readout.build(tmp_path, runs=20)
+    assert all_["n_days"] == 6 and all_["past_readout"] is True
+    assert "past the registered read-out" in readout.render(all_)
+    first = readout.build(tmp_path, runs=20, first_n=4)
+    assert first["n_days"] == 4 and first["last_day"] == days[3].isoformat()
+    assert first["past_readout"] is False
+
+
+def test_the_random_draw_refuses_an_impossible_pool_instead_of_hanging():
+    pool = np.array([1.0, 2.0, 3.0, 4.0])
+    with pytest.raises(ValueError, match="not enough"):
+        readout.random_day(DAYS[0], pool, np.array([True, False, False, False]), np.array([1.0]))
+    with pytest.raises(ValueError, match="not enough"):
+        readout.random_day(DAYS[0], pool[:2], np.array([True, True]), np.array([1.0]))
+    core, buy = readout.random_day(  # no Buy variant at all: zeros, not a crash
+        DAYS[0], pool, np.array([True, True, False, False]), np.array([]), runs=5
+    )
+    assert buy.tolist() == [0.0] * 5 and core.shape == (5,)
+
+
+def test_the_base_file_is_pinned_and_a_changed_one_is_refused(tmp_path, monkeypatch):
+    assert base.file_sha256(base.BASE_DIR / f"{base.DIR_NAME}.yaml") == base.BASE_YAML_SHA256
+    monkeypatch.setattr(base, "BASE_YAML_SHA256", "0" * 64)
+    lines: list[str] = []
+    out = base.score_days([DAYS[0]], root=tmp_path, log=lines.append)
+    assert out["written"] == 0 and "REFUSED" in lines[0]
+    assert base.dir_days(tmp_path) == set()

@@ -13,6 +13,7 @@ results W and D; holding each strategy at 2 lots changes nothing there.
 from __future__ import annotations
 
 import csv
+import hashlib
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
@@ -31,6 +32,13 @@ DIR_NAME = "N_dir_atm_0924"
 WIDE_NAME = "N_wide_0917"  # a rotation variant: its results are already stored nightly
 N_WIDE, N_DIR = 2, 1
 BASE_LOTS = N_WIDE + N_DIR  # one-lot strategies in the base
+#: The registered file, byte for byte (BL-058 amendment 2026-10-10). The base must not drift: a
+#: changed file is a different strategy, so scoring refuses it instead of mixing the two.
+BASE_YAML_SHA256 = "0369c2afee0ff4f6fbd7bf09a9e804b82acbb81c469476a796e33f1535d57b39"
+
+
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def base_dir(root: Path | None = None) -> Path:
@@ -100,7 +108,12 @@ def score_days(
     base has no SENSEX leg. A day the lake cannot serve is skipped and reported, not zero-filled."""
     root = root or data_dir()
     out: dict = {"written": 0, "already": 0, "skipped": []}
-    strategy = load_legwise(BASE_DIR / f"{DIR_NAME}.yaml")
+    path = BASE_DIR / f"{DIR_NAME}.yaml"
+    if file_sha256(path) != BASE_YAML_SHA256:
+        out["skipped"] = [f"{d}: {path.name} differs from the registered base file" for d in days]
+        log(f"base Dir ATM 09:24: REFUSED, {path.name} is not the registered file")
+        return out
+    strategy = load_legwise(path)
     reference = default_reference_data()
     sizing = date.fromisoformat(SIZING_DATE)
     have = dir_days(root)
