@@ -25,6 +25,12 @@
  *  GET  /api/backtest/legwise/day               — re-simulate one saved day (MTM curve, markers,
  *                                                  per-leg attribution). requireAccess
  *  GET  /api/backtest/legwise/anatomy           — per-day, per-segment index shape. requireAccess
+ *  GET  /api/backtest/legwise/correlation/available — strategies with daily results + picker groups.
+ *                                                  requireAccess
+ *  GET  /api/backtest/legwise/correlation       — how the chosen strategies' daily P&L move together
+ *                                                 (matrices, basket drawdown, drift). requireAccess
+ *  GET  /api/backtest/legwise/correlation/pick  — a basket under a correlation cap (in-sample).
+ *                                                 requireAccess
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
  *  GET  /api/backtest/legwise/daily             — that run's state/log. requireAccess
@@ -456,6 +462,82 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
       await forwardToBacktestApi(
         reply,
         `/legwise/anatomy${upstreamQuery(q, ['underlying', 'from', 'to', 'cuts'])}`,
+      );
+    },
+  );
+
+  // Correlation (BL-090). Selectors are comma-separated tokens; the Python side matches them only
+  // against enumerated strategy names. Numbers stay strings here so upstreamQuery forwards them
+  // as given; Python validates the ranges.
+  const SELECTORS_RE = '^[A-Za-z0-9_:*?.+,\\[\\]-]{1,400}$';
+  const CORRELATION_QUERY = {
+    selectors: { type: 'string', pattern: SELECTORS_RE },
+    from: { type: 'string', pattern: DATE_RE },
+    to: { type: 'string', pattern: DATE_RE },
+    include_stale: { type: 'string', enum: ['true', 'false'] },
+  } as const;
+
+  fastify.get(
+    '/api/backtest/legwise/correlation/available',
+    { preHandler: requireAccess },
+    async (_req, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/correlation/available');
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/correlation',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { ...CORRELATION_QUERY, window: { type: 'string', pattern: '^\\d{1,3}$' } },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/correlation${upstreamQuery(q, ['selectors', 'from', 'to', 'window', 'include_stale'])}`,
+      );
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/correlation/pick',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            ...CORRELATION_QUERY,
+            k: { type: 'string', pattern: '^\\d{1,2}$' },
+            max_corr: { type: 'string', pattern: '^-?\\d(\\.\\d{1,3})?$' },
+            measure: { type: 'string', enum: ['pearson', 'spearman', 'loss'] },
+            require: { type: 'string', pattern: '^[A-Za-z0-9_.,-]{1,400}$' },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/correlation/pick${upstreamQuery(q, [
+          'selectors',
+          'from',
+          'to',
+          'include_stale',
+          'k',
+          'max_corr',
+          'measure',
+          'require',
+        ])}`,
       );
     },
   );

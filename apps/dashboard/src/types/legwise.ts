@@ -218,3 +218,112 @@ export interface DayForensics {
   cuts: { ts: number; t: string }[];
   anatomy: DayAnatomy | null;
 }
+
+// ---------------------------------------------------------------------------
+// Correlation (BL-090): GET /legwise/correlation, /available, /pick
+// ---------------------------------------------------------------------------
+
+export type CorrelationMeasure = 'pearson' | 'spearman' | 'loss';
+
+export interface CorrelationStrategy {
+  name: string;
+  /** 'variant' = a rotation variant file; 'legwise' = a saved leg-wise strategy. */
+  kind: 'variant' | 'legwise';
+  index: string | null;
+  family: string | null;
+  slot: string | null;
+  first: string;
+  last: string;
+  n_days: number;
+  /** Its file changed since these results were saved. */
+  stale: boolean;
+}
+
+export interface CorrelationGroups {
+  slot: Record<string, number>;
+  family: Record<string, number>;
+  index: Record<string, number>;
+  kind: Record<string, number>;
+}
+
+export interface CorrelationAvailable {
+  strategies: CorrelationStrategy[];
+  groups: CorrelationGroups;
+  max_strategies: number;
+  default_selectors: string[];
+}
+
+export interface CorrelationPartStats {
+  net: number;
+  max_dd: number;
+  worst_day: number;
+  loss_day_share: number;
+  mean_over_std: number | null;
+}
+
+export interface CorrelationBasketStats {
+  names: string[];
+  net: number;
+  max_dd: number;
+  worst_day: number;
+  loss_day_share: number;
+  sum_of_part_dds: number;
+  /** max_dd / sum_of_part_dds; below 1 the basket draws down less than its parts added up. */
+  dd_ratio: number | null;
+  mean_over_std: number | null;
+}
+
+export interface CorrelationRollingRow {
+  start: string;
+  end: string;
+  n_days: number;
+  min: number | null;
+  mean: number | null;
+  max: number | null;
+  top_pair: [string, string, number] | null;
+}
+
+/** A k x k matrix; null where a correlation cannot be computed (a strategy that never varies). */
+export type CorrelationMatrix = (number | null)[][];
+
+export interface CorrelationResponse {
+  names: string[];
+  kinds: string[];
+  days: string[];
+  n_days: number;
+  window: number;
+  /** Leaf order that puts strategies that move together next to each other. */
+  order: number[];
+  pearson: CorrelationMatrix;
+  spearman: CorrelationMatrix;
+  /** [i][j] = share of the days i lost on which j lost too (not symmetric). */
+  loss_overlap: CorrelationMatrix;
+  loss_corr: CorrelationMatrix;
+  both_lose_days: number[][];
+  parts: Record<string, CorrelationPartStats>;
+  basket: CorrelationBasketStats;
+  rolling: CorrelationRollingRow[];
+  selectors: string[];
+  from: string | null;
+  to: string | null;
+  stale: string[];
+  in_sample: boolean;
+}
+
+export interface CorrelationPick {
+  names: string[];
+  wanted: number;
+  cap: number;
+  measure: CorrelationMeasure;
+  short: boolean;
+  in_sample: boolean;
+  /** [skipped name, the kept name that blocked it, their correlation]. */
+  skipped: [string, string, number | null][];
+  stats: CorrelationBasketStats;
+  uncapped: CorrelationBasketStats;
+  selectors: string[];
+  n_days: number;
+  from: string;
+  to: string;
+  candidates: number;
+}

@@ -620,6 +620,18 @@ The plan and the owner's decisions live in the backlog item; this table only tra
 | 3.23.3 | Point-in-time categories from NSE Basic Industry — [BL-074](backlog/BL-074-point-in-time-categories-nse-basic-industry.md) | claude | Planned: starts after 3.23.1 merges; first check is delisted-company coverage |
 | 3.23.4 | Phases 2–4: execution realism, follow the frozen four, optional | claude | Planned; Phase 3 waits for the owner's paper-tracking decision (BL-010) |
 
+### 3.24 Strategy correlation and diverse baskets — [BL-090](backlog/BL-090-strategy-correlation-and-diverse-baskets.md)
+
+Owner (2026-10-10): a basket should not hold look-alike strategies; measure it, find new strategies without a
+code change, show it in the UI later.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.24.1 | Phase 1: `obt rotation corr` / `corr-list` (Pearson, Spearman, loss-day overlap, basket drawdown, rolling drift; variants and live legwise strategies found by enumeration) | claude | **Built 2026-10-10** (`analytics/correlation.py`, `rotation/series.py`, 23 tests). First read in the BL-090 Log |
+| 3.24.2 | Phase 2: `obt rotation corr-pick` (greedy basket under a correlation cap, shown against the uncapped top-k) | claude | **Built 2026-10-10.** Diagnostic only, in-sample |
+| 3.24.3 | Phase 3: does a trailing-correlation cap cut the lists' drawdown? | claude | **Pre-registered, not run.** Judge on the forward journal from 2026-10-12 after at least 60 trading days |
+| 3.24.4 | `GET /legwise/correlation*` and an Options Lab › Correlation heatmap | claude | **Built 2026-10-10.** Three Python routes, three proxy routes, the tab (heatmap, pair readout, strategy table, basket builder, drift chart) and its Guide page; checked on live data at desktop and phone width |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

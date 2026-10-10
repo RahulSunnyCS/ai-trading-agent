@@ -244,6 +244,30 @@ def load_daily(con: duckdb.DuckDBPyConnection, day: date | None = None) -> list[
     ]
 
 
+def load_daily_net(
+    con: duckdb.DuckDBPyConnection, strategy_id: str | None = None
+) -> dict[tuple[str, str], dict[date, float]]:
+    """{(strategy_id, spec_hash): {day: net}} of the saved daily results: net P&L only, no trades
+    (`load_daily` loads every trade of every day and cannot filter by strategy)."""
+    where = "AND v.strategy_id = ?" if strategy_id else ""
+    rows = con.execute(
+        f"""
+        SELECT v.strategy_id, v.spec_hash, d.day, d.net
+        FROM backtest_runs r
+        JOIN strategy_versions v USING (version_id)
+        JOIN strategies s ON s.strategy_id = v.strategy_id
+        JOIN backtest_days d USING (run_id)
+        WHERE r.kind = 'daily' AND s.package = '{PACKAGE}' {where}
+        ORDER BY v.strategy_id, v.spec_hash, d.day
+        """,
+        [strategy_id] if strategy_id else [],
+    ).fetchall()
+    out: dict[tuple[str, str], dict[date, float]] = {}
+    for sid, sha, day, net in rows:
+        out.setdefault((sid, sha), {})[day] = float(net)
+    return out
+
+
 def record(result: DayResult, strategy: LegwiseStrategy) -> dict:
     """The same record shape, straight from an in-memory result (no round trip)."""
     return {
