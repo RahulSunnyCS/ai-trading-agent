@@ -55,6 +55,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-060](BL-060-sensex-widesl-closest-premium.md) | SENSEX Widesl by closest premium (₹250 and ₹320) across the whole day, beside the live OTM2 strike | P2 | Done: descriptive | research | options |
 | [BL-061](BL-061-rotation-with-closest-premium-widesl.md) | Daily rotation with closest-premium Widesl in the candidate list: their share of the 5 daily lots, and on which days | P2 | Done: descriptive | research | options |
 | [BL-057](BL-057-daily-four-criteria-rotation.md) | Daily four-criteria rotation (recent P&L, weekday, days-to-expiry, VIX fit) over the 66 NIFTY + SENSEX variants (POC) | P2 | Done: inconclusive | research | options |
+| [BL-088](BL-088-own-history-sector-relative-strength.md) | Sector scoring on its own relative strength: time-series RS (continuation and reversal) as a replace or tilt on the ETF rotation, then Broad's category layer | P2 | Idea | research | momentum |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
