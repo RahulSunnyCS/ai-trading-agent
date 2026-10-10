@@ -164,3 +164,11 @@ BL-036 Phase 1: every category-mode Broad result carries the extended-tags compa
 | broad_eight_categories_one_pick | 26.32% -> 26.32% | -27.29% -> -27.29% |
 | broad_gates_loosened_and_tilted | 9.34% -> 9.34% | -27.78% -> -27.78% |
 | broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 13.94% | -18.09% -> -18.09% |
+
+## 2026-10-10 (on top of `d35ef38`)
+
+BL-036 companion on the All Fridays scenario: the extended-tags figure is the whole account's (every sleeve re-run with the extended tags and blended); same field main accepted for the six other Broad scenarios, no CAGR, drawdown or trade moved
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_one_category_three_picks_four_weekly_all_fridays | 17.88% -> 17.88% | -35.50% -> -35.50% |
