@@ -127,9 +127,10 @@ def score_days(
             root,
         )
         out["written"] += 1
+    first = f"; first: {out['skipped'][0]}" if out["skipped"] else ""
     log(
         f"base Dir ATM 09:24: {out['written']} written, {out['already']} already there, "
-        f"{len(out['skipped'])} skipped"
+        f"{len(out['skipped'])} skipped{first}"
     )
     return out
 

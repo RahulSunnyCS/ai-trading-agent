@@ -129,8 +129,19 @@ def build(
     for e in entries:
         day = date.fromisoformat(e["day"])
         picks = {k: p["core"] + p["buy"] for k, p in e["lists"].items()}
-        have_all = all(day in gross[n] for ps in picks.values() for n in ps) and day in base_pl
-        (scored if have_all else pending).append({"day": day, "entry": e, "picks": picks})
+        lacking = sorted({n for ps in picks.values() for n in ps if day not in gross[n]})
+        if lacking:
+            why = f"no result yet for {', '.join(lacking[:4])}" + (
+                "..." if len(lacking) > 4 else ""
+            )
+        elif day not in base_pl:
+            why = "the base's Dir ATM 09:24 leg is not scored yet (obt rotation base --backfill)"
+        else:
+            why = ""
+        if why:
+            pending.append({"day": day, "why": why})
+        else:
+            scored.append({"day": day, "entry": e, "picks": picks})
 
     keys = list(LISTS)
     days = [s["day"] for s in scored]
@@ -149,6 +160,7 @@ def build(
         "first_day": days[0].isoformat() if days else None,
         "last_day": days[-1].isoformat() if days else None,
         "pending_days": [p["day"].isoformat() for p in pending],
+        "pending_reasons": {p["day"].isoformat(): p["why"] for p in pending},
         "late_entries": late,
         "short": len(days) < MIN_DAYS_FOR_INTERVAL,
         "lists": {},
@@ -252,8 +264,8 @@ def render(r: dict) -> str:
     """The read-out as text for `obt rotation readout`."""
     if not r["n_days"]:
         lines = ["no scored forward days yet"]
-        if r["pending_days"]:
-            lines.append(f"waiting on results: {', '.join(r['pending_days'])}")
+        for day, why in r["pending_reasons"].items():
+            lines.append(f"waiting: {day}: {why}")
         return "\n".join(lines)
     s = r["settings"]
     lines = [
@@ -288,8 +300,8 @@ def render(r: dict) -> str:
             f"{'YES' if vb['beats_base'] else 'no'}"
             f"{'' if vb['drawdown_no_worse'] else ' (drawdown worse)'}"
         )
-    if r["pending_days"]:
-        lines.append(f"  waiting on results: {', '.join(r['pending_days'])}")
+    for day, why in r["pending_reasons"].items():
+        lines.append(f"  waiting: {day}: {why}")
     if r["late_entries"]:
         lines.append(f"  late entries excluded: {', '.join(r['late_entries'])}")
     return "\n".join(lines)

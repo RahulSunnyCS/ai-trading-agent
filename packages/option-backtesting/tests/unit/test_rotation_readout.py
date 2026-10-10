@@ -207,3 +207,50 @@ def test_a_buy_day_counts_its_two_lots_and_four_strategies(tmp_path):
     assert a["lots_per_day"] == 8
     assert a["total"] == pytest.approx(2 * (300 + 700))
     assert a["per_lot_day"] == pytest.approx((300 + 700) / 4)
+
+
+def test_an_unscored_day_says_why_it_is_waiting(tmp_path):
+    d1, d2 = DAYS[0], DAYS[1]
+    _seed(tmp_path, days=[d1])  # d1 has every variant; d2 has none
+    _write(tmp_path, base.DIR_NAME, {}, where="base")  # the Dir leg has no days at all
+    core = ["N_wide_0932", "N_wide_1017", "N_dir_0947"]
+    _entry(tmp_path, d1, _all_lists(core))
+    _entry(tmp_path, d2, _all_lists(core))
+    r = readout.build(tmp_path, runs=20)
+    assert r["n_days"] == 0
+    assert "Dir ATM 09:24" in r["pending_reasons"][d1.isoformat()]
+    assert "no result yet for" in r["pending_reasons"][d2.isoformat()]
+    assert "waiting:" in readout.render(r)
+
+
+def test_base_scoring_reports_the_first_error_instead_of_a_bare_count(tmp_path, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("lake unreadable")
+
+    monkeypatch.setattr(base, "load_day", boom)
+    lines: list[str] = []
+    out = base.score_days([DAYS[0]], root=tmp_path, log=lines.append)
+    assert out["written"] == 0 and len(out["skipped"]) == 1
+    assert "lake unreadable" in lines[0] and "1 skipped" in lines[0]
+
+
+def test_a_base_failure_never_fails_the_nightly_update(monkeypatch):
+    from typer.testing import CliRunner
+
+    from option_backtesting.rotation import cli, triggers, update
+
+    monkeypatch.setattr(update, "default_day", lambda *a, **k: DAYS[0])
+    monkeypatch.setattr(
+        update,
+        "update_day",
+        lambda *a, **k: {"written": 1, "already": 0, "skipped": None, "errors": []},
+    )
+    monkeypatch.setattr(triggers, "score_pending", lambda *a, **k: None)
+
+    def boom(*a, **k):
+        raise RuntimeError("base broke")
+
+    monkeypatch.setattr(base, "pending_days", boom)
+    result = CliRunner().invoke(cli.rotation_app, ["update"])
+    assert result.exit_code == 0
+    assert "base scoring skipped" in (result.output + (result.stderr or ""))
