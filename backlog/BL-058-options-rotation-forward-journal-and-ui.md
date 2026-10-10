@@ -188,6 +188,18 @@ equal-weight, live mix, lots per window.
   not be read. Data comes from `rotation/` files via new `/legwise/rotation/*` endpoints (the files are
   read-only to the API). Also a per-list "what changed since yesterday" strip (members swapped) for the
   effort of re-setting AlgoTest.
+- **Owner decisions for the view, 2026-10-10** (from the five-widget plan: rotation page with Today's baskets,
+  Why this pick? and rank correlation, Daily log, Strategy Matrix, Shadow scoreboard):
+  - Default benchmark on the headline strip: the **fixed base** (see the Phase 0b amendment); REF second,
+    the random-basket median third. Comparisons in ₹ per lot-day.
+  - Default focus list for the headline: **A**.
+  - The dashboard may write a **placement record** (placed / changed / not placed, with a note), append-only
+    to its own file under `rotation/`, behind the dashboard password; the hash-chained journal is never
+    edited.
+  - The 2022–24 results for the Strategy Matrix are imported **after** its first version, into a separate
+    read-only folder the morning pick never reads.
+  - Today's baskets and the other rotation screens are **owner-only** on the hosted dashboard until
+    showing daily picks to friends has been checked against the signal-sharing note in `business.md`.
 
 ### Phase 5 — Review at 60 trading days
 - Score once against the Phase 0 rule; write the Result here and in BL-057's Log.
@@ -226,7 +238,8 @@ Supersedes the 66-variant rule of Phase 0 for the forward test; Phase 0's discip
   and drawdowns per list.
 - **Evaluation point:** 60 trading days from 2026-10-12. Per list: gross, max drawdown, and the share
   of random same-shape picks it beats (cumulative), with REF as the comparator and a 5-day
-  block-bootstrap interval of each list minus REF. Weekly read-only reports; nothing changes.
+  block-bootstrap interval of each list minus REF (the owner's fixed base, amended below, is now the
+  primary reference and REF the second). Weekly read-only reports; nothing changes.
 - **Will not:** change a list's weights, add a list, drop one, or switch the rule after seeing
   results; start from a later date.
 - **Deviation from Phase 1–2 as written:** the journal is a hash-chained JSONL file, not a catalog
@@ -235,10 +248,10 @@ Supersedes the 66-variant rule of Phase 0 for the forward test; Phase 0's discip
   `obt daily` unaffected. The variant YAMLs now live in `packages/option-backtesting/strategies/
   rotation/` (committed), not under `research/`.
 
-**Amendment 2026-10-10 (owner, before the first entry): a second reference, the fixed base.** REF answers
-"did the new weights beat the old rotation?". The owner's base answers the more basic question: does rotating
-at all beat the simple rule that would otherwise be traded? It is added beside REF; REF stays the registered
-comparator for its own question. Nothing in the lists, the ranking or the 298-variant universe changes.
+**Amendment 2026-10-10 (owner, before the first entry): the fixed base is the primary reference, REF the
+second.** The owner's base answers the basic question: does rotating at all beat the simple rule that would
+otherwise be traded? It is the default yardstick, reported first. REF stays registered as the second
+reference and answers "did the new weights beat the old rotation?". Nothing in the lists, the ranking or the 298-variant universe changes.
 
 - **Base:** 2 × NIFTY Widesl OTM1 at 09:17 + 1 × NIFTY Dir ATM at 09:24, every trading day, no ranking.
   - Widesl OTM1 09:17 is the rotation variant `N_wide_0917` (OTM1 strikes, ₹2,500 overall stop), identical
@@ -329,3 +342,7 @@ comparator for its own question. Nothing in the lists, the ranking or the 298-va
   90% lower bound of list minus base above zero with drawdown per lot no worse, no minimum size. Not yet
   built: the Dir ATM 09:24 file, the base's nightly scoring and its history run. Also not yet built, though
   registered above in Phase 0b: the daily random-pick percentile and the bootstrap itself.
+- 2026-10-10 — Owner: the fixed base is the **default** reference and REF the second (amendment heading
+  updated, before the first entry). View decisions recorded under Phase 4: base as headline benchmark, focus
+  list A, placement record allowed (append-only, separate file), 2022–24 matrix import after the first
+  version, rotation screens owner-only on the hosted dashboard.
