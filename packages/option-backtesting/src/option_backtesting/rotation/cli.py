@@ -142,6 +142,9 @@ def readout(
     start: str = typer.Option(None, "--from", help="First forward day."),
     end: str = typer.Option(None, "--to", help="Last forward day."),
     as_json: bool = typer.Option(False, "--json", help="The full read-out as JSON."),
+    first: int = typer.Option(
+        None, "--first", help="Only the first N scored sessions (60 = the registered read-out)."
+    ),
 ) -> None:
     """The registered 60-day read-out: per list, against REF, the base and random baskets."""
     import json
@@ -151,6 +154,7 @@ def readout(
     r = ro.build(
         start=date.fromisoformat(start) if start else None,
         end=date.fromisoformat(end) if end else None,
+        first_n=first,
     )
     typer.echo(json.dumps(r, indent=1) if as_json else ro.render(r))
 

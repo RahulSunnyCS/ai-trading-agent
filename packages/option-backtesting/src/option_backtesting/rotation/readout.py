@@ -35,6 +35,7 @@ BOOT_BLOCK = 5
 BOOT_SEED = 20261012
 BOOT_LEVEL = 0.90
 MIN_DAYS_FOR_INTERVAL = 10  # below this the interval is shown but flagged as too short to read
+READOUT_DAYS = 60  # the registered read-out point (BL-058 Phase 0b)
 
 
 def max_drawdown(daily: np.ndarray) -> float:
@@ -82,8 +83,13 @@ def random_day(
     the research did); `buy` is one random Buy variant, added by a list only on its Buy days. The
     generator is seeded by (RANDOM_SEED, day), so a day's draws do not depend on which other days
     are computed."""
-    rng = np.random.default_rng([RANDOM_SEED, day.toordinal()])
     m = pool.size
+    if m < 3 or int(pool_wide.sum()) < min_wide:
+        raise ValueError(
+            f"{day}: the pool has {m} strategies, {int(pool_wide.sum())} of them Widesl: "
+            f"not enough to draw 3 with at least {min_wide} Widesl"
+        )
+    rng = np.random.default_rng([RANDOM_SEED, day.toordinal()])
     core = np.empty(runs)
     todo = np.arange(runs)
     while todo.size:
@@ -92,7 +98,7 @@ def random_day(
         ok = pool_wide[ix].sum(axis=1) >= min_wide
         core[todo[ok]] = pool[ix[ok]].sum(axis=1)
         todo = todo[~ok]
-    buy = buy_pool[rng.integers(0, buy_pool.size, size=runs)]
+    buy = buy_pool[rng.integers(0, buy_pool.size, size=runs)] if buy_pool.size else np.zeros(runs)
     return core, buy
 
 
@@ -105,22 +111,25 @@ def build(
     start: date | None = None,
     end: date | None = None,
     runs: int = N_RUNS,
+    first_n: int | None = None,
 ) -> dict:
-    """The read-out over the forward entries (never a late one), as a plain dict."""
+    """The read-out over the forward entries (never a late one), as a plain dict.
+
+    `first_n` keeps only the first N scored sessions: `first_n=60` is the registered read-out even
+    when more days exist. Without it every scored session counts and `past_readout` says so."""
     root = root or data_dir()
     names = variant_names()
+    path = store.journal_path(root)
+    all_entries = journal.read(path)
+    chain_problems = journal.verify(path)
     entries = [
         e
-        for e in journal.read(store.journal_path(root))
+        for e in all_entries
         if e.get("before_first_entry", False)
         and (start is None or date.fromisoformat(e["day"]) >= start)
         and (end is None or date.fromisoformat(e["day"]) <= end)
     ]
-    late = [
-        e["day"]
-        for e in journal.read(store.journal_path(root))
-        if not e.get("before_first_entry", False)
-    ]
+    late = [e["day"] for e in all_entries if not e.get("before_first_entry", False)]
     gross = _grosses(names, root)
     base_pl = base_mod.base_per_lot(root, "gross")
 
@@ -129,10 +138,14 @@ def build(
     for e in entries:
         day = date.fromisoformat(e["day"])
         picks = {k: p["core"] + p["buy"] for k, p in e["lists"].items()}
-        lacking = sorted({n for ps in picks.values() for n in ps if day not in gross[n]})
-        if lacking:
-            why = f"no result yet for {', '.join(lacking[:4])}" + (
-                "..." if len(lacking) > 4 else ""
+        # a day counts only when every variant has its result: the random baskets draw from the
+        # whole universe, so a partly stored day would shrink the pool and move the percentile
+        missing_variants = [n for n in names if day not in gross[n]]
+        if missing_variants:
+            why = (
+                f"{len(missing_variants)} of {len(names)} variants have no result for this day "
+                f"(the nightly update has not finished or failed): "
+                f"{', '.join(missing_variants[:3])}{'...' if len(missing_variants) > 3 else ''}"
             )
         elif day not in base_pl:
             why = "the base's Dir ATM 09:24 leg is not scored yet (obt rotation base --backfill)"
@@ -142,6 +155,10 @@ def build(
             pending.append({"day": day, "why": why})
         else:
             scored.append({"day": day, "entry": e, "picks": picks})
+    scored.sort(key=lambda r: r["day"])
+    available = len(scored)
+    if first_n is not None:
+        scored = scored[:first_n]
 
     keys = list(LISTS)
     days = [s["day"] for s in scored]
@@ -157,6 +174,9 @@ def build(
             "basis": "gross",
         },
         "n_days": len(days),
+        "readout_days": READOUT_DAYS,
+        "past_readout": available > READOUT_DAYS and first_n is None,
+        "chain": {"intact": not chain_problems, "problems": chain_problems[:3]},
         "first_day": days[0].isoformat() if days else None,
         "last_day": days[-1].isoformat() if days else None,
         "pending_days": [p["day"].isoformat() for p in pending],
@@ -240,7 +260,8 @@ def build(
                 "lower": vs_base[1],
                 "upper": vs_base[2],
                 "drawdown_no_worse": bool(dd_lot >= base_dd),
-                "beats_base": bool(vs_base[1] > 0 and dd_lot >= base_dd),
+                # never a pass on a window too short to read: the interval of one day is the day
+                "beats_base": bool(vs_base[1] > 0 and dd_lot >= base_dd and not out["short"]),
             },
             "vs_ref": (
                 None
@@ -272,9 +293,17 @@ def render(r: dict) -> str:
         f"Forward read-out, {r['n_days']} scored days {r['first_day']} .. {r['last_day']} "
         f"({s['basis']}, {s['lots_per_strategy']} lots per strategy)",
     ]
+    if not r["chain"]["intact"]:
+        lines.append(f"  JOURNAL CHAIN BROKEN: {'; '.join(r['chain']['problems'])}")
     if r["short"]:
         lines.append(
-            f"  fewer than {MIN_DAYS_FOR_INTERVAL} days: intervals are shown but not readable yet"
+            f"  fewer than {MIN_DAYS_FOR_INTERVAL} days: intervals are shown but not readable, "
+            f"and no list can pass yet"
+        )
+    if r["past_readout"]:
+        lines.append(
+            f"  past the registered read-out ({r['readout_days']} sessions): these figures cover "
+            f"{r['n_days']}; `--first {r['readout_days']}` gives the registered read-out"
         )
     b = r["base"]
     lines.append(
