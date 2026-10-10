@@ -431,7 +431,7 @@ reference and answers "did the new weights beat the old rotation?". Nothing in t
   superseded by the matrix's own. **Not done:** the live launchd checkout is not synced (the rotation files
   there carry other sessions' uncommitted edits), so base scoring and the page reach the running stack only
   after the owner syncs or merges; no nightly scoring job yet for the BL-081 forward candidates.
-- 2026-10-11 — **Widgets 6–9 built (PRs #179, #180, #182, #183), widget 10 not.** Each PR was reviewed
+- 2026-10-11 — **Widgets 6–9 built (PRs #179, #180, #182, #183), widget 10 not; widget 11 (Family pulse, #181) finished.** Each PR was reviewed
   independently with inline comments, fixed and merged on green CI; nothing changed the journal, a list, a
   weight, the 298 universe, the base, `days.csv` or any stored result (owner's answer: no change to anything the
   scheduler runs). What differs from the plan above:
@@ -448,6 +448,14 @@ reference and answers "did the new weights beat the old rotation?". Nothing in t
     `rotation/history.py` keeps the built daily log for 30 s so a change of list or depth does not rebuild it.
   - **9. Selection drift** as written: a last-21 share is flagged only outside the list's own rolling-21 10th to
     90th percentile in P1.
+  - **11. Family pulse** (#181, written in the "top 5 widget" session): the 12 family-band cells with their
+    last 5 / 21 / 63, P1 and P2 means, rolling-21 sparkline, the rank the ranking gives each cell for the next
+    pick, where today's picks fall and a drift flag. It was reviewed there (Codex and an independent review,
+    ten findings, all fixed); this session re-ran its tests, checked its numbers on the real store against the
+    plan page's table (Dir 09:17–10:02 ₹676 last 21 and rank 1 of 12; Buy 14:17–15:17 rank 12 of 12), merged main
+    into it and merged it on green. Its drift flag uses the same rule form as the selection-drift card (a
+    last-21 value outside the 10th to 90th percentile of the rolling-21 values in P1, at least 10 windows),
+    applied to cell means instead of pick shares.
   - **10. Paper vs real is not built.** It needs the placement record (exists, from widget 3), the BL-063
     charge model applied to stored results (a change to the nightly update, not allowed in this run) and the
     contract-notes cutover (TODO §2). Until then there is no real figure to set against the paper one.
