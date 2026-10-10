@@ -155,6 +155,21 @@ Otherwise:
   displaced pick's stored result is pending, never zero), with the time-matched placebo Dir as its control line
   (BL-083's random-minute control is not in the trigger files, so it is reported `not_recorded`); and BL-081's two
   forward candidates returned `not_scored` with their definitions (no nightly scoring exists for them).
+- `rotation/matrix.py` + `api/rotation_matrix_routes.py` — the Options Lab's Matrix tab (the Strategy Matrix, read-only):
+  `GET /legwise/rotation/matrix` (views `family_slot` / `date_slot` / `dte_slot` / `vix_family` / `weekday_family` /
+  `pulse`; metrics `avg` / `win_rate` / `stop_rate` / `worst` / `selection`; periods P1, P2, P3 (returned as
+  `unavailable`: not in the store), `forward`, `custom`; `compare=P1,P2` returns both grids on one scale plus the
+  difference) and `GET /legwise/rotation/matrix/cell` (daily values, running total, pooled variants with their
+  settings). Reads `rotation/results/*.csv`, `days.csv` and the journal and writes nothing. Gross per ONE-lot
+  strategy-day, pooled as mean / rate / worst, never summed; `n` is distinct sessions, a cell under `min_n`
+  (default 20) is flagged `thin`, never hidden; a missing value is `missing` / `excluded` / `na`, never zero.
+  The selection overlay is journal entries only (late entries excluded from selection statistics); picks are never
+  reconstructed. Rows of `family_slot` are the 12 index x family tags found in the store (NIFTY wide / p80 / p100 /
+  dir / ditm1 / buy, SENSEX wide / p250 / p320 / dir / ditm1 / buy); `wide` is OTM1 on NIFTY and OTM2 on SENSEX,
+  read from the strategy file for the label. The loaded cube is cached on the files' size and mtime.
+  Saturday / Sunday sessions are left out and counted (`weekend_excluded`), as in `store.load_matrix`. A cell and its
+  drill-down both come from `pool_mask`, so they cannot disagree. The pulse is as of one day (period id `asof`),
+  its windows are the last N sessions that match the conditions, and `n_trades == 0` days are counted (`zt`), not dropped.
 - `analytics/correlation.py` — BL-090: Pearson / Spearman of strategies' daily 1-lot P&L, loss-day
   overlap and loss-day correlation, equal-lot basket drawdown against the sum of the parts, rolling
   drift, a leaf order that clusters look-alikes, and `pick_diverse` (a basket under a correlation cap).

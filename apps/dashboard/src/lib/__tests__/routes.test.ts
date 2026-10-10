@@ -75,6 +75,7 @@ describe('routes', () => {
     ['/optionslab/regimes', 'optionslab', ['regimes']],
     ['/optionslab/correlation', 'optionslab', ['correlation']],
     ['/optionslab/rotation', 'optionslab', ['rotation']],
+    ['/optionslab/matrix', 'optionslab', ['matrix']],
     ['/momentum', 'momentum', []],
     ['/momentum/backtest', 'momentum', ['backtest']],
     ['/momentum/backtest/etf', 'momentum', ['backtest', 'etf']],
@@ -163,6 +164,7 @@ describe('routes', () => {
       'regimes',
       'correlation',
       'rotation',
+      'matrix',
     ]);
   });
 
