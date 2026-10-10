@@ -632,6 +632,15 @@ code change, show it in the UI later.
 | 3.24.3 | Phase 3: does a trailing-correlation cap cut the lists' drawdown? | claude | **Pre-registered, not run.** Judge on the forward journal from 2026-10-12 after at least 60 trading days |
 | 3.24.4 | `GET /legwise/correlation*` and an Options Lab › Correlation heatmap | claude | **Built 2026-10-10.** Three Python routes, three proxy routes, the tab (heatmap, pair readout, strategy table, basket builder, drift chart) and its Guide page; checked on live data at desktop and phone width |
 
+### 3.25 Straddle premium exhaustion study — [BL-091](backlog/BL-091-straddle-premium-exhaustion-study.md)
+
+Owner (2026-10-10): learn from ≥ 25-point rises of the rolling ATM straddle when a stopped Widesl
+should be re-entered; P2 + P3 first, P1 once the rule is frozen.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.25.1 | Phase 1: episode census (≥ 25-point rises of the rolling ATM straddle) and the R0 re-entry replay on P2 + P3 | claude | **Running 2026-10-11** |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — evidence for the proposed Live premium-momentum view; useful before adding more signal parameters |
-| **Status** | Planned |
+| **Status** | In progress (Phase 1: episode census + R0 replay on P2 + P3; P1 unread) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
 | **Depends on** | BL-034 historical option/index/VIX coverage and quality; BL-083 (T3 as comparator, the straddle builder in `research/bl083/triggers.py`, and the nightly trigger scoring of PR #167 for any forward shadow) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.25.1 |
 
 ## Context
 
@@ -450,10 +450,14 @@ substance; these are the settings the start-time freeze will use unless the owne
    R-arm keep rule in item 6. The P1 verdict stands. No search over every combination. The result is reported as
    a win rate per rule with the number of attempts behind it, never as a confidence percentage, because
    parameters that agree often carry the same information and are not independent votes.
-8. **Assumption to confirm at start.** The wide sell that is re-entered is the OTM wide strangle of
-   the A / B / C lists, four lots, with the rupee stop on the whole position. Also to confirm: the
-   horizon for "decayed" versus "paused" (proposed: to 15:15 or the next 25-point rise, whichever
-   first) and the start of the day's observation window.
+8. **Confirmed by the owner (2026-10-10, at start).** The re-entered wide sell is **four Widesl
+   strategies = 4 OTM1 CE + 4 OTM1 PE** (OTM2 on SENSEX), each the live `N_wide_1202` /
+   `S_wide_1202` shape unchanged (115 % leg stops trailed 15/10, exit 15:28, 1 lot per leg) with an
+   MTM stop of **₹650 per strategy** ("I keep widesl as it is, with assume 650 as MTM SL"). One
+   strategy is simulated per attempt and its rupees are per strategy; ₹650 is 10 NIFTY points or 32.5
+   SENSEX points of combined premium at today's lots. The horizon for decayed versus paused is
+   **15:28**; observation starts **09:20**. Scope of the first run: the episode census and the R0
+   replay on P2 + P3 only; no parameter tables, no R1–R5, nothing on P1.
 
 ## Log
 
@@ -475,3 +479,16 @@ substance; these are the settings the start-time freeze will use unless the owne
   fixed (spliced series for episodes, reset for derivatives); stop restated as ₹2,000 on four lots
   with `lot_sizing: current`; R-arm keep rule given a floor, a bound and a time-matched comparator;
   C-arm rules assigned to stages.
+- 2026-10-11 — Phase 1 started: `research/bl091/` (periods, series, episodes, r0, census, replay_r0,
+  summarise, selfcheck) and `research/common/early_ref.py` committed before any run. Resolutions of
+  the episode wording, recorded as resolutions and not thresholds: (1) a decay is final at 15:28, or
+  earlier when a fresh ≥ 25-point rise starts from the pause's low without exceeding the old high (a
+  new high first means the episode resumed); (2) a third outcome `no_pause` for episodes that never
+  gave back 15 points; (3) both the minute of the high and the minute the 15-point give-back was
+  reached are recorded; (4) an episode starts at the last minute at its low; (5) a trigger at or
+  after 15:12 is counted but gets no attempt (entry would be 15:13 or later); (6) the spot path
+  after the high is `stalled` within one strike step, else `continued` or `reversed` against the
+  direction of the rise; (7) the horizon is the completed 15:28 bar, while the engine's 15:28 exit
+  fills at the 15:27 bar's close. Rupees reported at the engine's cost 0 and at an assumed ₹20 per
+  order. P1 and 2025-08-30 → 2025-12-02 are refused by `periods.assert_learning_day`; self-check 10
+  tests it.
