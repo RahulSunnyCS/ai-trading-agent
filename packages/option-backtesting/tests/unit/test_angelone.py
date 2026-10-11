@@ -281,3 +281,117 @@ def test_a_whole_day_goes_through_the_shared_collector(tmp_path, monkeypatch):
         [(source, status)] = con.execute("SELECT source, status FROM ingest_runs").fetchall()
     assert source == "angelone" and status in ("ok", "partial")
     assert (root / "raw" / "angelone").exists()
+
+
+def test_a_spaced_totp_secret_pads_from_the_cleaned_string():
+    # 16 base32 chars once spaces go; the raw length (19) used to add 5 stray "=".
+    assert auth.totp_now("JBSW Y3DP EHPK 3PXP", at=59) == auth.totp_now("JBSWY3DPEHPK3PXP", at=59)
+
+
+def test_a_network_failure_at_login_is_not_reported_as_a_credentials_problem():
+    def post(path, body, headers):
+        return 0, {"status": False, "message": "network: timed out"}
+
+    with pytest.raises(auth.AngelNetworkError, match="could not be reached"):
+        auth.login(CREDS, post=post, now=lambda: 10, sleep=lambda s: None)
+
+
+def test_a_bad_symboltoken_answer_does_not_stop_the_day():
+    def post(path, body, headers):
+        return 200, {"status": False, "errorcode": "AB1004", "message": "Invalid symboltoken"}
+
+    c = AngelClient(
+        auth.Session("jwt", "key"), min_interval_s=0, post=post, master_loader=lambda: MASTER
+    )
+    c.bind_contracts(CONTRACTS, [daily.UNDERLYINGS["NIFTY"]])
+    with pytest.raises(RuntimeError) as err:
+        c.minute_candles("NSE:NIFTY50-INDEX", DAY)
+    assert not isinstance(err.value, FyersCredentialsError)
+
+
+def test_an_unmapped_index_is_keyed_by_its_underlying_in_the_flags():
+    c = client_for(FakeSmartApi({}))
+    c.targets = {}
+    c.minute_candles("NSE:NIFTY50-INDEX", DAY)
+    assert c.flags["NIFTY"]["unmapped"] == 1
+
+
+def test_login_retries_a_network_failure_but_never_a_rejection():
+    calls = []
+
+    def flaky(path, body, headers):
+        calls.append(1)
+        if len(calls) < 3:
+            return 0, {"status": False, "message": "network: reset"}
+        return 200, {"status": True, "data": {"jwtToken": "jwt-1"}}
+
+    assert auth.login(CREDS, post=flaky, now=lambda: 10, sleep=lambda s: None).jwt == "jwt-1"
+    assert len(calls) == 3
+
+    rejected = []
+
+    def reject(path, body, headers):
+        rejected.append(1)
+        return 200, {"status": False, "errorcode": "AB1050", "message": "Invalid totp"}
+
+    with pytest.raises(auth.AngelCredentialsError):
+        auth.login(CREDS, post=reject, now=lambda: 10, sleep=lambda s: None)
+    assert len(rejected) == 1
+
+
+def test_a_gateway_error_at_login_is_not_a_credentials_problem():
+    def post(path, body, headers):
+        return 503, {"status": False, "message": "HTTP 503, not JSON"}
+
+    with pytest.raises(auth.AngelNetworkError, match="unavailable"):
+        auth.login(CREDS, post=post, now=lambda: 10, sleep=lambda s: None)
+
+
+def test_master_download_retries_then_reports_unavailable(monkeypatch):
+    import urllib.error
+
+    from option_backtesting.angelone import symbols
+
+    attempts = []
+
+    def boom(*args, **kwargs):
+        attempts.append(1)
+        raise urllib.error.URLError("down")
+
+    monkeypatch.setattr(symbols.urllib.request, "urlopen", boom)
+    with pytest.raises(auth.AngelNetworkError, match="master unavailable"):
+        symbols.download_master(attempts=3, pause_s=0, sleep=lambda s: None)
+    assert len(attempts) == 3
+
+
+def test_master_download_retries_a_truncated_body_and_a_dropped_read(monkeypatch):
+    import http.client
+    import io
+
+    from option_backtesting.angelone import symbols
+
+    answers = [http.client.IncompleteRead(b"[{"), io.BytesIO(b'[{"symbol": "X"'), io.BytesIO(b"[]")]
+
+    def fake(*args, **kwargs):
+        answer = answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    monkeypatch.setattr(symbols.urllib.request, "urlopen", fake)
+    assert symbols.download_master(attempts=3, pause_s=0, sleep=lambda s: None) == []
+
+
+def test_fallback_failure_keeps_the_fyers_login_hint(monkeypatch):
+    from option_backtesting.fyers.auth import FyersCredentialsError
+    from option_backtesting.legwise import evening
+
+    def collect(day, underlyings, *, source, **kwargs):
+        if source == "fyers":
+            raise FyersCredentialsError("Fyers token expired")
+        raise auth.AngelNetworkError("Angel One could not be reached: timed out")
+
+    monkeypatch.setattr(evening, "collect_detailed", collect)
+    with pytest.raises(auth.AngelNetworkError) as err:
+        evening.collect_with_fallback(DAY, ["NIFTY"], log=lambda m: None)
+    assert "Fyers login" in str(err.value) and "token expired" in str(err.value)

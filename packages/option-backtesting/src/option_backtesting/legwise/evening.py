@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from ..angelone.auth import AngelCredentialsError, AngelNetworkError
 from ..fyers.auth import FyersCredentialsError
 from ..fyers.daily import DEFAULT_MAX_EXTRA, DEFAULT_PREMIUM_FLOOR, UNDERLYINGS, data_dir
 from . import source as day_source
@@ -130,19 +131,22 @@ def collect_with_fallback(
     A Fyers token that is missing, expired or rejected raises FyersCredentialsError before any
     bar is written, and the same day is then collected from Angel One. When Fyers does work, any
     recent day that came from Angel One is repaired from it (`repair_from_fyers`)."""
-    from ..angelone.auth import AngelCredentialsError
-
     common = {"premium_floor": premium_floor, "max_extra": max_extra, "log": log}
     try:
         errors, details = collect_detailed(day, underlyings, force=force, source="fyers", **common)
-    except AngelCredentialsError:
-        raise
     except FyersCredentialsError as error:
         reason = str(error)[:160]
         log(f"Fyers is not available ({reason}); collecting from Angel One instead")
-        errors, details = collect_detailed(
-            day, underlyings, force=force, source="angelone", **common
-        )
+        try:
+            errors, details = collect_detailed(
+                day, underlyings, force=force, source="angelone", **common
+            )
+        except (AngelCredentialsError, AngelNetworkError) as fallback:
+            # Keep the Fyers reason: logging in to Fyers is the fix the owner can make, and the
+            # alert only says so when the message names the Fyers login.
+            raise type(fallback)(
+                f"Fyers login needed ({reason}); Angel One fallback also failed: {fallback}"
+            ) from fallback
         flags = details.get("flags") or {}
         notes = [
             f"Collected from Angel One: no Fyers login ({reason}).",
@@ -158,7 +162,11 @@ def collect_with_fallback(
         **{k: common[k] for k in ("premium_floor", "max_extra")},
     )
     notes = (
-        [f"Repaired from Fyers: {', '.join(f'{d:%a %d %b}' for d in repaired)}."]
+        [
+            f"Repaired from Fyers: {', '.join(f'{d:%a %d %b}' for d in repaired)}.",
+            "Rotation results stored for those days before the repair are not re-scored "
+            "(they were computed from the Angel One bars).",
+        ]
         if repaired
         else []
     )
