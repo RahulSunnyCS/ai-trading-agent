@@ -111,9 +111,10 @@ export const NAV_GROUPS: NavGroup[] = [
         id: 'optionslab',
         label: 'Options Lab',
         icon: Layers,
-        // /optionslab keeps opening Daily results, as it did before Strategies and Runs existed.
-        defaultSegment: 'results',
+        // /optionslab opens the straddle heatmap (BL-094); Daily results is one tab along.
+        defaultSegment: 'heatmap',
         children: [
+          { segment: 'heatmap', label: 'Heatmap' },
           { segment: 'strategies', label: 'Strategies' },
           { segment: 'builder', label: 'Builder' },
           { segment: 'runs', label: 'Runs' },

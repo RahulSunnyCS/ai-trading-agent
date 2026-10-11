@@ -36,6 +36,7 @@ import optionsBuilderForm from './content/optionslab/builder-form.md?raw';
 import optionsBuilderYaml from './content/optionslab/builder-yaml.md?raw';
 import optionsCorrelation from './content/optionslab/correlation.md?raw';
 import optionsDailyResults from './content/optionslab/daily-results.md?raw';
+import optionsHeatmap from './content/optionslab/heatmap.md?raw';
 import optionsHowItWorks from './content/optionslab/how-it-works.md?raw';
 import optionsRegimes from './content/optionslab/regimes.md?raw';
 import optionsRotationDailyLog from './content/optionslab/rotation-daily-log.md?raw';
@@ -233,6 +234,16 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     summary: 'Legs, strikes, stops, re-entries and costs, minute by minute over real data.',
     kind: 'Explainer',
     body: optionsHowItWorks,
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'heatmap',
+    title: 'Heatmap',
+    summary:
+      'What an ATM short straddle made at each entry time and stop loss, for any index or stock.',
+    kind: 'Screen',
+    body: optionsHeatmap,
+    screen: { tab: 'optionslab', rest: ['heatmap'] },
   },
   {
     chapter: 'optionslab',

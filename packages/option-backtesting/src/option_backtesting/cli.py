@@ -32,6 +32,10 @@ from .rotation.cli import rotation_app  # noqa: E402  (BL-058: the forward paper
 
 app.add_typer(rotation_app, name="rotation")
 
+from .heatmap.cli import heatmap_app  # noqa: E402  (BL-094: the straddle heatmap)
+
+app.add_typer(heatmap_app, name="heatmap")
+
 
 @app.callback()
 def _load_env() -> None:

@@ -138,8 +138,8 @@ describe('CorrelationPanel mode switch', () => {
     const q = new URLSearchParams(window.location.search);
     expect(q.get('mode')).toBeNull();
     expect(q.get('names')).toBe('N_wide_0932,S_dir_1202');
-    // slot must be "any": the default 09:17 slot would AND with the names' group and select none
-    expect(q.get('slot')).toBe('any');
+    // the default slot is "any" now, so it needs no key: a slot filter would AND with the names
+    expect(q.get('slot')).toBeNull();
     expect(q.get('family')).toBeNull();
     expect(q.get('from')).toBe('2025-12-03');
     expect(q.get('to')).toBe('2026-10-08');

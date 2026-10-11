@@ -153,10 +153,11 @@ describe('routes', () => {
     expect(builderMode(parsePath('/backtest').rest)).toBe('yaml');
   });
 
-  it('opens Daily results for the bare Options Lab path', () => {
-    expect(OPTIONS_LAB_DEFAULT_SECTION).toBe('results');
+  it('opens the Heatmap for the bare Options Lab path', () => {
+    expect(OPTIONS_LAB_DEFAULT_SECTION).toBe('heatmap');
     expect(oneOf(OPTIONS_LAB_SECTIONS, parsePath('/optionslab').rest[0])).toBeNull();
     expect(OPTIONS_LAB_SECTIONS).toEqual([
+      'heatmap',
       'strategies',
       'builder',
       'runs',
@@ -214,8 +215,9 @@ describe('routes', () => {
     ['optionslab', ['regimes'], 'Options Lab › Regimes · AI Trading Agent'],
     ['optionslab', ['correlation'], 'Options Lab › Correlation · AI Trading Agent'],
     ['optionslab', ['rotation'], 'Options Lab › Rotation · AI Trading Agent'],
-    ['optionslab', [], 'Options Lab › Daily results · AI Trading Agent'],
-    ['optionslab', ['nope'], 'Options Lab › Daily results · AI Trading Agent'],
+    ['optionslab', ['heatmap'], 'Options Lab › Heatmap · AI Trading Agent'],
+    ['optionslab', [], 'Options Lab › Heatmap · AI Trading Agent'],
+    ['optionslab', ['nope'], 'Options Lab › Heatmap · AI Trading Agent'],
     ['coverage', [], 'Coverage › Backfill · AI Trading Agent'],
     ['coverage', ['backfill'], 'Coverage › Backfill · AI Trading Agent'],
     ['coverage', ['replay'], 'Coverage › Replay · AI Trading Agent'],

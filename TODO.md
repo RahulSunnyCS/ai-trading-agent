@@ -635,6 +635,15 @@ code change, show it in the UI later.
 | 3.24.3 | Phase 3: does a trailing-correlation cap cut the lists' drawdown? | claude | **Pre-registered, not run.** Judge on the forward journal from 2026-10-12 after at least 60 trading days |
 | 3.24.4 | `GET /legwise/correlation*` and an Options Lab › Correlation heatmap | claude | **Built 2026-10-10.** Three Python routes, three proxy routes, the tab (heatmap, pair readout, strategy table, basket builder, drift chart) and its Guide page; checked on live data at desktop and phone width |
 
+### 3.25 Straddle heatmap — [BL-094](backlog/BL-094-straddle-heatmap.md)
+
+Owner (2026-10-11): an AlgoTest-style ATM short-straddle grid (entry time x stop loss x date) for every index and F&O
+stock, as the Options Lab's default page; Correlation becomes its own widget on three strategies with a multiselect.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.25.1 | Phases 1–4: `heatmap/` (grid, store, view), `obt heatmap build|show|list`, `GET /legwise/heatmap*` and its proxy routes, Options Lab › Heatmap (default tab), the Correlation tab on three strategies with a strategy multiselect, Guide page | claude | **Built 2026-10-11.** Grid parity with the legwise engine is a test; against AlgoTest's own 26 Aug 2026 NIFTY grid cells agree within about ₹100 at exit 15:15 |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |
