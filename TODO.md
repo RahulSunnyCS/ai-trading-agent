@@ -634,6 +634,18 @@ code change, show it in the UI later.
 | 3.24.3 | Phase 3: does a trailing-correlation cap cut the lists' drawdown? | claude | **Pre-registered, not run.** Judge on the forward journal from 2026-10-12 after at least 60 trading days |
 | 3.24.4 | `GET /legwise/correlation*` and an Options Lab › Correlation heatmap | claude | **Built 2026-10-10.** Three Python routes, three proxy routes, the tab (heatmap, pair readout, strategy table, basket builder, drift chart) and its Guide page; checked on live data at desktop and phone width |
 
+### 3.25 Portfolio MTM stop on the Rotation page — [BL-092](backlog/BL-092-portfolio-mtm-stop-in-rotation.md)
+
+Owner (2026-10-11): the lists are traded under a portfolio stop (about ₹10k on 6 lots); the Rotation log
+should show what the book did under it, with a typed amount, trailing modes and a list replay.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.25.1 | Phase 1: `rotation/portfolio.py` — the basket's combined MTM, the stop, Trail SL / Lock profit / Lock and trail | claude | **Built 2026-10-11.** 43 unit tests; reproduces BL-055's 12 totals and drawdowns to the rupee; empty stop equals the log's gross on 80 list-days |
+| 3.25.2 | Phase 2: `GET /legwise/rotation/portfolio/*` and the proxy | claude | Planned |
+| 3.25.3 | Phase 3: the Portfolio stop pop-up, Days table, calendar and "Replay the list" | claude | Planned |
+| 3.25.4 | Phase 4: hero curve, headline and Drawdowns with the stop | claude | Planned |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

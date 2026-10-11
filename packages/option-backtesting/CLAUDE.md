@@ -180,6 +180,13 @@ Otherwise:
   list's own rolling 21-session shares over P1 (no band under 10 windows, nothing flagged under 21 sessions); the
   concentration rows (distinct variants, most-picked, one-start-band days, Widesl-minimum days, Buy days) use the same
   yardstick. Picks, not P&L; descriptive only.
+- `rotation/portfolio.py` — the basket under a portfolio MTM stop (BL-092 Phase 1; no route yet). `apply_book(members, stop_inr, trail)`
+  sums each pick's one-lot path (0 before it starts, its MTM, then its gross) times its lots; the first minute the sum is
+  at or below the level every pick closes at that minute's close and nothing else enters. `stop_inr` empty, 0 or below is
+  no stop. `Trail`: `sl:X,Y` (every X of profit moves the stop Y), `lock:A,B`, `locktrail:A,B,X,Y`; the level never moves
+  down. `book_day` replays the nightly update's own strategy file and lot-sizing date. Reproduces BL-055's totals
+  (`research/bl092/reproduce_bl055.py`) and the log's gross with no stop (`research/bl092/check_log_gross.py`). Stores
+  nothing and never changes a stored result or the registered read-out.
 - `rotation/basket.py` + `api/rotation_basket_routes.py` — the Correlation tab's "A day's basket" preset (BL-058
   Phase 4 widget 6; `GET /legwise/rotation/basket?list=A|B|C|REF|BASE&day=&window=P1|P2|last63|forward|custom`),
   read-only. A list's picks for a day are the journal entry's when there is one, else `daylog.reconstruction`'s
