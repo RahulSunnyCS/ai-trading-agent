@@ -27,9 +27,8 @@ Click a job to read the last 200 lines of its latest log.
 | Job | What it does |
 |---|---|
 | `broker-login` (08:00) | Logs the broker accounts into [AlgoTest](glossary:algotest). |
-| `fyers-login` (08:05) | Gets the day's [Fyers token](glossary:fyers-token). |
 | `morning-summary` (09:00) | One Telegram message: did the logins work, is the data current. |
-| `options-daily` (16:15) | The [evening run](glossary:evening-run). |
+| `options-daily` (16:15) | The [evening run](glossary:evening-run). Collects from Fyers when you are logged in, otherwise from Angel One, and says which in its Telegram message. |
 | `options-derived` (23:30) | Builds any missing 5-minute snapshots and IV tables the evening run left out. |
 | `momentum-preview` (Fri 14:40) | The momentum preview on live prices. |
 | `momentum-final` (Fri 16:45) | The momentum final signal. |

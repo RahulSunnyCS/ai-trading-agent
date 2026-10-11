@@ -39,6 +39,9 @@ import { freshTotp, waitForNextWindow } from './totp.js';
  * GitHub runners have none, so a leaked token cannot place API orders.
  */
 
+/** How long a headed run waits for a person to tick Fyers' human-verification box. */
+const HUMAN_CHECK_WAIT_MS = 120_000;
+
 class FyersLoginError extends Error {
   constructor(
     message: string,
@@ -99,7 +102,20 @@ async function loginOnce(context: BrowserContext, config: FyersConfig): Promise<
     const input = fyersLogin.clientId(page);
     await input.waitFor({ state: 'visible', timeout: 20_000 });
     await input.fill(config.clientId);
-    await fyersLogin.submit(page).click();
+    const submit = fyersLogin.submit(page);
+    if (process.env.HEADED === '1') {
+      // Fyers keeps Continue disabled until a person ticks its "Verify you are human" box.
+      // The script never touches that box; in a headed run it waits for you to do it.
+      console.log(`  waiting up to ${HUMAN_CHECK_WAIT_MS / 1000}s for the human-verification box`);
+      const deadline = Date.now() + HUMAN_CHECK_WAIT_MS;
+      while (!(await submit.isEnabled().catch(() => false))) {
+        if (Date.now() > deadline) {
+          throw new Error('Continue stayed disabled: the human-verification box was not ticked');
+        }
+        await page.waitForTimeout(500);
+      }
+    }
+    await submit.click();
   });
   await failIfErrorShown(page);
 

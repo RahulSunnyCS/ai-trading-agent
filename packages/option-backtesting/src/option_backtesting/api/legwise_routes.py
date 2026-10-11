@@ -160,6 +160,31 @@ def data_status() -> dict[str, Any]:
     }
 
 
+@router.get("/source")
+def source_status(days: int = 7) -> dict[str, Any]:
+    """Which source each recent day's 1-minute data came from (BL-079), and what an Angel One day
+    is missing. The dashboard banner reads `attention`: days that came from Angel One and have
+    not been repaired from Fyers yet."""
+    from datetime import date, timedelta
+
+    from ..legwise import source as day_source
+
+    today = date.today()
+    sources = day_source.day_sources(
+        data_dir(), today - timedelta(days=min(max(days, 1), 30)), today
+    )
+    rows = [
+        {
+            "day": d.isoformat(),
+            "source": s.source,
+            "lines": day_source.describe(s.flags) if s.source == "angelone" else [],
+            "kept_existing": s.kept_existing,
+        }
+        for d, s in sorted(sources.items())
+    ]
+    return {"days": rows, "attention": [r["day"] for r in rows if r["source"] == "angelone"]}
+
+
 class BacktestBody(BaseModel):
     strategy: dict[str, Any]
     from_: str | None = Field(default=None, alias="from")

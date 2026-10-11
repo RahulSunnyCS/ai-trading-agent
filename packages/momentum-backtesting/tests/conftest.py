@@ -35,3 +35,28 @@ def _isolated_environ():
     yield
     os.environ.clear()
     os.environ.update(before)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_angel_one(monkeypatch):
+    """BL-079 Phase 4: no test may log into Angel One or probe Fyers. A route that loads the
+    repo's real .env mid-test (the A7 problem above) would otherwise put the owner's real
+    ANGELONE_* values in the environment and the first "no Fyers token" path would attempt a
+    real login. The transport, the scrip-master download, the Fyers token probe and the sleeps
+    are replaced; a test of the Angel One code passes its own fakes (`post=`, `master_loader=`)
+    or re-patches these. The session cache is cleared around every test."""
+    from momentum_backtesting import angelone
+
+    def blocked_post(path, body, headers):
+        return 0, {"status": False, "message": "network: blocked in tests"}
+
+    def blocked_master():
+        raise OSError("Angel One scrip master download blocked in tests")
+
+    angelone.reset()
+    monkeypatch.setattr(angelone, "_http_post", blocked_post)
+    monkeypatch.setattr(angelone, "download_master", blocked_master)
+    monkeypatch.setattr(angelone, "_fyers_token_rejected", lambda creds: False)
+    monkeypatch.setattr(angelone, "_wait", lambda seconds: None)
+    yield
+    angelone.reset()

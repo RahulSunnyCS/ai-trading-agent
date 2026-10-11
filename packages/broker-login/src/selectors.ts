@@ -179,9 +179,15 @@ export const dataBrokerKeys = {
  * of the page - tighten these from that.
  */
 export const fyersLogin = {
-  /** Some layouts open on mobile-number login with a switch to client ID. */
+  /**
+   * The page opens on the "Mobile number" radio; `#clientId_rb` ("Client ID", confirmed from
+   * the 2026-10-10 diagnostics HTML) swaps in the client ID form. The text form is an older layout.
+   */
   useClientId: (page: Page): Locator =>
-    page.getByText(/(login|continue) (with|using) client id/i).first(),
+    page
+      .locator('label:has(input#clientId_rb)')
+      .or(page.getByText(/(login|continue) (with|using) client id/i))
+      .first(),
 
   clientId: (page: Page): Locator =>
     page

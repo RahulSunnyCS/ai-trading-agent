@@ -74,23 +74,6 @@ const BASE_JOBS: Job[] = [
     fixHint: 'Start "Daily broker login" by hand from GitHub Actions',
   },
   {
-    id: 'fyers-login',
-    description: 'Headless Fyers login; stores the token in broker_tokens',
-    schedule: { at: '08:05', on: tradingDays, label: 'trading days 08:05' },
-    steps: [['node_modules/.bin/tsx', 'src/fyers.ts', '--store']],
-    cwd: BROKER_LOGIN,
-    timeoutMinutes: 10,
-    // No scheduler retry: fyers.ts retries a transient failure itself but deliberately stops on
-    // a rejected PIN or blocked account, because each wrong attempt counts toward a lockout.
-    // Re-running it here would submit that PIN again.
-    retries: 0,
-    retryDelayMinutes: 0,
-    catchUpHours: 10,
-    needs: ['postgres'],
-    alertsItself: true,
-    fixHint: 'Log in from the dashboard (Broker logins), or: uv run mbt login',
-  },
-  {
     // BL-051 Phase 3: the headline's orders before the close. With a signal delay of 1 the
     // decision is already fixed by last Friday's ranks, so they can be placed at 14:15.
     id: 'momentum-orders',

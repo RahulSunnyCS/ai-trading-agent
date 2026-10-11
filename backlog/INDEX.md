@@ -11,6 +11,10 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Priority | Status | Type | Area |
 |---|---|---|---|---|---|
+| [BL-076](BL-076-fyers-refresh-token-login.md) | Fyers unattended login through the refresh-token grant | Dropped: Fyers disabled the refresh-token API (code -16, SEBI); the spike returned no token. Follow-up BL-077 | 2026-10-10 |
+| [BL-077](BL-077-fyers-daily-login-reminder.md) | Fyers daily login reminder, dashboard banner and a truthful 08:05 job | Superseded by BL-079: the 08:05 job is removed, the dashboard already has a token banner, and the owner chose Angel One as the fallback source | 2026-10-10 |
+| [BL-078](BL-078-angel-one-data-source.md) | Angel One SmartAPI as a second 1-minute data source: what it can and cannot give versus the Fyers files | P1 | In progress | research | options |
+| [BL-079](BL-079-collector-fyers-or-angel-source.md) | Daily collector: Fyers when logged in, Angel One otherwise | Done: `obt daily` falls back to Angel One, Fyers login repairs those days, Source section + dashboard banner, Momentum backup source | 2026-10-10 |
 | [BL-001](BL-001-momentum-result-integrity.md) | Momentum result integrity: goldens, parameter coverage, drift alerts | P0 | In progress | improvement | momentum |
 | [BL-010](BL-010-momentum-evaluation-review.md) | Momentum evaluation review: prove the arithmetic, remove hindsight, fix selection | P0 | In progress | research | momentum |
 | [BL-012](BL-012-scheduler-service.md) | Scheduler service: one home for every recurring ingestion and maintenance job (laptop now, hostable later) | P0 | In progress | feature | infra |

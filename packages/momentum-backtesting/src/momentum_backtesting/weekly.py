@@ -8,9 +8,11 @@ Two runs each Friday (IST):
            last close. Estimates are never stored.
   final    ~16:45 - official closes; reports anything the close changed versus the preview.
 
-Sources, best first: Fyers (dashboard token or standalone env/file token),
-niftyindices.com (NSE's official closes, for indices with a `backfill` name), then the same
-ETF-implied estimate. Every series' freshness is checked; when too many are stale, the run
+Sources, best first: Fyers (dashboard token or standalone env/file token), Angel One when
+there is no valid Fyers token (`angelone.resolve_prices`; BL-079 Phase 4), niftyindices.com
+(NSE's official closes, for indices with a `backfill` name), then the same ETF-implied estimate.
+An instrument Angel One cannot map goes straight to the public sources, as it does with no
+broker token at all. Every series' freshness is checked; when too many are stale, the run
 sends a data-health alert instead of a signal.
 
 The positions are the backtest's model portfolio under live_config.toml, run from 2017 -
@@ -79,6 +81,7 @@ class Health:
     last_day: dict[str, date | None] = field(default_factory=dict)
     failures: dict[str, str] = field(default_factory=dict)
     fyers: str = "not used"
+    backup: str = ""  # a substitute price source that served instead of Fyers ("Angel One")
 
     def stale(self, names: list[str], as_of: date) -> list[str]:
         return [n for n in names if (self.last_day.get(n) or date.min) < as_of]
@@ -163,7 +166,11 @@ def refresh(
     rows of weekly_closes.csv. Older history (and each series' backfill join) is untouched.
     `until` drops anything later - the preview passes yesterday, because during market hours
     the sources return today's still-moving candle and that must never be stored."""
-    health = Health(today, fyers=f"token from {creds.source}" if creds else "no token")
+    alt = fyers.substitute(creds)
+    if alt is not None:
+        health = Health(today, fyers=alt.why_not_fyers, backup=alt.source)
+    else:
+        health = Health(today, fyers=f"token from {creds.source}" if creds else "no token")
     start = today - timedelta(days=REFRESH_DAYS)
     until = until or today
 
@@ -180,8 +187,14 @@ def refresh(
         if inst.etf_source == ETF_SAME:
             continue
         try:
-            if creds is not None:
-                raw = fyers.daily_candles(inst.etf_source, start, today, creds)
+            if fyers.serves(creds, inst.etf_source):
+                try:
+                    raw = fyers.daily_candles(inst.etf_source, start, today, creds)
+                except Exception:
+                    if fyers.substitute(creds) is None:
+                        raise
+                    # Angel One hiccuped on this one: the public source, as with no token.
+                    raw = yahoo_candles(f"{inst.trade_etf}.NS", start)
             else:
                 raw = yahoo_candles(f"{inst.trade_etf}.NS", start)
             etf_new[inst.name] = window(raw)
@@ -192,8 +205,18 @@ def refresh(
     for inst in universe:
         source, frame, how = inst.price_source, None, ""
         try:
-            if source.startswith("NSE:") and creds is not None:
-                frame, how = fyers.daily_candles(source, start, today, creds), "fyers"
+            served = None
+            if source.startswith("NSE:") and fyers.serves(creds, source):
+                try:
+                    served = fyers.daily_candles(source, start, today, creds)
+                except fyers.FyersCredentialsError:
+                    raise
+                except Exception:
+                    if fyers.substitute(creds) is None:
+                        raise
+                    # Angel One failed on this one: the public ladder below, as with no token.
+            if served is not None:
+                frame, how = served, fyers.price_label(creds).lower()
             elif source.startswith("NSE:") and inst.backfill.startswith("NIFTYINDICES:"):
                 name = inst.backfill.removeprefix("NIFTYINDICES:")
                 frame, how = niftyindices_candles(name, start, today), "niftyindices"
@@ -286,10 +309,18 @@ def live_prices(
 ) -> tuple[dict[str, float], dict[str, float], dict[str, str]]:
     """(index level now, ETF price now, how) per instrument, for the preview."""
     fyers_quotes: dict[str, float] = {}
+    live_label = fyers.price_label(creds).lower()  # "fyers", or "angel one" when it stood in
     if creds is not None:
         symbols = [i.price_source for i in universe if i.price_source.startswith("NSE:")]
         symbols += [i.etf_source for i in universe if i.etf_source.startswith("NSE:")]
-        fyers_quotes = fyers.quotes(sorted(set(symbols)), creds)
+        if fyers.substitute(creds) is None:
+            fyers_quotes = fyers.quotes(sorted(set(symbols)), creds)
+        else:
+            # A backup source: any trouble leaves the Yahoo / ETF-implied paths below to price it.
+            try:
+                fyers_quotes = fyers.quotes(sorted(set(symbols)), creds)
+            except Exception:
+                fyers_quotes = {}
     index_now, etf_now, how = {}, {}, {}
     for inst in universe:
         daily = _read(data_dir / "daily" / f"{inst.name}.csv")
@@ -308,7 +339,8 @@ def live_prices(
         if etf_price is not None:
             etf_now[inst.name] = etf_price
         if inst.price_source in fyers_quotes:
-            index_now[inst.name], how[inst.name] = fyers_quotes[inst.price_source], "fyers live"
+            index_now[inst.name] = fyers_quotes[inst.price_source]
+            how[inst.name] = f"{live_label} live"
         elif inst.price_source.startswith("NSE:") and inst.price_source.endswith("-EQ"):
             try:
                 price, when = yahoo_quote(inst.price_source[4:-3] + ".NS")
@@ -485,6 +517,13 @@ def format_message(
 
 def _health_line(health: Health, live_how: dict[str, str] | None) -> str:
     parts = [f"Fyers: {health.fyers}"]
+    if health.backup:
+        # Which source supplied each series' close, so a day on the backup is never silent.
+        kinds = pd.Series(
+            [h.removesuffix("+ETF-implied") or "ETF-implied" for h in health.sources.values()]
+        ).value_counts()
+        served = ", ".join(f"{k} {v}" for k, v in kinds.items())
+        parts.append(f"prices from {health.backup}" + (f" ({served})" if served else ""))
     estimated = sorted(n for n, how in health.sources.items() if "ETF-implied" in how)
     if estimated:
         parts.append(f"estimated from ETF: {', '.join(estimated)}")

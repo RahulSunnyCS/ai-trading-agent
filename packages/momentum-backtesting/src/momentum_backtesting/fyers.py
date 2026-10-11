@@ -8,6 +8,12 @@ Credential precedence:
   4. the token cached by `mbt login` (data/.fyers_token.json), if not expired
 Direct-mode dashboard previews prefer the local login cache over env fallbacks.
 Fyers tokens expire daily, so the cache and DB paths check expires_at first.
+
+Backup source (BL-079 Phase 4): `angelone.resolve_prices()` returns Fyers credentials when a
+token is valid and otherwise an `angelone.AngelSource`, which callers pass where Fyers
+credentials go. `substitute()` / `serves()` below are the whole hook: `daily_candles`,
+`daily_ohlcv`, `daily_closes`, `quotes` and `price_at` hand a substitute source the call, and
+callers use `serves(creds, symbol)` to send a symbol it cannot map to the public source.
 """
 
 import hashlib
@@ -77,6 +83,26 @@ class Credentials:
     access_token: str = field(repr=False)
     source: str
     expires_at: datetime | None = None
+
+
+def substitute(creds):
+    """The non-Fyers price source (Angel One) standing in for `creds`, else None."""
+    return creds if getattr(creds, "substitute_for_fyers", None) is True else None
+
+
+def serves(creds, symbol: str) -> bool:
+    """Whether `creds` can price `symbol`: always for Fyers credentials, only the symbols it can
+    map for a substitute source, never for None (no broker token: the public sources)."""
+    if creds is None:
+        return False
+    alt = substitute(creds)
+    return True if alt is None else bool(alt.can_serve(symbol))
+
+
+def price_label(creds) -> str:
+    """'Fyers', or the substitute source's name ('Angel One'), for logs and messages."""
+    alt = substitute(creds)
+    return alt.source if alt is not None else "Fyers"
 
 
 def _oauth_config() -> tuple[str, str, str]:
@@ -370,6 +396,9 @@ def _ist(epoch: int) -> pd.Timestamp:
 
 def daily_candles(symbol: str, start: date, end: date, creds: Credentials) -> pd.DataFrame:
     """Daily open and close indexed by IST trading date."""
+    alt = substitute(creds)
+    if alt is not None:
+        return alt.daily_candles(symbol, start, end)
     by_day = {
         _ist(epoch).date(): (float(open_), float(close))
         for epoch, open_, _high, _low, close, _volume in _candles(
@@ -459,6 +488,9 @@ QUOTES_URL = "https://api-t1.fyers.in/data/quotes"
 
 def quotes(symbols: list[str], creds: Credentials) -> dict[str, float]:
     """Last traded price per symbol (live during market hours), 50 symbols per request."""
+    alt = substitute(creds)
+    if alt is not None:
+        return alt.quotes(symbols)
     prices: dict[str, float] = {}
     for i in range(0, len(symbols), 50):
         batch = symbols[i : i + 50]
@@ -494,6 +526,9 @@ def price_at(
 ) -> pd.Series:
     """The traded price at `at` IST on each day: the close of the 15-minute candle that ends
     then (the 09:45 candle for 10:00). Days without that candle are left out."""
+    alt = substitute(creds)
+    if alt is not None:
+        return alt.price_at(symbol, start, end, at)
     hour, minute = map(int, at.split(":"))
     candle_start = (hour * 60 + minute - 15) % (24 * 60)
     prices = {}

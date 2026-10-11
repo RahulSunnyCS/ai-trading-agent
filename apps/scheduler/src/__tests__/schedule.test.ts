@@ -42,8 +42,8 @@ describe('schedules', () => {
 describe('job registry', () => {
   const repoRoot = resolve(import.meta.dirname, '../../../..');
 
-  it('does not retry fyers-login: fyers.ts stops on a wrong PIN to avoid a lockout', () => {
-    expect(JOBS.find((j) => j.id === 'fyers-login')?.retries).toBe(0);
+  it('has no scheduled Fyers login: Fyers put a human check on its login page (2026-10-10)', () => {
+    expect(JOBS.find((j) => j.id === 'fyers-login')).toBeUndefined();
   });
 
   it('has a registered builtin for every job that names one', () => {
