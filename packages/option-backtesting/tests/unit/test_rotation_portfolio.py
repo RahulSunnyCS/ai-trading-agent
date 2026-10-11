@@ -40,6 +40,12 @@ def member(name: str, lots: int, *points: tuple[int, float], start: int = 0) -> 
     return Member(name, lots, path(*points, start=start))
 
 
+@pytest.fixture(autouse=True)
+def _isolated_cache(tmp_path, monkeypatch):
+    monkeypatch.setenv("ATA_PORTFOLIO_CACHE_DIR", str(tmp_path / "pf-cache"))
+    pf.clear_cache()
+
+
 # --- the settings ---------------------------------------------------------------------------
 
 
@@ -251,6 +257,30 @@ def test_member_from_curve_holds_the_gross_after_the_last_minute():
     assert len(m.pnl) == N_MINUTES
     flat = member_from_curve("y", 1, [], gross=42.0)
     assert set(flat.pnl) == {42.0}
+
+
+def test_the_disk_cache_round_trips_and_replaces_a_stale_file():
+    day = date(2026, 9, 11)
+    key = ("/data", day, "N_wide_0917", (1, 2, 3))
+    path = tuple(float(i) for i in range(N_MINUTES))
+    assert pf._disk_read(key) is None
+    pf._disk_write(key, path)
+    assert pf._disk_read(key) == path
+    newer = ("/data", day, "N_wide_0917", (9, 9, 9))  # the day's lake files changed
+    pf._disk_write(newer, path)
+    assert pf._disk_read(newer) == path
+    assert pf._disk_read(key) is None  # the stale file is gone
+
+
+def test_a_torn_or_wrong_length_cache_file_is_ignored():
+    day = date(2026, 9, 11)
+    key = ("/data", day, "N_wide_0917", (1,))
+    file = pf._disk_file(key)
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_text("[1, 2, 3]")
+    assert pf._disk_read(key) is None
+    file.write_text("{not json")
+    assert pf._disk_read(key) is None
 
 
 def test_wrong_length_path_is_refused():

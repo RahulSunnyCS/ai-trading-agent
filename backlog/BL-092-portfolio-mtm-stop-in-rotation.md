@@ -262,3 +262,13 @@ decision. (Questions 1–7 of 2026-10-11 are answered: see Owner's decisions.)
   has not been looked at on real data. Still open: compare the three trailing modes with the
   owner's AlgoTest screen (open question 1), and whether the fixed base / Shadow scoreboard
   should follow the stop (Phase 5).
+- 2026-10-11 — Real-data look, Drawdowns (list A, P1, 202 sessions, gross, in-sample, ₹10,000 stop,
+  no trailing): worst fall −₹11,073 per lot registered, −₹10,467 with the stop; total +₹73,690 per
+  lot registered, +₹75,149 with it; the stop closed the book on 40 of 202 days; 20 episodes of at
+  least ₹500 either way. A small improvement on this history, not a result: the history is what the
+  weights were chosen on and BL-055 found the sign differs by mix. Speed: replaying the whole P1
+  window cold takes ~3.5 min (202 days, ~640 pick-days); the replayed paths are now also kept in
+  a disposable disk cache (`~/.cache/ai-trading-agent/portfolio-paths`, 4 MB), after which the same
+  request takes ~2 s even after an API restart; `obt rotation portfolio-warm` fills it ahead of the
+  first view. Nothing is added to the scheduler (not asked); running it nightly after
+  `rotation update` is Phase 5.

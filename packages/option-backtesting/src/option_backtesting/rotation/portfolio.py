@@ -25,7 +25,10 @@ same in every mode: everything closes at the close of the first minute at or bel
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
+import os
 import threading
 from dataclasses import dataclass
 from datetime import date
@@ -261,6 +264,49 @@ def _stamp(root: Path, day: date, name: str) -> tuple:
     return tuple(parts)
 
 
+def cache_dir() -> Path:
+    """Where replayed one-lot paths are kept between runs of the API: a disposable cache outside
+    the data root (`ATA_PORTFOLIO_CACHE_DIR` overrides it). Deleting it only makes the next
+    request replay again."""
+    env = os.environ.get("ATA_PORTFOLIO_CACHE_DIR")
+    return Path(env) if env else Path.home() / ".cache" / "ai-trading-agent" / "portfolio-paths"
+
+
+def _disk_file(key: tuple) -> Path:
+    root, day, name, stamp = key
+    digest = hashlib.sha1(f"{root}|{stamp}".encode()).hexdigest()[:12]  # noqa: S324 - a cache key
+    return cache_dir() / name / f"{day.isoformat()}.{digest}.json"
+
+
+def _disk_read(key: tuple) -> tuple[float, ...] | None:
+    try:
+        values = json.loads(_disk_file(key).read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(values, list) or len(values) != N_MINUTES:
+        return None
+    try:
+        return tuple(float(v) for v in values)
+    except (TypeError, ValueError):
+        return None
+
+
+def _disk_write(key: tuple, path: tuple[float, ...]) -> None:
+    """Best effort: a cache that cannot be written is simply not there next time. A stale file for
+    the same pick-day (its lake files were repaired since) is removed."""
+    target = _disk_file(key)
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        for old in target.parent.glob(f"{key[1].isoformat()}.*.json"):
+            if old != target:
+                old.unlink(missing_ok=True)
+        tmp = target.with_suffix(".tmp")
+        tmp.write_text(json.dumps(path))
+        tmp.replace(target)
+    except OSError:
+        pass
+
+
 def one_lot_path(root: Path, day: date, name: str, loaded: dict | None = None) -> tuple[float, ...]:
     """One variant's one-lot path on `day`, replayed exactly as the nightly update did (same
     strategy file, same lot-sizing date), and cached. `loaded` shares a day's loaded index data
@@ -277,6 +323,13 @@ def one_lot_path(root: Path, day: date, name: str, loaded: dict | None = None) -
     key = (str(root), day, name, _stamp(root, day, name))
     with _cache_lock:
         hit = _paths.get(key)
+    if hit is None:
+        hit = _disk_read(key)
+        if hit is not None:
+            with _cache_lock:
+                if len(_paths) >= _PATHS_MAX:
+                    _paths.pop(next(iter(_paths)))
+                _paths[key] = hit
     if hit is not None:
         return hit
     loaded = loaded if loaded is not None else {}
@@ -299,6 +352,7 @@ def one_lot_path(root: Path, day: date, name: str, loaded: dict | None = None) -
         if len(_paths) >= _PATHS_MAX:
             _paths.pop(next(iter(_paths)))
         _paths[key] = path
+    _disk_write(key, path)
     return path
 
 

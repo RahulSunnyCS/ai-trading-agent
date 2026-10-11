@@ -137,6 +137,30 @@ def base(
     )
 
 
+@rotation_app.command("portfolio-warm")
+def portfolio_warm(
+    start: str = typer.Option(None, "--from", help="First day (default: the whole history)."),
+    end: str = typer.Option(None, "--to", help="Last day (default: the latest)."),
+) -> None:
+    """Replay every list-day's baskets once so the Rotation page's portfolio stop is fast the
+    first time you open it (BL-092). Read-only: it fills a disposable cache under
+    ~/.cache/ai-trading-agent/portfolio-paths and changes no stored result."""
+    import time
+
+    from . import portfolio_log
+
+    lo = date.fromisoformat(start) if start else None
+    hi = date.fromisoformat(end) if end else None
+    for source in ("reconstructed", "recorded"):
+        t0 = time.monotonic()
+        out = portfolio_log.days(lo, hi, None, None, source)
+        n = sum(t["n"] for t in out["totals"].values())
+        typer.echo(
+            f"{source}: {len(out['rows'])} days, {n} list-days replayed "
+            f"({len(out['errors'])} could not be) in {time.monotonic() - t0:.0f} s"
+        )
+
+
 @rotation_app.command()
 def readout(
     start: str = typer.Option(None, "--from", help="First forward day."),
