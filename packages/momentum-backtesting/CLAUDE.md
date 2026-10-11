@@ -558,7 +558,9 @@ contract, not a shared service).
   Scores page, shuffle test and hold-out read stock_groups.csv alone). A dated id must not equal an
   existing category id (it would mask that category before launch; `test_dated_groups.py` pins it). A theme
   gets in here from `pending_themes.csv`, never into `category_extras.csv` (which applies to all years and
-  feeds Custom Index only). A new dated row moves the live signal from its launch week on.
+  feeds Custom Index only). A new dated row moves the live signal from its launch week on. Anything that *describes* the past
+  with category membership must respect the date too: `exit_reasons.explain_exits(launches=...)` drops a
+  dated category from a stock's tags for weeks before it launched, and `api._broad_parts` passes it.
 - `categories/exit_reasons.py` — display-only: for Broad Momentum closed trades the engine records as
   "ineligible" (rank NaN: the stock stopped being selected), fills the blank `exit_rank` (pool rank, else
   momentum rank) and sets a specific `reason` + `exit_cause` (`liquidity` with the failing gate test and its
