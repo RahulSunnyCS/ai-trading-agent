@@ -39,6 +39,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-051](BL-051-momentum-this-week-and-journal.md) | Momentum "This week" and Journal redesign: favourite statuses, Friday timeline, orders from Fyers holdings, alerts | P1 | In progress | feature | momentum |
 | [BL-074](BL-074-point-in-time-categories-nse-basic-industry.md) | Point-in-time categories from NSE's Basic Industry classification | P1 | Planned | research | momentum |
 | [BL-095](BL-095-portfolio-mtm-stop-in-rotation.md) | Portfolio MTM stop-loss on the Rotation page: a ₹ stop (default ₹10k; empty / 0 = none) with trailing (Trail SL, Lock, Lock and trail) set in a pop-up, applied to each list's basket — days table, calendar, "Replay the list", hero curve, drawdowns; read-out untouched | P1 | In progress (Phases 1–4 built; PR open) | feature | options / dashboard |
+| [BL-096](BL-096-directional-parameter-sweep.md) | Directional parameter sweep: per-leg SL, overall MTM SL, re-entry, trailing SL and exit time across the existing 100 Directional variants | P2 | In progress | research | options |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-039](BL-039-broad-warm-path-and-weekly-job-cost.md) | Broad warm path and weekly-job cost (follow-up to BL-005) | P2 | Planned | improvement | momentum |
 | [BL-041](BL-041-in-app-guide.md) | In-app Guide: what each dashboard section does and how to use it | P2 | In progress | feature | dashboard |
