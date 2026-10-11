@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import typer
 
-from . import fyers
+from . import angelone, fyers
 from .config import DATA_DIR, load_repo_env
 
 app = typer.Typer(no_args_is_help=True, help="Weekly momentum rotation backtester.")
@@ -952,10 +952,13 @@ def stocks_sync(
     from .stocks.fyers_topup import run_fyers_topup, run_fyers_topup_total_market
 
     try:
-        creds = fyers.resolve_credentials()
+        # Fyers when its token is valid, else Angel One (BL-079 Phase 4).
+        creds = angelone.resolve_prices()
     except fyers.FyersCredentialsError as cred_error:
         typer.echo(f"Fyers fallback unavailable: {cred_error}")
         raise typer.Exit(1) from cred_error
+    if fyers.substitute(creds) is not None:
+        typer.echo(f"No valid Fyers token; the fallback prices come from {creds.source}.")
 
     result = run_fyers_topup(creds)
     if result is None:
@@ -2715,6 +2718,16 @@ def sources_check() -> None:
         typer.echo(f"  ok    Fyers ({creds.source}): {len(closes)} days")
     except Exception as error:
         typer.echo(f"  skip  Fyers: {str(error)[:120]}")
+        # The backup broker source (one login; never fails the check, it is only a backup).
+        try:
+            alt = angelone.get_source()
+            if alt is None:
+                typer.echo("  skip  Angel One: not configured, or its login was refused")
+            else:
+                closes = fyers.daily_closes("NSE:NIFTY50-INDEX", start, date.today(), alt)
+                typer.echo(f"  ok    Angel One: {len(closes)} days")
+        except Exception as alt_error:
+            typer.echo(f"  skip  Angel One: {str(alt_error)[:120]}")
     raise typer.Exit(1 if failed else 0)
 
 

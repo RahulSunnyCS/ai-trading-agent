@@ -22,6 +22,7 @@ import { GuideLink } from './components/guide/GuideLink';
 import { GuideView } from './components/guide/GuideView';
 import { AlertsPopup } from './components/shell/AlertsPopup';
 import { BottomBar } from './components/shell/BottomBar';
+import { DataSourceBanner } from './components/shell/DataSourceBanner';
 import { Sidebar } from './components/shell/Sidebar';
 import { TokenBanner } from './components/shell/TokenBanner';
 import { Topbar } from './components/shell/Topbar';
@@ -243,6 +244,7 @@ export function App() {
           help={activeTab === 'guide' ? null : <GuideLink tab={activeTab} rest={helpRest} />}
         />
         <TokenBanner />
+        <DataSourceBanner />
         {/* Bottom padding below md clears the fixed BottomBar. */}
         <main
           id={MAIN_ID}

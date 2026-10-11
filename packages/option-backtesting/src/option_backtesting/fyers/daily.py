@@ -300,6 +300,27 @@ def register_contracts(
 # ---------------------------------------------------------------------------
 
 
+def _keep_unlisted(
+    path: Path, new_tables: list[pa.Table], details: dict, name: str
+) -> list[pa.Table]:
+    """The rows of `path` for instruments absent from `new_tables`, appended after them."""
+    old = pq.read_table(path)
+    new = pa.concat_tables(new_tables) if new_tables else None
+    fresh_ids = set(new.column("instrument_id").to_pylist()) if new is not None else set()
+    keep_mask = [i not in fresh_ids for i in old.column("instrument_id").to_pylist()]
+    kept = old.filter(pa.array(keep_mask))
+    if kept.num_rows:
+        kept_ids = len(set(kept.column("instrument_id").to_pylist()))
+        repair = details.setdefault("repair", {})
+        repair["kept_existing_contracts"] = repair.get("kept_existing_contracts", 0) + kept_ids
+        repair.setdefault("by_underlying", {})[name] = (
+            repair.get("by_underlying", {}).get(name, 0) + kept_ids
+        )
+    if new is None:
+        return [kept] if kept.num_rows else []
+    return [new, kept.cast(new.schema)] if kept.num_rows else [new]
+
+
 def _contract_fetcher(
     client: FyersClient,
     day: date,
@@ -335,11 +356,24 @@ def collect_day(
     max_extra: int = DEFAULT_MAX_EXTRA,
     force: bool = False,
     log: Callable[[str], None] = print,
+    source: str = "fyers",
+    merge_existing: bool = False,
 ) -> dict:
     """Collect one day. Returns the per-underlying details (also stored in
-    ingest_runs.details); each entry's "errors" list counts toward the run status."""
+    ingest_runs.details); each entry's "errors" list counts toward the run status.
+
+    `client` is anything with FyersClient's `minute_candles` / `calls` / `on_response`: the
+    Angel One client (BL-079) drives this same function, with `source` naming it on the run and
+    on the raw responses, and an optional `bind_contracts(contracts, specs)` hook that maps the
+    Fyers contract list onto its own instruments. Whatever it leaves in `client.flags` (what was
+    missing or synthesised on the day) is stored under `details["flags"]`.
+
+    `merge_existing` (with `force`) is the repair of a day first collected from another source:
+    the new bars replace the old for every contract listed today, and contracts the symbol master
+    no longer lists (they expired since) keep the rows already in the day file. How many were kept
+    is stored under `details["repair"]`."""
     specs = [UNDERLYINGS[u] for u in underlyings]
-    details: dict = {"premium_floor": premium_floor, "max_extra": max_extra}
+    details: dict = {"premium_floor": premium_floor, "max_extra": max_extra, "source": source}
 
     contracts: list[Contract] = []
     for segment in sorted({s.segment for s in specs}):
@@ -347,10 +381,13 @@ def collect_day(
     contracts = [c for c in contracts if c.expiry >= day]
     write_symbol_master(root, day, contracts)
     ids = register_contracts(root, contracts, specs)
+    bind = getattr(client, "bind_contracts", None)
+    if bind is not None:
+        bind(contracts, specs)
     with connect(root, views=()) as con:
-        run_id = ingest.start_run(con, "fyers", "bars_1m", day, ",".join(underlyings))
+        run_id = ingest.start_run(con, source, "bars_1m", day, ",".join(underlyings))
 
-    raw = lake.RawSink(root, "fyers", day)
+    raw = lake.RawSink(root, source, day)
     current = {"name": VIX_NAME}
     client.on_response = lambda symbol, params, body: raw.add(current["name"], symbol, params, body)
     calls_at_start, rows_total = client.calls, 0
@@ -403,10 +440,11 @@ def collect_day(
                 if fut_candles:
                     fut_tables.append(bars_table(ids[fut.symbol], fut.symbol, fut_candles))
                     rows_total += len(fut_candles)
+            fut_path = lake.bars_1m_path(root, "future", spec.name, day)
+            if merge_existing and fut_path.exists():
+                fut_tables = _keep_unlisted(fut_path, fut_tables, details, spec.name)
             if fut_tables:
-                lake.write_parquet(
-                    pa.concat_tables(fut_tables), lake.bars_1m_path(root, "future", spec.name, day)
-                )
+                lake.write_parquet(pa.concat_tables(fut_tables), fut_path)
 
             options = [c for c in mine if c.option_type in ("CE", "PE")]
             expiries = select_expiries([c.expiry for c in options], day, spec.cadence)
@@ -441,6 +479,8 @@ def collect_day(
                 )
 
             table = options_table(rows)
+            if merge_existing and opt_path.exists():
+                table = pa.concat_tables(_keep_unlisted(opt_path, [table], details, spec.name))
             lake.write_parquet(table, opt_path)
             raw.flush(spec.name)
             rows_total += table.num_rows
@@ -448,6 +488,8 @@ def collect_day(
             entry["requests"] = client.calls - calls_before
             log(f"{spec.name}: {table.num_rows} option bars, {entry['requests']} requests")
     except Exception:
+        if getattr(client, "flags", None):
+            details["flags"] = {k: dict(v) for k, v in client.flags.items()}
         with connect(root, views=()) as con:
             ingest.finish_run(
                 con,
@@ -462,6 +504,8 @@ def collect_day(
     finally:
         client.on_response = None
 
+    if getattr(client, "flags", None):
+        details["flags"] = {k: dict(v) for k, v in client.flags.items()}
     errors = sum(len(v.get("errors", [])) for v in details.values() if isinstance(v, dict))
     with connect(root, views=()) as con:
         ingest.finish_run(

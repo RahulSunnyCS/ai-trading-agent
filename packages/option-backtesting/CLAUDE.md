@@ -86,6 +86,13 @@ Otherwise:
   collection into `packages/trading-data`'s store — instruments registered, bars in the Parquet
   lake, raw responses in `raw/fyers/`, one `ingest_runs` row per call; `obt fyers migrate` moved
   the old `data/fyers/` layout in). Forward-only — see `DECISIONS.md`.
+- `angelone/` — the Angel One SmartAPI collector (BL-078/BL-079; `obt angel status|fetch`), the
+  fallback when no Fyers token is valid. A drop-in client for `fyers.daily.collect_day`
+  (`source="angelone"`): `auth.py` (REST login with `ANGELONE_API_KEY` / `_CLIENT_CODE` / `_MPIN` /
+  `_TOTP_SECRET`, one attempt, never retried), `symbols.py` (Fyers contract -> Angel token by
+  underlying/expiry/strike/side; instruments keep their Fyers identity), `client.py` (volume
+  lots->quantity, no-trade minutes carried forward, OI from `getOIData` for NFO only, the index
+  gap 15:15-15:28 flagged not filled; what was missing lands in `ingest_runs.details.flags`).
 - `rotation/` — the options rotation's forward paper journal (BL-058): `lists.py` (the registered lists
   A / B / C / REF, never edited after the first entry), `score.py` (a port of research/bl057/rotate.py's
   ranking, numpy only; `scripts/rotation-parity.py` must print PARITY OK), `update.py` (nightly one-day

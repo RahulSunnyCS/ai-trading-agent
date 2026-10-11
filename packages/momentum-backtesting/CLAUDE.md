@@ -585,6 +585,28 @@ contract, not a shared service).
 - Broad Momentum gotcha: `engine.run_backtest` skips weeks with fewer than `top_n` ranked
   names unless `Config.min_ranked` is set; Broad needs `min_ranked=1` (API
   `broad_every_week`) or about 190 of 508 weeks silently vanish (TODO 3.9.23).
+- `angelone.py` (BL-079 Phase 4) — Angel One (SmartAPI) as the **backup price source**. Order,
+  decided by the owner: **Fyers token valid -> Angel One -> the public sources** (Yahoo,
+  niftyindices, AMFI). `angelone.resolve_prices(**kw)` is the one place that decides (it calls
+  `fyers.resolve_credentials`, then probes the token's validity with `fyers.probe_token`, then
+  `get_source()`); every former `fyers.resolve_credentials()` price call site (`fetch_all`, the
+  weekly job, the rebalance preview, `_order_prices`, the stock top-up fallback) goes through it and
+  keeps its "no token" handling because it re-raises the Fyers error when neither source works.
+  The `AngelSource` it returns is passed where Fyers `Credentials` go, and `fyers.daily_candles /
+  daily_ohlcv / daily_closes / quotes / price_at` hand it the call (`fyers.substitute`), in the
+  same frames, keyed on the Fyers ticker. A caller asks `fyers.serves(creds, symbol)` and sends a
+  symbol Angel One cannot map to the public source exactly as with no broker token
+  (`weekly.refresh`, `fetch._public_signal_daily`); `fyers.price_label(creds)` names the source in
+  messages. Mapping is by the public scrip master (cached a day in `data/.angel_scrip_master.json`):
+  NSE `<NAME>-EQ` by symbol, NSE/BSE indices by punctuation-free name; the Nifty Capital Markets,
+  Chemicals, India Defence and Healthcare indices are not in it (Nasdaq 100, Hang Seng, silver and
+  the AMFI NAV never come from a broker). One login per process (reused up to 10 h, never retried
+  after a rejection: 6 h back-off, since a wrong PIN counts toward a lockout); a mid-run session
+  rejection marks the source dead so the rest of the run uses the public sources. **Same rule as
+  everywhere here: do not import `option-backtesting`'s Angel One client; this is its own copy.**
+  Tests fake the transport (`post=`, `master_loader=`); `tests/conftest.py` blocks the real one for
+  the whole suite. The weekly Telegram "Data ·" line reads `Fyers: no valid token · prices from
+  Angel One (angel one 18, niftyindices 2, ...)` on such a day.
 - `notify.py` — the Python-side mirror of `@trading/notify`'s `Notification`
   shape, used by the weekly Telegram signal job.
 - `local_store.py` — the weekly job's price/signal storage, since 2026-09-30

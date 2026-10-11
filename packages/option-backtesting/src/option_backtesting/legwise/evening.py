@@ -12,11 +12,13 @@ API marks its job failed). Neither sends the failure message from here.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from ..fyers.auth import FyersCredentialsError
 from ..fyers.daily import DEFAULT_MAX_EXTRA, DEFAULT_PREMIUM_FLOOR, UNDERLYINGS, data_dir
+from . import source as day_source
 from .daily import (
     load_history,
     load_strategy_files,
@@ -39,7 +41,7 @@ def check_underlyings(names: list[str]) -> None:
         raise UnknownUnderlying(f"unknown underlyings {unknown}; known: {sorted(UNDERLYINGS)}")
 
 
-def collect(
+def collect_detailed(
     day: date,
     underlyings: list[str],
     *,
@@ -47,13 +49,14 @@ def collect(
     max_extra: int = DEFAULT_MAX_EXTRA,
     force: bool = False,
     log: Log = print,
-) -> int:
+    source: str = "fyers",
+    merge_existing: bool = False,
+) -> tuple[int, dict]:
     """Collect one day; return the per-symbol error count. A token problem raises
-    FyersCredentialsError for the caller to report."""
+    FyersCredentialsError (Angel One's login error subclasses it) for the caller to report.
+    `source` is "fyers" or "angelone" (BL-079): the same collector, a different client."""
     from trading_data import lake
 
-    from ..fyers.auth import resolve_credentials
-    from ..fyers.client import FyersClient
     from ..fyers.daily import collect_day
 
     check_underlyings(underlyings)
@@ -68,7 +71,18 @@ def collect(
             "warning: the symbol master only lists live contracts - anything that expired "
             f"between {day} and today is missing from this run."
         )
-    client = FyersClient(resolve_credentials())
+    if source == "angelone":
+        from ..angelone.auth import load_credentials, login
+        from ..angelone.client import AngelClient
+
+        client = AngelClient(login(load_credentials()))
+    elif source == "fyers":
+        from ..fyers.auth import resolve_credentials
+        from ..fyers.client import FyersClient
+
+        client = FyersClient(resolve_credentials())
+    else:
+        raise ValueError(f"unknown source {source!r}")
     manifest = collect_day(
         client,
         day,
@@ -78,10 +92,115 @@ def collect(
         max_extra=max_extra,
         force=force,
         log=log,
+        source=source,
+        merge_existing=merge_existing,
     )
     errors = sum(len(v.get("errors", [])) for v in manifest.values() if isinstance(v, dict))
     log(f"done: {client.calls} requests, {errors} errors -> {root}")
-    return errors
+    return errors, manifest
+
+
+def collect(day: date, underlyings: list[str], **kwargs) -> int:
+    """`collect_detailed` returning only the error count (the CLI's and the API's contract)."""
+    return collect_detailed(day, underlyings, **kwargs)[0]
+
+
+@dataclass(frozen=True)
+class Collection:
+    errors: int
+    source: str  # "fyers" | "angelone" | "none" (collection not asked for)
+    fallback_reason: str | None = None
+    details: dict = field(default_factory=dict)
+    repaired: list[date] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)  # lines for the summary and the Telegram body
+
+
+def collect_with_fallback(
+    day: date,
+    underlyings: list[str],
+    *,
+    premium_floor: float = DEFAULT_PREMIUM_FLOOR,
+    max_extra: int = DEFAULT_MAX_EXTRA,
+    force: bool = False,
+    log: Log = print,
+    repair_window_days: int = 7,
+) -> Collection:
+    """Fyers when its token works, Angel One when it does not (BL-079).
+
+    A Fyers token that is missing, expired or rejected raises FyersCredentialsError before any
+    bar is written, and the same day is then collected from Angel One. When Fyers does work, any
+    recent day that came from Angel One is repaired from it (`repair_from_fyers`)."""
+    from ..angelone.auth import AngelCredentialsError
+
+    common = {"premium_floor": premium_floor, "max_extra": max_extra, "log": log}
+    try:
+        errors, details = collect_detailed(day, underlyings, force=force, source="fyers", **common)
+    except AngelCredentialsError:
+        raise
+    except FyersCredentialsError as error:
+        reason = str(error)[:160]
+        log(f"Fyers is not available ({reason}); collecting from Angel One instead")
+        errors, details = collect_detailed(
+            day, underlyings, force=force, source="angelone", **common
+        )
+        flags = details.get("flags") or {}
+        notes = [
+            f"Collected from Angel One: no Fyers login ({reason}).",
+            *day_source.describe(flags),
+            "Log in to Fyers: still-listed contracts are re-collected from it on the next run.",
+        ]
+        return Collection(errors, "angelone", reason, details, [], notes)
+    repaired = repair_from_fyers(
+        day,
+        underlyings,
+        window_days=repair_window_days,
+        log=log,
+        **{k: common[k] for k in ("premium_floor", "max_extra")},
+    )
+    notes = (
+        [f"Repaired from Fyers: {', '.join(f'{d:%a %d %b}' for d in repaired)}."]
+        if repaired
+        else []
+    )
+    return Collection(errors, "fyers", None, details, repaired, notes)
+
+
+def repair_from_fyers(
+    day: date,
+    underlyings: list[str],
+    *,
+    premium_floor: float = DEFAULT_PREMIUM_FLOOR,
+    max_extra: int = DEFAULT_MAX_EXTRA,
+    window_days: int = 7,
+    log: Log = print,
+) -> list[date]:
+    """Re-collect, from Fyers, the recent days that came from Angel One. Contracts that have
+    expired since stay as they were (`merge_existing`). Returns the days repaired; a Fyers
+    failure part-way leaves the rest for the next run and never fails the evening."""
+    root = data_dir()
+    todo = day_source.recent_angel_days(root, day, window_days)
+    done: list[date] = []
+    for d in todo:
+        try:
+            collect_detailed(
+                d,
+                underlyings,
+                premium_floor=premium_floor,
+                max_extra=max_extra,
+                force=True,
+                source="fyers",
+                merge_existing=True,
+                log=log,
+            )
+        except FyersCredentialsError as error:
+            log(f"repair of {d} skipped: {error}")
+            break
+        except Exception as error:  # noqa: BLE001 - a repair must not fail the evening
+            log(f"repair of {d} failed: {error}")
+            continue
+        done.append(d)
+        log(f"repaired {d} from Fyers")
+    return done
 
 
 @dataclass(frozen=True)
@@ -106,17 +225,35 @@ def run_daily(
     check_underlyings(underlyings)
     files = load_strategy_files(strategies_dir)
     log(f"{day}: {len(files)} strategies from {strategies_dir}")
-    errors = collect(day, underlyings, log=log) if fetch else 0
+    collection = (
+        collect_with_fallback(day, underlyings, log=log) if fetch else Collection(0, "none")
+    )
+    errors = collection.errors
     root = data_dir()
     # judge the day and build its derived tables first: the strategies skip an excluded day,
     # and the summary reports both (BL-034 Phase 4)
     check = refresh_day(root, day, underlyings, log=log)
     today = run_day(day, root, files)
+    for repaired_day in collection.repaired:  # re-judge and re-run what the repair rewrote
+        refresh_day(root, repaired_day, underlyings, log=log)
+        if repaired_day != day:
+            run_day(repaired_day, root, files)
     history = load_history(root)
     log("")
-    log(summary(day, today, history, files, check))
+    log(summary(day, today, history, files, check, collection.notes))
     sent = None
     if telegram:
-        sent, _ = send(telegram_summary(day, today, history, files, errors, check))
+        sent, _ = send(
+            telegram_summary(
+                day,
+                today,
+                history,
+                files,
+                errors,
+                check,
+                collection.notes,
+                warn=collection.source == "angelone",
+            )
+        )
         log("telegram: sent" if sent else "telegram: not sent")
     return EveningResult(today, errors, sent)
