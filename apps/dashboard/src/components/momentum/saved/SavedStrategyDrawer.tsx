@@ -20,8 +20,11 @@ import {
   TRUST,
   cagrMove,
   changeSentence,
+  extendedKpis,
+  extendedSentence,
   shortVersion,
   strategyDifferences,
+  universeTag,
 } from '../../../lib/momentumSaved';
 import type { SavedStrategy } from '../../../types/momentum';
 import { Badge } from '../../ui/Badge';
@@ -232,6 +235,8 @@ function DrawerBody({
 
   const isGroup = strategy.group !== null;
   const kpis = strategy.latest.kpis;
+  const universe = universeTag(strategy);
+  const extended = isGroup ? null : extendedKpis(kpis);
   const differences = defaults ? strategyDifferences(strategy.config, defaults, ignored) : null;
   const trust = strategy.trust ? TRUST[strategy.trust] : null;
   const moved = strategy.change ? cagrMove(strategy.change) : null;
@@ -389,6 +394,13 @@ function DrawerBody({
                 </div>
               ))}
             </dl>
+            {universe || extended ? (
+              <p className="mt-2 text-xs text-muted">
+                {universe ? `Universe: ${universe}.` : null}
+                {universe && extended ? ' ' : null}
+                {extended ? `${extendedSentence(extended)}.` : null}
+              </p>
+            ) : null}
             <Curve
               values={strategy.latest.strategy}
               dates={strategy.latest.dates}

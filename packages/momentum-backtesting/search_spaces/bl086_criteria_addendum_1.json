@@ -1,0 +1,12 @@
+{
+  "item": "BL-055",
+  "committed": "2026-10-09",
+  "adds": "two more skip rules for the lookback-following voladj; bl055_criteria.json's variant (skip only for lookbacks >= 26 weeks, killed) is unchanged",
+  "reason": "owner (2026-10-09), after the first variant was killed for chasing reversing spikes: test skipping the latest month on every lookback, and not skipping at all",
+  "cells": {
+    "skip_all": "Config.voladj_lookbacks = True, voladj_skip = 'all': every selected lookback's return is measured 4 weeks back (a 4-week lookback covers weeks t-8..t-4, a 1-week lookback t-5..t-4)",
+    "skip_none": "Config.voladj_lookbacks = True, voladj_skip = 'none': every return runs to the latest close"
+  },
+  "everything_else": "as bl055_criteria.json: the same 10 strategies, settings, windows, volatility (trailing 26 weeks, latest), weights, z-scoring, and the same pass and confirm rules, applied to each cell on its own against today's score",
+  "trials": "3 lookback-following variants in all (counting the killed one); a cell passing alone is reported with that count"
+}

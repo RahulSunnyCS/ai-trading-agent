@@ -23,7 +23,7 @@ from ..engine.loop import run_backtest
 from ..engine.margin import compute_return_on_peak_margin
 from ..engine.registry import RunRecord, get_run, list_runs, record_run
 from ..engine.result import aggregate, bootstrap_ci
-from ..features.regime import regime_bucket_report
+from ..features.regime import regime_bucket_status
 from ..presets import STRATEGIES_DIR, preset_names
 from ..strategy.loader import StrategyValidationError, load_strategy_from_source
 from .models import (
@@ -138,6 +138,7 @@ def create_run(body: RunRequest, request: Request) -> RunResponse:
             return_on_peak_margin=margin.return_on_peak_margin,
         )
 
+    regime = regime_bucket_status(sessions, loaded.strategy.universe.underlying)
     return RunResponse(
         run_id=run_id,
         net_inr=result.net_inr,
@@ -164,7 +165,9 @@ def create_run(body: RunRequest, request: Request) -> RunResponse:
         ],
         bootstrap=bootstrap_out,
         margin=margin_out,
-        regime_buckets=regime_bucket_report(sessions, loaded.strategy.universe.underlying),
+        regime_buckets=regime.buckets,
+        regime_status=regime.status,
+        regime_message=regime.message,
     )
 
 

@@ -6,6 +6,7 @@ import { useRef } from 'react';
 import { cn } from '../../../lib/cn';
 import { formatInt } from '../../../lib/format';
 import { STATUS_LABEL } from '../../../lib/momentumFavourites';
+import { tradingSleeves } from '../../../lib/momentumWeek';
 import type { MomentumWeekCard } from '../../../types/momentum';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
@@ -20,6 +21,13 @@ function cardSummary(card: MomentumWeekCard): string {
     const trading = card.sleeves.filter((s) => s.on_cadence).length;
     if (trading === 0) return 'No sleeve rebalances this week';
   }
+  const trades = tradeSummary(card);
+  const sleeves = tradingSleeves(card);
+  // A group that follows every Friday trades one sleeve a week: say which.
+  return sleeves.length > 0 && sleeves.length <= 2 ? `${sleeves.join(' + ')} · ${trades}` : trades;
+}
+
+function tradeSummary(card: MomentumWeekCard): string {
   const sells = card.rows.filter((r) => ['SELL', 'TRIM'].includes(r.action)).length;
   const buys = card.rows.filter((r) => ['BUY', 'ADD', 'TOP UP'].includes(r.action)).length;
   if (!sells && !buys) return 'No trades this week';

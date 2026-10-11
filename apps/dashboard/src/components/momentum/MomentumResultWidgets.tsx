@@ -20,12 +20,14 @@ import {
   worstEpisodes,
   yearlyRows,
 } from '../../lib/momentumBenchmark';
+import { isAllFridays } from '../../lib/momentumFridays';
 import { drawdownStats } from '../../lib/momentumResult';
 import type { MomentumResult, MomentumSavedRun, MomentumSeries } from '../../types/momentum';
 import { SkeletonRows } from '../ui/Skeleton';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { MomentumCircuitExposureLoader } from './MomentumCircuitExposure';
 import { MomentumCompare } from './MomentumCompare';
+import { MomentumFridayLuckLoader } from './MomentumFridayLuck';
 import { MomentumLineChart } from './MomentumLineChart';
 import { MomentumMonthlyHeatmap } from './MomentumMonthlyHeatmap';
 import { InstrumentsPanel, TimelinePanel, TradesPanel, WeekPanel } from './MomentumResultDetails';
@@ -348,6 +350,16 @@ export function MomentumResultWidgets({
             />
           )}
         </Widget>
+        {isAllFridays(config) ? (
+          <Widget
+            wide
+            title="Friday luck"
+            meta="Each Friday on its own, against holding all of them"
+            placeholderRows={4}
+          >
+            {() => <MomentumFridayLuckLoader runId={runId} />}
+          </Widget>
+        ) : null}
         <Widget title="Drawdowns" meta="The deepest falls and how long they lasted">
           {() => <DrawdownsBody series={series} view={view} />}
         </Widget>

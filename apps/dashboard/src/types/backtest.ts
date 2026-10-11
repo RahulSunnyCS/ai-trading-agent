@@ -73,6 +73,9 @@ export interface RunResult {
   /** null when regime data isn't available (DATABASE_URL unset server-side)
    * or no regime row applies to this window. */
   regime_buckets: Record<string, number> | null;
+  /** Why `regime_buckets` is null: ok | unavailable | empty | connect_failed | missing_table. */
+  regime_status?: string | null;
+  regime_message?: string | null;
 }
 
 export interface RunSummary {

@@ -12,7 +12,8 @@ them). Any percentage you leave unallocated counts as cash.
 
 | Control | What it does |
 |---|---|
-| Strategy | Which saved strategy's target to compare against. |
+| Strategy | Which saved strategy's target to compare against. A [group](glossary:favourite-group), such as a strategy followed on [all Fridays](glossary:all-fridays), is listed once, as the whole account. |
+| Strategy live start date | For a single strategy that rebalances every 2 or 4 weeks: the Friday that counts as week 1. Not asked for a group: each of its sleeves keeps its own Fridays. |
 | Current portfolio | Enter holdings one by one, or paste a list. |
 
 ## Reading the results
@@ -30,6 +31,14 @@ is too large to quote and always uses the latest close.
 If live prices were expected but could not be used, a yellow note above the table says so and
 why: no Fyers token, a stock Fyers returned no price for, or stock history more than ten days
 old (the Friday 19:30 sync refreshes it). The table then shows the latest close.
+
+### A group
+
+A group is previewed as **one account**. Each sleeve's own target is worked out, then they are
+mixed, each weighted by its value since the last April reset, and that mix is compared with what
+you hold. The card above the table names the sleeve that trades this week (one a week for all
+Fridays) and shows each sleeve's share of the account and when the others next trade. On a first
+allocation every sleeve invests now, with an equal share.
 
 ## Common questions
 

@@ -8,6 +8,7 @@ before DAY plus DAY's own weekday, days to expiry and 09:15 VIX open. Needs DAY'
 research/bl056 (the nightly update will provide them; see BL-058).
 
     uv run --with pandas --with numpy --with duckdb python research/bl057/today.py 2026-10-09
+    uv run --with pandas --with numpy --with duckdb python research/bl057/today.py --basket DRB-6W2 2026-10-09
 """
 
 from __future__ import annotations
@@ -25,7 +26,8 @@ sys.path.insert(0, str(HERE))
 import rotate as R  # noqa: E402
 
 LAKE = "/Volumes/TradingData/lake"
-VARIANTS = {"N_": HERE.parent / "bl054" / "variants", "S_": HERE.parent / "bl056" / "variants"}
+sys.path.insert(0, str(HERE.parent / "common"))
+import varlib  # noqa: E402
 
 
 def _one(con, sql: str, what: str):
@@ -73,7 +75,7 @@ def backtest_one_day(name: str, day: date) -> float:
     from option_backtesting.legwise.engine import run_legwise
     from option_backtesting.legwise.schema import load_legwise
 
-    path = VARIANTS[name[:2]] / f"{name[2:]}.yaml"
+    path = varlib.variant_file(name, "variants")
     skipped: dict = {}
     res = run_legwise(load_legwise(path), data_dir(), day, day, skipped=skipped)
     if not res:
@@ -92,7 +94,10 @@ def main() -> None:
         f"NIFTY expiry {att['dte_N_expiry']} (dte {att['dte_N']}), SENSEX expiry {att['dte_S_expiry']} "
         f"(dte {att['dte_S']}); history {len(P)} days to {P.index[-1].date()}"
     )
-    print(f"settings: core {R.CORE}, at least {R.MIN_WIDE} Widesl, up to {R.BUY_MAX} Buy")
+    print(
+        f"settings: core {R.CORE} lots, at least {R.MIN_WIDE} Widesl, up to {R.BUY_MAX} Buy, "
+        f"{R.LOTS_PER} lot(s) per strategy ({R.N_CORE} core strategies)"
+    )
     if (day - P.index[-1]).days > 4:
         print(
             f"WARNING: results end {P.index[-1].date()}; days since then are missing from the scores"
@@ -121,7 +126,7 @@ def main() -> None:
     total = 0.0
     print("\nresult (1 lot each, before charges):")
     for p in picks:
-        pnl = backtest_one_day(p, day.date())
+        pnl = backtest_one_day(p, day.date()) * R.LOTS_PER
         total += pnl
         print(f"  {p:14s} {pnl:>9,.0f}")
     print(f"  {'TOTAL':14s} {total:>9,.0f}")

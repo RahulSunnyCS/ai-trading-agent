@@ -7,6 +7,10 @@ import { useState } from 'react';
 
 import type {
   AnatomyResponse,
+  CorrelationAvailable,
+  CorrelationMeasure,
+  CorrelationPick,
+  CorrelationResponse,
   DailyJob,
   DataStatus,
   DayForensics,
@@ -64,9 +68,13 @@ export function useDayForensics(
   day: string,
   sha: string | undefined,
   cuts: readonly string[] = DEFAULT_CUTS,
+  /** `strategy` is a rotation variant name (N_wide_0917), not a saved strategy's id. */
+  rotationVariant = false,
 ) {
   return usePolledResource<DayForensics>(
-    `${BASE}/day${query({ strategy, day, sha, cuts: cuts.join(',') })}`,
+    rotationVariant
+      ? `${BASE}/rotation/forensics${query({ variant: strategy, day, cuts: cuts.join(',') })}`
+      : `${BASE}/day${query({ strategy, day, sha, cuts: cuts.join(',') })}`,
   );
 }
 
@@ -78,6 +86,51 @@ export function useAnatomy(
 ) {
   return usePolledResource<AnatomyResponse>(
     `${BASE}/anatomy${query({ underlying, cuts: cuts.join(','), ...range })}`,
+  );
+}
+
+/** Strategies that have daily results now, and the groups a picker offers (BL-090). */
+export function useCorrelationAvailable() {
+  return usePolledResource<CorrelationAvailable>(`${BASE}/correlation/available`, { cache: true });
+}
+
+/**
+ * How the strategies the selectors name moved together. Always fetches: mount the component
+ * that calls it only when there is something to ask. The URL carries the selectors verbatim,
+ * so a change of selection is a new request, and a poll is not used (results change nightly).
+ */
+export function useCorrelation(
+  selectors: string,
+  range: { from?: string | undefined; to?: string | undefined } = {},
+  window = 63,
+) {
+  return usePolledResource<CorrelationResponse>(
+    `${BASE}/correlation${query({ selectors, window: String(window), ...range })}`,
+  );
+}
+
+export interface PickParams {
+  selectors: string;
+  k: number;
+  maxCorr: number;
+  measure: CorrelationMeasure;
+  require: readonly string[];
+  from?: string | undefined;
+  to?: string | undefined;
+}
+
+/** A basket of k strategies none of which are alike (in-sample; a description, not a test). */
+export function useCorrelationPick(p: PickParams) {
+  return usePolledResource<CorrelationPick>(
+    `${BASE}/correlation/pick${query({
+      selectors: p.selectors,
+      k: String(p.k),
+      max_corr: String(p.maxCorr),
+      measure: p.measure,
+      require: p.require.join(','),
+      from: p.from,
+      to: p.to,
+    })}`,
   );
 }
 

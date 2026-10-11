@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-09
+Last updated: 2026-10-11
 
 ## Open
 
@@ -11,31 +11,36 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Priority | Status | Type | Area |
 |---|---|---|---|---|---|
+| [BL-076](BL-076-fyers-refresh-token-login.md) | Fyers unattended login through the refresh-token grant | Dropped: Fyers disabled the refresh-token API (code -16, SEBI); the spike returned no token. Follow-up BL-077 | 2026-10-10 |
+| [BL-077](BL-077-fyers-daily-login-reminder.md) | Fyers daily login reminder, dashboard banner and a truthful 08:05 job | Superseded by BL-079: the 08:05 job is removed, the dashboard already has a token banner, and the owner chose Angel One as the fallback source | 2026-10-10 |
+| [BL-078](BL-078-angel-one-data-source.md) | Angel One SmartAPI as a second 1-minute data source: what it can and cannot give versus the Fyers files | P1 | In progress | research | options |
+| [BL-079](BL-079-collector-fyers-or-angel-source.md) | Daily collector: Fyers when logged in, Angel One otherwise | Done: `obt daily` falls back to Angel One, Fyers login repairs those days, Source section + dashboard banner, Momentum backup source | 2026-10-10 |
 | [BL-001](BL-001-momentum-result-integrity.md) | Momentum result integrity: goldens, parameter coverage, drift alerts | P0 | In progress | improvement | momentum |
 | [BL-010](BL-010-momentum-evaluation-review.md) | Momentum evaluation review: prove the arithmetic, remove hindsight, fix selection | P0 | In progress | research | momentum |
 | [BL-012](BL-012-scheduler-service.md) | Scheduler service: one home for every recurring ingestion and maintenance job (laptop now, hostable later) | P0 | In progress | feature | infra |
 | [BL-014](BL-014-ci-and-merge-gates.md) | CI and merge gates: nothing reaches `main` while checks are red | P0 | In progress | chore | infra |
 | [BL-024](BL-024-forward-signal-journal.md) | Forward-signal journal: record every weekly signal from now on | P0 | In progress | feature | momentum |
 | [BL-034](BL-034-options-history-lake.md) | Options history lake: two years of vendor 1-minute data in `trading-data`, derived tables for straddle backtests, daily top-up | P0 | In progress | feature | trading-data |
-| [BL-058](BL-058-options-rotation-forward-journal-and-ui.md) | Options rotation: forward paper journal from Mon 12 Oct (picks recorded before 09:17, scored nightly) and the Options Lab screens it needs | P0 | Planned | feature | options |
+| [BL-058](BL-058-options-rotation-forward-journal-and-ui.md) | Options rotation: forward paper journal from Mon 12 Oct (picks recorded before 09:17, scored nightly) and the Options Lab screens it needs | P0 | In progress: journal built, first entry Mon 12 Oct 09:16 (lists A, B, C, REF); Phase 4 view built 2026-10-11 (page, shadow, explain, matrix, daily log, basket mode, forward vs periods, drawdowns, drift, family pulse; paper vs real waits for the charge model and contract notes); day-60 read-out pending | feature | options |
+| [BL-087](BL-087-momentum-all-fridays-split.md) | Momentum: backtest and follow a config split across every rebalance Friday | P0 | Built; live migration pending | feature | momentum |
+| [BL-089](BL-089-backlog-tracks-and-github-board.md) | Backlog restructure: research / product / platform tracks, a generated index and `DONE.md`, one issue per item and a GitHub Projects board with a "Needs me" view | P0 | Ready | chore | cross-cutting |
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-015](BL-015-research-gate.md) | Research gate: pre-register every experiment, log every override | P1 | In progress | chore | cross-cutting |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
 | [BL-022](BL-022-analog-day-search.md) | "Days like today": analog-day search for intraday options | P1 | Idea | research | options |
 | [BL-025](BL-025-live-money-rules.md) | Live-money rules for Momentum: written before the first rupee, enforced by alerts | P1 | In progress | feature | momentum |
 | [BL-026](BL-026-realised-vs-backtest-options.md) | Options: realised P&L against the backtest of the same days | P1 | Planned | feature | options |
-| [BL-029](BL-029-point-in-time-universe-in-ui.md) | Point-in-time universe as a choice on the Broad tab | P1 | Planned | feature | momentum |
 | [BL-030](BL-030-choose-journal-favourites.md) | Choose the ~8 favourites to track and trade | P1 | Idea | research | momentum |
 | [BL-035](BL-035-consolidation-tightness-feature.md) | Consolidation tightness as a Momentum ranking feature (the cheap "flag") | P1 | Idea | research | momentum |
+| [BL-036](BL-036-momentum-ui-from-bl010.md) | Momentum dashboard: what the BL-010 review changes on screen | P1 | In progress | improvement | dashboard |
 | [BL-038](BL-038-monthly-expiry-stock-options-collection.md) | Collect every F&O stock's options on its monthly expiry day, from Fyers, from October 2026 | P1 | Planned | feature | options |
 | [BL-040](BL-040-fill-the-vendor-gap-from-algotest.md) | Fill the vendor gap (26 Aug – 24 Sep 2026) from AlgoTest, for every index and stock (on hold: owner asks the vendor first) | P1 | Planned | feature | trading-data |
 | [BL-044](BL-044-local-service-auth-and-network-hardening.md) | Local-service auth and network hardening: Host/Origin guards, OAuth state bound to the browser, an internal token, tunnel checks | P1 | Planned | improvement | cross-cutting |
-| [BL-050](BL-050-momentum-filter-poc.md) | Momentum filter POC: volume, relative strength, overextension, residual momentum, trend quality (Broad only) | P1 | Planned | research | momentum |
 | [BL-051](BL-051-momentum-this-week-and-journal.md) | Momentum "This week" and Journal redesign: favourite statuses, Friday timeline, orders from Fyers holdings, alerts | P1 | In progress | feature | momentum |
+| [BL-074](BL-074-point-in-time-categories-nse-basic-industry.md) | Point-in-time categories from NSE's Basic Industry classification | P1 | Planned | research | momentum |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-039](BL-039-broad-warm-path-and-weekly-job-cost.md) | Broad warm path and weekly-job cost (follow-up to BL-005) | P2 | Planned | improvement | momentum |
 | [BL-041](BL-041-in-app-guide.md) | In-app Guide: what each dashboard section does and how to use it | P2 | In progress | feature | dashboard |
-| [BL-036](BL-036-momentum-ui-from-bl010.md) | Momentum dashboard: what the BL-010 review changes on screen | P2 | Planned | improvement | dashboard |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |
 | [BL-017](BL-017-momentum-settings-module.md) | Momentum: one settings module, and split `api.py` | P2 | Ready | improvement | momentum |
@@ -54,7 +59,29 @@ Sorted by priority (P0 first), then ID.
 | [BL-059](BL-059-whole-day-start-time-curve.md) | Whole-day start-time curve: NIFTY and SENSEX Widesl, Dir ATM and Buy from 12:02 to 15:02 (78 more variants) | P2 | Done: descriptive | research | options |
 | [BL-060](BL-060-sensex-widesl-closest-premium.md) | SENSEX Widesl by closest premium (₹250 and ₹320) across the whole day, beside the live OTM2 strike | P2 | Done: descriptive | research | options |
 | [BL-061](BL-061-rotation-with-closest-premium-widesl.md) | Daily rotation with closest-premium Widesl in the candidate list: their share of the 5 daily lots, and on which days | P2 | Done: descriptive | research | options |
+| [BL-062](BL-062-whole-day-rotation.md) | Daily rotation over the whole day (start times 09:17 to 15:17, 248 variants) with closest-premium Widesl | P2 | Done: passes (exploratory) | research | options |
+| [BL-063](BL-063-rotation-after-charges.md) | The rotations after brokerage (₹13 a lot) and statutory charges (STT, exchange, GST …) | P2 | Done | research | options |
+| [BL-064](BL-064-drb-daily-ranked-basket.md) | DRB, the Daily Ranked Basket: the whole-day rule at 6 core lots, at least 2 or 3 Widesl, up to 2 Buy | P2 | Done: passes (exploratory) | research | options |
+| [BL-065](BL-065-drb-two-lots-per-strategy.md) | DRB with 2 lots per strategy (3 strategies × 2 lots) to cut charges | P2 | Done: inconclusive | research | options |
+| [BL-066](BL-066-drb-6w3l2-daily-stop.md) | Daily stop-loss levels (₹10k, 12k, 15k, 17k, 20k) for DRB-6W3L2 | P2 | Done: no level helps | research | options |
+| [BL-067](BL-067-drb-weight-map.md) | Which of DRB's four ranking criteria carry the edge? A 16-row weight map | P2 | Done: recent return carries it; nothing beats the baseline beyond noise | research | options |
+| [BL-068](BL-068-drb-recent-controls-and-label-placebo.md) | Is DRB's recent-return edge real? Lookback ladder, lag, reverse, label placebo, stability of the BL-067 rows | P2 | Done: recent return is momentum and stable; fit criteria not shown real (placebo: 1 of 20 above) | research | options |
+| [BL-069](BL-069-drb-new-ingredients.md) | New ingredients for DRB's ranking: family-pooled recent, overnight gap, longer fit lookbacks, spacing, streak shapes, sit-out gates | P2 | Done: no ingredient beats the baseline; family-pooled recent (F=0.5) lifts recent-only to ₹4.05 lakh | research | options |
+| [BL-070](BL-070-drb-without-per-strategy-stops.md) | The 248 variants with no per-strategy MTM stop: are the stops worth it, does DRB's edge depend on them | P2 | Done: edge survives without stops but margin over chance shrinks; stops worth keeping only for SENSEX Widesl OTM | research | options |
+| [BL-071](BL-071-drb-out-of-period-and-2022-import.md) | Does DRB's rule hold outside the studied year? Jan–Aug 2025: recent edge NOT confirmed (baseline −₹1.27 lakh vs no-recent); 2022–2024 import (BL-034 Phase 5) started | P2 | Done: hold-out 2022–2024 kills the recent edge and the candidate; the fit criteria carry the rule; NIFTY 2022–24 imported | research | options |
+| [BL-072](BL-072-drb-blend-long-fit-lookbacks.md) | A blend built around the longer fit lookbacks: recent, family recent, weekday, days-to-expiry, VIX | P2 | Done: candidate killed by the hold-out; nothing adopted | research | options |
+| [BL-073](BL-073-drb-recency-weight-grid.md) | How much recency? A fixed grid of recent weight and fit lookbacks, judged by the worst period | P2 | Done: nothing meets the bar; recent 10% + 5/21/63/126 is the only row above chance in all three periods | research | options |
+| [BL-074](BL-074-drb-family-by-type-and-start-band.md) | Family recent pooled by strategy type and start-time band (index- and strike-agnostic) | P2 | Done: own 0 + family-band 10 is above chance in all three periods; journal candidate | research | options |
+| [BL-075](BL-075-drb-final-map-and-structural-switches.md) | The final map: 100 weightings × 3 periods, then the structural switches (Widesl minimum, Buy add-on, closest-premium) on the robust region | P2 | Done: 3 of the top 10 weightings real under label shuffles (list A yes); no cell meets the 0.85 bar; no structural switch adopted | research | options |
+| [BL-080](BL-080-drb-wider-closest-premium-families.md) | Four more closest-premium Widesl families: NIFTY ₹40 / ₹60 and SENSEX ₹120 / ₹200 | P2 | Done: closest-premium additions harmful, Dir ITM1 useful, leave-one-out table; block 4(a) recorded (298 map: 58% of cells above chance in all periods), pruning (b) not run | research | options |
+| [BL-081](BL-081-drb-hourly-checkpoints-and-no-trade.md) | Hourly checkpoints for picks that have not started yet (state at 10:30–13:30: VIX, trend, VWAP, ATR, RSI, pivots) and a no-trade option | P2 | Done: no state variable passes; block 3 (adjustment rule) nothing kept under the registered rule, re-timing gain is one half-year and reverses in 2022–24; two small owner's-rule versions lose in 2022–24 | research | options |
+| [BL-083](BL-083-event-triggered-intraday-entries.md) | Event-triggered intraday entries: fire Widesl / Dir / Buy the minute a pivot, VIX, straddle or RSI condition is met, overriding the next scheduled pick | P2 | Done (phases 1–2): Dir after pivot-with-trend and after RSI exhaustion wins on the last two years (+₹79k B, +₹55k REF), loses −₹10k to −₹27k for A, B and C in 2022–24; live poller not started | research | options |
 | [BL-057](BL-057-daily-four-criteria-rotation.md) | Daily four-criteria rotation (recent P&L, weekday, days-to-expiry, VIX fit) over the 66 NIFTY + SENSEX variants (POC) | P2 | Done: inconclusive | research | options |
+| [BL-088](BL-088-own-history-sector-relative-strength.md) | Sector scoring on its own relative strength: time-series RS (continuation and reversal) as a replace or tilt on the ETF rotation, then Broad's category layer | P2 | Idea | research | momentum |
+| [BL-090](BL-090-strategy-correlation-and-diverse-baskets.md) | Strategy correlation and diverse baskets: `obt rotation corr` / `corr-pick`, an API route and an Options Lab › Correlation heatmap, dynamic over any strategy with results | P2 | In progress | feature | options |
+| [BL-091](BL-091-straddle-premium-exhaustion-study.md) | Straddle premium exhaustion: historical incremental-value study for the Live widget (derivatives, persistence, retracement, IV, spot activity, nearby strikes) for the proposed Live widget | P2 | Planned | research | options |
+| [BL-093](BL-093-rotation-paper-vs-real.md) | Rotation paper versus real: waterfall from the journal through charges, days not placed and changes to the contract-notes P&L (widget 10 of the Rotation workspace) | P2 | Blocked: contract-notes cutover, charge model in the nightly update, placement record in use | feature | options |
+| [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
@@ -65,10 +92,15 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-029](BL-029-point-in-time-universe-in-ui.md) | Point-in-time universe as a choice on the Broad tab | Done: delivered by BL-036 Phase 1 (the third universe card, the default, the universe on the result and in Saved runs); a default run went from 41.4% to 33.3% | 2026-10-10 |
 | [BL-052](BL-052-momentum-saved-runs-redesign.md) | Momentum Saved runs: one row per strategy, why a result moved, findings | Done: one strategy per normalised set of settings, run fingerprints and the why-it-moved log, the merge (applied live), the strategies page and drawer, findings; Phases 1–3 merged (#138, #139, Phase 3 PR). Follow-ups in its Log | 2026-10-08 |
 | [BL-003](BL-003-momentum-weekly-rebalance-loading.md) | Momentum: honest loading states on Weekly signal and Rebalance | Superseded by BL-051: its findings are Phase 2's loading-state task on the merged This week page | 2026-10-08 |
 | [BL-027](BL-027-rebalance-basket-file.md) | Weekly rebalance as a broker basket-order file | Superseded by BL-051: Fyers basket file and recorded fills are its Phase 4; broker answered (Fyers) | 2026-10-08 |
 | [BL-049](BL-049-momentum-scores-redesign.md) | Momentum Scores redesign: market strip, sector rotation map, 1–10 score strips, stock drawer | Done: Sectors and Stocks views, rotation map, sector page, stock drawer, saved views, circuit locks and the strip guide; Phases 1–3 and review fixes merged (#124, #126–#128) | 2026-10-08 |
+| [BL-086](BL-086-voladj-follows-lookbacks.md) | Volatility-adjusted score that follows the selected lookbacks and weights | Killed, all three skip rules (26w+, every lookback, none): -7.5 to -12.0 pts a year after tax on FY2018-22. Keep today's 30/56-week score; found that its skip-month widens the window instead of skipping | 2026-10-09 |
+| [BL-050](BL-050-momentum-filter-poc.md) | Momentum filter POC: volume, relative strength, overextension, residual momentum, trend quality | No survivor: 4 of 7 features pass the screen (turnover expansion t 4.8), none improves the frozen ensemble (PBO 0.72); hold-out unread; the owner's volume gate pointed the wrong way | 2026-10-09 |
+| [BL-085](BL-085-momentum-improvement-levers.md) | Six levers to improve the Broad strategies | No lever adopted: slower cadence, ETF blend, daily stop, inverse-vol sizing and residual momentum all killed after tax; the tax hold cannot act in Broad; all-Fridays reported | 2026-10-09 |
+| [BL-084](BL-084-momentum-stop-loss.md) | Weekly stop-loss on the Broad Momentum strategies | Killed: 0 of 30 cells pass; stops cost little but do not reduce Ulcer or falls on 11 strategies; engine stop kept, off by default | 2026-10-08 |
 | [BL-006](BL-006-momentum-scores-table-responsiveness.md) | Momentum Scores table: responsive sort and filter | Superseded by BL-049: paged, memoised rows with a deferred filter are in its Phase 1 | 2026-10-07 |
 | [BL-018](BL-018-brittle-benchmark-tests.md) | Momentum tests fail when the live data is refreshed | Done: six data-dependent tests fixed (sessions checked against the bhavcopy calendar, isolated reference tests, current list matched to a curated day, tax classes over priced companies); tests only | 2026-10-07 |
 | [BL-004](BL-004-research-stack-production-mode.md) | Production-build mode for the local research stack (`bun run start:prod`) | Done: `bun run start:prod` serves a password-gated production build on 127.0.0.1:5190, rebuilt only on change (restart 4.2 s); page shell 3.5–4.9 s → ~0.1 s, JS 4.8 MB → 437 KB. Pages still wait 17–20 s on slow Momentum API calls (PRs #101/#104), so the ≤ 1.5 s goal is unmet on live data | 2026-10-07 |

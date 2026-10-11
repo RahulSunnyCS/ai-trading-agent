@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import {
   MOMENTUM_SETTING_LABELS,
+  TRUST_NOTE,
+  companionLine,
   describeConfig,
   diffConfigs,
   hindsightWarning,
   modifiedSections,
   settingsSectionOf,
+  trustNote,
 } from '../momentumConfig';
 
 const BASE = {
@@ -41,6 +44,23 @@ describe('describeConfig', () => {
     );
     expect(d.cadence).toBe(cadence);
     expect(d.cadenceChip).toBe(chip);
+  });
+
+  it('says all Fridays for a split run, and ignores the flag where it does nothing', () => {
+    const split = describeConfig(
+      {
+        ...BASE,
+        rebalance: 'weekly',
+        rebalance_every: 4,
+        rebalance_offset: 2,
+        split_fridays: true,
+      },
+      'etf',
+    );
+    expect(split.cadence).toBe('every 4 weeks, all Fridays');
+    expect(split.cadenceChip).toBe('Every 4 weeks (all 4 Fridays)');
+    const weekly = describeConfig({ ...BASE, rebalance: 'weekly', split_fridays: true }, 'etf');
+    expect(weekly.cadenceChip).toBe('Weekly rebalance');
   });
 
   it('monthly wins over a leftover rebalance_every', () => {
@@ -154,8 +174,21 @@ describe('describeConfig chips', () => {
       },
       'broad',
     );
-    expect(chips[1]).toEqual(['universe', 'Nifty Total Market', 'universe']);
+    expect(chips[1]).toEqual(['universe', "Today's list", 'universe']);
     expect(chips[2]).toEqual(['selection', 'top 10 stocks / exit >20', 'selection']);
+  });
+
+  it('names the point-in-time universe, which is always tradability-filtered', () => {
+    const chips = pairs(
+      {
+        ...BASE,
+        broad_universe: 'turnover_rank',
+        broad_liq_min_turnover_cr: 1,
+        broad_category_mode: 'on',
+      },
+      'broad',
+    );
+    expect(chips[1]).toEqual(['universe', 'Point in time · ≥ ₹1 Cr/day', 'universe']);
   });
 
   it('names an every-N cadence, with its phase, in the cadence chip', () => {
@@ -350,9 +383,92 @@ describe('hindsightWarning', () => {
     expect(w?.realismOff).toEqual([]);
   });
 
+  it("says today's list flatters, and points at the point-in-time universe", () => {
+    const w = hindsightWarning({ dataset: 'broad', broad_universe: 'total_market' });
+    expect(w?.detail).toMatch(/today's stock list/);
+    expect(w?.detail).toMatch(/As each year saw it/);
+  });
+
+  it('counts the point-in-time universe as filtered and stops blaming the stock list', () => {
+    const w = hindsightWarning({
+      dataset: 'broad',
+      broad_respect_circuits: true,
+      broad_universe: 'turnover_rank',
+    });
+    expect(w?.realismOff).toEqual([]);
+    expect(w?.headline).toMatch(/upper bound/);
+    expect(w?.detail).not.toMatch(/today's stock list/);
+    expect(w?.detail).toMatch(/2026 themes/);
+  });
+
+  it('names neither 2026 themes nor the extended-tags figure when categories are off', () => {
+    for (const universe of ['turnover_rank', 'all_liquid', 'total_market']) {
+      const w = hindsightWarning({
+        dataset: 'broad',
+        broad_universe: universe,
+        broad_category_mode: 'off',
+      });
+      expect(w?.detail, universe).not.toMatch(/2026 themes|extended|categories/i);
+    }
+  });
+
+  it('says the later-failed names are ranked but not bought when categories are on', () => {
+    const w = hindsightWarning({
+      dataset: 'broad',
+      broad_universe: 'turnover_rank',
+      broad_category_mode: 'on',
+    });
+    expect(w?.detail).toMatch(/only if it carries a category tag/);
+    expect(w?.detail).toMatch(/extended-tags figure/);
+    expect(w?.detail).not.toMatch(/no hindsight\. The categories/);
+  });
+
   it('warns on Custom Index, and not on ETF Rotation or the Nifty 50 stock set', () => {
     expect(hindsightWarning({ dataset: 'custom_index' })).not.toBeNull();
     expect(hindsightWarning({ dataset: 'etf' })).toBeNull();
     expect(hindsightWarning({ dataset: 'stock' })).toBeNull();
+  });
+});
+
+describe('trustNote', () => {
+  it('is the owner’s wording for Broad and Custom Index, and absent elsewhere', () => {
+    expect(trustNote({ dataset: 'broad' })).toBe(TRUST_NOTE);
+    expect(trustNote({ dataset: 'custom_index' })).toBe(TRUST_NOTE);
+    expect(trustNote({ dataset: 'etf' })).toBeNull();
+    expect(trustNote({ dataset: 'stock' })).toBeNull();
+    expect(TRUST_NOTE).toMatch(/^In-sample\./);
+    expect(TRUST_NOTE).toMatch(/22–25/);
+  });
+});
+
+describe('companionLine', () => {
+  it('shows the extended-tags figures with the gap to the headline', () => {
+    const line = companionLine({
+      status: 'computed',
+      tags: 'extended',
+      cagr: 0.334,
+      max_drawdown: -0.386,
+      cagr_impact: -0.052,
+    });
+    expect(line?.text).toBe('33.4% with extended tags (-5.2 pp)');
+    expect(line?.title).toContain('33.4% CAGR');
+    expect(line?.title).toContain('38.6% max drawdown');
+    expect(line?.title).toMatch(/today's classification/);
+  });
+
+  it('says when the run already uses extended tags, and why a figure is missing', () => {
+    expect(companionLine({ status: 'this_run', cagr: 0.3, max_drawdown: -0.3 })?.text).toMatch(
+      /already uses extended/,
+    );
+    const failed = companionLine({ status: 'failed', reason: 'FileNotFoundError: wide' });
+    expect(failed?.text).toBe('Extended-tags figure unavailable');
+    expect(failed?.title).toBe('FileNotFoundError: wide');
+  });
+
+  it('is silent with no category layer, on a weekly run, or on an old result', () => {
+    expect(companionLine({ status: 'not_applicable', reason: 'no category layer' })).toBeNull();
+    expect(companionLine({ status: 'skipped', reason: 'weekly run' })).toBeNull();
+    expect(companionLine(undefined)).toBeNull();
+    expect(companionLine(null)).toBeNull();
   });
 });

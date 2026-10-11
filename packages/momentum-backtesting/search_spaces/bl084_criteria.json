@@ -1,0 +1,64 @@
+{
+  "item": "BL-053",
+  "committed": "2026-10-08",
+  "note": "Pre-registered before any stop-loss result was computed. Never edit after a run; supersede with bl053_criteria_addendum_N.json naming what it replaces.",
+  "strategies": {
+    "configs": {
+      "953915b70ffe": "Trio Fortnightly",
+      "afbc88e00f32": "Five Sectors Monthly",
+      "fbb7ab054238": "Four Sectors, Four Lookbacks",
+      "5f86065cbf17": "Five Sectors, Stock Tilt",
+      "64488b1d979d": "Six Sectors, Equal Weights",
+      "754368b3d2e8": "Four Sectors, Quick Exit",
+      "f5c09c711710": "Four Sectors, Short Lookbacks",
+      "f35ff75965bb": "Six Sectors, Fast Signals",
+      "43046da93329": "Five Sectors, Recent Weights",
+      "9f9ef3aa6c1b": "Five Sectors, Rank Sum"
+    },
+    "configs_source": "data/search/round7_A results, as listed in docs/top-strategies-2026-10-08.md",
+    "configs_phases": "every rebalance phase, equal capital tranches, equity averaged (method._score_group)",
+    "ensemble": "search_spaces/bl010_phase6_frozen.json: four sleeves at their frozen offsets, equal capital reset each April (choose.ensemble_curve)",
+    "count": 11
+  },
+  "settings": {
+    "space": "search_spaces/round7_A.toml fixed settings (= bl010_phase6_frozen.json fixed_settings)",
+    "universe": "turnover_rank (point in time), curated tags",
+    "tax": "pre-tax",
+    "start": "2017-01-01",
+    "end": "2026-10-02"
+  },
+  "grid": {
+    "stop_from_buy": [null, 0.15, 0.2, 0.25],
+    "stop_from_peak": [null, 0.2, 0.25, 0.3],
+    "stop_proceeds": ["cash", "top"],
+    "stop_delay": [0, 1],
+    "cells": "every combination with at least one stop on: 15 threshold pairs x 2 proceeds = 30 cells, each run at both delays; the baseline is both stops off"
+  },
+  "fill_timing": "The engine fills Broad trades only at a Friday close. stop_delay 0 sells at the close the fall is seen on (optimistic: the order cannot be placed before Monday). stop_delay 1 sells at the next Friday close (pessimistic). A Monday-open fill lies between them in time, so a cell must pass at BOTH delays.",
+  "metrics": {
+    "cagr": "choose.cagr on the weekly curve",
+    "max_drawdown": "deepest peak-to-trough fall of the weekly curve",
+    "ulcer": "choose.ulcer",
+    "third_worst_fy_excess": "choose.lower_bound(choose.fy_excess(curve, Nifty200 Momentum 30 TRI, FY2018-FY2026))"
+  },
+  "pass_rule_per_cell": {
+    "a_risk": "Ulcer index AND max drawdown both lower (shallower) than the baseline's in at least 7 of the 11 strategies",
+    "b_return": "median over the 11 strategies of (cell CAGR - baseline CAGR) >= -0.02",
+    "c_bad_years": "median over the 11 strategies of third-worst-FY excess >= the baseline's median",
+    "both_delays": "a cell passes only if a, b and c all hold at stop_delay 0 AND at stop_delay 1"
+  },
+  "verdict": {
+    "helps": "at least 10 of the 30 cells pass",
+    "inconclusive": "1 to 9 cells pass: they are named, not adopted",
+    "kill": "no cell passes"
+  },
+  "monday_open_check": "report only, not part of the verdict: the audit replay (audit/studies.monday_open) of the ensemble's four sleeves, baseline and each passing cell at stop_delay 0, repriced at the next trading day's open",
+  "hold_out": "2012-2016 stays sealed (BL-010 addendum 5); nothing after 2026-10-02 is used",
+  "will_not_run": [
+    "other thresholds or a finer grid",
+    "a re-buy cool-down after a stop",
+    "per-strategy tuned stops",
+    "after-tax runs (BL-010 Phase 7)",
+    "the 2012-2016 hold-out"
+  ]
+}

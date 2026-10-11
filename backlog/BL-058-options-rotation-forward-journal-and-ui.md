@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — owner, 2026-10-09: the forward record must start before Monday 2026-10-12 09:15 |
-| **Status** | Planned |
+| **Status** | In progress — journal built 2026-10-10 (Phases 0b, 1, 2); Phase 4 view built 2026-10-11 (widgets 1–9 and 11; widget 10 paper vs real waits for the charge model and the contract-notes cutover); day-60 read-out pending |
 | **Type** | feature |
 | **Area** | options / dashboard / scheduler |
 | **Created** | 2026-10-09 |
@@ -179,9 +179,164 @@ equal-weight, live mix, lots per window.
 
 ### Phase 4 — Build the rotation view (after Monday; not part of the P0 deadline)
 - Endpoints, the view, Guide page, hide the "hide" items. Separate review.
+- **Added 2026-10-10 (owner: any UI change goes to the backlog; none is built with the journal):** the
+  view must show the four forward lists (A, B, C, REF) side by side, not one rule: per list the day's
+  three strategies and Buy strategy with their composite scores, the running gross and max drawdown, the
+  share of random same-shape picks it has beaten, and the difference to REF with its bootstrap
+  interval; a single "chain intact" badge from `obt rotation verify` and the chain head; the days
+  waiting on results (nightly update not yet run) and any day not recorded because the VIX open could
+  not be read. Data comes from `rotation/` files via new `/legwise/rotation/*` endpoints (the files are
+  read-only to the API). Also a per-list "what changed since yesterday" strip (members swapped) for the
+  effort of re-setting AlgoTest.
+- **Owner decisions for the view, 2026-10-10** (from the five-widget plan: rotation page with Today's baskets,
+  Why this pick? and rank correlation, Daily log, Strategy Matrix, Shadow scoreboard):
+  - Default benchmark on the headline strip: the **fixed base** (see the Phase 0b amendment); REF second,
+    the random-basket median third. Comparisons in ₹ per lot-day.
+  - Default focus list for the headline: **A**.
+  - The dashboard may write a **placement record** (placed / changed / not placed, with a note), append-only
+    to its own file under `rotation/`, behind the dashboard password; the hash-chained journal is never
+    edited.
+  - The 2022–24 results for the Strategy Matrix are imported **after** its first version, into a separate
+    read-only folder the morning pick never reads.
+  - Today's baskets and the other rotation screens are **owner-only** on the hosted dashboard until
+    showing daily picks to friends has been checked against the signal-sharing note in `business.md`.
+- **Widgets 6–10, 2026-10-10** (owner: add them here, recommended options taken; design in the plan page
+  https://claude.ai/artifact/KF4EvYf9f63uNco3MZ4oKm). Built after the five above, one reviewed PR each:
+  - **6. Today's basket on the Correlation tab** (BL-090). A preset that fills the tab with one list's
+    picks for one day, with a list toggle that includes the fixed base (its doubled Widesl drawn as one
+    4-lot line), windows P1 / P2 / last 63 / Forward, and a link from the Daily log drawer. No new maths:
+    `GET /legwise/correlation?selectors=<the three picks>`. Muted below 20 common days; a pick without
+    results is listed, never zero. Done when it equals `obt rotation corr` for the same names and window.
+    Starts straight after the rotation page. Example from the stored results: N_wide_0932, S_dir_1202,
+    S_wide_1347 correlate −0.05 to +0.17 in P1 and P2, and together their worst drawdown is 28% (P1) and
+    59% (P2) shallower than the three run alone.
+  - **7. Forward days vs research periods.** A panel showing the forward window's mix of opening VIX band,
+    NIFTY and SENSEX DTE and weekday against P1, P2 and P3 (after the import), with VIX open and each
+    index's day range as P10 / median / P90, and the total-variation distance to each period. Needs a
+    day-range column in `days.csv`, written by the nightly update from the lake's 1-minute index bars, and
+    `GET /legwise/rotation/regime`. **Lands before the 60-day read-out**, so the read-out can say what kind
+    of market it tested. Already visible in the real columns: NIFTY and SENSEX swapped expiry weekdays
+    between P2 and P1, so a DTE fit from one period describes a different weekday in the other.
+  - **8. Drawdown episodes.** Underwater chart per list against the fixed base (per lot or basket), an
+    episode table (peak, trough, back, depth per lot, sessions down, sessions to recover, the base over the
+    same days, stops) and the peak-to-trough loss by family × start band. **An episode is a fall of at least
+    ₹500 per lot below the running peak.** `GET /legwise/rotation/drawdowns`, a pure function in
+    `rotation/report.py`. Readable from about 60 sessions; before that it lists without ranking.
+  - **9. Selection drift.** Share of core picks by family, index, strike method and start band for history
+    (P1, reconstructed), last 63 and last 21, plus a concentration table (distinct variants, most-picked
+    variant, single-band baskets, Widesl minimum and Buy counts). **A share is flagged when the last 21
+    sessions fall outside that list's own rolling 21-session P10–P90 in P1**, not a fixed number of points.
+    Descriptive only; nothing changes. `GET /legwise/rotation/drift`. Readable from about 60 sessions.
+  - **10. Paper vs real. Moved to [BL-093](BL-093-rotation-paper-vs-real.md) on 2026-10-11 (owner: take it later).** A waterfall from paper gross through charges, days not placed, the owner's
+    changes and execution to the real P&L, a day table, and a Real column in the Daily log. Waits for three
+    things: the placement record; **the BL-063 charge model applied to stored results in the nightly update,
+    as its own registered change** (the `costs` column is zero today, so net equals gross); and the
+    contract-notes cutover (TODO §2). **The rotation trades on one broker account used for nothing else**, so
+    its contract notes are the real figure without filtering; until that holds, a day whose rotation
+    contracts cannot be told apart is marked "mixed" and left out of the gap.
+  - **11. Family pulse (added 2026-10-11, owner: design it).** "Is morning short-premium working right now?"
+    A Rotation-page card with the **12 cells the family-band criterion pools**: {Widesl incl. closest-premium,
+    Dir incl. Dir ITM1, Buy} × start band (09:17–10:02, 10:17–12:02, 12:17–14:02, 14:17–15:17), across both
+    indices and every strike, exactly `score.family_index`. Columns: mean gross ₹ per lot-day over the last
+    5 / 21 / 63 sessions, P1 and P2 for reference, each with "sessions · variants" (same-day variants are not
+    independent, so sessions is the count that matters); a rolling-21 sparkline over 126 sessions with the P1
+    mean dashed; "ranking sees" = the cell's rank 1–12 on the family-band criterion for the next 09:16 pick
+    (equal to the `rfam` value Why this pick reconstructs); chips where today's picks of A/B/C/REF fall; and the
+    focus list's share of core picks in the cell over the last 21 (frequency beside profit, as the proposal asks).
+    A cell is flagged when its last-21 mean sits outside its own rolling-21 P10–P90 in P1 (the drift rule).
+    Header note: the criterion carries 5% of the composite in A, B and C and none in REF. Index filter allowed,
+    labelled "not what the ranking uses". Click a row → Strategy Matrix pulse view (index × strike) filtered to
+    that family and band. Weekend sessions excluded as in the matrix; missing is never zero; before forward days
+    the windows read the stored research results, labelled. `GET /legwise/rotation/pulse?as_of&list`, a pure
+    function in `rotation/pulse.py` over the matrix's cached cube. Done when the cell means equal the matrix
+    pooled over the same variants and days, and the rank equals the composite's `rfam` for a recorded day.
+    Example from the stored results as of 9 Oct 2026: Dir 09:17–10:02 last 21 ₹676 per lot-day against ₹312
+    in P1 (rank 1 of 12); Widesl 09:17–10:02 ₹78 against ₹147 (rank 11); Buy 14:17–15:17 below zero in every
+    window (−₹121 last 21, −₹13 P1; rank 12). Built after widgets 6–9; no new data, no pre-registration needed.
+  - Not scheduled: basket-level day replay (built when a real losing day raises a question; the Daily log
+    drawer opens Day forensics per pick until then) and the two premium widgets (wait for BL-091 and an
+    intraday collector).
 
 ### Phase 5 — Review at 60 trading days
 - Score once against the Phase 0 rule; write the Result here and in BL-057's Log.
+
+### Phase 0b — what the journal records (dated 2026-10-10, registered before the first entry)
+**Amendment 2026-10-10 (owner, before the first entry): the universe is 298 variants, not 248** — the 248
+below plus the 50 Dir ITM1 variants (`N_ditm1_*`, `S_ditm1_*`, BL-080; family "dir" for the Widesl minimum
+and the family-band recent score). BL-080's read-out passed (A / B / C ≥ their 248 gross in 2 of 3
+periods, all above random P90; REF unchanged). Weights, lookbacks and rule are untouched; the journal
+records the universe size and a hash in every entry. Parity (`scripts/rotation-parity.py --ext-dir`)
+reproduces `rotate.py --ext-dir` on 202 of 202 days for each list.
+Supersedes the 66-variant rule of Phase 0 for the forward test; Phase 0's discipline (picks before
+09:17, scored after, no change from reports) stands.
+- **Lists (all DRB-6W3L2 shape):** 3 strategies × 2 lots from the whole-day list (298 variants, see the amendment above), at
+  least 2 Widesl strategies, the Buy add-on (one 2-lot Buy strategy) when a Buy variant ranks in the
+  overall top 10; per-strategy stops as in the variant files; every list ranks with fit lookbacks
+  5:30, 21:25, 63:25, 126:20 except REF. Weights are own-recent / weekday / dte / VIX / family-band
+  recent (BL-074 type × start-band family):
+
+  | List | Own | Weekday | DTE | VIX | Family | Notes |
+  |---|---|---|---|---|---|---|
+  | **A** | 5 | 34 | 33 | 23 | 5 | BL-075 stage 1, safest cell |
+  | **B** | 0 | 36 | 35 | 24 | 5 | BL-075, best Jan–Aug 2025 |
+  | **C** | 15 | 30 | 30 | 20 | 5 | BL-075, best in the 2025-26 regime |
+  | **REF** | 33 | 25 | 25 | 17 | 0 | the live baseline, lookbacks 5:40, 21:30, 63:30 |
+- **Entry (one per trading day, 09:16 IST):** the day, weekday, 09:15 India VIX open and band,
+  days to expiry per index, each list's three strategies and Buy strategy (with their composite
+  scores), the code commit, the universe size and hash, a digest of the stored results it was scored
+  on (`inputs_sha`), the time written, the previous entry's hash and its own SHA-256. Appended
+  to an insert-only hash-chained log under `TRADING_DATA_ROOT/rotation/`; `obt rotation verify`
+  re-computes the chain. The picks are Telegrammed with the chain head. If the 09:15 VIX open cannot
+  be read by 09:20 nothing is recorded for that day and an alert is sent (a late entry is not forward).
+- **Scoring (every evening, after `options-daily`):** the day's result for all 298 variants is
+  computed (one-day `run_legwise` per variant, same strategy files), stored, and each list's recorded
+  picks scored: gross for the day, the random-pick percentile for that day, and the running totals
+  and drawdowns per list.
+- **Evaluation point:** 60 trading days from 2026-10-12. Per list: gross, max drawdown, and the share
+  of random same-shape picks it beats (cumulative), with REF as the comparator and a 5-day
+  block-bootstrap interval of each list minus REF (the owner's fixed base, amended below, is now the
+  primary reference and REF the second). Weekly read-only reports; nothing changes.
+- **Will not:** change a list's weights, add a list, drop one, or switch the rule after seeing
+  results; start from a later date.
+- **Deviation from Phase 1–2 as written:** the journal is a hash-chained JSONL file, not a catalog
+  table, and the results store is per-variant CSV files under the same directory: the catalog
+  allows one writer, the migration ledger is mid-repair (see BL-071 Log), and the file form keeps
+  `obt daily` unaffected. The variant YAMLs now live in `packages/option-backtesting/strategies/
+  rotation/` (committed), not under `research/`.
+
+**Amendment 2026-10-10 (owner, before the first entry): the fixed base is the primary reference, REF the
+second.** The owner's base answers the basic question: does rotating at all beat the simple rule that would
+otherwise be traded? It is the default yardstick, reported first. REF stays registered as the second
+reference and answers "did the new weights beat the old rotation?". Nothing in the lists, the ranking or the 298-variant universe changes.
+
+- **Base:** 2 × NIFTY Widesl OTM1 at 09:17 + 1 × NIFTY Dir ATM at 09:24, every trading day, no ranking.
+  - Widesl OTM1 09:17 is the rotation variant `N_wide_0917` (OTM1 strikes, ₹2,500 overall stop), identical
+    to the live `strategies/legwise/nifty_widesl_917_otm1.yaml`.
+  - Dir ATM 09:24 is a new file: the live `nifty_dir_924_itm1_sl21_recost.yaml` with the strike changed from
+    ITM1 to ATM and nothing else (09:24 entry, 21% stop per leg, ₹3,000 overall stop, RE COST ×1, 15:28 exit). The owner chose ATM;
+    the live file and the earlier benchmarks B1–B3 use ITM1.
+  - 2 lots per strategy, so 6 lots a day, lots sized at `SIZING_DATE` exactly like the lists.
+- **Unit:** ₹ per lot-day is the headline unit for every comparison with the base and with REF. A list holds
+  6 lots, or 8 when the Buy add-on fires, so totals would reward holding more lots; totals at the stated lots
+  are reported beside.
+- **Read-out addition, per list (A, B, C and REF):** the daily series list minus base in ₹ per lot-day; its
+  mean and a two-sided 90% percentile interval from a circular 5-day block bootstrap, 2,000 resamples,
+  seed 20261012. **The REF comparison uses the same parameters;** Phase 0b named the bootstrap but not its
+  settings, and fixing them here, before the first entry, keeps both from being chosen after the data. **A list "beats the base" when the interval's lower bound is above zero and the list's max drawdown
+  per lot (of the cumulative ₹-per-lot-day series) is no worse than the base's.** No minimum size: the owner
+  chose "reliably ahead, any size" over a fixed 10% or 20% margin. The base's own gross, drawdown and ₹ per
+  lot-day are reported with the lists. All four lists are reported against the base; with four tries, one
+  list passing alone is read as weaker evidence than several passing. Sixty days give twelve 5-day blocks, so
+  the interval will be wide: only a clear edge passes, which is the point of the rule.
+- **Scoring:** the base is scored nightly with the lists from the same results store. Its strategy files
+  live outside `strategies/rotation/` (proposed `strategies/rotation_base/`) so the universe, its hash and the
+  morning pick are untouched. The Dir ATM 09:24 history over the stored period (2024-10-09 onward) is run
+  once for context; the verdict uses forward days only.
+- **If the scoring code lands after the first entry,** the base is scored from 2026-10-12 retroactively. That
+  is allowed because the base is a fixed rule with no discretion and this block is committed before the
+  first entry; the margin rule above cannot change after it.
+- **Will not:** change the base's legs, strikes, times or lots; add a minimum margin; or swap the base for
+  another mix after the first entry.
 
 ## Risks
 
@@ -215,3 +370,98 @@ equal-weight, live mix, lots per window.
   analysis discussion needs; owner asked that the discussion's UI needs be added here.
 - 2026-10-09 — created from the owner's request; P0 with a Monday 2026-10-12 09:15 deadline for
   Phases 0–3.
+- 2026-10-10 — owner chose the 298 universe (Dir ITM1 added) before the first entry; 50 variant files + results seeded, parity 202/202 on all four lists.
+- 2026-10-10 — owner chose lists A, B and C (BL-075 stage 1) plus the live baseline as REF; Phase 0b registered; build started.
+- 2026-10-10 — journal build is backend-only (CLI + two scheduler jobs + files); UI needs for the four lists added to Phase 4.
+- 2026-10-10 — **Built:** `obt rotation update|pick|verify|show` (`src/option_backtesting/rotation/`),
+  the 248 variant files committed under `strategies/rotation/` (5 of 5 sampled reproduce their stored
+  2026-10-08 result to the rupee), scheduler jobs `options-rotation-nightly` (19:45, retries to 23:00,
+  catalog group) and `options-rotation-pick` (09:16, no catch-up), 15 unit tests, and
+  `scripts/rotation-parity.py`: lists A, B, C and REF pick **202 of 202** selection days identically to
+  rotate.py (a weekend session — the Budget Sunday 2026-02-01 — had to be excluded from the history to
+  get there). Store seeded from the research results (248 files, 487 days) and 2026-10-09 run through
+  the nightly path (248 variants in 4.6 s, idempotent). The live VIX fetch returned 15.28 for
+  2026-10-09, equal to the lake. Dry run for Monday: A/B pick N_dir_0947, N_wide_1347, N_wide_1317.
+  **Before Monday:** the scheduler process must be restarted to load the two jobs; the code lives on this
+  branch only, so the main checkout must stay on it (or PR #154 merge first); the Fyers token for the
+  09:16 read depends on the 08:05 login.
+- 2026-10-10 — **Amendment (before the first entry): the 09:15 VIX open's source.** Fyers needs a human
+  login each day (BL-076 / BL-077 / BL-079), so a morning without it would leave no entry. The pick now
+  reads the same quantity (the open of the 09:15 India VIX 1-minute bar) from Fyers first and from Angel
+  One (unattended login, BL-078 / BL-079's module) when Fyers has no token or no bar; the entry records
+  `vix_source` (fyers / angelone / given). Checked on 2026-10-09: both return 15.28. If neither source
+  answers by 09:20 nothing is recorded and an alert is sent, as before.
+- 2026-10-10 — **Amendment (before the first entry): the fixed base as a second reference.** Owner: the
+  reference should be the basic rule, 2 × Widesl OTM1 09:17 + 1 × Dir ATM 09:24, and the lists should beat
+  it. Decisions: Dir leg ATM at 09:24 (a new file; the live one is ITM1); added beside REF, not replacing
+  it; compared in ₹ per lot-day because the lists carry 6 or 8 lots; "beats the base" = block-bootstrap
+  90% lower bound of list minus base above zero with drawdown per lot no worse, no minimum size. Built in
+  PR #171 (`obt rotation base | readout`): the Dir ATM 09:24 file under `strategies/rotation_base/`, its
+  scoring inside `rotation update` (isolated), the random-basket percentile and the bootstrap. History run
+  2026-10-10: 488 base days 2024-10-09 .. 2026-10-09, ₹349 per lot-day, ₹1,70,248 cumulative per lot.
+- 2026-10-10 — **Context finding for the base (research periods, reconstructed picks, not a verdict).** Per
+  lot-day, gross, list minus base with the registered 5-day block bootstrap 90% interval: Jan–Aug 2025 (157
+  days, base ₹496): A −₹153 [−352, +40], B −₹157, C −₹153, REF −₹282 [−478, −88]. Dec 2025–Oct 2026 (202 days,
+  base ₹208, in-sample for the lists): A +₹156 [−94, +410], B +₹120, C +₹173 [−77, +424], REF +₹104. Both
+  periods (359 days, base ₹334): A +₹21, B −₹1, C +₹31, REF −₹65, every interval contains zero. The lists'
+  edge is drawdown per lot (about −₹10k to −₹14k against the base's −₹30k on Dec 2025–Oct 2026), not return.
+  **The rule as registered is close to unpassable in 60 days:** the typical 90% half-width on a 60-day window
+  is ₹320–410 per lot-day, more than the base's own mean; over every 60-day window of the research history
+  a list passes 0 of 33 windows in Jan–Aug 2025 and 1 to 6 of 48 in Dec 2025–Oct 2026. A "no" at day 60
+  would mostly mean "not enough days", not "the lists do not beat the base". Owner decision before the first
+  entry, if wanted: keep the rule as the verdict and also read the drawdown per lot and the interval at day
+  120; or register a second, descriptive read-out. Nothing here changes the rule.
+- 2026-10-10 — Owner: the fixed base is the **default** reference and REF the second (amendment heading
+  updated, before the first entry). View decisions recorded under Phase 4: base as headline benchmark, focus
+  list A, placement record allowed (append-only, separate file), 2022–24 matrix import after the first
+  version, rotation screens owner-only on the hosted dashboard.
+- 2026-10-10 — Widgets 6–10 added under Phase 4 (today's basket on the Correlation tab, forward days vs
+  research periods, drawdown episodes, selection drift, paper vs real), with the recommended choices: ₹500
+  per lot as the smallest episode, drift flagged against the list's own P1 band, the BL-063 charge model as
+  its own registered change, one broker account used only for the rotation. UI only; nothing about the
+  journal, the lists or the read-out changes.
+- 2026-10-11 — **Phase 4 built, five widgets plus the page (PRs #170–#177).** Options Lab › Rotation page
+  (health strip, read-out headline per lot against the base, hero chart, today's baskets, verdict), Shadow
+  scoreboard (t gate at 10 days), Why this pick and Rank predicts (rank-IC), Strategy Matrix (its own tab;
+  weekend sessions excluded so it reconciles with the ranking history; P3 2022–24 not imported yet) and the
+  Daily log (reconstructed rows labelled and kept out of the forward counters; the placement record is a
+  separate append-only `rotation/placements.jsonl`, the only new write path). Each PR had an independent
+  review with inline comments and fixes before merge. Nothing changed the journal, a list, a weight, the 298
+  universe, the base or any stored result. Figures in the earlier plan artifact were weekend-inclusive and are
+  superseded by the matrix's own. **Not done:** the live launchd checkout is not synced (the rotation files
+  there carry other sessions' uncommitted edits), so base scoring and the page reach the running stack only
+  after the owner syncs or merges; no nightly scoring job yet for the BL-081 forward candidates.
+- 2026-10-11 — **Widgets 6–9 built (PRs #179, #180, #182, #183), widget 10 not; widget 11 (Family pulse, #181) finished.** Each PR was reviewed
+  independently with inline comments, fixed and merged on green CI; nothing changed the journal, a list, a
+  weight, the 298 universe, the base, `days.csv` or any stored result (owner's answer: no change to anything the
+  scheduler runs). What differs from the plan above:
+  - **6. Today's basket** is a second mode of the Correlation tab (`?mode=basket`), not a preset in its picker:
+    list A / B / C / REF / Base, a day, P1 / P2 / last 63 / Forward. The base's Widesl is listed twice
+    (2 W + D as traded) and that pair, 1.00 by construction, is left out of the average and the most-alike
+    pair. A forward window is the on-time days themselves (a late or missing day between two is not forward).
+    No link from the Daily log drawer yet.
+  - **7. Forward days vs research periods**: the day range is read from the lake's 1-minute index bars when
+    the card loads and stored nowhere (the planned `days.csv` column would have changed the nightly update).
+    P3 is drawn unavailable, never filled in.
+  - **8. Drawdown episodes** as written (₹500 per lot below the running peak by default; the owner can choose
+    ₹250 to ₹2,500). The basket column is what the list's actual lots lost over the peak-to-trough days.
+    `rotation/history.py` keeps the built daily log for 30 s so a change of list or depth does not rebuild it.
+  - **9. Selection drift** as written: a last-21 share is flagged only outside the list's own rolling-21 10th to
+    90th percentile in P1.
+  - **11. Family pulse** (#181, written in the "top 5 widget" session): the 12 family-band cells with their
+    last 5 / 21 / 63, P1 and P2 means, rolling-21 sparkline, the rank the ranking gives each cell for the next
+    pick, where today's picks fall and a drift flag. It was reviewed there (Codex and an independent review,
+    nine findings, all fixed); this session re-ran its tests, checked its numbers on the real store against the
+    plan page's table (Dir 09:17–10:02 ₹676 last 21 and rank 1 of 12; Buy 14:17–15:17 rank 12 of 12) and
+    merged main into it twice; it merged on green CI. Its drift flag uses the same rule form as the selection-drift card (a
+    last-21 value outside the 10th to 90th percentile of the rolling-21 values in P1, at least 10 windows),
+    applied to cell means instead of pick shares.
+  - **10. Paper vs real is not built.** It needs the placement record (exists, from widget 3), the BL-063
+    charge model applied to stored results (a change to the nightly update, not allowed in this run) and the
+    contract-notes cutover (TODO §2). Until then there is no real figure to set against the paper one.
+  - Real-data readings on 11 Oct (a description of the research history, not a result): list A, P1: 20
+    drawdown episodes of at least ₹500 per lot, worst −₹11,073 per lot against −₹30,365 for the base; the
+    last 21 sessions are outside the list's own P1 range on the share of picks starting 09:17–10:02 (25%
+    against 27%–59%), distinct variants (49 against 36–44) and Buy-qualified days (7 against 0–6). The three
+    picks the rule gave on Fri 9 Oct (N_p100_0917, N_p80_0932, N_ditm1_1202) correlate −0.15 to +0.69 over P1;
+    the base's Widesl and Dir ATM 09:24 +0.28 over P2.

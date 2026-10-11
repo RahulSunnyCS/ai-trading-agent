@@ -1,0 +1,11 @@
+{
+  "item": "BL-054",
+  "committed": "2026-10-09",
+  "supersedes": "bl054_criteria.json levers.L4_daily_stop.cells",
+  "reason": "owner (2026-10-09) asked for the 15% buy stop as well",
+  "L4_daily_stop": {
+    "cells": "stop_from_buy in [off, 0.15, 0.20, 0.25] x stop_from_peak in [off, 0.25, 0.30], both-off excluded: 11 cells; proceeds cash; fill at the next session's open (open / exchange prevclose on the engine's running price); a lower-circuit day blocks the sale",
+    "pass": "unchanged",
+    "confirm": "unchanged"
+  }
+}

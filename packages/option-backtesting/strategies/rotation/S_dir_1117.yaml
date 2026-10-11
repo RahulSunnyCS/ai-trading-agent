@@ -1,0 +1,30 @@
+# AlgoTest "Nifty_Dir_924_ITM1_SL21_RECOST_MTMSL_3000" (export 2026-09-29; checked against the
+# owner's backtest PDF of 2026-10-07 — unchanged).
+# Short ITM1 CE + ITM1 PE at 09:24, 21% SL per leg; after an SL, re-sell the
+# same strike once if it comes back to the entry price (RE COST x1);
+# ₹3,000 overall max loss.
+strategy:
+  id: bl056_dir_1117
+  underlying: SENSEX
+  entry_time: "11:17"
+  exit_time: "15:28"
+  square_off: partial
+  legs:
+    - id: ce
+      lots: 1
+      position: sell
+      option_type: CE
+      expiry: weekly
+      strike: { strike_type: ATM }
+      stop_loss: { percent: 21 }
+      reentry_on_sl: { mode: cost, count: 1 }
+    - id: pe
+      lots: 1
+      position: sell
+      option_type: PE
+      expiry: weekly
+      strike: { strike_type: ATM }
+      stop_loss: { percent: 21 }
+      reentry_on_sl: { mode: cost, count: 1 }
+  overall:
+    stop_loss_inr: 3000

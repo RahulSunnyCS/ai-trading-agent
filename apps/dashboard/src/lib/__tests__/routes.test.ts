@@ -73,6 +73,9 @@ describe('routes', () => {
     ['/optionslab/runs', 'optionslab', ['runs']],
     ['/optionslab/results', 'optionslab', ['results']],
     ['/optionslab/regimes', 'optionslab', ['regimes']],
+    ['/optionslab/correlation', 'optionslab', ['correlation']],
+    ['/optionslab/rotation', 'optionslab', ['rotation']],
+    ['/optionslab/matrix', 'optionslab', ['matrix']],
     ['/momentum', 'momentum', []],
     ['/momentum/backtest', 'momentum', ['backtest']],
     ['/momentum/backtest/etf', 'momentum', ['backtest', 'etf']],
@@ -153,7 +156,16 @@ describe('routes', () => {
   it('opens Daily results for the bare Options Lab path', () => {
     expect(OPTIONS_LAB_DEFAULT_SECTION).toBe('results');
     expect(oneOf(OPTIONS_LAB_SECTIONS, parsePath('/optionslab').rest[0])).toBeNull();
-    expect(OPTIONS_LAB_SECTIONS).toEqual(['strategies', 'builder', 'runs', 'results', 'regimes']);
+    expect(OPTIONS_LAB_SECTIONS).toEqual([
+      'strategies',
+      'builder',
+      'runs',
+      'results',
+      'regimes',
+      'correlation',
+      'rotation',
+      'matrix',
+    ]);
   });
 
   it('survives a malformed percent-escape', () => {
@@ -200,6 +212,8 @@ describe('routes', () => {
     ['optionslab', ['runs'], 'Options Lab › Runs · AI Trading Agent'],
     ['optionslab', ['results'], 'Options Lab › Daily results · AI Trading Agent'],
     ['optionslab', ['regimes'], 'Options Lab › Regimes · AI Trading Agent'],
+    ['optionslab', ['correlation'], 'Options Lab › Correlation · AI Trading Agent'],
+    ['optionslab', ['rotation'], 'Options Lab › Rotation · AI Trading Agent'],
     ['optionslab', [], 'Options Lab › Daily results · AI Trading Agent'],
     ['optionslab', ['nope'], 'Options Lab › Daily results · AI Trading Agent'],
     ['coverage', [], 'Coverage › Backfill · AI Trading Agent'],

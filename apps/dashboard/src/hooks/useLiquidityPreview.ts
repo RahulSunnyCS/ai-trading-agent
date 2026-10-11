@@ -27,7 +27,7 @@ export interface LiquidityPreviewParams {
   circuit: boolean;
   circuit_run: number;
   max_circuit_days: number | null;
-  universe: 'total_market' | 'all_liquid';
+  universe: 'total_market' | 'all_liquid' | 'turnover_rank';
 }
 
 /** Query string for the preview route; an unset circuit-days cap is simply omitted. */

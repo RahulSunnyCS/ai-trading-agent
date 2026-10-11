@@ -1113,3 +1113,14 @@ def test_compute_ranks_ranksum_is_unchanged_on_a_random_price_panel():
     returns = {k: prices / prices.shift(k) - 1 for k in config.lookbacks}
     expected = _rank_from_score_reference(score, returns[13], higher_is_better=False)
     pd.testing.assert_frame_equal(final, expected, check_exact=True)
+
+
+def test_a_flat_trade_is_not_a_win_whatever_the_last_bit_of_its_float_is():
+    """The look-ahead test found a one-week trade with return 0.0 in a whole run and 2.2e-16 in a
+    truncated copy of the same data, which moved win rate by one trade."""
+    from momentum_backtesting import analysis
+
+    returns = pd.Series([0.0, 2.220446049250313e-16, -1e-12, 0.05, -0.04])
+    wins, losses = analysis.split_wins_losses(returns)
+    assert list(wins) == [0.05]
+    assert len(losses) == 4

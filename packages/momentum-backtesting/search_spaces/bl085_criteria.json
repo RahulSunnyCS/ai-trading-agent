@@ -1,0 +1,72 @@
+{
+  "item": "BL-054",
+  "committed": "2026-10-09",
+  "note": "Pre-registered before any lever result was computed. Never edit after a run; supersede with bl054_criteria_addendum_N.json naming what it replaces.",
+  "strategies": "the 11 of bl053_criteria.json: the 10 named configs (every rebalance phase blended) and the frozen Phase 6 ensemble",
+  "settings": {
+    "space": "search_spaces/round7_A.toml fixed settings, except capital 500000 (the owner's slice)",
+    "universe": "turnover_rank (point in time), curated tags",
+    "tax": "after tax, TaxRules() defaults: 30% slab + 4% cess, STCG 20%, LTCG 12.5% past 365 days; pre-tax shown alongside",
+    "start": "2017-01-01",
+    "end": "2026-10-02"
+  },
+  "windows": {
+    "development": "FY2018-FY2022 (2017-04-01 to 2022-03-31): every pass rule is judged here",
+    "confirmation": "FY2023-FY2026 (2022-04-01 to 2026-03-31): read once per lever, only for levers that pass development; a lever is adopted only if its development pass holds there too (same direction, see per-lever rule)",
+    "sealed": "2012-2016 (BL-010 addendum 5); nothing after 2026-10-02",
+    "note": "windows are slices of one continuous curve (the engine runs the whole span once); the stop and sizing levers act identically whichever window is read"
+  },
+  "common_pass": {
+    "less_pain": "Ulcer index AND max drawdown both shallower than the baseline's in at least 7 of the 11 strategies, in the window",
+    "return_floor": "median over the 11 of (lever CAGR - baseline CAGR) >= -0.02, after tax",
+    "bad_years": "median third-worst FY excess over Nifty200 Momentum 30 TRI >= the baseline's median (development: FY2018-FY2022, so this is the second-worst of five)",
+    "timing": "where a lever sells between rebalances, it is run at both fill timings (stop_delay 0 and 1 for weekly; next day's open is the only timing for daily) and must pass at both"
+  },
+  "levers": {
+    "L1_cadence_tax": {
+      "question": "does trading less often, and holding a gain to long-term, raise the after-tax return?",
+      "cells": "rebalance_every in [4, 6, 8, 13] x tax_hold in [off, band 2 / 8 weeks]; every phase blended; the ensemble's sleeves at the same cadences on their frozen offsets mod the cadence",
+      "baseline": "each strategy's own cadence (2 or 4), tax_hold off",
+      "pass": "median after-tax CAGR change >= +0.015 AND the median Ulcer change <= +0.01 AND after-tax CAGR not lower in at least 7 of 11",
+      "confirm": "median after-tax CAGR change >= 0 on FY2023-FY2026",
+      "adopt": "the slowest cadence that passes both; tax_hold only if it passes on its own at that cadence"
+    },
+    "L2_phase_blend": {
+      "question": "how much does trading on all rebalance Fridays at once (equal tranches) change the ensemble and each config?",
+      "cells": "report only: own phase vs all phases blended, each of the 11, pre- and after-tax; no pass rule - adoption is a live-trading decision"
+    },
+    "L3_etf_blend": {
+      "question": "does holding part of the money in the ETF rotation lower the falls for little return?",
+      "cells": "Broad share in [1.0, 0.75, 0.5] with the ETF 'filter' strategy (data/backtests/compare.xlsx equity sheet, pre-tax, rebalanced to target weights at each April reset), from stored curves; pre-tax only (the ETF curve has no after-tax series)",
+      "pass": "at 0.75: less_pain AND return_floor (pre-tax)",
+      "confirm": "same at 0.75 on FY2023-FY2026"
+    },
+    "L4_daily_stop": {
+      "question": "the owner's rule: every evening check each holding's close; if it is X below the buy price or Y below its peak, sell at the next morning's open; hold cash until the next rebalance",
+      "cells": "stop_from_buy in [off, 0.20, 0.25] x stop_from_peak in [off, 0.25, 0.30], both-off excluded: 8 cells; proceeds cash; fill at the next session's open (open / exchange prevclose on the engine's running price); a day with a lower-circuit lock blocks the sale",
+      "daily_data": "bars_1d_stock EQ series; daily move = close / prevclose - 1 (the exchange adjusts prevclose for corporate actions); the running price is the engine's weekly fill price compounded by those moves; the peak is the highest daily close since the first buy",
+      "pass": "common_pass (less_pain, return_floor, bad_years) after tax, on development",
+      "confirm": "less_pain holds (>= 6 of 11) on FY2023-FY2026 and return_floor holds there"
+    },
+    "L5_inverse_vol": {
+      "question": "does sizing each pick by the inverse of its 26-week realised volatility (instead of equal shares) lower the falls?",
+      "cells": "weight_by in [equal, inverse_vol]; inverse_vol: shares of each buy week's money proportional to 1 / trailing 26-week weekly-return std, normalised across the names bought that week, then the position cap as today",
+      "pass": "common_pass after tax, on development",
+      "confirm": "less_pain holds (>= 6 of 11) on FY2023-FY2026 and return_floor holds there"
+    },
+    "L6_residual_momentum": {
+      "question": "does ranking stocks on momentum left after removing the market and the sector move keep the return with smaller falls?",
+      "cells": "score in [as searched, residual]; residual: regress each stock's weekly return on Nifty 50 TRI and its category's equal-weight return over the trailing 52 weeks (point in time), rank on the sum of the last 26 weekly residuals divided by their std (skip the latest 4 weeks); everything else as the config",
+      "pass": "common_pass after tax, on development",
+      "confirm": "less_pain holds (>= 6 of 11) on FY2023-FY2026 and return_floor holds there",
+      "status": "built last; may run after the others are reported"
+    }
+  },
+  "trial_count": "cells x timings across every lever here (about 22 cells, 30 cell-timings) are added to the BL-010 trial log; no cell is read as evidence on its own",
+  "will_not_run": [
+    "finer grids or other thresholds than listed",
+    "combinations of levers (a passing lever is adopted one at a time; a combination needs a new addendum)",
+    "the 2012-2016 hold-out",
+    "any change to the live weekly signal (adoption is a separate item)"
+  ]
+}

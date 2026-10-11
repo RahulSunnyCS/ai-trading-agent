@@ -1,0 +1,29 @@
+# AlgoTest "S_Widesl_917_otm2" — transcribed from the owner's backtest PDF (2026-10-07): short OTM2
+# weekly SENSEX strangle at 09:17, exit 15:28, SL 114% on the call and 115% on the put (as set in
+# AlgoTest), both trailed 15/10 as a PERCENTAGE, ₹2,500 overall max loss, partial square-off,
+# underlying Cash, slippage 0, qty = today's lot.
+strategy:
+  id: bl056_wide_0932
+  underlying: SENSEX
+  entry_time: "09:32"
+  exit_time: "15:28"
+  square_off: partial
+  legs:
+    - id: ce
+      lots: 1
+      position: sell
+      option_type: CE
+      expiry: weekly
+      strike: { strike_type: OTM2 }
+      stop_loss: { percent: 114 }
+      trail_sl: { percent: [15, 10] }
+    - id: pe
+      lots: 1
+      position: sell
+      option_type: PE
+      expiry: weekly
+      strike: { strike_type: OTM2 }
+      stop_loss: { percent: 115 }
+      trail_sl: { percent: [15, 10] }
+  overall:
+    stop_loss_inr: 2500

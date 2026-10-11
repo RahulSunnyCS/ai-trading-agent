@@ -34,9 +34,19 @@ import opsOverview from './content/operations/overview.md?raw';
 import opsSettings from './content/operations/settings.md?raw';
 import optionsBuilderForm from './content/optionslab/builder-form.md?raw';
 import optionsBuilderYaml from './content/optionslab/builder-yaml.md?raw';
+import optionsCorrelation from './content/optionslab/correlation.md?raw';
 import optionsDailyResults from './content/optionslab/daily-results.md?raw';
 import optionsHowItWorks from './content/optionslab/how-it-works.md?raw';
 import optionsRegimes from './content/optionslab/regimes.md?raw';
+import optionsRotationDailyLog from './content/optionslab/rotation-daily-log.md?raw';
+import optionsRotationDrawdowns from './content/optionslab/rotation-drawdowns.md?raw';
+import optionsRotationDrift from './content/optionslab/rotation-drift.md?raw';
+import optionsRotationExplain from './content/optionslab/rotation-explain.md?raw';
+import optionsRotationMatrix from './content/optionslab/rotation-matrix.md?raw';
+import optionsRotationPulse from './content/optionslab/rotation-pulse.md?raw';
+import optionsRotationRegime from './content/optionslab/rotation-regime.md?raw';
+import optionsRotationShadow from './content/optionslab/rotation-shadow.md?raw';
+import optionsRotation from './content/optionslab/rotation.md?raw';
 import optionsRuns from './content/optionslab/runs.md?raw';
 import optionsStrategies from './content/optionslab/strategies.md?raw';
 import optionsLosingDays from './content/optionslab/walkthrough-losing-days.md?raw';
@@ -278,6 +288,102 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     kind: 'Screen',
     body: optionsRegimes,
     screen: { tab: 'optionslab', rest: ['regimes'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'correlation',
+    title: 'Correlation',
+    summary: 'Which strategies lose on the same days, and a basket whose parts are not alike.',
+    kind: 'Screen',
+    body: optionsCorrelation,
+    screen: { tab: 'optionslab', rest: ['correlation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation',
+    title: 'Rotation',
+    summary:
+      'The four forward lists against REF, the fixed base and random baskets, and today’s picks.',
+    kind: 'Screen',
+    body: optionsRotation,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    // The two explain widgets of the Rotation page. After the page's own entry, so that one stays
+    // the first match for the screen (`guidePageForScreen` keeps the first of equal depth).
+    chapter: 'optionslab',
+    slug: 'rotation-explain',
+    title: 'Rotation: why a pick, and does rank predict results',
+    summary:
+      'Why each list picked what it did, criterion by criterion, and whether the morning ranking orders the day.',
+    kind: 'Screen',
+    body: optionsRotationExplain,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-regime',
+    title: 'Rotation: forward days vs research periods',
+    summary: 'What kind of market the forward window tested, beside P1, P2 and P3.',
+    kind: 'Screen',
+    body: optionsRotationRegime,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-drawdowns',
+    title: 'Rotation: drawdown episodes',
+    summary: 'Each fall of a list: how deep, how long, how fast back, and what it was holding.',
+    kind: 'Screen',
+    body: optionsRotationDrawdowns,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-drift',
+    title: 'Rotation: selection drift',
+    summary: 'What a list has been holding, by family, index, strike method and start band.',
+    kind: 'Screen',
+    body: optionsRotationDrift,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-shadow',
+    title: 'Rotation: Shadow scoreboard',
+    summary: 'Ideas kept for forward observation, each against the pick it would have replaced.',
+    kind: 'Screen',
+    body: optionsRotationShadow,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-pulse',
+    title: 'Rotation: the Family pulse',
+    summary:
+      'Is morning short-premium working right now: the twelve family-band cells, what the ranking sees, where the picks fall.',
+    kind: 'Screen',
+    body: optionsRotationPulse,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-daily-log',
+    title: 'Rotation: the daily log',
+    summary:
+      'What each list picked at 09:16 and what those picks did, day by day, with what you placed.',
+    kind: 'Screen',
+    body: optionsRotationDailyLog,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-matrix',
+    title: 'Matrix',
+    summary: 'Where the rotation variants make or lose money by start time, date and condition.',
+    kind: 'Screen',
+    body: optionsRotationMatrix,
+    screen: { tab: 'optionslab', rest: ['matrix'] },
   },
   {
     chapter: 'optionslab',

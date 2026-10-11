@@ -13,9 +13,9 @@ and choose which ones the Friday signal follows.
 | Paper + Invested n of 8 | How many of the eight places for followed favourites are used, across every dataset. |
 | ☐ | Tick up to four to compare; the bar below says how many settings they differ in. |
 | ★ | A star makes it a favourite (Watching). Its status is then set on the right. |
-| Strategy | Its name: the one you typed, or one made from what differs from the dataset's defaults ("Broad · Tradability filter Off"). **Headline** marks the one sent to Telegram; **Group** a group of strategies. |
+| Strategy | Its name: the one you typed, or one made from what differs from the dataset's defaults ("Broad · Tradability filter Off"). **Headline** marks the one sent to Telegram; **Group** a group of strategies. A Broad row ends with a faint tag for the stocks it ranks: *Point in time*, *Today's list* or *Whole NSE market*. A strategy saved on today's list now has its universe in an automatic name, because that is no longer the default for a new run. |
 | Runs | How many times these settings were run (×3). Repeats with the same result add no row. |
-| CAGR · Edge · Max DD · Sharpe | The latest run's numbers (Edge: CAGR over the benchmark, in points). A group shows its members' CAGR range. |
+| CAGR · Edge · Max DD · Sharpe | The latest run's numbers (Edge: CAGR over the benchmark, in points). A group shows its members' CAGR range. A faint figure after a Broad CAGR is the same run with extended category tags (hover for the sentence). Runs saved before 2026-10-10 show none until they are run again from the dashboard; it never counts as a moved result. |
 | Trust | How far the result can be trusted: [Validated, In-sample, Not tradable, Old data](glossary:strategy-trust). **↻** with the CAGR move, in points, when the latest run changed the result. |
 | Status | Not a favourite, Watching, Paper or Invested. **Blocked this week** when its data is not ready. |
 | Last run | When it was last run. |
@@ -26,7 +26,7 @@ the newest 10 per dataset; a star keeps one for good. Click a row to open its dr
 ## The drawer
 
 - **Header:** rename it, set its status, make it the [headline](glossary:headline).
-- **Result:** the latest run's numbers and equity curve.
+- **Result:** the latest run's numbers and equity curve. For a Broad strategy, a line under the numbers names its universe and, when stored, the extended-tags figure.
 - **Different from the defaults:** only the settings that differ. Settings the dataset never
   reads are not compared, which is why some runs that looked different are one strategy.
 - **Run history:** every run of these settings, newest first, with the code and data it ran on
@@ -80,6 +80,23 @@ and pops up once a day on any screen. Every change is also kept in a log on the 
 - Exactly **one** followed favourite is the **headline**: its signal goes out on Friday and it
   comes first on This week. Making a Watching favourite the headline makes it Paper.
 
+## Following on all Fridays
+
+A strategy that rebalances every 2 or 4 weeks has 2 or 4 possible sets of Fridays, and which one it
+trades is luck (see [All Fridays](glossary:all-fridays)). Run it with **Fridays: All (split)** in
+the Backtest settings, then set its status (Watching, Paper or Invested) here: it is followed as
+**one group with one sleeve per Friday**, each with an equal share of the money, named like
+*Five Sectors · all Fridays · Friday 2 of 4*. The run itself stays a saved run, as the record of
+what was tested. Setting its status again changes the group; it never makes a second one, and
+it never lowers the group: a star on the run itself cannot demote a Paper or Invested group or
+take away its headline (change that on the group's own row). The run's row shows its star filled
+and *followed on all Fridays*. A strategy run on one Friday is favourited as before.
+
+The favourites that followed a single Friday before this existed can be moved to all Fridays in
+one step with `mbt saved split-fridays` (it lists them first; `--apply` makes the groups). The
+single-Friday run is kept as a saved run and the group takes its status and headline. Removing the
+group keeps its sleeves.
+
 ## Groups
 
 Several strategies of one dataset can be **one favourite**: the Phase 6 ensemble is four configs
@@ -101,7 +118,9 @@ that each trade on their own weeks. Tick them and choose **Group as one favourit
 up and the toast said so. Each strategy keeps its last three repeats and every changed result.
 
 **Why is my highest CAGR marked Not tradable?** It was run with the tradability filter or the
-circuit rule off, so it holds stocks you could not have bought.
+circuit rule off, so it holds stocks you could not have bought. The filter is always on for the
+*As each year saw it* and *Whole NSE market* universes, so only *Today's index list* can be marked
+for it.
 
 ## What it does not tell you
 

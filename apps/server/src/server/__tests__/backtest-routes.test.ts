@@ -460,7 +460,7 @@ describe('leg-wise routes', () => {
       '/api/backtest/legwise/day?strategy=t1&day=2026-09-29&cuts=25:99;rm',
     ]) {
       const bad = await server.inject({ method: 'GET', url });
-      expect(bad.statusCode).toBe(400);
+      expect(bad.statusCode, `${url} -> ${bad.body}`).toBe(400);
     }
     expect(fetchMock).not.toHaveBeenCalled();
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { mtm: [] }));
@@ -493,6 +493,52 @@ describe('leg-wise routes', () => {
     const [url] = fetchMock.mock.calls[0] as [string];
     expect(url).toBe(
       'http://127.0.0.1:8000/legwise/anatomy?underlying=NIFTY&from=2026-01-01&cuts=11%3A00',
+    );
+  });
+
+  it('GET correlation forwards whitelisted, validated params and drops the rest', async () => {
+    server = await buildTestServer();
+    for (const url of [
+      '/api/backtest/legwise/correlation?selectors=slot%3A0917%3Brm',
+      '/api/backtest/legwise/correlation?selectors=slot%3A0917&window=abc',
+      '/api/backtest/legwise/correlation/pick?measure=bogus',
+    ]) {
+      const bad = await server.inject({ method: 'GET', url });
+      expect(bad.statusCode, `${url} -> ${bad.body}`).toBe(400);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { names: [] }));
+    const ok = await server.inject({
+      method: 'GET',
+      url: '/api/backtest/legwise/correlation?selectors=slot:0917%2Bindex:N,family:dir&from=2026-01-01&window=63&evil=1',
+    });
+    expect(ok.statusCode).toBe(200);
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toBe(
+      'http://127.0.0.1:8000/legwise/correlation?selectors=slot%3A0917%2Bindex%3AN%2Cfamily%3Adir&from=2026-01-01&window=63',
+    );
+  });
+
+  it('GET correlation/pick and /available reach their upstream routes', async () => {
+    server = await buildTestServer();
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { names: ['N_wide_0917'] }));
+    const pick = await server.inject({
+      method: 'GET',
+      url: '/api/backtest/legwise/correlation/pick?selectors=slot:0917&k=3&max_corr=0.6&measure=loss&require=N_wide_0917',
+    });
+    expect(pick.statusCode).toBe(200);
+    expect((fetchMock.mock.calls[0] as [string])[0]).toBe(
+      'http://127.0.0.1:8000/legwise/correlation/pick?selectors=slot%3A0917&k=3&max_corr=0.6&measure=loss&require=N_wide_0917',
+    );
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { strategies: [] }));
+    const avail = await server.inject({
+      method: 'GET',
+      url: '/api/backtest/legwise/correlation/available',
+    });
+    expect(avail.statusCode).toBe(200);
+    expect((fetchMock.mock.calls[1] as [string])[0]).toBe(
+      'http://127.0.0.1:8000/legwise/correlation/available',
     );
   });
 });

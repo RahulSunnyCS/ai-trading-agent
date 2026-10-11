@@ -9,6 +9,7 @@
  */
 
 import { EMPTY, formatDay, formatNumber, formatPct, formatPp } from './format';
+import { BROAD_UNIVERSES } from './momentumUniverse';
 
 /** The part of a saved run this module reads; `MomentumSavedRun` satisfies it. */
 export interface ComparableRun {
@@ -222,6 +223,7 @@ export const SETTING_LABELS: Record<string, string> = {
   rebalance: 'Rebalance',
   rebalance_every: 'Weeks between rebalances',
   rebalance_offset: 'Which Fridays (phase)',
+  split_fridays: 'Fridays: one or all (split)',
   sell_every_week: 'Sell exits weekly, buy only on the cadence',
   momentum_sizing: 'Win-rate position sizing',
   momentum_sizing_window: 'Sizing window (trades)',
@@ -303,8 +305,13 @@ const CHOICE_LABELS: Record<string, Record<string, string>> = {
   track: { index: 'The index (underlying)', etf: "The ETF you'd trade" },
   execution: { fri_close: 'Friday close', mon_open: 'Monday open', mon_10am: 'Monday 10:00' },
   broad_universe: {
-    total_market: 'Nifty Total Market',
-    all_liquid: 'Whole NSE market (liquid only)',
+    turnover_rank: BROAD_UNIVERSES.turnover_rank.label,
+    total_market: BROAD_UNIVERSES.total_market.label,
+    all_liquid: BROAD_UNIVERSES.all_liquid.label,
+  },
+  broad_category_tags: {
+    curated: "Today's list tags (curated)",
+    extended: 'Extended (BSE sectors)',
   },
   broad_category_mode: { on: 'On', off: 'Off (rank stocks directly)' },
 };

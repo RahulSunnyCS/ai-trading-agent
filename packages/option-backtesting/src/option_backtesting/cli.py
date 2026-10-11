@@ -28,6 +28,10 @@ app.add_typer(fyers_app, name="fyers")
 legwise_app = typer.Typer(no_args_is_help=True, help="AlgoTest-style leg-wise backtests.")
 app.add_typer(legwise_app, name="legwise")
 
+from .rotation.cli import rotation_app  # noqa: E402  (BL-058: the forward paper journal)
+
+app.add_typer(rotation_app, name="rotation")
+
 
 @app.callback()
 def _load_env() -> None:
@@ -167,13 +171,15 @@ def run(
         typer.echo("")
         typer.echo(render_margin(margin))
 
-    from .features.regime import regime_bucket_report
+    from .features.regime import regime_bucket_status
 
-    regime_buckets = regime_bucket_report(sessions, loaded.strategy.universe.underlying)
-    if regime_buckets is not None:
+    regime = regime_bucket_status(sessions, loaded.strategy.universe.underlying)
+    if regime.buckets is not None:
         typer.echo("\nRegime breakdown (lag-1):")
-        for regime_name in sorted(regime_buckets):
-            typer.echo(f"  {regime_name}: {regime_buckets[regime_name]:.0f}")
+        for regime_name in sorted(regime.buckets):
+            typer.echo(f"  {regime_name}: {regime.buckets[regime_name]:.0f}")
+    elif regime.message:
+        typer.echo(f"\n(regime breakdown not computed: {regime.status} — {regime.message})")
 
     with connect(views=()) as con:
         run_id = record_run(con, loaded.strategy, start, end, result, strategy_path.read_text())
@@ -402,6 +408,61 @@ def fyers_fetch(
 
     try:
         errors = _collect(date.fromisoformat(day), underlyings, premium_floor, max_extra, force)
+    except FyersCredentialsError as error:
+        typer.echo(f"stopped: {error}")
+        raise typer.Exit(1) from None
+    if errors:
+        raise typer.Exit(2)
+
+
+angel_app = typer.Typer(no_args_is_help=True, help="Angel One 1-minute collector (BL-079).")
+app.add_typer(angel_app, name="angel")
+
+
+@angel_app.command("status")
+def angel_status() -> None:
+    """Whether the Angel One credentials are present (never prints one)."""
+    from .angelone.auth import AngelCredentialsError, load_credentials
+    from .fyers.daily import data_dir
+
+    typer.echo(f"data dir: {data_dir()}")
+    try:
+        creds = load_credentials()
+    except AngelCredentialsError as error:
+        typer.echo(f"credentials: not ready - {error}")
+        raise typer.Exit(1) from None
+    typer.echo(f"credentials: ok for client {creds.client_code}")
+
+
+@angel_app.command("fetch")
+def angel_fetch(
+    day: str = typer.Option(date.today().isoformat(), "--date", help="Trading day, YYYY-MM-DD."),
+    underlyings: str = typer.Option(
+        "NIFTY,BANKNIFTY,MIDCPNIFTY,FINNIFTY,SENSEX", help="Comma-separated underlyings."
+    ),
+    premium_floor: float = typer.Option(
+        2.0, help="Keep walking outward while the OTM leg's intraday high is at least this (Rs)."
+    ),
+    max_extra: int = typer.Option(60, help="Cap on strikes fetched beyond the day's range."),
+    force: bool = typer.Option(False, help="Re-fetch underlyings already collected for this day."),
+) -> None:
+    """Collect one day from Angel One instead of Fyers (same lake layout; the run is recorded
+    with source `angelone` and the day's gaps under details.flags)."""
+    from .fyers.auth import FyersCredentialsError
+    from .legwise.evening import UnknownUnderlying, collect
+
+    try:
+        errors = collect(
+            date.fromisoformat(day),
+            _underlyings(underlyings),
+            premium_floor=premium_floor,
+            max_extra=max_extra,
+            force=force,
+            log=typer.echo,
+            source="angelone",
+        )
+    except UnknownUnderlying as error:
+        raise typer.BadParameter(str(error)) from None
     except FyersCredentialsError as error:
         typer.echo(f"stopped: {error}")
         raise typer.Exit(1) from None

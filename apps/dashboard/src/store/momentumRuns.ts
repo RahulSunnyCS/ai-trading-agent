@@ -215,6 +215,16 @@ function patchRun(id: string, patch: Partial<MomentumRun>): void {
   }));
 }
 
+/** The two display-only KPI keys for a result's companion; none unless it holds a figure. */
+function extendedKpisOf(companion: MomentumResult['companion']): Record<string, number> {
+  if (!companion || (companion.status !== 'computed' && companion.status !== 'this_run')) return {};
+  const out: Record<string, number> = {};
+  if (typeof companion.cagr === 'number') out.extended_cagr = companion.cagr;
+  if (typeof companion.max_drawdown === 'number')
+    out.extended_max_drawdown = companion.max_drawdown;
+  return out;
+}
+
 async function saveFinishedRun(run: MomentumRun, result: MomentumResult): Promise<void> {
   if (saving.has(run.id)) return;
   saving.add(run.id);
@@ -236,6 +246,9 @@ async function saveFinishedRun(run: MomentumRun, result: MomentumResult): Promis
         sharpe: num(kpis.sharpe),
         turnover_per_year: num(kpis.turnover_per_year),
         avg_holdings: num(kpis.avg_holdings),
+        // BL-036 Phase 1: the extended-tags companion, kept beside the run so Saved runs shows
+        // it without a re-run. The server ignores both keys when it asks "did the result move".
+        ...extendedKpisOf(result.companion),
       },
       dates: result.series.dates,
       strategy: result.series.strategy,

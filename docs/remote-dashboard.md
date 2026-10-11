@@ -158,6 +158,10 @@ that reads the root `.env` meanwhile. The script then `scripts/check-no-env-bund
 empty. Do not run `opennextjs-cloudflare build` or `wrangler deploy` directly. If a build is killed
 outright and a `.env` file is missing, rename its `.cf-build-hidden` copy back (the next `cf:build` also does it).
 
+OpenNext reads the build from `.next`, which a running `next dev` for the dashboard clears and rewrites, so
+the build then fails with `ENOENT … .next/required-server-files.json`. `cf-build.mjs` refuses to start while
+one runs (or while `NEXT_DIST_DIR` is set); stop it (`bun run stop:research`), deploy, then restart it.
+
 ```bash
 cd apps/dashboard
 npx wrangler login                                   # once

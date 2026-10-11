@@ -19,6 +19,22 @@ shared link all land where you were.
   its table, what changed this week, and the ten strongest stocks. Click a group to open its page.
 - **Stocks** answers "which stocks?": the full list below.
 
+## Live scores on Fridays
+
+On a Friday between 09:15 and 15:30 IST a second switch appears: **Last close | Live
+(provisional)**. Live adds this Friday as if it had closed at the current Fyers prices and
+recomputes every score, rank and sector from it, so you can see where the week is heading before
+the close. It needs a valid Fyers login.
+
+- It is **provisional**: nothing is saved, and once this evening's closes are stored the normal
+  scores replace it. The subtitle shows the time the prices were read; they are re-read every
+  five minutes.
+- A stock with no live price keeps last week's close, and so does one that fell more than 40% or
+  rose more than 67% (usually an unadjusted split or bonus, or a bad tick); the card says how many and names the second kind.
+- Membership and the liquidity gate stay as of last week: a day's turnover is not complete until
+  the close.
+- A stock's drawer still shows its closing history.
+
 ## The market strip
 
 Five tiles above the list say how healthy momentum is right now:

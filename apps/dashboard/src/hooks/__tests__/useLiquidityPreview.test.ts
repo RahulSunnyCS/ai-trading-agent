@@ -27,4 +27,10 @@ describe('liquidityPreviewUrl', () => {
       'universe=all_liquid',
     );
   });
+
+  it('sends the point-in-time universe', () => {
+    expect(liquidityPreviewUrl({ ...base, universe: 'turnover_rank' })).toContain(
+      'universe=turnover_rank',
+    );
+  });
 });

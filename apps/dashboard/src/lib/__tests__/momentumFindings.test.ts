@@ -106,6 +106,33 @@ describe('the tradable twin', () => {
   });
 });
 
+describe('the tradable twin on a universe that forces the filter on', () => {
+  const PIT = { ...BASE, broad_universe: 'turnover_rank' };
+  const circuitsOff = strategy('pit-circuits-off', 0.4, {
+    config_full: { ...PIT, broad_respect_circuits: false },
+    trust: 'not_tradable',
+  });
+
+  it('counts a stored filter-off as on, as the server does', () => {
+    const stored = strategy('pit-stored-off', 0.35, {
+      config_full: { ...PIT, broad_liquidity_filter: false },
+    });
+    expect(tradableTwin(circuitsOff, [circuitsOff, stored])?.id).toBe('pit-stored-off');
+  });
+
+  it("still needs the filter on when the universe is today's list", () => {
+    const today = { ...BASE, broad_universe: 'total_market' };
+    const offToday = strategy('today-off', 0.4, {
+      config_full: { ...today, broad_respect_circuits: false },
+      trust: 'not_tradable',
+    });
+    const filterOff = strategy('today-filter-off', 0.35, {
+      config_full: { ...today, broad_liquidity_filter: false },
+    });
+    expect(tradableTwin(offToday, [offToday, filterOff])).toBeNull();
+  });
+});
+
 describe('savedFindings', () => {
   it("finds screen 1's five on the live strategies, in order", () => {
     const findings = savedFindings(LIVE, name);

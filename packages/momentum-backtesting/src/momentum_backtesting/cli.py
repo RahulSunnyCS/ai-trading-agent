@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import typer
 
-from . import fyers
+from . import angelone, fyers
 from .config import DATA_DIR, load_repo_env
 
 app = typer.Typer(no_args_is_help=True, help="Weekly momentum rotation backtester.")
@@ -952,10 +952,13 @@ def stocks_sync(
     from .stocks.fyers_topup import run_fyers_topup, run_fyers_topup_total_market
 
     try:
-        creds = fyers.resolve_credentials()
+        # Fyers when its token is valid, else Angel One (BL-079 Phase 4).
+        creds = angelone.resolve_prices()
     except fyers.FyersCredentialsError as cred_error:
         typer.echo(f"Fyers fallback unavailable: {cred_error}")
         raise typer.Exit(1) from cred_error
+    if fyers.substitute(creds) is not None:
+        typer.echo(f"No valid Fyers token; the fallback prices come from {creds.source}.")
 
     result = run_fyers_topup(creds)
     if result is None:
@@ -1804,6 +1807,60 @@ def saved_merge(
         typer.echo(f"  left as is (two favourites share these settings): {names}")
     if not apply:
         typer.echo("Run again with --apply to write it. Later saves keep the last 3 repeats.")
+
+
+@saved_app.command("split-fridays")
+def saved_split_fridays(
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Make the groups. Without it, only list the favourites that would move.",
+    ),
+) -> None:
+    """BL-087: follow every favourite that rebalances every 2+ weeks on all its Fridays, as one
+    group of sleeves (one per Friday, capital / K each) in place of the single-Friday favourite,
+    which stays a saved run. Same status and headline. A dry run by default; deletes nothing."""
+    from fastapi import HTTPException
+
+    from . import all_fridays, api, runs_store
+    from .db_read import open_catalog, read_catalog
+
+    with read_catalog() as con:
+        plans = all_fridays.migration_plans(con)
+    if not plans:
+        typer.echo("Nothing to move: no favourite follows a single Friday of a slower cadence.")
+        return
+    verb = "Moving" if apply else "Would move"
+    typer.echo(f"{verb} {len(plans)} favourite{'' if len(plans) == 1 else 's'} to all Fridays:")
+    for plan in plans:
+        every = all_fridays.every_of(plan.config)
+        typer.echo(
+            f"  {plan.dataset:<12} {plan.name}  (every {every} weeks, Friday "
+            f"{int(plan.config.get('rebalance_offset') or 0) + 1} of {every}; {plan.status})"
+        )
+    if not apply:
+        typer.echo("Run again with --apply to make the groups.")
+        return
+    failed = 0
+    for plan in plans:
+        try:
+            sleeves = all_fridays.run_sleeves(plan, api.sleeve_summary)
+            with open_catalog() as con:
+                group = all_fridays.follow(
+                    con,
+                    plan,
+                    sleeves,
+                    status=plan.status or "watching",
+                    active=plan.active,
+                    release=plan.run_id,
+                )
+            typer.echo(f"  done  {group['name']} ({group['status']})")
+        except (HTTPException, runs_store.FavouriteError) as error:
+            failed += 1
+            detail = getattr(error, "detail", None) or str(error)
+            typer.echo(f"  FAILED {plan.name}: {detail} (left as it was)")
+    if failed:
+        raise typer.Exit(1)
 
 
 journal_app = typer.Typer(
@@ -2661,6 +2718,16 @@ def sources_check() -> None:
         typer.echo(f"  ok    Fyers ({creds.source}): {len(closes)} days")
     except Exception as error:
         typer.echo(f"  skip  Fyers: {str(error)[:120]}")
+        # The backup broker source (one login; never fails the check, it is only a backup).
+        try:
+            alt = angelone.get_source()
+            if alt is None:
+                typer.echo("  skip  Angel One: not configured, or its login was refused")
+            else:
+                closes = fyers.daily_closes("NSE:NIFTY50-INDEX", start, date.today(), alt)
+                typer.echo(f"  ok    Angel One: {len(closes)} days")
+        except Exception as alt_error:
+            typer.echo(f"  skip  Angel One: {str(alt_error)[:120]}")
     raise typer.Exit(1 if failed else 0)
 
 

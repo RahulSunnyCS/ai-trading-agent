@@ -12,6 +12,7 @@ import {
   rankDelta,
   roomToExit,
   sleeveLabel,
+  tradingSleeves,
 } from '../../../lib/momentumWeek';
 import type { MomentumWeekCard } from '../../../types/momentum';
 import { Badge } from '../../ui/Badge';
@@ -86,6 +87,13 @@ export function SignalCard({
             </span>
           ))}
         </div>
+      ) : null}
+      {(card.sleeves?.length ?? 0) > 1 && tradingSleeves(card).length > 0 ? (
+        <p className="px-4 pt-2 text-xs text-muted">
+          This Friday {tradingSleeves(card).join(' and ')} trade
+          {tradingSleeves(card).length === 1 ? 's' : ''}; the other sleeves hold. Orders are shown
+          as shares of the whole group.
+        </p>
       ) : null}
       {card.explain ? <p className="px-4 pt-2 text-xs text-muted">{card.explain}</p> : null}
       {card.blocked ? (

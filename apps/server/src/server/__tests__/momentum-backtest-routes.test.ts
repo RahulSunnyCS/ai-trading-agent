@@ -44,6 +44,20 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
+  it('forwards the live provisional scores, passing a 409 outside Friday hours through', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(409, { detail: 'Live scores run on Fridays only' }));
+
+    const response = await server.inject({ method: 'GET', url: '/api/momentum/scores/live' });
+    expect(response.statusCode).toBe(409);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/momentum-scores/live',
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+    await server.close();
+  });
+
   it("forwards one stock's score history, and refuses a symbol that is not an NSE symbol", async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);
@@ -130,6 +144,27 @@ describe('momentum backtest proxy routes', () => {
       url: '/api/momentum/liquidity-preview?min_turnover_cr=-1',
     });
     expect(bad.statusCode).toBe(400);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await server.close();
+  });
+
+  it('accepts the point-in-time universe on the liquidity preview and rejects unknown ones', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, { eligible: 1 }));
+
+    const pit = await server.inject({
+      method: 'GET',
+      url: '/api/momentum/liquidity-preview?universe=turnover_rank',
+    });
+    expect(pit.statusCode).toBe(200);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('universe=turnover_rank');
+
+    const unknown = await server.inject({
+      method: 'GET',
+      url: '/api/momentum/liquidity-preview?universe=nope',
+    });
+    expect(unknown.statusCode).toBe(400);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     await server.close();
   });

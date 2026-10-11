@@ -176,7 +176,11 @@ describe('differingSettings', () => {
       { top_n: 5, exit_rank: 10, broad_category_tags: 'curated' },
     ]);
     expect(diff).toEqual([
-      { key: 'broad_category_tags', label: 'Category tags', values: ['—', 'curated'] },
+      {
+        key: 'broad_category_tags',
+        label: 'Category tags',
+        values: ['—', "Today's list tags (curated)"],
+      },
     ]);
   });
 
@@ -238,5 +242,26 @@ describe('series helpers', () => {
 
   it('computes drawdown from the running peak', () => {
     expect(drawdownSeries([100, 120, 90, null, 150])).toEqual([0, 0, -0.25, null, 0]);
+  });
+});
+
+describe('universe labels', () => {
+  it('spells all three Broad universes, including the point-in-time one', () => {
+    const diff = differingSettings([
+      { broad_universe: 'turnover_rank' },
+      { broad_universe: 'total_market' },
+      { broad_universe: 'all_liquid' },
+    ]);
+    expect(diff).toEqual([
+      {
+        key: 'broad_universe',
+        label: 'Broad universe',
+        values: [
+          'As each year saw it',
+          "Today's index list (survivors only)",
+          'Whole NSE market (liquid only)',
+        ],
+      },
+    ]);
   });
 });

@@ -7,7 +7,9 @@
  * selection comes from the `broad_*` keys, which differ by category mode.
  */
 
-import { formatNumber } from './format';
+import type { MomentumCompanion } from '../types/momentum';
+import { formatNumber, formatPct, formatPp } from './format';
+import { BROAD_UNIVERSES, broadUniverse, isGatedUniverse } from './momentumUniverse';
 
 /**
  * The settings accordions, by id. The settings panel renders one accordion per id, the summary
@@ -36,7 +38,8 @@ export interface MomentumConfigDescription {
   period: string;
   /** Lower-case cadence for a sentence: "weekly", "every 2 weeks", "monthly". */
   cadence: string;
-  /** Standalone chip: "Weekly rebalance", "Every 2 weeks (phase 1)", "Monthly rebalance". */
+  /** Standalone chip: "Weekly rebalance", "Every 2 weeks (phase 1)", "Every 4 weeks (all 4
+   * Fridays)", "Monthly rebalance". */
   cadenceChip: string;
   /** "top 5, exit after rank 10" */
   selection: string;
@@ -68,12 +71,19 @@ export function describeConfig(
   const every = Number(config.rebalance_every ?? 1);
   const monthly = config.rebalance === 'monthly';
   const everyN = !monthly && Number.isFinite(every) && every > 1;
-  const cadence = monthly ? 'monthly' : everyN ? `every ${every} weeks` : 'weekly';
+  const allFridays = everyN && config.split_fridays === true;
+  const cadence = monthly
+    ? 'monthly'
+    : everyN
+      ? `every ${every} weeks${allFridays ? ', all Fridays' : ''}`
+      : 'weekly';
   const cadenceChip = monthly
     ? 'Monthly rebalance'
-    : everyN
-      ? `Every ${every} weeks (phase ${Number(config.rebalance_offset ?? 0) + 1})`
-      : 'Weekly rebalance';
+    : allFridays
+      ? `Every ${every} weeks (all ${every} Fridays)`
+      : everyN
+        ? `Every ${every} weeks (phase ${Number(config.rebalance_offset ?? 0) + 1})`
+        : 'Weekly rebalance';
 
   let selection: string;
   let selectionShort: string;
@@ -101,11 +111,11 @@ export function describeConfig(
 
   const chips: MomentumConfigChip[] = [{ id: 'period', label: period, section: 'period' }];
   if (broad) {
-    const wholeMarket = config.broad_universe === 'all_liquid';
-    const filtered = wholeMarket || config.broad_liquidity_filter === true;
+    const universe = broadUniverse(config);
+    const filtered = isGatedUniverse(universe) || config.broad_liquidity_filter === true;
     chips.push({
       id: 'universe',
-      label: `${wholeMarket ? 'Whole NSE market' : 'Nifty Total Market'}${
+      label: `${BROAD_UNIVERSES[universe].short}${
         filtered ? ` · ≥ ₹${count(config.broad_liq_min_turnover_cr)} Cr/day` : ''
       }`,
       section: 'universe',
@@ -256,6 +266,7 @@ const KEYS: Record<string, KeyInfo> = {
   rebalance: { section: 'portfolio', label: 'Rebalance' },
   rebalance_every: { section: 'portfolio', label: 'Rebalance every (weeks)' },
   rebalance_offset: { section: 'portfolio', label: 'Which Fridays (phase)' },
+  split_fridays: { section: 'portfolio', label: 'Fridays: one or all (split)' },
   sell_every_week: { section: 'portfolio', label: 'Sell exits weekly' },
   momentum_sizing: { section: 'portfolio', label: 'Win-rate position sizing' },
   momentum_sizing_window: { section: 'portfolio', label: 'Sizing window (trades)' },
@@ -424,16 +435,31 @@ export interface HindsightWarning {
 export function hindsightWarning(config: Record<string, unknown>): HindsightWarning | null {
   const dataset = config.dataset;
   if (dataset === 'broad') {
+    const universe = broadUniverse(config);
     const realismOff = [
       config.broad_respect_circuits === true ? null : 'circuit locks',
-      config.broad_liquidity_filter === true || config.broad_universe === 'all_liquid'
+      config.broad_liquidity_filter === true || isGatedUniverse(universe)
         ? null
         : 'the tradability filter',
     ].filter((item): item is string => item !== null);
+    // Without the category layer there are no 2026 themes and no extended-tags figure: only the
+    // stock list is left to talk about.
+    const categories = config.broad_category_mode !== 'off';
+    const detail =
+      universe === 'turnover_rank'
+        ? categories
+          ? 'Each year ranks the 750 stocks most traded before it began, delisted names included, so the ranking carries no hindsight. Buying is different: in category mode a stock is bought only if it carries a category tag, no later-delisted name carries a curated one and most carry no extended one, and the categories come from 2026 themes. Both flatter earlier years; the extended-tags figure under the CAGR is the closer reading, though it still flatters.'
+          : 'Each year ranks the 750 stocks most traded before it began, delisted names included, and buys them directly with no category tags, so the stock list carries no hindsight.'
+        : universe === 'all_liquid'
+          ? categories
+            ? 'Each week ranks every liquid NSE stock, so the ranking carries little hindsight. In category mode only stocks with a category tag can be bought, and the categories come from 2026 themes, which flatter earlier years.'
+            : 'Each week ranks every liquid NSE stock and buys them directly with no category tags, so the stock list carries little hindsight.'
+          : `Every year since 2017 uses today's stock list, so most stocks that later fell out or were delisted are missing${
+              categories ? ', and the categories come from 2026 themes' : ''
+            }. BL-010 measured the loss at about 5 points a year for a typical config and 22 to 25 for the best of a search: choose "As each year saw it" to see it.`;
     return {
       headline: 'Treat this CAGR as an upper bound, not an expected return.',
-      detail:
-        "Every year since 2017 uses today's stock list, so most stocks that later fell out or were delisted are missing, and the categories come from 2026 themes. Real returns are likely well below this until BL-010 re-measures it point-in-time.",
+      detail,
       realismOff,
     };
   }
@@ -443,6 +469,66 @@ export function hindsightWarning(config: Record<string, unknown>): HindsightWarn
       detail:
         "The categories and their member stocks come from 2026 themes and today's lists, so earlier years benefit from hindsight (BL-010).",
       realismOff: [],
+    };
+  }
+  return null;
+}
+
+/**
+ * What a Broad or Custom Index result is, in the owner's words (BL-036 Phase 1, wording as
+ * written in the backlog item). Shown under the KPI cards with a link to the review.
+ */
+export const TRUST_NOTE =
+  'In-sample. On a point-in-time list the typical config loses about 5 points a year and the best of a search about 22–25; the four frozen configs made 32% in 2017–2026 and 20% in the unseen 2012–2016.';
+
+export const EVALUATION_REVIEW_URL =
+  'https://github.com/RahulSunnyCS/ai-trading-agent/blob/main/packages/momentum-backtesting/docs/evaluation-review.md';
+
+/** The trust note for a dataset whose result is an in-sample search outcome; null elsewhere. */
+export function trustNote(config: Record<string, unknown>): string | null {
+  const dataset = config.dataset;
+  return dataset === 'broad' || dataset === 'custom_index' ? TRUST_NOTE : null;
+}
+
+export interface CompanionLine {
+  text: string;
+  /** Hover text: the full sentence, or the reason there is no figure. */
+  title: string;
+}
+
+/**
+ * The muted line under the headline CAGR: the same run with extended category tags. Null when
+ * there is nothing to say (no category layer, or the weekly job skipped it).
+ */
+export function companionLine(
+  companion: MomentumCompanion | null | undefined,
+): CompanionLine | null {
+  if (!companion) return null;
+  if (companion.status === 'computed') {
+    const impact = companion.cagr_impact;
+    // The figure leads: the card is narrow and the line must still say it. The drawdown and the
+    // definition are in the hover.
+    const text = `${formatPct(companion.cagr ?? null)} with extended tags${
+      typeof impact === 'number' ? ` (${formatPp(impact)})` : ''
+    }`;
+    return {
+      text,
+      title: `With extended category tags: ${formatPct(companion.cagr ?? null)} CAGR · ${formatPct(
+        companion.max_drawdown ?? null,
+      )} max drawdown. The same run with the extra category tags from BSE's current classification, which cover many more NSE stocks than today's 755 index members. A stock with no tag, which includes most delisted names, still cannot be bought through a category. Closer to an expected return than the headline, but it still flatters: the tags are today's classification applied to every year.`,
+    };
+  }
+  if (companion.status === 'this_run') {
+    return {
+      text: 'This run already uses extended category tags',
+      title:
+        'The extended tags are the setting of this run, so the headline is the extended figure.',
+    };
+  }
+  if (companion.status === 'failed') {
+    return {
+      text: 'Extended-tags figure unavailable',
+      title: companion.reason ?? 'The extended-tags run failed.',
     };
   }
   return null;

@@ -74,7 +74,7 @@ import pandas as pd
 
 from momentum_backtesting import engine
 from momentum_backtesting import tax as tax_mod
-from momentum_backtesting.categories import compose, snapshots, sources
+from momentum_backtesting.categories import compose, daily_moves, residual, snapshots, sources
 from momentum_backtesting.categories import liquidity as liquidity_mod
 from momentum_backtesting.categories import prices as cat_prices
 from momentum_backtesting.categories.liquidity import LiquidityConfig
@@ -499,6 +499,45 @@ class UniverseBase:
     global_ranks: pd.DataFrame
 
 
+def _apply_feature_tilt(
+    ranks: pd.DataFrame, feature: pd.DataFrame, weight: float
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """BL-050's tilt: blend each week's effective rank with the feature's rank over the same
+    names, then re-rank (lower = better). Returns (ranks, blended score)."""
+    if not 0 < weight < 1:
+        raise ValueError("feature_tilt weight must be between 0 and 1")
+    eligible = ranks.notna()
+    values = feature.reindex(index=ranks.index, columns=ranks.columns).where(eligible)
+    feat_rank = values.rank(axis=1, ascending=False, method="first")
+    middle = eligible.sum(axis=1).add(1).div(2)
+    feat_rank = feat_rank.apply(lambda col: col.fillna(middle)).where(eligible)
+    blended = ((1 - weight) * ranks + weight * feat_rank).where(eligible)
+    from ..levers import rerank
+
+    return rerank(blended), blended
+
+
+def _residual_global_ranks(full_frame: pd.DataFrame) -> pd.DataFrame:
+    """BL-085 L6: rank every column on residual momentum (categories/residual.py), with Nifty 50
+    TRI as the market and today's curated category tags as the groups."""
+    from momentum_backtesting import reference_benchmarks as rb
+
+    market = rb.load_references()[rb.NIFTY50_TRI]
+    market.index = pd.to_datetime(market.index)
+    tags = load_stock_groups(Path(__file__).parent / "curated")
+    first: dict[str, str] = {}
+    for group in sorted(tags):
+        for symbol in tags[group]:
+            first.setdefault(symbol, group)
+    group_of = {
+        col: first[col.split("#", 1)[0]]
+        for col in full_frame.columns
+        if col.split("#", 1)[0] in first
+    }
+    ranks, _scores = residual.residual_ranks(full_frame, market, group_of)
+    return ranks
+
+
 def compute_universe_base(
     *,
     outer_prices: pd.DataFrame,
@@ -506,8 +545,10 @@ def compute_universe_base(
     categories_data_dir: Path,
     lookbacks: tuple[int, ...] = (1, 4, 13, 26, 52),
     weights: tuple[float, ...] | None = None,
-    score: Literal["ranksum", "voladj", "blend"] = "ranksum",
+    score: Literal["ranksum", "voladj", "blend", "residual"] = "ranksum",
     voladj_skip_recent_month: bool = True,
+    voladj_lookbacks: bool = False,
+    voladj_skip: Literal["long", "all", "none"] = "long",
     min_drop_pct: float = cat_prices.DEFAULT_MIN_DROP_PCT,
     turnover_spike_multiple: float = cat_prices.DEFAULT_TURNOVER_SPIKE_MULTIPLE,
     liquidity: LiquidityConfig | None = None,
@@ -552,9 +593,14 @@ def compute_universe_base(
         weights=weights,
         score=score,
         voladj_skip_recent_month=voladj_skip_recent_month,
+        voladj_lookbacks=voladj_lookbacks,
+        voladj_skip=voladj_skip,
         universe=tuple(full_frame.columns),
     )
-    global_ranks, _global_scores = engine.compute_ranks(full_frame, config)
+    if score == "residual":
+        global_ranks = _residual_global_ranks(full_frame)
+    else:
+        global_ranks, _global_scores = engine.compute_ranks(full_frame, config)
 
     return UniverseBase(
         universe=universe,
@@ -1110,8 +1156,10 @@ def run_broad_backtest(
     end: str | None = None,
     lookbacks: tuple[int, ...] = (1, 4, 13, 26, 52),
     weights: tuple[float, ...] | None = None,
-    score: Literal["ranksum", "voladj", "blend"] = "ranksum",
+    score: Literal["ranksum", "voladj", "blend", "residual"] = "ranksum",
     voladj_skip_recent_month: bool = True,
+    voladj_lookbacks: bool = False,
+    voladj_skip: Literal["long", "all", "none"] = "long",
     pool_top_n: int = DEFAULT_POOL_TOP_N,
     pool_exit_rank: int = DEFAULT_POOL_EXIT_RANK,
     coverage_floor: float = DEFAULT_COVERAGE_FLOOR,
@@ -1163,6 +1211,26 @@ def run_broad_backtest(
     # Capital-gains tax per sale (tax.py). None = pre-tax, exactly as before. Every stock is
     # taxed as listed equity; the atomics by what they are (see `_tax_classes`).
     tax: tax_mod.TaxRules | None = None,
+    # BL-084 stop-loss (engine.Config's fields of the same names). Off by default.
+    stop_from_buy: float | None = None,
+    stop_from_peak: float | None = None,
+    stop_proceeds: Literal["cash", "top"] = "cash",
+    stop_delay: int = 0,
+    # BL-085 L1: engine.Config.tax_hold_band / tax_hold_weeks (inert without `tax`).
+    tax_hold_band: int = 0,
+    tax_hold_weeks: int = 0,
+    # BL-085 L4: "daily" checks the stop every day and sells at the next open; the daily moves are
+    # read from the daily bars here unless a caller passes them.
+    stop_granularity: Literal["weekly", "daily"] = "weekly",
+    daily: daily_moves.DailyMoves | None = None,
+    # BL-085 L5: engine.Config.weight_by / vol_window.
+    weight_by: Literal["equal", "inverse_vol"] = "equal",
+    vol_window: int = 26,
+    # BL-050: (feature, weight). Inside the effective stock ranking (after the stock tilt, if
+    # any), final = (1 - weight) x that rank + weight x the feature's rank among the same names
+    # that week (higher feature = better; a name without a value gets the week's middle rank),
+    # re-ranked. None (default) changes nothing.
+    feature_tilt: tuple[pd.DataFrame, float] | None = None,
 ) -> BroadBacktestResult:
     """Step 2 (if `ranking` isn't already supplied -- e.g. by a caller's own cache, see
     `api.py`'s `get_categories_universe` for the equivalent Custom Index pattern) plus either
@@ -1216,6 +1284,8 @@ def run_broad_backtest(
             weights=weights,
             score=score,
             voladj_skip_recent_month=voladj_skip_recent_month,
+            voladj_lookbacks=voladj_lookbacks,
+            voladj_skip=voladj_skip,
             pool_top_n=pool_top_n,
             pool_exit_rank=pool_exit_rank,
         )
@@ -1295,6 +1365,8 @@ def run_broad_backtest(
             index=eligible.index, columns=eligible.columns, fill_value=False
         )
         over_ceiling = low if over_ceiling is None else (over_ceiling.astype(bool) | low)
+    if feature_tilt is not None:
+        ranks_full, scores_full = _apply_feature_tilt(ranks_full, *feature_tilt)
     includes = {c: "core" for c in prices.columns}
     config = Config(
         lookbacks=lookbacks,
@@ -1328,7 +1400,22 @@ def run_broad_backtest(
         mass_exit_throttle=(mass_exit_response == "throttle"),
         mass_exit_throttle_fraction=mass_exit_throttle_fraction,
         tax=tax,
+        stop_from_buy=stop_from_buy,
+        stop_from_peak=stop_from_peak,
+        stop_proceeds=stop_proceeds,
+        stop_delay=stop_delay,
+        tax_hold_band=tax_hold_band,
+        tax_hold_weeks=tax_hold_weeks,
+        stop_granularity=stop_granularity,
+        weight_by=weight_by,
+        vol_window=vol_window,
     )
+    if stop_granularity == "daily" and daily is None:
+        daily = daily_moves.daily_moves(
+            {col: col.split("#", 1)[0] for col in prices.columns},
+            str(prices.index[0].date()),
+            str(prices.index[-1].date()),
+        )
     result = engine.run_backtest(
         prices,
         includes,
@@ -1343,6 +1430,7 @@ def run_broad_backtest(
         no_buy=over_ceiling.reindex(prices.index) if over_ceiling is not None else None,
         uc_locked=uc_locked,
         lc_locked=lc_locked,
+        daily=daily,
         tax_classes=_tax_classes(list(prices.columns)) if tax is not None else None,
     )
     return BroadBacktestResult(

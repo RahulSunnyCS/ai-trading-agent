@@ -7,10 +7,18 @@ import { type LiquidityPreviewParams, useLiquidityPreview } from '../../hooks/us
 import { cn } from '../../lib/cn';
 import { formatInr, formatInt, formatNumber } from '../../lib/format';
 import type { MomentumSettingsSection } from '../../lib/momentumConfig';
+import {
+  BROAD_UNIVERSES,
+  BROAD_UNIVERSE_ORDER,
+  broadUniverse,
+  isGatedUniverse,
+  universeSettings,
+} from '../../lib/momentumUniverse';
 import { Badge } from '../ui/Badge';
 import { InfoTooltip } from '../ui/InfoTooltip';
 import { Input, Select, NumberField as UiNumberField } from '../ui/Input';
 import { RadioCards } from '../ui/RadioCards';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { SettingsAccordion } from './backtest/SettingsAccordion';
 
 export type Dataset = 'etf' | 'stock' | 'custom_index' | 'broad';
@@ -689,9 +697,9 @@ function LiquidityPreviewCard({
 }
 
 /**
- * Broad Momentum's universe choice and tradability filter. The filter is optional on the
- * Total Market pool and mandatory on the whole-market universe, where it is what narrows
- * ~2,500 listed stocks down to the ones you could really buy and sell.
+ * Broad Momentum's universe choice and tradability filter. The filter is optional on today's
+ * Total Market list and mandatory on the point-in-time and whole-market universes, where it is
+ * what narrows the listed stocks down to the ones you could really buy and sell.
  */
 function BroadUniverseControls({
   values,
@@ -702,8 +710,9 @@ function BroadUniverseControls({
 }) {
   const num = (key: string, fallback: number) =>
     typeof values[key] === 'number' ? (values[key] as number) : fallback;
-  const wholeMarket = values.broad_universe === 'all_liquid';
-  const active = wholeMarket || Boolean(values.broad_liquidity_filter);
+  const universe = broadUniverse(values);
+  const gated = isGatedUniverse(universe);
+  const active = gated || Boolean(values.broad_liquidity_filter);
   const minTurnover = num('broad_liq_min_turnover_cr', 1);
   const maxCircuitRaw = values.broad_liq_max_circuit_days;
   const maxCircuitDays = typeof maxCircuitRaw === 'number' ? maxCircuitRaw : null;
@@ -713,29 +722,22 @@ function BroadUniverseControls({
     <div className="space-y-3">
       <RadioCards
         name="broad_universe"
-        value={wholeMarket ? 'all_liquid' : 'total_market'}
-        onChange={(value) => onChange('broad_universe', value)}
-        options={[
-          {
-            value: 'total_market',
-            label: 'Nifty Total Market',
-            description:
-              "about 750 stocks from NSE's own Total Market index. Category ranking covers all of them.",
-          },
-          {
-            value: 'all_liquid',
-            label: 'Whole NSE market (liquid only)',
-            description:
-              'every listed NSE equity, narrowed each week to the ones you could really trade. Only stocks with a category tag can be picked in category mode, so "Rank stocks directly" uses it fully.',
-          },
-        ]}
+        value={universe}
+        onChange={(value) => {
+          for (const [key, setting] of Object.entries(universeSettings(value))) {
+            onChange(key, setting);
+          }
+        }}
+        options={BROAD_UNIVERSE_ORDER.map((id) => ({
+          value: id,
+          label: BROAD_UNIVERSES[id].label,
+          description: BROAD_UNIVERSES[id].description,
+        }))}
       />
       <Toggle
-        label={
-          wholeMarket ? 'Tradability filter (always on for the whole market)' : 'Tradability filter'
-        }
-        disabled={wholeMarket}
-        help="Each week, keep only stocks with enough daily turnover to buy and sell your position, that are not pinned at a circuit limit. Uses only data available at that date. Always on for the whole-market universe."
+        label={gated ? 'Tradability filter (always on for this universe)' : 'Tradability filter'}
+        disabled={gated}
+        help="Each week, keep only stocks with enough daily turnover to buy and sell your position, that are not pinned at a circuit limit. Uses only data available at that date. Always on for the point-in-time and whole-market universes."
         checked={active}
         onChange={(value) => onChange('broad_liquidity_filter', value)}
       />
@@ -836,7 +838,7 @@ function BroadUniverseControls({
               circuit: values.broad_liq_circuit !== false,
               circuit_run: num('broad_liq_circuit_run', 3),
               max_circuit_days: maxCircuitDays,
-              universe: wholeMarket ? 'all_liquid' : 'total_market',
+              universe,
             }}
             positionRupees={positionRupees}
             poolTopN={num('broad_pool_top_n', 200)}
@@ -859,6 +861,7 @@ const SETTINGS_FALLBACKS: Values = {
   rebalance: 'weekly',
   rebalance_every: 1,
   rebalance_offset: 0,
+  split_fridays: false,
   sell_every_week: false,
   exclude_high_vol: 0,
   cost_model: 'flat',
@@ -893,7 +896,7 @@ const SETTINGS_FALLBACKS: Values = {
   broad_picks_per_category: 2,
   broad_off_top_n: 10,
   broad_off_exit_rank: 20,
-  broad_universe: 'total_market',
+  broad_universe: 'turnover_rank',
   broad_liquidity_filter: true,
   broad_respect_circuits: true,
   broad_liq_min_turnover_cr: 1,
@@ -1012,16 +1015,12 @@ export function MomentumSettingsPanel({
           <Section
             id="universe"
             title="Universe &amp; tradability"
-            description={
-              str('broad_universe', 'total_market') === 'all_liquid'
-                ? 'Whole NSE market'
-                : 'Nifty Total Market pool'
-            }
+            description={BROAD_UNIVERSES[broadUniverse(values)].short}
           >
             <Hint>
-              Stocks in the Nifty Total Market universe are screened using available membership data
-              and the pool is refreshed quarterly; each pool member&apos;s own rank still updates
-              weekly.
+              The pool is refreshed quarterly from the universe you pick; each pool member&apos;s
+              own rank still updates weekly. &quot;As each year saw it&quot; removes the survivor
+              bias of today&apos;s list; the categories are still today&apos;s themes.
             </Hint>
             <BroadUniverseControls values={values} onChange={onChange} />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1421,6 +1420,7 @@ export function MomentumSettingsPanel({
                   onChange('rebalance', choice === 'monthly' ? 'monthly' : 'weekly');
                   onChange('rebalance_every', choice === 'monthly' ? 1 : Number(choice.slice(5)));
                   onChange('rebalance_offset', 0);
+                  if (choice === 'monthly' || choice === 'every1') onChange('split_fridays', false);
                 }}
               >
                 <option value="every1">Weekly</option>
@@ -1430,6 +1430,30 @@ export function MomentumSettingsPanel({
               </Select>
             </Field>
             {num('rebalance_every', 1) > 1 && str('rebalance', 'weekly') === 'weekly' ? (
+              <div className="text-xs font-medium text-muted">
+                <span className="flex items-center gap-1.5">
+                  Fridays
+                  <InfoTooltip
+                    text="One trades on a single set of Fridays; All (split) runs every set with an equal share of the money each and adds them up, so no Friday has to be picked."
+                    label="About Fridays"
+                  />
+                </span>
+                <SegmentedControl
+                  className="mt-1"
+                  ariaLabel="One Friday or all Fridays"
+                  size="sm"
+                  value={bool('split_fridays') ? 'all' : 'one'}
+                  options={[
+                    { value: 'one', label: 'One' },
+                    { value: 'all', label: 'All (split)' },
+                  ]}
+                  onChange={(choice) => onChange('split_fridays', choice === 'all')}
+                />
+              </div>
+            ) : null}
+            {num('rebalance_every', 1) > 1 &&
+            str('rebalance', 'weekly') === 'weekly' &&
+            !bool('split_fridays') ? (
               <Field
                 label="Which Fridays"
                 help="Trading weeks are fixed on the calendar (counted from 1 Jan 2016), so each choice is a different set of Fridays. Comparing them shows how much of a result is down to lucky timing."
@@ -1448,6 +1472,16 @@ export function MomentumSettingsPanel({
               </Field>
             ) : null}
           </div>
+          {num('rebalance_every', 1) > 1 &&
+          str('rebalance', 'weekly') === 'weekly' &&
+          bool('split_fridays') ? (
+            <Hint>
+              All (split) runs every Friday set with an equal share of the money, evened out again
+              each April, and adds them into one account. Tax is counted per Friday set, so a loss
+              in one set does not offset a gain in another: slightly pessimistic. It takes about as
+              many times longer as there are sets, and the Friday luck card shows each one.
+            </Hint>
+          ) : null}
           {num('rebalance_every', 1) > 1 && str('rebalance', 'weekly') === 'weekly' && buffer ? (
             <Toggle
               label="Sell exits weekly, buy only on the cadence"

@@ -35,6 +35,11 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
     a hole), exported as `expiries_observed.csv`; days-to-expiry reads it (BL-034 Phase 2)
   - `010_ref_rates.sql`: `ref_rates`, the RBI repo rate from each policy decision date
     (`rates.csv`), the risk-free rate for implied volatility (`ReferenceData.risk_free_rate`)
+  - `011_momentum_result_changes.sql`: `momentum_result_changes`, why each saved Momentum
+    strategy's result moved (BL-052)
+  - `012_momentum_orders.sql`: `momentum_holdings`, `momentum_holding_rules`,
+    `momentum_owner_settings`, `momentum_orders` — Momentum's "Your orders" (BL-051 Phase 3).
+    Shipped first as `011_momentum_orders`, so it is idempotent (see Migrations below)
 - `lake/` — immutable Parquet price data, read through TEMP views (`bars_1m_option`,
   `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`). One file per
   (asset, name, trading day); `lake.BAR_SCHEMA` / `lake.OPT_SCHEMA` are the one definition
@@ -100,7 +105,13 @@ table instead.
   readers open the Parquet directly; `tdata status` counts on an in-memory DuckDB), so every
   `connect()` there passes `views=()`; a test in each package fails on one that does not.
 - **Migrations by filename**, like apps/server's runner: never edit an applied
-  migration, add `NNN_name.sql`.
+  migration, add `NNN_name.sql`. Never rename one either: the ledger
+  holds the old name, so the runner applies the file again over tables that already exist
+  (`CatalogException: Table ... already exists` at every `connect()`, 2026-10-10). If a
+  migration was renumbered anyway, make it idempotent (`CREATE TABLE IF NOT EXISTS`, `ALTER
+  ... ADD COLUMN IF NOT EXISTS` — nullable with a default, DuckDB rejects constraints there) and
+  pin it with a test that opens a catalog whose ledger holds the old name
+  (`test_012_applies_over_catalog_with_old_011_ledger`).
 - **No FOREIGN KEYs** (DuckDB checks them over-eagerly); relations are documented in
   the migration and kept by the writers.
 - **Reference data: the catalog is master.** The CSVs in

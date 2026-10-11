@@ -532,18 +532,31 @@ export function RegimesPanel() {
               </CommandHint>
             </Card>
           )}
-          {data && data.t33.status === 'error' && (
+          {data && (data.t33.status === 'error' || data.t33.status === 'connect_failed') && (
             <Card>
               <CardHeader title="Comparison with the live regime tagger" />
               <CommandHint command="docker compose up -d" where="from the repo root">
                 This comparison is not shown because the trading database, where the live tagger
-                stores its daily regimes, could not be reached. It is usually just not running:
+                stores its daily regimes, could not be connected to. It is usually just not running:
               </CommandHint>
               {data.t33.message && (
                 <Accordion title="Technical detail" defaultOpen={false} className="mt-3">
                   <CodeBlock className="whitespace-pre-wrap">{data.t33.message}</CodeBlock>
                 </Accordion>
               )}
+            </Card>
+          )}
+          {data && data.t33.status === 'missing_table' && (
+            <Card>
+              <CardHeader title="Comparison with the live regime tagger" />
+              <CommandHint
+                command="bun run migrate"
+                where="from the repo root, against the trading database"
+              >
+                This comparison is not shown because the database the service is connected to has no
+                daily regime table. Point DATABASE_URL at the trading database, or run the
+                migrations on this one:
+              </CommandHint>
             </Card>
           )}
           {t33Tab && (

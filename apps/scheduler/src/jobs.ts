@@ -74,23 +74,6 @@ const BASE_JOBS: Job[] = [
     fixHint: 'Start "Daily broker login" by hand from GitHub Actions',
   },
   {
-    id: 'fyers-login',
-    description: 'Headless Fyers login; stores the token in broker_tokens',
-    schedule: { at: '08:05', on: tradingDays, label: 'trading days 08:05' },
-    steps: [['node_modules/.bin/tsx', 'src/fyers.ts', '--store']],
-    cwd: BROKER_LOGIN,
-    timeoutMinutes: 10,
-    // No scheduler retry: fyers.ts retries a transient failure itself but deliberately stops on
-    // a rejected PIN or blocked account, because each wrong attempt counts toward a lockout.
-    // Re-running it here would submit that PIN again.
-    retries: 0,
-    retryDelayMinutes: 0,
-    catchUpHours: 10,
-    needs: ['postgres'],
-    alertsItself: true,
-    fixHint: 'Log in from the dashboard (Broker logins), or: uv run mbt login',
-  },
-  {
     // BL-051 Phase 3: the headline's orders before the close. With a signal delay of 1 the
     // decision is already fixed by last Friday's ranks, so they can be placed at 14:15.
     id: 'momentum-orders',
@@ -219,6 +202,40 @@ const BASE_JOBS: Job[] = [
     group: 'catalog',
     alertsItself: true,
     fixHint: 'Log in to Fyers, then: cd packages/option-backtesting && uv run obt daily',
+  },
+  {
+    id: 'options-rotation-nightly',
+    description:
+      "Run all 298 rotation variants over the day's collected data and store the results (BL-058)",
+    // Needs the day in the lake, so it follows options-daily (same group: never at the same time)
+    // and keeps trying until 23:00. Idempotent: a stored variant-day is never rewritten.
+    schedule: { at: '19:45', on: tradingDays, label: 'trading days 19:45' },
+    steps: [['uv', 'run', 'obt', 'rotation', 'update']],
+    cwd: OPTIONS,
+    timeoutMinutes: 20,
+    retries: 3,
+    retryDelayMinutes: 45, // 19:45, 20:30, 21:15, 22:00
+    catchUpHours: 3.25, // until 23:00
+    group: 'catalog',
+    fixHint: 'cd packages/option-backtesting && uv run obt rotation update',
+  },
+  {
+    id: 'options-rotation-pick',
+    description:
+      "Record the day's rotation picks (lists A, B, C, REF) before 09:17 and Telegram them (BL-058)",
+    // Needs the 09:15 VIX bar, which Fyers serves from 09:16, and yesterday's results (the nightly
+    // job above). A late entry is flagged (before_first_entry: false), never silently accepted,
+    // and a missed slot is not caught up: it would not be forward.
+    schedule: { at: '09:16', on: tradingDays, label: 'trading days 09:16' },
+    steps: [['uv', 'run', 'obt', 'rotation', 'pick']],
+    cwd: OPTIONS,
+    timeoutMinutes: 3,
+    retries: 2,
+    retryDelayMinutes: 1,
+    catchUpHours: 0,
+    alertsItself: true,
+    fixHint:
+      'cd packages/option-backtesting && uv run obt rotation pick  (a late entry is flagged, not forward)',
   },
   {
     id: 'options-derived',

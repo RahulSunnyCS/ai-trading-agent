@@ -904,6 +904,10 @@ def test_broad_meta_reports_no_instrument_picker_and_broad_defaults(broad_client
     # A new Broad run starts realistic: tradability gate and circuit-lock fills on (BL-010).
     assert meta["defaults"]["broad_liquidity_filter"] is True
     assert meta["defaults"]["broad_respect_circuits"] is True
+    # BL-036 Phase 1: a new run uses each year's own most-traded stocks; the request model itself
+    # keeps total_market, so a saved run that carries no value re-runs unchanged.
+    assert meta["defaults"]["broad_universe"] == "turnover_rank"
+    assert api.BacktestRequest(**_broad_request()).broad_universe == "total_market"
 
 
 def test_broad_meta_membership_warning_follows_file_provenance(broad_client, tmp_path):
@@ -2023,6 +2027,116 @@ def test_circuit_realism_runs_the_opposite_setting_on_the_prices_it_is_given(
     )
 
 
+def _write_wide_tags(extra_symbol: str = BROAD_ORPHAN_SYMBOL) -> None:
+    """The extended tags file beside the fixture's curated one: one stock outside every curated
+    category gets a tag, so the extended run can differ from the curated one."""
+    (api.CATEGORIES_CURATED_DIR / "stock_groups_wide.csv").write_text(
+        "parent_group,subgroup,symbol,company_name,note\n"
+        f"Test Parent,Alpha,{extra_symbol},{extra_symbol} Ltd,wide\n"
+    )
+
+
+def _companion_fixture():
+    req = api.BacktestRequest(
+        **_broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
+    )
+    ranking = api._broad_ranking(req)
+    outer = api.DATA.get()
+    return req, ranking, outer, api._run_broad(req, ranking, outer)
+
+
+def test_the_extended_tags_companion_reruns_on_the_same_ranking_with_extended_tags(
+    broad_client, monkeypatch
+):
+    """The real second engine run, spied: the tags change, the ranking object does not."""
+    _write_wide_tags()
+    req, ranking, outer, outcome = _companion_fixture()
+    calls = []
+    real = api._run_broad
+
+    def spy(request, ranked, prices):
+        calls.append((request.broad_category_tags, ranked))
+        return real(request, ranked, prices)
+
+    monkeypatch.setattr(api, "_run_broad", spy)
+    companion = api._extended_tags_companion(req, ranking, outcome, outer)
+    assert [tags for tags, _ in calls] == ["extended"]
+    assert calls[0][1] is ranking
+    assert companion["status"] == "computed" and companion["tags"] == "extended"
+    assert set(companion) >= {"cagr", "max_drawdown", "total_return", "trades", "cagr_impact"}
+    this_run = float(api.metrics.cagr(outcome.result.equity))
+    assert companion["cagr_impact"] == pytest.approx(companion["cagr"] - this_run)
+
+
+def test_an_all_fridays_companion_is_the_whole_accounts(broad_client, monkeypatch):
+    """BL-087 x BL-036: a split run's figures are the blend's, each sleeve re-run with the
+    extended tags and blended the same way, not the first sleeve's alone."""
+    _write_wide_tags()
+    req, ranking, outer, _outcome = _companion_fixture()
+    sleeves = [
+        req.model_copy(update={"rebalance_every": 2, "rebalance_offset": k, "capital": 0.5})
+        for k in range(2)
+    ]
+    runs = [api._run_broad(r, ranking, outer) for r in sleeves]
+    blend = api.tranches.blend_reset([o.result for o in runs])
+    calls = []
+    real = api._run_broad
+
+    def spy(request, ranked, prices):
+        calls.append((request.broad_category_tags, request.rebalance_offset))
+        return real(request, ranked, prices)
+
+    monkeypatch.setattr(api, "_run_broad", spy)
+    companion = api._extended_tags_companion(req, ranking, runs[0], outer, split=(blend, sleeves))
+    assert calls == [("extended", 0), ("extended", 1)]
+    assert companion["status"] == "computed"
+    this_run = float(api.metrics.cagr(blend.equity))
+    assert companion["cagr_impact"] == pytest.approx(companion["cagr"] - this_run)
+
+
+def test_the_extended_tags_companion_is_skipped_where_there_is_nothing_to_compare(
+    broad_client, monkeypatch
+):
+    req, ranking, outer, outcome = _companion_fixture()
+
+    def forbidden(*_a, **_k):
+        raise AssertionError("no second engine pass expected")
+
+    monkeypatch.setattr(api, "_run_broad", forbidden)
+    off = api._extended_tags_companion(
+        req.model_copy(update={"broad_category_mode": "off"}), ranking, outcome, outer
+    )
+    assert off == {"status": "not_applicable", "reason": "no category layer"}
+    already = api._extended_tags_companion(
+        req.model_copy(update={"broad_category_tags": "extended"}), ranking, outcome, outer
+    )
+    assert already["status"] == "this_run"
+    assert already["cagr"] == pytest.approx(float(api.metrics.cagr(outcome.result.equity)))
+
+
+def test_a_missing_extended_tags_file_fails_the_companion_not_the_run(broad_client):
+    """The fixture's curated folder has no stock_groups_wide.csv, as on a fresh clone."""
+    body = _broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
+    result = _job(broad_client, body, fresh=True)["result"]
+    assert result["kpis"]["cagr"] is not None
+    assert result["companion"]["status"] == "failed"
+    # A fixed sentence: the exception text carries a filesystem path and reaches a hover.
+    assert "/" not in result["companion"]["reason"]
+    assert "stock_groups_wide" not in result["companion"]["reason"]
+
+
+def test_the_weekly_build_skips_the_companion(broad_client, monkeypatch):
+    def forbidden(*_a, **_k):
+        raise AssertionError("the weekly job must not run the companion pass")
+
+    monkeypatch.setattr(api, "_extended_tags_companion", forbidden)
+    req = api.BacktestRequest(
+        **_broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
+    )
+    core, _lazy = api._broad_parts(req, companion=False)
+    assert core["companion"] == {"status": "skipped", "reason": "weekly run"}
+
+
 def test_the_circuit_section_builds_the_real_realism_comparison(broad_client, monkeypatch):
     """Through the section route, with only the two database reads replaced."""
 
@@ -2150,3 +2264,96 @@ def test_the_stock_circuits_endpoint_reads_the_52_weeks_to_the_pages_last_week(c
 
     monkeypatch.setattr(api.circuit_exposure_mod, "stock_circuit_locks", no_database)
     assert client.get("/api/momentum-scores/stock/S0/circuits").status_code == 503
+
+
+# --- BL-087: "All Fridays" ----------------------------------------------------------------------
+
+
+def _blend_of(phases: list[dict], dates: list[str]) -> np.ndarray:
+    from momentum_backtesting import choose
+
+    curves = pd.DataFrame(
+        {o: p["series"]["strategy"] for o, p in enumerate(phases)}, index=pd.to_datetime(dates)
+    )
+    line = choose.ensemble_curve(curves, list(curves.columns))
+    return (line / line.iloc[0]).to_numpy()
+
+
+def test_all_fridays_is_the_april_reset_blend_of_every_friday(client):
+    body = {"universe": core(client), "start": "2017-01-06", "rebalance_every": 4, "tax": True}
+    split = client.post("/api/backtest", json={**body, "split_fridays": True})
+    assert split.status_code == 200, split.text
+    split = split.json()
+    phases = [
+        client.post(
+            "/api/backtest", json={**body, "rebalance_offset": o, "capital": 250_000}
+        ).json()
+        for o in range(4)
+    ]
+    dates = split["series"]["dates"]
+    strategy = np.array(split["series"]["strategy"])
+    assert np.allclose(strategy / strategy[0], _blend_of(phases, dates))
+    spread = split["friday_spread"]
+    assert [p["offset"] for p in spread["phases"]] == [0, 1, 2, 3]
+    for offset, phase in enumerate(phases):
+        assert spread["phases"][offset]["cagr"] == pytest.approx(phase["kpis"]["cagr"])
+    assert spread["blend"]["cagr"] == pytest.approx(split["kpis"]["cagr"])
+    assert split["trades"] and {t["friday"] for t in split["trades"]} <= {0, 1, 2, 3}
+    # A run on one Friday has no Friday-luck section and no `friday` on its trades.
+    one = client.post("/api/backtest", json=body).json()
+    assert "friday_spread" not in one and all("friday" not in t for t in one["trades"])
+
+
+def test_all_fridays_has_no_combined_signal(client):
+    body = {"universe": core(client), "start": "2017-01-06", "rebalance_every": 4}
+    split = client.post("/api/backtest", json={**body, "split_fridays": True}).json()
+    # One list of buys and sells for the whole account would judge every sleeve against the
+    # union of holdings; the panel says so instead of showing it.
+    assert split["latest"]["split"] is True and split["latest"]["rows"] == []
+    assert "no combined signal" in split["latest"]["explain"].lower()
+    assert split["latest"]["week"] == split["series"]["dates"][-1]
+    # The account's open positions are still there.
+    assert "open_positions" in split
+    one = client.post("/api/backtest", json=body).json()
+    assert "split" not in one["latest"] and one["latest"]["rows"]
+
+
+def test_all_fridays_is_a_no_op_on_a_weekly_cadence(client):
+    body = {"universe": core(client), "start": "2017-01-06"}
+    plain = client.post("/api/backtest", json=body).json()
+    flagged = client.post("/api/backtest", json={**body, "split_fridays": True}).json()
+    assert flagged["kpis"] == plain["kpis"] and "friday_spread" not in flagged
+
+
+def test_all_fridays_job_offers_the_friday_spread_section(client):
+    body = {
+        "universe": core(client),
+        "start": "2017-01-06",
+        "rebalance_every": 2,
+        "split_fridays": True,
+    }
+    started = client.post("/api/backtest/jobs", json=body).json()["job"]
+    done = _wait_for(started["id"], client, "done", "failed")
+    assert done["status"] == "done", done["error"]
+    assert "friday_spread" in done["result"]["sections_available"]
+    section = client.get(f"/api/backtest/jobs/{started['id']}/sections/friday_spread").json()
+    assert section["data"]["every"] == 2 and len(section["data"]["phases"]) == 2
+
+
+def test_broad_all_fridays_blends_each_friday_and_drops_the_circuit_card(broad_client):
+    body = _broad_request(
+        broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10, rebalance_every=2
+    )
+    split = broad_client.post("/api/backtest", json={**body, "split_fridays": True})
+    assert split.status_code == 200, split.text
+    split = split.json()
+    phases = [
+        broad_client.post(
+            "/api/backtest", json={**body, "rebalance_offset": o, "capital": 500_000}
+        ).json()
+        for o in range(2)
+    ]
+    strategy = np.array(split["series"]["strategy"])
+    assert np.allclose(strategy / strategy[0], _blend_of(phases, split["series"]["dates"]))
+    assert "circuit_exposure" not in split and "friday_spread" in split
+    assert all(set(entry["fridays"]) <= {0, 1} for entry in split["held_categories"])

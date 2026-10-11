@@ -25,6 +25,33 @@
  *  GET  /api/backtest/legwise/day               — re-simulate one saved day (MTM curve, markers,
  *                                                  per-leg attribution). requireAccess
  *  GET  /api/backtest/legwise/anatomy           — per-day, per-segment index shape. requireAccess
+ *  GET  /api/backtest/legwise/rotation/explain  — why a list picked what it picked on a day, rebuilt
+ *                                                 and checked against the journal. requireAccess
+ *  GET  /api/backtest/legwise/rotation/ic       — daily rank correlation of the morning ranking
+ *                                                 with the day's results. requireAccess
+ *  GET  /api/backtest/legwise/correlation/available — strategies with daily results + picker groups.
+ *                                                  requireAccess
+ *  GET  /api/backtest/legwise/correlation       — how the chosen strategies' daily P&L move together
+ *                                                 (matrices, basket drawdown, drift). requireAccess
+ *  GET  /api/backtest/legwise/correlation/pick  — a basket under a correlation cap (in-sample).
+ *  GET  /api/backtest/legwise/rotation/overview — the Rotation page: data health, the latest baskets, the lists.
+ *  GET  /api/backtest/legwise/rotation/summary  — the 60-day read-out: lists against REF, the base and random baskets.
+ *                                                 requireAccess
+ *  GET  /api/backtest/legwise/rotation/matrix       — the Strategy Matrix: one view, period (or two
+ *                                                 compared) of the rotation variants' gross results
+ *                                                 and the recorded picks overlay. requireAccess
+ *  GET  /api/backtest/legwise/rotation/matrix/cell  — the daily values, curve and variants behind one
+ *                                                 cell. requireAccess
+ *  GET  /api/backtest/legwise/rotation/pulse        — the Family pulse: the 12 family-band cells' recent
+ *                                                 gross, the ranking's rank for each, today's picks.
+ *                                                 requireAccess
+ *  GET  /api/backtest/legwise/rotation/basket   — one list's (or the fixed base's) picks for a day,
+ *                                                 correlated over a window. requireAccess
+ *  GET  /api/backtest/legwise/rotation/regime   — the forward window's market mix beside P1, P2 and P3.
+ *  GET  /api/backtest/legwise/rotation/drawdowns — a list's drawdown episodes against the fixed base.
+ *                                                 requireAccess
+ *  GET  /api/backtest/legwise/rotation/drift    — what a list has held, by family, index, strike method and
+ *                                                 start band, against its own past. requireAccess
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
  *  GET  /api/backtest/legwise/daily             — that run's state/log. requireAccess
@@ -459,6 +486,564 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
       );
     },
   );
+
+  // --- rotation explain ---
+  // "Why this pick?" and "Does rank predict results?": read-only, params whitelisted and
+  // validated here, ranges checked again by the Python side.
+  const ROTATION_LIST = { type: 'string', enum: ['A', 'B', 'C', 'REF'] } as const;
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/explain',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            day: { type: 'string', pattern: DATE_RE },
+            list: ROTATION_LIST,
+            top: { type: 'string', pattern: '^\\d{1,2}$' },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/explain${upstreamQuery(q, ['day', 'list', 'top'])}`,
+      );
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/ic',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', pattern: DATE_RE },
+            to: { type: 'string', pattern: DATE_RE },
+            list: ROTATION_LIST,
+            mode: { type: 'string', enum: ['forward', 'research'] },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/ic${upstreamQuery(q, ['from', 'to', 'list', 'mode'])}`,
+      );
+    },
+  );
+  // --- end rotation explain ---
+
+  // Correlation (BL-090). Selectors are comma-separated tokens; the Python side matches them only
+  // against enumerated strategy names. Numbers stay strings here so upstreamQuery forwards them
+  // as given; Python validates the ranges.
+  const SELECTORS_RE = '^[A-Za-z0-9_:*?.+,\\[\\]-]{1,400}$';
+  const CORRELATION_QUERY = {
+    selectors: { type: 'string', pattern: SELECTORS_RE },
+    from: { type: 'string', pattern: DATE_RE },
+    to: { type: 'string', pattern: DATE_RE },
+    include_stale: { type: 'string', enum: ['true', 'false'] },
+  } as const;
+
+  fastify.get(
+    '/api/backtest/legwise/correlation/available',
+    { preHandler: requireAccess },
+    async (_req, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/correlation/available');
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/correlation',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { ...CORRELATION_QUERY, window: { type: 'string', pattern: '^\\d{1,3}$' } },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/correlation${upstreamQuery(q, ['selectors', 'from', 'to', 'window', 'include_stale'])}`,
+      );
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/correlation/pick',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            ...CORRELATION_QUERY,
+            k: { type: 'string', pattern: '^\\d{1,2}$' },
+            max_corr: { type: 'string', pattern: '^-?\\d(\\.\\d{1,3})?$' },
+            measure: { type: 'string', enum: ['pearson', 'spearman', 'loss'] },
+            require: { type: 'string', pattern: '^[A-Za-z0-9_.,-]{1,400}$' },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/correlation/pick${upstreamQuery(q, [
+          'selectors',
+          'from',
+          'to',
+          'include_stale',
+          'k',
+          'max_corr',
+          'measure',
+          'require',
+        ])}`,
+      );
+    },
+  );
+
+  // --- rotation: the Rotation page's read layer (BL-058 Phase 4) ---
+  fastify.get(
+    '/api/backtest/legwise/rotation/overview',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { day: { type: 'string', pattern: DATE_RE } },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(reply, `/legwise/rotation/overview${upstreamQuery(q, ['day'])}`);
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/summary',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', pattern: DATE_RE },
+            to: { type: 'string', pattern: DATE_RE },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/summary${upstreamQuery(q, ['from', 'to'])}`,
+      );
+    },
+  );
+  // --- end rotation ---
+
+  // --- rotation shadow --- the Shadow scoreboard (rotation/shadow.py, read-only). Only the two
+  // optional dates are forwarded; the Python side raises a `from` before the forward window.
+  fastify.get(
+    '/api/backtest/legwise/rotation/shadow',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', pattern: DATE_RE },
+            to: { type: 'string', pattern: DATE_RE },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/shadow${upstreamQuery(q, ['from', 'to'])}`,
+      );
+    },
+  );
+  // --- end rotation shadow ---
+
+  // --- rotation basket --- the Correlation tab's "Today's basket" preset (rotation/basket.py,
+  // read-only). The list and window are enums, the dates are validated, nothing else is forwarded.
+  fastify.get(
+    '/api/backtest/legwise/rotation/basket',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            list: { type: 'string', enum: ['A', 'B', 'C', 'REF', 'BASE'] },
+            day: { type: 'string', pattern: DATE_RE },
+            window: { type: 'string', enum: ['P1', 'P2', 'last63', 'forward', 'custom'] },
+            from: { type: 'string', pattern: DATE_RE },
+            to: { type: 'string', pattern: DATE_RE },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/basket${upstreamQuery(q, ['list', 'day', 'window', 'from', 'to'])}`,
+      );
+    },
+  );
+  // --- end rotation basket ---
+  // --- rotation regime --- "Forward days vs research periods" (rotation/regime.py, read-only).
+  // No parameters: the periods are the registered ones, so nothing from the query is forwarded.
+  fastify.get(
+    '/api/backtest/legwise/rotation/regime',
+    {
+      preHandler: requireAccess,
+      schema: { querystring: { type: 'object', properties: {}, additionalProperties: false } },
+    },
+    async (_request, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/rotation/regime');
+    },
+  );
+  // --- end rotation regime ---
+
+  // --- rotation drawdowns --- the Rotation page's "Drawdown episodes" card
+  // (rotation/drawdowns.py, read-only). List and window are enums; min_depth is a plain number.
+  fastify.get(
+    '/api/backtest/legwise/rotation/drawdowns',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            list: { type: 'string', enum: ['A', 'B', 'C', 'REF'] },
+            window: { type: 'string', enum: ['P1', 'P2', 'last63', 'forward'] },
+            min_depth: { type: 'string', pattern: '^\\d{1,6}(\\.\\d{1,2})?$' },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/drawdowns${upstreamQuery(q, ['list', 'window', 'min_depth'])}`,
+      );
+    },
+  );
+  // --- end rotation drawdowns ---
+
+  // --- rotation drift --- the Rotation page's "Selection drift" card (rotation/drift.py,
+  // read-only). Only the list is forwarded, as an enum.
+  fastify.get(
+    '/api/backtest/legwise/rotation/drift',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { list: { type: 'string', enum: ['A', 'B', 'C', 'REF'] } },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(reply, `/legwise/rotation/drift${upstreamQuery(q, ['list'])}`);
+    },
+  );
+  // --- end rotation drift ---
+
+  // --- rotation matrix ---
+  // The Strategy Matrix (packages/option-backtesting rotation/matrix.py). Read-only. Every value
+  // is a token list the Python side parses again; "+" and "<" occur in DTE and VIX-band labels
+  // ("7+", "<10.5"), so they are allowed here and the client sends them percent-encoded.
+  const PERIOD_ENUM = ['P1', 'P2', 'P3', 'forward', 'custom'];
+  const MATRIX_FILTERS = {
+    index: { type: 'string', enum: ['NIFTY', 'SENSEX', 'both'] },
+    family: { type: 'string', pattern: '^[A-Za-z0-9_,]{1,80}$' },
+    slot: { type: 'string', pattern: '^[0-9:,]{1,200}$' },
+    weekday: { type: 'string', pattern: '^[A-Za-z,]{1,40}$' },
+    dte: { type: 'string', pattern: '^[0-9a-z+,]{1,40}$' },
+    vix_band: { type: 'string', pattern: '^[0-9a-z<+.,-]{1,100}$' },
+    list: { type: 'string', enum: ['A', 'B', 'C', 'REF'] },
+    basis: { type: 'string', enum: ['all', 'selected'] },
+    view: {
+      type: 'string',
+      enum: ['family_slot', 'date_slot', 'dte_slot', 'vix_family', 'weekday_family', 'pulse'],
+    },
+    period: { type: 'string', enum: PERIOD_ENUM },
+    from: { type: 'string', pattern: DATE_RE },
+    to: { type: 'string', pattern: DATE_RE },
+  } as const;
+  const MATRIX_FILTER_KEYS = [
+    'view',
+    'period',
+    'from',
+    'to',
+    'index',
+    'family',
+    'slot',
+    'weekday',
+    'dte',
+    'vix_band',
+    'list',
+    'basis',
+  ];
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/matrix',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            ...MATRIX_FILTERS,
+            metric: {
+              type: 'string',
+              enum: ['avg', 'win_rate', 'stop_rate', 'worst', 'selection'],
+            },
+            compare: {
+              type: 'string',
+              pattern: '^(P1|P2|P3|forward|custom),(P1|P2|P3|forward|custom)$',
+            },
+            min_n: { type: 'string', pattern: '^\\d{1,4}$' },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/matrix${upstreamQuery(q, [
+          ...MATRIX_FILTER_KEYS,
+          'metric',
+          'compare',
+          'min_n',
+        ])}`,
+      );
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/matrix/cell',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            ...MATRIX_FILTERS,
+            row: { type: 'string', pattern: '^[A-Za-z0-9_:.+<>-]{1,40}$' },
+            col: { type: 'string', pattern: '^[A-Za-z0-9_:.+<>-]{1,40}$' },
+          },
+          required: ['row', 'col'],
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/matrix/cell${upstreamQuery(q, [...MATRIX_FILTER_KEYS, 'row', 'col'])}`,
+      );
+    },
+  );
+  // --- end rotation matrix ---
+
+  // --- rotation daily log ---------------------------------------------------------------
+  // The decision-to-result log and the owner's placement record (packages/option-backtesting
+  // api/rotation_log_routes.py). Queries are whitelisted and rebuilt; the one write is rebuilt
+  // field by field from a strict body, so nothing the client adds can reach the upstream.
+  const ROTATION_LISTS = ['A', 'B', 'C', 'REF'] as const;
+  const ROTATION_PLACEMENT_STATUSES = ['placed', 'changed', 'not_placed'] as const;
+  const ROTATION_NOTE_MAX = 300;
+  const ROTATION_RANGE = {
+    from: { type: 'string', pattern: DATE_RE },
+    to: { type: 'string', pattern: DATE_RE },
+  } as const;
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/log',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            ...ROTATION_RANGE,
+            source: { type: 'string', enum: ['recorded', 'reconstructed', 'all'] },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/log${upstreamQuery(q, ['from', 'to', 'source'])}`,
+      );
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/day/:day',
+    {
+      preHandler: requireAccess,
+      schema: {
+        params: {
+          type: 'object',
+          properties: { day: { type: 'string', pattern: DATE_RE } },
+          required: ['day'],
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { day } = request.params as { day: string };
+      await forwardToBacktestApi(reply, `/legwise/rotation/day/${encodeURIComponent(day)}`);
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/placement',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { ...ROTATION_RANGE },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/placement${upstreamQuery(q, ['from', 'to'])}`,
+      );
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/forensics',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            variant: { type: 'string', pattern: '^[NS]_[a-z0-9]{2,8}_\\d{4}$' },
+            day: { type: 'string', pattern: DATE_RE },
+            cuts: { type: 'string', pattern: CUTS_RE },
+          },
+          required: ['variant', 'day'],
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/forensics${upstreamQuery(q, ['variant', 'day', 'cuts'])}`,
+      );
+    },
+  );
+
+  fastify.post(
+    '/api/backtest/legwise/rotation/placement',
+    {
+      preHandler: requireAccess,
+      bodyLimit: 4 * 1024,
+      schema: {
+        body: {
+          type: 'object',
+          properties: {
+            day: { type: 'string', pattern: DATE_RE },
+            list: { type: 'string', enum: [...ROTATION_LISTS] },
+            status: { type: 'string', enum: [...ROTATION_PLACEMENT_STATUSES] },
+            note: { type: 'string', maxLength: ROTATION_NOTE_MAX },
+          },
+          required: ['day', 'list', 'status'],
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const b = request.body as { day: string; list: string; status: string; note?: string };
+      await forwardToBacktestApi(reply, '/legwise/rotation/placement', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ day: b.day, list: b.list, status: b.status, note: b.note ?? '' }),
+      });
+    },
+  );
+  // --- end rotation daily log -----------------------------------------------------------
+
+  // --- rotation pulse ---
+  // The Family pulse card (rotation/pulse.py, read-only): three optional parameters, validated
+  // here and again by the Python side. `index` takes the names the Python parser accepts.
+  fastify.get(
+    '/api/backtest/legwise/rotation/pulse',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            as_of: { type: 'string', pattern: DATE_RE },
+            list: { type: 'string', enum: ['A', 'B', 'C', 'REF'] },
+            index: { type: 'string', enum: ['both', 'NIFTY', 'SENSEX'] },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/pulse${upstreamQuery(q, ['as_of', 'list', 'index'])}`,
+      );
+    },
+  );
+  // --- end rotation pulse ---
 
   fastify.post(
     '/api/backtest/legwise/daily',

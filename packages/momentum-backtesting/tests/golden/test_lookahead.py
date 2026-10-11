@@ -27,6 +27,8 @@ RESULT_KEYS = (
     "open_positions",
     "comparisons",
     "benchmarks",
+    # The extended-tags companion (BL-036 Phase 1): a second engine pass over the same ranking.
+    "companion",
 )
 
 

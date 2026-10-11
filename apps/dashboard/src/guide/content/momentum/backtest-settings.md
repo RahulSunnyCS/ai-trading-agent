@@ -28,9 +28,9 @@ a one-line reminder.
 | Control | What it does |
 |---|---|
 | Instrument groups (ETF) | Which kinds of ETF may be ranked: Broad, Sector, Thematic, Commodity, International, Debt. |
-| Universe (Broad) | *Nifty Total Market* (about 750 stocks) or *Whole NSE market (liquid only)*. |
+| Universe (Broad) | Which stocks may be ranked. **As each year saw it** (the default for a new run) uses each year's 750 most-traded stocks, delisted names included in the ranking. In the default category mode a stock is bought only if it carries a category tag, and a company that later failed rarely does (none carries a curated tag, most carry no extended one), so it can be ranked but not bought; *Rank stocks directly* buys any ranked stock. **Today's index list (survivors only)** applies today's Total Market list to every year, which flatters the result. **Whole NSE market (liquid only)** ranks every listed equity that passes the tradability filter. The categories are still today's themes whichever you pick. |
 | Pool top N / Pool exit rank (Broad) | How many of the strongest stocks form the pool (default 200), and how far a pool stock may slip before it leaves (250). Refreshed quarterly. |
-| Tradability filter | Keeps only stocks with enough daily turnover to buy and sell, that are not stuck at a [circuit limit](glossary:circuit). Uses only data known on each date. |
+| Tradability filter | Keeps only stocks with enough daily turnover to buy and sell, that are not stuck at a [circuit limit](glossary:circuit). Uses only data known on each date. Always on for the *As each year saw it* and *Whole NSE market* universes. |
 | Respect circuit locks | When on, the backtest cannot buy a stock locked at the upper circuit or sell one locked at the lower circuit. More realistic. |
 
 ### Period
@@ -70,7 +70,8 @@ researching that idea.
 | Wait / Make room | When a new name enters the top N but nothing was sold: wait for cash (default) or trim everything to buy it now. |
 | Top N / Sell when rank > | How many to buy, and the [exit rank](glossary:exit-rank). The ETF default is 5 and 10. |
 | Rebalance | Every week, every 2 or 4 weeks, or monthly. |
-| Which Fridays | For a slower cadence, which set of Fridays. Try both: if they differ a lot, the result owes much to calendar luck. |
+| Fridays: One / All (split) | For a slower cadence (every 2 or 4 weeks). **One** trades a single set of Fridays; **All (split)** runs every set with an equal share of the money each, evens the shares out again each April, and adds them into one account. See [All Fridays](glossary:all-fridays). |
+| Which Fridays | With **One**: which set of Fridays. Try each: if they differ a lot, the result owes much to calendar luck. Hidden for **All (split)**, which holds every set. |
 | Sell exits weekly, buy only on the cadence | Sell a fallen name the week it falls, but only buy on cadence Fridays. |
 | Win-rate position sizing | Buy smaller after a losing streak. Off by default; on its own tests it cost return without cutting risk. |
 
