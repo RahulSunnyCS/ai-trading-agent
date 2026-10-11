@@ -180,12 +180,12 @@ Otherwise:
   list's own rolling 21-session shares over P1 (no band under 10 windows, nothing flagged under 21 sessions); the
   concentration rows (distinct variants, most-picked, one-start-band days, Widesl-minimum days, Buy days) use the same
   yardstick. Picks, not P&L; descriptive only.
-- `rotation/portfolio.py` — the basket under a portfolio MTM stop (BL-092; routes: `GET /legwise/rotation/portfolio/day|days`, `api/rotation_portfolio_routes.py` over `rotation/portfolio_log.py`, proxied at `/api/backtest/legwise/rotation/portfolio/*`; `stop` empty/0/below = none, `trail` = `sl:X,Y` | `lock:A,B` | `locktrail:A,B,X,Y`, malformed = 422; one-lot paths cached per day, pick and lake-file mtime, so the first full-history call takes ~45 s and later ones ~1 s; replayed paths are also kept in `~/.cache/ai-trading-agent/portfolio-paths` (`ATA_PORTFOLIO_CACHE_DIR` overrides it), so an API restart is not cold, and `obt rotation portfolio-warm` fills it ahead of the first view — the whole P1 window is ~3.5 min cold, ~2 s from the cache). `GET /legwise/rotation/drawdowns` also takes `stop` / `trail` and returns the series run through the stop under `with_stop` and `per_lot_with` / `underwater_with` per day, beside the registered figures (`drawdowns.build(..., portfolio=(stop, trail))`). `apply_book(members, stop_inr, trail)`
+- `rotation/portfolio.py` — the basket under a portfolio MTM stop (BL-095; routes: `GET /legwise/rotation/portfolio/day|days`, `api/rotation_portfolio_routes.py` over `rotation/portfolio_log.py`, proxied at `/api/backtest/legwise/rotation/portfolio/*`; `stop` empty/0/below = none, `trail` = `sl:X,Y` | `lock:A,B` | `locktrail:A,B,X,Y`, malformed = 422; one-lot paths cached per day, pick and lake-file mtime, so the first full-history call takes ~45 s and later ones ~1 s; replayed paths are also kept in `~/.cache/ai-trading-agent/portfolio-paths` (`ATA_PORTFOLIO_CACHE_DIR` overrides it), so an API restart is not cold, and `obt rotation portfolio-warm` fills it ahead of the first view — the whole P1 window is ~3.5 min cold, ~2 s from the cache). `GET /legwise/rotation/drawdowns` also takes `stop` / `trail` and returns the series run through the stop under `with_stop` and `per_lot_with` / `underwater_with` per day, beside the registered figures (`drawdowns.build(..., portfolio=(stop, trail))`). `apply_book(members, stop_inr, trail)`
   sums each pick's one-lot path (0 before it starts, its MTM, then its gross) times its lots; the first minute the sum is
   at or below the level every pick closes at that minute's close and nothing else enters. `stop_inr` empty, 0 or below is
   no stop. `Trail`: `sl:X,Y` (every X of profit moves the stop Y), `lock:A,B`, `locktrail:A,B,X,Y`; the level never moves
   down. `book_day` replays the nightly update's own strategy file and lot-sizing date. Reproduces BL-055's totals
-  (`research/bl092/reproduce_bl055.py`) and the log's gross with no stop (`research/bl092/check_log_gross.py`). Stores
+  (`research/bl095/reproduce_bl055.py`) and the log's gross with no stop (`research/bl095/check_log_gross.py`). Stores
   nothing and never changes a stored result or the registered read-out.
 - `rotation/basket.py` + `api/rotation_basket_routes.py` — the Correlation tab's "A day's basket" preset (BL-058
   Phase 4 widget 6; `GET /legwise/rotation/basket?list=A|B|C|REF|BASE&day=&window=P1|P2|last63|forward|custom`),
@@ -231,6 +231,16 @@ Otherwise:
   As-of is the last COMPLETE session (every variant stored; a part-stored day is reported under `store.partial`
   and left out of windows and rank); the route's snapshot is keyed on the cube object plus the journal's stat, not a TTL.
   Journal figures are those on or before as-of. A stored variant outside the 12 cells is listed in `store.unplaced`.
+- `heatmap/` + `api/heatmap_routes.py` — BL-094, the Options Lab's Heatmap tab (default page): the P&L of an ATM
+  short straddle for every entry time (09:16, then each half hour to 14:45), exit (15:30, 15:15) and per-leg SL
+  (10..100 %). `grid.py` restates the legwise engine's fills for the fixed two-leg shape (a test pins every cell to
+  `simulate_day`); indices take ATM from the index spot, a stock (no spot, no strike step, mostly no lot size in the
+  lake) from put-call parity, so stock P&L is points per share and an index's is rupees per lot at today's lot.
+  NIFTY and SENSEX use the nearest weekly, every other index and stock the monthly. `store.py` keeps one Parquet per
+  underlying under `TRADING_DATA_ROOT/heatmap/` (incremental; a file with an old column layout is rebuilt);
+  `view.py` reads the three views (`time_sl`, `date_time`, `date_sl`), sums a date range, filters weeks to expiry
+  and gives `value` or `pct`-of-premium; `obt heatmap build [-u X | --stocks] [--force] | show | list`;
+  `evening.update_heatmap` adds each index's day inside `obt daily`, isolated.
 - `analytics/correlation.py` — BL-090: Pearson / Spearman of strategies' daily 1-lot P&L, loss-day
   overlap and loss-day correlation, equal-lot basket drawdown against the sum of the parts, rolling
   drift, a leaf order that clusters look-alikes, and `pick_diverse` (a basket under a correlation cap).

@@ -1,5 +1,5 @@
 /**
- * The portfolio stop's pop-up (BL-092): the stop in rupees (empty or 0 = none) and AlgoTest's
+ * The portfolio stop's pop-up (BL-095): the stop in rupees (empty or 0 = none) and AlgoTest's
  * three trailing modes, each with only its own fields, and a plain sentence for what the setting
  * will do. Applying changes what the Rotation page shows, never what was recorded or stored.
  */

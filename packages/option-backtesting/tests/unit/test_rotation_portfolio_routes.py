@@ -1,4 +1,4 @@
-"""BL-092 Phase 2: `/legwise/rotation/portfolio/{day,days}` over a synthetic store.
+"""BL-095 Phase 2: `/legwise/rotation/portfolio/{day,days}` over a synthetic store.
 
 The log (picks, lots, stored gross) is the real `daylog` over a store built through
 `pick.record`; the minute paths are crafted, because the synthetic store has no lake bars to

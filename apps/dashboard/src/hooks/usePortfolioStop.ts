@@ -1,5 +1,5 @@
 /**
- * The portfolio stop's setting (BL-092), kept in this browser. One value drives every Rotation
+ * The portfolio stop's setting (BL-095), kept in this browser. One value drives every Rotation
  * widget that shows stopped figures; it is a per-viewer convenience, never state anything else
  * reads. A failed read or write (private window, blocked storage) falls back to the default.
  */

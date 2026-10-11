@@ -46,6 +46,7 @@ const TAB_BY_SEGMENT = new Map<string, Tab>(
 
 /** In display order. Must match the Options Lab nav item's children (a test checks it). */
 export const OPTIONS_LAB_SECTIONS = [
+  'heatmap',
   'strategies',
   'builder',
   'runs',
@@ -57,8 +58,8 @@ export const OPTIONS_LAB_SECTIONS = [
 ] as const;
 export type OptionsLabSection = (typeof OPTIONS_LAB_SECTIONS)[number];
 
-/** What `/optionslab` opens. Daily results was the default before the other sections existed. */
-export const OPTIONS_LAB_DEFAULT_SECTION: OptionsLabSection = 'results';
+/** What `/optionslab` opens: the straddle heatmap (BL-094; it was Daily results before). */
+export const OPTIONS_LAB_DEFAULT_SECTION: OptionsLabSection = 'heatmap';
 
 /** `/optionslab/builder` is the form; `/optionslab/builder/yaml` is the YAML engine. */
 export const BUILDER_MODES = ['form', 'yaml'] as const;

@@ -1,4 +1,4 @@
-"""A portfolio mark-to-market stop over a basket of strategies (BL-092).
+"""A portfolio mark-to-market stop over a basket of strategies (BL-095).
 
 Each strategy already has its own overall stop, per lot. The owner also runs the whole basket
 under one stop on the combined P&L: the first minute the book's mark-to-market reaches the stop

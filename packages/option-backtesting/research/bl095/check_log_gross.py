@@ -1,10 +1,10 @@
-"""BL-092 Phase 1 check: with no portfolio stop, the replayed book equals the Daily log's gross.
+"""BL-095 Phase 1 check: with no portfolio stop, the replayed book equals the Daily log's gross.
 
 For each reconstructed (research-history) day in the window, every list's picks are replayed with
 `book_day(..., stop=None)` and compared with `list_block`'s gross for the same list. Also prints
 what a ₹10,000 stop does on those days. Needs the data root mounted; not part of the product.
 
-    uv run python research/bl092/check_log_gross.py --from 2026-09-01 --to 2026-09-30
+    uv run python research/bl095/check_log_gross.py --from 2026-09-01 --to 2026-09-30
 """
 
 from __future__ import annotations

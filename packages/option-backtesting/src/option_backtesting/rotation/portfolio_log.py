@@ -1,4 +1,4 @@
-"""The portfolio stop over the Rotation log's baskets (BL-092 Phase 2).
+"""The portfolio stop over the Rotation log's baskets (BL-095 Phase 2).
 
 `portfolio.py` is the calculation; this takes the picks of a list-day from the daily log
 (`daylog.build_day` / `build_log`: recorded, or reconstructed from the research history) and

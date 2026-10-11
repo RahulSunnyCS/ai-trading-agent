@@ -2,7 +2,12 @@
 
 import { useCallback, useMemo } from 'react';
 
-import { ANY, type CorrelationFilters, DEFAULT_FILTERS } from '../lib/correlationView';
+import {
+  ANY,
+  type CorrelationFilters,
+  DEFAULT_FILTERS,
+  DEFAULT_NAMES,
+} from '../lib/correlationView';
 import type { CorrelationMeasure } from '../types/legwise';
 import { useQueryState } from './useQueryState';
 
@@ -11,8 +16,8 @@ const MEASURES: readonly CorrelationMeasure[] = ['pearson', 'spearman', 'loss'];
 /**
  * What Options Lab › Correlation is showing, kept in the URL query so a link or a refresh lands
  * on the same comparison: `?slot=0917&family=wide&index=N&kind=legwise&names=a,b&from=…&to=…`.
- * An absent key is its default (09:17 for the slot, "any" for the rest), so the bare page is the
- * 09:17 strategies; "any slot" is stored as `slot=any`.
+ * An absent key is its default ("any" for the filters, the three NIFTY 09:17 strategies for
+ * `names`), so the bare page is those three; an emptied list is stored as `names=-`.
  */
 export function useCorrelationFilters() {
   const [slot, setSlot] = useQueryState('slot');
@@ -30,7 +35,8 @@ export function useCorrelationFilters() {
       family: family ?? ANY,
       index: index ?? ANY,
       kind: kind ?? ANY,
-      names: names ? names.split(',').filter(Boolean) : [],
+      names:
+        names === null ? [...DEFAULT_NAMES] : names === '-' ? [] : names.split(',').filter(Boolean),
     }),
     [slot, family, index, kind, names],
   );
@@ -42,7 +48,12 @@ export function useCorrelationFilters() {
       if (patch.family !== undefined) setFamily(patch.family === ANY ? null : patch.family);
       if (patch.index !== undefined) setIndex(patch.index === ANY ? null : patch.index);
       if (patch.kind !== undefined) setKind(patch.kind === ANY ? null : patch.kind);
-      if (patch.names !== undefined) setNames(patch.names.length ? patch.names.join(',') : null);
+      if (patch.names !== undefined) {
+        const same =
+          patch.names.length === DEFAULT_NAMES.length &&
+          patch.names.every((n, i) => n === DEFAULT_NAMES[i]);
+        setNames(same ? null : patch.names.length ? patch.names.join(',') : '-');
+      }
     },
     [setSlot, setFamily, setIndex, setKind, setNames],
   );

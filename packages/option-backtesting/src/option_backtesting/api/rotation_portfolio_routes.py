@@ -1,4 +1,4 @@
-"""`/legwise/rotation/portfolio/*`: what a list's basket did under a portfolio MTM stop (BL-092).
+"""`/legwise/rotation/portfolio/*`: what a list's basket did under a portfolio MTM stop (BL-095).
 
     GET /legwise/rotation/portfolio/day?day=YYYY-MM-DD&list=A|B|C|REF&stop=10000&trail=sl:1000,500
     GET /legwise/rotation/portfolio/days?from=&to=&source=recorded|reconstructed&stop=&trail=

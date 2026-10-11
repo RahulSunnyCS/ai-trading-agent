@@ -23,13 +23,18 @@ export interface CorrelationFilters {
   names: string[];
 }
 
-/** 09:17 across both indices and every family: the rotation's first slot, ten strategies. */
+/**
+ * What the tab opens on (BL-094): the three 09:17 families on NIFTY, so the matrix stays three
+ * by three however many strategies exist. Any other strategy is added from the multiselect.
+ */
+export const DEFAULT_NAMES: readonly string[] = ['N_wide_0917', 'N_dir_0917', 'N_buy_0917'];
+
 export const DEFAULT_FILTERS: CorrelationFilters = {
-  slot: '0917',
+  slot: ANY,
   family: ANY,
   index: ANY,
   kind: ANY,
-  names: [],
+  names: [...DEFAULT_NAMES],
 };
 
 /**

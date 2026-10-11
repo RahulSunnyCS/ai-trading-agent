@@ -1,5 +1,5 @@
 /**
- * The portfolio stop's setting (BL-092): what the owner types, what is sent to the API, and the
+ * The portfolio stop's setting (BL-095): what the owner types, what is sent to the API, and the
  * words that say what it will do. Drafts stay strings so an emptied field stays empty ("nothing
  * typed" is "no portfolio stop", as is 0 or below). Nothing here computes a figure.
  *

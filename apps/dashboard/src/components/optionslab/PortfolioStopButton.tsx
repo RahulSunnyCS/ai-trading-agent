@@ -1,5 +1,5 @@
 /**
- * The "Portfolio stop" button of the Rotation page's run bar (BL-092): shows the setting that is
+ * The "Portfolio stop" button of the Rotation page's run bar (BL-095): shows the setting that is
  * applied and opens its pop-up.
  */
 

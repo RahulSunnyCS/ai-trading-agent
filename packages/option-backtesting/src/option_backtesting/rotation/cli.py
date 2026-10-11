@@ -143,7 +143,7 @@ def portfolio_warm(
     end: str = typer.Option(None, "--to", help="Last day (default: the latest)."),
 ) -> None:
     """Replay every list-day's baskets once so the Rotation page's portfolio stop is fast the
-    first time you open it (BL-092). Read-only: it fills a disposable cache under
+    first time you open it (BL-095). Read-only: it fills a disposable cache under
     ~/.cache/ai-trading-agent/portfolio-paths and changes no stored result."""
     import time
 

@@ -255,7 +255,7 @@ def test_the_route_answers_validates_and_writes_nothing(world):
     assert _fingerprint(root) == before
 
 
-# --- BL-092: the same series through the portfolio stop ---------------------------------------
+# --- BL-095: the same series through the portfolio stop ---------------------------------------
 
 
 @pytest.fixture

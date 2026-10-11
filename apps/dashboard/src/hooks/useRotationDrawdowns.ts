@@ -15,7 +15,7 @@ export function useRotationDrawdowns(p: {
   list: RotationListKey;
   window: DrawdownWindowId;
   minDepth: number;
-  /** BL-092: also run the series through the portfolio stop (nothing is added when it is off). */
+  /** BL-095: also run the series through the portfolio stop (nothing is added when it is off). */
   portfolio?: PortfolioStopSetting | undefined;
 }) {
   const q = new URLSearchParams({

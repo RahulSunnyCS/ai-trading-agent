@@ -1,4 +1,4 @@
-# BL-092 — Portfolio MTM stop-loss on the Rotation page (lists, replay, curves, drawdowns)
+# BL-095 — Portfolio MTM stop-loss on the Rotation page (lists, replay, curves, drawdowns)
 
 | | |
 |---|---|
@@ -8,7 +8,7 @@
 | **Area** | options / dashboard |
 | **Created** | 2026-10-11 |
 | **Depends on** | BL-058 (the Rotation page and its daily log), BL-055 (the portfolio-stop rule and its numbers) |
-| **TODO.md row** | 3.25 |
+| **TODO.md row** | 3.26 |
 
 ## Context
 
@@ -217,10 +217,10 @@ decision. (Questions 1–7 of 2026-10-11 are answered: see Owner's decisions.)
   the stop ₹Y), Lock profit and Lock and trail. Both trailing questions closed by that; plan
   updated (rule in Phase 1, `trail=` in Phase 2, the pop-up in Phase 3).
 - 2026-10-11 — started. Phase 1 built (`rotation/portfolio.py`, `tests/unit/test_rotation_portfolio.py`,
-  `research/bl092/`). Done-when checks: (1) a book of one strategy with the stop at its own overall
+  `research/bl095/`). Done-when checks: (1) a book of one strategy with the stop at its own overall
   stop reproduces the engine's result (unit test); (2) BL-055's 12 totals and max drawdowns
   (B1 / B2 / B3 × none / 8k / 10k / 12.5k) are reproduced to the rupee from its curves
-  (`research/bl092/reproduce_bl055.py`, 489 days); (3) with no stop, 80 reconstructed list-days
+  (`research/bl095/reproduce_bl055.py`, 489 days); (3) with no stop, 80 reconstructed list-days
   (24 Aug – 30 Sep 2026, lists A / B / C / REF) replay to the log's gross (`check_log_gross.py`, 0 differ); (4) each
   trailing mode on synthetic paths, and the level never moves down (unit tests). The trailing rules
   are written from AlgoTest's wording; open question 1 (compare with the owner's AlgoTest screen)

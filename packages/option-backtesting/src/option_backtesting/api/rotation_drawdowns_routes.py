@@ -6,7 +6,7 @@ writes anything.
     GET /legwise/rotation/drawdowns?list=A|B|C|REF&window=P1|P2|last63|forward&min_depth=500
         [&stop=10000&trail=sl:1000,500]
 
-`stop` / `trail` (BL-092) also run the series through the portfolio stop and return it under
+`stop` / `trail` (BL-095) also run the series through the portfolio stop and return it under
 `with_stop` beside the registered figures; empty, 0 or below is no stop.
 
 `min_depth` is rupees per lot below the running peak (default 500). Errors come back as

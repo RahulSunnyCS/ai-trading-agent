@@ -1,5 +1,5 @@
 /**
- * "Replay the list" (BL-092): one list's whole basket on one day, minute by minute, under the
+ * "Replay the list" (BL-095): one list's whole basket on one day, minute by minute, under the
  * portfolio stop. The basket's combined P&L, the level it stops at (a step line when trailing), a
  * marker where it closed, and each pick as a thin line. Read-only; it re-simulates the strategy
  * files (the same call the nightly update made) and says whether the no-stop total equals the log.

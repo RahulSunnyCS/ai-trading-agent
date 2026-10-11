@@ -135,7 +135,7 @@ export function RotationDailyLog({
   // One pick's day, replayed from its strategy file: shown above the calendar, drawer closed.
   const [replay, setReplay] = useState<{ variant: string; day: string } | null>(null);
   const replayRef = useRef<HTMLDivElement>(null);
-  // One list's whole basket for a day under the portfolio stop (BL-092).
+  // One list's whole basket for a day under the portfolio stop (BL-095).
   const [listReplay, setListReplay] = useState<{ list: RotationListKey; day: string } | null>(null);
   useEffect(() => {
     if (replay || listReplay)
@@ -151,7 +151,7 @@ export function RotationDailyLog({
   // request is shown, so reconstructed rows never sit under a Recorded label or the reverse.
   const log = res.data !== null && logMatches(res.data, source, range) ? res.data : null;
 
-  // The stopped figures (BL-092). Only an answer to THIS source and setting is laid over the log;
+  // The stopped figures (BL-095). Only an answer to THIS source and setting is laid over the log;
   // until it lands the log's own figures stay, and the note below says so.
   const book = useRotationPortfolioDays(source, range, setting);
   const bookNow =

@@ -1,6 +1,6 @@
 /**
  * The portfolio-stop proxy routes (`GET /api/backtest/legwise/rotation/portfolio/{day,days}`,
- * BL-092): the day, list, source, stop and trail are matched to strict shapes before they reach
+ * BL-095): the day, list, source, stop and trail are matched to strict shapes before they reach
  * the Python service, anything else is dropped or refused, and access is gated like every other
  * Options Lab route. Same harness as backtest-rotation-drift.test.ts.
  */

@@ -1,5 +1,5 @@
 /**
- * Data hooks for the portfolio stop (BL-092), on usePolledResource and behind the Fastify proxy
+ * Data hooks for the portfolio stop (BL-095), on usePolledResource and behind the Fastify proxy
  * (/api/backtest/legwise/rotation/portfolio/*). Read-only. Nothing is fetched while the setting
  * changes nothing (no stop, no lock): the page then shows the log's own figures.
  */

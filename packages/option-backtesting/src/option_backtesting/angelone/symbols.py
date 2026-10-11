@@ -9,10 +9,12 @@ underlying, expiry, strike and option type, so a day collected here is stored li
 from __future__ import annotations
 
 import json
+import time
 import urllib.request
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
+from http.client import HTTPException
 
 from ..fyers.client import USER_AGENT
 from ..fyers.symbols import Contract
@@ -28,7 +30,6 @@ INDEX_ROWS: dict[str, tuple[str, str]] = {
     "SENSEX": ("BSE", "SENSEX"),
     "INDIAVIX": ("NSE", "India VIX"),
 }
-FO_EXCHANGE = {"NSE": "NFO", "BSE": "BFO"}
 
 
 @dataclass(frozen=True)
@@ -40,10 +41,26 @@ class Target:
     lot_size: int = 1
 
 
-def download_master() -> list[dict]:
+def download_master(
+    attempts: int = 3, pause_s: float = 5.0, sleep: Callable[[float], None] = time.sleep
+) -> list[dict]:
+    """The scrip master, retried on a network or parse error; AngelNetworkError when it stays
+    unavailable (the same stop-the-run error the login raises, with a message that says so)."""
+    from .auth import AngelNetworkError
+
     request = urllib.request.Request(MASTER_URL, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request, timeout=120) as response:
-        return json.load(response)
+    last: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response:
+                return json.load(response)
+        except (OSError, HTTPException, ValueError) as error:
+            # URLError, timeouts and resets are OSErrors; a drop mid-read is IncompleteRead
+            # (HTTPException); a truncated body is a JSON ValueError. All are worth a retry.
+            last = error
+            if attempt < attempts - 1:
+                sleep(pause_s * (attempt + 1))
+    raise AngelNetworkError(f"Angel One master unavailable: {type(last).__name__}")
 
 
 def _expiry(row: dict) -> date | None:

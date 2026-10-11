@@ -264,7 +264,7 @@ def build(
     root: Path | None = None,
     portfolio: tuple[float | None, pf_mod.Trail | None] | None = None,
 ) -> dict:
-    """`portfolio` is (stop in rupees, trailing) for BL-092: the same series is also run through
+    """`portfolio` is (stop in rupees, trailing) for BL-095: the same series is also run through
     the portfolio stop and returned under `with_stop` and per-point `*_with` fields, beside the
     registered figures, which are never replaced."""
     if key not in KEYS:

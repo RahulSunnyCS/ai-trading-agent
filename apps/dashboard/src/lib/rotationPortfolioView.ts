@@ -1,5 +1,5 @@
 /**
- * Laying the portfolio stop's figures over the daily log's rows (BL-092). The table and the
+ * Laying the portfolio stop's figures over the daily log's rows (BL-095). The table and the
  * calendar read `gross` and `per_lot_day` off a list block; this returns the same rows with those
  * two replaced by the stopped ones (and `pf` saying what the log showed and where the book
  * stopped), so neither component needs a second code path. A row or list the stop run could not
@@ -81,7 +81,7 @@ function maxDrawdown(values: readonly number[]): number {
 }
 
 /**
- * The read-out's forward sessions with the portfolio stop laid over them (BL-092): each list's
+ * The read-out's forward sessions with the portfolio stop laid over them (BL-095): each list's
  * day total and per-lot figure are replaced by the stopped ones, and the figures that follow from
  * them (cumulative gross, ₹ per lot-day, the two max drawdowns) are recomputed from those days.
  * Everything that needs the registered machinery (the random baskets, the intervals, the verdict)

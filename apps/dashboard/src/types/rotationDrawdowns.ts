@@ -43,7 +43,7 @@ export interface DrawdownPoint {
   underwater: number;
   base_per_lot: number | null;
   base_underwater: number | null;
-  /** Only with a portfolio stop (BL-092): the same day through the stop. */
+  /** Only with a portfolio stop (BL-095): the same day through the stop. */
   per_lot_with?: number;
   cum_with?: number;
   underwater_with?: number;

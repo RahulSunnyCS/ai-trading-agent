@@ -65,13 +65,13 @@ export function RotationPanel() {
   const [benchmark, setBenchmark] = useState<RotationBenchmark>('REF');
   const [shown, setShown] = useState<ReadonlySet<RotationListKey>>(new Set(['A', 'REF']));
   const [showBase, setShowBase] = useState(true);
-  // BL-092: one portfolio stop for every widget below that shows stopped figures.
+  // BL-095: one portfolio stop for every widget below that shows stopped figures.
   const [portfolio, setPortfolio] = usePortfolioStop();
 
   const readoutDays = overview.data?.readout_days ?? 60;
   const s = summary.data;
 
-  // BL-092: the forward sessions replayed under the portfolio stop. Only an answer for this
+  // BL-095: the forward sessions replayed under the portfolio stop. Only an answer for this
   // setting is laid over the read-out; the verdict, the intervals and the random baskets always
   // stay on the registered basis (the pre-registered test does not move with a typed level).
   const book = useRotationPortfolioDays('recorded', {}, portfolio);

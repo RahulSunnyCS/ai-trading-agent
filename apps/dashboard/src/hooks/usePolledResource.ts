@@ -139,7 +139,7 @@ export interface UsePolledResourceOptions {
    * loading state. It still re-fetches as usual; `loading` is true until that lands. */
   cache?: boolean;
   /** `false` fetches nothing: `data` is null and `loading` false until it turns true again. For a
-   * resource that only exists under some setting (BL-092's portfolio-stop figures). Default true. */
+   * resource that only exists under some setting (BL-095's portfolio-stop figures). Default true. */
   enabled?: boolean;
 }
 

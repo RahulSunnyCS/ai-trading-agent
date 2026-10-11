@@ -125,9 +125,8 @@ def load_credentials(env: Mapping[str, str] | None = None) -> AngelCredentials |
 
 def totp_now(secret: str, at: float | None = None) -> str:
     """RFC 6238, SHA-1, 30 s, 6 digits (the code an authenticator app shows)."""
-    key = base64.b32decode(
-        secret.replace(" ", "").replace("-", "").upper() + "=" * (-len(secret) % 8)
-    )
+    cleaned = secret.replace(" ", "").replace("-", "").upper()
+    key = base64.b32decode(cleaned + "=" * (-len(cleaned) % 8))
     counter = struct.pack(">Q", int((time.time() if at is None else at) // 30))
     digest = hmac.new(key, counter, hashlib.sha1).digest()
     offset = digest[-1] & 15

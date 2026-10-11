@@ -281,7 +281,7 @@ export function RotationDrawdowns({
   portfolio,
 }: {
   list: RotationListKey;
-  /** The page's portfolio stop (BL-092): the series is also run through it, beside the registered one. */
+  /** The page's portfolio stop (BL-095): the series is also run through it, beside the registered one. */
   portfolio?: PortfolioStopSetting;
 }) {
   const [winQ, setWinQ] = useQueryState('ddwin');

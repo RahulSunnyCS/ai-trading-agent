@@ -1,5 +1,5 @@
 /**
- * Wire types of the portfolio-stop routes (BL-092): `GET /legwise/rotation/portfolio/days` and
+ * Wire types of the portfolio-stop routes (BL-095): `GET /legwise/rotation/portfolio/days` and
  * `/day` (packages/option-backtesting `rotation/portfolio_log.py`, `api/rotation_portfolio_routes.py`).
  * Gross, for the lots in `lots`; `gross_without` is what the daily log already shows.
  */
