@@ -227,7 +227,7 @@ equal-weight, live mix, lots per window.
     variant, single-band baskets, Widesl minimum and Buy counts). **A share is flagged when the last 21
     sessions fall outside that list's own rolling 21-session P10–P90 in P1**, not a fixed number of points.
     Descriptive only; nothing changes. `GET /legwise/rotation/drift`. Readable from about 60 sessions.
-  - **10. Paper vs real.** A waterfall from paper gross through charges, days not placed, the owner's
+  - **10. Paper vs real. Moved to [BL-093](BL-093-rotation-paper-vs-real.md) on 2026-10-11 (owner: take it later).** A waterfall from paper gross through charges, days not placed, the owner's
     changes and execution to the real P&L, a day table, and a Real column in the Daily log. Waits for three
     things: the placement record; **the BL-063 charge model applied to stored results in the nightly update,
     as its own registered change** (the `costs` column is zero today, so net equals gross); and the
