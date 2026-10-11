@@ -946,3 +946,13 @@ small decisions taken and logged.
   one gate would be chosen before any P1 test). Arms added: G1400 / G1430 / G1450 = no re-entry
   before that time (G1330 is R3) at ₹650 / ₹1,300 / ₹1,950; F1330 … F1450 = every entry, the first
   included, at or after the gate (₹650). Same events, comparator and engine as Stage 1a.
+- 2026-10-11 — Time gates run (first spike of each day, ₹650, per Widesl = 1 lot a leg). Re-entry
+  gates: win rate 48–57 % in every case; mean per spike NIFTY 2025 / 2022–24 / SENSEX: re-enter at once
+  +₹372 / +₹380 / +₹511; 13:30 +₹846 / +₹628 / +₹735; 14:00 +₹868 / +₹321 / +₹819; 14:30 +₹794 /
+  +₹471 / +₹560; 14:50 +₹619 / +₹478 / +₹583. Gates halve the average losing spike (about −₹2,000 to
+  −₹2,800 → −₹870 to −₹1,550) while the average win stays about ₹2,100–2,500. Gating every entry,
+  the first included (F): win rate 60–74 %, smaller wins and losses, and positive against the
+  comparator in all three groups; F1450 meets the screening bar on these learning periods (NIFTY
+  2025 +₹241 vs comparator, t 2.45; 2022–24 +₹160; mean at ₹20 +₹195; SENSEX +₹349, t 2.46). This
+  was one of 13 variants tried after Stage 1a, so it is a lead for a registered P1 test, not a
+  result. Table: `research/bl091/out/gates.csv`.
