@@ -98,9 +98,9 @@ by this block, frozen with the learned thresholds before P1 is read. This task a
   expiry calendar available on each historical day. Use all eligible sessions within a frozen
   data manifest, not today's contracts or only days on which rotation selected a strategy.
   Analyse indices separately; report actual DTE coverage and missing/excluded sessions.
-- **Series:** Display rolling ATM as context, but estimate derivatives only on a continuous
-  strike/expiry segment. Reset after a switch. At detection, freeze that pair for the entire
-  outcome horizon. Use the same conventions for controls. Fixed morning-ATM T3 remains a
+- **Series (E.1):** Detection reads the spliced rolling ATM series; estimate derivatives only on
+  a continuous strike/expiry segment and reset velocity and acceleration after a switch. At
+  detection, freeze that pair for the entire outcome horizon; outcomes are measured on it. Use the same conventions for controls. Fixed morning-ATM T3 remains a
   separately labelled legacy comparator, not a silently changed version of this signal.
 - **Look-ahead check:** Use completed bars with their actual availability timestamps, trailing
   smoothing and as-of highs/baselines only. A five-minute bucket's close is not available at
@@ -123,10 +123,11 @@ by this block, frozen with the learned thresholds before P1 is read. This task a
   before its first future event and evaluate after 60 trading sessions. The actual start is
   the first eligible session after that registration, not automatically 12 October. No live
   shadow is started by this item creation.
-- **Primary outcome (proposed):** Fixed-strike premium contraction over 30 minutes from the
-  next available bar, normalised by starting premium, alongside maximum adverse expansion
-  over the same path. Report points as a secondary unit. The 15/60-minute horizons are
-  descriptive secondary outcomes and cannot rescue a failed primary result.
+- **Primary outcome (E.2, E.6):** Fixed-strike premium contraction in **points** (no percent rule,
+  E.2) from the next available bar, alongside maximum adverse expansion over the same path, and
+  the rupee result of the re-entry ladder (E.6). The 30-minute horizon, the 15/60-minute horizons
+  and the percent thresholds of A.3 and A.5 are descriptive secondary outcomes and cannot rescue
+  a failed primary result.
 - **Pass / kill rule (proposed; freeze before runs):** For a forward-shadow lead, the primary
   mean contraction improvement versus the simpler parent rule's matched controls must have
   a multiplicity-adjusted 95% lower confidence bound above zero, beat the time/DTE-matched
@@ -308,9 +309,10 @@ change to Phase 0–3; none is frozen until the owner starts the item. Nothing h
    option bars of the 2022 import allow; say so in the coverage table rather than dropping P3.
 10. **One-minute observations, causal smoothing, from the lake's contract bars.** Resolves open
     question 2. The derived `straddle_series_5m` is rolling ATM at 5-minute windows and switches
-    strikes; it is the context series, not the signal series. Build fixed-strike paths from
-    `bars_1m` option contracts, reusing the 09:20-ATM straddle builder in `research/bl083/triggers.py`
-    (it already freezes a pair and reads bars stamped ≤ j only). The widget's "completed one- or
+    strikes. Build the signal series (E.1: spliced rolling ATM, reset at each strike switch) and
+    the frozen-pair outcome paths from `bars_1m` option contracts, reusing the reading rules of
+    the 09:20-ATM straddle builder in `research/bl083/triggers.py` (it freezes a pair and reads
+    bars stamped ≤ j only); that builder needs a rolling variant for detection. The widget's "completed one- or
     five-minute intervals" then share one definition with the study.
 11. **The legacy T3 comparator becomes a hard requirement, run on the same sample.** BL-083's T3
     (09:20-ATM straddle up ≥ 5 % on its 10:00 value, now ≥ 3 % below that high, 30-minute spot range
@@ -427,14 +429,17 @@ substance; these are the settings the start-time freeze will use unless the owne
 
    One rule per arm, no sweep. All arms run on the same episodes through the legwise engine (its
    stops and costs; a ladder of attempts is a sequence of its single entries, built under
-   `research/bl091/`), with a comparator of 1,000 runs of random re-entry minutes inside the episode,
-   drawn from the same time-of-day distribution as the arm's own entries, so R3 and R5 cannot win by
+   `research/bl091/`), with a comparator of 1,000 runs of random re-entry minutes drawn from a causal
+   window (from the stop-out, or the episode's start, to the arms' fixed horizon, never from
+   whether the episode decayed or resumed, which is only known afterwards) with the same
+   time-of-day distribution as the arm's own entries, so R3 and R5 cannot win by
    entering later in a late-decay market. Per episode and per attempt number: stopped or held,
    rupees, attempts before the winner, worst day. Episodes where **no** attempt held are in the
    tally, since memory keeps the days the fifth attempt paid for the first four and drops the rest.
    Learned on P2 + P3, confirmed once on P1. **Keep rule (freeze before P1):** on P1, the arm's net
    rupees per episode after costs is above R0's and above the comparator's P90, its session-block
-   resampled 95 % lower bound of the improvement over R0 is above zero, its worst day is not worse
+   resampled 95 % lower bound of the improvement over R0 is above zero (Holm-adjusted across
+   R1–R5, as the Phase 0 data-snooping control requires), its worst day is not worse
    than R0's, and it has at least 40 episodes with at least one attempt; fewer episodes is
    inconclusive, not a pass. Reported alongside: attempts removed and winners removed, so the owner
    sees what was given up.
