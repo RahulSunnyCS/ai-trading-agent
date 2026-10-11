@@ -40,12 +40,22 @@ same strategies' curves together with the same rule.
 - **2026-10-11 — the control:** the portfolio stop is a number the owner types, in rupees. Empty
   means no portfolio stop, and so does 0 or anything below 0. No preset levels, no on/off switch
   next to it.
+- **2026-10-11 — answers to the open questions:**
+  1. The typed amount applies to the whole book as typed; the owner changes it when a list's lots
+     differ (8 with the Buy add-on).
+  2. After the portfolio stop fires, strategies that have not entered yet do not enter that day.
+  3. Each strategy keeps its own overall stop, per lot, as the engine already does.
+  4. The portfolio stop fills at the minute's close.
+  5. A **trailing** portfolio stop is wanted as an option. A portfolio **target** is not.
+  6. Computed on demand (with a cache), not in the nightly scheduler job.
+  7. The default is **₹10,000**.
 
 ## Goal
 
-With a portfolio stop typed in, the Rotation page shows what each list's book did under that stop.
-That covers every day's figure, a replay of the basket's combined MTM, the equity curve and the
-drawdowns. With the field empty, everything is exactly as today. The stored variant results and the
+The Rotation page shows what each list's book did under a portfolio stop (₹10,000 by default,
+editable, with an optional trailing stop). That covers every day's figure, a replay of the
+basket's combined MTM, the equity curve and the drawdowns. With the field emptied (or 0 or
+below), everything is exactly as today. The stored variant results and the
 registered read-out are never changed.
 
 ## Out of scope
@@ -56,7 +66,7 @@ registered read-out are never changed.
 - Choosing a stop level. The owner types the level they use; the page does not search, rank or
   recommend levels (see Risks).
 - Placing or enforcing anything. The real stop lives in AlgoTest; this repo places no orders.
-- Portfolio target and trailing portfolio stop (open question 5).
+- A portfolio target (owner, 2026-10-11: not required).
 
 ## Plan
 
@@ -67,10 +77,15 @@ registered read-out are never changed.
     member with `simulate_day` and builds each member's per-minute P&L: 0 before it enters, its
     MTM while open, its realised P&L after it exits. It scales each by its lots and sums them.
   - The rule, as the engine's overall stop and BL-055: at the first minute the combined MTM is
-    ≤ −stop, every member exits at that minute's close. A member that has not entered yet (e.g.
-    Dir 09:24, Buy 09:35) does not enter that day. Stop empty, 0 or below → no portfolio stop.
-  - Output: the combined curve, each member's curve, the stop minute (or none), the book's gross
-    with and without the stop, and each member's P&L at the stop.
+    ≤ the stop level, every member exits at that minute's close. A member that has not entered yet
+    (e.g. Dir 09:24, Buy 09:35) does not enter that day. Stop empty, 0 or below → no portfolio stop.
+  - Optional trailing, AlgoTest's two numbers [X, Y] as the legs' `trail_sl`: the level starts at
+    −stop, and every ₹X the book's best MTM so far rises, the level moves up ₹Y. It never moves
+    down, and it is checked at the minute's close like the fixed level. X or Y empty, 0 or below →
+    no trailing. Trailing needs a stop; with no stop it is ignored.
+  - Output: the combined curve, the stop level at each minute (it moves when trailing), each
+    member's curve, the stop minute (or none) and whether it was the trailed level, the book's
+    gross with and without the stop, and each member's P&L at the stop.
   - A list-day whose picks lack data, or a pick still waiting, gets no figure, the same as
     `list_block` today.
 - **Deliverables:** the module and its unit tests.
@@ -80,14 +95,16 @@ registered read-out are never changed.
   2. BL-055's totals for B1 / B2 / B3 at ₹8k / ₹10k / ₹12.5k are reproduced to the rupee.
   3. With the stop empty, every list-day in the reconstructed history equals today's
      `list_block` gross.
+  4. Trailing on synthetic curves: a book that rises ₹3X then falls stops at −stop + 3Y; a book
+     that never rises stops at −stop; the level never moves down.
 
 ### Phase 2 — API and proxy
 - **Tasks:**
-  - `GET /legwise/rotation/portfolio/day?day=&list=&stop=`: one list's basket replayed (combined
-    and member curves, stop line, stop minute, with and without).
-  - `GET /legwise/rotation/portfolio/days?from=&to=&stop=`: per day and list, the gross with the
-    stop and the stop minute.
-  - An in-process cache keyed on (day, basket, the members' file hashes, stop); identical baskets
+  - `GET /legwise/rotation/portfolio/day?day=&list=&stop=&trail=X,Y`: one list's basket replayed
+    (combined and member curves, the stop level per minute, stop minute, with and without).
+  - `GET /legwise/rotation/portfolio/days?from=&to=&stop=&trail=X,Y`: per day and list, the gross
+    with the stop and the stop minute.
+  - An in-process cache keyed on (day, basket, the members' file hashes, stop, trail); identical baskets
     across lists are replayed once.
   - Fastify proxy routes and their tests, as the other `/legwise/rotation/*` routes.
 - **Deliverables:** the routes, the proxy and the tests. The time for the full history (114 days ×
@@ -97,19 +114,21 @@ registered read-out are never changed.
 
 ### Phase 3 — Daily log: days table, calendar and "Replay the list"
 - **Tasks:**
-  - A "Portfolio stop ₹" `NumberField` on the Rotation page, held at page level so one value
-    drives every widget below. It is kept in the URL (`?pfstop=`) and remembered per viewer.
+  - A "Portfolio stop ₹" `NumberField` on the Rotation page, **10000 by default**, held at page
+    level so one value drives every widget below; clearing it, 0 or below means no portfolio stop.
+    Beside it, "Trail every ₹ [X] by ₹ [Y]", empty by default (no trailing). All three are kept in
+    the URL (`?pfstop=&pftrail=`) and remembered per viewer.
   - Days table and calendar: with a stop set, each list's figure is the stopped one, with a
     "PF stop 11:42" flag on days it fired. Hover shows both figures and the lots. The calendar
     shading follows.
   - The day drawer gets "Replay the list" beside the per-pick replay: the basket's combined MTM,
-    the −stop line, a marker at the stop minute, each pick as a thin line, and the end value with
+    the stop level (a step line when trailing), a marker at the stop minute, each pick as a thin line, and the end value with
     and without the stop. It reuses the DayForensics chart helpers.
   - Guide: `rotation-daily-log.md` and a glossary entry "Portfolio stop", in the same commit.
 - **Deliverables:** the components, tests and Guide pages.
-- **Done when:** on Fri 11 Sep 2026 with 10000 typed, list A shows the stopped total and its stop
-  minute, and the replay's end value equals the table's figure. With the field empty, the page is
-  unchanged.
+- **Done when:** on Fri 11 Sep 2026 at the default 10000, list A shows the stopped total and its
+  stop minute, and the replay's end value equals the table's figure. With the field cleared, the
+  page shows today's figures.
 
 ### Phase 4 — Hero curve, headline and Drawdowns
 - **Tasks:**
@@ -130,10 +149,16 @@ registered read-out are never changed.
 
 ## Risks
 
-- **Choosing a level on the history:** typing several levels and keeping the best is a search on
-  in-sample data. BL-055 was inconclusive and showed the stop is not free (whipsaw days). The page
+- **Choosing a level on the history:** typing several levels (or trail numbers) and keeping the
+  best is a search on in-sample data. BL-055 was inconclusive and showed the stop is not free (whipsaw days). The page
   labels every stopped figure as in-sample, offers no level comparison, and the read-out never uses
   it. A study of levels would be its own pre-registered research item.
+- **Default on:** with ₹10,000 as the default, the page opens on stopped figures while the
+  read-out stays on its registered basis. Every stopped figure carries "with ₹X portfolio stop",
+  and the read-out says "no portfolio stop", so the two are never read as one number.
+- **Trailing semantics:** the rule above is [X, Y] as the legs' `trail_sl`. AlgoTest also offers
+  "lock profit" variants; if the owner's AlgoTest setting differs, the rule is changed here first
+  (open question 1).
 - **Overshoot:** the fill is the minute's close, so a fast day ends past the level, as in BL-055.
   AlgoTest checks the stop on live prices, so its fills land closer to the level; the figures here
   are the conservative side.
@@ -147,21 +172,13 @@ registered read-out are never changed.
 ## Open questions
 
 Pending — discuss when this item is picked up. Claude's proposal is beside each one; none is a
-decision.
+decision. (Questions 1–7 of 2026-10-11 are answered: see Owner's decisions.)
 
-1. **One amount for every list, whatever its lots?** A list is 6 lots, 8 with the Buy add-on.
-   *Proposal:* the typed amount applies to the whole book as typed, with the lot count shown next
-   to it.
-2. **After the stop:** does the AlgoTest portfolio stop square off everything and block strategies
-   that have not entered yet that day? *Proposal:* yes, as the engine's overall stop and BL-055.
-3. **Per-strategy stops at 2 lots:** is each strategy's own stop per lot (₹2,500 → ₹5,000 at
-   2 lots), as the log assumes? *Proposal:* keep per lot, as now.
-4. **Fill:** the minute's close (can overshoot) or exactly at the level? *Proposal:* the close.
-5. **Portfolio target or trailing stop too?** *Proposal:* stop only for now.
-6. **When it is computed:** on demand with a cache, or nightly in `rotation update` (a scheduler
-   job)? *Proposal:* on demand first.
-7. **Default value:** empty (no stop) for every viewer, or the owner's 10000? *Proposal:* empty,
-   so the page shows the registered basis unless a level is typed.
+1. **Trailing form:** the plain [X, Y] trail (every ₹X rise in the book's best MTM moves the level
+   up ₹Y), or AlgoTest's "lock profit" / "lock and trail" (once the book is up ₹A, the level jumps
+   to +₹B, then trails)? *Proposal:* plain [X, Y] first, matching what the owner sets in AlgoTest.
+2. **Trailing start:** does the level start moving from the book's first rupee of profit, or only
+   once the book is up some amount? *Proposal:* from the first rupee, as the legs' trail.
 
 ## Log
 
@@ -170,3 +187,7 @@ decision.
   0 or below = none. Widgets in scope: Daily log (table, calendar, list replay), hero and
   headline, Drawdowns. Left alone: Why this pick, Pulse, Regime, Drift, Rank IC, Matrix and
   Correlation, which rank single strategies; the stop does not change a pick.
+- 2026-10-11 — owner answered the seven open questions: the typed amount applies as typed (the
+  owner changes it per book); after the stop nothing else enters; per-strategy stops stay per lot;
+  minute-close fills; a trailing portfolio stop wanted, no portfolio target; on demand; default
+  ₹10,000. Plan updated (trailing in Phases 1–3). New open questions: the trailing form and start.
