@@ -156,8 +156,8 @@ def collect_with_fallback(
     notes = (
         [
             f"Repaired from Fyers: {', '.join(f'{d:%a %d %b}' for d in repaired)}.",
-            "Rotation results already stored for those days are not re-scored; they still come "
-            "from the Angel One bars.",
+            "Rotation results stored for those days before the repair are not re-scored "
+            "(they were computed from the Angel One bars).",
         ]
         if repaired
         else []

@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import time
 import urllib.request
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -40,7 +40,9 @@ class Target:
     lot_size: int = 1
 
 
-def download_master(attempts: int = 3, pause_s: float = 5.0) -> list[dict]:
+def download_master(
+    attempts: int = 3, pause_s: float = 5.0, sleep: Callable[[float], None] = time.sleep
+) -> list[dict]:
     """The scrip master, retried on a network or parse error; AngelNetworkError when it stays
     unavailable (the same stop-the-run error the login raises, with a message that says so)."""
     from .auth import AngelNetworkError
@@ -51,10 +53,12 @@ def download_master(attempts: int = 3, pause_s: float = 5.0) -> list[dict]:
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
                 return json.load(response)
-        except (OSError, ValueError) as error:  # URLError, timeouts and resets are OSErrors
+        except OSError as error:  # URLError, timeouts and resets are OSErrors
             last = error
             if attempt < attempts - 1:
-                time.sleep(pause_s * (attempt + 1))
+                sleep(pause_s * (attempt + 1))
+        except ValueError as error:  # a truncated or non-JSON body: not a connection problem
+            raise RuntimeError(f"Angel One master is not valid JSON: {error}"[:200]) from error
     raise AngelNetworkError(f"Angel One master unavailable: {type(last).__name__}")
 
 

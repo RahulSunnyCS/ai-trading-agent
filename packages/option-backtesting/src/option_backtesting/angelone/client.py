@@ -100,6 +100,7 @@ class AngelClient:
                 time.sleep(2**attempt)
                 continue
             return payload
+        raise AssertionError("unreachable: the last attempt always returns")  # pragma: no cover
 
     @staticmethod
     def _check(payload: dict, what: str) -> None:
@@ -195,8 +196,12 @@ class AngelClient:
         return out
 
     def _underlying_of(self, symbol: str) -> str:
+        from ..fyers.daily import UNDERLYINGS, VIX_NAME, VIX_SYMBOL
+
+        index_names = {s.index_symbol: s.name for s in UNDERLYINGS.values()} | {
+            VIX_SYMBOL: VIX_NAME
+        }
+        if symbol in index_names:
+            return index_names[symbol]
         name = symbol.split(":", 1)[-1]
-        if name.endswith("-INDEX"):  # NSE:NIFTY50-INDEX, NSE:INDIAVIX-INDEX
-            name = name.removesuffix("-INDEX")
-            return {"NIFTY50": "NIFTY", "NIFTYBANK": "BANKNIFTY"}.get(name, name)
         return name.split("2", 1)[0] or "UNKNOWN"

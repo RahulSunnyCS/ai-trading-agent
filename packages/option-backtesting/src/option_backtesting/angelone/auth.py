@@ -117,27 +117,38 @@ def post_json(path: str, body: dict, headers: dict[str, str]) -> tuple[int, dict
 
 
 def login(
-    creds: AngelCredentials, post: Post = post_json, now: Callable[[], float] = time.time
+    creds: AngelCredentials,
+    post: Post = post_json,
+    now: Callable[[], float] = time.time,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> Session:
     """One login attempt. Waits for a fresh TOTP window rather than send a code about to expire."""
     left = 30 - int(now()) % 30
     if left < 4:
-        time.sleep(left + 0.5)
-    status, body = post(
-        LOGIN_PATH,
-        {
-            "clientcode": creds.client_code,
-            "password": creds.pin,
-            "totp": totp_now(creds.totp_secret, now()),
-        },
-        request_headers(creds.api_key, creds.public_ip),
-    )
+        sleep(left + 0.5)
+    for attempt in range(3):
+        status, body = post(
+            LOGIN_PATH,
+            {
+                "clientcode": creds.client_code,
+                "password": creds.pin,
+                "totp": totp_now(creds.totp_secret, now()),
+            },
+            request_headers(creds.api_key, creds.public_ip),
+        )
+        # Status 0 = the request never reached Angel One: safe to retry, no lockout count.
+        # Anything that got an answer (even a 5xx) is never re-sent.
+        if status != 0 or attempt == 2:
+            break
+        sleep(2 * (attempt + 1))
     jwt = (body.get("data") or {}).get("jwtToken") if body.get("status") else None
     if not jwt:
         detail = _scrub(str(body.get("message") or f"HTTP {status}"), creds)
         code = body.get("errorcode") or ""
         if status == 0:
             raise AngelNetworkError(f"Angel One could not be reached: {detail}")
+        if status >= 500:
+            raise AngelNetworkError(f"Angel One is unavailable (HTTP {status}): {detail}")
         raise AngelCredentialsError(f"Angel One login failed: {code} {detail}".strip())
     return Session(jwt=jwt, api_key=creds.api_key, public_ip=creds.public_ip)
 

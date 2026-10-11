@@ -314,3 +314,51 @@ def test_an_unmapped_index_is_keyed_by_its_underlying_in_the_flags():
     c.targets = {}
     c.minute_candles("NSE:NIFTY50-INDEX", DAY)
     assert c.flags["NIFTY"]["unmapped"] == 1
+
+
+def test_login_retries_a_network_failure_but_never_a_rejection():
+    calls = []
+
+    def flaky(path, body, headers):
+        calls.append(1)
+        if len(calls) < 3:
+            return 0, {"status": False, "message": "network: reset"}
+        return 200, {"status": True, "data": {"jwtToken": "jwt-1"}}
+
+    assert auth.login(CREDS, post=flaky, now=lambda: 10, sleep=lambda s: None).jwt == "jwt-1"
+    assert len(calls) == 3
+
+    rejected = []
+
+    def reject(path, body, headers):
+        rejected.append(1)
+        return 200, {"status": False, "errorcode": "AB1050", "message": "Invalid totp"}
+
+    with pytest.raises(auth.AngelCredentialsError):
+        auth.login(CREDS, post=reject, now=lambda: 10, sleep=lambda s: None)
+    assert len(rejected) == 1
+
+
+def test_a_gateway_error_at_login_is_not_a_credentials_problem():
+    def post(path, body, headers):
+        return 503, {"status": False, "message": "HTTP 503, not JSON"}
+
+    with pytest.raises(auth.AngelNetworkError, match="unavailable"):
+        auth.login(CREDS, post=post, now=lambda: 10, sleep=lambda s: None)
+
+
+def test_master_download_retries_then_reports_unavailable(monkeypatch):
+    import urllib.error
+
+    from option_backtesting.angelone import symbols
+
+    attempts = []
+
+    def boom(*args, **kwargs):
+        attempts.append(1)
+        raise urllib.error.URLError("down")
+
+    monkeypatch.setattr(symbols.urllib.request, "urlopen", boom)
+    with pytest.raises(auth.AngelNetworkError, match="master unavailable"):
+        symbols.download_master(attempts=3, pause_s=0, sleep=lambda s: None)
+    assert len(attempts) == 3
