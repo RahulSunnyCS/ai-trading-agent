@@ -184,8 +184,11 @@ def summary(
     history: list[dict],
     files: list[StrategyFile],
     check: DayCheck | None = None,
+    source_notes: list[str] | None = None,
 ) -> str:
     lines = [f"Leg-wise strategies — {day:%a %d %b %Y}"]
+    if source_notes:
+        lines += ["", "Source", *(f"  {line}" for line in source_notes)]
     if check is not None and check.lines:
         lines += ["", "Data", *(f"  {line}" for line in check.lines)]
     for file in files:
@@ -231,13 +234,15 @@ def telegram_summary(
     files: list[StrategyFile],
     collection_errors: int = 0,
     check: DayCheck | None = None,
+    source_notes: list[str] | None = None,
+    warn: bool = False,
 ) -> Notification:
     """The evening message: one line per strategy (today's net, trades, what
     stopped it, and the running total over results from the current version of
     its file). `warn` when anything was skipped or collection had errors."""
     lines = []
     day_total = 0.0
-    problems = collection_errors > 0
+    problems = collection_errors > 0 or warn
     for file in files:
         sid = file.strategy.id
         rec = next((r for r in today if r["strategy_id"] == sid), None)
@@ -259,6 +264,8 @@ def telegram_summary(
         )
     if collection_errors:
         lines.append(f"\n{collection_errors} symbol(s) failed to download — see the run log.")
+    if source_notes:
+        lines.append("\n" + "\n".join(source_notes))
     if check is not None and check.lines:
         lines.append("\n" + "\n".join(check.lines))
         problems = problems or check.problems

@@ -1,20 +1,4 @@
 symbol,category,note
-PACEDIGITK,Battery Storage (BESS),own research 2026-10-05 — real revenue: BESS containers via Lineage Power
-ACMESOLAR,Battery Storage (BESS),own research 2026-10-05 — real: operating BESS assets
-ADANIGREEN,Battery Storage (BESS),own research 2026-10-05 — real: operating BESS at Khavda
-HBLENGINE,Battery Storage (BESS),"own research 2026-10-05 — real, niche: containerised Li-ion BESS"
-KABRAEXTRU,Battery Storage (BESS),own research 2026-10-05 — real: Battrixx packs and a commissioned BESS
-ARE&M,Battery Storage (BESS),own research 2026-10-05 — real packs (small); cells pre-commercial
-QPOWER,Battery Storage (BESS),own research 2026-10-05 — order book: PCS/STATCOM for BESS via Endoks
-EXIDEIND,Battery Storage (BESS),own research 2026-10-05 — cell plant commissioned; cell revenue not yet real
-WAAREEENER,Battery Storage (BESS),own research 2026-10-05 — BESS container plant just started
-KPIGREEN,Battery Storage (BESS),own research 2026-10-05 — order book: GUVNL standalone BESS
-ADVAIT,Battery Storage (BESS),own research 2026-10-05 — order book: GUVNL BESS under construction
-SOLARWORLD,Battery Storage (BESS),own research 2026-10-05 — order book: NTPC BESS EPC
-SWSOLAR,Battery Storage (BESS),own research 2026-10-05 — order book: BESS EPC
-PROSTARM,Battery Storage (BESS),own research 2026-10-05 — BESS assembly plant just started
-NEOGEN,Battery Storage (BESS),own research 2026-10-05 — early real: electrolyte and lithium salts
-HSCL,Battery Storage (BESS),own research 2026-10-05 — pilot-scale real: anode material
 MOSCHIP,Semiconductors,"own research 2026-10-05 — real, near pure play: chip design services"
 CGPOWER,Semiconductors,"own research 2026-10-05 — real, early: CG Semi OSAT in production"
 KAYNES,Semiconductors,"own research 2026-10-05 — real, ramping: Kaynes Semicon OSAT"
@@ -49,3 +33,6 @@ TDPOWERSYS,Data Centre Power & Cooling,own research 2026-10-05 — real: generat
 SCHNEIDER,Data Centre Power & Cooling,own research 2026-10-05 — real: power distribution
 THERMAX,Data Centre Power & Cooling,own research 2026-10-05 — partly real: cooling and utilities
 KRN,Data Centre Power & Cooling,own research 2026-10-05 — mostly narrative: heat exchangers
+SHILCTECH,Battery Storage (BESS),"candidate 2026-10-11 (Smart Sync BESS infographic) — transformers for BESS/grid; BESS share of revenue not verified, not yet in the dated file"
+TCPLPACK,Battery Storage (BESS),"candidate 2026-10-11 (Smart Sync BESS infographic) — separator films; early, BESS share not verified"
+SPMLINFRA,Battery Storage (BESS),candidate 2026-10-11 (Smart Sync BESS infographic) — EPC/infrastructure; BESS share not verified

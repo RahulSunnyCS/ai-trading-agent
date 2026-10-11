@@ -9,6 +9,9 @@
  *  - Daily results: saved `obt daily` results, the evening run button, trade logs.
  *  - Regimes: does the index come in persistent periods? (index + VIX history)
  *  - Correlation: do the strategies lose on the same days? (BL-090)
+ *  - Rotation: how the four forward lists are doing against REF, the base and luck (BL-058)
+ *  - Matrix: where do the rotation variants make or lose money, by start time, date and
+ *    condition, with the recorded picks laid over it (the Strategy Matrix; read-only)
  *
  * /optionslab with no section opens Daily results, as it always has.
  */
@@ -25,6 +28,8 @@ import {
 import { CorrelationPanel } from './optionslab/CorrelationPanel';
 import { RegimesPanel } from './optionslab/RegimesPanel';
 import { ResultsPanel } from './optionslab/ResultsPanel';
+import { RotationMatrixPanel } from './optionslab/RotationMatrixPanel';
+import { RotationPanel } from './optionslab/RotationPanel';
 import { RunsPanel } from './optionslab/RunsPanel';
 import { StrategiesPanel } from './optionslab/StrategiesPanel';
 import { StrategyBuilder } from './optionslab/StrategyBuilder';
@@ -40,6 +45,8 @@ const SECTION_LABEL: Record<OptionsLabSection, string> = {
   results: 'Daily results',
   regimes: 'Regimes',
   correlation: 'Correlation',
+  rotation: 'Rotation',
+  matrix: 'Matrix',
 };
 
 const SECTIONS: TabItem<OptionsLabSection>[] = OPTIONS_LAB_SECTIONS.map((value) => ({
@@ -104,6 +111,8 @@ export function OptionsLabView() {
       {section === 'results' && <ResultsPanel />}
       {section === 'regimes' && <RegimesPanel />}
       {section === 'correlation' && <CorrelationPanel />}
+      {section === 'rotation' && <RotationPanel />}
+      {section === 'matrix' && <RotationMatrixPanel />}
     </div>
   );
 }

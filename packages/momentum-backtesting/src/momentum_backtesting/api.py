@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field, model_validator
 from . import (
     all_fridays,
     analysis,
+    angelone,
     db_read,
     fyers,
     levers,
@@ -2238,11 +2239,12 @@ def _broad_parts(
     # all) - a consistent response shape the frontend can rely on regardless of mode.
     group_members = (
         broad.load_stock_groups(
-            CATEGORIES_CURATED_DIR, extended=req.broad_category_tags == "extended"
+            CATEGORIES_CURATED_DIR, extended=req.broad_category_tags == "extended", dated=True
         )
         if on
         else {}
     )
+    launches = broad.load_group_launches(CATEGORIES_CURATED_DIR) if on else {}
     core["held_categories"] = _merge_held_categories(
         [
             broad.current_holdings_detail(
@@ -2277,6 +2279,7 @@ def _broad_parts(
                     pool_exit_rank=req.broad_pool_exit_rank,
                     picks_per_category=req.broad_picks_per_category,
                     liquidity_cfg=_liquidity_config(req),
+                    launches=launches,
                 )
         return rows
 
@@ -2703,7 +2706,8 @@ def _rebalance_model(req: RebalanceRequest, now: datetime) -> dict:
     if live:
         load_repo_env()
         try:
-            creds = fyers.resolve_credentials(prefer_dashboard=req.auth_source == "dashboard")
+            # Fyers when its token is valid, else Angel One (BL-079 Phase 4).
+            creds = angelone.resolve_prices(prefer_dashboard=req.auth_source == "dashboard")
         except fyers.FyersCredentialsError as error:
             live, live_unavailable = False, f"No usable Fyers token: {error}"
 
@@ -2783,6 +2787,8 @@ def _rebalance_model(req: RebalanceRequest, now: datetime) -> dict:
         "week": week,
         "live": live,
         "live_unavailable": live_unavailable,
+        # which source priced it (Fyers, or the Angel One backup when there is no Fyers token)
+        "price_label": fyers.price_label(creds),
         "schedule": schedule,
         "first_allocation": first_allocation,
         "model_req": model_req,
@@ -2824,7 +2830,11 @@ def _rebalance_response(
         "as_of": now.isoformat(timespec="seconds") if live else week.strftime("%Y-%m-%d"),
         "signal_week": week.strftime("%Y-%m-%d"),
         "price_mode": price_mode,
-        "price_source": "Fyers last traded price" if live else "Latest database close",
+        "price_source": (
+            f"{model.get('price_label') or 'Fyers'} last traded price"
+            if live
+            else "Latest database close"
+        ),
         "live_unavailable": model.get("live_unavailable"),
         "portfolio_value": req.portfolio_value,
         "first_allocation": first_allocation,
@@ -2841,7 +2851,7 @@ def _rebalance_response(
             + "Model target uses the strategy's simulated historical holdings. "
             "Your supplied weights determine the difference. "
             + (
-                "Live Fyers prices were used. "
+                f"Live {model.get('price_label') or 'Fyers'} prices were used. "
                 if live
                 else "This is an as-of preview using persisted closes, not live prices. "
             )
@@ -3244,17 +3254,18 @@ def _strategy_symbols(
 def _order_prices(
     stored: dict[str, float], symbols: dict[str, str], names: set[str]
 ) -> tuple[dict[str, float], str]:
-    """Rupee prices for `names`: live Fyers quotes when the token works, else the last close."""
+    """Rupee prices for `names`: live quotes (Fyers, else Angel One) when a token works, else the
+    last close."""
     prices = {name: stored[name] for name in names if name in stored}
     wanted = {name: symbols[name] for name in names if name in symbols}
     try:
-        creds = fyers.resolve_credentials()
+        creds = angelone.resolve_prices()
         quoted = fyers.quotes(sorted(set(wanted.values())), creds)
     except (fyers.FyersCredentialsError, RuntimeError, OSError):
         return prices, "last close"
     live = {name: quoted[symbol] for name, symbol in wanted.items() if symbol in quoted}
     prices.update(live)
-    return prices, ("live Fyers quotes" if live else "last close")
+    return prices, (f"live {fyers.price_label(creds)} quotes" if live else "last close")
 
 
 def _compute_orders(trigger: str = "manual") -> dict:
@@ -3464,7 +3475,8 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
     from .weekly import run_favorite_strategies, week_ending_on_or_before
 
     try:
-        creds = fyers.resolve_credentials()
+        # Fyers when its token is valid, else Angel One; None runs on the public sources.
+        creds = angelone.resolve_prices()
     except fyers.FyersCredentialsError:
         creds = None
     with open_catalog() as con:
@@ -4169,8 +4181,9 @@ def _broad_live_previews(
         outcome["awaiting_data"] = False
         if creds is None:
             outcome["blocked"] = (
-                "Live Broad preview needs a Fyers token; log in from Broker logins or run "
-                "`uv run mbt login`. The 19:30 run will still send the signal on closing prices."
+                "Live Broad preview needs a Fyers token (or Angel One credentials in .env); log "
+                "in from Broker logins or run `uv run mbt login`. The 19:30 run will still send "
+                "the signal on closing prices."
             )
             continue
         favorite = favorites_by_id[outcome["id"]]
@@ -4255,7 +4268,8 @@ def _broad_live_weekly_result(
     else:
         lines.append("No trades this week.")
     lines.append(
-        f"Ranked on Fyers live prices at {now:%H:%M} IST, held in memory only. The final "
+        f"Ranked on {fyers.price_label(creds)} live prices at {now:%H:%M} IST, held in memory "
+        "only. The final "
         "signal on closing prices follows after the 19:30 data sync."
     )
     note = Notification(

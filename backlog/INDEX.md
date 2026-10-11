@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-10
+Last updated: 2026-10-11
 
 ## Open
 
@@ -11,13 +11,17 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Priority | Status | Type | Area |
 |---|---|---|---|---|---|
+| [BL-076](BL-076-fyers-refresh-token-login.md) | Fyers unattended login through the refresh-token grant | Dropped: Fyers disabled the refresh-token API (code -16, SEBI); the spike returned no token. Follow-up BL-077 | 2026-10-10 |
+| [BL-077](BL-077-fyers-daily-login-reminder.md) | Fyers daily login reminder, dashboard banner and a truthful 08:05 job | Superseded by BL-079: the 08:05 job is removed, the dashboard already has a token banner, and the owner chose Angel One as the fallback source | 2026-10-10 |
+| [BL-078](BL-078-angel-one-data-source.md) | Angel One SmartAPI as a second 1-minute data source: what it can and cannot give versus the Fyers files | P1 | In progress | research | options |
+| [BL-079](BL-079-collector-fyers-or-angel-source.md) | Daily collector: Fyers when logged in, Angel One otherwise | Done: `obt daily` falls back to Angel One, Fyers login repairs those days, Source section + dashboard banner, Momentum backup source | 2026-10-10 |
 | [BL-001](BL-001-momentum-result-integrity.md) | Momentum result integrity: goldens, parameter coverage, drift alerts | P0 | In progress | improvement | momentum |
 | [BL-010](BL-010-momentum-evaluation-review.md) | Momentum evaluation review: prove the arithmetic, remove hindsight, fix selection | P0 | In progress | research | momentum |
 | [BL-012](BL-012-scheduler-service.md) | Scheduler service: one home for every recurring ingestion and maintenance job (laptop now, hostable later) | P0 | In progress | feature | infra |
 | [BL-014](BL-014-ci-and-merge-gates.md) | CI and merge gates: nothing reaches `main` while checks are red | P0 | In progress | chore | infra |
 | [BL-024](BL-024-forward-signal-journal.md) | Forward-signal journal: record every weekly signal from now on | P0 | In progress | feature | momentum |
 | [BL-034](BL-034-options-history-lake.md) | Options history lake: two years of vendor 1-minute data in `trading-data`, derived tables for straddle backtests, daily top-up | P0 | In progress | feature | trading-data |
-| [BL-058](BL-058-options-rotation-forward-journal-and-ui.md) | Options rotation: forward paper journal from Mon 12 Oct (picks recorded before 09:17, scored nightly) and the Options Lab screens it needs | P0 | In progress: journal built, first entry Mon 12 Oct 09:16 (lists A, B, C, REF); UI view in Phase 4 | feature | options |
+| [BL-058](BL-058-options-rotation-forward-journal-and-ui.md) | Options rotation: forward paper journal from Mon 12 Oct (picks recorded before 09:17, scored nightly) and the Options Lab screens it needs | P0 | In progress: journal built, first entry Mon 12 Oct 09:16 (lists A, B, C, REF); Phase 4 view built 2026-10-11 (page, shadow, explain, matrix, daily log, basket mode, forward vs periods, drawdowns, drift, family pulse; paper vs real waits for the charge model and contract notes); day-60 read-out pending | feature | options |
 | [BL-087](BL-087-momentum-all-fridays-split.md) | Momentum: backtest and follow a config split across every rebalance Friday | P0 | Built; live migration pending | feature | momentum |
 | [BL-089](BL-089-backlog-tracks-and-github-board.md) | Backlog restructure: research / product / platform tracks, a generated index and `DONE.md`, one issue per item and a GitHub Projects board with a "Needs me" view | P0 | Ready | chore | cross-cutting |
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
@@ -76,6 +80,8 @@ Sorted by priority (P0 first), then ID.
 | [BL-088](BL-088-own-history-sector-relative-strength.md) | Sector scoring on its own relative strength: time-series RS (continuation and reversal) as a replace or tilt on the ETF rotation, then Broad's category layer | P2 | Idea | research | momentum |
 | [BL-090](BL-090-strategy-correlation-and-diverse-baskets.md) | Strategy correlation and diverse baskets: `obt rotation corr` / `corr-pick`, an API route and an Options Lab › Correlation heatmap, dynamic over any strategy with results | P2 | In progress | feature | options |
 | [BL-091](BL-091-straddle-premium-exhaustion-study.md) | Straddle premium exhaustion: learn the peak rule from ≥ 25-point rises of the rolling ATM straddle, NIFTY first (P2 + P3), test once on P1, and remove the losing re-entries of the owner's stopped wide sell (derivatives, persistence, retracement, IV, spot activity, nearby strikes as candidates) | P2 | Planned | research | options |
+| [BL-092](BL-092-forward-dated-themes-bess.md) | Forward-dated themes: `stock_groups_dated.csv` gives a Broad category a `launch_date`, so BESS (then the other pending themes) is selectable from the week of 2026-10-16, never in history | P2 | In progress | feature | momentum |
+| [BL-093](BL-093-rotation-paper-vs-real.md) | Rotation paper versus real: waterfall from the journal through charges, days not placed and changes to the contract-notes P&L (widget 10 of the Rotation workspace) | P2 | Blocked: contract-notes cutover, charge model in the nightly update, placement record in use | feature | options |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |

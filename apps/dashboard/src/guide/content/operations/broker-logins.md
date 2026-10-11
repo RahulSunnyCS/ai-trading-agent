@@ -5,8 +5,18 @@ screen shows whether today's login is valid and lets you log in by hand.
 
 ## Why it expires every day
 
-A Fyers token dies at **06:00 IST** the next morning, whenever you logged in. The scheduled
-`fyers-login` job logs in again at 08:05 on trading days, so normally you never touch this.
+A Fyers token dies at **06:00 IST** the next morning, whenever you logged in. Fyers put a
+human-verification check on its login page, so no scheduled job can log in for you: use **Log in
+again** once a trading day, any time before the evening data collection.
+
+## When you did not log in
+
+If no Fyers login is valid when the evening run starts, it collects that day's options data from
+**Angel One** instead, so the day is not lost. Angel One's data has known gaps: the NIFTY index has no
+bars from 15:15 to 15:28, SENSEX options have no open interest, and minutes with no trade are carried
+forward. A banner under the top bar names the days that came from Angel One and what each lacks.
+Logging in here is the repair: the next evening run re-collects those days from Fyers for every
+contract that is still listed.
 
 ## The states
 

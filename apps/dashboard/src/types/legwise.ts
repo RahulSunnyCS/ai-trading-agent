@@ -194,7 +194,17 @@ export interface LegAttribution {
   reentries: number;
 }
 
+/** Present when the day was replayed from a rotation variant's file (`/legwise/rotation/forensics`). */
+export interface RotationReplay {
+  variant: string;
+  stored_gross: number | null;
+  simulated_gross: number;
+  matches_stored: boolean;
+}
+
 export interface DayForensics {
+  /** Only on a rotation variant's replay: how it compares with the stored result. */
+  rotation?: RotationReplay;
   strategy_id: string;
   sha: string;
   day: string;

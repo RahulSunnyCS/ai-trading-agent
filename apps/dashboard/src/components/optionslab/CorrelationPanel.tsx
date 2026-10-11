@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react';
 
 import { useCorrelationFilters } from '../../hooks/useCorrelationFilters';
 import { useCorrelation, useCorrelationAvailable } from '../../hooks/useLegwise';
+import { useQueryState } from '../../hooks/useQueryState';
 import {
   ANY,
   MEASURE_LABEL,
@@ -45,6 +46,7 @@ import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StatCard } from '../ui/StatCard';
 import { StateMessage } from '../ui/StateMessage';
+import { CorrelationBasket } from './correlation/CorrelationBasket';
 import { type Cell, CorrelationHeatmap } from './correlation/CorrelationHeatmap';
 import { BasketBuilder, DriftChart, PairCard, StrategyTable } from './correlation/CorrelationParts';
 
@@ -339,9 +341,8 @@ function Result({
   );
 }
 
-export function CorrelationPanel() {
+function StrategyPicker({ state }: { state: ReturnType<typeof useCorrelationFilters> }) {
   const available = useCorrelationAvailable();
-  const state = useCorrelationFilters();
   const selectors = buildSelectors(state.filters);
   const result = useCorrelation(selectors, state.range);
 
@@ -398,6 +399,45 @@ export function CorrelationPanel() {
           selectors={selectors}
           range={state.range}
         />
+      )}
+    </div>
+  );
+}
+
+type Mode = 'picker' | 'basket';
+const MODE_OPTIONS: SegmentedOption<Mode>[] = [
+  { value: 'picker', label: 'Pick strategies' },
+  { value: 'basket', label: 'A day’s basket' },
+];
+
+/**
+ * The Correlation tab: the strategy picker, and the "A day's basket" preset that fills it with
+ * one list's picks for one day (or the fixed base). The mode lives in the URL (`?mode=basket`)
+ * with the picker's own filters, so a link lands on the same view.
+ */
+export function CorrelationPanel() {
+  const [modeQ, setModeQ] = useQueryState('mode');
+  const state = useCorrelationFilters();
+  const mode: Mode = modeQ === 'basket' ? 'basket' : 'picker';
+  return (
+    <div className="space-y-5">
+      <SegmentedControl
+        value={mode}
+        options={MODE_OPTIONS}
+        onChange={(m) => setModeQ(m === 'basket' ? 'basket' : null)}
+        ariaLabel="What to compare"
+        size="sm"
+      />
+      {mode === 'basket' ? (
+        <CorrelationBasket
+          onOpenCustom={(names, range) => {
+            state.setFilters({ slot: ANY, family: ANY, index: ANY, kind: ANY, names });
+            state.setRange({ from: range.from ?? null, to: range.to ?? null });
+            setModeQ(null);
+          }}
+        />
+      ) : (
+        <StrategyPicker state={state} />
       )}
     </div>
   );
