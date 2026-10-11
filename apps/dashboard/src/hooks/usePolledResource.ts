@@ -138,6 +138,9 @@ export interface UsePolledResourceOptions {
    * that re-mounts — switching sections and back — shows its data at once instead of a
    * loading state. It still re-fetches as usual; `loading` is true until that lands. */
   cache?: boolean;
+  /** `false` fetches nothing: `data` is null and `loading` false until it turns true again. For a
+   * resource that only exists under some setting (BL-095's portfolio-stop figures). Default true. */
+  enabled?: boolean;
 }
 
 /** `mount` (and a url change) joins a shared in-flight request, `manual` (refetch) always
@@ -153,10 +156,10 @@ export function usePolledResource<T>(
   url: string,
   opts: UsePolledResourceOptions = {},
 ): PolledResourceResult<T> {
-  const { intervalMs, cache = false } = opts;
+  const { intervalMs, cache = false, enabled = true } = opts;
   const [state, setState] = useState<PolledResourceState<T>>(() => ({
     data: cache && responseCache.has(url) ? (responseCache.get(url) as T) : null,
-    loading: true,
+    loading: enabled,
     error: null,
   }));
 
@@ -228,6 +231,15 @@ export function usePolledResource<T>(
   );
 
   useEffect(() => {
+    if (!enabled) {
+      dropCurrent();
+      setState((prev) =>
+        prev.data === null && !prev.loading && prev.error === null
+          ? prev
+          : { data: null, loading: false, error: null },
+      );
+      return undefined;
+    }
     void run('mount');
 
     let timer: ReturnType<typeof setInterval> | undefined;
@@ -247,9 +259,11 @@ export function usePolledResource<T>(
       if (timer) clearInterval(timer);
       if (onVisibility) document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [run, intervalMs, dropCurrent]);
+  }, [run, intervalMs, dropCurrent, enabled]);
 
-  const refetch = useCallback(() => void run('manual'), [run]);
+  const refetch = useCallback(() => {
+    if (enabled) void run('manual');
+  }, [run, enabled]);
 
   return { ...state, refetch };
 }

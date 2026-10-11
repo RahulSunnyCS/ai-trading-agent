@@ -635,6 +635,41 @@ code change, show it in the UI later.
 | 3.24.3 | Phase 3: does a trailing-correlation cap cut the lists' drawdown? | claude | **Pre-registered, not run.** Judge on the forward journal from 2026-10-12 after at least 60 trading days |
 | 3.24.4 | `GET /legwise/correlation*` and an Options Lab › Correlation heatmap | claude | **Built 2026-10-10.** Three Python routes, three proxy routes, the tab (heatmap, pair readout, strategy table, basket builder, drift chart) and its Guide page; checked on live data at desktop and phone width |
 
+### 3.25 Straddle heatmap — [BL-094](backlog/BL-094-straddle-heatmap.md)
+
+Owner (2026-10-11): an AlgoTest-style ATM short-straddle grid (entry time x stop loss x date) for every index and F&O
+stock, as the Options Lab's default page; Correlation becomes its own widget on three strategies with a multiselect.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.25.1 | Phases 1–4: `heatmap/` (grid, store, view), `obt heatmap build|show|list`, `GET /legwise/heatmap*` and its proxy routes, Options Lab › Heatmap (default tab), the Correlation tab on three strategies with a strategy multiselect, Guide page | claude | **Built 2026-10-11.** Grid parity with the legwise engine is a test; against AlgoTest's own 26 Aug 2026 NIFTY grid cells agree within about ₹100 at exit 15:15 |
+
+### 3.26 Straddle premium exhaustion study — [BL-091](backlog/BL-091-straddle-premium-exhaustion-study.md)
+
+Owner (2026-10-10): learn from ≥ 25-point rises of the rolling ATM straddle when a stopped Widesl
+should be re-entered; P2 + P3 first, P1 once the rule is frozen.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.26.1 | Phase 1: episode census (≥ 25-point rises of the rolling ATM straddle) and the R0 re-entry replay on P2 + P3 | claude | **Done 2026-10-11.** 1,450 episodes on 932 index-days; R0 replayed on 1,318 (counts in the BL-091 Result section); next steps wait for the owner |
+| 3.26.2 | Stage 1a: Widesl (3 stops × 5 re-entry rules) and Directional D1 (3 stops) after a held spike, against a comparator of nearby days with no held spike (not causal: it reads the rest of the day, so spike day vs no-spike day) | claude | **Done 2026-10-11.** No arm passes; every 2025 arm worse than on normal days; R3 (nothing before 13:30) least bad |
+| 3.26.3 | Stage 1b: Directional D2 at support / resistance (rejection and break) | claude | **Done 2026-10-11.** No arm passes; level reactions fire almost at once |
+| 3.26.4 | Stage 2: true vs false tops over 32 parameters; rule R1 through the trading test | claude | **Done 2026-10-11.** IV change separates; R1 does not pass |
+| 3.26.5 | Time gates: no re-entry before 13:30 / 14:00 / 14:30 / 14:50, and gating every entry (F) | claude | **Done 2026-10-11 as an unregistered look (13 variants).** F1450 meets the screening bar on P2 + P3 (NIFTY 2025 +₹241 vs comparator, t 2.45); a lead, not a result. Owner's `override:` line owed in the BL-091 Log |
+| 3.26.6 | Owner decision: register R3 or F1450 (counting all 31 arms tried, with a causal comparator) as one question for the held-back year, or close | owner | **Open** |
+
+### 3.27 Portfolio MTM stop on the Rotation page — [BL-095](backlog/BL-095-portfolio-mtm-stop-in-rotation.md)
+
+Owner (2026-10-11): the lists are traded under a portfolio stop (about ₹10k on 6 lots); the Rotation log
+should show what the book did under it, with a typed amount, trailing modes and a list replay.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.27.1 | Phase 1: `rotation/portfolio.py` — the basket's combined MTM, the stop, Trail SL / Lock profit / Lock and trail | claude | **Built 2026-10-11.** 43 unit tests; reproduces BL-055's 12 totals and drawdowns to the rupee; empty stop equals the log's gross on 80 list-days |
+| 3.27.2 | Phase 2: `GET /legwise/rotation/portfolio/day` and `/days` and the Fastify proxy | claude | **Built 2026-10-11.** 17 route tests + 10 proxy tests; full history (116 days) 45 s cold, 1.2 s warm |
+| 3.27.3 | Phase 3: the Portfolio stop pop-up, Days table, calendar and "Replay the list" | claude | **Built 2026-10-11.** Button and pop-up (`ui/Modal`), stopped figures and PF stop flag in the Days table, calendar shading, Replay the list in the day drawer, Guide and glossary |
+| 3.27.4 | Phase 4: hero curve, headline and Drawdowns with the stop | claude | **Built 2026-10-11.** Drawdowns: `/rotation/drawdowns?stop=&trail=` returns `with_stop` and a second line with three figures; headline and hero: `overlaySummary` over the forward days (empty until the first scored session). The read-out, verdict and random baskets stay registered |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

@@ -57,6 +57,18 @@ export interface RotationListBlock {
   stops: number;
   targets: number;
   shared_start_band: boolean;
+  /** Set only by the portfolio-stop overlay (`overlayBook`): the figures above are then the
+   * stopped ones and this holds what the log showed and where the book stopped. */
+  pf?: PortfolioOverlay;
+}
+
+export interface PortfolioOverlay {
+  /** The log's own gross for the list-day, and per lot-day. */
+  gross_without: number;
+  per_lot_day_without: number;
+  /** `11:14` when the book stopped (the portfolio stop, a trailed level or a lock), else null. */
+  stop_label: string | null;
+  fired_by: 'stop' | 'trail' | 'lock' | null;
 }
 
 export interface RotationPlacement {

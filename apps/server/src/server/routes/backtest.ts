@@ -34,6 +34,8 @@
  *  GET  /api/backtest/legwise/correlation       — how the chosen strategies' daily P&L move together
  *                                                 (matrices, basket drawdown, drift). requireAccess
  *  GET  /api/backtest/legwise/correlation/pick  — a basket under a correlation cap (in-sample).
+ *  GET  /api/backtest/legwise/heatmap/available  — underlyings with a straddle heatmap grid (BL-094).
+ *  GET  /api/backtest/legwise/heatmap            — one view of it: time_sl | date_time | date_sl.
  *  GET  /api/backtest/legwise/rotation/overview — the Rotation page: data health, the latest baskets, the lists.
  *  GET  /api/backtest/legwise/rotation/summary  — the 60-day read-out: lists against REF, the base and random baskets.
  *                                                 requireAccess
@@ -52,6 +54,11 @@
  *                                                 requireAccess
  *  GET  /api/backtest/legwise/rotation/drift    — what a list has held, by family, index, strike method and
  *                                                 start band, against its own past. requireAccess
+ *  GET  /api/backtest/legwise/rotation/portfolio/day  — one list's basket under a portfolio MTM stop
+ *                                                 (BL-095): the day replayed, stop level and minute.
+ *  GET  /api/backtest/legwise/rotation/portfolio/days — every scored list-day with and without the stop.
+ *                                                 Both requireAccess; the stop and trail are echoed back
+ *                                                 as typed, bad values are refused here.
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
  *  GET  /api/backtest/legwise/daily             — that run's state/log. requireAccess
@@ -434,6 +441,11 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     return text ? `?${text}` : '';
   }
 
+  // BL-095: the portfolio stop's query values, matched to a strict shape before they are forwarded.
+  const PF_DAY = '^\\d{4}-\\d{2}-\\d{2}$';
+  const PF_STOP = '^(-?\\d{1,9}(\\.\\d{1,2})?)?$'; // empty = no stop
+  const PF_TRAIL = '^((sl|lock|locktrail):\\d{1,9}(\\.\\d{1,2})?(,\\d{1,9}(\\.\\d{1,2})?){1,3})?$';
+
   fastify.get(
     '/api/backtest/legwise/day',
     {
@@ -620,6 +632,58 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
 
+  // Straddle heatmap (BL-094): read-only views over the grids `obt heatmap build` stores.
+  fastify.get(
+    '/api/backtest/legwise/heatmap/available',
+    { preHandler: requireAccess },
+    async (_req, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/heatmap/available');
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/heatmap',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            underlying: { type: 'string', pattern: '^[A-Z0-9&-]{1,20}$' },
+            view: { type: 'string', enum: ['time_sl', 'date_time', 'date_sl'] },
+            date: { type: 'string', pattern: DATE_RE },
+            from: { type: 'string', pattern: DATE_RE },
+            to: { type: 'string', pattern: DATE_RE },
+            sl: { type: 'string', pattern: '^\\d{1,3}$' },
+            time: { type: 'string', pattern: '^\\d\\d:\\d\\d$' },
+            exit: { type: 'string', pattern: '^\\d\\d:\\d\\d$' },
+            weeks: { type: 'string', pattern: '^\\d{1,2}(,\\d{1,2}){0,7}$' },
+            metric: { type: 'string', enum: ['value', 'pct'] },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/heatmap${upstreamQuery(q, [
+          'underlying',
+          'view',
+          'date',
+          'from',
+          'to',
+          'sl',
+          'time',
+          'exit',
+          'weeks',
+          'metric',
+        ])}`,
+      );
+    },
+  );
+
   // --- rotation: the Rotation page's read layer (BL-058 Phase 4) ---
   fastify.get(
     '/api/backtest/legwise/rotation/overview',
@@ -735,7 +799,8 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
   // --- end rotation regime ---
 
   // --- rotation drawdowns --- the Rotation page's "Drawdown episodes" card
-  // (rotation/drawdowns.py, read-only). List and window are enums; min_depth is a plain number.
+  // (rotation/drawdowns.py, read-only). List and window are enums; min_depth is a plain number;
+  // stop and trail (BL-095) run the series through the portfolio stop beside the registered one.
   fastify.get(
     '/api/backtest/legwise/rotation/drawdowns',
     {
@@ -747,6 +812,8 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
             list: { type: 'string', enum: ['A', 'B', 'C', 'REF'] },
             window: { type: 'string', enum: ['P1', 'P2', 'last63', 'forward'] },
             min_depth: { type: 'string', pattern: '^\\d{1,6}(\\.\\d{1,2})?$' },
+            stop: { type: 'string', pattern: PF_STOP },
+            trail: { type: 'string', pattern: PF_TRAIL },
           },
           additionalProperties: false,
         },
@@ -756,7 +823,7 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
       const q = request.query as Record<string, unknown>;
       await forwardToBacktestApi(
         reply,
-        `/legwise/rotation/drawdowns${upstreamQuery(q, ['list', 'window', 'min_depth'])}`,
+        `/legwise/rotation/drawdowns${upstreamQuery(q, ['list', 'window', 'min_depth', 'stop', 'trail'])}`,
       );
     },
   );
@@ -782,6 +849,66 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation drift ---
+
+  // --- rotation portfolio stop --- BL-095: what a list's basket did under a portfolio MTM stop
+  // (rotation/portfolio.py, read-only). `stop` is rupees (empty, 0 or below = none) and `trail`
+  // is sl:X,Y | lock:A,B | locktrail:A,B,X,Y; both are matched to a strict shape before they are
+  // forwarded, and Python refuses what is still malformed.
+  fastify.get(
+    '/api/backtest/legwise/rotation/portfolio/day',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          required: ['day'],
+          properties: {
+            day: { type: 'string', pattern: PF_DAY },
+            list: { type: 'string', enum: ['A', 'B', 'C', 'REF'] },
+            // a filter on the day's kind; `all` (the default) takes either
+            source: { type: 'string', enum: ['recorded', 'reconstructed', 'all'] },
+            stop: { type: 'string', pattern: PF_STOP },
+            trail: { type: 'string', pattern: PF_TRAIL },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/portfolio/day${upstreamQuery(q, ['day', 'list', 'source', 'stop', 'trail'])}`,
+      );
+    },
+  );
+  fastify.get(
+    '/api/backtest/legwise/rotation/portfolio/days',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', pattern: PF_DAY },
+            to: { type: 'string', pattern: PF_DAY },
+            source: { type: 'string', enum: ['recorded', 'reconstructed'] },
+            stop: { type: 'string', pattern: PF_STOP },
+            trail: { type: 'string', pattern: PF_TRAIL },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/portfolio/days${upstreamQuery(q, ['from', 'to', 'source', 'stop', 'trail'])}`,
+      );
+    },
+  );
+  // --- end rotation portfolio stop ---
 
   // --- rotation matrix ---
   // The Strategy Matrix (packages/option-backtesting rotation/matrix.py). Read-only. Every value

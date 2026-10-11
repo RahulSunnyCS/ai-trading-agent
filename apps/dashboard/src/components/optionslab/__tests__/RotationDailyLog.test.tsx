@@ -264,7 +264,7 @@ describe('RotationDailyLog', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
-        if (url.includes('source=reconstructed')) {
+        if (url.includes('/rotation/log') && url.includes('source=reconstructed')) {
           await new Promise<void>((r) => {
             release = r;
           });

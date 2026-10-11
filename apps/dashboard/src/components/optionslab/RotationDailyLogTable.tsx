@@ -17,6 +17,7 @@ import {
   placementTally,
   rowFlags,
 } from '../../lib/rotationDailyLogView';
+import { stopFlag } from '../../lib/rotationPortfolioView';
 import type { PlacementStatus, RotationListKey, RotationRow } from '../../types/rotationDailyLog';
 import { Badge, type Tone } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -56,19 +57,34 @@ function ListCell({ row, list }: { row: RotationRow; list: RotationListKey }) {
     );
   }
   const total = `${list}: ${formatInr(block.gross, { sign: true })} gross for ${block.lots} lots (${block.picks.length} strategies); ${formatInr(block.per_lot_day, { sign: true })} per lot-day`;
+  const pf = block.pf;
+  const stopped = pf !== undefined && pf.stop_label !== null;
   const notes = [
+    stopped
+      ? `With the portfolio stop (${pf.fired_by === 'lock' ? 'profit lock' : 'stop'} at ${pf.stop_label}); the log shows ${formatInr(pf.gross_without, { sign: true })} for ${block.lots} lots (${formatInr(pf.per_lot_day_without, { sign: true })} per lot-day)`
+      : null,
     block.overridden ? 'the Widesl minimum replaced a top-ranked Dir' : null,
     block.buy_qualified ? 'a Buy strategy qualified and was added' : null,
   ].filter((n): n is string => n !== null);
   return (
     <span
-      className={cn('metric', pnlClass(block.per_lot_day))}
+      className={cn(
+        'metric inline-flex flex-col items-end whitespace-nowrap leading-tight',
+        pnlClass(block.per_lot_day),
+      )}
       title={notes.length > 0 ? `${total}\n${notes.join('; ')}` : total}
     >
-      {formatInr(block.per_lot_day, { sign: true })}
-      <span className="ml-0.5 inline-block w-4 text-left text-[10px] font-sans text-faint">
-        {block.overridden ? 'W' : ''}
-        {block.buy_qualified ? 'B' : ''}
+      {stopped ? (
+        <span className="text-[10px] text-faint line-through">
+          {formatInr(pf.per_lot_day_without, { sign: true })}
+        </span>
+      ) : null}
+      <span>
+        {formatInr(block.per_lot_day, { sign: true })}
+        <span className="ml-0.5 inline-block w-4 text-left text-[10px] font-sans text-faint">
+          {block.overridden ? 'W' : ''}
+          {block.buy_qualified ? 'B' : ''}
+        </span>
       </span>
     </span>
   );
@@ -156,6 +172,7 @@ export function RotationDailyLogTable({
         <tbody>
           {shown.map((row) => {
             const flags = rowFlags(row);
+            const pfFlag = stopFlag(row, focus);
             return (
               <TRow
                 key={row.day}
@@ -189,6 +206,13 @@ export function RotationDailyLogTable({
                         </Badge>
                       </span>
                     ))}
+                    {pfFlag ? (
+                      <span title={pfFlag.title}>
+                        <Badge tone="warning" className="px-1.5 py-0 text-[11px]">
+                          {pfFlag.label}
+                        </Badge>
+                      </span>
+                    ) : null}
                     {flags.length > 3 ? (
                       <span
                         className="text-xs text-faint"

@@ -12,8 +12,12 @@
 
 import { useMemo, useState } from 'react';
 
+import { usePortfolioStop } from '../../hooks/usePortfolioStop';
 import { useRotationOverview, useRotationSummary } from '../../hooks/useRotation';
+import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { formatIstTime, istToday } from '../../lib/format';
+import { amountOf, buttonLabel, isOn, sameTrail, trailParam } from '../../lib/portfolioStop';
+import { overlaySummary, unmatched } from '../../lib/rotationPortfolioView';
 import {
   BENCHMARK_LABEL,
   BENCHMARK_NOTE,
@@ -30,6 +34,7 @@ import { RefreshButton } from '../ui/RefreshButton';
 import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
+import { PortfolioStopButton } from './PortfolioStopButton';
 import { RotationDailyLog } from './RotationDailyLog';
 import { RotationDrawdowns } from './RotationDrawdowns';
 import { RotationDrift } from './RotationDrift';
@@ -60,18 +65,35 @@ export function RotationPanel() {
   const [benchmark, setBenchmark] = useState<RotationBenchmark>('REF');
   const [shown, setShown] = useState<ReadonlySet<RotationListKey>>(new Set(['A', 'REF']));
   const [showBase, setShowBase] = useState(true);
+  // BL-095: one portfolio stop for every widget below that shows stopped figures.
+  const [portfolio, setPortfolio] = usePortfolioStop();
 
   const readoutDays = overview.data?.readout_days ?? 60;
   const s = summary.data;
 
+  // BL-095: the forward sessions replayed under the portfolio stop. Only an answer for this
+  // setting is laid over the read-out; the verdict, the intervals and the random baskets always
+  // stay on the registered basis (the pre-registered test does not move with a typed level).
+  const book = useRotationPortfolioDays('recorded', {}, portfolio);
+  const bookNow =
+    book.data !== null &&
+    book.data.setting?.amount === amountOf(portfolio) &&
+    sameTrail(book.data.setting?.trail, trailParam(portfolio)) &&
+    Array.isArray(book.data.rows)
+      ? book.data
+      : null;
+  const shown_s = useMemo(() => (s ? overlaySummary(s, bookNow) : s), [s, bookNow]);
+  const stopped = shown_s !== s;
+  const skipped = unmatched(bookNow);
+
   const visible = useMemo(() => new Set<RotationListKey>([...shown, focus]), [shown, focus]);
   const figures = useMemo(
-    () => (s ? headline(s, focus, benchmark, readoutDays) : []),
-    [s, focus, benchmark, readoutDays],
+    () => (shown_s ? headline(shown_s, focus, benchmark, readoutDays) : []),
+    [shown_s, focus, benchmark, readoutDays],
   );
-  const points = useMemo(() => (s ? heroSeries(s, focus) : []), [s, focus]);
+  const points = useMemo(() => (shown_s ? heroSeries(shown_s, focus) : []), [shown_s, focus]);
   const verdictFor = useMemo(() => (s ? buildVerdict(s, focus) : null), [s, focus]);
-  const bench = s ? benchmarkFigures(s, benchmark, focus) : null;
+  const bench = shown_s ? benchmarkFigures(shown_s, benchmark, focus) : null;
 
   const reload = () => {
     overview.refetch();
@@ -111,6 +133,7 @@ export function RotationPanel() {
         <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted">
           Forward · gross · 2 lots per strategy
         </span>
+        <PortfolioStopButton setting={portfolio} onChange={setPortfolio} />
         <span className="flex-1" />
         <RefreshButton
           onClick={reload}
@@ -166,6 +189,15 @@ export function RotationPanel() {
         <SkeletonRows rows={5} />
       ) : (
         <>
+          {isOn(portfolio) && s.n_days > 0 ? (
+            <p className="text-xs text-muted" aria-live="polite">
+              {stopped
+                ? `With the ${buttonLabel(portfolio).replace('Portfolio stop ', '')} portfolio stop replayed over these sessions: cumulative gross, ₹ per lot-day, the drawdowns and the curves. Beats random baskets, the verdict and the read-out stay on the registered basis, without a stop.${skipped > 0 ? ` ${skipped} list-day${skipped === 1 ? '' : 's'} no longer replay to their logged figure (bars repaired since the nightly update) and keep the registered one.` : ''}`
+                : book.error
+                  ? `The portfolio stop could not be replayed (${book.error}); the registered figures are shown.`
+                  : 'Replaying the sessions under the portfolio stop; the registered figures are shown meanwhile.'}
+            </p>
+          ) : null}
           <RotationHeadline figures={figures} benchmarkLabel={bench?.label ?? ''} />
           {verdictFor && s.n_days > 0 ? <RotationVerdict verdict={verdictFor} /> : null}
           <Card>
@@ -174,7 +206,7 @@ export function RotationPanel() {
               description={
                 s.n_days === 0
                   ? 'Appears with the first scored session.'
-                  : `${s.n_days} scored forward sessions, 2 lots per strategy. Late entries and unscored days are left out.`
+                  : `${s.n_days} scored forward sessions, 2 lots per strategy.${stopped ? ' With the portfolio stop applied.' : ''} Late entries and unscored days are left out.`
               }
             />
             {s.n_days === 0 ? (
@@ -242,13 +274,13 @@ export function RotationPanel() {
       {/* slot:explain */}
       <RotationExplain list={focus} onList={setFocus} />
       {/* slot:daily-log */}
-      <RotationDailyLog focus={focus} />
+      <RotationDailyLog focus={focus} portfolio={portfolio} />
       {/* slot:shadow */}
       <RotationShadowScoreboard />
       {/* slot:regime */}
       <RotationRegime />
       {/* slot:drawdowns */}
-      <RotationDrawdowns list={focus} />
+      <RotationDrawdowns list={focus} portfolio={portfolio} />
       {/* slot:drift */}
       <RotationDrift list={focus} />
     </div>

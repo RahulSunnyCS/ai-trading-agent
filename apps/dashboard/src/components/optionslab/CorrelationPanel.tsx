@@ -49,6 +49,7 @@ import { StateMessage } from '../ui/StateMessage';
 import { CorrelationBasket } from './correlation/CorrelationBasket';
 import { type Cell, CorrelationHeatmap } from './correlation/CorrelationHeatmap';
 import { BasketBuilder, DriftChart, PairCard, StrategyTable } from './correlation/CorrelationParts';
+import { StrategyMultiSelect } from './correlation/StrategyMultiSelect';
 
 const MEASURE_OPTIONS: SegmentedOption<CorrelationMeasure>[] = (
   ['pearson', 'spearman', 'loss'] as const
@@ -91,8 +92,6 @@ function Filters({
   const { filters, setFilters, range, setRange } = state;
   const g = available.groups;
   const variantsOnly = filters.kind !== 'legwise';
-  const chosen = new Set(filters.names);
-  const addable = available.strategies.filter((s) => !chosen.has(s.name) && !s.stale);
   return (
     <Card>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -168,23 +167,12 @@ function Filters({
             aria-label="To date"
           />
         </div>
-        <div className="flex flex-col gap-1 text-xs text-muted sm:col-span-2">
-          Also include
-          <Select
-            value=""
-            onChange={(e) => {
-              if (e.target.value) setFilters({ names: [...filters.names, e.target.value] });
-            }}
-            aria-label="Also include a strategy by name"
-          >
-            <option value="">Add a strategy by name…</option>
-            {addable.map((s) => (
-              <option key={s.name} value={s.name}>
-                {s.name}
-                {s.kind === 'legwise' ? ' (live)' : ''}
-              </option>
-            ))}
-          </Select>
+        <div className="sm:col-span-2">
+          <StrategyMultiSelect
+            options={available.strategies}
+            chosen={filters.names}
+            onChange={(names) => setFilters({ names })}
+          />
         </div>
       </div>
       {filters.names.length > 0 ? (
