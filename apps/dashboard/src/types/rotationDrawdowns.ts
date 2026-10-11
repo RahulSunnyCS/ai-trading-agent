@@ -43,6 +43,27 @@ export interface DrawdownPoint {
   underwater: number;
   base_per_lot: number | null;
   base_underwater: number | null;
+  /** Only with a portfolio stop (BL-092): the same day through the stop. */
+  per_lot_with?: number;
+  cum_with?: number;
+  underwater_with?: number;
+  /** The book closed at the portfolio stop (or a lock) that day. */
+  stopped?: boolean;
+}
+
+/** The series run through the portfolio stop, beside the registered figures. */
+export interface DrawdownWithStop {
+  setting: { amount: number | null; trail: string | null };
+  /** Worst fall per lot with the stop (negative). */
+  max_dd: number;
+  total_per_lot: number;
+  total_per_lot_without: number;
+  days_stopped: number;
+  /** Days that could not be replayed and kept their registered figure. */
+  replay_errors: number;
+  episodes: number;
+  all_episodes: number;
+  current: { underwater: number } | null;
 }
 
 export interface RotationDrawdownsResponse {
@@ -66,4 +87,6 @@ export interface RotationDrawdownsResponse {
   basis: 'gross';
   unit: 'per_lot';
   in_sample: boolean;
+  /** null (or absent) when no portfolio stop was asked for. */
+  with_stop?: DrawdownWithStop | null;
 }

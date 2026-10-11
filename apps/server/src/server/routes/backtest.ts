@@ -439,6 +439,11 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     return text ? `?${text}` : '';
   }
 
+  // BL-092: the portfolio stop's query values, matched to a strict shape before they are forwarded.
+  const PF_DAY = '^\\d{4}-\\d{2}-\\d{2}$';
+  const PF_STOP = '^(-?\\d{1,9}(\\.\\d{1,2})?)?$'; // empty = no stop
+  const PF_TRAIL = '^((sl|lock|locktrail):\\d{1,9}(\\.\\d{1,2})?(,\\d{1,9}(\\.\\d{1,2})?){1,3})?$';
+
   fastify.get(
     '/api/backtest/legwise/day',
     {
@@ -740,7 +745,8 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
   // --- end rotation regime ---
 
   // --- rotation drawdowns --- the Rotation page's "Drawdown episodes" card
-  // (rotation/drawdowns.py, read-only). List and window are enums; min_depth is a plain number.
+  // (rotation/drawdowns.py, read-only). List and window are enums; min_depth is a plain number;
+  // stop and trail (BL-092) run the series through the portfolio stop beside the registered one.
   fastify.get(
     '/api/backtest/legwise/rotation/drawdowns',
     {
@@ -752,6 +758,8 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
             list: { type: 'string', enum: ['A', 'B', 'C', 'REF'] },
             window: { type: 'string', enum: ['P1', 'P2', 'last63', 'forward'] },
             min_depth: { type: 'string', pattern: '^\\d{1,6}(\\.\\d{1,2})?$' },
+            stop: { type: 'string', pattern: PF_STOP },
+            trail: { type: 'string', pattern: PF_TRAIL },
           },
           additionalProperties: false,
         },
@@ -761,7 +769,7 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
       const q = request.query as Record<string, unknown>;
       await forwardToBacktestApi(
         reply,
-        `/legwise/rotation/drawdowns${upstreamQuery(q, ['list', 'window', 'min_depth'])}`,
+        `/legwise/rotation/drawdowns${upstreamQuery(q, ['list', 'window', 'min_depth', 'stop', 'trail'])}`,
       );
     },
   );
@@ -792,9 +800,6 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
   // (rotation/portfolio.py, read-only). `stop` is rupees (empty, 0 or below = none) and `trail`
   // is sl:X,Y | lock:A,B | locktrail:A,B,X,Y; both are matched to a strict shape before they are
   // forwarded, and Python refuses what is still malformed.
-  const PF_DAY = '^\\d{4}-\\d{2}-\\d{2}$';
-  const PF_STOP = '^(-?\\d{1,9}(\\.\\d{1,2})?)?$'; // empty = no stop
-  const PF_TRAIL = '^((sl|lock|locktrail):\\d{1,9}(\\.\\d{1,2})?(,\\d{1,9}(\\.\\d{1,2})?){1,3})?$';
   fastify.get(
     '/api/backtest/legwise/rotation/portfolio/day',
     {

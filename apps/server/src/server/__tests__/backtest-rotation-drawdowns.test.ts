@@ -86,6 +86,27 @@ describe('GET /api/backtest/legwise/rotation/drawdowns', () => {
     );
   });
 
+  it('forwards the portfolio stop and trail, and refuses a malformed one', async () => {
+    server = await buildTestServer();
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, {}));
+    const ok = await server.inject({
+      method: 'GET',
+      url: '/api/backtest/legwise/rotation/drawdowns?list=A&stop=10000&trail=sl:1000,500',
+    });
+    expect(ok.statusCode).toBe(200);
+    expect((fetchMock.mock.calls[0] as [string])[0]).toBe(
+      'http://127.0.0.1:8000/legwise/rotation/drawdowns?list=A&stop=10000&trail=sl%3A1000%2C500',
+    );
+    for (const q of ['stop=abc', 'trail=evil:1,2', 'stop=1e9']) {
+      const bad = await server.inject({
+        method: 'GET',
+        url: `/api/backtest/legwise/rotation/drawdowns?${q}`,
+      });
+      expect(bad.statusCode, `${q} -> ${bad.body}`).toBe(400);
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('refuses an unknown list or window and a malformed depth', async () => {
     server = await buildTestServer();
     for (const q of [

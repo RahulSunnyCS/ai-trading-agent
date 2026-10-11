@@ -18,25 +18,13 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 from ..rotation import daylog, journal, portfolio_log
-from ..rotation.portfolio import PortfolioStopError, Trail, parse_trail
+from ..rotation.portfolio import PortfolioStopError, settings_from_query
 
 router = APIRouter(prefix="/legwise/rotation/portfolio")
 
 
 def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": message})
-
-
-def _settings(stop: str | None, trail: str | None) -> tuple[float | None, Trail | None]:
-    amount: float | None = None
-    if stop is not None and stop.strip() != "":
-        try:
-            amount = float(stop)
-        except ValueError as error:
-            raise PortfolioStopError(f"stop must be a number, got {stop!r}") from error
-        if amount != amount or amount in (float("inf"), float("-inf")):
-            raise PortfolioStopError("stop must be a finite number")
-    return amount, parse_trail(trail)
 
 
 def _day(raw: str | None, label: str) -> date | None:
@@ -58,7 +46,7 @@ def get_day(
 ) -> Any:
     try:
         parsed = _day(day, "day")
-        amount, trailing = _settings(stop, trail)
+        amount, trailing = settings_from_query(stop, trail)
         if parsed is None:
             raise PortfolioStopError("day is required, YYYY-MM-DD")
         return portfolio_log.list_day(parsed, list_, amount, trailing, source)
@@ -82,7 +70,7 @@ def get_days(
         return _error(422, f"source must be one of {', '.join(daylog.SOURCES)}")
     try:
         start, end = _day(from_, "from"), _day(to, "to")
-        amount, trailing = _settings(stop, trail)
+        amount, trailing = settings_from_query(stop, trail)
         if start and end and start > end:
             raise PortfolioStopError("from must not be after to")
         return portfolio_log.days(start, end, amount, trailing, source)

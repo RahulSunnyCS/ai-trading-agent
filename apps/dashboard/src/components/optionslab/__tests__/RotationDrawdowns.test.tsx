@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { episode, response } from '../../../lib/__tests__/rotationDrawdownsFixture';
+import { DEFAULT_SETTING } from '../../../lib/portfolioStop';
 
 const hook = vi.hoisted(() => ({
   state: { data: null, loading: false, error: null, refetch: vi.fn() } as {
@@ -141,5 +142,50 @@ describe('RotationDrawdowns', () => {
     render(<RotationDrawdowns list="A" />);
     expect(screen.getByText('Could not read the drawdowns')).toBeTruthy();
     expect(screen.queryByRole('table')).toBeNull();
+  });
+});
+
+describe('RotationDrawdowns with a portfolio stop', () => {
+  const withStop = {
+    setting: { amount: 10000, trail: null },
+    max_dd: -900,
+    total_per_lot: 1200,
+    total_per_lot_without: 800,
+    days_stopped: 2,
+    replay_errors: 1,
+    episodes: 1,
+    all_episodes: 1,
+    current: null,
+  };
+
+  it('asks for the stop and shows both worst falls and the stopped line', () => {
+    const base = response();
+    hook.state.data = response({
+      with_stop: withStop,
+      series: base.series.map((p) => ({ ...p, underwater_with: p.underwater / 2, stopped: false })),
+    });
+    render(<RotationDrawdowns list="A" portfolio={DEFAULT_SETTING} />);
+    expect((hook.lastArgs as { portfolio: unknown }).portfolio).toEqual(DEFAULT_SETTING);
+    expect(screen.getByText('Worst fall per lot, registered')).toBeTruthy();
+    expect(screen.getByText('-₹900')).toBeTruthy();
+    expect(screen.getByText(/2 of 6/)).toBeTruthy();
+    expect(screen.getByText(/1 not replayed/)).toBeTruthy();
+    expect(screen.getByText(/with the portfolio stop/)).toBeTruthy();
+    expect(screen.getByText(/With the ₹10,000 stop replayed/)).toBeTruthy();
+  });
+
+  it('does not draw an answer made for another setting under this one', () => {
+    hook.state.data = response({
+      with_stop: { ...withStop, setting: { amount: 8000, trail: null } },
+    });
+    render(<RotationDrawdowns list="A" portfolio={DEFAULT_SETTING} />);
+    expect(screen.queryByText('Worst fall per lot, registered')).toBeNull();
+  });
+
+  it('shows nothing extra when the stop is off', () => {
+    hook.state.data = response();
+    render(<RotationDrawdowns list="A" portfolio={{ ...DEFAULT_SETTING, stop: '' }} />);
+    expect(screen.queryByText('Worst fall per lot, registered')).toBeNull();
+    expect(screen.getByText('6 sessions')).toBeTruthy();
   });
 });

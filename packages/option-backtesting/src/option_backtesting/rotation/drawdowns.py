@@ -35,6 +35,7 @@ import numpy as np
 from ..fyers.daily import data_dir
 from . import base as base_mod
 from . import daylog, history
+from . import portfolio as pf_mod
 from .history import BAND_LABEL
 from .lists import LISTS
 from .matrix import NAMED
@@ -198,12 +199,74 @@ def _drivers(window_days: list[Day], lo: int, hi: int) -> list[dict]:
     return rows
 
 
+def _with_stop(
+    root: Path,
+    window_days: list[Day],
+    series: list[dict],
+    min_depth: float,
+    portfolio: tuple[float | None, pf_mod.Trail | None],
+) -> dict:
+    """Replay each day's basket under the portfolio stop and add `per_lot_with`, `cum_with`,
+    `underwater_with` and `stopped` to the series rows (in place). A day that cannot be replayed
+    keeps its registered figure and is counted in `replay_errors`, never dropped or zeroed."""
+    stop, trail = portfolio
+    per_lot: list[float] = []
+    stopped: list[bool] = []
+    errors = 0
+    for d in window_days:
+        names = [p["name"] for p in d.picks]
+        if not names or d.lots <= 0:
+            per_lot.append(d.per_lot)
+            stopped.append(False)
+            errors += 1
+            continue
+        lots_each = d.lots // len(names)
+        try:
+            book = pf_mod.book_day(root, d.day, [(n, lots_each) for n in names], stop, trail, {})
+        except pf_mod.PortfolioStopError:
+            per_lot.append(d.per_lot)
+            stopped.append(False)
+            errors += 1
+            continue
+        per_lot.append(book.gross_with / d.lots)
+        stopped.append(book.stop_minute is not None)
+    arr = np.array(per_lot, dtype=float)
+    cum = np.cumsum(arr) if arr.size else np.array([])
+    under = cum - np.maximum.accumulate(np.maximum(cum, 0.0)) if arr.size else np.array([])
+    for i, row in enumerate(series):
+        row["per_lot_with"] = round(float(arr[i]), 2)
+        row["cum_with"] = round(float(cum[i]), 2)
+        row["underwater_with"] = round(float(under[i]), 2)
+        row["stopped"] = stopped[i]
+    every = episodes_of(arr, 0.01)
+    return {
+        "setting": {
+            "amount": pf_mod.normalise_stop(stop),
+            "trail": None if trail is None else trail.text(),
+        },
+        "max_dd": round(max_drawdown(arr), 2),
+        "total_per_lot": round(float(arr.sum()), 2) if arr.size else 0.0,
+        "total_per_lot_without": round(float(sum(d.per_lot for d in window_days)), 2),
+        "days_stopped": int(sum(stopped)),
+        "replay_errors": errors,
+        "episodes": len([e for e in every if -e["depth"] >= min_depth]),
+        "all_episodes": len(every),
+        "current": (
+            {"underwater": round(float(under[-1]), 2)} if arr.size and under[-1] < 0 else None
+        ),
+    }
+
+
 def build(
     key: str,
     window: str = "P1",
     min_depth: float = DEFAULT_MIN_DEPTH,
     root: Path | None = None,
+    portfolio: tuple[float | None, pf_mod.Trail | None] | None = None,
 ) -> dict:
+    """`portfolio` is (stop in rupees, trailing) for BL-092: the same series is also run through
+    the portfolio stop and returned under `with_stop` and per-point `*_with` fields, beside the
+    registered figures, which are never replaced."""
     if key not in KEYS:
         raise DrawdownError(422, f"list must be one of {', '.join(KEYS)}")
     if window not in WINDOWS:
@@ -300,6 +363,9 @@ def build(
             "sessions": len(window_days) - 1 - peak_i,
         }
     lot_counts = sorted({d.lots for d in window_days})
+    with_stop = None
+    if portfolio is not None and (pf_mod.normalise_stop(portfolio[0]) or portfolio[1]):
+        with_stop = _with_stop(root, window_days, series, min_depth, portfolio)
     return {
         "list": key,
         "window": {
@@ -324,4 +390,5 @@ def build(
         "basis": "gross",
         "unit": "per_lot",
         "in_sample": window != "forward",
+        "with_stop": with_stop,
     }

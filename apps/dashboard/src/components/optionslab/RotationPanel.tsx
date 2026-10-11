@@ -14,7 +14,10 @@ import { useMemo, useState } from 'react';
 
 import { usePortfolioStop } from '../../hooks/usePortfolioStop';
 import { useRotationOverview, useRotationSummary } from '../../hooks/useRotation';
+import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { formatIstTime, istToday } from '../../lib/format';
+import { amountOf, buttonLabel, isOn, trailParam } from '../../lib/portfolioStop';
+import { overlaySummary } from '../../lib/rotationPortfolioView';
 import {
   BENCHMARK_LABEL,
   BENCHMARK_NOTE,
@@ -68,14 +71,28 @@ export function RotationPanel() {
   const readoutDays = overview.data?.readout_days ?? 60;
   const s = summary.data;
 
+  // BL-092: the forward sessions replayed under the portfolio stop. Only an answer for this
+  // setting is laid over the read-out; the verdict, the intervals and the random baskets always
+  // stay on the registered basis (the pre-registered test does not move with a typed level).
+  const book = useRotationPortfolioDays('recorded', {}, portfolio);
+  const bookNow =
+    book.data !== null &&
+    book.data.setting?.amount === amountOf(portfolio) &&
+    book.data.setting?.trail === trailParam(portfolio) &&
+    Array.isArray(book.data.rows)
+      ? book.data
+      : null;
+  const shown_s = useMemo(() => (s ? overlaySummary(s, bookNow) : s), [s, bookNow]);
+  const stopped = shown_s !== s;
+
   const visible = useMemo(() => new Set<RotationListKey>([...shown, focus]), [shown, focus]);
   const figures = useMemo(
-    () => (s ? headline(s, focus, benchmark, readoutDays) : []),
-    [s, focus, benchmark, readoutDays],
+    () => (shown_s ? headline(shown_s, focus, benchmark, readoutDays) : []),
+    [shown_s, focus, benchmark, readoutDays],
   );
-  const points = useMemo(() => (s ? heroSeries(s, focus) : []), [s, focus]);
+  const points = useMemo(() => (shown_s ? heroSeries(shown_s, focus) : []), [shown_s, focus]);
   const verdictFor = useMemo(() => (s ? buildVerdict(s, focus) : null), [s, focus]);
-  const bench = s ? benchmarkFigures(s, benchmark, focus) : null;
+  const bench = shown_s ? benchmarkFigures(shown_s, benchmark, focus) : null;
 
   const reload = () => {
     overview.refetch();
@@ -171,6 +188,15 @@ export function RotationPanel() {
         <SkeletonRows rows={5} />
       ) : (
         <>
+          {isOn(portfolio) && s.n_days > 0 ? (
+            <p className="text-xs text-muted" aria-live="polite">
+              {stopped
+                ? `With the ${buttonLabel(portfolio).replace('Portfolio stop ', '')} portfolio stop replayed over these sessions: cumulative gross, ₹ per lot-day, the drawdowns and the curves. Beats random baskets, the verdict and the read-out stay on the registered basis, without a stop.`
+                : book.error
+                  ? `The portfolio stop could not be replayed (${book.error}); the registered figures are shown.`
+                  : 'Replaying the sessions under the portfolio stop; the registered figures are shown meanwhile.'}
+            </p>
+          ) : null}
           <RotationHeadline figures={figures} benchmarkLabel={bench?.label ?? ''} />
           {verdictFor && s.n_days > 0 ? <RotationVerdict verdict={verdictFor} /> : null}
           <Card>
@@ -179,7 +205,7 @@ export function RotationPanel() {
               description={
                 s.n_days === 0
                   ? 'Appears with the first scored session.'
-                  : `${s.n_days} scored forward sessions, 2 lots per strategy. Late entries and unscored days are left out.`
+                  : `${s.n_days} scored forward sessions, 2 lots per strategy.${stopped ? ' With the portfolio stop applied.' : ''} Late entries and unscored days are left out.`
               }
             />
             {s.n_days === 0 ? (
@@ -253,7 +279,7 @@ export function RotationPanel() {
       {/* slot:regime */}
       <RotationRegime />
       {/* slot:drawdowns */}
-      <RotationDrawdowns list={focus} />
+      <RotationDrawdowns list={focus} portfolio={portfolio} />
       {/* slot:drift */}
       <RotationDrift list={focus} />
     </div>

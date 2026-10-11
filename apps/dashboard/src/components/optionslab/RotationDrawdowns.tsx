@@ -13,6 +13,7 @@ import { useMemo, useState } from 'react';
 import { useQueryState } from '../../hooks/useQueryState';
 import { useRotationDrawdowns } from '../../hooks/useRotationDrawdowns';
 import { formatDay, formatInr, formatInt } from '../../lib/format';
+import { type PortfolioStopSetting, amountOf, buttonLabel, isOn } from '../../lib/portfolioStop';
 import {
   DEFAULT_DEPTH,
   DEPTH_OPTIONS,
@@ -49,6 +50,7 @@ function Chart({
   const own = d.series.map((p) => p.underwater);
   const base = d.series.map((p) => p.base_underwater);
   const hasBase = base.some((v) => v !== null);
+  const withStop = d.with_stop ? d.series.map((p) => p.underwater_with ?? null) : null;
   const last = d.series.length - 1;
   return (
     <div>
@@ -103,6 +105,9 @@ function Chart({
           />
         ) : null}
         <path d={linePath(own, g)} className="fill-none stroke-primary" strokeWidth={1.8} />
+        {withStop ? (
+          <path d={linePath(withStop, g)} className="fill-none stroke-warning" strokeWidth={1.8} />
+        ) : null}
         {d.series.map((p, i) => (
           <rect
             key={p.day}
@@ -115,6 +120,10 @@ function Chart({
             <title>
               {`${formatDay(p.day)} · ${p.source}: ${formatInr(p.underwater)} below peak${
                 p.base_underwater === null ? '' : ` · base ${formatInr(p.base_underwater)}`
+              }${
+                p.underwater_with === undefined
+                  ? ''
+                  : ` · with the stop ${formatInr(p.underwater_with)}${p.stopped ? ' (stopped)' : ''}`
               }`}
             </title>
           </rect>
@@ -139,6 +148,11 @@ function Chart({
         <span className="inline-flex items-center gap-1.5">
           <i className="inline-block h-0.5 w-4 bg-primary" /> list {d.list}
         </span>
+        {withStop ? (
+          <span className="inline-flex items-center gap-1.5">
+            <i className="inline-block h-0.5 w-4 bg-warning" /> with the portfolio stop
+          </span>
+        ) : null}
         {hasBase ? (
           <span className="inline-flex items-center gap-1.5">
             <i className="inline-block h-0 w-4 border-t border-dashed border-muted" /> fixed base
@@ -262,15 +276,28 @@ function Drivers({ e }: { e: DrawdownEpisode }) {
   );
 }
 
-export function RotationDrawdowns({ list }: { list: RotationListKey }) {
+export function RotationDrawdowns({
+  list,
+  portfolio,
+}: {
+  list: RotationListKey;
+  /** The page's portfolio stop (BL-092): the series is also run through it, beside the registered one. */
+  portfolio?: PortfolioStopSetting;
+}) {
   const [winQ, setWinQ] = useQueryState('ddwin');
   const [depthQ, setDepthQ] = useQueryState('dddepth');
   const window = asWindow(winQ);
   const minDepth = asDepth(depthQ);
-  const res = useRotationDrawdowns({ list, window, minDepth });
+  const res = useRotationDrawdowns({ list, window, minDepth, portfolio });
   const d = res.data;
   const current =
-    d !== null && d.list === list && d.window.id === window && d.min_depth === minDepth;
+    d !== null &&
+    d.list === list &&
+    d.window.id === window &&
+    d.min_depth === minDepth &&
+    // an answer for another portfolio setting is not drawn under this one (the hook keeps the last)
+    Boolean(d.with_stop) === (portfolio !== undefined && isOn(portfolio)) &&
+    (!d.with_stop || d.with_stop.setting.amount === (portfolio ? amountOf(portfolio) : null));
   // The chosen episode belongs to one list, window and depth: another choice starts afresh.
   const choice = `${list}|${window}|${minDepth}`;
   const [pick, setPick] = useState<{ choice: string; n: number } | null>(null);
@@ -351,6 +378,29 @@ export function RotationDrawdowns({ list }: { list: RotationListKey }) {
               </span>
             ) : null}
           </div>
+          {d.with_stop && portfolio ? (
+            <dl className="grid gap-x-8 gap-y-2 rounded-lg border border-border bg-surface-2/40 px-4 py-3 text-xs sm:grid-cols-3">
+              <div>
+                <dt className="text-faint">Worst fall per lot, registered</dt>
+                <dd className="metric text-sm text-negative">{formatInr(d.max_dd)}</dd>
+              </div>
+              <div>
+                <dt className="text-faint">With {buttonLabel(portfolio).toLowerCase()}</dt>
+                <dd className="metric text-sm text-negative">{formatInr(d.with_stop.max_dd)}</dd>
+              </div>
+              <div>
+                <dt className="text-faint">Days the stop closed the book</dt>
+                <dd className="metric text-sm">
+                  {formatInt(d.with_stop.days_stopped)} of {formatInt(d.n_days)}
+                  {d.with_stop.replay_errors > 0 ? (
+                    <span className="ml-1 text-warning">
+                      ({formatInt(d.with_stop.replay_errors)} not replayed)
+                    </span>
+                  ) : null}
+                </dd>
+              </div>
+            </dl>
+          ) : null}
           <Chart d={d} selected={shown?.n ?? null} />
           {d.episodes.length > 0 && shown ? (
             <div className="space-y-5">

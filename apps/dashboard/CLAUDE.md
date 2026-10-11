@@ -142,7 +142,10 @@ needs to be shared with the server, it is currently hand-duplicated in
   `lib/rotationPortfolioView.ts::overlayBook` lays the stopped figures over the log rows so the
   table and calendar need no second code path. The button and its `ui/Modal` pop-up live in
   `components/optionslab/PortfolioStop*.tsx`; the Rotation page holds the one setting and passes it
-  down. Only an answer matching the current source and setting is laid over the log.
+  down. Only an answer matching the current source and setting is laid over the log. The Drawdowns
+  widget passes the setting to `/rotation/drawdowns` (`with_stop`, a second line and three figures);
+  the page's headline and hero chart use `overlaySummary` over the forward read-out's days. The
+  verdict, the intervals and "beats random baskets" always stay on the registered basis.
 - `src/hooks/useNow.ts` — the one ticking clock (`Date | null`, null until mounted). Every caller
   re-renders on each tick, so call a fast one in a small leaf (`components/live/LiveClock.tsx`),
   not at the top of a view.

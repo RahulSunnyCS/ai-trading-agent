@@ -67,6 +67,7 @@ export function geometry(
     0,
     ...series.map((p) => p.underwater),
     ...series.map((p) => p.base_underwater ?? 0),
+    ...series.map((p) => p.underwater_with ?? 0),
   );
   const min = deepest === 0 ? -1 : deepest * 1.08;
   const n = Math.max(series.length - 1, 1);
@@ -182,6 +183,19 @@ export function readingLine(d: RotationDrawdownsResponse): string {
     parts.push(
       `It is now ${formatInr(-d.current.underwater)} per lot below its peak${d.current.since ? ` of ${formatDay(d.current.since)}` : ''}, ${formatInt(d.current.sessions)} session${d.current.sessions === 1 ? '' : 's'} on.`,
     );
+  }
+  const w = d.with_stop;
+  if (w) {
+    const setting =
+      w.setting.amount === null ? 'the profit lock' : `the ${formatInr(w.setting.amount)} stop`;
+    parts.push(
+      `With ${setting} replayed over the same days the worst fall is ${formatInr(w.max_dd)} per lot (${formatInr(d.max_dd)} without), the stop closed the book on ${formatInt(w.days_stopped)} day${w.days_stopped === 1 ? '' : 's'}, and the total is ${formatInr(w.total_per_lot, { sign: true })} per lot against ${formatInr(w.total_per_lot_without, { sign: true })}.`,
+    );
+    if (w.replay_errors > 0) {
+      parts.push(
+        `${formatInt(w.replay_errors)} day${w.replay_errors === 1 ? '' : 's'} could not be replayed and keep ${w.replay_errors === 1 ? 'its' : 'their'} registered figure.`,
+      );
+    }
   }
   parts.push(
     d.in_sample

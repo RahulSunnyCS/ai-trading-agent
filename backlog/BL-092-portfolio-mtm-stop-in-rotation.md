@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades the lists with a portfolio stop (about ₹10k on 6 lots); the Rotation log today shows losses that book could not reach |
-| **Status** | In progress (Phases 1–2 built; Phase 3 table, calendar and pop-up built) |
+| **Status** | In progress (Phases 1–4 built; PR open; trailing modes to confirm against AlgoTest) |
 | **Type** | feature |
 | **Area** | options / dashboard |
 | **Created** | 2026-10-11 |
@@ -247,3 +247,18 @@ decision. (Questions 1–7 of 2026-10-11 are answered: see Owner's decisions.)
   own figures stay on screen with a note while the stopped ones are replayed (about 45 s the first
   time). Still to do in Phase 3: "Replay the list" in the day drawer. Tests: 14 + 5 + 6 + 3 new
   dashboard tests, 1,620 dashboard tests pass.
+- 2026-10-11 — Phase 3 finished: "Replay the list" in the day drawer (the basket's combined P&L,
+  the stop level as a step line when trailing, a marker where it closed, the dotted no-stop line,
+  each pick as a thin line; says when the replay without a stop differs from the log).
+- 2026-10-11 — Phase 4 built. Drawdowns: `GET /legwise/rotation/drawdowns` takes `stop` / `trail`
+  and returns `with_stop` (worst fall, total per lot with and without, days stopped, replay errors)
+  and `per_lot_with` / `underwater_with` per day; the widget draws the second line and three
+  figures, the episode table and drivers stay registered. Headline and hero: `overlaySummary`
+  recomputes cumulative gross, ₹ per lot-day and the two max drawdowns from the stopped days;
+  "beats random baskets", the verdict and its intervals stay on the registered basis and a line
+  says so. The hero keeps no faint no-stop curve (the plan had one): the registered figures are
+  the read-out and the Daily log shows both numbers per day. The forward read-out has no scored
+  sessions yet (first entry Mon 12 Oct), so the headline and hero overlay is unit-tested and
+  has not been looked at on real data. Still open: compare the three trailing modes with the
+  owner's AlgoTest screen (open question 1), and whether the fixed base / Shadow scoreboard
+  should follow the stop (Phase 5).

@@ -136,6 +136,20 @@ def parse_trail(text: str | None) -> Trail | None:
     return trail
 
 
+def settings_from_query(stop: str | None, trail: str | None) -> tuple[float | None, Trail | None]:
+    """The stop and trail as a route receives them: `stop` empty or missing is none, a malformed
+    value raises PortfolioStopError (never silently ignored)."""
+    amount: float | None = None
+    if stop is not None and stop.strip() != "":
+        try:
+            amount = float(stop)
+        except ValueError as error:
+            raise PortfolioStopError(f"stop must be a number, got {stop!r}") from error
+        if math.isnan(amount) or math.isinf(amount):
+            raise PortfolioStopError("stop must be a finite number")
+    return amount, parse_trail(trail)
+
+
 def _check(trail: Trail) -> None:
     if trail.x is not None and trail.y is not None and trail.y > trail.x:
         raise PortfolioStopError("the stop cannot move more than the profit did (Y above X)")
