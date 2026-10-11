@@ -57,7 +57,15 @@ class Trail:
     y: float | None = None
 
     def text(self) -> str:
-        return f"{self.mode}:" + ",".join(f"{getattr(self, f):g}" for f in _FIELDS[self.mode])
+        return f"{self.mode}:" + ",".join(_plain(getattr(self, f)) for f in _FIELDS[self.mode])
+
+
+def _plain(value: float) -> str:
+    """A rupee figure without exponent form and without losing digits (`:g` writes 1250000 as
+    `1.25e+06`): whole numbers as integers, the rest as Python's shortest round-trip repr."""
+    return (
+        str(int(value)) if float(value).is_integer() and abs(value) < 1e15 else repr(float(value))
+    )
 
 
 @dataclass(frozen=True)
@@ -240,27 +248,41 @@ def member_from_curve(name: str, lots: int, curve: list[tuple[int, float]], gros
 
 _cache_lock = threading.Lock()
 _paths: dict[tuple, tuple[float, ...]] = {}  # one-lot paths; a replay costs ~0.1-0.7 s a day
+_flights: dict[tuple, threading.Lock] = {}  # single-flight: one replay per key at a time
 _PATHS_MAX = 6000  # about 12 distinct picks a day: the whole history is ~1,500
+
+#: Bump when the replay's own code changes what a path is (the engine is also covered by the
+#: reference and strategy mtimes, but a code fix changes none of those files).
+CACHE_VERSION = 2
+
+
+def _mtime(path: Path) -> int:
+    try:
+        stat = path.stat()
+    except OSError:
+        return 0
+    return stat.st_mtime_ns ^ (stat.st_size << 1)
 
 
 def _stamp(root: Path, day: date, name: str) -> tuple:
-    """What the replay of `name` on `day` depends on: its strategy file and the day's lake files
-    (a day repaired from Fyers changes them, so a long-running API never serves the old path)."""
+    """Everything the replay of `name` on `day` depends on: the cache version, the lot-sizing
+    date, the strategy file, the reference CSVs (lot sizes, strike steps, expiries, holidays), and
+    the day's lake files: option and index bars, India VIX and the symbol master. A day repaired
+    from Fyers or a corrected lot size changes the stamp, so neither a long-running API nor a
+    restart serves the old path."""
     from trading_data import lake
 
+    from ..data.reference.loader import REFERENCE_DIR
+    from .lists import SIZING_DATE
     from .variants import strategy_path, underlying_of
 
     underlying = underlying_of(name)
-    parts: list[int] = []
-    for kind in ("option", "index"):
-        try:
-            parts.append(lake.bars_1m_path(root, kind, underlying, day).stat().st_mtime_ns)
-        except OSError:
-            parts.append(0)
-    try:
-        parts.append(strategy_path(name).stat().st_mtime_ns)
-    except OSError:
-        parts.append(0)
+    parts: list = [CACHE_VERSION, SIZING_DATE]
+    for kind, symbol in (("option", underlying), ("index", underlying), ("index", "INDIAVIX")):
+        parts.append(_mtime(lake.bars_1m_path(root, kind, symbol, day)))
+    parts.append(_mtime(lake.symbol_master_path(root, "fyers", day)))
+    parts.append(_mtime(strategy_path(name)))
+    parts.extend(_mtime(p) for p in sorted(REFERENCE_DIR.glob("*.csv")))
     return tuple(parts)
 
 
@@ -272,10 +294,15 @@ def cache_dir() -> Path:
     return Path(env) if env else Path.home() / ".cache" / "ai-trading-agent" / "portfolio-paths"
 
 
+def _root_dir(root: str) -> str:
+    """One folder per data root, so two roots on one machine never share (or clean up) files."""
+    return hashlib.sha1(root.encode()).hexdigest()[:12]  # noqa: S324 - a cache folder name
+
+
 def _disk_file(key: tuple) -> Path:
     root, day, name, stamp = key
-    digest = hashlib.sha1(f"{root}|{stamp}".encode()).hexdigest()[:12]  # noqa: S324 - a cache key
-    return cache_dir() / name / f"{day.isoformat()}.{digest}.json"
+    digest = hashlib.sha1(repr(stamp).encode()).hexdigest()[:12]  # noqa: S324 - a cache key
+    return cache_dir() / _root_dir(root) / name / f"{day.isoformat()}.{digest}.json"
 
 
 def _disk_read(key: tuple) -> tuple[float, ...] | None:
@@ -293,7 +320,8 @@ def _disk_read(key: tuple) -> tuple[float, ...] | None:
 
 def _disk_write(key: tuple, path: tuple[float, ...]) -> None:
     """Best effort: a cache that cannot be written is simply not there next time. A stale file for
-    the same pick-day (its lake files were repaired since) is removed."""
+    the same pick-day (its inputs changed since) is removed; the folder belongs to this data root
+    alone, so another root's files are never touched."""
     target = _disk_file(key)
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -307,32 +335,62 @@ def _disk_write(key: tuple, path: tuple[float, ...]) -> None:
         pass
 
 
-def one_lot_path(root: Path, day: date, name: str, loaded: dict | None = None) -> tuple[float, ...]:
-    """One variant's one-lot path on `day`, replayed exactly as the nightly update did (same
-    strategy file, same lot-sizing date), and cached. `loaded` shares a day's loaded index data
-    across picks of one call. Raises PortfolioStopError for a day or variant it cannot run."""
-    from ..data.reference.loader import MissingReferenceData, default_reference_data
-    from ..legwise.engine import simulate_day
-    from ..legwise.market import load_day
-    from ..legwise.schema import load_legwise
-    from .lists import SIZING_DATE
-    from .variants import strategy_path, underlying_of, variant_names
+def _remember(key: tuple, path: tuple[float, ...]) -> None:
+    with _cache_lock:
+        if len(_paths) >= _PATHS_MAX:
+            _paths.pop(next(iter(_paths)))
+        _paths[key] = path
 
-    if name not in set(variant_names()):  # matched against the enumerated files, never a path
-        raise PortfolioStopError(f"{name!r} is not one of the rotation variants")
-    key = (str(root), day, name, _stamp(root, day, name))
+
+def _lookup(key: tuple) -> tuple[float, ...] | None:
     with _cache_lock:
         hit = _paths.get(key)
     if hit is None:
         hit = _disk_read(key)
         if hit is not None:
-            with _cache_lock:
-                if len(_paths) >= _PATHS_MAX:
-                    _paths.pop(next(iter(_paths)))
-                _paths[key] = hit
+            _remember(key, hit)
+    return hit
+
+
+def one_lot_path(root: Path, day: date, name: str, loaded: dict | None = None) -> tuple[float, ...]:
+    """One variant's one-lot path on `day`, replayed exactly as the nightly update did (same
+    strategy file, same lot-sizing date), and cached. `loaded` shares a day's loaded index data
+    across picks of one call. Raises PortfolioStopError for a day or variant it cannot run."""
+    from .variants import variant_names
+
+    if name not in set(variant_names()):  # matched against the enumerated files, never a path
+        raise PortfolioStopError(f"{name!r} is not one of the rotation variants")
+    key = (str(root), day, name, _stamp(root, day, name))
+    hit = _lookup(key)
     if hit is not None:
         return hit
-    loaded = loaded if loaded is not None else {}
+    # Single-flight: concurrent cold requests for one pick-day replay it once; the others wait on
+    # the first caller's lock and then find it cached.
+    with _cache_lock:
+        flight = _flights.setdefault(key, threading.Lock())
+    try:
+        with flight:
+            hit = _lookup(key)
+            if hit is not None:
+                return hit
+            path = _replay(root, day, name, loaded if loaded is not None else {})
+            _remember(key, path)
+            _disk_write(key, path)
+            return path
+    finally:
+        with _cache_lock:
+            if _flights.get(key) is flight:
+                del _flights[key]
+
+
+def _replay(root: Path, day: date, name: str, loaded: dict) -> tuple[float, ...]:
+    from ..data.reference.loader import MissingReferenceData, default_reference_data
+    from ..legwise.engine import simulate_day
+    from ..legwise.market import load_day
+    from ..legwise.schema import load_legwise
+    from .lists import SIZING_DATE
+    from .variants import strategy_path, underlying_of
+
     underlying = underlying_of(name)
     try:
         if underlying not in loaded:
@@ -347,13 +405,7 @@ def one_lot_path(root: Path, day: date, name: str, loaded: dict | None = None) -
         raise PortfolioStopError(f"no collected {underlying} data for {day}") from error
     except MissingReferenceData as error:
         raise PortfolioStopError(f"{name}: reference: {error}") from error
-    path = member_from_curve(name, 1, result.mtm, result.gross).pnl
-    with _cache_lock:
-        if len(_paths) >= _PATHS_MAX:
-            _paths.pop(next(iter(_paths)))
-        _paths[key] = path
-    _disk_write(key, path)
-    return path
+    return member_from_curve(name, 1, result.mtm, result.gross).pnl
 
 
 def book_day(

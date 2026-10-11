@@ -3,7 +3,10 @@
  * calendar read `gross` and `per_lot_day` off a list block; this returns the same rows with those
  * two replaced by the stopped ones (and `pf` saying what the log showed and where the book
  * stopped), so neither component needs a second code path. A row or list the stop run could not
- * replay is left exactly as the log has it.
+ * replay is left exactly as the log has it, and so is a list-day whose replay with no stop does not
+ * equal the log's stored figure (`matches_log` false: its bars were repaired after the nightly
+ * update). A stopped figure from the new bars beside a struck-through one from the old bars would
+ * be two different days; `unmatched` counts those so the page can say so.
  */
 
 import type { RotationDayRow, RotationSummary } from '../types/rotation';
@@ -27,6 +30,7 @@ export function overlayBook(
       const figure = lists[key];
       if (block === undefined || figure === undefined || block.lots <= 0) continue;
       if (block.gross === null || block.per_lot_day === null) continue;
+      if (!figure.matches_log) continue; // the log's own figure stays; see the header
       next[key] = {
         ...block,
         gross: figure.gross_with,
@@ -42,6 +46,16 @@ export function overlayBook(
     }
     return changed ? { ...row, lists: next } : row;
   });
+}
+
+/** How many list-days replayed to a figure other than the log's (left out of the overlay). */
+export function unmatched(book: PortfolioDays | null): number {
+  if (book === null) return 0;
+  let n = 0;
+  for (const row of book.rows) {
+    for (const key of LIST_KEYS) if (row.lists[key]?.matches_log === false) n += 1;
+  }
+  return n;
 }
 
 /** Where the focus list's book stopped that day (else the first list that did), for the flag. */
@@ -100,7 +114,7 @@ export function overlaySummary(
     const next: RotationDayRow = { ...row };
     for (const k of keys) {
       const f = lists[k];
-      if (f === undefined || f.lots <= 0) continue;
+      if (f === undefined || f.lots <= 0 || !f.matches_log) continue;
       next[`${k}_total`] = f.gross_with;
       next[k] = f.gross_with / f.lots;
     }

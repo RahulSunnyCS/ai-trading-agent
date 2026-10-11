@@ -97,7 +97,9 @@ for both totals. Days the stop never reached are unchanged.
 > read-out are not changed, and the read-out stays without a portfolio stop. A stop can also cost:
 > it closes days that would have recovered.
 
-The first time over the whole history takes about a minute while the baskets are replayed; the log's own figures stay on screen until the stopped ones arrive. The setting is kept in this browser.
+The first time over the whole history takes a few minutes while the baskets are replayed (`obt rotation portfolio-warm` does it ahead of time); the log's own figures stay on screen until the stopped ones arrive. The setting is in the page's address (`pfstop`, `pftrail`), so a copied link shows the same figures, and this browser remembers the last one you chose.
+
+A day whose bars were repaired after the nightly update (Fyers, after an Angel One day) no longer replays to the figure the log stored. Such a list-day keeps the log's own figure, with no stopped one, and a note says how many there are.
 
 ## Browsing filters
 

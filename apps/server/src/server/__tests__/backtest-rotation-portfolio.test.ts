@@ -75,6 +75,25 @@ describe('GET /api/backtest/legwise/rotation/portfolio/day', () => {
     );
   });
 
+  it('takes source=all, the day route’s filter default', async () => {
+    server = await buildTestServer();
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, {}));
+    const res = await server.inject({
+      method: 'GET',
+      url: `${BASE}/day?day=2026-09-11&list=A&source=all`,
+    });
+    expect(res.statusCode).toBe(200);
+    expect((fetchMock.mock.calls[0] as [string])[0]).toContain('&source=all');
+  });
+
+  it('passes a 202 warming answer through unchanged (a cold replay is still running)', async () => {
+    server = await buildTestServer();
+    fetchMock.mockResolvedValueOnce(jsonResponse(202, { status: 'warming' }));
+    const res = await server.inject({ method: 'GET', url: `${BASE}/days?stop=10000` });
+    expect(res.statusCode).toBe(202);
+    expect(res.json()).toEqual({ status: 'warming' });
+  });
+
   it('drops a parameter it does not know', async () => {
     server = await buildTestServer();
     fetchMock.mockResolvedValueOnce(jsonResponse(200, {}));

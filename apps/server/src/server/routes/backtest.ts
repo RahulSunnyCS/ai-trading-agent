@@ -865,7 +865,8 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
           properties: {
             day: { type: 'string', pattern: PF_DAY },
             list: { type: 'string', enum: ['A', 'B', 'C', 'REF'] },
-            source: { type: 'string', enum: ['recorded', 'reconstructed'] },
+            // a filter on the day's kind; `all` (the default) takes either
+            source: { type: 'string', enum: ['recorded', 'reconstructed', 'all'] },
             stop: { type: 'string', pattern: PF_STOP },
             trail: { type: 'string', pattern: PF_TRAIL },
           },

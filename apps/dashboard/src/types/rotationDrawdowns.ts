@@ -89,4 +89,7 @@ export interface RotationDrawdownsResponse {
   in_sample: boolean;
   /** null (or absent) when no portfolio stop was asked for. */
   with_stop?: DrawdownWithStop | null;
+  /** True while the stopped replay is still running: the registered figures are complete and
+   * `with_stop` is null; the hook asks again. */
+  with_stop_pending?: boolean;
 }

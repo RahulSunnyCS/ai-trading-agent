@@ -13,7 +13,14 @@ import { useMemo, useState } from 'react';
 import { useQueryState } from '../../hooks/useQueryState';
 import { useRotationDrawdowns } from '../../hooks/useRotationDrawdowns';
 import { formatDay, formatInr, formatInt } from '../../lib/format';
-import { type PortfolioStopSetting, amountOf, buttonLabel, isOn } from '../../lib/portfolioStop';
+import {
+  type PortfolioStopSetting,
+  amountOf,
+  buttonLabel,
+  isOn,
+  sameTrail,
+  trailParam,
+} from '../../lib/portfolioStop';
 import {
   DEFAULT_DEPTH,
   DEPTH_OPTIONS,
@@ -296,8 +303,11 @@ export function RotationDrawdowns({
     d.window.id === window &&
     d.min_depth === minDepth &&
     // an answer for another portfolio setting is not drawn under this one (the hook keeps the last)
-    Boolean(d.with_stop) === (portfolio !== undefined && isOn(portfolio)) &&
-    (!d.with_stop || d.with_stop.setting.amount === (portfolio ? amountOf(portfolio) : null));
+    (Boolean(d.with_stop) || d.with_stop_pending === true) ===
+      (portfolio !== undefined && isOn(portfolio)) &&
+    (!d.with_stop ||
+      (d.with_stop.setting.amount === (portfolio ? amountOf(portfolio) : null) &&
+        sameTrail(d.with_stop.setting.trail, portfolio ? trailParam(portfolio) : null)));
   // The chosen episode belongs to one list, window and depth: another choice starts afresh.
   const choice = `${list}|${window}|${minDepth}`;
   const [pick, setPick] = useState<{ choice: string; n: number } | null>(null);
@@ -378,6 +388,12 @@ export function RotationDrawdowns({
               </span>
             ) : null}
           </div>
+          {d.with_stop_pending && portfolio ? (
+            <output className="block rounded-lg border border-border bg-surface-2/60 px-4 py-2.5 text-xs text-muted">
+              Replaying the baskets under the portfolio stop; the registered figures are shown
+              meanwhile. The first time over a long window takes a few minutes.
+            </output>
+          ) : null}
           {d.with_stop && portfolio ? (
             <dl className="grid gap-x-8 gap-y-2 rounded-lg border border-border bg-surface-2/40 px-4 py-3 text-xs sm:grid-cols-3">
               <div>

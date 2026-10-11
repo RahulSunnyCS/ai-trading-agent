@@ -174,3 +174,62 @@ export function parseStored(raw: unknown): PortfolioStopSetting {
     y: text(r.y),
   };
 }
+
+/** Whether two `trail` strings (the API's echo and this page's own) say the same thing. Compared
+ * as numbers, so how the server writes 1250000 (`1.25e+06`) cannot matter. */
+export function sameTrail(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return !a && !b;
+  const [modeA = '', restA = ''] = a.split(':');
+  const [modeB = '', restB = ''] = b.split(':');
+  if (modeA !== modeB) return false;
+  const left = restA.split(',').map(Number);
+  const right = restB.split(',').map(Number);
+  return left.length === right.length && left.every((v, i) => v === right[i]);
+}
+
+function isDefault(s: PortfolioStopSetting): boolean {
+  return (
+    s.stop === DEFAULT_SETTING.stop &&
+    s.mode === 'none' &&
+    s.a === '' &&
+    s.b === '' &&
+    s.x === '' &&
+    s.y === ''
+  );
+}
+
+/** The setting as URL query values (`pfstop`, `pftrail`), or nulls when it is the default. */
+export function toQuery(s: PortfolioStopSetting): {
+  pfstop: string | null;
+  pftrail: string | null;
+} {
+  if (isDefault(s)) return { pfstop: null, pftrail: null };
+  const fields = MODE_FIELDS[s.mode].map((f) => s[f].trim()).join(',');
+  return {
+    pfstop: s.stop.trim() === '' ? 'off' : s.stop.trim(),
+    pftrail: s.mode === 'none' ? null : `${s.mode}:${fields}`,
+  };
+}
+
+/** The setting a URL carries, or null when it carries none (both values absent). Anything
+ * unreadable in it is the default, never an error. */
+export function fromQuery(
+  pfstop: string | null,
+  pftrail: string | null,
+): PortfolioStopSetting | null {
+  if (pfstop === null && pftrail === null) return null;
+  const safe = (v: string) => (v.length <= 12 && /^[0-9.,]*$/.test(v) ? v : '');
+  const stop = pfstop === null ? DEFAULT_STOP : pfstop === 'off' ? '' : safe(pfstop);
+  const setting: PortfolioStopSetting = { ...DEFAULT_SETTING, stop };
+  if (pftrail !== null) {
+    const [mode = '', rest = ''] = pftrail.split(':');
+    if (mode === 'sl' || mode === 'lock' || mode === 'locktrail') {
+      const values = rest.split(',');
+      setting.mode = mode;
+      MODE_FIELDS[mode].forEach((f, i) => {
+        setting[f] = safe(values[i] ?? '');
+      });
+    }
+  }
+  return setting;
+}

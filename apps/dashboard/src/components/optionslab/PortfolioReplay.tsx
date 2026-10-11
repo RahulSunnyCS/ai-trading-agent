@@ -9,6 +9,7 @@ import type { ISeriesApi, SeriesMarker, Time, UTCTimestamp } from 'lightweight-c
 import { X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
+import { useChart } from '../../hooks/useChart';
 import { useRotationPortfolioDay } from '../../hooks/useRotationPortfolio';
 import { getChartTheme, getSeriesPalette, pickSeries, withAlpha } from '../../lib/chartTheme';
 import { formatDay, formatInr } from '../../lib/format';
@@ -19,7 +20,6 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Skeleton } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
-import { useChart } from './DayForensics';
 import { pnlClass } from './shared';
 
 const SESSION_OPEN_MINUTE = 9 * 60 + 15;

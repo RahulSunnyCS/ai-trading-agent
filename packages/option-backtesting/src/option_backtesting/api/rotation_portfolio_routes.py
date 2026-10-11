@@ -3,6 +3,10 @@
     GET /legwise/rotation/portfolio/day?day=YYYY-MM-DD&list=A|B|C|REF&stop=10000&trail=sl:1000,500
     GET /legwise/rotation/portfolio/days?from=&to=&source=recorded|reconstructed&stop=&trail=
 
+`/day` filters by `source` (`recorded`, `reconstructed` or the default `all`): a day that exists
+only as the other kind is a 404. `/days` answers `202 {"status": "warming"}` while a cold replay
+is still running (it carries on in the background; ask again).
+
 `stop` empty, missing, 0 or below is no portfolio stop. `trail` is `sl:X,Y`, `lock:A,B` or
 `locktrail:A,B,X,Y`; a malformed one is a 422, never ignored. The maths is `rotation/portfolio.py`
 and the log wiring `rotation/portfolio_log.py`; nothing here writes anything and no stored result
@@ -17,7 +21,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
-from ..rotation import daylog, journal, portfolio_log
+from ..rotation import daylog, journal, portfolio_log, warm
 from ..rotation.portfolio import PortfolioStopError, settings_from_query
 
 router = APIRouter(prefix="/legwise/rotation/portfolio")
@@ -42,8 +46,10 @@ def get_day(
     list_: str = Query(default="A", alias="list"),
     stop: str | None = None,
     trail: str | None = None,
-    source: str = "recorded",
+    source: str = "all",
 ) -> Any:
+    if source not in daylog.SOURCES:
+        return _error(422, f"source must be one of {', '.join(daylog.SOURCES)}")
     try:
         parsed = _day(day, "day")
         amount, trailing = settings_from_query(stop, trail)
@@ -73,7 +79,15 @@ def get_days(
         amount, trailing = settings_from_query(stop, trail)
         if start and end and start > end:
             raise PortfolioStopError("from must not be after to")
-        return portfolio_log.days(start, end, amount, trailing, source)
+        # A cold replay of the whole history outlasts the proxy's 30 s: answer 202 within the
+        # wait and let the page ask again (rotation/warm.py); the work fills the path cache.
+        done, value = warm.run_within(
+            ("days", start, end, amount, trailing, source),
+            lambda: portfolio_log.days(start, end, amount, trailing, source),
+        )
+        if not done:
+            return JSONResponse(status_code=202, content={"status": "warming"})
+        return value
     except PortfolioStopError as error:
         return _error(422, str(error))
     except portfolio_log.LogBookError as error:

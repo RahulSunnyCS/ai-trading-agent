@@ -283,6 +283,85 @@ def test_a_torn_or_wrong_length_cache_file_is_ignored():
     assert pf._disk_read(key) is None
 
 
+def test_cleanup_never_touches_another_data_roots_files():
+    day = date(2026, 9, 11)
+    mine = ("/data/real", day, "N_wide_0917", (1, 2, 3))
+    theirs = ("/data/demo", day, "N_wide_0917", (4, 5, 6))
+    path = tuple(float(i) for i in range(N_MINUTES))
+    pf._disk_write(mine, path)
+    pf._disk_write(theirs, path)  # same pick-day, another root
+    assert pf._disk_read(mine) == path
+    assert pf._disk_read(theirs) == path
+    pf._disk_write(("/data/real", day, "N_wide_0917", (7, 8, 9)), path)  # repaired: mine only
+    assert pf._disk_read(mine) is None
+    assert pf._disk_read(theirs) == path
+
+
+def test_the_stamp_covers_reference_csvs_the_symbol_master_and_the_version(tmp_path, monkeypatch):
+    from option_backtesting.data.reference import loader
+    from option_backtesting.rotation.variants import variant_names
+
+    ref = tmp_path / "reference"
+    ref.mkdir()
+    (ref / "lot_sizes.csv").write_text("underlying,lot_size,effective_date\nNIFTY,75,2024-11-20\n")
+    monkeypatch.setattr(loader, "REFERENCE_DIR", ref)
+    name, day = variant_names()[0], date(2026, 9, 11)
+    before = pf._stamp(tmp_path, day, name)
+    assert before == pf._stamp(tmp_path, day, name)  # deterministic
+    (ref / "lot_sizes.csv").write_text("underlying,lot_size,effective_date\nNIFTY,65,2024-11-20\n")
+    assert pf._stamp(tmp_path, day, name) != before  # a corrected lot size invalidates
+    after_lot = pf._stamp(tmp_path, day, name)
+    monkeypatch.setattr(pf, "CACHE_VERSION", pf.CACHE_VERSION + 1)
+    assert pf._stamp(tmp_path, day, name) != after_lot  # an engine fix bumps the version
+    from trading_data import lake
+
+    master = lake.symbol_master_path(tmp_path, "fyers", day)
+    master.parent.mkdir(parents=True, exist_ok=True)
+    before_master = pf._stamp(tmp_path, day, name)
+    master.write_bytes(b"x")
+    assert pf._stamp(tmp_path, day, name) != before_master
+
+
+def test_concurrent_cold_requests_replay_a_pick_day_once(tmp_path, monkeypatch):
+    import threading
+    import time
+
+    from option_backtesting.rotation.variants import variant_names
+
+    name, day = variant_names()[0], date(2026, 9, 11)
+    replays: list[int] = []
+    path = tuple(float(i) for i in range(N_MINUTES))
+
+    def slow(root, d, n, loaded):
+        replays.append(1)
+        time.sleep(0.3)
+        return path
+
+    monkeypatch.setattr(pf, "_replay", slow)
+    results: list[tuple] = []
+    threads = [
+        threading.Thread(target=lambda: results.append(pf.one_lot_path(tmp_path, day, name)))
+        for _ in range(4)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(replays) == 1 and results == [path] * 4
+
+
+@pytest.mark.parametrize(
+    ("text", "echo"),
+    [
+        ("lock:1250000,1000000", "lock:1250000,1000000"),
+        ("sl:1000.5,500", "sl:1000.5,500"),
+        ("locktrail:20000,12000,2000,1000", "locktrail:20000,12000,2000,1000"),
+    ],
+)
+def test_the_echoed_trail_keeps_every_digit(text, echo):
+    assert pf.parse_trail(text).text() == echo
+
+
 def test_wrong_length_path_is_refused():
     with pytest.raises(PortfolioStopError):
         apply_book([Member("a", 1, (0.0,) * 10)], 10000)

@@ -328,6 +328,36 @@ def test_the_route_takes_stop_and_trail_and_refuses_a_bad_one(world, dive):
         assert r.status_code == 422 and "error" in r.json(), q
 
 
+def test_a_slow_replay_returns_the_registered_figures_pending_then_the_stopped_ones(
+    world, monkeypatch
+):
+    """Past the wait the route answers with the registered series and `with_stop_pending`; the
+    replay carries on, and the next ask has the stopped one (BL-095 review, proxy timeout)."""
+    import threading
+
+    from option_backtesting.rotation import warm
+
+    gate = threading.Event()
+
+    def slow(root, day, name, loaded=None):
+        gate.wait(10)
+        return (0.0,) * N_MINUTES
+
+    monkeypatch.setattr(pf_mod, "one_lot_path", slow)
+    monkeypatch.setattr(warm, "WAIT_SECONDS", 0.2)
+    c = TestClient(create_app())
+    url = "/legwise/rotation/drawdowns?list=A&window=P1&stop=10000"
+    first = c.get(url)
+    assert first.status_code == 200, first.text
+    body = first.json()
+    assert body["with_stop"] is None and body["with_stop_pending"] is True
+    assert body["series"] and body["n_days"] > 0  # the registered figures are all there
+    gate.set()
+    monkeypatch.setattr(warm, "WAIT_SECONDS", 20.0)
+    done = c.get(url).json()
+    assert done["with_stop"] is not None and "with_stop_pending" not in done
+
+
 # --- review fixes: crafted log rows -----------------------------------------------------------
 
 

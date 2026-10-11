@@ -5,11 +5,14 @@ import {
   type PortfolioStopSetting,
   amountOf,
   buttonLabel,
+  fromQuery,
   isOn,
   parseStored,
   problems,
   queryOf,
+  sameTrail,
   summary,
+  toQuery,
   trailParam,
 } from '../portfolioStop';
 
@@ -104,5 +107,38 @@ describe('what was stored', () => {
     expect(parseStored(null)).toEqual(DEFAULT_SETTING);
     expect(parseStored({ mode: 'evil' })).toEqual(DEFAULT_SETTING);
     expect(parseStored({ mode: 'sl', stop: 'x'.repeat(50) }).stop).toBe('10000');
+  });
+});
+
+describe('the URL form', () => {
+  it('writes nothing for the default and round-trips anything else', () => {
+    expect(toQuery(DEFAULT_SETTING)).toEqual({ pfstop: null, pftrail: null });
+    expect(fromQuery(null, null)).toBeNull();
+    const cases = [
+      make({ stop: '8000' }),
+      make({ stop: '' }),
+      make({ mode: 'sl', x: '1000', y: '500' }),
+      make({ stop: '', mode: 'lock', a: '2000', b: '500' }),
+      make({ mode: 'locktrail', a: '20000', b: '12000', x: '2000', y: '1000' }),
+    ];
+    for (const s of cases) {
+      const q = toQuery(s);
+      expect(fromQuery(q.pfstop, q.pftrail)).toEqual(s);
+    }
+  });
+
+  it('turns an unreadable URL into the default, never an error', () => {
+    expect(fromQuery('<script>', 'sl:a,b')).toEqual({ ...DEFAULT_SETTING, stop: '', mode: 'sl' });
+    expect(fromQuery(null, 'evil:1,2')).toEqual(DEFAULT_SETTING);
+  });
+});
+
+describe('sameTrail', () => {
+  it('compares numbers, not the way the server wrote them', () => {
+    expect(sameTrail('lock:1.25e+06,1000000', 'lock:1250000,1000000')).toBe(true);
+    expect(sameTrail('sl:1000,500', 'sl:1000,501')).toBe(false);
+    expect(sameTrail('sl:1000,500', 'lock:1000,500')).toBe(false);
+    expect(sameTrail(null, null)).toBe(true);
+    expect(sameTrail('sl:1,1', null)).toBe(false);
   });
 });

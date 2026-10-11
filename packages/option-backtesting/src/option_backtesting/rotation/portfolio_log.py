@@ -57,16 +57,22 @@ def list_day(
     list_key: str,
     stop_inr: float | None,
     trail: Trail | None,
-    source: str = "recorded",
+    source: str = "all",
     root: Path | None = None,
 ) -> dict:
     """One list's basket on one day: the combined and each pick's path, the stop level and where it
-    fired. `LogBookError` carries the HTTP status for a day or list that cannot be shown."""
+    fired. `source` (`recorded`, `reconstructed` or `all`) is a filter: a day that exists only as
+    the other kind is a 404, never silently shown under the wrong label. `LogBookError` carries
+    the HTTP status for a day or list that cannot be shown."""
     if list_key not in LISTS:
         raise LogBookError(422, f"list must be one of {', '.join(LISTS)}")
+    if source not in daylog.SOURCES:
+        raise LogBookError(422, f"source must be one of {', '.join(daylog.SOURCES)}")
     body = daylog.build_day(day, root)
     if body is None:
         raise LogBookError(404, f"{day} is not a recorded or reconstructable day")
+    if source != "all" and body.get("source") != source:
+        raise LogBookError(404, f"{day} is a {body.get('source')} day, not a {source} one")
     block = (body.get("lists") or {}).get(list_key)
     if block is None:
         raise LogBookError(404, f"no list {list_key} on {day}")

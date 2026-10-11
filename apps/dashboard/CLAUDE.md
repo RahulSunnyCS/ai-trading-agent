@@ -138,11 +138,14 @@ needs to be shared with the server, it is currently hand-duplicated in
   resource that only exists under some setting.
 - The portfolio stop (BL-095): `lib/portfolioStop.ts` is the setting (drafts stay strings; empty,
   0 or below is none; Trail SL / Lock profit / Lock and trail), `hooks/usePortfolioStop.ts` keeps it
-  in this browser, `hooks/useRotationPortfolio.ts` reads `/rotation/portfolio/days|day`, and
+  in the URL query (`pfstop`, `pftrail`; a copied link shows the same figures) with this browser's last choice
+  (localStorage, read after mount) as the fallback, `hooks/useRotationPortfolio.ts` reads `/rotation/portfolio/days|day` through `hooks/useWarmingResource.ts`
+  (a cold replay answers 202 "warming" or `with_stop_pending`; the hook asks again every few seconds), and
   `lib/rotationPortfolioView.ts::overlayBook` lays the stopped figures over the log rows so the
   table and calendar need no second code path. The button and its `ui/Modal` pop-up live in
   `components/optionslab/PortfolioStop*.tsx`; the Rotation page holds the one setting and passes it
-  down. Only an answer matching the current source and setting is laid over the log. The Drawdowns
+  down. Only an answer matching the current source and setting (`sameTrail` compares numbers, not strings) is laid over the log;
+  a list-day whose replay no longer matches the log (`matches_log` false) keeps the log's own figure and is counted (`unmatched`). The Drawdowns
   widget passes the setting to `/rotation/drawdowns` (`with_stop`, a second line and three figures);
   the page's headline and hero chart use `overlaySummary` over the forward read-out's days. The
   verdict, the intervals and "beats random baskets" always stay on the registered basis.

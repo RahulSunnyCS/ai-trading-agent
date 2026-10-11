@@ -8,6 +8,7 @@ import { type PortfolioStopSetting, isOn, queryOf } from '../lib/portfolioStop';
 import type { RotationListKey, RotationLogSource } from '../types/rotationDailyLog';
 import type { PortfolioDay, PortfolioDays } from '../types/rotationPortfolio';
 import { usePolledResource } from './usePolledResource';
+import { useWarmingResource } from './useWarmingResource';
 
 const BASE = '/api/backtest/legwise/rotation/portfolio';
 
@@ -23,15 +24,22 @@ function sourceOf(source: RotationLogSource): string {
   return source === 'reconstructed' ? 'reconstructed' : 'recorded';
 }
 
+/** The `source` filter of the one-day route: a day exists as one kind, and the log's `all` shows
+ * both, so it asks for either. */
+function daySourceOf(source: RotationLogSource): string {
+  return source === 'reconstructed' || source === 'recorded' ? source : 'all';
+}
+
 /** Every scored list-day in the window with and without the stop. The first call over the whole
- * history replays about 600 strategy-days (tens of seconds); later calls are served warm. */
+ * history replays hundreds of strategy-days: the API answers "warming" and the hook asks again
+ * until it is done (see useWarmingResource); later calls are served warm. */
 export function useRotationPortfolioDays(
   source: RotationLogSource,
   range: { from?: string | undefined; to?: string | undefined },
   setting: PortfolioStopSetting,
 ) {
   const { stop, trail } = queryOf(setting);
-  return usePolledResource<PortfolioDays>(
+  return useWarmingResource<PortfolioDays>(
     `${BASE}/days${query({ source: sourceOf(source), from: range.from, to: range.to, stop, trail })}`,
     { enabled: isOn(setting) },
   );
@@ -46,6 +54,6 @@ export function useRotationPortfolioDay(
 ) {
   const { stop, trail } = queryOf(setting);
   return usePolledResource<PortfolioDay>(
-    `${BASE}/day${query({ day, list, source: sourceOf(source), stop, trail })}`,
+    `${BASE}/day${query({ day, list, source: daySourceOf(source), stop, trail })}`,
   );
 }

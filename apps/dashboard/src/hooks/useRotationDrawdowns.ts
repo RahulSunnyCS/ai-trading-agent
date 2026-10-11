@@ -7,7 +7,7 @@
 import { type PortfolioStopSetting, queryOf } from '../lib/portfolioStop';
 import type { RotationListKey } from '../types/rotation';
 import type { DrawdownWindowId, RotationDrawdownsResponse } from '../types/rotationDrawdowns';
-import { usePolledResource } from './usePolledResource';
+import { useWarmingResource } from './useWarmingResource';
 
 const BASE = '/api/backtest/legwise';
 
@@ -28,5 +28,8 @@ export function useRotationDrawdowns(p: {
     if (stop) q.set('stop', stop);
     if (trail) q.set('trail', trail);
   }
-  return usePolledResource<RotationDrawdownsResponse>(`${BASE}/rotation/drawdowns?${q.toString()}`);
+  return useWarmingResource<RotationDrawdownsResponse>(
+    `${BASE}/rotation/drawdowns?${q.toString()}`,
+    { pending: (d) => d.with_stop_pending === true },
+  );
 }

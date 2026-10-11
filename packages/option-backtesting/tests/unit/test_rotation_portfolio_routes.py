@@ -197,6 +197,48 @@ def test_days_validates_window_and_source(world, paths):
     assert c.get("/legwise/rotation/portfolio/days?from=junk").status_code == 422
 
 
+def test_day_source_is_a_filter_not_a_label(world, paths):
+    day = _a_scored_day(world)  # a recorded day
+    c = TestClient(create_app())
+    assert (
+        c.get(f"/legwise/rotation/portfolio/day?day={day}&list=A&source=recorded").status_code
+        == 200
+    )
+    assert c.get(f"/legwise/rotation/portfolio/day?day={day}&list=A&source=all").status_code == 200
+    other = c.get(f"/legwise/rotation/portfolio/day?day={day}&list=A&source=reconstructed")
+    assert other.status_code == 404 and "recorded" in other.json()["error"]
+    assert c.get(f"/legwise/rotation/portfolio/day?day={day}&list=A&source=nope").status_code == 422
+
+
+def test_a_cold_replay_answers_warming_then_the_figures(world, monkeypatch):
+    """The whole-history replay outlasts the proxy's 30 s: past the wait the route says 202 and
+    the work carries on; the next ask joins or finds it done (BL-095 review)."""
+    import threading
+
+    from option_backtesting.rotation import warm
+
+    gate = threading.Event()
+    calls: list[tuple] = []
+
+    def slow(root, day, name, loaded=None):
+        calls.append((day, name))
+        gate.wait(10)
+        return crafted_path(0.0)
+
+    monkeypatch.setattr(pf, "one_lot_path", slow)
+    monkeypatch.setattr(warm, "WAIT_SECONDS", 0.2)
+    c = TestClient(create_app())
+    url = "/legwise/rotation/portfolio/days?source=reconstructed&from=2026-09-21&to=2026-09-30"
+    first = c.get(url + "&stop=10000")
+    assert first.status_code == 202 and first.json() == {"status": "warming"}
+    again = c.get(url + "&stop=10000")  # joins the running job, does not start another
+    assert again.status_code == 202
+    gate.set()
+    monkeypatch.setattr(warm, "WAIT_SECONDS", 20.0)
+    done = c.get(url + "&stop=10000")
+    assert done.status_code == 200 and done.json()["rows"]
+
+
 def test_nothing_is_written(world, paths):
     root, _ = world
     before = _fingerprint(root)

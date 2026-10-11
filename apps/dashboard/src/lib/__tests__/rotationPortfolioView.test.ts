@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { RotationSummary } from '../../types/rotation';
 import type { PortfolioDays } from '../../types/rotationPortfolio';
-import { hasOverlay, overlayBook, overlaySummary, stopFlag } from '../rotationPortfolioView';
+import {
+  hasOverlay,
+  overlayBook,
+  overlaySummary,
+  stopFlag,
+  unmatched,
+} from '../rotationPortfolioView';
 import { ROWS } from './rotationDailyLogFixture';
 
 function book(
@@ -39,6 +45,19 @@ function book(
 const scored = ROWS.find((r) => r.lists.A?.per_lot_day != null && r.lists.A.lots > 0);
 
 describe('overlayBook', () => {
+  it('leaves a list-day alone when its replay no longer matches the log, and counts it', () => {
+    expect(scored).toBeDefined();
+    if (!scored) return;
+    const b = book(scored.day, { matches_log: false });
+    const out = overlayBook(ROWS, b);
+    const a = out.find((r) => r.day === scored.day)?.lists.A;
+    expect(a?.gross).toBe(scored.lists.A?.gross);
+    expect(a?.pf).toBeUndefined();
+    expect(unmatched(b)).toBe(1);
+    expect(unmatched(book(scored.day, {}))).toBe(0);
+    expect(unmatched(null)).toBe(0);
+  });
+
   it('returns the log rows untouched without a book', () => {
     expect(overlayBook(ROWS, null)).toBe(ROWS);
     expect(hasOverlay(ROWS)).toBe(false);

@@ -20,7 +20,13 @@ import { useRotationLog } from '../../hooks/useRotationDailyLog';
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { cn } from '../../lib/cn';
 import { formatDay, formatInr, istToday } from '../../lib/format';
-import { type PortfolioStopSetting, amountOf, isOn, trailParam } from '../../lib/portfolioStop';
+import {
+  type PortfolioStopSetting,
+  amountOf,
+  isOn,
+  sameTrail,
+  trailParam,
+} from '../../lib/portfolioStop';
 import {
   FILTER_HELP,
   FILTER_LABEL,
@@ -38,7 +44,7 @@ import {
   monthOf,
   windowRange,
 } from '../../lib/rotationDailyLogView';
-import { hasOverlay, overlayBook } from '../../lib/rotationPortfolioView';
+import { hasOverlay, overlayBook, unmatched } from '../../lib/rotationPortfolioView';
 import type { RotationListKey, RotationLog, RotationLogSource } from '../../types/rotationDailyLog';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -158,7 +164,7 @@ export function RotationDailyLog({
     book.data !== null &&
     book.data.source === (source === 'reconstructed' ? 'reconstructed' : 'recorded') &&
     book.data.setting?.amount === amountOf(setting) &&
-    book.data.setting?.trail === trailParam(setting) &&
+    sameTrail(book.data.setting?.trail, trailParam(setting)) &&
     Array.isArray(book.data.rows)
       ? book.data
       : null;
@@ -279,7 +285,7 @@ export function RotationDailyLog({
           {pending ? (
             <output className="block rounded-lg border border-border bg-surface-2/60 px-4 py-2.5 text-sm text-muted">
               Replaying the baskets under the portfolio stop. The log's own figures stay until it is
-              done; the first time over the whole history takes about a minute.
+              done; the first time over the whole history takes a few minutes.
             </output>
           ) : null}
           {book.error && isOn(setting) && bookNow === null ? (
@@ -294,6 +300,13 @@ export function RotationDailyLog({
               {bookNow.errors.length} list-day{bookNow.errors.length === 1 ? '' : 's'} could not be
               replayed (e.g. {bookNow.errors[0]?.day} {bookNow.errors[0]?.list}:{' '}
               {bookNow.errors[0]?.error}) and show the log's own figure.
+            </div>
+          ) : null}
+          {bookNow && unmatched(bookNow) > 0 ? (
+            <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-2.5 text-xs text-foreground">
+              {unmatched(bookNow)} list-day{unmatched(bookNow) === 1 ? '' : 's'} no longer replay to
+              the logged figure (their bars were repaired after the nightly update) and keep the
+              log's own figure, with no stopped one.
             </div>
           ) : null}
           {source === 'reconstructed' ? (

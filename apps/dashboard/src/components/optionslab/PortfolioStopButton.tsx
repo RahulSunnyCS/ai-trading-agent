@@ -6,8 +6,8 @@
 import { ShieldHalf } from 'lucide-react';
 import { useState } from 'react';
 
-import { cn } from '../../lib/cn';
 import { type PortfolioStopSetting, buttonLabel, isOn } from '../../lib/portfolioStop';
+import { Button } from '../ui/Button';
 import { PortfolioStopDialog } from './PortfolioStopDialog';
 
 export function PortfolioStopButton({
@@ -21,22 +21,16 @@ export function PortfolioStopButton({
   const on = isOn(setting);
   return (
     <>
-      <button
-        type="button"
+      <Button
+        variant={on ? 'primary' : 'secondary'}
+        size="sm"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         title="Show the lists with a portfolio stop applied. Changes what is shown, not what is recorded."
-        className={cn(
-          'inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-          on
-            ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15'
-            : 'border-border bg-surface text-muted hover:border-border-strong hover:text-foreground',
-        )}
       >
         <ShieldHalf className="h-3.5 w-3.5" aria-hidden="true" />
         {buttonLabel(setting)}
-      </button>
+      </Button>
       <PortfolioStopDialog
         open={open}
         onOpenChange={setOpen}

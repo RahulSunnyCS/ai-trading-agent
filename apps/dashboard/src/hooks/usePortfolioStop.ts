@@ -1,33 +1,61 @@
 /**
- * The portfolio stop's setting (BL-095), kept in this browser. One value drives every Rotation
- * widget that shows stopped figures; it is a per-viewer convenience, never state anything else
- * reads. A failed read or write (private window, blocked storage) falls back to the default.
+ * The portfolio stop's setting (BL-095). One value drives every Rotation widget that shows
+ * stopped figures. The committed setting lives in the URL query (`pfstop`, `pftrail`) so a copied
+ * link or a refresh shows the same figures; this browser's last choice (localStorage) is the
+ * fallback when the URL carries none. Storage is read after mount, never in the initial render,
+ * so the server HTML and the first client render are both the default. A failed read or write
+ * (private window, blocked storage) falls back to the default.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { DEFAULT_SETTING, type PortfolioStopSetting, parseStored } from '../lib/portfolioStop';
+import {
+  DEFAULT_SETTING,
+  type PortfolioStopSetting,
+  fromQuery,
+  parseStored,
+  toQuery,
+} from '../lib/portfolioStop';
+import { useQueryState } from './useQueryState';
 
 const KEY = 'ata.rotation.portfolioStop.v1';
 
-function read(): PortfolioStopSetting {
+function read(): PortfolioStopSetting | null {
   try {
     const raw = window.localStorage.getItem(KEY);
-    return raw === null ? DEFAULT_SETTING : parseStored(JSON.parse(raw));
+    return raw === null ? null : parseStored(JSON.parse(raw));
   } catch {
-    return DEFAULT_SETTING;
+    return null;
   }
 }
 
 export function usePortfolioStop(): [PortfolioStopSetting, (next: PortfolioStopSetting) => void] {
-  const [setting, setState] = useState<PortfolioStopSetting>(read);
-  const set = useCallback((next: PortfolioStopSetting) => {
-    setState(next);
-    try {
-      window.localStorage.setItem(KEY, JSON.stringify(next));
-    } catch {
-      // the setting still applies for this visit
-    }
+  const [urlStop, setUrlStop] = useQueryState('pfstop');
+  const [urlTrail, setUrlTrail] = useQueryState('pftrail');
+  const [stored, setStored] = useState<PortfolioStopSetting | null>(null);
+
+  useEffect(() => {
+    setStored(read());
   }, []);
+
+  const set = useCallback(
+    (next: PortfolioStopSetting) => {
+      setStored(next);
+      try {
+        window.localStorage.setItem(KEY, JSON.stringify(next));
+      } catch {
+        // the setting still applies for this visit
+      }
+      const q = toQuery(next);
+      setUrlStop(q.pfstop);
+      setUrlTrail(q.pftrail);
+    },
+    [setUrlStop, setUrlTrail],
+  );
+
+  const setting = useMemo(
+    () => fromQuery(urlStop, urlTrail) ?? stored ?? DEFAULT_SETTING,
+    [urlStop, urlTrail, stored],
+  );
   return [setting, set];
 }

@@ -16,8 +16,8 @@ import { usePortfolioStop } from '../../hooks/usePortfolioStop';
 import { useRotationOverview, useRotationSummary } from '../../hooks/useRotation';
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { formatIstTime, istToday } from '../../lib/format';
-import { amountOf, buttonLabel, isOn, trailParam } from '../../lib/portfolioStop';
-import { overlaySummary } from '../../lib/rotationPortfolioView';
+import { amountOf, buttonLabel, isOn, sameTrail, trailParam } from '../../lib/portfolioStop';
+import { overlaySummary, unmatched } from '../../lib/rotationPortfolioView';
 import {
   BENCHMARK_LABEL,
   BENCHMARK_NOTE,
@@ -78,12 +78,13 @@ export function RotationPanel() {
   const bookNow =
     book.data !== null &&
     book.data.setting?.amount === amountOf(portfolio) &&
-    book.data.setting?.trail === trailParam(portfolio) &&
+    sameTrail(book.data.setting?.trail, trailParam(portfolio)) &&
     Array.isArray(book.data.rows)
       ? book.data
       : null;
   const shown_s = useMemo(() => (s ? overlaySummary(s, bookNow) : s), [s, bookNow]);
   const stopped = shown_s !== s;
+  const skipped = unmatched(bookNow);
 
   const visible = useMemo(() => new Set<RotationListKey>([...shown, focus]), [shown, focus]);
   const figures = useMemo(
@@ -191,7 +192,7 @@ export function RotationPanel() {
           {isOn(portfolio) && s.n_days > 0 ? (
             <p className="text-xs text-muted" aria-live="polite">
               {stopped
-                ? `With the ${buttonLabel(portfolio).replace('Portfolio stop ', '')} portfolio stop replayed over these sessions: cumulative gross, ₹ per lot-day, the drawdowns and the curves. Beats random baskets, the verdict and the read-out stay on the registered basis, without a stop.`
+                ? `With the ${buttonLabel(portfolio).replace('Portfolio stop ', '')} portfolio stop replayed over these sessions: cumulative gross, ₹ per lot-day, the drawdowns and the curves. Beats random baskets, the verdict and the read-out stay on the registered basis, without a stop.${skipped > 0 ? ` ${skipped} list-day${skipped === 1 ? '' : 's'} no longer replay to their logged figure (bars repaired since the nightly update) and keep the registered one.` : ''}`
                 : book.error
                   ? `The portfolio stop could not be replayed (${book.error}); the registered figures are shown.`
                   : 'Replaying the sessions under the portfolio stop; the registered figures are shown meanwhile.'}

@@ -7,7 +7,9 @@ writes anything.
         [&stop=10000&trail=sl:1000,500]
 
 `stop` / `trail` (BL-095) also run the series through the portfolio stop and return it under
-`with_stop` beside the registered figures; empty, 0 or below is no stop.
+`with_stop` beside the registered figures; empty, 0 or below is no stop. While that replay is
+still running the registered figures come back with `with_stop_pending: true` and `with_stop`
+null; the page asks again.
 
 `min_depth` is rupees per lot below the running peak (default 500). Errors come back as
 `{"error": ...}`, as in `correlation_routes.py`.
@@ -22,7 +24,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
-from ..rotation import drawdowns
+from ..rotation import drawdowns, warm
 from ..rotation.portfolio import PortfolioStopError, settings_from_query
 
 router = APIRouter(prefix="/legwise/rotation/drawdowns")
@@ -60,7 +62,19 @@ def get_drawdowns(
     if hit is not None and now - hit[0] < CACHE_SECONDS:
         return hit[1]
     try:
-        value = drawdowns.build(list_, window, min_depth, root, portfolio=pf)
+        if pf is None:
+            value = drawdowns.build(list_, window, min_depth, root)
+        else:
+            # The stopped series replays hundreds of strategy-days: past the wait (under the
+            # proxy's 30 s) the registered figures come back with `with_stop_pending` and the
+            # page asks again; the replay keeps running and fills the path cache.
+            done, value = warm.run_within(
+                ("drawdowns", *key),
+                lambda: drawdowns.build(list_, window, min_depth, root, portfolio=pf),
+            )
+            if not done:
+                registered = drawdowns.build(list_, window, min_depth, root)
+                return {**registered, "with_stop": None, "with_stop_pending": True}
     except drawdowns.DrawdownError as error:
         return _error(error.status, str(error))
     except (ValueError, KeyError, OSError) as error:  # a torn stored file
