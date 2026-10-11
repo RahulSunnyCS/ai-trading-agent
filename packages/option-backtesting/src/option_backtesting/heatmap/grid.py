@@ -25,7 +25,7 @@ that have both quotes, and the step is the chain's smallest strike gap.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -214,4 +214,8 @@ def day_cells(
         expiry = expiries[0] if expiries else None
     if expiry is None:
         return [], [f"no {expiry_kind(underlying)} expiry listed"]
+    if expiry_kind(underlying) == "monthly" and (expiry + timedelta(days=7)).month == expiry.month:
+        # vendor days carry only the contracts collected, so "the last expiry of the month" can
+        # be a mid-month weekly; a real monthly is the last of its weekday in the month
+        return [], [f"{expiry} is not a month-end expiry (monthly contracts not collected)"]
     return cells_from(underlying, day, chain, spot, expiry, reference)

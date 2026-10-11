@@ -29,7 +29,7 @@ touchpad zoom and the shared CSS theme tokens.
 
 **Routing:** the URL is the source of truth for tab and sub-tab (`app/[[...slug]]/page.tsx`
 renders the shell; `lib/routes.ts` holds the path grammar, `hooks/useAppRoute.ts` reads/pushes
-it). Paths: `/<tab>`, `/optionslab/<strategies|builder|runs|results|regimes|correlation|rotation>`,
+it). Paths: `/<tab>`, `/optionslab/<heatmap|strategies|builder|runs|results|regimes|correlation|rotation|matrix>`,
 `/optionslab/builder/yaml` (the YAML engine; `/backtest` redirects there),
 `/coverage/<backfill|replay>` (old `/backfill`, `/replay` redirect), `/jobs` (the scheduler's Jobs page, read from `/api/scheduler/*` — needs `SCHEDULER_DIRECT=1`), `/billing` (`/pricing` redirects),
 `/momentum/<backtest|scores|saved|week|rebalance|journal>` (`/momentum/weekly` redirects to `week`; This week's state is in the query: `?week=`, `?fav=`, `?panel=run`, `?review=`, `?stock=`), `/momentum/backtest/<dataset>`,

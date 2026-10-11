@@ -228,7 +228,7 @@ def update_heatmap(root: Path, days: list[date], underlyings: list[str], log: Lo
             continue
         try:
             for d in days:
-                store.build(name, root, d, d)
+                store.build(name, root, d, d, force=True)  # a repaired day's bars changed
         except Exception as error:  # noqa: BLE001 - the heatmap is not the evening's product
             log(f"heatmap {name}: skipped ({error})")
 

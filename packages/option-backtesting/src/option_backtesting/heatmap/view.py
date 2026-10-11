@@ -16,6 +16,9 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+import pyarrow as pa
+import pyarrow.compute as pc
+
 from ..data.reference.loader import ReferenceData, default_reference_data
 from . import grid, store
 
@@ -97,22 +100,24 @@ def build_view(
     if view == "date_sl" and time not in grid.ENTRY_TIMES:
         raise HeatmapError(f"time must be one of {list(grid.ENTRY_TIMES)}")
 
-    cols = table.to_pydict()
-    n = table.num_rows
-    sel: list[dict] = []
-    for i in range(n):
-        d = cols["day"][i]
-        if (start and d < start) or (end and d > end):
-            continue
-        if cols["exit"][i] != exit_time:
-            continue
-        if weeks is not None and (cols["dte"][i] // 7) not in weeks:
-            continue
-        if view == "date_time" and cols["sl"][i] != sl:
-            continue
-        if view == "date_sl" and cols["time"][i] != time:
-            continue
-        sel.append({k: cols[k][i] for k in cols})
+    # filter in Arrow first: a NIFTY file is ~280k rows and a request needs a few hundred
+    mask = pc.equal(table.column("exit"), exit_time)
+    if start is not None:
+        mask = pc.and_(mask, pc.greater_equal(table.column("day"), pa.scalar(start, pa.date32())))
+    if end is not None:
+        mask = pc.and_(mask, pc.less_equal(table.column("day"), pa.scalar(end, pa.date32())))
+    if view == "date_time":
+        mask = pc.and_(mask, pc.equal(table.column("sl"), pa.scalar(sl, pa.int16())))
+    if view == "date_sl":
+        mask = pc.and_(mask, pc.equal(table.column("time"), time))
+    if weeks is not None:
+        in_weeks = pc.is_in(
+            pc.divide(table.column("dte"), pa.scalar(7, pa.int16())),
+            pa.array(sorted(weeks), pa.int16()),
+        )
+        mask = pc.and_(mask, in_weeks)
+    cols = table.filter(mask).to_pydict()
+    sel: list[dict] = [{k: cols[k][i] for k in cols} for i in range(len(cols["day"]))]
     days = sorted({r["day"] for r in sel})
     if view != "time_sl" and len(days) > MAX_DAYS:
         raise HeatmapError(f"{len(days)} days is more than {MAX_DAYS}; narrow the range")

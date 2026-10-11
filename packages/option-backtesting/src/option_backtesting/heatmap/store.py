@@ -7,8 +7,11 @@ A build is incremental: days already in the file are kept, new collected days ar
 
 from __future__ import annotations
 
+import fcntl
 import logging
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
 
@@ -85,6 +88,17 @@ def _rows(cells: list[grid.Cell]) -> list[dict]:
     ]
 
 
+@contextmanager
+def _write_lock(root: Path) -> Iterator[None]:
+    """One exclusive lock for every build: the read, the merge and the rename are one step, so
+    `obt daily` and a manual `obt heatmap build` cannot each drop the other's days."""
+    directory = heatmap_dir(root)
+    directory.mkdir(parents=True, exist_ok=True)
+    with open(directory / ".build.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
 def build(
     underlying: str,
     root: Path | None = None,
@@ -96,6 +110,19 @@ def build(
 ) -> dict:
     """Add (or with `force` recompute) the grid for every usable collected day in [start, end].
     Returns {"added": days built, "skipped": {day: reason}, "total_days": days in the file}."""
+    root = root or data_dir()
+    with _write_lock(root):
+        return _build(underlying, root, start, end, force, reference)
+
+
+def _build(
+    underlying: str,
+    root: Path,
+    start: date | None,
+    end: date | None,
+    force: bool,
+    reference: ReferenceData | None,
+) -> dict:
     root = root or data_dir()
     reference = reference or default_reference_data()
     days, left_out = backtest_days(root, underlying, start, end)
@@ -132,7 +159,7 @@ def build(
         )
         path = path_for(underlying, root)
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".parquet.tmp")
+        tmp = path.with_suffix(f".parquet.{os.getpid()}.tmp")
         pq.write_table(new, tmp, compression="zstd")
         os.replace(tmp, path)
         total = len(set(new.column("day").to_pylist()))

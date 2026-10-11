@@ -253,3 +253,22 @@ def test_api_routes(root, monkeypatch):
     ):
         r = client.get("/legwise/heatmap", params=bad)
         assert r.status_code == 422 and "error" in r.json()
+
+
+def test_a_mid_month_weekly_is_not_taken_for_a_monthly_expiry(tmp_path, monkeypatch):
+    """Vendor days carry only the contracts collected: for a monthly underlying the nearest
+    expiry can be a mid-month weekly, which must not be graded as a monthly straddle."""
+    from option_backtesting.heatmap import grid as g
+
+    mid = date(2026, 9, 17)  # a Thursday with another Thursday later in September
+    day = DayData(
+        day=date(2026, 9, 14),
+        underlying="BANKNIFTY",
+        spot=flat(50000.0),
+        chain={(mid, 50000.0, "CE"): flat(300.0), (mid, 50000.0, "PE"): flat(280.0)},
+        listed_expiries=[mid],
+        master_lot_size=None,
+    )
+    monkeypatch.setattr(g, "load_day", lambda *_: day)
+    cells, notes = g.day_cells(tmp_path, "BANKNIFTY", day.day)
+    assert cells == [] and "month-end" in notes[0]

@@ -411,39 +411,43 @@ function Controls({
           ariaLabel="Straddle or split"
           size="sm"
         />
-        <fieldset className="flex flex-wrap items-center gap-1.5">
-          <legend className="sr-only">Weeks to expiry</legend>
-          <span className="text-xs text-muted">Weeks to expiry</span>
-          {WEEKS.map((w) => {
-            const on = weeks.includes(w);
-            return (
+        {info?.expiry === 'weekly' ? (
+          <p className="text-xs text-faint">Weekly expiry: every day is in its expiry week.</p>
+        ) : (
+          <fieldset className="flex flex-wrap items-center gap-1.5">
+            <legend className="sr-only">Weeks to expiry</legend>
+            <span className="text-xs text-muted">Weeks to expiry</span>
+            {WEEKS.map((w) => {
+              const on = weeks.includes(w);
+              return (
+                <button
+                  key={w}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() =>
+                    setters.weeks(on ? weeks.filter((x) => x !== w) : [...weeks, w].sort())
+                  }
+                  className={`rounded-full px-2.5 py-0.5 text-xs ring-1 ring-inset ${
+                    on
+                      ? 'bg-primary/15 text-foreground ring-primary/40'
+                      : 'bg-surface-2 text-muted ring-border hover:ring-border-strong'
+                  }`}
+                >
+                  {WEEK_LABEL[w]}
+                </button>
+              );
+            })}
+            {weeks.length > 0 ? (
               <button
-                key={w}
                 type="button"
-                aria-pressed={on}
-                onClick={() =>
-                  setters.weeks(on ? weeks.filter((x) => x !== w) : [...weeks, w].sort())
-                }
-                className={`rounded-full px-2.5 py-0.5 text-xs ring-1 ring-inset ${
-                  on
-                    ? 'bg-primary/15 text-foreground ring-primary/40'
-                    : 'bg-surface-2 text-muted ring-border hover:ring-border-strong'
-                }`}
+                onClick={() => setters.weeks([])}
+                className="text-xs text-muted underline"
               >
-                {WEEK_LABEL[w]}
+                all weeks
               </button>
-            );
-          })}
-          {weeks.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => setters.weeks([])}
-              className="text-xs text-muted underline"
-            >
-              all weeks
-            </button>
-          ) : null}
-        </fieldset>
+            ) : null}
+          </fieldset>
+        )}
       </div>
     </Card>
   );
@@ -486,7 +490,8 @@ function useHeatmapSettings(available: HeatmapAvailable) {
   const exit =
     exitQ && available.exit_times.includes(exitQ) ? exitQ : (available.exit_times[0] ?? '15:30');
   const metric: HeatmapMetric = metricQ === 'pct' ? 'pct' : 'value';
-  const weeks = (weeksQ ?? '')
+  // a weekly index is always in its expiry week, so the filter only means something for monthly
+  const weeks = (info?.expiry === 'weekly' ? '' : (weeksQ ?? ''))
     .split(',')
     .filter(Boolean)
     .map(Number)
@@ -508,7 +513,13 @@ function useHeatmapSettings(available: HeatmapAvailable) {
     split,
     set: {
       view: (v: HeatmapViewKey) => setViewQ(v === 'time_sl' ? null : v),
-      underlying: (u: string) => setUnderlyingQ(u === 'NIFTY' ? null : u),
+      // a new underlying has its own span of days: drop the dates chosen for the old one
+      underlying: (u: string) => {
+        setUnderlyingQ(u === 'NIFTY' ? null : u);
+        setDateQ(null);
+        setFromQ(null);
+        setToQ(null);
+      },
       date: (v: string) => setDateQ(v || null),
       from: (v: string) => setFromQ(v || null),
       to: (v: string) => setToQ(v || null),
