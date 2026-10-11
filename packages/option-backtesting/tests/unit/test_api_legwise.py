@@ -89,18 +89,18 @@ def test_daily_job_runs_the_same_routine_as_obt_daily(client, monkeypatch):
 
     def collect(day, underlyings, **_kwargs):
         calls["collect"] = (day, underlyings)
-        return 3
+        return evening.Collection(3, "fyers")
 
     def refresh(_root, day, underlyings, log):
         calls["refresh"] = (day, underlyings)
         log("refresh ran")
         return daily.DayCheck(["data usable: NIFTY"], problems=False)
 
-    def telegram_summary(*args):
+    def telegram_summary(*args, **_kwargs):
         calls["telegram"] = args
         return "message"
 
-    monkeypatch.setattr(evening, "collect", collect)
+    monkeypatch.setattr(evening, "collect_with_fallback", collect)
     monkeypatch.setattr(evening, "refresh_day", refresh)
     monkeypatch.setattr(evening, "run_day", lambda _day, _root, _files: [])
     monkeypatch.setattr(evening, "telegram_summary", telegram_summary)
@@ -112,8 +112,26 @@ def test_daily_job_runs_the_same_routine_as_obt_daily(client, monkeypatch):
     underlyings = list(legwise_routes.UNDERLYINGS)
     assert calls["collect"] == (date(2026, 9, 29), underlyings)
     assert calls["refresh"] == (date(2026, 9, 29), underlyings)
-    *_, errors, check = calls["telegram"]
-    assert errors == 3 and check.lines == ["data usable: NIFTY"]  # verdicts reach Telegram
+    *_, errors, check, notes = calls["telegram"]
+    assert (
+        notes == [] and errors == 3 and check.lines == ["data usable: NIFTY"]
+    )  # verdicts reach Telegram
     assert legwise_routes._job.state == "done"
     assert "refresh ran" in legwise_routes._job.log
     assert any("data usable: NIFTY" in line for line in legwise_routes._job.log)
+
+
+def test_source_endpoint_lists_angel_one_days_for_the_banner(client, monkeypatch):
+    from option_backtesting.legwise import source as day_source
+
+    today = date.today()
+    fake = {
+        today: day_source.DaySource(today, "angelone", {"NIFTY": {"index_missing_minutes": 14}}),
+        today.replace(day=1): day_source.DaySource(today.replace(day=1), "fyers"),
+    }
+    monkeypatch.setattr(day_source, "day_sources", lambda root, since, until: fake)
+    body = client.get("/legwise/source").json()
+    assert body["attention"] == [today.isoformat()]
+    angel = next(r for r in body["days"] if r["source"] == "angelone")
+    assert angel["lines"] == ["NIFTY: index minutes 15:15-15:28 missing (14)"]
+    assert next(r for r in body["days"] if r["source"] == "fyers")["lines"] == []

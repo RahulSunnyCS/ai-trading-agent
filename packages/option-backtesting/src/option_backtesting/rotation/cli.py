@@ -1,5 +1,5 @@
-"""`obt rotation …`: update | pick | verify | show (BL-058); triggers, triggers-show (BL-083);
-corr, corr-list, corr-pick (BL-090)."""
+"""`obt rotation …`: update | pick | verify | show | readout | base (BL-058); triggers,
+triggers-show (BL-083); corr, corr-list, corr-pick (BL-090)."""
 
 from __future__ import annotations
 
@@ -37,6 +37,16 @@ def update(
         for e in r["errors"][:10]:
             typer.echo(f"  {e}", err=True)
         raise typer.Exit(1)
+    # BL-058 amendment: the owner's fixed base (its Dir ATM 09:24 leg). Isolated like the triggers.
+    try:
+        from . import base as base_mod
+
+        base_mod.score_days(base_mod.pending_days(), log=typer.echo)
+    except Exception as error:  # noqa: BLE001
+        typer.echo(
+            f"base scoring skipped ({type(error).__name__}: {error}); the update is stored",
+            err=True,
+        )
     # BL-083: score the day's intraday triggers. Isolated: a failure here never fails the update.
     try:
         from .triggers import score_pending
@@ -93,6 +103,60 @@ def pick(
                 body=r.text,
             )
         )
+
+
+@rotation_app.command()
+def base(
+    backfill: bool = typer.Option(
+        False, "--backfill", help="Score every day the Widesl leg has and the Dir leg lacks."
+    ),
+    start: str = typer.Option(None, "--from", help="First day to score (with --backfill)."),
+    end: str = typer.Option(None, "--to", help="Last day to score (with --backfill)."),
+) -> None:
+    """The fixed base reference: score its Dir ATM 09:24 leg, or show its series (BL-058)."""
+    from . import base as base_mod
+
+    if backfill:
+        days = base_mod.pending_days()
+        if start:
+            days = [d for d in days if d >= date.fromisoformat(start)]
+        if end:
+            days = [d for d in days if d <= date.fromisoformat(end)]
+        r = base_mod.score_days(days, log=typer.echo)
+        for line in r["skipped"][:10]:
+            typer.echo(f"  skipped {line}", err=True)
+        return
+    series = base_mod.base_per_lot()
+    if not series:
+        typer.echo("no base days yet: run `obt rotation base --backfill`")
+        return
+    vals = list(series.values())
+    typer.echo(
+        f"base: {len(vals)} days {min(series)} .. {max(series)}, "
+        f"₹{sum(vals) / len(vals):,.0f} per lot-day, cumulative per lot ₹{sum(vals):,.0f}"
+    )
+
+
+@rotation_app.command()
+def readout(
+    start: str = typer.Option(None, "--from", help="First forward day."),
+    end: str = typer.Option(None, "--to", help="Last forward day."),
+    as_json: bool = typer.Option(False, "--json", help="The full read-out as JSON."),
+    first: int = typer.Option(
+        None, "--first", help="Only the first N scored sessions (60 = the registered read-out)."
+    ),
+) -> None:
+    """The registered 60-day read-out: per list, against REF, the base and random baskets."""
+    import json
+
+    from . import readout as ro
+
+    r = ro.build(
+        start=date.fromisoformat(start) if start else None,
+        end=date.fromisoformat(end) if end else None,
+        first_n=first,
+    )
+    typer.echo(json.dumps(r, indent=1) if as_json else ro.render(r))
 
 
 @rotation_app.command()

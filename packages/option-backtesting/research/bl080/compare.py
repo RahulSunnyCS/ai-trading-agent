@@ -34,6 +34,9 @@ NEW = ("p40", "p60", "p120", "p200", "ditm1")
 
 def main() -> None:
     flags = [f for f in sys.argv[1:] if f in ("--ext-closest", "--ext-dir")] or ["--ext-closest"]
+    drop = sys.argv[sys.argv.index("--drop") + 1] if "--drop" in sys.argv else ""
+    if drop:
+        flags += ["--drop", drop]
     tag = (
         "".join(f[6:] if f.startswith("--ext-") else f for f in flags)
         .replace("closest", "c")

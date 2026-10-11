@@ -550,7 +550,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     term: 'Fyers token',
     group: 'Data & tools',
     short:
-      'The daily login key for Fyers, the broker this tool uses for market data only. It dies at 06:00 IST every day; a scheduled job logs in again at 08:05.',
+      'The daily login key for Fyers, the broker this tool uses for market data only. It dies at 06:00 IST every day; log in again from the Broker logins page (no job does it for you; the evening run falls back to Angel One without it).',
   },
   {
     id: 'algotest',

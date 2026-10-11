@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react';
 
 import { useCorrelationFilters } from '../../hooks/useCorrelationFilters';
 import { useCorrelation, useCorrelationAvailable } from '../../hooks/useLegwise';
+import { useQueryState } from '../../hooks/useQueryState';
 import {
   ANY,
   MEASURE_LABEL,
@@ -45,8 +46,10 @@ import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StatCard } from '../ui/StatCard';
 import { StateMessage } from '../ui/StateMessage';
+import { CorrelationBasket } from './correlation/CorrelationBasket';
 import { type Cell, CorrelationHeatmap } from './correlation/CorrelationHeatmap';
 import { BasketBuilder, DriftChart, PairCard, StrategyTable } from './correlation/CorrelationParts';
+import { StrategyMultiSelect } from './correlation/StrategyMultiSelect';
 
 const MEASURE_OPTIONS: SegmentedOption<CorrelationMeasure>[] = (
   ['pearson', 'spearman', 'loss'] as const
@@ -89,8 +92,6 @@ function Filters({
   const { filters, setFilters, range, setRange } = state;
   const g = available.groups;
   const variantsOnly = filters.kind !== 'legwise';
-  const chosen = new Set(filters.names);
-  const addable = available.strategies.filter((s) => !chosen.has(s.name) && !s.stale);
   return (
     <Card>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -166,23 +167,12 @@ function Filters({
             aria-label="To date"
           />
         </div>
-        <div className="flex flex-col gap-1 text-xs text-muted sm:col-span-2">
-          Also include
-          <Select
-            value=""
-            onChange={(e) => {
-              if (e.target.value) setFilters({ names: [...filters.names, e.target.value] });
-            }}
-            aria-label="Also include a strategy by name"
-          >
-            <option value="">Add a strategy by name…</option>
-            {addable.map((s) => (
-              <option key={s.name} value={s.name}>
-                {s.name}
-                {s.kind === 'legwise' ? ' (live)' : ''}
-              </option>
-            ))}
-          </Select>
+        <div className="sm:col-span-2">
+          <StrategyMultiSelect
+            options={available.strategies}
+            chosen={filters.names}
+            onChange={(names) => setFilters({ names })}
+          />
         </div>
       </div>
       {filters.names.length > 0 ? (
@@ -339,9 +329,8 @@ function Result({
   );
 }
 
-export function CorrelationPanel() {
+function StrategyPicker({ state }: { state: ReturnType<typeof useCorrelationFilters> }) {
   const available = useCorrelationAvailable();
-  const state = useCorrelationFilters();
   const selectors = buildSelectors(state.filters);
   const result = useCorrelation(selectors, state.range);
 
@@ -398,6 +387,45 @@ export function CorrelationPanel() {
           selectors={selectors}
           range={state.range}
         />
+      )}
+    </div>
+  );
+}
+
+type Mode = 'picker' | 'basket';
+const MODE_OPTIONS: SegmentedOption<Mode>[] = [
+  { value: 'picker', label: 'Pick strategies' },
+  { value: 'basket', label: 'A day’s basket' },
+];
+
+/**
+ * The Correlation tab: the strategy picker, and the "A day's basket" preset that fills it with
+ * one list's picks for one day (or the fixed base). The mode lives in the URL (`?mode=basket`)
+ * with the picker's own filters, so a link lands on the same view.
+ */
+export function CorrelationPanel() {
+  const [modeQ, setModeQ] = useQueryState('mode');
+  const state = useCorrelationFilters();
+  const mode: Mode = modeQ === 'basket' ? 'basket' : 'picker';
+  return (
+    <div className="space-y-5">
+      <SegmentedControl
+        value={mode}
+        options={MODE_OPTIONS}
+        onChange={(m) => setModeQ(m === 'basket' ? 'basket' : null)}
+        ariaLabel="What to compare"
+        size="sm"
+      />
+      {mode === 'basket' ? (
+        <CorrelationBasket
+          onOpenCustom={(names, range) => {
+            state.setFilters({ slot: ANY, family: ANY, index: ANY, kind: ANY, names });
+            state.setRange({ from: range.from ?? null, to: range.to ?? null });
+            setModeQ(null);
+          }}
+        />
+      ) : (
+        <StrategyPicker state={state} />
       )}
     </div>
   );

@@ -82,7 +82,7 @@ History starts in **2016** for the ETF table (a year before the 2017 backtest st
 52-week lookback has data from January 2017) and in **2011** for stocks.
 
 **Fyers login.** Fyers gives a token that dies at the next 06:00 IST regardless of what it
-says. A scheduled job logs in at 08:05 on trading days and stores the token; the code looks for
+says. Nothing logs in for Fyers on a schedule: log in from the dashboard's Broker logins page (or `mbt login`) and the token is stored; the code looks for
 a token in four places in order (the dashboard login, environment variables, a token file,
 a local cache from `mbt login`).
 

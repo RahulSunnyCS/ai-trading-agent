@@ -1,7 +1,9 @@
 """Build the weekly close table for every index in universe.csv.
 
 Price source prefixes in the `price_source` column:
-  NSE:...                      Fyers daily candles (index or ETF symbol)
+  NSE:...                      Fyers daily candles (index or ETF symbol); Angel One's when
+                               there is no valid Fyers token (angelone.resolve_prices), and
+                               the public sources for what Angel One cannot map
   AMFI:<code>                  mutual fund NAV (cash series)
   INDEXFX:<index>:<fx>:<when>  foreign index x FX from Yahoo; <when> is `prev` (use the
                                previous close - US markets) or `same` (Hong Kong)
@@ -26,7 +28,7 @@ from datetime import date
 
 import pandas as pd
 
-from . import fyers
+from . import angelone, fyers
 from .config import DATA_DIR, HISTORY_START, UNIVERSE_CSV
 from .sources import (
     amfi_nav,
@@ -130,15 +132,31 @@ def _signal_daily(inst: Instrument, start: date, end: date, creds) -> pd.DataFra
 
 
 def _etf_daily(inst: Instrument, start: date, end: date, creds) -> tuple[pd.DataFrame, str]:
-    """The ETF's own daily open/close: Fyers when logged in, Yahoo otherwise."""
-    if creds is not None:
+    """The ETF's own daily open/close: Fyers when logged in (Angel One when it stands in and
+    maps the ETF), Yahoo otherwise."""
+    if fyers.serves(creds, inst.etf_source):
         try:
-            return fyers.daily_candles(inst.etf_source, start, end, creds), "fyers"
+            return (
+                fyers.daily_candles(inst.etf_source, start, end, creds),
+                fyers.price_label(creds).lower(),
+            )
         except fyers.FyersCredentialsError:
             raise
         except Exception:  # fall through to Yahoo
             pass
     return yahoo_candles(f"{inst.trade_etf}.NS", start), "yahoo"
+
+
+def _public_signal_daily(inst: Instrument, start: date, end: date) -> pd.DataFrame | None:
+    """An `NSE:` series Angel One cannot map, from the public sources the weekly refresh uses
+    (niftyindices.com for an index with a `backfill` name, Yahoo for an ETF). None when there is
+    no public source - the instrument is then left out, as it is with no broker token."""
+    source = inst.price_source
+    if inst.backfill.startswith("NIFTYINDICES:"):
+        return niftyindices_candles(inst.backfill.removeprefix("NIFTYINDICES:"), start, end)
+    if source.endswith("-EQ"):
+        return yahoo_candles(source[4:-3] + ".NS", start)
+    return None
 
 
 def fetch_etfs(
@@ -184,7 +202,7 @@ def fetch_etfs(
                     extra += f"  ({int(bad.sum())} days dropped: NAV/price units disagree)"
             except Exception as error:
                 extra += f"  (NAV failed: {error})"
-        if intraday and creds is not None:
+        if intraday and fyers.serves(creds, inst.etf_source):
             try:
                 at10 = fyers.price_at(inst.etf_source, max(start, INTRADAY_START), end, creds)
                 at10 = at10 * factors.reindex(at10.index).fillna(1.0)
@@ -214,9 +232,14 @@ def fetch_all(
     """Returns (weekly closes: week x index, coverage per index) and writes both to DATA_DIR,
     plus the daily files trade_prices.py reads (see the module docstring)."""
     start, end = HISTORY_START, date.today()
-    creds = fyers.resolve_credentials() if use_fyers else None
+    # Fyers when its token is valid, else Angel One; raises when neither works (use --no-fyers
+    # for public sources only - they lack most of the index series, so it is never automatic).
+    creds = angelone.resolve_prices() if use_fyers else None
     if creds:
-        log(f"Fyers token from {creds.source}")
+        if fyers.substitute(creds) is not None:
+            log(f"No valid Fyers token ({creds.why_not_fyers}): prices from {creds.source}")
+        else:
+            log(f"Fyers token from {creds.source}")
 
     daily_dir = DATA_DIR / "daily"
     daily_dir.mkdir(parents=True, exist_ok=True)
@@ -227,9 +250,27 @@ def fetch_all(
     for inst in load_universe():
         source = inst.price_source
         try:
-            if source.startswith("NSE:") and creds is None:
-                continue
-            daily = _signal_daily(inst, start, end, creds)
+            if source.startswith("NSE:") and not fyers.serves(creds, source):
+                if creds is None:
+                    continue
+                # Angel One does not map this series: the public source, if there is one.
+                daily = _public_signal_daily(inst, start, end)
+                if daily is None:
+                    log(f"  {inst.name:<24} not on {creds.source}, no public source: skipped")
+                    continue
+            else:
+                try:
+                    daily = _signal_daily(inst, start, end, creds)
+                except fyers.FyersCredentialsError:
+                    raise
+                except Exception as error:
+                    # A mapped series whose Angel One request failed: the public source, if any.
+                    if creds is None or fyers.substitute(creds) is None:
+                        raise
+                    daily = _public_signal_daily(inst, start, end)
+                    if daily is None:
+                        raise
+                    log(f"  {inst.name:<24} {creds.source} failed ({error}): public source")
             if daily is None:  # silver
                 prices, labels = silver_weekly(start)
                 pd.DataFrame({"close": prices, "source": labels}).to_csv(
@@ -272,7 +313,7 @@ def fetch_all(
         _write(daily, daily_dir / f"{inst.name}.csv")
         signal[inst.name] = daily
         columns[inst.name] = weekly(daily["close"])
-        if intraday and creds is not None and source.startswith("NSE:"):
+        if intraday and fyers.serves(creds, source) and source.startswith("NSE:"):
             try:
                 at10 = fyers.price_at(source, max(start, INTRADAY_START), end, creds)
                 _write(at10.rename("price"), DATA_DIR / "intraday" / "index" / f"{inst.name}.csv")

@@ -23,6 +23,8 @@ from rotparse import parse_case_a  # noqa: E402
 CUT = pd.Timestamp("2025-09-01")
 WEIGHTS = {"vix20": "25,15,15,20,0,25", "vix10gap10": "25,15,15,10,10,25"}
 LOOKBACKS = {"fit21-63": "21:50,63:50", "fit63-126": "63:50,126:50"}
+# block 2: VIX weight on the taken set, all on 63:50,126:50 (recent/weekday/dte/vix/gap/family)
+BLOCK2 = {"b2-vix0": "30,20,20,0,0,30", "b2-vix10": "25,20,20,10,0,25", "b2-own40-vix10": "40,20,20,10,0,10"}
 
 
 def mdd(s) -> float:
@@ -67,7 +69,13 @@ def main() -> None:
             runs.append((f"{tag}", base))
             runs.append((f"{tag}_slice", [*base, "--window-from", "2024-10-09"]))
             runs += [(f"{tag}_shuf{s}", [*base, "--shuffle-labels", str(s)]) for s in range(10)]
-    workers = int(sys.argv[1]) if len(sys.argv) > 1 else 4
+    for tag, w in BLOCK2.items():
+        base = ["--weights", w, "--fit-lookbacks", LOOKBACKS["fit63-126"]]
+        runs.append((tag, base))
+        runs.append((f"{tag}_slice", [*base, "--window-from", "2024-10-09"]))
+        if "--no-shuffles" not in sys.argv:
+            runs += [(f"{tag}_shuf{s}", [*base, "--shuffle-labels", str(s)]) for s in range(10)]
+    workers = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else 4
     with ThreadPoolExecutor(workers) as pool:
         rows = list(pool.map(run, runs))
     df = pd.DataFrame(rows)

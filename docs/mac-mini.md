@@ -29,7 +29,7 @@ expired-contract history that cannot be re-downloaded) lives on disk where the j
 ## 3. Install the tools
 Homebrew, then: `bun`, `uv`, `node` (via `fnm`, Node 20 — `packages/contract-notes` and
 `packages/broker-login` need it), `gh`, `qpdf`, Docker or a local PostgreSQL 16 with TimescaleDB if
-you want the trading app and the 08:05 Fyers token store (`DATABASE_URL`, default port 5433).
+you want the trading app and the Fyers token store (`DATABASE_URL`, default port 5433; the dashboard's Fyers login writes it).
 The scheduler finds tools on `~/.bun/bin`, `~/.local/bin` (uv), `~/.local/share/fnm/aliases/default/bin`
 and `/opt/homebrew/bin`; if you install somewhere else, extend `jobPath()` in `apps/scheduler/src/env.ts`.
 
@@ -39,7 +39,7 @@ git clone https://github.com/RahulSunnyCS/ai-trading-agent ~/Projects/ai-trading
 cd ~/Projects/ai-trading-agent && bun install
 (cd packages/momentum-backtesting && uv sync && uv run playwright install chromium)   # NSE stock sync: a real (headed) browser
 (cd packages/option-backtesting && uv sync) && (cd packages/trading-data && uv sync)
-(cd packages/broker-login && node_modules/.bin/playwright install chromium)           # the 08:05 Fyers login
+(cd packages/broker-login && node_modules/.bin/playwright install chromium)           # only for a manual, headed Fyers login run
 ```
 - Copy the repo-root **`.env`** over a channel you trust (it holds the broker, Telegram, Fyers
   and database secrets — never commit it, never paste it into chat). Compare against `.env.example`.
@@ -64,8 +64,7 @@ bun run --filter @ata/scheduler jobs status        # every job, with next run ti
 bun run --filter @ata/scheduler jobs run morning-summary   # sends a real summary to Telegram
 ```
 Dry-run the logins: `DRY_RUN=1 bun run --filter @ata/scheduler jobs run broker-login` only checks
-`gh` and prints the command. Run `jobs run fyers-login` once while watching (it needs `DATABASE_URL`
-reachable). Run the Friday jobs' pieces by hand once: `uv run mbt stocks sync` in a desktop session
+`gh` and prints the command. Run the Friday jobs' pieces by hand once: `uv run mbt stocks sync` in a desktop session
 (the headed browser must open and pass NSE's check — this is the step most likely to need attention).
 
 ## 7. Compare before cutting over

@@ -1,0 +1,32 @@
+# The owner's fixed base, directional leg (BL-058 amendment 2026-10-10, registered before the first
+# entry): the live "Nifty_Dir_924_ITM1_SL21_RECOST_MTMSL_3000" with the strike changed from ITM1 to
+# ATM and nothing else. The base is 2 x Widesl OTM1 09:17 (the rotation variant N_wide_0917, which is
+# the live nifty_widesl_917_otm1 file) + 1 x this strategy, each strategy at 2 lots.
+# Short ATM CE + ATM PE at 09:24, 21% SL per leg; after an SL, re-sell the same strike once if it
+# comes back to the entry price (RE COST x1); ₹3,000 overall max loss.
+# Never edited after the first journal entry: the base must not drift.
+strategy:
+  id: base_n_dir_atm_0924
+  underlying: NIFTY
+  entry_time: "09:24"
+  exit_time: "15:28"
+  square_off: partial
+  legs:
+    - id: ce
+      lots: 1
+      position: sell
+      option_type: CE
+      expiry: weekly
+      strike: { strike_type: ATM }
+      stop_loss: { percent: 21 }
+      reentry_on_sl: { mode: cost, count: 1 }
+    - id: pe
+      lots: 1
+      position: sell
+      option_type: PE
+      expiry: weekly
+      strike: { strike_type: ATM }
+      stop_loss: { percent: 21 }
+      reentry_on_sl: { mode: cost, count: 1 }
+  overall:
+    stop_loss_inr: 3000

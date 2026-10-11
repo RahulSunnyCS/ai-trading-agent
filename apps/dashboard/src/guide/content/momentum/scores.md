@@ -9,6 +9,12 @@ likely to favour, to spot what changed this week, and to sanity-check a signal.
 Nothing; it reads the latest prices in the research database. The card's subtitle says the date
 of those prices and how many stocks were scored.
 
+## What it does not show
+
+The page groups stocks by the long-standing sector list only. A theme added later with a launch date
+(Battery Storage, selectable in Broad from the week of 12 Oct 2026) can be held by a Broad strategy
+without appearing here.
+
 ## Two views: Sectors and Stocks
 
 The switch under the header picks the view; **Sectors** is the default. The address follows
