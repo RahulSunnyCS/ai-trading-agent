@@ -218,6 +218,21 @@ class EveningResult:
     telegram_sent: bool | None  # None when Telegram was not asked for
 
 
+def update_heatmap(root: Path, days: list[date], underlyings: list[str], log: Log) -> None:
+    """BL-094: add the day's straddle-heatmap grid for each index. Isolated like the other
+    side tables: a failure is logged and never fails the evening."""
+    from ..heatmap import grid, store
+
+    for name in underlyings:
+        if not grid.is_index(name):
+            continue
+        try:
+            for d in days:
+                store.build(name, root, d, d)
+        except Exception as error:  # noqa: BLE001 - the heatmap is not the evening's product
+            log(f"heatmap {name}: skipped ({error})")
+
+
 def run_daily(
     day: date,
     underlyings: list[str],
@@ -246,6 +261,7 @@ def run_daily(
         refresh_day(root, repaired_day, underlyings, log=log)
         if repaired_day != day:
             run_day(repaired_day, root, files)
+    update_heatmap(root, [day, *[d for d in collection.repaired if d != day]], underlyings, log)
     history = load_history(root)
     log("")
     log(summary(day, today, history, files, check, collection.notes))

@@ -18,8 +18,8 @@ import {
 } from '../correlationView';
 
 describe('buildSelectors', () => {
-  it('is the 09:17 slot by default', () => {
-    expect(buildSelectors(DEFAULT_FILTERS)).toBe('slot:0917');
+  it('is the three NIFTY 09:17 strategies by default', () => {
+    expect(buildSelectors(DEFAULT_FILTERS)).toBe('N_wide_0917,N_dir_0917,N_buy_0917');
   });
 
   it('ANDs the filters into one group and keeps hand-added names as separate selectors', () => {

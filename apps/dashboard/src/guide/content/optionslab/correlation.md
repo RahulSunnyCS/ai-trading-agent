@@ -8,15 +8,15 @@ look-alikes, and to build a basket whose parts are not.
 
 | Control | What it does |
 |---|---|
-| Start time | The entry slot to compare. The default, 09:17, is the ten rotation variants that start at the open. "Any start time" compares every slot (capped at 80 strategies at once). |
+| Strategies to compare | A tick list of every strategy that has results. The screen opens on three: NIFTY Widesl, Dir and Buy at 09:17. Tick more to add them, or type in the box to narrow the list. |
+| Start time | Adds a whole entry slot on top of the ticked strategies, e.g. every 09:32 variant. "Any start time" adds none (capped at 80 strategies at once). |
 | Family | Widesl, Dir or Buy, or one closest-premium family. "Widesl" includes the closest-premium variants. |
 | Index | NIFTY, SENSEX or both. |
 | Kind | Rotation variants (the 248 files the forward journal scores), live strategies (the saved leg-wise strategies `obt daily` runs), or both. |
 | From, To | Which days to use. Every strategy compared must have a result on a day for it to count. |
-| Also include | Add a strategy by name on top of the filter. |
 | Measure | Which matrix the grid shows: daily P&L, the rank of daily P&L, or loss days. |
 
-The filters combine: start time 09:17 and index NIFTY is the NIFTY strategies that start at 09:17.
+The filters combine: start time 09:17 and index NIFTY adds the NIFTY strategies that start at 09:17, on top of the ticked ones.
 The address bar holds your choices, so a link opens the same comparison.
 
 New strategies appear on their own. A strategy is listed once it has saved days: a new rotation

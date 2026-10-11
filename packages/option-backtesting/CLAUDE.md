@@ -224,6 +224,16 @@ Otherwise:
   As-of is the last COMPLETE session (every variant stored; a part-stored day is reported under `store.partial`
   and left out of windows and rank); the route's snapshot is keyed on the cube object plus the journal's stat, not a TTL.
   Journal figures are those on or before as-of. A stored variant outside the 12 cells is listed in `store.unplaced`.
+- `heatmap/` + `api/heatmap_routes.py` — BL-094, the Options Lab's Heatmap tab (default page): the P&L of an ATM
+  short straddle for every entry time (09:16, then each half hour to 14:45), exit (15:30, 15:15) and per-leg SL
+  (10..100 %). `grid.py` restates the legwise engine's fills for the fixed two-leg shape (a test pins every cell to
+  `simulate_day`); indices take ATM from the index spot, a stock (no spot, no strike step, mostly no lot size in the
+  lake) from put-call parity, so stock P&L is points per share and an index's is rupees per lot at today's lot.
+  NIFTY and SENSEX use the nearest weekly, every other index and stock the monthly. `store.py` keeps one Parquet per
+  underlying under `TRADING_DATA_ROOT/heatmap/` (incremental; a file with an old column layout is rebuilt);
+  `view.py` reads the three views (`time_sl`, `date_time`, `date_sl`), sums a date range, filters weeks to expiry
+  and gives `value` or `pct`-of-premium; `obt heatmap build [-u X | --stocks] [--force] | show | list`;
+  `evening.update_heatmap` adds each index's day inside `obt daily`, isolated.
 - `analytics/correlation.py` — BL-090: Pearson / Spearman of strategies' daily 1-lot P&L, loss-day
   overlap and loss-day correlation, equal-lot basket drawdown against the sum of the parts, rolling
   drift, a leaf order that clusters look-alikes, and `pick_diverse` (a basket under a correlation cap).

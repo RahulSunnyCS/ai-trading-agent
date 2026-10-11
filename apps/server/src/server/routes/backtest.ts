@@ -34,6 +34,8 @@
  *  GET  /api/backtest/legwise/correlation       — how the chosen strategies' daily P&L move together
  *                                                 (matrices, basket drawdown, drift). requireAccess
  *  GET  /api/backtest/legwise/correlation/pick  — a basket under a correlation cap (in-sample).
+ *  GET  /api/backtest/legwise/heatmap/available  — underlyings with a straddle heatmap grid (BL-094).
+ *  GET  /api/backtest/legwise/heatmap            — one view of it: time_sl | date_time | date_sl.
  *  GET  /api/backtest/legwise/rotation/overview — the Rotation page: data health, the latest baskets, the lists.
  *  GET  /api/backtest/legwise/rotation/summary  — the 60-day read-out: lists against REF, the base and random baskets.
  *                                                 requireAccess
@@ -615,6 +617,58 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
           'max_corr',
           'measure',
           'require',
+        ])}`,
+      );
+    },
+  );
+
+  // Straddle heatmap (BL-094): read-only views over the grids `obt heatmap build` stores.
+  fastify.get(
+    '/api/backtest/legwise/heatmap/available',
+    { preHandler: requireAccess },
+    async (_req, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/heatmap/available');
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/heatmap',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            underlying: { type: 'string', pattern: '^[A-Z0-9&-]{1,20}$' },
+            view: { type: 'string', enum: ['time_sl', 'date_time', 'date_sl'] },
+            date: { type: 'string', pattern: DATE_RE },
+            from: { type: 'string', pattern: DATE_RE },
+            to: { type: 'string', pattern: DATE_RE },
+            sl: { type: 'string', pattern: '^\\d{1,3}$' },
+            time: { type: 'string', pattern: '^\\d\\d:\\d\\d$' },
+            exit: { type: 'string', pattern: '^\\d\\d:\\d\\d$' },
+            weeks: { type: 'string', pattern: '^\\d{1,2}(,\\d{1,2}){0,7}$' },
+            metric: { type: 'string', enum: ['value', 'pct'] },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/heatmap${upstreamQuery(q, [
+          'underlying',
+          'view',
+          'date',
+          'from',
+          'to',
+          'sl',
+          'time',
+          'exit',
+          'weeks',
+          'metric',
         ])}`,
       );
     },
