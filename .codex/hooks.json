@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/rahul/Projects/ai-trading-agent/.codex/hooks/merge-guard.py'",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
