@@ -137,23 +137,13 @@ export function Tabs<T extends string>({
                   type="button"
                   role="tab"
                   aria-selected={selected}
-                  aria-controls={panelId}
                   id={triggerId}
                   data-tabs-value={item.value}
                   disabled={item.disabled}
                   title={item.title}
                   tabIndex={selected || (value === null && index === focusIndex) ? 0 : -1}
-                  // Selecting on mouse-down keeps route-backed tabs responsive and preserves the
-                  // old Radix behavior used by callers and tests.
-                  onMouseDown={(event) => {
-                    if (event.button !== 0 || event.ctrlKey || item.disabled) return;
-                    if (onCollapse && selected) {
-                      event.preventDefault();
-                      onCollapse();
-                      return;
-                    }
-                    select(item);
-                  }}
+                  onClick={() => select(item)}
+                  aria-controls={children ? panelId : undefined}
                   onKeyDown={(event) => onKeyDown(event, item)}
                   className={cn(
                     'inline-flex items-center gap-2 whitespace-nowrap text-sm font-medium transition-colors',

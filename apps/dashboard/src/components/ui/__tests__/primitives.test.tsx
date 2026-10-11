@@ -142,14 +142,15 @@ describe('Tabs with onCollapse', () => {
     expect(alpha.getAttribute('aria-selected')).toBe('false');
     expect(screen.queryByText('Panel a')).toBeNull();
 
-    fireEvent.mouseDown(alpha, { button: 0 });
+    fireEvent.click(alpha);
     expect(alpha.getAttribute('aria-selected')).toBe('true');
+    expect(alpha.getAttribute('aria-controls')).toBe('tabs-details-content-a');
     expect(screen.getByText('Panel a')).toBeTruthy();
 
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Bravo' }), { button: 0 });
+    fireEvent.click(screen.getByRole('tab', { name: 'Bravo' }));
     expect(screen.getByText('Panel b')).toBeTruthy();
 
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Bravo' }), { button: 0 });
+    fireEvent.click(screen.getByRole('tab', { name: 'Bravo' }));
     expect(screen.queryByText('Panel b')).toBeNull();
     expect(screen.getByRole('tab', { name: 'Bravo' }).getAttribute('aria-selected')).toBe('false');
   });
@@ -162,5 +163,17 @@ describe('Tabs with onCollapse', () => {
     expect(screen.getByText('Panel a')).toBeTruthy();
     fireEvent.keyDown(screen.getByRole('tab', { name: 'Alpha' }), { key: 'Enter' });
     expect(screen.queryByText('Panel a')).toBeNull();
+  });
+
+  it('does not claim a panel relationship when the caller owns the content', () => {
+    render(
+      <Tabs
+        ariaLabel="Sections"
+        value="a"
+        onChange={() => undefined}
+        items={[{ value: 'a', label: 'Alpha' }]}
+      />,
+    );
+    expect(screen.getByRole('tab', { name: 'Alpha' }).getAttribute('aria-controls')).toBeNull();
   });
 });

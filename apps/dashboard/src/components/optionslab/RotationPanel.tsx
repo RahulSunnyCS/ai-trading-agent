@@ -76,7 +76,7 @@ function rotationView(value: string | null): RotationView {
 export function RotationPanel() {
   const overview = useRotationOverview();
   const summary = useRotationSummary();
-  const [viewParam, setViewParam] = useQueryState('view');
+  const [viewParam, setViewParam] = useQueryState('rotationView');
   const view = rotationView(viewParam);
   const [focus, setFocus] = useState<RotationListKey>('A');
   const [benchmark, setBenchmark] = useState<RotationBenchmark>('base');
