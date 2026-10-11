@@ -3,8 +3,8 @@
 <!--
   The scheduler (BL-012, apps/scheduler): one always-running process that runs every
   recurring job in apps/scheduler/src/jobs.ts, records each run, catches up slots missed
-  while the Mac slept, and alerts on Telegram. Replaces the per-job plists (broker-login,
-  fyers-login and the four Friday momentum jobs).
+  while the Mac slept, and alerts on Telegram. Replaces the per-job plists (broker-login
+  and the four Friday momentum jobs; the Fyers login job was removed, not replaced).
 
   KeepAlive restarts it if it exits; RunAtLoad starts it at login. It parses the repo .env
   itself and sets each job's PATH, so nothing is sourced here.

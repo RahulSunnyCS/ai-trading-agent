@@ -259,7 +259,18 @@ def fetch_all(
                     log(f"  {inst.name:<24} not on {creds.source}, no public source: skipped")
                     continue
             else:
-                daily = _signal_daily(inst, start, end, creds)
+                try:
+                    daily = _signal_daily(inst, start, end, creds)
+                except fyers.FyersCredentialsError:
+                    raise
+                except Exception as error:
+                    # A mapped series whose Angel One request failed: the public source, if any.
+                    if creds is None or fyers.substitute(creds) is None:
+                        raise
+                    daily = _public_signal_daily(inst, start, end)
+                    if daily is None:
+                        raise
+                    log(f"  {inst.name:<24} {creds.source} failed ({error}): public source")
             if daily is None:  # silver
                 prices, labels = silver_weekly(start)
                 pd.DataFrame({"close": prices, "source": labels}).to_csv(

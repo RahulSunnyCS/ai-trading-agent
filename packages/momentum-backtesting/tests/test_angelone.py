@@ -676,3 +676,15 @@ def test_the_json_shape_the_compact_master_keeps_is_small():
         ("exch_seg", "instrumenttype", "name", "symbol", "token")
     }
     json.dumps(rows)
+
+
+def test_daily_ohlcv_goes_to_the_substitute_source():
+    from momentum_backtesting import fyers
+
+    class Alt:
+        substitute_for_fyers = True
+
+        def daily_ohlcv(self, symbol, start, end):
+            return "from-angel"
+
+    assert fyers.daily_ohlcv("NSE:X-EQ", date(2026, 1, 1), date(2026, 1, 2), Alt()) == "from-angel"

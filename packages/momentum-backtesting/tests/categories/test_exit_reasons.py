@@ -115,3 +115,36 @@ def test_rows_that_already_have_a_rank_and_reason_are_left_alone(monkeypatch):
     )
     assert rows[-1]["reason"] == "rank 12 > 10" and rows[-1]["exit_rank"] == 12
     assert "exit_cause" not in rows[-1]
+
+
+def _category_exit_reason(group_members, launches):
+    rows = [
+        {
+            "asset": "CAT",
+            "exit_week": SOLD.strftime("%Y-%m-%d"),
+            "exit_rank": None,
+            "reason": "ineligible",
+        }
+    ]
+    exit_reasons.explain_exits(
+        rows,
+        ranking=_ranking(),
+        held_by_week={DECISION: ["Some other category"]},
+        group_members=group_members,
+        signal_delay=1,
+        pool_exit_rank=268,
+        picks_per_category=2,
+        liquidity_cfg=None,
+        launches=launches,
+    )
+    return rows[0]["reason"]
+
+
+def test_an_exit_before_a_dated_category_launched_never_names_it():
+    """BL-092: a stock with a curated tag and a forward-dated tag, sold before the launch week."""
+    members = {"Sector :: Cats": {"CAT"}, "Theme :: Late": {"CAT"}}
+    before = _category_exit_reason(members, {"Theme :: Late": DECISION + pd.Timedelta(days=7)})
+    assert "Cats" in before and "Late" not in before
+    after = _category_exit_reason(members, {"Theme :: Late": DECISION})
+    assert "Cats" in after and "Late" in after  # the launch week itself counts
+    assert "Late" in _category_exit_reason(members, None)  # no launches: unchanged behaviour

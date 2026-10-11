@@ -100,7 +100,7 @@ class AngelClient:
                 time.sleep(2**attempt)
                 continue
             return payload
-        return {"status": False, "message": "rate limited"}
+        raise AssertionError("unreachable: the last attempt always returns")  # pragma: no cover
 
     @staticmethod
     def _check(payload: dict, what: str) -> None:
@@ -108,7 +108,7 @@ class AngelClient:
             return
         message = str(payload.get("message") or payload)
         code = str(payload.get("errorcode") or "")
-        if code in _AUTH_CODES or "token" in message.lower():
+        if code in _AUTH_CODES or "invalid token" in message.lower():
             raise AngelCredentialsError(f"Angel One rejected the session: {code} {message}"[:200])
         raise RuntimeError(f"{what}: {code} {message}"[:200])
 
@@ -196,4 +196,12 @@ class AngelClient:
         return out
 
     def _underlying_of(self, symbol: str) -> str:
-        return symbol.split(":", 1)[-1].split("2", 1)[0] or "UNKNOWN"
+        from ..fyers.daily import UNDERLYINGS, VIX_NAME, VIX_SYMBOL
+
+        index_names = {s.index_symbol: s.name for s in UNDERLYINGS.values()} | {
+            VIX_SYMBOL: VIX_NAME
+        }
+        if symbol in index_names:
+            return index_names[symbol]
+        name = symbol.split(":", 1)[-1]
+        return name.split("2", 1)[0] or "UNKNOWN"
