@@ -246,7 +246,9 @@ export function RotationPanel() {
               <Card className="py-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-foreground">No scored forward sessions yet</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      No scored forward sessions yet
+                    </p>
                     <p className="mt-0.5 text-sm text-muted">
                       {Object.values(s.pending_reasons)[0] ??
                         (s.late_entries.length > 0
@@ -279,7 +281,8 @@ export function RotationPanel() {
                 />
                 {s.late_entries.length > 0 ? (
                   <p className="mt-3 text-xs text-warning">
-                    Left out as late (recorded after 09:17, not forward): {s.late_entries.join(', ')}.
+                    Left out as late (recorded after 09:17, not forward):{' '}
+                    {s.late_entries.join(', ')}.
                   </p>
                 ) : null}
                 {Object.keys(s.pending_reasons).length > 0 ? (
@@ -296,7 +299,9 @@ export function RotationPanel() {
                 <Card>
                   <CardHeader
                     title={
-                      overview.data.baskets.entry?.day === istToday() ? "Today's baskets" : 'Latest baskets'
+                      overview.data.baskets.entry?.day === istToday()
+                        ? "Today's baskets"
+                        : 'Latest baskets'
                     }
                     description="What each list holds and what changed since the entry before."
                   />
