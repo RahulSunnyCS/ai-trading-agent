@@ -652,10 +652,11 @@ should be re-entered; P2 + P3 first, P1 once the rule is frozen.
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.26.1 | Phase 1: episode census (≥ 25-point rises of the rolling ATM straddle) and the R0 re-entry replay on P2 + P3 | claude | **Done 2026-10-11.** 1,450 episodes on 932 index-days; R0 replayed on 1,318 (counts in the BL-091 Result section); next steps wait for the owner |
-| 3.26.2 | Stage 1a: Widesl (3 stops × 5 re-entry rules) and Directional D1 (3 stops) after a held spike, against a time-matched comparator | claude | **Done 2026-10-11.** No arm passes; every 2025 arm worse than on normal days; R3 (nothing before 13:30) least bad |
+| 3.26.2 | Stage 1a: Widesl (3 stops × 5 re-entry rules) and Directional D1 (3 stops) after a held spike, against a comparator of nearby days with no held spike (not causal: it reads the rest of the day, so spike day vs no-spike day) | claude | **Done 2026-10-11.** No arm passes; every 2025 arm worse than on normal days; R3 (nothing before 13:30) least bad |
 | 3.26.3 | Stage 1b: Directional D2 at support / resistance (rejection and break) | claude | **Done 2026-10-11.** No arm passes; level reactions fire almost at once |
 | 3.26.4 | Stage 2: true vs false tops over 32 parameters; rule R1 through the trading test | claude | **Done 2026-10-11.** IV change separates; R1 does not pass |
-| 3.26.5 | Owner decision: register R3 (or expiry-day spikes) as one question for the held-back year, or close | owner | **Open** |
+| 3.26.5 | Time gates: no re-entry before 13:30 / 14:00 / 14:30 / 14:50, and gating every entry (F) | claude | **Done 2026-10-11 as an unregistered look (13 variants).** F1450 meets the screening bar on P2 + P3 (NIFTY 2025 +₹241 vs comparator, t 2.45); a lead, not a result. Owner's `override:` line owed in the BL-091 Log |
+| 3.26.6 | Owner decision: register R3 or F1450 (counting all 31 arms tried, with a causal comparator) as one question for the held-back year, or close | owner | **Open** |
 
 ## Reference — where detail lives
 

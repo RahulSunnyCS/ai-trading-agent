@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — evidence for the proposed Live premium-momentum view; useful before adding more signal parameters |
-| **Status** | In progress (Phase 1, Stage 1a / 1b and Stage 2 done on P2 + P3; no arm passed; owner to decide the P1 question; P1 unread) |
+| **Status** | In progress (Phase 1, Stage 1a / 1b and Stage 2 done on P2 + P3, plus an unregistered time-gate look; no registered arm passed; F1450 meets the screening bar as a post-hoc lead among 31 Stage 1 arms tried; owner to decide the P1 question; P1 unread) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
 | **Depends on** | BL-034 historical option/index/VIX coverage and quality; BL-083 (T3 as comparator, the straddle builder in `research/bl083/triggers.py`, and the nightly trigger scoring of PR #167 for any forward shadow) |
-| **TODO.md row** | 3.25.1 |
+| **TODO.md row** | 3.26.1–3.26.6 |
 
 ## Context
 
@@ -961,3 +961,33 @@ small decisions taken and logged.
   2025 +₹241 vs comparator, t 2.45; 2022–24 +₹160; mean at ₹20 +₹195; SENSEX +₹349, t 2.46). This
   was one of 13 variants tried after Stage 1a, so it is a lead for a registered P1 test, not a
   result. Table: `research/bl091/out/gates.csv`.
+- 2026-10-11 — PR #174 review, second round (code fixes after the logged numbers; no number below was
+  re-run, so each effect is stated, not measured):
+  - **Comparator is not causal (limitation of the registered design).** Stage 1 / 1b / R1 draw their
+    placebo days from days with no held spike at any time that day, which reads bars after the entry
+    minute. For a short-premium strategy "no spike later today" is close to "theta decayed without a
+    scare", so the placebo mean is biased upward and every event-minus-comparator difference
+    is biased negative. Read the Stage 1a / 1b / R1 verdicts as spike day versus no-spike day, not as a
+    time-matched test; "no arm passes" cannot be read as evidence of harm, and F1450 cleared the bar
+    despite the bias. A P1 registration should use a causal comparator (days with no held spike
+    completed before the entry minute, or the same-day random-minute comparator of E.6). The
+    pre-registered rule above is unchanged.
+  - **Override line still owed.** The time-gate arms (`EXTRA_ARMS`, G1400 / G1430 / G1450 and F1330 …
+    F1450, 13 variants, commit 392c8c0) are outside the Stage 1 "will not run" list and were run on the
+    owner's chat request of 2026-10-11 without an `override: <reason>` line from the owner, which the
+    research gate requires. Owner to add it here. Any P1 registration of F1450 or R3 must count all 31
+    Stage 1 arms tried (18 registered + 13 time gates).
+  - **R1's 2022–24 trade result is in-sample.** R1's thresholds were learned on 2022–24, so the
+    +₹568 / +₹185 against the comparator above is in-sample; only the 2025 line is a check.
+  - **Code fixes that would move a logged number (not re-run):** a missing VIX is no longer filed as
+    `ge13` but `vix_unknown` (`stage1.regime`); a Directional arm's `NO_ENTRY` is no longer counted as
+    held (`stage1.sim_day`, `stage2` label_b; held = ran to exit time or only leg stops hit); Stage 2
+    candidates stop at 15:11 so none enters at 15:13 (Stage 1 forbids it), and R1 no longer counts a
+    15:13-or-later first entry as a traded event worth ₹0. Expected effect: small (events with no VIX
+    or at 15:12 only); a re-run before any P1 registration will state the change.
+  - **Scan start:** `census.show_day` and `selfcheck.truncation` now scan from the first priced minute,
+    as the census does, so the check tests what the census runs. `report_data.py` resolves its folder
+    from `__file__`.
+  - **Limitation, stated:** R0 and every stage fill at the engine's forward-filled closes, including
+    the vendor's zero-volume carried bars, whereas the episode series refuses a leg stale for more than
+    5 minutes (`r0.py` docstring).

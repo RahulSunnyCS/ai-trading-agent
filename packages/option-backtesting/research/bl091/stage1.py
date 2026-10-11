@@ -151,7 +151,10 @@ def sim_day(task: tuple[str, str, list[tuple[str, int]]]) -> list[dict]:
                     dir_strategy(und, minute_label(first), pct, overall), data, ref, SIZING
                 )
                 row = attempt_row(1, first, res)
-                row["outcome"] = "HELD" if classify(res) != "OVERALL_SL" else "OVERALL_SL"
+                # held = ran to the exit time or only leg stops hit; a day with no entry is not held
+                row["outcome"] = (
+                    "HELD" if classify(res) in ("HELD", "LEG_SL_FLAT") else classify(res)
+                )
                 rows = [row]
             out.append(summarise(und, day_s, arm, first, rows))
         except Exception as e:  # noqa: BLE001 -- recorded and re-run next time
@@ -161,6 +164,8 @@ def sim_day(task: tuple[str, str, list[tuple[str, int]]]) -> list[dict]:
 
 
 def regime(v: float, three: bool) -> str:
+    if v != v:  # NaN fails both comparisons below and would be filed as ge13
+        return "vix_unknown"
     if v < 11 and three:
         return "lt11"
     if v < 13:

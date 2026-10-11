@@ -26,7 +26,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 from episodes import scan_episodes
-from periods import M_1512, M_1528, SIZING, assert_learning_day
+from periods import M_1512, M_1513, M_1528, SIZING, assert_learning_day
 from r0 import classify, wide_strategy
 from series import first_priced, level, load_chain_day, rolling_straddle
 from stage1 import CUTS2, category, regime
@@ -148,7 +148,8 @@ def day_work(task) -> list[dict]:
         ep = eps.get(idx)
         if ep is None:
             continue
-        start, end = ep.start_min, min(ep.end_min, M_1512)
+        # a candidate at t enters at t+1, and Stage 1 forbids an entry at 15:13 or later
+        start, end = ep.start_min, min(ep.end_min, M_1512 - 1)
         atm0 = ro.atm[start]
         far = {"far8_ce": (atm0 + 8 * step, "CE"), "far8_pe": (atm0 - 8 * step, "PE"),
                "round_ce": (math.ceil((atm0 + 8 * step) / rnd) * rnd, "CE"),
@@ -175,7 +176,7 @@ def day_work(task) -> list[dict]:
                     label_a = 1
                     break
             res = simulate_day(wide_strategy(und, minute_label(t + 1), 650.0), data, ref, SIZING)
-            label_b = int(classify(res) != "OVERALL_SL")
+            label_b = int(classify(res) in ("HELD", "LEG_SL_FLAT"))  # no entry is not a held trade
             s_t, s_0 = chain.spot[t], chain.spot[start]
             up = None if s_t is None or s_0 is None or s_t == s_0 else s_t > s_0
             d1 = [x[m] - x[m - 1] for m in range(t - 5, t + 1)]
@@ -464,7 +465,7 @@ def r1_day(task) -> list[dict]:
             rows, i = [], 0
             while i < len(ts) and len(rows) < 5:
                 entry = ts[i] + 1
-                if entry >= 358:
+                if entry >= M_1513:
                     break
                 res = simulate_day(wide_strategy(und, minute_label(entry), stop), data, ref, SIZING)
                 row = attempt_row(len(rows) + 1, entry, res)
@@ -472,7 +473,10 @@ def r1_day(task) -> list[dict]:
                 if row["outcome"] != "OVERALL_SL" or row["exit_min"] is None:
                     break
                 i = next((j for j, t in enumerate(ts) if t >= row["exit_min"]), len(ts))
-            r = summarise(und, day_s, f"W{int(stop)}_R1", ts[0] + 1 if ts else -1, rows)
+            first = ts[0] + 1 if ts else -1
+            if first >= M_1513:  # no entry is allowed this late: not traded, not a zero-rupee trade
+                first = -1
+            r = summarise(und, day_s, f"W{int(stop)}_R1", first, rows)
             out.append({**r, "key": key})
     return out
 

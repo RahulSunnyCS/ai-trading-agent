@@ -194,7 +194,7 @@ def show_day(underlying: str, day: date) -> None:
                                          ("M", sp.missing[m])) if on)  # fmt: skip
         print(f"{minute_label(m)} {chain.spot[m]!s:9} {rolling.atm[m]!s:8} {rolling.s[m]!s:9} "
               f"{sp.x[m]:7.2f} {flags}")  # fmt: skip
-    for i, ep in enumerate(scan_episodes(sp.x)):
+    for i, ep in enumerate(scan_episodes(sp.x, start=first_priced(rolling) or 5)):
         print(i, ep)
 
 

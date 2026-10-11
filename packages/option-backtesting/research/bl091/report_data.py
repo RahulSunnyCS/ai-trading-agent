@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-HERE = Path("research/bl091")
+HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from series import level, load_chain_day, rolling_straddle, splice  # noqa: E402
 

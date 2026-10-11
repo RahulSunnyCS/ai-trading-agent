@@ -9,6 +9,12 @@ Attempt 1 enters at the minute after the episode's trigger bar (trigger on bar t
 which fills at bar t's close). After an overall stop at bar m the next attempt enters at m+1, i.e.
 at the price the stop filled at. The ladder ends when an attempt is not overall-stopped, after
 MAX_ATTEMPTS, or when the next entry would be at or after 15:13.
+
+Limitation (PR #174 review): the engine prices from forward-filled closes, including the vendor's
+zero-volume carried bars, whereas the episode series (`series.py`) refuses a leg whose last real
+trade is more than 5 minutes old. A stale OTM strike can therefore be sold at an old close and
+stopped on its first real trade. This is the engine convention shared by every stored result and
+is deliberately not changed here.
 """
 
 from __future__ import annotations

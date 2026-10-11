@@ -22,6 +22,7 @@ from series import (
     FRESH_MINUTES,
     ChainDay,
     _ffill,
+    first_priced,
     level,
     load_chain_day,
     rolling_straddle,
@@ -176,7 +177,8 @@ def truncation(root: Path) -> None:
         ch = load_chain_day(root, und, day)
         r = rolling_straddle(ch)
         sp = level(r)
-        full = scan_episodes(sp.x)
+        first = first_priced(r) or 5
+        full = scan_episodes(sp.x, start=first)
         for T in (120, 200, 300, 373):
             cut = ChainDay(ch.day, ch.underlying, ch.expiry, ch.step,
                            ch.spot[: T + 1] + [ch.spot[T]] * (N_MINUTES - T - 1),
@@ -185,7 +187,7 @@ def truncation(root: Path) -> None:
             sp_cut = level(rolling_straddle(cut))
             if sp_cut.x[: T + 1] != sp.x[: T + 1]:
                 bad.append((und, day, T, "series"))
-            part = scan_episodes(sp.x, end=T)
+            part = scan_episodes(sp.x, start=first, end=T)
             a = [(e.start_min, e.low_x, e.trigger_min, e.rise_at_trigger) for e in part]
             b = [
                 (e.start_min, e.low_x, e.trigger_min, e.rise_at_trigger)
