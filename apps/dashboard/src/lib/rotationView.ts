@@ -207,7 +207,7 @@ export function verdict(summary: RotationSummary, focus: RotationListKey, minDay
   const f = summary.lists[focus];
   const lines: VerdictLine[] = [];
   if (f) {
-    if (f.vs_ref) lines.push({ label: `List ${focus} minus REF`, ...f.vs_ref, rule: null });
+    // The fixed base first: it is what the page compares with by default and it carries the rule.
     lines.push({
       label: `List ${focus} minus the fixed base`,
       mean: f.vs_base.mean,
@@ -215,6 +215,7 @@ export function verdict(summary: RotationSummary, focus: RotationListKey, minDay
       upper: f.vs_base.upper,
       rule: { drawdownNoWorse: f.vs_base.drawdown_no_worse, beats: f.vs_base.beats_base },
     });
+    if (f.vs_ref) lines.push({ label: `List ${focus} minus REF`, ...f.vs_ref, rule: null });
   }
   return { readable: summary.n_days >= minDays, nDays: summary.n_days, minDays, lines };
 }
