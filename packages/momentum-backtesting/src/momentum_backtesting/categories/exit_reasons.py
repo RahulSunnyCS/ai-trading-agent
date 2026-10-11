@@ -68,9 +68,14 @@ def explain_exits(
     pool_exit_rank: int,
     picks_per_category: int,
     liquidity_cfg: liquidity_mod.LiquidityConfig | None,
+    launches: dict[str, pd.Timestamp] | None = None,
 ) -> None:
     """Fill in `exit_rank`, `exit_rank_basis`, `exit_cause` and a specific `reason`, in place, on
-    every closed-trade row that was sold with no rank."""
+    every closed-trade row that was sold with no rank.
+
+    `launches` (BL-092) maps a forward-dated category to its first week: before that week a stock
+    is not described as belonging to it, so an exit years ago never names a theme that did not
+    exist then."""
     columns = set(ranking.global_ranks.columns)
     quarter_ends = _quarter_end_weeks(list(ranking.weeks))
     index = {week: i for i, week in enumerate(ranking.weeks)}
@@ -194,7 +199,11 @@ def explain_exits(
                 now = f" (momentum rank {glob} when sold)" if glob is not None else ""
                 text = f"Dropped from the quarterly momentum pool re-selected {when}: {why}{now}"
         elif held_by_week is not None:
-            own = categories_of.get(symbol, [])
+            own = [
+                cid
+                for cid in categories_of.get(symbol, [])
+                if not launches or cid not in launches or week >= launches[cid]
+            ]
             held = set(held_by_week.get(week, ()))
             if own and not (set(own) & held):
                 cause = "category"

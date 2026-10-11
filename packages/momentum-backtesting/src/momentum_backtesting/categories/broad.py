@@ -101,6 +101,11 @@ STOCK_GROUPS_FILENAME = "stock_groups.csv"
 #: sector/industry classification; see curated/stock_groups_wide_catalog.md). Read only when a run
 #: asks for `category_tags="extended"` -- the default curated-only behaviour is unchanged.
 STOCK_GROUPS_WIDE_FILENAME = "stock_groups_wide.csv"
+#: Forward-dated categories (BL-092): stock_groups.csv's columns plus `launch_date`. A category
+#: here is selectable only for weeks labelled on or after its launch date, so a theme picked in 2026
+#: never ranks in 2017-2025 (BL-010 F2). Read only by the Broad run path (`run_broad_backtest`);
+#: every other reader of stock_groups.csv is unaffected.
+STOCK_GROUPS_DATED_FILENAME = "stock_groups_dated.csv"
 
 #: Defaults -- Step 6's real sweep (TODO.md 3.9.13's own row has the full numbers) found
 #: pool_exit_rank=250 a clean, unambiguous win over the plan's original 300 guess (better CAGR,
@@ -228,7 +233,29 @@ def _read_groups(path: Path, groups: dict[str, set[str]]) -> None:
                 groups.setdefault(cid, set()).add(symbol)
 
 
-def load_stock_groups(curated_dir: Path, extended: bool = False) -> dict[str, set[str]]:
+def load_group_launches(curated_dir: Path) -> dict[str, pd.Timestamp]:
+    """category_id -> launch date, from stock_groups_dated.csv (empty if the file is absent).
+    A category with several rows must give one launch date; two different dates are an error,
+    since "selectable from when" would then depend on row order."""
+    path = curated_dir / STOCK_GROUPS_DATED_FILENAME
+    if not path.exists():
+        return {}
+    launches: dict[str, pd.Timestamp] = {}
+    with path.open(newline="") as f:
+        for row in csv.DictReader(f):
+            cid = f"{row['parent_group']} :: {row['subgroup']}"
+            raw = (row.get("launch_date") or "").strip()
+            if not raw:
+                raise ValueError(f"{path}: {cid} has no launch_date")
+            launch = pd.Timestamp(raw)
+            if launches.setdefault(cid, launch) != launch:
+                raise ValueError(f"{path}: {cid} has more than one launch_date")
+    return launches
+
+
+def load_stock_groups(
+    curated_dir: Path, extended: bool = False, dated: bool = False
+) -> dict[str, set[str]]:
     """category_id ("parent_group :: subgroup") -> member symbols, from stock_groups.csv.
     `parent_group :: subgroup` (not `subgroup` alone) is used as the id so two differently-
     parented subgroups that happen to share a display name can never collide -- verified none
@@ -237,15 +264,26 @@ def load_stock_groups(curated_dir: Path, extended: bool = False) -> dict[str, se
 
     `extended=True` also reads `stock_groups_wide.csv` (tags for stocks outside the 755-name
     Total Market). Rows that name an existing category id add members to it; others make new
-    categories. The default is the curated file only, so every existing result is unchanged."""
+    categories. The default is the curated file only, so every existing result is unchanged.
+
+    `dated=True` also reads `stock_groups_dated.csv` (BL-092). Its categories exist only through
+    the week they launch: pass `load_group_launches` to the selection so earlier weeks never see
+    them. Only the Broad run path asks for this."""
     path = curated_dir / STOCK_GROUPS_FILENAME
     wide = curated_dir / STOCK_GROUPS_WIDE_FILENAME
+    dated_path = curated_dir / STOCK_GROUPS_DATED_FILENAME
     use_wide = extended and wide.exists()
+    use_dated = dated and dated_path.exists()
     if extended and not wide.exists():
         raise FileNotFoundError(
             f"{wide} is missing; build it before using category_tags='extended'"
         )
-    stamp = (str(path), path.stat().st_mtime_ns, wide.stat().st_mtime_ns if use_wide else 0)
+    stamp = (
+        str(path),
+        path.stat().st_mtime_ns,
+        wide.stat().st_mtime_ns if use_wide else 0,
+        dated_path.stat().st_mtime_ns if use_dated else 0,
+    )
     cached = _groups_cache.get(stamp)
     if cached is not None:
         return cached
@@ -253,14 +291,16 @@ def load_stock_groups(curated_dir: Path, extended: bool = False) -> dict[str, se
     _read_groups(path, groups)
     if use_wide:
         _read_groups(wide, groups)
+    if use_dated:
+        _read_groups(dated_path, groups)
     # Same object back on every call until the file changes, so callers must treat it as
     # read-only; it is also what lets `ordered_categories_by_week` recognise repeat calls.
-    # One entry per variant (curated / extended) so alternating between them keeps both cached.
+    # One entry per variant (curated / extended / dated), so alternating keeps every one cached.
     _groups_cache[stamp] = groups
     return groups
 
 
-_groups_cache: dict[tuple[str, int, int], dict[str, set[str]]] = {}
+_groups_cache: dict[tuple[str, int, int, int], dict[str, set[str]]] = {}
 
 
 # ---------------------------------------------------------------------------------------------
@@ -736,6 +776,7 @@ def ordered_categories_by_week(
     group_members: dict[str, set[str]],
     atomic_names: tuple[str, ...],
     coverage_floor: float,
+    launches: dict[str, pd.Timestamp] | None = None,
 ) -> list[list[str]]:
     """For every row of `combined_pool_ranks`, the categories/atomics `score_categories` would
     return, ordered best-first by (score, name) -- the exact input `apply_hysteresis` wants.
@@ -743,8 +784,13 @@ def ordered_categories_by_week(
     Same numbers as calling `score_categories` week by week, computed once as array maths instead
     (the ranks are whole numbers, so the means are exact either way). It depends only on the
     ranking, the groups and `coverage_floor` -- not on top_n/exit_rank -- so a search that varies
-    those reuses it: results are cached against the identity of the inputs."""
-    key = (id(combined_pool_ranks), id(group_members), atomic_names, coverage_floor)
+    those reuses it: results are cached against the identity of the inputs.
+
+    `launches` (BL-092) maps a category id to the first week it may be selected: its score is
+    NaN for every earlier row, so it is never ranked, held or picked before then. A category not
+    in `launches`, and `launches=None`, behave exactly as before."""
+    launch_key = tuple(sorted((launches or {}).items()))
+    key = (id(combined_pool_ranks), id(group_members), atomic_names, coverage_floor, launch_key)
     hit = _order_cache.get(key)
     if hit is not None and hit[0] is combined_pool_ranks and hit[1] is group_members:
         _order_cache.move_to_end(key)
@@ -767,8 +813,11 @@ def ordered_categories_by_week(
         with np.errstate(invalid="ignore", divide="ignore"):
             mean = total / count
             covered = (count / len(members) >= coverage_floor) & (count > 0)
+        score = np.where(covered, mean, np.nan)
+        if launches and cid in launches:
+            score = np.where(combined_pool_ranks.index >= launches[cid], score, np.nan)
         names.append(cid)
-        score_cols.append(np.where(covered, mean, np.nan))
+        score_cols.append(score)
     atomic_scores: dict[str, np.ndarray] = {}
     for name in atomic_names:
         if name in columns:
@@ -919,6 +968,7 @@ def compute_category_selection_mass_exit(
     exit_rank: int = DEFAULT_CATEGORY_EXIT_RANK,
     mass_exit_response: MassExitResponse = "off",
     mass_exit_threshold: float = DEFAULT_MASS_EXIT_THRESHOLD,
+    launches: dict[str, pd.Timestamp] | None = None,
 ) -> CategorySelection:
     """`compute_category_selection`, extended with the TODO.md 3.9.20 mass-exit trigger.
 
@@ -955,7 +1005,7 @@ def compute_category_selection_mass_exit(
     out: dict[pd.Timestamp, list[str]] = {}
     mass_exit_weeks: set[pd.Timestamp] = set()
     all_ordered = ordered_categories_by_week(
-        combined_pool_ranks, group_members, atomic_names, coverage_floor
+        combined_pool_ranks, group_members, atomic_names, coverage_floor, launches
     )
     for w in weeks:
         ordered = all_ordered[combined_pool_ranks.index.get_loc(w)]
@@ -1313,7 +1363,10 @@ def run_broad_backtest(
     held_by_week: dict[pd.Timestamp, list[str]] | None = None
     mass_exit_weeks: frozenset[pd.Timestamp] | None = None
     if category_mode == "on":
-        group_members = load_stock_groups(curated_dir, extended=category_tags == "extended")
+        group_members = load_stock_groups(
+            curated_dir, extended=category_tags == "extended", dated=True
+        )
+        launches = load_group_launches(curated_dir)
         # Categories are scored per symbol and pick per price column: see collapse_segments.
         segments = ranking.column_to_base_symbol
         selection = compute_category_selection_mass_exit(
@@ -1325,6 +1378,7 @@ def run_broad_backtest(
             exit_rank=category_exit_rank,
             mass_exit_response=mass_exit_response,
             mass_exit_threshold=mass_exit_threshold,
+            launches=launches,
         )
         held_by_week = selection.held_by_week
         mass_exit_weeks = selection.mass_exit_weeks

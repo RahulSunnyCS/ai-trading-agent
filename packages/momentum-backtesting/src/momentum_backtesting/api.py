@@ -2239,11 +2239,12 @@ def _broad_parts(
     # all) - a consistent response shape the frontend can rely on regardless of mode.
     group_members = (
         broad.load_stock_groups(
-            CATEGORIES_CURATED_DIR, extended=req.broad_category_tags == "extended"
+            CATEGORIES_CURATED_DIR, extended=req.broad_category_tags == "extended", dated=True
         )
         if on
         else {}
     )
+    launches = broad.load_group_launches(CATEGORIES_CURATED_DIR) if on else {}
     core["held_categories"] = _merge_held_categories(
         [
             broad.current_holdings_detail(
@@ -2278,6 +2279,7 @@ def _broad_parts(
                     pool_exit_rank=req.broad_pool_exit_rank,
                     picks_per_category=req.broad_picks_per_category,
                     liquidity_cfg=_liquidity_config(req),
+                    launches=launches,
                 )
         return rows
 
