@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-10
+Last updated: 2026-10-11
 
 ## Open
 
@@ -81,6 +81,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-090](BL-090-strategy-correlation-and-diverse-baskets.md) | Strategy correlation and diverse baskets: `obt rotation corr` / `corr-pick`, an API route and an Options Lab › Correlation heatmap, dynamic over any strategy with results | P2 | In progress | feature | options |
 | [BL-091](BL-091-straddle-premium-exhaustion-study.md) | Straddle premium exhaustion: historical incremental-value study for the Live widget (derivatives, persistence, retracement, IV, spot activity, nearby strikes) for the proposed Live widget | P2 | Planned | research | options |
 | [BL-092](BL-092-forward-dated-themes-bess.md) | Forward-dated themes: a `launch_date` on category extras so BESS (then the other pending themes) is selectable from next week, never in history | P2 | In progress | feature | momentum |
+| [BL-093](BL-093-rotation-paper-vs-real.md) | Rotation paper versus real: waterfall from the journal through charges, days not placed and changes to the contract-notes P&L (widget 10 of the Rotation workspace) | P2 | Blocked: contract-notes cutover, charge model in the nightly update, placement record in use | feature | options |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
