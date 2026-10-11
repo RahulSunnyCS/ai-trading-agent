@@ -8,7 +8,7 @@
 | **Area** | options / dashboard |
 | **Created** | 2026-10-11 |
 | **Depends on** | BL-058 (the Rotation page and its daily log), BL-055 (the portfolio-stop rule and its numbers) |
-| **TODO.md row** | 3.26 |
+| **TODO.md row** | 3.27 |
 
 ## Context
 
@@ -272,4 +272,4 @@ decision. (Questions 1–7 of 2026-10-11 are answered: see Owner's decisions.)
   request takes ~2 s even after an API restart; `obt rotation portfolio-warm` fills it ahead of the
   first view. Nothing is added to the scheduler (not asked); running it nightly after
   `rotation update` is Phase 5.
-- 2026-10-11 — PR review fixes. Renumbered from BL-092 (taken by forward-dated themes on main) and the TODO row to 3.26. The setting is now in the URL (`pfstop`, `pftrail`) with localStorage as a fallback read after mount; the path cache stamp covers the reference CSVs, symbol master, VIX bars, `SIZING_DATE` and a `CACHE_VERSION`, in one folder per data root, with one replay per key at a time; a cold `/portfolio/days` or `/drawdowns?stop=` answers within 20 s (202 warming / `with_stop_pending`) and the page asks again, so nothing waits past the proxy's 30 s; a list-day whose replay no longer matches the log keeps the log's figure and is counted; `source` on `/portfolio/day` is a filter; `Trail.text()` no longer uses `:g`.
+- 2026-10-11 — PR review fixes. Renumbered from BL-092 (taken by forward-dated themes on main) and the TODO row to 3.27 (3.26 went to BL-091 on main). The setting is now in the URL (`pfstop`, `pftrail`) with localStorage as a fallback read after mount; the path cache stamp covers the reference CSVs, symbol master, VIX bars, `SIZING_DATE` and a `CACHE_VERSION`, in one folder per data root, with one replay per key at a time; a cold `/portfolio/days` or `/drawdowns?stop=` answers within 20 s (202 warming / `with_stop_pending`) and the page asks again, so nothing waits past the proxy's 30 s; a list-day whose replay no longer matches the log keeps the log's figure and is counted; `source` on `/portfolio/day` is a filter; `Trail.text()` no longer uses `:g`.
