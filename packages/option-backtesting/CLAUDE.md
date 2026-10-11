@@ -180,7 +180,7 @@ Otherwise:
   list's own rolling 21-session shares over P1 (no band under 10 windows, nothing flagged under 21 sessions); the
   concentration rows (distinct variants, most-picked, one-start-band days, Widesl-minimum days, Buy days) use the same
   yardstick. Picks, not P&L; descriptive only.
-- `rotation/portfolio.py` — the basket under a portfolio MTM stop (BL-092 Phase 1; no route yet). `apply_book(members, stop_inr, trail)`
+- `rotation/portfolio.py` — the basket under a portfolio MTM stop (BL-092; routes: `GET /legwise/rotation/portfolio/day|days`, `api/rotation_portfolio_routes.py` over `rotation/portfolio_log.py`, proxied at `/api/backtest/legwise/rotation/portfolio/*`; `stop` empty/0/below = none, `trail` = `sl:X,Y` | `lock:A,B` | `locktrail:A,B,X,Y`, malformed = 422; one-lot paths cached per day, pick and lake-file mtime, so the first full-history call takes ~45 s and later ones ~1 s). `apply_book(members, stop_inr, trail)`
   sums each pick's one-lot path (0 before it starts, its MTM, then its gross) times its lots; the first minute the sum is
   at or below the level every pick closes at that minute's close and nothing else enters. `stop_inr` empty, 0 or below is
   no stop. `Trail`: `sl:X,Y` (every X of profit moves the stop Y), `lock:A,B`, `locktrail:A,B,X,Y`; the level never moves

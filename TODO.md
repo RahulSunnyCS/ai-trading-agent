@@ -642,7 +642,7 @@ should show what the book did under it, with a typed amount, trailing modes and 
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.25.1 | Phase 1: `rotation/portfolio.py` — the basket's combined MTM, the stop, Trail SL / Lock profit / Lock and trail | claude | **Built 2026-10-11.** 43 unit tests; reproduces BL-055's 12 totals and drawdowns to the rupee; empty stop equals the log's gross on 80 list-days |
-| 3.25.2 | Phase 2: `GET /legwise/rotation/portfolio/*` and the proxy | claude | Planned |
+| 3.25.2 | Phase 2: `GET /legwise/rotation/portfolio/day` and `/days` and the Fastify proxy | claude | **Built 2026-10-11.** 17 route tests + 10 proxy tests; full history (116 days) 45 s cold, 1.2 s warm |
 | 3.25.3 | Phase 3: the Portfolio stop pop-up, Days table, calendar and "Replay the list" | claude | Planned |
 | 3.25.4 | Phase 4: hero curve, headline and Drawdowns with the stop | claude | Planned |
 

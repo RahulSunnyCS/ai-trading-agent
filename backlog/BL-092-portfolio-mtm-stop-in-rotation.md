@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades the lists with a portfolio stop (about ₹10k on 6 lots); the Rotation log today shows losses that book could not reach |
-| **Status** | In progress (Phase 1 built) |
+| **Status** | In progress (Phases 1–2 built) |
 | **Type** | feature |
 | **Area** | options / dashboard |
 | **Created** | 2026-10-11 |
@@ -227,3 +227,12 @@ decision. (Questions 1–7 of 2026-10-11 are answered: see Owner's decisions.)
   is still to do before any figure is shown. First look at the data, not a result: at ₹10,000 the
   stop fires on 18 of the 80 list-days; Fri 11 Sep 2026 A −₹17,986 → −₹10,361 at 11:14, and Thu
   27 Aug 2026 A −₹890 → −₹10,580 at 15:24 (a stop that cost a day that ended near flat).
+- 2026-10-11 — Phase 2 built: `rotation/portfolio_log.py`, `api/rotation_portfolio_routes.py`
+  (`GET /legwise/rotation/portfolio/day`, `/days`), the Fastify proxy and their tests. `stop`
+  empty / 0 / below is none and a malformed `trail` is a 422. Timing on the real lake, full
+  reconstructed history (116 days, 4 lists): 45 s cold, 1.2 s warm and for any other stop or
+  trail (the cache holds the one-lot paths, 561 of them). First look, not a result: at ₹10,000,
+  list totals with / without the stop over those 116 days — A 227,085 / 231,305 (fired 23 days),
+  B 203,865 / 217,709 (26), C 308,378 / 293,492 (17), REF 221,203 / 216,501 (21), gross,
+  in-sample. The stop cuts A and B and adds to C and REF: it is not free (as BL-055 found).
+  The 45 s first call is why Phase 3 shows a loading state; a warm-up at API start is Phase 5.

@@ -26,6 +26,7 @@ same in every mode: everything closes at the close of the first minute at or bel
 from __future__ import annotations
 
 import math
+import threading
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -220,16 +221,36 @@ def member_from_curve(name: str, lots: int, curve: list[tuple[int, float]], gros
     return Member(name, lots, tuple(path))
 
 
-def book_day(
-    root: Path,
-    day: date,
-    picks: list[tuple[str, int]],
-    stop_inr: float | None,
-    trail: Trail | None = None,
-) -> BookDay:
-    """Replay each pick's strategy file on `day` exactly as the nightly update did (same file,
-    same lot-sizing date) and apply the portfolio stop. `picks` is [(variant name, lots)]. A day
-    any pick cannot be run on raises PortfolioStopError, never a partial book."""
+_cache_lock = threading.Lock()
+_paths: dict[tuple, tuple[float, ...]] = {}  # one-lot paths; a replay costs ~0.1-0.7 s a day
+_PATHS_MAX = 6000  # about 12 distinct picks a day: the whole history is ~1,500
+
+
+def _stamp(root: Path, day: date, name: str) -> tuple:
+    """What the replay of `name` on `day` depends on: its strategy file and the day's lake files
+    (a day repaired from Fyers changes them, so a long-running API never serves the old path)."""
+    from trading_data import lake
+
+    from .variants import strategy_path, underlying_of
+
+    underlying = underlying_of(name)
+    parts: list[int] = []
+    for kind in ("option", "index"):
+        try:
+            parts.append(lake.bars_1m_path(root, kind, underlying, day).stat().st_mtime_ns)
+        except OSError:
+            parts.append(0)
+    try:
+        parts.append(strategy_path(name).stat().st_mtime_ns)
+    except OSError:
+        parts.append(0)
+    return tuple(parts)
+
+
+def one_lot_path(root: Path, day: date, name: str, loaded: dict | None = None) -> tuple[float, ...]:
+    """One variant's one-lot path on `day`, replayed exactly as the nightly update did (same
+    strategy file, same lot-sizing date), and cached. `loaded` shares a day's loaded index data
+    across picks of one call. Raises PortfolioStopError for a day or variant it cannot run."""
     from ..data.reference.loader import MissingReferenceData, default_reference_data
     from ..legwise.engine import simulate_day
     from ..legwise.market import load_day
@@ -237,29 +258,53 @@ def book_day(
     from .lists import SIZING_DATE
     from .variants import strategy_path, underlying_of, variant_names
 
+    if name not in set(variant_names()):  # matched against the enumerated files, never a path
+        raise PortfolioStopError(f"{name!r} is not one of the rotation variants")
+    key = (str(root), day, name, _stamp(root, day, name))
+    with _cache_lock:
+        hit = _paths.get(key)
+    if hit is not None:
+        return hit
+    loaded = loaded if loaded is not None else {}
+    underlying = underlying_of(name)
+    try:
+        if underlying not in loaded:
+            loaded[underlying] = load_day(root, underlying, day)
+        result = simulate_day(
+            load_legwise(strategy_path(name)),
+            loaded[underlying],
+            default_reference_data(),
+            date.fromisoformat(SIZING_DATE),
+        )
+    except FileNotFoundError as error:
+        raise PortfolioStopError(f"no collected {underlying} data for {day}") from error
+    except MissingReferenceData as error:
+        raise PortfolioStopError(f"{name}: reference: {error}") from error
+    path = member_from_curve(name, 1, result.mtm, result.gross).pnl
+    with _cache_lock:
+        if len(_paths) >= _PATHS_MAX:
+            _paths.pop(next(iter(_paths)))
+        _paths[key] = path
+    return path
+
+
+def book_day(
+    root: Path,
+    day: date,
+    picks: list[tuple[str, int]],
+    stop_inr: float | None,
+    trail: Trail | None = None,
+    loaded: dict | None = None,
+) -> BookDay:
+    """Replay each pick on `day` and apply the portfolio stop. `picks` is [(variant, lots)]. A day
+    any pick cannot be run on raises PortfolioStopError, never a partial book."""
     if not picks:
         raise PortfolioStopError("a book needs at least one pick")
-    known = set(variant_names())
-    reference = default_reference_data()
-    sizing = date.fromisoformat(SIZING_DATE)
-    loaded: dict[str, object] = {}
-    members: list[Member] = []
-    for name, lots in picks:
-        if name not in known:  # matched against the enumerated files, never a path
-            raise PortfolioStopError(f"{name!r} is not one of the rotation variants")
-        underlying = underlying_of(name)
-        try:
-            if underlying not in loaded:
-                loaded[underlying] = load_day(root, underlying, day)
-            result = simulate_day(
-                load_legwise(strategy_path(name)),
-                loaded[underlying],  # type: ignore[arg-type]
-                reference,
-                sizing,
-            )
-        except FileNotFoundError as error:
-            raise PortfolioStopError(f"no collected {underlying} data for {day}") from error
-        except MissingReferenceData as error:
-            raise PortfolioStopError(f"{name}: reference: {error}") from error
-        members.append(member_from_curve(name, lots, result.mtm, result.gross))
+    loaded = loaded if loaded is not None else {}
+    members = [Member(n, lots, one_lot_path(root, day, n, loaded)) for n, lots in picks]
     return apply_book(members, stop_inr, trail)
+
+
+def clear_cache() -> None:
+    with _cache_lock:
+        _paths.clear()

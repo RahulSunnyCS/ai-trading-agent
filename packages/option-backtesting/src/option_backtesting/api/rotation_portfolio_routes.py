@@ -1,0 +1,94 @@
+"""`/legwise/rotation/portfolio/*`: what a list's basket did under a portfolio MTM stop (BL-092).
+
+    GET /legwise/rotation/portfolio/day?day=YYYY-MM-DD&list=A|B|C|REF&stop=10000&trail=sl:1000,500
+    GET /legwise/rotation/portfolio/days?from=&to=&source=recorded|reconstructed&stop=&trail=
+
+`stop` empty, missing, 0 or below is no portfolio stop. `trail` is `sl:X,Y`, `lock:A,B` or
+`locktrail:A,B,X,Y`; a malformed one is a 422, never ignored. The maths is `rotation/portfolio.py`
+and the log wiring `rotation/portfolio_log.py`; nothing here writes anything and no stored result
+or registered read-out figure changes.
+"""
+
+from __future__ import annotations
+
+from datetime import date
+from typing import Any
+
+from fastapi import APIRouter, Query
+from fastapi.responses import JSONResponse
+
+from ..rotation import daylog, journal, portfolio_log
+from ..rotation.portfolio import PortfolioStopError, Trail, parse_trail
+
+router = APIRouter(prefix="/legwise/rotation/portfolio")
+
+
+def _error(status: int, message: str) -> JSONResponse:
+    return JSONResponse(status_code=status, content={"error": message})
+
+
+def _settings(stop: str | None, trail: str | None) -> tuple[float | None, Trail | None]:
+    amount: float | None = None
+    if stop is not None and stop.strip() != "":
+        try:
+            amount = float(stop)
+        except ValueError as error:
+            raise PortfolioStopError(f"stop must be a number, got {stop!r}") from error
+        if amount != amount or amount in (float("inf"), float("-inf")):
+            raise PortfolioStopError("stop must be a finite number")
+    return amount, parse_trail(trail)
+
+
+def _day(raw: str | None, label: str) -> date | None:
+    if raw is None or raw == "":
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except ValueError as error:
+        raise PortfolioStopError(f"{label} must be YYYY-MM-DD") from error
+
+
+@router.get("/day")
+def get_day(
+    day: str,
+    list_: str = Query(default="A", alias="list"),
+    stop: str | None = None,
+    trail: str | None = None,
+    source: str = "recorded",
+) -> Any:
+    try:
+        parsed = _day(day, "day")
+        amount, trailing = _settings(stop, trail)
+        if parsed is None:
+            raise PortfolioStopError("day is required, YYYY-MM-DD")
+        return portfolio_log.list_day(parsed, list_, amount, trailing, source)
+    except PortfolioStopError as error:
+        return _error(422, str(error))
+    except portfolio_log.LogBookError as error:
+        return _error(error.status, str(error))
+    except journal.JournalCorrupt as error:
+        return _error(500, f"the journal cannot be read: {error}")
+
+
+@router.get("/days")
+def get_days(
+    from_: str | None = Query(default=None, alias="from"),
+    to: str | None = None,
+    source: str = "recorded",
+    stop: str | None = None,
+    trail: str | None = None,
+) -> Any:
+    if source not in daylog.SOURCES:
+        return _error(422, f"source must be one of {', '.join(daylog.SOURCES)}")
+    try:
+        start, end = _day(from_, "from"), _day(to, "to")
+        amount, trailing = _settings(stop, trail)
+        if start and end and start > end:
+            raise PortfolioStopError("from must not be after to")
+        return portfolio_log.days(start, end, amount, trailing, source)
+    except PortfolioStopError as error:
+        return _error(422, str(error))
+    except portfolio_log.LogBookError as error:
+        return _error(error.status, str(error))
+    except journal.JournalCorrupt as error:
+        return _error(500, f"the journal cannot be read: {error}")
