@@ -658,6 +658,18 @@ should be re-entered; P2 + P3 first, P1 once the rule is frozen.
 | 3.26.5 | Time gates: no re-entry before 13:30 / 14:00 / 14:30 / 14:50, and gating every entry (F) | claude | **Done 2026-10-11 as an unregistered look (13 variants).** F1450 meets the screening bar on P2 + P3 (NIFTY 2025 +₹241 vs comparator, t 2.45); a lead, not a result. Owner's `override:` line owed in the BL-091 Log |
 | 3.26.6 | Owner decision: register R3 or F1450 (counting all 31 arms tried, with a causal comparator) as one question for the held-back year, or close | owner | **Open** |
 
+### 3.27 Portfolio MTM stop on the Rotation page — [BL-095](backlog/BL-095-portfolio-mtm-stop-in-rotation.md)
+
+Owner (2026-10-11): the lists are traded under a portfolio stop (about ₹10k on 6 lots); the Rotation log
+should show what the book did under it, with a typed amount, trailing modes and a list replay.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.27.1 | Phase 1: `rotation/portfolio.py` — the basket's combined MTM, the stop, Trail SL / Lock profit / Lock and trail | claude | **Built 2026-10-11.** 43 unit tests; reproduces BL-055's 12 totals and drawdowns to the rupee; empty stop equals the log's gross on 80 list-days |
+| 3.27.2 | Phase 2: `GET /legwise/rotation/portfolio/day` and `/days` and the Fastify proxy | claude | **Built 2026-10-11.** 17 route tests + 10 proxy tests; full history (116 days) 45 s cold, 1.2 s warm |
+| 3.27.3 | Phase 3: the Portfolio stop pop-up, Days table, calendar and "Replay the list" | claude | **Built 2026-10-11.** Button and pop-up (`ui/Modal`), stopped figures and PF stop flag in the Days table, calendar shading, Replay the list in the day drawer, Guide and glossary |
+| 3.27.4 | Phase 4: hero curve, headline and Drawdowns with the stop | claude | **Built 2026-10-11.** Drawdowns: `/rotation/drawdowns?stop=&trail=` returns `with_stop` and a second line with three figures; headline and hero: `overlaySummary` over the forward days (empty until the first scored session). The read-out, verdict and random baskets stay registered |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

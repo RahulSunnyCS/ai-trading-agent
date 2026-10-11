@@ -15,9 +15,18 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { usePortfolioStop } from '../../hooks/usePortfolioStop';
 import { useRotationLog } from '../../hooks/useRotationDailyLog';
+import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { cn } from '../../lib/cn';
-import { formatDay, istToday } from '../../lib/format';
+import { formatDay, formatInr, istToday } from '../../lib/format';
+import {
+  type PortfolioStopSetting,
+  amountOf,
+  isOn,
+  sameTrail,
+  trailParam,
+} from '../../lib/portfolioStop';
 import {
   FILTER_HELP,
   FILTER_LABEL,
@@ -35,6 +44,7 @@ import {
   monthOf,
   windowRange,
 } from '../../lib/rotationDailyLogView';
+import { hasOverlay, overlayBook, unmatched } from '../../lib/rotationPortfolioView';
 import type { RotationListKey, RotationLog, RotationLogSource } from '../../types/rotationDailyLog';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -44,6 +54,8 @@ import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { Skeleton } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
 import { DayForensics } from './DayForensics';
+import { PortfolioReplay } from './PortfolioReplay';
+import { PortfolioStopButton } from './PortfolioStopButton';
 import { RotationDailyLogCalendar } from './RotationDailyLogCalendar';
 import { RotationDailyLogDrawer } from './RotationDailyLogDrawer';
 import { RotationDailyLogTable } from './RotationDailyLogTable';
@@ -107,8 +119,17 @@ function EmptyJournal({ log, onBrowseHistory }: { log: RotationLog; onBrowseHist
   );
 }
 
-export function RotationDailyLog({ focus: focusProp }: { focus?: RotationListKey } = {}) {
+export function RotationDailyLog({
+  focus: focusProp,
+  portfolio,
+}: {
+  focus?: RotationListKey;
+  /** The page's portfolio stop; used on its own, the widget keeps (and offers) its own. */
+  portfolio?: PortfolioStopSetting;
+} = {}) {
   const today = useMemo(() => istToday(), []);
+  const [ownPortfolio, setOwnPortfolio] = usePortfolioStop();
+  const setting = portfolio ?? ownPortfolio;
   const [source, setSource] = useState<RotationLogSource>('recorded');
   const [windowChoice, setWindowChoice] = useState<WindowChoice>(defaultWindow('recorded'));
   // The page's focus list when it passes one; otherwise this widget's own (A, the owner's default).
@@ -120,9 +141,12 @@ export function RotationDailyLog({ focus: focusProp }: { focus?: RotationListKey
   // One pick's day, replayed from its strategy file: shown above the calendar, drawer closed.
   const [replay, setReplay] = useState<{ variant: string; day: string } | null>(null);
   const replayRef = useRef<HTMLDivElement>(null);
+  // One list's whole basket for a day under the portfolio stop (BL-095).
+  const [listReplay, setListReplay] = useState<{ list: RotationListKey; day: string } | null>(null);
   useEffect(() => {
-    if (replay) replayRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-  }, [replay]);
+    if (replay || listReplay)
+      replayRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }, [replay, listReplay]);
 
   const range = useMemo(
     () => windowRange(windowChoice, today, source),
@@ -133,6 +157,19 @@ export function RotationDailyLog({ focus: focusProp }: { focus?: RotationListKey
   // request is shown, so reconstructed rows never sit under a Recorded label or the reverse.
   const log = res.data !== null && logMatches(res.data, source, range) ? res.data : null;
 
+  // The stopped figures (BL-095). Only an answer to THIS source and setting is laid over the log;
+  // until it lands the log's own figures stay, and the note below says so.
+  const book = useRotationPortfolioDays(source, range, setting);
+  const bookNow =
+    book.data !== null &&
+    book.data.source === (source === 'reconstructed' ? 'reconstructed' : 'recorded') &&
+    book.data.setting?.amount === amountOf(setting) &&
+    sameTrail(book.data.setting?.trail, trailParam(setting)) &&
+    Array.isArray(book.data.rows)
+      ? book.data
+      : null;
+  const pending = isOn(setting) && bookNow === null && book.error === null;
+
   function pickSource(next: RotationLogSource) {
     setSource(next);
     setWindowChoice(defaultWindow(next));
@@ -140,7 +177,7 @@ export function RotationDailyLog({ focus: focusProp }: { focus?: RotationListKey
     setFilter('all');
   }
 
-  const rows = log?.rows ?? [];
+  const rows = useMemo(() => overlayBook(log?.rows ?? [], bookNow), [log, bookNow]);
   const shownMonth = month ?? initialMonth(rows, log?.today ?? today);
   const filtered = useMemo(() => applyFilter(rows, filter, focus), [rows, filter, focus]);
   const counters = log
@@ -181,6 +218,9 @@ export function RotationDailyLog({ focus: focusProp }: { focus?: RotationListKey
               size="sm"
             />
           </div>
+          {portfolio === undefined ? (
+            <PortfolioStopButton setting={setting} onChange={setOwnPortfolio} />
+          ) : null}
           {focusProp === undefined ? (
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted">Shade by list</span>
@@ -242,6 +282,33 @@ export function RotationDailyLog({ focus: focusProp }: { focus?: RotationListKey
               description={`The latest refresh failed: ${res.error}`}
             />
           ) : null}
+          {pending ? (
+            <output className="block rounded-lg border border-border bg-surface-2/60 px-4 py-2.5 text-sm text-muted">
+              Replaying the baskets under the portfolio stop. The log's own figures stay until it is
+              done; the first time over the whole history takes a few minutes.
+            </output>
+          ) : null}
+          {book.error && isOn(setting) && bookNow === null ? (
+            <StateMessage
+              variant="error"
+              title="Could not replay the baskets under the portfolio stop"
+              description={`${book.error}. The log's own figures are shown.`}
+            />
+          ) : null}
+          {bookNow && bookNow.errors.length > 0 ? (
+            <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-2.5 text-xs text-foreground">
+              {bookNow.errors.length} list-day{bookNow.errors.length === 1 ? '' : 's'} could not be
+              replayed (e.g. {bookNow.errors[0]?.day} {bookNow.errors[0]?.list}:{' '}
+              {bookNow.errors[0]?.error}) and show the log's own figure.
+            </div>
+          ) : null}
+          {bookNow && unmatched(bookNow) > 0 ? (
+            <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-2.5 text-xs text-foreground">
+              {unmatched(bookNow)} list-day{unmatched(bookNow) === 1 ? '' : 's'} no longer replay to
+              the logged figure (their bars were repaired after the nightly update) and keep the
+              log's own figure, with no stopped one.
+            </div>
+          ) : null}
           {source === 'reconstructed' ? (
             <div className="rounded-lg border border-border bg-surface-2/60 px-4 py-3 text-sm text-muted">
               <span className="font-medium text-foreground">Reconstructed, not recorded.</span>{' '}
@@ -254,6 +321,19 @@ export function RotationDailyLog({ focus: focusProp }: { focus?: RotationListKey
                   History could not be read: {log.reconstructable.error}
                 </span>
               ) : null}
+            </div>
+          ) : null}
+
+          {listReplay ? (
+            <div ref={replayRef}>
+              <PortfolioReplay
+                key={`${listReplay.list}-${listReplay.day}`}
+                day={listReplay.day}
+                list={listReplay.list}
+                source={source}
+                setting={setting}
+                onClose={() => setListReplay(null)}
+              />
             </div>
           ) : null}
 
@@ -313,11 +393,15 @@ export function RotationDailyLog({ focus: focusProp }: { focus?: RotationListKey
               <Card>
                 <CardHeader
                   title="Days"
-                  description={
+                  description={`${
                     rows.length === filtered.length
                       ? `${rows.length} days, newest first.`
                       : `${filtered.length} of ${rows.length} days, newest first.`
-                  }
+                  }${
+                    hasOverlay(rows)
+                      ? ` With a ${formatInr(amountOf(setting))} portfolio stop applied; the log's own figure is struck through where the stop fired. In-sample, gross.`
+                      : ''
+                  }`}
                   actions={
                     <SegmentedControl
                       value={filter}
@@ -372,7 +456,13 @@ export function RotationDailyLog({ focus: focusProp }: { focus?: RotationListKey
         onChanged={res.refetch}
         onReplay={(variant, day) => {
           setOpenDay(null);
+          setListReplay(null);
           setReplay({ variant, day });
+        }}
+        onReplayList={(list, day) => {
+          setOpenDay(null);
+          setReplay(null);
+          setListReplay({ list, day });
         }}
       />
     </div>

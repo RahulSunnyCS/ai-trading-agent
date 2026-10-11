@@ -14,6 +14,12 @@ rupees per lot. The peak starts at zero, as in the read-out. The dashed line is 
 the same days, drawn from its own peak of zero; it breaks where the base has no result. Shaded and
 numbered stretches are the falls of at least the chosen size.
 
+With a **portfolio stop** applied (the button at the top of the page), the same days are also
+replayed through it and drawn as a second line. Three figures sit above the chart: the worst fall
+without the stop, the worst fall with it, and on how many days the stop closed the book. The
+episode table and the drivers stay on the registered figures; only the chart, those three figures
+and the reading line below it show the stopped series.
+
 ## The controls
 
 | Control | What it does |
@@ -50,4 +56,7 @@ The bars add up to the episode's depth.
   history, so those falls are a description, not a test.
 - **A day that is late, waiting for results, or has no entry is left out** of the series and counted
   in the line above the chart. It neither extends nor ends a fall.
+- **A stopped series is a replay.** It is re-simulated from the strategy files at the minute
+  close, over the same history the weights were chosen on, so it describes what a stop would have
+  done to these falls. A day that cannot be replayed keeps its registered figure and is counted.
 - **Gross.** The stored costs are zero today.

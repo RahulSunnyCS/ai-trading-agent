@@ -41,6 +41,20 @@ changed since the entry before, which is the work list for re-setting AlgoTest b
 with their recent gross per lot-day, the rank the ranking gives each, and where the lists' picks
 fall. See [the Family pulse](guide:optionslab/rotation-pulse).
 
+## The portfolio stop
+
+The **Portfolio stop** button in the run bar applies one stop to the combined P&L of each list's
+basket (10,000 rupees by default; empty or 0 is none; optional trailing: Trail SL, Lock profit,
+Lock and trail). It changes what the **Daily log**, **Drawdown episodes** and, once there are
+forward sessions, the **headline figures and the cumulative chart** show: the baskets are replayed
+minute by minute and closed the first minute the stop is reached. See the
+[Daily log](guide:optionslab/rotation-daily-log) page for how the stop works.
+
+The registered read-out does not move with it. **Beats random baskets**, the **verdict** and its
+intervals always stay on the registered basis, without a portfolio stop, because the pre-registered
+test must not change after the fact. A line above the headline says when the figures shown are the
+stopped ones.
+
 ## How to read it
 
 - **Gross only.** The stored costs are zero. Net figures need the charge model applied first.

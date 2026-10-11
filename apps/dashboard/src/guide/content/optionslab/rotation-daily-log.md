@@ -54,7 +54,7 @@ One 32 px line a day, newest first.
 | DTE N / S | Days to the nearest listed expiry for NIFTY and SENSEX |
 | Recorded | The time the entry was written. After 09:17 it is *late* |
 | A, B, C, REF | Gross per lot-day of the list's basket that day. Hover for the list's total in rupees and its lots. **W** marks that the Widesl minimum replaced a top-ranked Dir; **B** that a Buy strategy qualified and was added |
-| Flags | Late, VIX from Angel One or by hand, days to expiry from the calendar, a stop |
+| Flags | Late, VIX from Angel One or by hand, days to expiry from the calendar, a stop, and **PF stop 11:14** when the portfolio stop closed the basket (below) |
 | Placed | Four dots, A to REF: green placed, amber changed, red not placed, hollow not marked |
 | Status | Scored, Waiting, Late or Not recorded |
 
@@ -71,6 +71,35 @@ One 32 px line a day, newest first.
 | Waiting | At least one pick has none yet. The line says which, or that the nightly update has not run. The list's gross stays blank until all of its picks have one |
 | Late | Recorded after 09:17: shown with its results, but not a forward entry and left out of every forward counter |
 | Not recorded | A trading day from the first registered day with no entry. The reason is in the tooltip (the VIX open could not be read, the job did not run, or the exchange was shut and the holiday list does not have the day) |
+
+## The portfolio stop
+
+The **Portfolio stop** button in the run bar shows the stop that is applied and opens its pop-up.
+It is the stop you trade the lists under: one level on the *combined* P&L of the basket, on top of
+each strategy's own stop. The first minute the basket's mark-to-market reaches the level, every
+pick closes at that minute's close and nothing that has not entered yet enters that day.
+
+| Field | What it does |
+|---|---|
+| Stop loss | Rupees for the whole basket. **10,000 by default.** Empty, 0 or below means no portfolio stop |
+| Trail SL | Every ₹X of profit the basket makes, the stop moves up ₹Y. It never moves down. Needs a stop loss |
+| Lock profit | Once profit reaches ₹A, lock ₹B: the basket closes if it falls back to ₹B. Works with no stop loss |
+| Lock and trail | Lock ₹B once profit reaches ₹A, then every further ₹X of profit raises the level ₹Y |
+
+With a stop set, each list's figure in the table and the calendar is the stopped one, with the
+log's own figure struck through where the stop fired and the minute in the **PF stop** flag. Hover
+for both totals. Days the stop never reached are unchanged.
+
+> [!NOTE]
+> These are replayed figures: gross, at the minute close (a fast day can end past the level),
+> over history the rule and the picks were chosen on. They show what a stop would have done to
+> this log, not a better rule. The recorded entries, the stored results and the registered 60-day
+> read-out are not changed, and the read-out stays without a portfolio stop. A stop can also cost:
+> it closes days that would have recovered.
+
+The first time over the whole history takes a few minutes while the baskets are replayed (`obt rotation portfolio-warm` does it ahead of time); the log's own figures stay on screen until the stopped ones arrive. The setting is in the page's address (`pfstop`, `pftrail`), so a copied link shows the same figures, and this browser remembers the last one you chose.
+
+A day whose bars were repaired after the nightly update (Fyers, after an Angel One day) no longer replays to the figure the log stored. Such a list-day keeps the log's own figure, with no stopped one, and a note says how many there are.
 
 ## Browsing filters
 

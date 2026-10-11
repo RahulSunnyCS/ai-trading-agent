@@ -114,6 +114,15 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       'Every time the premium moves X in the leg’s favour, the stop loss moves Y in the same direction, locking in part of the gain.',
   },
   {
+    id: 'portfolio-stop',
+    term: 'Portfolio stop',
+    group: 'Options',
+    short:
+      'One stop on the combined P&L of a whole basket: the first minute it reaches the level, every pick closes and nothing else enters that day. Separate from each strategy’s own stop.',
+    long: 'On the Rotation page you type the level in rupees (10,000 by default; empty or 0 means none) and can add AlgoTest’s trailing modes: Trail SL (every X of profit moves the stop Y), Lock profit (once profit reaches A, lock B) and Lock and trail. The figures are replayed from the strategy files at the minute close, gross and in-sample; the recorded entries, the stored results and the registered 60-day read-out are not changed.',
+    seeAlso: ['stop-loss', 'trailing-sl'],
+  },
+  {
     id: 're-entry',
     term: 'Re-entry (RE COST, RE ASAP)',
     group: 'Options',

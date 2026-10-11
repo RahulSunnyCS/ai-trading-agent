@@ -21,8 +21,10 @@ from fastapi.testclient import TestClient
 
 from option_backtesting.api import rotation_drawdowns_routes
 from option_backtesting.api.app import create_app
+from option_backtesting.legwise.market import N_MINUTES
 from option_backtesting.rotation import base as base_mod
 from option_backtesting.rotation import daylog, drawdowns, history, readout, store
+from option_backtesting.rotation import portfolio as pf_mod
 
 from . import rotation_synth as syn
 
@@ -251,6 +253,109 @@ def test_the_route_answers_validates_and_writes_nothing(world):
         r = c.get(url)
         assert r.status_code == 422 and "error" in r.json(), url
     assert _fingerprint(root) == before
+
+
+# --- BL-095: the same series through the portfolio stop ---------------------------------------
+
+
+@pytest.fixture
+def dive(monkeypatch):
+    """Every pick replays to a path that dives -4,000 an hour in and ends at its stored gross."""
+
+    def fake(root, day, name, loaded=None):
+        row = daylog._Results(root).row(name, day)
+        gross = 0.0 if row is None else float(row["gross"])
+        out = []
+        for m in range(N_MINUTES):
+            frac = min(m / 60, 1.0)
+            tail = max(0.0, (m - 60) / (N_MINUTES - 1 - 60))
+            out.append(-4000.0 * frac + (gross + 4000.0) * tail)
+        return tuple(out)
+
+    monkeypatch.setattr(pf_mod, "one_lot_path", fake)
+
+
+def test_without_a_portfolio_setting_the_response_has_no_stopped_series(world):
+    root, _ = world
+    out = drawdowns.build("A", "P1", 0.0, root)
+    assert out["with_stop"] is None
+    assert "per_lot_with" not in out["series"][0]
+
+
+def test_a_stop_adds_the_stopped_series_and_leaves_the_registered_one_alone(world, dive):
+    root, _ = world
+    plain = drawdowns.build("A", "P1", 0.0, root)
+    out = drawdowns.build("A", "P1", 0.0, root, portfolio=(10000.0, None))
+    assert out["series"][0]["per_lot"] == plain["series"][0]["per_lot"]
+    assert out["max_dd"] == plain["max_dd"] and out["episodes"] == plain["episodes"]
+    ws = out["with_stop"]
+    assert ws["setting"] == {"amount": 10000.0, "trail": None}
+    assert ws["replay_errors"] == 0 and ws["days_stopped"] > 0
+    # 6 lots each diving 4,000: -24,000 combined, so the stop (-10,000) closes the book at about
+    # -10,000 / 6 per lot, never the registered figure's depth
+    stopped_rows = [r for r in out["series"] if r["stopped"]]
+    assert stopped_rows and all(r["per_lot_with"] > -4000 for r in stopped_rows)
+    cum = np.cumsum([r["per_lot_with"] for r in out["series"]])
+    # the rows are rounded to the paisa a day, so the sums agree to within a rupee
+    assert ws["max_dd"] == pytest.approx(drawdowns.max_drawdown(np.diff(cum, prepend=0)), abs=1.0)
+    assert out["series"][-1]["cum_with"] == pytest.approx(float(cum[-1]), abs=1.0)
+
+
+def test_a_day_that_cannot_be_replayed_keeps_its_registered_figure_and_is_counted(
+    world, monkeypatch
+):
+    root, _ = world
+
+    def broken(root, day, name, loaded=None):
+        raise pf_mod.PortfolioStopError("no collected NIFTY data")
+
+    monkeypatch.setattr(pf_mod, "one_lot_path", broken)
+    out = drawdowns.build("A", "P1", 0.0, root, portfolio=(10000.0, None))
+    assert out["with_stop"]["replay_errors"] == out["n_days"]
+    assert all(r["per_lot_with"] == r["per_lot"] for r in out["series"])
+    assert out["with_stop"]["days_stopped"] == 0
+
+
+def test_the_route_takes_stop_and_trail_and_refuses_a_bad_one(world, dive):
+    c = TestClient(create_app())
+    ok = c.get("/legwise/rotation/drawdowns?list=A&window=P1&stop=10000&trail=sl:1000,500")
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["with_stop"]["setting"] == {"amount": 10000.0, "trail": "sl:1000,500"}
+    off = c.get("/legwise/rotation/drawdowns?list=A&window=P1&stop=0")
+    assert off.status_code == 200 and off.json()["with_stop"] is None
+    for q in ("stop=abc", "trail=nope:1,2", "trail=sl:500,1000"):
+        r = c.get(f"/legwise/rotation/drawdowns?list=A&{q}")
+        assert r.status_code == 422 and "error" in r.json(), q
+
+
+def test_a_slow_replay_returns_the_registered_figures_pending_then_the_stopped_ones(
+    world, monkeypatch
+):
+    """Past the wait the route answers with the registered series and `with_stop_pending`; the
+    replay carries on, and the next ask has the stopped one (BL-095 review, proxy timeout)."""
+    import threading
+
+    from option_backtesting.rotation import warm
+
+    gate = threading.Event()
+
+    def slow(root, day, name, loaded=None):
+        gate.wait(10)
+        return (0.0,) * N_MINUTES
+
+    monkeypatch.setattr(pf_mod, "one_lot_path", slow)
+    monkeypatch.setattr(warm, "WAIT_SECONDS", 0.2)
+    c = TestClient(create_app())
+    url = "/legwise/rotation/drawdowns?list=A&window=P1&stop=10000"
+    first = c.get(url)
+    assert first.status_code == 200, first.text
+    body = first.json()
+    assert body["with_stop"] is None and body["with_stop_pending"] is True
+    assert body["series"] and body["n_days"] > 0  # the registered figures are all there
+    gate.set()
+    monkeypatch.setattr(warm, "WAIT_SECONDS", 20.0)
+    done = c.get(url).json()
+    assert done["with_stop"] is not None and "with_stop_pending" not in done
 
 
 # --- review fixes: crafted log rows -----------------------------------------------------------
