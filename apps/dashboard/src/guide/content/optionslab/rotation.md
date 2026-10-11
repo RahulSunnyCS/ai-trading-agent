@@ -5,6 +5,17 @@ had seen. Each morning at 09:16 the forward journal records the strategies each 
 that day, before anything is known. Each evening the day is scored from the collected data. This
 page reads that journal; it never changes a list, a weight or an entry.
 
+The screen is split into three modes so the daily workflow stays short:
+
+- **Overview** — forward-test status, today's baskets, headline numbers, verdict and cumulative
+  chart. Before the first scored day it shows the next entry instead of reserving a large empty
+  chart area.
+- **Journal** — the recorded or reconstructed day log, with risk review for drawdowns and selection
+  drift.
+- **Research** — optional diagnostics: why a pick was selected, family pulse, rank correlation,
+  market context and shadow experiments. These open as focused sections rather than appearing in
+  one long page.
+
 ## What you see
 
 **Data health.** One line of checks: the latest session stored, how many of the 298 strategies have
@@ -37,9 +48,9 @@ composite score, and how many lists hold it. "Widesl min" marks a list where the
 least two Widesl strategies replaced a higher-ranked Dir pick. The line under the baskets says what
 changed since the entry before, which is the work list for re-setting AlgoTest by hand.
 
-**Family pulse.** Below the baskets: the twelve strategy-kind by start-band cells the ranking pools,
-with their recent gross per lot-day, the rank the ranking gives each, and where the lists' picks
-fall. See [the Family pulse](guide:optionslab/rotation-pulse).
+**Family pulse.** In Research › Decision diagnostics: the twelve strategy-kind by start-band cells
+the ranking pools, with their recent gross per lot-day, the rank the ranking gives each, and where
+the lists' picks fall. See [the Family pulse](guide:optionslab/rotation-pulse).
 
 ## The portfolio stop
 
