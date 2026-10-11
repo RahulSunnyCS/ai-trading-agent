@@ -487,3 +487,39 @@ describe('usePolledResource', () => {
     });
   });
 });
+
+describe('usePolledResource: enabled', () => {
+  let ctl: ReturnType<typeof installControllableFetch>;
+  beforeEach(() => {
+    clearPolledResourceCache();
+    ctl = installControllableFetch();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('fetches nothing while disabled and fetches when it turns on', async () => {
+    const { result, rerender } = renderHook(
+      ({ on }: { on: boolean }) => usePolledResource<{ x: number }>('/api/x', { enabled: on }),
+      { initialProps: { on: false } },
+    );
+    expect(ctl.calls).toHaveLength(0);
+    expect(result.current.data).toBeNull();
+    expect(result.current.loading).toBe(false);
+
+    rerender({ on: true });
+    await waitFor(() => expect(ctl.calls).toHaveLength(1));
+    act(() => ctl.calls[0]!.resolve({ x: 1 }));
+    await waitFor(() => expect(result.current.data).toEqual({ x: 1 }));
+
+    rerender({ on: false });
+    await waitFor(() => expect(result.current.data).toBeNull());
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('refetch does nothing while disabled', () => {
+    const { result } = renderHook(() => usePolledResource('/api/x', { enabled: false }));
+    act(() => result.current.refetch());
+    expect(ctl.calls).toHaveLength(0);
+  });
+});

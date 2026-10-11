@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades the lists with a portfolio stop (about ₹10k on 6 lots); the Rotation log today shows losses that book could not reach |
-| **Status** | In progress (Phases 1–2 built) |
+| **Status** | In progress (Phases 1–2 built; Phase 3 table, calendar and pop-up built) |
 | **Type** | feature |
 | **Area** | options / dashboard |
 | **Created** | 2026-10-11 |
@@ -236,3 +236,14 @@ decision. (Questions 1–7 of 2026-10-11 are answered: see Owner's decisions.)
   B 203,865 / 217,709 (26), C 308,378 / 293,492 (17), REF 221,203 / 216,501 (21), gross,
   in-sample. The stop cuts A and B and adds to C and REF: it is not free (as BL-055 found).
   The 45 s first call is why Phase 3 shows a loading state; a warm-up at API start is Phase 5.
+- 2026-10-11 — Phase 3 first part built. The "Portfolio stop" button sits in the Rotation page's
+  run bar and opens a pop-up (new `ui/Modal`): stop loss (10,000 by default; empty, 0 or below is
+  none) and None / Trail SL / Lock profit / Lock and trail, with a plain-English line and inline
+  checks. One setting drives the Days table (stopped figure per lot-day, the log's own struck
+  through, a "PF stop 11:14" flag, both totals on hover), the calendar shading and the filters,
+  through `overlayBook` so neither component has a second path. `usePolledResource` got an
+  `enabled` option (nothing is fetched while the setting changes nothing). Deviations from the plan,
+  both small: the setting is kept in this browser (localStorage), not in the URL; and the log's
+  own figures stay on screen with a note while the stopped ones are replayed (about 45 s the first
+  time). Still to do in Phase 3: "Replay the list" in the day drawer. Tests: 14 + 5 + 6 + 3 new
+  dashboard tests, 1,620 dashboard tests pass.

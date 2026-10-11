@@ -12,6 +12,7 @@
 
 import { useMemo, useState } from 'react';
 
+import { usePortfolioStop } from '../../hooks/usePortfolioStop';
 import { useRotationOverview, useRotationSummary } from '../../hooks/useRotation';
 import { formatIstTime, istToday } from '../../lib/format';
 import {
@@ -30,6 +31,7 @@ import { RefreshButton } from '../ui/RefreshButton';
 import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
+import { PortfolioStopButton } from './PortfolioStopButton';
 import { RotationDailyLog } from './RotationDailyLog';
 import { RotationDrawdowns } from './RotationDrawdowns';
 import { RotationDrift } from './RotationDrift';
@@ -60,6 +62,8 @@ export function RotationPanel() {
   const [benchmark, setBenchmark] = useState<RotationBenchmark>('REF');
   const [shown, setShown] = useState<ReadonlySet<RotationListKey>>(new Set(['A', 'REF']));
   const [showBase, setShowBase] = useState(true);
+  // BL-092: one portfolio stop for every widget below that shows stopped figures.
+  const [portfolio, setPortfolio] = usePortfolioStop();
 
   const readoutDays = overview.data?.readout_days ?? 60;
   const s = summary.data;
@@ -111,6 +115,7 @@ export function RotationPanel() {
         <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted">
           Forward · gross · 2 lots per strategy
         </span>
+        <PortfolioStopButton setting={portfolio} onChange={setPortfolio} />
         <span className="flex-1" />
         <RefreshButton
           onClick={reload}
@@ -242,7 +247,7 @@ export function RotationPanel() {
       {/* slot:explain */}
       <RotationExplain list={focus} onList={setFocus} />
       {/* slot:daily-log */}
-      <RotationDailyLog focus={focus} />
+      <RotationDailyLog focus={focus} portfolio={portfolio} />
       {/* slot:shadow */}
       <RotationShadowScoreboard />
       {/* slot:regime */}

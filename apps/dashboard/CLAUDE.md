@@ -134,7 +134,15 @@ needs to be shared with the server, it is currently hand-duplicated in
   for the exact bug this fixed (two hooks got stuck on "loading" forever from
   duplicated logic before the extraction). Pass `{ intervalMs }` for polling,
   omit it for fetch-once-with-manual-refresh; `{ cache: true }` is in root
-  `technical.md`.
+  `technical.md`; `{ enabled: false }` fetches nothing (data null, loading false) for a
+  resource that only exists under some setting.
+- The portfolio stop (BL-092): `lib/portfolioStop.ts` is the setting (drafts stay strings; empty,
+  0 or below is none; Trail SL / Lock profit / Lock and trail), `hooks/usePortfolioStop.ts` keeps it
+  in this browser, `hooks/useRotationPortfolio.ts` reads `/rotation/portfolio/days|day`, and
+  `lib/rotationPortfolioView.ts::overlayBook` lays the stopped figures over the log rows so the
+  table and calendar need no second code path. The button and its `ui/Modal` pop-up live in
+  `components/optionslab/PortfolioStop*.tsx`; the Rotation page holds the one setting and passes it
+  down. Only an answer matching the current source and setting is laid over the log.
 - `src/hooks/useNow.ts` — the one ticking clock (`Date | null`, null until mounted). Every caller
   re-renders on each tick, so call a fast one in a small leaf (`components/live/LiveClock.tsx`),
   not at the top of a view.
