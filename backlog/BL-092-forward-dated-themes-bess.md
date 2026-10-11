@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — keeps the owner's own-research themes usable going forward without touching the validated Momentum results (BL-010, BL-001 come first) |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | feature |
 | **Area** | momentum |
 | **Created** | 2026-10-11 |
 | **Depends on** | BL-010 Phase 3 step 3 (launch-dated taxonomy; this is its forward-only slice), BL-024 (forward journal), BL-001 (goldens prove existing output is unchanged) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.9.27 |
 
 ## Context
 
@@ -19,6 +19,15 @@ a 2026-popular theme would be ranked across 2017–2025 (BL-010 finding F2, hind
 
 BL-010 (2026-10-06) and BL-074 already say these themes are "tracked forward only", but nothing in
 `resolve.py` / `compose.py` can express "selectable only from date D".
+
+## Correction found while starting (2026-10-11)
+
+The first plan put `launch_date` on `category_extras.csv`. That file feeds **Custom Index** only
+(`resolve.py`, `compose.py`) and works by year. The live headline, Broad Momentum, takes its
+categories from `curated/stock_groups.csv` (`parent_group :: subgroup`) through
+`broad.load_stock_groups` and scores them week by week in `ordered_categories_by_week`. So the
+launch date lives in a new file, `stock_groups_dated.csv`, read only by the Broad run path.
+`category_extras.csv` and Custom Index are untouched; BESS is not selectable there.
 
 ## Goal
 
@@ -73,5 +82,15 @@ Every existing result is byte-identical (goldens unchanged); no historical week 
 
 ## Log
 
+- 2026-10-11 — owner answers: BESS **selectable in the live signal**; launch **Monday 2026-10-12**
+  (first selectable week: the Friday-labelled week of 2026-10-16); membership left to Claude's
+  recommendation: keep the 16 vetted names, keep Hindalco and Gujarat Fluorochemicals out, hold
+  SHILCTECH / TCPLPACK / SPMLINFRA (tickers confirmed in `stock_groups_wide.csv`) in
+  `pending_themes.csv` as unverified candidates, because their BESS share of revenue is unchecked and
+  this now moves the live signal.
+- 2026-10-11 — Phases 1–2 built: `stock_groups_dated.csv` (16 BESS rows), `load_group_launches`,
+  `load_stock_groups(dated=True)`, `launches` through `ordered_categories_by_week` and
+  `compute_category_selection_mass_exit`; BESS rows moved out of `pending_themes.csv`;
+  `tests/categories/test_dated_groups.py`; Guide and package CLAUDE.md updated.
 - 2026-10-11 — created from the owner's request to add BESS for forward use only; recommended
   option A (launch-date column) chosen by the owner. Questions above still open.

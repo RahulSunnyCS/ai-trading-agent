@@ -551,6 +551,14 @@ contract, not a shared service).
   `failed` with a reason, or `skipped`) and the weekly job skips it (`_broad_parts(..., companion=False)`).
   The dashboard shows it muted under the CAGR; it is the closest figure to an expected return, not a
   point-in-time one (the tags are still today's classification: BL-074).
+- `curated/stock_groups_dated.csv` (BL-092) — forward-dated Broad categories: `stock_groups.csv`'s columns plus
+  `launch_date`. `broad.load_stock_groups(..., dated=True)` merges the rows and `load_group_launches` returns
+  each id's date; `ordered_categories_by_week(..., launches)` scores the category NaN for weeks labelled
+  before it, so it is never ranked, held or picked earlier. Only `run_broad_backtest` asks for it (the
+  Scores page, shuffle test and hold-out read stock_groups.csv alone). A dated id must not equal an
+  existing category id (it would mask that category before launch; `test_dated_groups.py` pins it). A theme
+  gets in here from `pending_themes.csv`, never into `category_extras.csv` (which applies to all years and
+  feeds Custom Index only). A new dated row moves the live signal from its launch week on.
 - `categories/exit_reasons.py` — display-only: for Broad Momentum closed trades the engine records as
   "ineligible" (rank NaN: the stock stopped being selected), fills the blank `exit_rank` (pool rank, else
   momentum rank) and sets a specific `reason` + `exit_cause` (`liquidity` with the failing gate test and its

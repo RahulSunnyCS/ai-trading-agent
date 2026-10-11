@@ -1,16 +1,20 @@
 # Pending themes — set aside, not read by any backtest
 
-`pending_themes.csv` holds five own-research themes added in a session on 2026-10-05:
+`pending_themes.csv` holds own-research themes added in a session on 2026-10-05. **Battery
+Storage (BESS) has moved out** (BL-092, 2026-10-11): its 16 stocks are in `stock_groups_dated.csv`
+with launch date 2026-10-12, selectable in the Broad run from that week and never before. Three more
+BESS candidates (SHILCTECH, TCPLPACK, SPMLINFRA, from an infographic, exposure unverified) wait here
+until someone checks them. Still pending:
 
 | Category | Stocks |
 |---|---|
-| Battery Storage (BESS) | 16 |
 | Semiconductors | 10 |
 | Nuclear Supply Chain | 9 |
 | Optic Fibre | 8 |
 | Data Centre Power & Cooling | 7 |
 
-Each row's note says whether the exposure is real revenue or still order book. Excluded for no
+A theme leaves this file the way BESS did: rows move to `stock_groups_dated.csv` with a launch date
+(no backtest sees it before then). Each row's note says whether the exposure is real revenue or still order book. Excluded for no
 price history in `bars_1d_stock`: ORIANA, BONDADA, MAXVOLT, ATCENERGY (battery storage); ASMTEC,
 SAHASRA (semiconductors); VALIANT, RTL, KDL (optic fibre).
 
