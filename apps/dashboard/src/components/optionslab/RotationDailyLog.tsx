@@ -48,6 +48,7 @@ import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { Skeleton } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
 import { DayForensics } from './DayForensics';
+import { PortfolioReplay } from './PortfolioReplay';
 import { PortfolioStopButton } from './PortfolioStopButton';
 import { RotationDailyLogCalendar } from './RotationDailyLogCalendar';
 import { RotationDailyLogDrawer } from './RotationDailyLogDrawer';
@@ -134,9 +135,12 @@ export function RotationDailyLog({
   // One pick's day, replayed from its strategy file: shown above the calendar, drawer closed.
   const [replay, setReplay] = useState<{ variant: string; day: string } | null>(null);
   const replayRef = useRef<HTMLDivElement>(null);
+  // One list's whole basket for a day under the portfolio stop (BL-092).
+  const [listReplay, setListReplay] = useState<{ list: RotationListKey; day: string } | null>(null);
   useEffect(() => {
-    if (replay) replayRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-  }, [replay]);
+    if (replay || listReplay)
+      replayRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }, [replay, listReplay]);
 
   const range = useMemo(
     () => windowRange(windowChoice, today, source),
@@ -307,6 +311,19 @@ export function RotationDailyLog({
             </div>
           ) : null}
 
+          {listReplay ? (
+            <div ref={replayRef}>
+              <PortfolioReplay
+                key={`${listReplay.list}-${listReplay.day}`}
+                day={listReplay.day}
+                list={listReplay.list}
+                source={source}
+                setting={setting}
+                onClose={() => setListReplay(null)}
+              />
+            </div>
+          ) : null}
+
           {replay ? (
             <div ref={replayRef}>
               <DayForensics
@@ -426,7 +443,13 @@ export function RotationDailyLog({
         onChanged={res.refetch}
         onReplay={(variant, day) => {
           setOpenDay(null);
+          setListReplay(null);
           setReplay({ variant, day });
+        }}
+        onReplayList={(list, day) => {
+          setOpenDay(null);
+          setReplay(null);
+          setListReplay({ list, day });
         }}
       />
     </div>

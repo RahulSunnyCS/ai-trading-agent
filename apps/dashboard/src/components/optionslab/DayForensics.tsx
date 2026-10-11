@@ -34,7 +34,7 @@ const toData = (points: TimedValue[]) =>
   points.map((p) => ({ time: p.ts as UTCTimestamp, value: p.v }));
 
 /** Create/resize/theme a Lightweight chart; returns a ref to the live chart. */
-function useChart(container: React.RefObject<HTMLDivElement>, withLeftScale: boolean) {
+export function useChart(container: React.RefObject<HTMLDivElement>, withLeftScale: boolean) {
   const chartRef = useRef<IChartApi | null>(null);
   const [ready, setReady] = useState(false);
   const theme = useThemeStore((s) => s.theme);

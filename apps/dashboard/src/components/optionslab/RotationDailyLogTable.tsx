@@ -68,18 +68,23 @@ function ListCell({ row, list }: { row: RotationRow; list: RotationListKey }) {
   ].filter((n): n is string => n !== null);
   return (
     <span
-      className={cn('metric', pnlClass(block.per_lot_day))}
+      className={cn(
+        'metric inline-flex flex-col items-end whitespace-nowrap leading-tight',
+        pnlClass(block.per_lot_day),
+      )}
       title={notes.length > 0 ? `${total}\n${notes.join('; ')}` : total}
     >
       {stopped ? (
-        <span className="mr-1 text-[10px] text-faint line-through">
+        <span className="text-[10px] text-faint line-through">
           {formatInr(pf.per_lot_day_without, { sign: true })}
         </span>
       ) : null}
-      {formatInr(block.per_lot_day, { sign: true })}
-      <span className="ml-0.5 inline-block w-4 text-left text-[10px] font-sans text-faint">
-        {block.overridden ? 'W' : ''}
-        {block.buy_qualified ? 'B' : ''}
+      <span>
+        {formatInr(block.per_lot_day, { sign: true })}
+        <span className="ml-0.5 inline-block w-4 text-left text-[10px] font-sans text-faint">
+          {block.overridden ? 'W' : ''}
+          {block.buy_qualified ? 'B' : ''}
+        </span>
       </span>
     </span>
   );

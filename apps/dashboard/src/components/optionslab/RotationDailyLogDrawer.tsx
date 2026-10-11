@@ -83,6 +83,7 @@ function Basket({
   sameAs,
   day,
   onReplay,
+  onReplayList,
 }: {
   listKey: RotationListKey;
   block: RotationListBlock;
@@ -90,6 +91,7 @@ function Basket({
   sameAs: RotationListKey | null;
   day: string;
   onReplay: (variant: string, day: string) => void;
+  onReplayList: (list: RotationListKey, day: string) => void;
 }) {
   return (
     <div className="rounded-lg border border-border p-3">
@@ -98,6 +100,17 @@ function Basket({
           <span className="text-sm font-semibold text-foreground">List {listKey}</span>
           {sameAs ? (
             <span className="ml-2 text-xs text-faint">same strategies as {sameAs}</span>
+          ) : null}
+          {block.scored ? (
+            <button
+              type="button"
+              onClick={() => onReplayList(listKey, day)}
+              className="ml-2 rounded px-1 text-[11px] font-medium text-primary hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={`Replay list ${listKey} on ${formatDay(day)} as one basket`}
+              title="Replay the whole basket minute by minute, with the portfolio stop"
+            >
+              Replay the list
+            </button>
           ) : null}
         </div>
         <div className="text-right">
@@ -313,11 +326,13 @@ function DayBody({
   d,
   onChanged,
   onReplay,
+  onReplayList,
   refreshError,
 }: {
   d: RotationDay;
   onChanged: () => void;
   onReplay: (variant: string, day: string) => void;
+  onReplayList: (list: RotationListKey, day: string) => void;
   /** The latest re-read of the day failed: what is shown is from before it. */
   refreshError: string | null;
 }) {
@@ -376,6 +391,7 @@ function DayBody({
                   sameAs={sameAs(k)}
                   day={d.day}
                   onReplay={onReplay}
+                  onReplayList={onReplayList}
                 />
               );
             })}
@@ -522,12 +538,15 @@ export function RotationDailyLogDrawer({
   onClose,
   onChanged,
   onReplay,
+  onReplayList,
 }: {
   day: string | null;
   onClose: () => void;
   onChanged: () => void;
   /** Open one pick's day in Day forensics (the caller closes the drawer and shows it). */
   onReplay: (variant: string, day: string) => void;
+  /** Open one list's whole basket for the day under the portfolio stop (the caller closes the drawer). */
+  onReplayList: (list: RotationListKey, day: string) => void;
 }) {
   return (
     <Drawer
@@ -538,7 +557,15 @@ export function RotationDailyLogDrawer({
       title={day ? formatDay(day) : 'Day'}
       subtitle="Rotation daily log"
     >
-      {day ? <DayLoader key={day} day={day} onChanged={onChanged} onReplay={onReplay} /> : null}
+      {day ? (
+        <DayLoader
+          key={day}
+          day={day}
+          onChanged={onChanged}
+          onReplay={onReplay}
+          onReplayList={onReplayList}
+        />
+      ) : null}
     </Drawer>
   );
 }
@@ -547,10 +574,12 @@ function DayLoader({
   day,
   onChanged,
   onReplay,
+  onReplayList,
 }: {
   day: string;
   onChanged: () => void;
   onReplay: (variant: string, day: string) => void;
+  onReplayList: (list: RotationListKey, day: string) => void;
 }) {
   const res = useRotationDay(day);
   if (res.error && !res.data) {
@@ -577,6 +606,7 @@ function DayLoader({
       d={res.data}
       refreshError={res.error}
       onReplay={onReplay}
+      onReplayList={onReplayList}
       onChanged={() => {
         res.refetch();
         onChanged();

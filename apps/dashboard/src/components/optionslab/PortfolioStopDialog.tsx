@@ -130,7 +130,7 @@ export function PortfolioStopDialog({
       </p>
 
       <div className="space-y-2 pt-1">
-        <span className="text-xs text-muted">Trailing</span>
+        <span className="block text-xs text-muted">Trailing</span>
         <SegmentedControl
           value={draft.mode}
           options={MODE_OPTIONS}
