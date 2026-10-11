@@ -281,3 +281,36 @@ def test_a_whole_day_goes_through_the_shared_collector(tmp_path, monkeypatch):
         [(source, status)] = con.execute("SELECT source, status FROM ingest_runs").fetchall()
     assert source == "angelone" and status in ("ok", "partial")
     assert (root / "raw" / "angelone").exists()
+
+
+def test_a_spaced_totp_secret_pads_from_the_cleaned_string():
+    # 16 base32 chars once spaces go; the raw length (19) used to add 5 stray "=".
+    assert auth.totp_now("JBSW Y3DP EHPK 3PXP", at=59) == auth.totp_now("JBSWY3DPEHPK3PXP", at=59)
+
+
+def test_a_network_failure_at_login_is_not_reported_as_a_credentials_problem():
+    def post(path, body, headers):
+        return 0, {"status": False, "message": "network: timed out"}
+
+    with pytest.raises(auth.AngelNetworkError, match="could not be reached"):
+        auth.login(CREDS, post=post, now=lambda: 10)
+
+
+def test_a_bad_symboltoken_answer_does_not_stop_the_day():
+    def post(path, body, headers):
+        return 200, {"status": False, "errorcode": "AB1004", "message": "Invalid symboltoken"}
+
+    c = AngelClient(
+        auth.Session("jwt", "key"), min_interval_s=0, post=post, master_loader=lambda: MASTER
+    )
+    c.bind_contracts(CONTRACTS, [daily.UNDERLYINGS["NIFTY"]])
+    with pytest.raises(RuntimeError) as err:
+        c.minute_candles("NSE:NIFTY50-INDEX", DAY)
+    assert not isinstance(err.value, FyersCredentialsError)
+
+
+def test_an_unmapped_index_is_keyed_by_its_underlying_in_the_flags():
+    c = client_for(FakeSmartApi({}))
+    c.targets = {}
+    c.minute_candles("NSE:NIFTY50-INDEX", DAY)
+    assert c.flags["NIFTY"]["unmapped"] == 1

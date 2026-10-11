@@ -420,6 +420,9 @@ def daily_ohlcv(symbol: str, start: date, end: date, creds: Credentials) -> pd.D
     `daily_candles` (open+close only), this keeps the full bar — used by
     `stocks/fyers_topup.py`'s Total Market top-up, which writes real `bars_1d_stock`
     rows (not a flat synthetic bar) when NSE's own bhavcopy is unreachable."""
+    alt = substitute(creds)
+    if alt is not None:
+        return alt.daily_ohlcv(symbol, start, end)
     by_day = {
         _ist(epoch).date(): (float(open_), float(high), float(low), float(close), float(volume))
         for epoch, open_, high, low, close, volume in _candles(

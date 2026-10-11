@@ -130,13 +130,9 @@ def collect_with_fallback(
     A Fyers token that is missing, expired or rejected raises FyersCredentialsError before any
     bar is written, and the same day is then collected from Angel One. When Fyers does work, any
     recent day that came from Angel One is repaired from it (`repair_from_fyers`)."""
-    from ..angelone.auth import AngelCredentialsError
-
     common = {"premium_floor": premium_floor, "max_extra": max_extra, "log": log}
     try:
         errors, details = collect_detailed(day, underlyings, force=force, source="fyers", **common)
-    except AngelCredentialsError:
-        raise
     except FyersCredentialsError as error:
         reason = str(error)[:160]
         log(f"Fyers is not available ({reason}); collecting from Angel One instead")
@@ -158,7 +154,11 @@ def collect_with_fallback(
         **{k: common[k] for k in ("premium_floor", "max_extra")},
     )
     notes = (
-        [f"Repaired from Fyers: {', '.join(f'{d:%a %d %b}' for d in repaired)}."]
+        [
+            f"Repaired from Fyers: {', '.join(f'{d:%a %d %b}' for d in repaired)}.",
+            "Rotation results already stored for those days are not re-scored; they still come "
+            "from the Angel One bars.",
+        ]
         if repaired
         else []
     )

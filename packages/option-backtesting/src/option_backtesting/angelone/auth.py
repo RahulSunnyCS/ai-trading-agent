@@ -35,6 +35,11 @@ class AngelCredentialsError(FyersCredentialsError):
     instead of logging the same error for every contract."""
 
 
+class AngelNetworkError(AngelCredentialsError):
+    """Angel One could not be reached (no route, timeout). Still stops the run, but is reported
+    as a connection problem, not as a login to fix."""
+
+
 @dataclass(frozen=True)
 class AngelCredentials:
     client_code: str
@@ -69,9 +74,8 @@ def load_credentials(env: Mapping[str, str] | None = None) -> AngelCredentials:
 
 def totp_now(secret: str, at: float | None = None) -> str:
     """RFC 6238, SHA-1, 30 s, 6 digits (the same code Google Authenticator shows)."""
-    key = base64.b32decode(
-        secret.replace(" ", "").replace("-", "").upper() + "=" * (-len(secret) % 8)
-    )
+    cleaned = secret.replace(" ", "").replace("-", "").upper()
+    key = base64.b32decode(cleaned + "=" * (-len(cleaned) % 8))
     counter = struct.pack(">Q", int((time.time() if at is None else at) // 30))
     digest = hmac.new(key, counter, hashlib.sha1).digest()
     offset = digest[-1] & 15
@@ -124,7 +128,7 @@ def login(
         {
             "clientcode": creds.client_code,
             "password": creds.pin,
-            "totp": totp_now(creds.totp_secret),
+            "totp": totp_now(creds.totp_secret, now()),
         },
         request_headers(creds.api_key, creds.public_ip),
     )
@@ -132,6 +136,8 @@ def login(
     if not jwt:
         detail = _scrub(str(body.get("message") or f"HTTP {status}"), creds)
         code = body.get("errorcode") or ""
+        if status == 0:
+            raise AngelNetworkError(f"Angel One could not be reached: {detail}")
         raise AngelCredentialsError(f"Angel One login failed: {code} {detail}".strip())
     return Session(jwt=jwt, api_key=creds.api_key, public_ip=creds.public_ip)
 
