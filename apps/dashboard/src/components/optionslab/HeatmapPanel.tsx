@@ -11,19 +11,21 @@
  * Everything is a historical replay with no costs or slippage: a description, not a forecast.
  */
 
-import { RefreshCw } from 'lucide-react';
+import { Download, RefreshCw } from 'lucide-react';
 import { useMemo } from 'react';
 
 import { type HeatmapParams, useHeatmap, useHeatmapAvailable } from '../../hooks/useHeatmap';
 import { useQueryState } from '../../hooks/useQueryState';
 import { formatDay, formatInt } from '../../lib/format';
 import {
+  ALL_STOCKS,
   VIEW_LABEL,
   WEEK_LABEL,
   cellClass,
   formatCell,
   maxAbsOf,
   metricLabel,
+  toCsv,
   unitNote,
 } from '../../lib/heatmapView';
 import type {
@@ -58,6 +60,18 @@ const SPLIT_OPTIONS: SegmentedOption<Split>[] = [
 ];
 
 const WEEKS = [0, 1, 2, 3, 4] as const;
+
+function downloadCsv(r: HeatmapResponse, split: boolean) {
+  const blob = new Blob([toCsv(r, split)], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `heatmap-${r.underlying}-${r.view}-${r.exit_time.replace(':', '')}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 function addDays(day: string, delta: number): string {
   const d = new Date(`${day}T00:00:00Z`);
@@ -246,7 +260,10 @@ function Controls({
 }) {
   const { view, underlying, date, from, to, sl, time, exit, metric, weeks, info } = current;
   const indices = available.underlyings.filter((u) => u.kind === 'index');
-  const stocks = available.underlyings.filter((u) => u.kind === 'stock');
+  const stocks = available.underlyings.filter(
+    (u) => u.kind === 'stock' && u.underlying !== ALL_STOCKS,
+  );
+  const hasPool = available.underlyings.some((u) => u.underlying === ALL_STOCKS);
   const indexOptions: SegmentedOption<string>[] = indices.map((u) => ({
     value: u.underlying,
     label: u.underlying,
@@ -367,11 +384,16 @@ function Controls({
         <div className="flex flex-col gap-1 text-xs text-muted">
           Stock (monthly expiry)
           <Select
-            value={stocks.some((u) => u.underlying === underlying) ? underlying : ''}
+            value={
+              underlying === ALL_STOCKS || stocks.some((u) => u.underlying === underlying)
+                ? underlying
+                : ''
+            }
             onChange={(e) => e.target.value && setters.underlying(e.target.value)}
             aria-label="Stock"
           >
             <option value="">Pick a stock…</option>
+            {hasPool ? <option value={ALL_STOCKS}>All F&O stocks (% of premium)</option> : null}
             {stocks.map((u) => (
               <option key={u.underlying} value={u.underlying}>
                 {u.underlying}
@@ -399,7 +421,10 @@ function Controls({
       <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3">
         <SegmentedControl
           value={metric}
-          options={METRIC_OPTIONS}
+          options={METRIC_OPTIONS.map((o) => ({
+            ...o,
+            disabled: underlying === ALL_STOCKS && o.value === 'value',
+          }))}
           onChange={setters.metric}
           ariaLabel="Metric"
           size="sm"
@@ -489,7 +514,8 @@ function useHeatmapSettings(available: HeatmapAvailable) {
   const time = timeQ && available.times.includes(timeQ) ? timeQ : (available.times[0] ?? '09:16');
   const exit =
     exitQ && available.exit_times.includes(exitQ) ? exitQ : (available.exit_times[0] ?? '15:30');
-  const metric: HeatmapMetric = metricQ === 'pct' ? 'pct' : 'value';
+  // points per share cannot be added across stocks, so the pooled view is always % of premium
+  const metric: HeatmapMetric = metricQ === 'pct' || underlying === ALL_STOCKS ? 'pct' : 'value';
   // a weekly index is always in its expiry week, so the filter only means something for monthly
   const weeks = (info?.expiry === 'weekly' ? '' : (weeksQ ?? ''))
     .split(',')
@@ -551,19 +577,31 @@ function Result({ params, split }: { params: HeatmapParams; split: boolean }) {
           title={`${r.underlying} short straddle · ${VIEW_LABEL[r.view]}`}
           description={`${unitNote(r)}. Each leg has its own stop at the SL % above its entry price; legs not stopped exit at ${r.exit_time}.`}
           actions={
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={result.refetch}
-              disabled={result.loading}
-              aria-label="Refresh heatmap"
-            >
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${result.loading ? 'animate-spin' : ''}`}
-                aria-hidden="true"
-              />
-              Refresh
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => downloadCsv(r, split)}
+                disabled={r.rows.length === 0}
+                aria-label="Download CSV"
+              >
+                <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                CSV
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={result.refetch}
+                disabled={result.loading}
+                aria-label="Refresh heatmap"
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${result.loading ? 'animate-spin' : ''}`}
+                  aria-hidden="true"
+                />
+                Refresh
+              </Button>
+            </div>
           }
         />
         {r.rows.length === 0 ? (

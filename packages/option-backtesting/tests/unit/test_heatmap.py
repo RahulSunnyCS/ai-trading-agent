@@ -272,3 +272,39 @@ def test_a_mid_month_weekly_is_not_taken_for_a_monthly_expiry(tmp_path, monkeypa
     monkeypatch.setattr(g, "load_day", lambda *_: day)
     cells, notes = g.day_cells(tmp_path, "BANKNIFTY", day.day)
     assert cells == [] and "month-end" in notes[0]
+
+
+def test_a_forced_rebuild_drops_days_it_can_no_longer_build(tmp_path, monkeypatch):
+    d1, d2 = date(2026, 9, 28), date(2026, 9, 29)
+    _write_rows(
+        tmp_path, "NIFTY", [_row(d1, "09:16", 10, 5.0, -2.0), _row(d2, "09:16", 10, 1.0, 1.0)]
+    )
+    # d1 is now excluded by data_quality; d2 still builds
+    monkeypatch.setattr(
+        store, "backtest_days", lambda *a, **k: ([d2], {d1: "excluded: thin_chain"})
+    )
+
+    def fake(root, underlying, day, reference):
+        return [
+            grid.Cell(day, "09:16", "15:30", 10, 22000.0, EXP, 100.0, 50.0, 2.0, 2.0, False, False)
+        ], []
+
+    monkeypatch.setattr(grid, "day_cells", fake)
+    store.build("NIFTY", tmp_path)  # not forced: d1's old rows stay
+    assert store.stored_days("NIFTY", tmp_path) == {d1, d2}
+    store.build("NIFTY", tmp_path, force=True)
+    assert store.stored_days("NIFTY", tmp_path) == {d2}
+
+
+def test_all_stocks_pools_every_stock_as_pct_of_premium(tmp_path):
+    day = date(2026, 9, 28)
+    _write_rows(tmp_path, "AXISBANK", [_row(day, "09:16", 10, 5.0, -2.0, entry=(100.0, 50.0))])
+    _write_rows(tmp_path, "BEL", [_row(day, "09:16", 10, 1.0, 1.0, entry=(30.0, 20.0))])
+    _write_rows(tmp_path, "NIFTY", [_row(day, "09:16", 10, 99.0, 99.0)])
+    names = [u["underlying"] for u in store.available(tmp_path)]
+    assert store.ALL_STOCKS in names
+    v = view.build_view(store.ALL_STOCKS, "time_sl", root=tmp_path, day=day, metric="value")
+    assert v["unit"] == "pct_of_premium" and v["pooled"] is True
+    cell = v["cells"][0][0]
+    assert cell["n"] == 2  # NIFTY is not in the pool
+    assert cell["net"] == pytest.approx((3.0 + 2.0) / (150.0 + 50.0) * 100, abs=0.01)

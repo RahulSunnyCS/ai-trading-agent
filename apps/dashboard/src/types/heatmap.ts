@@ -36,6 +36,8 @@ export interface HeatmapResponse {
   view: HeatmapViewKey;
   metric: HeatmapMetric;
   unit: 'inr_per_lot' | 'points_per_share' | 'pct_of_premium';
+  /** Every stock pooled (ALLSTOCKS): always % of premium. */
+  pooled?: boolean;
   lot: number | null;
   exit_time: string;
   exit_times: string[];

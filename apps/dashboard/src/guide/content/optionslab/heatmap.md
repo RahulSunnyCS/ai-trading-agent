@@ -23,13 +23,13 @@ The TOTAL row and column add the cells up. In a range, a cell is the sum of the 
 | Control | What it does |
 |---|---|
 | Index | NIFTY and SENSEX use the nearest weekly expiry. BANKNIFTY, FINNIFTY and MIDCPNIFTY use the monthly expiry. |
-| Stock | Any F&O stock in the lake, monthly expiry only. |
+| Stock | Any F&O stock in the lake, monthly expiry only, or **All F&O stocks**, which pools every stock's straddles and is always shown as % of premium (points per share cannot be added across stocks). |
 | Exit | 15:30 is the close of the last bar. 15:15 is where AlgoTest squares off; choose it to compare with an AlgoTest grid. |
 | P&L / % of premium | Rupees (index, one lot) or points per share (stock), or the P&L as a share of the premium sold, which can be compared across underlyings. |
 | Straddle / Split PE / CE | One number per cell, or the put and the call separately. |
 | Weeks to expiry | Keep only days that many weeks before the expiry. 0 is the expiry week itself. This is how to look at a stock's expiry week against the weeks before it. |
 
-The address bar holds your choices, so a link opens the same table.
+The **CSV** button downloads the table as shown (straddle or split). The address bar holds your choices, so a link opens the same table.
 
 ## How to read it
 

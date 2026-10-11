@@ -72,3 +72,32 @@ export const WEEK_LABEL: Record<number, string> = {
   4: '4 weeks out',
   5: '5 weeks out',
 };
+
+export const ALL_STOCKS = 'ALLSTOCKS';
+
+function csvField(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/**
+ * The table as CSV, in the unit on screen: one row per table row with a TOTAL column and row.
+ * With `split`, each cell is two columns (put, call) after the straddle's net.
+ */
+export function toCsv(r: HeatmapResponse, split: boolean): string {
+  const num = (c: HeatmapCell | null, k: 'net' | 'ce' | 'pe') => (c ? String(c[k]) : '');
+  const head = ['', ...r.columns.map(String), 'TOTAL'];
+  const lines = [head];
+  const keys: ('net' | 'pe' | 'ce')[] = split ? ['pe', 'ce'] : ['net'];
+  for (const k of keys) {
+    if (split) lines.push([k === 'pe' ? 'PUT' : 'CALL']);
+    r.rows.forEach((row, i) => {
+      lines.push([
+        row,
+        ...(r.cells[i] ?? []).map((c) => num(c, k)),
+        num(r.row_totals[i] ?? null, k),
+      ]);
+    });
+    lines.push(['TOTAL', ...r.column_totals.map((c) => num(c, k)), num(r.total, k)]);
+  }
+  return `${lines.map((l) => l.map(csvField).join(',')).join('\n')}\n`;
+}

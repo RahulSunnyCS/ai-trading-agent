@@ -84,9 +84,22 @@ def build_view(
         raise HeatmapError(f"view must be one of {VIEWS}")
     if metric not in METRICS:
         raise HeatmapError(f"metric must be one of {METRICS}")
-    table = store.read(underlying, root)
-    if table is None:
-        raise HeatmapError(f"no heatmap for {underlying}; run `obt heatmap build`")
+    pooled = underlying == store.ALL_STOCKS
+    if pooled:
+        metric = "pct"  # points per share cannot be added across stocks
+        tables = [
+            t
+            for u in store.available(root)
+            if u["kind"] == "stock" and u["underlying"] != store.ALL_STOCKS
+            if (t := store.read(u["underlying"], root)) is not None
+        ]
+        if not tables:
+            raise HeatmapError("no stock heatmaps built; run `obt heatmap build --stocks`")
+    else:
+        one = store.read(underlying, root)
+        if one is None:
+            raise HeatmapError(f"no heatmap for {underlying}; run `obt heatmap build`")
+        tables = [one]
     reference = reference or default_reference_data()
     mult = _multiplier(underlying, reference)
     if view == "time_sl" and day is not None:
@@ -101,22 +114,27 @@ def build_view(
         raise HeatmapError(f"time must be one of {list(grid.ENTRY_TIMES)}")
 
     # filter in Arrow first: a NIFTY file is ~280k rows and a request needs a few hundred
-    mask = pc.equal(table.column("exit"), exit_time)
-    if start is not None:
-        mask = pc.and_(mask, pc.greater_equal(table.column("day"), pa.scalar(start, pa.date32())))
-    if end is not None:
-        mask = pc.and_(mask, pc.less_equal(table.column("day"), pa.scalar(end, pa.date32())))
-    if view == "date_time":
-        mask = pc.and_(mask, pc.equal(table.column("sl"), pa.scalar(sl, pa.int16())))
-    if view == "date_sl":
-        mask = pc.and_(mask, pc.equal(table.column("time"), time))
-    if weeks is not None:
-        in_weeks = pc.is_in(
-            pc.divide(table.column("dte"), pa.scalar(7, pa.int16())),
-            pa.array(sorted(weeks), pa.int16()),
-        )
-        mask = pc.and_(mask, in_weeks)
-    cols = table.filter(mask).to_pydict()
+    def keep(table: pa.Table) -> pa.Table:
+        mask = pc.equal(table.column("exit"), exit_time)
+        if start is not None:
+            mask = pc.and_(
+                mask, pc.greater_equal(table.column("day"), pa.scalar(start, pa.date32()))
+            )
+        if end is not None:
+            mask = pc.and_(mask, pc.less_equal(table.column("day"), pa.scalar(end, pa.date32())))
+        if view == "date_time":
+            mask = pc.and_(mask, pc.equal(table.column("sl"), pa.scalar(sl, pa.int16())))
+        if view == "date_sl":
+            mask = pc.and_(mask, pc.equal(table.column("time"), time))
+        if weeks is not None:
+            in_weeks = pc.is_in(
+                pc.divide(table.column("dte"), pa.scalar(7, pa.int16())),
+                pa.array(sorted(weeks), pa.int16()),
+            )
+            mask = pc.and_(mask, in_weeks)
+        return table.filter(mask)
+
+    cols = pa.concat_tables([keep(t) for t in tables]).to_pydict()
     sel: list[dict] = [{k: cols[k][i] for k in cols} for i in range(len(cols["day"]))]
     days = sorted({r["day"] for r in sel})
     if view != "time_sl" and len(days) > MAX_DAYS:
@@ -156,6 +174,7 @@ def build_view(
         "view": view,
         "metric": metric,
         "unit": "pct_of_premium" if metric == "pct" else unit(underlying),
+        "pooled": pooled,
         "lot": mult if grid.is_index(underlying) else None,
         "exit_time": exit_time,
         "exit_times": list(grid.EXIT_TIMES),

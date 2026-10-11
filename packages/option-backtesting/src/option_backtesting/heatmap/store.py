@@ -45,6 +45,11 @@ SCHEMA = pa.schema(
 )
 
 
+#: Pseudo-underlying: every stock's grid pooled, shown as % of premium sold (points per share
+#: cannot be added across stocks).
+ALL_STOCKS = "ALLSTOCKS"
+
+
 def heatmap_dir(root: Path | None = None) -> Path:
     return (root or data_dir()) / "heatmap"
 
@@ -142,12 +147,14 @@ def _build(
             continue
         rows.extend(_rows(cells))
     built = {r["day"] for r in rows}
-    if rows:
+    # a forced rebuild that cannot rebuild a day (excluded now, or its contracts gone) must not
+    # leave the day's old rows behind: they were computed from bars that no longer qualify
+    drop = (have & (set(days) | set(left_out)) - built) if force else set()
+    if rows or drop:
         new = pa.Table.from_pylist(rows, schema=SCHEMA)
         if existing is not None:
-            keep = existing.filter(
-                pc.invert(pc.is_in(existing.column("day"), pa.array(sorted(built), pa.date32())))
-            )
+            gone = pa.array(sorted(built | drop), pa.date32())
+            keep = existing.filter(pc.invert(pc.is_in(existing.column("day"), gone)))
             new = pa.concat_tables([keep.cast(SCHEMA), new])
         new = new.sort_by(
             [
@@ -188,6 +195,18 @@ def available(root: Path | None = None) -> list[dict]:
                 "first_day": days[0].isoformat(),
                 "last_day": days[-1].isoformat(),
                 "days": len(days),
+            }
+        )
+    stocks = [r for r in out if r["kind"] == "stock"]
+    if stocks:
+        out.append(
+            {
+                "underlying": ALL_STOCKS,
+                "kind": "stock",
+                "expiry": "monthly",
+                "first_day": min(r["first_day"] for r in stocks),
+                "last_day": max(r["last_day"] for r in stocks),
+                "days": max(r["days"] for r in stocks),
             }
         )
     return out
