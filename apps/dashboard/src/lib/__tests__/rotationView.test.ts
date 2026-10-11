@@ -129,14 +129,14 @@ describe('headline', () => {
 });
 
 describe('verdict', () => {
-  it('lists REF and the base with the base carrying the pass rule', () => {
+  it('lists the base first, carrying the pass rule, then REF', () => {
     const v = verdict(summary(), 'A');
     expect(v.lines.map((l) => l.label)).toEqual([
-      'List A minus REF',
       'List A minus the fixed base',
+      'List A minus REF',
     ]);
-    expect(v.lines[0]?.rule).toBeNull();
-    expect(v.lines[1]?.rule).toEqual({ drawdownNoWorse: true, beats: false });
+    expect(v.lines[0]?.rule).toEqual({ drawdownNoWorse: true, beats: false });
+    expect(v.lines[1]?.rule).toBeNull();
     expect(v.readable).toBe(false); // 2 days
   });
 

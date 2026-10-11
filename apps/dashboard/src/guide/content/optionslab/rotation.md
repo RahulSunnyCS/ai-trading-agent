@@ -24,12 +24,12 @@ every figure is descriptive and changes nothing.
 | Beats random baskets | Share of 1,000 random baskets of the same shape that the list's cumulative is above |
 | Sessions scored | Forward sessions counted so far, against the 60 of the read-out |
 
-**Compare with.** REF is the old live rule: did the new weightings beat it? Fixed base is
-2 × Widesl OTM1 at 09:17 plus 1 × Dir ATM at 09:24 every day with no ranking: does rotating beat the
-simple rule at all? Random median is what luck gives. One picker switches every comparison on the
-page.
+**Compare with.** The page opens on the fixed base: 2 × Widesl OTM1 at 09:17 plus 1 × Dir ATM at
+09:24 every day with no ranking. Does rotating beat the simple rule at all? REF is the old live rule:
+did the new weightings beat it? Random median is what luck gives. One picker switches every
+comparison on the page, and the registered comparisons list the base first.
 
-**Hero chart.** Cumulative gross by list, the fixed base, and a shaded band of the random baskets
+**Hero chart.** Cumulative gross by the focus list, the fixed base (REF and the other lists are toggles), and a shaded band of the random baskets
 (10th to 90th percentile). Hover for a day, click to pin it, ← → to step, Esc to close.
 
 **Today's baskets.** The latest entry for all four lists side by side: start time, the strategy, its

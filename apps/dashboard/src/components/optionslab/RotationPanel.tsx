@@ -55,15 +55,15 @@ const FOCUS_OPTIONS: SegmentedOption<RotationListKey>[] = LIST_KEYS.map((value) 
 }));
 
 const BENCHMARK_OPTIONS: SegmentedOption<RotationBenchmark>[] = (
-  ['REF', 'base', 'random'] as const
+  ['base', 'REF', 'random'] as const
 ).map((value) => ({ value, label: BENCHMARK_LABEL[value] }));
 
 export function RotationPanel() {
   const overview = useRotationOverview();
   const summary = useRotationSummary();
   const [focus, setFocus] = useState<RotationListKey>('A');
-  const [benchmark, setBenchmark] = useState<RotationBenchmark>('REF');
-  const [shown, setShown] = useState<ReadonlySet<RotationListKey>>(new Set(['A', 'REF']));
+  const [benchmark, setBenchmark] = useState<RotationBenchmark>('base');
+  const [shown, setShown] = useState<ReadonlySet<RotationListKey>>(new Set(['A']));
   const [showBase, setShowBase] = useState(true);
   // BL-095: one portfolio stop for every widget below that shows stopped figures.
   const [portfolio, setPortfolio] = usePortfolioStop();
