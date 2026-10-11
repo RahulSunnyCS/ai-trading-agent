@@ -474,3 +474,28 @@ def test_load_references_fills_series_the_database_lacks_from_the_csv(tmp_path, 
     out = reference_benchmarks.load_references(tmp_path)
     assert list(out["Nifty 50 TRI"]) == [1.0, 2.0, 3.0]  # the database wins where both have it
     assert list(out["Nifty Midcap 150 TRI"]) == [7.0, 8.0, 9.0]  # the CSV fills the gap
+
+
+def test_refresh_core_benchmarks_csv_moves_only_the_core_columns_and_drops_part_weeks(tmp_path):
+    stocks = tmp_path
+    _write_main_raw(stocks / "raw")
+    weeks = pd.date_range("2020-01-03", periods=2, freq="W-FRI")
+    existing = pd.DataFrame(
+        {
+            "nifty50_tri": [1.0, 2.0],  # stale: must be replaced from the raw snapshot
+            "nifty200_momentum30_tri": [1.0, 2.0],
+            "nifty50_ew_tri": [1.0, 2.0],
+            "nifty200_momentum30_back_calculated": [False, False],
+            "nifty500_tri": [9.0, 9.5],  # an extra column the refresh must leave alone
+        },
+        index=weeks,
+    )
+    existing.to_csv(stocks / "benchmarks_weekly.csv")
+
+    fresh = adjust.refresh_core_benchmarks_csv(stocks, as_of=date(2020, 1, 20))
+    out = pd.read_csv(stocks / "benchmarks_weekly.csv", index_col=0, parse_dates=True)
+
+    assert fresh.index.max() <= pd.Timestamp("2020-01-20")  # the 24 Jan week is still partial
+    assert (out["nifty200_momentum30_tri"].dropna() != [1.0, 2.0][0]).any()
+    assert out.loc[weeks, "nifty500_tri"].tolist() == [9.0, 9.5]
+    assert list(out.columns[:4]) == list(adjust.CORE_BENCHMARK_COLUMNS)

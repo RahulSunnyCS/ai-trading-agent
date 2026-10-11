@@ -913,6 +913,29 @@ def stocks_fetch_benchmarks(
     typer.echo(f"catalog stock_weekly_series: {n_rows:,} rows written ({data_root()})")
 
 
+def _refresh_core_benchmarks() -> None:
+    """The benchmark TRIs come from niftyindices.com, not NSE: bring their weekly columns (and the
+    catalog's series) up to the raw snapshots the sync just refreshed, so a failed NSE fetch does
+    not leave the Nifty200 Momentum 30 level (and the journal's benchmark entry) weeks behind.
+    Never fails the sync."""
+    from .stocks import adjust
+
+    try:
+        data_dir = _stocks_data_dir()
+        core = adjust.refresh_core_benchmarks_csv(data_dir)
+        last = core["nifty200_momentum30_tri"].dropna().index[-1]
+        typer.echo(f"benchmark TRIs refreshed from the raw snapshots through {last:%Y-%m-%d}")
+        from trading_data.db import data_root
+
+        from . import db_migrate
+        from .db_read import open_catalog
+
+        with open_catalog(data_root()) as con:
+            db_migrate.import_core_benchmarks(con, core)
+    except Exception as error:  # noqa: BLE001 - a benchmark refresh must not fail the sync
+        typer.echo(f"benchmark refresh skipped: {error}")
+
+
 @stocks_app.command("sync")
 def stocks_sync(
     fallback_to_fyers: bool = typer.Option(
@@ -948,6 +971,7 @@ def stocks_sync(
         if not fallback_to_fyers:
             raise
         typer.echo(f"NSE fetch failed ({error}); trying Fyers fallback…")
+        _refresh_core_benchmarks()
 
     from .stocks.fyers_topup import run_fyers_topup, run_fyers_topup_total_market
 

@@ -374,6 +374,32 @@ def import_extra_benchmarks(con: duckdb.DuckDBPyConnection, extra: pd.DataFrame)
     return written
 
 
+def import_core_benchmarks(con: duckdb.DuckDBPyConnection, core: pd.DataFrame) -> int:
+    """Upsert the three core benchmark TRIs (`ui_data._BENCHMARK_COLUMNS`) into
+    `stock_weekly_series` after a refresh from the raw snapshots, replacing only those series
+    (the same contract as `import_extra_benchmarks`). Returns rows written."""
+    from .stocks.ui_data import _BENCHMARK_COLUMNS  # noqa: PLC0415
+
+    renamed = core[[c for c in _BENCHMARK_COLUMNS if c in core.columns]].rename(
+        columns=_BENCHMARK_COLUMNS
+    )
+    if renamed.empty:
+        return 0
+    names = list(renamed.columns)
+    con.execute("BEGIN TRANSACTION")
+    try:
+        con.execute(
+            f"DELETE FROM stock_weekly_series WHERE series IN ({','.join('?' * len(names))})",  # noqa: S608
+            names,
+        )
+        written = _insert_series(con, renamed)
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
+    con.execute("COMMIT")
+    return written
+
+
 def _insert_series(con: duckdb.DuckDBPyConnection, frame: pd.DataFrame) -> int:
     long = _melt_weekly(frame, "close")
     _bulk_insert(

@@ -1318,6 +1318,32 @@ def merge_extra_benchmarks_csv(data_dir: Path, as_of: date | None = None) -> pd.
     return extra
 
 
+#: The columns `build_benchmarks_weekly` derives from the three core TRI snapshots.
+CORE_BENCHMARK_COLUMNS = (
+    "nifty50_tri",
+    "nifty200_momentum30_tri",
+    "nifty50_ew_tri",
+    "nifty200_momentum30_back_calculated",
+)
+
+
+def refresh_core_benchmarks_csv(data_dir: Path, as_of: date | None = None) -> pd.DataFrame:
+    """Refresh only the core TRI columns (Nifty 50, Nifty200 Momentum 30, Nifty 50 equal weight,
+    and the back-calculated flag) in data_dir/benchmarks_weekly.csv from the raw snapshots on
+    disk, leaving every other column as it was. Needs no NSE access: the snapshots come from
+    niftyindices.com, so a failed NSE fetch no longer leaves the benchmark (and the journal's
+    benchmark entry that waits for it) weeks behind. Weeks labelled after `as_of` (default
+    today) are dropped, as for the extras. Returns the refreshed columns."""
+    path = data_dir / "benchmarks_weekly.csv"
+    fresh = build_benchmarks_weekly(data_dir / "raw")
+    fresh = fresh[[c for c in CORE_BENCHMARK_COLUMNS if c in fresh.columns]]
+    fresh = fresh[fresh.index <= pd.Timestamp(as_of or date.today())]
+    existing = pd.read_csv(path, index_col=0, parse_dates=True)
+    kept = existing.drop(columns=[c for c in fresh.columns if c in existing.columns])
+    fresh.join(kept, how="outer").to_csv(path)
+    return fresh
+
+
 # --------------------------------------------------------------------------
 # build_all -- the single entry point (T8's CLI calls this)
 # --------------------------------------------------------------------------
