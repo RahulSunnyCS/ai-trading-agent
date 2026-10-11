@@ -79,7 +79,7 @@ describe('MomentumCircuitExposureCard', () => {
     expect(screen.getByText(/already out before 1 \(10%\)/)).toBeTruthy();
     expect(screen.getByText(/still holding in 9/)).toBeTruthy();
 
-    // The shared Tabs (Radix) selects on mouse down, not on click.
+    // The shared Tabs selects on mouse down, not on click.
     fireEvent.mouseDown(screen.getByRole('tab', { name: /got out in time \(1\)/ }));
     expect(screen.getByText('QUESS')).toBeTruthy();
     expect(screen.getByText('31 Jan 2020 (47 days before)')).toBeTruthy();
