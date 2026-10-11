@@ -49,6 +49,9 @@ same strategies' curves together with the same rule.
   5. A **trailing** portfolio stop is wanted as an option. A portfolio **target** is not.
   6. Computed on demand (with a cache), not in the nightly scheduler job.
   7. The default is **₹10,000**.
+- **2026-10-11 — trailing:** the settings open in a pop-up from a "Portfolio stop" button. Three
+  trailing modes, as AlgoTest's: **Trail SL** (when profit moves ₹X, the stop moves ₹Y), **Lock
+  profit** and **Lock and trail**.
 
 ## Goal
 
@@ -73,16 +76,22 @@ registered read-out are never changed.
 ### Phase 1 — The shared calculation
 - **Tasks:**
   - A module, `rotation/portfolio.py` (or `legwise/portfolio.py` if the Options Lab reuses it):
-    `book_day(members, day, stop_inr)`. `members` is a list of (strategy, lots). It replays each
+    `book_day(members, day, stop_inr, trail)`. `members` is a list of (strategy, lots). It replays each
     member with `simulate_day` and builds each member's per-minute P&L: 0 before it enters, its
     MTM while open, its realised P&L after it exits. It scales each by its lots and sums them.
   - The rule, as the engine's overall stop and BL-055: at the first minute the combined MTM is
     ≤ the stop level, every member exits at that minute's close. A member that has not entered yet
     (e.g. Dir 09:24, Buy 09:35) does not enter that day. Stop empty, 0 or below → no portfolio stop.
-  - Optional trailing, AlgoTest's two numbers [X, Y] as the legs' `trail_sl`: the level starts at
-    −stop, and every ₹X the book's best MTM so far rises, the level moves up ₹Y. It never moves
-    down, and it is checked at the minute's close like the fixed level. X or Y empty, 0 or below →
-    no trailing. Trailing needs a stop; with no stop it is ignored.
+  - Optional trailing, one of AlgoTest's three modes. `best` is the book's highest combined MTM
+    so far that day (at minute closes); the level is recomputed each minute and never moves down:
+    - **Trail SL [X, Y]:** level = −stop + Y × ⌊best / X⌋ (from the first rupee of profit).
+      Needs a stop; without one it does nothing.
+    - **Lock profit [A, B]** (B ≤ A): once best ≥ A, level = max(level, +B).
+    - **Lock and trail [A, B, X, Y]:** once best ≥ A, level = max(level, B + Y × ⌊(best − A) / X⌋).
+    - Lock and Lock and trail also work with the stop cleared (a profit lock with no stop
+      below). Any field empty, 0 or below → that mode is off.
+    - The exit is the same as the stop: every member closes at the first minute's close at or
+      below the level; nothing enters afterwards.
   - Output: the combined curve, the stop level at each minute (it moves when trailing), each
     member's curve, the stop minute (or none) and whether it was the trailed level, the book's
     gross with and without the stop, and each member's P&L at the stop.
@@ -95,15 +104,19 @@ registered read-out are never changed.
   2. BL-055's totals for B1 / B2 / B3 at ₹8k / ₹10k / ₹12.5k are reproduced to the rupee.
   3. With the stop empty, every list-day in the reconstructed history equals today's
      `list_block` gross.
-  4. Trailing on synthetic curves: a book that rises ₹3X then falls stops at −stop + 3Y; a book
-     that never rises stops at −stop; the level never moves down.
+  4. Each trailing mode on synthetic curves: Trail SL — a book that rises ₹3X then falls stops at
+     −stop + 3Y, one that never rises stops at −stop; Lock — a book that touches ₹A then falls
+     exits at +B, one that peaks below A is unaffected; Lock and trail — A reached then +2X more
+     exits at B + 2Y. In every mode the level never moves down.
 
 ### Phase 2 — API and proxy
 - **Tasks:**
-  - `GET /legwise/rotation/portfolio/day?day=&list=&stop=&trail=X,Y`: one list's basket replayed
+  - `GET /legwise/rotation/portfolio/day?day=&list=&stop=&trail=…`: one list's basket replayed
     (combined and member curves, the stop level per minute, stop minute, with and without).
-  - `GET /legwise/rotation/portfolio/days?from=&to=&stop=&trail=X,Y`: per day and list, the gross
+  - `GET /legwise/rotation/portfolio/days?from=&to=&stop=&trail=…`: per day and list, the gross
     with the stop and the stop minute.
+  - `trail` is one of `sl:X,Y`, `lock:A,B`, `locktrail:A,B,X,Y`; absent = none. A malformed value
+    is a 422, never silently ignored.
   - An in-process cache keyed on (day, basket, the members' file hashes, stop, trail); identical baskets
     across lists are replayed once.
   - Fastify proxy routes and their tests, as the other `/legwise/rotation/*` routes.
@@ -114,10 +127,18 @@ registered read-out are never changed.
 
 ### Phase 3 — Daily log: days table, calendar and "Replay the list"
 - **Tasks:**
-  - A "Portfolio stop ₹" `NumberField` on the Rotation page, **10000 by default**, held at page
-    level so one value drives every widget below; clearing it, 0 or below means no portfolio stop.
-    Beside it, "Trail every ₹ [X] by ₹ [Y]", empty by default (no trailing). All three are kept in
-    the URL (`?pfstop=&pftrail=`) and remembered per viewer.
+  - A **"Portfolio stop" button** in the Rotation page's run bar, showing the current setting
+    ("Portfolio stop ₹10,000 · trail 1,000 → 500", or "Portfolio stop off"). Clicking it opens a
+    **pop-up** (a new `components/ui/Dialog.tsx`, since `components/ui` has no dialog yet; the
+    analytics pattern's settings `Drawer` is the fallback if a dialog does not fit) with:
+    - **Stop loss ₹** — a `NumberField`, **10000 by default**; cleared, 0 or below = no stop.
+    - **Trailing** — `RadioCards`: None (default) / Trail SL / Lock profit / Lock and trail,
+      each showing only its own fields: Trail SL "every ₹X of profit, move the stop ₹Y"; Lock
+      profit "when profit reaches ₹A, lock ₹B"; Lock and trail "when profit reaches ₹A, lock
+      ₹B, then every ₹X more, raise it ₹Y". A one-line plain-English summary under the fields.
+    - Apply / Reset to default. Field checks inline (B below A, Y not above X, positive amounts).
+  - One setting drives every widget below it; it is kept in the URL (`?pfstop=&pftrail=`) and
+    remembered per viewer.
   - Days table and calendar: with a stop set, each list's figure is the stopped one, with a
     "PF stop 11:42" flag on days it fired. Hover shows both figures and the lots. The calendar
     shading follows.
@@ -156,9 +177,9 @@ registered read-out are never changed.
 - **Default on:** with ₹10,000 as the default, the page opens on stopped figures while the
   read-out stays on its registered basis. Every stopped figure carries "with ₹X portfolio stop",
   and the read-out says "no portfolio stop", so the two are never read as one number.
-- **Trailing semantics:** the rule above is [X, Y] as the legs' `trail_sl`. AlgoTest also offers
-  "lock profit" variants; if the owner's AlgoTest setting differs, the rule is changed here first
-  (open question 1).
+- **Trailing semantics:** the three modes are written from AlgoTest's wording (Phase 1). If the
+  owner's AlgoTest screen behaves differently, the rule is changed here first (open question 1),
+  before any figure is shown.
 - **Overshoot:** the fill is the minute's close, so a fast day ends past the level, as in BL-055.
   AlgoTest checks the stop on live prices, so its fills land closer to the level; the figures here
   are the conservative side.
@@ -174,11 +195,11 @@ registered read-out are never changed.
 Pending — discuss when this item is picked up. Claude's proposal is beside each one; none is a
 decision. (Questions 1–7 of 2026-10-11 are answered: see Owner's decisions.)
 
-1. **Trailing form:** the plain [X, Y] trail (every ₹X rise in the book's best MTM moves the level
-   up ₹Y), or AlgoTest's "lock profit" / "lock and trail" (once the book is up ₹A, the level jumps
-   to +₹B, then trails)? *Proposal:* plain [X, Y] first, matching what the owner sets in AlgoTest.
-2. **Trailing start:** does the level start moving from the book's first rupee of profit, or only
-   once the book is up some amount? *Proposal:* from the first rupee, as the legs' trail.
+1. **Match AlgoTest exactly:** when this is started, compare the three modes with the owner's
+   AlgoTest portfolio settings screen (a screenshot), field by field, before Phase 1 is written.
+   In particular: does Trail SL count profit from 0 or from the first lock, and may Lock / Lock and
+   trail be used with the stop amount cleared? *Proposal:* from 0, and yes (a profit lock without
+   a stop), as written in Phase 1.
 
 ## Log
 
@@ -191,3 +212,7 @@ decision. (Questions 1–7 of 2026-10-11 are answered: see Owner's decisions.)
   owner changes it per book); after the stop nothing else enters; per-strategy stops stay per lot;
   minute-close fills; a trailing portfolio stop wanted, no portfolio target; on demand; default
   ₹10,000. Plan updated (trailing in Phases 1–3). New open questions: the trailing form and start.
+- 2026-10-11 — owner on trailing: the settings open in a pop-up from a "Portfolio stop" button,
+  with the stop amount and three trailing modes, AlgoTest's: Trail SL (every ₹X of profit moves
+  the stop ₹Y), Lock profit and Lock and trail. Both trailing questions closed by that; plan
+  updated (rule in Phase 1, `trail=` in Phase 2, the pop-up in Phase 3).
