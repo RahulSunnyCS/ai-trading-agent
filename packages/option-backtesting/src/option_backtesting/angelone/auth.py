@@ -123,10 +123,10 @@ def login(
     sleep: Callable[[float], None] = time.sleep,
 ) -> Session:
     """One login attempt. Waits for a fresh TOTP window rather than send a code about to expire."""
-    left = 30 - int(now()) % 30
-    if left < 4:
-        sleep(left + 0.5)
     for attempt in range(3):
+        left = 30 - int(now()) % 30
+        if left < 4:
+            sleep(left + 0.5)
         status, body = post(
             LOGIN_PATH,
             {

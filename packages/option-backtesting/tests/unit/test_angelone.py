@@ -293,7 +293,7 @@ def test_a_network_failure_at_login_is_not_reported_as_a_credentials_problem():
         return 0, {"status": False, "message": "network: timed out"}
 
     with pytest.raises(auth.AngelNetworkError, match="could not be reached"):
-        auth.login(CREDS, post=post, now=lambda: 10)
+        auth.login(CREDS, post=post, now=lambda: 10, sleep=lambda s: None)
 
 
 def test_a_bad_symboltoken_answer_does_not_stop_the_day():
@@ -362,3 +362,36 @@ def test_master_download_retries_then_reports_unavailable(monkeypatch):
     with pytest.raises(auth.AngelNetworkError, match="master unavailable"):
         symbols.download_master(attempts=3, pause_s=0, sleep=lambda s: None)
     assert len(attempts) == 3
+
+
+def test_master_download_retries_a_truncated_body_and_a_dropped_read(monkeypatch):
+    import http.client
+    import io
+
+    from option_backtesting.angelone import symbols
+
+    answers = [http.client.IncompleteRead(b"[{"), io.BytesIO(b'[{"symbol": "X"'), io.BytesIO(b"[]")]
+
+    def fake(*args, **kwargs):
+        answer = answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    monkeypatch.setattr(symbols.urllib.request, "urlopen", fake)
+    assert symbols.download_master(attempts=3, pause_s=0, sleep=lambda s: None) == []
+
+
+def test_fallback_failure_keeps_the_fyers_login_hint(monkeypatch):
+    from option_backtesting.fyers.auth import FyersCredentialsError
+    from option_backtesting.legwise import evening
+
+    def collect(day, underlyings, *, source, **kwargs):
+        if source == "fyers":
+            raise FyersCredentialsError("Fyers token expired")
+        raise auth.AngelNetworkError("Angel One could not be reached: timed out")
+
+    monkeypatch.setattr(evening, "collect_detailed", collect)
+    with pytest.raises(auth.AngelNetworkError) as err:
+        evening.collect_with_fallback(DAY, ["NIFTY"], log=lambda m: None)
+    assert "Fyers login" in str(err.value) and "token expired" in str(err.value)

@@ -14,6 +14,7 @@ import urllib.request
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
+from http.client import HTTPException
 
 from ..fyers.client import USER_AGENT
 from ..fyers.symbols import Contract
@@ -53,12 +54,12 @@ def download_master(
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
                 return json.load(response)
-        except OSError as error:  # URLError, timeouts and resets are OSErrors
+        except (OSError, HTTPException, ValueError) as error:
+            # URLError, timeouts and resets are OSErrors; a drop mid-read is IncompleteRead
+            # (HTTPException); a truncated body is a JSON ValueError. All are worth a retry.
             last = error
             if attempt < attempts - 1:
                 sleep(pause_s * (attempt + 1))
-        except ValueError as error:  # a truncated or non-JSON body: not a connection problem
-            raise RuntimeError(f"Angel One master is not valid JSON: {error}"[:200]) from error
     raise AngelNetworkError(f"Angel One master unavailable: {type(last).__name__}")
 
 

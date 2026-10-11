@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from ..angelone.auth import AngelCredentialsError, AngelNetworkError
 from ..fyers.auth import FyersCredentialsError
 from ..fyers.daily import DEFAULT_MAX_EXTRA, DEFAULT_PREMIUM_FLOOR, UNDERLYINGS, data_dir
 from . import source as day_source
@@ -136,9 +137,16 @@ def collect_with_fallback(
     except FyersCredentialsError as error:
         reason = str(error)[:160]
         log(f"Fyers is not available ({reason}); collecting from Angel One instead")
-        errors, details = collect_detailed(
-            day, underlyings, force=force, source="angelone", **common
-        )
+        try:
+            errors, details = collect_detailed(
+                day, underlyings, force=force, source="angelone", **common
+            )
+        except (AngelCredentialsError, AngelNetworkError) as fallback:
+            # Keep the Fyers reason: logging in to Fyers is the fix the owner can make, and the
+            # alert only says so when the message names the Fyers login.
+            raise type(fallback)(
+                f"Fyers login needed ({reason}); Angel One fallback also failed: {fallback}"
+            ) from fallback
         flags = details.get("flags") or {}
         notes = [
             f"Collected from Angel One: no Fyers login ({reason}).",
