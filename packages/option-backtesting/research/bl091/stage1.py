@@ -44,6 +44,11 @@ W_STOPS = (650.0, 1300.0, 1950.0)
 RULES = ("R0", "R2", "R3", "R5", "R6")
 DIR_STOPS = ((21, 3000.0), (25, 3600.0), (30, 4300.0))
 ARMS = [f"W{int(s)}_{r}" for s in W_STOPS for r in RULES] + [f"D1_{p}" for p, _ in DIR_STOPS]
+# owner 2026-10-11: re-entry time gates (G) and gates on every entry (F); 13:30 / 14:00 / 14:30 / 14:50
+GATES = {"1330": 255, "1400": 285, "1430": 315, "1450": 335}
+EXTRA_ARMS = [f"W{int(s)}_G{g}" for s in W_STOPS for g in ("1400", "1430", "1450")] + [
+    f"W650_F{g}" for g in GATES
+]
 PLACEBO_EACH_SIDE = 5
 # frozen cut points (registered): (index, regime) -> (P60, P85) on the level when the hold completes
 CUTS2 = {("NIFTY", "lt13"): (31.82, 36.02), ("NIFTY", "ge13"): (35.21, 44.65),
@@ -77,6 +82,8 @@ def next_entry(rule: str, stop_min: int, first: int, x: list[float] | None, und:
         return max(stop_min + 1, M_1330)
     if rule == "R5":
         return stop_min + 20
+    if rule[0] in "GF":
+        return max(stop_min + 1, GATES[rule[1:]])
     if rule == "R2":
         assert x is not None
         high = max(x[first : stop_min + 1])
@@ -90,7 +97,7 @@ def next_entry(rule: str, stop_min: int, first: int, x: list[float] | None, und:
 
 def run_wide(data, und: str, first: int, ref, stop: float, rule: str, x) -> list[dict]:
     rows: list[dict] = []
-    entry: int | None = first
+    entry: int | None = max(first, GATES[rule[1:]]) if rule[0] == "F" else first
     for k in range(1, (3 if rule == "R6" else 5) + 1):
         if entry is None or entry >= M_1513:
             break
@@ -204,7 +211,8 @@ def plan() -> None:
     print(p.groupby(["period", "underlying", "role"]).size().to_string())
 
 
-def sim(workers: int) -> int:
+def sim(workers: int, arms: list[str] | None = None) -> int:
+    arms = arms or ARMS
     p = pd.read_csv(PLAN)
     units = p[["underlying", "day", "entry_min"]].drop_duplicates()
     done: set[tuple] = set()
@@ -214,7 +222,7 @@ def sim(workers: int) -> int:
         done = set(zip(prev.underlying, prev.day, prev.arm, prev.entry_min, strict=True))
     by_day: dict[tuple[str, str], list[tuple[str, int]]] = {}
     for r in units.itertuples(index=False):
-        for arm in ARMS:
+        for arm in arms:
             if (r.underlying, r.day, arm, r.entry_min) not in done:
                 by_day.setdefault((r.underlying, r.day), []).append((arm, int(r.entry_min)))
     todo = [(u, d, us) for (u, d), us in sorted(by_day.items())]
@@ -238,7 +246,7 @@ def sim(workers: int) -> int:
     ok = set(zip(s.underlying, s.day, s.arm, s.entry_min, strict=True)) - {
         k for k, n in zip(zip(s.underlying, s.day, s.arm, s.entry_min, strict=True),
                           s.notes.fillna(""), strict=True) if n.startswith("ERR")}  # fmt: skip
-    missing = sum(1 for r in units.itertuples(index=False) for a in ARMS
+    missing = sum(1 for r in units.itertuples(index=False) for a in arms
                   if (r.underlying, r.day, a, r.entry_min) not in ok)  # fmt: skip
     print(f"done; {missing} runs missing or in error")
     return 0 if missing == 0 else 1
@@ -378,6 +386,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("step", choices=["plan", "check", "sim", "read"])
     ap.add_argument("--workers", type=int, default=6)
+    ap.add_argument("--extra", action="store_true", help="the owner's time-gate arms")
     a = ap.parse_args()
     if a.step == "plan":
         plan()
@@ -385,7 +394,7 @@ def main() -> int:
     if a.step == "check":
         return check()
     if a.step == "sim":
-        return sim(a.workers)
+        return sim(a.workers, EXTRA_ARMS if a.extra else None)
     read()
     return 0
 

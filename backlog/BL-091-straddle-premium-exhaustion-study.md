@@ -941,3 +941,8 @@ small decisions taken and logged.
   down; a chained mask; daily bars built once). Stage 1b entries, all 1,130 Stage 2 candidates, the
   AUC table and R1 were re-run and are identical, so no reported number changed. Report sentence on
   the secondary view corrected: ₹650 R3 is +₹74 / +₹341 / −₹1, not at or above zero in all three.
+- 2026-10-11 — Owner asked for the R3 time gate at 13:30, 14:00, 14:30 and 14:50, with win rate and
+  average result per lot, against re-entering at once. Run as a look on P2 + P3 (P1 stays unread;
+  one gate would be chosen before any P1 test). Arms added: G1400 / G1430 / G1450 = no re-entry
+  before that time (G1330 is R3) at ₹650 / ₹1,300 / ₹1,950; F1330 … F1450 = every entry, the first
+  included, at or after the gate (₹650). Same events, comparator and engine as Stage 1a.
