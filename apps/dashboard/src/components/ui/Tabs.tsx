@@ -1,6 +1,6 @@
 'use client';
 
-import { type KeyboardEvent, type ReactNode, createContext, useContext } from 'react';
+import { type KeyboardEvent, type ReactNode, createContext, useContext, useRef } from 'react';
 
 import { cn } from '../../lib/cn';
 
@@ -70,6 +70,7 @@ export function Tabs<T extends string>({
   const enabledItems = items.filter((item) => !item.disabled);
   const selectedIndex = items.findIndex((item) => item.value === value);
   const focusIndex = selectedIndex >= 0 ? selectedIndex : items.findIndex((item) => !item.disabled);
+  const mouseDownValue = useRef<T | null>(null);
 
   function select(item: TabItem<T>): void {
     if (item.disabled) return;
@@ -142,7 +143,19 @@ export function Tabs<T extends string>({
                   disabled={item.disabled}
                   title={item.title}
                   tabIndex={selected || (value === null && index === focusIndex) ? 0 : -1}
-                  onClick={() => select(item)}
+                  onMouseDown={(event) => {
+                    if (event.button !== 0 || event.ctrlKey || item.disabled) return;
+                    mouseDownValue.current = item.value;
+                    select(item);
+                  }}
+                  onClick={(event) => {
+                    if (event.ctrlKey || item.disabled) return;
+                    if (mouseDownValue.current === item.value) {
+                      mouseDownValue.current = null;
+                      return;
+                    }
+                    select(item);
+                  }}
                   aria-controls={children ? panelId : undefined}
                   onKeyDown={(event) => onKeyDown(event, item)}
                   className={cn(
