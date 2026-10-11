@@ -2239,7 +2239,7 @@ def _broad_parts(
     # all) - a consistent response shape the frontend can rely on regardless of mode.
     group_members = (
         broad.load_stock_groups(
-            CATEGORIES_CURATED_DIR, extended=req.broad_category_tags == "extended"
+            CATEGORIES_CURATED_DIR, extended=req.broad_category_tags == "extended", dated=True
         )
         if on
         else {}

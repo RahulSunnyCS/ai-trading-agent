@@ -940,6 +940,27 @@ def test_broad_backtest_on_mode_returns_a_complete_payload(broad_client):
         assert row["position"] >= 1
 
 
+def test_broad_backtest_result_shows_a_dated_category_it_held(broad_client, tmp_path):
+    """BL-092: the run picks stocks through a forward-dated category, so the result's held
+    categories and exit explanations must read the same merged membership (a Codex review of
+    PR 188 caught `_broad_parts` loading the groups without it)."""
+    (api.CATEGORIES_CURATED_DIR / "stock_groups_dated.csv").write_text(
+        "parent_group,subgroup,symbol,company_name,launch_date,note\n"
+        f"Test Parent,Dated,{BROAD_ORPHAN_SYMBOL},{BROAD_ORPHAN_SYMBOL} Ltd,2016-01-01,test\n"
+    )
+    res = broad_client.post(
+        "/api/backtest",
+        json=_broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10),
+    )
+    assert res.status_code == 200, res.text
+    held = res.json()["held_categories"]
+    dated = [row for row in held if row["category"].endswith(":: Dated")]
+    assert dated, (
+        "the dated category was never held; the fixture's strongest stock should rank it first"
+    )
+    assert BROAD_ORPHAN_SYMBOL in {p for row in dated for p in row["picks"]}
+
+
 def test_broad_backtest_off_mode_has_no_held_categories(broad_client):
     res = broad_client.post(
         "/api/backtest",
