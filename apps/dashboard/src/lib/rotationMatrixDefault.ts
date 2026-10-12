@@ -11,6 +11,7 @@
 import type { MatrixResult } from '../types/rotationMatrix';
 import { formatDay, istToday } from './format';
 import { addDays } from './regimeTags';
+import { listName } from './rotationListNames';
 import {
   ANY,
   DEFAULT_FILTERS,
@@ -20,7 +21,6 @@ import {
   matrixParams,
   needsStrategy,
 } from './rotationMatrixView';
-import { listName } from './rotationListNames';
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
