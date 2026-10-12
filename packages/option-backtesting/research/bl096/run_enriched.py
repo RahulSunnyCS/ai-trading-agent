@@ -209,7 +209,7 @@ class _Stats:
                 self.pe_sl_hits += trade.exit_reason == "SL"
             if trade.exit_reason == "SL":
                 sl_legs.add(trade.leg_id)
-            if trade.exit_reason in self.exit_counts:
+            if trade.exit_reason.lower() in self.exit_counts:
                 self.exit_counts[trade.exit_reason.lower()] += 1
             leg_count = seen_legs.get(trade.leg_id, 0)
             if leg_count:
