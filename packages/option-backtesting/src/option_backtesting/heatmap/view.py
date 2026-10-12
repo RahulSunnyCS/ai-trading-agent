@@ -5,8 +5,10 @@
     date_sl    rows days, columns stop losses, at one entry time
 
 The stop-loss axis ends with `grid.NO_SL` (0): both legs held to the exit time, never stopped.
-A store built before that level existed has no such rows; its column comes back empty (None
-cells) until `obt heatmap build` fills it.
+Its column has its own total but is left out of the row totals and the grand total (a different
+strategy on the same trades, not another stop to add). A store built before that level existed has
+no such rows; a No SL cell is shown only when it covers every day the 100 % cell does, so the
+column comes back empty (None cells) until `obt heatmap build` fills it, never a partial sum.
 
 A cell is the straddle's P&L (call + put). Unit: an index is rupees for one lot at the current lot
 size (the legwise engine's `lot_sizing: current`); a stock is points per share, because the lake
@@ -159,6 +161,7 @@ def build_view(
         rk = lambda r: r["day"].isoformat()  # noqa: E731
         ck = lambda r: r["sl"]  # noqa: E731
 
+    sl_axis = view != "date_time"
     cells = {(r, c): _acc() for r in row_keys for c in col_keys}
     rows_tot = {r: _acc() for r in row_keys}
     cols_tot = {c: _acc() for c in col_keys}
@@ -168,9 +171,23 @@ def build_view(
         if key not in cells:
             continue
         _add(cells[key], r)
-        _add(rows_tot[key[0]], r)
         _add(cols_tot[key[1]], r)
-        _add(grand, r)
+        # No SL is a different strategy on the same trades, not another stop to add up: it has
+        # its own column total but stays out of the row totals and the grand total, which keep
+        # their pre-No-SL meaning
+        if not (sl_axis and key[1] == grid.NO_SL):
+            _add(rows_tot[key[0]], r)
+            _add(grand, r)
+
+    if sl_axis:
+        # a stored day without its No SL rows (not rebuilt yet) must not make a partial sum: the
+        # cell is shown only when it covers every straddle the widest stop's cell does
+        ref = grid.STOP_LOSSES[-1]
+        for r in row_keys:
+            if cells[(r, grid.NO_SL)]["n"] != cells[(r, ref)]["n"]:
+                cells[(r, grid.NO_SL)] = _acc()
+        if cols_tot[grid.NO_SL]["n"] != cols_tot[ref]["n"]:
+            cols_tot[grid.NO_SL] = _acc()
 
     matrix = [[_cell(cells[(r, c)], mult, metric) for c in col_keys] for r in row_keys]
     return {

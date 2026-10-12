@@ -592,7 +592,7 @@ function Result({ params, split }: { params: HeatmapParams; split: boolean }) {
       <Card>
         <CardHeader
           title={`${r.underlying} short straddle · ${VIEW_LABEL[r.view]}`}
-          description={`${unitNote(r)}. Each leg has its own stop at the SL % above its entry price; legs not stopped exit at ${r.exit_time}. ${slLabel(NO_SL)} holds both legs to the exit with no stop.`}
+          description={`${unitNote(r)}. ${r.view === 'date_time' && r.filters.sl === NO_SL ? `No stop loss: both legs are held to ${r.exit_time}.` : `Each leg has its own stop at the SL % above its entry price; legs not stopped exit at ${r.exit_time}. ${slLabel(NO_SL)} holds both legs to the exit with no stop.`}`}
           actions={
             <div className="flex items-center gap-1">
               <Button

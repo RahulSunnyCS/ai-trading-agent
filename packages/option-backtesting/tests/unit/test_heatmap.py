@@ -236,7 +236,9 @@ def test_no_sl_column_in_every_view_and_empty_before_it_is_built(root, tmp_path)
         "NIFTY",
         [
             _row(d1, "09:16", 10, 5.0, -2.0, dte=1),
+            _row(d1, "09:16", 100, 6.0, -2.0, dte=1),
             _row(d1, "09:16", grid.NO_SL, 7.0, -4.0, dte=1),
+            _row(d1, "09:45", 100, 1.0, 1.0, dte=1),
             _row(d1, "09:45", grid.NO_SL, -1.0, -1.0, dte=1),
         ],
     )
@@ -244,6 +246,9 @@ def test_no_sl_column_in_every_view_and_empty_before_it_is_built(root, tmp_path)
     assert t["columns"] == [*range(10, 101, 10), 0]
     assert t["cells"][0][-1]["net"] == pytest.approx(3.0 * LOT)
     assert t["column_totals"][-1]["net"] == pytest.approx(1.0 * LOT)
+    # No SL has its own column total but is not added into the row totals or the grand total
+    assert t["row_totals"][0]["net"] == pytest.approx((3.0 + 4.0) * LOT)
+    assert t["total"]["net"] == pytest.approx((3.0 + 4.0 + 2.0) * LOT)
     p = view.build_view("NIFTY", "time_sl", root=tmp_path, day=d1, metric="pct")
     assert p["cells"][0][-1]["net"] == pytest.approx(3.0 / 150.0 * 100, abs=0.01)
     ds = view.build_view("NIFTY", "date_sl", root=tmp_path, start=d1, end=d1, time="09:16")
@@ -257,6 +262,24 @@ def test_no_sl_column_in_every_view_and_empty_before_it_is_built(root, tmp_path)
     assert w["cells"][0][-1] is None
 
 
+def test_a_no_sl_cell_is_never_a_partial_sum_over_rebuilt_and_old_days(tmp_path):
+    d1, d2 = date(2026, 9, 28), date(2026, 9, 29)
+    _write_rows(
+        tmp_path,
+        "NIFTY",
+        [
+            _row(d1, "09:16", 100, 6.0, -2.0, dte=1),
+            _row(d1, "09:16", grid.NO_SL, 7.0, -4.0, dte=1),
+            _row(d2, "09:16", 100, 1.0, 1.0, dte=1),  # d2 not rebuilt: no No SL row
+        ],
+    )
+    both = view.build_view("NIFTY", "time_sl", root=tmp_path, start=d1, end=d2)
+    assert both["cells"][0][-1] is None and both["column_totals"][-1] is None
+    assert both["cells"][0][-2]["n"] == 2
+    one = view.build_view("NIFTY", "time_sl", root=tmp_path, start=d1, end=d1)
+    assert one["cells"][0][-1]["net"] == pytest.approx(3.0 * LOT)
+
+
 def test_a_plain_build_fills_no_sl_for_days_stored_without_it(tmp_path, monkeypatch):
     d1 = date(2026, 9, 28)
     _write_rows(tmp_path, "NIFTY", [_row(d1, "09:16", 10, 5.0, -2.0, dte=1)])
@@ -267,7 +290,7 @@ def test_a_plain_build_fills_no_sl_for_days_stored_without_it(tmp_path, monkeypa
         calls.append(day)
         return [
             grid.Cell(day, "09:16", "15:30", sl, 22000.0, EXP, 100.0, 50.0, 2.0, 2.0, False, False)
-            for sl in (10, grid.NO_SL)
+            for sl in (10, 100, grid.NO_SL)
         ], []
 
     monkeypatch.setattr(grid, "day_cells", fake)

@@ -59,6 +59,12 @@ STOP_LOSSES = tuple(range(10, 101, 10))
 #: are held to the exit time and never stopped. Defined here once; the views list it last.
 NO_SL = 0
 SL_LEVELS = (*STOP_LOSSES, NO_SL)
+
+
+def sl_label(sl: int) -> str:
+    return "No SL" if sl == NO_SL else f"{sl}%"
+
+
 #: Exit times a grid is built for. 15:30 is the end of the 375-minute grid (legs not stopped exit at
 #: the last bar's close; the owner's choice). AlgoTest's own heatmap squares off at 15:15 — its
 #: 26 Aug 2026 NIFTY grid reproduces from the lake at that time, not at 15:30.
@@ -182,8 +188,7 @@ def cells_from(
                 ce = _sell_leg(ce_s, minute, sl, exit_min)
                 pe = _sell_leg(pe_s, minute, sl, exit_min)
                 if ce is None or pe is None:
-                    label = "no SL" if sl == NO_SL else f"SL{sl}"
-                    notes.append(f"{hhmm} {label}: a leg has no price")
+                    notes.append(f"{hhmm} {sl_label(sl)}: a leg has no price")
                     continue
                 out.append(
                     Cell(

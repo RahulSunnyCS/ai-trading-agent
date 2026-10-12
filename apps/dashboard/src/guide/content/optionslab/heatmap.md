@@ -16,7 +16,9 @@ stopped is bought back at the exit time. The last stop-loss setting, **No SL**, 
 | Date vs Time | One row per day | Entry times | A stop loss (10% to 100%, or No SL) and a date range |
 | Date vs SL | One row per day | Stop loss, 10% to 100%, then No SL | An entry time and a date range |
 
-The TOTAL row and column add the cells up. In a range, a cell is the sum of the days in it.
+The TOTAL row and column add the cells up. In a range, a cell is the sum of the days in it. The
+No SL column has its own total at the bottom but is not added into the TOTAL column or the headline
+Total: it is the same trades with no stop, not one more stop to add.
 
 ## The controls
 
