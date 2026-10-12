@@ -141,6 +141,10 @@ const detail: MatrixCellDetail = {
   overlay: matrixResponse().overlay,
 };
 
+function openSettings() {
+  fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
+}
+
 const ok = (body: unknown, status = 200) => Response.json(body, { status });
 
 function stub(handler: (url: string) => Response) {
@@ -151,7 +155,8 @@ function stub(handler: (url: string) => Response) {
 
 beforeEach(() => {
   clearPolledResourceCache();
-  window.history.replaceState(null, '', '/optionslab/matrix');
+  // the page opens on today's session when no period is named: these tests start from P1
+  window.history.replaceState(null, '', '/optionslab/matrix?period=P1');
 });
 afterEach(() => {
   cleanup();
@@ -252,6 +257,7 @@ describe('RotationMatrixPanel', () => {
     const fetchMock = stub(() => ok(matrixResponse()));
     render(<RotationMatrixPanel />);
     await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17: \+₹148/);
+    openSettings();
     fireEvent.click(screen.getByText('P1 and P2'));
     await waitFor(() =>
       expect(
@@ -334,7 +340,9 @@ describe('RotationMatrixPanel', () => {
     );
     render(<RotationMatrixPanel />);
     await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17/);
+    openSettings();
     fireEvent.click(screen.getByText('P1 and P2'));
+    fireEvent.keyDown(document.body, { key: 'Escape' });
     fireEvent.click(await screen.findByText('Difference'));
     fireEvent.click(
       await screen.findByLabelText(
@@ -349,8 +357,98 @@ describe('RotationMatrixPanel', () => {
       expect(cells.some((u) => u.includes('period=P2'))).toBe(true);
     });
     fireEvent.keyDown(document.body, { key: 'Escape' });
+    openSettings();
     fireEvent.click(screen.getByText('One period'));
+    fireEvent.keyDown(document.body, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByText('Difference')).toBeNull());
     expect(document.body.textContent).not.toContain('minus P2');
+  });
+
+  describe('default view: the latest scored session', () => {
+    const days = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09'];
+    const probeResponse = () =>
+      matrixResponse({
+        view: 'date_slot',
+        rows: days.map((d) => ({ key: d, label: d, date: d })),
+      });
+    const handler = (url: string) =>
+      url.includes('view=date_slot') ? ok(probeResponse()) : ok(matrixResponse());
+    const mainCalls = (fetchMock: ReturnType<typeof stub>) =>
+      fetchMock.mock.calls
+        .map(([u]) => String(u))
+        .filter((u) => u.includes('/matrix?') && !u.includes('view=date_slot'));
+
+    it('opens on the latest scored day as one session with min_n=1 and says which day', async () => {
+      window.history.replaceState(null, '', '/optionslab/matrix');
+      const fetchMock = stub(handler);
+      render(<RotationMatrixPanel />);
+      await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17/);
+      const calls = mainCalls(fetchMock);
+      expect(calls.length).toBeGreaterThan(0);
+      for (const u of calls) {
+        expect(u).toContain('period=custom');
+        expect(u).toContain('from=2026-10-09');
+        expect(u).toContain('to=2026-10-09');
+        expect(u).toContain('min_n=1');
+        expect(u).not.toContain('period=P1');
+      }
+      expect(screen.getByTestId('matrix-summary').textContent).toContain('Session of 09 Oct 2026');
+      expect(screen.getByText(/Showing the latest scored session, 09 Oct 2026/)).toBeTruthy();
+    });
+
+    it('keeps a period named in the URL and never asks for the latest day', async () => {
+      window.history.replaceState(null, '', '/optionslab/matrix?period=P2&minn=5');
+      const fetchMock = stub(handler);
+      render(<RotationMatrixPanel />);
+      await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17/);
+      const calls = mainCalls(fetchMock);
+      expect(calls.every((u) => u.includes('period=P2') && u.includes('min_n=5'))).toBe(true);
+      expect(screen.queryByText(/Showing the latest scored session/)).toBeNull();
+    });
+
+    it('keeps the pulse view as of its own date, not a single day', async () => {
+      window.history.replaceState(null, '', '/optionslab/matrix?view=pulse');
+      const fetchMock = stub(handler);
+      render(<RotationMatrixPanel />);
+      await waitFor(() => expect(mainCalls(fetchMock).length).toBeGreaterThan(0));
+      expect(mainCalls(fetchMock).every((u) => !u.includes('period='))).toBe(true);
+    });
+
+    it('a quick preset names the period in the URL and Reset to today clears it', async () => {
+      window.history.replaceState(null, '', '/optionslab/matrix');
+      const fetchMock = stub(handler);
+      render(<RotationMatrixPanel />);
+      await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17/);
+      openSettings();
+      fireEvent.click(await screen.findByText('Last 5 sessions'));
+      await waitFor(() => expect(window.location.search).toContain('period=custom'));
+      expect(window.location.search).toContain('from=2026-10-05');
+      expect(window.location.search).toContain('to=2026-10-09');
+      await waitFor(() =>
+        expect(mainCalls(fetchMock).some((u) => u.includes('from=2026-10-05'))).toBe(true),
+      );
+      fireEvent.click(screen.getByText('Reset to today'));
+      await waitFor(() => expect(window.location.search).toBe(''));
+    });
+
+    it('Latest day returns to following the newest session and keeps other settings', async () => {
+      window.history.replaceState(null, '', '/optionslab/matrix?period=P1&family=widesl');
+      stub(handler);
+      render(<RotationMatrixPanel />);
+      await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17/);
+      openSettings();
+      fireEvent.click(screen.getByText('Latest day'));
+      await waitFor(() => expect(window.location.search).toBe('?family=widesl'));
+    });
+
+    it('falls back to P1 and says so when no scored session can be found', async () => {
+      window.history.replaceState(null, '', '/optionslab/matrix');
+      const fetchMock = stub((url) =>
+        url.includes('view=date_slot') ? ok({ error: 'down' }, 500) : ok(matrixResponse()),
+      );
+      render(<RotationMatrixPanel />);
+      expect(await screen.findByText(/could not be found, so this shows P1/)).toBeTruthy();
+      expect(mainCalls(fetchMock).some((u) => u.includes('period=P1'))).toBe(true);
+    });
   });
 });
