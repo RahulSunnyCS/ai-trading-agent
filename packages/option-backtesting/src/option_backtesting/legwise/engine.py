@@ -32,6 +32,10 @@ backtest (TODO.md 3.10.7):
   (side high) or whose low undercuts the range low (side low) enters, at the
   range level (or the bar's open if it gapped through). `source: underlying`
   fills at the option's CLOSE of the breakout minute. Triggers at most once.
+  `gap_percent` (default 0) moves the trigger out by that percentage of the range edge
+  (high x (1 + g/100), low x (1 - g/100)); the fill is at that widened level, or the bar's open
+  if it gapped through it. `valid_until` (default none) is the last minute the breakout can
+  still trigger; after it the leg is done without entering.
 - **Intrabar entries** (breakout, RE COST) skip SL/target/trail on their own
   bar — the bar's high/low may have happened before the fill.
 - **RE COST** — after an SL, the same contract re-enters when its price comes
@@ -150,6 +154,7 @@ class _LegRun:
     target: float | None = None
     best: float = 0.0
     range_end: int = 0
+    range_valid_until: int = N_MINUTES
     range_hi: float | None = None
     range_lo: float | None = None
     fresh_intrabar: bool = False
@@ -292,6 +297,11 @@ class _DaySim:
         if run.spec.range_breakout is not None:
             run.state = "range"
             run.range_end = minute_index(run.spec.range_breakout.until)
+            run.range_valid_until = (
+                minute_index(run.spec.range_breakout.valid_until)
+                if run.spec.range_breakout.valid_until is not None
+                else N_MINUTES
+            )
             return
         assert run.series is not None
         self._enter(run, minute, run.series.price_at(minute), intrabar=False)  # type: ignore[arg-type]
@@ -318,14 +328,20 @@ class _DaySim:
     def _step_armed(self, run: _LegRun, minute: int) -> None:
         rb = run.spec.range_breakout
         assert rb is not None and run.series is not None
+        if minute > run.range_valid_until:
+            run.state = "done"
+            return
         source = self._range_source(run)
         o, h, lo = source.open[minute], source.high[minute], source.low[minute]
         if o is None or h is None or lo is None:
             return
-        if rb.side == "high" and h > run.range_hi + _EPS:  # type: ignore[operator]
-            level = max(o, run.range_hi)  # type: ignore[type-var]
-        elif rb.side == "low" and lo < run.range_lo - _EPS:  # type: ignore[operator]
-            level = min(o, run.range_lo)  # type: ignore[type-var]
+        gap = rb.gap_percent / 100
+        high_trigger = run.range_hi * (1 + gap)  # type: ignore[operator]
+        low_trigger = run.range_lo * (1 - gap)  # type: ignore[operator]
+        if rb.side == "high" and h > high_trigger + _EPS:  # type: ignore[operator]
+            level = max(o, high_trigger)
+        elif rb.side == "low" and lo < low_trigger - _EPS:  # type: ignore[operator]
+            level = min(o, low_trigger)
         else:
             return
         price = level if rb.source == "instrument" else run.series.close[minute]

@@ -23,6 +23,7 @@ ignoring it.
           trail_sl: { points: [15, 10] }       # every 15 pts in favour, move SL 10
           reentry_on_sl: { mode: cost, count: 1 }
           range_breakout: { until: "09:45", side: high, source: instrument }
+          # optional: gap_percent: 2 (trigger 2% beyond the range edge), valid_until: "11:00"
       overall:
         stop_loss_inr: 2500
 """
@@ -35,7 +36,14 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 _STRIKE_TYPE_RE = re.compile(r"^(ATM|(OTM|ITM)([1-9]\d?))$")
 
@@ -113,6 +121,11 @@ class ReEntry(_Model):
 
 class RangeBreakout(_Model):
     until: str
+    #: Widen the trigger: enter only above the range high x (1 + gap_percent / 100) (side high)
+    #: or below the range low x (1 - gap_percent / 100) (side low). 0 = the plain range edge.
+    gap_percent: float = Field(default=0.0, ge=0)
+    #: Last minute (inclusive) the breakout can still trigger; None = until the strategy exits.
+    valid_until: str | None = None
     side: Literal["high", "low"]
     #: instrument — the range is the leg's own option premium ("Strike Price"
     #: in AlgoTest's dropdown); underlying — the index. (Not `on:` — YAML 1.1
@@ -120,6 +133,22 @@ class RangeBreakout(_Model):
     source: Literal["instrument", "underlying"] = "instrument"
 
     _until = field_validator("until")(_hhmm)
+    _valid_until = field_validator("valid_until")(lambda v: v if v is None else _hhmm(v))
+
+    @model_serializer(mode="wrap")
+    def _omit_new_defaults(self, handler):
+        """Leave `gap_percent` / `valid_until` out of the dump while they are at their defaults.
+
+        `store.spec_hash` is the hash of this dump; adding the two fields must not give every
+        range-breakout strategy (all the Buy rotation variants) a new version, which would orphan
+        its saved results and the frozen goldens' `strategy_spec_hash`.
+        """
+        data = handler(self)
+        if data.get("gap_percent") == 0:
+            data.pop("gap_percent", None)
+        if data.get("valid_until") is None:
+            data.pop("valid_until", None)
+        return data
 
 
 class Leg(_Model):
@@ -188,8 +217,16 @@ class LegwiseStrategy(_Model):
             raise ValueError(f"leg ids must be unique, got {ids}")
         for leg in self.legs:
             rb = leg.range_breakout
-            if rb is not None and not self.entry_time < rb.until < self.exit_time:
-                raise ValueError(f"leg {leg.id!r}: range_breakout.until must be inside entry-exit")
+            if rb is not None:
+                if not self.entry_time < rb.until < self.exit_time:
+                    raise ValueError(
+                        f"leg {leg.id!r}: range_breakout.until must be inside entry-exit"
+                    )
+                if rb.valid_until is not None and not rb.until < rb.valid_until <= self.exit_time:
+                    raise ValueError(
+                        f"leg {leg.id!r}: range_breakout.valid_until must be after until "
+                        "and no later than exit"
+                    )
             reentry = leg.reentry_on_sl or leg.reentry_on_target
             if self.square_off == "complete" and reentry is not None:
                 raise ValueError("re-entry with square_off: complete is not supported yet")

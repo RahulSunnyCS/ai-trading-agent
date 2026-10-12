@@ -150,6 +150,99 @@ def test_range_breakout_never_triggers_without_a_break():
     assert simulate_day(strategy([leg]), day({(22000.0, "CE"): bars(50)})).trades == []
 
 
+def _breakout_leg(side: str = "high", **range_extra) -> dict:
+    return {
+        "id": "pe",
+        "lots": 1,
+        "position": "buy",
+        "option_type": "PE",
+        "strike": {"strike_type": "ATM"},
+        "range_breakout": {"until": "09:30", "side": side, **range_extra},
+    }
+
+
+def _breakout_day(overrides: dict[str, tuple[float, float, float, float]]) -> DayData:
+    """Range 09:20-09:30 is high 58 / low 49 (the 09:25 bar); flat 50 around it."""
+    return day({(22000.0, "PE"): bars(50, {"09:25": (50, 58, 49, 55), **overrides})})
+
+
+def test_range_breakout_gap_percent_widens_the_trigger_on_the_high_side():
+    # 5% above the range high 58 is 60.9: a high of 60 is not a trigger, 61 is, filled at 60.9.
+    leg = _breakout_leg("high", gap_percent=5)
+    short = _breakout_day({"09:40": (56, 60, 55, 59)})
+    assert simulate_day(strategy([leg]), short).trades == []
+    long = _breakout_day({"09:40": (56, 61, 55, 60), "14:59": (70, 70, 70, 70)})
+    [t] = simulate_day(strategy([leg]), long).trades
+    assert t.entry_min == minute_index("09:40")
+    assert t.entry_price == pytest.approx(58 * 1.05)
+    # a bar that gaps open above the widened level fills at its open
+    gapped = _breakout_day({"09:40": (63, 64, 62, 63)})
+    [g] = simulate_day(strategy([leg]), gapped).trades
+    assert g.entry_price == 63
+
+
+def test_range_breakout_gap_percent_widens_the_trigger_on_the_low_side():
+    # 5% below the range low 49 is 46.55: a low of 47 is not a trigger, 46 is, filled at 46.55.
+    leg = _breakout_leg("low", gap_percent=5)
+    short = _breakout_day({"09:40": (48, 49, 47, 48)})
+    assert simulate_day(strategy([leg]), short).trades == []
+    long = _breakout_day({"09:40": (48, 49, 46, 47), "14:59": (40, 40, 40, 40)})
+    [t] = simulate_day(strategy([leg]), long).trades
+    assert t.entry_min == minute_index("09:40")
+    assert t.entry_price == pytest.approx(49 * 0.95)
+    gapped = _breakout_day({"09:40": (44, 45, 43, 44)})
+    [g] = simulate_day(strategy([leg]), gapped).trades
+    assert g.entry_price == 44
+
+
+def test_range_breakout_valid_until_ends_the_armed_state():
+    leg = _breakout_leg("high", valid_until="10:00")
+    # the valid_until minute itself is still armed
+    on_time = _breakout_day({"10:00": (56, 61, 55, 60), "14:59": (70, 70, 70, 70)})
+    [t] = simulate_day(strategy([leg]), on_time).trades
+    assert (t.entry_min, t.entry_price) == (minute_index("10:00"), 58)
+    # one minute later the leg has expired without entering, however far it then breaks
+    late = _breakout_day({"10:01": (56, 61, 55, 60), "11:00": (80, 90, 80, 85)})
+    result = simulate_day(strategy([leg]), late)
+    assert result.trades == []
+    # without valid_until the same late break does enter
+    [t] = simulate_day(strategy([_breakout_leg("high")]), late).trades
+    assert t.entry_min == minute_index("10:01")
+
+
+def test_range_breakout_without_gap_or_valid_until_is_unchanged():
+    overrides = {"09:40": (56, 61, 30, 60), "14:59": (70, 70, 70, 70)}
+    plain = simulate_day(strategy([_breakout_leg("high")]), _breakout_day(overrides))
+    explicit = simulate_day(
+        strategy([_breakout_leg("high", gap_percent=0, valid_until=None)]),
+        _breakout_day(overrides),
+    )
+    assert plain.trades == explicit.trades and plain.gross == explicit.gross
+    assert [(t.entry_min, t.entry_price) for t in plain.trades] == [(minute_index("09:40"), 58)]
+    rb = strategy([_breakout_leg("high")]).legs[0].range_breakout
+    assert rb.gap_percent == 0 and rb.valid_until is None
+    # defaults stay out of the dump, so `store.spec_hash` (and every saved result version and
+    # frozen golden hash) of an existing range-breakout strategy does not move
+    assert set(rb.model_dump(mode="json")) == {"until", "side", "source"}
+    tuned = strategy([_breakout_leg("high", gap_percent=2, valid_until="10:00")])
+    assert tuned.legs[0].range_breakout.model_dump(mode="json")["gap_percent"] == 2
+    assert tuned.legs[0].range_breakout.model_dump(mode="json")["valid_until"] == "10:00"
+
+
+def test_range_breakout_schema_validates_gap_and_valid_until():
+    with pytest.raises(ValidationError):
+        strategy([_breakout_leg(gap_percent=-1)])
+    with pytest.raises(ValidationError):
+        strategy([_breakout_leg(valid_until="9am")])
+    with pytest.raises(ValidationError, match="valid_until"):
+        strategy([_breakout_leg(valid_until="09:30")])  # not after until
+    with pytest.raises(ValidationError, match="valid_until"):
+        strategy([_breakout_leg(valid_until="09:25")])  # before until
+    with pytest.raises(ValidationError, match="valid_until"):
+        strategy([_breakout_leg(valid_until="15:01")])  # after exit (15:00)
+    assert strategy([_breakout_leg(valid_until="15:00")])  # exactly at exit is fine
+
+
 def test_re_cost_re_enters_same_contract_at_entry_price_once():
     leg = sell_leg(stop_loss={"percent": 20}, reentry_on_sl={"mode": "cost", "count": 1})
     ce = bars(100, {"10:00": (110, 125, 110, 124)})  # SL at 120
