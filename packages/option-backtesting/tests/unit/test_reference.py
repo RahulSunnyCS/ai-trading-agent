@@ -26,6 +26,11 @@ class TestStrikeStep:
     def test_nifty(self, rd: ReferenceData) -> None:
         assert rd.strike_step("NIFTY", date(2026, 9, 1)) == 50
 
+    def test_nifty_vendor_history_from_2013(self, rd: ReferenceData) -> None:
+        """NIFTY's 50-point step is dated 2013-01-01 so the 2013-2017 vendor history resolves."""
+        assert rd.strike_step("NIFTY", date(2013, 1, 1)) == 50
+        assert rd.strike_step("NIFTY", date(2016, 6, 1)) == 50
+
     def test_banknifty(self, rd: ReferenceData) -> None:
         assert rd.strike_step("BANKNIFTY", date(2026, 9, 1)) == 100
 
@@ -213,6 +218,15 @@ class TestRiskFreeRate:
         assert rd.risk_free_rate(date(2025, 6, 6)) == pytest.approx(0.055)
         assert rd.risk_free_rate(date(2026, 9, 1)) == pytest.approx(0.0525)
 
+    def test_history_from_2013(self, rd: ReferenceData) -> None:
+        """Vendor history reaches back to 2013 (BL-034); the table carries every decision since
+        2013-05-03 (the January and March 2013 cuts are not in it)."""
+        assert rd.risk_free_rate(date(2013, 5, 3)) == pytest.approx(0.0725)
+        assert rd.risk_free_rate(date(2016, 4, 5)) == pytest.approx(0.065)
+        assert rd.risk_free_rate(date(2020, 1, 1)) == pytest.approx(0.0515)
+        assert rd.risk_free_rate(date(2021, 6, 1)) == pytest.approx(0.04)  # unchanged 2020-05 .. 2022-05
+        assert rd.risk_free_rate(date(2022, 12, 7)) == pytest.approx(0.0625)
+
     def test_before_the_table_raises(self, rd: ReferenceData) -> None:
         with pytest.raises(ValueError, match="No rates row"):
-            rd.risk_free_rate(date(2020, 1, 1))
+            rd.risk_free_rate(date(2013, 1, 1))

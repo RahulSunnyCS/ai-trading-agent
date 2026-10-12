@@ -867,8 +867,9 @@ def available_days(root: Path, dataset: str, underlying: str) -> list[date]:
 
 
 def candidate_days(root: Path, underlying: str, days: tuple[date, date] | None) -> list[date]:
+    # The default window starts at DERIVED_FROM; an explicit `days` may reach back before it
+    # (the 2013-2021 NIFTY vendor history) at the caller's request.
     lo, hi = days or (DERIVED_FROM, date.max)
-    lo = max(lo, DERIVED_FROM)
     option_days = set(lake.available_days(root, "option", underlying))
     index_days = set(lake.available_days(root, "index", underlying))
     return sorted(d for d in option_days & index_days if lo <= d <= hi)
