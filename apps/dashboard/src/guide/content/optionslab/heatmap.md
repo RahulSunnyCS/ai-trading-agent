@@ -6,17 +6,19 @@ this project collects, for every index and every F&O stock it holds.
 
 Each cell is the profit or loss of selling the at-the-money call and put together at the entry
 time. Each leg has its own stop loss at a percentage above its own entry price; a leg that is not
-stopped is bought back at the exit time. Green is profit, red is loss, darker is bigger.
+stopped is bought back at the exit time. The last stop-loss setting, **No SL**, has no stop at all: both legs are held to the exit time. Green is profit, red is loss, darker is bigger.
 
 ## The three tables
 
 | Table configuration | Rows | Columns | You choose |
 |---|---|---|---|
-| Time vs SL | Entry times (09:16, then every half hour from 09:45 to 14:45) | Stop loss, 10% to 100% | One date, or a date and an end date to sum the days |
-| Date vs Time | One row per day | Entry times | A stop loss and a date range |
-| Date vs SL | One row per day | Stop loss, 10% to 100% | An entry time and a date range |
+| Time vs SL | Entry times (09:16, then every half hour from 09:45 to 14:45) | Stop loss, 10% to 100%, then No SL | One date, or a date and an end date to sum the days |
+| Date vs Time | One row per day | Entry times | A stop loss (10% to 100%, or No SL) and a date range |
+| Date vs SL | One row per day | Stop loss, 10% to 100%, then No SL | An entry time and a date range |
 
-The TOTAL row and column add the cells up. In a range, a cell is the sum of the days in it.
+The TOTAL row and column add the cells up. In a range, a cell is the sum of the days in it. The
+No SL column has its own total at the bottom but is not added into the TOTAL column or the headline
+Total: it is the same trades with no stop, not one more stop to add.
 
 ## The controls
 
@@ -72,6 +74,11 @@ never reached at those settings, so the number is the plain hold-to-exit result.
 red at a tight stop and green at a wide one is a time where the straddle usually swings against you
 first and then recovers.
 
+The **No SL** column, set apart at the right, is the plain hold-to-exit result: no stop on either
+leg. Compare it with the 100% column to see what a very wide stop adds, and with the tight columns
+to see what stops cost or save. In "Best cell", No SL can win like any other setting. If the column
+is dashed, the stored days have not been rebuilt with it yet (`obt heatmap build`).
+
 > [!NOTE]
 > A cell is a few days at one setting. It is a place to look, not a rule. Wider tables have more
 > cells, so the best one on screen is partly luck.
@@ -80,7 +87,8 @@ first and then recovers.
 
 - Replay of collected 1-minute bars; no brokerage, taxes or slippage.
 - Entry at the price of the minute before the entry time, as AlgoTest reads it. A stop fills at its
-  level, or at the bar's open if the price gapped through it.
+  level, or at the bar's open if the price gapped through it. With No SL nothing is stopped; each
+  leg is bought back at the exit time's price.
 - Index P&L is for one lot at today's lot size. The lake holds no lot size for most stock
   contracts, so a stock is shown per share.
 - A stock has no spot price in the lake, so its at-the-money strike is the strike where the call

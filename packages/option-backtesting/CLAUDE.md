@@ -233,11 +233,12 @@ Otherwise:
   Journal figures are those on or before as-of. A stored variant outside the 12 cells is listed in `store.unplaced`.
 - `heatmap/` + `api/heatmap_routes.py` — BL-094, the Options Lab's Heatmap tab (default page): the P&L of an ATM
   short straddle for every entry time (09:16, then each half hour to 14:45), exit (15:30, 15:15) and per-leg SL
-  (10..100 %). `grid.py` restates the legwise engine's fills for the fixed two-leg shape (a test pins every cell to
+  (10..100 %, then "No SL": no stop, both legs held to the exit; `grid.NO_SL`, stored as `sl = 0`). `grid.py` restates the legwise engine's fills for the fixed two-leg shape (a test pins every cell to
   `simulate_day`); indices take ATM from the index spot, a stock (no spot, no strike step, mostly no lot size in the
   lake) from put-call parity, so stock P&L is points per share and an index's is rupees per lot at today's lot.
   NIFTY and SENSEX use the nearest weekly, every other index and stock the monthly. `store.py` keeps one Parquet per
-  underlying under `TRADING_DATA_ROOT/heatmap/` (incremental; a file with an old column layout is rebuilt);
+  underlying under `TRADING_DATA_ROOT/heatmap/` (incremental: a day stored without its `sl = 0` row is rebuilt by a plain build, and until then the No SL column
+  reads empty, never zero; a file with an old column layout is rebuilt);
   `view.py` reads the three views (`time_sl`, `date_time`, `date_sl`), sums a date range, filters weeks to expiry
   and gives `value` or `pct`-of-premium; `obt heatmap build [-u X | --stocks] [--force] | show | list`;
   `evening.update_heatmap` adds each index's day inside `obt daily`, isolated.
