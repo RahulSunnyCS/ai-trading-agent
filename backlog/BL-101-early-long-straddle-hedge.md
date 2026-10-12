@@ -109,3 +109,11 @@ Any other entry time, strike, stop, filter, underlying or expiry choice (see "Wi
   turns negative (1%: -57/day) so the carry-matched comparator degenerates to cash. All four
   rules fail. Not run, needs `override`: smaller straddle sizes (1 lot is a ~₹20k premium
   against a base whose worst day is ~₹11k), or a conditional entry.
+- 2026-10-12 — Phase 0b (OTM4 strangle) run once, as registered (`report_otm4.txt`,
+  `daily_otm4.csv`). Killed: all four rules fail. Full window, net, slippage 0: B mean 829/day,
+  ES95 -9,831, MDD -124,096; B+L mean 406, ES95 -11,757 (-19.6%), MDD -164,776 (-32.8%), worst
+  day -17,668; L alone -423/day, wins 27.5% of days, corr(B,L) -0.42. Worse than B in both
+  halves and every year; carry-matched kB (k=0.49) and 0.75 B both beat it on tail risk. L
+  averages -4 on B's worst 5% of days (positive on only 24% of them, +1,208 on the worst 10).
+  Cheaper than the ATM straddle (-423 vs -566/day) but protects less. Both strike depths
+  tested; no other depth is run without a further override.
