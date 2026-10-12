@@ -7,6 +7,7 @@
  */
 
 import { formatDay, formatIstTime, formatNumber } from '../../../lib/format';
+import { listName } from '../../../lib/rotationListNames';
 import { LIST_KEYS } from '../../../lib/rotationView';
 import type {
   RotationBaskets as Baskets,
@@ -63,7 +64,9 @@ function Basket({ k, basket }: { k: RotationListKey; basket: RotationBasket }) {
   return (
     <div className="rounded-lg border border-border bg-surface px-3 py-2">
       <div className="mb-1 flex items-center justify-between text-sm font-semibold text-foreground">
-        <span>List {k}</span>
+        <span>
+          {listName(k)} <span className="text-[10px] font-normal text-faint">({k})</span>
+        </span>
         {basket.overridden ? (
           <span
             className="rounded border border-warning/40 px-1.5 py-0.5 text-[10px] font-medium text-warning"
@@ -125,7 +128,7 @@ export function RotationBaskets({
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {LIST_KEYS.map((k) => (
             <div key={k} className="rounded-lg border border-border bg-surface px-3 py-2">
-              <div className="text-sm font-semibold text-foreground">List {k}</div>
+              <div className="text-sm font-semibold text-foreground">{listName(k)}</div>
               <p className="mt-1 font-mono text-xs text-muted">{weightsLine(specs[k])}</p>
               <p className="mt-1 text-xs text-faint">{specs[k].description}</p>
             </div>
@@ -171,7 +174,7 @@ export function RotationBaskets({
             const c = baskets.changed[k];
             return (
               <div key={k} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="w-9 shrink-0 font-medium text-foreground">{k}</span>
+                <span className="w-20 shrink-0 font-medium text-foreground">{listName(k)}</span>
                 {c?.removed.map((n) => (
                   <span key={`r-${n}`} className="font-mono text-negative">
                     −{n}

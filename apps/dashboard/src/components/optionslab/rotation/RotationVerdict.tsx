@@ -1,5 +1,5 @@
 /**
- * The registered comparisons for the focus list, in words: the difference per lot-day against REF
+ * The registered comparisons for the focus list, in words: the difference per lot-day against Baseline
  * and against the fixed base with its 5-day block-bootstrap 90% interval, and whether the base's
  * pass rule is met. Under the minimum number of days the intervals are shown and the rule says so.
  */

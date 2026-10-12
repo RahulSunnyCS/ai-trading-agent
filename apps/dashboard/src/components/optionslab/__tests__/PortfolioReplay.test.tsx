@@ -108,7 +108,7 @@ describe('PortfolioReplay', () => {
       />,
     );
     expect(await screen.findByText(/Closed by the portfolio stop at 10:55/)).toBeTruthy();
-    expect(screen.getByText(/List A as one basket/)).toBeTruthy();
+    expect(screen.getByText(/Steady \(A\) as one basket/)).toBeTruthy();
     const titles = added.map((a) => a.title);
     expect(titles).toEqual(
       expect.arrayContaining([

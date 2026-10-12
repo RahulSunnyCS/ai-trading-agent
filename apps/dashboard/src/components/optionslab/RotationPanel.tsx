@@ -1,6 +1,6 @@
 /**
- * Options Lab → Rotation: how the four registered lists (A, B, C, REF) are doing on days nobody
- * had seen, against REF, the owner's fixed base and random baskets, and whether today's data can
+ * Options Lab → Rotation: how the four registered lists (Steady A, Calendar B, Adaptive C,
+ * Baseline REF) are doing on days nobody had seen, against Baseline, the owner's fixed base and random baskets, and whether today's data can
  * be trusted (BL-058 Phase 4).
  *
  * The first screen (health strip, read-out banner, headline, hero chart) answers "is this good?"
@@ -17,6 +17,7 @@ import { useRotationOverview, useRotationSummary } from '../../hooks/useRotation
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { formatIstTime, istToday } from '../../lib/format';
 import { amountOf, buttonLabel, isOn, sameTrail, trailParam } from '../../lib/portfolioStop';
+import { listName } from '../../lib/rotationListNames';
 import { overlaySummary, unmatched } from '../../lib/rotationPortfolioView';
 import {
   BENCHMARK_LABEL,
@@ -51,7 +52,7 @@ import { RotationVerdict } from './rotation/RotationVerdict';
 
 const FOCUS_OPTIONS: SegmentedOption<RotationListKey>[] = LIST_KEYS.map((value) => ({
   value,
-  label: value,
+  label: listName(value),
 }));
 
 const BENCHMARK_OPTIONS: SegmentedOption<RotationBenchmark>[] = (

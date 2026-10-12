@@ -1,9 +1,26 @@
 # Rotation
 
-The Rotation page shows how the four registered lists (A, B, C and REF) are doing on days nobody
-had seen. Each morning at 09:16 the forward journal records the strategies each list would trade
-that day, before anything is known. Each evening the day is scored from the collected data. This
-page reads that journal; it never changes a list, a weight or an entry.
+The Rotation page shows how the four registered lists (Steady, Calendar, Adaptive and Baseline)
+are doing on days nobody had seen. Each morning at 09:16 the forward journal records the
+strategies each list would trade that day, before anything is known. Each evening the day is
+scored from the collected data. This page reads that journal; it never changes a list, a weight or
+an entry.
+
+## The four lists
+
+Each list ranks the same 298 strategies with a different mix of five criteria. The names are what
+this page shows; the **key** is what the journal, the stored results and the API use, so it is
+what you will see in a saved link or an exported file. The numbers are the weights in percent.
+
+| Name | Key | Own recent results | Weekday | Days to expiry | VIX | Family band | What it is |
+|---|---|---|---|---|---|---|---|
+| Steady | A | 5 | 34 | 33 | 23 | 5 | The safest cell of the weightings |
+| Calendar | B | 0 | 36 | 35 | 24 | 5 | Leans on the calendar and ignores its own recent results |
+| Adaptive | C | 15 | 30 | 30 | 20 | 5 | Lets its own recent results count the most |
+| Baseline | REF | 33 | 25 | 25 | 17 | 0 | The old live rotation, kept as the comparator |
+
+Where a screen records a decision (the Daily log, a saved placement) the key is shown beside the
+name, as "Steady (A)", so an entry can be matched to the journal.
 
 ## What you see
 
@@ -26,10 +43,11 @@ every figure is descriptive and changes nothing.
 
 **Compare with.** The page opens on the fixed base: 2 × Widesl OTM1 at 09:17 plus 1 × Dir ATM at
 09:24 every day with no ranking. Does rotating beat the simple rule at all? REF is the old live rule:
-did the new weightings beat it? Random median is what luck gives. One picker switches every
+did the new weightings beat it? (It is the Baseline list; the picker calls it Baseline.) Random
+median is what luck gives. One picker switches every
 comparison on the page, and the registered comparisons list the base first.
 
-**Hero chart.** Cumulative gross by the focus list, the fixed base (REF and the other lists are toggles), and a shaded band of the random baskets
+**Hero chart.** Cumulative gross by the focus list, the fixed base (Baseline and the other lists are toggles), and a shaded band of the random baskets
 (10th to 90th percentile). Hover for a day, click to pin it, ← → to step, Esc to close.
 
 **Today's baskets.** The latest entry for all four lists side by side: start time, the strategy, its

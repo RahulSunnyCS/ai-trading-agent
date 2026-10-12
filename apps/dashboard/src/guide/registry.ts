@@ -314,7 +314,7 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     slug: 'rotation',
     title: 'Rotation',
     summary:
-      'The four forward lists against REF, the fixed base and random baskets, and today’s picks.',
+      'The four forward lists against Baseline, the fixed base and random baskets, and today’s picks.',
     kind: 'Screen',
     body: optionsRotation,
     screen: { tab: 'optionslab', rest: ['rotation'] },

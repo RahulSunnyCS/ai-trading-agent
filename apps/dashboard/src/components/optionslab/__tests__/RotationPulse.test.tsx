@@ -199,13 +199,15 @@ describe('RotationPulse', () => {
     expect(within(dir).getByText('₹676')).toBeTruthy();
     expect(within(dir).getByText('1/12')).toBeTruthy();
     expect(within(dir).getByText('Above')).toBeTruthy();
-    expect(within(dir).getByText('A')).toBeTruthy();
+    expect(within(dir).getByText('Steady')).toBeTruthy();
     expect(within(dir).getByText('5% · 3/63')).toBeTruthy();
     const buy = screen.getByText('Buy').closest('tr') as HTMLElement;
     expect(within(buy).getByText('Below')).toBeTruthy();
     expect(within(buy).getByText('4 of 21 d')).toBeTruthy();
     expect(
-      screen.getByText(/carries 5% of the composite in A, B and C and none in REF/),
+      screen.getByText(
+        /carries 5% of the composite in Steady, Calendar and Adaptive and none in Baseline/,
+      ),
     ).toBeTruthy();
   });
 

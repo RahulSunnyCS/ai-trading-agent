@@ -27,6 +27,7 @@ import {
   icVerdict,
   nearestBar,
 } from '../../lib/rotationExplainView';
+import { listName } from '../../lib/rotationListNames';
 import type {
   RotationIc,
   RotationIcDay,
@@ -42,7 +43,7 @@ import { StatCard } from '../ui/StatCard';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 
-const LIST_OPTIONS = LIST_KEYS.map((value) => ({ value, label: value }));
+const LIST_OPTIONS = LIST_KEYS.map((value) => ({ value, label: listName(value) }));
 
 type View = 'forward' | 'research';
 type Window = '63' | 'p1' | 'all';
@@ -285,7 +286,7 @@ function Legend({ hasReference }: { hasReference: boolean }) {
       {hasReference ? (
         <li className="flex items-center gap-1.5">
           <span className="h-0.5 w-4 border-t-2 border-dashed border-info" aria-hidden="true" />
-          Research mean, list A
+          Research mean, {listName('A')}
         </li>
       ) : null}
     </ul>
@@ -344,8 +345,8 @@ function CriterionTable({
           align="right"
           title={
             ref
-              ? `${ref.source}, list ${ref.list}, ${formatDay(ref.from)} to ${formatDay(ref.to)}, ${ref.variants} variants`
-              : 'Only list A has a research reference'
+              ? `${ref.source}, ${listName(ref.list)} list, ${formatDay(ref.from)} to ${formatDay(ref.to)}, ${ref.variants} variants`
+              : `Only the ${listName('A')} list has a research reference`
           }
         >
           Research
