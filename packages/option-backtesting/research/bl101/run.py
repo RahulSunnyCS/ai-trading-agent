@@ -167,7 +167,7 @@ def main() -> None:
     imp, dd, beat, B, L = gate[("full", 0.0)]
     order = np.argsort(B)
     n5 = max(1, math.ceil(len(B) * 0.05))
-    out.append(f"\n== L on B's worst days (net, slip 0)")
+    out.append("\n== L on B's worst days (net, slip 0)")
     out.append(f"worst 5% ({n5} days): B mean {B[order[:n5]].mean():,.0f}  L mean {L[order[:n5]].mean():,.0f}  "
                f"L>0 on {(L[order[:n5]]>0).mean()*100:.0f}% of them")
     out.append(f"worst 10 days: B mean {B[order[:10]].mean():,.0f}  L mean {L[order[:10]].mean():,.0f}")
@@ -179,7 +179,6 @@ def main() -> None:
             pts = mtm.get((d, k), {})
             tot[k] = (pts, m)
         mins = sorted(set().union(*[set(p) for p, _ in tot.values()]))
-        cb = cbl = None
         last = {k: 0.0 for k in tot}
         wb_d = wbl_d = 0.0
         for mnt in mins:
