@@ -53,9 +53,9 @@ One 32 px line a day, newest first.
 | VIX open | The 09:15 India VIX open the entry was scored on, and where it was read from: Fyers, Angel One (the fallback when there is no Fyers login that morning), or given (typed by hand) |
 | DTE N / S | Days to the nearest listed expiry for NIFTY and SENSEX |
 | Recorded | The time the entry was written. After 09:17 it is *late* |
-| A, B, C, REF | Gross per lot-day of the list's basket that day. Hover for the list's total in rupees and its lots. **W** marks that the Widesl minimum replaced a top-ranked Dir; **B** that a Buy strategy qualified and was added |
+| Steady, Calendar, Adaptive, Baseline | Gross per lot-day of the list's basket that day. Each header carries the journal key (A, B, C, REF) in small type. Hover for the list's total in rupees and its lots. **W** marks that the Widesl minimum replaced a top-ranked Dir; **B** that a Buy strategy qualified and was added |
 | Flags | Late, VIX from Angel One or by hand, days to expiry from the calendar, a stop, and **PF stop 11:14** when the portfolio stop closed the basket (below) |
-| Placed | Four dots, A to REF: green placed, amber changed, red not placed, hollow not marked |
+| Placed | Four dots, in the order Steady, Calendar, Adaptive, Baseline: green placed, amber changed, red not placed, hollow not marked |
 | Status | Scored, Waiting, Late or Not recorded |
 
 > [!NOTE]

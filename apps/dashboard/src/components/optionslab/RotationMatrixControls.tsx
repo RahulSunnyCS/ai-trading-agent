@@ -1,5 +1,6 @@
 'use client';
 
+import { listName } from '../../lib/rotationListNames';
 import {
   ANY,
   METRIC_NOTE,
@@ -37,10 +38,10 @@ const PERIOD_OPTIONS: SegmentedOption<MatrixPeriodId>[] = (
 
 const LIST_OPTIONS: SegmentedOption<MatrixListId | typeof ANY>[] = [
   { value: ANY, label: 'None' },
-  { value: 'A', label: 'A' },
-  { value: 'B', label: 'B' },
-  { value: 'C', label: 'C' },
-  { value: 'REF', label: 'REF' },
+  { value: 'A', label: listName('A') },
+  { value: 'B', label: listName('B') },
+  { value: 'C', label: listName('C') },
+  { value: 'REF', label: listName('REF') },
 ];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -309,7 +310,7 @@ export function RotationMatrixControls({
         {METRIC_NOTE[f.metric]} Gross, per one lot, before costs. Alternative settings are not a
         portfolio: no row or column is summed.
         {f.list !== ANY
-          ? ` The marks are list ${f.list}'s recorded picks, never reconstructed.`
+          ? ` The marks are the ${listName(f.list)} list's recorded picks, never reconstructed.`
           : ''}
       </p>
     </Card>

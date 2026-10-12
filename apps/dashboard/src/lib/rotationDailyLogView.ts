@@ -21,6 +21,7 @@ import type {
 } from '../types/rotationDailyLog';
 import { formatDay, formatInr } from './format';
 import { addDays } from './regimeTags';
+import { listName } from './rotationListNames';
 
 export const LIST_KEYS: readonly RotationListKey[] = ['A', 'B', 'C', 'REF'];
 
@@ -470,7 +471,7 @@ export interface CounterPart {
 }
 
 function perList(values: Record<RotationListKey, number>, of: number): string {
-  return LIST_KEYS.map((k) => `${k} ${values[k] ?? 0}/${of}`).join(' · ');
+  return LIST_KEYS.map((k) => `${listName(k)} ${values[k] ?? 0}/${of}`).join(' · ');
 }
 
 /** The footer line: how often each structural thing happened, over the days counted. */
@@ -567,9 +568,9 @@ export function cellDescription(cell: CalendarCell, focus: RotationListKey): str
   else parts.push('scored');
   if (row.source === 'reconstructed') parts.push('reconstructed, not recorded');
   if (cell.value !== null) {
-    parts.push(`list ${focus} ${formatInr(cell.value, { sign: true })} gross per lot-day`);
+    parts.push(`${listName(focus)} ${formatInr(cell.value, { sign: true })} gross per lot-day`);
   }
-  if (focusStopped(row, focus)) parts.push(`overall stop-loss fired in list ${focus}`);
+  if (focusStopped(row, focus)) parts.push(`overall stop-loss fired in ${listName(focus)}`);
   const flags = rowFlags(row).filter((f) => f.id !== 'late' && f.id !== 'reconstructed');
   for (const f of flags) if (f.id !== 'stop') parts.push(f.label);
   if (row.status !== 'scored' && row.status_detail) parts.push(row.status_detail);

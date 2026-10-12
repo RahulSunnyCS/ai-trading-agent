@@ -20,6 +20,7 @@ import { useState } from 'react';
 
 import { useRotationShadow } from '../../hooks/useRotationShadow';
 import { EMPTY, formatDay, formatInr, formatInt, formatPct } from '../../lib/format';
+import { listName, renameListsIn } from '../../lib/rotationListNames';
 import {
   bannerText,
   dayCells,
@@ -172,7 +173,7 @@ function TriggerTable({ r }: { r: RotationShadowResponse }) {
 function listOptions(lists: readonly ShadowListSummary[]): SegmentedOption<ShadowListKey>[] {
   return lists.map((l) => ({
     value: l.list,
-    label: l.candidate ? `${l.list} (candidate)` : l.list,
+    label: l.candidate ? `${listName(l.list)} (candidate)` : listName(l.list),
   }));
 }
 
@@ -371,7 +372,7 @@ function ResearchCard({ r }: { r: RotationShadowResponse }) {
           {rows.map((row) => (
             <TRow key={row.list} highlighted={row.candidate}>
               <Td dense className="whitespace-nowrap">
-                {row.list}
+                {listName(row.list)}
                 {row.candidate ? (
                   <Badge tone="primary" className="ml-2">
                     Candidate
@@ -436,7 +437,7 @@ function CandidatesCard({ r }: { r: RotationShadowResponse }) {
         {r.candidates.map((c) => (
           <div key={c.id} className="rounded-lg border border-border bg-surface-2/60 px-4 py-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-medium text-foreground">{c.title}</p>
+              <p className="text-sm font-medium text-foreground">{renameListsIn(c.title)}</p>
               <Badge tone="warning">Not scored</Badge>
             </div>
             <p className="mt-2 text-xs text-muted">{c.definition}</p>

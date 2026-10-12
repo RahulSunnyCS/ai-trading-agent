@@ -24,6 +24,7 @@ import {
   shadeScale,
   shiftMonth,
 } from '../../lib/rotationDailyLogView';
+import { listName } from '../../lib/rotationListNames';
 import type { RotationListKey, RotationRow } from '../../types/rotationDailyLog';
 import { Button } from '../ui/Button';
 import { pnlClass } from './shared';
@@ -192,11 +193,11 @@ export function RotationDailyLogCalendar({
       <ul className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-faint">
         <li className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-sm bg-positive/20" aria-hidden="true" />
-          list {focus} gained
+          {listName(focus)} gained
         </li>
         <li className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-sm bg-negative/20" aria-hidden="true" />
-          list {focus} lost (shading scales to the largest day in view)
+          {listName(focus)} lost (shading scales to the largest day in view)
         </li>
         <li className="flex items-center gap-1.5">
           <span
