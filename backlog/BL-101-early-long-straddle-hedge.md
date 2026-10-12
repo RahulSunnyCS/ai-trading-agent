@@ -71,6 +71,16 @@ Any other entry time, strike, stop, filter, underlying or expiry choice (see "Wi
   0DTE-only or non-weekly expiry, SENSEX or other underlyings, more than 1 and 2 lots. Running
   one needs `override: <reason>` in the Log.
 
+### Phase 0b — Variant: long OTM4 strangle (registered 2026-10-12, before its run)
+- override: owner asked for it in chat on 2026-10-12 after the ATM straddle was killed; it lifts
+  only the "other strikes" line of "Will not run".
+- **Change:** buy 1 lot of the OTM4 CE and the OTM4 PE at 09:16 (nearest weekly, exit 15:28, no
+  stops or filters), file `research/bl101/nifty_long_strangle_otm4_916.yaml`. Nothing else
+  differs: same days, same B, same charges, same slippage scenarios, same comparators, same
+  pass / kill rules 1 to 4, 1 lot primary and 2 lots as sensitivity only.
+- **Multiplicity:** this is the second trial on one idea. A pass is not adjusted for that, so a
+  pass here means only "worth a forward paper test"; other strike depths are not run.
+
 ## Risks
 
 - B is in-sample; a hedge that looks good against an over-fitted B may be hedging noise.

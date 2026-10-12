@@ -5,6 +5,7 @@ Read-only on the lake; writes only daily.csv / report.txt in this folder."""
 
 from __future__ import annotations
 
+import argparse
 import csv
 import math
 from datetime import date
@@ -12,7 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
-from option_backtesting.data.reference.loader import default_reference_data
+from option_backtesting.data.reference.loader import MissingReferenceData, default_reference_data
 from option_backtesting.fyers.daily import data_dir
 from option_backtesting.legwise.engine import simulate_day
 from option_backtesting.legwise.market import backtest_days, load_day
@@ -46,13 +47,22 @@ def charges(day, t) -> float:
     return brok + stt + ex + se + ip + STAMP * buy + GST * (brok + ex + se + ip)
 
 
-def curve(result, n=400):
-    """Minute-indexed gross MTM, forward-filled; 0 before the first sample."""
-    pts = dict(result.mtm)
-    if not pts:
-        return None
-    lo = min(pts)
-    return pts, lo
+class _PreTableLots:
+    """lot_sizes.csv starts 2024-10-03. In `current` sizing the per-contract lot is only compared
+    with the symbol master for a note; the quantity is today's lot. So an earlier day falls back
+    to the sizing-date lot instead of raising and dropping the day."""
+
+    def __init__(self, ref, sizing):
+        self._ref, self._sizing = ref, sizing
+
+    def __getattr__(self, name):
+        return getattr(self._ref, name)
+
+    def lot_size(self, underlying, when):
+        try:
+            return self._ref.lot_size(underlying, when)
+        except MissingReferenceData:
+            return self._ref.lot_size(underlying, self._sizing)
 
 
 def es95(x):
@@ -72,9 +82,15 @@ def stats(x):
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--leg", default="nifty_long_straddle_916.yaml")
+    ap.add_argument("--tag", default="")
+    a = ap.parse_args()
+    FILES["L"] = HERE / a.leg
+    sfx = f"_{a.tag}" if a.tag else ""
     root = data_dir()
-    ref = default_reference_data()
     sizing = date.fromisoformat(SIZING_DATE)
+    ref = _PreTableLots(default_reference_data(), sizing)
     days, _ = backtest_days(root, "NIFTY", FROM, TO)
     base = {k: load_legwise(p) for k, p in FILES.items()}
     strat = {}
@@ -100,7 +116,7 @@ def main() -> None:
             if s == 0.0:
                 mtm[(d, k)] = dict(r.mtm)
         rows.append(row)
-    with open(HERE / "daily.csv", "w", newline="") as f:
+    with open(HERE / f"daily{sfx}.csv", "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0]))
         w.writeheader()
         w.writerows(rows)
@@ -189,7 +205,7 @@ def main() -> None:
     out.append(f"\nVERDICT rules: 1 (>=15% both) {ok1} | 2 (beats kB) {ok2} | 3 (both halves) {ok3} | 4 (slip 2%) {ok4}"
                f"  => {'PASS' if ok1 and ok2 and ok3 and ok4 else 'KILL'}")
     text = "\n".join(out)
-    (HERE / "report.txt").write_text(text)
+    (HERE / f"report{sfx}.txt").write_text(text)
     print(text)
 
 
