@@ -45,12 +45,33 @@ the period ("1 weekend session left out of P1"), so the numbers reconcile with t
 
 DTE is each strategy's **own** index's days to expiry: a SENSEX variant uses SENSEX's.
 
+## The layout and the default
+
+The grid is the first thing on the page. Above it is one slim bar with the two switches you use
+most, the **view** and the **metric**, a one-line summary of the active settings (for example
+"Today · 12 Oct 2026 · Both indices · All families") and a **Settings** button. The button opens a
+drawer from the right with everything else; a small number on it counts the settings that differ
+from the opening view.
+
+With no period in the address, the page opens on **today's performance**: the latest scored
+session as a single day, Family × start, Average ₹. If today has no scored session yet (a weekend
+or holiday, or the evening run has not finished) it shows the latest scored one and the bar says
+which day that is. One session is not a thin sample of itself, so a single day asks for a minimum
+of 1 session; any longer range keeps the minimum of 20 unless you set one.
+
+In the drawer, **Latest day**, **Last 5 sessions**, **Last 21**, **Last 63**, **P1**, **P2** and
+**Forward** are quick periods, and **Reset to today** puts every setting back to the opening view.
+Choosing a period writes it into the address, so a link you copy keeps it; a link with no period
+always opens on the newest day.
+
 ## The controls
+
+These are the drawer's settings; the view and the metric are on the bar.
 
 | Control | What it does |
 |---|---|
 | Metric | Average ₹, win rate, stop-hit rate, worst strategy-day, or selection frequency. |
-| Period | P1 (Dec 2025 – Oct 2026), P2 (Jan – Aug 2025), P3, Forward (recorded days), or a custom range. "P1 and P2" shows both on one colour scale, with a Difference view. |
+| Period | P1 (Dec 2025 – Oct 2026), P2 (Jan – Aug 2025), P3, Forward (recorded days), or a custom range (From and To; one day if they are equal). "P1 and P2" shows both on one colour scale, with a Difference view. |
 | Index, Family | Which strategies. "Widesl (all)" includes the closest-premium variants. |
 | Start time, Weekday, Days to expiry, Opening VIX band | Keep only those days or start times. |
 | Start time (from the Family pulse) | A row clicked on the Rotation page's Family pulse opens the Pulse view with the family set and Start time showing a band, for example "09:17 to 10:02 (4 start times)". Choose Any start time to clear it. |

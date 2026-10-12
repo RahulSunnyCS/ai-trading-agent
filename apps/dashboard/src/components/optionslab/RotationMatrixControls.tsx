@@ -1,12 +1,11 @@
 'use client';
 
+import type { ReactNode } from 'react';
+
 import { listName } from '../../lib/rotationListNames';
 import {
   ANY,
-  METRIC_NOTE,
-  METRIC_OPTIONS,
   type MatrixFilters,
-  VIEW_OPTIONS,
   WEEKDAYS,
   canCompare,
   needsStrategy,
@@ -14,7 +13,6 @@ import {
   slotListLabel,
 } from '../../lib/rotationMatrixView';
 import type { MatrixListId, MatrixMeta, MatrixPeriodId } from '../../types/rotationMatrix';
-import { Card } from '../ui/Card';
 import { Input, NumberField, Select } from '../ui/Input';
 import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 
@@ -28,6 +26,13 @@ const FAMILY_NAME: Record<string, string> = {
   ditm1: 'Dir ITM1',
   buy: 'Buy',
 };
+
+/** The display name of a family filter value (`widesl`, `dirs`, a tag), for the run bar's summary. */
+export function familyName(value: string): string {
+  if (value === 'widesl') return 'Widesl (all)';
+  if (value === 'dirs') return 'Dir (ATM and ITM1)';
+  return FAMILY_NAME[value] ?? value;
+}
 
 const PERIOD_OPTIONS: SegmentedOption<MatrixPeriodId>[] = (
   ['P1', 'P2', 'P3', 'forward', 'custom'] as const
@@ -44,7 +49,7 @@ const LIST_OPTIONS: SegmentedOption<MatrixListId | typeof ANY>[] = [
   { value: 'REF', label: listName('REF') },
 ];
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1 text-xs text-muted">
       {label}
@@ -53,23 +58,35 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-faint">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
 /**
- * The run bar of the matrix: which view, metric and period; which strategies and conditions;
- * which list's recorded picks to lay over it. Nothing here changes a registered list, and none
- * of it is a strategy parameter: they are display filters.
+ * The matrix's settings, as the body of its settings drawer: which period; which strategies and
+ * conditions; which list's recorded picks to lay over it. The view and metric toggles live on the
+ * run bar. Nothing here changes a registered list, and none of it is a strategy parameter: they
+ * are display filters.
  */
 export function RotationMatrixControls({
   filters: f,
   set,
   meta,
+  periodExtras,
 }: {
   filters: MatrixFilters;
   set: (patch: Partial<MatrixFilters>) => void;
   meta: MatrixMeta | undefined;
+  /** Shown at the top of the period section (the quick presets). */
+  periodExtras?: ReactNode;
 }) {
   const tags = Array.from(new Set((meta?.families ?? []).map((x) => x.family)));
   const compareOk = canCompare(f.view);
-  const viewHint = VIEW_OPTIONS.find((o) => o.value === f.view)?.hint;
   const strategySelect = (
     <Field label="Strategy kind">
       <Select
@@ -86,56 +103,36 @@ export function RotationMatrixControls({
     </Field>
   );
   return (
-    <Card className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-        <div className="flex flex-wrap items-center gap-3">
-          <SegmentedControl
-            value={f.view}
-            options={VIEW_OPTIONS.map(({ value, label }) => ({ value, label }))}
-            onChange={(view) => set({ view })}
-            ariaLabel="Matrix view"
-            size="sm"
-          />
-          {viewHint ? <p className="text-xs text-muted">{viewHint}</p> : null}
-        </div>
-        <SegmentedControl
-          value={f.metric}
-          options={METRIC_OPTIONS.map((o) => ({
-            ...o,
-            disabled: o.value === 'selection' && f.list === ANY,
-          }))}
-          onChange={(metric) => set({ metric })}
-          ariaLabel="Metric"
-          size="sm"
-        />
-      </div>
-
-      <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
+    <div className="space-y-6">
+      <Section title={f.view === 'pulse' ? 'As of' : 'Period'}>
         {f.view !== 'pulse' ? (
-          <Field label="Period">
-            <div className="flex flex-wrap items-center gap-2">
-              <SegmentedControl
-                value={f.compare && compareOk ? ('P1' as MatrixPeriodId) : f.period}
-                options={PERIOD_OPTIONS.map((o) => ({
-                  ...o,
-                  disabled: f.compare && compareOk,
-                }))}
-                onChange={(period) => set({ period })}
-                ariaLabel="Period"
-                size="sm"
-              />
-              <SegmentedControl
-                value={f.compare && compareOk ? 'both' : 'one'}
-                options={[
-                  { value: 'one', label: 'One period' },
-                  { value: 'both', label: 'P1 and P2', disabled: !compareOk },
-                ]}
-                onChange={(v) => set({ compare: v === 'both' })}
-                ariaLabel="Compare periods"
-                size="sm"
-              />
-            </div>
-          </Field>
+          <>
+            {periodExtras}
+            <Field label="Period">
+              <div className="flex flex-wrap items-center gap-2">
+                <SegmentedControl
+                  value={f.compare && compareOk ? ('P1' as MatrixPeriodId) : f.period}
+                  options={PERIOD_OPTIONS.map((o) => ({
+                    ...o,
+                    disabled: f.compare && compareOk,
+                  }))}
+                  onChange={(period) => set({ period })}
+                  ariaLabel="Period"
+                  size="sm"
+                />
+                <SegmentedControl
+                  value={f.compare && compareOk ? 'both' : 'one'}
+                  options={[
+                    { value: 'one', label: 'One period' },
+                    { value: 'both', label: 'P1 and P2', disabled: !compareOk },
+                  ]}
+                  onChange={(v) => set({ compare: v === 'both' })}
+                  ariaLabel="Compare periods"
+                  size="sm"
+                />
+              </div>
+            </Field>
+          </>
         ) : (
           <Field label="As of">
             <Input
@@ -148,7 +145,7 @@ export function RotationMatrixControls({
           </Field>
         )}
         {f.period === 'custom' && f.view !== 'pulse' && !f.compare ? (
-          <>
+          <div className="flex flex-wrap gap-3">
             <Field label="From">
               <Input
                 type="date"
@@ -167,8 +164,21 @@ export function RotationMatrixControls({
                 className="w-40"
               />
             </Field>
-          </>
+          </div>
         ) : null}
+        <Field label="Minimum sessions">
+          <NumberField
+            value={f.minN}
+            min={1}
+            max={1000}
+            onChange={(minN) => set({ minN })}
+            aria-label="Minimum sessions"
+            className="w-40"
+          />
+        </Field>
+      </Section>
+
+      <Section title="Which strategies">
         {needsStrategy(f.view) ? (
           strategySelect
         ) : (
@@ -186,38 +196,6 @@ export function RotationMatrixControls({
             />
           </Field>
         )}
-        <Field label="Recorded picks of list">
-          <SegmentedControl
-            value={f.list}
-            options={LIST_OPTIONS}
-            onChange={(list) =>
-              set({
-                list,
-                ...(list === ANY ? { basis: 'all' as const } : {}),
-                ...(list === ANY && f.metric === 'selection' ? { metric: 'avg' as const } : {}),
-              })
-            }
-            ariaLabel="List overlay"
-            size="sm"
-          />
-        </Field>
-        {f.list !== ANY && f.metric !== 'selection' ? (
-          <Field label="Cells show">
-            <SegmentedControl
-              value={f.basis}
-              options={[
-                { value: 'all', label: 'All opportunities' },
-                { value: 'selected', label: 'Selected only' },
-              ]}
-              onChange={(basis) => set({ basis })}
-              ariaLabel="All opportunities or selected only"
-              size="sm"
-            />
-          </Field>
-        ) : null}
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {needsStrategy(f.view) ? null : (
           <Field label="Family">
             <Select
@@ -254,65 +232,86 @@ export function RotationMatrixControls({
             ))}
           </Select>
         </Field>
-        <Field label="Weekday">
-          <Select
-            value={f.weekday}
-            onChange={(e) => set({ weekday: e.target.value })}
-            aria-label="Weekday"
-          >
-            <option value={ANY}>Any weekday</option>
-            {WEEKDAYS.map((w) => (
-              <option key={w} value={w}>
-                {w}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Days to expiry (own index)">
-          <Select
-            value={f.dte}
-            onChange={(e) => set({ dte: e.target.value })}
-            aria-label="Days to expiry"
-          >
-            <option value={ANY}>Any</option>
-            {(meta?.dte ?? []).map((x) => (
-              <option key={x} value={x}>
-                {x === 'unknown' ? 'Unknown' : `${x} days`}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Opening VIX band">
-          <Select
-            value={f.vix}
-            onChange={(e) => set({ vix: e.target.value })}
-            aria-label="VIX band"
-          >
-            <option value={ANY}>Any</option>
-            {(meta?.vix_bands ?? []).map((x) => (
-              <option key={x} value={x}>
-                {x === 'unknown' ? 'Unknown' : x}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Minimum sessions">
-          <NumberField
-            value={f.minN}
-            min={1}
-            max={1000}
-            onChange={(minN) => set({ minN })}
-            aria-label="Minimum sessions"
+      </Section>
+
+      <Section title="Which days">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="Weekday">
+            <Select
+              value={f.weekday}
+              onChange={(e) => set({ weekday: e.target.value })}
+              aria-label="Weekday"
+            >
+              <option value={ANY}>Any weekday</option>
+              {WEEKDAYS.map((w) => (
+                <option key={w} value={w}>
+                  {w}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Days to expiry (own index)">
+            <Select
+              value={f.dte}
+              onChange={(e) => set({ dte: e.target.value })}
+              aria-label="Days to expiry"
+            >
+              <option value={ANY}>Any</option>
+              {(meta?.dte ?? []).map((x) => (
+                <option key={x} value={x}>
+                  {x === 'unknown' ? 'Unknown' : `${x} days`}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Opening VIX band">
+            <Select
+              value={f.vix}
+              onChange={(e) => set({ vix: e.target.value })}
+              aria-label="VIX band"
+            >
+              <option value={ANY}>Any</option>
+              {(meta?.vix_bands ?? []).map((x) => (
+                <option key={x} value={x}>
+                  {x === 'unknown' ? 'Unknown' : x}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+      </Section>
+
+      <Section title="Recorded picks">
+        <Field label="Recorded picks of list">
+          <SegmentedControl
+            value={f.list}
+            options={LIST_OPTIONS}
+            onChange={(list) =>
+              set({
+                list,
+                ...(list === ANY ? { basis: 'all' as const } : {}),
+                ...(list === ANY && f.metric === 'selection' ? { metric: 'avg' as const } : {}),
+              })
+            }
+            ariaLabel="List overlay"
+            size="sm"
           />
         </Field>
-      </div>
-      <p className="text-xs text-muted">
-        {METRIC_NOTE[f.metric]} Gross, per one lot, before costs. Alternative settings are not a
-        portfolio: no row or column is summed.
-        {f.list !== ANY
-          ? ` The marks are the ${listName(f.list)} list's recorded picks, never reconstructed.`
-          : ''}
-      </p>
-    </Card>
+        {f.list !== ANY && f.metric !== 'selection' ? (
+          <Field label="Cells show">
+            <SegmentedControl
+              value={f.basis}
+              options={[
+                { value: 'all', label: 'All opportunities' },
+                { value: 'selected', label: 'Selected only' },
+              ]}
+              onChange={(basis) => set({ basis })}
+              ariaLabel="All opportunities or selected only"
+              size="sm"
+            />
+          </Field>
+        ) : null}
+      </Section>
+    </div>
   );
 }
