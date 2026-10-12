@@ -174,7 +174,7 @@ def test_range_breakout_gap_percent_widens_the_trigger_on_the_high_side():
     long = _breakout_day({"09:40": (56, 61, 55, 60), "14:59": (70, 70, 70, 70)})
     [t] = simulate_day(strategy([leg]), long).trades
     assert t.entry_min == minute_index("09:40")
-    assert t.entry_price == pytest.approx(58 * 1.05)
+    assert t.entry_price == 60.9  # 60.9000000000000x, rounded to the 0.05 tick
     # a bar that gaps open above the widened level fills at its open
     gapped = _breakout_day({"09:40": (63, 64, 62, 63)})
     [g] = simulate_day(strategy([leg]), gapped).trades
@@ -189,7 +189,7 @@ def test_range_breakout_gap_percent_widens_the_trigger_on_the_low_side():
     long = _breakout_day({"09:40": (48, 49, 46, 47), "14:59": (40, 40, 40, 40)})
     [t] = simulate_day(strategy([leg]), long).trades
     assert t.entry_min == minute_index("09:40")
-    assert t.entry_price == pytest.approx(49 * 0.95)
+    assert t.entry_price == 46.55
     gapped = _breakout_day({"09:40": (44, 45, 43, 44)})
     [g] = simulate_day(strategy([leg]), gapped).trades
     assert g.entry_price == 44
@@ -205,6 +205,7 @@ def test_range_breakout_valid_until_ends_the_armed_state():
     late = _breakout_day({"10:01": (56, 61, 55, 60), "11:00": (80, 90, 80, 85)})
     result = simulate_day(strategy([leg]), late)
     assert result.trades == []
+    assert any("breakout window closed at 10:00" in n for n in result.notes)
     # without valid_until the same late break does enter
     [t] = simulate_day(strategy([_breakout_leg("high")]), late).trades
     assert t.entry_min == minute_index("10:01")
@@ -232,6 +233,10 @@ def test_range_breakout_without_gap_or_valid_until_is_unchanged():
 def test_range_breakout_schema_validates_gap_and_valid_until():
     with pytest.raises(ValidationError):
         strategy([_breakout_leg(gap_percent=-1)])
+    with pytest.raises(ValidationError):
+        strategy([_breakout_leg(gap_percent=100)])  # a low trigger would be at or below zero
+    with pytest.raises(ValidationError):
+        strategy([_breakout_leg(gap_percent=float("inf"))])
     with pytest.raises(ValidationError):
         strategy([_breakout_leg(valid_until="9am")])
     with pytest.raises(ValidationError, match="valid_until"):

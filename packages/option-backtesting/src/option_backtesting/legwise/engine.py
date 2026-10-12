@@ -154,7 +154,7 @@ class _LegRun:
     target: float | None = None
     best: float = 0.0
     range_end: int = 0
-    range_valid_until: int = N_MINUTES
+    range_valid_until: int | None = None
     range_hi: float | None = None
     range_lo: float | None = None
     fresh_intrabar: bool = False
@@ -300,7 +300,7 @@ class _DaySim:
             run.range_valid_until = (
                 minute_index(run.spec.range_breakout.valid_until)
                 if run.spec.range_breakout.valid_until is not None
-                else N_MINUTES
+                else None
             )
             return
         assert run.series is not None
@@ -328,7 +328,10 @@ class _DaySim:
     def _step_armed(self, run: _LegRun, minute: int) -> None:
         rb = run.spec.range_breakout
         assert rb is not None and run.series is not None
-        if minute > run.range_valid_until:
+        if run.range_valid_until is not None and minute > run.range_valid_until:
+            self.notes.append(
+                f"{run.spec.id}: breakout window closed at {rb.valid_until} — no entry"
+            )
             run.state = "done"
             return
         source = self._range_source(run)
@@ -338,6 +341,9 @@ class _DaySim:
         gap = rb.gap_percent / 100
         high_trigger = run.range_hi * (1 + gap)  # type: ignore[operator]
         low_trigger = run.range_lo * (1 - gap)  # type: ignore[operator]
+        if gap and rb.source == "instrument":
+            # an option premium trades on the 0.05 tick; a widened level is a fill price
+            high_trigger, low_trigger = to_tick(high_trigger), to_tick(low_trigger)
         if rb.side == "high" and h > high_trigger + _EPS:  # type: ignore[operator]
             level = max(o, high_trigger)
         elif rb.side == "low" and lo < low_trigger - _EPS:  # type: ignore[operator]

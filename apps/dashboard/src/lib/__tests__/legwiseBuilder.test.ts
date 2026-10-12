@@ -55,6 +55,25 @@ describe('summarizeLeg', () => {
     );
   });
 
+  it('names a widened trigger and an expiry on a range breakout', () => {
+    const text = summarizeLeg(
+      leg({
+        stop_loss: undefined,
+        range_breakout: {
+          until: '09:45',
+          side: 'low',
+          source: 'instrument',
+          gap_percent: 2,
+          valid_until: '11:00',
+        },
+      }),
+      'NIFTY',
+    );
+    expect(text).toContain(
+      'enters on premium low break after 09:45 (2% beyond the range, valid until 11:00)',
+    );
+  });
+
   it('says nothing about rules that are off', () => {
     const bare = leg();
     bare.stop_loss = undefined;

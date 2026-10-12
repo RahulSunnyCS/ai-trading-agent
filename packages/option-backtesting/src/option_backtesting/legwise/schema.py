@@ -123,7 +123,7 @@ class RangeBreakout(_Model):
     until: str
     #: Widen the trigger: enter only above the range high x (1 + gap_percent / 100) (side high)
     #: or below the range low x (1 - gap_percent / 100) (side low). 0 = the plain range edge.
-    gap_percent: float = Field(default=0.0, ge=0)
+    gap_percent: float = Field(default=0.0, ge=0, lt=100, allow_inf_nan=False)
     #: Last minute (inclusive) the breakout can still trigger; None = until the strategy exits.
     valid_until: str | None = None
     side: Literal["high", "low"]
