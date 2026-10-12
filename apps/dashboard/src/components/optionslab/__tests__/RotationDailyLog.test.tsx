@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearPolledResourceCache } from '../../../hooks/usePolledResource';
 import { COUNTERS, ROWS, log, placement } from '../../../lib/__tests__/rotationDailyLogFixture';
+import { listLabel } from '../../../lib/rotationListNames';
 import type { RotationDay, RotationLog, RotationPlacement } from '../../../types/rotationDailyLog';
 import { RotationDailyLog } from '../RotationDailyLog';
 import { RotationReplayStatus } from '../RotationReplayStatus';
@@ -94,8 +95,10 @@ describe('RotationDailyLog', () => {
     // counters line
     const counters = screen.getByLabelText('Counters');
     expect(counters.textContent).toMatch(/Recorded\s*5/);
-    expect(counters.textContent).toMatch(/Buy qualified\s*A 1\/5/);
-    expect(counters.textContent).toMatch(/Widesl min applied\s*A 0\/5 · B 0\/5 · C 1\/5/);
+    expect(counters.textContent).toMatch(/Buy qualified\s*Steady 1\/5/);
+    expect(counters.textContent).toMatch(
+      /Widesl min applied\s*Steady 0\/5 · Calendar 0\/5 · Adaptive 1\/5/,
+    );
     expect(COUNTERS.days).toBe(5);
   });
 
@@ -104,7 +107,7 @@ describe('RotationDailyLog', () => {
     render(<RotationDailyLog focus="REF" />);
     await screen.findByRole('table');
     expect(screen.queryByRole('radiogroup', { name: /List the calendar is shaded by/ })).toBeNull();
-    expect(screen.getByText(/Shaded by list REF/)).toBeTruthy();
+    expect(screen.getByText(/Shaded by the Baseline list/)).toBeTruthy();
   });
 
   it('labels the filters as browsing and filters to the losing days', async () => {
@@ -157,9 +160,9 @@ describe('RotationDailyLog', () => {
     await screen.findByRole('table');
     fireEvent.click(within(screen.getByRole('table')).getByText('13 Oct 2026'));
     const dialog = await screen.findByRole('dialog');
-    await within(dialog).findAllByText('List A');
+    await within(dialog).findAllByText('Steady (A)');
     for (const key of ['A', 'B', 'C', 'REF']) {
-      expect(within(dialog).getAllByText(`List ${key}`).length).toBeGreaterThan(0);
+      expect(within(dialog).getAllByText(listLabel(key)).length).toBeGreaterThan(0);
     }
     expect(within(dialog).getAllByText(/Widesl OTM1 09:17/).length).toBeGreaterThan(0);
     expect(within(dialog).getByText(/Executed: what you placed/i)).toBeTruthy();
@@ -167,14 +170,17 @@ describe('RotationDailyLog', () => {
     // Save is disabled until a status is chosen; "changed" needs a note
     const saveButtons = within(dialog).getAllByRole('button', { name: 'Save' });
     expect((saveButtons[0] as HTMLButtonElement).disabled).toBe(true);
-    const groups = within(dialog).getAllByRole('radiogroup', { name: /Placement of list/ });
+    const groups = within(dialog).getAllByRole('radiogroup', { name: /Placement of the .* list/ });
     fireEvent.click(within(groups[0] as HTMLElement).getByRole('radio', { name: 'Changed' }));
     expect(
       (within(dialog).getAllByRole('button', { name: 'Save' })[0] as HTMLButtonElement).disabled,
     ).toBe(true);
-    fireEvent.change(within(dialog).getAllByLabelText(/Note for list A/)[0] as HTMLElement, {
-      target: { value: 'dropped the Buy leg' },
-    });
+    fireEvent.change(
+      within(dialog).getAllByLabelText(/Note for the Steady list/)[0] as HTMLElement,
+      {
+        target: { value: 'dropped the Buy leg' },
+      },
+    );
     fireEvent.click(
       within(dialog).getAllByRole('button', { name: 'Save' })[0] as HTMLButtonElement,
     );
@@ -302,15 +308,20 @@ describe('RotationDailyLog', () => {
     await screen.findByRole('table');
     fireEvent.click(within(screen.getByRole('table')).getByText('13 Oct 2026'));
     const dialog = await screen.findByRole('dialog');
-    const groups = await within(dialog).findAllByRole('radiogroup', { name: /Placement of list/ });
+    const groups = await within(dialog).findAllByRole('radiogroup', {
+      name: /Placement of the .* list/,
+    });
     fireEvent.click(within(groups[0] as HTMLElement).getByRole('radio', { name: 'Placed' }));
     fireEvent.click(within(dialog).getAllByRole('button', { name: 'Save' })[0] as HTMLElement);
     const alert = await within(dialog).findByRole('alert');
     expect(alert.textContent).toMatch(/Not saved: note is 320 characters; at most 300/);
     expect(alert.className).toMatch(/text-negative/);
-    fireEvent.change(within(dialog).getAllByLabelText(/Note for list A/)[0] as HTMLElement, {
-      target: { value: 'x' },
-    });
+    fireEvent.change(
+      within(dialog).getAllByLabelText(/Note for the Steady list/)[0] as HTMLElement,
+      {
+        target: { value: 'x' },
+      },
+    );
     expect(within(dialog).queryByRole('alert')).toBeNull();
   });
 
@@ -334,7 +345,9 @@ describe('RotationDailyLog', () => {
     await screen.findByRole('table');
     fireEvent.click(within(screen.getByRole('table')).getByText('13 Oct 2026'));
     const dialog = await screen.findByRole('dialog');
-    const groups = await within(dialog).findAllByRole('radiogroup', { name: /Placement of list/ });
+    const groups = await within(dialog).findAllByRole('radiogroup', {
+      name: /Placement of the .* list/,
+    });
     fireEvent.click(within(groups[0] as HTMLElement).getByRole('radio', { name: 'Placed' }));
     const save = within(dialog).getAllByRole('button', { name: 'Save' })[0] as HTMLButtonElement;
     fireEvent.click(save);

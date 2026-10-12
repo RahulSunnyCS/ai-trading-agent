@@ -20,6 +20,7 @@ import {
   matrixParams,
   needsStrategy,
 } from './rotationMatrixView';
+import { listName } from './rotationListNames';
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -188,7 +189,7 @@ export function settingsSummary(
   if (f.weekday !== ANY) parts.push(f.weekday);
   if (f.dte !== ANY) parts.push(`DTE ${f.dte}`);
   if (f.vix !== ANY) parts.push(`VIX ${f.vix}`);
-  if (f.list !== ANY) parts.push(`List ${f.list} picks`);
+  if (f.list !== ANY) parts.push(`${listName(f.list)} picks`);
   return parts.join(' · ');
 }
 

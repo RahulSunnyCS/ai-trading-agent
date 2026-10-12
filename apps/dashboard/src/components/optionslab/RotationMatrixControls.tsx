@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 
+import { listName } from '../../lib/rotationListNames';
 import {
   ANY,
   type MatrixFilters,
@@ -42,10 +43,10 @@ const PERIOD_OPTIONS: SegmentedOption<MatrixPeriodId>[] = (
 
 const LIST_OPTIONS: SegmentedOption<MatrixListId | typeof ANY>[] = [
   { value: ANY, label: 'None' },
-  { value: 'A', label: 'A' },
-  { value: 'B', label: 'B' },
-  { value: 'C', label: 'C' },
-  { value: 'REF', label: 'REF' },
+  { value: 'A', label: listName('A') },
+  { value: 'B', label: listName('B') },
+  { value: 'C', label: listName('C') },
+  { value: 'REF', label: listName('REF') },
 ];
 
 function Field({ label, children }: { label: string; children: ReactNode }) {

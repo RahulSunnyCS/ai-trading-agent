@@ -125,10 +125,10 @@ afterEach(cleanup);
 describe('CorrelationPanel mode switch', () => {
   it('starts on the strategy picker and goes to the basket through ?mode=basket', () => {
     render(<CorrelationPanel />);
-    expect(screen.queryByText('List A · Mon 12 Oct 2026')).toBeNull();
+    expect(screen.queryByText('Steady (A) · Mon 12 Oct 2026')).toBeNull();
     fireEvent.click(screen.getByRole('radio', { name: 'A day’s basket' }));
     expect(new URLSearchParams(window.location.search).get('mode')).toBe('basket');
-    expect(screen.getByText(/List A/)).toBeTruthy();
+    expect(screen.getByText(/Steady \(A\)/)).toBeTruthy();
   });
 
   it('opens the basket in the picker with only those names, any slot, and the window dates', () => {

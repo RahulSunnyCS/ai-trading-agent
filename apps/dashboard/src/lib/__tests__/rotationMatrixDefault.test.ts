@@ -150,7 +150,7 @@ describe('words', () => {
         },
         { today: '2026-10-12' },
       ),
-    ).toBe('Session of 09 Oct 2026 · NIFTY · All families · Fri · List A picks');
+    ).toBe('Session of 09 Oct 2026 · NIFTY · All families · Fri · Steady picks');
     expect(
       settingsSummary({ ...DEFAULT_FILTERS, period: 'P1', compare: true }, { today: 'x' }),
     ).toContain('P1 and P2');

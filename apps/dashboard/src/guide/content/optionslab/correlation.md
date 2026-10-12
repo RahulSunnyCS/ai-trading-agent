@@ -59,7 +59,7 @@ correlates exactly those strategies, with the same maths as the strategy picker.
 
 | Control | What it does |
 |---|---|
-| List | A, B, C or REF: the picks that list made. **Base** is the owner's fixed reference, 2 × Widesl OTM1 09:17 and 1 × Dir ATM 09:24, traded every day with no ranking. |
+| List | Steady, Calendar, Adaptive or Baseline: the picks that list made. **Base** is the owner's fixed reference, 2 × Widesl OTM1 09:17 and 1 × Dir ATM 09:24, traded every day with no ranking. |
 | Day | The day whose picks to use. Empty is the latest entry. A day before the journal began is re-scored from the results before it and labelled **Reconstructed**; a day with an entry says **Recorded**. Not used for the base. |
 | Window | The days the correlation is measured over: **P1** (3 Dec 2025 to 8 Oct 2026), **P2** (10 Jan to 29 Aug 2025), the **last 63** sessions the picks have in common, or **Forward** (only the on-time recorded days). |
 | Open as custom | Moves the same names and dates into the strategy picker for further browsing. Not offered for the base: its Dir leg is not one of the listed strategies. |

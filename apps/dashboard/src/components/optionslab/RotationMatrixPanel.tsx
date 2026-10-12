@@ -22,6 +22,7 @@ import { useRotationMatrix } from '../../hooks/useRotationMatrix';
 import { useRotationMatrixFilters } from '../../hooks/useRotationMatrixFilters';
 import { useTodayIst } from '../../hooks/useTodayIst';
 import { formatDay, formatInt } from '../../lib/format';
+import { listName } from '../../lib/rotationListNames';
 import {
   FALLBACK_NOTE,
   type MatrixPreset,
@@ -393,7 +394,7 @@ export function RotationMatrixPanel() {
               {METRIC_NOTE[r.metric]} Gross, per one lot, before costs. Alternative settings are not
               a portfolio: no row or column is summed.
               {filters.list !== ANY
-                ? ` The marks are list ${filters.list}'s recorded picks, never reconstructed.`
+                ? ` The marks are the ${listName(filters.list)} list's recorded picks, never reconstructed.`
                 : ''}
             </p>
             <ul className="mt-2 space-y-0.5 text-xs text-faint">

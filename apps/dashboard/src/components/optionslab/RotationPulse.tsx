@@ -20,6 +20,7 @@ import { navigateToLink } from '../../hooks/useQueryState';
 import { useRotationPulse } from '../../hooks/useRotationPulse';
 import { cn } from '../../lib/cn';
 import { EMPTY, formatDay, formatInr, formatInt } from '../../lib/format';
+import { listName } from '../../lib/rotationListNames';
 import {
   type Figure,
   WINDOW_KEYS,
@@ -240,7 +241,7 @@ function Row({ cell, r, focus }: { cell: PulseCell; r: PulseAvailable; focus: Pu
                 <Badge
                   tone={picks.source === 'reconstructed' ? 'neutral' : c.focus ? 'primary' : 'info'}
                 >
-                  {c.count > 1 ? `${c.list}×${c.count}` : c.list}
+                  {c.count > 1 ? `${listName(c.list)}×${c.count}` : listName(c.list)}
                 </Badge>
               </span>
             ))}
@@ -388,9 +389,9 @@ export function RotationPulse({ focus }: { focus: PulseListKey }) {
               <Th dense>Picks</Th>
               <Th dense align="right">
                 <HeadWithTip
-                  tip={`List ${focus}'s share of its core picks that landed in the cell over its last 21 sessions (frequency beside profit). A Buy cell shows the days the Buy add-on sat there, because the Buy is not a core pick.`}
+                  tip={`The ${listName(focus)} list's share of its core picks that landed in the cell over its last 21 sessions (frequency beside profit). A Buy cell shows the days the Buy add-on sat there, because the Buy is not a core pick.`}
                 >
-                  {`Share of ${focus}`}
+                  {`Share of ${listName(focus)}`}
                 </HeadWithTip>
               </Th>
             </THead>
