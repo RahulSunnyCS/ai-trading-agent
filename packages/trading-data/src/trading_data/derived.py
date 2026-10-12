@@ -68,7 +68,9 @@ STRIKES_EACH_SIDE = 10
 MAX_DTE_DAYS = 45
 #: Owner decision (2026-10-06): derived tables for NIFTY and SENSEX; the code takes any index.
 DEFAULT_UNDERLYINGS = ("NIFTY", "SENSEX")
-#: The first day with dated lot sizes, real expiries and full chains (BL-034 Phase 2).
+#: The first day with dated lot sizes, real expiries and full chains (BL-034 Phase 2). The
+#: default window starts here; an explicit `days` window may reach before it (the vendor's
+#: earlier history covers expiry weeks only, so those rows have sparse expiries: read them so).
 DERIVED_FROM = date(2024, 10, 1)
 DATASETS = ("chain_snapshots_5m", "straddle_series_5m", "contracts_daily")
 #: iv_daily uses the window ending at these times.
@@ -867,8 +869,9 @@ def available_days(root: Path, dataset: str, underlying: str) -> list[date]:
 
 
 def candidate_days(root: Path, underlying: str, days: tuple[date, date] | None) -> list[date]:
+    # The default window starts at DERIVED_FROM; an explicit `days` may reach back before it
+    # (the 2013-2021 NIFTY vendor history) at the caller's request.
     lo, hi = days or (DERIVED_FROM, date.max)
-    lo = max(lo, DERIVED_FROM)
     option_days = set(lake.available_days(root, "option", underlying))
     index_days = set(lake.available_days(root, "index", underlying))
     return sorted(d for d in option_days & index_days if lo <= d <= hi)

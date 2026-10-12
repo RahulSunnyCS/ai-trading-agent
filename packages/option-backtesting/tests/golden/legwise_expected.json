@@ -33,7 +33,7 @@
     },
     "reference_files_sha256": {
       "lot_sizes.csv": "a205c54adcf9be134871b17f838edba96ba7b4a887748f287a5a7d8a4d7c5207",
-      "strike_step.csv": "57bc1bd1cd71a67353c27527ff6a0691423b0b5ffc30f110af774c7f2522cb9b"
+      "strike_step.csv": "4f55c4eb6459dbfa6164e96a3fd6b6e33ae48d082cc862258cd3bd6a405a267c"
     }
   },
   "scenarios": [
