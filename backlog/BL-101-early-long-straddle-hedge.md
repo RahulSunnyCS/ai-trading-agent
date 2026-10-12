@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a cheap, parameter-free test of the book's main open risk (fast moves hurting short premium) |
-| **Status** | In progress |
+| **Status** | Dropped — killed by its pre-registered rule (2026-10-12) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-12 |
@@ -80,3 +80,22 @@ Any other entry time, strike, stop, filter, underlying or expiry choice (see "Wi
 ## Log
 
 - 2026-10-12 — created from the owner's request; Phase 0 written before any run.
+- 2026-10-12 — run once, as registered (`research/bl101/run.py`, report in `report.txt`,
+  daily rows in `daily.csv`). 680 NIFTY sessions, 2024-01-01..2026-10-09, none skipped. Engine
+  note: `lot_sizes.csv` starts 2024-10-03, so the runner falls back to the sizing-date lot for
+  earlier days (only a mismatch note uses the per-contract lot in `current` sizing; quantity is
+  unchanged). Result, net of charges, slippage 0:
+
+  | | mean/day | ES95 | MDD | worst day |
+  |---|---|---|---|---|
+  | B (base) | 829 | -9,831 | -124,096 | -11,407 |
+  | B+L (1 lot) | 263 | -12,874 | -173,423 | -20,572 |
+  | 0.75 B | 622 | -7,373 | -93,072 | -8,555 |
+  | L alone | -566 | -9,783 | -421,202 | -25,500 |
+
+  L wins on 33% of days, correlates -0.46 with B, but pays only +277 on average on B's worst 5%
+  of days (+1,962 on the worst 10) while losing its whole premium on flat days. ES95 and MDD
+  both get worse (-31%, -40%), in both halves and in every year; with slippage the base itself
+  turns negative (1%: -57/day) so the carry-matched comparator degenerates to cash. All four
+  rules fail. Not run, needs `override`: smaller straddle sizes (1 lot is a ~₹20k premium
+  against a base whose worst day is ~₹11k), or a conditional entry.
