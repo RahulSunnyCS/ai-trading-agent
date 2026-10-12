@@ -11,8 +11,14 @@ import { usePolledResource } from './usePolledResource';
 const BASE = '/api/backtest/legwise/rotation/matrix';
 
 /** One view of the matrix for the given request parameters (`matrixParams`). */
-export function useRotationMatrix(params: Record<string, string>) {
-  return usePolledResource<MatrixResult>(`${BASE}${toQuery(params)}`, { cache: true });
+export function useRotationMatrix(
+  params: Record<string, string>,
+  options: { enabled?: boolean } = {},
+) {
+  return usePolledResource<MatrixResult>(`${BASE}${toQuery(params)}`, {
+    cache: true,
+    ...(options.enabled === undefined ? {} : { enabled: options.enabled }),
+  });
 }
 
 /**

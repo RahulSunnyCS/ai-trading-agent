@@ -38,11 +38,12 @@ import type {
 } from '../../types/heatmap';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
+import { InfoTooltip } from '../ui/InfoTooltip';
 import { Input, Select } from '../ui/Input';
 import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
-import { StatCard } from '../ui/StatCard';
 import { StateMessage } from '../ui/StateMessage';
+import { HeatmapTimeByType } from './HeatmapTimeByType';
 
 const VIEW_OPTIONS: { value: HeatmapViewKey; label: string }[] = (
   ['time_sl', 'date_time', 'date_sl'] as const
@@ -222,29 +223,44 @@ function bestOf(r: HeatmapResponse): { label: string; value: number } | null {
 
 function Summary({ r }: { r: HeatmapResponse }) {
   const best = bestOf(r);
+  const days = `${formatInt(r.days.length)} day${r.days.length === 1 ? '' : 's'}`;
+  // Exit and metric repeat the controls above, so they are one muted line of basis, not two cards.
+  const basis = [
+    `Exit ${r.exit_time}`,
+    metricLabel(r.metric),
+    'no costs or slippage',
+    r.kind === 'stock' ? 'stock options: monthly expiry only' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <StatCard
-        label="Total"
-        value={r.total ? formatCell(r.total.net, r.unit) : '—'}
-        note={`${formatInt(r.days.length)} day${r.days.length === 1 ? '' : 's'}, ${unitNote(r)}`}
-      />
-      <StatCard
-        label="Best cell"
-        value={best ? formatCell(best.value, r.unit) : '—'}
-        note={best?.label}
-        hint="The largest single cell on screen. One cell is a few days at one setting, so it is a place to look, not a rule."
-      />
-      <StatCard
-        label="Exit"
-        value={r.exit_time}
-        note="Legs not stopped exit here; no costs or slippage"
-      />
-      <StatCard
-        label="Metric"
-        value={metricLabel(r.metric)}
-        note={r.kind === 'stock' ? 'Stock options: monthly expiry only' : undefined}
-      />
+    <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1.5 rounded-lg border border-border bg-surface-2/60 px-4 py-2">
+      <div className="flex min-w-0 items-baseline gap-2" title={`${days}, ${unitNote(r)}`}>
+        <span className="text-xs font-medium uppercase tracking-wider text-faint">Total</span>
+        <span className="metric text-base font-semibold tracking-tight text-foreground">
+          {r.total ? formatCell(r.total.net, r.unit) : '—'}
+        </span>
+        <span className="text-xs text-muted">{days}</span>
+      </div>
+      <div className="flex min-w-0 items-baseline gap-2">
+        <span className="flex items-center gap-1 self-center text-xs font-medium uppercase tracking-wider text-faint">
+          Best cell
+          <InfoTooltip
+            text="The largest single cell on screen. One cell is a few days at one setting, so it is a place to look, not a rule."
+            label="About Best cell"
+          />
+        </span>
+        <span className="metric text-base font-semibold tracking-tight text-foreground">
+          {best ? formatCell(best.value, r.unit) : '—'}
+        </span>
+        {best ? <span className="truncate text-xs text-muted">{best.label}</span> : null}
+      </div>
+      <p
+        className="min-w-0 text-xs text-muted"
+        title={`${unitNote(r)}. Legs not stopped exit at ${r.exit_time}; no costs or slippage.`}
+      >
+        {basis}
+      </p>
     </div>
   );
 }
@@ -655,7 +671,7 @@ function HeatmapBody({ available }: { available: HeatmapAvailable }) {
   );
 }
 
-export function HeatmapPanel() {
+function StraddleSection() {
   const available = useHeatmapAvailable();
   if (available.error && available.data === null) {
     return (
@@ -677,4 +693,13 @@ export function HeatmapPanel() {
     );
   }
   return <HeatmapBody available={available.data} />;
+}
+
+export function HeatmapPanel() {
+  return (
+    <div className="space-y-5">
+      <StraddleSection />
+      <HeatmapTimeByType />
+    </div>
+  );
 }
