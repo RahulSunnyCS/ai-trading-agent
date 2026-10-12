@@ -37,7 +37,7 @@ out of every cell and named under the table, never dropped silently.
 | P1, P2 | The same mean over the two reference periods the research used, so a recent number has something to be read against. |
 | Rolling 21 | The 21-session mean, drawn over up to the last 126 sessions. The dashed line is the P1 mean. Hover a point for its day. |
 | Ranking sees | The cell's rank, 1 to 12, on the family-band criterion for the next 09:16 pick. |
-| Picks | Chips for the lists whose latest picks fall in the cell (A, B, C, REF). A count shows when a list picked twice there. |
+| Picks | Chips for the lists whose latest picks fall in the cell (Steady, Calendar, Adaptive, Baseline). A count shows when a list picked twice there. |
 | Share of A | How often the focus list picked in the cell over its last 21 sessions. |
 
 Click a row to open the Strategy Matrix's pulse view, filtered to that kind and start band.
@@ -70,7 +70,7 @@ turned into a percentile among all 298. The card shows the same average ranked a
 so a cell at 1 of 12 is the one the criterion rewards most.
 
 It is the same value Why this pick shows as Family-band recent; a test checks they are equal. The
-criterion carries 5% of the composite in A, B and C and none in REF, so a high rank here nudges the
+criterion carries 5% of the composite in Steady, Calendar and Adaptive and none in Baseline, so a high rank here nudges the
 strategies in that cell up and decides nothing alone.
 
 The ranking reads net results, which equal gross while the stored costs are zero. The card says gross

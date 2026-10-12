@@ -450,7 +450,7 @@ describe('keyboard and screen readers', () => {
     expect(label).toContain('9 sessions');
     expect(label).toContain('thin sample');
     expect(label).toContain('of 40 sessions');
-    expect(label).toContain('A 2 times');
+    expect(label).toContain('Steady 2 times');
     expect(
       cellLabel(
         'r',

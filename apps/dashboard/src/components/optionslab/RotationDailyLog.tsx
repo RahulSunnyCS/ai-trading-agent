@@ -44,6 +44,7 @@ import {
   monthOf,
   windowRange,
 } from '../../lib/rotationDailyLogView';
+import { listLabel, listName } from '../../lib/rotationListNames';
 import { hasOverlay, overlayBook, unmatched } from '../../lib/rotationPortfolioView';
 import type { RotationListKey, RotationLog, RotationLogSource } from '../../types/rotationDailyLog';
 import { Badge } from '../ui/Badge';
@@ -67,7 +68,7 @@ const SOURCE_OPTIONS: SegmentedOption<RotationLogSource>[] = [
 
 const FOCUS_OPTIONS: SegmentedOption<RotationListKey>[] = LIST_KEYS.map((value) => ({
   value,
-  label: value,
+  label: listLabel(value),
 }));
 
 const FILTER_OPTIONS: SegmentedOption<RowFilter>[] = (
@@ -132,7 +133,7 @@ export function RotationDailyLog({
   const setting = portfolio ?? ownPortfolio;
   const [source, setSource] = useState<RotationLogSource>('recorded');
   const [windowChoice, setWindowChoice] = useState<WindowChoice>(defaultWindow('recorded'));
-  // The page's focus list when it passes one; otherwise this widget's own (A, the owner's default).
+  // The page's focus list when it passes one; otherwise this widget's own (Steady, the owner's default).
   const [ownFocus, setFocus] = useState<RotationListKey>('A');
   const focus = focusProp ?? ownFocus;
   const [filter, setFilter] = useState<RowFilter>('all');
@@ -298,7 +299,7 @@ export function RotationDailyLog({
           {bookNow && bookNow.errors.length > 0 ? (
             <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-2.5 text-xs text-foreground">
               {bookNow.errors.length} list-day{bookNow.errors.length === 1 ? '' : 's'} could not be
-              replayed (e.g. {bookNow.errors[0]?.day} {bookNow.errors[0]?.list}:{' '}
+              replayed (e.g. {bookNow.errors[0]?.day} {listLabel(bookNow.errors[0]?.list ?? '')}:{' '}
               {bookNow.errors[0]?.error}) and show the log's own figure.
             </div>
           ) : null}
@@ -374,7 +375,7 @@ export function RotationDailyLog({
               <Card>
                 <CardHeader
                   title="Calendar"
-                  description={`Shaded by list ${focus}'s gross per lot-day. Click a day to open it.`}
+                  description={`Shaded by the ${listName(focus)} list's gross per lot-day. Click a day to open it.`}
                 />
                 <RotationDailyLogCalendar
                   month={shownMonth}

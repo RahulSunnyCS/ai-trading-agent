@@ -20,6 +20,7 @@ import {
   readingLine,
   spanText,
 } from '../../lib/rotationDriftView';
+import { listName } from '../../lib/rotationListNames';
 import type { RotationListKey } from '../../types/rotation';
 import type { DriftDimension, RotationDriftResponse } from '../../types/rotationDrift';
 import { Badge } from '../ui/Badge';
@@ -112,7 +113,7 @@ export function RotationDrift({ list }: { list: RotationListKey }) {
     <Card>
       <CardHeader
         title="Selection drift"
-        description={`List ${list}: what its core picks have been, by family, index, strike method and start band, against its own range in P1. Counts picks, not P&L.`}
+        description={`${listName(list)}: what its core picks have been, by family, index, strike method and start band, against its own range in P1. Counts picks, not P&L.`}
         actions={
           <span className="flex items-center gap-2">
             {current && d.flags > 0 ? (

@@ -261,7 +261,7 @@ describe('picks and share', () => {
     });
     const dir = shareView(cell(), r);
     expect(dir.text).toBe('5% · 3/63');
-    expect(dir.title).toContain('Reconstructed picks of list A');
+    expect(dir.title).toContain('Reconstructed picks of the Steady list, 21 sessions');
     const buy = shareView(
       cell({
         kind: 'buy',
@@ -277,7 +277,7 @@ describe('picks and share', () => {
 describe('header texts and links', () => {
   it('derives the criterion note from the lists’ own weights', () => {
     expect(criterionNote(pulse())).toBe(
-      'The family-band criterion carries 5% of the composite in A, B and C and none in REF.',
+      'The family-band criterion carries 5% of the composite in Steady, Calendar and Adaptive and none in Baseline.',
     );
     const none = pulse({
       rank: { ...pulse().rank, weights: { A: 0, B: 0, C: 0, REF: 0 } },

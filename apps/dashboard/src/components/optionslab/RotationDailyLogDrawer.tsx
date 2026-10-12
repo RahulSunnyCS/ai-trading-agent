@@ -29,6 +29,7 @@ import {
   placementProblem,
   rowFlags,
 } from '../../lib/rotationDailyLogView';
+import { listLabel, listName } from '../../lib/rotationListNames';
 import type {
   PlacementStatus,
   RotationDay,
@@ -97,16 +98,16 @@ function Basket({
     <div className="rounded-lg border border-border p-3">
       <div className="flex items-baseline justify-between gap-2">
         <div className="min-w-0">
-          <span className="text-sm font-semibold text-foreground">List {listKey}</span>
+          <span className="text-sm font-semibold text-foreground">{listLabel(listKey)}</span>
           {sameAs ? (
-            <span className="ml-2 text-xs text-faint">same strategies as {sameAs}</span>
+            <span className="ml-2 text-xs text-faint">same strategies as {listName(sameAs)}</span>
           ) : null}
           {block.scored ? (
             <button
               type="button"
               onClick={() => onReplayList(listKey, day)}
               className="ml-2 rounded px-1 text-[11px] font-medium text-primary hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label={`Replay list ${listKey} on ${formatDay(day)} as one basket`}
+              aria-label={`Replay the ${listName(listKey)} list on ${formatDay(day)} as one basket`}
               title="Replay the whole basket minute by minute, with the portfolio stop"
             >
               Replay the list
@@ -245,8 +246,8 @@ function PlacementRow({
       setAnswered(result.data.row);
       toast(
         result.data.written === false
-          ? `List ${listKey}: already marked ${PLACEMENT_LABEL[result.data.row.status].toLowerCase()}`
-          : `List ${listKey}: ${PLACEMENT_LABEL[result.data.row.status].toLowerCase()} saved`,
+          ? `${listLabel(listKey)}: already marked ${PLACEMENT_LABEL[result.data.row.status].toLowerCase()}`
+          : `${listLabel(listKey)}: ${PLACEMENT_LABEL[result.data.row.status].toLowerCase()} saved`,
       );
       onSaved();
     } else {
@@ -257,7 +258,7 @@ function PlacementRow({
   return (
     <div className="space-y-1.5 rounded-lg border border-border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-foreground">List {listKey}</span>
+        <span className="text-sm font-semibold text-foreground">{listLabel(listKey)}</span>
         <span className="text-xs text-faint">
           {current
             ? `saved: ${PLACEMENT_LABEL[current.status]}, ${formatIstDateTimeShort(current.at)}`
@@ -271,7 +272,7 @@ function PlacementRow({
           setStatus(v);
           setError(null);
         }}
-        ariaLabel={`Placement of list ${listKey}`}
+        ariaLabel={`Placement of the ${listName(listKey)} list`}
         size="sm"
       />
       <Input
@@ -282,7 +283,7 @@ function PlacementRow({
           setError(null);
         }}
         placeholder={status === 'changed' ? 'What was changed (required)' : 'Note (optional)'}
-        aria-label={`Note for list ${listKey}`}
+        aria-label={`Note for the ${listName(listKey)} list`}
       />
       <div className="flex items-start justify-between gap-2">
         {error ? (
@@ -511,7 +512,7 @@ function DayBody({
               <ul className="mt-1 space-y-0.5">
                 {d.placement_history.map((p, i) => (
                   <li key={`${i}-${p.list}-${p.at}`}>
-                    {formatIstDateTimeShort(p.at)}: {p.list}{' '}
+                    {formatIstDateTimeShort(p.at)}: {listLabel(p.list)}{' '}
                     {PLACEMENT_LABEL[p.status].toLowerCase()}
                     {p.note ? ` (${p.note})` : ''}
                   </li>

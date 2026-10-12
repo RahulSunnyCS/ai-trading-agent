@@ -333,7 +333,7 @@ describe('RotationShadowScoreboard', () => {
   it('switches lists', () => {
     hook.state = { data: base(), loading: false, error: null, refetch: vi.fn() };
     render(<RotationShadowScoreboard />);
-    fireEvent.click(screen.getByRole('radio', { name: 'A' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Steady' }));
     expect(screen.getByText('No override day yet')).toBeTruthy();
   });
 });

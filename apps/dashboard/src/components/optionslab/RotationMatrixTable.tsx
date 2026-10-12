@@ -3,6 +3,7 @@
 import { type KeyboardEvent, memo, useCallback, useMemo, useRef, useState } from 'react';
 
 import { cn } from '../../lib/cn';
+import { listShort } from '../../lib/rotationListNames';
 import {
   type CellKind,
   cellKind,
@@ -118,7 +119,7 @@ function markerFor(
   overlayList: MatrixListId | null,
   picks: MatrixListId[] | undefined,
 ): string | null {
-  if (picks && picks.length > 0) return picks.join('');
+  if (picks && picks.length > 0) return picks.map(listShort).join(' ');
   const sel = (cell as MatrixCell).sel;
   if (overlayList && sel?.[overlayList]) {
     const n = sel[overlayList] ?? 0;
