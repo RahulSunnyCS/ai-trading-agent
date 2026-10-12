@@ -19,12 +19,17 @@ import { useQueryState } from '../../hooks/useQueryState';
 import { formatDay, formatInt } from '../../lib/format';
 import {
   ALL_STOCKS,
+  NO_SL,
+  NO_SL_HINT,
   VIEW_LABEL,
   WEEK_LABEL,
   cellClass,
   formatCell,
   maxAbsOf,
   metricLabel,
+  slLabel,
+  slLevels,
+  slOptionLabel,
   toCsv,
   unitNote,
 } from '../../lib/heatmapView';
@@ -85,7 +90,12 @@ function rowLabel(view: HeatmapViewKey, row: string): string {
 
 function columnLabel(view: HeatmapViewKey, col: string | number): string {
   if (view === 'date_time') return String(col);
-  return String(col);
+  return slLabel(col);
+}
+
+/** The No SL column exists only where the columns are stop losses. */
+function isNoSl(view: HeatmapViewKey, col: string | number | undefined): boolean {
+  return view !== 'date_time' && Number(col) === NO_SL;
 }
 
 function Cell({
@@ -94,21 +104,26 @@ function Cell({
   unit,
   split,
   bold,
+  noSl,
 }: {
   cell: HeatmapCell | null;
   maxAbs: number;
   unit: HeatmapResponse['unit'];
   split: boolean;
   bold?: boolean;
+  /** The No SL column: set apart by a heavier left edge. */
+  noSl?: boolean;
 }) {
   const tone = cellClass(cell?.net, maxAbs);
   return (
     <td
-      className={`${tone} whitespace-nowrap border border-surface px-2 py-1.5 text-center font-mono text-xs tabular-nums ${bold ? 'font-semibold' : ''}`}
+      className={`${tone} whitespace-nowrap border border-surface px-2 py-1.5 text-center font-mono text-xs tabular-nums ${bold ? 'font-semibold' : ''} ${noSl ? 'border-l-2 border-l-border-strong' : ''}`}
       title={
         cell
-          ? `Call ${formatCell(cell.ce, unit)} · Put ${formatCell(cell.pe, unit)} · ${formatInt(cell.n)} straddle${cell.n === 1 ? '' : 's'}`
-          : 'No straddle'
+          ? `${noSl ? `${NO_SL_HINT}. ` : ''}Call ${formatCell(cell.ce, unit)} · Put ${formatCell(cell.pe, unit)} · ${formatInt(cell.n)} straddle${cell.n === 1 ? '' : 's'}`
+          : noSl
+            ? `${NO_SL_HINT}. Nothing stored for it (not built yet, or no straddle)`
+            : 'No straddle'
       }
     >
       {cell ? (
@@ -149,7 +164,8 @@ function HeatmapTable({ r, split }: { r: HeatmapResponse; split: boolean }) {
             {r.columns.map((c) => (
               <th
                 key={c}
-                className="px-2 py-2 text-center font-mono text-xs font-semibold text-muted"
+                title={isNoSl(r.view, c) ? NO_SL_HINT : undefined}
+                className={`px-2 py-2 text-center font-mono text-xs font-semibold text-muted ${isNoSl(r.view, c) ? 'border-l-2 border-l-border-strong' : ''}`}
               >
                 {columnLabel(r.view, c)}
               </th>
@@ -172,6 +188,7 @@ function HeatmapTable({ r, split }: { r: HeatmapResponse; split: boolean }) {
                   maxAbs={maxAbs}
                   unit={r.unit}
                   split={split}
+                  noSl={isNoSl(r.view, r.columns[j])}
                 />
               ))}
               <Cell
@@ -195,6 +212,7 @@ function HeatmapTable({ r, split }: { r: HeatmapResponse; split: boolean }) {
                 unit={r.unit}
                 split={split}
                 bold
+                noSl={isNoSl(r.view, r.columns[j])}
               />
             ))}
             <Cell cell={r.total} maxAbs={maxAbs} unit={r.unit} split={split} bold />
@@ -344,9 +362,9 @@ function Controls({
               onChange={(e) => setters.sl(Number(e.target.value))}
               aria-label="Stop loss"
             >
-              {available.stop_losses.map((s) => (
+              {slLevels(available).map((s) => (
                 <option key={s} value={s}>
-                  {s}%
+                  {slOptionLabel(s)}
                 </option>
               ))}
             </Select>
@@ -508,9 +526,8 @@ function useHeatmapSettings(available: HeatmapAvailable) {
   const date = dateQ && /^\d{4}-\d{2}-\d{2}$/.test(dateQ) ? dateQ : last;
   const to = toQ && /^\d{4}-\d{2}-\d{2}$/.test(toQ) ? toQ : view === 'time_sl' ? '' : last;
   const from = fromQ && /^\d{4}-\d{2}-\d{2}$/.test(fromQ) ? fromQ : last ? addDays(last, -14) : '';
-  const sl = available.stop_losses.includes(Number(slQ))
-    ? Number(slQ)
-    : (available.stop_losses[0] ?? 10);
+  const levels = slLevels(available);
+  const sl = slQ !== null && levels.includes(Number(slQ)) ? Number(slQ) : (levels[0] ?? 10);
   const time = timeQ && available.times.includes(timeQ) ? timeQ : (available.times[0] ?? '09:16');
   const exit =
     exitQ && available.exit_times.includes(exitQ) ? exitQ : (available.exit_times[0] ?? '15:30');
@@ -575,7 +592,7 @@ function Result({ params, split }: { params: HeatmapParams; split: boolean }) {
       <Card>
         <CardHeader
           title={`${r.underlying} short straddle · ${VIEW_LABEL[r.view]}`}
-          description={`${unitNote(r)}. Each leg has its own stop at the SL % above its entry price; legs not stopped exit at ${r.exit_time}.`}
+          description={`${unitNote(r)}. Each leg has its own stop at the SL % above its entry price; legs not stopped exit at ${r.exit_time}. ${slLabel(NO_SL)} holds both legs to the exit with no stop.`}
           actions={
             <div className="flex items-center gap-1">
               <Button

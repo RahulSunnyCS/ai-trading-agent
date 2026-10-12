@@ -16,6 +16,9 @@ whole grid is cheap:
 Legs are independent (the engine's `square_off: partial`), with no slippage and no costs, so the
 numbers are gross. `tests/unit/test_heatmap.py` pins this to `simulate_day` on the same day.
 
+"No SL" (`NO_SL`, stored as sl = 0) is the same straddle with no stop on either leg: both legs
+exit at the exit time. It is pinned to `simulate_day` with legs that have no `stop_loss`.
+
 ATM: for the five indices the strike is `resolve_strike("ATM")` from the index spot, as the engine
 does. A stock has no spot bars and no strike step in the lake, so its ATM is the strike with the
 smallest |CE - PE| at the entry minute (put-call parity puts that at the money) among strikes
@@ -52,6 +55,10 @@ ENTRY_TIMES = (
     "12:15", "12:45", "13:15", "13:45", "14:15", "14:45",
 )  # fmt: skip
 STOP_LOSSES = tuple(range(10, 101, 10))
+#: The "no stop loss" level, stored in the `sl` column as 0 (never a real percentage): both legs
+#: are held to the exit time and never stopped. Defined here once; the views list it last.
+NO_SL = 0
+SL_LEVELS = (*STOP_LOSSES, NO_SL)
 #: Exit times a grid is built for. 15:30 is the end of the 375-minute grid (legs not stopped exit at
 #: the last bar's close; the owner's choice). AlgoTest's own heatmap squares off at 15:15 — its
 #: 26 Aug 2026 NIFTY grid reproduces from the lake at that time, not at 15:30.
@@ -93,11 +100,12 @@ def _sell_leg(
     price = series.price_at(entry)
     if price is None:
         return None
-    level = to_tick(price * (1 + sl / 100))
-    for m in range(entry, min(exit_min, N_MINUTES)):
-        high, op = series.high[m], series.open[m]
-        if high is not None and op is not None and high >= level:
-            return price, price - (op if op >= level else level), True
+    if sl != NO_SL:
+        level = to_tick(price * (1 + sl / 100))
+        for m in range(entry, min(exit_min, N_MINUTES)):
+            high, op = series.high[m], series.open[m]
+            if high is not None and op is not None and high >= level:
+                return price, price - (op if op >= level else level), True
     last = series.price_at(exit_min) if exit_min < N_MINUTES else series.close[N_MINUTES - 1]
     if last is None:
         return None
@@ -170,11 +178,12 @@ def cells_from(
             continue
         for exit_time in EXIT_TIMES:
             exit_min = minute_index(exit_time)
-            for sl in STOP_LOSSES:
+            for sl in SL_LEVELS:
                 ce = _sell_leg(ce_s, minute, sl, exit_min)
                 pe = _sell_leg(pe_s, minute, sl, exit_min)
                 if ce is None or pe is None:
-                    notes.append(f"{hhmm} SL{sl}: a leg has no price")
+                    label = "no SL" if sl == NO_SL else f"SL{sl}"
+                    notes.append(f"{hhmm} {label}: a leg has no price")
                     continue
                 out.append(
                     Cell(

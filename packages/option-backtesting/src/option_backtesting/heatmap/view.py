@@ -4,6 +4,10 @@
     date_time  rows days, columns entry times, at one stop loss
     date_sl    rows days, columns stop losses, at one entry time
 
+The stop-loss axis ends with `grid.NO_SL` (0): both legs held to the exit time, never stopped.
+A store built before that level existed has no such rows; its column comes back empty (None
+cells) until `obt heatmap build` fills it.
+
 A cell is the straddle's P&L (call + put). Unit: an index is rupees for one lot at the current lot
 size (the legwise engine's `lot_sizing: current`); a stock is points per share, because the lake
 has no lot size for most stock contracts. `metric="pct"` is P&L as a percentage of the premium
@@ -108,8 +112,10 @@ def build_view(
         raise HeatmapError("a date range is needed (from, to)")
     if exit_time not in grid.EXIT_TIMES:
         raise HeatmapError(f"exit must be one of {list(grid.EXIT_TIMES)}")
-    if view == "date_time" and sl not in grid.STOP_LOSSES:
-        raise HeatmapError(f"sl must be one of {list(grid.STOP_LOSSES)}")
+    if view == "date_time" and sl not in grid.SL_LEVELS:
+        raise HeatmapError(
+            f"sl must be one of {list(grid.STOP_LOSSES)} or {grid.NO_SL} (no stop loss)"
+        )
     if view == "date_sl" and time not in grid.ENTRY_TIMES:
         raise HeatmapError(f"time must be one of {list(grid.ENTRY_TIMES)}")
 
@@ -141,7 +147,7 @@ def build_view(
         raise HeatmapError(f"{len(days)} days is more than {MAX_DAYS}; narrow the range")
 
     if view == "time_sl":
-        row_keys, col_keys = list(grid.ENTRY_TIMES), list(grid.STOP_LOSSES)
+        row_keys, col_keys = list(grid.ENTRY_TIMES), list(grid.SL_LEVELS)
         rk = lambda r: r["time"]  # noqa: E731
         ck = lambda r: r["sl"]  # noqa: E731
     elif view == "date_time":
@@ -149,7 +155,7 @@ def build_view(
         rk = lambda r: r["day"].isoformat()  # noqa: E731
         ck = lambda r: r["time"]  # noqa: E731
     else:
-        row_keys, col_keys = [d.isoformat() for d in days], list(grid.STOP_LOSSES)
+        row_keys, col_keys = [d.isoformat() for d in days], list(grid.SL_LEVELS)
         rk = lambda r: r["day"].isoformat()  # noqa: E731
         ck = lambda r: r["sl"]  # noqa: E731
 

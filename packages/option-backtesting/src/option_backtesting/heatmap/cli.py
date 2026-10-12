@@ -86,7 +86,7 @@ def show_cmd(
         exit_time=exit_time,
         metric=metric,
     )
-    head = "".join(f"{c!s:>9}" for c in out["columns"])
+    head = "".join(f"{('NoSL' if c == grid.NO_SL else c)!s:>9}" for c in out["columns"])
     typer.echo(f"{out['underlying']} {out['view']} ({out['unit']})\n{'':>12}{head}{'TOTAL':>10}")
     for r, line, tot in zip(out["rows"], out["cells"], out["row_totals"], strict=True):
         typer.echo(f"{r:>12}{''.join(_fmt(c) for c in line)}{_fmt(tot)}")

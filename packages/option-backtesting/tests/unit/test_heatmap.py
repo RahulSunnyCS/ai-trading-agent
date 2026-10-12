@@ -71,7 +71,8 @@ def engine_gross(data: DayData, entry: str, exit_time: str, sl: int) -> float:
             "position": "sell",
             "option_type": kind,
             "strike": {"strike_type": "ATM"},
-            "stop_loss": {"percent": sl},
+            # grid.NO_SL: the legs carry no stop_loss at all
+            **({} if sl == grid.NO_SL else {"stop_loss": {"percent": sl}}),
         }
         for kind in ("CE", "PE")
     ]
@@ -94,7 +95,7 @@ def test_every_cell_equals_the_legwise_engine(seed):
         "NIFTY", DAY, data.chain, data.spot, EXP, default_reference_data()
     )
     assert not notes
-    assert len(cells) == len(grid.ENTRY_TIMES) * len(grid.EXIT_TIMES) * len(grid.STOP_LOSSES)
+    assert len(cells) == len(grid.ENTRY_TIMES) * len(grid.EXIT_TIMES) * len(grid.SL_LEVELS)
     stopped = 0
     for c in cells:
         got = (c.ce_pts + c.pe_pts) * LOT
@@ -102,6 +103,22 @@ def test_every_cell_equals_the_legwise_engine(seed):
         assert got == pytest.approx(want, abs=1e-6), (c.time, c.exit, c.sl)
         stopped += c.ce_stopped + c.pe_stopped
     assert stopped > 0  # the series does hit stops, so the stop path is covered
+    # the No SL level is in the grid, never stops a leg, and (pinned above) equals the engine run
+    # with legs that have no stop_loss
+    no_sl = [c for c in cells if c.sl == grid.NO_SL]
+    assert len(no_sl) == len(grid.ENTRY_TIMES) * len(grid.EXIT_TIMES)
+    assert not any(c.ce_stopped or c.pe_stopped for c in no_sl)
+
+
+def test_no_sl_is_the_last_level_and_a_100_percent_stop_is_not_it():
+    assert grid.SL_LEVELS[-1] == grid.NO_SL == 0
+    assert grid.NO_SL not in grid.STOP_LOSSES
+    # a 100% stop on a series that doubles is stopped; the same series with No SL is not
+    s = flat(100.0)
+    entry = minute_index("09:45")
+    s.high[entry + 5] = 250.0
+    assert grid._sell_leg(s, entry, 100, minute_index("15:15"))[2] is True
+    assert grid._sell_leg(s, entry, grid.NO_SL, minute_index("15:15")) == (100.0, 0.0, False)
 
 
 def test_a_stock_straddle_is_struck_where_call_and_put_cost_the_same():
@@ -204,6 +221,64 @@ def test_weeks_to_expiry_filter_and_exit_choice(root):
     assert early["cells"][0][0]["net"] == pytest.approx(198 * LOT)
 
 
+def test_no_sl_column_in_every_view_and_empty_before_it_is_built(root, tmp_path):
+    d1 = date(2026, 9, 28)
+    # `root` has no sl = 0 rows (a store from before the level existed): the column is there, empty
+    old = view.build_view("NIFTY", "time_sl", root=root, day=d1)
+    assert old["columns"][-1] == grid.NO_SL and old["cells"][0][-1] is None
+    assert old["column_totals"][-1] is None
+    assert (
+        view.build_view("NIFTY", "date_time", root=root, start=d1, end=d1, sl=grid.NO_SL)["total"]
+        is None
+    )
+    _write_rows(
+        tmp_path,
+        "NIFTY",
+        [
+            _row(d1, "09:16", 10, 5.0, -2.0, dte=1),
+            _row(d1, "09:16", grid.NO_SL, 7.0, -4.0, dte=1),
+            _row(d1, "09:45", grid.NO_SL, -1.0, -1.0, dte=1),
+        ],
+    )
+    t = view.build_view("NIFTY", "time_sl", root=tmp_path, day=d1)
+    assert t["columns"] == [*range(10, 101, 10), 0]
+    assert t["cells"][0][-1]["net"] == pytest.approx(3.0 * LOT)
+    assert t["column_totals"][-1]["net"] == pytest.approx(1.0 * LOT)
+    p = view.build_view("NIFTY", "time_sl", root=tmp_path, day=d1, metric="pct")
+    assert p["cells"][0][-1]["net"] == pytest.approx(3.0 / 150.0 * 100, abs=0.01)
+    ds = view.build_view("NIFTY", "date_sl", root=tmp_path, start=d1, end=d1, time="09:16")
+    assert ds["columns"][-1] == 0 and ds["cells"][0][-1]["net"] == pytest.approx(3.0 * LOT)
+    dt = view.build_view("NIFTY", "date_time", root=tmp_path, start=d1, end=d1, sl=grid.NO_SL)
+    assert dt["cells"][0][0]["net"] == pytest.approx(3.0 * LOT)
+    assert dt["cells"][0][1]["net"] == pytest.approx(-2.0 * LOT)
+    assert dt["filters"]["sl"] == 0
+    # weeks-to-expiry applies to it like any other level
+    w = view.build_view("NIFTY", "time_sl", root=tmp_path, day=d1, weeks={3})
+    assert w["cells"][0][-1] is None
+
+
+def test_a_plain_build_fills_no_sl_for_days_stored_without_it(tmp_path, monkeypatch):
+    d1 = date(2026, 9, 28)
+    _write_rows(tmp_path, "NIFTY", [_row(d1, "09:16", 10, 5.0, -2.0, dte=1)])
+    monkeypatch.setattr(store, "backtest_days", lambda *a, **k: ([d1], {}))
+    calls = []
+
+    def fake(root, underlying, day, reference):
+        calls.append(day)
+        return [
+            grid.Cell(day, "09:16", "15:30", sl, 22000.0, EXP, 100.0, 50.0, 2.0, 2.0, False, False)
+            for sl in (10, grid.NO_SL)
+        ], []
+
+    monkeypatch.setattr(grid, "day_cells", fake)
+    store.build("NIFTY", tmp_path)
+    assert calls == [d1]
+    v = view.build_view("NIFTY", "time_sl", root=tmp_path, day=d1)
+    assert v["cells"][0][-1]["net"] == pytest.approx(4.0 * LOT)
+    store.build("NIFTY", tmp_path)  # now complete: nothing is rebuilt
+    assert calls == [d1]
+
+
 def test_pct_of_premium_and_stock_units(root, tmp_path):
     v = view.build_view("NIFTY", "time_sl", root=root, day=date(2026, 9, 28), metric="pct")
     assert v["unit"] == "pct_of_premium"
@@ -240,6 +315,7 @@ def test_api_routes(root, monkeypatch):
     avail = client.get("/legwise/heatmap/available").json()
     assert [u["underlying"] for u in avail["underlyings"]] == ["NIFTY"]
     assert avail["times"][0] == "09:16" and avail["stop_losses"] == list(range(10, 101, 10))
+    assert avail["no_sl"] == 0 and avail["sl_levels"][-1] == 0
     ok = client.get(
         "/legwise/heatmap",
         params={"underlying": "NIFTY", "view": "time_sl", "date": "2026-09-28", "weeks": "1,0"},
