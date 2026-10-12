@@ -134,7 +134,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     term: 'Range breakout',
     group: 'Options',
     short:
-      'A leg that waits: it records the high and low from entry until a set time, then enters only when that high or low is broken.',
+      'A leg that waits: it records the high and low from entry until a set time, then enters only when that high or low is broken. In YAML mode `gap_percent` moves the trigger a percentage beyond the range edge and `valid_until` is the last minute the breakout can still trigger.',
   },
   {
     id: 'square-off',
