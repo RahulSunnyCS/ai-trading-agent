@@ -27,7 +27,8 @@ class TestStrikeStep:
         assert rd.strike_step("NIFTY", date(2026, 9, 1)) == 50
 
     def test_nifty_vendor_history_from_2013(self, rd: ReferenceData) -> None:
-        """NIFTY's 50-point step is dated 2013-01-01 so the 2013-2017 vendor history resolves."""
+        """NIFTY's 50-point step is dated 2013-01-01 so the vendor history has a strike step.
+        (Lot sizes still start 2024-10: a legwise run over those days needs lot sizes too.)"""
         assert rd.strike_step("NIFTY", date(2013, 1, 1)) == 50
         assert rd.strike_step("NIFTY", date(2016, 6, 1)) == 50
 

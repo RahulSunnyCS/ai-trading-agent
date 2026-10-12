@@ -413,6 +413,12 @@ the RBI policy repo rate from each Monetary Policy Committee decision: 6.50% (in
 2025-12-05, held at every meeting since up to 2026-08-05. The 2026-10-07 decision was not yet
 known when this was written: add a row if it changed the rate.
 
+Added later (2026-10-12) for the 2013-2021 vendor history: every decision from 2013-05-03 to
+2022-12-07 (7.25% in force from 2013-05-03 ... 6.25% from 2022-12-07), from the RBI's
+announcements; there is no source file in the repo, so check them against the RBI's list. The table therefore begins 2013-05-03: the
+January 2013 (7.75%) and March 2013 (7.50%) cuts are not in it, so days before 2013-05-03 have no
+rate and are reported "not built" by `tdata derived rebuild`.
+
 - **Why the repo rate, not the 91-day T-bill.** The T-bill yield moves weekly and has no
   committed source here; it trades close to the repo rate. For options a few days from expiry
   the rate moves a price by paise, so a stepped policy rate is precise enough and is verifiable

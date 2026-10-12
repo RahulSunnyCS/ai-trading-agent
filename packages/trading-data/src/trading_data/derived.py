@@ -68,7 +68,9 @@ STRIKES_EACH_SIDE = 10
 MAX_DTE_DAYS = 45
 #: Owner decision (2026-10-06): derived tables for NIFTY and SENSEX; the code takes any index.
 DEFAULT_UNDERLYINGS = ("NIFTY", "SENSEX")
-#: The first day with dated lot sizes, real expiries and full chains (BL-034 Phase 2).
+#: The first day with dated lot sizes, real expiries and full chains (BL-034 Phase 2). The
+#: default window starts here; an explicit `days` window may reach before it (the vendor's
+#: earlier history covers expiry weeks only, so those rows have sparse expiries: read them so).
 DERIVED_FROM = date(2024, 10, 1)
 DATASETS = ("chain_snapshots_5m", "straddle_series_5m", "contracts_daily")
 #: iv_daily uses the window ending at these times.
