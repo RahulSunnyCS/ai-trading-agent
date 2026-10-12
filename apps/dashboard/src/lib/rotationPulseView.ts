@@ -232,7 +232,7 @@ export function shareView(cell: PulseCell, r: PulseAvailable): ShareView {
   if (!summary || !one)
     return { text: EMPTY, title: 'No pick figure for this cell.', short: false };
   const basis =
-    `${source === 'recorded' ? 'Recorded' : 'Reconstructed'} picks of the ${listName(summary.list)} list,` +
+    `${source === 'recorded' ? 'Recorded' : 'Reconstructed'} picks of the ${listName(summary.list)} list, ` +
     `${formatInt(summary.sessions)} ${summary.sessions === 1 ? 'session' : 'sessions'} ` +
     `(${formatDay(summary.from)} to ${formatDay(summary.to)}).`;
   const short = source === 'recorded' && summary.sessions < r.share.sessions;

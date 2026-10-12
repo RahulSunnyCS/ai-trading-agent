@@ -261,7 +261,7 @@ describe('picks and share', () => {
     });
     const dir = shareView(cell(), r);
     expect(dir.text).toBe('5% · 3/63');
-    expect(dir.title).toContain('Reconstructed picks of the Steady list');
+    expect(dir.title).toContain('Reconstructed picks of the Steady list, 21 sessions');
     const buy = shareView(
       cell({
         kind: 'buy',
