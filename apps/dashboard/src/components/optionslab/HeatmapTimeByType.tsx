@@ -14,7 +14,7 @@
  */
 
 import { RefreshCw } from 'lucide-react';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 
 import { useRotationMatrix } from '../../hooks/useRotationMatrix';
 import { useTimeByTypeSelection } from '../../hooks/useTimeByTypeSelection';
@@ -53,8 +53,18 @@ function weekendNote(r: MatrixResponse): string | null {
   return `${formatInt(days.length)} weekend session${days.length === 1 ? '' : 's'} left out (${days.join(', ')}), as in the ranking history.`;
 }
 
+/** Today on the exchange's calendar, re-read every few minutes so a tab left open overnight moves on. */
+function useTodayIst(): string {
+  const [today, setToday] = useState(() => todayIst());
+  useEffect(() => {
+    const id = setInterval(() => setToday(todayIst()), 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+  return today;
+}
+
 export function HeatmapTimeByType() {
-  const today = useMemo(() => todayIst(), []);
+  const today = useTodayIst();
   const probe = useRotationMatrix(useMemo(() => probeParams(today), [today]));
   const sessions = useMemo(() => parseSessions(probe.data), [probe.data]);
   const { input, pickPreset, pickDay, pickRange } = useTimeByTypeSelection();
@@ -97,6 +107,14 @@ export function HeatmapTimeByType() {
     );
   } else if (probe.data === null) {
     body = <SkeletonRows rows={6} />;
+  } else if (sel === null && probe.data.available) {
+    body = (
+      <StateMessage
+        variant="empty"
+        title="No scored sessions yet"
+        description="The nightly run has not stored a weekday result."
+      />
+    );
   } else if (probe.data && !probe.data.available) {
     body = (
       <StateMessage variant="empty" title="No results stored yet" description={probe.data.reason} />

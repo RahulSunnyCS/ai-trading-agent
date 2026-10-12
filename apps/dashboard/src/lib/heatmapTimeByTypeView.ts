@@ -225,7 +225,7 @@ export function selectionTitle(sel: TimeByTypeSelection, periodLabel?: string): 
 /** Said when the default day is not today: which scored day this is and why. */
 export function latestNote(sel: TimeByTypeSelection, today: string): string | null {
   if (sel.mode !== 'latest' || sel.from === today) return null;
-  return `Showing the latest scored session, ${formatDay(sel.from)}. No results are stored for today (${formatDay(today)}) yet.`;
+  return `Showing the latest scored session, ${formatDay(sel.from)}. Today (${formatDay(today)}) has no scored session yet: a weekend or holiday, or the evening run has not finished.`;
 }
 
 /** Said when every cell is flagged thin only because the range is short. */
