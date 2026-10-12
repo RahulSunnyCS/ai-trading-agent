@@ -441,6 +441,16 @@ describe('RotationMatrixPanel', () => {
       await waitFor(() => expect(window.location.search).toBe('?family=widesl'));
     });
 
+    it('One period after P1 and P2 (cmp only in the URL) stays on P1, not today', async () => {
+      window.history.replaceState(null, '', '/optionslab/matrix?cmp=1');
+      stub(handler);
+      render(<RotationMatrixPanel />);
+      await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17/);
+      openSettings();
+      fireEvent.click(screen.getByText('One period'));
+      await waitFor(() => expect(window.location.search).toBe('?period=P1'));
+    });
+
     it('falls back to P1 and says so when no scored session can be found', async () => {
       window.history.replaceState(null, '', '/optionslab/matrix');
       const fetchMock = stub((url) =>

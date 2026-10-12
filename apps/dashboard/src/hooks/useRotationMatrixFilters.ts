@@ -106,7 +106,13 @@ export function useRotationMatrixFilters() {
       some(patch.metric, DEFAULT_FILTERS.metric, setMetric);
       // A period is always written: an absent one means "today's session" (rotationMatrixDefault.ts)
       if (patch.period !== undefined) setPeriod(patch.period);
-      if (patch.compare !== undefined) setCmp(patch.compare ? '1' : null);
+      if (patch.compare !== undefined) {
+        setCmp(patch.compare ? '1' : null);
+        // "One period" from P1 and P2 with no period key: stay on P1 rather than jump to today
+        if (!patch.compare && period === null && patch.period === undefined) {
+          setPeriod(DEFAULT_FILTERS.period);
+        }
+      }
       some(patch.from, '', setFrom);
       some(patch.to, '', setTo);
       some(patch.index, DEFAULT_FILTERS.index, setIndex);
@@ -122,6 +128,7 @@ export function useRotationMatrixFilters() {
       some(patch.basis, 'all', setBasis);
     },
     [
+      period,
       setView,
       setMetric,
       setPeriod,
@@ -188,14 +195,13 @@ export function useRotationMatrixFilters() {
     setBasis,
   ]);
 
-  /** Only the time keys: the period, P1/P2 side by side, the dates and the minimum sessions. */
+  /** Only the time keys: the period, P1/P2 side by side and the dates (an explicit minimum stays). */
   const clearPeriod = useCallback(() => {
     setPeriod(null);
     setCmp(null);
     setFrom(null);
     setTo(null);
-    setMinN(null);
-  }, [setPeriod, setCmp, setFrom, setTo, setMinN]);
+  }, [setPeriod, setCmp, setFrom, setTo]);
 
   return { filters, explicit, set, reset, clearPeriod };
 }

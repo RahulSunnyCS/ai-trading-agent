@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { addDays } from '../regimeTags';
 import {
   FALLBACK_NOTE,
-  addDays,
   changedCount,
   effectiveFilters,
   latestDayNote,

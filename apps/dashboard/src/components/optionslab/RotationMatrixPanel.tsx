@@ -433,6 +433,7 @@ export function RotationMatrixPanel() {
         set={set}
         meta={meta}
         summary={summary}
+        sessionsReady={sessions.last !== null}
         onPreset={onPreset}
         onReset={reset}
       />

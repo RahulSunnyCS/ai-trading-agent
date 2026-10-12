@@ -9,7 +9,8 @@
  */
 
 import type { MatrixResult } from '../types/rotationMatrix';
-import { formatDay } from './format';
+import { formatDay, istToday } from './format';
+import { addDays } from './regimeTags';
 import {
   ANY,
   DEFAULT_FILTERS,
@@ -29,16 +30,9 @@ export function isDay(value: string | null | undefined): value is string {
   return typeof value === 'string' && DAY_RE.test(value);
 }
 
-/** An ISO day `delta` days from `day`. */
-export function addDays(day: string, delta: number): string {
-  const d = new Date(`${day}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + delta);
-  return d.toISOString().slice(0, 10);
-}
-
 /** Today's date in India (the exchange's calendar), as YYYY-MM-DD. */
 export function todayIst(now: number = Date.now()): string {
-  return new Date(now + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+  return istToday(new Date(now));
 }
 
 /** The request that lists the scored sessions of the last ~130 calendar days. */

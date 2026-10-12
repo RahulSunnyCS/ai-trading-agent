@@ -86,6 +86,7 @@ export function RotationMatrixSettingsDrawer({
   set,
   meta,
   summary,
+  sessionsReady,
   onPreset,
   onReset,
 }: {
@@ -95,6 +96,8 @@ export function RotationMatrixSettingsDrawer({
   set: (patch: Partial<MatrixFilters>) => void;
   meta: MatrixMeta | undefined;
   summary: string;
+  /** The scored sessions are known, so "Last N sessions" can count back from the newest. */
+  sessionsReady: boolean;
   onPreset: (preset: MatrixPreset) => void;
   onReset: () => void;
 }) {
@@ -124,7 +127,17 @@ export function RotationMatrixSettingsDrawer({
         periodExtras={
           <div className="flex flex-wrap gap-1.5">
             {PRESET_OPTIONS.map((p) => (
-              <Button key={p.value} size="sm" onClick={() => onPreset(p.value)}>
+              <Button
+                key={p.value}
+                size="sm"
+                onClick={() => onPreset(p.value)}
+                disabled={!sessionsReady && p.value.startsWith('last')}
+                title={
+                  !sessionsReady && p.value.startsWith('last')
+                    ? 'The scored sessions are still loading'
+                    : undefined
+                }
+              >
                 {p.label}
               </Button>
             ))}
