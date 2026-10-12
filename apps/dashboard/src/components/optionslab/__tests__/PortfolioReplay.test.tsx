@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const added: { kind: string; title: string | undefined; points: number }[] = [];
@@ -109,18 +109,21 @@ describe('PortfolioReplay', () => {
     );
     expect(await screen.findByText(/Closed by the portfolio stop at 10:55/)).toBeTruthy();
     expect(screen.getByText(/Steady \(A\) as one basket/)).toBeTruthy();
-    const titles = added.map((a) => a.title);
-    expect(titles).toEqual(
-      expect.arrayContaining([
-        'N_wide_0917',
-        'S_wide_0917',
-        'Basket ₹',
-        'No portfolio stop',
-        'Stop level',
-      ]),
-    );
-    // the level is drawn only up to the stop
-    expect(added.find((a) => a.title === 'Stop level')?.points).toBe(101);
+    // The series are added by an effect that runs after the chart reports ready, one commit after
+    // the text above appears, so wait for them rather than reading `added` straight away.
+    await waitFor(() => {
+      expect(added.map((a) => a.title)).toEqual(
+        expect.arrayContaining([
+          'N_wide_0917',
+          'S_wide_0917',
+          'Basket ₹',
+          'No portfolio stop',
+          'Stop level',
+        ]),
+      );
+      // the level is drawn only up to the stop
+      expect(added.find((a) => a.title === 'Stop level')?.points).toBe(101);
+    });
     expect(screen.queryByText(/differs from the log/)).toBeNull();
   });
 
