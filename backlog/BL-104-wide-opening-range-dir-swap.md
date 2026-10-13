@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Priority** | P3 — small, in-sample effect on about 9% of days; worth a forward shadow, not a change to the lists |
+| **Priority** | P0 — set by the owner on 2026-10-14 for exploration; Claude's own judgement was P3 (small, in-sample effect on about 9% of days) |
 | **Status** | Planned (pre-registration drafted; nothing run) |
 | **Type** | research |
 | **Area** | options |
@@ -129,3 +129,4 @@ Committed before any forward day is scored. A rule is never edited after a run.
 
 - 2026-10-14 — created from the opening-range / gap / expiry study; pre-registration drafted, nothing run.
 - 2026-10-14 — figures corrected (the swapped basket double-counted the 09:17 picks); SENSEX-range flag (300 points) tested and does not support the rule; Widesl floor kept at 1.
+- 2026-10-14 — priority set to P0 by the owner for exploration purposes (was P3 by Claude's judgement; the evidence is unchanged).

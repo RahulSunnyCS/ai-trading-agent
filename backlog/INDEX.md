@@ -24,6 +24,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-058](BL-058-options-rotation-forward-journal-and-ui.md) | Options rotation: forward paper journal from Mon 12 Oct (picks recorded before 09:17, scored nightly) and the Options Lab screens it needs | P0 | In progress: journal built, first entry Mon 12 Oct 09:16 (lists A, B, C, REF); Phase 4 view built 2026-10-11 (page, shadow, explain, matrix, daily log, basket mode, forward vs periods, drawdowns, drift, family pulse; paper vs real waits for the charge model and contract notes); day-60 read-out pending | feature | options |
 | [BL-087](BL-087-momentum-all-fridays-split.md) | Momentum: backtest and follow a config split across every rebalance Friday | P0 | Built; live migration pending | feature | momentum |
 | [BL-089](BL-089-backlog-tracks-and-github-board.md) | Backlog restructure: research / product / platform tracks, a generated index and `DONE.md`, one issue per item and a GitHub Projects board with a "Needs me" view | P0 | Ready | chore | cross-cutting |
+| [BL-104](BL-104-wide-opening-range-dir-swap.md) | Wide opening-range days: swap not-yet-entered Widesl picks for Dir, as a forward shadow rule | P0 | Planned | research | options |
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-015](BL-015-research-gate.md) | Research gate: pre-register every experiment, log every override | P1 | In progress | chore | cross-cutting |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
@@ -95,7 +96,6 @@ Sorted by priority (P0 first), then ID.
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
 | [BL-037](BL-037-stock-options-in-the-lake.md) | Stock options in the lake: finish loading the vendor's 216 stocks (deferred) | P3 | Planned | feature | trading-data |
 | [BL-048](BL-048-dormant-server-surfaces.md) | Dormant surfaces: test-only server, broken personality edit, unwritten regime tags, the YAML engine's future | P3 | Planned | chore | server |
-| [BL-104](BL-104-wide-opening-range-dir-swap.md) | Wide opening-range days: swap not-yet-entered Widesl picks for Dir, as a forward shadow rule | P3 | Planned | research | options |
 
 ## Done / Dropped
 
