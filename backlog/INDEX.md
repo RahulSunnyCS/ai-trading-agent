@@ -95,6 +95,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
 | [BL-037](BL-037-stock-options-in-the-lake.md) | Stock options in the lake: finish loading the vendor's 216 stocks (deferred) | P3 | Planned | feature | trading-data |
 | [BL-048](BL-048-dormant-server-surfaces.md) | Dormant surfaces: test-only server, broken personality edit, unwritten regime tags, the YAML engine's future | P3 | Planned | chore | server |
+| [BL-104](BL-104-wide-opening-range-dir-swap.md) | Wide opening-range days: swap not-yet-entered Widesl picks for Dir, as a forward shadow rule | P3 | Planned | research | options |
 
 ## Done / Dropped
 
