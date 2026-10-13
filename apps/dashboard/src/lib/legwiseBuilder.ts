@@ -183,8 +183,15 @@ export function summarizeLeg(leg: Leg, underlying: string): string {
   if (leg.reentry_on_target) parts.push(`re-entry on target ${reentryText(leg.reentry_on_target)}`);
   if (leg.range_breakout) {
     const on = leg.range_breakout.source === 'underlying' ? 'index' : 'premium';
+    const { gap_percent: gap, valid_until: validUntil } = leg.range_breakout;
+    const extras = [
+      gap ? `${num(gap)}% beyond the range` : '',
+      validUntil ? `valid until ${validUntil}` : '',
+    ].filter(Boolean);
     parts.push(
-      `enters on ${on} ${leg.range_breakout.side} break after ${leg.range_breakout.until}`,
+      `enters on ${on} ${leg.range_breakout.side} break after ${leg.range_breakout.until}${
+        extras.length ? ` (${extras.join(', ')})` : ''
+      }`,
     );
   }
   return parts.join(' · ');
@@ -343,6 +350,10 @@ const PLAIN: readonly [RegExp, (m: RegExpMatchArray) => string][] = [
   [
     /range_breakout\.until must be inside entry-exit$/,
     () => 'Range end must be between the entry and exit times',
+  ],
+  [
+    /range_breakout\.valid_until must be after until and no later than exit$/,
+    () => 'Range breakout "valid until" must be after the range end and not after the exit time',
   ],
   [
     /^re-entry with square_off: complete is not supported yet$/,

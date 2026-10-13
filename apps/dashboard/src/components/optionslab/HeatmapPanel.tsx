@@ -19,12 +19,17 @@ import { useQueryState } from '../../hooks/useQueryState';
 import { formatDay, formatInt } from '../../lib/format';
 import {
   ALL_STOCKS,
+  NO_SL,
+  NO_SL_HINT,
   VIEW_LABEL,
   WEEK_LABEL,
   cellClass,
   formatCell,
   maxAbsOf,
   metricLabel,
+  slLabel,
+  slLevels,
+  slOptionLabel,
   toCsv,
   unitNote,
 } from '../../lib/heatmapView';
@@ -38,11 +43,12 @@ import type {
 } from '../../types/heatmap';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
+import { InfoTooltip } from '../ui/InfoTooltip';
 import { Input, Select } from '../ui/Input';
 import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
-import { StatCard } from '../ui/StatCard';
 import { StateMessage } from '../ui/StateMessage';
+import { HeatmapTimeByType } from './HeatmapTimeByType';
 
 const VIEW_OPTIONS: { value: HeatmapViewKey; label: string }[] = (
   ['time_sl', 'date_time', 'date_sl'] as const
@@ -85,7 +91,12 @@ function rowLabel(view: HeatmapViewKey, row: string): string {
 
 function columnLabel(view: HeatmapViewKey, col: string | number): string {
   if (view === 'date_time') return String(col);
-  return String(col);
+  return slLabel(col);
+}
+
+/** The No SL column exists only where the columns are stop losses. */
+function isNoSl(view: HeatmapViewKey, col: string | number | undefined): boolean {
+  return view !== 'date_time' && Number(col) === NO_SL;
 }
 
 function Cell({
@@ -94,21 +105,26 @@ function Cell({
   unit,
   split,
   bold,
+  noSl,
 }: {
   cell: HeatmapCell | null;
   maxAbs: number;
   unit: HeatmapResponse['unit'];
   split: boolean;
   bold?: boolean;
+  /** The No SL column: set apart by a heavier left edge. */
+  noSl?: boolean;
 }) {
   const tone = cellClass(cell?.net, maxAbs);
   return (
     <td
-      className={`${tone} whitespace-nowrap border border-surface px-2 py-1.5 text-center font-mono text-xs tabular-nums ${bold ? 'font-semibold' : ''}`}
+      className={`${tone} whitespace-nowrap border border-surface px-2 py-1.5 text-center font-mono text-xs tabular-nums ${bold ? 'font-semibold' : ''} ${noSl ? 'border-l-2 border-l-border-strong' : ''}`}
       title={
         cell
-          ? `Call ${formatCell(cell.ce, unit)} · Put ${formatCell(cell.pe, unit)} · ${formatInt(cell.n)} straddle${cell.n === 1 ? '' : 's'}`
-          : 'No straddle'
+          ? `${noSl ? `${NO_SL_HINT}. ` : ''}Call ${formatCell(cell.ce, unit)} · Put ${formatCell(cell.pe, unit)} · ${formatInt(cell.n)} straddle${cell.n === 1 ? '' : 's'}`
+          : noSl
+            ? `${NO_SL_HINT}. Nothing stored for it (not built yet, or no straddle)`
+            : 'No straddle'
       }
     >
       {cell ? (
@@ -149,7 +165,8 @@ function HeatmapTable({ r, split }: { r: HeatmapResponse; split: boolean }) {
             {r.columns.map((c) => (
               <th
                 key={c}
-                className="px-2 py-2 text-center font-mono text-xs font-semibold text-muted"
+                title={isNoSl(r.view, c) ? NO_SL_HINT : undefined}
+                className={`px-2 py-2 text-center font-mono text-xs font-semibold text-muted ${isNoSl(r.view, c) ? 'border-l-2 border-l-border-strong' : ''}`}
               >
                 {columnLabel(r.view, c)}
               </th>
@@ -172,6 +189,7 @@ function HeatmapTable({ r, split }: { r: HeatmapResponse; split: boolean }) {
                   maxAbs={maxAbs}
                   unit={r.unit}
                   split={split}
+                  noSl={isNoSl(r.view, r.columns[j])}
                 />
               ))}
               <Cell
@@ -195,6 +213,7 @@ function HeatmapTable({ r, split }: { r: HeatmapResponse; split: boolean }) {
                 unit={r.unit}
                 split={split}
                 bold
+                noSl={isNoSl(r.view, r.columns[j])}
               />
             ))}
             <Cell cell={r.total} maxAbs={maxAbs} unit={r.unit} split={split} bold />
@@ -222,29 +241,44 @@ function bestOf(r: HeatmapResponse): { label: string; value: number } | null {
 
 function Summary({ r }: { r: HeatmapResponse }) {
   const best = bestOf(r);
+  const days = `${formatInt(r.days.length)} day${r.days.length === 1 ? '' : 's'}`;
+  // Exit and metric repeat the controls above, so they are one muted line of basis, not two cards.
+  const basis = [
+    `Exit ${r.exit_time}`,
+    metricLabel(r.metric),
+    'no costs or slippage',
+    r.kind === 'stock' ? 'stock options: monthly expiry only' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <StatCard
-        label="Total"
-        value={r.total ? formatCell(r.total.net, r.unit) : '—'}
-        note={`${formatInt(r.days.length)} day${r.days.length === 1 ? '' : 's'}, ${unitNote(r)}`}
-      />
-      <StatCard
-        label="Best cell"
-        value={best ? formatCell(best.value, r.unit) : '—'}
-        note={best?.label}
-        hint="The largest single cell on screen. One cell is a few days at one setting, so it is a place to look, not a rule."
-      />
-      <StatCard
-        label="Exit"
-        value={r.exit_time}
-        note="Legs not stopped exit here; no costs or slippage"
-      />
-      <StatCard
-        label="Metric"
-        value={metricLabel(r.metric)}
-        note={r.kind === 'stock' ? 'Stock options: monthly expiry only' : undefined}
-      />
+    <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1.5 rounded-lg border border-border bg-surface-2/60 px-4 py-2">
+      <div className="flex min-w-0 items-baseline gap-2" title={`${days}, ${unitNote(r)}`}>
+        <span className="text-xs font-medium uppercase tracking-wider text-faint">Total</span>
+        <span className="metric text-base font-semibold tracking-tight text-foreground">
+          {r.total ? formatCell(r.total.net, r.unit) : '—'}
+        </span>
+        <span className="text-xs text-muted">{days}</span>
+      </div>
+      <div className="flex min-w-0 items-baseline gap-2">
+        <span className="flex items-center gap-1 self-center text-xs font-medium uppercase tracking-wider text-faint">
+          Best cell
+          <InfoTooltip
+            text="The largest single cell on screen. One cell is a few days at one setting, so it is a place to look, not a rule."
+            label="About Best cell"
+          />
+        </span>
+        <span className="metric text-base font-semibold tracking-tight text-foreground">
+          {best ? formatCell(best.value, r.unit) : '—'}
+        </span>
+        {best ? <span className="truncate text-xs text-muted">{best.label}</span> : null}
+      </div>
+      <p
+        className="min-w-0 text-xs text-muted"
+        title={`${unitNote(r)}. Legs not stopped exit at ${r.exit_time}; no costs or slippage.`}
+      >
+        {basis}
+      </p>
     </div>
   );
 }
@@ -344,9 +378,9 @@ function Controls({
               onChange={(e) => setters.sl(Number(e.target.value))}
               aria-label="Stop loss"
             >
-              {available.stop_losses.map((s) => (
+              {slLevels(available).map((s) => (
                 <option key={s} value={s}>
-                  {s}%
+                  {slOptionLabel(s)}
                 </option>
               ))}
             </Select>
@@ -508,9 +542,8 @@ function useHeatmapSettings(available: HeatmapAvailable) {
   const date = dateQ && /^\d{4}-\d{2}-\d{2}$/.test(dateQ) ? dateQ : last;
   const to = toQ && /^\d{4}-\d{2}-\d{2}$/.test(toQ) ? toQ : view === 'time_sl' ? '' : last;
   const from = fromQ && /^\d{4}-\d{2}-\d{2}$/.test(fromQ) ? fromQ : last ? addDays(last, -14) : '';
-  const sl = available.stop_losses.includes(Number(slQ))
-    ? Number(slQ)
-    : (available.stop_losses[0] ?? 10);
+  const levels = slLevels(available);
+  const sl = slQ !== null && levels.includes(Number(slQ)) ? Number(slQ) : (levels[0] ?? 10);
   const time = timeQ && available.times.includes(timeQ) ? timeQ : (available.times[0] ?? '09:16');
   const exit =
     exitQ && available.exit_times.includes(exitQ) ? exitQ : (available.exit_times[0] ?? '15:30');
@@ -575,7 +608,7 @@ function Result({ params, split }: { params: HeatmapParams; split: boolean }) {
       <Card>
         <CardHeader
           title={`${r.underlying} short straddle · ${VIEW_LABEL[r.view]}`}
-          description={`${unitNote(r)}. Each leg has its own stop at the SL % above its entry price; legs not stopped exit at ${r.exit_time}.`}
+          description={`${unitNote(r)}. ${r.view === 'date_time' && r.filters.sl === NO_SL ? `No stop loss: both legs are held to ${r.exit_time}.` : `Each leg has its own stop at the SL % above its entry price; legs not stopped exit at ${r.exit_time}. ${slLabel(NO_SL)} holds both legs to the exit with no stop.`}`}
           actions={
             <div className="flex items-center gap-1">
               <Button
@@ -655,7 +688,7 @@ function HeatmapBody({ available }: { available: HeatmapAvailable }) {
   );
 }
 
-export function HeatmapPanel() {
+function StraddleSection() {
   const available = useHeatmapAvailable();
   if (available.error && available.data === null) {
     return (
@@ -677,4 +710,13 @@ export function HeatmapPanel() {
     );
   }
   return <HeatmapBody available={available.data} />;
+}
+
+export function HeatmapPanel() {
+  return (
+    <div className="space-y-5">
+      <StraddleSection />
+      <HeatmapTimeByType />
+    </div>
+  );
 }

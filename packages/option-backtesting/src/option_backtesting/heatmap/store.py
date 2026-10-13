@@ -1,6 +1,7 @@
 """The heatmap's rows on disk: TRADING_DATA_ROOT/heatmap/<UNDERLYING>.parquet, one row per
-(day, entry time, stop loss), points per unit for each leg. Plain files, not the catalog (which
-allows one writer, and `obt daily` must not wait on a heatmap build).
+(day, entry time, exit, stop loss), points per unit for each leg; sl = 0 is "No SL" (grid.NO_SL).
+Plain files, not the catalog (which allows one writer, and `obt daily` must not wait on a
+heatmap build).
 
 A build is incremental: days already in the file are kept, new collected days are added, and
 `force` recomputes the range. The write is a temp file renamed over the old one."""
@@ -134,7 +135,18 @@ def _build(
     skipped: dict[date, str] = dict(left_out)
     existing = read(underlying, root)
     have = set(existing.column("day").to_pylist()) if existing is not None else set()
-    todo = [d for d in days if force or d not in have]
+    # a day stored before the "No SL" level existed has no sl = 0 row: it is rebuilt (the other
+    # cells come out identical), so a plain build fills the new column for the stored days
+    complete = (
+        set(
+            existing.filter(pc.equal(existing.column("sl"), pa.scalar(grid.NO_SL, pa.int16())))
+            .column("day")
+            .to_pylist()
+        )
+        if existing is not None
+        else set()
+    )
+    todo = [d for d in days if force or d not in complete]
     rows: list[dict] = []
     for day in todo:
         try:

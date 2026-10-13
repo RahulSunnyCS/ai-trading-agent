@@ -74,7 +74,7 @@ place of that pick on that day", which may have nothing to do with the trigger. 
 is drawn only on days with enough earlier non-event days, and the page says when it covers fewer
 days than the solid line.
 
-Switch lists with the control above: all four are shown, and B and REF are marked as candidates
+Switch lists with the control above: all four are shown, and Calendar and Baseline are marked as candidates
 because those were the two the research found above both of its controls.
 
 > [!NOTE]
@@ -85,16 +85,16 @@ because those were the two the research found above both of its controls.
 ## What the research found
 
 The same override in the research, for all four lists: the gain over the plain list, and the 90th
-percentile of 200 random draws for each of its two controls. On the last two years, lists B and
-REF beat both controls (+₹79,389 and +₹54,556). On 2022 to 2024 B lost (−₹26,749) and REF gained
+percentile of 200 random draws for each of its two controls. On the last two years, the Calendar and
+Baseline lists beat both controls (+₹79,389 and +₹54,556). On 2022 to 2024 Calendar lost (−₹26,749) and Baseline gained
 a little (+₹16,268), below its controls. The forward column puts the running total so far next to
 those; it is much shorter than two years and means nothing until the judgement point.
 
 ## Candidates with no scoring yet
 
 Two small versions from the hourly-checkpoint study passed every control on the last two years and
-lost about ₹10,000 on 2022 to 2024: list A dropping a pending pick when the VIX state says it
-will lose, and list C swapping pending picks by VIX and the running Widesl's result. They are
+lost about ₹10,000 on 2022 to 2024: the Steady list dropping a pending pick when the VIX state says it
+will lose, and the Adaptive list swapping pending picks by VIX and the running Widesl's result. They are
 kept for observation, but nothing scores them each night yet. They are shown with their
 definitions and marked Not scored; no number here is theirs.
 

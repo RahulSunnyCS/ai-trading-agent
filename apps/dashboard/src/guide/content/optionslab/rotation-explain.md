@@ -19,7 +19,7 @@ rebuild against the entry.
 
 | Control | What it does |
 |---|---|
-| List | A, B, C or REF. The same switch drives the other card. |
+| List | Steady, Calendar, Adaptive or Baseline. The same switch drives the other card. |
 | Day | The day to explain. The arrows step through the days that can be explained; a typed date snaps to the nearest one on or before it. "Latest recorded" jumps to the newest journal entry, or the newest day with enough history when there is no entry yet. |
 | A row | Click a strategy to see its criterion table. The picks are listed first by rank, with the best-ranked strategies they beat beneath. |
 
@@ -77,7 +77,7 @@ day is kept; days are never pooled.
 |---|---|
 | Bars | The correlation for each day. Dark bars are forward days, the others research days. |
 | Line and band | The running mean, with a 95% band (mean ± the Student t multiple of the standard error over days, which is wide on few days). The band is drawn, and read, only from the tenth day. |
-| Dashed line | The research mean for list A over 2025-12-03 to 2026-10-08 (+0.048, the calibration of the pre-registered study), for list A only. |
+| Dashed line | The research mean for the Steady list over 2025-12-03 to 2026-10-08 (+0.048, the calibration of the pre-registered study), for the Steady list only. |
 | Top 30 − bottom 30 | Mean gross per lot of the 30 best-ranked strategies minus the 30 worst, in rupees. The ranking's effect in money. |
 
 ### Forward days and research days

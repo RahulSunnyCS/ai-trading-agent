@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from 'react';
 
+import type { Explicit } from '../lib/rotationMatrixDefault';
 import {
   ANY,
   DEFAULT_FILTERS,
@@ -103,8 +104,15 @@ export function useRotationMatrixFilters() {
       };
       some(patch.view, DEFAULT_FILTERS.view, setView);
       some(patch.metric, DEFAULT_FILTERS.metric, setMetric);
-      some(patch.period, DEFAULT_FILTERS.period, setPeriod);
-      if (patch.compare !== undefined) setCmp(patch.compare ? '1' : null);
+      // A period is always written: an absent one means "today's session" (rotationMatrixDefault.ts)
+      if (patch.period !== undefined) setPeriod(patch.period);
+      if (patch.compare !== undefined) {
+        setCmp(patch.compare ? '1' : null);
+        // "One period" from P1 and P2 with no period key: stay on P1 rather than jump to today
+        if (!patch.compare && period === null && patch.period === undefined) {
+          setPeriod(DEFAULT_FILTERS.period);
+        }
+      }
       some(patch.from, '', setFrom);
       some(patch.to, '', setTo);
       some(patch.index, DEFAULT_FILTERS.index, setIndex);
@@ -114,11 +122,13 @@ export function useRotationMatrixFilters() {
       some(patch.weekday, ANY, setWeekday);
       some(patch.dte, ANY, setDte);
       some(patch.vix, ANY, setVix);
-      some(patch.minN, DEFAULT_MIN_N, setMinN);
+      // written even at the default: an absent `minn` lets a one-day selection ask for 1
+      if (patch.minN !== undefined) setMinN(String(patch.minN));
       some(patch.list, ANY, setList);
       some(patch.basis, 'all', setBasis);
     },
     [
+      period,
       setView,
       setMetric,
       setPeriod,
@@ -138,5 +148,60 @@ export function useRotationMatrixFilters() {
     ],
   );
 
-  return { filters, set };
+  /** Which of the settings the URL names itself (the rest take the page's defaults). */
+  const explicit: Explicit = useMemo(
+    () => ({ period: period !== null || cmp === '1', minN: minN !== null }),
+    [period, cmp, minN],
+  );
+
+  /** Back to the opening view: no key in the URL, so today's session, family x start, Average. */
+  const reset = useCallback(() => {
+    for (const clear of [
+      setView,
+      setMetric,
+      setPeriod,
+      setCmp,
+      setFrom,
+      setTo,
+      setIndex,
+      setFamily,
+      setStrategy,
+      setSlot,
+      setWeekday,
+      setDte,
+      setVix,
+      setMinN,
+      setList,
+      setBasis,
+    ]) {
+      clear(null);
+    }
+  }, [
+    setView,
+    setMetric,
+    setPeriod,
+    setCmp,
+    setFrom,
+    setTo,
+    setIndex,
+    setFamily,
+    setStrategy,
+    setSlot,
+    setWeekday,
+    setDte,
+    setVix,
+    setMinN,
+    setList,
+    setBasis,
+  ]);
+
+  /** Only the time keys: the period, P1/P2 side by side and the dates (an explicit minimum stays). */
+  const clearPeriod = useCallback(() => {
+    setPeriod(null);
+    setCmp(null);
+    setFrom(null);
+    setTo(null);
+  }, [setPeriod, setCmp, setFrom, setTo]);
+
+  return { filters, explicit, set, reset, clearPeriod };
 }

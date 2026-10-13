@@ -246,8 +246,8 @@ describe('counters and the empty state', () => {
     expect(get('days')?.value).toBe('5');
     expect(get('late')?.value).toBe('1');
     expect(get('not_recorded')?.value).toBe('1');
-    expect(get('buy')?.value).toBe('A 1/5 · B 1/5 · C 0/5 · REF 0/5');
-    expect(get('override')?.value).toBe('A 0/5 · B 0/5 · C 1/5 · REF 0/5');
+    expect(get('buy')?.value).toBe('Steady 1/5 · Calendar 1/5 · Adaptive 0/5 · Baseline 0/5');
+    expect(get('override')?.value).toBe('Steady 0/5 · Calendar 0/5 · Adaptive 1/5 · Baseline 0/5');
     expect(get('identical')?.value).toBe('3/5');
     expect(get('stops')?.value).toBe('1/5');
   });
@@ -301,7 +301,7 @@ describe('calendar cell wording', () => {
     const t = of('2026-10-16');
     expect(t).toMatch(/scored/);
     expect(t).toMatch(/\+₹1,267|₹/);
-    expect(t).toMatch(/overall stop-loss fired in list A/);
+    expect(t).toMatch(/overall stop-loss fired in Steady/);
     expect(t).toMatch(/VIX: Angel One/);
   });
   it('gives the reason for a day with no figure, a holiday and a day to come', () => {

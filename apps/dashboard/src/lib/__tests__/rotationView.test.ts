@@ -102,7 +102,7 @@ describe('headline', () => {
     expect(byId.drawdownLot?.gap).toBe(0);
     expect(byId.drawdownLot?.tone).toBe('default');
     expect(byId.total?.gap).toBeNull();
-    expect(byId.total?.caption).toBe('6 lots a day here, 6 for REF');
+    expect(byId.total?.caption).toBe('6 lots a day here, 6 for Baseline');
     expect(byId.sessions?.value).toBe(2);
     expect(byId.sessions?.benchmark).toBe(60);
   });
@@ -129,14 +129,14 @@ describe('headline', () => {
 });
 
 describe('verdict', () => {
-  it('lists REF and the base with the base carrying the pass rule', () => {
+  it('lists the base first, carrying the pass rule, then REF', () => {
     const v = verdict(summary(), 'A');
     expect(v.lines.map((l) => l.label)).toEqual([
-      'List A minus REF',
-      'List A minus the fixed base',
+      'Steady minus the fixed base',
+      'Steady minus Baseline',
     ]);
-    expect(v.lines[0]?.rule).toBeNull();
-    expect(v.lines[1]?.rule).toEqual({ drawdownNoWorse: true, beats: false });
+    expect(v.lines[0]?.rule).toEqual({ drawdownNoWorse: true, beats: false });
+    expect(v.lines[1]?.rule).toBeNull();
     expect(v.readable).toBe(false); // 2 days
   });
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { HeatmapCell, HeatmapResponse } from '../../types/heatmap';
-import { cellClass, maxAbsOf, toCsv } from '../heatmapView';
+import { cellClass, maxAbsOf, slLabel, slLevels, slOptionLabel, toCsv } from '../heatmapView';
 
 const cell = (net: number, ce: number, pe: number): HeatmapCell => ({ net, ce, pe, n: 1 });
 
@@ -54,5 +54,34 @@ describe('cellClass', () => {
 
   it('measures intensity against the biggest cell', () => {
     expect(maxAbsOf(response.cells)).toBe(300);
+  });
+});
+
+describe('No SL level', () => {
+  it('labels the 0 sentinel, leaves real stops as they are', () => {
+    expect(slLabel(0)).toBe('No SL');
+    expect(slLabel('0')).toBe('No SL');
+    expect(slLabel(10)).toBe('10');
+    expect(slOptionLabel(0)).toBe('No SL');
+    expect(slOptionLabel(30)).toBe('30%');
+  });
+
+  it('reads the levels from the response, falling back for an older API', () => {
+    expect(slLevels({ stop_losses: [10, 20], sl_levels: [10, 20, 0] })).toEqual([10, 20, 0]);
+    expect(slLevels({ stop_losses: [10, 20] })).toEqual([10, 20]);
+  });
+
+  it('puts No SL in the CSV heading of an SL axis but leaves a time axis alone', () => {
+    const withNoSl: HeatmapResponse = {
+      ...response,
+      columns: [10, 0],
+      cells: [
+        [cell(1, 1, 0), null],
+        [cell(2, 1, 1), null],
+      ],
+    };
+    expect(toCsv(withNoSl, false).split('\n')[0]).toBe(',10,No SL,TOTAL');
+    const byTime: HeatmapResponse = { ...withNoSl, view: 'date_time', columns: ['09:16', '09:45'] };
+    expect(toCsv(byTime, false).split('\n')[0]).toBe(',09:16,09:45,TOTAL');
   });
 });

@@ -10,7 +10,7 @@
  *  - Daily results: saved `obt daily` results, the evening run button, trade logs.
  *  - Regimes: does the index come in persistent periods? (index + VIX history)
  *  - Correlation: do the strategies lose on the same days? (BL-090)
- *  - Rotation: how the four forward lists are doing against REF, the base and luck (BL-058)
+ *  - Rotation: how the four forward lists are doing against Baseline, the base and luck (BL-058)
  *  - Matrix: where do the rotation variants make or lose money, by start time, date and
  *    condition, with the recorded picks laid over it (the Strategy Matrix; read-only)
  *
