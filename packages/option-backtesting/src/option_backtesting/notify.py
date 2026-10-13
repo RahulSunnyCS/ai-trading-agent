@@ -96,16 +96,16 @@ def render(n: Notification, now: datetime | None = None) -> str:
     return text
 
 
-def send(n: Notification) -> tuple[bool, str]:
+def send(n: Notification, *, chat_id: str | None = None) -> tuple[bool, str]:
     """Send (or, without TELEGRAM_* configured, print) the message.
-    Returns (delivered, text)."""
+    Returns (delivered, text). An explicit chat_id overrides the default destination."""
     load_dotenv()
     text = render(n)
     if not is_enabled(n.type):
         print(f"\n[telegram: '{n.type}' is switched off, message below]\n{text}")
         return False, text
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
-    chat = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    chat = (chat_id if chat_id is not None else os.environ.get("TELEGRAM_CHAT_ID", "")).strip()
     if not (token and chat):
         print(f"\n[telegram not configured, message below]\n{text}")
         return False, text

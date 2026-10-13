@@ -149,8 +149,9 @@ needs to be shared with the server, it is currently hand-duplicated in
   widget passes the setting to `/rotation/drawdowns` (`with_stop`, a second line and three figures);
   the page's headline and hero chart use `overlaySummary` over the forward read-out's days. The
   verdict, the intervals and "beats random baskets" always stay on the registered basis.
-- `src/lib/rotationListNames.ts` — the one map from a rotation list key (`A`, `B`, `C`, `REF`) to
-  its display name (Steady, Calendar, Adaptive, Baseline) and registered weights. Keys never change
+- `src/lib/rotationListNames.ts` — display helpers and registered weights for rotation lists;
+  names come from `packages/option-backtesting/src/option_backtesting/rotation/list_names.json`,
+  shared with Telegram. Keys never change
   (journal, results, API, URL); render a key as text only through `listName` / `listLabel`
   ("Steady (A)", for entry and journal views) / `listShort` (a corner mark), never a raw key.
 - `src/hooks/useNow.ts` — the one ticking clock (`Date | null`, null until mounted). Every caller

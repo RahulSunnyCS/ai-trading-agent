@@ -1,11 +1,13 @@
 /**
- * The one place the rotation lists' display names live.
+ * Display helpers for the rotation lists; names come from the shared JSON used by Telegram.
  *
  * The journal, the stored results, the API payloads and the pre-registration all key the lists
  * `A`, `B`, `C` and `REF`; those keys never change. Only what a reader SEES is renamed here.
  * Render a list key as text through `listName` (name alone) or `listLabel` (name with the key
  * as a small hint, for places that map back to the journal).
  */
+
+import displayNames from '../../../../packages/option-backtesting/src/option_backtesting/rotation/list_names.json';
 
 export type ListKey = 'A' | 'B' | 'C' | 'REF';
 
@@ -19,22 +21,22 @@ export interface ListInfo {
 
 export const LIST_INFO: Record<ListKey, ListInfo> = {
   A: {
-    name: 'Steady',
+    name: displayNames.A,
     note: 'The safest cell of the weightings.',
     weights: { own: 5, weekday: 34, dte: 33, vix: 23, family: 5 },
   },
   B: {
-    name: 'Calendar',
+    name: displayNames.B,
     note: 'Leans on the calendar: weekday and days to expiry.',
     weights: { own: 0, weekday: 36, dte: 35, vix: 24, family: 5 },
   },
   C: {
-    name: 'Adaptive',
+    name: displayNames.C,
     note: 'Gives its own recent results the most say.',
     weights: { own: 15, weekday: 30, dte: 30, vix: 20, family: 5 },
   },
   REF: {
-    name: 'Baseline',
+    name: displayNames.REF,
     note: 'The old live rotation, kept as the comparator.',
     weights: null,
   },

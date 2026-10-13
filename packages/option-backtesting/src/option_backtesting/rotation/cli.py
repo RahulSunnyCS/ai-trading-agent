@@ -3,6 +3,7 @@ triggers-show (BL-083); corr, corr-list, corr-pick (BL-090)."""
 
 from __future__ import annotations
 
+import os
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
@@ -12,6 +13,18 @@ rotation_app = typer.Typer(
     no_args_is_help=True, help="The options rotation's forward paper journal (BL-058)."
 )
 IST = ZoneInfo("Asia/Kolkata")
+
+
+def _send_private_and_group(notification) -> bool:
+    """Send a rotation message to the owner and, when configured, the friends' group."""
+    from ..notify import send
+
+    private_ok, _ = send(notification)
+    group = os.environ.get("TELEGRAM_ROTATION_CHAT_ID", "").strip()
+    if group and group != os.environ.get("TELEGRAM_CHAT_ID", "").strip():
+        group_ok, _ = send(notification, chat_id=group)
+        return private_ok and group_ok
+    return private_ok
 
 
 def _day(text: str | None) -> date:
@@ -95,14 +108,49 @@ def pick(
     typer.echo(r.text)
     if telegram and not dry_run:
         severity = "info" if r.entry["before_first_entry"] else "warn"
-        send(
+        notification = Notification(
+            source="options-rotation",
+            severity=severity,
+            title=f"Rotation picks {d}",
+            body=r.text,
+        )
+        _send_private_and_group(notification)
+
+
+@rotation_app.command()
+def result(
+    day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
+    telegram: bool = typer.Option(True, "--telegram/--no-telegram"),
+    force: bool = typer.Option(False, "--force", help="Resend even if this result was sent."),
+) -> None:
+    """Send the completed day's net paper gain for Steady, Calendar and Adaptive."""
+    from ..notify import Notification
+    from .result import ResultUnavailable, calculate, mark_sent, render, was_sent
+
+    d = _day(day)
+    try:
+        completed = calculate(d)
+        text = render(completed)
+    except ResultUnavailable as error:
+        typer.echo(f"result not ready: {error}", err=True)
+        raise typer.Exit(2) from error
+    typer.echo(text)
+    if telegram:
+        if not force and was_sent(completed):
+            typer.echo("already sent to Telegram")
+            return
+        delivered = _send_private_and_group(
             Notification(
                 source="options-rotation",
-                severity=severity,
-                title=f"Rotation picks {d}",
-                body=r.text,
+                severity="info",
+                title=f"Option results {d}",
+                body=text,
             )
         )
+        if not delivered:
+            typer.echo("Telegram delivery was incomplete; result not marked sent", err=True)
+            raise typer.Exit(2)
+        mark_sent(completed)
 
 
 @rotation_app.command()
