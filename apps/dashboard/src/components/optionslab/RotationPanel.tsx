@@ -3,8 +3,9 @@
  * Baseline REF) are doing on days nobody had seen, against Baseline, the owner's fixed base and random baskets, and whether today's data can
  * be trusted (BL-058 Phase 4).
  *
- * The first screen (health strip, read-out banner, headline, hero chart) answers "is this good?"
- * from two small requests. Widgets below it load after the chart paints.
+ * Overview is the short daily surface: health/read-out, the current baskets, and the headline
+ * and chart once a forward session has been scored. Journal and Research are intentional drill-down
+ * modes, so their heavier widgets are not mounted while Overview is selected.
  *
  * Gross only: the stored costs are zero. Lists are alternative baskets and are never added up.
  * Nothing on this page changes a list, a weight or the journal.
@@ -13,9 +14,10 @@
 import { useMemo, useState } from 'react';
 
 import { usePortfolioStop } from '../../hooks/usePortfolioStop';
+import { useQueryState } from '../../hooks/useQueryState';
 import { useRotationOverview, useRotationSummary } from '../../hooks/useRotation';
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
-import { formatIstTime, istToday } from '../../lib/format';
+import { formatDay, formatIstTime, istToday } from '../../lib/format';
 import { amountOf, buttonLabel, isOn, sameTrail, trailParam } from '../../lib/portfolioStop';
 import { listName } from '../../lib/rotationListNames';
 import { overlaySummary, unmatched } from '../../lib/rotationPortfolioView';
@@ -30,6 +32,7 @@ import {
   heroSeries,
 } from '../../lib/rotationView';
 import type { RotationListKey } from '../../types/rotation';
+import { Accordion } from '../ui/Accordion';
 import { Card, CardHeader } from '../ui/Card';
 import { RefreshButton } from '../ui/RefreshButton';
 import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
@@ -59,9 +62,23 @@ const BENCHMARK_OPTIONS: SegmentedOption<RotationBenchmark>[] = (
   ['base', 'REF', 'random'] as const
 ).map((value) => ({ value, label: BENCHMARK_LABEL[value] }));
 
+type RotationView = 'overview' | 'journal' | 'research';
+
+const VIEW_OPTIONS: SegmentedOption<RotationView>[] = [
+  { value: 'overview', label: 'Overview' },
+  { value: 'journal', label: 'Journal' },
+  { value: 'research', label: 'Research' },
+];
+
+function rotationView(value: string | null): RotationView {
+  return value === 'journal' || value === 'research' ? value : 'overview';
+}
+
 export function RotationPanel() {
   const overview = useRotationOverview();
   const summary = useRotationSummary();
+  const [viewParam, setViewParam] = useQueryState('rotationView');
+  const view = rotationView(viewParam);
   const [focus, setFocus] = useState<RotationListKey>('A');
   const [benchmark, setBenchmark] = useState<RotationBenchmark>('base');
   const [shown, setShown] = useState<ReadonlySet<RotationListKey>>(new Set(['A']));
@@ -142,7 +159,16 @@ export function RotationPanel() {
           label="Reload"
         />
       </div>
-      <p className="text-xs text-faint">{BENCHMARK_NOTE[benchmark]}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SegmentedControl
+          value={view}
+          options={VIEW_OPTIONS}
+          onChange={setViewParam}
+          ariaLabel="Rotation view"
+          size="sm"
+        />
+        <p className="text-xs text-faint">{BENCHMARK_NOTE[benchmark]}</p>
+      </div>
 
       {overview.error && overview.data ? (
         <StateMessage
@@ -188,7 +214,7 @@ export function RotationPanel() {
         />
       ) : s === null ? (
         <SkeletonRows rows={5} />
-      ) : (
+      ) : view === 'overview' ? (
         <>
           {isOn(portfolio) && s.n_days > 0 ? (
             <p className="text-xs text-muted" aria-live="polite">
@@ -199,91 +225,156 @@ export function RotationPanel() {
                   : 'Replaying the sessions under the portfolio stop; the registered figures are shown meanwhile.'}
             </p>
           ) : null}
-          <RotationHeadline figures={figures} benchmarkLabel={bench?.label ?? ''} />
-          {verdictFor && s.n_days > 0 ? <RotationVerdict verdict={verdictFor} /> : null}
-          <Card>
-            <CardHeader
-              title="Cumulative gross by list"
-              description={
-                s.n_days === 0
-                  ? 'Appears with the first scored session.'
-                  : `${s.n_days} scored forward sessions, 2 lots per strategy.${stopped ? ' With the portfolio stop applied.' : ''} Late entries and unscored days are left out.`
-              }
-            />
-            {s.n_days === 0 ? (
-              <StateMessage
-                variant="empty"
-                title="No scored forward sessions yet"
-                description={
-                  Object.values(s.pending_reasons)[0] ??
-                  (s.late_entries.length > 0
-                    ? `${s.late_entries.length} entr${s.late_entries.length === 1 ? 'y was' : 'ies were'} recorded after 09:17 and do not count: ${s.late_entries.join(', ')}.`
-                    : 'The first entry is recorded at 09:16 and scored by the 19:45 update the same evening.')
-                }
-              />
-            ) : (
-              <RotationHero
-                points={points}
-                focus={focus}
-                shown={visible}
-                onToggle={toggle}
-                showBase={showBase}
-                onToggleBase={() => setShowBase((v) => !v)}
-              />
-            )}
-            {s.n_days > 0 && s.late_entries.length > 0 ? (
-              <p className="mt-3 text-xs text-warning">
-                Left out as late (recorded after 09:17, not forward): {s.late_entries.join(', ')}.
-              </p>
-            ) : null}
-            {s.n_days > 0 && Object.keys(s.pending_reasons).length > 0 ? (
-              <ul className="mt-3 space-y-0.5 text-xs text-muted">
-                {Object.entries(s.pending_reasons).map(([day, why]) => (
-                  <li key={day}>
-                    <span className="font-mono">{day}</span> waiting: {why}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </Card>
+          {s.n_days === 0 ? (
+            <>
+              {overview.data ? (
+                <Card>
+                  <CardHeader
+                    title={
+                      overview.data.baskets.entry === null
+                        ? 'Next entry'
+                        : overview.data.baskets.entry.day === istToday()
+                          ? "Today's baskets"
+                          : 'Latest recorded baskets'
+                    }
+                    description={
+                      overview.data.baskets.entry === null
+                        ? "The lists to be recorded at 09:16, before the day's results are known."
+                        : overview.data.baskets.entry.day === istToday()
+                          ? "Recorded at 09:16, before the day's results were known; scored after the evening run."
+                          : `Recorded on ${formatDay(overview.data.baskets.entry.day)}; the next entry is recorded at 09:16 on the next session.`
+                    }
+                  />
+                  <RotationBaskets
+                    baskets={overview.data.baskets}
+                    specs={overview.data.lists}
+                    firstEntryDay={overview.data.first_entry_day}
+                  />
+                </Card>
+              ) : null}
+              <Card className="py-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      No scored forward sessions yet
+                    </p>
+                    <p className="mt-0.5 text-sm text-muted">
+                      {Object.values(s.pending_reasons)[0] ??
+                        (s.late_entries.length > 0
+                          ? `${s.late_entries.length} late entr${s.late_entries.length === 1 ? 'y' : 'ies'} excluded from the forward read-out.`
+                          : 'The first entry is recorded at 09:16 and scored after the evening update.')}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-info/30 bg-info/10 px-2.5 py-1 text-xs text-info">
+                    {readoutDays} sessions to read-out
+                  </span>
+                </div>
+              </Card>
+            </>
+          ) : (
+            <>
+              <RotationHeadline figures={figures} benchmarkLabel={bench?.label ?? ''} />
+              {verdictFor ? <RotationVerdict verdict={verdictFor} /> : null}
+              <Card>
+                <CardHeader
+                  title="Cumulative gross by list"
+                  description={`${s.n_days} scored forward sessions, 2 lots per strategy.${stopped ? ' With the portfolio stop applied.' : ''} Late entries and unscored days are left out.`}
+                />
+                <RotationHero
+                  points={points}
+                  focus={focus}
+                  shown={visible}
+                  onToggle={toggle}
+                  showBase={showBase}
+                  onToggleBase={() => setShowBase((v) => !v)}
+                />
+                {s.late_entries.length > 0 ? (
+                  <p className="mt-3 text-xs text-warning">
+                    Left out as late (recorded after 09:17, not forward):{' '}
+                    {s.late_entries.join(', ')}.
+                  </p>
+                ) : null}
+                {Object.keys(s.pending_reasons).length > 0 ? (
+                  <ul className="mt-3 space-y-0.5 text-xs text-muted">
+                    {Object.entries(s.pending_reasons).map(([day, why]) => (
+                      <li key={day}>
+                        <span className="font-mono">{day}</span> waiting: {why}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </Card>
+              {overview.data ? (
+                <Card>
+                  <CardHeader
+                    title={
+                      overview.data.baskets.entry?.day === istToday()
+                        ? "Today's baskets"
+                        : 'Latest baskets'
+                    }
+                    description="What each list holds and what changed since the entry before."
+                  />
+                  <RotationBaskets
+                    baskets={overview.data.baskets}
+                    specs={overview.data.lists}
+                    firstEntryDay={overview.data.first_entry_day}
+                  />
+                </Card>
+              ) : null}
+            </>
+          )}
         </>
+      ) : view === 'journal' ? (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight text-foreground">Journal</h2>
+            <p className="mt-0.5 text-sm text-muted">
+              What each list picked, what happened afterwards, and where the risk came from.
+            </p>
+          </div>
+          <RotationDailyLog focus={focus} portfolio={portfolio} />
+          <Accordion
+            title="Risk review"
+            description="Drawdowns and changes in the selected list"
+            defaultOpen={false}
+          >
+            <RotationDrawdowns list={focus} portfolio={portfolio} />
+            <RotationDrift list={focus} />
+          </Accordion>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight text-foreground">Research</h2>
+            <p className="mt-0.5 text-sm text-muted">
+              Diagnostics for understanding the ranking and its forward behaviour. Open only the
+              section you need.
+            </p>
+          </div>
+          <Accordion
+            title="Decision diagnostics"
+            description="Why the next basket looks the way it does"
+            defaultOpen
+          >
+            <RotationPulse focus={focus} />
+            <RotationExplain list={focus} onList={setFocus} />
+          </Accordion>
+          <Accordion
+            title="Market context"
+            description="Forward days versus research periods"
+            defaultOpen={false}
+          >
+            <RotationRegime />
+          </Accordion>
+          <Accordion
+            title="Shadow experiments"
+            description="Unregistered candidates and trigger studies"
+            defaultOpen={false}
+          >
+            <RotationShadowScoreboard />
+          </Accordion>
+        </div>
       )}
-
-      {overview.data ? (
-        <Card>
-          <CardHeader
-            title={
-              overview.data.baskets.entry?.day === istToday() ? "Today's baskets" : 'Latest baskets'
-            }
-            description={
-              overview.data.baskets.entry && overview.data.baskets.entry.day !== istToday()
-                ? 'Not today’s: no entry for today has been recorded (yet). These are the latest ones.'
-                : 'What each list holds and what changed since the entry before.'
-            }
-          />
-          <RotationBaskets
-            baskets={overview.data.baskets}
-            specs={overview.data.lists}
-            firstEntryDay={overview.data.first_entry_day}
-          />
-        </Card>
-      ) : null}
-
-      {/* ---- widget slots: one line each, in page order; other rotation widgets mount here ---- */}
-      {/* slot:pulse */}
-      <RotationPulse focus={focus} />
-      {/* slot:explain */}
-      <RotationExplain list={focus} onList={setFocus} />
-      {/* slot:daily-log */}
-      <RotationDailyLog focus={focus} portfolio={portfolio} />
-      {/* slot:shadow */}
-      <RotationShadowScoreboard />
-      {/* slot:regime */}
-      <RotationRegime />
-      {/* slot:drawdowns */}
-      <RotationDrawdowns list={focus} portfolio={portfolio} />
-      {/* slot:drift */}
-      <RotationDrift list={focus} />
     </div>
   );
 }
