@@ -8,7 +8,12 @@ new name.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
+
+# Display only: shared with the dashboard; the registered list keys never change.
+DISPLAY_NAMES: dict[str, str] = json.loads(Path(__file__).with_name("list_names.json").read_text())
 
 #: fit lookbacks (days, weight) of the weekday / days-to-expiry / VIX-band criteria
 LOOKBACKS_NEW: tuple[tuple[int, float], ...] = ((5, 0.30), (21, 0.25), (63, 0.25), (126, 0.20))

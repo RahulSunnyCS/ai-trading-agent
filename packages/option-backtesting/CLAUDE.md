@@ -125,6 +125,15 @@ Otherwise:
   `momentum-backtesting`'s notify.py mirroring `@trading/notify`'s contract (never `parse_mode`,
   redacts known secrets, never raises; prints when unconfigured). Tests must stub `send` —
   `load_dotenv()` would otherwise pick up the real bot token from the repo `.env`.
+  `send(..., chat_id=...)` supports an explicit destination for the rotation pick's group copy;
+  its environment configuration lives in the root `technical.md`.
+  Rotation messages use `rotation/list_names.json` (also imported by the dashboard) for
+  display names, and omit Baseline / VIX / days to expiry from the text; the journal still stores them.
+  `rotation/result.py` reads the completed picked variants' net results (after estimated costs),
+  reports one lot per strategy with every picked strategy's contribution under its section, and
+  sends Steady / Calendar / Adaptive after the evening pipeline finishes (normally around 16:00).
+  A per-entry marker prevents a retry from sending it twice;
+  `obt rotation result --force` explicitly resends it.
 - `api/legwise_routes.py` — `/legwise/*` on `obt-api` for the dashboard's Options Lab: `/day` and `/anatomy` (see above; `/anatomy` also overlays apps/server's T-33 `daily_regime_tags` as `t33` when `DATABASE_URL` is set in this process, with an explicit status), list/
   validate/save strategies (slug-checked name, `yaml.safe_dump` of the validated model — never
   raw client text), ad-hoc backtest over collected days, saved results, data/token status, and

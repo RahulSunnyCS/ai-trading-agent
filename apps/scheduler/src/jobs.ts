@@ -188,9 +188,9 @@ const BASE_JOBS: Job[] = [
   {
     id: 'options-evening',
     description:
-      "The evening run: collect the day's 1-minute option data and run every leg-wise strategy (`obt daily`), store the rotation results (`obt rotation update`, BL-058), then rebuild any missing derived tables (`tdata derived rebuild`)",
+      "The evening run: collect the day's 1-minute option data and run every leg-wise strategy (`obt daily`), store the rotation results (`obt rotation update`, BL-058), rebuild missing derived tables, then Telegram each strategy's net paper gain",
     schedule: { at: '15:45', on: tradingDays, label: 'trading days 15:45' },
-    // One job, three steps in order: each needs the day the one before it collected, and the run
+    // One job, four steps in order: each needs the day the one before it collected, and the run
     // stops at the first failure. Every step is idempotent (obt daily skips data already
     // collected, a stored rotation variant-day is never rewritten, derived rebuilds only what is
     // missing), so a retry re-runs the whole chain cheaply.
@@ -198,6 +198,7 @@ const BASE_JOBS: Job[] = [
       ['uv', 'run', '--directory', OPTIONS, 'obt', 'daily'],
       ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'update'],
       ['uv', 'run', '--directory', TRADING_DATA, 'tdata', 'derived', 'rebuild'],
+      ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'result'],
     ],
     cwd: '.',
     timeoutMinutes: 90, // per step
@@ -208,7 +209,7 @@ const BASE_JOBS: Job[] = [
     catchUpHours: 7.25, // until 23:00
     group: 'catalog',
     fixHint:
-      'Log in to Fyers, then: cd packages/option-backtesting && uv run obt daily && uv run obt rotation update',
+      'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt daily && uv run --directory packages/option-backtesting obt rotation update && uv run --directory packages/option-backtesting obt rotation result',
   },
   {
     id: 'options-rotation-pick',
