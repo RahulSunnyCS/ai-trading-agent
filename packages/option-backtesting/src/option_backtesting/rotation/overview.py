@@ -24,7 +24,7 @@ IST = ZoneInfo("Asia/Kolkata")
 FIRST_ENTRY_DAY = date(2026, 10, 12)  # registered, BL-058 Phase 0
 READOUT_DAYS = 60
 ENTRY_DEADLINE = FIRST_ENTRY  # the same 09:17 the journal marks late entries by
-UPDATE_DUE = time(19, 45)  # the nightly options-rotation-nightly job
+UPDATE_DUE = time(15, 45)  # the options-evening scheduler job (rotation update is its 2nd step)
 UPDATE_OVERDUE = time(20, 30)  # past this a missing session is a problem, not a wait
 
 FAMILY_LABEL = {
@@ -115,12 +115,12 @@ def health(root: Path | None = None, now: datetime | None = None) -> dict:
         if not behind:
             state, note = "ok", ""
         elif now.date() == want and now.time() < UPDATE_OVERDUE:
-            state, note = "info", f"{want} is stored by the 19:45 update"
+            state, note = "info", f"{want} is stored by the 15:45 evening run"
         else:
             state = "bad"
             note = (
                 f"no stored results for {', '.join(str(d) for d in behind[:3])}"
-                f"{'...' if len(behind) > 3 else ''}: the 19:45 `options-rotation-nightly` job did "
+                f"{'...' if len(behind) > 3 else ''}: the 15:45 `options-evening` job did "
                 f"not store them (or data_quality excluded the day); run "
                 f"`obt rotation update --day {behind[0]}`"
             )

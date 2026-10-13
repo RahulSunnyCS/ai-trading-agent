@@ -186,38 +186,29 @@ const BASE_JOBS: Job[] = [
     fixHint: 'cd packages/momentum-backtesting && uv run mbt live-rules check --send',
   },
   {
-    id: 'options-daily',
+    id: 'options-evening',
     description:
-      "Collect the day's 1-minute option data from Fyers and run every leg-wise strategy",
-    schedule: { at: '16:15', on: tradingDays, label: 'trading days 16:15' },
-    steps: [['uv', 'run', 'obt', 'daily']],
-    cwd: OPTIONS,
-    timeoutMinutes: 90,
+      "The evening run: collect the day's 1-minute option data and run every leg-wise strategy (`obt daily`), store the rotation results (`obt rotation update`, BL-058), then rebuild any missing derived tables (`tdata derived rebuild`)",
+    schedule: { at: '15:45', on: tradingDays, label: 'trading days 15:45' },
+    // One job, three steps in order: each needs the day the one before it collected, and the run
+    // stops at the first failure. Every step is idempotent (obt daily skips data already
+    // collected, a stored rotation variant-day is never rewritten, derived rebuilds only what is
+    // missing), so a retry re-runs the whole chain cheaply.
+    steps: [
+      ['uv', 'run', '--directory', OPTIONS, 'obt', 'daily'],
+      ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'update'],
+      ['uv', 'run', '--directory', TRADING_DATA, 'tdata', 'derived', 'rebuild'],
+    ],
+    cwd: '.',
+    timeoutMinutes: 90, // per step
     // Contracts that expire today cannot be downloaded tomorrow, so keep trying through
-    // the evening (16:15, 17:45, 19:15) — usually it is waiting on a Fyers login. obt
-    // daily skips data already collected, so a retry is cheap.
-    retries: 2,
-    retryDelayMinutes: 90,
-    catchUpHours: 6.75, // until 23:00
-    group: 'catalog',
-    alertsItself: true,
-    fixHint: 'Log in to Fyers, then: cd packages/option-backtesting && uv run obt daily',
-  },
-  {
-    id: 'options-rotation-nightly',
-    description:
-      "Run all 298 rotation variants over the day's collected data and store the results (BL-058)",
-    // Needs the day in the lake, so it follows options-daily (same group: never at the same time)
-    // and keeps trying until 23:00. Idempotent: a stored variant-day is never rewritten.
-    schedule: { at: '19:45', on: tradingDays, label: 'trading days 19:45' },
-    steps: [['uv', 'run', 'obt', 'rotation', 'update']],
-    cwd: OPTIONS,
-    timeoutMinutes: 20,
+    // the evening (15:45, 17:15, 18:45, 20:15) — usually it is waiting on a Fyers login.
     retries: 3,
-    retryDelayMinutes: 45, // 19:45, 20:30, 21:15, 22:00
-    catchUpHours: 3.25, // until 23:00
+    retryDelayMinutes: 90,
+    catchUpHours: 7.25, // until 23:00
     group: 'catalog',
-    fixHint: 'cd packages/option-backtesting && uv run obt rotation update',
+    fixHint:
+      'Log in to Fyers, then: cd packages/option-backtesting && uv run obt daily && uv run obt rotation update',
   },
   {
     id: 'options-rotation-pick',
@@ -236,22 +227,6 @@ const BASE_JOBS: Job[] = [
     alertsItself: true,
     fixHint:
       'cd packages/option-backtesting && uv run obt rotation pick  (a late entry is flagged, not forward)',
-  },
-  {
-    id: 'options-derived',
-    description:
-      'Catch up the derived 5-minute snapshots and IV tables for any day options-daily left unbuilt',
-    // options-daily builds the day's derived tables itself; this nightly pass rebuilds anything
-    // missing or out of version (e.g. after an interrupted evening or a DERIVED_VERSION bump).
-    // Lock-free (lake + reference CSVs only), so it needs no catalog group.
-    schedule: { at: '23:30', on: tradingDays, label: 'trading days 23:30' },
-    steps: [['uv', 'run', 'tdata', 'derived', 'rebuild']],
-    cwd: TRADING_DATA,
-    timeoutMinutes: 60,
-    retries: 1,
-    retryDelayMinutes: 30,
-    catchUpHours: 8,
-    fixHint: 'cd packages/trading-data && uv run tdata derived rebuild',
   },
   {
     id: 'backup',
