@@ -35,6 +35,7 @@ import {
   linePath,
   readingLine,
 } from '../../lib/rotationDrawdownsView';
+import { listName } from '../../lib/rotationListNames';
 import type { RotationListKey } from '../../types/rotation';
 import type { DrawdownEpisode, RotationDrawdownsResponse } from '../../types/rotationDrawdowns';
 import { Badge } from '../ui/Badge';
@@ -65,7 +66,7 @@ function Chart({
         viewBox={`0 0 ${g.width} ${g.height}`}
         className="w-full"
         role="img"
-        aria-label={`Underwater chart for list ${d.list}: ${d.episodes.length} falls of at least ${d.min_depth} rupees per lot, worst ${Math.round(d.max_dd)} rupees per lot.`}
+        aria-label={`Underwater chart for the ${listName(d.list)} list: ${d.episodes.length} falls of at least ${d.min_depth} rupees per lot, worst ${Math.round(d.max_dd)} rupees per lot.`}
       >
         {g.ticks.map((t) => (
           <g key={t}>
@@ -153,7 +154,7 @@ function Chart({
       </svg>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
         <span className="inline-flex items-center gap-1.5">
-          <i className="inline-block h-0.5 w-4 bg-primary" /> list {d.list}
+          <i className="inline-block h-0.5 w-4 bg-primary" /> {listName(d.list)}
         </span>
         {withStop ? (
           <span className="inline-flex items-center gap-1.5">
@@ -323,7 +324,7 @@ export function RotationDrawdowns({
     <Card>
       <CardHeader
         title="Drawdown episodes"
-        description={`List ${list}, gross per lot-day: how deep each fall went, how long it took to come back, and what the fixed base did over the same days.`}
+        description={`${listName(list)}, gross per lot-day: how deep each fall went, how long it took to come back, and what the fixed base did over the same days.`}
         actions={
           <span className="flex flex-wrap items-center gap-2">
             <SegmentedControl

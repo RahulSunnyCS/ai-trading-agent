@@ -59,6 +59,20 @@ describe('job registry', () => {
       expect(job.steps.length > 0 || job.builtin !== undefined).toBe(true);
     }
   });
+
+  it('sends rotation results only after the evening calculations finish', () => {
+    const evening = JOBS.find((job) => job.id === 'options-evening');
+    expect(evening?.schedule.at).toBe('15:45');
+    expect(evening?.steps.at(-1)).toEqual([
+      'uv',
+      'run',
+      '--directory',
+      'packages/option-backtesting',
+      'obt',
+      'rotation',
+      'result',
+    ]);
+  });
 });
 
 describe('.env parsing', () => {

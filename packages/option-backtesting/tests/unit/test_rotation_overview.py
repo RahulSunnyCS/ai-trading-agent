@@ -209,7 +209,7 @@ def test_tonights_session_is_awaited_until_the_update_is_overdue(tmp_path):
     waiting = overview.health(tmp_path, now=_now(D13, 19, 50))
     assert _state(waiting, "session")["state"] == "info"
     assert _state(overview.health(tmp_path, now=_now(D13, 21, 0)), "session")["state"] == "bad"
-    # before 19:45 the session still owed is yesterday's, which is stored
+    # before 15:45 the session still owed is yesterday's, which is stored
     assert _state(overview.health(tmp_path, now=_now(D13, 12, 0)), "session")["state"] == "ok"
 
 

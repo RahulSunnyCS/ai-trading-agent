@@ -210,6 +210,22 @@ def test_rebuild_writes_versioned_files_once_and_views_read_them(root):
         assert con.execute("SELECT count(DISTINCT expiry) FROM iv_daily").fetchone()[0] == 2
 
 
+def test_candidate_days_default_window_starts_at_derived_from_but_explicit_days_may_reach_back(
+    tmp_path,
+):
+    before = date(2023, 3, 10)  # inside the vendor history, before DERIVED_FROM
+    assert before < derived.DERIVED_FROM
+    write_day(tmp_path, last_minute=5, day=before)
+    write_day(tmp_path, last_minute=5)  # DAY, 2025-03-10
+    # default window: only days from DERIVED_FROM on
+    assert derived.candidate_days(tmp_path, "NIFTY", None) == [DAY]
+    # an explicit window is honoured as given, including days before DERIVED_FROM
+    assert derived.candidate_days(tmp_path, "NIFTY", (before, before)) == [before]
+    assert derived.candidate_days(tmp_path, "NIFTY", (before, DAY)) == [before, DAY]
+    # and it still bounds the result
+    assert derived.candidate_days(tmp_path, "NIFTY", (DAY, DAY)) == [DAY]
+
+
 def test_iv_daily_trailing_values_ignore_later_days(tmp_path):
     days = [DAY + timedelta(days=i) for i in range(4)]  # Mon .. Thu
     for d in days:

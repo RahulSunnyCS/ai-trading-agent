@@ -14,12 +14,13 @@ import type {
 } from '../types/rotationBasket';
 import { type PairRef, diversificationNote } from './correlationView';
 import { formatNumber } from './format';
+import { listName } from './rotationListNames';
 
 export const BASKET_LIST_OPTIONS: { value: BasketListKey; label: string }[] = [
-  { value: 'A', label: 'A' },
-  { value: 'B', label: 'B' },
-  { value: 'C', label: 'C' },
-  { value: 'REF', label: 'REF' },
+  { value: 'A', label: listName('A') },
+  { value: 'B', label: listName('B') },
+  { value: 'C', label: listName('C') },
+  { value: 'REF', label: listName('REF') },
   { value: 'BASE', label: 'Base' },
 ];
 

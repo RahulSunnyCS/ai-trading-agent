@@ -32,8 +32,8 @@ heatmap needs a grid of (entry time x stop) simulations per day and underlying.
   3. **Date vs SL** for a date range at a chosen entry time.
 - Cell = rupee P&L of one lot, short ATM CE + PE sold at the entry time, **SL per leg as % of that leg's entry
   premium**, exit at **15:30**, the close of the last 1-minute bar (owner, 2026-10-11, second answer; supersedes 15:20).
-  SL columns are 10, 20 ... 100 as in the AlgoTest screenshots; there is no separate "no SL" column (the owner's
-  correction: the SL column *is* the chart).
+  SL columns are 10, 20 ... 100 as in the AlgoTest screenshots. (2026-10-12, owner: one more column, **No SL**:
+  the same straddle with no stop, both legs held to the exit time; `sl = 0` in the store, last in every SL axis.)
 - **Expiry rule:** NIFTY and SENSEX use the nearest weekly; every other index and every stock uses the monthly expiry only. TOTAL row and column, split PE/CE toggle, CSV download.
 - Underlying picker for every index in the lake plus a stock picker (and "all F&O stocks aggregated").
 - Stock filter by **week of the monthly expiry cycle** (week 1-4 / expiry week) and by date range.

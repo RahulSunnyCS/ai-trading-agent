@@ -33,6 +33,7 @@ import {
   supportOf,
   whyLine,
 } from '../../lib/rotationExplainView';
+import { listName } from '../../lib/rotationListNames';
 import type {
   RotationExplain,
   RotationListKey,
@@ -48,7 +49,7 @@ import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 
-const LIST_OPTIONS = LIST_KEYS.map((value) => ({ value, label: value }));
+const LIST_OPTIONS = LIST_KEYS.map((value) => ({ value, label: listName(value) }));
 
 // ---------------------------------------------------------------------------
 // Small parts

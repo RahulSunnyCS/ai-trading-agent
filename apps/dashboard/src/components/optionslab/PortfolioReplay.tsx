@@ -14,6 +14,7 @@ import { useRotationPortfolioDay } from '../../hooks/useRotationPortfolio';
 import { getChartTheme, getSeriesPalette, pickSeries, withAlpha } from '../../lib/chartTheme';
 import { formatDay, formatInr } from '../../lib/format';
 import { type PortfolioStopSetting, buttonLabel, isOn } from '../../lib/portfolioStop';
+import { listLabel } from '../../lib/rotationListNames';
 import type { RotationListKey, RotationLogSource } from '../../types/rotationDailyLog';
 import type { PortfolioDay } from '../../types/rotationPortfolio';
 import { Button } from '../ui/Button';
@@ -156,7 +157,7 @@ export function PortfolioReplay({
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold text-foreground">
-            List {list} as one basket · {formatDay(day)}
+            {listLabel(list)} as one basket · {formatDay(day)}
           </h3>
           <p className="text-xs text-muted">
             {buttonLabel(setting)}. Replayed from the strategy files, gross, minute close.

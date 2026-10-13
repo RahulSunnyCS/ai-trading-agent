@@ -44,6 +44,8 @@ def available() -> Any:
         "underlyings": store.available(),
         "times": list(grid.ENTRY_TIMES),
         "stop_losses": list(grid.STOP_LOSSES),
+        "no_sl": grid.NO_SL,
+        "sl_levels": list(grid.SL_LEVELS),
         "exit_times": list(grid.EXIT_TIMES),
         "views": list(view.VIEWS),
         "metrics": list(view.METRICS),

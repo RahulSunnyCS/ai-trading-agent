@@ -23,6 +23,10 @@ export interface ReEntry {
 
 export interface RangeBreakout {
   until: string;
+  /** Trigger this percentage beyond the range edge (omitted when 0). Set in YAML mode. */
+  gap_percent?: number | undefined;
+  /** Last minute the breakout can still trigger (omitted when none). Set in YAML mode. */
+  valid_until?: string | undefined;
   side: 'high' | 'low';
   source: 'instrument' | 'underlying';
 }

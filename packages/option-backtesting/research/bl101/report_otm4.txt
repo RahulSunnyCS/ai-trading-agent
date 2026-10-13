@@ -1,0 +1,90 @@
+BL-101  NIFTY  2024-01-01 .. 2026-10-09  days=680  skipped=0
+
+== FULL  slip=0%  L lots=1
+                  n       total  mean/day      ES95        MDD     worst   win%
+B               680     563,582       829    -9,831   -124,096   -11,407   55.3
+B+L             680     276,161       406   -11,757   -164,776   -17,668   54.1
+kB(k=0.49)      680     276,161       406    -4,817    -60,808    -5,590   55.3
+0.75B           680     422,686       622    -7,373    -93,072    -8,555   55.3
+L               680    -287,421      -423    -6,358   -318,649   -18,823   27.5
+vs B: ES95 -19.6%  MDD -32.8%   vs kB better on both: False   ES95 gained per Rs of mean given up: -4.56
+
+== FULL  slip=1%  L lots=1
+                  n       total  mean/day      ES95        MDD     worst   win%
+B               680     -38,762       -57   -10,342   -260,875   -12,290   49.0
+B+L             680    -416,838      -613   -12,316   -532,430   -18,407   45.0
+kB(k=0.00)      680           0         0         0         -0        -0    0.0
+0.75B           680     -29,071       -43    -7,756   -195,657    -9,217   49.0
+L               680    -378,077      -556    -6,547   -405,037   -19,010   25.7
+vs B: ES95 -19.1%  MDD -104.1%   vs kB better on both: False   ES95 gained per Rs of mean given up: -3.55
+
+== FULL  slip=2%  L lots=1
+                  n       total  mean/day      ES95        MDD     worst   win%
+B               680    -702,497    -1,033   -11,030   -702,907   -11,964   42.4
+B+L             680  -1,171,230    -1,722   -13,239 -1,173,438   -19,264   36.2
+kB(k=0.00)      680           0         0         0         -0        -0    0.0
+0.75B           680    -526,873      -775    -8,273   -527,180    -8,973   42.4
+L               680    -468,733      -689    -6,750   -491,743   -19,198   24.1
+vs B: ES95 -20.0%  MDD -66.9%   vs kB better on both: False   ES95 gained per Rs of mean given up: -3.20
+
+== FULL  slip=0%  L lots=2
+                  n       total  mean/day      ES95        MDD     worst   win%
+B               680     563,582       829    -9,831   -124,096   -11,407   55.3
+B+L             680     -11,260       -17   -14,178   -279,625   -26,451   47.5
+kB(k=0.00)      680           0         0         0         -0        -0    0.0
+0.75B           680     422,686       622    -7,373    -93,072    -8,555   55.3
+L               680    -574,842      -845   -12,716   -637,298   -37,646   27.5
+vs B: ES95 -44.2%  MDD -125.3%   vs kB better on both: False   ES95 gained per Rs of mean given up: -5.14
+
+== HALF 1 (to 2025-06-30)  slip=0%  L lots=1
+                  n       total  mean/day      ES95        MDD     worst   win%
+B               369     500,977     1,358    -9,905    -44,507   -11,147   56.1
+B+L             369     347,542       942   -11,805    -46,605   -17,668   57.5
+kB(k=0.69)      369     347,542       942    -6,872    -30,876    -7,733   56.1
+0.75B           369     375,733     1,018    -7,429    -33,380    -8,360   56.1
+L               369    -153,435      -416    -6,846   -176,214   -11,705   29.3
+vs B: ES95 -19.2%  MDD -4.7%   vs kB better on both: False   ES95 gained per Rs of mean given up: -4.57
+
+== HALF 2 (2025-07-01+)  slip=0%  L lots=1
+                  n       total  mean/day      ES95        MDD     worst   win%
+B               311      62,605       201    -9,656   -124,096   -11,407   54.3
+B+L             311     -71,382      -230   -11,599   -164,776   -15,261   50.2
+kB(k=0.00)      311           0         0         0          0        -0    0.0
+0.75B           311      46,953       151    -7,242    -93,072    -8,555   54.3
+L               311    -133,986      -431    -5,224   -142,577   -18,823   25.4
+vs B: ES95 -20.1%  MDD -32.8%   vs kB better on both: False   ES95 gained per Rs of mean given up: -4.51
+
+== YEAR 2024  slip=0%  L lots=1
+                  n       total  mean/day      ES95        MDD     worst   win%
+B               246     308,753     1,255    -9,679    -44,507   -10,483   58.5
+B+L             246     257,448     1,047   -11,622    -46,605   -17,668   59.3
+kB(k=0.83)      246     257,448     1,047    -8,070    -37,111    -8,741   58.5
+0.75B           246     231,565       941    -7,259    -33,380    -7,863   58.5
+L               246     -51,305      -209    -5,739    -75,941    -8,783   29.7
+vs B: ES95 -20.1%  MDD -4.7%   vs kB better on both: False   ES95 gained per Rs of mean given up: -9.32
+
+== YEAR 2025  slip=0%  L lots=1
+                  n       total  mean/day      ES95        MDD     worst   win%
+B               248     245,855       991    -9,917    -33,151   -11,147   56.0
+B+L             248      82,376       332   -11,224    -54,594   -12,912   54.0
+kB(k=0.34)      248      82,376       332    -3,323    -11,108    -3,735   56.0
+0.75B           248     184,391       744    -7,438    -24,863    -8,360   56.0
+L               248    -163,479      -659    -6,641   -183,010   -11,705   25.0
+vs B: ES95 -13.2%  MDD -64.7%   vs kB better on both: False   ES95 gained per Rs of mean given up: -1.98
+
+== YEAR 2026  slip=0%  L lots=1
+                  n       total  mean/day      ES95        MDD     worst   win%
+B               186       8,973        48    -9,787   -124,096   -11,407   50.0
+B+L             186     -63,663      -342   -12,180   -164,776   -15,261   47.3
+kB(k=0.00)      186           0         0         0          0        -0    0.0
+0.75B           186       6,730        36    -7,340    -93,072    -8,555   50.0
+L               186     -72,637      -391    -6,273    -92,520   -18,823   28.0
+vs B: ES95 -24.5%  MDD -32.8%   vs kB better on both: False   ES95 gained per Rs of mean given up: -6.13
+
+== L on B's worst days (net, slip 0)
+worst 5% (34 days): B mean -9,831  L mean -4  L>0 on 24% of them
+worst 10 days: B mean -10,468  L mean 1,208
+L loses on 72% of all days; corr(B,L)=-0.42
+intraday worst MTM (gross): B mean -3,490 min -11,011; B+L mean -3,343 min -17,914; worst-5% mean B -9,407 vs B+L -11,381
+
+VERDICT rules: 1 (>=15% both) False | 2 (beats kB) False | 3 (both halves) False | 4 (slip 2%) False  => KILL

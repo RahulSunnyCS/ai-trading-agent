@@ -14,6 +14,26 @@ export const VIEW_LABEL = {
   date_sl: 'Date vs SL',
 } as const;
 
+/** The `sl` value the API uses for "no stop loss": both legs held to the exit time. */
+export const NO_SL = 0;
+export const NO_SL_LABEL = 'No SL';
+export const NO_SL_HINT = 'No stop loss: both legs held to the exit time';
+
+/** An SL axis value as a column heading: 10 -> "10", 0 -> "No SL". */
+export function slLabel(sl: string | number): string {
+  return Number(sl) === NO_SL ? NO_SL_LABEL : String(sl);
+}
+
+/** An SL choice as a dropdown option: 10 -> "10%", 0 -> "No SL". */
+export function slOptionLabel(sl: number): string {
+  return sl === NO_SL ? NO_SL_LABEL : `${sl}%`;
+}
+
+/** Every SL level the API offers, No SL last; falls back to the plain list for an older API. */
+export function slLevels(a: { stop_losses: number[]; sl_levels?: number[] | undefined }): number[] {
+  return a.sl_levels && a.sl_levels.length > 0 ? a.sl_levels : a.stop_losses;
+}
+
 const POSITIVE = [
   'bg-positive/10',
   'bg-positive/20',
@@ -85,7 +105,8 @@ function csvField(value: string): string {
  */
 export function toCsv(r: HeatmapResponse, split: boolean): string {
   const num = (c: HeatmapCell | null, k: 'net' | 'ce' | 'pe') => (c ? String(c[k]) : '');
-  const head = ['', ...r.columns.map(String), 'TOTAL'];
+  const slAxis = r.view !== 'date_time';
+  const head = ['', ...r.columns.map((c) => (slAxis ? slLabel(c) : String(c))), 'TOTAL'];
   const lines = [head];
   const keys: ('net' | 'pe' | 'ce')[] = split ? ['pe', 'ce'] : ['net'];
   for (const k of keys) {

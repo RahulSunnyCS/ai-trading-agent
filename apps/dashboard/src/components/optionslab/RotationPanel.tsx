@@ -1,6 +1,6 @@
 /**
- * Options Lab → Rotation: how the four registered lists (A, B, C, REF) are doing on days nobody
- * had seen, against REF, the owner's fixed base and random baskets, and whether today's data can
+ * Options Lab → Rotation: how the four registered lists (Steady A, Calendar B, Adaptive C,
+ * Baseline REF) are doing on days nobody had seen, against Baseline, the owner's fixed base and random baskets, and whether today's data can
  * be trusted (BL-058 Phase 4).
  *
  * Overview is the short daily surface: health/read-out, the current baskets, and the headline
@@ -17,8 +17,9 @@ import { usePortfolioStop } from '../../hooks/usePortfolioStop';
 import { useQueryState } from '../../hooks/useQueryState';
 import { useRotationOverview, useRotationSummary } from '../../hooks/useRotation';
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
-import { formatIstTime, istToday } from '../../lib/format';
+import { formatDay, formatIstTime, istToday } from '../../lib/format';
 import { amountOf, buttonLabel, isOn, sameTrail, trailParam } from '../../lib/portfolioStop';
+import { listName } from '../../lib/rotationListNames';
 import { overlaySummary, unmatched } from '../../lib/rotationPortfolioView';
 import {
   BENCHMARK_LABEL,
@@ -54,11 +55,11 @@ import { RotationVerdict } from './rotation/RotationVerdict';
 
 const FOCUS_OPTIONS: SegmentedOption<RotationListKey>[] = LIST_KEYS.map((value) => ({
   value,
-  label: value,
+  label: listName(value),
 }));
 
 const BENCHMARK_OPTIONS: SegmentedOption<RotationBenchmark>[] = (
-  ['REF', 'base', 'random'] as const
+  ['base', 'REF', 'random'] as const
 ).map((value) => ({ value, label: BENCHMARK_LABEL[value] }));
 
 type RotationView = 'overview' | 'journal' | 'research';
@@ -80,7 +81,7 @@ export function RotationPanel() {
   const view = rotationView(viewParam);
   const [focus, setFocus] = useState<RotationListKey>('A');
   const [benchmark, setBenchmark] = useState<RotationBenchmark>('base');
-  const [shown, setShown] = useState<ReadonlySet<RotationListKey>>(new Set(['A', 'REF']));
+  const [shown, setShown] = useState<ReadonlySet<RotationListKey>>(new Set(['A']));
   const [showBase, setShowBase] = useState(true);
   // BL-095: one portfolio stop for every widget below that shows stopped figures.
   const [portfolio, setPortfolio] = usePortfolioStop();
@@ -230,11 +231,19 @@ export function RotationPanel() {
                 <Card>
                   <CardHeader
                     title={
-                      overview.data.baskets.entry?.day === istToday()
-                        ? "Today's baskets"
-                        : 'Next entry'
+                      overview.data.baskets.entry === null
+                        ? 'Next entry'
+                        : overview.data.baskets.entry.day === istToday()
+                          ? "Today's baskets"
+                          : 'Latest recorded baskets'
                     }
-                    description="The lists to be recorded at 09:16, before the day's results are known."
+                    description={
+                      overview.data.baskets.entry === null
+                        ? "The lists to be recorded at 09:16, before the day's results are known."
+                        : overview.data.baskets.entry.day === istToday()
+                          ? "Recorded at 09:16, before the day's results were known; scored after the evening run."
+                          : `Recorded on ${formatDay(overview.data.baskets.entry.day)}; the next entry is recorded at 09:16 on the next session.`
+                    }
                   />
                   <RotationBaskets
                     baskets={overview.data.baskets}

@@ -125,6 +125,15 @@ Otherwise:
   `momentum-backtesting`'s notify.py mirroring `@trading/notify`'s contract (never `parse_mode`,
   redacts known secrets, never raises; prints when unconfigured). Tests must stub `send` —
   `load_dotenv()` would otherwise pick up the real bot token from the repo `.env`.
+  `send(..., chat_id=...)` supports an explicit destination for the rotation pick's group copy;
+  its environment configuration lives in the root `technical.md`.
+  Rotation messages use `rotation/list_names.json` (also imported by the dashboard) for
+  display names, and omit Baseline / VIX / days to expiry from the text; the journal still stores them.
+  `rotation/result.py` reads the completed picked variants' net results (after estimated costs),
+  reports one lot per strategy with every picked strategy's contribution under its section, and
+  sends Steady / Calendar / Adaptive after the evening pipeline finishes (normally around 16:00).
+  A per-entry marker prevents a retry from sending it twice;
+  `obt rotation result --force` explicitly resends it.
 - `api/legwise_routes.py` — `/legwise/*` on `obt-api` for the dashboard's Options Lab: `/day` and `/anatomy` (see above; `/anatomy` also overlays apps/server's T-33 `daily_regime_tags` as `t33` when `DATABASE_URL` is set in this process, with an explicit status), list/
   validate/save strategies (slug-checked name, `yaml.safe_dump` of the validated model — never
   raw client text), ad-hoc backtest over collected days, saved results, data/token status, and
@@ -233,11 +242,12 @@ Otherwise:
   Journal figures are those on or before as-of. A stored variant outside the 12 cells is listed in `store.unplaced`.
 - `heatmap/` + `api/heatmap_routes.py` — BL-094, the Options Lab's Heatmap tab (default page): the P&L of an ATM
   short straddle for every entry time (09:16, then each half hour to 14:45), exit (15:30, 15:15) and per-leg SL
-  (10..100 %). `grid.py` restates the legwise engine's fills for the fixed two-leg shape (a test pins every cell to
+  (10..100 %, then "No SL": no stop, both legs held to the exit; `grid.NO_SL`, stored as `sl = 0`). `grid.py` restates the legwise engine's fills for the fixed two-leg shape (a test pins every cell to
   `simulate_day`); indices take ATM from the index spot, a stock (no spot, no strike step, mostly no lot size in the
   lake) from put-call parity, so stock P&L is points per share and an index's is rupees per lot at today's lot.
   NIFTY and SENSEX use the nearest weekly, every other index and stock the monthly. `store.py` keeps one Parquet per
-  underlying under `TRADING_DATA_ROOT/heatmap/` (incremental; a file with an old column layout is rebuilt);
+  underlying under `TRADING_DATA_ROOT/heatmap/` (incremental: a day stored without its `sl = 0` row is rebuilt by a plain build, and until then the No SL column
+  reads empty, never zero; a file with an old column layout is rebuilt);
   `view.py` reads the three views (`time_sl`, `date_time`, `date_sl`), sums a date range, filters weeks to expiry
   and gives `value` or `pct`-of-premium; `obt heatmap build [-u X | --stocks] [--force] | show | list`;
   `evening.update_heatmap` adds each index's day inside `obt daily`, isolated.
