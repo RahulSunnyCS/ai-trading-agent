@@ -357,10 +357,13 @@ def run_cohort(
     }
 
 
-def cohort_days(root: Path, underlying: str, start: date, end: date) -> list[date]:
-    """Backtest days in [start, end] with weekend sessions left out (the rotation's rule)."""
+def cohort_days(
+    root: Path, underlying: str, start: date, end: date, weekends: bool = False
+) -> list[date]:
+    """Backtest days in [start, end]; weekend sessions (the Budget Saturday) left out as in the
+    rotation unless `weekends` (the BL-096/097/098 sweeps kept them — the regression check)."""
     days, _ = backtest_days(root, underlying, start, end)
-    return [d for d in days if d.weekday() < 5]
+    return [d for d in days if weekends or d.weekday() < 5]
 
 
 def load_cells_file(path: Path) -> dict[tuple[str, str, str], list[dict[str, Any] | None]]:
@@ -430,6 +433,11 @@ def main() -> None:
     parser.add_argument(
         "--limit", type=int, default=0, help="first N cells per cohort (smoke runs)"
     )
+    parser.add_argument(
+        "--weekends",
+        action="store_true",
+        help="keep weekend sessions (regression vs BL-096/097/098)",
+    )
     parser.add_argument("--summarise-only", action="store_true")
     args = parser.parse_args()
 
@@ -478,7 +486,7 @@ def main() -> None:
     for (family, index, slot), params_list in jobs.items():
         underlying = grid.INDICES[index]
         if underlying not in days_cache:
-            days_cache[underlying] = cohort_days(root, underlying, start, end)
+            days_cache[underlying] = cohort_days(root, underlying, start, end, args.weekends)
         cohort = grid.Cell(family, index, slot, None).cohort
         chunks = (
             [params_list]

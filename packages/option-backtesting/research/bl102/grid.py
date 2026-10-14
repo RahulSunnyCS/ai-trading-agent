@@ -168,6 +168,18 @@ class Cell:
         return self.params is None
 
 
+def pretty(axis: str, value: Any) -> str:
+    """How a value reads in a table: `cost×1@13:00`, `[15,10]`, `none`."""
+    if value is None:
+        return "none"
+    if axis == "reentry":
+        mode, count, cutoff = value
+        return f"{mode}×{count}" + (f"@{cutoff}" if cutoff else "")
+    if isinstance(value, tuple):
+        return "[" + ",".join(f"{v:g}" for v in value) + "]"
+    return str(value)
+
+
 def token(value: Any) -> str:
     if value is None:
         return "none"
@@ -252,11 +264,15 @@ def build(
         return LegwiseStrategy.model_validate(strategy.model_dump())
     underlying = cell.underlying
     scale = POINT_SCALE[underlying]
+    # Stage-2 extras (off-grid controls, backlog/BL-102 Phase 2): exit for D and B,
+    # square_off, Buy gap_percent and valid_until (minutes after the range end).
+    if "exit" in p:
+        strategy.exit_time = p["exit"]
+    if "square_off" in p:
+        strategy.square_off = p["square_off"]
     if cell.family in ("W", "D"):
         reentry = p["reentry"]
         strategy.no_reentry_after = None
-        if cell.family == "W":
-            strategy.exit_time = p["exit"]
         for leg in strategy.legs:
             leg.strike = strike_for(cell.family, underlying, p["strike"])
             leg.stop_loss = Amount(percent=p["sl"])
@@ -278,7 +294,13 @@ def build(
                 if p["trail"] is None
                 else TrailSL(points=(p["trail"][0] * scale, p["trail"][1] * scale))
             )
-            leg.range_breakout = RangeBreakout(until=until, side="high", source=p["source"])
+            leg.range_breakout = RangeBreakout(
+                until=until,
+                side="high",
+                source=p["source"],
+                gap_percent=p.get("gap", 0.0),
+                valid_until=None if p.get("valid") is None else hhmm_plus(until, p["valid"]),
+            )
         strategy.overall.stop_loss_inr = p["mtm"]
     else:
         raise ValueError(f"unknown family {cell.family!r}")
@@ -317,6 +339,8 @@ def params_from_row(family: str, row: dict[str, str]) -> dict[str, Any] | None:
         out[axis] = json.loads(raw) if raw else None
         if isinstance(out[axis], list):
             out[axis] = tuple(out[axis])
+    if row.get("p_extra"):
+        out.update(json.loads(row["p_extra"]))
     return out
 
 
@@ -325,6 +349,8 @@ def params_to_row(family: str, params: dict[str, Any] | None) -> dict[str, str]:
     for axis in AXES[family]:
         value = None if params is None else params[axis]
         out[f"p_{axis}"] = "" if value is None else json.dumps(value)
+    extra = {} if params is None else {k: v for k, v in params.items() if k not in AXES[family]}
+    out["p_extra"] = json.dumps(extra, sort_keys=True) if extra else ""
     return out
 
 
