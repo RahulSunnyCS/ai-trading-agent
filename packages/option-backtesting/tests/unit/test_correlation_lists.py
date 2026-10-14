@@ -183,3 +183,12 @@ def test_load_brings_in_the_lists_only_when_asked(monkeypatch, tmp_path):
     got = rseries.load(["list:A", "N_wide_0917"], tmp_path)
     assert [s.name for s in got] == ["list:A", "N_wide_0917"]
     assert calls == [1]
+
+
+def test_a_basket_can_be_required_to_include_a_list(client):
+    res = client.get(
+        "/legwise/correlation/pick",
+        params={"selectors": "list:A,N_wide_0917,N_p80_0917", "k": 2, "require": "list:A"},
+    )
+    assert res.status_code == 200, res.text
+    assert "list:A" in res.json()["names"]
