@@ -13,7 +13,7 @@
  *   - Correlation: do the strategies lose on the same days? (BL-090)
  *  Build and test
  *   - Strategies: the saved leg-wise strategies and each one's latest saved result.
- *   - Builder: Form (the leg-wise strategy builder) or YAML (the YAML DSL engine, which
+ *   - Builder: Leg grid (the leg-wise strategy builder) or YAML engine (the YAML DSL engine, which
  *     was the standalone Backtest tab; /backtest redirects to /optionslab/builder/yaml).
  *   - Runs: the YAML run registry and the leg-wise runs in one list, clickable and comparable.
  *  Advanced

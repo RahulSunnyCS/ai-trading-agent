@@ -41,7 +41,7 @@ export interface NavChild {
   label: string;
   /**
    * A heading the sidebar shows above the first child of each run of children sharing it
-   * (Options Lab's workspaces: Today, Explore data, Build and test).
+   * (Options Lab's workspaces: Today, Explore data, Build and test, Advanced).
    */
   group?: string;
   /**

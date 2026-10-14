@@ -69,8 +69,8 @@ over every collected day fills in results for the new version.
 
 ## Two engines
 
-The **Form** builder uses the leg-wise engine described here. The **YAML** mode is an older
+The **Leg grid** builder uses the leg-wise engine described here. The **YAML engine (advanced)** mode is an older
 rule engine that reads a cache of AlgoTest data; it is kept for experiments that need its
-richer condition language. See [Builder: YAML mode](guide:optionslab/builder-yaml).
+richer condition language. See [Builder: YAML engine](guide:optionslab/builder-yaml).
 
 Next: [the Strategies screen](guide:optionslab/strategies).
