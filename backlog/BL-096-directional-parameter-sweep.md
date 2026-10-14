@@ -168,3 +168,4 @@ rankings are before brokerage/statutory charges and slippage.
   net rises monotonically with MTM up to ₹4,000, the grid edge. Caveat: the
   shortlist was chosen after viewing holdout, so these numbers are optimistic.
   Open: extend MTM past ₹4,000 (needs a committed pre-registration first).
+- 2026-10-14 — Phase 3 (interactions, robustness) superseded by BL-102's full-factorial grid; the holdout used here was later spent by BL-099.

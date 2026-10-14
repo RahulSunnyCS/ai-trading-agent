@@ -6,6 +6,7 @@ import {
   DEFAULT_FILTERS,
   averagePairwise,
   bandOf,
+  basisNote,
   buildSelectors,
   displayResponse,
   diversificationNote,
@@ -256,6 +257,23 @@ describe('rotation lists in a comparison', () => {
     // Nothing to rename: the same object comes back.
     const plain = response(['N_wide_0917', 'N_dir_0917']);
     expect(displayResponse(plain)).toBe(plain);
+  });
+
+  it('says what a list and a strategy are measured in, only when both are compared', () => {
+    const basis = {
+      list: 'gross per lot-day',
+      legwise: 'net per lot, after costs',
+    };
+    const mixed = { ...response(['list:A', 'nifty_x']), basis } as CorrelationResponse;
+    expect(basisNote(mixed)).toContain(
+      'A list is gross per lot-day; a strategy is net per lot, after costs.',
+    );
+    const listsOnly = {
+      ...response(['list:A', 'list:B']),
+      basis: { list: 'gross per lot-day' },
+    } as CorrelationResponse;
+    expect(basisNote(listsOnly)).toBeNull();
+    expect(basisNote(response(['N_wide_0917']))).toBeNull();
   });
 
   it('says how many compared days were re-scored', () => {

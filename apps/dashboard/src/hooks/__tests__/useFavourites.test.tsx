@@ -11,10 +11,17 @@ interface Served {
   strategies: string[];
 }
 
-/** A fetch that serves GET from `state` and applies PUT, unless `failPut` makes it answer 422. */
-function installServer(initial: Served, opts: { failPut?: boolean } = {}) {
+/**
+ * A fetch that serves GET from `state` and applies PUT. `failPut` makes every PUT answer 422;
+ * `failFirstPut` only the first. `holdPuts` keeps each PUT pending until `release()` is called.
+ */
+function installServer(
+  initial: Served,
+  opts: { failPut?: boolean; failFirstPut?: boolean; holdPuts?: boolean } = {},
+) {
   const state: Served = { ...initial };
   const puts: Served[] = [];
+  const waiting: Array<() => void> = [];
   const respond = (body: unknown, status = 200) => ({
     ok: status < 400,
     status,
@@ -33,7 +40,10 @@ function installServer(initial: Served, opts: { failPut?: boolean } = {}) {
       if (init?.method === 'PUT') {
         const sent = JSON.parse(String(init.body)) as Served;
         puts.push(sent);
-        if (opts.failPut) return respond({ error: 'unknown list' }, 422);
+        if (opts.holdPuts) await new Promise<void>((resolve) => waiting.push(resolve));
+        if (opts.failPut || (opts.failFirstPut && puts.length === 1)) {
+          return respond({ error: 'unknown list' }, 422);
+        }
         state.lists = sent.lists;
         state.strategies = sent.strategies;
         return respond(body());
@@ -41,7 +51,7 @@ function installServer(initial: Served, opts: { failPut?: boolean } = {}) {
       return respond(body());
     }),
   );
-  return { puts, state };
+  return { puts, state, release: () => waiting.shift()?.() };
 }
 
 beforeEach(() => {
@@ -72,8 +82,8 @@ describe('useFavourites', () => {
     expect(server.puts[0]).toEqual({ lists: ['A'], strategies: ['nifty_buy_range_breakout'] });
   });
 
-  it('keeps two quick toggles in order, each from the one before', async () => {
-    const server = installServer({ lists: ['A'], strategies: [] });
+  it('builds a quick second toggle on the first and saves what is wanted now', async () => {
+    const server = installServer({ lists: ['A'], strategies: [] }, { holdPuts: true });
     const { result } = renderHook(() => useFavourites());
     await waitFor(() => expect(result.current.set).not.toBeNull());
 
@@ -81,10 +91,60 @@ describe('useFavourites', () => {
       result.current.toggleList('B');
       result.current.toggleStrategy('x');
     });
-    await waitFor(() => expect(server.puts).toHaveLength(2));
+    // Both show at once, and only the first save is out.
+    expect(result.current.set).toEqual({ lists: ['A', 'B'], strategies: ['x'] });
+    await waitFor(() => expect(server.puts).toHaveLength(1));
     expect(server.puts[0]).toEqual({ lists: ['A', 'B'], strategies: [] });
+    act(() => server.release());
+    // The second save carries the whole current wish, not a stale queued copy.
+    await waitFor(() => expect(server.puts).toHaveLength(2));
     expect(server.puts[1]).toEqual({ lists: ['A', 'B'], strategies: ['x'] });
+    act(() => server.release());
     await waitFor(() => expect(server.state.strategies).toEqual(['x']));
+  });
+
+  it('keeps the screen and the server together when an earlier save fails and a later one succeeds', async () => {
+    const server = installServer(
+      { lists: ['A'], strategies: [] },
+      { holdPuts: true, failFirstPut: true },
+    );
+    const { result } = renderHook(() => useFavourites());
+    await waitFor(() => expect(result.current.set).not.toBeNull());
+
+    act(() => result.current.toggleStrategy('x'));
+    await waitFor(() => expect(server.puts).toHaveLength(1));
+    act(() => result.current.toggleStrategy('y')); // queued behind the first
+    act(() => server.release()); // the first fails
+    await waitFor(() => expect(server.puts).toHaveLength(2));
+    // The retry carries both stars: the failed one is not silently dropped.
+    expect(server.puts[1]).toEqual({ lists: ['A'], strategies: ['x', 'y'] });
+    act(() => server.release());
+    await waitFor(() => expect(server.state.strategies).toEqual(['x', 'y']));
+    await waitFor(() => expect(result.current.set?.strategies).toEqual(['x', 'y']));
+    // And the next toggle builds on that, so nothing is deleted on the server.
+    act(() => result.current.toggleStrategy('z'));
+    await waitFor(() => expect(server.puts).toHaveLength(3));
+    expect(server.puts[2]).toEqual({ lists: ['A'], strategies: ['x', 'y', 'z'] });
+    act(() => server.release());
+    await waitFor(() => expect(server.state.strategies).toEqual(['x', 'y', 'z']));
+  });
+
+  it("shows another device's change once its own saves have settled", async () => {
+    const server = installServer({ lists: ['A'], strategies: [] });
+    const { result } = renderHook(() => useFavourites());
+    await waitFor(() => expect(result.current.set).not.toBeNull());
+
+    act(() => result.current.toggleList('B'));
+    await waitFor(() => expect(server.state.lists).toEqual(['A', 'B']));
+    await waitFor(() => expect(result.current.set?.lists).toEqual(['A', 'B']));
+
+    // Another device stars a strategy; this one re-reads and shows it, and a toggle starts from it.
+    server.state.strategies = ['elsewhere'];
+    act(() => result.current.refetch());
+    await waitFor(() => expect(result.current.set?.strategies).toEqual(['elsewhere']));
+    act(() => result.current.toggleList('C'));
+    await waitFor(() => expect(server.puts).toHaveLength(2));
+    expect(server.puts[1]).toEqual({ lists: ['A', 'B', 'C'], strategies: ['elsewhere'] });
   });
 
   it('puts the star back and says so when the save fails', async () => {

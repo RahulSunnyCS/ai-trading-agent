@@ -39,6 +39,15 @@ The screen is split into three modes so the daily workflow stays short:
 that day's result, whether today's entry was recorded on time, which source gave the 09:15 VIX open,
 and whether the journal's hash chain is intact. A problem names its fix underneath.
 
+**The three lists.** Cards for Steady, Calendar and Adaptive come first on the Overview. Each shows
+the list's gross on the latest scored day, its total since the first forward day, its largest
+drawdown and its mean daily gap to the fixed base per lot (on the same basis as the headline below,
+so it follows a portfolio stop when one is applied). Before a day is scored every figure is a
+dash, not a zero. Clicking a card makes that list the focus for the headline and chart below. The
+picks line opens the strategies the list chose; it says "Today's" only when the latest entry is
+today's, and otherwise names the day it was recorded for. Baseline is not a card: it is a
+comparator, chosen in **Compare with**.
+
 **Read-out banner.** "Day 18 of 60" counts scored forward sessions. The review is at 60. Until then
 every figure is descriptive and changes nothing.
 
