@@ -14,16 +14,15 @@ import { Plus } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAppRoute } from '../../hooks/useAppRoute';
+import { useFavourites } from '../../hooks/useFavourites';
 import { LEGWISE_API, useLegwiseResults, useLegwiseStrategies } from '../../hooks/useLegwise';
 import { useLegwiseValidate } from '../../hooks/useLegwiseValidate';
 import { usePaymentBalance } from '../../hooks/usePaymentBalance';
 import { apiPost, apiPut } from '../../lib/api';
 import {
   STRATEGY_NAME_RE,
-  TEMPLATES,
-  type TemplateId,
+  type StartSpec,
   UNDERLYINGS,
-  buildTemplate,
   fromSaved,
   isDirty,
   newLeg,
@@ -32,6 +31,8 @@ import {
   parseIssue,
   placeIssues,
   runFailureKind,
+  startFromParams,
+  strategyFromStart,
   toPayload,
 } from '../../lib/legwiseBuilder';
 import { compareToBaseline, lotsOf } from '../../lib/legwiseStats';
@@ -40,6 +41,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { toast } from '../ui/Toast';
+import { NewStrategyDialog } from './NewStrategyDialog';
 import { ConfirmDialog, type ConfirmRequest } from './builder/ConfirmDialog';
 import { LegCard } from './builder/LegCard';
 import { ResultTable } from './builder/ResultTable';
@@ -107,6 +109,8 @@ export function StrategyBuilder() {
   const [problem, setProblem] = useState<ReactNode | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const [starting, setStarting] = useState(false);
+  const favourites = useFavourites();
   /** Credits used here since the balance was last read (it is only re-read once a minute). */
   const [spent, setSpent] = useState<{ at: number | null; count: number }>({ at: null, count: 0 });
 
@@ -197,29 +201,27 @@ export function StrategyBuilder() {
     if (loadParamHandled.current || !saved.data) return;
     const params = new URLSearchParams(window.location.search);
     const target = params.get('load');
+    const spec = startFromParams(params);
     loadParamHandled.current = true;
-    if (!target) return;
-    params.delete('load');
+    if (!target && !spec) return;
+    for (const key of ['load', 'new', 'index', 'premium', 'copy']) params.delete(key);
     const query = params.toString();
     window.history.replaceState(
       window.history.state,
       '',
       `${window.location.pathname}${query ? `?${query}` : ''}`,
     );
-    load(target);
+    if (target) load(target);
+    else if (spec) startFrom(spec);
   }, [saved.data]);
 
-  function startNew() {
-    discardThen('Start a new strategy?', () => replaceForm(blank(), null));
-  }
-
-  function applyTemplate(id: TemplateId) {
-    const template = TEMPLATES.find((t) => t.id === id);
-    if (!template) return;
-    discardThen(`Start from ${template.label}?`, () => {
-      const strategy = buildTemplate(id, s.underlying);
-      replaceForm({ name: strategy.id, strategy }, null);
-    });
+  /** Open what the Start a strategy dialog chose, unsaved, after the discard check. */
+  function startFrom(spec: StartSpec) {
+    const started = strategyFromStart(spec, saved.data ?? []);
+    if (!started) return;
+    discardThen(`Start ${started.name}?`, () =>
+      replaceForm({ name: started.name, strategy: started.strategy }, null),
+    );
   }
 
   async function backtest() {
@@ -337,16 +339,7 @@ export function StrategyBuilder() {
                   options={loadOptions}
                   onChange={load}
                 />
-                <Choice<TemplateId | ''>
-                  label="Start from a template"
-                  value=""
-                  options={[
-                    { value: '', label: 'Start from…' },
-                    ...TEMPLATES.map((t) => ({ value: t.id, label: t.label })),
-                  ]}
-                  onChange={(id) => id && applyTemplate(id)}
-                />
-                <Button size="sm" onClick={startNew}>
+                <Button size="sm" onClick={() => setStarting(true)}>
                   New
                 </Button>
               </>
@@ -579,6 +572,14 @@ export function StrategyBuilder() {
       )}
 
       <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
+      <NewStrategyDialog
+        open={starting}
+        onOpenChange={setStarting}
+        saved={saved.data ?? []}
+        starred={new Set(favourites.set?.strategies ?? [])}
+        onStart={startFrom}
+        initialUnderlying={s.underlying}
+      />
     </div>
   );
 }

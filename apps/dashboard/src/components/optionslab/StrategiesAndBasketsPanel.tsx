@@ -21,6 +21,7 @@ import { useLegwiseResults, useLegwiseStrategies } from '../../hooks/useLegwise'
 import { useRotationOverview, useRotationSummary } from '../../hooks/useRotation';
 import { correlateHref } from '../../lib/favourites';
 import { formatDay, formatInr, formatInt } from '../../lib/format';
+import { type StartSpec, startToParams } from '../../lib/legwiseBuilder';
 import { lastResultOf, legsSummary } from '../../lib/optionsRuns';
 import { LIST_INFO } from '../../lib/rotationListNames';
 import { buildPath } from '../../lib/routes';
@@ -34,6 +35,7 @@ import { SkeletonRows } from '../ui/Skeleton';
 import { StarToggle } from '../ui/StarToggle';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
+import { NewStrategyDialog } from './NewStrategyDialog';
 import { pnlClass } from './shared';
 
 /**
@@ -149,6 +151,7 @@ export function StrategiesAndBasketsPanel() {
   const summary = useRotationSummary();
   const favourites = useFavourites();
   const [show, setShow] = useState<Show>('all');
+  const [starting, setStarting] = useState(false);
 
   const rows: SavedStrategy[] = strategies.data ?? [];
   const saved = results.data?.results ?? [];
@@ -165,6 +168,10 @@ export function StrategiesAndBasketsPanel() {
     summary.refetch();
     favourites.refetch();
   };
+
+  // Start a strategy: the Builder reads the choice from the address once and opens it unsaved.
+  const start = (spec: StartSpec) =>
+    pushPath(`${buildPath('optionslab', 'builder')}?${startToParams(spec).toString()}`);
 
   const correlate = (selector: string) => {
     if (set) pushPath(correlateHref(selector, set));
@@ -185,11 +192,18 @@ export function StrategiesAndBasketsPanel() {
           onClick={refresh}
           loading={strategies.loading || results.loading || summary.loading}
         />
-        <Button variant="primary" size="sm" onClick={() => navigate('optionslab', 'builder')}>
+        <Button variant="primary" size="sm" onClick={() => setStarting(true)}>
           <Plus className="h-3.5 w-3.5" />
           New strategy
         </Button>
       </div>
+      <NewStrategyDialog
+        open={starting}
+        onOpenChange={setStarting}
+        saved={rows}
+        starred={new Set(set?.strategies ?? [])}
+        onStart={start}
+      />
 
       {favourites.warning ? <p className="text-xs text-warning">{favourites.warning}</p> : null}
       {favourites.error && !set ? (

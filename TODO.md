@@ -682,7 +682,7 @@ Steady / Calendar / Adaptive lists, favourites, a leg-grid builder. Features fol
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.28.1 | Phase 1: three workspaces, one navigation, Today as landing, Daily results hidden, question headers, Guide tour | claude | **Built 2026-10-14.** Sidebar groups (`NavChild.group` / `hidden`), question header per screen (`lib/optionsLabSections.ts`), Runs reads `?strategy=`; Daily results redirect waits for Phase 2 |
-| 3.28.2 | Phase 1b: favourites store, Strategies and baskets page, New strategy dialog, Correlation multiselect with lists | claude | **In progress.** Built 2026-10-14: favourites API and proxy, `list:` correlation series, Correlation opens on favourites, Strategies and baskets page. Left: the New strategy dialog and templates |
+| 3.28.2 | Phase 1b: favourites store, Strategies and baskets page, New strategy dialog, Correlation multiselect with lists | claude | **In progress.** Built 2026-10-14: favourites API and proxy, `list:` correlation series, Correlation opens on favourites, Strategies and baskets page. New strategy dialog with three templates built 2026-10-14 |
 | 3.28.3 | Phase 1c: Builder design A (token strip, leg grid, backtest settings popover) | claude | Planned |
 | 3.28.4 | Phase 2–3: Analytics page pattern on Today, Builder result, Runs, Heatmap, Correlation, Regimes; declutter | claude | Planned |
 

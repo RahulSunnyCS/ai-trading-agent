@@ -1,10 +1,10 @@
 This walkthrough builds a simple NIFTY short straddle with stops, backtests it, and saves it so
 the evening run tracks it.
 
-## 1. Start from the template
+## 1. Start a blank strategy
 
-Open [Builder](app:/optionslab/builder) and choose the **Short straddle** template. It has two
-legs: sell the ATM call and sell the ATM put, weekly expiry.
+Open [Builder](app:/optionslab/builder), press **New** and choose **Blank**. It has two legs: sell
+the ATM call and sell the ATM put, weekly expiry.
 
 ## 2. Set the times
 
