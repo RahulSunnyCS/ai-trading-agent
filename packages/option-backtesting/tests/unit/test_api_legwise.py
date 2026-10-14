@@ -63,6 +63,51 @@ def test_backtest_without_collected_days_is_a_clear_404(client):
     assert "no collected NIFTY days" in response.json()["error"]
 
 
+def _capture_run(monkeypatch, result=None, raises=None):
+    """Replace the engine run with one that records how it was called."""
+    calls = []
+
+    def fake(strategy, root, start=None, end=None, **kwargs):
+        calls.append(kwargs)
+        if raises is not None:
+            raise raises
+        return result or []
+
+    monkeypatch.setattr(legwise_routes, "run_legwise", fake)
+    return calls
+
+
+def test_backtest_defaults_keep_one_minute_bars_and_skip_excluded_days(client, monkeypatch):
+    calls = _capture_run(monkeypatch)
+    assert client.post("/legwise/backtest", json={"strategy": STRATEGY}).status_code == 404
+    assert calls[0]["bars"] == "1m" and calls[0]["include_excluded"] is False
+
+
+def test_backtest_passes_bars_and_include_excluded_to_the_engine(client, monkeypatch):
+    calls = _capture_run(monkeypatch)
+    client.post(
+        "/legwise/backtest",
+        json={"strategy": STRATEGY, "bars": "5m", "include_excluded": True},
+    )
+    assert calls[0]["bars"] == "5m" and calls[0]["include_excluded"] is True
+
+
+def test_backtest_refuses_an_unknown_bar_size_before_running(client, monkeypatch):
+    calls = _capture_run(monkeypatch)
+    response = client.post("/legwise/backtest", json={"strategy": STRATEGY, "bars": "15m"})
+    assert response.status_code == 422 and "bars must be one of" in response.json()["error"]
+    assert calls == []
+
+
+def test_a_strategy_five_minute_bars_cannot_run_is_a_422_with_the_reason(client, monkeypatch):
+    from option_backtesting.legwise.market import UnsupportedOn5m
+
+    _capture_run(monkeypatch, raises=UnsupportedOn5m("09:22 is not on a 5-minute mark"))
+    response = client.post("/legwise/backtest", json={"strategy": STRATEGY, "bars": "5m"})
+    assert response.status_code == 422
+    assert "not on a 5-minute mark" in response.json()["error"]
+
+
 def test_daily_job_runs_in_background_and_reports_its_log(client, monkeypatch):
     sent = []
     monkeypatch.setattr("option_backtesting.notify.send", lambda n: (sent.append(n), (True, ""))[1])
