@@ -1,8 +1,9 @@
 /**
- * Options Lab → Strategy builder: an AlgoTest/Quantiply-style form over the leg-wise schema
- * (legwise/schema.py). Two panes from `xl`: the strategy and its legs (each collapsed to a
- * one-line summary) on the left, and a sticky run rail on the right with the date range, live
- * validation, Backtest (its credit cost beside it), Save and the latest run.
+ * Options Lab → Strategy builder over the leg-wise schema (legwise/schema.py), as a leg grid
+ * (BL-102): a header with the strategy's name and file, a row of tokens for its own settings, one
+ * dense row per leg edited in place, the strategy read back in plain words, and below them the
+ * run panel with the period, test settings, live validation, Backtest (its credit cost beside
+ * it), Save and the latest run. Anything the grid does not show is behind a leg's "All settings".
  *
  * The form only shapes JSON; the Python schema is the validator. It is asked on every edit
  * (useLegwiseValidate) and its messages are placed beside the fields they are about.
@@ -10,19 +11,22 @@
  * lib/legwiseBuilder.ts.
  */
 
-import { Plus } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAppRoute } from '../../hooks/useAppRoute';
 import { useFavourites } from '../../hooks/useFavourites';
-import { LEGWISE_API, useLegwiseResults, useLegwiseStrategies } from '../../hooks/useLegwise';
+import {
+  LEGWISE_API,
+  useLegwiseData,
+  useLegwiseResults,
+  useLegwiseStrategies,
+} from '../../hooks/useLegwise';
 import { useLegwiseValidate } from '../../hooks/useLegwiseValidate';
 import { usePaymentBalance } from '../../hooks/usePaymentBalance';
 import { apiPost, apiPut } from '../../lib/api';
 import {
   STRATEGY_NAME_RE,
   type StartSpec,
-  UNDERLYINGS,
   fromSaved,
   isDirty,
   newLeg,
@@ -35,27 +39,25 @@ import {
   strategyFromStart,
   toPayload,
 } from '../../lib/legwiseBuilder';
+import { type PeriodKey, autoName, periodOf, periodRange, slugId } from '../../lib/legwiseGrid';
 import { compareToBaseline, lotsOf } from '../../lib/legwiseStats';
 import type { BacktestResponse, Leg, LegwiseStrategy } from '../../types/legwise';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Card, CardHeader } from '../ui/Card';
+import { Card } from '../ui/Card';
+import { Drawer } from '../ui/Drawer';
 import { toast } from '../ui/Toast';
 import { NewStrategyDialog } from './NewStrategyDialog';
 import { ConfirmDialog, type ConfirmRequest } from './builder/ConfirmDialog';
 import { LegCard } from './builder/LegCard';
+import { LegGrid } from './builder/LegGrid';
+import { ReadBack } from './builder/ReadBack';
 import { ResultTable } from './builder/ResultTable';
 import { RunRail } from './builder/RunRail';
-import { Choice, LabeledField, OptionalNumber, TextField } from './builder/fields';
+import { StrategyTokens } from './builder/StrategyTokens';
+import { Choice, LabeledField, TextField } from './builder/fields';
 
 const BLANK_NAME = 'my_strategy';
-
-const HINTS = {
-  noReentryAfter:
-    'After this time a stopped-out leg is not re-entered, even if it has re-entries left.',
-  squareOff:
-    'Partial closes only the leg whose stop loss or target was hit; Complete closes every leg as soon as any one of them is.',
-} as const;
 
 interface Version {
   name: string;
@@ -101,7 +103,6 @@ export function StrategyBuilder() {
   /** What the form started from: the loaded (or last saved) version, or the blank strategy. */
   const [baseline, setBaseline] = useState<Version>(blank);
   const [loaded, setLoaded] = useState<{ name: string; sha: string } | null>(null);
-  const [openLegs, setOpenLegs] = useState<ReadonlySet<number>>(new Set());
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [running, setRunning] = useState(false);
@@ -111,6 +112,16 @@ export function StrategyBuilder() {
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [starting, setStarting] = useState(false);
   const favourites = useFavourites();
+  const data = useLegwiseData();
+  /** Edit a CE and a PE that match together (the grid's "Edit both legs together"). */
+  const [together, setTogether] = useState(true);
+  /** The leg whose full settings are open in the drawer. */
+  const [detailsIndex, setDetailsIndex] = useState<number | null>(null);
+  /** Test settings: bar size and whether to run the days the quality gate refused. */
+  const [bars, setBars] = useState<'1m' | '5m'>('1m');
+  const [includeExcluded, setIncludeExcluded] = useState(false);
+  /** Until the file name is edited by hand it follows what the strategy does. */
+  const [nameTouched, setNameTouched] = useState(false);
   /** Credits used here since the balance was last read (it is only re-read once a minute). */
   const [spent, setSpent] = useState<{ at: number | null; count: number }>({ at: null, count: 0 });
 
@@ -129,9 +140,27 @@ export function StrategyBuilder() {
       ? Math.max(0, payment.balance - spent.count)
       : payment.balance;
 
-  const set = <K extends keyof LegwiseStrategy>(key: K, value: LegwiseStrategy[K]) =>
-    setS({ ...s, [key]: value });
-  const setLegs = (legs: Leg[]) => set('legs', legs);
+  /**
+   * A change to the strategy. A strategy that is not saved yet and whose file name nobody has
+   * typed takes its file name (and id) from what it does, so "Short strangle OTM1 · 09:17"
+   * becomes nifty_short_strangle_otm1_09_17 without anyone writing it.
+   */
+  function change(next: LegwiseStrategy) {
+    if (loaded === null && !nameTouched) {
+      const id = slugId(autoName(next), next.underlying);
+      setName(id);
+      setS({ ...next, id });
+      return;
+    }
+    setS(next);
+  }
+
+  /** The file name is the strategy id too, as in every saved strategy; a hand edit stops the auto name. */
+  function setFileName(value: string) {
+    setNameTouched(true);
+    setName(value);
+    if (s.id === name || loaded === null) setS({ ...s, id: value });
+  }
 
   // The saved version's results are already stored (keyed by version hash), so comparing
   // an edit against them is free — a second backtest call would spend a credit.
@@ -157,7 +186,9 @@ export function StrategyBuilder() {
     setS(version.strategy);
     setLoaded(origin);
     setBaseline(origin ? version : blank());
-    setOpenLegs(new Set());
+    setDetailsIndex(null);
+    // A started or loaded strategy keeps the name it came with until the file name is edited.
+    setNameTouched(origin !== null || version.name !== BLANK_NAME);
     setRun(null);
     setProblem(null);
   }
@@ -230,6 +261,8 @@ export function StrategyBuilder() {
     const body: Record<string, unknown> = { strategy: payload };
     if (from) body.from = from;
     if (to) body.to = to;
+    if (bars !== '1m') body.bars = bars;
+    if (includeExcluded) body.include_excluded = true;
     const r = await apiPost<BacktestResponse>(`${LEGWISE_API}/backtest`, body);
     setRunning(false);
     if (r.ok) {
@@ -310,247 +343,129 @@ export function StrategyBuilder() {
       : []),
   ];
 
+  const lastDay = (data.data?.days[s.underlying] ?? []).slice(-1)[0] ?? null;
+  const period = periodOf(from, to, lastDay);
+  const problems = useMemo(() => {
+    if (validation.status === 'unknown') return ['The form could not be checked right now.'];
+    if (validation.status !== 'invalid') return [];
+    const placed = Object.values(issues.bySlot).flat();
+    const unplaced = issues.unplaced.map((u) => u.message);
+    return [...new Set([...unplaced, ...placed])];
+  }, [validation.status, issues]);
+
+  const detailLeg = detailsIndex === null ? undefined : s.legs[detailsIndex];
+
   return (
-    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
-      <div className="min-w-0 space-y-5">
-        <Card>
-          <CardHeader
-            title={
-              <span className="flex flex-wrap items-center gap-2">
-                Strategy
-                {loaded ? (
-                  <Badge tone="neutral">
-                    {loaded.name}
-                    {loaded.sha ? <span className="font-mono">· {loaded.sha}</span> : null}
-                  </Badge>
-                ) : (
-                  <Badge tone="neutral">Not saved yet</Badge>
-                )}
-                {dirty && <Badge status="attention">Unsaved changes</Badge>}
-              </span>
-            }
-            description="Leg-wise, AlgoTest-style. Backtests run on the 1-minute Fyers data collected so far."
-            className="flex-wrap"
-            actions={
-              <>
-                <Choice<string>
-                  label="Load a saved strategy"
-                  value={loaded?.name ?? ''}
-                  options={loadOptions}
-                  onChange={load}
-                />
-                <Button size="sm" onClick={() => setStarting(true)}>
-                  New
-                </Button>
-              </>
-            }
-          />
-          {saved.error && !saved.data && (
-            <p className="mb-3 text-xs text-warning">
-              Saved strategies could not be loaded ({saved.error}).
+    <div className="space-y-5">
+      <Card className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold tracking-tight text-foreground">
+              {autoName(s)}
+              {loaded ? (
+                <Badge tone="neutral">
+                  {loaded.name}
+                  {loaded.sha ? <span className="font-mono">· {loaded.sha}</span> : null}
+                </Badge>
+              ) : (
+                <Badge tone="neutral">Not saved yet</Badge>
+              )}
+              {dirty && <Badge status="attention">Unsaved changes</Badge>}
+            </h2>
+            <p className="text-xs text-muted">
+              Saved as{' '}
+              <span className="font-mono text-foreground">strategies/legwise/{name}.yaml</span>
+              {s.id !== name ? (
+                <>
+                  {' '}
+                  · id <span className="font-mono text-foreground">{s.id}</span>
+                </>
+              ) : null}
             </p>
-          )}
-          <div className="flex flex-wrap items-start gap-3">
-            <LabeledField
-              label="File name (a-z 0-9 _)"
-              errors={nameError ? [nameError] : undefined}
-            >
-              <TextField
-                label="File name"
-                value={name}
-                onChange={setName}
-                className="w-48"
-                errors={nameError ? [nameError] : undefined}
-              />
-            </LabeledField>
-            <LabeledField label="Strategy id" errors={slot('id')}>
-              <TextField
-                label="Strategy id"
-                value={s.id}
-                onChange={(v) => set('id', v)}
-                className="w-48"
-                errors={slot('id')}
-              />
-            </LabeledField>
-            <LabeledField label="Index" errors={slot('underlying')}>
-              <Choice
-                label="Index"
-                value={s.underlying}
-                options={UNDERLYINGS}
-                onChange={(v) => set('underlying', v)}
-              />
-            </LabeledField>
-            <LabeledField label="Entry" errors={slot('entry_time')}>
-              <TextField
-                label="Entry time"
-                type="time"
-                value={s.entry_time}
-                errors={slot('entry_time')}
-                onChange={(v) => set('entry_time', v)}
-              />
-            </LabeledField>
-            <LabeledField label="Exit" errors={slot('exit_time')}>
-              <TextField
-                label="Exit time"
-                type="time"
-                value={s.exit_time}
-                errors={slot('exit_time')}
-                onChange={(v) => set('exit_time', v)}
-              />
-            </LabeledField>
-            <LabeledField
-              label="No re-entry after"
-              hint={HINTS.noReentryAfter}
-              errors={slot('no_reentry_after')}
-            >
-              <TextField
-                label="No re-entry after"
-                type="time"
-                value={s.no_reentry_after ?? ''}
-                errors={slot('no_reentry_after')}
-                onChange={(v) => set('no_reentry_after', v || undefined)}
-              />
-            </LabeledField>
-            <LabeledField label="Square off" hint={HINTS.squareOff} errors={slot('square_off')}>
-              <Choice
-                label="Square off"
-                value={s.square_off}
-                errors={slot('square_off')}
-                options={[
-                  { value: 'partial', label: 'Partial (only the leg)' },
-                  { value: 'complete', label: 'Complete (all legs)' },
-                ]}
-                onChange={(v) => set('square_off', v)}
-              />
-            </LabeledField>
           </div>
-        </Card>
+          <div className="flex flex-wrap items-center gap-2">
+            <Choice<string>
+              label="Open a saved strategy"
+              value={loaded?.name ?? ''}
+              options={loadOptions}
+              onChange={load}
+            />
+            <Button size="sm" onClick={() => setStarting(true)}>
+              New
+            </Button>
+          </div>
+        </div>
+        {saved.error && !saved.data && (
+          <p className="text-xs text-warning">
+            Saved strategies could not be loaded ({saved.error}).
+          </p>
+        )}
+        <div className="flex flex-wrap items-start gap-3">
+          <LabeledField label="File name (a-z 0-9 _)" errors={nameError ? [nameError] : slot('id')}>
+            <TextField
+              label="File name"
+              value={name}
+              onChange={setFileName}
+              className="w-72"
+              errors={nameError ? [nameError] : slot('id')}
+            />
+          </LabeledField>
+        </div>
+        <StrategyTokens strategy={s} slots={issues.bySlot} onChange={change} />
+      </Card>
 
-        <Card>
-          <CardHeader
-            title="Legs"
-            description={s.legs.length === 0 ? 'Add at least one leg.' : undefined}
-            actions={
-              <>
-                {s.legs.length > 1 && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() =>
-                      setOpenLegs(
-                        openLegs.size === s.legs.length ? new Set() : new Set(s.legs.keys()),
-                      )
-                    }
-                  >
-                    {openLegs.size === s.legs.length ? 'Collapse all' : 'Expand all'}
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    const last = s.legs[s.legs.length - 1];
-                    setLegs([
-                      ...s.legs,
-                      newLeg(
-                        nextLegId(s.legs.map((l) => l.id)),
-                        last?.option_type === 'CE' ? 'PE' : 'CE',
-                      ),
-                    ]);
-                    setOpenLegs(new Set([...openLegs, s.legs.length]));
-                  }}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add leg
-                </Button>
-              </>
-            }
-          />
-          <div className="space-y-2">
-            {s.legs.map((leg, i) => (
-              <LegCard
-                // biome-ignore lint/suspicious/noArrayIndexKey: legs have no stable identity (ids are user-edited and may repeat while typing); every input is controlled, so a position key cannot leave stale input state behind
-                key={i}
-                leg={leg}
-                index={i}
-                underlying={s.underlying}
-                issues={issues}
-                open={openLegs.has(i)}
-                onToggle={() => {
-                  const next = new Set(openLegs);
-                  if (!next.delete(i)) next.add(i);
-                  setOpenLegs(next);
-                }}
-                onChange={(l) => setLegs(s.legs.map((x, j) => (j === i ? l : x)))}
-                onRemove={() => {
-                  setLegs(s.legs.filter((_, j) => j !== i));
-                  // Keep the cards after the removed one open or closed as they were.
-                  setOpenLegs(
-                    new Set([...openLegs].filter((j) => j !== i).map((j) => (j > i ? j - 1 : j))),
-                  );
-                }}
-                onCopy={() => {
-                  setLegs([
-                    ...s.legs,
-                    {
-                      ...leg,
-                      id: nextLegId(
-                        s.legs.map((l) => l.id),
-                        leg.id,
-                      ),
-                    },
-                  ]);
-                  setOpenLegs(new Set([...openLegs, s.legs.length]));
-                }}
-              />
-            ))}
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader title="Overall & execution" />
-          <div className="flex flex-wrap items-start gap-3">
-            <LabeledField label="Overall max loss (₹)" errors={slot('overall.stop_loss_inr')}>
-              <OptionalNumber
-                label="Overall max loss in rupees"
-                value={s.overall.stop_loss_inr}
-                errors={slot('overall.stop_loss_inr')}
-                onChange={(v) => set('overall', { ...s.overall, stop_loss_inr: v })}
-              />
-            </LabeledField>
-            <LabeledField label="Overall max profit (₹)" errors={slot('overall.target_inr')}>
-              <OptionalNumber
-                label="Overall max profit in rupees"
-                value={s.overall.target_inr}
-                errors={slot('overall.target_inr')}
-                onChange={(v) => set('overall', { ...s.overall, target_inr: v })}
-              />
-            </LabeledField>
-            <LabeledField label="Slippage %" errors={slot('execution.slippage_pct')}>
-              <OptionalNumber
-                label="Slippage percent"
-                value={s.execution.slippage_pct}
-                step={0.1}
-                errors={slot('execution.slippage_pct')}
-                onChange={(v) => set('execution', { ...s.execution, slippage_pct: v ?? 0 })}
-              />
-            </LabeledField>
-            <LabeledField label="Cost per order (₹)" errors={slot('execution.cost_per_order_inr')}>
-              <OptionalNumber
-                label="Cost per order in rupees"
-                value={s.execution.cost_per_order_inr}
-                errors={slot('execution.cost_per_order_inr')}
-                onChange={(v) => set('execution', { ...s.execution, cost_per_order_inr: v ?? 0 })}
-              />
-            </LabeledField>
-          </div>
-        </Card>
-      </div>
+      <Card className="space-y-3">
+        <LegGrid
+          legs={s.legs}
+          issues={issues}
+          together={together}
+          onTogetherChange={setTogether}
+          onChange={(legs) => change({ ...s, legs })}
+          onDetails={setDetailsIndex}
+          onCopy={(i) => {
+            const leg = s.legs[i];
+            if (!leg) return;
+            change({
+              ...s,
+              legs: [
+                ...s.legs,
+                {
+                  ...leg,
+                  id: nextLegId(
+                    s.legs.map((l) => l.id),
+                    leg.id,
+                  ),
+                },
+              ],
+            });
+          }}
+          onRemove={(i) => change({ ...s, legs: s.legs.filter((_, j) => j !== i) })}
+          onAdd={() => change({ ...s, legs: [...s.legs, newLegFor(s)] })}
+          onAddPair={() => {
+            const ids = s.legs.map((l) => l.id);
+            const ce = nextLegId(ids, 'ce');
+            const pe = nextLegId([...ids, ce], 'pe');
+            change({ ...s, legs: [...s.legs, newLeg(ce, 'CE'), newLeg(pe, 'PE')] });
+          }}
+        />
+        <ReadBack strategy={s} problems={problems} checking={validation.status === 'checking'} />
+      </Card>
 
       <RunRail
         from={from}
         to={to}
         onFrom={setFrom}
         onTo={setTo}
+        period={period}
+        onPeriod={(key: PeriodKey) => {
+          const range = periodRange(lastDay, key);
+          setFrom(range.from);
+          setTo(range.to);
+        }}
+        bars={bars}
+        onBars={setBars}
+        includeExcluded={includeExcluded}
+        onIncludeExcluded={setIncludeExcluded}
         validation={validation}
         issues={issues}
         payment={{ enabled: payment.enabled, balance }}
@@ -565,11 +480,51 @@ export function StrategyBuilder() {
         }
       />
 
-      {run && (
-        <div className="min-w-0 xl:col-span-2">
-          <ResultTable result={run.result} lots={run.lots} comparison={comparison} />
-        </div>
-      )}
+      {run && <ResultTable result={run.result} lots={run.lots} comparison={comparison} />}
+
+      <Drawer
+        open={detailLeg !== undefined}
+        onOpenChange={(open) => {
+          if (!open) setDetailsIndex(null);
+        }}
+        title={
+          detailLeg ? `All settings for ${detailLeg.id || `leg ${(detailsIndex ?? 0) + 1}`}` : 'Leg'
+        }
+        subtitle="Everything the grid does not show: range breakout, re-entry on target, ids."
+      >
+        {detailLeg && detailsIndex !== null ? (
+          <LegCard
+            leg={detailLeg}
+            index={detailsIndex}
+            underlying={s.underlying}
+            issues={issues}
+            open
+            onToggle={() => undefined}
+            onChange={(l) =>
+              change({ ...s, legs: s.legs.map((x, j) => (j === detailsIndex ? l : x)) })
+            }
+            onRemove={() => {
+              change({ ...s, legs: s.legs.filter((_, j) => j !== detailsIndex) });
+              setDetailsIndex(null);
+            }}
+            onCopy={() =>
+              change({
+                ...s,
+                legs: [
+                  ...s.legs,
+                  {
+                    ...detailLeg,
+                    id: nextLegId(
+                      s.legs.map((l) => l.id),
+                      detailLeg.id,
+                    ),
+                  },
+                ],
+              })
+            }
+          />
+        ) : null}
+      </Drawer>
 
       <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
       <NewStrategyDialog
@@ -582,6 +537,12 @@ export function StrategyBuilder() {
       />
     </div>
   );
+}
+
+/** A new leg for the strategy: the opposite type of the last one, with the next free id. */
+function newLegFor(s: LegwiseStrategy): Leg {
+  const last = s.legs[s.legs.length - 1];
+  return newLeg(nextLegId(s.legs.map((l) => l.id)), last?.option_type === 'CE' ? 'PE' : 'CE');
 }
 
 /** A failed call's message, one line per problem, in plain words where the mapping knows them. */

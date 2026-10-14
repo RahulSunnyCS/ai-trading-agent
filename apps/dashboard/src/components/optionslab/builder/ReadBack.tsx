@@ -47,7 +47,6 @@ export function ReadBack({
             </p>
             <ul className="mt-1 space-y-0.5 text-muted">
               {problems.slice(0, 5).map((p, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: two legs can share a message
                 <li key={`${i}-${p}`}>{p}</li>
               ))}
               {problems.length > 5 ? <li>…and {problems.length - 5} more.</li> : null}
