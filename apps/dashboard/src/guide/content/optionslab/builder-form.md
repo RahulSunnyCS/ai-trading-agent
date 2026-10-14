@@ -5,8 +5,19 @@ tracks it every day.
 
 ## Before you start
 
-Pick a starting point: **load a saved strategy**, or start from a **template** (Short straddle,
-Short strangle, Iron condor). Templates are the quickest way in.
+Pick a starting point with **New**, which opens *Start a strategy*, or **load a saved strategy**
+from the list. Nothing is saved until you press **Save**.
+
+| Start | What you get |
+|---|---|
+| Short strangle | Sell the call and put one strike out of the money at 09:17, each stopped at 115% and trailed, ₹2,500 overall loss, out at 15:28. The shape of the Widesl strategy. |
+| Buy range breakout | Buy the call and put priced near ₹50 when one breaks its own 09:35 to 09:45 high, each stopped at 25% and trailed, ₹2,000 overall loss, out at 15:14. |
+| Short strangle at a premium | Sell the call and put whose premium is closest to a price you type, at 09:17, each stopped at 115% and trailed, ₹2,500 overall loss, out at 15:25. |
+| Copy a saved strategy | One you already have, saved under a new name (`…_copy`). Starred strategies are listed first. |
+| Blank | A short straddle skeleton: sell the ATM call and put, 25% stop on each, 09:20 to 15:15. |
+
+The templates are modelled on the strategies the evening run tests, so you can change one detail
+and see what it does.
 
 ## The controls
 

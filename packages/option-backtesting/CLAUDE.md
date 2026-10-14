@@ -278,8 +278,8 @@ Otherwise:
   `regime_message` on `POST /runs`, `regime_status` in the MCP `run_backtest`
   output, `t33.status` on `/legwise/anatomy`). Any other query error still raises.
 
-- `research/bl102/` — BL-102, the full-factorial parameter sweep over the Widesl / Dir / Buy families:
-  `grid.py` (the registered axes, cells and their SHA; `tests/unit/test_bl102_grid.py` holds the counts),
+- `research/bl104/` — BL-104, the full-factorial parameter sweep over the Widesl / Dir / Buy families:
+  `grid.py` (the registered axes, cells and their SHA; `tests/unit/test_bl104_grid.py` holds the counts),
   `run_grid.py` (one job per cohort, resumable parts + day × cell series under `results/<tag>/`),
   `score.py` (gates, Martin / Calmar, the plateau rule, band tables), `robust.py` (numpy CSCV,
   half-years, bootstrap vs template, DTE / VIX / weekday strata, breadth over the 25 slots),

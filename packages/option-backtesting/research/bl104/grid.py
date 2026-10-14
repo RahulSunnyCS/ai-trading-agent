@@ -1,4 +1,4 @@
-"""BL-102 Stage-1 grid: the registered axes, the cells they make, and the strategy each cell is.
+"""BL-104 Stage-1 grid: the registered axes, the cells they make, and the strategy each cell is.
 
 Three families, each a full Cartesian product over its axes (the owner's "every parameter"),
 at seven entry slots per index. The values here are the pre-registration: `grid_sha()` is
@@ -39,7 +39,9 @@ from option_backtesting.legwise.schema import (
 PACKAGE = Path(__file__).resolve().parents[2]
 ROTATION = PACKAGE / "strategies" / "rotation"
 
-GRID_VERSION = "bl102-stage1-2026-10-14"
+GRID_VERSION = (
+    "bl102-stage1-2026-10-14"  # the registered label (renumbered to BL-104 later; part of the SHA)
+)
 FAMILIES = ("W", "D", "B")
 FAMILY_FILE = {"W": "wide", "D": "dir", "B": "buy"}
 FAMILY_NAME = {"W": "Widesl", "D": "Dir", "B": "Buy"}
@@ -273,7 +275,7 @@ def build(
         return LegwiseStrategy.model_validate(strategy.model_dump())
     underlying = cell.underlying
     scale = POINT_SCALE[underlying]
-    # Stage-2 extras (off-grid controls, backlog/BL-102 Phase 2): exit for D and B,
+    # Stage-2 extras (off-grid controls, backlog/BL-104 Phase 2): exit for D and B,
     # square_off, Buy gap_percent and valid_until (minutes after the range end).
     if "exit" in p:
         strategy.exit_time = p["exit"]

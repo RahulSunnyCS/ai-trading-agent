@@ -24,6 +24,10 @@ name, as "Steady (A)", so an entry can be matched to the journal.
 
 The screen is one page, in the order you read it:
 
+- **The evening run bar** — at the top. It shows whether a Fyers login is valid (the run uses Angel
+  One when it is not), when the run last finished, a *Run* button, and under *Options & log*
+  the Day field, *Collect data first* and *Send summary to Telegram*. The run is also scheduled at
+  15:45 on trading days; this bar is for running it by hand or seeing how the last one went.
 - **The three lists and the headline** — forward-test status, a card for each list, the headline
   numbers, the verdict, the cumulative chart and today's baskets. Before the first scored day it
   shows the next entry instead of reserving a large empty chart area.

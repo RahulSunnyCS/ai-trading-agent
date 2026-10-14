@@ -1,4 +1,4 @@
-"""BL-102: the numpy CSCV in research/bl102/robust.py reproduces analytics/overfit.run_cscv."""
+"""BL-104: the numpy CSCV in research/bl104/robust.py reproduces analytics/overfit.run_cscv."""
 
 from __future__ import annotations
 
@@ -14,14 +14,14 @@ import pytest
 from option_backtesting.analytics.overfit import run_cscv
 from option_backtesting.analytics.sweep import SweepReport
 
-ROBUST_PY = Path(__file__).resolve().parents[2] / "research" / "bl102" / "robust.py"
+ROBUST_PY = Path(__file__).resolve().parents[2] / "research" / "bl104" / "robust.py"
 
 
 def _load():
-    spec = importlib.util.spec_from_file_location("bl102_robust", ROBUST_PY)
+    spec = importlib.util.spec_from_file_location("bl104_robust", ROBUST_PY)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
-    sys.modules["bl102_robust"] = module
+    sys.modules["bl104_robust"] = module
     spec.loader.exec_module(module)
     return module
 
@@ -61,9 +61,17 @@ def test_cscv_rejects_bad_shapes() -> None:
 
 
 def test_half_years_and_ulcer() -> None:
-    days = [date(2024, 10, 9), date(2025, 2, 3), date(2025, 6, 2), date(2025, 11, 3), date(2026, 5, 4)]
+    days = [
+        date(2024, 10, 9),
+        date(2025, 2, 3),
+        date(2025, 6, 2),
+        date(2025, 11, 3),
+        date(2026, 5, 4),
+    ]
     values = np.array([100.0, -50.0, 200.0, -300.0, 400.0])
     halves = robust.half_years(days, values)
     assert [h["n_days"] for h in halves] == [2, 1, 1, 1]
     assert halves[0]["avg_day_inr"] == pytest.approx(25.0)
-    assert robust.ulcer(np.array([100.0, -100.0, 100.0])) == pytest.approx(np.sqrt((0 + 100**2 + 0) / 3))
+    assert robust.ulcer(np.array([100.0, -100.0, 100.0])) == pytest.approx(
+        np.sqrt((0 + 100**2 + 0) / 3)
+    )

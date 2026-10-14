@@ -14,7 +14,7 @@ when it is back.
 | Column | Meaning |
 |---|---|
 | Job | Its id, such as `options-daily`. |
-| Schedule | When it runs, in IST: "trading days 16:15", "Fri 14:40", "1st Sunday of the month 10:00". |
+| Schedule | When it runs, in IST: "trading days 15:45", "Fri 14:40", "1st Sunday of the month 10:00". |
 | Next run, Last run | When it will run next; when it last ran and whether it succeeded. |
 | Group | Jobs in the same group never run at the same time (for example, two jobs that write the same data). |
 | Needs | What it depends on, such as the laptop or a broker login. |

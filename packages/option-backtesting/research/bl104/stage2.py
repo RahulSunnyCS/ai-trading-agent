@@ -1,4 +1,4 @@
-"""BL-102 Stage 2: is the winning plateau flat? (backlog/BL-102 Phase 2)
+"""BL-104 Stage 2: is the winning plateau flat? (backlog/BL-104 Phase 2)
 
 generate   from `results/<stage1>/<family>_band_winners.csv`, the top band candidate of each
            index x band and, at each of the band's slots, its one-change neighbourhood with
@@ -11,9 +11,9 @@ generate   from `results/<stage1>/<family>_band_winners.csv`, the top band candi
 evaluate   after the run: the neighbourhood's median Martin against the winner's, pooled over
            the band's slots; below 70 % the winner is "fragile" (rule 3) and the template stays.
 
-uv run python research/bl102/stage2.py generate --stage1 stage1 --tag stage2
-uv run python research/bl102/run_grid.py --cells research/bl102/results/stage2/cells.json --tag stage2
-uv run python research/bl102/stage2.py evaluate --tag stage2
+uv run python research/bl104/stage2.py generate --stage1 stage1 --tag stage2
+uv run python research/bl104/run_grid.py --cells research/bl104/results/stage2/cells.json --tag stage2
+uv run python research/bl104/stage2.py evaluate --tag stage2
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ import grid  # noqa: E402
 RESULTS = HERE / "results"
 FLAT_RATIO = 0.70
 
-# The registered Stage-2 values (backlog/BL-102 Phase 2), one change at a time from the winner:
+# The registered Stage-2 values (backlog/BL-104 Phase 2), one change at a time from the winner:
 #   between  — in-between values: the ones adjacent to the winner in the merged coarse+fine order
 #   delta    — the winner's value +- d, kept only inside the Stage-1 range
 #   each     — every listed value, tried as it is

@@ -87,9 +87,8 @@ class TestLotSize:
 
 
 class TestMargin:
-    """margin.csv carries two committed rows, both effective 2026-08: NIFTY/short-straddle at
-    140000/lot and SENSEX/short-straddle at 130000/lot (BL-102, nominal until the owner confirms
-    it against a broker's margin calculator)."""
+    """margin.csv currently carries one committed row: NIFTY/short-straddle
+    effective 2026-08 at 140000/lot."""
 
     def test_nifty_short_straddle_current_month(self, rd: ReferenceData) -> None:
         assert rd.margin_per_lot("NIFTY", "short-straddle", date(2026, 9, 1)) == 140000
@@ -104,12 +103,9 @@ class TestMargin:
         with pytest.raises(ValueError, match="No margin row"):
             rd.margin_per_lot("NIFTY", "short-straddle", date(2026, 1, 1))
 
-    def test_sensex_short_straddle_current_month(self, rd: ReferenceData) -> None:
-        assert rd.margin_per_lot("SENSEX", "short-straddle", date(2026, 9, 1)) == 130000
-
     def test_unknown_underlying_raises(self, rd: ReferenceData) -> None:
         with pytest.raises(ValueError, match="No margin row"):
-            rd.margin_per_lot("BANKNIFTY", "short-straddle", date(2026, 9, 1))
+            rd.margin_per_lot("SENSEX", "short-straddle", date(2026, 9, 1))
 
     def test_unknown_strategy_type_raises(self, rd: ReferenceData) -> None:
         with pytest.raises(ValueError, match="No margin row"):

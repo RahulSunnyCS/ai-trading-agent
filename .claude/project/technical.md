@@ -275,7 +275,7 @@ ai-trading-agent/
 │       ├── e2e/                     # Playwright specs
 │       └── src/                     # App.tsx, components/, hooks/, lib/, store/, types/
 │                                     # components/optionslab/ + hooks/useBacktest*.ts, useLegwise*.ts — Options
-│                                     # Lab (Strategies, Builder with Form | YAML modes, Runs, Daily results,
+│                                     # Lab (Strategies, Builder with Form | YAML modes, Runs,
 │                                     # Regimes); the YAML engine's tab (M-4) is now the Builder's YAML mode.
 │                                     # Fed entirely through /api/backtest/* (never the Python service directly)
 └── packages/
