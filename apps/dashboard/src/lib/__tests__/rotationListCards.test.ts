@@ -3,12 +3,19 @@ import { describe, expect, it } from 'vitest';
 import type { RotationSummary } from '../../types/rotation';
 import { CARD_KEYS, listCards } from '../rotationListCards';
 
+// vs the base is the list's per-lot-day minus the base's (100), so a stop carries through.
 const stats = (total: number, dd: number, vs: number) =>
-  ({ total, max_drawdown: dd, vs_base: { mean: vs, lower: 0, upper: 0 } }) as never;
+  ({
+    total,
+    max_drawdown: dd,
+    per_lot_day: 100 + vs,
+    vs_base: { mean: 0, lower: 0, upper: 0 },
+  }) as never;
 
 function summary(over: Partial<RotationSummary> = {}): RotationSummary {
   return {
     n_days: 3,
+    base: { per_lot_day: 100 },
     first_day: '2026-10-12',
     last_day: '2026-10-14',
     lists: {
@@ -41,7 +48,6 @@ describe('listCards', () => {
     expect(a?.vsBase).toBe(1062);
     expect(b?.maxDrawdown).toBe(-8708);
     expect(b?.vsBase).toBe(-300);
-    expect(a?.days).toBe(3);
   });
 
   it('treats a real zero as a value, not as missing', () => {

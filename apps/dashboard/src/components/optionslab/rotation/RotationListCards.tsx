@@ -8,13 +8,13 @@
  */
 
 import { cn } from '../../../lib/cn';
-import { formatDay, formatInr } from '../../../lib/format';
+import { EMPTY, formatDay, formatInr } from '../../../lib/format';
 import { type ListCard, listCards } from '../../../lib/rotationListCards';
 import type { RotationBasket, RotationListKey, RotationSummary } from '../../../types/rotation';
+import { pnlClass } from '../shared';
 
 function tone(value: number | null): string {
-  if (value === null || value === 0) return 'text-foreground';
-  return value > 0 ? 'text-positive' : 'text-negative';
+  return value === null ? 'text-foreground' : pnlClass(value);
 }
 
 function Figure({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -26,15 +26,18 @@ function Figure({ label, value, hint }: { label: string; value: string; hint?: s
   );
 }
 
-function Card({
+function ListCardView({
   card,
   focused,
   basket,
+  picksTitle,
   onFocus,
 }: {
   card: ListCard;
   focused: boolean;
   basket: RotationBasket | undefined;
+  /** "Today's 3 picks", or the day they were recorded when that is not today. */
+  picksTitle: (count: number) => string;
   onFocus: () => void;
 }) {
   const picks = basket ? [...basket.core, ...basket.buy] : [];
@@ -64,31 +67,30 @@ function Card({
           {card.latest ? `Latest scored day, ${formatDay(card.latest.day)}` : 'Latest scored day'}
         </div>
         <div className={cn('metric text-xl font-semibold', tone(card.latest?.total ?? null))}>
-          {card.latest ? formatInr(card.latest.total, { sign: true }) : '—'}
+          {formatInr(card.latest?.total ?? null, { sign: true })}
         </div>
       </div>
 
       <dl className="space-y-1">
         <Figure
           label="Since the first day"
-          value={card.total === null ? '—' : formatInr(card.total, { sign: true })}
+          value={formatInr(card.total, { sign: true })}
           hint="Gross, two lots a strategy, over the scored forward days."
         />
-        <Figure
-          label="Max drawdown"
-          value={card.maxDrawdown === null ? '—' : formatInr(card.maxDrawdown)}
-        />
+        <Figure label="Max drawdown" value={formatInr(card.maxDrawdown)} />
         <Figure
           label="Against the fixed base"
-          value={card.vsBase === null ? '—' : `${formatInr(card.vsBase, { sign: true })} / lot-day`}
-          hint="The mean daily gap per lot, the list minus the fixed base. Too few days to read until the read-out."
+          value={
+            card.vsBase === null ? EMPTY : `${formatInr(card.vsBase, { sign: true })} / lot-day`
+          }
+          hint="The mean daily gap per lot, the list minus the fixed base. A description of the days so far, not a verdict: the registered read-out is at 60 sessions."
         />
       </dl>
 
       {picks.length > 0 ? (
         <details className="border-t border-border pt-2 text-xs">
           <summary className="cursor-pointer text-muted hover:text-foreground">
-            Today's {picks.length} picks
+            {picksTitle(picks.length)}
           </summary>
           <ul className="mt-1 space-y-0.5 font-mono text-[11px] text-foreground">
             {picks.map((p) => (
@@ -107,23 +109,35 @@ function Card({
 export function RotationListCards({
   summary,
   baskets,
+  entryDay,
+  today,
   focus,
   onFocus,
 }: {
   summary: RotationSummary | null;
   baskets: Partial<Record<RotationListKey, RotationBasket>> | undefined;
+  /** The day those baskets were recorded for, and today (IST): picks are "today's" only when equal. */
+  entryDay: string | null;
+  today: string;
   focus: RotationListKey;
   onFocus: (key: RotationListKey) => void;
 }) {
   const cards = listCards(summary);
+  const picksTitle = (count: number) =>
+    entryDay === today
+      ? `Today's ${count} picks`
+      : entryDay
+        ? `${count} picks recorded for ${formatDay(entryDay)}`
+        : `${count} picks`;
   return (
-    <div className="grid gap-3 md:grid-cols-3" aria-label="The three rotation lists">
+    <div className="grid gap-4 lg:grid-cols-3">
       {cards.map((card) => (
-        <Card
+        <ListCardView
           key={card.key}
           card={card}
           focused={card.key === focus}
           basket={baskets?.[card.key]}
+          picksTitle={picksTitle}
           onFocus={() => onFocus(card.key)}
         />
       ))}

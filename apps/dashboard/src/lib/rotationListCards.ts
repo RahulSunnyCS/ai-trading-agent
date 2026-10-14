@@ -22,10 +22,12 @@ export interface ListCard {
   /** Gross since the first scored forward day; null before there is one. */
   total: number | null;
   maxDrawdown: number | null;
-  /** Mean daily gap to the fixed base, per lot-day, and whether the registered rule is met. */
+  /**
+   * Mean daily gap to the fixed base, per lot-day: the list's own per-lot-day figure minus the
+   * base's. Worked out here, from the same figures as the headline, so it follows a portfolio
+   * stop when one is applied (the read-out's `vs_base` interval stays on the registered basis).
+   */
   vsBase: number | null;
-  /** Scored forward days behind these figures. */
-  days: number;
 }
 
 function latestOf(summary: RotationSummary, key: RotationListKey) {
@@ -51,8 +53,8 @@ export function listCards(summary: RotationSummary | null): ListCard[] {
       latest: summary && scored ? latestOf(summary, key) : null,
       total: stats && scored ? stats.total : null,
       maxDrawdown: stats && scored ? stats.max_drawdown : null,
-      vsBase: stats && scored ? stats.vs_base.mean : null,
-      days: summary?.n_days ?? 0,
+      vsBase:
+        stats && scored && summary?.base ? stats.per_lot_day - summary.base.per_lot_day : null,
     };
   });
 }

@@ -277,6 +277,8 @@ export function RotationPanel() {
               <RotationListCards
                 summary={shown_s}
                 baskets={overview.data?.baskets.lists}
+                entryDay={overview.data?.baskets.entry?.day ?? null}
+                today={istToday()}
                 focus={focus}
                 onFocus={setFocus}
               />
