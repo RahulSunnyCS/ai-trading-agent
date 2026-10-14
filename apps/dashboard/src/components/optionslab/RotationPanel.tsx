@@ -3,9 +3,11 @@
  * Baseline REF) are doing on days nobody had seen, against Baseline, the owner's fixed base and random baskets, and whether today's data can
  * be trusted (BL-058 Phase 4).
  *
- * Overview is the short daily surface: health/read-out, the current baskets, and the headline
- * and chart once a forward session has been scored. Journal and Research are intentional drill-down
- * modes, so their heavier widgets are not mounted while Overview is selected.
+ * One page, in reading order (BL-102): the list cards, health/read-out, the headline, chart and
+ * current baskets once a forward session has been scored; then What happened (the day log),
+ * Is the rule still working? and Experiments. The diagnostics sit in closed accordions that mount
+ * their widget only when opened, so the page stays light. The bands do not wait for the read-out:
+ * the day log loads alongside it.
  *
  * Gross only: the stored costs are zero. Lists are alternative baskets and are never added up.
  * Nothing on this page changes a list, a weight or the journal.
@@ -308,64 +310,71 @@ export function RotationPanel() {
               ) : null}
             </>
           )}
-          <section aria-label="What happened" className="space-y-3">
-            <header>
-              <h3 className="text-base font-semibold tracking-tight text-foreground">
-                What happened
-              </h3>
-              <p className="mt-0.5 text-sm text-muted">
-                What each list picked, what happened afterwards, and where the risk came from.
-              </p>
-            </header>
-            <RotationDailyLog focus={focus} portfolio={portfolio} />
-            <Accordion
-              title="Drawdowns and selection drift"
-              description="How deep the falls were, and what the list has been holding"
-              defaultOpen={false}
-            >
-              <RotationDrawdowns list={focus} portfolio={portfolio} />
-              <RotationDrift list={focus} />
-            </Accordion>
-          </section>
-
-          <section aria-label="Is the rule still working?" className="space-y-3">
-            <header>
-              <h3 className="text-base font-semibold tracking-tight text-foreground">
-                Is the rule still working?
-              </h3>
-              <p className="mt-0.5 text-sm text-muted">
-                Diagnostics for the ranking and its forward behaviour. Open only what you need; each
-                loads when opened.
-              </p>
-            </header>
-            <Accordion
-              title="Why these picks, and is morning short-premium working?"
-              description="The family pulse, a pick criterion by criterion, and rank correlation"
-              defaultOpen={false}
-            >
-              <RotationPulse focus={focus} />
-              <RotationExplain list={focus} onList={setFocus} />
-            </Accordion>
-            <Accordion
-              title="What market did the forward days test?"
-              description="Forward days versus the research periods"
-              defaultOpen={false}
-            >
-              <RotationRegime />
-            </Accordion>
-          </section>
-
-          <section aria-label="Experiments" className="space-y-3">
-            <Accordion
-              title="Ideas being watched"
-              description="Unregistered candidates and trigger studies, each against what it replaced"
-              defaultOpen={false}
-            >
-              <RotationShadowScoreboard />
-            </Accordion>
-          </section>
         </>
       )}
+
+      <section aria-labelledby="band-happened" className="space-y-3">
+        <header>
+          <h2 id="band-happened" className="text-base font-semibold tracking-tight text-foreground">
+            What happened
+          </h2>
+          <p className="mt-0.5 text-sm text-muted">
+            What each list picked, what happened afterwards, and where the risk came from.
+          </p>
+        </header>
+        <RotationDailyLog focus={focus} portfolio={portfolio} />
+        <Accordion
+          title="Drawdowns and selection drift"
+          description="How deep the falls were, and what the list has been holding"
+          defaultOpen={false}
+        >
+          <RotationDrawdowns list={focus} portfolio={portfolio} />
+          <RotationDrift list={focus} />
+        </Accordion>
+      </section>
+
+      <section aria-labelledby="band-working" className="space-y-3">
+        <header>
+          <h2 id="band-working" className="text-base font-semibold tracking-tight text-foreground">
+            Is the rule still working?
+          </h2>
+          <p className="mt-0.5 text-sm text-muted">
+            Diagnostics for the ranking and its forward behaviour. Open only what you need; each
+            loads when opened.
+          </p>
+        </header>
+        <Accordion
+          title="Why these picks, and is morning short-premium working?"
+          description="The family pulse, a pick criterion by criterion, and rank correlation"
+          defaultOpen={false}
+        >
+          <RotationPulse focus={focus} />
+          <RotationExplain list={focus} onList={setFocus} />
+        </Accordion>
+        <Accordion
+          title="What market did the forward days test?"
+          description="Forward days versus the research periods"
+          defaultOpen={false}
+        >
+          <RotationRegime />
+        </Accordion>
+      </section>
+
+      <section aria-labelledby="band-experiments" className="space-y-3">
+        <h2
+          id="band-experiments"
+          className="text-base font-semibold tracking-tight text-foreground"
+        >
+          Experiments
+        </h2>
+        <Accordion
+          title="Ideas being watched"
+          description="Unregistered candidates and trigger studies, each against what it replaced"
+          defaultOpen={false}
+        >
+          <RotationShadowScoreboard />
+        </Accordion>
+      </section>
     </div>
   );
 }

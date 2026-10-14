@@ -146,6 +146,14 @@ describe('RotationPanel as one page', () => {
     expect(screen.getByRole('heading', { name: 'Is the rule still working?' })).toBeTruthy();
   });
 
+  it('loads the day log and the bands without waiting for the read-out', () => {
+    mocks.summary = null; // still loading
+    render(<RotationPanel />);
+    expect(screen.getByTestId('DailyLog')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'What happened' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Experiments' })).toBeTruthy();
+  });
+
   it('ignores the old ?rotationView= address', () => {
     window.history.replaceState(null, '', '/optionslab/rotation?rotationView=research');
     render(<RotationPanel />);
