@@ -4,7 +4,7 @@
  *
  *   /overview
  *   /live  /trades  /personalities  /pnl  /regime
- *   /optionslab/{rotation|heatmap|matrix|correlation|regimes|strategies|builder|runs}
+ *   /optionslab/{rotation|heatmap|matrix|correlation|strategies|builder|runs|regimes}
  *   /optionslab/builder/yaml        (the builder's YAML mode; /optionslab/builder is the form)
  *   /momentum/{backtest|scores|saved|week|rebalance|journal} (old /momentum/weekly redirects)
  *   /momentum/backtest/{etf|stock|custom_index|broad}
@@ -46,7 +46,7 @@ const TAB_BY_SEGMENT = new Map<string, Tab>(
 
 /**
  * In display order, workspace by workspace (BL-102): Today, then Explore data, then Build and
- * test. Must match the Options Lab nav item's children (a test checks it). Daily results is not
+ * test, then Advanced (Regimes). Must match the Options Lab nav item's children (a test checks it). Daily results is not
  * one: its page was retired and `/optionslab/results` redirects to Today (PATH_ALIASES), where
  * the evening run's status and Run button now are.
  */
@@ -55,10 +55,10 @@ export const OPTIONS_LAB_SECTIONS = [
   'heatmap',
   'matrix',
   'correlation',
-  'regimes',
   'strategies',
   'builder',
   'runs',
+  'regimes',
 ] as const;
 export type OptionsLabSection = (typeof OPTIONS_LAB_SECTIONS)[number];
 

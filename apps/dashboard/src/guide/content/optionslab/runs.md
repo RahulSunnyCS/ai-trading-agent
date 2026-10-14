@@ -1,6 +1,6 @@
 ## What it is for
 
-Every backtest run, from the Builder, the YAML mode and the evening run, in one list, and a side-by-side
+Every backtest run, from the Builder, the YAML engine and the evening run, in one list, and a side-by-side
 comparison of any two.
 
 ## The controls

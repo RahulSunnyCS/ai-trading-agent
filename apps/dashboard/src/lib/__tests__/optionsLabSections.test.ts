@@ -36,7 +36,7 @@ describe('Options Lab section metadata', () => {
         seen.push(String(group));
       }
     }
-    expect(seen).toEqual(['Today', 'Explore data', 'Build and test']);
+    expect(seen).toEqual(['Today', 'Explore data', 'Build and test', 'Advanced']);
   });
 
   it('lists every section in the sidebar, and no retired one', () => {

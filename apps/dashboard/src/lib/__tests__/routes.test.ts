@@ -162,10 +162,10 @@ describe('routes', () => {
       'heatmap',
       'matrix',
       'correlation',
-      'regimes',
       'strategies',
       'builder',
       'runs',
+      'regimes',
     ]);
   });
 
