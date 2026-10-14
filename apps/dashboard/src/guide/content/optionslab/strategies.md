@@ -25,4 +25,4 @@ the new version's results for every collected day.
 
 ## What it does not tell you
 
-How the strategy did day by day. That is [Daily results](guide:optionslab/daily-results).
+How the strategy did day by day. That is [Runs](guide:optionslab/runs): filter it to the strategy.

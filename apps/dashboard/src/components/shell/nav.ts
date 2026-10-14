@@ -46,7 +46,7 @@ export interface NavChild {
   group?: string;
   /**
    * Reachable by URL and still a valid sub-route, but not listed in the sidebar (Options Lab's
-   * Daily results, hidden in BL-102; its links and Guide walkthroughs keep working).
+   * a page kept out of the sidebar but still routed).
    */
   hidden?: boolean;
 }
@@ -132,7 +132,6 @@ export const NAV_GROUPS: NavGroup[] = [
           { segment: 'strategies', label: 'Strategies', group: 'Build and test' },
           { segment: 'builder', label: 'Builder', group: 'Build and test' },
           { segment: 'runs', label: 'Runs', group: 'Build and test' },
-          { segment: 'results', label: 'Daily results', group: 'Build and test', hidden: true },
         ],
       },
     ],

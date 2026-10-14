@@ -158,4 +158,9 @@ None open; the owner answered them on 2026-10-14 (Log).
   with the pulse); the Builder's backtest settings are inside the Run panel, not a popover on the
   button; lot size (`execution.lot_sizing`) is not exposed yet; a Family-pulse link to the Matrix
   and back lands on Today with the accordions closed (the open accordion is not in the URL).
+- 2026-10-15 — Daily results retired as planned: `/optionslab/results` redirects to Today (PATH_ALIASES),
+  Today carries the evening run's status and Run button (`EveningRunBar`), and the page's
+  components (ResultsPanel, ComparisonTable, DayGrid, DayTypeCard, PnlScatter) and two Guide pages
+  (daily-results, walkthrough-losing-days) are deleted; DayForensics and the anatomy chips stay,
+  used by the day log.
 

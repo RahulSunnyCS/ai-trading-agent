@@ -30,7 +30,7 @@ build and test.
 | Build and test | [Builder](app:/optionslab/builder) | Build a strategy leg by leg, backtest it over a date range, save it. A YAML mode writes strategies as text instead. [Guide](guide:optionslab/builder-form) |
 | Build and test | [Runs](app:/optionslab/runs) | Every backtest run in one list; tick two to compare. [Guide](guide:optionslab/runs) |
 
-[Daily results](app:/optionslab/results) is no longer in the sidebar; the page is still there. [Guide](guide:optionslab/daily-results)
+The evening run's status and its **Run** button are at the top of Today.
 
 ## Momentum
 

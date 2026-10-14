@@ -17,8 +17,8 @@
  *   - Builder: Form (the leg-wise strategy builder) or YAML (the YAML DSL engine, which
  *     was the standalone Backtest tab; /backtest redirects to /optionslab/builder/yaml).
  *   - Runs: the YAML run registry and the leg-wise runs in one list, clickable and comparable.
- *  Hidden from the sidebar, still reachable at /optionslab/results:
- *   - Daily results: saved `obt daily` results, the evening run button, trade logs.
+ *  Retired: Daily results (saved `obt daily` results, trade logs). `/optionslab/results` redirects
+ *  to Today, whose status bar carries the evening run and its Run button.
  *
  * /optionslab with no section opens Today (the rotation page).
  */
@@ -35,7 +35,6 @@ import {
 import { CorrelationPanel } from './optionslab/CorrelationPanel';
 import { HeatmapPanel } from './optionslab/HeatmapPanel';
 import { RegimesPanel } from './optionslab/RegimesPanel';
-import { ResultsPanel } from './optionslab/ResultsPanel';
 import { RotationMatrixPanel } from './optionslab/RotationMatrixPanel';
 import { RotationPanel } from './optionslab/RotationPanel';
 import { RunsPanel } from './optionslab/RunsPanel';
@@ -97,7 +96,6 @@ export function OptionsLabView() {
         />
       )}
       {section === 'runs' && <RunsPanel />}
-      {section === 'results' && <ResultsPanel />}
       {section === 'regimes' && <RegimesPanel />}
       {section === 'correlation' && <CorrelationPanel />}
       {section === 'rotation' && <RotationPanel />}

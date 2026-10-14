@@ -69,5 +69,5 @@ what your last change did.
 ## What it does not tell you
 
 Whether the strategy suits the kind of market coming next. Use
-[Daily results](guide:optionslab/daily-results) and [Regimes](guide:optionslab/regimes) to see
-*which* days it made and lost money on.
+[Runs](guide:optionslab/runs) and [Regimes](guide:optionslab/regimes) to see *which* days it made
+and lost money on.

@@ -35,7 +35,6 @@ import opsSettings from './content/operations/settings.md?raw';
 import optionsBuilderForm from './content/optionslab/builder-form.md?raw';
 import optionsBuilderYaml from './content/optionslab/builder-yaml.md?raw';
 import optionsCorrelation from './content/optionslab/correlation.md?raw';
-import optionsDailyResults from './content/optionslab/daily-results.md?raw';
 import optionsHeatmap from './content/optionslab/heatmap.md?raw';
 import optionsHowItWorks from './content/optionslab/how-it-works.md?raw';
 import optionsRegimes from './content/optionslab/regimes.md?raw';
@@ -50,7 +49,6 @@ import optionsRotationShadow from './content/optionslab/rotation-shadow.md?raw';
 import optionsRotation from './content/optionslab/rotation.md?raw';
 import optionsRuns from './content/optionslab/runs.md?raw';
 import optionsStrategies from './content/optionslab/strategies.md?raw';
-import optionsLosingDays from './content/optionslab/walkthrough-losing-days.md?raw';
 import optionsShortStraddle from './content/optionslab/walkthrough-short-straddle.md?raw';
 import startAlerts from './content/start/alerts.md?raw';
 import startDailyRoutine from './content/start/daily-routine.md?raw';
@@ -284,15 +282,6 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
   },
   {
     chapter: 'optionslab',
-    slug: 'daily-results',
-    title: 'Daily results',
-    summary: 'How each saved strategy did on every collected day, with a minute-by-minute replay.',
-    kind: 'Screen',
-    body: optionsDailyResults,
-    screen: { tab: 'optionslab', rest: ['results'] },
-  },
-  {
-    chapter: 'optionslab',
     slug: 'regimes',
     title: 'Regimes',
     summary: 'Label each day Quiet, Chop or Trend, and see whether those labels persist.',
@@ -403,14 +392,6 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     summary: 'From the template to a saved strategy the evening run will track.',
     kind: 'Walkthrough',
     body: optionsShortStraddle,
-  },
-  {
-    chapter: 'optionslab',
-    slug: 'walkthrough-losing-days',
-    title: 'Walkthrough: find the days a strategy loses on',
-    summary: 'Use the day grid, the replay and the day-type card to understand bad days.',
-    kind: 'Walkthrough',
-    body: optionsLosingDays,
   },
 
   // ---- Data & operations ---------------------------------------------------------------
