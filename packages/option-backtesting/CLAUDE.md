@@ -134,6 +134,10 @@ Otherwise:
   sends Steady / Calendar / Adaptive after the evening pipeline finishes (normally around 16:00).
   A per-entry marker prevents a retry from sending it twice;
   `obt rotation result --force` explicitly resends it.
+  `rotation/tomorrow.py` appends a "Tomorrow" section to that message (`--no-tomorrow` drops it): for the
+  next session's weekday and days to expiry, the win rate and mean per-lot-day gross of Steady / Calendar /
+  Adaptive on similar days of the stored history (daylog, since 2025-01-10; thin samples flagged, a failure
+  never blocks the result). A historical frequency, not a forecast: gap, opening range and VIX are unknown at 16:00.
 - `api/legwise_routes.py` — `/legwise/*` on `obt-api` for the dashboard's Options Lab: `/day` and `/anatomy` (see above; `/anatomy` also overlays apps/server's T-33 `daily_regime_tags` as `t33` when `DATABASE_URL` is set in this process, with an explicit status), list/
   validate/save strategies (slug-checked name, `yaml.safe_dump` of the validated model — never
   raw client text), ad-hoc backtest over collected days, saved results, data/token status, and
