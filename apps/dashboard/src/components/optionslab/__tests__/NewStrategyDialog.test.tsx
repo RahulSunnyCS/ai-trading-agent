@@ -41,6 +41,19 @@ describe('NewStrategyDialog helpers', () => {
     ]);
   });
 
+  it('counts a strategy as starred by its id as well as its file name', () => {
+    const renamed = {
+      name: 'file_name',
+      sha: 'abc',
+      strategy: { id: 'the_id', underlying: 'NIFTY', legs: [] },
+    } as unknown as SavedStrategy;
+    const rows = copyOptions([saved('zzz'), renamed], new Set(['the_id']));
+    expect(rows).toEqual([
+      { name: 'file_name', starred: true },
+      { name: 'zzz', starred: false },
+    ]);
+  });
+
   it('reads a premium only when it is a positive amount', () => {
     expect(parsePremium('65')).toBe(65);
     expect(parsePremium(' 72.5 ')).toBe(72.5);

@@ -28,16 +28,19 @@ type Choice = TemplateId | 'copy' | 'blank';
 const COPY_VALUE = 'copy';
 const BLANK_VALUE = 'blank';
 
-/** Strategies to copy from: the starred ones first, then the rest, each group by name. */
+/**
+ * Strategies to copy from: the starred ones first, then the rest, each group by name. A star is
+ * kept under the strategy's id (what Correlation names it), which can differ from its file name,
+ * so either counts.
+ */
 export function copyOptions(
   saved: readonly SavedStrategy[],
   starred: ReadonlySet<string>,
 ): { name: string; starred: boolean }[] {
-  const names = [...saved.map((s) => s.name)].sort((a, b) => a.localeCompare(b));
-  return [
-    ...names.filter((n) => starred.has(n)).map((name) => ({ name, starred: true })),
-    ...names.filter((n) => !starred.has(n)).map((name) => ({ name, starred: false })),
-  ];
+  const rows = saved
+    .map((s) => ({ name: s.name, starred: starred.has(s.strategy.id) || starred.has(s.name) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return [...rows.filter((r) => r.starred), ...rows.filter((r) => !r.starred)];
 }
 
 /** The premium typed in, as a number; null when it is not a positive amount. */
