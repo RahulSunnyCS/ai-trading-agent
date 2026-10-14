@@ -9,8 +9,8 @@ backtesting and saving happen in the [Builder](guide:optionslab/builder-form).
 
 A basket is a rotation list: every morning at 09:16 it picks three strategies and a Buy from the
 rotation variants, before the market opens. Each card shows the list's name and what it leans on,
-its forward result since the first recorded day (gross, two lots per strategy), its largest
-drawdown, and its weights (own results, weekday, days to expiry, VIX, family).
+its forward result since the first scored day (gross, two lots per strategy, without a portfolio
+stop), its largest drawdown, and its weights (own results, weekday, days to expiry, VIX, family).
 
 | Basket | What it leans on |
 |---|---|
@@ -30,11 +30,11 @@ basket with your other starred items.
 
 | Column | Meaning |
 |---|---|
-| Star | Mark it as a favourite. Saved on the server, so it follows you to any device. |
+| Star | Mark it as a favourite. Saved on the server, so it follows you to any device. Starring waits until your stars have loaded. |
 | Strategy | The strategy file's name, its index, and its id when that differs. Hover for the version. |
 | Legs | How many legs, what they are, and the entry and exit times. |
 | Last result | Net ₹ per lot over every saved day of this version, after costs ([net vs gross](glossary:net-gross)), with the number of up days and the last day. |
-| Actions | **Open in builder** loads it to edit or re-test; **Correlate** compares it with your other starred items; **View results** opens [Runs](guide:optionslab/runs) filtered to this strategy. |
+| Actions | **Open in builder** loads it to edit or re-test; **Correlate** compares it with your other starred items (not offered while it has no saved result for its current version); **View results** opens [Runs](guide:optionslab/runs) filtered to this strategy. |
 
 **Starred only** narrows both the baskets and the strategies to your favourites.
 

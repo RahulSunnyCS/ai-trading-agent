@@ -4,11 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   strategies: [] as unknown[],
+  results: [] as unknown[],
   starred: { lists: ['A'] as string[], strategies: ['nifty_buy_range_breakout'] as string[] },
   loaded: true,
   toggleList: vi.fn(),
   toggleStrategy: vi.fn(),
   summary: null as unknown,
+  summaryError: null as string | null,
 }));
 
 vi.mock('../../../hooks/useFavourites', () => ({
@@ -33,7 +35,7 @@ vi.mock('../../../hooks/useLegwise', () => ({
     refetch: () => undefined,
   }),
   useLegwiseResults: () => ({
-    data: { results: [] },
+    data: { results: mocks.results },
     loading: false,
     error: null,
     refetch: () => undefined,
@@ -49,7 +51,7 @@ vi.mock('../../../hooks/useRotation', () => ({
   useRotationSummary: () => ({
     data: mocks.summary,
     loading: false,
-    error: null,
+    error: mocks.summaryError,
     refetch: () => undefined,
   }),
 }));
@@ -90,7 +92,27 @@ function strategy(name: string, sha = 'abcdef1234') {
   };
 }
 
+const result = (id: string) => ({
+  run_id: `daily:${id}`,
+  strategy_id: id,
+  strategy_sha: 'abcdef1234',
+  day: '2026-10-14',
+  gross: 120,
+  costs: 20,
+  net: 100,
+  worst_mtm: -50,
+  best_mtm: 150,
+  stopped_by: '',
+  notes: [],
+  current: true,
+});
+
 beforeEach(() => {
+  mocks.results = [
+    result('nifty_buy_range_breakout'),
+    result('nifty_widesl_917_otm1'),
+    result('sensex_widesl_917_otm2'),
+  ];
   mocks.strategies = [
     strategy('nifty_buy_range_breakout'),
     strategy('nifty_widesl_917_otm1'),
@@ -98,6 +120,7 @@ beforeEach(() => {
   ];
   mocks.starred = { lists: ['A'], strategies: ['nifty_buy_range_breakout'] };
   mocks.loaded = true;
+  mocks.summaryError = null;
   mocks.toggleList.mockClear();
   mocks.toggleStrategy.mockClear();
   mocks.summary = {
@@ -179,5 +202,56 @@ describe('StrategiesAndBasketsPanel', () => {
     render(<StrategiesAndBasketsPanel />);
     const row = screen.getByText('nifty_widesl_917_otm1').closest('tr') as HTMLElement;
     expect(within(row).getByRole('button', { name: 'Correlate' })).toHaveProperty('disabled', true);
+  });
+
+  it('stars and correlates by strategy id, which is what Correlation names its series', () => {
+    mocks.strategies = [
+      {
+        ...strategy('file_name_one'),
+        strategy: { ...strategy('x').strategy, id: 'the_strategy_id' },
+      },
+    ];
+    mocks.results = [result('the_strategy_id')];
+    mocks.starred = { lists: [], strategies: ['the_strategy_id'] };
+    render(<StrategiesAndBasketsPanel />);
+    const row = screen.getByText('file_name_one').closest('tr') as HTMLElement;
+    // Starred because its id is, even though its file name is not in the set.
+    expect(
+      within(row).getByRole('button', { name: 'Remove the star from file_name_one' }),
+    ).toBeTruthy();
+    fireEvent.click(within(row).getByRole('button', { name: 'Correlate' }));
+    expect(new URLSearchParams(window.location.search).get('names')).toBe('the_strategy_id,list:A');
+    fireEvent.click(within(row).getByRole('button', { name: /Remove the star from/ }));
+    expect(mocks.toggleStrategy).toHaveBeenCalledWith('the_strategy_id');
+  });
+
+  it('does not offer Correlate for a strategy with no result for its current version', () => {
+    mocks.results = [];
+    render(<StrategiesAndBasketsPanel />);
+    const row = screen.getByText('nifty_widesl_917_otm1').closest('tr') as HTMLElement;
+    expect(within(row).getByRole('button', { name: 'Correlate' })).toHaveProperty('disabled', true);
+  });
+
+  it('waits for the stars instead of saying nothing is starred', () => {
+    mocks.loaded = false;
+    render(<StrategiesAndBasketsPanel />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Starred only' }));
+    expect(screen.queryByText('No basket is starred')).toBeNull();
+    expect(screen.queryByText('No strategy is starred')).toBeNull();
+    // And nothing can be starred or correlated before they are there.
+    fireEvent.click(screen.getByRole('radio', { name: 'All' }));
+    expect(screen.getByRole('button', { name: 'Star Calendar' })).toHaveProperty('disabled', true);
+    expect(
+      within(screen.getByRole('region', { name: 'Steady basket' })).getByRole('button', {
+        name: 'Correlate',
+      }),
+    ).toHaveProperty('disabled', true);
+  });
+
+  it('says when the forward figures could not be read, rather than showing dashes quietly', () => {
+    mocks.summary = null;
+    mocks.summaryError = 'HTTP 500';
+    render(<StrategiesAndBasketsPanel />);
+    expect(screen.getByText(/The forward figures could not be read \(HTTP 500\)/)).toBeTruthy();
   });
 });
