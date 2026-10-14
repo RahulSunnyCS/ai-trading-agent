@@ -16,7 +16,8 @@ from pathlib import Path
 from . import daylog
 from .lists import DISPLAY_NAMES
 
-LIST_KEYS = ("A", "B", "C")
+#: the lists shown: Steady (A) and Adaptive (C); Calendar is left out of the tomorrow section
+LIST_KEYS = ("A", "C")
 #: the first scored day of the recent history (63 days of warm-up after the store began)
 HISTORY_FROM = date(2025, 1, 10)
 MIN_DAYS = 10  # a condition with fewer days than this is not shown
@@ -31,6 +32,15 @@ class Condition:
 
 
 @dataclass(frozen=True)
+class Expected:
+    """The picks the 09:16 job would record tomorrow, by the 09:15 VIX open (unknown tonight)."""
+
+    base_band: str  # the VIX band of the last collected open, the likely case
+    base: dict[str, tuple[list[str], list[str]]]  # list -> (core, buy)
+    alts: list[tuple[list[str], dict[str, tuple[list[str], list[str]]]]]  # bands, picks
+
+
+@dataclass(frozen=True)
 class Tomorrow:
     day: date
     weekday: str
@@ -40,6 +50,7 @@ class Tomorrow:
     rows: list[tuple[str, int, dict[str, tuple[float, float]]]]  # label, days, {list: (win, avg)}
     recent: dict[str, float]  # list -> win rate of the last RECENT scored sessions
     sessions: int
+    expected: Expected | None = None
 
 
 def next_session(day: date, holidays: dict[date, str] | None = None) -> date:
@@ -119,21 +130,89 @@ def build(
     return Tomorrow(day, weekday, dte_n, dte_s, source, table, recent, len(scored))
 
 
+def group_alternatives(
+    by_band: dict[str, dict[str, tuple[list[str], list[str]]]], base_band: str
+) -> list[tuple[list[str], dict[str, tuple[list[str], list[str]]]]]:
+    """The bands whose picks differ from the base case, bands with the same picks grouped."""
+    base = by_band[base_band]
+    groups: list[tuple[list[str], dict[str, tuple[list[str], list[str]]]]] = []
+    for band, picks in by_band.items():
+        if band == base_band or picks == base:
+            continue
+        for bands, existing in groups:
+            if existing == picks:
+                bands.append(band)
+                break
+        else:
+            groups.append(([band], picks))
+    return groups
+
+
+def expected_picks(
+    day: date, root: Path, dte_n: str, dte_s: str, base_band: str | None
+) -> Expected | None:
+    """Re-run the 09:16 ranking for `day` from the stored results, once per VIX band."""
+    from . import pick, score, store
+    from .variants import variant_names
+
+    names = variant_names()
+    hist = pick.load_history(day, root, names)
+    if base_band is None:
+        attrs = store.read_days(root)
+        base_band = attrs[max(attrs)]["vix_band"] if attrs else None
+    if base_band is None:
+        return None
+    dte = {"dte_n": dte_n, "dte_s": dte_s}
+    by_band: dict[str, dict[str, tuple[list[str], list[str]]]] = {}
+    for lo, hi, label in zip(
+        score.VIX_BINS[:-1], score.VIX_BINS[1:], score.VIX_LABELS, strict=True
+    ):
+        vix = (lo + hi) / 2 if hi < 1e6 else lo + 3
+        picks = pick.score_history(hist, day, vix, dte)
+        by_band[label] = {k: (picks[k]["core"], picks[k]["buy"]) for k in LIST_KEYS}
+    if base_band not in by_band:
+        return None
+    return Expected(base_band, by_band[base_band], group_alternatives(by_band, base_band))
+
+
 def for_next_session(today: date, root: Path | None = None) -> Tomorrow:
     """The section for the session after `today`, from the stored history."""
+    from ..fyers.daily import data_dir
     from .live import calendar_dte_labels
 
+    root = root or data_dir()
     nxt = next_session(today)
     labels = calendar_dte_labels(nxt)
     log = daylog.build_log(root, start=HISTORY_FROM, source="all")
-    return build(nxt, log["rows"], nxt.strftime("%a"), labels["dte_n"], labels["dte_s"])
+    section = build(nxt, log["rows"], nxt.strftime("%a"), labels["dte_n"], labels["dte_s"])
+    try:
+        expected = expected_picks(nxt, root, labels["dte_n"], labels["dte_s"], None)
+    except Exception:  # noqa: BLE001 - the base rates still go out without the picks
+        expected = None
+    return Tomorrow(**{**section.__dict__, "expected": expected})
+
+
+def _picks_text(picks: dict[str, tuple[list[str], list[str]]]) -> list[str]:
+    out = []
+    for key in LIST_KEYS:
+        core, buy = picks[key]
+        text = ", ".join(core) + (f" + Buy {', '.join(buy)}" if buy else "")
+        out.append(f"  {DISPLAY_NAMES[key]}: {text}")
+    return out
 
 
 def render(t: Tomorrow) -> str:
-    lines = [
-        f"Tomorrow {t.day} ({t.weekday}): NIFTY {t.dte_n} / SENSEX {t.dte_s} days to expiry",
-        f"History: {t.sessions} sessions · win rate and average ₹ per lot-day, gross",
-    ]
+    lines = [f"Tomorrow {t.day} ({t.weekday}): NIFTY {t.dte_n} / SENSEX {t.dte_s} days to expiry"]
+    if t.expected is not None:
+        lines.append(
+            f"Expected picks if the VIX opens in {t.expected.base_band} like the last open:"
+        )
+        lines.extend(_picks_text(t.expected.base))
+        for bands, picks in t.expected.alts:
+            lines.append(f"If the VIX opens {' or '.join(bands)}:")
+            lines.extend(_picks_text(picks))
+        lines.append("Picks are recorded at 09:16 from the 09:15 VIX open.")
+    lines.append(f"History: {t.sessions} sessions · win rate and average ₹ per lot-day, gross")
     for label, n, stats in t.rows:
         flag = " (thin)" if n < THIN_DAYS else ""
         cells = "  ".join(

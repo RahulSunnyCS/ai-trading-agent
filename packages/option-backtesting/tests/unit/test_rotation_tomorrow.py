@@ -79,4 +79,33 @@ def test_render_flags_thin_samples_and_says_it_is_not_a_forecast():
     assert "Tomorrow 2026-03-01 (Thu)" in text
     assert "SENSEX expiry day (12d (thin))" in text
     assert "not a forecast" in text
-    assert "Steady" in text and "Calendar" in text and "Adaptive" in text
+    assert "Steady" in text and "Adaptive" in text and "Calendar" not in text
+
+
+def test_alternatives_group_the_bands_with_the_same_picks():
+    base = {"A": (["x", "y", "z"], []), "C": (["x", "y", "z"], [])}
+    other = {"A": (["u", "y", "z"], []), "C": (["u", "y", "z"], [])}
+    by_band = {"<10": base, "10-12": base, "12-14": base, "14-16": other, "16+": other}
+    groups = tomorrow.group_alternatives(by_band, "12-14")
+    assert groups == [(["14-16", "16+"], other)]
+
+
+def test_render_lists_expected_picks_for_steady_and_adaptive_only():
+    picks = {"A": (["s1", "s2", "s3"], []), "C": (["s1", "s2", "s4"], ["b1"])}
+    alt = {"A": (["s9", "s2", "s3"], []), "C": (["s9", "s2", "s4"], [])}
+    t = tomorrow.Tomorrow(
+        date(2026, 10, 15),
+        "Thu",
+        "4",
+        "0",
+        "calendar",
+        [],
+        {},
+        10,
+        tomorrow.Expected("13-15", picks, [(["15-18", "18+"], alt)]),
+    )
+    text = tomorrow.render(t)
+    assert "Expected picks if the VIX opens in 13-15" in text
+    assert "Steady: s1, s2, s3" in text and "Adaptive: s1, s2, s4 + Buy b1" in text
+    assert "If the VIX opens 15-18 or 18+:" in text
+    assert "Calendar" not in text
