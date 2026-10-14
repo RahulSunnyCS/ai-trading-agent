@@ -168,4 +168,9 @@ None open; the owner answered them on 2026-10-14 (Log).
 - 2026-10-15 — Phase 3: Regimes is its own Advanced group in the sidebar and the Builder's YAML
   mode is labelled "YAML engine (advanced)". Heatmap has chips and a drawer (PR #224). Not done: moving Correlation and Regimes
   inline controls into a run bar plus drawer (Phase 2's last bullet, "only if time allows").
-
+- 2026-10-15 — Builder wired to the leg grid (PR #227). Not built from the Phase 1c plan: arrow-key
+  movement between grid cells (a cell edits with click or Enter, and Tab moves on, but there is no
+  arrow navigation), a read-only "View as YAML", the one-popover backtest settings (they sit in the
+  Run panel instead), lot size (`execution.lot_sizing`) and the all-five-strategies byte-identical
+  round-trip test. The Δ-vs-saved comparison is shown for 1-minute runs only (stored results are
+  1-minute). Backtest and Save are held while a grid cell still shows a refused value.

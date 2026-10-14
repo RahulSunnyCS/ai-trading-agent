@@ -92,6 +92,9 @@ export interface BacktestResponse {
   /** Every builder run is stored as an `adhoc` run under this id (legwise_routes.py). */
   run_id?: string | undefined;
   days: DayRow[];
+  /** Echoed by the API: the bar size the run used and whether unusable days were included. */
+  bars?: '1m' | '5m' | undefined;
+  include_excluded?: boolean | undefined;
 }
 
 export interface SavedResult extends DayRow {
