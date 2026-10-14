@@ -151,3 +151,11 @@ None open; the owner answered them on 2026-10-14 (Log).
   with that. Strategies' "View results" now opens Runs filtered by the strategy (`?strategy=`). No
   separate "How to read this" link was added: the top bar already carries "How this works" for
   every screen.
+- 2026-10-15 — Phases 1b, 1c and most of 2 built and reviewed (PRs #213 to #222). Notes where the
+  build differs from the plan: Today's bands are What happened (day log, with drawdowns and
+  selection drift), Is the rule still working? (why a pick and the pulse, market context) and
+  Experiments, not the plan's Track / Diagnose grouping (drift sits with drawdowns, "why a pick"
+  with the pulse); the Builder's backtest settings are inside the Run panel, not a popover on the
+  button; lot size (`execution.lot_sizing`) is not exposed yet; a Family-pulse link to the Matrix
+  and back lands on Today with the accordions closed (the open accordion is not in the URL).
+
