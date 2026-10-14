@@ -22,6 +22,11 @@ Total: it is the same trades with no stop, not one more stop to add.
 
 ## The controls
 
+The row above the table shows the settings in force as chips: the index or stock, the table, the
+day or range, the entry or stop, the exit and the unit. **Change** opens the settings in a panel on
+the right; the table updates as you change them, and the address holds them, so a link opens the same
+table.
+
 | Control | What it does |
 |---|---|
 | Index | NIFTY and SENSEX use the nearest weekly expiry. BANKNIFTY, FINNIFTY and MIDCPNIFTY use the monthly expiry. |

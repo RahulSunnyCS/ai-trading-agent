@@ -11,8 +11,8 @@
  * Everything is a historical replay with no costs or slippage: a description, not a forecast.
  */
 
-import { Download, RefreshCw } from 'lucide-react';
-import { useMemo } from 'react';
+import { Download, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 import { type HeatmapParams, useHeatmap, useHeatmapAvailable } from '../../hooks/useHeatmap';
 import { useQueryState } from '../../hooks/useQueryState';
@@ -27,6 +27,7 @@ import {
   formatCell,
   maxAbsOf,
   metricLabel,
+  settingsChips,
   slLabel,
   slLevels,
   slOptionLabel,
@@ -43,6 +44,7 @@ import type {
 } from '../../types/heatmap';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
+import { Drawer } from '../ui/Drawer';
 import { InfoTooltip } from '../ui/InfoTooltip';
 import { Input, Select } from '../ui/Input';
 import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
@@ -657,6 +659,7 @@ function Result({ params, split }: { params: HeatmapParams; split: boolean }) {
 
 function HeatmapBody({ available }: { available: HeatmapAvailable }) {
   const s = useHeatmapSettings(available);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const params: HeatmapParams | null = (() => {
     if (!s.info) return null;
     const base = {
@@ -676,9 +679,32 @@ function HeatmapBody({ available }: { available: HeatmapAvailable }) {
     params && s.view === 'time_sl' && s.to
       ? { ...params, date: undefined, from: s.date, to: s.to }
       : params;
+  const chips = settingsChips(s);
   return (
     <div className="space-y-5">
-      <Controls available={available} current={s} setters={s.set} />
+      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2">
+        {chips.map((chip) => (
+          <span
+            key={chip}
+            className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs text-foreground"
+          >
+            {chip}
+          </span>
+        ))}
+        <span className="flex-1" />
+        <Button size="sm" variant="secondary" onClick={() => setSettingsOpen(true)}>
+          <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+          Change
+        </Button>
+      </div>
+      <Drawer
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        title="Heatmap settings"
+        subtitle="Table, dates, index or stock, exit and unit. The table updates as you change them."
+      >
+        <Controls available={available} current={s} setters={s.set} />
+      </Drawer>
       {fixed ? (
         <Result params={fixed} split={s.split === 'split'} />
       ) : (

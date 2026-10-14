@@ -6,7 +6,7 @@
  */
 
 import type { HeatmapCell, HeatmapMetric, HeatmapResponse } from '../types/heatmap';
-import { formatNumber, formatPct } from './format';
+import { formatDay, formatNumber, formatPct } from './format';
 
 export const VIEW_LABEL = {
   time_sl: 'Time vs SL',
@@ -121,4 +121,32 @@ export function toCsv(r: HeatmapResponse, split: boolean): string {
     lines.push(['TOTAL', ...r.column_totals.map((c) => num(c, k)), num(r.total, k)]);
   }
   return `${lines.map((l) => l.map(csvField).join(',')).join('\n')}\n`;
+}
+
+/** What the heatmap settings come to, as the short chips of the run bar (BL-102). */
+export function settingsChips(s: {
+  view: keyof typeof VIEW_LABEL;
+  underlying: string;
+  date: string;
+  from: string;
+  to: string;
+  sl: number;
+  time: string;
+  exit: string;
+  metric: HeatmapMetric;
+  weeks: readonly number[];
+}): string[] {
+  const chips = [s.underlying === ALL_STOCKS ? 'All stocks' : s.underlying, VIEW_LABEL[s.view]];
+  if (s.view === 'time_sl') {
+    chips.push(s.to ? `${formatDay(s.date)} to ${formatDay(s.to)}` : formatDay(s.date));
+  } else {
+    chips.push(
+      s.from && s.to ? `${formatDay(s.from)} to ${formatDay(s.to)}` : formatDay(s.to || s.from),
+    );
+    chips.push(s.view === 'date_time' ? `SL ${slOptionLabel(s.sl)}` : `Entry ${s.time}`);
+  }
+  chips.push(`Exit ${s.exit}`);
+  chips.push(s.metric === 'pct' ? '% of premium' : 'Rupees');
+  if (s.weeks.length > 0) chips.push(`Weeks to expiry ${s.weeks.join(', ')}`);
+  return chips;
 }
