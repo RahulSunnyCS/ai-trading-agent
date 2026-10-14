@@ -307,11 +307,14 @@ def run_cohort(
     cells = [grid.Cell(family, index, slot, p) for p in params_list]
     strategies = [grid.build(c, template, execution=execution) for c in cells]
     stats = [Stats(underlying) for _ in cells]
-    capital = (
-        reference.margin_per_lot(underlying, "short-straddle", sizing_date)
-        if family in ("W", "D")
-        else None
-    )
+    # Owner (2026-10-15): the unit is rupees per lot; no return-on-margin view. The capital
+    # column is kept only where a margin row happens to exist, never required.
+    capital = None
+    if family in ("W", "D"):
+        try:
+            capital = reference.margin_per_lot(underlying, "short-straddle", sizing_date)
+        except ValueError:
+            capital = None
     used: list[date] = []
     skipped: dict[str, str] = {}
     for day in days:

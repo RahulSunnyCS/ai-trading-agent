@@ -91,8 +91,9 @@ Every number reproducible from `packages/option-backtesting/research/bl102/`.
   Reported per cell: net, ₹/lot-day, median day, day win rate, worst day, max DD and recovery
   days, Ulcer, CVaR95, longest losing streak, profit factor, payoff ratio, expectancy and win rate
   per trade, MTM-stop frequency, orders/day, charges per day and charge drag, net at today's
-  rates, annualised return on margin (W, D: `margin.csv` short-straddle at `SIZING_DATE`) or on
-  mean premium outlay (B), Calmar, Martin. Family secondaries (read, not scored): W tail ratio,
+  rates, Calmar, Martin. Owner (2026-10-15): the unit is rupees per lot, no return-on-margin
+  view (the `return_on_capital_pct` column stays in the CSVs where a margin row exists, and is
+  not shown in the tables). Family secondaries (read, not scored): W tail ratio,
   both-legs-stopped days, premium-strike no-contract days; D re-entry contribution, CE/PE net,
   one- vs both-leg SL days; B hit rate, payoff and profit factor instead of win rate, hold
   minutes, target vs SL vs time exits.
@@ -151,13 +152,10 @@ Every number reproducible from `packages/option-backtesting/research/bl102/`.
   a like-for-like comparison.
 - Re-entry parity with AlgoTest (RE COST gap fills, RE ASAP) is open; cells that lean on it are
   flagged, never adopted.
-- SENSEX short-straddle margin (₹1,30,000 in `margin.csv`) is nominal until the owner checks it
-  against a broker's calculator; it scales the return-on-margin column only, not the ranking.
 - 8 GB laptop: one worker per cohort peaks ~0.4 GB; three workers as the owner asked.
 
 ## Open questions
 
-- SENSEX short-straddle margin figure (above).
 - Whether the owner wants the Stage-2 neighbourhoods run at all for a family whose Stage-1 best
   robust cell is the template itself (default: no).
 
@@ -166,3 +164,8 @@ Every number reproducible from `packages/option-backtesting/research/bl102/`.
 - 2026-10-14 — created from the owner's request and the planning session; Phase 0 registered
   with grid SHA `6a1078bb4fe68786` (63,384 cells + 42 templates). Smoke run: 3 cells × 8 days
   (results identical on rerun; parts skipped). BL-096/097/098 Phase 3 superseded by this item.
+- 2026-10-15 — owner: judge in rupees per lot, no return-on-margin percentage. The nominal
+  SENSEX margin row added on 2026-10-14 is to be removed from `margin.csv` once Stage 1's
+  workers (which read it) have finished. Regression: the weekend-less 488-day templates differ
+  from BL-097/098 only by the two weekend sessions (four trades); NIFTY Widesl max drawdown and
+  worst day match to the paisa. Stage 1 started 23:45 IST on 2 workers.

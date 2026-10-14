@@ -288,7 +288,6 @@ def render_markdown(
             "win %",
             "PF",
             "MTM stop %",
-            "RoC %",
         ]
         lines.append("| " + " | ".join(header) + " |")
         lines.append("|" + "---|" * len(header))
@@ -312,7 +311,6 @@ def render_markdown(
                 fmt(r["mean_win_rate"] * 100, 0),
                 fmt(r["mean_profit_factor"], 2),
                 fmt(r["mean_mtm_stop_frequency"] * 100, 0),
-                fmt(r["mean_return_on_capital_pct"], 0),
             ]
             lines.append("| " + " | ".join(cells) + " |")
         lines.append("")
@@ -326,7 +324,6 @@ def render_markdown(
             "₹/day",
             "Δ vs tmpl",
             "maxDD",
-            "RoC %",
         ]
         lines.append("| " + " | ".join(header) + " |")
         lines.append("|" + "---|" * len(header))
@@ -339,7 +336,6 @@ def render_markdown(
                 fmt(r["mean_avg_day_inr"]),
                 fmt(r["delta_vs_template_inr"]),
                 fmt(r["mean_max_drawdown_inr"]),
-                fmt(r["mean_return_on_capital_pct"], 0),
             ]
             lines.append("| " + " | ".join(cells) + " |")
         lines.append("")
