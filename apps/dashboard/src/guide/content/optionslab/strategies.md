@@ -12,7 +12,7 @@ each one's latest saved result. It is read-only: you edit a strategy in the
 | Version | A short fingerprint of the strategy file. It changes whenever the strategy is edited. |
 | Legs | How many legs, what they are, and the entry and exit times. |
 | Last result | Net ₹ per lot over every saved day of this version, after costs ([net vs gross](glossary:net-gross)), with the number of up days and the last day. |
-| Actions | **Open in builder** loads it into the Builder to edit or re-test; **View results** opens its days in Daily results. |
+| Actions | **Open in builder** loads it into the Builder to edit or re-test; **View results** opens [Runs](guide:optionslab/runs) filtered to this strategy. |
 
 ## Common questions
 

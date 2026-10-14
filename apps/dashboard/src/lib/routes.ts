@@ -4,7 +4,7 @@
  *
  *   /overview
  *   /live  /trades  /personalities  /pnl  /regime
- *   /optionslab/{strategies|builder|runs|results|regimes|correlation|rotation|matrix}
+ *   /optionslab/{rotation|heatmap|matrix|correlation|regimes|strategies|builder|runs|results}
  *   /optionslab/builder/yaml        (the builder's YAML mode; /optionslab/builder is the form)
  *   /momentum/{backtest|scores|saved|week|rebalance|journal} (old /momentum/weekly redirects)
  *   /momentum/backtest/{etf|stock|custom_index|broad}
@@ -44,22 +44,29 @@ const TAB_BY_SEGMENT = new Map<string, Tab>(
   NAV_GROUPS.flatMap((group) => group.items.map((item) => [tabSegment(item.id), item.id])),
 );
 
-/** In display order. Must match the Options Lab nav item's children (a test checks it). */
+/**
+ * In display order, workspace by workspace (BL-102): Today, then Explore data, then Build and
+ * test. Must match the Options Lab nav item's children (a test checks it). `results` (Daily
+ * results) is last: hidden from the sidebar but still reachable by its URL.
+ */
 export const OPTIONS_LAB_SECTIONS = [
+  'rotation',
   'heatmap',
+  'matrix',
+  'correlation',
+  'regimes',
   'strategies',
   'builder',
   'runs',
   'results',
-  'regimes',
-  'correlation',
-  'rotation',
-  'matrix',
 ] as const;
 export type OptionsLabSection = (typeof OPTIONS_LAB_SECTIONS)[number];
 
-/** What `/optionslab` opens: the straddle heatmap (BL-094; it was Daily results before). */
-export const OPTIONS_LAB_DEFAULT_SECTION: OptionsLabSection = 'heatmap';
+/**
+ * What `/optionslab` opens: Today, how the Steady, Calendar and Adaptive lists are doing
+ * (BL-102; it was the straddle heatmap, BL-094, and Daily results before that).
+ */
+export const OPTIONS_LAB_DEFAULT_SECTION: OptionsLabSection = 'rotation';
 
 /** `/optionslab/builder` is the form; `/optionslab/builder/yaml` is the YAML engine. */
 export const BUILDER_MODES = ['form', 'yaml'] as const;

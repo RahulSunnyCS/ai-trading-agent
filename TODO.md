@@ -674,6 +674,18 @@ should show what the book did under it, with a typed amount, trailing modes and 
 | 3.27.3 | Phase 3: the Portfolio stop pop-up, Days table, calendar and "Replay the list" | claude | **Built 2026-10-11.** Button and pop-up (`ui/Modal`), stopped figures and PF stop flag in the Days table, calendar shading, Replay the list in the day drawer, Guide and glossary |
 | 3.27.4 | Phase 4: hero curve, headline and Drawdowns with the stop | claude | **Built 2026-10-11.** Drawdowns: `/rotation/drawdowns?stop=&trail=` returns `with_stop` and a second line with three figures; headline and hero: `overlaySummary` over the forward days (empty until the first scored session). The read-out, verdict and random baskets stay registered |
 
+### 3.28 Options Lab redesign — [BL-102](backlog/BL-102-options-lab-ux-redesign.md)
+
+Owner (2026-10-14): make Options Lab clean and easy to understand: three workspaces, Today about the
+Steady / Calendar / Adaptive lists, favourites, a leg-grid builder. Features follow in BL-103.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.28.1 | Phase 1: three workspaces, one navigation, Today as landing, Daily results hidden, question headers, Guide tour | claude | **Built 2026-10-14.** Sidebar groups (`NavChild.group` / `hidden`), question header per screen (`lib/optionsLabSections.ts`), Runs reads `?strategy=`; Daily results redirect waits for Phase 2 |
+| 3.28.2 | Phase 1b: favourites store, Strategies and baskets page, New strategy dialog, Correlation multiselect with lists | claude | Planned |
+| 3.28.3 | Phase 1c: Builder design A (token strip, leg grid, backtest settings popover) | claude | Planned |
+| 3.28.4 | Phase 2–3: Analytics page pattern on Today, Builder result, Runs, Heatmap, Correlation, Regimes; declutter | claude | Planned |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

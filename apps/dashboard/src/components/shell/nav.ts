@@ -39,6 +39,16 @@ export interface NavChild {
   /** First path segment after the tab. */
   segment: string;
   label: string;
+  /**
+   * A heading the sidebar shows above the first child of each run of children sharing it
+   * (Options Lab's workspaces: Today, Explore data, Build and test).
+   */
+  group?: string;
+  /**
+   * Reachable by URL and still a valid sub-route, but not listed in the sidebar (Options Lab's
+   * Daily results, hidden in BL-102; its links and Guide walkthroughs keep working).
+   */
+  hidden?: boolean;
 }
 
 export interface NavItem {
@@ -111,18 +121,18 @@ export const NAV_GROUPS: NavGroup[] = [
         id: 'optionslab',
         label: 'Options Lab',
         icon: Layers,
-        // /optionslab opens the straddle heatmap (BL-094); Daily results is one tab along.
-        defaultSegment: 'heatmap',
+        // Three workspaces (BL-102): /optionslab opens Today, the rotation lists' page.
+        defaultSegment: 'rotation',
         children: [
-          { segment: 'heatmap', label: 'Heatmap' },
-          { segment: 'strategies', label: 'Strategies' },
-          { segment: 'builder', label: 'Builder' },
-          { segment: 'runs', label: 'Runs' },
-          { segment: 'results', label: 'Daily results' },
-          { segment: 'regimes', label: 'Regimes' },
-          { segment: 'correlation', label: 'Correlation' },
-          { segment: 'rotation', label: 'Rotation' },
-          { segment: 'matrix', label: 'Matrix' },
+          { segment: 'rotation', label: 'Today', group: 'Today' },
+          { segment: 'heatmap', label: 'Heatmap', group: 'Explore data' },
+          { segment: 'matrix', label: 'Matrix', group: 'Explore data' },
+          { segment: 'correlation', label: 'Correlation', group: 'Explore data' },
+          { segment: 'regimes', label: 'Regimes', group: 'Explore data' },
+          { segment: 'strategies', label: 'Strategies', group: 'Build and test' },
+          { segment: 'builder', label: 'Builder', group: 'Build and test' },
+          { segment: 'runs', label: 'Runs', group: 'Build and test' },
+          { segment: 'results', label: 'Daily results', group: 'Build and test', hidden: true },
         ],
       },
     ],

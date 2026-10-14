@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-12
+Last updated: 2026-10-14
 
 ## Open
 
@@ -44,9 +44,11 @@ Sorted by priority (P0 first), then ID.
 | [BL-098](BL-098-widesl-parameter-sweep.md) | Widesl parameter sweep: strike/premium family, wide leg SL, MTM stop, trail, re-entry and exit sensitivity across NIFTY/SENSEX | P2 | In progress (Phase 2 complete) | research | options |
 | [BL-099](BL-099-combined-final-selection-post-charge.md) | Combined final qualified list: one Directional / Buy / Widesl configuration per index and timing band, post-charge holdout (reports only; no item file with a plan yet) | P2 | In progress | research | options |
 | [BL-100](BL-100-restricted-rotation-lists-p3.md) | Rotation lists A/B/C restricted to the BL-099 families, tested on 2022-24 | P2 | Planned (pre-registration; not run) | research | options |
+| [BL-102](BL-102-options-lab-ux-redesign.md) | Options Lab redesign: three workspaces, lists first (Steady / Calendar / Adaptive), favourites, a leg-grid builder | P1 | In progress | improvement | dashboard |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-039](BL-039-broad-warm-path-and-weekly-job-cost.md) | Broad warm path and weekly-job cost (follow-up to BL-005) | P2 | Planned | improvement | momentum |
 | [BL-041](BL-041-in-app-guide.md) | In-app Guide: what each dashboard section does and how to use it | P2 | In progress | feature | dashboard |
+| [BL-103](BL-103-options-backtesting-features.md) | Options backtesting features: "is this real?", breakdowns, compare runs, smarter strikes and filters, real charges and margin | P2 | Planned | feature | options |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |
 | [BL-017](BL-017-momentum-settings-module.md) | Momentum: one settings module, and split `api.py` | P2 | Ready | improvement | momentum |
