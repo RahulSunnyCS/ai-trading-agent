@@ -82,30 +82,40 @@ def test_render_flags_thin_samples_and_says_it_is_not_a_forecast():
     assert "Steady" in text and "Adaptive" in text and "Calendar" not in text
 
 
-def test_alternatives_group_the_bands_with_the_same_picks():
-    base = {"A": (["x", "y", "z"], []), "C": (["x", "y", "z"], [])}
-    other = {"A": (["u", "y", "z"], []), "C": (["u", "y", "z"], [])}
-    by_band = {"<10": base, "10-12": base, "12-14": base, "14-16": other, "16+": other}
-    groups = tomorrow.group_alternatives(by_band, "12-14")
-    assert groups == [(["14-16", "16+"], other)]
+def _picks(a_core, c_core):
+    return {"A": (a_core, []), "C": (c_core, [])}
 
 
-def test_render_lists_expected_picks_for_steady_and_adaptive_only():
-    picks = {"A": (["s1", "s2", "s3"], []), "C": (["s1", "s2", "s4"], ["b1"])}
-    alt = {"A": (["s9", "s2", "s3"], []), "C": (["s9", "s2", "s4"], [])}
-    t = tomorrow.Tomorrow(
-        date(2026, 10, 15),
-        "Thu",
-        "4",
-        "0",
-        "calendar",
-        [],
-        {},
-        10,
-        tomorrow.Expected("13-15", picks, [(["15-18", "18+"], alt)]),
+def test_expected_picks_carry_probabilities_and_probable_changes():
+    order = ["low", "mid", "high"]
+    base = _picks(["s1", "s2", "s3"], ["s1", "s2", "s3"])
+    by_band = {
+        "low": _picks(["s9", "s2", "s3"], ["s9", "s2", "s3"]),
+        "mid": base,
+        "high": _picks(["s1", "s2", "s7"], ["s1", "s2", "s7"]),
+    }
+    e = tomorrow.build_expected(base, by_band, order, "mid", {"low": 0.2, "mid": 0.7, "high": 0.1})
+    assert abs(e.same - 0.7) < 1e-9
+    assert abs(e.likelihood["A"]["s1"] - 0.8) < 1e-9  # in mid and high
+    assert abs(e.likelihood["A"]["s3"] - 0.9) < 1e-9  # in low and mid
+    labels = {s.label: s for s in e.scenarios}
+    assert abs(labels["calmer open"].probability - 0.2) < 1e-9
+    assert labels["calmer open"].changes["A"] == (["s9"], ["s1"])
+    assert labels["more volatile open"].changes["C"] == (["s7"], ["s3"])
+
+
+def test_render_shows_the_picks_with_probabilities_and_no_vix_wording():
+    order = ["low", "mid", "high"]
+    base = _picks(["s1", "s2", "s3"], ["s1", "s2", "s4"])
+    by_band = {"low": _picks(["s9", "s2", "s3"], ["s1", "s2", "s4"]), "mid": base, "high": base}
+    e = tomorrow.build_expected(
+        base, by_band, order, "mid", {"low": 0.25, "mid": 0.5, "high": 0.25}
     )
+    t = tomorrow.Tomorrow(date(2026, 10, 15), "Thu", "4", "0", "calendar", [], {}, 10, e)
     text = tomorrow.render(t)
-    assert "Expected picks if the VIX opens in 13-15" in text
-    assert "Steady: s1, s2, s3" in text and "Adaptive: s1, s2, s4 + Buy b1" in text
-    assert "If the VIX opens 15-18 or 18+:" in text
-    assert "Calendar" not in text
+    assert "Expected picks if the conditions at the close stay the same:" in text
+    assert "Steady: s1 (75%), s2 (100%), s3 (100%)" in text
+    assert "calmer open (~25%): Steady +s9 -s1" in text
+    assert "Adaptive +" not in text  # Adaptive does not change in that scenario
+    assert "VIX" not in text and "Calendar" not in text
+    assert "The final picks are recorded at 09:16." in text

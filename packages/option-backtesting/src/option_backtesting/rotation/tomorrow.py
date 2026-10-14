@@ -31,13 +31,27 @@ class Condition:
     matches: Callable[[dict], bool]
 
 
+Picks = dict[str, tuple[list[str], list[str]]]  # list -> (core, buy)
+
+
+@dataclass(frozen=True)
+class Scenario:
+    """A way tomorrow's opening conditions could differ from tonight's close, and what changes."""
+
+    label: str  # "calmer open" | "more volatile open"
+    probability: float
+    changes: dict[str, tuple[list[str], list[str]]]  # list -> (added, dropped)
+
+
 @dataclass(frozen=True)
 class Expected:
-    """The picks the 09:16 job would record tomorrow, by the 09:15 VIX open (unknown tonight)."""
+    """The picks the 09:16 job would record tomorrow if the conditions at tonight's close hold,
+    how likely each pick is across the plausible openings, and the probable changes."""
 
-    base_band: str  # the VIX band of the last collected open, the likely case
-    base: dict[str, tuple[list[str], list[str]]]  # list -> (core, buy)
-    alts: list[tuple[list[str], dict[str, tuple[list[str], list[str]]]]]  # bands, picks
+    picks: Picks
+    likelihood: dict[str, dict[str, float]]  # list -> strategy -> probability it is picked
+    same: float  # probability the opening leaves the picks as they are
+    scenarios: list[Scenario]
 
 
 @dataclass(frozen=True)
@@ -130,49 +144,99 @@ def build(
     return Tomorrow(day, weekday, dte_n, dte_s, source, table, recent, len(scored))
 
 
-def group_alternatives(
-    by_band: dict[str, dict[str, tuple[list[str], list[str]]]], base_band: str
-) -> list[tuple[list[str], dict[str, tuple[list[str], list[str]]]]]:
-    """The bands whose picks differ from the base case, bands with the same picks grouped."""
-    base = by_band[base_band]
-    groups: list[tuple[list[str], dict[str, tuple[list[str], list[str]]]]] = []
-    for band, picks in by_band.items():
-        if band == base_band or picks == base:
+def _flat(picks: tuple[list[str], list[str]]) -> list[str]:
+    return [*picks[0], *picks[1]]
+
+
+def build_expected(
+    base: Picks,
+    by_band: dict[str, Picks],
+    order: list[str],
+    base_band: str,
+    weights: dict[str, float],
+) -> Expected:
+    """`by_band`: the picks for each opening band; `weights`: P(open band | close band)."""
+    total = sum(weights.get(b, 0.0) for b in order) or 1.0
+    w = {b: weights.get(b, 0.0) / total for b in order}
+    likelihood = {
+        k: {n: sum(w[b] for b in order if n in _flat(by_band[b][k])) for n in _flat(base[k])}
+        for k in base
+    }
+    same = sum(w[b] for b in order if all(_flat(by_band[b][k]) == _flat(base[k]) for k in base))
+    pos = order.index(base_band) if base_band in order else 0
+    groups: dict[tuple, dict] = {}
+    for i, b in enumerate(order):
+        if all(_flat(by_band[b][k]) == _flat(base[k]) for k in base) or w[b] <= 0:
             continue
-        for bands, existing in groups:
-            if existing == picks:
-                bands.append(band)
-                break
-        else:
-            groups.append(([band], picks))
-    return groups
+        label = "calmer open" if i < pos else "more volatile open"
+        key = (label, tuple((k, tuple(_flat(by_band[b][k]))) for k in sorted(base)))
+        g = groups.setdefault(key, {"label": label, "p": 0.0, "picks": by_band[b]})
+        g["p"] += w[b]
+    scenarios = []
+    for g in sorted(groups.values(), key=lambda x: -x["p"]):
+        changes = {}
+        for k in base:
+            now, then = _flat(g["picks"][k]), _flat(base[k])
+            changes[k] = ([n for n in now if n not in then], [n for n in then if n not in now])
+        scenarios.append(Scenario(g["label"], g["p"], changes))
+    return Expected(base, likelihood, same, scenarios)
+
+
+def vix_transitions(root: Path) -> dict[str, dict[str, float]]:
+    """P(open band of the next session | band of this session's close), from the stored days."""
+    from . import attrs as attrs_mod
+    from . import store
+    from .score import vix_band
+
+    days = store.read_days(root)
+    ordered = sorted(days)
+    counts: dict[str, dict[str, int]] = {}
+    for prev, nxt in zip(ordered, ordered[1:], strict=False):
+        close = attrs_mod.vix_close_from_lake(root, prev)
+        open_band = days[nxt].get("vix_band")
+        if close is None or not open_band or open_band == "unknown":
+            continue
+        row = counts.setdefault(vix_band(close), {})
+        row[open_band] = row.get(open_band, 0) + 1
+    out: dict[str, dict[str, float]] = {}
+    for frm, row in counts.items():
+        n = sum(row.values())
+        out[frm] = {to: c / n for to, c in row.items()} if n >= 20 else {}
+    return out
 
 
 def expected_picks(
-    day: date, root: Path, dte_n: str, dte_s: str, base_band: str | None
+    day: date, root: Path, dte_n: str, dte_s: str, last_day: date
 ) -> Expected | None:
-    """Re-run the 09:16 ranking for `day` from the stored results, once per VIX band."""
+    """Re-run the 09:16 ranking for `day` from the stored results: with the market's last close
+    standing in for tomorrow's opening conditions, and for each band the open could land in."""
+    from . import attrs as attrs_mod
     from . import pick, score, store
     from .variants import variant_names
 
-    names = variant_names()
-    hist = pick.load_history(day, root, names)
-    if base_band is None:
-        attrs = store.read_days(root)
-        base_band = attrs[max(attrs)]["vix_band"] if attrs else None
-    if base_band is None:
+    vix = attrs_mod.vix_close_from_lake(root, last_day)
+    if vix is None:  # no close in the lake: the last stored open is the next best
+        vix = (store.read_days(root).get(last_day) or {}).get("vix_open")
+        vix = float(vix) if vix not in (None, "") else None
+    if vix is None:
         return None
+    hist = pick.load_history(day, root, variant_names())
     dte = {"dte_n": dte_n, "dte_s": dte_s}
-    by_band: dict[str, dict[str, tuple[list[str], list[str]]]] = {}
-    for lo, hi, label in zip(
-        score.VIX_BINS[:-1], score.VIX_BINS[1:], score.VIX_LABELS, strict=True
-    ):
-        vix = (lo + hi) / 2 if hi < 1e6 else lo + 3
-        picks = pick.score_history(hist, day, vix, dte)
-        by_band[label] = {k: (picks[k]["core"], picks[k]["buy"]) for k in LIST_KEYS}
+
+    def picks_at(v: float) -> Picks:
+        r = pick.score_history(hist, day, v, dte)
+        return {k: (r[k]["core"], r[k]["buy"]) for k in LIST_KEYS}
+
+    order = list(score.VIX_LABELS)
+    by_band = {}
+    for lo, hi, label in zip(score.VIX_BINS[:-1], score.VIX_BINS[1:], order, strict=True):
+        by_band[label] = picks_at((lo + hi) / 2 if hi < 1e6 else lo + 3)
+    base_band = score.vix_band(vix)
     if base_band not in by_band:
         return None
-    return Expected(base_band, by_band[base_band], group_alternatives(by_band, base_band))
+    trans = vix_transitions(root).get(base_band) or {}
+    weights = trans or {b: 1.0 if b == base_band else 0.0 for b in order}
+    return build_expected(picks_at(vix), by_band, order, base_band, weights)
 
 
 def for_next_session(today: date, root: Path | None = None) -> Tomorrow:
@@ -186,32 +250,39 @@ def for_next_session(today: date, root: Path | None = None) -> Tomorrow:
     log = daylog.build_log(root, start=HISTORY_FROM, source="all")
     section = build(nxt, log["rows"], nxt.strftime("%a"), labels["dte_n"], labels["dte_s"])
     try:
-        expected = expected_picks(nxt, root, labels["dte_n"], labels["dte_s"], None)
+        expected = expected_picks(nxt, root, labels["dte_n"], labels["dte_s"], today)
     except Exception:  # noqa: BLE001 - the base rates still go out without the picks
         expected = None
     return Tomorrow(**{**section.__dict__, "expected": expected})
 
 
-def _picks_text(picks: dict[str, tuple[list[str], list[str]]]) -> list[str]:
-    out = []
-    for key in LIST_KEYS:
-        core, buy = picks[key]
-        text = ", ".join(core) + (f" + Buy {', '.join(buy)}" if buy else "")
-        out.append(f"  {DISPLAY_NAMES[key]}: {text}")
-    return out
-
-
 def render(t: Tomorrow) -> str:
     lines = [f"Tomorrow {t.day} ({t.weekday}): NIFTY {t.dte_n} / SENSEX {t.dte_s} days to expiry"]
-    if t.expected is not None:
-        lines.append(
-            f"Expected picks if the VIX opens in {t.expected.base_band} like the last open:"
-        )
-        lines.extend(_picks_text(t.expected.base))
-        for bands, picks in t.expected.alts:
-            lines.append(f"If the VIX opens {' or '.join(bands)}:")
-            lines.extend(_picks_text(picks))
-        lines.append("Picks are recorded at 09:16 from the 09:15 VIX open.")
+    e = t.expected
+    if e is not None:
+        lines.append("Expected picks if the conditions at the close stay the same:")
+        for key in LIST_KEYS:
+            core, buy = e.picks[key]
+            names = [f"{n} ({100 * e.likelihood[key].get(n, 0):.0f}%)" for n in [*core, *buy]]
+            lines.append(f"  {DISPLAY_NAMES[key]}: {', '.join(names)}")
+        if e.scenarios:
+            lines.append("Probable changes if the opening conditions shift:")
+            for sc in e.scenarios[:3]:
+                grouped: dict[tuple, list[str]] = {}
+                for key in LIST_KEYS:
+                    added, dropped = sc.changes[key]
+                    if added or dropped:
+                        grouped.setdefault((tuple(added), tuple(dropped)), []).append(
+                            DISPLAY_NAMES[key]
+                        )
+                parts = [
+                    " and ".join(who)
+                    + " "
+                    + " ".join([*(f"+{n}" for n in a_), *(f"-{n}" for n in d_)])
+                    for (a_, d_), who in grouped.items()
+                ]
+                lines.append(f"  {sc.label} (~{100 * sc.probability:.0f}%): " + "; ".join(parts))
+        lines.append("The final picks are recorded at 09:16.")
     lines.append(f"History: {t.sessions} sessions · win rate and average ₹ per lot-day, gross")
     for label, n, stats in t.rows:
         flag = " (thin)" if n < THIN_DAYS else ""
@@ -224,5 +295,5 @@ def render(t: Tomorrow) -> str:
     if t.recent:
         cells = ", ".join(f"{DISPLAY_NAMES[k]} {100 * w:.0f}%" for k, w in t.recent.items())
         lines.append(f"  Last {RECENT} sessions' win rate: {cells}")
-    lines.append("Historical frequency, not a forecast; gap, opening range and VIX are unknown.")
+    lines.append("Historical frequency, not a forecast; the opening conditions are not known yet.")
     return "\n".join(lines)
