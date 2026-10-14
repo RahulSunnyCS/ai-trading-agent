@@ -1,6 +1,6 @@
 /**
- * The builder's run rail: date range, live validation, Backtest (with its credit cost beside
- * it), Save, and a summary of the latest run. Sticky beside the form from `xl`.
+ * The builder's run rail: period, bar size, live validation, Backtest (with its credit cost beside
+ * it), Save, and a summary of the latest run, beside the settings from `lg`.
  */
 
 import { FlaskConical, Save } from 'lucide-react';
@@ -115,6 +115,10 @@ export function RunRail(props: {
   saving: boolean;
   /** Why Save is unavailable (a bad file name), or null. */
   saveBlocked: string | null;
+  /** A grid cell still holds a value the form refused: Backtest and Save would use the old one. */
+  editPending: boolean;
+  /** False until the collected days are known; 3 months and 1 year need them. */
+  periodReady: boolean;
   onBacktest: () => void;
   onSave: () => void;
   /** What went wrong with the last run or save, already worded for the reader. */
@@ -122,7 +126,8 @@ export function RunRail(props: {
   summary: RunSummary | null;
 }) {
   const { validation, issues, summary } = props;
-  const blocked = validation.status === 'invalid' || validation.status === 'checking';
+  const blocked =
+    validation.status === 'invalid' || validation.status === 'checking' || props.editPending;
   const pending = props.running || props.saving;
   const totals = summary ? runTotals(summary.result.days, summary.lots) : null;
   const stats = summary ? statsOf(summary.result.days, summary.lots) : null;
@@ -144,6 +149,7 @@ export function RunRail(props: {
               key={key}
               type="button"
               aria-pressed={props.period === key}
+              disabled={key !== 'all' && !props.periodReady}
               onClick={() => props.onPeriod(key)}
               className={
                 props.period === key
@@ -249,6 +255,11 @@ export function RunRail(props: {
               : 'Each backtest is kept as an experiment. Saving adds the strategy to the evening run.'}
           </p>
           {props.saveBlocked && <p className="text-xs text-negative">{props.saveBlocked}</p>}
+          {props.editPending && (
+            <p className="text-xs text-negative">
+              A cell in the grid still has a value that was not accepted. Fix it or press Esc.
+            </p>
+          )}
         </div>
 
         {validation.status === 'unknown' && (

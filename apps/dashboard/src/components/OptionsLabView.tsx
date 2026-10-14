@@ -50,7 +50,7 @@ const BUILDER_MODE_OPTIONS: SegmentedOption<BuilderMode>[] = [
 ];
 
 const BUILDER_MODE_NOTE: Record<BuilderMode, string> = {
-  form: 'Leg-wise strategies on the 1-minute Fyers data.',
+  form: 'Leg-wise strategies on the collected 1-minute Fyers data (5-minute bars on request).',
   yaml: 'The YAML strategy DSL on the cached AlgoTest bars.',
 };
 

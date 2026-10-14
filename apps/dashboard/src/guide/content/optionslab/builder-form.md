@@ -31,8 +31,8 @@ an optional setting off.
 
 ### The file name
 
-Until you type one, the file name follows what the strategy does, and it is the strategy's id as
-well. Type your own and it stays yours. A strategy you opened from the list keeps its own name.
+A new strategy takes its file name from what it does once you change it (a name already used by a
+saved file gets `_copy` added), and it is the strategy's id as well. Type your own and it stays yours. A strategy you opened from the list keeps its own name.
 
 ### The settings tokens
 
@@ -98,8 +98,9 @@ type, and **Save** writes the strategy file.
 | [Profit factor](glossary:profit-factor) | Winning days' total ÷ losing days' total. |
 | Worst day, [Max drawdown](glossary:max-drawdown) | The single worst day, and the worst peak-to-trough fall of the running total. |
 
-A sparkline shows the running total, and the previous run is shown alongside so you can see
-what your last change did.
+A sparkline shows the running total. For a 1-minute run of a strategy that is already saved, the
+panel also shows the difference from the saved version's stored results over the days both cover
+("Δ vs saved"); a 5-minute run is not compared, because the stored results are 1-minute.
 
 ## What it does not tell you
 

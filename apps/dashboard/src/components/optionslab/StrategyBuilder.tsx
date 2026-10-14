@@ -11,7 +11,7 @@
  * lib/legwiseBuilder.ts.
  */
 
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAppRoute } from '../../hooks/useAppRoute';
 import { useFavourites } from '../../hooks/useFavourites';
@@ -27,6 +27,7 @@ import { apiPost, apiPut } from '../../lib/api';
 import {
   STRATEGY_NAME_RE,
   type StartSpec,
+  copyName,
   fromSaved,
   isDirty,
   newLeg,
@@ -49,6 +50,7 @@ import { Drawer } from '../ui/Drawer';
 import { toast } from '../ui/Toast';
 import { NewStrategyDialog } from './NewStrategyDialog';
 import { ConfirmDialog, type ConfirmRequest } from './builder/ConfirmDialog';
+import { PendingEdits } from './builder/EditableCell';
 import { LegCard } from './builder/LegCard';
 import { LegGrid } from './builder/LegGrid';
 import { ReadBack } from './builder/ReadBack';
@@ -125,8 +127,22 @@ export function StrategyBuilder() {
   /** Credits used here since the balance was last read (it is only re-read once a minute). */
   const [spent, setSpent] = useState<{ at: number | null; count: number }>({ at: null, count: 0 });
 
+  /** Grid cells that currently hold a refused value (see EditableCell). */
+  const [refusedCells, setRefusedCells] = useState<ReadonlySet<string>>(new Set());
+  const reportRefused = useCallback((id: string, pending: boolean) => {
+    setRefusedCells((prev) => {
+      if (prev.has(id) === pending) return prev;
+      const next = new Set(prev);
+      if (pending) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+
   const payload = useMemo(() => toPayload(s), [s]);
   const sent = useMemo(() => JSON.stringify(payload), [payload]);
+  /** What a run was made from: the strategy and the test settings, so changing either flags it. */
+  const runKey = `${sent}|${from}|${to}|${bars}|${includeExcluded}`;
   const validation = useLegwiseValidate(payload);
   const issues = useMemo(
     () => placeIssues(validation.errors, payload),
@@ -147,7 +163,10 @@ export function StrategyBuilder() {
    */
   function change(next: LegwiseStrategy) {
     if (loaded === null && !nameTouched) {
-      const id = slugId(autoName(next), next.underlying);
+      const base = slugId(autoName(next), next.underlying);
+      // Never take the name of a file that already exists: Save would overwrite it unasked.
+      const taken = new Set((saved.data ?? []).flatMap((x) => [x.name, x.strategy.id]));
+      const id = taken.has(base) ? copyName(base, taken) : base;
       setName(id);
       setS({ ...next, id });
       return;
@@ -176,7 +195,9 @@ export function StrategyBuilder() {
 
   const comparison = useMemo(
     () =>
-      run && savedBaseline ? compareToBaseline(run.result.days, run.lots, savedBaseline) : null,
+      run && savedBaseline && (run.result.bars ?? '1m') === '1m'
+        ? compareToBaseline(run.result.days, run.lots, savedBaseline)
+        : null,
     [run, savedBaseline],
   );
 
@@ -266,7 +287,7 @@ export function StrategyBuilder() {
     const r = await apiPost<BacktestResponse>(`${LEGWISE_API}/backtest`, body);
     setRunning(false);
     if (r.ok) {
-      setRun({ result: r.data, lots: lotsOf(payload), sent });
+      setRun({ result: r.data, lots: lotsOf(payload), sent: runKey });
       if (payment.enabled)
         setSpent((prev) => ({
           at: payment.balance,
@@ -356,186 +377,197 @@ export function StrategyBuilder() {
   const detailLeg = detailsIndex === null ? undefined : s.legs[detailsIndex];
 
   return (
-    <div className="space-y-5">
-      <Card className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold tracking-tight text-foreground">
-              {autoName(s)}
-              {loaded ? (
-                <Badge tone="neutral">
-                  {loaded.name}
-                  {loaded.sha ? <span className="font-mono">· {loaded.sha}</span> : null}
-                </Badge>
-              ) : (
-                <Badge tone="neutral">Not saved yet</Badge>
-              )}
-              {dirty && <Badge status="attention">Unsaved changes</Badge>}
-            </h2>
-            <p className="text-xs text-muted">
-              Saved as{' '}
-              <span className="font-mono text-foreground">strategies/legwise/{name}.yaml</span>
-              {s.id !== name ? (
-                <>
-                  {' '}
-                  · id <span className="font-mono text-foreground">{s.id}</span>
-                </>
-              ) : null}
+    <PendingEdits.Provider value={reportRefused}>
+      <div className="space-y-5">
+        <Card className="space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1">
+              <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold tracking-tight text-foreground">
+                {autoName(s)}
+                {loaded ? (
+                  <Badge tone="neutral">
+                    {loaded.name}
+                    {loaded.sha ? <span className="font-mono">· {loaded.sha}</span> : null}
+                  </Badge>
+                ) : (
+                  <Badge tone="neutral">Not saved yet</Badge>
+                )}
+                {dirty && <Badge status="attention">Unsaved changes</Badge>}
+              </h2>
+              <p className="text-xs text-muted">
+                Saved as{' '}
+                <span className="font-mono text-foreground">strategies/legwise/{name}.yaml</span>
+                {s.id !== name ? (
+                  <>
+                    {' '}
+                    · id <span className="font-mono text-foreground">{s.id}</span>
+                  </>
+                ) : null}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Choice<string>
+                label="Open a saved strategy"
+                value={loaded?.name ?? ''}
+                options={loadOptions}
+                onChange={load}
+              />
+              <Button size="sm" onClick={() => setStarting(true)}>
+                New
+              </Button>
+            </div>
+          </div>
+          {saved.error && !saved.data && (
+            <p className="text-xs text-warning">
+              Saved strategies could not be loaded ({saved.error}).
             </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Choice<string>
-              label="Open a saved strategy"
-              value={loaded?.name ?? ''}
-              options={loadOptions}
-              onChange={load}
-            />
-            <Button size="sm" onClick={() => setStarting(true)}>
-              New
-            </Button>
-          </div>
-        </div>
-        {saved.error && !saved.data && (
-          <p className="text-xs text-warning">
-            Saved strategies could not be loaded ({saved.error}).
-          </p>
-        )}
-        <div className="flex flex-wrap items-start gap-3">
-          <LabeledField label="File name (a-z 0-9 _)" errors={nameError ? [nameError] : slot('id')}>
-            <TextField
-              label="File name"
-              value={name}
-              onChange={setFileName}
-              className="w-72"
+          )}
+          <div className="flex flex-wrap items-start gap-3">
+            <LabeledField
+              label="File name (a-z 0-9 _)"
               errors={nameError ? [nameError] : slot('id')}
-            />
-          </LabeledField>
-        </div>
-        <StrategyTokens strategy={s} slots={issues.bySlot} onChange={change} />
-      </Card>
+            >
+              <TextField
+                label="File name"
+                value={name}
+                onChange={setFileName}
+                className="w-72"
+                errors={nameError ? [nameError] : slot('id')}
+              />
+            </LabeledField>
+          </div>
+          <StrategyTokens strategy={s} slots={issues.bySlot} onChange={change} />
+        </Card>
 
-      <Card className="space-y-3">
-        <LegGrid
-          legs={s.legs}
-          issues={issues}
-          together={together}
-          onTogetherChange={setTogether}
-          onChange={(legs) => change({ ...s, legs })}
-          onDetails={setDetailsIndex}
-          onCopy={(i) => {
-            const leg = s.legs[i];
-            if (!leg) return;
-            change({
-              ...s,
-              legs: [
-                ...s.legs,
-                {
-                  ...leg,
-                  id: nextLegId(
-                    s.legs.map((l) => l.id),
-                    leg.id,
-                  ),
-                },
-              ],
-            });
-          }}
-          onRemove={(i) => change({ ...s, legs: s.legs.filter((_, j) => j !== i) })}
-          onAdd={() => change({ ...s, legs: [...s.legs, newLegFor(s)] })}
-          onAddPair={() => {
-            const ids = s.legs.map((l) => l.id);
-            const ce = nextLegId(ids, 'ce');
-            const pe = nextLegId([...ids, ce], 'pe');
-            change({ ...s, legs: [...s.legs, newLeg(ce, 'CE'), newLeg(pe, 'PE')] });
-          }}
-        />
-        <ReadBack strategy={s} problems={problems} checking={validation.status === 'checking'} />
-      </Card>
-
-      <RunRail
-        from={from}
-        to={to}
-        onFrom={setFrom}
-        onTo={setTo}
-        period={period}
-        onPeriod={(key: PeriodKey) => {
-          const range = periodRange(lastDay, key);
-          setFrom(range.from);
-          setTo(range.to);
-        }}
-        bars={bars}
-        onBars={setBars}
-        includeExcluded={includeExcluded}
-        onIncludeExcluded={setIncludeExcluded}
-        validation={validation}
-        issues={issues}
-        payment={{ enabled: payment.enabled, balance }}
-        running={running}
-        saving={saving}
-        saveBlocked={nameError}
-        onBacktest={() => void backtest()}
-        onSave={save}
-        problem={problem}
-        summary={
-          run ? { result: run.result, lots: run.lots, comparison, stale: run.sent !== sent } : null
-        }
-      />
-
-      {run && <ResultTable result={run.result} lots={run.lots} comparison={comparison} />}
-
-      <Drawer
-        open={detailLeg !== undefined}
-        onOpenChange={(open) => {
-          if (!open) setDetailsIndex(null);
-        }}
-        title={
-          detailLeg ? `All settings for ${detailLeg.id || `leg ${(detailsIndex ?? 0) + 1}`}` : 'Leg'
-        }
-        subtitle="Everything the grid does not show: range breakout, re-entry on target, ids."
-      >
-        {detailLeg && detailsIndex !== null ? (
-          <LegCard
-            leg={detailLeg}
-            index={detailsIndex}
-            underlying={s.underlying}
+        <Card className="space-y-3">
+          <LegGrid
+            legs={s.legs}
             issues={issues}
-            open
-            onToggle={() => undefined}
-            onChange={(l) =>
-              change({ ...s, legs: s.legs.map((x, j) => (j === detailsIndex ? l : x)) })
-            }
-            onRemove={() => {
-              change({ ...s, legs: s.legs.filter((_, j) => j !== detailsIndex) });
-              setDetailsIndex(null);
-            }}
-            onCopy={() =>
+            together={together}
+            onTogetherChange={setTogether}
+            onChange={(legs) => change({ ...s, legs })}
+            onDetails={setDetailsIndex}
+            onCopy={(i) => {
+              const leg = s.legs[i];
+              if (!leg) return;
               change({
                 ...s,
                 legs: [
                   ...s.legs,
                   {
-                    ...detailLeg,
+                    ...leg,
                     id: nextLegId(
                       s.legs.map((l) => l.id),
-                      detailLeg.id,
+                      leg.id,
                     ),
                   },
                 ],
-              })
-            }
+              });
+            }}
+            onRemove={(i) => change({ ...s, legs: s.legs.filter((_, j) => j !== i) })}
+            onAdd={() => change({ ...s, legs: [...s.legs, newLegFor(s)] })}
+            onAddPair={() => {
+              const ids = s.legs.map((l) => l.id);
+              const ce = nextLegId(ids, 'ce');
+              const pe = nextLegId([...ids, ce], 'pe');
+              change({ ...s, legs: [...s.legs, newLeg(ce, 'CE'), newLeg(pe, 'PE')] });
+            }}
           />
-        ) : null}
-      </Drawer>
+          <ReadBack strategy={s} problems={problems} checking={validation.status === 'checking'} />
+        </Card>
 
-      <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
-      <NewStrategyDialog
-        open={starting}
-        onOpenChange={setStarting}
-        saved={saved.data ?? []}
-        starred={new Set(favourites.set?.strategies ?? [])}
-        onStart={startFrom}
-        initialUnderlying={s.underlying}
-      />
-    </div>
+        <RunRail
+          from={from}
+          to={to}
+          onFrom={setFrom}
+          onTo={setTo}
+          period={period}
+          onPeriod={(key: PeriodKey) => {
+            const range = periodRange(lastDay, key);
+            setFrom(range.from);
+            setTo(range.to);
+          }}
+          bars={bars}
+          onBars={setBars}
+          includeExcluded={includeExcluded}
+          onIncludeExcluded={setIncludeExcluded}
+          validation={validation}
+          issues={issues}
+          payment={{ enabled: payment.enabled, balance }}
+          running={running}
+          saving={saving}
+          saveBlocked={nameError}
+          editPending={refusedCells.size > 0}
+          periodReady={lastDay !== null}
+          onBacktest={() => void backtest()}
+          onSave={save}
+          problem={problem}
+          summary={
+            run
+              ? { result: run.result, lots: run.lots, comparison, stale: run.sent !== runKey }
+              : null
+          }
+        />
+
+        {run && <ResultTable result={run.result} lots={run.lots} comparison={comparison} />}
+
+        <Drawer
+          open={detailLeg !== undefined}
+          onOpenChange={(open) => {
+            if (!open) setDetailsIndex(null);
+          }}
+          title={
+            detailLeg
+              ? `All settings for ${detailLeg.id || `leg ${(detailsIndex ?? 0) + 1}`}`
+              : 'Leg'
+          }
+          subtitle="Everything the grid does not show: range breakout, re-entry on target, ids."
+        >
+          {detailLeg && detailsIndex !== null ? (
+            <LegCard
+              leg={detailLeg}
+              index={detailsIndex}
+              underlying={s.underlying}
+              issues={issues}
+              open
+              onToggle={() => undefined}
+              onChange={(l) =>
+                change({ ...s, legs: s.legs.map((x, j) => (j === detailsIndex ? l : x)) })
+              }
+              onRemove={() => {
+                change({ ...s, legs: s.legs.filter((_, j) => j !== detailsIndex) });
+                setDetailsIndex(null);
+              }}
+              onCopy={() =>
+                change({
+                  ...s,
+                  legs: [
+                    ...s.legs,
+                    {
+                      ...detailLeg,
+                      id: nextLegId(
+                        s.legs.map((l) => l.id),
+                        detailLeg.id,
+                      ),
+                    },
+                  ],
+                })
+              }
+            />
+          ) : null}
+        </Drawer>
+
+        <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
+        <NewStrategyDialog
+          open={starting}
+          onOpenChange={setStarting}
+          saved={saved.data ?? []}
+          starred={new Set(favourites.set?.strategies ?? [])}
+          onStart={startFrom}
+          initialUnderlying={s.underlying}
+        />
+      </div>
+    </PendingEdits.Provider>
   );
 }
 

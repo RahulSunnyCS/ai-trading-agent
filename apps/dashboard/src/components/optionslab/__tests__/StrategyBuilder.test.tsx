@@ -109,6 +109,32 @@ describe('StrategyBuilder (the leg grid)', () => {
     expect((screen.getByLabelText('File name') as HTMLInputElement).value).toBe('my_own_name');
   });
 
+  it('never auto-names a new strategy after a file that already exists', () => {
+    mocks.saved = [saved('nifty_short_strangle_otm1_09_20')];
+    render(<StrategyBuilder />);
+    edit('Strike for leg1', 'OTM1');
+    expect((screen.getByLabelText('File name') as HTMLInputElement).value).toBe(
+      'nifty_short_strangle_otm1_09_20_copy',
+    );
+  });
+
+  it('holds Backtest and Save while a cell still has a value that was refused', () => {
+    render(<StrategyBuilder />);
+    fireEvent.click(screen.getByRole('button', { name: /^Strike for leg1:/ }));
+    const input = screen.getByRole('textbox', { name: 'Strike for leg1' });
+    fireEvent.change(input, { target: { value: 'abc' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByRole('alert')).toBeTruthy();
+    expect((screen.getByRole('button', { name: /Backtest/ }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect((screen.getByRole('button', { name: /Backtest/ }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+
   it('edits one leg only when "both legs together" is off', () => {
     render(<StrategyBuilder />);
     fireEvent.click(screen.getByRole('checkbox', { name: /Edit both legs together/ }));

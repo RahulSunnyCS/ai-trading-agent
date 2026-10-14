@@ -158,4 +158,9 @@ None open; the owner answered them on 2026-10-14 (Log).
   with the pulse); the Builder's backtest settings are inside the Run panel, not a popover on the
   button; lot size (`execution.lot_sizing`) is not exposed yet; a Family-pulse link to the Matrix
   and back lands on Today with the accordions closed (the open accordion is not in the URL).
-
+- 2026-10-15 — Builder wired to the leg grid (PR #227). Not built from the Phase 1c plan: arrow-key
+  movement between grid cells (a cell edits with click or Enter, and Tab moves on, but there is no
+  arrow navigation), a read-only "View as YAML", the one-popover backtest settings (they sit in the
+  Run panel instead), lot size (`execution.lot_sizing`) and the all-five-strategies byte-identical
+  round-trip test. The Δ-vs-saved comparison is shown for 1-minute runs only (stored results are
+  1-minute). Backtest and Save are held while a grid cell still shows a refused value.
