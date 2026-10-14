@@ -234,7 +234,7 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
 
   Clean so far (rules 1, 2, 5, 6, 7, 8 pass): W NIFTY B, W SENSEX D, B SENSEX A, B, C. Rule 8
   (re-entry parity open) blocks every SENSEX Dir winner, which all lean on RE COST ×2. PBO ≤ 0.5
-  in 38 of 42 cohorts; above it: W NIFTY 09:17 and 09:47, D NIFTY 09:17 / 09:32 / 13:02 (16
+  in 37 of 42 cohorts; above it: W NIFTY 09:17 and 09:47, D NIFTY 09:17 / 09:32 / 13:02 (16
   blocks). NIFTY Buy: no cell clears the gates in any band; the template stays. Wide-stop NIFTY
   Widesl winners have worse worst days than the template (−₹16.6k vs −₹4.5k at 09:17) though
   smaller drawdowns. Nominal SENSEX margin row and its test reverted (owner chose rupees per lot).
