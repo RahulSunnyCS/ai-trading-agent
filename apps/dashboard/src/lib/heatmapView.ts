@@ -6,7 +6,7 @@
  */
 
 import type { HeatmapCell, HeatmapMetric, HeatmapResponse } from '../types/heatmap';
-import { formatNumber, formatPct } from './format';
+import { formatDay, formatNumber, formatPct } from './format';
 
 export const VIEW_LABEL = {
   time_sl: 'Time vs SL',
@@ -121,4 +121,45 @@ export function toCsv(r: HeatmapResponse, split: boolean): string {
     lines.push(['TOTAL', ...r.column_totals.map((c) => num(c, k)), num(r.total, k)]);
   }
   return `${lines.map((l) => l.map(csvField).join(',')).join('\n')}\n`;
+}
+
+/** What the heatmap settings come to, as the short chips of the run bar (BL-102). */
+export function settingsChips(s: {
+  view: keyof typeof VIEW_LABEL;
+  underlying: string;
+  /** An index is in rupees per lot, a stock in points per share. Default: an index. */
+  kind?: 'index' | 'stock';
+  date: string;
+  from: string;
+  to: string;
+  sl: number;
+  time: string;
+  exit: string;
+  metric: HeatmapMetric;
+  weeks: readonly number[];
+  /** CE and PE shown apart instead of as one straddle. */
+  split?: boolean;
+}): string[] {
+  const days = (a: string, b: string) => {
+    const from = formatDay(a);
+    const to = formatDay(b);
+    return !b || from === to ? from : `${from} to ${to}`;
+  };
+  const chips = [s.underlying === ALL_STOCKS ? 'All stocks' : s.underlying, VIEW_LABEL[s.view]];
+  if (s.view === 'time_sl') {
+    chips.push(days(s.date, s.to));
+  } else {
+    chips.push(days(s.from || s.to, s.from ? s.to : ''));
+    chips.push(
+      s.view === 'date_time' ? (s.sl === NO_SL ? 'No stop' : `SL ${s.sl}%`) : `Entry ${s.time}`,
+    );
+  }
+  chips.push(`Exit ${s.exit}`);
+  const stock = s.kind === 'stock' || s.underlying === ALL_STOCKS;
+  chips.push(s.metric === 'pct' ? '% of premium' : stock ? 'Points per share' : 'Rupees per lot');
+  if (s.split) chips.push('CE and PE apart');
+  if (s.weeks.length > 0) {
+    chips.push(`Expiry week ${s.weeks.map((w) => (w === 0 ? 'of' : `${w} out`)).join(', ')}`);
+  }
+  return chips;
 }
