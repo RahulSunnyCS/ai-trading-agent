@@ -81,12 +81,16 @@ Every number reproducible from `packages/option-backtesting/research/bl102/`.
   tables, a price seam at 2024-10): a sign flip in one band is a caution flag, a flip in every band
   of a family returns that family to "research only". SENSEX has no older usable data.
 - **Scorecard.** Gates (all must pass before a cell is ranked): results on ≥ 95 % of the
-  cohort's sessions; net after charges > 0; **Calmar ≥ 1.0** (annualised net per lot ÷ |max
+  cohort's sessions and, for W and D, an entry on ≥ 95 % of them (a premium strike with no
+  contract that day is a ₹0 day, not a result; clarified 2026-10-15 after review); net after charges > 0; **Calmar ≥ 1.0** (annualised net per lot ÷ |max
   drawdown| per lot, annualised as net ÷ days × 252: the worst fall is earned back within a
   year); profit factor ≥ 1.05; MTM-stop days ≤ 30 %; Buy only: entry hit rate ≥ 40 %.
   **Ranking: Martin ratio** (annualised net ÷ Ulcer index), tie-break ₹/lot-day. **Plateau
   rule:** a cell's robust score is min(own Martin, median Martin of its ±1-step neighbours along
-  each axis chain in `grid.CHAINS`); a cell with a gate-failing neighbour is not a candidate. The
+  each axis chain in `grid.CHAINS`); a cell with a gate-failing neighbour is not a candidate
+  (**superseded 2026-10-15, before Stage 1 was scored:** a candidate passes its own gates and at
+  least half of its neighbours pass; a failing neighbour still pulls the median down. Reason in
+  the Log.) The
   band winner is the parameter set with the best robust score averaged over the band's slots.
   Reported per cell: net, ₹/lot-day, median day, day win rate, worst day, max DD and recovery
   days, Ulcer, CVaR95, longest losing streak, profit factor, payoff ratio, expectancy and win rate
@@ -183,3 +187,19 @@ Every number reproducible from `packages/option-backtesting/research/bl102/`.
   strata read-out as a reported stratum only (not a flag). A single mechanism-based split
   (expiry day vs not) may become its own pre-registered item after Stage 3 if the strata
   warrant it.
+- 2026-10-15 — PR #218 review (Opus) found two places where the code was looser than the text
+  and one gate that could not fail. **Plateau rule superseded** (above): the strict "any failing
+  neighbour disqualifies" wording would let one unlucky neighbour at the loose edge of an axis
+  (MTM none, SL 150) kill a genuine plateau, while a median over the neighbours already punishes
+  a cliff; the implemented rule (own gates + at least half the neighbours pass, robust = min(own,
+  median)) is what is registered from here. Disclosure: before this supersession two Widesl
+  NIFTY cohorts (09:17, 09:32) had been scored and read with the implemented rule, not the
+  strict one; nothing was selected. **Coverage gate** clarified as an entry on ≥ 95 % of
+  sessions for W / D. **Stage 2** code brought to exactly the registered lists (D SL ±3 inside
+  10–40, W SL 90/110/130, no value past a Stage-1 range, W-only square-off complete, every listed
+  exit tried). Buy `valid_until` is clamped to the exit as registered. Parts now carry a run
+  signature (grid SHA, window, weekends, cell count, slippage, lot sizing) and are reused only
+  when it matches; the finalist verdict reads rules 3 (flatness), 4 (breadth over the 25 slots,
+  new `robust.py breadth`) and 6 (PBO) and prints PENDING until they exist. W tail ratios
+  (worst day and CVaR95 over the average day) and D re-entry net are now reported; the template
+  appears in the band ranking so "the template is the best" is visible.

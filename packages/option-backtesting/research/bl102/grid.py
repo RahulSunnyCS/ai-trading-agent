@@ -240,6 +240,15 @@ def hhmm_plus(value: str, minutes: int) -> str:
     return (datetime.strptime(value, "%H:%M") + timedelta(minutes=minutes)).strftime("%H:%M")
 
 
+def valid_until_for(until: str, exit_time: str, minutes: int | None) -> str | None:
+    """Buy `valid_until` = range end + minutes, clamped to the exit (Phase 2); None when there is
+    nothing to clamp to (the clamp would equal the range end, i.e. no window at all)."""
+    if minutes is None:
+        return None
+    value = min(hhmm_plus(until, minutes), exit_time)
+    return value if value > until else None
+
+
 def strike_for(family: str, underlying: str, value: str) -> Strike:
     if value in PREMIUM.get(family, {}).get(underlying, {}):
         return Strike(closest_premium=PREMIUM[family][underlying][value])
@@ -299,7 +308,7 @@ def build(
                 side="high",
                 source=p["source"],
                 gap_percent=p.get("gap", 0.0),
-                valid_until=None if p.get("valid") is None else hhmm_plus(until, p["valid"]),
+                valid_until=valid_until_for(until, strategy.exit_time, p.get("valid")),
             )
         strategy.overall.stop_loss_inr = p["mtm"]
     else:

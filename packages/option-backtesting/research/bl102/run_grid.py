@@ -159,6 +159,7 @@ class Stats:
         self.ce_entries = self.pe_entries = 0
         self.ce_net = self.pe_net = 0.0
         self.reentry_count = 0
+        self.reentry_net = 0.0  # net after charges of the re-entry trades (D secondary)
         self.one_leg_sl_days = self.both_leg_sl_days = 0
         self.mtm_stop_days = 0
         self.exit_counts = dict.fromkeys(EXIT_REASONS, 0)
@@ -192,6 +193,7 @@ class Stats:
                 self.pe_net += net
             if trade.leg_id in seen:
                 self.reentry_count += 1
+                self.reentry_net += net
             seen.add(trade.leg_id)
             if trade.exit_min is not None:
                 self.hold_sum += trade.exit_min - trade.entry_min
@@ -275,6 +277,7 @@ class Stats:
             "ce_net_inr": self.ce_net,
             "pe_net_inr": self.pe_net,
             "reentry_count": self.reentry_count,
+            "reentry_net_inr": self.reentry_net,
             "one_leg_sl_days": self.one_leg_sl_days,
             "both_leg_sl_days": self.both_leg_sl_days,
             "premium_outlay_peak_inr": self.outlay_peak,
@@ -297,6 +300,7 @@ def run_cohort(
     root: str,
     slippage: float,
     lot_sizing: str,
+    run: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     started = time.monotonic()
     reference = default_reference_data()
@@ -354,6 +358,7 @@ def run_cohort(
         "labels": [c.label for c in cells],
         "days": [d.isoformat() for d in used],
         "skipped": skipped,
+        "run": run,
         "seconds": seconds,
         "ms_per_cell_day": 1000 * seconds / max(1, len(cells) * len(used)),
         "rss_mb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6,
@@ -380,6 +385,37 @@ def load_cells_file(path: Path) -> dict[tuple[str, str, str], list[dict[str, Any
     return jobs
 
 
+def signature(args: argparse.Namespace, job: tuple[Any, ...]) -> dict[str, Any]:
+    """What a part was run with; a part on disk is reused only when this matches (review of
+    PR #218: a smoke part left under a tag must not be mistaken for a whole cohort)."""
+    return {
+        "grid": grid.grid_sha(),
+        "from": args.start,
+        "to": args.end,
+        "weekends": bool(args.weekends),
+        "n_cells": len(job[3]),
+        "slippage": job[6],
+        "lot_sizing": job[7],
+    }
+
+
+def part_matches(out_dir: Path, name: str, expected: dict[str, Any]) -> bool:
+    part = out_dir / "parts" / f"{name}.csv"
+    meta = out_dir / "series" / f"{name}.json"
+    if not part.exists() or not meta.exists():
+        return False
+    run = json.loads(meta.read_text()).get("run")
+    if run is None:  # written before signatures existed (the 2026-10-14 Stage-1 run)
+        print(f"{name}: unsigned part kept (pre-signature run)", flush=True)
+        return True
+    if run != expected:
+        print(
+            f"{name}: part on disk was run with {run}, expected {expected}; rerunning", flush=True
+        )
+        return False
+    return True
+
+
 def write_part(out_dir: Path, name: str, result: dict[str, Any]) -> None:
     series_dir = out_dir / "series"
     parts_dir = out_dir / "parts"
@@ -388,7 +424,12 @@ def write_part(out_dir: Path, name: str, result: dict[str, Any]) -> None:
     np.save(series_dir / f"{name}.npy", result["matrix"])
     (series_dir / f"{name}.json").write_text(
         json.dumps(
-            {"labels": result["labels"], "days": result["days"], "skipped": result["skipped"]}
+            {
+                "labels": result["labels"],
+                "days": result["days"],
+                "skipped": result["skipped"],
+                "run": result["run"],
+            }
         )
     )
     part = parts_dir / f"{name}.csv"
@@ -430,7 +471,6 @@ def main() -> None:
     parser.add_argument("--tag", default="stage1", help="results/<tag>/")
     parser.add_argument("--root", type=Path, default=None, help="TRADING_DATA_ROOT override")
     parser.add_argument("--workers", type=int, default=3)
-    parser.add_argument("--chunk", type=int, default=0, help="cells per job (0 = whole cohort)")
     parser.add_argument("--slippage", type=float, default=0.0, help="execution.slippage_pct")
     parser.add_argument("--lot-sizing", default="current", choices=("current", "historical"))
     parser.add_argument(
@@ -491,29 +531,22 @@ def main() -> None:
         if underlying not in days_cache:
             days_cache[underlying] = cohort_days(root, underlying, start, end, args.weekends)
         cohort = grid.Cell(family, index, slot, None).cohort
-        chunks = (
-            [params_list]
-            if not args.chunk
-            else [params_list[i : i + args.chunk] for i in range(0, len(params_list), args.chunk)]
-        )
-        for k, chunk in enumerate(chunks):
-            name = cohort if len(chunks) == 1 else f"{cohort}_{k:02d}"
-            submissions.append(
+        submissions.append(
+            (
+                cohort,
                 (
-                    name,
-                    (
-                        family,
-                        index,
-                        slot,
-                        chunk,
-                        days_cache[underlying],
-                        str(root),
-                        args.slippage,
-                        args.lot_sizing,
-                    ),
-                )
+                    family,
+                    index,
+                    slot,
+                    params_list,
+                    days_cache[underlying],
+                    str(root),
+                    args.slippage,
+                    args.lot_sizing,
+                ),
             )
-    pending = [(n, a) for n, a in submissions if not (out_dir / "parts" / f"{n}.csv").exists()]
+        )
+    pending = [(n, a) for n, a in submissions if not part_matches(out_dir, n, signature(args, a))]
     n_cells = sum(len(a[3]) for _, a in submissions)
     print(
         f"tag={args.tag} jobs={len(submissions)} pending={len(pending)} cells={n_cells} "
@@ -521,7 +554,7 @@ def main() -> None:
         flush=True,
     )
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
-        futures = {pool.submit(run_cohort, *a): n for n, a in pending}
+        futures = {pool.submit(run_cohort, *a, signature(args, a)): n for n, a in pending}
         for future in as_completed(futures):
             name = futures[future]
             result = future.result()

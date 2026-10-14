@@ -10,6 +10,7 @@ The registered rules (backlog/BL-102 Phase 0):
   ranking    Martin ratio (annualised net / Ulcer), tie-break rupees per lot-day
   plateau    robust = min(own Martin, median Martin of the +-1-step neighbours along each axis
              chain); a candidate passes its own gates and at least half of its neighbours pass
+             (Phase 0 as superseded on 2026-10-15; the first wording is in the item's Log)
   band       one parameter set per family x index x band: the set with the best robust score
              averaged over the band's slots, candidate at every slot
 
@@ -60,6 +61,19 @@ def finite(value: float) -> float:
     return max(-BIG, min(BIG, value))
 
 
+def ratio_or_nan(a: float, b: float) -> float:
+    return a / b if b else float("nan")
+
+
+def martin_floored(row: dict[str, Any]) -> float:
+    """Annualised net over the Ulcer index with the Ulcer floored at one rupee: a cell that never
+    fell below its peak is very good, not infinitely good (it would otherwise pull every
+    neighbour's median up)."""
+    if math.isnan(row["ulcer_index_inr"]) or math.isnan(row["annual_net_inr"]):
+        return float("nan")
+    return row["annual_net_inr"] / max(1.0, row["ulcer_index_inr"])
+
+
 def key_of(params: dict[str, Any]) -> Key:
     return tuple((axis, value) for axis, value in params.items())
 
@@ -68,6 +82,10 @@ def failed_gates(row: dict[str, Any], sessions: int) -> list[str]:
     out = []
     if row["n_days"] < GATES["coverage"] * sessions:
         out.append("coverage")
+    if row["family"] in ("W", "D") and not row["entry_hit_rate"] >= GATES["coverage"]:
+        out.append(
+            "coverage"
+        )  # a premium strike with no contract that day is a 0 day, not a result
     if not row["net_inr"] > 0:
         out.append("net")
     if not row["calmar"] >= GATES["calmar"]:
@@ -133,7 +151,9 @@ def score_cohort(rows: list[dict[str, Any]]) -> None:
         r["sessions"] = sessions
         r["gates_failed"] = ";".join(failed_gates(r, sessions))
         r["passes"] = r["gates_failed"] == ""
-        r["martin_f"] = finite(r["martin"])
+        r["martin_f"] = finite(martin_floored(r))
+        r["tail_ratio_worst"] = ratio_or_nan(r["worst_day_inr"], r["avg_day_inr"])
+        r["tail_ratio_cvar"] = ratio_or_nan(r["cvar95_day_inr"], r["avg_day_inr"])
     for r in rows:
         if r["key"] is None:  # the template: scored as itself, no neighbourhood
             r["n_neighbours"] = 0
@@ -181,7 +201,7 @@ def band_winners(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         )
         scored = []
         for key, members in sets.items():
-            if key is None or len(members) < len(slots):
+            if len(members) < len(slots):
                 continue
             scored.append(
                 {
@@ -189,8 +209,9 @@ def band_winners(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "index": index,
                     "band": band_,
                     "slots": ",".join(slots),
-                    **grid.params_to_row(family, dict(key)),
+                    **grid.params_to_row(family, None if key is None else dict(key)),
                     "key": key,
+                    "is_template": key is None,
                     "label_at_first_slot": members[0]["label"],
                     "band_candidate": all(m["candidate"] for m in members),
                     "slots_candidate": sum(m["candidate"] for m in members),
@@ -294,7 +315,7 @@ def render_markdown(
         for r in rows[:TOP_N]:
             cells = [str(r["band_rank"])]
             cells += [
-                grid.pretty(a, dict(r["key"])[a]) if r.get("key") else r[f"p_{a}"] for a in axes
+                grid.pretty(a, dict(r["key"])[a]) if r.get("key") else "template" for a in axes
             ]
             cells += [
                 "yes"
@@ -327,7 +348,7 @@ def render_markdown(
         ]
         lines.append("| " + " | ".join(header) + " |")
         lines.append("|" + "---|" * len(header))
-        for r in [s for s in strikes if s["index"] == index and s["band"] == band_]:
+        for r in [s for s in strikes if s["index"] == index and s["band"] == band_ and s["key"]]:
             cells = [grid.pretty("strike", dict(r["key"])["strike"])]
             cells += [grid.pretty(a, dict(r["key"])[a]) for a in axes if a != "strike"]
             cells += [

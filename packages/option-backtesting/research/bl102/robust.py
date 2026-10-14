@@ -251,8 +251,110 @@ def read_winners(out_dir: Path, family: str, top: int) -> list[dict[str, Any]]:
     return rows
 
 
+def read_csv(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    with path.open(newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def joined_rules(
+    out_dir: Path,
+    stage2_dir: Path | None,
+    breadth_dir: Path | None,
+    name: str,
+    family: str,
+    index: str,
+    band_: str,
+    slots: list[str],
+) -> dict[str, Any]:
+    """Rules 3, 4 and 6 come from other files; absent = not yet run (None), never a pass."""
+    out: dict[str, Any] = {"rule3_flat": None, "rule4_breadth": None, "rule6_pbo": None}
+    if stage2_dir is not None:
+        for r in read_csv(stage2_dir / "flatness.csv"):
+            if r["winner"] == name:
+                out["rule3_flat"] = r["rule3_flat"] == "True"
+    pbo = {r["cohort"]: r for r in read_csv(out_dir / "pbo.csv")}
+    cohorts = [grid.Cell(family, index, s, None).cohort for s in slots]
+    if pbo and all(c in pbo for c in cohorts):
+        out["rule6_pbo"] = all(pbo[c]["pbo_ok"] == "True" for c in cohorts)
+    if breadth_dir is not None:
+        for r in read_csv(breadth_dir / "breadth.csv"):
+            if r["finalist"] == name:
+                out["rule4_breadth"] = r["rule4_breadth"] == "True"
+    return out
+
+
+def breadth(
+    out_dir: Path, families: tuple[str, ...], stage1_dir: Path, top: int
+) -> list[dict[str, Any]]:
+    """Rule 4 over an all-25-slot run of the finalists (`slots-cells` -> run_grid --cells): at the
+    band's slots, the sign of rupees per lot-day and Calmar >= 1 must hold on >= 70 % of slots."""
+    rows = []
+    for family in families:
+        summary = {r["label"]: r for r in read_csv(out_dir / f"{family}_summary.csv")}
+        for w in read_winners(stage1_dir, family, top):
+            index, band_ = w["index"], w["band"]
+            name = f"{family}_{index}_{band_}"
+            hits = []
+            for r in summary.values():
+                cell_band = grid.band(r["slot"])
+                if r["index"] != index or cell_band != band_ or r["cell"] == "template":
+                    continue
+                if grid.params_from_row(family, r) != w["params"]:
+                    continue
+                avg, calmar_ = float(r["avg_day_inr"]), float(r["calmar"])
+                hits.append(avg > 0 and calmar_ >= 1.0)
+            share = sum(hits) / len(hits) if hits else float("nan")
+            rows.append(
+                {
+                    "finalist": name,
+                    "slots_checked": len(hits),
+                    "share_ok": share,
+                    "rule4_breadth": bool(hits) and share >= 0.7,
+                }
+            )
+            print(
+                f"{name}: {sum(hits)}/{len(hits)} band slots positive with Calmar >= 1 -> rule 4 {'PASS' if rows[-1]['rule4_breadth'] else 'FAIL'}",
+                flush=True,
+            )
+    return rows
+
+
+def slots_cells(stage1_dir: Path, families: tuple[str, ...], top: int, out_path: Path) -> None:
+    """The finalists' parameter sets at every rotation slot (the 25 of `strategies/rotation/`),
+    plus the template at each, as a cells.json for run_grid.py."""
+    slots = sorted(
+        {p.stem[-4:][:2] + ":" + p.stem[-2:] for p in grid.ROTATION.glob("N_wide_*.yaml")}
+    )
+    items = []
+    for family in families:
+        for w in read_winners(stage1_dir, family, top):
+            for slot in slots:
+                if not grid.template_path(family, w["index"], slot).exists():
+                    continue
+                for params in (w["params"], None):
+                    items.append(
+                        {
+                            "family": family,
+                            "index": w["index"],
+                            "slot": slot,
+                            "params": params,
+                            "finalist": f"{family}_{w['index']}_{w['band']}",
+                        }
+                    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(items, indent=1, default=list))
+    print(f"{len(items)} cells at {len(slots)} slots -> {out_path}", flush=True)
+
+
 def check_finalists(
-    out_dir: Path, families: tuple[str, ...], top: int, root: Path
+    out_dir: Path,
+    families: tuple[str, ...],
+    top: int,
+    root: Path,
+    stage2_dir: Path | None = None,
+    breadth_dir: Path | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
     attrs = load_day_attrs(root)
     summary: list[dict[str, Any]] = []
@@ -315,6 +417,7 @@ def check_finalists(
                 if not math.isnan(regime)
                 else True,
                 "rule8_parity_verified": not parity,
+                **joined_rules(out_dir, stage2_dir, breadth_dir, name, family, index, band_, slots),
             }
             summary.append(row)
             for h in halves:
@@ -401,9 +504,34 @@ def main() -> None:
     f.add_argument("--family", default="all")
     f.add_argument("--top", type=int, default=1)
     f.add_argument("--root", type=Path, default=None)
+    f.add_argument("--stage2", default=None, help="tag of the Stage-2 run (rule 3)")
+    f.add_argument("--breadth", default=None, help="tag of the all-25-slot run (rule 4)")
+    b = sub.add_parser("breadth")
+    b.add_argument("--tag", required=True, help="tag the all-25-slot run was written under")
+    b.add_argument("--stage1", default="stage1")
+    b.add_argument("--family", default="all")
+    b.add_argument("--top", type=int, default=1)
+    c = sub.add_parser("slots-cells")
+    c.add_argument("--stage1", default="stage1")
+    c.add_argument("--family", default="all")
+    c.add_argument("--top", type=int, default=1)
+    c.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
-    out_dir = RESULTS / args.tag
+    out_dir = RESULTS / getattr(args, "tag", "stage1")
     families = grid.FAMILIES if args.family == "all" else tuple(args.family.split(","))
+    if args.command == "breadth":
+        rows = breadth(out_dir, families, RESULTS / args.stage1, args.top)
+        write_csv(out_dir / "breadth.csv", rows)
+        print(f"wrote {out_dir / 'breadth.csv'}", flush=True)
+        return
+    if args.command == "slots-cells":
+        slots_cells(
+            RESULTS / args.stage1,
+            families,
+            args.top,
+            args.out or RESULTS / "stage3_slots" / "cells.json",
+        )
+        return
     if args.command == "pbo":
         blocks = tuple(int(b) for b in args.blocks.split(","))
         rows = []
@@ -413,7 +541,12 @@ def main() -> None:
         print(f"wrote {out_dir / 'pbo.csv'}", flush=True)
     else:
         summary, detail, text = check_finalists(
-            out_dir, families, args.top, args.root or data_dir()
+            out_dir,
+            families,
+            args.top,
+            args.root or data_dir(),
+            RESULTS / args.stage2 if args.stage2 else None,
+            RESULTS / args.breadth if args.breadth else None,
         )
         write_csv(out_dir / "finalists.csv", summary)
         write_csv(out_dir / "finalists_detail.csv", detail)
@@ -423,11 +556,19 @@ def main() -> None:
             flush=True,
         )
         for row in summary:
-            verdict = all(row[k] for k in row if k.startswith("rule"))
+            rules = {k: v for k, v in row.items() if k.startswith("rule")}
+            pending = [k for k, v in rules.items() if v is None]
+            verdict = (
+                "PENDING " + ",".join(k[:5] for k in pending)
+                if pending
+                else ("PASS" if all(rules.values()) else "FAIL")
+            )
             print(
-                f"{row['finalist']}: {'PASS' if verdict else 'FAIL'} — "
+                f"{row['finalist']}: {verdict} — "
                 + ", ".join(
-                    f"{k[:5]} {'ok' if row[k] else 'no'}" for k in row if k.startswith("rule")
+                    f"{k[:5]} {'ok' if row[k] else ('?' if row[k] is None else 'no')}"
+                    for k in row
+                    if k.startswith("rule")
                 ),
                 flush=True,
             )

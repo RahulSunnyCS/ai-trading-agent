@@ -2,10 +2,12 @@
 
 generate   from `results/<stage1>/<family>_band_winners.csv`, the top band candidate of each
            index x band and, at each of the band's slots, its one-change neighbourhood with
-           the registered Stage-2 values (the in-between steps adjacent to the winner, the
-           extra trails / exits / re-entries, square-off complete without re-entry, Buy gap
-           and valid-until). Written as `results/<tag>/cells.json` for run_grid.py --cells.
-           Nothing here promotes a value: the adopted set stays the Stage-1 winner.
+           EXACTLY the registered Stage-2 values (Phase 2 of the item, nothing past the
+           registered Stage-1 range): the in-between steps adjacent to the winner, D's SL
+           +-3, the extra trails / exits / re-entries / cutoffs, W's square-off complete
+           without re-entry, Buy gap and valid-until (clamped to the exit by grid.build).
+           Written as `results/<tag>/cells.json` for run_grid.py --cells. Nothing here
+           promotes a value: the adopted set stays the Stage-1 winner.
 evaluate   after the run: the neighbourhood's median Martin against the winner's, pooled over
            the band's slots; below 70 % the winner is "fragile" (rule 3) and the template stays.
 
@@ -33,51 +35,46 @@ import grid  # noqa: E402
 RESULTS = HERE / "results"
 FLAT_RATIO = 0.70
 
-# Registered Stage-2 values. "fine" lists are merged with the coarse axis and the two values
-# adjacent to the winner's are taken; "each" lists are tried one at a time.
+# The registered Stage-2 values (backlog/BL-102 Phase 2), one change at a time from the winner:
+#   between  — in-between values: the ones adjacent to the winner in the merged coarse+fine order
+#   delta    — the winner's value +- d, kept only inside the Stage-1 range
+#   each     — every listed value, tried as it is
+#   square_off_complete — the winner with no re-entry and square_off: complete (W only)
 STAGE2: dict[str, dict[str, Any]] = {
     "W": {
-        "fine": {
-            "sl": (30, 50, 70, 90, 110, 130, 140, 160),
-            "mtm": (1500, 2500, 3500, 5000),
-            "exit": ("14:50", "15:00", "15:20"),
-        },
+        "between": {"sl": (90, 110, 130), "mtm": (1500, 2500, 3500, 5000)},
         "each": {
             "trail": ((10, 5), (20, 10), (20, 15)),
+            "exit": ("14:50", "15:00", "15:20"),
             "reentry": (("cost", 2, None), ("asap", 1, None)),
         },
         "square_off_complete": True,
     },
     "D": {
-        "fine": {
-            "sl": (7, 12, 13, 17, 18, 22, 23, 27, 28, 33, 35, 37, 45),
-            "mtm": (2500, 3500, 5000),
-        },
+        "delta": {"sl": 3},
+        "between": {"mtm": (2500, 3500, 5000)},
         "each": {"trail": ((5, 5), (15, 5)), "exit": ("15:10",), "cutoff": ("11:00", "12:00")},
-        "square_off_complete": True,
+        "square_off_complete": False,
     },
     "B": {
-        "fine": {"range": (5, 20, 45), "target": (30, 150), "mtm": (None, 1500, 3000)},
-        "each": {"gap": (0.5, 1.0, 2.0), "valid": (30, 60), "exit": ("15:00", "15:28")},
+        "between": {"range": (5, 20), "target": (30, 150)},
+        "each": {
+            "mtm": (None, 1500, 3000),
+            "gap": (0.5, 1.0, 2.0),
+            "valid": (30, 60),
+            "exit": ("15:00", "15:28"),
+        },
         "square_off_complete": False,
     },
 }
-# Merged orders for the "fine" axes (coarse + fine), None = the loosest end of a stop.
+# Merged orders (coarse + registered in-between values); None = the loosest end of a stop.
 ORDER: dict[str, dict[str, tuple[Any, ...]]] = {
     "W": {
-        "sl": (30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160),
+        "sl": (40, 60, 80, 90, 100, 110, 120, 130, 150),
         "mtm": (1500, 2000, 2500, 3000, 3500, 4000, 5000, None),
-        "exit": ("14:50", "15:00", "15:10", "15:20", "15:28"),
     },
-    "D": {
-        "sl": (7, 10, 12, 13, 15, 17, 18, 20, 22, 23, 25, 27, 28, 30, 33, 35, 37, 40, 45),
-        "mtm": (2000, 2500, 3000, 3500, 4000, 5000, None),
-    },
-    "B": {
-        "range": (5, 10, 15, 20, 30, 45),
-        "target": (None, 30, 50, 100, 150),
-        "mtm": (1000, 1500, 2000, 3000, None),
-    },
+    "D": {"mtm": (2000, 2500, 3000, 3500, 4000, 5000, None)},
+    "B": {"range": (5, 10, 15, 20, 30), "target": (None, 30, 50, 100, 150)},
 }
 
 
@@ -92,12 +89,16 @@ def neighbourhood(
     """(change, params) pairs around a winner; only values the Stage-2 list registers."""
     spec = STAGE2[family]
     out: list[tuple[str, dict[str, Any]]] = []
-    for axis, fine in spec["fine"].items():
-        current = params.get(axis)
-        for value in adjacent(ORDER[family][axis], current):
-            if value in fine or (axis == "mtm" and value is None and None in fine):
+    for axis, fine in spec.get("between", {}).items():
+        for value in adjacent(ORDER[family][axis], params.get(axis)):
+            if value in fine:
                 out.append((f"{axis}={grid.pretty(axis, value)}", {**params, axis: value}))
-    for axis, values in spec["each"].items():
+    for axis, d in spec.get("delta", {}).items():
+        lo, hi = min(grid.AXES[family][axis]), max(grid.AXES[family][axis])
+        for value in (params[axis] - d, params[axis] + d):
+            if lo <= value <= hi:
+                out.append((f"{axis}={value}", {**params, axis: value}))
+    for axis, values in spec.get("each", {}).items():
         for value in values:
             if axis == "cutoff":
                 reentry = params.get("reentry")
@@ -106,9 +107,7 @@ def neighbourhood(
                 out.append(
                     (f"cutoff={value}", {**params, "reentry": (reentry[0], reentry[1], value)})
                 )
-            else:
-                if params.get(axis) == value:
-                    continue
+            elif params.get(axis) != value:
                 out.append((f"{axis}={grid.pretty(axis, value)}", {**params, axis: value}))
     if spec["square_off_complete"]:
         out.append(("square_off=complete", {**params, "reentry": None, "square_off": "complete"}))
@@ -138,54 +137,33 @@ def generate(stage1_dir: Path, out_dir: Path, families: tuple[str, ...]) -> None
             index, band_ = w["index"], w["band"]
             slots = w["slots"].split(",")
             winner = f"{family}_{index}_{band_}"
+            if w["params"] is None:
+                print(f"{winner}: the template is the band's best; no Stage 2", flush=True)
+                continue
             for slot in slots:
                 template = grid.load_template(family, index, slot)
-                items.append(
-                    {
-                        "family": family,
-                        "index": index,
-                        "slot": slot,
-                        "params": w["params"],
-                        "role": "winner",
-                        "winner": winner,
-                        "change": "",
-                    }
-                )
-                items.append(
-                    {
-                        "family": family,
-                        "index": index,
-                        "slot": slot,
-                        "params": None,
-                        "role": "template",
-                        "winner": winner,
-                        "change": "",
-                    }
-                )
+                common = {"family": family, "index": index, "slot": slot, "winner": winner}
+                items.append({**common, "params": w["params"], "role": "winner", "change": ""})
+                items.append({**common, "params": None, "role": "template", "change": ""})
                 for change, params in neighbourhood(family, w["params"], slot):
                     cell = grid.Cell(family, index, slot, params)
                     try:
                         grid.build(cell, template)
                     except (ValueError, TypeError) as error:
-                        dropped.append(f"{cell.label}: {str(error).splitlines()[0][:80]}")
+                        reason = " ".join(str(error).split())[:200]
+                        dropped.append(f"{cell.label}: {reason}")
                         continue
                     items.append(
-                        {
-                            "family": family,
-                            "index": index,
-                            "slot": slot,
-                            "params": params,
-                            "role": "neighbour",
-                            "winner": winner,
-                            "change": change,
-                        }
+                        {**common, "params": params, "role": "neighbour", "change": change}
                     )
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "cells.json").write_text(json.dumps(items, indent=1, default=list))
     (out_dir / "dropped.txt").write_text("\n".join(dropped) + ("\n" if dropped else ""))
     winners = {i["winner"] for i in items}
     print(
-        f"{len(items)} cells for {len(winners)} winners ({sum(i['role'] == 'neighbour' for i in items)} neighbours, {len(dropped)} invalid dropped) -> {out_dir / 'cells.json'}",
+        f"{len(items)} cells for {len(winners)} winners "
+        f"({sum(i['role'] == 'neighbour' for i in items)} neighbours, {len(dropped)} invalid dropped) "
+        f"-> {out_dir / 'cells.json'}",
         flush=True,
     )
 
@@ -208,9 +186,7 @@ def evaluate(out_dir: Path) -> None:
         )
         label = grid.Cell(item["family"], item["index"], item["slot"], params).label
         role_of[label] = (item["winner"], item["role"], item["change"])
-    martin: dict[tuple[str, str, str], list[float]] = defaultdict(
-        list
-    )  # (winner, role, change) -> per-slot Martin
+    martin: dict[tuple[str, str, str], list[float]] = defaultdict(list)
     for path in sorted(out_dir.glob("*_summary.csv")):
         with path.open(newline="") as handle:
             for row in csv.DictReader(handle):
@@ -218,21 +194,17 @@ def evaluate(out_dir: Path) -> None:
                     m = fnum(row["martin"])
                     martin[role_of[row["label"]]].append(-1e9 if math.isnan(m) else min(1e9, m))
     rows = []
-    winners = sorted({k[0] for k in martin})
-    for winner in winners:
+    for winner in sorted({k[0] for k in martin}):
         own = statistics.fmean(martin[(winner, "winner", "")])
-        tmpl = (
-            statistics.fmean(martin[(winner, "template", "")])
-            if (winner, "template", "") in martin
-            else float("nan")
-        )
+        tmpl_key = (winner, "template", "")
+        tmpl = statistics.fmean(martin[tmpl_key]) if tmpl_key in martin else float("nan")
         neighbours = {
             k[2]: statistics.fmean(v)
             for k, v in martin.items()
             if k[0] == winner and k[1] == "neighbour"
         }
         median = statistics.median(neighbours.values()) if neighbours else float("nan")
-        flat = median >= FLAT_RATIO * own if neighbours else False
+        flat = bool(neighbours) and median >= FLAT_RATIO * own
         rows.append(
             {
                 "winner": winner,
@@ -246,7 +218,8 @@ def evaluate(out_dir: Path) -> None:
             }
         )
         print(
-            f"{winner}: Martin {own:.1f}, neighbourhood median {median:.1f} ({len(neighbours)} changes) -> {'FLAT' if flat else 'FRAGILE'}; worst change {rows[-1]['worst_change']}",
+            f"{winner}: Martin {own:.1f}, neighbourhood median {median:.1f} ({len(neighbours)} changes)"
+            f" -> {'FLAT' if flat else 'FRAGILE'}; worst change {rows[-1]['worst_change']}",
             flush=True,
         )
     with (out_dir / "flatness.csv").open("w", newline="") as handle:
