@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-12
+Last updated: 2026-10-14
 
 ## Open
 
@@ -39,6 +39,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-051](BL-051-momentum-this-week-and-journal.md) | Momentum "This week" and Journal redesign: favourite statuses, Friday timeline, orders from Fyers holdings, alerts | P1 | In progress | feature | momentum |
 | [BL-074](BL-074-point-in-time-categories-nse-basic-industry.md) | Point-in-time categories from NSE's Basic Industry classification | P1 | Planned | research | momentum |
 | [BL-095](BL-095-portfolio-mtm-stop-in-rotation.md) | Portfolio MTM stop-loss on the Rotation page: a ₹ stop (default ₹10k; empty / 0 = none) with trailing (Trail SL, Lock, Lock and trail) set in a pop-up, applied to each list's basket — days table, calendar, "Replay the list", hero curve, drawdowns; read-out untouched | P1 | In progress (Phases 1–4 built; PR open) | feature | options / dashboard |
+| [BL-102](BL-102-full-parameter-sweep.md) | Full-factorial parameter sweep over Widesl (incl. ATM), Dir and Buy: strike, stops, trail, MTM, exit, re-entry, range and target at 7 slots × 2 indices (63,384 cells), Calmar-gated Martin ranking with a plateau rule; absorbs BL-096/097/098 Phase 3 | P1 | In progress (Phase 0 registered; Stage 1 running) | research | options |
 | [BL-096](BL-096-directional-parameter-sweep.md) | Directional stop, re-entry, trailing and exit sweep across NIFTY/SENSEX ATM and ITM1 variants | P2 | In progress | research | options |
 | [BL-097](BL-097-buy-parameter-sweep.md) | Buy parameter sweep: premium, leg SL, MTM SL, trail, breakout window and exit sensitivity over the existing NIFTY/SENSEX Buy rotation | P2 | In progress (Phase 2 complete) | research | options |
 | [BL-098](BL-098-widesl-parameter-sweep.md) | Widesl parameter sweep: strike/premium family, wide leg SL, MTM stop, trail, re-entry and exit sensitivity across NIFTY/SENSEX | P2 | In progress (Phase 2 complete) | research | options |

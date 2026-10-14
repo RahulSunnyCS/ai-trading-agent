@@ -64,3 +64,4 @@ extend-immutable-calls = ["typer.Option", "typer.Argument"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["slow: needs the TradingData SSD (skipped when /Volumes/TradingData is absent)"]
