@@ -195,8 +195,9 @@ def strata(
             continue
         dte = a.get(dte_key, "")
         label = "unknown"
-        if dte not in ("", "None"):
-            n = int(float(dte))
+        dte = dte.rstrip("+")  # days.csv writes rotation.score.dte_label: "0".."6" or "7+"
+        if dte.isdigit():
+            n = int(dte)
             label = next(name for name, lo, hi in DTE_BUCKETS if lo <= n <= hi)
         groups[("dte", label)].append(i)
         groups[("vix", a.get("vix_band", "unknown") or "unknown")].append(i)
