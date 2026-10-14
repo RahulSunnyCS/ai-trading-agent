@@ -1,10 +1,9 @@
 'use client';
 
-import { Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { cn } from '../../../lib/cn';
 import { Input } from '../../ui/Input';
+import { StarToggle } from '../../ui/StarToggle';
 
 interface Option {
   name: string;
@@ -31,28 +30,6 @@ interface Props {
 }
 
 const SHOWN = 60;
-
-function StarButton({ on, label, onClick }: { on: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      aria-label={`${on ? 'Remove the star from' : 'Star'} ${label}`}
-      title={on ? 'Starred: opens in the comparison by default' : 'Star: open with this by default'}
-      onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onClick();
-      }}
-      className={cn(
-        'ml-auto rounded p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        on ? 'text-warning' : 'text-faint hover:text-muted',
-      )}
-    >
-      <Star className={cn('h-3.5 w-3.5', on && 'fill-current')} aria-hidden="true" />
-    </button>
-  );
-}
 
 /**
  * The comparison's members (BL-094, BL-102): the rotation lists first (Steady, Calendar,
@@ -124,9 +101,10 @@ export function StrategyMultiSelect({
               />
               <span className="text-foreground">{l.name}</span>
               {stars ? (
-                <StarButton
+                <StarToggle
                   on={starred?.has(l.selector) ?? false}
                   label={l.name}
+                  className="ml-auto"
                   onClick={() => onToggleStar?.(l.selector)}
                 />
               ) : null}
@@ -151,9 +129,10 @@ export function StrategyMultiSelect({
               {o.kind === 'legwise' ? <span className="text-faint">live</span> : null}
               {o.stale ? <span className="text-warning">older version</span> : null}
               {stars ? (
-                <StarButton
+                <StarToggle
                   on={starred?.has(o.name) ?? false}
                   label={o.name}
+                  className="ml-auto"
                   onClick={() => onToggleStar?.(o.name)}
                 />
               ) : null}
