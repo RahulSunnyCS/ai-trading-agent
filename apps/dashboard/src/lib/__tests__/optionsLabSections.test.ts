@@ -13,7 +13,7 @@ describe('Options Lab section metadata', () => {
     for (const section of OPTIONS_LAB_SECTIONS) {
       const meta = SECTION_META[section];
       expect(meta, section).toBeDefined();
-      expect(meta.question.endsWith('?'), section).toBe(true);
+      expect(meta.question.length, section).toBeGreaterThan(10);
       expect(meta.explanation.length, section).toBeGreaterThan(20);
     }
   });

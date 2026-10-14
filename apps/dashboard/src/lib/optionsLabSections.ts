@@ -48,9 +48,9 @@ export const SECTION_META: Readonly<Record<OptionsLabSection, SectionMeta>> = {
   },
   strategies: {
     workspace: 'Build and test',
-    question: 'Which strategies run every evening?',
+    question: 'Everything you can trade, in one place',
     explanation:
-      'The saved strategies the evening run tests on every collected day, with each one’s latest saved result.',
+      'The rotation baskets and the saved strategies the evening run tests every day. Star the ones you care about: starred items are the default in Correlation.',
   },
   builder: {
     workspace: 'Build and test',

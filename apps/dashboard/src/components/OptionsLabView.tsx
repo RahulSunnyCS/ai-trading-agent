@@ -38,7 +38,7 @@ import { RegimesPanel } from './optionslab/RegimesPanel';
 import { RotationMatrixPanel } from './optionslab/RotationMatrixPanel';
 import { RotationPanel } from './optionslab/RotationPanel';
 import { RunsPanel } from './optionslab/RunsPanel';
-import { StrategiesPanel } from './optionslab/StrategiesPanel';
+import { StrategiesAndBasketsPanel } from './optionslab/StrategiesAndBasketsPanel';
 import { StrategyBuilder } from './optionslab/StrategyBuilder';
 import { YamlBacktest } from './optionslab/yaml/YamlBacktest';
 import { SegmentedControl, type SegmentedOption } from './ui/SegmentedControl';
@@ -86,7 +86,7 @@ export function OptionsLabView() {
         <p className="max-w-3xl text-sm text-muted">{meta.explanation}</p>
       </header>
       {section === 'heatmap' && <HeatmapPanel />}
-      {section === 'strategies' && <StrategiesPanel />}
+      {section === 'strategies' && <StrategiesAndBasketsPanel />}
       {section === 'builder' && (
         <BuilderSection
           mode={builderMode(rest)}

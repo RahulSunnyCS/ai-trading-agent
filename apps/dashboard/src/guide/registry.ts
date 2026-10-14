@@ -246,8 +246,9 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
   {
     chapter: 'optionslab',
     slug: 'strategies',
-    title: 'Strategies',
-    summary: 'The saved strategies the evening run tests every trading day.',
+    title: 'Strategies and baskets',
+    summary:
+      'The rotation baskets and the saved strategies the evening run tests every day; star your favourites.',
     kind: 'Screen',
     body: optionsStrategies,
     screen: { tab: 'optionslab', rest: ['strategies'] },

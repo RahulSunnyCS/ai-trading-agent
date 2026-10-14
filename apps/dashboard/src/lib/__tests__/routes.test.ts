@@ -207,7 +207,7 @@ describe('routes', () => {
     ['momentum', ['scores', 'sectors'], 'Momentum › Scores · AI Trading Agent'],
     ['momentum', [], 'Momentum › Backtest · AI Trading Agent'],
     ['momentum', ['nope'], 'Momentum › Backtest · AI Trading Agent'],
-    ['optionslab', ['strategies'], 'Options Lab › Strategies · AI Trading Agent'],
+    ['optionslab', ['strategies'], 'Options Lab › Strategies and baskets · AI Trading Agent'],
     ['optionslab', ['builder'], 'Options Lab › Builder · AI Trading Agent'],
     ['optionslab', ['builder', 'yaml'], 'Options Lab › Builder › YAML · AI Trading Agent'],
     ['optionslab', ['runs'], 'Options Lab › Runs · AI Trading Agent'],
