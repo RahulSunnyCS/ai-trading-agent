@@ -223,6 +223,37 @@ describe('templates', () => {
   });
 });
 
+describe('template names', () => {
+  it('writes a decimal premium into a valid file name', () => {
+    for (const premium of [62.5, 0.5, 65.333, 1e-7, 1e21, 100]) {
+      const s = buildTemplate('short_strangle_premium', 'NIFTY', { premium });
+      expect(STRATEGY_NAME_RE.test(s.id), `${premium} -> ${s.id}`).toBe(true);
+    }
+    expect(buildTemplate('short_strangle_premium', 'NIFTY', { premium: 62.5 }).id).toBe(
+      'nifty_short_strangle_premium_62p5',
+    );
+  });
+
+  it('never opens a template under the name of a saved strategy', () => {
+    const live = {
+      name: 'nifty_buy_range_breakout',
+      sha: 'a',
+      strategy: { ...newStrategy('NIFTY'), id: 'nifty_buy_range_breakout' },
+    } as SavedStrategy;
+    const started = strategyFromStart(
+      { kind: 'template', id: 'buy_range_breakout', underlying: 'NIFTY' },
+      [live],
+    );
+    expect(started?.name).toBe('nifty_buy_range_breakout_copy');
+    expect(started?.strategy.id).toBe('nifty_buy_range_breakout_copy');
+    // With nothing in the way it keeps its own name.
+    expect(
+      strategyFromStart({ kind: 'template', id: 'buy_range_breakout', underlying: 'NIFTY' }, [])
+        ?.name,
+    ).toBe('nifty_buy_range_breakout');
+  });
+});
+
 describe('starting a strategy', () => {
   const saved = [
     {

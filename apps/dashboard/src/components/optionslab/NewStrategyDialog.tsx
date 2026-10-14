@@ -7,7 +7,7 @@
  * unsaved and nothing is written until Save.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   DEFAULT_TEMPLATE_PREMIUM,
@@ -28,16 +28,19 @@ type Choice = TemplateId | 'copy' | 'blank';
 const COPY_VALUE = 'copy';
 const BLANK_VALUE = 'blank';
 
-/** Strategies to copy from: the starred ones first, then the rest, each group by name. */
+/**
+ * Strategies to copy from: the starred ones first, then the rest, each group by name. A star is
+ * kept under the strategy's id (what Correlation names it), which can differ from its file name,
+ * so either counts.
+ */
 export function copyOptions(
   saved: readonly SavedStrategy[],
   starred: ReadonlySet<string>,
 ): { name: string; starred: boolean }[] {
-  const names = [...saved.map((s) => s.name)].sort((a, b) => a.localeCompare(b));
-  return [
-    ...names.filter((n) => starred.has(n)).map((name) => ({ name, starred: true })),
-    ...names.filter((n) => !starred.has(n)).map((name) => ({ name, starred: false })),
-  ];
+  const rows = saved
+    .map((s) => ({ name: s.name, starred: starred.has(s.strategy.id) || starred.has(s.name) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return [...rows.filter((r) => r.starred), ...rows.filter((r) => !r.starred)];
 }
 
 /** The premium typed in, as a number; null when it is not a positive amount. */
@@ -68,7 +71,18 @@ export function NewStrategyDialog({
   const copies = useMemo(() => copyOptions(saved, starred), [saved, starred]);
   const [copyFrom, setCopyFrom] = useState('');
 
-  const copyName = copyFrom || copies[0]?.name || '';
+  // Each opening starts afresh, on the index of the strategy in hand: the dialog stays mounted,
+  // so its state would otherwise be whatever the first (or last) opening left behind.
+  useEffect(() => {
+    if (!open) return;
+    setUnderlying(initialUnderlying);
+    setChoice('short_strangle');
+    setPremiumText(String(DEFAULT_TEMPLATE_PREMIUM[initialUnderlying] ?? ''));
+    setCopyFrom('');
+  }, [open, initialUnderlying]);
+
+  // A copy source that has gone from the list falls back to the first one.
+  const copyName = copies.some((c) => c.name === copyFrom) ? copyFrom : (copies[0]?.name ?? '');
   const needsPremium =
     choice !== COPY_VALUE && choice !== BLANK_VALUE && templateInfo(choice).needsPremium;
   const premium = parsePremium(premiumText);
