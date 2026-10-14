@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner's "proper sweep over every parameter" before any of these families gets real money |
-| **Status** | In progress — Phase 0 registered; Stage 1 running |
+| **Status** | In progress — Stage 1 done and scored; Stage 2 waits for the owner's read |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-14 |
@@ -203,3 +203,38 @@ Every number reproducible from `packages/option-backtesting/research/bl102/`.
   new `robust.py breadth`) and 6 (PBO) and prints PENDING until they exist. W tail ratios
   (worst day and CVaR95 over the average day) and D re-entry net are now reported; the template
   appears in the band ranking so "the template is the best" is visible.
+- 2026-10-15 — **Stage 1 done** (42 cohorts, 63,426 cells, 488 days each, 04:00 IST; two workers,
+  ~4 h). Scored with `score.py` and `robust.py pbo` / `finalists` (rules 3 and 4 pending: they
+  need Stage 2 and the 25-slot run). Gate passes: W 4,682 / 24,206, D 7,862 / 16,526, B 701 /
+  22,694. Band winner vs template, ₹ per lot-day, after charges (in-sample):
+
+  | Band | Template | Best set | Best | Rules failed so far |
+  |---|---:|---|---:|---|
+  | W NIFTY A | 175 | OTM1 SL150 trail[15,10] no MTM, RE cost×1 | 283 | 1, 5, 6, 7 |
+  | W NIFTY B | 117 | ATM SL80 trail[25,15] no MTM | 268 | none |
+  | W NIFTY C | 124 | ATM SL150 no trail no MTM, RE cost×1 | 308 | 7 |
+  | W NIFTY D | 83 | ATM SL150 trail[25,15] MTM 4,000 | 196 | 7 |
+  | W SENSEX A | 90 | ₹200 SL40 trail[15,10] MTM 4,000, RE cost×1 | 214 | 1 |
+  | W SENSEX B | −115 | ₹320 SL40 no trail MTM 4,000, RE cost×1 | 253 | 5 |
+  | W SENSEX C | 76 | ₹320 SL40 trail[25,15] MTM 4,000, RE cost×1 | 242 | 7 |
+  | W SENSEX D | −15 | ₹200 SL40 trail[15,10] no MTM, RE cost×1 | 85 | none |
+  | D NIFTY A | 127 | OTM1 SL40 MTM 3,000 RE asap×1@13:00 trail[10,5] | 195 | 1, 5, 6, 7, 8 |
+  | D NIFTY B | 254 | ITM1 SL25 MTM 4,000 RE asap×1@13:00 trail[10,5] | 343 | 1, 2, 7, 8 |
+  | D NIFTY C | 238 | ATM SL25 MTM 2,000 RE cost×1 trail[10,5] | 297 | 1, 6, 7 |
+  | D NIFTY D | 51 | ITM2 SL25 MTM 3,000 RE asap×1 | 167 | 7, 8 |
+  | D SENSEX A | 251 | ITM1 SL25 no MTM RE cost×2 trail[10,5] | 434 | 2, 8 |
+  | D SENSEX B | 287 | ITM2 SL20 no MTM RE cost×2 trail[10,5] | 518 | 8 |
+  | D SENSEX C | 127 | ITM2 SL30 no MTM RE cost×2 trail[10,5] | 246 | 1, 8 |
+  | D SENSEX D | 16 | ITM2 SL40 no MTM RE cost×2 | 88 | 1, 5, 7, 8 |
+  | B NIFTY A–D | 28 / −46 / −90 / −66 | no set passes the gates | — | gates |
+  | B SENSEX A | −33 | ₹150, range 30, SL30, trail[3,3], MTM 2,000 | 158 | none |
+  | B SENSEX B | −41 | ₹225, range 30, SL40, target 100 %, trail[3,3], MTM 2,000 | 154 | none |
+  | B SENSEX C | −71 | ₹225, range 10, SL40, trail[9,3], MTM 2,000 | 226 | none |
+  | B SENSEX D | −49 | OTM1, range 30, SL40, target 100 %, MTM 1,000 | 44 | 5 |
+
+  Clean so far (rules 1, 2, 5, 6, 7, 8 pass): W NIFTY B, W SENSEX D, B SENSEX A, B, C. Rule 8
+  (re-entry parity open) blocks every SENSEX Dir winner, which all lean on RE COST ×2. PBO ≤ 0.5
+  in 38 of 42 cohorts; above it: W NIFTY 09:17 and 09:47, D NIFTY 09:17 / 09:32 / 13:02 (16
+  blocks). NIFTY Buy: no cell clears the gates in any band; the template stays. Wide-stop NIFTY
+  Widesl winners have worse worst days than the template (−₹16.6k vs −₹4.5k at 09:17) though
+  smaller drawdowns. Nominal SENSEX margin row and its test reverted (owner chose rupees per lot).
