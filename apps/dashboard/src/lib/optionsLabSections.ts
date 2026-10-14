@@ -56,7 +56,7 @@ export const SECTION_META: Readonly<Record<OptionsLabSection, SectionMeta>> = {
     workspace: 'Build and test',
     question: 'How would this strategy have done?',
     explanation:
-      'Build a strategy leg by leg, test it over a date range on real 1-minute prices, and save it.',
+      'Build a strategy, test it over a date range on real 1-minute prices, and save it.',
   },
   runs: {
     workspace: 'Build and test',

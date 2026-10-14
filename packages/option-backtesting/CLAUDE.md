@@ -240,7 +240,7 @@ Otherwise:
   As-of is the last COMPLETE session (every variant stored; a part-stored day is reported under `store.partial`
   and left out of windows and rank); the route's snapshot is keyed on the cube object plus the journal's stat, not a TTL.
   Journal figures are those on or before as-of. A stored variant outside the 12 cells is listed in `store.unplaced`.
-- `heatmap/` + `api/heatmap_routes.py` — BL-094, the Options Lab's Heatmap tab (default page): the P&L of an ATM
+- `heatmap/` + `api/heatmap_routes.py` — BL-094, the Options Lab's Heatmap page (Explore data): the P&L of an ATM
   short straddle for every entry time (09:16, then each half hour to 14:45), exit (15:30, 15:15) and per-leg SL
   (10..100 %, then "No SL": no stop, both legs held to the exit; `grid.NO_SL`, stored as `sl = 0`). `grid.py` restates the legwise engine's fills for the fixed two-leg shape (a test pins every cell to
   `simulate_day`); indices take ATM from the index spot, a stock (no spot, no strike step, mostly no lot size in the
