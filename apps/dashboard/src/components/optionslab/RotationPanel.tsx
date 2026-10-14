@@ -3,9 +3,11 @@
  * Baseline REF) are doing on days nobody had seen, against Baseline, the owner's fixed base and random baskets, and whether today's data can
  * be trusted (BL-058 Phase 4).
  *
- * Overview is the short daily surface: health/read-out, the current baskets, and the headline
- * and chart once a forward session has been scored. Journal and Research are intentional drill-down
- * modes, so their heavier widgets are not mounted while Overview is selected.
+ * One page, in reading order (BL-102): the list cards, health/read-out, the headline, chart and
+ * current baskets once a forward session has been scored; then What happened (the day log),
+ * Is the rule still working? and Experiments. The diagnostics sit in closed accordions that mount
+ * their widget only when opened, so the page stays light. The bands do not wait for the read-out:
+ * the day log loads alongside it.
  *
  * Gross only: the stored costs are zero. Lists are alternative baskets and are never added up.
  * Nothing on this page changes a list, a weight or the journal.
@@ -14,7 +16,6 @@
 import { useMemo, useState } from 'react';
 
 import { usePortfolioStop } from '../../hooks/usePortfolioStop';
-import { useQueryState } from '../../hooks/useQueryState';
 import { useRotationOverview, useRotationSummary } from '../../hooks/useRotation';
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { formatDay, formatIstTime, istToday } from '../../lib/format';
@@ -63,23 +64,9 @@ const BENCHMARK_OPTIONS: SegmentedOption<RotationBenchmark>[] = (
   ['base', 'REF', 'random'] as const
 ).map((value) => ({ value, label: BENCHMARK_LABEL[value] }));
 
-type RotationView = 'overview' | 'journal' | 'research';
-
-const VIEW_OPTIONS: SegmentedOption<RotationView>[] = [
-  { value: 'overview', label: 'Overview' },
-  { value: 'journal', label: 'Journal' },
-  { value: 'research', label: 'Research' },
-];
-
-function rotationView(value: string | null): RotationView {
-  return value === 'journal' || value === 'research' ? value : 'overview';
-}
-
 export function RotationPanel() {
   const overview = useRotationOverview();
   const summary = useRotationSummary();
-  const [viewParam, setViewParam] = useQueryState('rotationView');
-  const view = rotationView(viewParam);
   const [focus, setFocus] = useState<RotationListKey>('A');
   const [benchmark, setBenchmark] = useState<RotationBenchmark>('base');
   const [shown, setShown] = useState<ReadonlySet<RotationListKey>>(new Set(['A']));
@@ -160,16 +147,7 @@ export function RotationPanel() {
           label="Reload"
         />
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <SegmentedControl
-          value={view}
-          options={VIEW_OPTIONS}
-          onChange={setViewParam}
-          ariaLabel="Rotation view"
-          size="sm"
-        />
-        <p className="text-xs text-faint">{BENCHMARK_NOTE[benchmark]}</p>
-      </div>
+      <p className="text-xs text-faint">{BENCHMARK_NOTE[benchmark]}</p>
 
       {overview.error && overview.data ? (
         <StateMessage
@@ -215,7 +193,7 @@ export function RotationPanel() {
         />
       ) : s === null ? (
         <SkeletonRows rows={5} />
-      ) : view === 'overview' ? (
+      ) : (
         <>
           {isOn(portfolio) && s.n_days > 0 ? (
             <p className="text-xs text-muted" aria-live="polite">
@@ -333,57 +311,70 @@ export function RotationPanel() {
             </>
           )}
         </>
-      ) : view === 'journal' ? (
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-base font-semibold tracking-tight text-foreground">Journal</h2>
-            <p className="mt-0.5 text-sm text-muted">
-              What each list picked, what happened afterwards, and where the risk came from.
-            </p>
-          </div>
-          <RotationDailyLog focus={focus} portfolio={portfolio} />
-          <Accordion
-            title="Risk review"
-            description="Drawdowns and changes in the selected list"
-            defaultOpen={false}
-          >
-            <RotationDrawdowns list={focus} portfolio={portfolio} />
-            <RotationDrift list={focus} />
-          </Accordion>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-base font-semibold tracking-tight text-foreground">Research</h2>
-            <p className="mt-0.5 text-sm text-muted">
-              Diagnostics for understanding the ranking and its forward behaviour. Open only the
-              section you need.
-            </p>
-          </div>
-          <Accordion
-            title="Decision diagnostics"
-            description="Why the next basket looks the way it does"
-            defaultOpen
-          >
-            <RotationPulse focus={focus} />
-            <RotationExplain list={focus} onList={setFocus} />
-          </Accordion>
-          <Accordion
-            title="Market context"
-            description="Forward days versus research periods"
-            defaultOpen={false}
-          >
-            <RotationRegime />
-          </Accordion>
-          <Accordion
-            title="Shadow experiments"
-            description="Unregistered candidates and trigger studies"
-            defaultOpen={false}
-          >
-            <RotationShadowScoreboard />
-          </Accordion>
-        </div>
       )}
+
+      <section aria-labelledby="band-happened" className="space-y-3">
+        <header>
+          <h2 id="band-happened" className="text-base font-semibold tracking-tight text-foreground">
+            What happened
+          </h2>
+          <p className="mt-0.5 text-sm text-muted">
+            What each list picked, what happened afterwards, and where the risk came from.
+          </p>
+        </header>
+        <RotationDailyLog focus={focus} portfolio={portfolio} />
+        <Accordion
+          title="Drawdowns and selection drift"
+          description="How deep the falls were, and what the list has been holding"
+          defaultOpen={false}
+        >
+          <RotationDrawdowns list={focus} portfolio={portfolio} />
+          <RotationDrift list={focus} />
+        </Accordion>
+      </section>
+
+      <section aria-labelledby="band-working" className="space-y-3">
+        <header>
+          <h2 id="band-working" className="text-base font-semibold tracking-tight text-foreground">
+            Is the rule still working?
+          </h2>
+          <p className="mt-0.5 text-sm text-muted">
+            Diagnostics for the ranking and its forward behaviour. Open only what you need; each
+            loads when opened.
+          </p>
+        </header>
+        <Accordion
+          title="Why these picks, and is morning short-premium working?"
+          description="The family pulse, a pick criterion by criterion, and rank correlation"
+          defaultOpen={false}
+        >
+          <RotationPulse focus={focus} />
+          <RotationExplain list={focus} onList={setFocus} />
+        </Accordion>
+        <Accordion
+          title="What market did the forward days test?"
+          description="Forward days versus the research periods"
+          defaultOpen={false}
+        >
+          <RotationRegime />
+        </Accordion>
+      </section>
+
+      <section aria-labelledby="band-experiments" className="space-y-3">
+        <h2
+          id="band-experiments"
+          className="text-base font-semibold tracking-tight text-foreground"
+        >
+          Experiments
+        </h2>
+        <Accordion
+          title="Ideas being watched"
+          description="Unregistered candidates and trigger studies, each against what it replaced"
+          defaultOpen={false}
+        >
+          <RotationShadowScoreboard />
+        </Accordion>
+      </section>
     </div>
   );
 }
