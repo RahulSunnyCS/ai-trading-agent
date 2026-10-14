@@ -179,7 +179,8 @@ def strata(
     underlying: str,
 ) -> list[dict[str, Any]]:
     """Candidate and template rupees per lot-day, and the share of the edge (candidate minus
-    template, positive part pooled), by days-to-expiry bucket and by VIX band."""
+    template), by days-to-expiry bucket, by VIX band and by weekday. Weekday is reported only
+    (owner, 2026-10-15: a calendar label is not a mechanism); the regime flag reads DTE and VIX."""
     dte_key = "dte_n" if underlying == "NIFTY" else "dte_s"
     edge = candidate - template
     total_edge = edge.sum()
@@ -190,6 +191,7 @@ def strata(
         if a is None:
             groups[("dte", "unknown")].append(i)
             groups[("vix", "unknown")].append(i)
+            groups[("weekday", day.strftime("%a"))].append(i)
             continue
         dte = a.get(dte_key, "")
         label = "unknown"
@@ -198,6 +200,7 @@ def strata(
             label = next(name for name, lo, hi in DTE_BUCKETS if lo <= n <= hi)
         groups[("dte", label)].append(i)
         groups[("vix", a.get("vix_band", "unknown") or "unknown")].append(i)
+        groups[("weekday", a.get("weekday", "") or day.strftime("%a"))].append(i)
     for (kind, label), idx in sorted(groups.items()):
         ix = np.array(idx)
         rows.append(
@@ -276,7 +279,9 @@ def check_finalists(
                 (
                     s["edge_share"]
                     for s in strata_rows
-                    if s["bucket"] != "unknown" and not math.isnan(s["edge_share"])
+                    if s["stratum"] in ("dte", "vix")
+                    and s["bucket"] != "unknown"
+                    and not math.isnan(s["edge_share"])
                 ),
                 default=float("nan"),
             )

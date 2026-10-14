@@ -176,3 +176,10 @@ Every number reproducible from `packages/option-backtesting/research/bl102/`.
   488-day NIFTY∩SENSEX set equal its charged fit+holdout nets (N ₹47,223.19, S ₹1,24,069.94).
   BL-096's set keeps the two weekend sessions (2025-02-01, 2026-02-01) and drops two unmatched
   days; Stage 1 uses the registered per-underlying lists without weekends (488 each).
+- 2026-10-15 — owner asked whether parameters should vary by weekday (e.g. ₹50 premium on
+  some days, ₹80 on others). Decision: no — five times the trials on a fifth of the days each is
+  curve fitting, and day-type conditioning already lives in the rotation's picker (BL-058),
+  which chooses among fixed strategies by weekday / DTE / VIX. Weekday is added to the Stage-3
+  strata read-out as a reported stratum only (not a flag). A single mechanism-based split
+  (expiry day vs not) may become its own pre-registered item after Stage 3 if the strata
+  warrant it.
