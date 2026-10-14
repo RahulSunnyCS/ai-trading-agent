@@ -9,7 +9,7 @@ There are three products inside it:
 | Product | In one line | Where |
 |---|---|---|
 | **Momentum** | Each Friday, rank ETFs or stocks by how strongly they have been rising, hold the leaders, sell the ones that fall back. Backtest the rule over ten years, and get the weekly buy/sell list. | [Momentum](app:/momentum/backtest) |
-| **Options Lab** | Build an intraday index-options strategy leg by leg (for example a short straddle with a stop loss), and test it on real 1-minute option prices, day by day. | [Options Lab](app:/optionslab/results) |
+| **Options Lab** | Build an intraday index-options strategy leg by leg (for example a short straddle with a stop loss), and test it on real 1-minute option prices, day by day. | [Options Lab](app:/optionslab) |
 | **Data & operations** | The jobs that collect market data every day, the broker logins they need, and the settings. | [Jobs](app:/jobs) |
 
 ## What it does not do

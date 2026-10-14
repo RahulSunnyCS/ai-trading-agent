@@ -145,3 +145,9 @@ None open; the owner answered them on 2026-10-14 (Log).
   New strategy templates are Short strangle, Buy range breakout and Short strangle at a premium;
   Builder design A (leg grid) chosen over a sentence design and a collapsible-sections draft.
   Delivery: backlog first, then Phase 1, 1b, 1c as separate PRs. Phase 1 started.
+- 2026-10-14 — Phase 1 built. Deviation from the plan: Daily results is hidden from the sidebar but
+  its URL still opens the page (it does not redirect to Today yet), because the evening run's Run
+  button lives only on that page until Today's status pill exists (Phase 2); the redirect lands
+  with that. Strategies' "View results" now opens Runs filtered by the strategy (`?strategy=`). No
+  separate "How to read this" link was added: the top bar already carries "How this works" for
+  every screen.
