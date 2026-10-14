@@ -63,10 +63,4 @@ export const SECTION_META: Readonly<Record<OptionsLabSection, SectionMeta>> = {
     question: 'What have I tested, and did it get better?',
     explanation: 'Every backtest in one list. Tick two of the same kind to compare them.',
   },
-  results: {
-    workspace: 'Build and test',
-    question: 'How did each saved strategy do, day by day?',
-    explanation:
-      'Daily results are no longer part of the main workflow; the evening run and its history are still here.',
-  },
 };
