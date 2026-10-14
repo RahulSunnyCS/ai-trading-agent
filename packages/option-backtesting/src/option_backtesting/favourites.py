@@ -81,7 +81,7 @@ def clean(lists: object, strategies: object) -> tuple[tuple[str, ...], tuple[str
 
     seen: dict[str, None] = {}
     for name in strategies:
-        if not isinstance(name, str) or not STRATEGY_RE.match(name):
+        if not isinstance(name, str) or not STRATEGY_RE.fullmatch(name):
             raise FavouritesError(f"{name!r} is not a strategy name (letters, digits, underscore)")
         seen.setdefault(name, None)
     if len(seen) > MAX_STRATEGIES:
@@ -119,19 +119,23 @@ def write(lists: object, strategies: object, root: Path | None = None) -> Favour
     """Replace the favourites. Validated first; the file is written to a temp name and renamed
     into place, so a reader never sees a half-written file."""
     kept_lists, kept_strategies = clean(lists, strategies)
-    updated = datetime.now(IST).isoformat(timespec="seconds")
-    payload = {
-        "lists": list(kept_lists),
-        "strategies": list(kept_strategies),
-        "updated_at": updated,
-    }
     path = favourites_path(root)
     with _write_lock(root):
+        updated = datetime.now(IST).isoformat(timespec="seconds")
+        payload = {
+            "lists": list(kept_lists),
+            "strategies": list(kept_strategies),
+            "updated_at": updated,
+        }
         fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".favourites.", suffix=".tmp")
         try:
             with os.fdopen(fd, "w") as handle:
                 json.dump(payload, handle, indent=2)
                 handle.write("\n")
+                handle.flush()
+                os.fsync(
+                    handle.fileno()
+                )  # a crash must not leave an empty file that reads as defaults
             os.replace(tmp, path)
         except BaseException:
             Path(tmp).unlink(missing_ok=True)
