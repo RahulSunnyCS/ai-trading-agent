@@ -33,7 +33,7 @@ from ..analytics import regime_source
 from ..fyers.daily import UNDERLYINGS, data_dir
 from ..legwise import anatomy, evening, forensics, store
 from ..legwise.daily import load_history, load_strategy_files, telegram_failure
-from ..legwise.engine import DayResult, run_legwise, simulate_day
+from ..legwise.engine import DayResult, run_legwise, simulate_day, skipped_summary
 from ..legwise.market import BAR_SIZES, UnsupportedOn5m, available_days, load_day, minute_label
 from ..legwise.schema import LegwiseStrategy
 from ..presets import STRATEGIES_DIR
@@ -221,7 +221,13 @@ def backtest(body: BacktestBody) -> Any:
     except UnsupportedOn5m as error:
         return _error(422, str(error))
     if not results:
-        return _error(404, f"no collected {strategy.underlying} days in that range")
+        message = f"no collected {strategy.underlying} days in that range"
+        if skipped:
+            # Days were found but none could run (5-minute bars need snapshots, a day was
+            # excluded by data_quality): say why instead of calling the range empty.
+            reasons = sorted({r.partition(": ")[0] for r in skipped.values()})[:3]
+            message += f" ({skipped_summary(skipped)}; {'; '.join(reasons)})"
+        return _error(404, message)
     # Kept as an `adhoc` run: every builder experiment stays queryable with the exact
     # settings that produced it. A setting at its default is not recorded, so a run made
     # before these options existed and one made with the defaults read the same.

@@ -63,12 +63,14 @@ def test_backtest_without_collected_days_is_a_clear_404(client):
     assert "no collected NIFTY days" in response.json()["error"]
 
 
-def _capture_run(monkeypatch, result=None, raises=None):
+def _capture_run(monkeypatch, result=None, raises=None, skip=None):
     """Replace the engine run with one that records how it was called."""
     calls = []
 
     def fake(strategy, root, start=None, end=None, **kwargs):
         calls.append(kwargs)
+        if skip:
+            kwargs["skipped"].update(skip)
         if raises is not None:
             raise raises
         return result or []
@@ -97,6 +99,19 @@ def test_backtest_refuses_an_unknown_bar_size_before_running(client, monkeypatch
     response = client.post("/legwise/backtest", json={"strategy": STRATEGY, "bars": "15m"})
     assert response.status_code == 422 and "bars must be one of" in response.json()["error"]
     assert calls == []
+
+
+def test_days_that_exist_but_could_not_run_are_not_called_an_empty_range(client, monkeypatch):
+    skip = {
+        date(2014, 3, 3): "no 5-minute snapshot (tdata derived rebuild)",
+        date(2014, 3, 4): "no 5-minute snapshot (tdata derived rebuild)",
+    }
+    _capture_run(monkeypatch, skip=skip)
+    response = client.post("/legwise/backtest", json={"strategy": STRATEGY, "bars": "5m"})
+    assert response.status_code == 404
+    error = response.json()["error"]
+    assert error.startswith("no collected NIFTY days in that range")  # the old text still leads
+    assert "2 days skipped" in error and "no 5-minute snapshot" in error
 
 
 def test_a_strategy_five_minute_bars_cannot_run_is_a_422_with_the_reason(client, monkeypatch):
