@@ -34,7 +34,7 @@ MAX_SELECTORS = 40
 CACHE_SECONDS = 30.0  # results are written nightly; a picker should not re-read 248 files a click
 LIST_CACHE_SECONDS = 120.0  # the list series replay the daily log (about 8 s cold)
 _SELECTOR_RE = re.compile(r"^[A-Za-z0-9_:*?.+\[\]-]{1,80}$")
-_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
+_NAME_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,80}$")  # `:` for a rotation list, `list:A`
 
 _cache: dict[str, Any] = {"at": 0.0, "root": None, "value": None}
 _list_cache: dict[str, Any] = {"at": 0.0, "root": None, "value": None}
@@ -219,6 +219,8 @@ def correlation(
             for a in chosen
             if a.kind == rseries.LIST_KIND
         },
+        # What each kind of series is measured in, so a list beside a strategy is not misread.
+        "basis": {k: v for k, v in rseries.BASIS.items() if k in set(report.kinds)},
         "in_sample": True,
     }
 
