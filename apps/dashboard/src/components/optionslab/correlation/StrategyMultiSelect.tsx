@@ -1,10 +1,9 @@
 'use client';
 
-import { Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { cn } from '../../../lib/cn';
 import { Input } from '../../ui/Input';
+import { StarToggle } from '../../ui/StarToggle';
 
 interface Option {
   name: string;
@@ -31,28 +30,6 @@ interface Props {
 }
 
 const SHOWN = 60;
-
-function StarButton({ on, label, onClick }: { on: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      aria-label={`${on ? 'Remove the star from' : 'Star'} ${label}`}
-      title={on ? 'Starred: opens in the comparison by default' : 'Star: open with this by default'}
-      onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onClick();
-      }}
-      className={cn(
-        'ml-auto rounded p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        on ? 'text-warning' : 'text-faint hover:text-muted',
-      )}
-    >
-      <Star className={cn('h-3.5 w-3.5', on && 'fill-current')} aria-hidden="true" />
-    </button>
-  );
-}
 
 /**
  * The comparison's members (BL-094, BL-102): the rotation lists first (Steady, Calendar,
@@ -114,8 +91,8 @@ export function StrategyMultiSelect({
           </li>
         ) : null}
         {listMatches.map((l) => (
-          <li key={l.selector}>
-            <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-surface-2">
+          <li key={l.selector} className="flex items-center gap-1 rounded px-2 hover:bg-surface-2">
+            <label className="flex flex-1 cursor-pointer items-center gap-2 py-1">
               <input
                 type="checkbox"
                 checked={picked.has(l.selector)}
@@ -123,14 +100,14 @@ export function StrategyMultiSelect({
                 aria-label={l.name}
               />
               <span className="text-foreground">{l.name}</span>
-              {stars ? (
-                <StarButton
-                  on={starred?.has(l.selector) ?? false}
-                  label={l.name}
-                  onClick={() => onToggleStar?.(l.selector)}
-                />
-              ) : null}
             </label>
+            {stars ? (
+              <StarToggle
+                on={starred?.has(l.selector) ?? false}
+                label={l.name}
+                onClick={() => onToggleStar?.(l.selector)}
+              />
+            ) : null}
           </li>
         ))}
         {shown.length > 0 ? (
@@ -139,25 +116,26 @@ export function StrategyMultiSelect({
           </li>
         ) : null}
         {shown.map((o) => (
-          <li key={o.name}>
-            <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-surface-2">
+          <li key={o.name} className="flex items-center gap-1 rounded px-2 hover:bg-surface-2">
+            <label className="flex flex-1 cursor-pointer items-center gap-2 py-1">
               <input
                 type="checkbox"
                 checked={picked.has(o.name)}
                 disabled={o.stale && !picked.has(o.name)}
                 onChange={() => toggle(o.name)}
+                aria-label={o.name}
               />
               <span className="font-mono text-foreground">{o.name}</span>
               {o.kind === 'legwise' ? <span className="text-faint">live</span> : null}
               {o.stale ? <span className="text-warning">older version</span> : null}
-              {stars ? (
-                <StarButton
-                  on={starred?.has(o.name) ?? false}
-                  label={o.name}
-                  onClick={() => onToggleStar?.(o.name)}
-                />
-              ) : null}
             </label>
+            {stars ? (
+              <StarToggle
+                on={starred?.has(o.name) ?? false}
+                label={o.name}
+                onClick={() => onToggleStar?.(o.name)}
+              />
+            ) : null}
           </li>
         ))}
         {matches.length === 0 && listMatches.length === 0 ? (

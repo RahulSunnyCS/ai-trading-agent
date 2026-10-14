@@ -4,13 +4,16 @@
  * The stars on Strategies and baskets (BL-102), read and written through
  * `/api/backtest/legwise/favourites`.
  *
- * A toggle shows at once (optimistic) and is sent in order, one request at a time, so two quick
- * clicks cannot land out of order. When a save fails the stars go back to what the server last
- * confirmed and a toast says so. Until the server has answered, `set` is null: a picker that
- * defaults to the favourites waits for it instead of guessing.
+ * A toggle shows at once (optimistic). Saves go one at a time, and each one sends what the
+ * person wants *now*, not what they wanted when it was queued, so a failed save followed by a
+ * newer toggle cannot leave the screen and the server disagreeing, and two quick clicks are one
+ * round trip, not a race. Once the saves have settled the screen goes back to the server's own
+ * copy, so a change made on another device is shown, and a failed last save is simply undone
+ * (with a toast). Until the server has answered, `set` is null: a picker that defaults to the
+ * favourites waits for it instead of guessing.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { toast } from '../components/ui/Toast';
 import { apiPut } from '../lib/api';
@@ -29,39 +32,53 @@ export const FAVOURITES_URL = '/api/backtest/legwise/favourites';
 
 export function useFavourites() {
   const resource = usePolledResource<Favourites>(FAVOURITES_URL, { cache: true });
-  // What the screen shows after a toggle, until the server's own answer arrives.
+  // What the screen shows while a save is outstanding; null when the server's copy is shown.
   const [local, setLocal] = useState<FavouriteSet | null>(null);
-  // The last set the server confirmed, kept for the rollback; null until the first save.
-  const confirmed = useRef<FavouriteSet | null>(null);
-  // The set the next toggle starts from (a ref, so two clicks in one frame both count).
-  const latest = useRef<FavouriteSet | null>(null);
-  const queue = useRef<Promise<void>>(Promise.resolve());
+  // What the person wants, until a save of exactly that has finished; null when nothing is
+  // outstanding. A ref, so two clicks in one frame both build on the same latest set.
+  const desired = useRef<FavouriteSet | null>(null);
+  const saving = useRef(false);
+  const { refetch } = resource;
+
+  const pump = useCallback(() => {
+    if (saving.current) return;
+    const sending = desired.current;
+    if (sending === null) return;
+    saving.current = true;
+    void apiPut<Favourites>(FAVOURITES_URL, sending).then((result) => {
+      saving.current = false;
+      if (!result.ok) toast(`The star could not be saved: ${result.error}`, 'error');
+      if (desired.current === sending) {
+        // Nothing newer was asked for: settled. Show the server's copy again and re-read it.
+        desired.current = null;
+        if (result.ok)
+          setLocal(setOf(result.data)); // until the re-read lands, no flicker
+        else setLocal(null);
+        refetch();
+      } else {
+        pump(); // a newer toggle arrived while this one was saving: send that instead
+      }
+    });
+  }, [refetch]);
+
+  // The re-read has arrived: the server's copy is what the screen shows from here on.
+  useEffect(() => {
+    if (resource.data && desired.current === null && !saving.current) setLocal(null);
+  }, [resource.data]);
 
   const server = resource.data ? setOf(resource.data) : null;
   const set = local ?? server;
 
   const apply = useCallback(
     (next: (current: FavouriteSet) => FavouriteSet) => {
-      const base = latest.current ?? (resource.data ? setOf(resource.data) : null);
+      const base = desired.current ?? (resource.data ? setOf(resource.data) : null);
       if (base === null) return;
-      if (confirmed.current === null) confirmed.current = base;
       const updated = next(base);
-      latest.current = updated;
+      desired.current = updated;
       setLocal(updated);
-      queue.current = queue.current.then(async () => {
-        const result = await apiPut<Favourites>(FAVOURITES_URL, updated);
-        if (result.ok) {
-          confirmed.current = setOf(result.data);
-          return;
-        }
-        // Roll back to what the server holds; later queued saves carry their own full set.
-        latest.current = confirmed.current;
-        setLocal(confirmed.current);
-        toast(`The star could not be saved: ${result.error}`, 'error');
-      });
-      void queue.current.then(() => resource.refetch());
+      pump();
     },
-    [resource],
+    [resource.data, pump],
   );
 
   return {

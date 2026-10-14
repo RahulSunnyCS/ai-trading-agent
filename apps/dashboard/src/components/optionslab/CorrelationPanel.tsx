@@ -202,13 +202,15 @@ function Filters({
                 : undefined
             }
           />
-          <button
-            type="button"
-            onClick={() => setFilters({ names: [...state.defaultNames] })}
-            className="mt-1 w-fit text-xs text-primary hover:underline"
-          >
-            Reset to favourites
-          </button>
+          {starred.size > 0 ? (
+            <button
+              type="button"
+              onClick={() => setFilters({ names: [...state.defaultNames] })}
+              className="mt-1 w-fit text-xs text-primary hover:underline"
+            >
+              Reset to favourites
+            </button>
+          ) : null}
         </div>
       </div>
       {filters.names.length > 0 ? (
