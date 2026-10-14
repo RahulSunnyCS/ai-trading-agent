@@ -43,7 +43,7 @@ export function parseRupees(
 function parseNonNegative(
   text: string,
 ): { ok: true; value: number } | { ok: false; error: string } {
-  const t = text.trim().replace(/^₹\s*/, '').replace(/%$/, '');
+  const t = text.trim();
   if (t === '') return { ok: true, value: 0 };
   if (!/^\d+(\.\d+)?$/.test(t)) return { ok: false, error: 'Use a number, 0 or more.' };
   return { ok: true, value: Number(t) };
@@ -175,7 +175,7 @@ export function StrategyTokens({
               errors={slots.no_reentry_after}
               placeholder="13:00"
               onCommit={(text) => {
-                if (text.trim() === '' || text.trim() === OFF) {
+                if (['', OFF, 'off', 'none'].includes(text.trim().toLowerCase())) {
                   const { no_reentry_after: _drop, ...rest } = strategy;
                   onChange(rest);
                   return null;

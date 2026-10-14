@@ -78,7 +78,7 @@ export function LegGrid({
   return (
     <div className="space-y-2">
       <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full min-w-[46rem] table-fixed border-collapse text-xs">
+        <table className="w-full min-w-[54rem] table-fixed border-collapse text-xs">
           <colgroup>
             <col className="w-[5.5rem]" />
             <col className="w-[3.5rem]" />
@@ -250,7 +250,7 @@ export function LegGrid({
                           }
                           className={cn('px-0.5', together ? 'text-primary' : 'text-faint')}
                         >
-                          <Link2 className="h-3.5 w-3.5" aria-label="Paired" />
+                          <Link2 className="h-3.5 w-3.5" role="img" aria-label="Paired" />
                         </span>
                       ) : null}
                       {leg.range_breakout ? (
@@ -328,7 +328,7 @@ export function LegGrid({
         >
           <input
             type="checkbox"
-            checked={together}
+            checked={together && anyPair}
             disabled={!anyPair}
             onChange={(event) => onTogetherChange(event.target.checked)}
           />

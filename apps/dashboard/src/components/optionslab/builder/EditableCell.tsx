@@ -42,40 +42,45 @@ export function EditableCell({
   const [problem, setProblem] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
-  const cancelled = useRef(false);
+  /** Set by Enter and Esc so the blur that follows the input unmounting does not act again. */
+  const done = useRef(false);
 
   useEffect(() => {
     if (editing) input.current?.select();
   }, [editing]);
 
   function open() {
-    cancelled.current = false;
+    done.current = false;
     setDraft(seed ?? (display === OFF ? '' : display));
     setProblem(null);
     setEditing(true);
   }
 
-  function close() {
+  /** Close the editor. `refocus` only after Enter or Esc: a blur is the browser already moving focus. */
+  function close(refocus: boolean) {
+    done.current = true;
     setEditing(false);
     setProblem(null);
-    // Give focus back so keyboard users carry on from the same cell.
-    queueMicrotask(() => opener.current?.focus());
+    if (refocus) {
+      // Give focus back so keyboard users carry on from the same cell.
+      queueMicrotask(() => opener.current?.focus());
+    }
   }
 
-  function commit() {
+  function commit(refocus: boolean) {
+    if (done.current) return;
     const message = onCommit(draft);
-    if (message === null) close();
+    if (message === null) close(refocus);
     else setProblem(message);
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'Enter') {
       event.preventDefault();
-      commit();
+      commit(true);
     } else if (event.key === 'Escape') {
       event.preventDefault();
-      cancelled.current = true;
-      close();
+      close(true);
     }
   }
 
@@ -97,9 +102,8 @@ export function EditableCell({
           }}
           onKeyDown={onKeyDown}
           onBlur={() => {
-            if (cancelled.current) return;
             // Leaving the cell keeps a valid value; an invalid one is left open and explained.
-            commit();
+            commit(false);
           }}
           className={cn(
             'h-7 w-full min-w-14 rounded border bg-surface px-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30',
@@ -135,6 +139,7 @@ export function EditableCell({
       )}
     >
       {display}
+      {message ? <span className="sr-only"> ({message})</span> : null}
     </button>
   );
 }

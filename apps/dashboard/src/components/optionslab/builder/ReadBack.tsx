@@ -15,9 +15,13 @@ export function ReadBack({
   checking,
 }: {
   strategy: LegwiseStrategy;
-  /** One plain sentence per problem the validator found; empty when it is ready. */
+  /** One plain sentence per problem the validator found; empty when it found none. */
   problems: readonly string[];
-  /** True while the validator has not answered for the current edit. */
+  /**
+   * True while the validator has not answered for the current edit, or could not be reached:
+   * "Ready to run" is only said when it has answered and found nothing, so the parent must pass
+   * `checking` for any state in which it has no answer.
+   */
   checking: boolean;
 }) {
   const ready = problems.length === 0 && !checking;
@@ -28,7 +32,8 @@ export function ReadBack({
         <p className="mt-1 text-xs leading-relaxed text-muted">{readBack(strategy)}</p>
       </section>
       <section
-        aria-label="Ready to run"
+        aria-label={problems.length > 0 ? 'What to fix' : 'Ready to run'}
+        aria-live="polite"
         className={cn(
           'rounded-lg border px-3 py-2.5 text-xs',
           problems.length > 0 ? 'border-negative/40' : 'border-border',
@@ -41,9 +46,11 @@ export function ReadBack({
               {problems.length === 1 ? '1 thing to fix' : `${problems.length} things to fix`}
             </p>
             <ul className="mt-1 space-y-0.5 text-muted">
-              {problems.slice(0, 5).map((p) => (
-                <li key={p}>{p}</li>
+              {problems.slice(0, 5).map((p, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: two legs can share a message
+                <li key={`${i}-${p}`}>{p}</li>
               ))}
+              {problems.length > 5 ? <li>…and {problems.length - 5} more.</li> : null}
             </ul>
           </>
         ) : (
@@ -53,7 +60,7 @@ export function ReadBack({
               ready ? 'text-positive' : 'text-muted',
             )}
           >
-            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+            {ready ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : null}
             {ready ? 'Ready to run' : 'Checking…'}
           </p>
         )}

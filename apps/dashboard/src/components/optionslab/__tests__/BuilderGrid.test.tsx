@@ -303,6 +303,44 @@ describe('token parsers', () => {
   });
 });
 
+describe('EditableCell focus', () => {
+  it('does not pull focus back to the cell when it is left with a blur', async () => {
+    render(
+      <>
+        <EditableCell display="115%" ariaLabel="Stop" onCommit={() => null} />
+        <button type="button">elsewhere</button>
+      </>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Stop: 115%' }));
+    const input = screen.getByRole('textbox', { name: 'Stop' });
+    fireEvent.change(input, { target: { value: '25%' } });
+    const elsewhere = screen.getByRole('button', { name: 'elsewhere' });
+    elsewhere.focus();
+    fireEvent.blur(input);
+    await Promise.resolve();
+    expect(document.activeElement).toBe(elsewhere);
+  });
+
+  it('puts focus back on the cell after Enter', async () => {
+    render(<EditableCell display="115%" ariaLabel="Stop" onCommit={() => null} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Stop: 115%' }));
+    const input = screen.getByRole('textbox', { name: 'Stop' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await Promise.resolve();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Stop: 115%' }));
+  });
+
+  it('commits once when Enter is followed by a blur', () => {
+    const onCommit = vi.fn(() => null);
+    render(<EditableCell display="115%" ariaLabel="Stop" onCommit={onCommit} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Stop: 115%' }));
+    const input = screen.getByRole('textbox', { name: 'Stop' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.blur(input);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('ReadBack', () => {
   it('reads the strategy back and says it is ready', () => {
     render(<ReadBack strategy={newStrategy('NIFTY')} problems={[]} checking={false} />);
@@ -321,6 +359,7 @@ describe('ReadBack', () => {
     );
     expect(screen.getByText('1 thing to fix')).toBeTruthy();
     expect(screen.getByText('Exit must be after entry')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'What to fix' })).toBeTruthy();
     rerender(<ReadBack strategy={newStrategy('NIFTY')} problems={[]} checking />);
     expect(screen.getByText('Checking…')).toBeTruthy();
     expect(screen.queryByText('Ready to run')).toBeNull();
