@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { SavedStrategy } from '../../../types/legwise';
@@ -59,6 +60,42 @@ describe('NewStrategyDialog helpers', () => {
     expect(parsePremium(' 72.5 ')).toBe(72.5);
     for (const bad of ['', ' ', '0', '-3', 'abc', '1e999'])
       expect(parsePremium(bad), bad).toBeNull();
+  });
+});
+
+describe('NewStrategyDialog opening', () => {
+  function Host({ underlying }: { underlying: 'NIFTY' | 'SENSEX' }) {
+    const [open, setOpen] = useState(true);
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>
+          reopen
+        </button>
+        <NewStrategyDialog
+          open={open}
+          onOpenChange={setOpen}
+          saved={[saved('a_strategy')]}
+          starred={new Set()}
+          onStart={() => undefined}
+          initialUnderlying={underlying}
+        />
+      </>
+    );
+  }
+
+  it('opens on the index of the strategy in hand, and starts afresh each time', () => {
+    const { rerender } = render(<Host underlying="NIFTY" />);
+    expect((screen.getByLabelText('Index') as HTMLSelectElement).value).toBe('NIFTY');
+    fireEvent.change(screen.getByLabelText('Index'), { target: { value: 'BANKNIFTY' } });
+    fireEvent.click(screen.getByRole('radio', { name: /Blank/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    // The strategy in hand is now a SENSEX one; reopening shows SENSEX and the first choice.
+    rerender(<Host underlying="SENSEX" />);
+    fireEvent.click(screen.getByRole('button', { name: 'reopen' }));
+    expect((screen.getByLabelText('Index') as HTMLSelectElement).value).toBe('SENSEX');
+    expect(
+      (screen.getByRole('radio', { name: /^Short strangle —/ }) as HTMLInputElement).checked,
+    ).toBe(true);
   });
 });
 

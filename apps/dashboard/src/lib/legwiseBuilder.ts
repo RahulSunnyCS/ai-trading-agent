@@ -269,6 +269,14 @@ function templateLeg(
   return { id, lots: 1, position, option_type: optionType, expiry: 'weekly', strike, ...extra };
 }
 
+/** A premium as part of a file name: 65 -> "65", 62.5 -> "62p5"; never a dot or an exponent. */
+function premiumTag(premium: number): string {
+  const rounded = Math.round(premium * 100) / 100;
+  const text =
+    Number.isFinite(rounded) && rounded < 1e6 ? String(rounded) : String(Math.round(premium));
+  return text.replace(/[^0-9]/g, 'p').slice(0, 12);
+}
+
 /**
  * A valid starting strategy for `underlying`, using only what the form can edit. `premium`
  * (rupees) is read by `short_strangle_premium` only; without one it falls back to the index's
@@ -318,7 +326,7 @@ export function buildTemplate(
       );
     return {
       ...base,
-      id: `${prefix}_short_strangle_premium_${premium}`,
+      id: `${prefix}_short_strangle_premium_${premiumTag(premium)}`,
       entry_time: '09:17',
       exit_time: '15:25',
       legs: [leg('ce', 'CE'), leg('pe', 'PE')],
@@ -414,10 +422,14 @@ export function strategyFromStart(
     return { name: strategy.id, strategy };
   }
   if (spec.kind === 'template') {
-    const strategy = buildTemplate(spec.id, spec.underlying, {
+    const built = buildTemplate(spec.id, spec.underlying, {
       ...(spec.premium !== undefined ? { premium: spec.premium } : {}),
     });
-    return { name: strategy.id, strategy };
+    // A template never opens under the name of a strategy that already exists (the live
+    // nifty_buy_range_breakout, say), so a Save cannot overwrite it by accident.
+    const taken = new Set(saved.flatMap((s) => [s.name, s.strategy.id]));
+    const name = taken.has(built.id) ? copyName(built.id.replace(/_copy$/, ''), taken) : built.id;
+    return { name, strategy: { ...built, id: name } };
   }
   const source = saved.find((s) => s.name === spec.name);
   if (!source) return null;
