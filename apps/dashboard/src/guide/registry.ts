@@ -256,7 +256,7 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
   {
     chapter: 'optionslab',
     slug: 'builder-form',
-    title: 'Builder: Form mode',
+    title: 'Builder: leg grid',
     summary: 'Build a strategy leg by leg, backtest it over a date range, and save it.',
     kind: 'Screen',
     body: optionsBuilderForm,
@@ -265,7 +265,7 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
   {
     chapter: 'optionslab',
     slug: 'builder-yaml',
-    title: 'Builder: YAML mode',
+    title: 'Builder: YAML engine',
     summary:
       'The older rule engine, where a strategy is written as text rather than built in a form.',
     kind: 'Screen',

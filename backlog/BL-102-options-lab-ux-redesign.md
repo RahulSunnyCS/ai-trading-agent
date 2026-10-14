@@ -165,6 +165,9 @@ None open; the owner answered them on 2026-10-14 (Log).
   the code so the page could come back; the owner asked for the page to go once Today carried the
   run bar. DayForensics stays (the day log opens it); the anatomy chips and the Daily-results
   parts of `lib/legwiseResults.ts` / `legwiseJoin.ts` are now unused and left for a clean-up.
+- 2026-10-15 — Phase 3: Regimes is its own Advanced group in the sidebar and the Builder's YAML
+  mode is labelled "YAML engine (advanced)". Heatmap has chips and a drawer (PR #224). Not done: moving Correlation and Regimes
+  inline controls into a run bar plus drawer (Phase 2's last bullet, "only if time allows").
 - 2026-10-15 — Builder wired to the leg grid (PR #227). Not built from the Phase 1c plan: arrow-key
   movement between grid cells (a cell edits with click or Enter, and Tab moves on, but there is no
   arrow navigation), a read-only "View as YAML", the one-popover backtest settings (they sit in the
