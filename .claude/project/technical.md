@@ -236,6 +236,9 @@ ai-trading-agent/
 ├── scripts/install-biome.sh         # root-level tooling (downloads the Biome binary), not app code
 ├── deploy/cloudflared/              # tunnel config template for serving the research APIs from a laptop (docs/remote-dashboard.md)
 ├── deploy/launchd/                  # the one LaunchAgent that keeps apps/scheduler running + install/uninstall (BL-012)
+├── research/                        # findings notes only, one page per strategy × variable: options/strategies/<family>/,
+│                                     # options/common/, momentum/ (rules: research/README.md). Not the research CODE,
+│                                     # which lives in packages/option-backtesting/research/blNNN/ and momentum's search_spaces/
 ├── apps/
 │   ├── server/                      # @ata/server — the Fastify/Bun backend
 │   │   ├── package.json · tsconfig.json · vitest.config.ts · vitest.workspace.ts
