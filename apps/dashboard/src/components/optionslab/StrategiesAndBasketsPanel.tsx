@@ -18,7 +18,7 @@ import { useState } from 'react';
 import { useAppRoute } from '../../hooks/useAppRoute';
 import { useFavourites } from '../../hooks/useFavourites';
 import { useLegwiseResults, useLegwiseStrategies } from '../../hooks/useLegwise';
-import { useRotationOverview, useRotationSummary } from '../../hooks/useRotation';
+import { useRotationSummary } from '../../hooks/useRotation';
 import { correlateHref } from '../../lib/favourites';
 import { formatDay, formatInr, formatInt } from '../../lib/format';
 import { lastResultOf, legsSummary } from '../../lib/optionsRuns';
@@ -76,6 +76,7 @@ function BasketCard({
   stats,
   firstDay,
   starred,
+  ready,
   onStar,
   onOpenToday,
   onCorrelate,
@@ -84,6 +85,8 @@ function BasketCard({
   stats: RotationListStats | null;
   firstDay: string | null;
   starred: boolean;
+  /** False until the stars have loaded: starring and correlating wait for them. */
+  ready: boolean;
   onStar: () => void;
   onOpenToday: () => void;
   onCorrelate: () => void;
@@ -99,7 +102,7 @@ function BasketCard({
           <h3 className="text-sm font-semibold text-foreground">{info.name}</h3>
           <p className="text-xs text-muted">{info.note}</p>
         </div>
-        <StarToggle on={starred} label={info.name} onClick={onStar} size="md" />
+        <StarToggle on={starred} label={info.name} onClick={onStar} size="md" disabled={!ready} />
       </div>
       <dl className="space-y-1 text-xs">
         <div className="flex justify-between gap-3">
@@ -126,13 +129,16 @@ function BasketCard({
           </div>
         ) : null}
       </dl>
-      <p className="text-[11px] text-faint">Gross, two lots per strategy, forward days only.</p>
+      <p className="text-[11px] text-faint">
+        Gross, two lots per strategy, forward days only, without a portfolio stop (the Rotation page
+        can apply one).
+      </p>
       <div className="mt-auto flex flex-wrap gap-2 pt-1">
         <Button size="sm" variant="secondary" onClick={onOpenToday}>
           <LayoutDashboard className="h-3.5 w-3.5" />
           Open in Today
         </Button>
-        <Button size="sm" variant="ghost" onClick={onCorrelate}>
+        <Button size="sm" variant="ghost" disabled={!ready} onClick={onCorrelate}>
           <GitCompareArrows className="h-3.5 w-3.5" />
           Correlate
         </Button>
@@ -145,7 +151,6 @@ export function StrategiesAndBasketsPanel() {
   const { navigate } = useAppRoute();
   const strategies = useLegwiseStrategies();
   const results = useLegwiseResults();
-  const overview = useRotationOverview();
   const summary = useRotationSummary();
   const favourites = useFavourites();
   const [show, setShow] = useState<Show>('all');
@@ -154,14 +159,21 @@ export function StrategiesAndBasketsPanel() {
   const saved = results.data?.results ?? [];
   const set = favourites.set;
   const starredOnly = show === 'starred';
+  // Stars decide what "Starred only" shows and what can be starred: until they have loaded
+  // there is nothing to filter by and nothing to change.
+  const ready = set !== null;
+  const waitingForStars = starredOnly && !ready;
 
-  const shownRows = starredOnly ? rows.filter((r) => favourites.isStrategyStarred(r.name)) : rows;
+  // Stars are kept by strategy id: it is what Correlation's series are named, and it can differ
+  // from the file name (`row.name`), which only "Open in builder" needs.
+  const shownRows = starredOnly
+    ? rows.filter((r) => favourites.isStrategyStarred(r.strategy.id))
+    : rows;
   const shownBaskets = starredOnly ? BASKETS.filter((k) => favourites.isListStarred(k)) : BASKETS;
 
   const refresh = () => {
     strategies.refetch();
     results.refetch();
-    overview.refetch();
     summary.refetch();
     favourites.refetch();
   };
@@ -192,6 +204,11 @@ export function StrategiesAndBasketsPanel() {
       </div>
 
       {favourites.warning ? <p className="text-xs text-warning">{favourites.warning}</p> : null}
+      {summary.error && !summary.data ? (
+        <p className="text-xs text-warning">
+          The forward figures could not be read ({summary.error}), so the baskets show dashes.
+        </p>
+      ) : null}
       {favourites.error && !set ? (
         <p className="text-xs text-warning">
           The stars could not be loaded ({favourites.error}), so they cannot be changed right now.
@@ -203,7 +220,9 @@ export function StrategiesAndBasketsPanel() {
           title="Baskets"
           description="Each rotation list picks three strategies and a Buy every morning at 09:16."
         />
-        {shownBaskets.length === 0 ? (
+        {waitingForStars ? (
+          <SkeletonRows rows={2} />
+        ) : shownBaskets.length === 0 ? (
           <StateMessage
             variant="empty"
             title="No basket is starred"
@@ -218,6 +237,7 @@ export function StrategiesAndBasketsPanel() {
                 stats={summary.data?.lists[key] ?? null}
                 firstDay={summary.data?.first_day ?? null}
                 starred={favourites.isListStarred(key)}
+                ready={ready}
                 onStar={() => favourites.toggleList(key)}
                 onOpenToday={() => navigate('optionslab', 'rotation')}
                 onCorrelate={() => correlate(`list:${key}`)}
@@ -231,6 +251,7 @@ export function StrategiesAndBasketsPanel() {
             <StarToggle
               on={favourites.isListStarred('REF')}
               label={LIST_INFO.REF.name}
+              disabled={!ready}
               onClick={() => favourites.toggleList('REF')}
             />
             {LIST_INFO.REF.name}: {LIST_INFO.REF.note.toLowerCase()}
@@ -239,16 +260,12 @@ export function StrategiesAndBasketsPanel() {
             <StarToggle
               on={favourites.isListStarred('base')}
               label="Fixed base"
+              disabled={!ready}
               onClick={() => favourites.toggleList('base')}
             />
             Fixed base: 2 × Widesl OTM1 09:17 + 1 × Dir ATM 09:24
           </span>
         </div>
-        {overview.error && !overview.data ? (
-          <p className="mt-2 text-xs text-warning">
-            The forward figures could not be read ({overview.error}).
-          </p>
-        ) : null}
       </Card>
 
       <Card>
@@ -271,6 +288,8 @@ export function StrategiesAndBasketsPanel() {
             title="No saved strategies yet"
             description="Build one in the Builder and save it; it will be listed here and run by the evening job."
           />
+        ) : waitingForStars ? (
+          <SkeletonRows rows={3} />
         ) : shownRows.length === 0 ? (
           <StateMessage
             variant="empty"
@@ -303,9 +322,10 @@ export function StrategiesAndBasketsPanel() {
                     <TRow key={row.name}>
                       <Td>
                         <StarToggle
-                          on={favourites.isStrategyStarred(row.name)}
+                          on={favourites.isStrategyStarred(row.strategy.id)}
                           label={row.name}
-                          onClick={() => favourites.toggleStrategy(row.name)}
+                          disabled={!ready}
+                          onClick={() => favourites.toggleStrategy(row.strategy.id)}
                         />
                       </Td>
                       <Td className="font-medium" title={`Version ${row.sha.slice(0, 7)}`}>
@@ -355,8 +375,13 @@ export function StrategiesAndBasketsPanel() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            disabled={!set}
-                            onClick={() => correlate(row.name)}
+                            disabled={!set || last === null}
+                            title={
+                              last === null
+                                ? 'No saved results for this version, so there is nothing to compare'
+                                : undefined
+                            }
+                            onClick={() => correlate(row.strategy.id)}
                           >
                             <GitCompareArrows className="h-3.5 w-3.5" />
                             Correlate

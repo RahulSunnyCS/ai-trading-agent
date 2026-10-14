@@ -26,7 +26,7 @@ build and test.
 | Explore data | [Matrix](app:/optionslab/matrix) | Where the strategy variants make or lose money, by start time, date and condition. [Guide](guide:optionslab/rotation-matrix) |
 | Explore data | [Correlation](app:/optionslab/correlation) | Which strategies lose on the same days. [Guide](guide:optionslab/correlation) |
 | Explore data | [Regimes](app:/optionslab/regimes) | Labels each day Quiet, Chop, Trend up or Trend down, and tests whether those labels last. [Guide](guide:optionslab/regimes) |
-| Build and test | [Strategies](app:/optionslab/strategies) | The saved strategies the evening run tests every trading day, with each one's latest result. [Guide](guide:optionslab/strategies) |
+| Build and test | [Strategies and baskets](app:/optionslab/strategies) | The rotation baskets and the saved strategies the evening run tests every trading day, each with its latest result; star your favourites. [Guide](guide:optionslab/strategies) |
 | Build and test | [Builder](app:/optionslab/builder) | Build a strategy leg by leg, backtest it over a date range, save it. A YAML mode writes strategies as text instead. [Guide](guide:optionslab/builder-form) |
 | Build and test | [Runs](app:/optionslab/runs) | Every backtest run in one list; tick two to compare. [Guide](guide:optionslab/runs) |
 

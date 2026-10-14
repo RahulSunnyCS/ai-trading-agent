@@ -129,7 +129,7 @@ export const NAV_GROUPS: NavGroup[] = [
           { segment: 'matrix', label: 'Matrix', group: 'Explore data' },
           { segment: 'correlation', label: 'Correlation', group: 'Explore data' },
           { segment: 'regimes', label: 'Regimes', group: 'Explore data' },
-          { segment: 'strategies', label: 'Strategies', group: 'Build and test' },
+          { segment: 'strategies', label: 'Strategies and baskets', group: 'Build and test' },
           { segment: 'builder', label: 'Builder', group: 'Build and test' },
           { segment: 'runs', label: 'Runs', group: 'Build and test' },
           { segment: 'results', label: 'Daily results', group: 'Build and test', hidden: true },
