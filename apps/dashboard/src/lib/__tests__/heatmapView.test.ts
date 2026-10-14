@@ -114,34 +114,48 @@ describe('settingsChips', () => {
       'Time vs SL',
       '14 Oct 2026',
       'Exit 15:30',
-      'Rupees',
+      'Rupees per lot',
     ]);
   });
 
-  it('gives a range for a summed time-vs-SL table', () => {
+  it('names the unit by what the table is in: a stock is points per share', () => {
+    expect(settingsChips({ ...base, underlying: 'RELIANCE', kind: 'stock' })).toContain(
+      'Points per share',
+    );
+    expect(
+      settingsChips({ ...base, underlying: 'RELIANCE', kind: 'stock', metric: 'pct' }),
+    ).toContain('% of premium');
+  });
+
+  it('gives a range for a summed time-vs-SL table, and one day for a one-day range', () => {
     expect(settingsChips({ ...base, to: '2026-10-14', date: '2026-10-01' })).toContain(
       '01 Oct 2026 to 14 Oct 2026',
     );
+    const one = settingsChips({ ...base, to: '2026-10-14', date: '2026-10-14' });
+    expect(one).toContain('14 Oct 2026');
+    expect(one.join('|')).not.toContain(' to ');
   });
 
   it('adds the stop for date vs time and the entry for date vs SL', () => {
     const dateTime = settingsChips({ ...base, view: 'date_time', to: '2026-10-14' });
     expect(dateTime).toContain('SL 10%');
-    const noSl = settingsChips({ ...base, view: 'date_time', sl: 0, to: '2026-10-14' });
-    expect(noSl).toContain('SL No SL');
-    const dateSl = settingsChips({ ...base, view: 'date_sl', to: '2026-10-14' });
-    expect(dateSl).toContain('Entry 09:45');
+    expect(settingsChips({ ...base, view: 'date_time', sl: 0, to: '2026-10-14' })).toContain(
+      'No stop',
+    );
+    expect(settingsChips({ ...base, view: 'date_sl', to: '2026-10-14' })).toContain('Entry 09:45');
   });
 
-  it('names a pooled stock view, the percent unit and the weeks filter', () => {
+  it('names a pooled stock view, the split and the expiry-week filter', () => {
     const chips = settingsChips({
       ...base,
       underlying: 'ALLSTOCKS',
       metric: 'pct',
       weeks: [0, 1],
+      split: true,
     });
     expect(chips[0]).toBe('All stocks');
     expect(chips).toContain('% of premium');
-    expect(chips).toContain('Weeks to expiry 0, 1');
+    expect(chips).toContain('CE and PE apart');
+    expect(chips).toContain('Expiry week of, 1 out');
   });
 });

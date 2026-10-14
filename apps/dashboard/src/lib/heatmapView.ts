@@ -127,6 +127,8 @@ export function toCsv(r: HeatmapResponse, split: boolean): string {
 export function settingsChips(s: {
   view: keyof typeof VIEW_LABEL;
   underlying: string;
+  /** An index is in rupees per lot, a stock in points per share. Default: an index. */
+  kind?: 'index' | 'stock';
   date: string;
   from: string;
   to: string;
@@ -135,18 +137,29 @@ export function settingsChips(s: {
   exit: string;
   metric: HeatmapMetric;
   weeks: readonly number[];
+  /** CE and PE shown apart instead of as one straddle. */
+  split?: boolean;
 }): string[] {
+  const days = (a: string, b: string) => {
+    const from = formatDay(a);
+    const to = formatDay(b);
+    return !b || from === to ? from : `${from} to ${to}`;
+  };
   const chips = [s.underlying === ALL_STOCKS ? 'All stocks' : s.underlying, VIEW_LABEL[s.view]];
   if (s.view === 'time_sl') {
-    chips.push(s.to ? `${formatDay(s.date)} to ${formatDay(s.to)}` : formatDay(s.date));
+    chips.push(days(s.date, s.to));
   } else {
+    chips.push(days(s.from || s.to, s.from ? s.to : ''));
     chips.push(
-      s.from && s.to ? `${formatDay(s.from)} to ${formatDay(s.to)}` : formatDay(s.to || s.from),
+      s.view === 'date_time' ? (s.sl === NO_SL ? 'No stop' : `SL ${s.sl}%`) : `Entry ${s.time}`,
     );
-    chips.push(s.view === 'date_time' ? `SL ${slOptionLabel(s.sl)}` : `Entry ${s.time}`);
   }
   chips.push(`Exit ${s.exit}`);
-  chips.push(s.metric === 'pct' ? '% of premium' : 'Rupees');
-  if (s.weeks.length > 0) chips.push(`Weeks to expiry ${s.weeks.join(', ')}`);
+  const stock = s.kind === 'stock' || s.underlying === ALL_STOCKS;
+  chips.push(s.metric === 'pct' ? '% of premium' : stock ? 'Points per share' : 'Rupees per lot');
+  if (s.split) chips.push('CE and PE apart');
+  if (s.weeks.length > 0) {
+    chips.push(`Expiry week ${s.weeks.map((w) => (w === 0 ? 'of' : `${w} out`)).join(', ')}`);
+  }
   return chips;
 }

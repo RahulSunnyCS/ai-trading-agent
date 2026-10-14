@@ -306,7 +306,7 @@ function Controls({
   }));
   return (
     <Card>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
         <div className="flex flex-col gap-1 text-xs text-muted">
           Table configuration
           <Select
@@ -406,7 +406,7 @@ function Controls({
         ) : null}
       </div>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2">
         <div className="flex flex-col gap-1 text-xs text-muted sm:col-span-2">
           Index
           <SegmentedControl
@@ -679,7 +679,11 @@ function HeatmapBody({ available }: { available: HeatmapAvailable }) {
     params && s.view === 'time_sl' && s.to
       ? { ...params, date: undefined, from: s.date, to: s.to }
       : params;
-  const chips = settingsChips(s);
+  const chips = settingsChips({
+    ...s,
+    kind: s.info?.kind === 'stock' ? 'stock' : 'index',
+    split: s.split === 'split',
+  });
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2">
