@@ -8,7 +8,8 @@ look-alikes, and to build a basket whose parts are not.
 
 | Control | What it does |
 |---|---|
-| Strategies to compare | A tick list of every strategy that has results. The screen opens on three: NIFTY Widesl, Dir and Buy at 09:17. Tick more to add them, or type in the box to narrow the list. |
+| To compare | A tick list with two groups: the rotation **lists** (Steady, Calendar, Adaptive and the old live rotation) and every **strategy** that has results. The screen opens on your starred items; if nothing is starred it opens on three: NIFTY Widesl, Dir and Buy at 09:17. Tick more to add them, or type in the box to narrow the list. |
+| Star | The star beside a list or strategy marks a favourite. Starred items are what the screen opens on, on any browser or device. **Reset to favourites** puts the ticks back to them. |
 | Start time | Adds a whole entry slot on top of the ticked strategies, e.g. every 09:32 variant. "Any start time" adds none (capped at 80 strategies at once). |
 | Family | Widesl, Dir or Buy, or one closest-premium family. "Widesl" includes the closest-premium variants. |
 | Index | NIFTY, SENSEX or both. |
@@ -17,6 +18,8 @@ look-alikes, and to build a basket whose parts are not.
 | Measure | Which matrix the grid shows: daily P&L, the rank of daily P&L, or loss days. |
 
 The filters combine: start time 09:17 and index NIFTY adds the NIFTY strategies that start at 09:17, on top of the ticked ones.
+
+A list is compared by what it made each day: the gross per lot-day of the three strategies and the Buy it picked, so it can sit beside a single strategy in the grid. Days before the forward journal began are re-scored from history; a line under the summary says how many of the compared days were, so they are never mistaken for recorded ones.
 The address bar holds your choices, so a link opens the same comparison.
 
 New strategies appear on their own. A strategy is listed once it has saved days: a new rotation
