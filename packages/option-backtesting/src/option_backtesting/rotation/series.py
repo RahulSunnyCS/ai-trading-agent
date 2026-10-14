@@ -5,7 +5,11 @@ Nothing here is a fixed list. A strategy is found because it has results:
 * a rotation variant: a CSV in `TRADING_DATA_ROOT/rotation/results/` (a new YAML under
   `strategies/rotation/` gets one the first evening `obt rotation update` runs);
 * a legwise strategy: saved `daily` results in the trading-data catalog (a new YAML under
-  `strategies/legwise/` gets them from `obt daily` or `obt legwise rerun`).
+  `strategies/legwise/` gets them from `obt daily` or `obt legwise rerun`);
+* a rotation list (`list:A`, `list:B`, `list:C`, `list:REF`, BL-102): the list's own daily gross
+  per lot-day, from the journal's recorded days plus the earlier days the history re-scores
+  (`daylog.reconstruction`). These are built only when a selector asks for one (about 8 s cold),
+  never by `available()`, and a day's source is kept so a reader can label reconstructed days.
 
 Legwise results belong to a version of the strategy (a hash of its validated settings). Only the
 file's current version counts; a strategy whose saved days are all of an older version is listed
@@ -20,6 +24,7 @@ the day it has results: an exact name, a glob (`N_*_0917`, `nifty_*`), `all`, `s
 from __future__ import annotations
 
 import fnmatch
+import json
 import re
 from dataclasses import dataclass, field
 from datetime import date
@@ -39,6 +44,12 @@ from .variants import is_buy, is_dir, is_wide
 LEGWISE_DIR = STRATEGIES_DIR / "legwise"
 DEFAULT_SELECTORS = ["slot:0917"]
 
+#: Rotation lists a `list:<key>` selector can name, and the selector prefix.
+LIST_KEYS = ("A", "B", "C", "REF")
+LIST_PREFIX = "list:"
+LIST_KIND = "list"
+_LIST_NAMES_FILE = Path(__file__).with_name("list_names.json")
+
 
 class SelectorError(ValueError):
     pass
@@ -53,6 +64,9 @@ class Available:
     n_days: int
     stale: bool = False
     values: dict[date, float] = field(default_factory=dict, repr=False, compare=False)
+    #: Days of `values` that were re-scored from history, not recorded in the forward journal
+    #: (rotation lists only; empty for strategies).
+    reconstructed: frozenset[date] = field(default=frozenset(), repr=False, compare=False)
 
     def series(self) -> Series:
         return Series(self.name, self.kind, self.values)
@@ -116,6 +130,62 @@ def available(root: Path | None = None, strategies_dir: Path | None = None) -> l
     return out
 
 
+def list_names() -> dict[str, str]:
+    """{key: display name} for the rotation lists, from the file the Telegram messages share."""
+    return json.loads(_LIST_NAMES_FILE.read_text())
+
+
+def is_list_selector(selector: str) -> bool:
+    """True when a selector needs the rotation list series (`list:A`, `kind:list`, or a `+` mix)."""
+    return any(
+        part.startswith(LIST_PREFIX) or part == f"kind:{LIST_KIND}"
+        for part in selector.split("+")
+        if part
+    )
+
+
+def lists_available(root: Path | None = None) -> list[Available]:
+    """One series per rotation list: its gross per lot-day on every day it is scored, recorded or
+    re-scored. Reads the daily log, so a journal that cannot be read raises JournalCorrupt rather
+    than returning a partial history."""
+    from . import daylog  # deferred: daylog is heavy and most callers never need list series
+
+    root = root or data_dir()
+    log = daylog.build_log(root, start=date(2000, 1, 1), source="all")
+    values: dict[str, dict[date, float]] = {key: {} for key in LIST_KEYS}
+    rescored: dict[str, set[date]] = {key: set() for key in LIST_KEYS}
+    for row in log["rows"]:
+        day = date.fromisoformat(row["day"])
+        if row["source"] not in ("recorded", "reconstructed"):
+            continue
+        for key in LIST_KEYS:
+            block = (row.get("lists") or {}).get(key)
+            if not block or block.get("per_lot_day") is None:
+                continue
+            # A late entry is not forward and is not part of the lists' record.
+            if row["source"] == "recorded" and not (row.get("recorded") or {}).get("on_time"):
+                continue
+            values[key][day] = float(block["per_lot_day"])
+            if row["source"] == "reconstructed":
+                rescored[key].add(day)
+    out = []
+    for key in LIST_KEYS:
+        v = values[key]
+        if v:
+            out.append(
+                Available(
+                    f"{LIST_PREFIX}{key}",
+                    LIST_KIND,
+                    min(v),
+                    max(v),
+                    len(v),
+                    values=v,
+                    reconstructed=frozenset(rescored[key]),
+                )
+            )
+    return out
+
+
 _SLOT = re.compile(r"^\d{1,2}:?\d{2}$")
 
 
@@ -125,7 +195,8 @@ def _matches(selector: str, a: Available) -> bool:
         return all(_matches(part, a) for part in selector.split("+") if part)
     key, sep, arg = selector.partition(":")
     if selector == "all":
-        return True
+        # Every strategy; a rotation list is a basket of them, so it never counts as one.
+        return a.kind != LIST_KIND
     if sep and key == "kind":
         return a.kind == arg
     if sep and key in ("slot", "family", "index"):
@@ -182,6 +253,9 @@ def load(
     include_stale: bool = False,
     strategies_dir: Path | None = None,
 ) -> list[Series]:
-    """Series for the selectors, enumerated fresh each call."""
+    """Series for the selectors, enumerated fresh each call. A `list:<key>` selector also brings
+    in the rotation list series, which are built only then."""
     avail = available(root, strategies_dir)
+    if any(is_list_selector(s) for s in selectors or []):
+        avail = [*avail, *lists_available(root)]
     return [a.series() for a in resolve(selectors, avail, include_stale)]

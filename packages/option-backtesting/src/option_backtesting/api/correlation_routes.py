@@ -2,7 +2,8 @@
 Correlation tab (BL-090). The maths is `analytics/correlation.py` and the strategies are found by
 `rotation/series.py`, the same code `obt rotation corr` runs; nothing here computes a figure.
 
-    GET /legwise/correlation/available   what has results now, and the groups a picker offers
+    GET /legwise/correlation/available   what has results now, the groups a picker offers, and
+                                         the rotation lists a `list:<key>` selector can name
     GET /legwise/correlation             the matrices, per-strategy stats, basket, drift
     GET /legwise/correlation/pick        a basket whose members are not alike (in-sample)
 
@@ -22,6 +23,7 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 from ..analytics import correlation as c
+from ..rotation import journal
 from ..rotation import series as rseries
 from ..rotation.variants import is_dir, is_wide
 
@@ -30,10 +32,12 @@ router = APIRouter(prefix="/legwise/correlation")
 MAX_STRATEGIES = 80  # a matrix this size is ~25k numbers a measure; more is unreadable anyway
 MAX_SELECTORS = 40
 CACHE_SECONDS = 30.0  # results are written nightly; a picker should not re-read 248 files a click
+LIST_CACHE_SECONDS = 120.0  # the list series replay the daily log (about 8 s cold)
 _SELECTOR_RE = re.compile(r"^[A-Za-z0-9_:*?.+\[\]-]{1,80}$")
 _NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
 
 _cache: dict[str, Any] = {"at": 0.0, "root": None, "value": None}
+_list_cache: dict[str, Any] = {"at": 0.0, "root": None, "value": None}
 
 
 def _error(status: int, message: str) -> JSONResponse:
@@ -53,6 +57,24 @@ def _available() -> list[rseries.Available]:
         return _cache["value"]
     value = rseries.available(root)
     _cache.update(at=now, root=root, value=value)
+    return value
+
+
+def _lists() -> list[rseries.Available]:
+    """The rotation list series, built only when a selector asks for one and cached a little
+    longer than the strategies (the journal changes twice a day)."""
+    from ..fyers.daily import data_dir
+
+    root = data_dir()
+    now = time.monotonic()
+    if (
+        _list_cache["value"] is not None
+        and _list_cache["root"] == root
+        and now - _list_cache["at"] < LIST_CACHE_SECONDS
+    ):
+        return _list_cache["value"]
+    value = rseries.lists_available(root)
+    _list_cache.update(at=now, root=root, value=value)
     return value
 
 
@@ -80,7 +102,12 @@ def _selected(
     if isinstance(parsed, str):
         return _error(422, parsed)
     try:
-        chosen = rseries.resolve(parsed, _available(), include_stale)
+        pool = _available()
+        if any(rseries.is_list_selector(p) for p in parsed):
+            pool = [*pool, *_lists()]
+        chosen = rseries.resolve(parsed, pool, include_stale)
+    except journal.JournalCorrupt as error:
+        return _error(503, f"the rotation journal cannot be read: {error}")
     except rseries.SelectorError as error:
         return _error(404, str(error))
     if len(chosen) > MAX_STRATEGIES:
@@ -141,9 +168,16 @@ def available() -> Any:
             # closest-premium ones, `dir` includes Dir ITM1; a specific token counts itself too
             for token in _family_tokens(a.name, family):
                 groups["family"][token] += 1
+    names = rseries.list_names()
     return {
         "strategies": out,
         "groups": {k: dict(sorted(v.items())) for k, v in groups.items()},
+        # The rotation lists a `list:<key>` selector can name. Static (no history is read), so the
+        # picker opens at once; the series are built when a comparison asks for one.
+        "lists": [
+            {"key": key, "selector": f"{rseries.LIST_PREFIX}{key}", "name": names.get(key, key)}
+            for key in rseries.LIST_KEYS
+        ],
         "max_strategies": MAX_STRATEGIES,
         "default_selectors": rseries.DEFAULT_SELECTORS,
     }
@@ -171,12 +205,20 @@ def correlation(
         report = c.analyse([a.series() for a in chosen], start=start, end=end, window=window)
     except ValueError as error:
         return _error(422, str(error))
+    window_days = set(report.days)
     return {
         **c.to_json(report),
         "selectors": used,
         "from": start.isoformat() if start else None,
         "to": end.isoformat() if end else None,
         "stale": [a.name for a in chosen if a.stale],
+        # Per rotation list: how many of the compared days were re-scored from history rather
+        # than recorded forward, so the page can say so and never mix them up.
+        "reconstructed": {
+            a.name: len(window_days & a.reconstructed)
+            for a in chosen
+            if a.kind == rseries.LIST_KIND
+        },
         "in_sample": True,
     }
 
