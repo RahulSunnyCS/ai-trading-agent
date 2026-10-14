@@ -1,4 +1,4 @@
-# BL-102 — Full-factorial parameter sweep: Widesl (incl. ATM), Dir and Buy
+# BL-104 — Full-factorial parameter sweep: Widesl (incl. ATM), Dir and Buy
 
 | | |
 |---|---|
@@ -33,7 +33,7 @@ Not possible in the engine, so not swept: AlgoTest's "simple momentum" / symbol-
 
 For each family × index × entry band, either a parameter set that beats the current rotation
 template with evidence that survives the robustness checks, or a reasoned "keep the template".
-Every number reproducible from `packages/option-backtesting/research/bl102/`.
+Every number reproducible from `packages/option-backtesting/research/bl104/`.
 
 ## Out of scope
 
@@ -56,8 +56,8 @@ Every number reproducible from `packages/option-backtesting/research/bl102/`.
   legs symmetric; weekly expiry; partial square-off; `lot_sizing: current` at `SIZING_DATE`
   2026-10-12; slippage 0; charges = the BL-096 model (₹20 per order, STT 0.10 % → 0.15 % from
   2026-04-01, exchange, SEBI/IPFT, stamp, 18 % GST), plus the same trades re-priced at today's STT.
-- **Grid** (`research/bl102/grid.py`, version `bl102-stage1-2026-10-14`, **SHA `6a1078bb4fe68786`**,
-  held by `tests/unit/test_bl102_grid.py`):
+- **Grid** (`research/bl104/grid.py`, version `bl102-stage1-2026-10-14`, **SHA `6a1078bb4fe68786`**,
+  held by `tests/unit/test_bl104_grid.py`):
 
   | Family | Axes | Cells |
   |---|---|---|
@@ -238,3 +238,7 @@ Every number reproducible from `packages/option-backtesting/research/bl102/`.
   blocks). NIFTY Buy: no cell clears the gates in any band; the template stays. Wide-stop NIFTY
   Widesl winners have worse worst days than the template (−₹16.6k vs −₹4.5k at 09:17) though
   smaller drawdowns. Nominal SENSEX margin row and its test reverted (owner chose rupees per lot).
+- 2026-10-15 — **renumbered BL-102 → BL-104**: the Options Lab redesign took BL-102 first (committed
+  23:01 on 14 Oct, this item 23:28) and IDs are never reused. Folder `research/bl104/`, tests
+  `test_bl104_*`. The grid's internal label stays `bl102-stage1-2026-10-14`, since it is part of
+  the registered SHA `6a1078bb4fe68786`; PR #218 and its commits carry the old number.

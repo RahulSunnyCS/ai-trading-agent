@@ -1,4 +1,4 @@
-"""BL-102: do the template cells reproduce the earlier sweeps to the rupee?
+"""BL-104: do the template cells reproduce the earlier sweeps to the rupee?
 
 Compares the `template` rows of `results/<tag>/{W,D,B}_summary.csv` with the `baseline` rows of
 BL-097/098 (`research/bl097/results/{widesl,buy}_sweep_postcharge.csv`, `full_*` columns, the
@@ -6,7 +6,7 @@ per-underlying day lists WITH weekend sessions) and the charged Dir row of BL-09
 (`research/bl096/results/primary_diagnostics_charged.csv`, ATM / 21 / 3000 / 15:28 / cost1,
 fit + holdout = the 488 common sessions). Run the templates with `--weekends` for BL-097/098.
 
-    uv run python research/bl102/check_regression.py --tag regression490
+    uv run python research/bl104/check_regression.py --tag regression490
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 RESEARCH = HERE.parent
-COMPARE = (  # (bl102 column, earlier column suffix)
+COMPARE = (  # (bl104 column, earlier column suffix)
     ("n_days", "n_days"),
     ("gross_inr", "gross_inr"),
     ("charges_inr", "charges_inr"),

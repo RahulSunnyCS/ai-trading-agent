@@ -1,4 +1,4 @@
-"""BL-102 Stage 3: the robustness checks, from the stored day x cell series.
+"""BL-104 Stage 3: the robustness checks, from the stored day x cell series.
 
 pbo        CSCV / PBO per cohort over the whole Stage-1 matrix (every trial counts), at 8 and
            16 blocks. A numpy restatement of analytics/overfit.run_cscv (the stdlib one loops
@@ -10,8 +10,8 @@ finalists  for each band's top parameter set (score.py's band winners): the pool
            seed 20261012), the four half-years, the DTE and VIX strata (rotation/days.csv),
            and the correlation among the finalists (analytics/correlation.analyse).
 
-uv run python research/bl102/robust.py pbo --tag stage1 --family W
-uv run python research/bl102/robust.py finalists --tag stage1 --family all
+uv run python research/bl104/robust.py pbo --tag stage1 --family W
+uv run python research/bl104/robust.py finalists --tag stage1 --family all
 """
 
 from __future__ import annotations
@@ -361,7 +361,7 @@ def check_finalists(
     summary: list[dict[str, Any]] = []
     detail: list[dict[str, Any]] = []
     finalist_series: list[Series] = []
-    lines = ["# BL-102 Stage 3 — finalists vs their templates", ""]
+    lines = ["# BL-104 Stage 3 — finalists vs their templates", ""]
     for family in families:
         for w in read_winners(out_dir, family, top):
             index, band_ = w["index"], w["band"]
