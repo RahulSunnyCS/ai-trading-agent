@@ -50,6 +50,7 @@ import { RotationBaskets } from './rotation/RotationBaskets';
 import { RotationHeadline } from './rotation/RotationHeadline';
 import { RotationHealthStrip } from './rotation/RotationHealth';
 import { RotationHero } from './rotation/RotationHero';
+import { RotationListCards } from './rotation/RotationListCards';
 import { RotationReadoutBanner } from './rotation/RotationReadout';
 import { RotationVerdict } from './rotation/RotationVerdict';
 
@@ -273,6 +274,12 @@ export function RotationPanel() {
             </>
           ) : (
             <>
+              <RotationListCards
+                summary={shown_s}
+                baskets={overview.data?.baskets.lists}
+                focus={focus}
+                onFocus={setFocus}
+              />
               <RotationHeadline figures={figures} benchmarkLabel={bench?.label ?? ''} />
               {verdictFor ? <RotationVerdict verdict={verdictFor} /> : null}
               <Card>
