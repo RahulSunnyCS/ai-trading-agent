@@ -9,7 +9,7 @@ says what runs when, and when it is worth looking.
 | 08:00 | The broker accounts are logged into [AlgoTest](glossary:algotest) automatically. | [Jobs](app:/jobs) |
 | 08:05 | Nothing runs for Fyers: log in from [Broker logins](app:/brokerLogins) when you want Fyers data. Without a login, the evening run collects from Angel One. | [Broker logins](app:/brokerLogins) |
 | 09:00 | One Telegram message: did the logins work, is the data current. | Telegram |
-| 16:15 | The [evening run](glossary:evening-run): today's 1-minute option data is collected and every saved options strategy is run over it. A summary goes to Telegram. | [Today](app:/optionslab/rotation) |
+| 15:45 | The [evening run](glossary:evening-run): today's 1-minute option data is collected and every saved options strategy is run over it. A summary goes to Telegram. | [Today](app:/optionslab/rotation) |
 
 ## Every Friday
 

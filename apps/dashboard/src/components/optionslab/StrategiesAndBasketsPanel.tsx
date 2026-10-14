@@ -50,7 +50,7 @@ export function builderLoadHref(name: string): string {
   return `${buildPath('optionslab', 'builder')}?load=${encodeURIComponent(name)}`;
 }
 
-/** Runs reads `?strategy=<text>` to list one strategy's runs (Daily results is hidden, BL-102). */
+/** Runs reads `?strategy=<text>` to list one strategy's runs (Daily results was retired, BL-102). */
 export function resultsHref(strategyId: string): string {
   return `${buildPath('optionslab', 'runs')}?strategy=${encodeURIComponent(strategyId)}`;
 }
