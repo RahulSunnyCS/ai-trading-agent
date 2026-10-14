@@ -332,6 +332,8 @@ export interface CorrelationResponse {
   stale: string[];
   /** Per rotation list: how many compared days were re-scored from history, not recorded. */
   reconstructed?: Record<string, number>;
+  /** What each kind of series is measured in (`list`, `variant`, `legwise`), as plain words. */
+  basis?: Record<string, string>;
   in_sample: boolean;
 }
 

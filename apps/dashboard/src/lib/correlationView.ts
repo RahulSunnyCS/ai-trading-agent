@@ -73,6 +73,19 @@ export function reconstructedNotes(r: CorrelationResponse): string[] {
     });
 }
 
+/**
+ * When a rotation list is compared with a strategy, one sentence on what each is measured in, so
+ * the matrix is not misread: a list is gross per lot-day, a strategy is net per lot after costs.
+ * Empty when no list is compared or only lists are.
+ */
+export function basisNote(r: CorrelationResponse): string | null {
+  const basis = r.basis;
+  if (!basis?.list) return null;
+  const others = Object.entries(basis).filter(([kind]) => kind !== 'list');
+  if (others.length === 0) return null;
+  return `A list is ${basis.list}; a strategy is ${others.map(([, text]) => text).join(', or ')}. Correlation does not depend on the unit, but the net, drawdown and worst-day figures do.`;
+}
+
 export const DEFAULT_FILTERS: CorrelationFilters = {
   slot: ANY,
   family: ANY,

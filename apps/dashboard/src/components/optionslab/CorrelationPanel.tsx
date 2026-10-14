@@ -26,6 +26,7 @@ import {
   MEASURE_LABEL,
   MEASURE_NOTE,
   averagePairwise,
+  basisNote,
   buildSelectors,
   displayResponse,
   diversificationNote,
@@ -285,6 +286,7 @@ function Result({
   const raw = r;
   r = useMemo(() => displayResponse(raw), [raw]);
   const notes = useMemo(() => reconstructedNotes(raw), [raw]);
+  const basis = useMemo(() => basisNote(raw), [raw]);
   const matrix = useMemo(() => matrixOf(r, measure), [r, measure]);
   const view = useMemo(() => reorder(matrix, r.names, r.order), [matrix, r.names, r.order]);
   const rowAverage = useMemo(
@@ -301,8 +303,9 @@ function Result({
   return (
     <div className="space-y-5">
       <Summary r={r} matrix={r.pearson} />
-      {notes.length > 0 ? (
-        <ul className="space-y-0.5 text-xs text-muted" aria-label="Reconstructed days">
+      {notes.length > 0 || basis ? (
+        <ul className="space-y-0.5 text-xs text-muted" aria-label="About the lists">
+          {basis ? <li>{basis}</li> : null}
           {notes.map((note) => (
             <li key={note}>{note}</li>
           ))}
