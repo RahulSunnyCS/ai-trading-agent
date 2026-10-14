@@ -169,3 +169,10 @@ Every number reproducible from `packages/option-backtesting/research/bl102/`.
   workers (which read it) have finished. Regression: the weekend-less 488-day templates differ
   from BL-097/098 only by the two weekend sessions (four trades); NIFTY Widesl max drawdown and
   worst day match to the paisa. Stage 1 started 23:45 IST on 2 workers.
+- 2026-10-15 — **Regression to the rupee passed** (`check_regression.py --tag regression490`, the
+  templates run with `--weekends`): all six Widesl / Buy template cells equal the BL-097/098
+  `baseline` rows on every compared column over 490 days (net N_wide ₹1,13,165.91, S_wide
+  ₹1,26,435.10, N_buy ₹19,427.16, S_buy -₹9,192.57); the Dir templates summed over BL-096's
+  488-day NIFTY∩SENSEX set equal its charged fit+holdout nets (N ₹47,223.19, S ₹1,24,069.94).
+  BL-096's set keeps the two weekend sessions (2025-02-01, 2026-02-01) and drops two unmatched
+  days; Stage 1 uses the registered per-underlying lists without weekends (488 each).
