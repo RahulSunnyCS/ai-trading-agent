@@ -219,6 +219,8 @@ def correlation(
             for a in chosen
             if a.kind == rseries.LIST_KIND
         },
+        # What each kind of series is measured in, so a list beside a strategy is not misread.
+        "basis": {k: v for k, v in rseries.BASIS.items() if k in set(report.kinds)},
         "in_sample": True,
     }
 

@@ -35,11 +35,16 @@ MEASURES = ("pearson", "spearman", "loss")
 
 @dataclass(frozen=True)
 class Series:
-    """One strategy's daily net P&L."""
+    """One strategy's daily net P&L (a rotation list's: gross per lot-day)."""
 
     name: str
-    kind: str  # "variant" (a rotation variant file) | "legwise" (a saved legwise strategy)
+    # "variant" (a rotation variant file) | "legwise" (a saved legwise strategy) |
+    # "list" (a rotation list, `list:A`)
+    kind: str
     values: dict[date, float]
+    #: Days of `values` re-scored from history rather than recorded forward (lists only), so a
+    #: report can say how many of the compared days they were.
+    reconstructed: frozenset[date] = frozenset()
 
 
 @dataclass(frozen=True)

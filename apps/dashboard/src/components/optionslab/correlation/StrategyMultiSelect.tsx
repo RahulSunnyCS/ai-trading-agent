@@ -91,8 +91,8 @@ export function StrategyMultiSelect({
           </li>
         ) : null}
         {listMatches.map((l) => (
-          <li key={l.selector}>
-            <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-surface-2">
+          <li key={l.selector} className="flex items-center gap-1 rounded px-2 hover:bg-surface-2">
+            <label className="flex flex-1 cursor-pointer items-center gap-2 py-1">
               <input
                 type="checkbox"
                 checked={picked.has(l.selector)}
@@ -100,15 +100,14 @@ export function StrategyMultiSelect({
                 aria-label={l.name}
               />
               <span className="text-foreground">{l.name}</span>
-              {stars ? (
-                <StarToggle
-                  on={starred?.has(l.selector) ?? false}
-                  label={l.name}
-                  className="ml-auto"
-                  onClick={() => onToggleStar?.(l.selector)}
-                />
-              ) : null}
             </label>
+            {stars ? (
+              <StarToggle
+                on={starred?.has(l.selector) ?? false}
+                label={l.name}
+                onClick={() => onToggleStar?.(l.selector)}
+              />
+            ) : null}
           </li>
         ))}
         {shown.length > 0 ? (
@@ -117,26 +116,26 @@ export function StrategyMultiSelect({
           </li>
         ) : null}
         {shown.map((o) => (
-          <li key={o.name}>
-            <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-surface-2">
+          <li key={o.name} className="flex items-center gap-1 rounded px-2 hover:bg-surface-2">
+            <label className="flex flex-1 cursor-pointer items-center gap-2 py-1">
               <input
                 type="checkbox"
                 checked={picked.has(o.name)}
                 disabled={o.stale && !picked.has(o.name)}
                 onChange={() => toggle(o.name)}
+                aria-label={o.name}
               />
               <span className="font-mono text-foreground">{o.name}</span>
               {o.kind === 'legwise' ? <span className="text-faint">live</span> : null}
               {o.stale ? <span className="text-warning">older version</span> : null}
-              {stars ? (
-                <StarToggle
-                  on={starred?.has(o.name) ?? false}
-                  label={o.name}
-                  className="ml-auto"
-                  onClick={() => onToggleStar?.(o.name)}
-                />
-              ) : null}
             </label>
+            {stars ? (
+              <StarToggle
+                on={starred?.has(o.name) ?? false}
+                label={o.name}
+                onClick={() => onToggleStar?.(o.name)}
+              />
+            ) : null}
           </li>
         ))}
         {matches.length === 0 && listMatches.length === 0 ? (

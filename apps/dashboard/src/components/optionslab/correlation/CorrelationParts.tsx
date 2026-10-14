@@ -304,7 +304,10 @@ function BasketResult({
           Left out for being too alike:{' '}
           {b.skipped
             .slice(0, 5)
-            .map(([name, blocker, c]) => `${name} (${formatNumber(c, 2)} with ${blocker})`)
+            .map(
+              ([name, blocker, c]) =>
+                `${selectorLabel(name)} (${formatNumber(c, 2)} with ${selectorLabel(blocker)})`,
+            )
             .join(', ')}
           {b.skipped.length > 5 ? `, and ${b.skipped.length - 5} more` : ''}.
         </p>

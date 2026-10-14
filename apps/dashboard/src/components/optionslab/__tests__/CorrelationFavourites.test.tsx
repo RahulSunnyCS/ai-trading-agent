@@ -141,6 +141,7 @@ function response(names: string[], reconstructed: Record<string, number>): Corre
     to: null,
     stale: [],
     reconstructed,
+    basis: { list: 'gross per lot-day', variant: 'net per lot' },
     in_sample: true,
   } as unknown as CorrelationResponse;
 }
@@ -206,6 +207,7 @@ describe('Correlation shows lists by name', () => {
     expect(screen.getByRole('checkbox', { name: 'Calendar' })).toBeTruthy();
     expect(screen.getByRole('button', { name: /^Steady ×$/ })).toBeTruthy();
     expect(screen.getByText(/Steady: 30 of 60 compared days were re-scored/)).toBeTruthy();
+    expect(screen.getByText(/A list is gross per lot-day; a strategy is net per lot/)).toBeTruthy();
     // The raw selector never reaches the reader.
     expect(screen.queryByText('list:A')).toBeNull();
   });
