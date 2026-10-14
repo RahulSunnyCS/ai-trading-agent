@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import type { HeatmapCell, HeatmapResponse } from '../../types/heatmap';
-import { cellClass, maxAbsOf, slLabel, slLevels, slOptionLabel, toCsv } from '../heatmapView';
+import {
+  cellClass,
+  maxAbsOf,
+  settingsChips,
+  slLabel,
+  slLevels,
+  slOptionLabel,
+  toCsv,
+} from '../heatmapView';
 
 const cell = (net: number, ce: number, pe: number): HeatmapCell => ({ net, ce, pe, n: 1 });
 
@@ -83,5 +91,71 @@ describe('No SL level', () => {
     expect(toCsv(withNoSl, false).split('\n')[0]).toBe(',10,No SL,TOTAL');
     const byTime: HeatmapResponse = { ...withNoSl, view: 'date_time', columns: ['09:16', '09:45'] };
     expect(toCsv(byTime, false).split('\n')[0]).toBe(',09:16,09:45,TOTAL');
+  });
+});
+
+describe('settingsChips', () => {
+  const base = {
+    view: 'time_sl' as const,
+    underlying: 'NIFTY',
+    date: '2026-10-14',
+    from: '2026-09-30',
+    to: '',
+    sl: 10,
+    time: '09:45',
+    exit: '15:30',
+    metric: 'value' as const,
+    weeks: [] as number[],
+  };
+
+  it('says the index, the table, the day, the exit and the unit', () => {
+    expect(settingsChips(base)).toEqual([
+      'NIFTY',
+      'Time vs SL',
+      '14 Oct 2026',
+      'Exit 15:30',
+      'Rupees per lot',
+    ]);
+  });
+
+  it('names the unit by what the table is in: a stock is points per share', () => {
+    expect(settingsChips({ ...base, underlying: 'RELIANCE', kind: 'stock' })).toContain(
+      'Points per share',
+    );
+    expect(
+      settingsChips({ ...base, underlying: 'RELIANCE', kind: 'stock', metric: 'pct' }),
+    ).toContain('% of premium');
+  });
+
+  it('gives a range for a summed time-vs-SL table, and one day for a one-day range', () => {
+    expect(settingsChips({ ...base, to: '2026-10-14', date: '2026-10-01' })).toContain(
+      '01 Oct 2026 to 14 Oct 2026',
+    );
+    const one = settingsChips({ ...base, to: '2026-10-14', date: '2026-10-14' });
+    expect(one).toContain('14 Oct 2026');
+    expect(one.join('|')).not.toContain(' to ');
+  });
+
+  it('adds the stop for date vs time and the entry for date vs SL', () => {
+    const dateTime = settingsChips({ ...base, view: 'date_time', to: '2026-10-14' });
+    expect(dateTime).toContain('SL 10%');
+    expect(settingsChips({ ...base, view: 'date_time', sl: 0, to: '2026-10-14' })).toContain(
+      'No stop',
+    );
+    expect(settingsChips({ ...base, view: 'date_sl', to: '2026-10-14' })).toContain('Entry 09:45');
+  });
+
+  it('names a pooled stock view, the split and the expiry-week filter', () => {
+    const chips = settingsChips({
+      ...base,
+      underlying: 'ALLSTOCKS',
+      metric: 'pct',
+      weeks: [0, 1],
+      split: true,
+    });
+    expect(chips[0]).toBe('All stocks');
+    expect(chips).toContain('% of premium');
+    expect(chips).toContain('CE and PE apart');
+    expect(chips).toContain('Expiry week of, 1 out');
   });
 });
