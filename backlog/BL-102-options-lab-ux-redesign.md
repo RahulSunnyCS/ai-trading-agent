@@ -163,4 +163,7 @@ None open; the owner answered them on 2026-10-14 (Log).
   components (ResultsPanel, ComparisonTable, DayGrid, DayTypeCard, PnlScatter) and two Guide pages
   (daily-results, walkthrough-losing-days) are deleted; DayForensics and the anatomy chips stay,
   used by the day log.
+- 2026-10-15 — Phase 3: Regimes is its own Advanced group in the sidebar and the Builder's YAML
+  mode is labelled "YAML engine (advanced)". Not done: moving Heatmap, Correlation and Regimes
+  inline controls into a run bar plus drawer (Phase 2's last bullet, "only if time allows").
 

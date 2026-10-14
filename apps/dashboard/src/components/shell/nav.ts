@@ -128,10 +128,11 @@ export const NAV_GROUPS: NavGroup[] = [
           { segment: 'heatmap', label: 'Heatmap', group: 'Explore data' },
           { segment: 'matrix', label: 'Matrix', group: 'Explore data' },
           { segment: 'correlation', label: 'Correlation', group: 'Explore data' },
-          { segment: 'regimes', label: 'Regimes', group: 'Explore data' },
           { segment: 'strategies', label: 'Strategies and baskets', group: 'Build and test' },
           { segment: 'builder', label: 'Builder', group: 'Build and test' },
           { segment: 'runs', label: 'Runs', group: 'Build and test' },
+          // Kept, but out of the daily path (BL-102): index regimes are only known after the day.
+          { segment: 'regimes', label: 'Regimes', group: 'Advanced' },
         ],
       },
     ],
