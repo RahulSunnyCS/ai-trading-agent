@@ -1,10 +1,10 @@
-"""BL-102 scoring: gates, Martin / Calmar, the plateau rule and the per-band tables.
+"""BL-104 scoring: gates, Martin / Calmar, the plateau rule and the per-band tables.
 
 Reads `results/<tag>/<family>_summary.csv` (run_grid.py) and writes, next to it,
 `<family>_ranked.csv` (every cell with its gate verdicts, neighbours and robust score),
 `<family>_band_winners.csv` (the top parameter sets per index x band) and `band_tables.md`.
 
-The registered rules (backlog/BL-102 Phase 0):
+The registered rules (backlog/BL-104 Phase 0):
   gates      n_days >= 95 % of the cohort's sessions; net > 0; Calmar >= 1; profit factor >= 1.05;
              MTM-stop frequency <= 30 %; Buy: entry hit rate >= 40 %
   ranking    Martin ratio (annualised net / Ulcer), tie-break rupees per lot-day
@@ -14,7 +14,7 @@ The registered rules (backlog/BL-102 Phase 0):
   band       one parameter set per family x index x band: the set with the best robust score
              averaged over the band's slots, candidate at every slot
 
-    uv run python research/bl102/score.py --tag stage1 [--family W]
+    uv run python research/bl104/score.py --tag stage1 [--family W]
 """
 
 from __future__ import annotations

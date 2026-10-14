@@ -37,7 +37,7 @@ better, not just whichever made more; over a short sample the difference may be 
 
 Give it a clear file name and **Save**. It appears under [Strategies](app:/optionslab/strategies),
 and from the next evening run its daily result shows in
-[Daily results](app:/optionslab/results).
+[Runs](app:/optionslab/runs).
 
 > [!TIP]
 > To see how it would have done on every day already collected, ask for a re-run of all

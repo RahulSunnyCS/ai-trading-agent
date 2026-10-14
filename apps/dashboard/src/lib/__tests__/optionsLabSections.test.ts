@@ -39,11 +39,8 @@ describe('Options Lab section metadata', () => {
     expect(seen).toEqual(['Today', 'Explore data', 'Build and test']);
   });
 
-  it('hides only Daily results from the sidebar', () => {
-    expect(
-      children()
-        .filter((child) => child.hidden)
-        .map((child) => child.segment),
-    ).toEqual(['results']);
+  it('lists every section in the sidebar, and no retired one', () => {
+    expect(children().some((child) => child.hidden)).toBe(false);
+    expect(children().map((child) => child.segment)).not.toContain('results');
   });
 });

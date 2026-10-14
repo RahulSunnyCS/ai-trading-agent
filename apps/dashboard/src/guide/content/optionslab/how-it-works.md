@@ -54,7 +54,7 @@ trading 2 lots and one trading 1 lot can be compared fairly. Multiply by your ow
 
 ## Where the data comes from
 
-Every trading day at 16:15 the [evening run](glossary:evening-run) downloads that day's
+Every trading day at 15:45 the [evening run](glossary:evening-run) downloads that day's
 [1-minute data](glossary:one-minute-data) for the index and its options from Fyers, then runs
 every saved strategy over it. Option contracts disappear after expiry, so a day that was not
 collected cannot be backtested later. The number of days a strategy has been tested on is

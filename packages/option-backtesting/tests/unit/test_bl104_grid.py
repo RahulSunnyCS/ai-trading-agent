@@ -1,4 +1,4 @@
-"""BL-102: the registered Stage-1 grid is what Phase 0 says it is.
+"""BL-104: the registered Stage-1 grid is what Phase 0 says it is.
 
 Every cell must validate through the legwise schema (no cell is silently dropped by the runner),
 the counts are the registered ones, the SHA is the one recorded in the backlog item, and each
@@ -13,15 +13,15 @@ from pathlib import Path
 
 import pytest
 
-GRID_PY = Path(__file__).resolve().parents[2] / "research" / "bl102" / "grid.py"
-REGISTERED_SHA = "6a1078bb4fe68786"  # recorded in backlog/BL-102 Phase 0
+GRID_PY = Path(__file__).resolve().parents[2] / "research" / "bl104" / "grid.py"
+REGISTERED_SHA = "6a1078bb4fe68786"  # recorded in backlog/BL-104 Phase 0
 
 
 def _load():
-    spec = importlib.util.spec_from_file_location("bl102_grid", GRID_PY)
+    spec = importlib.util.spec_from_file_location("bl104_grid", GRID_PY)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
-    sys.modules["bl102_grid"] = module  # dataclasses resolve string annotations through here
+    sys.modules["bl104_grid"] = module  # dataclasses resolve string annotations through here
     spec.loader.exec_module(module)
     return module
 

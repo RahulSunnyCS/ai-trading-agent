@@ -201,4 +201,4 @@ near-one profit factors require the Phase 3 robustness checks before adoption.
 - 2026-10-11 — plan created from the six existing Widesl family groups.
 - 2026-10-12 — Phase 2 one-factor sweep completed with post-charge accounting;
   report generated. Phase 3 remains pending.
-- 2026-10-14 — Phase 3 superseded by BL-102 (full grid with strike ATM–OTM3 and premium as an axis).
+- 2026-10-14 — Phase 3 superseded by BL-104 (full grid with strike ATM–OTM3 and premium as an axis).

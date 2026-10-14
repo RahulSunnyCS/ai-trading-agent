@@ -23,7 +23,7 @@ import { Skeleton } from '../../ui/Skeleton';
 function TokenBadge({ token, now }: { token: DataStatus['token']; now: Date }) {
   if (!token.ok) {
     return (
-      <Badge status="disconnected" dot>
+      <Badge status="attention" dot>
         Fyers login needed
       </Badge>
     );
@@ -197,8 +197,8 @@ export function EveningRunBar({
       </div>
 
       {token && !token.ok && token.message ? (
-        <p className="whitespace-pre-line border-t border-border px-4 py-2 text-xs text-negative">
-          {token.message}
+        <p className="whitespace-pre-line border-t border-border px-4 py-2 text-xs text-muted">
+          {token.message} The evening run uses Angel One when Fyers is not logged in.
         </p>
       ) : null}
       {error && !open ? (
@@ -209,8 +209,8 @@ export function EveningRunBar({
 
       <div id={panelId} hidden={!open} className="space-y-3 border-t border-border px-4 py-3">
         <p className="text-xs text-muted">
-          Collects the day's 1-minute Fyers data, runs every saved strategy on it and sends the
-          summary to Telegram.
+          Collects the day's 1-minute option data (Fyers, or Angel One when Fyers is not logged in),
+          runs every saved strategy on it and sends the summary to Telegram.
         </p>
         <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
           <label htmlFor={`${panelId}-day`} className="flex flex-col gap-1 text-xs text-muted">

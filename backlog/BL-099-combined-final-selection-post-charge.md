@@ -73,7 +73,7 @@ This report keeps only the combined winner in each index/timing section. The win
 ## Note (2026-10-14)
 
 The holdout above was used to choose these rows, so it is no longer unseen for any later
-selection. BL-102 fits on the full 2024-10-09 → 2026-10-09 window and says so.
+selection. BL-104 fits on the full 2024-10-09 → 2026-10-09 window and says so.
 
 ## Sources
 

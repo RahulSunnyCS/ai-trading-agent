@@ -321,8 +321,7 @@ export function RegimesPanel() {
         </div>
         {draftError && <p className="mt-2 text-xs text-negative">{draftError}</p>}
         <p className="mt-2 text-xs text-faint">
-          These cut times are shared: Daily results and the day replay split the session the same
-          way.
+          These cut times are shared: the day replay splits the session the same way.
         </p>
         {res.loading && !data && <SkeletonRows rows={3} className="mt-3" />}
         {res.error && !data && (
