@@ -22,16 +22,20 @@ what you will see in a saved link or an exported file. The numbers are the weigh
 Where a screen records a decision (the Daily log, a saved placement) the key is shown beside the
 name, as "Steady (A)", so an entry can be matched to the journal.
 
-The screen is split into three modes so the daily workflow stays short:
+The screen is one page, in the order you read it:
 
-- **Overview** — forward-test status, today's baskets, headline numbers, verdict and cumulative
-  chart. Before the first scored day it shows the next entry instead of reserving a large empty
-  chart area.
-- **Journal** — the recorded or reconstructed day log, with risk review for drawdowns and selection
-  drift.
-- **Research** — optional diagnostics: why a pick was selected, family pulse, rank correlation,
-  market context and shadow experiments. These open as focused sections rather than appearing in
-  one long page.
+- **The three lists and the headline** — forward-test status, a card for each list, the headline
+  numbers, the verdict, the cumulative chart and today's baskets. Before the first scored day it
+  shows the next entry instead of reserving a large empty chart area.
+- **What happened** — the recorded or reconstructed day log. Below it, *Drawdowns and selection
+  drift* opens the risk review for the focus list.
+- **Is the rule still working?** — optional diagnostics, each closed until you open it: why a pick
+  was selected, the family pulse, rank correlation, and what market the forward days tested.
+- **Experiments** — *Ideas being watched*: the unregistered candidates and trigger studies, each
+  against what it replaced.
+
+A link with the old `?rotationView=` in it still opens this page; the setting no longer does
+anything.
 
 ## What you see
 
