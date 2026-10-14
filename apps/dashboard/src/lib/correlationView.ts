@@ -11,6 +11,7 @@ import type {
   CorrelationResponse,
   CorrelationRollingRow,
 } from '../types/legwise';
+import { listName } from './rotationListNames';
 
 export const ANY = 'any';
 
@@ -28,6 +29,62 @@ export interface CorrelationFilters {
  * by three however many strategies exist. Any other strategy is added from the multiselect.
  */
 export const DEFAULT_NAMES: readonly string[] = ['N_wide_0917', 'N_dir_0917', 'N_buy_0917'];
+
+/** A rotation list is addressed as `list:A` (Steady), `list:B` (Calendar), `list:C`, `list:REF`. */
+export const LIST_PREFIX = 'list:';
+
+export function isListSelector(name: string): boolean {
+  return name.startsWith(LIST_PREFIX);
+}
+
+/** What a reader sees for a selector name: a list by its name, a strategy as it is. */
+export function selectorLabel(name: string): string {
+  return isListSelector(name) ? listName(name.slice(LIST_PREFIX.length)) : name;
+}
+
+/**
+ * The response with the rotation lists' names shown as a reader would say them. Only for
+ * display: `parts` and the basket are re-keyed with the names, while the raw `r` is what a
+ * follow-up request (a basket pick) must keep using.
+ */
+export function displayResponse(r: CorrelationResponse): CorrelationResponse {
+  if (!r.names.some(isListSelector)) return r;
+  const parts: CorrelationResponse['parts'] = {};
+  for (const [name, stats] of Object.entries(r.parts)) parts[selectorLabel(name)] = stats;
+  return {
+    ...r,
+    names: r.names.map(selectorLabel),
+    parts,
+    basket: { ...r.basket, names: r.basket.names.map(selectorLabel) },
+    stale: r.stale.map(selectorLabel),
+  };
+}
+
+/**
+ * How many compared days of each rotation list were re-scored from history rather than recorded
+ * forward, as one plain sentence each. Empty when none were (or no list is compared).
+ */
+export function reconstructedNotes(r: CorrelationResponse): string[] {
+  return Object.entries(r.reconstructed ?? {})
+    .filter(([, days]) => days > 0)
+    .map(([name, days]) => {
+      const of = r.n_days;
+      return `${selectorLabel(name)}: ${days} of ${of} compared days were re-scored from history, not recorded forward.`;
+    });
+}
+
+/**
+ * When a rotation list is compared with a strategy, one sentence on what each is measured in, so
+ * the matrix is not misread: a list is gross per lot-day, a strategy is net per lot after costs.
+ * Empty when no list is compared or only lists are.
+ */
+export function basisNote(r: CorrelationResponse): string | null {
+  const basis = r.basis;
+  if (!basis?.list) return null;
+  const others = Object.entries(basis).filter(([kind]) => kind !== 'list');
+  if (others.length === 0) return null;
+  return `A list is ${basis.list}; a strategy is ${others.map(([, text]) => text).join(', or ')}. Correlation does not depend on the unit, but the net, drawdown and worst-day figures do.`;
+}
 
 export const DEFAULT_FILTERS: CorrelationFilters = {
   slot: ANY,

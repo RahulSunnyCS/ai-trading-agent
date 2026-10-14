@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 
 import { useCorrelationPick } from '../../../hooks/useLegwise';
-import { type PairReadout, driftPoints } from '../../../lib/correlationView';
+import { type PairReadout, driftPoints, selectorLabel } from '../../../lib/correlationView';
 import {
   EMPTY,
   formatDay,
@@ -277,7 +277,7 @@ function BasketResult({
       <div className="flex flex-wrap items-center gap-1.5">
         {b.names.map((n) => (
           <Badge key={n} tone="info">
-            <span className="font-mono">{n}</span>
+            <span className="font-mono">{selectorLabel(n)}</span>
           </Badge>
         ))}
         {b.short ? (
@@ -304,7 +304,10 @@ function BasketResult({
           Left out for being too alike:{' '}
           {b.skipped
             .slice(0, 5)
-            .map(([name, blocker, c]) => `${name} (${formatNumber(c, 2)} with ${blocker})`)
+            .map(
+              ([name, blocker, c]) =>
+                `${selectorLabel(name)} (${formatNumber(c, 2)} with ${selectorLabel(blocker)})`,
+            )
             .join(', ')}
           {b.skipped.length > 5 ? `, and ${b.skipped.length - 5} more` : ''}.
         </p>
@@ -373,7 +376,7 @@ export function BasketBuilder({
               .filter((n) => !required.includes(n))
               .map((n) => (
                 <option key={n} value={n}>
-                  {n}
+                  {selectorLabel(n)}
                 </option>
               ))}
           </Select>
@@ -389,7 +392,7 @@ export function BasketBuilder({
               className="rounded-full bg-surface-2 px-2.5 py-0.5 font-mono text-xs text-foreground ring-1 ring-inset ring-border hover:ring-border-strong"
               title="Remove from the must-include list"
             >
-              {n} ×
+              {selectorLabel(n)} ×
             </button>
           ))}
         </div>
