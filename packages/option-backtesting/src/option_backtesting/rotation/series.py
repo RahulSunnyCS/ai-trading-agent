@@ -44,6 +44,14 @@ from .variants import is_buy, is_dir, is_wide
 LEGWISE_DIR = STRATEGIES_DIR / "legwise"
 DEFAULT_SELECTORS = ["slot:0917"]
 
+#: What a series is measured in, by kind, so a reader of a mixed comparison is told. A list is
+#: gross per one-lot strategy-day; a strategy is net per lot after its costs.
+BASIS = {
+    "list": "gross per lot-day (the average one-lot gross of the list's picks)",
+    "variant": "net per lot (rotation variants carry no costs, so net equals gross)",
+    "legwise": "net per lot, after costs",
+}
+
 #: Rotation lists a `list:<key>` selector can name, and the selector prefix.
 LIST_KEYS = ("A", "B", "C", "REF")
 LIST_PREFIX = "list:"
@@ -58,7 +66,7 @@ class SelectorError(ValueError):
 @dataclass(frozen=True)
 class Available:
     name: str
-    kind: str  # "variant" | "legwise"
+    kind: str  # "variant" | "legwise" | "list" (a rotation list, built on request)
     first: date
     last: date
     n_days: int
@@ -69,7 +77,7 @@ class Available:
     reconstructed: frozenset[date] = field(default=frozenset(), repr=False, compare=False)
 
     def series(self) -> Series:
-        return Series(self.name, self.kind, self.values)
+        return Series(self.name, self.kind, self.values, self.reconstructed)
 
 
 def _parts(name: str) -> tuple[str, str, str] | None:
@@ -216,6 +224,9 @@ def _matches(selector: str, a: Available) -> bool:
         if wanted == "buy":
             return is_buy(a.name)
         return family == wanted
+    if a.kind == LIST_KIND and not selector.startswith(LIST_PREFIX):
+        # A bare glob (`*`) names strategies; a rotation list is only found by `list:...`.
+        return False
     return fnmatch.fnmatchcase(a.name, selector)
 
 

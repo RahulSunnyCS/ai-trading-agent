@@ -99,7 +99,8 @@ export function toPayload(strategy: LegwiseStrategy): LegwiseStrategy {
 // Dirty comparison
 // ---------------------------------------------------------------------------
 
-function canonical(value: unknown): unknown {
+/** The value with keys sorted at every depth and unset/null keys dropped, so equal strategies read equal. */
+export function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {};

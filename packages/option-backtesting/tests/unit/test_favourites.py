@@ -58,6 +58,7 @@ def test_an_empty_choice_is_allowed(root):
         (["Z"], []),
         (["A"], ["has space"]),
         (["A"], ["../escape"]),
+        (["A"], ["name\n"]),  # a trailing newline must not slip past the pattern
         (["A"], [""]),
         (["A"], [3]),
         ("A", []),

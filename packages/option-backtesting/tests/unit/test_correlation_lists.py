@@ -185,6 +185,68 @@ def test_load_brings_in_the_lists_only_when_asked(monkeypatch, tmp_path):
     assert calls == [1]
 
 
+def test_a_bare_glob_never_picks_up_a_list():
+    days = _weekdays(3)
+    strat = rseries.Available("N_wide_0917", "variant", days[0], days[-1], 3, values={})
+    lst = rseries.Available("list:A", "list", days[0], days[-1], 3, values={})
+    assert [a.name for a in rseries.resolve(["*"], [strat, lst])] == ["N_wide_0917"]
+    assert [a.name for a in rseries.resolve(["list:*"], [strat, lst])] == ["list:A"]
+
+
+def test_the_series_keeps_which_days_were_reconstructed(monkeypatch, tmp_path):
+    days = _weekdays(2)
+    rows = [
+        _row(days[0], "reconstructed", {"A": 1.0}),
+        _row(days[1], "recorded", {"A": 2.0}),
+    ]
+    monkeypatch.setattr(daylog, "build_log", lambda *a, **k: _log(rows))
+    (a,) = rseries.lists_available(tmp_path)
+    assert a.series().reconstructed == frozenset({days[0]})
+
+
+def test_the_response_says_what_each_kind_is_measured_in(client):
+    body = client.get("/legwise/correlation", params={"selectors": "list:A,N_wide_0917"}).json()
+    assert set(body["basis"]) == {"list", "variant"}
+    assert "gross per lot-day" in body["basis"]["list"]
+
+
+def test_the_cli_labels_reconstructed_days_and_the_basis(monkeypatch, tmp_path):
+    from typer.testing import CliRunner
+
+    from option_backtesting.rotation.cli import rotation_app
+
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(tmp_path))
+    rng = np.random.default_rng(3)
+    wide = rng.normal(0, 1000, 60)
+    for d, v in zip(_weekdays(60), wide, strict=True):
+        store.append_result("N_wide_0917", {"day": d.isoformat(), "net": float(v)}, tmp_path)
+    rows = [
+        _row(d, "reconstructed" if i < 40 else "recorded", {"A": float(v) * 0.9})
+        for i, (d, v) in enumerate(zip(_weekdays(60), wide, strict=True))
+    ]
+    monkeypatch.setattr(daylog, "build_log", lambda *a, **k: _log(rows))
+    out = CliRunner().invoke(rotation_app, ["corr", "list:A", "N_wide_0917", "--min-days", "30"])
+    assert out.exit_code == 0, out.output
+    assert "list:A: 40 of 60 compared days were re-scored from history" in out.output
+    assert "Lists are gross per lot-day" in out.output
+
+
+def test_the_cli_reports_a_corrupt_journal_without_a_traceback(monkeypatch, tmp_path):
+    from typer.testing import CliRunner
+
+    from option_backtesting.rotation.cli import rotation_app
+
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(tmp_path))
+
+    def corrupt(*a, **k):
+        raise journal.JournalCorrupt("line 2 is not valid JSON")
+
+    monkeypatch.setattr(daylog, "build_log", corrupt)
+    out = CliRunner().invoke(rotation_app, ["corr", "list:A", "list:B"])
+    assert out.exit_code == 2
+    assert "journal cannot be read" in out.output
+
+
 def test_a_basket_can_be_required_to_include_a_list(client):
     res = client.get(
         "/legwise/correlation/pick",
