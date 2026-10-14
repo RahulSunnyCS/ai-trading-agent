@@ -15,6 +15,7 @@ export function StarToggle({
   onClick,
   className,
   size = 'sm',
+  disabled = false,
 }: {
   on: boolean;
   /** What is being starred: a list or strategy name. */
@@ -22,11 +23,14 @@ export function StarToggle({
   onClick: () => void;
   className?: string;
   size?: 'sm' | 'md';
+  /** True until the stars have loaded: a click would have nothing to change. */
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-pressed={on}
+      disabled={disabled}
       aria-label={`${on ? 'Remove the star from' : 'Star'} ${label}`}
       title={on ? 'Starred: used as a default in pickers' : 'Star: use as a default in pickers'}
       onClick={(event) => {
@@ -35,7 +39,7 @@ export function StarToggle({
         onClick();
       }}
       className={cn(
-        'rounded p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'rounded p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40',
         on ? 'text-warning' : 'text-faint hover:text-muted',
         className,
       )}

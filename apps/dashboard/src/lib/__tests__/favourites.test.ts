@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type FavouriteSet,
+  correlateHref,
   favouriteSelectors,
   isListStarred,
   isStrategyStarred,
@@ -58,5 +59,21 @@ describe('favourites', () => {
   it('copies a server answer into a set', () => {
     const copy = setOf({ lists: ['A'], strategies: ['x'] });
     expect(copy).toEqual({ lists: ['A'], strategies: ['x'] });
+  });
+});
+
+describe('correlateHref', () => {
+  it('compares an item with the starred ones, the item first and never twice', () => {
+    expect(correlateHref('list:A', set(['A', 'B'], ['x']))).toBe(
+      '/optionslab/correlation?names=list%3AA,list%3AB,x',
+    );
+    expect(correlateHref('x', set(['A'], ['x']))).toBe('/optionslab/correlation?names=x,list%3AA');
+  });
+
+  it('pairs a lone item with Steady, or with Calendar when it is Steady', () => {
+    expect(correlateHref('x', set([], []))).toBe('/optionslab/correlation?names=x,list%3AA');
+    expect(correlateHref('list:A', set([], []))).toBe(
+      '/optionslab/correlation?names=list%3AA,list%3AB',
+    );
   });
 });
