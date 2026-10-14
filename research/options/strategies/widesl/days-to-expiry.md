@@ -15,8 +15,9 @@ Thursday to Tuesday about Sep 2025; SENSEX went Fri → Tue → Thu, about Aug 2
 
 ## Live value
 
-None: the live strategies trade every day. The rotation lists use a days-to-expiry fit as one of four
-ranking criteria (25% in the REF weights; see [rotation ranking](../../common/rotation-ranking.md)).
+None: the live strategies trade every day. The forward journal's lists weight a days-to-expiry fit heavily: A 33%, B 35%, C 30%, REF 25%
+(`packages/option-backtesting/src/option_backtesting/rotation/lists.py`); in A and B it is one of the
+two largest weights. See [rotation ranking](../../common/rotation-ranking.md).
 
 ## Tested
 

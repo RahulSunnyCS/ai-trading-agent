@@ -14,8 +14,9 @@ window starts 2025-09-01.
 
 ## Live value
 
-None: the live Dir trades every day. The rotation uses a days-to-expiry fit as one ranking criterion
-([rotation ranking](../../common/rotation-ranking.md)).
+None: the live Dir trades every day. The forward journal's lists weight a days-to-expiry fit heavily: A 33%, B 35%, C 30%, REF 25%
+(`packages/option-backtesting/src/option_backtesting/rotation/lists.py`); in A and B it is one of the
+two largest weights. See [rotation ranking](../../common/rotation-ranking.md).
 
 ## Tested
 

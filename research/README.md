@@ -9,7 +9,8 @@ it found, and where the evidence is. One page per variable.
   plain-English twin on 2026-10-14.
 
 These are **findings notes, not the record.** Each verdict summarises a backlog item's Result or Log
-and cites it; the item (`backlog/BL-NNN-*.md`) stays the record, with its pre-registration. Code and
+and cites it (a number worked out for the page from an item's result files says so, and names the
+file); the item (`backlog/BL-NNN-*.md`) stays the record, with its pre-registration. Code and
 result files stay where they are:
 
 | What | Where |
