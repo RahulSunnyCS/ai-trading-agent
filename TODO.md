@@ -683,7 +683,7 @@ Steady / Calendar / Adaptive lists, favourites, a leg-grid builder. Features fol
 |---|---|---|---|
 | 3.28.1 | Phase 1: three workspaces, one navigation, Today as landing, Daily results hidden, question headers, Guide tour | claude | **Built 2026-10-14.** Sidebar groups (`NavChild.group` / `hidden`), question header per screen (`lib/optionsLabSections.ts`), Runs reads `?strategy=`; Daily results redirect waits for Phase 2 |
 | 3.28.2 | Phase 1b: favourites store, Strategies and baskets page, New strategy dialog, Correlation multiselect with lists | claude | **In progress.** Favourites API (`favourites.py`, `GET`/`PUT /legwise/favourites`, proxy) built 2026-10-14 |
-| 3.28.3 | Phase 1c: Builder design A (token strip, leg grid, backtest settings popover) | claude | Planned |
+| 3.28.3 | Phase 1c: Builder design A (token strip, leg grid, backtest settings popover) | claude | **In progress.** `POST /legwise/backtest` takes `bars` and `include_excluded` (built 2026-10-15); the grid UI is next |
 | 3.28.4 | Phase 2–3: Analytics page pattern on Today, Builder result, Runs, Heatmap, Correlation, Regimes; declutter | claude | Planned |
 
 ## Reference — where detail lives

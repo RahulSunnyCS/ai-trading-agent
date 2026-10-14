@@ -395,6 +395,10 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
             strategy: { type: 'object' },
             from: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
             to: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+            // 1-minute bars by default; 5-minute bars run the same engine on the chain snapshots.
+            bars: { type: 'string', enum: ['1m', '5m'] },
+            // Also run the days data_quality judged unusable.
+            include_excluded: { type: 'boolean' },
           },
           required: ['strategy'],
           additionalProperties: false,
