@@ -1,4 +1,4 @@
-"""BL-102: run the registered grid (or a listed set of cells) over the collected days.
+"""BL-104: run the registered grid (or a listed set of cells) over the collected days.
 
 A job is one cohort (family, index, slot): its template is loaded once, every cell is built
 in memory (`grid.build`; strategy YAMLs are never written), and each day is loaded ONCE and run
@@ -12,9 +12,9 @@ Charges are the registered BL-096 model (date-aware STT); `net_current_rates_inr
 same trades at today's STT. Slippage and lot sizing are 0 / `current` unless `--slippage` /
 `--lot-sizing` say otherwise (Stage 3 sensitivity).
 
-    uv run python research/bl102/run_grid.py --family W --workers 3
-    uv run python research/bl102/run_grid.py --cells results/stage2/cells.json --tag stage2
-    uv run python research/bl102/run_grid.py --family all --slots all25 --cells finalists.json ...
+    uv run python research/bl104/run_grid.py --family W --workers 3
+    uv run python research/bl104/run_grid.py --cells results/stage2/cells.json --tag stage2
+    uv run python research/bl104/run_grid.py --family all --slots all25 --cells finalists.json ...
 """
 
 from __future__ import annotations
