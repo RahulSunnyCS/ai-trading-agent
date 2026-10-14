@@ -131,7 +131,7 @@ Otherwise:
   display names, and omit Baseline / VIX / days to expiry from the text; the journal still stores them.
   `rotation/result.py` reads the completed picked variants' net results (after estimated costs),
   reports one lot per strategy with every picked strategy's contribution under its section, and
-  sends Steady / Calendar / Adaptive after the evening pipeline finishes (normally around 16:00).
+  sends Steady / Adaptive after the evening pipeline finishes (Calendar and the baseline are recorded in the journal but not sent) (normally around 16:00).
   A per-entry marker prevents a retry from sending it twice;
   `obt rotation result --force` explicitly resends it.
   `rotation/tomorrow.py` appends a "Tomorrow" section to that message (`--no-tomorrow` drops it): for the

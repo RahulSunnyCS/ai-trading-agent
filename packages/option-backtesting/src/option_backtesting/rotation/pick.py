@@ -17,7 +17,7 @@ import numpy as np
 from ..fyers.daily import data_dir
 from . import journal, store
 from .attrs import last_collected_before
-from .lists import DISPLAY_NAMES, LISTS, LOTS_PER, WARMUP
+from .lists import DISPLAY_NAMES, LISTS, LOTS_PER, PUBLIC_KEYS, WARMUP
 from .live import listed_dte_labels, vix_open_with_source
 from .score import composite, dte_matrix, family_index, select, vix_band
 from .variants import variant_names
@@ -223,7 +223,7 @@ def record(
 def render(entry: dict) -> str:
     lines = [f"Rotation picks {entry['day']} ({entry['weekday']})"]
     for key, p in entry["lists"].items():
-        if key == "REF":
+        if key not in PUBLIC_KEYS:  # Steady and Adaptive only; the entry still records every list
             continue
         picked = ", ".join(p["core"]) + (f" + Buy {', '.join(p['buy'])}" if p["buy"] else "")
         lines.append(f"{DISPLAY_NAMES.get(key, key)}: {picked}")

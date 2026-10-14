@@ -114,8 +114,9 @@ def test_message_uses_strategy_names_and_keeps_recording_witness(on_time):
         "before_first_entry": on_time,
     }
     text = pick.render(entry)
-    for name in ["Steady", "Calendar", "Adaptive"]:
+    for name in ["Steady", "Adaptive"]:
         assert f"{name}: N_ditm1_0932, N_wide_1117 + Buy N_buy_1147" in text
+    assert "Calendar" not in text
     assert "VIX" not in text and "DTE" not in text
     assert "Baseline" not in text and "REF:" not in text
     assert "REF" in entry["lists"]
@@ -146,10 +147,9 @@ def test_result_goes_to_private_chat_and_group(telegram, monkeypatch):
     assert [request["chat_id"] for request in telegram] == ["123", "-456"]
     for request in telegram:
         assert "Steady: +₹1,200" in request["text"]
-        assert "Calendar: -₹450" in request["text"]
+        assert "Calendar" not in request["text"]
         assert "Adaptive: ₹0" in request["text"]
         assert "• a: +₹1,400" in request["text"]
-        assert "• c: -₹450" in request["text"]
         assert "Baseline" not in request["text"]
 
 

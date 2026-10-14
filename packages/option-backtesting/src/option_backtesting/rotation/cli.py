@@ -126,7 +126,7 @@ def result(
         True, "--tomorrow/--no-tomorrow", help="Add how days like the next session have gone."
     ),
 ) -> None:
-    """Send the completed day's net paper gain for Steady, Calendar and Adaptive."""
+    """Send the completed day's net paper gain for Steady and Adaptive."""
     from ..notify import Notification
     from .result import ResultUnavailable, calculate, mark_sent, render, was_sent
 

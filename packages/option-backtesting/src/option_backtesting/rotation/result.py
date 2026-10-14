@@ -1,4 +1,4 @@
-"""The completed day's paper result for the three rotation strategies sent in the morning."""
+"""The completed day's paper result for the two public rotation strategies (Steady, Adaptive)."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ from pathlib import Path
 
 from ..fyers.daily import data_dir
 from . import journal, store
-from .lists import DISPLAY_NAMES
+from .lists import DISPLAY_NAMES, PUBLIC_KEYS
 
-RESULT_KEYS = ("A", "B", "C")
+RESULT_KEYS = PUBLIC_KEYS
 REPORT_LOTS = 1
 
 
