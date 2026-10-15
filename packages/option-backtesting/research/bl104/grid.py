@@ -364,7 +364,7 @@ def params_from_row(family: str, row: dict[str, str]) -> dict[str, Any] | None:
 def params_to_row(family: str, params: dict[str, Any] | None) -> dict[str, str]:
     out = {"cell": TEMPLATE if params is None else "grid"}
     for axis in AXES[family]:
-        value = None if params is None else params[axis]
+        value = None if params is None else params.get(axis)  # a strike-only cell has no other axes
         out[f"p_{axis}"] = "" if value is None else json.dumps(value)
     extra = {} if params is None else {k: v for k, v in params.items() if k not in AXES[family]}
     out["p_extra"] = json.dumps(extra, sort_keys=True) if extra else ""
