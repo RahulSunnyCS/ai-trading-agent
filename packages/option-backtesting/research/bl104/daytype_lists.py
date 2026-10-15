@@ -70,22 +70,22 @@ class Family:
 
 
 FAMILIES = [
-    Family("N_wide", "W", "N", "OTM1", (("N_wide", "stage1", None),)),
+    Family("N_wide", "W", "N", "OTM1", (("N_wide", None, None),)),
     Family("NIFTY_Widesl_premium", "W", "N", None,
-           (("N_p80", "daytype", {"strike": 80}), ("N_p100", "daytype", {"strike": "PHIGH"})),
+           (("N_p80", None, {"strike": 80}), ("N_p100", None, {"strike": "PHIGH"})),
            (40, 60, 80, 100, 120, 150)),
-    Family("S_wide", "W", "S", "OTM2", (("S_wide", "stage1", None),)),
+    Family("S_wide", "W", "S", "OTM2", (("S_wide", None, None),)),
     Family("SENSEX_Widesl_premium", "W", "S", None,
-           (("S_p250", "daytype", {"strike": 250}), ("S_p320", "daytype", {"strike": "PHIGH"})),
+           (("S_p250", None, {"strike": 250}), ("S_p320", None, {"strike": "PHIGH"})),
            (100, 150, 200, 250, 320, 400)),
-    Family("N_dir", "D", "N", "ATM", (("N_dir", "stage1", None),)),
-    Family("N_ditm1", "D", "N", "ITM1", (("N_ditm1", "daytype", {"strike": "ITM1"}),)),
-    Family("S_dir", "D", "S", "ATM", (("S_dir", "stage1", None),)),
-    Family("S_ditm1", "D", "S", "ITM1", (("S_ditm1", "daytype", {"strike": "ITM1"}),)),
-    Family("NIFTY_Buy_premium", "B", "N", None, (("N_buy", "stage1", None),), (20, 30, 50, 75, 100)),
-    Family("SENSEX_Buy_premium", "B", "S", None, (("S_buy", "stage1", None),), (30, 50, 90, 150, 225)),
+    Family("N_dir", "D", "N", "ATM", (("N_dir", None, None),)),
+    Family("N_ditm1", "D", "N", "ITM1", (("N_ditm1", None, {"strike": "ITM1"}),)),
+    Family("S_dir", "D", "S", "ATM", (("S_dir", None, None),)),
+    Family("S_ditm1", "D", "S", "ITM1", (("S_ditm1", None, {"strike": "ITM1"}),)),
+    Family("NIFTY_Buy_premium", "B", "N", None, (("N_buy", None, None),), (20, 30, 50, 75, 100)),
+    Family("SENSEX_Buy_premium", "B", "S", None, (("S_buy", None, None),), (30, 50, 90, 150, 225)),
 ]
-PREMIUM_TAGS = ("daytype", "premium_coarse", "premium_refine")
+TAGS = ("stage1", "daytype", "premium_coarse", "premium_refine", "slots12")  # searched in order
 PREMIUM_DUP_CORR = 0.9  # Amendment 2: a later premium pick is dropped only as a near-duplicate
 GRID_STRIKE_FOR_OFFGRID = {"W": "OTM1", "B": "ATM"}  # how the off-grid cells were generated
 
@@ -121,8 +121,13 @@ def series(tag: str, cohort: str) -> tuple[list[date], dict[str, int], np.ndarra
     return _SERIES[(tag, cohort)]
 
 
-def column(tag: str, f: Family, slot: str, params: dict | None) -> tuple[list[date], np.ndarray]:
+def column(tag: str | None, f: Family, slot: str, params: dict | None) -> tuple[list[date], np.ndarray]:
+    """A cell's series; `tag` None = the first results tag that holds it."""
     cell = grid.Cell(f.fam, f.idx, slot, params)
+    if tag is None:
+        tag = next((t for t in TAGS if _has(t, f, slot, params)), None)
+        if tag is None:
+            raise KeyError(f"no stored series for {cell.label}")
     days, col, m = series(tag, cell.cohort)
     return days, m[:, col[cell.label]]
 
@@ -160,18 +165,16 @@ def candidates(f: Family, slot: str) -> list[tuple[dict, str, dict]]:
             continue
         if not f.is_premium:
             if p["strike"] == f.strike:
-                out.append((p, "stage1", p))
+                out.append((p, None, p))
             continue
         if p["strike"] != base_strike:
             continue
         for pr in premiums:
             described = {**p, "strike": pr}
-            if pr in grid_names:
-                out.append((described, "stage1", {**p, "strike": grid_names[pr]}))
-                continue
-            tag = next((t for t in PREMIUM_TAGS if _has(t, f, slot, described)), None)
+            stored = {**p, "strike": grid_names[pr]} if pr in grid_names else described
+            tag = next((t for t in TAGS if _has(t, f, slot, stored)), None)
             if tag is not None:
-                out.append((described, tag, described))
+                out.append((described, tag, stored))
     return out
 
 
@@ -327,18 +330,23 @@ def evaluate(f: Family, slot: str, exp: set[date]) -> dict[str, Any]:
     return out
 
 
-BANDS = {  # Amendment 5 (owner, 2026-10-16)
-    "09:15-10:30": ("09:17", "09:32", "09:47", "10:17"),
-    "10:30-13:02": ("11:32", "13:02"),  # Amendment 7: 13:02 also counts here
-    "13:00-15:30": ("13:02", "14:32"),
-    "all times": grid.SLOTS,  # Amendment 6: the best across every time, no band
+ALL_SLOTS = (  # Amendment 8: four per band
+    "09:17", "09:32", "09:47", "10:17",
+    "10:47", "11:32", "12:17", "13:02",
+    "13:17", "13:47", "14:02", "14:32",
+)
+BANDS = {
+    "09:15-10:30": ALL_SLOTS[0:4],
+    "10:30-13:00": ALL_SLOTS[4:8],
+    "13:00-15:30": ALL_SLOTS[8:12],
+    "all times": ALL_SLOTS,  # Amendment 6: the best across every time, no band
 }
 
 
 def slots_needed(n: int) -> int:
-    """All 7 times (Amendment 6): 5 of 7. A band of three or more: all but one. Otherwise: all."""
-    if n == len(grid.SLOTS):
-        return 5
+    """All 12 times: 9 of 12. A band of four: 3 of 4 (all but one). Fewer: all (Amendment 8)."""
+    if n == len(ALL_SLOTS):
+        return 9
     return n - 1 if n >= 3 else n
 
 
@@ -488,7 +496,7 @@ def refine_cells() -> None:
     for f in (x for x in FAMILIES if x.is_premium):
         coarse = sorted(f.premiums)
         base_strike = {"W": "OTM1", "B": "ATM"}[f.fam]
-        results = {slot: evaluate(f, slot, exp[grid.INDICES[f.idx]]) for slot in grid.SLOTS}
+        results = {slot: evaluate(f, slot, exp[grid.INDICES[f.idx]]) for slot in ALL_SLOTS}
         new: set[float] = set()
         for kind, (band, slots) in ((k, b) for k in KINDS for b in BANDS.items()):
             score = premium_scores(aggregate(f, results, kind, slots))
@@ -501,7 +509,7 @@ def refine_cells() -> None:
             new |= set(pts)
             report.append(f"{f.name} {kind} {band}: scores " + ", ".join(f"₹{p:g} {score[p]:+.0f}" for p in sorted(score))
                           + f" -> area ₹{area:g}, add {pts}")
-        for slot in grid.SLOTS:
+        for slot in ALL_SLOTS:
             for c in grid.cells(f.fam, f.idx, slot, with_template=False):
                 prm = c.params
                 if prm["strike"] != base_strike or (f.fam == "W" and prm["mtm"] is None):
@@ -514,7 +522,7 @@ def refine_cells() -> None:
     print(f"wrote {len(out)} cells to {path.name}")
 
 
-def describe_params(f: Family, params: Any, slots: tuple[str, ...] = grid.SLOTS) -> dict[str, str]:
+def describe_params(f: Family, params: Any, slots: tuple[str, ...] = ALL_SLOTS) -> dict[str, str]:
     st = build(f, slots[0], None if params == "template" else params)
     d = describe(st, f.fam)
     d["entry"] = ", ".join(slots)
@@ -535,7 +543,7 @@ def main() -> None:
     lists: dict[str, list[dict]] = {"expiry": [], "other": []}
     premium_report: list[str] = []
     for f in FAMILIES:
-        results = {slot: evaluate(f, slot, exp[grid.INDICES[f.idx]]) for slot in grid.SLOTS}
+        results = {slot: evaluate(f, slot, exp[grid.INDICES[f.idx]]) for slot in ALL_SLOTS}
         for kind, (band, slots) in ((k, b) for k in KINDS for b in BANDS.items()):
             agg = aggregate(f, results, kind, slots)
             allowed = None
@@ -603,8 +611,9 @@ def write_readme(lists: dict[str, list[dict]], premium_report: list[str]) -> Non
         "# Day-type strategy lists (BL-104, research leads — not adopted)",
         "",
         "For every Core-298 family, for each of three time bands — **09:15–10:30** (09:17, 09:32, 09:47,",
-        "10:17), **10:30–13:02** (11:32, 13:02) and **13:00–15:30** (13:02, 14:32) — and for **all times** (one",
-        "setting across all 7, beating the template at 5 or more of them): **one setting per day type",
+        "10:17), **10:30–13:00** (10:47, 11:32, 12:17, 13:02) and **13:00–15:30** (13:17, 13:47, 14:02,",
+        "14:32) — and for **all times** (one setting across all 12, beating the template at 9 or more of",
+        "them): **one setting per day type",
         "that works across the band's entry times**, for **expiry days** and for",
         "**non-expiry days** (each index's own weekly expiries). The premium families (NIFTY / SENSEX",
         "Widesl, NIFTY / SENSEX Buy) also choose up to three premiums, each with its own setting.",
@@ -615,8 +624,8 @@ def write_readme(lists: dict[str, list[dict]], premium_report: list[str]) -> Non
         "day-type lists, Amendments 1–4): the default is the family's own rotation file (for N_wide, the",
         "owner's settings: expiry SL 150 % / trail 25/15 / MTM ₹4,000 / RE cost ×1; other days SL 60 % /",
         "trail 15/10 / MTM ₹3,000 / no re-entry). Another setting replaces it only when, averaged over the",
-        "band, it beats the template in **both** years, beats it at all but one of the band's times (every",
-        "time in a band of one or two), beats the",
+        "band, it beats the template in **both** years, beats it at 3 of the band's 4 times (9 of 12 for all",
+        "times), beats the",
         "default by ₹25 (expiry) or ₹15 (other days) a lot-day, has a worst day no more than 1.25 × the",
         "template's and at least two grid neighbours that also beat the template. A second pick is kept",
         "only when its daily P&L correlates below 0.7 with the first.",

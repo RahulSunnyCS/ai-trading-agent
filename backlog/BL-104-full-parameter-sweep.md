@@ -378,6 +378,13 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
 - **Amendment 7 (2026-10-16, owner, same): 13:02 also counts in the middle band.** Bands:
   09:15–10:30 (09:17, 09:32, 09:47, 10:17), 10:30–13:02 (11:32, 13:02), 13:00–15:30 (13:02, 14:32);
   13:02 sits in both later bands. No extra slots are sampled.
+- **Amendment 8 (2026-10-16, owner, before any band list was read; replaces Amendment 7's bands):
+  four sampled slots per band, 12 in all, run overnight on 4 workers.** 09:15–10:30: 09:17, 09:32,
+  09:47, 10:17. 10:30–13:00: 10:47, 11:32, 12:17, 13:02. 13:00–15:30: 13:17, 13:47, 14:02, 14:32 (the
+  last slot stays at 14:32 so a 30-minute Buy range still ends before its 15:14 exit). New slots
+  10:47, 12:17, 13:17, 13:47, 14:02 get every cell the lists use (tag `slots12`, cells
+  `slots12_cells_2026-10-16.json`). A band setting must beat the template at 3 of its 4 slots; the
+  all-times group at 9 of the 12. The refine step runs at all 12 slots.
 
 ## Risks
 
