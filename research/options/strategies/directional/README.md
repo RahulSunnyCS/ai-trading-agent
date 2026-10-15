@@ -1,6 +1,6 @@
 # Directional ("Dir")
 
-**Last updated:** 2026-10-14
+**Last updated:** 2026-10-15
 
 ## Definition
 
@@ -46,6 +46,9 @@ not the Buy (range-breakout) family.
 | [Days to expiry](days-to-expiry.md) | Descriptive | NIFTY strong at 0–1 days, negative 6 days out; SENSEX peaks 2 days out; within noise |
 | [India VIX](vix.md) | Tested | Weak at VIX 15–18 in one year; VIX-based rules and states failed |
 | [Weekday](weekday.md) | Descriptive | Same split as days to expiry within one expiry regime |
+| [Profit target, lock and trail](profit-lock.md) | Tested | Killed (BL-105): targets lose money, locks change nothing after charges |
+| [Restart after a cut](restart.md) | Tested | Killed (BL-105); a SENSEX morning lead is unregistered |
+| [Roll the decayed leg](roll.md) | Tested | Killed (BL-105): 0 of 336 settings pass; bounded risk, no edge |
 
 ## Across strategies
 

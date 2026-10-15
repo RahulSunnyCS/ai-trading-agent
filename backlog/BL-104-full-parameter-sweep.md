@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner's "proper sweep over every parameter" before any of these families gets real money |
-| **Status** | In progress — Stage 1 done and scored; Stage 2 waits for the owner's read |
+| **Status** | In progress: Stages 1–3 done except the finalists' correlation, the Buy ₹1-per-fill check and the bootstrap against the BL-099 picks; Phase 4 advisory run done, forward test not started; pool POC awaiting the owner's go; owner `override:` owed for the post-hoc tail gate and the Buy 60 % day-stop cap |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-14 |
@@ -259,3 +259,62 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   cohort is reported and the run exits non-zero, schema-invalid cells are named, pre-2024-10
   lookups use the earliest reference row (historical lot sizing before 2024-10-03 is refused),
   and `robust.py` refuses to mix the tail and return-only selections' Stage 2 results.
+- 2026-10-15 — **Stored for later cuts.** `research/bl104/shortlist.py --build` writes
+  `research/bl104/shortlists/stage1_set_checks.csv.gz`: all 35,232 Stage 1 parameter sets at band
+  level with their figures and, for each of nine checks (Calmar, profit factor, day-stop rate with
+  a 30 % cap for Widesl / Dir and 60 % for Buy, entry rate, worst day and worst five days against
+  the template, plateau, real stops, verified re-entry), whether they pass and whether they pass
+  strongly. Any later cut is a filter on that table (`--max-fails`, `--strong`, `--allow-fail`,
+  `--min-gain`, `--family`). The owner's 2026-10-15 cut (higher ₹ per lot-day than the template,
+  at most two failed checks, every other check passed strongly) is
+  `shortlists/2026-10-15_owner_cut_max2fails_strong.csv`. **Corrected after the PR 230 review:**
+  the first version averaged Calmar, profit factor and day-stop rate over a band's slots and its
+  "plateau" re-counted the set's own gate failures, so it reported 165 sets with mislabelled
+  failures. Every check is now applied per slot (the set takes its worst slot), the plateau test is
+  the neighbour test only, and the registered Buy hit-rate gate is included. Corrected cut: **143
+  sets** (21 fail nothing, 108 fail Calmar and plateau, 5 fail Calmar, 5 fail the day-stop rate and
+  plateau, 2 fail the day-stop rate and verified re-entry, 1 fails the day-stop rate, 1 fails the
+  real-stop rule). 113 of the 143 are Buy SENSEX 14:17–15:02. The morning Buy SENSEX sets first
+  reported as "plateau only" fail Calmar below 1 at one of their slots. "Strong" is a post-hoc
+  standard set for owner shortlists (equal to a plain pass on four of the ten checks), not a
+  registered rule. The 60 % day-stop cap for Buy loosens the registered 30 % after the results
+  were read (owner, 2026-10-15: "MTM stop rate less than 30 might not work for buy"); it is a
+  post-hoc loosening and needs the owner's `override:`. A scratch re-score of Stage 1 Buy with that
+  cap (`results/pool_probe/`, not committed) raised Buy candidates from 316 to 537. The raw results (summaries and day × cell series, 444 MB) are copied to
+  `/Volumes/TradingData/research-archive/bl104/` (not covered by the monthly `tdata backup`,
+  which copies only lake / raw / catalog).
+- 2026-10-15 — **Stage 3 and Stage 4 results.** The 25-slot breadth run (124 cohorts; 745 cells
+  listed, 738 run, 7 skipped as schema-invalid at their slot). Under the registered rule (all eight
+  rules) **one band passes: Buy SENSEX 09:17–10:02.** Five more pass every rule except rule 7 (a
+  one-bucket regime flag) or rule 8 (re-entry parity); the three Dir SENSEX rows exist only in the
+  tail-gated selection, so they are **pending the owner's `override:`**. Band labels are the
+  rotation's bands; the figures are means over the Stage 1 sampled slots of each band (₹ per
+  lot-day, in-sample 2024-10 → 2026-10):
+
+  | Band | Winner settings | Winner ₹ | Template ₹ | Remaining issue |
+  |---|---|---:|---:|---|
+  | Buy SENSEX 09:17–10:02 | ₹150 premium, range 30, SL 30 %, trail 1/1, MTM ₹2,000 | 158 | −33 | none (all eight rules) |
+  | Widesl NIFTY 12:17–14:02 | ATM, SL 150 %, no trail, no MTM stop, RE cost ×1 | 308 | 124 | regime flag; **rejected by the owner (no real stop)** |
+  | Widesl SENSEX 12:17–14:02 | ₹320 premium, SL 40 %, trail 25/15, MTM ₹4,000, RE cost ×1 | 242 | 76 | regime flag |
+  | Dir SENSEX 09:17–10:02 (tail) | ATM, SL 20 %, trail 10/5, MTM ₹3,000, RE cost ×2 | 355 | 251 | re-entry parity (BL-009) |
+  | Dir SENSEX 10:17–12:02 (tail) | ITM2, SL 15 %, trail 10/5, MTM ₹3,000, RE cost ×2 | 495 | 287 | re-entry parity |
+  | Dir SENSEX 12:17–14:02 (tail) | ITM1, SL 30 %, trail 10/5, MTM none, RE cost ×2 | 258 | 127 | re-entry parity; no day stop (fails the owner's real-stop rule) |
+
+  Breadth (rule 4) failed for Buy SENSEX 10:17–12:02, 12:17–14:02 and 14:17–15:02, Widesl NIFTY
+  10:17–12:02 and 14:17–15:02, Widesl SENSEX 14:17–15:02, and Dir NIFTY 12:17–14:02, 14:17–15:02 and
+  Dir SENSEX 14:17–15:02 (several of these had already failed other rules). **Slippage** (Phase 3; winner minus template at its band slots): at 0.25 % per fill
+  +176 / +143 / +160 / +39 / +203 / +127 for the six rows above; at 0.5 % +163 / +124 / +157 / +5 /
+  +107 / +95, so Dir SENSEX 09:17–10:02's edge shrinks to ₹5 per lot-day at 0.5 %. **Historical lot sizing** was
+  dropped by the owner (2026-10-15: "not significant; calculate with current lot"). **NIFTY
+  2022-01 → 2024-10 advisory** (Phase 4 advisory only; 681 days; winner vs template): Widesl NIFTY keeps its sign
+  in all four bands for the return-only selection (+46, +26, +34, +28); the tail-gated Widesl NIFTY
+  09:17–10:02 holds (233 vs 157) but 10:17–11:32 flips (25 vs 50); Dir NIFTY flips in three of four
+  bands (−100, −48, −8; +4 late), which agrees with its failing the bootstrap in-sample. SENSEX has no
+  usable data before 2024-09. Not done: the bootstrap against the BL-099 picks.
+
+  Owner direction after the read (2026-10-15): judge in rupees per lot; require real stops (a day MTM
+  stop, Widesl leg stop ≤ 100 %); a 60 % day-stop cap for Buy (30 % for Widesl and Dir). The
+  follow-up is a candidate pool for the picker (about 440 variants, up to four different sets per
+  band) tested out-of-sample: pool re-selected on 2024-10 → 2025-10 only, Steady / Calendar / Adaptive
+  replayed on 2025-10 → 2026-10 against the same lists over the 298 universe. To be registered as its
+  own item before any run.

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — three management ideas for the Dir family; informative whatever the answer |
-| **Status** | In progress (Phase 1 closed by the Phase 0 rule; engine roll built and reviewed; Phase 2 roll screen running) |
+| **Status** | Done for the registered ideas (2026-10-15): lock / trail, restart and roll all closed by the Phase 0 rule; one unregistered morning-restart lead noted |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-15 |
@@ -227,8 +227,9 @@ Nothing is adopted from this item; a survivor goes to Stage 2 (engine-exact) and
   Lock / trail change almost nothing because the arm level is reached on a minority of days and
   the lock often sits near where the base would end anyway; cutting at a target gives up the
   decay that is the strategy's profit. One lead, **not a result**: SENSEX restart after a ₹3,000
-  target gains ₹100–240 per lot-day in the 09:17–10:17 slots and loses ₹25–90 from 11:32 on,
-  in both ITM1 and ITM2 and without the leg trail; its bootstrap lower bound includes zero, and a
+  target gains ₹66–237 per lot-day in the 09:17–10:17 slots and loses ₹12–87 from 11:32 on,
+  in both ITM1 and ITM2 and without the leg trail; the bootstrap lower bound is above zero in only 6
+  of the 16 morning cells, and a
   morning-only rule would be a choice made after seeing the result, so it needs its own registered
   item and the forward test before it counts. Roll (B, B′) is untested and still needs the Phase 2
   engine feature; it is the owner's remaining idea.
@@ -246,3 +247,33 @@ Nothing is adopted from this item; a survivor goes to Stage 2 (engine-exact) and
   - *Phase 0 wording, as run:* a restart enters at the close of the cut minute (the engine's
     fixed-time entry convention, which is the next minute's start) and only when the cut is
     before 14:00, not at 14:00. Rolled legs share the leg's SL re-entry counter.
+- 2026-10-15 — **Phase 2 roll screen done** (fixed engine, 2,352 variant-cases = (24 roll variants
+  × 6 bases + 6 roll-to-ATM variants × 4 ITM bases) × 7 slots × 2 indices; run 15:25 IST). **No setting passed the registered rule (0 of 336
+  index × base × setting cases).** The roll fires rarely: per day 0.04 / 0.07 / 0.12 / 0.18 / 0.23 /
+  0.53 rolls at decay 15 / 25 / 35 / 45 / 50 / 70 % (rolls per day; a day can hold two), and about
+  a quarter to a half of that when gated on ₹3,000 of day profit. Mean change vs the unrolled base, ₹ per lot-day (21 % stop on the new
+  leg, strike rule of the base):
+
+  | Decay trigger | NIFTY any time / after ₹3,000 | SENSEX any time / after ₹3,000 |
+  |---|---|---|
+  | 15 % | +5 / +7 | −1 / +2 |
+  | 25 % | +1 / +2 | −13 / −5 |
+  | 35 % | −15 / −6 | −15 / −10 |
+  | 45 % | −20 / −13 | −19 / −5 |
+  | 50 % | −21 / −18 | −30 / −8 |
+  | 70 % | −35 / −31 | −33 / +6 |
+
+  Roll to ATM (ITM bases only): −34 to +4 on NIFTY, −9 to +13 on SENSEX. Tight triggers do
+  almost nothing because they seldom fire; looser ones fire more and lose money, with a deeper
+  maximum drawdown (up to +17 % on NIFTY at 70 % any time) while the single worst day is slightly
+  *better* than the base's (the mean change is ₹0 to +₹170; e.g. −₹4,324 against −₹5,264 at
+  NIFTY 70 % any time): closing the decayed leg early trims one bad day but gives up the leg's
+  remaining decay over many days. The best case in any slot-count is 1 of 7 slots with a gain
+  of ₹10–21 per lot-day (mean over its 7 slots), under the ₹25 kill line and not significant. The owner's reasoning that the new
+  leg's own 21–30 % stop bounds the risk holds (the downside is small), but there is no edge to
+  collect against it: the base's decay on the other leg is already the profit, and a roll adds two
+  orders and re-opens gamma at a new ATM. A 30 % stop on the new leg against 21 % changes the
+  mean gain by between about −7 and +16 per lot-day depending on the trigger and grouping, with no
+  consistent winner.
+  All three ideas are closed under their registered rules; the SENSEX morning restart lead (above)
+  remains the one thing to carry forward, as a hypothesis for a new registered test, not a result.
