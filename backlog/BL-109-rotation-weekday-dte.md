@@ -109,3 +109,21 @@ Committed before any run of `research/bl109/`.
   (Steady +₹367 older / +₹370 newer per lot-day; Adaptive +₹375 / +₹378; picks differ on
   about 15% of days). It is disclosed here and is **not** the registered test: the window,
   rule and interval above are.
+- 2026-10-15 — **Phase 1 run** (`research/bl109/rescore.py`; `rescore_2026-10-15.json`, daily
+  rows in `rescore_daily_2026-10-15.csv`). 238 scored days, 2025-10-16 to 2026-10-15, gross ₹ per
+  lot-day, older = calendar-day labels, newer = weekdays only:
+
+  | | Older | Newer | Newer minus older (90% block bootstrap) | Days picks differ |
+  |---|---|---|---|---|
+  | **Adaptive** mean | +₹406 | +₹430 | +₹25 [-₹6, +₹63] | 26 of 238 |
+  | win rate / cumulative / max drawdown | 65.1% / +₹96,548 / -₹10,089 | 65.1% / +₹102,408 / -₹10,688 | | |
+  | **Steady** mean | +₹395 | +₹406 | +₹11 [-₹16, +₹46] | 33 of 238 |
+  | win rate / cumulative / max drawdown | 63.4% / +₹94,003 / -₹11,073 | 63.0% / +₹96,650 / -₹11,610 | | |
+
+  By half-year (descriptive): Adaptive +₹377 to +₹425, then +₹434 to +₹436; Steady +₹437 to
+  +₹471, then +₹353 to +₹341.
+  **Rule applied:** Adaptive's interval is not entirely below zero and its drawdown is 6%
+  deeper (limit 20%), so the change is **adopted as "no worse"**. It is **not** shown to be
+  better: both intervals include zero, the lists were fitted on the calendar labels, and all
+  of it is in-sample. Steady's second half is slightly lower; reported, not part of the rule.
+

@@ -30,7 +30,6 @@ Sorted by priority (P0 first), then ID.
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
 | [BL-022](BL-022-analog-day-search.md) | "Days like today": analog-day search for intraday options | P1 | Idea | research | options |
 | [BL-025](BL-025-live-money-rules.md) | Live-money rules for Momentum: written before the first rupee, enforced by alerts | P1 | In progress | feature | momentum |
-| [BL-109](BL-109-rotation-weekday-dte.md) | Rotation days to expiry: count weekdays only, not calendar days | P1 | In progress | research | options |
 | [BL-026](BL-026-realised-vs-backtest-options.md) | Options: realised P&L against the backtest of the same days | P1 | Planned | feature | options |
 | [BL-030](BL-030-choose-journal-favourites.md) | Choose the ~8 favourites to track and trade | P1 | Idea | research | momentum |
 | [BL-035](BL-035-consolidation-tightness-feature.md) | Consolidation tightness as a Momentum ranking feature (the cheap "flag") | P1 | Idea | research | momentum |
@@ -49,6 +48,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-099](BL-099-combined-final-selection-post-charge.md) | Combined final qualified list: one Directional / Buy / Widesl configuration per index and timing band, post-charge holdout (reports only; no item file with a plan yet) | P2 | In progress | research | options |
 | [BL-100](BL-100-restricted-rotation-lists-p3.md) | Rotation lists A/B/C restricted to the BL-099 families, tested on 2022-24 | P2 | Planned (pre-registration; not run) | research | options |
 | [BL-102](BL-102-options-lab-ux-redesign.md) | Options Lab redesign: three workspaces, lists first (Steady / Calendar / Adaptive), favourites, a leg-grid builder | P1 | In progress | improvement | dashboard |
+| [BL-109](BL-109-rotation-weekday-dte.md) | Rotation days to expiry: count weekdays only, not calendar days | P1 | In progress | research | options |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-039](BL-039-broad-warm-path-and-weekly-job-cost.md) | Broad warm path and weekly-job cost (follow-up to BL-005) | P2 | Planned | improvement | momentum |
 | [BL-041](BL-041-in-app-guide.md) | In-app Guide: what each dashboard section does and how to use it | P2 | In progress | feature | dashboard |
