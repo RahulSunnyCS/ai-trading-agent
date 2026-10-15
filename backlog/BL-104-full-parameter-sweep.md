@@ -286,6 +286,14 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   (first-year selection, test year read once, reverse split, the five conditions, luck line over
   all 648); pooled two-year ranking and best per strike reported as descriptive.
 - **Will not run:** ATM and premium strikes; per-slot settings; values outside the Stage 1 grid.
+- **Result (2026-10-15): kill — the template stands on non-expiry days.** `--days other --strikes
+  OTM1,OTM2,OTM3` (outputs `results/otm1-2-3_other/`); 0 of 648 pass; luck line +₹219 / +₹197. The
+  template on these days: ₹120 a lot-day in the first year, −₹51 in the test year (negative at 5
+  of 7 slots), Calmar 0.3. First → test picks SL 150 % / trail 25/15 / MTM ₹4,000 (+67 then +18);
+  test → first picks SL 40–60 % (+104 to +118 then −73 to +24). Pooled leader (descriptive): OTM1
+  SL 60 %, trail 15/10, MTM ₹3,000, no re-entry: ₹99 a lot-day (145 / 53), +64 over the template,
+  better at 7 of 7 slots, max drawdown −₹23,758 against −₹33,978, Calmar 1.1; it is the only family
+  that stays positive in the test year. Best OTM2 +27 (SL 60 %, MTM ₹3,000), best OTM3 +4.
 
 ## Risks
 
