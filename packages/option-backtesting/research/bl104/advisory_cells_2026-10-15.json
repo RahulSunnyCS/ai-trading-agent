@@ -1,0 +1,523 @@
+[
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 150,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": null,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "selection": "original",
+  "winner": "W_N_A",
+  "role": "winner"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "params": null,
+  "selection": "original",
+  "winner": "W_N_A",
+  "role": "template"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 150,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": null,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "selection": "original",
+  "winner": "W_N_A",
+  "role": "winner"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "params": null,
+  "selection": "original",
+  "winner": "W_N_A",
+  "role": "template"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 150,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": null,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "selection": "original",
+  "winner": "W_N_A",
+  "role": "winner"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "params": null,
+  "selection": "original",
+  "winner": "W_N_A",
+  "role": "template"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": null,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "selection": "original",
+  "winner": "W_N_B",
+  "role": "winner"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "params": null,
+  "selection": "original",
+  "winner": "W_N_B",
+  "role": "template"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": null,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "selection": "original",
+  "winner": "W_N_B",
+  "role": "winner"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "params": null,
+  "selection": "original",
+  "winner": "W_N_B",
+  "role": "template"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 150,
+   "trail": null,
+   "mtm": null,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "selection": "original",
+  "winner": "W_N_C",
+  "role": "winner"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:02",
+  "params": null,
+  "selection": "original",
+  "winner": "W_N_C",
+  "role": "template"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 150,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "selection": "original",
+  "winner": "W_N_D",
+  "role": "winner"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:32",
+  "params": null,
+  "selection": "original",
+  "winner": "W_N_D",
+  "role": "template"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": [
+    "asap",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "selection": "original",
+  "winner": "D_N_A",
+  "role": "winner"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:17",
+  "params": null,
+  "selection": "original",
+  "winner": "D_N_A",
+  "role": "template"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": [
+    "asap",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "selection": "original",
+  "winner": "D_N_A",
+  "role": "winner"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:32",
+  "params": null,
+  "selection": "original",
+  "winner": "D_N_A",
+  "role": "template"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": [
+    "asap",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "selection": "original",
+  "winner": "D_N_A",
+  "role": "winner"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:47",
+  "params": null,
+  "selection": "original",
+  "winner": "D_N_A",
+  "role": "template"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "asap",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "selection": "original",
+  "winner": "D_N_B",
+  "role": "winner"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:17",
+  "params": null,
+  "selection": "original",
+  "winner": "D_N_B",
+  "role": "template"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:32",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "asap",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "selection": "original",
+  "winner": "D_N_B",
+  "role": "winner"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:32",
+  "params": null,
+  "selection": "original",
+  "winner": "D_N_B",
+  "role": "template"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "selection": "original",
+  "winner": "D_N_C",
+  "role": "winner"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:02",
+  "params": null,
+  "selection": "original",
+  "winner": "D_N_C",
+  "role": "template"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:32",
+  "params": {
+   "strike": "ITM2",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "asap",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "selection": "original",
+  "winner": "D_N_D",
+  "role": "winner"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:32",
+  "params": null,
+  "selection": "original",
+  "winner": "D_N_D",
+  "role": "template"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "selection": "tail",
+  "winner": "W_N_A",
+  "role": "winner"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "selection": "tail",
+  "winner": "W_N_A",
+  "role": "winner"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "selection": "tail",
+  "winner": "W_N_A",
+  "role": "winner"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "selection": "tail",
+  "winner": "W_N_B",
+  "role": "winner"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "selection": "tail",
+  "winner": "W_N_B",
+  "role": "winner"
+ }
+]
