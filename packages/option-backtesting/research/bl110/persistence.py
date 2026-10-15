@@ -30,6 +30,8 @@ WITH b AS (
   SELECT ts, open, high, low,
          hour(ts AT TIME ZONE 'Asia/Kolkata') * 60 + minute(ts AT TIME ZONE 'Asia/Kolkata') AS m
   FROM read_parquet(?)
+  WHERE hour(ts AT TIME ZONE 'Asia/Kolkata') * 60 + minute(ts AT TIME ZONE 'Asia/Kolkata')
+        BETWEEN 555 AND 929  -- the 09:15 to 15:29 session; pre-open bars are not part of it
 )
 SELECT min(m), max(m), arg_min(open, ts), max(high), min(low),
        max(high) FILTER (WHERE m < ?), min(low) FILTER (WHERE m < ?),

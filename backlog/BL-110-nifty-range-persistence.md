@@ -95,7 +95,7 @@ Committed before `research/bl110/persistence.py` is run.
   Not a trading rule; findings page `research/options/common/index-range-persistence.md`.
   The owner asked whether daily candles would do: for the day-range tests they give the same
   numbers; the opening-range test needs minutes. A 2016 to 2021 daily-candle confirmation is a
-  possible follow-up (needs the Fyers token); not run.
+  possible follow-up (needs the Fyers token); not run. (Superseded: Amendment 1 below ran the 2016 to 2021 check on a proxy.)
 - 2026-10-15 — **Amendment 1 (registered before it is run; the main result above is unchanged).**
   The owner pointed to Momentum's daily NIFTY file. It holds `date, open, close` only, 2016-01-01
   to 2026-10-09 (no high or low), so it cannot give the day range `R`. A confirmation on the 2016
@@ -118,4 +118,19 @@ Committed before `research/bl110/persistence.py` is run.
   of ratios to a median baseline sits above 1 for any skewed series. The same-state probabilities
   barely differ from the base rates (0.41 vs 0.40, 0.41 vs 0.42), so on this proxy
   "range-bound continues" is not shown, consistent with the main result.
+- 2026-10-15 — **Review corrections (PR #234).** (1) The reading above, "range-bound does not shrink
+  the next ranges", is **withdrawn**. It compared mean ratios with 1.0, but a mean of ratios to a
+  median sits above 1 for any skewed series (over all sessions it averages 1.09 to 1.12). Against
+  that reference, after a range-bound session the next day is lower by 0.15 (first period) and
+  0.12 [0.18, 0.06 below] (second), the next-5-day average by 0.09 and 0.13, intervals excluding
+  zero; after an expanded session it is higher by about 0.14. Both states persist, roughly
+  symmetrically. Post-hoc, reproduced in `posthoc_baseline.py`; not part of the registered rule,
+  which is unaffected. (2) "VIX carries about half of the information" is reworded: the
+  coefficient on the previous range halves, but R² rises 0.17 to 0.28 with VIX added, so the range
+  still adds information. (3) The 2016 to 2021 confirmation rests on 2020 to 2021; split post hoc,
+  2016 to 2019 alone shows nothing (lag-1 0.04 [-0.03, 0.09]). The registered window still passes as
+  registered. (4) Data-quality fix, no rule change: the session filter now keeps only bars from
+  09:15 to 15:29, so three September 2026 sessions with pre-open bars (an Angel One collection) are
+  included: 1,178 sessions, every headline number unchanged to two decimals, the JSON regenerated.
+  (5) `proxy_2016.py` reads the file by repo-relative path.
 
