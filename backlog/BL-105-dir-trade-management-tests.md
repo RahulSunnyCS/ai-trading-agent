@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — three management ideas for the Dir family; informative whatever the answer |
-| **Status** | In progress (Phase 0 approved and registered 2026-10-15; Phase 1 building) |
+| **Status** | In progress (Phase 1 screen done 2026-10-15: lock / trail and restart closed by the Phase 0 rule; roll waits for engine support) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-15 |
@@ -203,3 +203,27 @@ Nothing is adopted from this item; a survivor goes to Stage 2 (engine-exact) and
 - 2026-10-15 — owner amended the roll trigger before any run: f = 15 / 25 / 35 / 45 / 50 / 70 %
   (was 15 / 25 / 35), and confirmed the screen runs ATM bases as well as ITM1 / ITM2, not ITM only.
   Phase 2 roll count rises from 12 + 3 to 24 + 6 per base.
+- 2026-10-15 — **Phase 1 screen done** (1,680 cells, 488 days, 2024-10-09 → 2026-10-09; run
+  12:28 IST). The cut replay was first checked against the engine's own profit-target exit: 75
+  checks, 34 fired, 0 mismatches. How often the unmanaged base's open profit reaches a level (mean
+  of 7 slots): ≥ ₹2,000 on 31–41 % of days, ≥ ₹3,000 on 16–28 %, ≥ ₹4,000 on 8–18 %, ≥ ₹6,000 on
+  1–6 % (ATM lowest, ITM2 highest; NIFTY and SENSEX alike).
+
+  | Idea | Result (mean change vs the base, per lot-day, 42 base-slot cases per index) | Pass rule |
+  |---|---|---|
+  | A1 cut at a target | NIFTY −79 / −35 / −10 at T = 2,000 / 3,000 / 4,000; SENSEX −103 / −16 / −2 | fails: gain < ₹25 and negative |
+  | A2 lock at A / 2 | NIFTY −15 / −1 / +5 at A = 2,000 / 3,000 / 4,000; SENSEX −25 / −2 / −3 | fails: gain < ₹25 |
+  | A3 lock and trail | NIFTY −17 / +2 / +5; SENSEX −28 / −2 / −2 | fails: gain < ₹25 |
+  | C restart after a target | NIFTY −20 to −44; SENSEX −56 / −51 at T = 2,000, +26 / +33 at 3,000, +18 / +19 at 4,000 | fails: no setting passes in 4 of 7 slots (best 2 of 7, bootstrap lower bound below 0) |
+  | C restart after a lock cut | −2 to −9 on both indices | fails: gain < ₹25 |
+
+  **No setting passed the registered rule (0 of 228 index × base × setting cases).** The worst-day
+  gate never bound (every variant is within 1.5 × its base): a cut can only shorten the tail.
+  Lock / trail change almost nothing because the arm level is reached on a minority of days and
+  the lock often sits near where the base would end anyway; cutting at a target gives up the
+  decay that is the strategy's profit. One lead, **not a result**: SENSEX restart after a ₹3,000
+  target gains ₹100–240 per lot-day in the 09:17–10:17 slots and loses ₹25–90 from 11:32 on,
+  in both ITM1 and ITM2 and without the leg trail; its bootstrap lower bound includes zero, and a
+  morning-only rule would be a choice made after seeing the result, so it needs its own registered
+  item and the forward test before it counts. Roll (B, B′) is untested and still needs the Phase 2
+  engine feature; it is the owner's remaining idea.
