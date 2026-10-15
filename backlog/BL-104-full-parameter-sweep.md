@@ -360,6 +360,18 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   score, dropping a premium whose slot-mean daily P&L correlates ≥ 0.9 with a kept one; the same
   premiums hold at every slot. Within each slot, the Amendment 1 rule then picks the settings among
   those premiums, keeping at most one setting per premium.
+- **Amendment 4 (2026-10-16, owner, before any premium result was read): no per-slot picks.** One
+  setting per family and day type that works across the entry times ("this strategy which should
+  work fairly well for all the time zones"); premium score = the best such setting's mean gain.
+- **Amendment 5 (2026-10-16, owner, same): three time bands**, each chosen on its own: **09:15–10:30**
+  (slots 09:17, 09:32, 09:47, 10:17), **10:30–13:00** (11:32 only), **13:00–15:30** (13:02, 14:32).
+  Per family × band × day type: the premiums (premium families) and the setting are chosen across
+  the band's slots. A setting must beat the template at all but one of the band's slots when the
+  band has three or more, and at every slot when it has one or two; the other Amendment 1
+  conditions use band means. The refine step adds the midpoints around each band's top premium,
+  union over bands and day types. Known weakness: the 10:30–13:00 band has one sampled slot and the
+  13:00–15:30 band two, so "across the band" is barely tested there; adding sampled slots in those
+  bands is the owner's call.
 
 ## Risks
 

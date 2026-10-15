@@ -9,6 +9,8 @@ readable lists in strategies/daytype/README.md. The schema has no day filter: a 
 if run, and the day type lives in its folder and name.
 
     uv run python research/bl104/daytype_lists.py                  # the lists (after every run)
+Amendment 4 (owner, 2026-10-16): one setting per family and day type that works across all 7 entry
+times (time-generic), never a per-slot pick.
     uv run python research/bl104/daytype_lists.py --refine-cells   # after premium_coarse: refine cells
 """
 
@@ -325,18 +327,104 @@ def evaluate(f: Family, slot: str, exp: set[date]) -> dict[str, Any]:
     return out
 
 
-def decide(f: Family, res: dict, kind: str, allowed: list[float] | None = None) -> dict[str, Any]:
-    rows, tmpl = res["rows"], res["template"]
-    dflt = rows[key(OWNER_DEFAULT[kind])] if f.name == "N_wide" else tmpl
+BANDS = {  # Amendment 5 (owner, 2026-10-16)
+    "09:15-10:30": ("09:17", "09:32", "09:47", "10:17"),
+    "10:30-13:00": ("11:32",),
+    "13:00-15:30": ("13:02", "14:32"),
+}
+
+
+def slots_needed(n: int) -> int:
+    """Beat the template at all but one slot of a band of three or more, at every slot otherwise."""
+    return n - 1 if n >= 3 else n
+
+
+def aggregate(f: Family, results: dict[str, dict], kind: str, slots: tuple[str, ...]) -> dict[str, dict]:
+    """Amendment 4: every setting across the 7 slots — slot-mean gain, per-slot gains, both-year
+    slot-mean gains, slot-mean worst-day ratio, and the slot-mean daily P&L (for correlations)."""
+    agg: dict[str, dict] = {}
+    keys = set.intersection(*(set(results[s][kind]["rows"]) for s in slots))
+    for k in keys:
+        per = [results[s][kind]["rows"][k] for s in slots]
+        wx = [r["worst_x"] for r in per if r["worst_x"] == r["worst_x"]]
+        agg[k] = {
+            "params": per[0]["params"],
+            "slot_gain": [r["gain"] for r in per],
+            "slot_net": [r["net"] for r in per],
+            "gain": float(np.mean([r["gain"] for r in per])),
+            "gain_first": float(np.mean([r["gain_first"] for r in per])),
+            "gain_test": float(np.mean([r["gain_test"] for r in per])),
+            "net": float(np.mean([r["net"] for r in per])),
+            "net_first": float(np.mean([r["net_first"] for r in per])),
+            "net_test": float(np.mean([r["net_test"] for r in per])),
+            "worst_x": float(np.mean(wx)) if wx else float("nan"),
+            "slots_pos": sum(r["gain"] > 0 for r in per),
+            "values": np.mean([r["values"] for r in per], axis=0),
+            "slots": slots,
+        }
+    for r in agg.values():
+        nb = [agg[key(q)] for q in neighbours(f, r["params"]) if key(q) in agg]
+        r["nb_beat"] = sum(x["gain"] > 0 for x in nb)
+    t = [results[s][kind]["template"] for s in slots]
+    agg["__template__"] = {
+        "params": "template", "slot_gain": [0.0] * len(t), "slot_net": [x["net"] for x in t],
+        "gain": 0.0, "gain_first": 0.0, "gain_test": 0.0,
+        "net": float(np.mean([x["net"] for x in t])),
+        "net_first": float(np.mean([x["net_first"] for x in t])),
+        "net_test": float(np.mean([x["net_test"] for x in t])),
+        "worst_x": 1.0, "slots_pos": 0, "nb_beat": 0, "is_template": True,
+        "values": np.mean([x["values"] for x in t], axis=0),
+        "names": [x["name"] for x in t], "slots": slots,
+    }
+    return agg
+
+
+def premium_scores(agg: dict[str, dict]) -> dict[float, float]:
+    """Amendment 4: a premium's score is its best time-generic setting's slot-mean gain."""
+    score: dict[float, float] = {}
+    for k, r in agg.items():
+        if k == "__template__":
+            continue
+        pr = r["params"]["strike"]
+        score[pr] = max(score.get(pr, -1e18), r["gain"])
+    return score
+
+
+def family_premiums(agg: dict[str, dict]) -> tuple[list[float], dict[float, float]]:
+    """Top three premiums by score; a later one dropped when its best setting's slot-mean daily
+    P&L correlates >= 0.9 with a kept one's (a near-duplicate)."""
+    score = premium_scores(agg)
+    best = {}
+    for k, r in agg.items():
+        if k == "__template__":
+            continue
+        pr = r["params"]["strike"]
+        if pr not in best or r["gain"] > best[pr]["gain"]:
+            best[pr] = r
+    kept: list[float] = []
+    for pr in sorted(score, key=lambda p: -score[p]):
+        if any(float(np.corrcoef(best[k]["values"], best[pr]["values"])[0, 1]) >= PREMIUM_DUP_CORR for k in kept):
+            continue
+        kept.append(pr)
+        if len(kept) == 3:
+            break
+    return kept, score
+
+
+def decide(f: Family, agg: dict[str, dict], kind: str, allowed: list[float] | None) -> dict[str, Any]:
+    tmpl = agg["__template__"]
+    dflt = agg[key(OWNER_DEFAULT[kind])] if f.name == "N_wide" else tmpl
 
     def clears(r: dict) -> bool:
         return (
-            r is not dflt and r["gain_first"] > 0 and r["gain_test"] > 0
+            r is not dflt and not r.get("is_template")
+            and r["gain_first"] > 0 and r["gain_test"] > 0
+            and r["slots_pos"] >= slots_needed(len(r["slots"]))
             and r["gain"] >= dflt["gain"] + MARGIN[kind]
             and not (r["worst_x"] > WORST_X) and r["nb_beat"] >= 2
         )
 
-    ok = sorted((r for r in rows.values() if clears(r)), key=lambda r: -r["gain"])
+    ok = sorted((r for r in agg.values() if clears(r)), key=lambda r: -r["gain"])
     if f.is_premium and allowed is not None:
         ok = [r for r in ok if r["params"]["strike"] in allowed]
     if ok and f.is_premium:
@@ -344,28 +432,28 @@ def decide(f: Family, res: dict, kind: str, allowed: list[float] | None = None) 
         for r in ok:
             if any(r["params"]["strike"] == k["params"]["strike"] for k in picks):
                 continue
-            corr = [float(np.corrcoef(k["values"], r["values"])[0, 1]) for k in picks]
             if picks:
-                r["corr_with_first"] = corr[0]
+                r["corr_with_first"] = float(np.corrcoef(picks[0]["values"], r["values"])[0, 1])
             picks.append(r)
             if len(picks) == 3:
                 break
-        return {"status": f"chosen ({len(picks)} premium{'s' if len(picks) > 1 else ''})",
-                "picks": picks, "alts": [], "default": dflt, "n_clear": len(ok)}
+        return {"status": f"chosen ({len(picks)} premium{'s' if len(picks) > 1 else ''})", "picks": picks,
+                "alts": [], "n_clear": len(ok)}
     if ok:
         picks = [ok[0]]
         for r in ok[1:]:
-            if float(np.corrcoef(ok[0]["values"], r["values"])[0, 1]) < MAX_CORR:
-                r["corr_with_first"] = float(np.corrcoef(ok[0]["values"], r["values"])[0, 1])
+            c = float(np.corrcoef(ok[0]["values"], r["values"])[0, 1])
+            if c < MAX_CORR:
+                r["corr_with_first"] = c
                 picks.append(r)
                 break
-        return {"status": "chosen" if len(picks) == 1 else "chosen (2, low correlation)",
-                "picks": picks, "alts": [], "default": dflt, "n_clear": len(ok)}
+        return {"status": "chosen" if len(picks) == 1 else "chosen (2, low correlation)", "picks": picks,
+                "alts": [], "n_clear": len(ok)}
     if dflt["gain_first"] < 0 and dflt["gain_test"] < 0:
-        top = sorted(rows.values(), key=lambda r: -r["gain"])[:3]
-        return {"status": "owner to choose", "picks": [dflt], "alts": top, "default": dflt, "n_clear": 0}
-    return {"status": "default (template)" if dflt is tmpl else "default (owner setting)",
-            "picks": [dflt], "alts": [], "default": dflt, "n_clear": 0}
+        top = sorted((r for r in agg.values() if not r.get("is_template")), key=lambda r: -r["gain"])[:3]
+        return {"status": "owner to choose", "picks": [dflt], "alts": top, "n_clear": 0}
+    return {"status": "default (template)" if dflt is tmpl else "default (owner setting)", "picks": [dflt],
+            "alts": [], "n_clear": 0}
 
 
 def write_yaml(f: Family, slot: str, kind: str, st: LegwiseStrategy, status: str, text: str) -> Path:
@@ -374,9 +462,9 @@ def write_yaml(f: Family, slot: str, kind: str, st: LegwiseStrategy, status: str
     path.parent.mkdir(parents=True, exist_ok=True)
     st = st.model_copy(deep=True)
     st.id = stem
-    day = "NIFTY/SENSEX weekly EXPIRY days only" if kind == "expiry" else "NON-expiry days only"
+    day = "weekly EXPIRY days only" if kind == "expiry" else "NON-expiry days only"
     head = (
-        f"# BL-104 day-type list ({status}) — {day} of {st.underlying}.\n"
+        f"# BL-104 day-type list ({status}) — {st.underlying} {day}; one setting for every entry time.\n"
         f"# {text}\n"
         "# The schema has no day filter: this file trades every day if run. Research lead, not adopted.\n"
         "# Generated by packages/option-backtesting/research/bl104/daytype_lists.py.\n"
@@ -388,25 +476,10 @@ def write_yaml(f: Family, slot: str, kind: str, st: LegwiseStrategy, status: str
     return path
 
 
-def premium_scores(f: Family, kind: str, exp: dict, results: dict | None = None) -> dict[float, float]:
-    """Amendment 3: per premium, the mean over the 7 slots of the best setting's gain over the
-    template on this day type (the premium is chosen across entry times, never per slot)."""
-    per: dict[float, list[float]] = {}
-    for slot in grid.SLOTS:
-        res = (results or {}).get(slot) or evaluate(f, slot, exp[grid.INDICES[f.idx]])
-        best: dict[float, float] = {}
-        for r in res[kind]["rows"].values():
-            pr = r["params"]["strike"]
-            best[pr] = max(best.get(pr, -1e18), r["gain"])
-        for pr, g in best.items():
-            per.setdefault(pr, []).append(g)
-    return {pr: float(np.mean(v)) for pr, v in per.items() if len(v) == len(grid.SLOTS)}
-
-
 def refine_cells() -> None:
-    """Amendment 3 refine step: per premium family and day type, the coarse premium with the best
-    slot-mean score is the area; add the midpoints to its coarse neighbours (₹5 rounding), or one
-    step beyond at an end of the range; the union over the two day types is run at all 7 slots."""
+    """Refine step (Amendments 3–4): per premium family and day type, the coarse premium with the
+    best time-generic score is the area; add the midpoints to its coarse neighbours (₹5 rounding),
+    or one step beyond at an end of the range; the union over the two day types, all 7 slots."""
     exp = expiries()
     out, report = [], []
     for f in (x for x in FAMILIES if x.is_premium):
@@ -414,8 +487,8 @@ def refine_cells() -> None:
         base_strike = {"W": "OTM1", "B": "ATM"}[f.fam]
         results = {slot: evaluate(f, slot, exp[grid.INDICES[f.idx]]) for slot in grid.SLOTS}
         new: set[float] = set()
-        for kind in KINDS:
-            score = premium_scores(f, kind, exp, results)
+        for kind, (band, slots) in ((k, b) for k in KINDS for b in BANDS.items()):
+            score = premium_scores(aggregate(f, results, kind, slots))
             area = max((p for p in score if p in coarse), key=score.get)
             i = coarse.index(area)
             lo = 5 * round((area + coarse[i - 1]) / 10) if i > 0 else max(5, 5 * round((2 * area - coarse[1]) / 5))
@@ -423,7 +496,7 @@ def refine_cells() -> None:
                   else 5 * round((2 * area - coarse[-2]) / 5))
             pts = [x for x in (lo, hi) if x not in coarse and x > 0]
             new |= set(pts)
-            report.append(f"{f.name} {kind}: scores " + ", ".join(f"₹{p:g} {score[p]:+.0f}" for p in sorted(score))
+            report.append(f"{f.name} {kind} {band}: scores " + ", ".join(f"₹{p:g} {score[p]:+.0f}" for p in sorted(score))
                           + f" -> area ₹{area:g}, add {pts}")
         for slot in grid.SLOTS:
             for c in grid.cells(f.fam, f.idx, slot, with_template=False):
@@ -438,25 +511,11 @@ def refine_cells() -> None:
     print(f"wrote {len(out)} cells to {path.name}")
 
 
-def family_premiums(f: Family, kind: str, exp: dict, results: dict) -> tuple[list[float], dict[float, float]]:
-    """Amendment 3: the family's premiums for a day type, top three by slot-mean score, a later one
-    dropped when its slot-mean daily P&L (best setting per slot) correlates >= 0.9 with a kept one."""
-    score = premium_scores(f, kind, exp, results)
-    curves: dict[float, np.ndarray] = {}
-    for pr in score:
-        parts = []
-        for slot in grid.SLOTS:
-            rows = [r for r in results[slot][kind]["rows"].values() if r["params"]["strike"] == pr]
-            parts.append(max(rows, key=lambda r: r["gain"])["values"])
-        curves[pr] = np.mean(parts, axis=0)
-    kept: list[float] = []
-    for pr in sorted(score, key=lambda p: -score[p]):
-        if any(float(np.corrcoef(curves[k], curves[pr])[0, 1]) >= PREMIUM_DUP_CORR for k in kept):
-            continue
-        kept.append(pr)
-        if len(kept) == 3:
-            break
-    return kept, score
+def describe_params(f: Family, params: Any, slots: tuple[str, ...] = grid.SLOTS) -> dict[str, str]:
+    st = build(f, slots[0], None if params == "template" else params)
+    d = describe(st, f.fam)
+    d["entry"] = ", ".join(slots)
+    return d
 
 
 def main() -> None:
@@ -471,52 +530,53 @@ def main() -> None:
             for old in folder.glob("*.yaml"):
                 old.unlink()
     lists: dict[str, list[dict]] = {"expiry": [], "other": []}
-    premium_report = []
+    premium_report: list[str] = []
     for f in FAMILIES:
-        underlying = grid.INDICES[f.idx]
-        results = {slot: evaluate(f, slot, exp[underlying]) for slot in grid.SLOTS}
-        allowed: dict[str, list[float] | None] = {k: None for k in KINDS}
-        if f.is_premium:
-            for kind in KINDS:
-                allowed[kind], score = family_premiums(f, kind, exp, results)
+        results = {slot: evaluate(f, slot, exp[grid.INDICES[f.idx]]) for slot in grid.SLOTS}
+        for kind, (band, slots) in ((k, b) for k in KINDS for b in BANDS.items()):
+            agg = aggregate(f, results, kind, slots)
+            allowed = None
+            if f.is_premium:
+                allowed, score = family_premiums(agg)
+                kept = ", ".join(f"₹{p:g}" for p in allowed)
                 premium_report.append(
-                    f"{f.name} {KINDS[kind][0]}: premiums kept {['₹%g' % p for p in allowed[kind]]}; scores "
+                    f"{f.name} {KINDS[kind][0]} {band}: premiums kept {kept}; best band gain by premium "
                     + ", ".join(f"₹{p:g} {score[p]:+.0f}" for p in sorted(score))
                 )
-        for slot in grid.SLOTS:
-            res = results[slot]
-            for kind in KINDS:
-                dec = decide(f, res[kind], kind, allowed[kind])
-                t = res[kind]["template"]
-                for rank, r in enumerate(dec["picks"], 1):
-                    st = build(f, slot, r["params"])
-                    desc = describe(st, f.fam)
-                    text = one_line(desc)
-                    path = write_yaml(f, slot, kind, st, dec["status"], text)
-                    lists[kind].append({
-                        "family": f.name, "slot": slot, "pick": rank, "status": dec["status"],
-                        **desc,
-                        "net_per_lot_day": round(r["net"]), "net_first_year": round(r["net_first"]),
-                        "net_test_year": round(r["net_test"]),
-                        "template": t["name"],
-                        "template_net": round(t["net"]), "template_first_year": round(t["net_first"]),
-                        "template_test_year": round(t["net_test"]),
-                        "gain_vs_template": round(r["gain"]), "gain_first_year": round(r["gain_first"]),
-                        "gain_test_year": round(r["gain_test"]), "worst_day": round(r["worst"]),
-                        "template_worst_day": round(t["worst"]),
-                        "corr_with_pick_1": "" if rank == 1 else round(r.get("corr_with_first", float("nan")), 2),
-                        "settings_clearing_rule": dec["n_clear"],
-                        "alternatives": " || ".join(
-                            f"{one_line(describe(build(f, slot, a['params']), f.fam))} "
-                            f"(gain {a['gain']:+.0f}; {a['gain_first']:+.0f} / {a['gain_test']:+.0f})"
-                            for a in dec["alts"]
-                        ),
-                        "days": res[kind]["n_days"], "file": str(path.relative_to(PACKAGE)),
-                        "description": text,
-                    })
+            dec = decide(f, agg, kind, allowed)
+            tmpl = agg["__template__"]
+            for rank, r in enumerate(dec["picks"], 1):
+                params = None if r.get("is_template") else r["params"]
+                files = []
+                for slot in slots:
+                    st = build(f, slot, params if params is not None else _template_params(f, results, slot, kind))
+                    text = one_line(describe(st, f.fam))
+                    files.append(str(write_yaml(f, slot, kind, st, dec["status"], text).relative_to(PACKAGE)))
+                desc = describe_params(f, params if params is not None else "template", slots)
+                lists[kind].append({
+                    "family": f.name, "band": band, "pick": rank, "status": dec["status"], **desc,
+                    "net_per_lot_day": round(r["net"]), "net_first_year": round(r["net_first"]),
+                    "net_test_year": round(r["net_test"]),
+                    "template_net": round(tmpl["net"]), "template_first_year": round(tmpl["net_first"]),
+                    "template_test_year": round(tmpl["net_test"]),
+                    "gain_vs_template": round(r["gain"]), "gain_first_year": round(r["gain_first"]),
+                    "gain_test_year": round(r["gain_test"]),
+                    "slots_better": f"{r['slots_pos']}/{len(slots)}",
+                    "gain_by_slot": ", ".join(f"{s} {g:+.0f}" for s, g in zip(slots, r["slot_gain"], strict=True)),
+                    "net_by_slot": ", ".join(f"{s} {g:.0f}" for s, g in zip(slots, r["slot_net"], strict=True)),
+                    "worst_day_x_template": round(r["worst_x"], 2),
+                    "corr_with_pick_1": "" if rank == 1 else round(r.get("corr_with_first", float("nan")), 2),
+                    "settings_clearing_rule": dec["n_clear"],
+                    "alternatives": " || ".join(
+                        f"{one_line(describe_params(f, a['params'], slots))} (gain {a['gain']:+.0f}; "
+                        f"{a['gain_first']:+.0f} / {a['gain_test']:+.0f}; {a['slots_pos']}/{len(slots)} slots)"
+                        for a in dec["alts"]
+                    ),
+                    "comparator": ", ".join(sorted(set(tmpl["names"]))),
+                    "files": " ".join(files),
+                })
     for kind, rows in lists.items():
-        name = f"{KINDS[kind][0]}_list.csv"
-        with (OUT / name).open("w", newline="") as h:
+        with (OUT / f"{KINDS[kind][0]}_list.csv").open("w", newline="") as h:
             fields: list[str] = []
             for r in rows:
                 fields += [k for k in r if k not in fields]
@@ -526,35 +586,39 @@ def main() -> None:
     write_readme(lists, premium_report)
     print("\n".join(premium_report))
     for kind, rows in lists.items():
-        changed = [r for r in rows if r["status"].startswith("chosen")]
-        print(f"{KINDS[kind][0]}: {len(rows)} rows, {len(changed)} picks differ from the default, "
-              f"{sum(r['status'] == 'owner to choose' for r in rows)} owner-to-choose")
+        print(f"{KINDS[kind][0]}: {len(rows)} rows, {sum(r['status'].startswith('chosen') for r in rows)} "
+              f"differ from the default, {sum(r['status'] == 'owner to choose' for r in rows)} owner-to-choose")
+
+
+def _template_params(f: Family, results: dict, slot: str, kind: str) -> dict | None:
+    """The comparator file at a slot (for a premium family, the better current file there)."""
+    return results[slot][kind]["template"]["params"]
 
 
 def write_readme(lists: dict[str, list[dict]], premium_report: list[str]) -> None:
     lines = [
         "# Day-type strategy lists (BL-104, research leads — not adopted)",
         "",
-        "Two lists for every Core-298 family at the 7 sampled entry times: the best setting on",
-        "**expiry days** and on **non-expiry days** (NIFTY and SENSEX weekly expiries, each index its own).",
-        "Each family keeps its own strike; every other parameter was varied over the BL-104 Stage 1 grid.",
-        "Net ₹ per lot-day after charges, 2024-10-09 → 2026-10-09; first year ends 2025-10-08.",
+        "For every Core-298 family and each of three time bands — **09:15–10:30** (09:17, 09:32, 09:47,",
+        "10:17), **10:30–13:00** (11:32) and **13:00–15:30** (13:02, 14:32) — **one setting per day type",
+        "that works across the band's entry times**, for **expiry days** and for",
+        "**non-expiry days** (each index's own weekly expiries). The premium families (NIFTY / SENSEX",
+        "Widesl, NIFTY / SENSEX Buy) also choose up to three premiums, each with its own setting.",
+        "Net ₹ per lot-day after charges, averaged over the band's entry times, 2024-10-09 → 2026-10-09;",
+        "the first year ends 2025-10-08.",
         "",
         "How a row was chosen (registered in `backlog/BL-104-full-parameter-sweep.md` → Experiments,",
-        "day-type lists, Amendment 1): the default is the family's own rotation file (for N_wide, the",
+        "day-type lists, Amendments 1–4): the default is the family's own rotation file (for N_wide, the",
         "owner's settings: expiry SL 150 % / trail 25/15 / MTM ₹4,000 / RE cost ×1; other days SL 60 % /",
-        "trail 15/10 / MTM ₹3,000 / no re-entry). Another setting replaces it only when it beats the",
-        "template in **both** years, beats the default by ₹25 (expiry) or ₹15 (other days) a lot-day, has a",
-        "worst day no more than 1.25 × the template's and at least two grid neighbours that also beat the",
-        "template. A second pick is kept only when its daily P&L correlates below 0.7 with the first.",
+        "trail 15/10 / MTM ₹3,000 / no re-entry). Another setting replaces it only when, averaged over the",
+        "band, it beats the template in **both** years, beats it at all but one of the band's times (every",
+        "time in a band of one or two), beats the",
+        "default by ₹25 (expiry) or ₹15 (other days) a lot-day, has a worst day no more than 1.25 × the",
+        "template's and at least two grid neighbours that also beat the template. A second pick is kept",
+        "only when its daily P&L correlates below 0.7 with the first.",
         "",
-        "**Caution:** a per-slot choice from hundreds of settings on about 50 expiry days a year is close",
-        "to choosing noise. These files are for the forward journal, not proof. The engine has no day",
-        "filter, so a file trades every day if run; the day type is in its folder and in its name (`EXP` /",
-        "`NONEXP`).",
-        "",
-        "Premium families: the premium is chosen across all 7 entry times (Amendment 3), then the",
-        "settings per entry time among those premiums.",
+        "The engine has no day filter: each file trades every day if run. The day type is in its folder",
+        "and in its name (`EXP` / `NONEXP`); one file per entry time carries the same setting.",
         "",
         *[f"- {line}" for line in premium_report],
         "",
@@ -562,23 +626,26 @@ def write_readme(lists: dict[str, list[dict]], premium_report: list[str]) -> Non
     for kind, rows in lists.items():
         title = "Expiry days" if kind == "expiry" else "Non-expiry days"
         lines += [f"## {title}", "",
-                  "| Family | Entry | Status | Index | Strategy | Strike | Range | Leg SL | Trail SL | MTM SL | Target | Re-entry | Exit | Net/lot-day (1st / test) | Template (1st / test) | Gain vs template (1st / test) | Worst day (template) |",
-                  "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+                  "| Family | Band | Status | Index | Strategy | Strike | Range | Leg SL | Trail SL | MTM SL | Target | Re-entry | Exit | Net/lot-day (1st / test) | Template (1st / test) | Gain (1st / test) | Times better | Worst day × template |",
+                  "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for r in rows:
             lines.append(
-                f"| {r['family']}{'' if r['pick'] == 1 else ' (2nd)'} | {r['slot']} | {r['status']} | {r['index']} | "
+                f"| {r['family']}{'' if r['pick'] == 1 else ' (pick ' + str(r['pick']) + ')'} | {r['band']} | {r['status']} | {r['index']} | "
                 f"{r['strategy']} | {r['strike']} | {r.get('range', '—') or '—'} | {r['leg SL']} | {r['trail SL']} | "
                 f"{r['MTM SL']} | {r['target']} | {r['re-entry']} | {r['exit']} | "
                 f"{r['net_per_lot_day']} ({r['net_first_year']} / {r['net_test_year']}) | "
                 f"{r['template_net']} ({r['template_first_year']} / {r['template_test_year']}) | "
                 f"{r['gain_vs_template']:+d} ({r['gain_first_year']:+d} / {r['gain_test_year']:+d}) | "
-                f"{r['worst_day']} ({r['template_worst_day']}) |"
+                f"{r['slots_better']} | {r['worst_day_x_template']} |"
             )
+        lines += ["", f"Gain by entry time ({title.lower()}):", ""]
+        for r in rows:
+            lines.append(f"- {r['family']} {r['band']} pick {r['pick']}: {r['gain_by_slot']}")
         alts = [r for r in rows if r["alternatives"]]
         if alts:
-            lines += ["", f"### {title}: slots for the owner to choose", ""]
+            lines += ["", f"### {title}: for the owner to choose", ""]
             for r in alts:
-                lines.append(f"- **{r['family']} {r['slot']}**: {r['alternatives']}")
+                lines.append(f"- **{r['family']} {r['band']}**: {r['alternatives']}")
         lines.append("")
     (STRATEGIES / "README.md").write_text("\n".join(lines))
 
