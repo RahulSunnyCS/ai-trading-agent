@@ -8,6 +8,6 @@ collected data every evening, and kept in an insert-only hash chain. The scoring
 Modules: `lists` (the registered lists), `score` (the ranking), `variants` (the 298 strategy files),
 `store` (per-variant results and per-day attributes under TRADING_DATA_ROOT/rotation),
 `attrs` (weekday / VIX band / days to expiry from the lake), `live` (the 09:15 VIX open and the
-weekdays to expiry, BL-109), `dte` (the weekday count), `update` (the nightly one-day run of every variant), `journal` (the
-chain) and `pick` (the morning entry).
+weekdays to expiry), `dte` (the weekday count, BL-109), `update` (the nightly one-day run of every
+variant), `journal` (the chain) and `pick` (the morning entry).
 """
