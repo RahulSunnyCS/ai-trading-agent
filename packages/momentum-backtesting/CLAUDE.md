@@ -305,6 +305,13 @@ Market filled 745/755 symbols (2,980 rows) in a few minutes, and a subsequent `m
 produced real BUY/SELL/ADD signals for all three previously-blocked favourites (Stock
 Weekly Core, Broad Weekly Core, Fav 1).
 
+**The benchmark TRIs do not depend on NSE (2026-10-11).** `mbt stocks sync` refreshes the TRI raw
+snapshots from niftyindices.com first, but `stocks fetch` alone rewrites the core
+`benchmarks_weekly.csv` columns, so a failed NSE fetch left the Nifty200 Momentum 30 level two weeks
+behind and the journal's benchmark entry "missing". The fallback branch now calls
+`adjust.refresh_core_benchmarks_csv` + `db_migrate.import_core_benchmarks` (the CSV and the
+catalog's `stock_weekly_series`, core columns only; never fails the sync).
+
 Python callers here do not import `@trading/notify` — `notify.py` mirrors
 the `Notification` shape directly rather than importing the TypeScript
 package (see that package's `CLAUDE.md` for why the boundary is the
