@@ -17,6 +17,7 @@ import numpy as np
 from ..fyers.daily import data_dir
 from . import journal, store
 from .attrs import last_collected_before
+from .dte import DTE_BASIS
 from .lists import DISPLAY_NAMES, LISTS, LOTS_PER, PUBLIC_KEYS, WARMUP
 from .live import listed_dte_labels, vix_open_with_source
 from .score import composite, dte_matrix, family_index, runners_up, select, vix_band
@@ -97,13 +98,13 @@ class History:
     digest: str
 
 
-def load_history(day: date, root: Path, names: list[str]) -> History:
+def load_history(day: date, root: Path, names: list[str], basis: str = "weekdays") -> History:
     """Everything the pick reads from disk. Raises PickError when the history is short or does not
     reach the last collected trading day."""
     if not names:
         raise PickError("no variant strategy files found")
     m = store.load_matrix(names, root, through=day - timedelta(days=1))
-    attrs = store.read_days(root)
+    attrs = store.read_days(root, basis)
     keep = [i for i, d in enumerate(m.days) if d in attrs]
     days = [m.days[i] for i in keep]
     if len(days) < WARMUP:
@@ -219,6 +220,7 @@ def record(
         "vix_band": vix_band(vix_open),
         "dte": {"NIFTY": dte["dte_n"], "SENSEX": dte["dte_s"]},
         "dte_source": dte_source,
+        "dte_basis": DTE_BASIS,
         "lists": lists,
         "commit": commit,
         "universe": universe_fingerprint(names),

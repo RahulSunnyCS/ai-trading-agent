@@ -51,7 +51,7 @@ One 32 px line a day, newest first.
 | Column | What it shows |
 |---|---|
 | VIX open | The 09:15 India VIX open the entry was scored on, and where it was read from: Fyers, Angel One (the fallback when there is no Fyers login that morning), or given (typed by hand) |
-| DTE N / S | Days to the nearest listed expiry for NIFTY and SENSEX |
+| DTE N / S | Weekdays to the nearest listed expiry for NIFTY and SENSEX (Saturdays and Sundays are not counted). The four entries recorded before 16 Oct were scored on calendar days; they are shown converted, and the drawer says what the entry itself holds |
 | Recorded | The time the entry was written. After 09:17 it is *late* |
 | Steady, Calendar, Adaptive, Baseline | Gross per lot-day of the list's basket that day. Each header carries the journal key (A, B, C, REF) in small type. Hover for the list's total in rupees and its lots. **W** marks that the Widesl minimum replaced a top-ranked Dir; **B** that a Buy strategy qualified and was added |
 | Flags | Late, VIX from Angel One or by hand, days to expiry from the calendar, a stop, and **PF stop 11:14** when the portfolio stop closed the basket (below) |
@@ -123,7 +123,7 @@ At the foot of the table, over the forward days only (or the reconstructed days,
 ## One day in full
 
 Click a day to open it. The drawer shows each list's basket with every pick's one-lot gross, worst
-mark-to-market, stop reason and score; the VIX and days to expiry the entry was scored on; and the
+mark-to-market, stop reason and score; the VIX and weekdays to expiry the entry was scored on (an entry recorded before 16 Oct shows the calendar days it was scored on, and its re-score is checked on those days); and the
 record: when it was written, the chain hash (copyable), the code commit, whether the chain still
 verifies, and whether re-scoring today's stored results gives the same picks.
 
