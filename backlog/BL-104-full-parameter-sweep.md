@@ -242,3 +242,16 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   23:01 on 14 Oct, this item 23:28) and IDs are never reused. Folder `research/bl104/`, tests
   `test_bl104_*`. The grid's internal label stays `bl102-stage1-2026-10-14`, since it is part of
   the registered SHA `6a1078bb4fe68786`; PR #218 and its commits carry the old number.
+- 2026-10-15 — **Stored for later cuts.** `research/bl104/shortlist.py --build` writes
+  `research/bl104/shortlists/stage1_set_checks.csv.gz`: all 35,232 Stage 1 parameter sets at band
+  level with their figures and, for each of nine checks (Calmar, profit factor, day-stop rate with
+  a 30 % cap for Widesl / Dir and 60 % for Buy, entry rate, worst day and worst five days against
+  the template, plateau, real stops, verified re-entry), whether they pass and whether they pass
+  strongly. Any later cut is a filter on that table (`--max-fails`, `--strong`, `--allow-fail`,
+  `--min-gain`, `--family`). The owner's 2026-10-15 cut (higher ₹ per lot-day than the template,
+  at most two failed checks, every other check passed strongly) is
+  `shortlists/2026-10-15_owner_cut_max2fails_strong.csv`: 165 sets (22 fail nothing, 15 fail only
+  the plateau, 124 fail Calmar and plateau, 3 fail the day-stop rate and plateau, 1 fails the
+  real-stop rule). The raw results (summaries and day × cell series, 444 MB) are copied to
+  `/Volumes/TradingData/research-archive/bl104/` (not covered by the monthly `tdata backup`,
+  which copies only lake / raw / catalog).
