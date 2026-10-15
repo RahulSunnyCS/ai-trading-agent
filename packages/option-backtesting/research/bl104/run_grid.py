@@ -381,7 +381,9 @@ def load_cells_file(path: Path) -> dict[tuple[str, str, str], list[dict[str, Any
         params = item["params"]
         if params is not None:
             params = {k: tuple(v) if isinstance(v, list) else v for k, v in params.items()}
-        jobs.setdefault((item["family"], item["index"], item["slot"]), []).append(params)
+        bucket = jobs.setdefault((item["family"], item["index"], item["slot"]), [])
+        if params not in bucket:  # the same cell listed for several winners runs once
+            bucket.append(params)
     return jobs
 
 
