@@ -61,6 +61,15 @@ Registered-experiment figures, test year, 7 times pooled (from the BL-104 OTM1 r
   adds almost no diversification; a 50/50 mix lands between them.
 - None passes the luck line: the best of 216 by chance is about +₹197 a lot-day.
 
+- **What each change is worth** (SL 115 % cells run 2026-10-15, BL-104): raising the MTM stop from
+  ₹2,500 to ₹3,000 alone gives +₹20 a lot-day in both years, mostly on other days; re-entry alone
+  costs −₹8; widening the leg stop from 115 % adds only on expiry days and only in the test year
+  (B: +9; A at 150 % vs 115 %: +22).
+- **Searched by day type** (BL-104, 2026-10-15): nothing passes on expiry days or on other days. On
+  other days a tight SL 60 % / trail 15/10 / MTM ₹3,000 / no re-entry setting leads pooled (+₹64,
+  7 of 7 slots, smaller drawdown), but mostly from the test year, when the template lost money on
+  those days.
+
 ## Not yet tested
 
 - An expiry-day switch (A on expiry days, B or the template otherwise) as a pre-registered rule,

@@ -226,6 +226,29 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
 - **Will not run:** per-slot settings; strikes other than OTM1; values outside the Stage 1 grid;
   SENSEX; a joint rule that picks the expiry-day and other-day settings together (it would be a
   second registration if either day set passes).
+- **Result (2026-10-15): kill in both day sets — the template stands on both.** Stored series, no
+  re-simulation (`otm1_one_setting.py --days expiry|other`; outputs `results/otm1_expiry/`,
+  `results/otm1_other/`). **Expiry days** (104): the template earns ₹546 a lot-day in the first year
+  and ₹487 in the test year. Chosen on the first year, SL 100 %, no trail, MTM ₹4,000, no re-entry
+  gains +64 then +70 in the test year (90 % interval [−5, +139]) but passes the risk gates at 2 of 7
+  slots; the luck line is +₹458 (≈ 50 days a year). Chosen on the test year, the SL 150 % / MTM
+  ₹4,000 / re-entry family (+268) is −28 to −124 in the first year. Pooled descriptive top: SL 150 %,
+  trail 25/15, MTM ₹4,000, RE ×1, +117, 6/7 slots positive, risk gates 0/7 (worst day 1.66 ×).
+  **Other days** (384): the template earns ₹120 a lot-day in the first year and **−₹51 in the test
+  year**. Chosen on the first year, the SL 150 % / MTM ₹4,000 family gains +67 then +18; chosen on the
+  test year, SL 40–60 % with MTM ₹3,000–4,000 gains +104 to +118 there and −73 to +24 in the first
+  year. Pooled descriptive top: SL 60 %, trail 15/10, MTM ₹3,000, no re-entry, +64 (+24 first year,
+  +104 test year), positive at 7/7 slots, risk gates 6/7, drawdown 0.81 ×, worst day 0.95 × (slot
+  means). Luck line +216 / +192. The direction that helps differs by day type (looser stops on
+  expiry days, tighter on other days) but each is carried by one year, and nothing passes.
+- **Decomposition with SL 115 % cells (2026-10-15, 35 extra cells, `--tag sl115`, cells file
+  `sl115_cells_2026-10-15.json`; descriptive).** The re-run template matches the stored series to the
+  paisa. Against the template, net ₹ per lot-day over 7 slots: re-entry alone −8; MTM ₹2,500 → ₹3,000
+  alone **+20 (+24 first year / +16 test year; +26 on other days, −2 on expiry days)**, drawdown
+  0.95 ×, worst day 1.07 ×; adding re-entry to that changes nothing (+20). Moving the leg stop
+  115 → 120 % adds +9, all on expiry days (+1 → +50) and in the test year. For A, 115 % gives +37
+  (+35 / +38, even across years); 150 % adds +22, mostly expiry days (+49 → +117). So the MTM stop
+  is the steady part of the gain; the wider leg stop is an expiry-day, test-year effect.
 
 ## Risks
 

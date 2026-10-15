@@ -3,6 +3,8 @@ entry times? Reads the stored Stage 1 day x cell series (after charges) for the 
 
     uv run python research/bl104/otm1_one_setting.py            # the grid answer (7 slots)
     uv run python research/bl104/otm1_one_setting.py --tag <t>  # the same on another tag's series
+    uv run python research/bl104/otm1_one_setting.py --days expiry   # NIFTY weekly expiry days only
+    uv run python research/bl104/otm1_one_setting.py --days other    # every other weekday
 """
 
 from __future__ import annotations
@@ -41,8 +43,21 @@ def risk_ok(c: np.ndarray, t: np.ndarray) -> bool:
     )
 
 
-def load(tag: str, slots: tuple[str, ...]):
-    """{slot: (days, labels, matrix)} for the W_N cohorts of a results tag."""
+REFERENCE = HERE.parents[1] / "src" / "option_backtesting" / "data" / "reference"
+
+
+def nifty_expiries() -> set[date]:
+    """The NIFTY expiry dates the lake's option files list (holiday shifts included)."""
+    with (REFERENCE / "expiries_observed.csv").open(newline="") as h:
+        return {
+            date.fromisoformat(r["expiry"]) for r in csv.DictReader(h) if r["underlying"] == "NIFTY"
+        }
+
+
+def load(tag: str, slots: tuple[str, ...], days_kind: str = "all"):
+    """{slot: (days, labels, matrix)} for the W_N cohorts of a results tag; `days_kind` keeps all
+    weekdays, only the NIFTY expiry days, or only the other days."""
+    expiries = nifty_expiries() if days_kind != "all" else set()
     out = {}
     for slot in slots:
         cohort = f"W_N_{slot.replace(':', '')}"
@@ -50,7 +65,12 @@ def load(tag: str, slots: tuple[str, ...]):
         meta = json.loads(base.with_suffix(".json").read_text())
         m = np.load(base.with_suffix(".npy")).astype(float)
         days = [date.fromisoformat(d) for d in meta["days"]]
-        keep = [i for i, d in enumerate(days) if d.weekday() < 5]
+        keep = [
+            i
+            for i, d in enumerate(days)
+            if d.weekday() < 5
+            and (days_kind == "all" or (d in expiries) == (days_kind == "expiry"))
+        ]
         out[slot] = ([days[i] for i in keep], meta["labels"], m[keep])
     return out
 
@@ -155,16 +175,19 @@ def pretty(p: dict) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", default="stage1")
+    ap.add_argument("--days", default="all", choices=("all", "expiry", "other"))
     args = ap.parse_args()
-    data = load(args.tag, grid.SLOTS)
+    data = load(args.tag, grid.SLOTS, args.days)
     labels = data[grid.SLOTS[0]][1]
     cands = candidates(labels)
     first = lambda d: d < CUT  # noqa: E731
     test = lambda d: d >= CUT  # noqa: E731
-    out_dir = HERE / "results" / "otm1"
+    out_dir = HERE / "results" / ("otm1" if args.days == "all" else f"otm1_{args.days}")
     out_dir.mkdir(parents=True, exist_ok=True)
     print(
-        f"{len(cands)} OTM1 candidates with a day stop, {len(grid.SLOTS)} slots, days per slot {len(data[grid.SLOTS[0]][0])}\n"
+        f"{len(cands)} OTM1 candidates with a day stop, {len(grid.SLOTS)} slots, days={args.days}: "
+        f"{len(data[grid.SLOTS[0]][0])} per slot "
+        f"({sum(d < CUT for d in data[grid.SLOTS[0]][0])} first year)\n"
     )
     for name, sel, chk in (
         ("select on FIRST year, check on TEST year", first, test),
@@ -248,6 +271,23 @@ def main() -> None:
                         *r["chk_gain"],
                     ]
                 )
+    # descriptive only: every day of both years pooled (in-sample by construction, never a pass)
+    allm = lambda d: np.ones(len(d), dtype=bool)  # noqa: E731
+    pooled_rows = evaluate(data, cands, allm, allm)
+    pooled_rows.sort(key=lambda r: -r["chk_mean"])
+    print("== POOLED, both years (descriptive, in-sample) ==")
+    for i, r in enumerate(pooled_rows[:5], 1):
+        print(
+            f"{i:2d} {pretty(r['params']):48s}{r['chk_mean']:+7.0f}  [{r['chk_lo']:+5.0f}, {r['chk_hi']:+5.0f}]"
+            f"  slots>0 {sum(g > 0 for g in r['chk_gain'])}/7  risk-ok {r['chk_pass']}/7"
+            f"  DDx {np.nanmean(r['chk_dd_x']):.2f} worstx {np.nanmean(r['chk_wd_x']):.2f}"
+        )
+    with (out_dir / "ranked_pooled.csv").open("w", newline="") as h:
+        w = csv.writer(h)
+        w.writerow(["settings", "mean_gain", "lo90", "hi90", "slots_pos", "slots_risk_ok", *[f"gain_{s}" for s in grid.SLOTS]])
+        for r in pooled_rows:
+            w.writerow([pretty(r["params"]), r["chk_mean"], r["chk_lo"], r["chk_hi"], sum(g > 0 for g in r["chk_gain"]), r["chk_pass"], *r["chk_gain"]])
+    print()
     # PBO over the 216 at each slot (test year), 8 blocks
     pbos = []
     for slot in grid.SLOTS:
