@@ -250,6 +250,23 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   (+35 / +38, even across years); 150 % adds +22, mostly expiry days (+49 → +117). So the MTM stop
   is the steady part of the gain; the wider leg stop is an expiry-day, test-year effect.
 
+### 2026-10-15 — NIFTY Widesl OTM1–OTM3 on expiry days only: does any OTM setting beat the template there?
+- **Hypothesis:** on NIFTY weekly expiry days, some OTM strike (OTM1, OTM2 or OTM3) with some
+  combination of leg stop, trail, MTM stop, exit and re-entry beats the Core-298 template
+  (`N_wide_*`, OTM1) on the same days at most entry times.
+- **Universe:** the 648 Stage 1 cells with strike OTM1, OTM2 or OTM3 and a day MTM stop (216 per
+  strike, the same axes as the OTM1 experiment), the 7 sampled slots, the 104 NIFTY weekly expiry days
+  (53 first year, 51 test year) from `expiries_observed.csv`, stored day × cell series after charges.
+  The comparator for every strike is the OTM1 template (what is traded today).
+- **Look-ahead check, pass / kill rule, hold-out:** as the by-day-type experiment above (selection
+  on the first year, the test year read once, the reverse split reported, the same five conditions;
+  the luck line is the best of all 648). Also reported: the best per strike, and a pooled two-year
+  ranking marked descriptive.
+- **Known weakness, stated before the run:** about 50 expiry days a year and 648 candidates; the
+  luck line will be higher than the 216-candidate one (+₹458), so a kill is the expected outcome and
+  is not evidence of no effect.
+- **Will not run:** ATM and premium strikes; per-slot settings; values outside the Stage 1 grid.
+
 ## Risks
 
 - Nothing is unseen: a result here is in-sample by construction; the forward test is the only
