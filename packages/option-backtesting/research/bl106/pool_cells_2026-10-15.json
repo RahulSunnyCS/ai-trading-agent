@@ -1,0 +1,9867 @@
+[
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "params": {
+   "strike": "OTM2",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA1_0917"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "params": {
+   "strike": "OTM2",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA1_0932"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "params": {
+   "strike": "OTM2",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA1_0947"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:02",
+  "params": {
+   "strike": "OTM2",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA1_1002"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "params": {
+   "strike": "OTM3",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA2_0917"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "params": {
+   "strike": "OTM3",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA2_0932"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "params": {
+   "strike": "OTM3",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA2_0947"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:02",
+  "params": {
+   "strike": "OTM3",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA2_1002"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA3_0917"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA3_0932"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA3_0947"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:02",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA3_1002"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA4_0917"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA4_0932"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA4_0947"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:02",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wA4_1002"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": null,
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB1_1017"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": null,
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB1_1032"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": null,
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB1_1047"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": null,
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB1_1102"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": null,
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB1_1117"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": null,
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB1_1132"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": null,
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB1_1147"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": null,
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB1_1202"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB2_1017"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB2_1032"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB2_1047"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB2_1102"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB2_1117"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB2_1132"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB2_1147"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "N_wB2_1202"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wB3_1017"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wB3_1032"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wB3_1047"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wB3_1102"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wB3_1117"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wB3_1132"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wB3_1147"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wB3_1202"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "params": {
+   "strike": "OTM2",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wB4_1017"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:32",
+  "params": {
+   "strike": "OTM2",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wB4_1032"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:47",
+  "params": {
+   "strike": "OTM2",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wB4_1047"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:02",
+  "params": {
+   "strike": "OTM2",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wB4_1102"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:17",
+  "params": {
+   "strike": "OTM2",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wB4_1117"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "params": {
+   "strike": "OTM2",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wB4_1132"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:47",
+  "params": {
+   "strike": "OTM2",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wB4_1147"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:02",
+  "params": {
+   "strike": "OTM2",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wB4_1202"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:17",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC1_1217"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:32",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC1_1232"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:47",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC1_1247"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:02",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC1_1302"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:17",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC1_1317"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:32",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC1_1332"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:47",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC1_1347"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:02",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC1_1402"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC2_1217"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC2_1232"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC2_1247"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC2_1302"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC2_1317"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC2_1332"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC2_1347"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC2_1402"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wC3_1217"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wC3_1232"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wC3_1247"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wC3_1302"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wC3_1317"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wC3_1332"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wC3_1347"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wC3_1402"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC4_1217"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC4_1232"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "12:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC4_1247"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC4_1302"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC4_1317"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC4_1332"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "13:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC4_1347"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wC4_1402"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wD1_1417"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wD1_1432"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wD1_1447"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "15:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wD1_1502"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "15:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wD1_1517"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wD2_1417"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wD2_1432"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wD2_1447"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "15:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wD2_1502"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "15:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wD2_1517"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wD3_1417"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wD3_1432"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wD3_1447"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "15:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wD3_1502"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "15:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "N_wD3_1517"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wD4_1417"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wD4_1432"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "14:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wD4_1447"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "15:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wD4_1502"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "15:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "N_wD4_1517"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "09:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA1_0917"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "09:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA1_0932"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "09:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA1_0947"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA1_1002"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "09:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA2_0917"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "09:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA2_0932"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "09:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA2_0947"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA2_1002"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "09:17",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA3_0917"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "09:32",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA3_0932"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "09:47",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA3_0947"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:02",
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA3_1002"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "09:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA4_0917"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "09:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA4_0932"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "09:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA4_0947"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wA4_1002"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB1_1017"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB1_1032"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB1_1047"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB1_1102"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB1_1117"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB1_1132"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB1_1147"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB1_1202"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:17",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB2_1017"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:32",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB2_1032"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:47",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB2_1047"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:02",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB2_1102"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:17",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB2_1117"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:32",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB2_1132"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:47",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB2_1147"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:02",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB2_1202"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:17",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB3_1017"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:32",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB3_1032"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:47",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB3_1047"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:02",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB3_1102"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:17",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB3_1117"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:32",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB3_1132"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:47",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB3_1147"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:02",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB3_1202"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:17",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB4_1017"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:32",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB4_1032"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "10:47",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB4_1047"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:02",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB4_1102"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:17",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB4_1117"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:32",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB4_1132"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "11:47",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB4_1147"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:02",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wB4_1202"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:17",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC1_1217"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:32",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC1_1232"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:47",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC1_1247"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:02",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC1_1302"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:17",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC1_1317"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:32",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC1_1332"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:47",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC1_1347"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:02",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC1_1402"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wC2_1217"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wC2_1232"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wC2_1247"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wC2_1302"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wC2_1317"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wC2_1332"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wC2_1347"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wC2_1402"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "S_wC3_1217"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "S_wC3_1232"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "S_wC3_1247"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "S_wC3_1302"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "S_wC3_1317"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "S_wC3_1332"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "S_wC3_1347"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "name": "S_wC3_1402"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:17",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC4_1217"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:32",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC4_1232"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "12:47",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC4_1247"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:02",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC4_1302"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:17",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC4_1317"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:32",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC4_1332"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "13:47",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC4_1347"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:02",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wC4_1402"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wD1_1417"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wD1_1432"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wD1_1447"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "15:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wD1_1502"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:17",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wD2_1417"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:32",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wD2_1432"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:47",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wD2_1447"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "15:02",
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wD2_1502"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wD3_1417"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wD3_1432"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wD3_1447"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "15:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "name": "S_wD3_1502"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:17",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wD4_1417"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:32",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wD4_1432"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "14:47",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wD4_1447"
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "slot": "15:02",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "name": "S_wD4_1502"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA1_0917"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA1_0932"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA1_0947"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA1_1002"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA2_0917"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA2_0932"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA2_0947"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA2_1002"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA3_0917"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA3_0932"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA3_0947"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA3_1002"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA4_0917"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA4_0932"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA4_0947"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA4_1002"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB1_1017"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB1_1032"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB1_1047"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB1_1102"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB1_1117"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB1_1132"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB1_1147"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB1_1202"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB2_1017"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB2_1032"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB2_1047"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB2_1102"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB2_1117"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB2_1132"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB2_1147"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB2_1202"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB3_1017"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB3_1032"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB3_1047"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB3_1102"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB3_1117"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB3_1132"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB3_1147"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB3_1202"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB4_1017"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB4_1032"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB4_1047"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB4_1102"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB4_1117"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB4_1132"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB4_1147"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dB4_1202"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC1_1217"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC1_1232"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC1_1247"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC1_1302"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC1_1317"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC1_1332"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC1_1347"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC1_1402"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC2_1217"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC2_1232"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC2_1247"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC2_1302"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC2_1317"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC2_1332"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC2_1347"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC2_1402"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC3_1217"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC3_1232"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC3_1247"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC3_1302"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC3_1317"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC3_1332"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC3_1347"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC3_1402"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC4_1217"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC4_1232"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC4_1247"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC4_1302"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:17",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC4_1317"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:32",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC4_1332"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:47",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC4_1347"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:02",
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC4_1402"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dD1_1417"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dD1_1432"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dD1_1447"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "15:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dD1_1502"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "15:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dD1_1517"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dD2_1417"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:32",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dD2_1432"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:47",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dD2_1447"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "15:02",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dD2_1502"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "15:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "N_dD2_1517"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": null,
+   "trail": null
+  },
+  "name": "N_dD3_1417"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": null,
+   "trail": null
+  },
+  "name": "N_dD3_1432"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": null,
+   "trail": null
+  },
+  "name": "N_dD3_1447"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "15:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": null,
+   "trail": null
+  },
+  "name": "N_dD3_1502"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "15:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": null,
+   "trail": null
+  },
+  "name": "N_dD3_1517"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dD4_1417"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dD4_1432"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dD4_1447"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "15:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dD4_1502"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "15:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dD4_1517"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA1_0917"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:32",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA1_0932"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:47",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA1_0947"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:02",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA1_1002"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA2_0917"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA2_0932"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA2_0947"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA2_1002"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:17",
+  "params": {
+   "strike": "ITM2",
+   "sl": 30,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA3_0917"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:32",
+  "params": {
+   "strike": "ITM2",
+   "sl": 30,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA3_0932"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:47",
+  "params": {
+   "strike": "ITM2",
+   "sl": 30,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA3_0947"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:02",
+  "params": {
+   "strike": "ITM2",
+   "sl": 30,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA3_1002"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:17",
+  "params": {
+   "strike": "ITM2",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA4_0917"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:32",
+  "params": {
+   "strike": "ITM2",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA4_0932"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:47",
+  "params": {
+   "strike": "ITM2",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA4_0947"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:02",
+  "params": {
+   "strike": "ITM2",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dA4_1002"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:17",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dB1_1017"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:32",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dB1_1032"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:47",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dB1_1047"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:02",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dB1_1102"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:17",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dB1_1117"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:32",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dB1_1132"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:47",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dB1_1147"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:02",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dB1_1202"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:17",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB2_1017"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:32",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB2_1032"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:47",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB2_1047"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:02",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB2_1102"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:17",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB2_1117"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:32",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB2_1132"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:47",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB2_1147"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:02",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB2_1202"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:17",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB3_1017"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:32",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB3_1032"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:47",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB3_1047"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:02",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB3_1102"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:17",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB3_1117"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:32",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB3_1132"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:47",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB3_1147"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:02",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB3_1202"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:17",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB4_1017"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:32",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB4_1032"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:47",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB4_1047"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:02",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB4_1102"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:17",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB4_1117"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:32",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB4_1132"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:47",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB4_1147"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:02",
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dB4_1202"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC1_1217"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:32",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC1_1232"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:47",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC1_1247"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:02",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC1_1302"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC1_1317"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:32",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC1_1332"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:47",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC1_1347"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:02",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC1_1402"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:17",
+  "params": {
+   "strike": "ITM2",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC2_1217"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:32",
+  "params": {
+   "strike": "ITM2",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC2_1232"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:47",
+  "params": {
+   "strike": "ITM2",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC2_1247"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:02",
+  "params": {
+   "strike": "ITM2",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC2_1302"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:17",
+  "params": {
+   "strike": "ITM2",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC2_1317"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:32",
+  "params": {
+   "strike": "ITM2",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC2_1332"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:47",
+  "params": {
+   "strike": "ITM2",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC2_1347"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:02",
+  "params": {
+   "strike": "ITM2",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC2_1402"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC3_1217"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:32",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC3_1232"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:47",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC3_1247"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:02",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC3_1302"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC3_1317"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:32",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC3_1332"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:47",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC3_1347"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:02",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dC3_1402"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC4_1217"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC4_1232"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "12:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC4_1247"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC4_1302"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:17",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC4_1317"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:32",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC4_1332"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:47",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC4_1347"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:02",
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dC4_1402"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dD1_1417"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:32",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dD1_1432"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:47",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dD1_1447"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "15:02",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dD1_1502"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "15:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "name": "S_dD1_1517"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:17",
+  "params": {
+   "strike": "ITM2",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dD2_1417"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:32",
+  "params": {
+   "strike": "ITM2",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dD2_1432"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:47",
+  "params": {
+   "strike": "ITM2",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dD2_1447"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "15:02",
+  "params": {
+   "strike": "ITM2",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dD2_1502"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "15:17",
+  "params": {
+   "strike": "ITM2",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dD2_1517"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dD3_1417"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:32",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dD3_1432"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:47",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dD3_1447"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "15:02",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dD3_1502"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "15:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dD3_1517"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dD4_1417"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:32",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dD4_1432"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "14:47",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dD4_1447"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "15:02",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dD4_1502"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "15:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "S_dD4_1517"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "09:17",
+  "params": {
+   "strike": "ATM",
+   "range": 15,
+   "source": "instrument",
+   "sl": 20,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bA1_0917"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "09:32",
+  "params": {
+   "strike": "ATM",
+   "range": 15,
+   "source": "instrument",
+   "sl": 20,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bA1_0932"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "09:47",
+  "params": {
+   "strike": "ATM",
+   "range": 15,
+   "source": "instrument",
+   "sl": 20,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bA1_0947"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "10:02",
+  "params": {
+   "strike": "ATM",
+   "range": 15,
+   "source": "instrument",
+   "sl": 20,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bA1_1002"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "09:17",
+  "params": {
+   "strike": "PLOW",
+   "range": 30,
+   "source": "instrument",
+   "sl": 20,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bA2_0917"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "09:32",
+  "params": {
+   "strike": "PLOW",
+   "range": 30,
+   "source": "instrument",
+   "sl": 20,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bA2_0932"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "09:47",
+  "params": {
+   "strike": "PLOW",
+   "range": 30,
+   "source": "instrument",
+   "sl": 20,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bA2_0947"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "10:02",
+  "params": {
+   "strike": "PLOW",
+   "range": 30,
+   "source": "instrument",
+   "sl": 20,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bA2_1002"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "09:17",
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 20,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bA3_0917"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "09:32",
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 20,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bA3_0932"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "09:47",
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 20,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bA3_0947"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "10:02",
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 20,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bA3_1002"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "12:17",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "N_bC1_1217"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "12:32",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "N_bC1_1232"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "12:47",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "N_bC1_1247"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:02",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "N_bC1_1302"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:17",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "N_bC1_1317"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:32",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "N_bC1_1332"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:47",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "N_bC1_1347"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "14:02",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "N_bC1_1402"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "12:17",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bC2_1217"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "12:32",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bC2_1232"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "12:47",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bC2_1247"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:02",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bC2_1302"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:17",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bC2_1317"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:32",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bC2_1332"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:47",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bC2_1347"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "14:02",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bC2_1402"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "12:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC3_1217"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "12:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC3_1232"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "12:47",
+  "params": {
+   "strike": "PHIGH",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC3_1247"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:02",
+  "params": {
+   "strike": "PHIGH",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC3_1302"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC3_1317"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC3_1332"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:47",
+  "params": {
+   "strike": "PHIGH",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC3_1347"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "14:02",
+  "params": {
+   "strike": "PHIGH",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC3_1402"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "12:17",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC4_1217"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "12:32",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC4_1232"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "12:47",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC4_1247"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:02",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC4_1302"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:17",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC4_1317"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:32",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC4_1332"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "13:47",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC4_1347"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "14:02",
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bC4_1402"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "14:17",
+  "params": {
+   "strike": "ATM",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": null,
+   "mtm": 1000
+  },
+  "name": "N_bD1_1417"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "14:32",
+  "params": {
+   "strike": "ATM",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": null,
+   "mtm": 1000
+  },
+  "name": "N_bD1_1432"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "14:17",
+  "params": {
+   "strike": "ATM",
+   "range": 30,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bD2_1417"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "14:32",
+  "params": {
+   "strike": "ATM",
+   "range": 30,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bD2_1432"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "14:17",
+  "params": {
+   "strike": "ATM",
+   "range": 30,
+   "source": "instrument",
+   "sl": 40,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bD3_1417"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "14:32",
+  "params": {
+   "strike": "ATM",
+   "range": 30,
+   "source": "instrument",
+   "sl": 40,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "N_bD3_1432"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "14:17",
+  "params": {
+   "strike": "ATM",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bD4_1417"
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "slot": "14:32",
+  "params": {
+   "strike": "ATM",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "N_bD4_1432"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "09:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 15,
+   "source": "instrument",
+   "sl": 20,
+   "target": null,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bA1_0917"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "09:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 15,
+   "source": "instrument",
+   "sl": 20,
+   "target": null,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bA1_0932"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "09:47",
+  "params": {
+   "strike": "PHIGH",
+   "range": 15,
+   "source": "instrument",
+   "sl": 20,
+   "target": null,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bA1_0947"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:02",
+  "params": {
+   "strike": "PHIGH",
+   "range": 15,
+   "source": "instrument",
+   "sl": 20,
+   "target": null,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bA1_1002"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "09:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 20,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bA2_0917"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "09:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 20,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bA2_0932"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "09:47",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 20,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bA2_0947"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:02",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 20,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bA2_1002"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "09:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bA3_0917"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "09:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bA3_0932"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "09:47",
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bA3_0947"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:02",
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bA3_1002"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "09:17",
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 20,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bA4_0917"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "09:32",
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 20,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bA4_0932"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "09:47",
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 20,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bA4_0947"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:02",
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 20,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bA4_1002"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:17",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB1_1017"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:32",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB1_1032"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:47",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB1_1047"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:02",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB1_1102"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:17",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB1_1117"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:32",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB1_1132"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:47",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB1_1147"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:02",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB1_1202"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:17",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB2_1017"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:32",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB2_1032"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:47",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB2_1047"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:02",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB2_1102"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:17",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB2_1117"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:32",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB2_1132"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:47",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB2_1147"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:02",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB2_1202"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:17",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB3_1017"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:32",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB3_1032"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:47",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB3_1047"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:02",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB3_1102"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:17",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB3_1117"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:32",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB3_1132"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:47",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB3_1147"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:02",
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB3_1202"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB4_1017"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB4_1032"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "10:47",
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB4_1047"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:02",
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB4_1102"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB4_1117"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB4_1132"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "11:47",
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB4_1147"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:02",
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bB4_1202"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC1_1217"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC1_1232"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:47",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC1_1247"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:02",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC1_1302"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC1_1317"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC1_1332"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:47",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC1_1347"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "14:02",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC1_1402"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "S_bC2_1217"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "S_bC2_1232"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:47",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "S_bC2_1247"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:02",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "S_bC2_1302"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "S_bC2_1317"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "S_bC2_1332"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:47",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "S_bC2_1347"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "14:02",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "name": "S_bC2_1402"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC3_1217"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC3_1232"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:47",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC3_1247"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:02",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC3_1302"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC3_1317"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC3_1332"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:47",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC3_1347"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "14:02",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "name": "S_bC3_1402"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bC4_1217"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bC4_1232"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "12:47",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bC4_1247"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:02",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bC4_1302"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bC4_1317"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bC4_1332"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "13:47",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bC4_1347"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "14:02",
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bC4_1402"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "14:17",
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 40,
+   "target": 100,
+   "trail": null,
+   "mtm": 1000
+  },
+  "name": "S_bD1_1417"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "14:32",
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 40,
+   "target": 100,
+   "trail": null,
+   "mtm": 1000
+  },
+  "name": "S_bD1_1432"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "14:17",
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": null,
+   "mtm": 1000
+  },
+  "name": "S_bD2_1417"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "14:32",
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": null,
+   "mtm": 1000
+  },
+  "name": "S_bD2_1432"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "14:17",
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": null,
+   "trail": null,
+   "mtm": 1000
+  },
+  "name": "S_bD3_1417"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "14:32",
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": null,
+   "trail": null,
+   "mtm": 1000
+  },
+  "name": "S_bD3_1432"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "14:17",
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bD4_1417"
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "slot": "14:32",
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 1000
+  },
+  "name": "S_bD4_1432"
+ }
+]

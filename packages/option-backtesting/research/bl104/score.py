@@ -44,6 +44,9 @@ GATES = {
 # its five worst days, more than 1.5x its cohort template's, with the template's magnitude floored
 # so a template with almost no tail (Buy) does not cap everything at a few hundred rupees.
 TAIL = {"ratio": 1.5, "worst_day_floor_inr": 3000.0, "worst5_floor_inr": 15000.0}
+# Per-family day-stop-rate cap; the registered BL-104 value is 30 % for every family. BL-106 runs
+# with --buy-stop-cap 0.6 (the owner's 2026-10-15 loosening for Buy, a long-premium strategy).
+STOP_CAP: dict[str, float] = {}
 BIG = 1e9  # an infinite ratio (no drawdown at all) ranks above every finite one
 TOP_N = 10
 
@@ -96,7 +99,7 @@ def failed_gates(row: dict[str, Any], sessions: int) -> list[str]:
         out.append("calmar")
     if not row["profit_factor"] >= GATES["profit_factor"]:
         out.append("profit_factor")
-    if not row["mtm_stop_frequency"] <= GATES["mtm_stop_frequency"]:
+    if not row["mtm_stop_frequency"] <= STOP_CAP.get(row["family"], GATES["mtm_stop_frequency"]):
         out.append("mtm_stop_frequency")
     if row["family"] == "B" and not row["entry_hit_rate"] >= GATES["entry_hit_rate"]:
         out.append("entry_hit_rate")
@@ -446,7 +449,12 @@ def main() -> None:
         action="store_true",
         help="also gate on worst day / worst-five-days vs the template; files get a _tail suffix",
     )
+    parser.add_argument(
+        "--buy-stop-cap", type=float, default=None, help="day-stop-rate cap for Buy"
+    )
     args = parser.parse_args()
+    if args.buy_stop_cap is not None:
+        STOP_CAP["B"] = args.buy_stop_cap
     out_dir = RESULTS / args.tag
     families = grid.FAMILIES if args.family == "all" else tuple(args.family.split(","))
     texts = []
