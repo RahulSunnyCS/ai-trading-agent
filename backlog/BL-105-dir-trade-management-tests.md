@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — three management ideas for the Dir family; informative whatever the answer |
-| **Status** | Planned (plan written 2026-10-15; nothing run) |
+| **Status** | In progress (Phase 0 approved and registered 2026-10-15; Phase 1 building) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-15 |
 | **Depends on** | BL-104 (the Dir cohorts, the scorecard, the tail gate, the pool); BL-009 (re-entry parity, for engine-exact Stage 2) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.10.27 |
 
 ## Context
 
@@ -73,27 +73,33 @@ Nothing is adopted from this item; a survivor goes to Stage 2 (engine-exact) and
   decayed leg to the current ATM, (c) restarting at the current ATM after a profit limit improves
   net ₹ per lot-day or reduces drawdown without worsening the worst-day tail, against the same
   strategy with no management.
-- **Universe and bases:** NIFTY and SENSEX Dir, the seven BL-104 slots (09:17, 09:32, 09:47,
-  10:17, 11:32, 13:02, 14:32). Bases are the rotation templates (ATM and ITM1, SL 21 %, MTM ₹3,000,
-  re-entry at cost once) and the BL-104 tail-gated band winners that are not blocked by re-entry
-  parity (the non-`cost ×2` ones). One base per cohort is the comparator for its own variants.
-- **Variants (every value registered; the SHA goes here before the run):**
+- **Universe and bases (approved by the owner 2026-10-15):** NIFTY and SENSEX Dir at the seven
+  BL-104 slots (09:17, 09:32, 09:47, 10:17, 11:32, 13:02, 14:32). Six bases per index and slot:
+  strike {ATM, ITM1, ITM2} × leg trail {none, 10/5 %}, with leg stop 21 %, MTM stop ₹3,000,
+  re-entry at cost once, exit 15:28, weekly expiry (the template's settings; ITM2 is added
+  because it appears in 4 of the 8 tail-gated BL-104 Dir winners). Each variant is compared with
+  its own unmanaged base at the same index and slot. All rupee levels are per one lot, day profit
+  = realised plus open (the engine's MTM).
+- **Variants (every value registered):**
 
-  | Idea | Axis | Values | Cells per base |
+  | Idea | Setting | Values | Variants |
   |---|---|---|---|
-  | Lock / trail on day MTM | arm A (₹ profit) | 1,500, 2,500, 4,000, 6,000 | |
-  | | locked level | A / 2 | |
-  | | trail (X, Y) | none; or X = A / 2, Y = A / 4 | 8 |
-  | Roll the decayed leg | trigger: leg price ≤ f × its entry | 10 %, 20 %, 35 % | |
-  | | max rolls | 1, 2 | |
-  | | no roll after | 12:00, 14:00 | 12 |
-  | Restart at a limit | profit limit L (₹) | 2,000, 3,000, 4,000 | |
-  | | max restarts | 1, 2 | |
-  | | no restart after | 14:00 (fixed) | 6 |
+  | A1 cut at a profit target | T (₹) | 2,000, 3,000, 4,000 | 3 |
+  | A2 profit lock | arm A, then close when profit falls back to A / 2 | A = 2,000, 3,000, 4,000 | 3 |
+  | A3 lock and trail | as A2, then the lock rises A / 4 for every A / 2 more profit | A = 2,000, 3,000, 4,000 | 3 |
+  | B roll the decayed leg | leg price ≤ f × its entry | f = 15 %, 25 %, 35 % | |
+  | | only after day profit ≥ ₹3,000, or at any time | 2 | |
+  | | fresh stop on the new leg | 21 %, 30 % | |
+  | | new leg strike | the base's own strike type | 12 |
+  | B′ roll to ATM | as B with the new leg at ATM, 21 %, profit ≥ ₹3,000, ITM bases only | f = 15 %, 25 %, 35 % | 3 (ITM1, ITM2 bases: 6) |
+  | C restart after a cut | after A1 target T, 1 or 2 restarts | T = 2,000, 3,000, 4,000 | 6 |
+  | | after an A2 lock cut, 1 or 2 restarts | A = 3,000, 4,000 | 4 |
 
-  Rolled and restarted legs use the base's stop %, trail, MTM stop and exit. Combinations: only
-  the best single of each idea, at most 8 pairs / triples, registered after the singles and not
-  before.
+  A restart enters at the next minute with fresh stops at the base's settings (its own ₹3,000 MTM
+  stop applies afresh); no restart or roll after 14:00 (roll: 13:30); one roll per leg. The
+  restart comparator also includes the same strategy entered at the next later slot. The MTM stop
+  is not varied here; a survivor's ₹2,000 / ₹3,000 / ₹4,000 sensitivity is a Phase 3 check.
+  About 35 variants per base, about 3,000 cells.
 - **Look-ahead check:** a trigger reads only the minute's own bar and earlier; a roll / restart
   enters at the next minute's open, as RE ASAP does. No trigger reads the day's final result.
 - **Charges:** the BL-096 model on every order, including the extra ones from rolls and restarts.
@@ -188,3 +194,7 @@ Nothing is adopted from this item; a survivor goes to Stage 2 (engine-exact) and
 
 - 2026-10-15 — plan written from the owner's three ideas; nothing run; Phase 0 values registered in
   this item's table before any run.
+- 2026-10-15 — owner approved the plan above with the defaults (profit levels ₹2,000 to ₹4,000,
+  realised plus open, immediate restart at the next minute, decay 15 / 25 / 35 %). Strike axis
+  widened to ATM / ITM1 / ITM2 from the BL-104 winners. Phase 0 values frozen here; Phase 1
+  (A and C) builds first, B waits for engine support.

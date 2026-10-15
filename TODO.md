@@ -439,6 +439,7 @@ collector is forward-only".
 | 3.10.24 | Buy parameter sweep — [BL-097](backlog/BL-097-buy-parameter-sweep.md) | claude | **Phase 2 complete 2026-10-12:** 2,304 rows (2,258 valid) across 48 variants with post-charge accounting; qualified report generated. Phase 3 interactions/robustness pending. |
 | 3.10.25 | Widesl parameter sweep — [BL-098](backlog/BL-098-widesl-parameter-sweep.md) | claude | **Phase 2 complete 2026-10-12:** 4,950 rows (4,920 valid) across 33 variants with post-charge accounting; qualified report generated. Phase 3 interactions/robustness pending. |
 | 3.10.26 | Full-factorial parameter sweep — [BL-104](backlog/BL-104-full-parameter-sweep.md) | claude | **Stage 1 done 2026-10-15** (grid SHA `6a1078bb4fe68786`, 63,384 cells + 42 templates, scored): 5 band winners clear every rule run so far (Widesl NIFTY 10:17–11:32, Widesl SENSEX 14:32, Buy SENSEX 09:17–14:02); NIFTY Buy has no passing cell. Stage 2 waits for the owner's read of the band tables. |
+| 3.10.27 | Directional trade management (profit lock / trail, roll, restart) — [BL-105](backlog/BL-105-dir-trade-management-tests.md) | claude | **Phase 0 registered 2026-10-15; Phase 1 (lock / trail, restart) building**; roll needs engine support (Phase 2). |
 
 ### 3.11 Local research database (`packages/trading-data`)
 
