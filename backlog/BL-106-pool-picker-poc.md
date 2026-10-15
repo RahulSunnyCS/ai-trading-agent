@@ -79,3 +79,11 @@ unverified re-entry types; any adoption from this item alone.
 
 - 2026-10-15 — created and registered from the owner's request (test year only, no charges, pool
   from the first year, four workers).
+- 2026-10-15 — **Amendment before any list replay (owner):** each NIFTY Dir band whose four
+  first-year-selected sets hold no ITM1 / ITM2 gets one extra set, the strongest ITM candidate by
+  first-year robust score that passes the same gates, has a day stop and a verified re-entry
+  (`research/bl106/pool_ext.py`). Bands A, B and C each gain one ITM1 set (SL 15 / 25 / 20, trail
+  10/5, MTM ₹4,000 / ₹4,000 / ₹2,000, re-entry at cost once); band D already had ITM1. Reason: in
+  first-year scoring ITM1 / ITM2 ranked a few points below ATM and OTM1 for NIFTY Dir and fell out of
+  the top four, so the pool had no ITM exposure on NIFTY. +3 sets, +20 variants (556 in all). The
+  main simulation had started; the extras run as a separate job set and are merged in the replay.

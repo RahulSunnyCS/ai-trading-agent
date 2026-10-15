@@ -74,8 +74,14 @@ def job(index: str, slot: str, cells: list[dict], root: str) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--ext", action="store_true", help="simulate the amendment's extra sets")
     args = ap.parse_args()
-    cells = json.loads((HERE / "results" / "pool_cells.json").read_text())
+    global OUT
+    if args.ext:
+        OUT = HERE / "results" / "sim_ext"
+        cells = json.loads((HERE / "pool_cells_ext_2026-10-15.json").read_text())
+    else:
+        cells = json.loads((HERE / "results" / "pool_cells.json").read_text())
     jobs: dict[tuple[str, str], list[dict]] = {}
     for c in cells:
         jobs.setdefault((c["index"], c["slot"]), []).append(c)
