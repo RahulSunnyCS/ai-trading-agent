@@ -44,6 +44,8 @@ MARGIN = {"expiry": 25.0, "other": 15.0, "all": 15.0}
 WORST_X = 1.25
 MAX_CORR = 0.7
 KINDS = {"expiry": ("expiry", "EXP"), "other": ("non_expiry", "NONEXP"), "all": ("all_days", "ALL")}
+HALF = date(2025, 4, 9)  # with WINDOW "first": the first year is split here for the both-halves rule
+WINDOW: str | None = None  # "first" = selection on the first year only (BL-107)
 R1 = ("cost", 1, None)
 OWNER_DEFAULT = {  # N_wide only (owner, 2026-10-15)
     "expiry": {"strike": "OTM1", "sl": 150, "trail": (25, 15), "mtm": 4000, "exit": "15:28", "reentry": R1},
@@ -298,6 +300,12 @@ def evaluate(f: Family, slot: str, exp: set[date]) -> dict[str, Any]:
         vals[key(described)] = v
     d = np.array(tdays)
     first = d < CUT
+    if WINDOW == "first":  # BL-107: nothing from the test year is read
+        tvals = {n: v[first] for n, v in tvals.items()}
+        vals = {k: v[first] for k, v in vals.items()}
+        tdays = [x for x, k in zip(tdays, first, strict=True) if k]
+        d = d[first]
+        first = d < HALF  # "both years positive" becomes "both halves of the first year positive"
     is_exp = np.array([x in exp for x in tdays])
     out = {}
     for kind, mask in (("expiry", is_exp), ("other", ~is_exp), ("all", np.ones(len(is_exp), dtype=bool))):
@@ -537,12 +545,20 @@ def describe_params(f: Family, params: Any, slots: tuple[str, ...] = ALL_SLOTS) 
 
 
 def main() -> None:
+    global WINDOW, OUT
     if "--refine-cells" in sys.argv:
         refine_cells()
         return
+    write = True
+    if "--window" in sys.argv:
+        WINDOW = sys.argv[sys.argv.index("--window") + 1]
+        assert WINDOW == "first"
+        OUT = RESULTS / "daytype_fy"
+        write = False  # selection only: no strategy files, no README
     exp = expiries()
     OUT.mkdir(parents=True, exist_ok=True)
-    for kind in KINDS:
+    winners: list[dict] = []
+    for kind in KINDS if write else ():
         folder = STRATEGIES / KINDS[kind][0]
         if folder.exists():
             for old in folder.glob("*.yaml"):
@@ -568,7 +584,12 @@ def main() -> None:
             for rank, r in enumerate(dec["picks"], 1):
                 params = None if r.get("is_template") else r["params"]
                 files = []
-                for slot in slots:
+                winners.append({
+                    "family": f.name, "fam": f.fam, "index": f.idx, "kind": kind, "band": band,
+                    "rank": rank, "status": dec["status"], "params": params,
+                    "gain": r["gain"], "gain_first": r["gain_first"], "gain_test": r["gain_test"],
+                })
+                for slot in slots if write else ():
                     st = build(f, slot, params if params is not None else _template_params(f, results, slot, kind))
                     text = one_line(describe(st, f.fam))
                     files.append(str(write_yaml(f, slot, kind, st, dec["status"], text).relative_to(PACKAGE)))
@@ -609,7 +630,9 @@ def main() -> None:
             w = csv.DictWriter(h, fieldnames=fields)
             w.writeheader()
             w.writerows(rows)
-    write_readme(lists, premium_report)
+    (OUT / "winners.json").write_text(json.dumps(winners, default=list, indent=1))
+    if write:
+        write_readme(lists, premium_report)
     print("\n".join(premium_report))
     for kind, rows in lists.items():
         print(f"{KINDS[kind][0]}: {len(rows)} rows, {sum(r['status'].startswith('chosen') for r in rows)} "
