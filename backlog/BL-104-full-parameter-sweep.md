@@ -295,6 +295,30 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   better at 7 of 7 slots, max drawdown −₹23,758 against −₹33,978, Calmar 1.1; it is the only family
   that stays positive in the test year. Best OTM2 +27 (SL 60 %, MTM ₹3,000), best OTM3 +4.
 
+### 2026-10-15 — NIFTY Widesl OTM1 day-type lists for all 25 entry times (owner-directed, descriptive)
+- **override:** owner, 2026-10-15, in chat: "in expiry day, do the SL 150 and MTM 4000. Non-expiry
+  day, keep the SL 60, trail 15/10, MTM 3000, no re-entry … do this for each and every thing … one
+  for expiry and one for no expiry. Best take it. If you have any confusion on some choosing best,
+  keep a list … I will choose it from there." This overrides this item's "never per slot" rule
+  (Phase 0, decision 5) for building candidate lists only; nothing here is a pass or an adoption.
+- **What is built:** two lists, one per day type, one row per `N_wide` entry time (09:17 → 15:17,
+  25). Each row's default is the owner's setting for that day type (expiry: SL 150 %, trail 25/15,
+  MTM ₹4,000, exit 15:28, RE cost ×1; other days: SL 60 %, trail 15/10, MTM ₹3,000, exit 15:28, no
+  re-entry).
+- **Data:** the 216 OTM1 cells with a day MTM stop plus the template at all 25 slots (7 stored; the
+  other 18 simulated with the Stage 1 code, tag `slots25`), 488 days, after charges; NIFTY expiry
+  days from `expiries_observed.csv`.
+- **Choosing rule, fixed before the 18 slots are read:** for a slot and day type, a setting other
+  than the default is chosen only when (1) its gain over the template is positive in both years,
+  (2) its pooled gain beats the default's by at least ₹25 a lot-day (expiry) or ₹15 (other days),
+  (3) its worst day is no worse than 1.25 × the template's on those days, and (4) at least two of its
+  grid neighbours also beat the template. One candidate clears all four → chosen. More than one
+  clears and the top two are within ₹10 → the slot is marked "owner to choose" with the top three
+  listed. None clears → the default stays, and if the default itself loses to the template on those
+  days in both years the slot is marked "owner to choose" too.
+- **Known weakness:** per-slot choice over 216 settings on ~50 expiry days a year is close to
+  choosing noise; the list is a starting point for the forward journal, not evidence.
+
 ## Risks
 
 - Nothing is unseen: a result here is in-sample by construction; the forward test is the only
