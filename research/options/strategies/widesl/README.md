@@ -1,6 +1,6 @@
 # Widesl (short wide strangle)
 
-**Last updated:** 2026-10-14
+**Last updated:** 2026-10-15
 
 ## Definition
 
@@ -46,6 +46,7 @@ three ways.
 | [Days to expiry](days-to-expiry.md) | Descriptive | NIFTY falls steadily away from expiry (₹616 → −₹52 a day); SENSEX has no gradient; at the edge of noise, one year |
 | [India VIX](vix.md) | Tested | Weak at VIX 18+ in one year; VIX-based rules and intraday VIX states failed |
 | [Weekday](weekday.md) | Descriptive | Same split as days to expiry within one expiry regime |
+| [NIFTY OTM1 candidates](nifty-otm1-candidates.md) | Descriptive | Two loose-stop settings kept as leads (A for expiry days, B otherwise); none passed the registered rule |
 
 ## Across strategies
 

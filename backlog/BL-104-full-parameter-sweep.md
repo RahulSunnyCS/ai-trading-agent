@@ -188,6 +188,15 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   from 389 → 33 (09:17), 372 → 59 (09:32), 277 → 97 (10:17) net per lot-day between the years.
   The 18-unsampled-slot check was started and then stopped at the owner's request (2026-10-15:
   the 7 sampled times suffice); its cell list is removed and no result is recorded.
+- **Owner's keep list (2026-10-15), no adoption.** Expiry-day split (NIFTY weekly expiry days, 104 of
+  488): the template earns ₹517 a lot-day on expiry days and ₹35 on the rest (about 80% of its
+  profit from 21% of days). SL 150 % / trail 25/15 / MTM ₹4,000 / RE ×1 gains +117 on expiry days
+  and +43 on other days, but by year it is −28 / +67 in the first year and +268 / +18 in the test
+  year, so the gain moved between day types. Daily P&L of SL 120 % / trail 15/10 / MTM ₹3,000 / RE
+  ×1 against SL 80 % / no trail / MTM ₹3,000 correlates 0.92. The owner kept the first as the
+  expiry-day candidate and the SL 120 % setting for other days; both are recorded, as leads only, in
+  `research/options/strategies/widesl/nifty-otm1-candidates.md`. An expiry-day switch would need its
+  own registration.
 
 ## Risks
 
