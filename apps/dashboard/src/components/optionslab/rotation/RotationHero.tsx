@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { formatDay, formatInr } from '../../../lib/format';
 import { tooltipPlacement } from '../../../lib/momentumResult';
+import { listName } from '../../../lib/rotationListNames';
 import { type HeroPoint, LIST_KEYS, nearestIndex, niceTicks } from '../../../lib/rotationView';
 import type { RotationListKey } from '../../../types/rotation';
 
@@ -150,7 +151,7 @@ export function RotationHero({
             } disabled:cursor-default`}
           >
             <span className={`h-2 w-2 rounded-full ${SWATCH[k]}`} />
-            {k}
+            {listName(k)}
             {k === focus ? <span className="text-faint">focus</span> : null}
           </button>
         ))}
@@ -273,7 +274,7 @@ export function RotationHero({
             <div className="font-medium text-foreground">{formatDay(point.day)}</div>
             {LIST_KEYS.filter((k) => shown.has(k)).map((k) => (
               <div key={k} className="flex justify-between gap-3 font-mono text-muted">
-                <span>{k}</span>
+                <span>{listName(k)}</span>
                 <span>{formatInr(point.lists[k], { compact: true })}</span>
               </div>
             ))}
@@ -325,7 +326,7 @@ export function RotationHero({
           <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 font-mono text-muted">
             {LIST_KEYS.filter((k) => point.lists[k] !== undefined).map((k) => (
               <span key={k}>
-                {k} {formatInr(point.lists[k], { compact: true })}
+                {listName(k)} {formatInr(point.lists[k], { compact: true })}
               </span>
             ))}
             <span>Base {formatInr(point.base, { compact: true })}</span>

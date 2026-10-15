@@ -133,6 +133,7 @@ uv run obt legwise run strategies/legwise/*.yaml [--trades] [--include-excluded]
 uv run obt legwise rerun    # re-run every strategy over every collected day and save (after editing a strategy)
 uv run obt rotation update [--day D]   # BL-058: run the 298 rotation variants over a collected day, store results (idempotent; default day = the newest collected day not yet stored; scheduler 19:45)
 uv run obt rotation pick [--dry-run]     # record lists A / B / C / REF before 09:17, hash-chained, + Telegram (scheduler 09:16; never late-recorded silently)
+uv run obt rotation result               # after the evening run, Telegram today's net paper gain for Steady / Calendar / Adaptive to both destinations
 uv run obt rotation verify | show        # re-compute the chain | recent entries with each list's P&L once scored
 uv run obt rotation triggers [--day D]  # BL-083: score the day's intraday triggers (event vs placebo simulations); also run by `rotation update`, isolated
 uv run obt rotation triggers-show        # event minus placebo per trigger and template over every scored day (forward, unseen days only)
@@ -140,7 +141,7 @@ uv run obt rotation readout [--from D --to D] [--json]  # BL-058: the registered
 uv run obt rotation base [--backfill]    # BL-058: the owner's fixed base (2 x Widesl OTM1 09:17 + 1 x Dir ATM 09:24): score its Dir leg (also run by `rotation update`, isolated) or show its series
 # the Options Lab › Rotation page reads GET /legwise/rotation/overview and /summary (api/rotation_routes.py; proxied at /api/backtest/legwise/rotation/*), the same code as `rotation readout`
 uv run obt rotation corr [slot:0917 | N_*_0917 | family:dir kind:legwise | all]  # BL-090: correlation of the strategies' daily P&L, loss-day overlap, basket drawdown, rolling drift; any strategy with results is found, no list to edit (--json/--csv, --from/--to)
-uv run obt heatmap build [-u NIFTY | --stocks] [--from D --to D] [--force]  # BL-094: ATM short-straddle grid (entry time x exit x SL) per day, stored under TRADING_DATA_ROOT/heatmap/; `show NIFTY --view time_sl --day D [--exit 15:15]` prints a view, `list` what is stored; the Options Lab Heatmap tab (default page) reads GET /legwise/heatmap* (proxied at /api/backtest/legwise/heatmap*)
+uv run obt heatmap build [-u NIFTY | --stocks] [--from D --to D] [--force]  # BL-094: ATM short-straddle grid (entry time x exit x SL) per day, stored under TRADING_DATA_ROOT/heatmap/; `show NIFTY --view time_sl --day D [--exit 15:15]` prints a view, `list` what is stored; the Options Lab Heatmap page (Explore data) reads GET /legwise/heatmap* (proxied at /api/backtest/legwise/heatmap*)
 uv run obt rotation portfolio-warm [--from D --to D]  # BL-095: replay every list-day's baskets once so the Rotation page's portfolio stop is fast the first time; fills the disposable path cache (ATA_PORTFOLIO_CACHE_DIR), read-only, not scheduled
 # the portfolio stop (BL-095) reads GET /legwise/rotation/portfolio/day|days (api/rotation_portfolio_routes.py over rotation/portfolio.py; proxied at /api/backtest/legwise/rotation/portfolio/*) and /legwise/rotation/drawdowns?stop=&trail=; /days answers 202 {"status":"warming"} past 20 s of a cold replay (the work carries on; the dashboard asks again)
 uv run obt rotation corr-list | corr-pick slot:0917 --k 3 --max-corr 0.6 [--require N_wide_0917]  # what has results | a basket none of whose members are alike (diagnostic, in-sample)
@@ -235,6 +236,9 @@ ai-trading-agent/
 ├── scripts/install-biome.sh         # root-level tooling (downloads the Biome binary), not app code
 ├── deploy/cloudflared/              # tunnel config template for serving the research APIs from a laptop (docs/remote-dashboard.md)
 ├── deploy/launchd/                  # the one LaunchAgent that keeps apps/scheduler running + install/uninstall (BL-012)
+├── research/                        # findings notes only, one page per strategy × variable: options/strategies/<family>/,
+│                                     # options/common/, momentum/ (rules: research/README.md). Not the research CODE,
+│                                     # which lives in packages/option-backtesting/research/blNNN/ and momentum's search_spaces/
 ├── apps/
 │   ├── server/                      # @ata/server — the Fastify/Bun backend
 │   │   ├── package.json · tsconfig.json · vitest.config.ts · vitest.workspace.ts
@@ -271,7 +275,7 @@ ai-trading-agent/
 │       ├── e2e/                     # Playwright specs
 │       └── src/                     # App.tsx, components/, hooks/, lib/, store/, types/
 │                                     # components/optionslab/ + hooks/useBacktest*.ts, useLegwise*.ts — Options
-│                                     # Lab (Strategies, Builder with Form | YAML modes, Runs, Daily results,
+│                                     # Lab (Strategies, Builder with Form | YAML modes, Runs,
 │                                     # Regimes); the YAML engine's tab (M-4) is now the Builder's YAML mode.
 │                                     # Fed entirely through /api/backtest/* (never the Python service directly)
 └── packages/
@@ -541,6 +545,7 @@ Critical variables whose misconfiguration causes real pain:
 | `FYERS_TOKEN_FILE` | Path of the 0600 JSON token `packages/broker-login`'s `bun run fyers-token` writes in CI (headless Fyers login: `FYERS_CLIENT_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET` + app id/secret/redirect). `mbt` reads it after the dashboard token and `FYERS_ACCESS_TOKEN`; the workflow deletes it when the job ends |
 | `MOMENTUM_OWNER` | Owner ID on Momentum's Your orders rows (settings, holdings, orders; BL-051). Default `rahul`; a second person would run with their own. Tests also set `MOMENTUM_STATE_DIR` / `SCHEDULER_STATE_DIR` to temp folders so they never touch the real `data/` files or the scheduler's run history |
 | `NOTIFY_PREFS_FILE` | Optional override for the notification preferences file (default `~/.config/ai-trading-agent/notifications.json`, `{"disabled": [type, ...]}`) that `@trading/notify` and both Python `notify.py` copies read before every Telegram send (BL-012). Missing or broken = everything on |
+| `TELEGRAM_ROTATION_CHAT_ID` | Optional Telegram group chat ID. `obt rotation pick` copies the 09:16 picks to this group as well as the existing private `TELEGRAM_CHAT_ID`; errors and other notifications stay private. Add the existing bot to the group first. An identical ID sends only once |
 | `ANGELONE_API_KEY` / `ANGELONE_CLIENT_CODE` / `ANGELONE_MPIN` / `ANGELONE_TOTP_SECRET` | The Angel One SmartAPI app key (smartapi.angelone.in) plus the account's client code, 4-digit PIN and TOTP seed. `obt angel fetch` logs in with them over REST (no browser). The last three are the same values AlgoTest's broker login uses; the key is separate. `ANGELONE_PUBLIC_IP` is optional (sent as `X-ClientPublicIP`) |
 | `TRADING_DATA_ROOT` | The local research database (`packages/trading-data`): `catalog.duckdb` + the Parquet `lake/` + gzipped `raw/` vendor responses. Default `~/TradingData`. On the owner's laptop it is `/Volumes/TradingData`, an APFS disk image on the external SSD (BL-034: ~110k day files would cost 2×256 KiB each on ExFAT). Every process refuses a root on a `/Volumes/<name>` that is not mounted (`trading_data.db.check_mounted`) rather than writing elsewhere; `tdata mount` attaches it. `obt`, `obt-api` and `obt-mcp` load the repo `.env` at start, `mbt` already did; `tdata` reads the environment only. Replaced `FYERS_DATA_DIR` (2026-09-30). The Fyers 1-minute data in it cannot be re-downloaded once contracts expire — back it up monthly with `tdata backup --to <disk>` |
 | `TRADING_DATA_IMAGE` | Path of the disk image `tdata mount` attaches (and the `trading-data-mount` LaunchAgent at login / when a volume appears). Must be double-quoted in `.env`: the launchd jobs `source` it with bash and the SSD's name contains an apostrophe and a space |

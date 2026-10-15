@@ -16,6 +16,10 @@ export interface HeatmapAvailable {
   underlyings: HeatmapUnderlying[];
   times: string[];
   stop_losses: number[];
+  /** The sl value that means "no stop loss" (0). Absent from an older API. */
+  no_sl?: number;
+  /** stop_losses plus no_sl last; the dropdown and the column axis come from the response. */
+  sl_levels?: number[];
   exit_times: string[];
   views: HeatmapViewKey[];
   metrics: HeatmapMetric[];

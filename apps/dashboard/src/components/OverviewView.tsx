@@ -543,7 +543,7 @@ function EveningJobCard() {
     <OverviewCard
       title="Options Lab evening job"
       icon={<Layers className="h-4 w-4" />}
-      links={[{ label: 'Options Lab', tab: 'optionslab', rest: ['results'] }]}
+      links={[{ label: 'Options Lab', tab: 'optionslab', rest: ['rotation'] }]}
     >
       {body}
     </OverviewCard>

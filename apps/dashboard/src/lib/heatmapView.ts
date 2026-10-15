@@ -6,13 +6,33 @@
  */
 
 import type { HeatmapCell, HeatmapMetric, HeatmapResponse } from '../types/heatmap';
-import { formatNumber, formatPct } from './format';
+import { formatDay, formatNumber, formatPct } from './format';
 
 export const VIEW_LABEL = {
   time_sl: 'Time vs SL',
   date_time: 'Date vs Time',
   date_sl: 'Date vs SL',
 } as const;
+
+/** The `sl` value the API uses for "no stop loss": both legs held to the exit time. */
+export const NO_SL = 0;
+export const NO_SL_LABEL = 'No SL';
+export const NO_SL_HINT = 'No stop loss: both legs held to the exit time';
+
+/** An SL axis value as a column heading: 10 -> "10", 0 -> "No SL". */
+export function slLabel(sl: string | number): string {
+  return Number(sl) === NO_SL ? NO_SL_LABEL : String(sl);
+}
+
+/** An SL choice as a dropdown option: 10 -> "10%", 0 -> "No SL". */
+export function slOptionLabel(sl: number): string {
+  return sl === NO_SL ? NO_SL_LABEL : `${sl}%`;
+}
+
+/** Every SL level the API offers, No SL last; falls back to the plain list for an older API. */
+export function slLevels(a: { stop_losses: number[]; sl_levels?: number[] | undefined }): number[] {
+  return a.sl_levels && a.sl_levels.length > 0 ? a.sl_levels : a.stop_losses;
+}
 
 const POSITIVE = [
   'bg-positive/10',
@@ -85,7 +105,8 @@ function csvField(value: string): string {
  */
 export function toCsv(r: HeatmapResponse, split: boolean): string {
   const num = (c: HeatmapCell | null, k: 'net' | 'ce' | 'pe') => (c ? String(c[k]) : '');
-  const head = ['', ...r.columns.map(String), 'TOTAL'];
+  const slAxis = r.view !== 'date_time';
+  const head = ['', ...r.columns.map((c) => (slAxis ? slLabel(c) : String(c))), 'TOTAL'];
   const lines = [head];
   const keys: ('net' | 'pe' | 'ce')[] = split ? ['pe', 'ce'] : ['net'];
   for (const k of keys) {
@@ -100,4 +121,45 @@ export function toCsv(r: HeatmapResponse, split: boolean): string {
     lines.push(['TOTAL', ...r.column_totals.map((c) => num(c, k)), num(r.total, k)]);
   }
   return `${lines.map((l) => l.map(csvField).join(',')).join('\n')}\n`;
+}
+
+/** What the heatmap settings come to, as the short chips of the run bar (BL-102). */
+export function settingsChips(s: {
+  view: keyof typeof VIEW_LABEL;
+  underlying: string;
+  /** An index is in rupees per lot, a stock in points per share. Default: an index. */
+  kind?: 'index' | 'stock';
+  date: string;
+  from: string;
+  to: string;
+  sl: number;
+  time: string;
+  exit: string;
+  metric: HeatmapMetric;
+  weeks: readonly number[];
+  /** CE and PE shown apart instead of as one straddle. */
+  split?: boolean;
+}): string[] {
+  const days = (a: string, b: string) => {
+    const from = formatDay(a);
+    const to = formatDay(b);
+    return !b || from === to ? from : `${from} to ${to}`;
+  };
+  const chips = [s.underlying === ALL_STOCKS ? 'All stocks' : s.underlying, VIEW_LABEL[s.view]];
+  if (s.view === 'time_sl') {
+    chips.push(days(s.date, s.to));
+  } else {
+    chips.push(days(s.from || s.to, s.from ? s.to : ''));
+    chips.push(
+      s.view === 'date_time' ? (s.sl === NO_SL ? 'No stop' : `SL ${s.sl}%`) : `Entry ${s.time}`,
+    );
+  }
+  chips.push(`Exit ${s.exit}`);
+  const stock = s.kind === 'stock' || s.underlying === ALL_STOCKS;
+  chips.push(s.metric === 'pct' ? '% of premium' : stock ? 'Points per share' : 'Rupees per lot');
+  if (s.split) chips.push('CE and PE apart');
+  if (s.weeks.length > 0) {
+    chips.push(`Expiry week ${s.weeks.map((w) => (w === 0 ? 'of' : `${w} out`)).join(', ')}`);
+  }
+  return chips;
 }

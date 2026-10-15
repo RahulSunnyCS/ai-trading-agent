@@ -39,6 +39,11 @@ A test the spec gates off runs only after the owner writes `override: <reason>`;
 in the item's Log. Worked example: BL-010 and
 `packages/momentum-backtesting/search_spaces/bl010_criteria.json`.
 
+**Research findings.** `research/` (repo root) holds one findings page per strategy and variable
+(`research/options/strategies/<family>/<variable>.md`, `research/momentum/...`); rules in
+`research/README.md`. Closing a research item updates the page of every variable it tested, in
+the same commit. The item stays the record; the page summarises and cites it.
+
 `TODO.md` (repo root) is the hand-maintained single source of truth for open
 work items — read it for context, and update the relevant row in the same
 commit as the code change that closes it.

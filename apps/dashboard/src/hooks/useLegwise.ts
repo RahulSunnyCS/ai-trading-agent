@@ -103,9 +103,12 @@ export function useCorrelation(
   selectors: string,
   range: { from?: string | undefined; to?: string | undefined } = {},
   window = 63,
+  /** False while the caller is still deciding what to ask for (nothing is fetched). */
+  enabled = true,
 ) {
   return usePolledResource<CorrelationResponse>(
     `${BASE}/correlation${query({ selectors, window: String(window), ...range })}`,
+    { enabled },
   );
 }
 

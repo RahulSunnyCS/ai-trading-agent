@@ -32,6 +32,10 @@ backtest (TODO.md 3.10.7):
   (side high) or whose low undercuts the range low (side low) enters, at the
   range level (or the bar's open if it gapped through). `source: underlying`
   fills at the option's CLOSE of the breakout minute. Triggers at most once.
+  `gap_percent` (default 0) moves the trigger out by that percentage of the range edge
+  (high x (1 + g/100), low x (1 - g/100)); the fill is at that widened level, or the bar's open
+  if it gapped through it. `valid_until` (default none) is the last minute the breakout can
+  still trigger; after it the leg is done without entering.
 - **Intrabar entries** (breakout, RE COST) skip SL/target/trail on their own
   bar — the bar's high/low may have happened before the fill.
 - **RE COST** — after an SL, the same contract re-enters when its price comes
@@ -79,7 +83,7 @@ from .market import (
     snapshot_days,
     window_close_minute,
 )
-from .schema import Leg, LegwiseStrategy, ReEntry
+from .schema import Amount, Leg, LegwiseStrategy, ReEntry, Strike
 
 _EPS = 1e-9
 #: NSE/BSE option tick. Stop and target levels are rounded to the nearest one, as AlgoTest
@@ -150,6 +154,7 @@ class _LegRun:
     target: float | None = None
     best: float = 0.0
     range_end: int = 0
+    range_valid_until: int | None = None
     range_hi: float | None = None
     range_lo: float | None = None
     fresh_intrabar: bool = False
@@ -157,6 +162,8 @@ class _LegRun:
     reentries_target: int = 0
     reentry_mode: str | None = None
     reentry_price: float = 0.0
+    rolls_done: int = 0  # BL-105: how many times this leg has been rolled today
+    roll_pending: bool = False  # BL-105: the next entry is the roll's (consumed by _enter)
 
     @property
     def sign(self) -> int:
@@ -205,13 +212,15 @@ class _DaySim:
         run.entry_price = price
         run.best = price
         spec = run.spec
-        run.initial_sl = run.sl = (
-            to_tick(price - run.sign * spec.stop_loss.distance(price)) if spec.stop_loss else None
-        )
+        stop = spec.stop_loss
+        if run.roll_pending and spec.roll is not None and spec.roll.stop_loss_percent is not None:
+            stop = Amount(percent=spec.roll.stop_loss_percent)  # the rolled leg's own stop (BL-105)
+        run.initial_sl = run.sl = to_tick(price - run.sign * stop.distance(price)) if stop else None
         run.target = (
             to_tick(price + run.sign * spec.target.distance(price)) if spec.target else None
         )
         run.fresh_intrabar = intrabar
+        run.roll_pending = False  # only the roll's own entry takes the roll overrides
         run.state = "open"
 
     def _exit(self, run: _LegRun, minute: int, raw: float, reason: str) -> None:
@@ -231,14 +240,17 @@ class _DaySim:
         if expiry is None:
             self.notes.append(f"{spec.id}: no {spec.expiry} expiry listed")
             return False
-        if spec.strike.strike_type is not None:
+        strike_rule = spec.strike
+        if run.roll_pending and spec.roll is not None and spec.roll.to_atm:
+            strike_rule = Strike(strike_type="ATM")  # a rolled leg re-enters at ATM (BL-105)
+        if strike_rule.strike_type is not None:
             spot = self.data.spot.price_at(minute)
             if spot is None:
                 self.notes.append(f"{spec.id}: no index price at {minute_label(minute)}")
                 return False
             strike = resolve_strike(
                 self.s.underlying,
-                spec.strike.strike_type,
+                strike_rule.strike_type,
                 Right(spec.option_type),
                 spot,
                 as_of=self.data.day,
@@ -249,7 +261,7 @@ class _DaySim:
                 self.notes.append(f"{spec.id}: {strike:g}{spec.option_type} {expiry} not collected")
                 return False
         else:
-            target = spec.strike.closest_premium
+            target = strike_rule.closest_premium
             priced = [
                 (abs(p - target), p, k)
                 for k, series in self.data.chain.items()
@@ -292,6 +304,11 @@ class _DaySim:
         if run.spec.range_breakout is not None:
             run.state = "range"
             run.range_end = minute_index(run.spec.range_breakout.until)
+            run.range_valid_until = (
+                minute_index(run.spec.range_breakout.valid_until)
+                if run.spec.range_breakout.valid_until is not None
+                else None
+            )
             return
         assert run.series is not None
         self._enter(run, minute, run.series.price_at(minute), intrabar=False)  # type: ignore[arg-type]
@@ -318,14 +335,26 @@ class _DaySim:
     def _step_armed(self, run: _LegRun, minute: int) -> None:
         rb = run.spec.range_breakout
         assert rb is not None and run.series is not None
+        if run.range_valid_until is not None and minute > run.range_valid_until:
+            self.notes.append(
+                f"{run.spec.id}: breakout window closed at {rb.valid_until} — no entry"
+            )
+            run.state = "done"
+            return
         source = self._range_source(run)
         o, h, lo = source.open[minute], source.high[minute], source.low[minute]
         if o is None or h is None or lo is None:
             return
-        if rb.side == "high" and h > run.range_hi + _EPS:  # type: ignore[operator]
-            level = max(o, run.range_hi)  # type: ignore[type-var]
-        elif rb.side == "low" and lo < run.range_lo - _EPS:  # type: ignore[operator]
-            level = min(o, run.range_lo)  # type: ignore[type-var]
+        gap = rb.gap_percent / 100
+        high_trigger = run.range_hi * (1 + gap)  # type: ignore[operator]
+        low_trigger = run.range_lo * (1 - gap)  # type: ignore[operator]
+        if gap and rb.source == "instrument":
+            # an option premium trades on the 0.05 tick; a widened level is a fill price
+            high_trigger, low_trigger = to_tick(high_trigger), to_tick(low_trigger)
+        if rb.side == "high" and h > high_trigger + _EPS:  # type: ignore[operator]
+            level = max(o, high_trigger)
+        elif rb.side == "low" and lo < low_trigger - _EPS:  # type: ignore[operator]
+            level = min(o, low_trigger)
         else:
             return
         price = level if rb.source == "instrument" else run.series.close[minute]
@@ -396,6 +425,39 @@ class _DaySim:
         if fill is not None:
             self._enter(run, minute, fill, intrabar=fill != o)
 
+    def _roll_exhausted_legs(self, minute: int) -> None:
+        """BL-105: a sold leg whose premium has decayed to roll.decay x its entry is closed at this
+        bar's close and re-enters through the ASAP re-entry path at the next minute's open (the
+        strike re-selected, a fresh stop). Checked after every leg has stepped, so the day-profit
+        gate sees one consistent MTM; a leg that just exited or entered this bar is not rolled."""
+        day_profit: float | None = None
+        for run in self.legs:
+            roll = run.spec.roll
+            if (
+                roll is None
+                or minute + 1 > self.last_reentry_min  # a roll is a re-entry: same cutoff
+                or run.state != "open"
+                or run.series is None
+                or run.rolls_done >= roll.max_rolls
+                or minute > minute_index(roll.not_after)
+                or run.trade is None
+                or run.trade.entry_min >= minute
+            ):
+                continue
+            close = run.series.close[minute]
+            if close is None or close > roll.decay * run.entry_price:
+                continue
+            if roll.min_day_profit is not None:
+                if day_profit is None:
+                    day_profit = self._mtm(minute)
+                if day_profit < roll.min_day_profit:
+                    continue
+            self._exit(run, minute, close, "ROLL")
+            run.rolls_done += 1
+            run.roll_pending = True
+            run.reentry_mode = "asap"
+            run.state = "reentry"
+
     def _close_all(self, minute: int, price_of: str, reason: str) -> None:
         for run in self.legs:
             if run.state == "open":
@@ -441,6 +503,7 @@ class _DaySim:
                         self._close_all(minute, "close", "SQUARE_OFF")
                     elif hit:
                         self._arm_reentry(run, minute, hit)
+            self._roll_exhausted_legs(minute)
             mtm = self._mtm(minute)
             curve.append((minute, mtm))
             worst, best = min(worst, mtm), max(best, mtm)

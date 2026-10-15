@@ -1,26 +1,60 @@
 # Rotation
 
-The Rotation page shows how the four registered lists (A, B, C and REF) are doing on days nobody
-had seen. Each morning at 09:16 the forward journal records the strategies each list would trade
-that day, before anything is known. Each evening the day is scored from the collected data. This
-page reads that journal; it never changes a list, a weight or an entry.
+The Rotation page shows how the four registered lists (Steady, Calendar, Adaptive and Baseline)
+are doing on days nobody had seen. Each morning at 09:16 the forward journal records the
+strategies each list would trade that day, before anything is known. Each evening the day is
+scored from the collected data. This page reads that journal; it never changes a list, a weight or
+an entry.
 
-The screen is split into three modes so the daily workflow stays short:
+## The four lists
 
-- **Overview** — forward-test status, today's baskets, headline numbers, verdict and cumulative
-  chart. Before the first scored day it shows the next entry instead of reserving a large empty
-  chart area.
-- **Journal** — the recorded or reconstructed day log, with risk review for drawdowns and selection
-  drift.
-- **Research** — optional diagnostics: why a pick was selected, family pulse, rank correlation,
-  market context and shadow experiments. These open as focused sections rather than appearing in
-  one long page.
+Each list ranks the same 298 strategies with a different mix of five criteria. The names are what
+this page shows; the **key** is what the journal, the stored results and the API use, so it is
+what you will see in a saved link or an exported file. The numbers are the weights in percent.
+
+| Name | Key | Own recent results | Weekday | Days to expiry | VIX | Family band | What it is |
+|---|---|---|---|---|---|---|---|
+| Steady | A | 5 | 34 | 33 | 23 | 5 | The safest cell of the weightings |
+| Calendar | B | 0 | 36 | 35 | 24 | 5 | Leans on the calendar and ignores its own recent results |
+| Adaptive | C | 15 | 30 | 30 | 20 | 5 | Lets its own recent results count the most |
+| Baseline | REF | 33 | 25 | 25 | 17 | 0 | The old live rotation, kept as the comparator |
+
+Where a screen records a decision (the Daily log, a saved placement) the key is shown beside the
+name, as "Steady (A)", so an entry can be matched to the journal.
+
+The screen is one page, in the order you read it:
+
+- **The evening run bar** — at the top. It shows whether a Fyers login is valid (the run uses Angel
+  One when it is not), when the run last finished, a *Run* button, and under *Options & log*
+  the Day field, *Collect data first* and *Send summary to Telegram*. The run is also scheduled at
+  15:45 on trading days; this bar is for running it by hand or seeing how the last one went.
+- **The three lists and the headline** — forward-test status, a card for each list, the headline
+  numbers, the verdict, the cumulative chart and today's baskets. Before the first scored day it
+  shows the next entry instead of reserving a large empty chart area.
+- **What happened** — the recorded or reconstructed day log. Below it, *Drawdowns and selection
+  drift* opens the risk review for the focus list.
+- **Is the rule still working?** — optional diagnostics, each closed until you open it: why a pick
+  was selected, the family pulse, rank correlation, and what market the forward days tested.
+- **Experiments** — *Ideas being watched*: the unregistered candidates and trigger studies, each
+  against what it replaced.
+
+A link with the old `?rotationView=` in it still opens this page; the setting no longer does
+anything.
 
 ## What you see
 
 **Data health.** One line of checks: the latest session stored, how many of the 298 strategies have
 that day's result, whether today's entry was recorded on time, which source gave the 09:15 VIX open,
 and whether the journal's hash chain is intact. A problem names its fix underneath.
+
+**The three lists.** Cards for Steady, Calendar and Adaptive come first on the page. Each shows
+the list's gross on the latest scored day, its total since the first forward day, its largest
+drawdown and its mean daily gap to the fixed base per lot (on the same basis as the headline below,
+so it follows a portfolio stop when one is applied). Before a day is scored every figure is a
+dash, not a zero. Clicking a card makes that list the focus for the headline and chart below. The
+picks line opens the strategies the list chose; it says "Today's" only when the latest entry is
+today's, and otherwise names the day it was recorded for. Baseline is not a card: it is a
+comparator, chosen in **Compare with**.
 
 **Read-out banner.** "Day 18 of 60" counts scored forward sessions. The review is at 60. Until then
 every figure is descriptive and changes nothing.
@@ -35,12 +69,13 @@ every figure is descriptive and changes nothing.
 | Beats random baskets | Share of 1,000 random baskets of the same shape that the list's cumulative is above |
 | Sessions scored | Forward sessions counted so far, against the 60 of the read-out |
 
-**Compare with.** REF is the old live rule: did the new weightings beat it? Fixed base is
-2 × Widesl OTM1 at 09:17 plus 1 × Dir ATM at 09:24 every day with no ranking: does rotating beat the
-simple rule at all? Random median is what luck gives. One picker switches every comparison on the
-page.
+**Compare with.** The page opens on the fixed base: 2 × Widesl OTM1 at 09:17 plus 1 × Dir ATM at
+09:24 every day with no ranking. Does rotating beat the simple rule at all? REF is the old live rule:
+did the new weightings beat it? (It is the Baseline list; the picker calls it Baseline.) Random
+median is what luck gives. One picker switches every
+comparison on the page, and the registered comparisons list the base first.
 
-**Hero chart.** Cumulative gross by list, the fixed base, and a shaded band of the random baskets
+**Hero chart.** Cumulative gross by the focus list, the fixed base (Baseline and the other lists are toggles), and a shaded band of the random baskets
 (10th to 90th percentile). Hover for a day, click to pin it, ← → to step, Esc to close.
 
 **Today's baskets.** The latest entry for all four lists side by side: start time, the strategy, its
@@ -48,7 +83,7 @@ composite score, and how many lists hold it. "Widesl min" marks a list where the
 least two Widesl strategies replaced a higher-ranked Dir pick. The line under the baskets says what
 changed since the entry before, which is the work list for re-setting AlgoTest by hand.
 
-**Family pulse.** In Research › Decision diagnostics: the twelve strategy-kind by start-band cells
+**Family pulse.** Under *Is the rule still working?* › *Why these picks…*: the twelve strategy-kind by start-band cells
 the ranking pools, with their recent gross per lot-day, the rank the ranking gives each, and where
 the lists' picks fall. See [the Family pulse](guide:optionslab/rotation-pulse).
 

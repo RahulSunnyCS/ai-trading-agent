@@ -33,8 +33,8 @@ from ..analytics import regime_source
 from ..fyers.daily import UNDERLYINGS, data_dir
 from ..legwise import anatomy, evening, forensics, store
 from ..legwise.daily import load_history, load_strategy_files, telegram_failure
-from ..legwise.engine import DayResult, run_legwise, simulate_day
-from ..legwise.market import available_days, load_day, minute_label
+from ..legwise.engine import DayResult, run_legwise, simulate_day, skipped_summary
+from ..legwise.market import BAR_SIZES, UnsupportedOn5m, available_days, load_day, minute_label
 from ..legwise.schema import LegwiseStrategy
 from ..presets import STRATEGIES_DIR
 
@@ -189,6 +189,11 @@ class BacktestBody(BaseModel):
     strategy: dict[str, Any]
     from_: str | None = Field(default=None, alias="from")
     to: str | None = None
+    #: "1m" (the default) or "5m": the same engine on the 5-minute chain snapshots, which need
+    #: every strategy time on a 5-minute mark (`obt legwise run --bars 5m`).
+    bars: str = "1m"
+    #: Run the days data_quality judged unusable too (`obt legwise run --include-excluded`).
+    include_excluded: bool = False
 
 
 @router.post("/backtest")
@@ -197,22 +202,49 @@ def backtest(body: BacktestBody) -> Any:
         strategy = LegwiseStrategy.model_validate(body.strategy)
     except ValidationError as error:
         return _error(422, "; ".join(_validation_messages(error)))
+    if body.bars not in BAR_SIZES:
+        return _error(422, f"bars must be one of {', '.join(BAR_SIZES)}")
     start = date.fromisoformat(body.from_) if body.from_ else None
     end = date.fromisoformat(body.to) if body.to else None
     root = data_dir()
     skipped: dict[date, str] = {}
-    results = run_legwise(strategy, root, start, end, skipped=skipped)
+    try:
+        results = run_legwise(
+            strategy,
+            root,
+            start,
+            end,
+            skipped=skipped,
+            bars=body.bars,
+            include_excluded=body.include_excluded,
+        )
+    except UnsupportedOn5m as error:
+        return _error(422, str(error))
     if not results:
-        return _error(404, f"no collected {strategy.underlying} days in that range")
+        message = f"no collected {strategy.underlying} days in that range"
+        if skipped:
+            # Days were found but none could run (5-minute bars need snapshots, a day was
+            # excluded by data_quality): say why instead of calling the range empty.
+            reasons = sorted({r.partition(": ")[0] for r in skipped.values()})[:3]
+            message += f" ({skipped_summary(skipped)}; {'; '.join(reasons)})"
+        return _error(404, message)
     # Kept as an `adhoc` run: every builder experiment stays queryable with the exact
-    # settings that produced it.
+    # settings that produced it. A setting at its default is not recorded, so a run made
+    # before these options existed and one made with the defaults read the same.
+    params: dict[str, Any] = {"from": body.from_, "to": body.to}
+    if body.bars != "1m":
+        params["bars"] = body.bars
+    if body.include_excluded:
+        params["include_excluded"] = True
     with connect(root, views=()) as con:
-        run_id = store.save_adhoc(con, strategy, results, {"from": body.from_, "to": body.to})
+        run_id = store.save_adhoc(con, strategy, results, params)
     return {
         "strategy_id": strategy.id,
         "run_id": run_id,
         "days": [_day_json(r) for r in results],
         "skipped": [{"day": d.isoformat(), "reason": r} for d, r in sorted(skipped.items())],
+        "bars": body.bars,
+        "include_excluded": body.include_excluded,
     }
 
 

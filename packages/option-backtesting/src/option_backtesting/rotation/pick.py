@@ -17,7 +17,7 @@ import numpy as np
 from ..fyers.daily import data_dir
 from . import journal, store
 from .attrs import last_collected_before
-from .lists import LISTS, LOTS_PER, WARMUP
+from .lists import DISPLAY_NAMES, LISTS, LOTS_PER, WARMUP
 from .live import listed_dte_labels, vix_open_with_source
 from .score import composite, dte_matrix, family_index, select, vix_band
 from .variants import variant_names
@@ -221,14 +221,12 @@ def record(
 
 
 def render(entry: dict) -> str:
-    lines = [
-        f"Rotation picks {entry['day']} ({entry['weekday']}): "
-        f"VIX {entry['vix_open']} ({entry['vix_band']}), "
-        f"DTE NIFTY {entry['dte']['NIFTY']} / SENSEX {entry['dte']['SENSEX']}"
-    ]
+    lines = [f"Rotation picks {entry['day']} ({entry['weekday']})"]
     for key, p in entry["lists"].items():
+        if key == "REF":
+            continue
         picked = ", ".join(p["core"]) + (f" + Buy {', '.join(p['buy'])}" if p["buy"] else "")
-        lines.append(f"{key}: {picked}")
+        lines.append(f"{DISPLAY_NAMES.get(key, key)}: {picked}")
     lines.append(f"chain {entry['hash'][:12]}  recorded {entry['recorded_at'][11:19]} IST")
     if not entry["before_first_entry"]:
         lines.append("LATE: recorded after 09:17 IST, this entry is NOT forward")

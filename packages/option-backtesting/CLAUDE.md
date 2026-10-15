@@ -125,6 +125,15 @@ Otherwise:
   `momentum-backtesting`'s notify.py mirroring `@trading/notify`'s contract (never `parse_mode`,
   redacts known secrets, never raises; prints when unconfigured). Tests must stub `send` —
   `load_dotenv()` would otherwise pick up the real bot token from the repo `.env`.
+  `send(..., chat_id=...)` supports an explicit destination for the rotation pick's group copy;
+  its environment configuration lives in the root `technical.md`.
+  Rotation messages use `rotation/list_names.json` (also imported by the dashboard) for
+  display names, and omit Baseline / VIX / days to expiry from the text; the journal still stores them.
+  `rotation/result.py` reads the completed picked variants' net results (after estimated costs),
+  reports one lot per strategy with every picked strategy's contribution under its section, and
+  sends Steady / Calendar / Adaptive after the evening pipeline finishes (normally around 16:00).
+  A per-entry marker prevents a retry from sending it twice;
+  `obt rotation result --force` explicitly resends it.
 - `api/legwise_routes.py` — `/legwise/*` on `obt-api` for the dashboard's Options Lab: `/day` and `/anatomy` (see above; `/anatomy` also overlays apps/server's T-33 `daily_regime_tags` as `t33` when `DATABASE_URL` is set in this process, with an explicit status), list/
   validate/save strategies (slug-checked name, `yaml.safe_dump` of the validated model — never
   raw client text), ad-hoc backtest over collected days, saved results, data/token status, and
@@ -231,13 +240,14 @@ Otherwise:
   As-of is the last COMPLETE session (every variant stored; a part-stored day is reported under `store.partial`
   and left out of windows and rank); the route's snapshot is keyed on the cube object plus the journal's stat, not a TTL.
   Journal figures are those on or before as-of. A stored variant outside the 12 cells is listed in `store.unplaced`.
-- `heatmap/` + `api/heatmap_routes.py` — BL-094, the Options Lab's Heatmap tab (default page): the P&L of an ATM
+- `heatmap/` + `api/heatmap_routes.py` — BL-094, the Options Lab's Heatmap page (Explore data): the P&L of an ATM
   short straddle for every entry time (09:16, then each half hour to 14:45), exit (15:30, 15:15) and per-leg SL
-  (10..100 %). `grid.py` restates the legwise engine's fills for the fixed two-leg shape (a test pins every cell to
+  (10..100 %, then "No SL": no stop, both legs held to the exit; `grid.NO_SL`, stored as `sl = 0`). `grid.py` restates the legwise engine's fills for the fixed two-leg shape (a test pins every cell to
   `simulate_day`); indices take ATM from the index spot, a stock (no spot, no strike step, mostly no lot size in the
   lake) from put-call parity, so stock P&L is points per share and an index's is rupees per lot at today's lot.
   NIFTY and SENSEX use the nearest weekly, every other index and stock the monthly. `store.py` keeps one Parquet per
-  underlying under `TRADING_DATA_ROOT/heatmap/` (incremental; a file with an old column layout is rebuilt);
+  underlying under `TRADING_DATA_ROOT/heatmap/` (incremental: a day stored without its `sl = 0` row is rebuilt by a plain build, and until then the No SL column
+  reads empty, never zero; a file with an old column layout is rebuilt);
   `view.py` reads the three views (`time_sl`, `date_time`, `date_sl`), sums a date range, filters weeks to expiry
   and gives `value` or `pct`-of-premium; `obt heatmap build [-u X | --stocks] [--force] | show | list`;
   `evening.update_heatmap` adds each index's day inside `obt daily`, isolated.
@@ -267,6 +277,14 @@ Otherwise:
   into an absent regime section plus a status (CLI line, `regime_status` /
   `regime_message` on `POST /runs`, `regime_status` in the MCP `run_backtest`
   output, `t33.status` on `/legwise/anatomy`). Any other query error still raises.
+
+- `research/bl104/` — BL-104, the full-factorial parameter sweep over the Widesl / Dir / Buy families:
+  `grid.py` (the registered axes, cells and their SHA; `tests/unit/test_bl104_grid.py` holds the counts),
+  `run_grid.py` (one job per cohort, resumable parts + day × cell series under `results/<tag>/`),
+  `score.py` (gates, Martin / Calmar, the plateau rule, band tables), `robust.py` (numpy CSCV,
+  half-years, bootstrap vs template, DTE / VIX / weekday strata, breadth over the 25 slots),
+  `stage2.py` (the winners' neighbourhoods and the flatness verdict), `check_regression.py`. Research only:
+  never writes a strategy YAML; the pre-registration is the backlog item's Phase 0.
 
 ## Commands
 

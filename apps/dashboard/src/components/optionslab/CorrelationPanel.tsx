@@ -16,28 +16,38 @@ import { RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { useCorrelationFilters } from '../../hooks/useCorrelationFilters';
+import { useFavourites } from '../../hooks/useFavourites';
 import { useCorrelation, useCorrelationAvailable } from '../../hooks/useLegwise';
 import { useQueryState } from '../../hooks/useQueryState';
 import {
   ANY,
+  DEFAULT_NAMES,
+  LIST_PREFIX,
   MEASURE_LABEL,
   MEASURE_NOTE,
   averagePairwise,
+  basisNote,
   buildSelectors,
+  displayResponse,
   diversificationNote,
   extremePairs,
   familyLabel,
+  isListSelector,
   matrixOf,
   pairReadout,
   pairsAtOrAbove,
+  reconstructedNotes,
   reorder,
+  selectorLabel,
   slotLabel,
 } from '../../lib/correlationView';
+import { favouriteSelectors } from '../../lib/favourites';
 import { formatDay, formatInt, formatMultiple, formatNumber } from '../../lib/format';
 import type {
   CorrelationAvailable,
   CorrelationMeasure,
   CorrelationResponse,
+  FavouriteListKey,
 } from '../../types/legwise';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
@@ -85,11 +95,18 @@ function indexOptions(groups: Record<string, number>): SegmentedOption<string>[]
 function Filters({
   available,
   state,
+  favourites,
 }: {
   available: CorrelationAvailable;
   state: ReturnType<typeof useCorrelationFilters>;
+  favourites: ReturnType<typeof useFavourites>;
 }) {
   const { filters, setFilters, range, setRange } = state;
+  const starred = useMemo(
+    () => new Set(favourites.set ? favouriteSelectors(favourites.set) : []),
+    [favourites.set],
+  );
+  const lists = (available.lists ?? []).map((l) => ({ selector: l.selector, name: l.name }));
   const g = available.groups;
   const variantsOnly = filters.kind !== 'legwise';
   return (
@@ -170,9 +187,30 @@ function Filters({
         <div className="sm:col-span-2">
           <StrategyMultiSelect
             options={available.strategies}
+            lists={lists}
             chosen={filters.names}
             onChange={(names) => setFilters({ names })}
+            starred={starred}
+            onToggleStar={
+              favourites.set
+                ? (selector) =>
+                    isListSelector(selector)
+                      ? favourites.toggleList(
+                          selector.slice(LIST_PREFIX.length) as FavouriteListKey,
+                        )
+                      : favourites.toggleStrategy(selector)
+                : undefined
+            }
           />
+          {starred.size > 0 ? (
+            <button
+              type="button"
+              onClick={() => setFilters({ names: [...state.defaultNames] })}
+              className="mt-1 w-fit text-xs text-primary hover:underline"
+            >
+              Reset to favourites
+            </button>
+          ) : null}
         </div>
       </div>
       {filters.names.length > 0 ? (
@@ -185,7 +223,7 @@ function Filters({
               className="rounded-full bg-surface-2 px-2.5 py-0.5 font-mono text-xs text-foreground ring-1 ring-inset ring-border hover:ring-border-strong"
               title="Remove from the comparison"
             >
-              {n} ×
+              {selectorLabel(n)} ×
             </button>
           ))}
         </div>
@@ -245,6 +283,12 @@ function Result({
 }) {
   const [hover, setHover] = useState<Cell | null>(null);
   const [pinned, setPinned] = useState<Cell | null>(null);
+  // A rotation list is shown by its name (`list:A` -> Steady); `raw` keeps the selector names
+  // that a follow-up request (the basket pick) must send.
+  const raw = r;
+  r = useMemo(() => displayResponse(raw), [raw]);
+  const notes = useMemo(() => reconstructedNotes(raw), [raw]);
+  const basis = useMemo(() => basisNote(raw), [raw]);
   const matrix = useMemo(() => matrixOf(r, measure), [r, measure]);
   const view = useMemo(() => reorder(matrix, r.names, r.order), [matrix, r.names, r.order]);
   const rowAverage = useMemo(
@@ -261,6 +305,14 @@ function Result({
   return (
     <div className="space-y-5">
       <Summary r={r} matrix={r.pearson} />
+      {notes.length > 0 || basis ? (
+        <ul className="space-y-0.5 text-xs text-muted" aria-label="About the lists">
+          {basis ? <li>{basis}</li> : null}
+          {notes.map((note) => (
+            <li key={note}>{note}</li>
+          ))}
+        </ul>
+      ) : null}
       {r.stale.length > 0 ? (
         <StateMessage
           variant="error"
@@ -314,7 +366,7 @@ function Result({
             title="A basket that is not alike"
             description="Pick the best-ranked strategies that do not move with one already kept."
           />
-          <BasketBuilder selectors={selectors} names={r.names} measure={measure} range={range} />
+          <BasketBuilder selectors={selectors} names={raw.names} measure={measure} range={range} />
         </Card>
       </div>
 
@@ -329,10 +381,32 @@ function Result({
   );
 }
 
-function StrategyPicker({ state }: { state: ReturnType<typeof useCorrelationFilters> }) {
+function StrategyPicker({
+  state,
+  favourites,
+}: {
+  state: ReturnType<typeof useCorrelationFilters>;
+  favourites: ReturnType<typeof useFavourites>;
+}) {
   const available = useCorrelationAvailable();
-  const selectors = buildSelectors(state.filters);
-  const result = useCorrelation(selectors, state.range);
+  // When the page is on its own defaults (no ?names=), drop starred items that no longer exist
+  // (a strategy deleted since it was starred) so one stale star cannot break the comparison.
+  const filters = useMemo(() => {
+    if (!state.usingDefaults || available.data === null) return state.filters;
+    const known = new Set([
+      ...available.data.strategies.map((s) => s.name),
+      ...(available.data.lists ?? []).map((l) => l.selector),
+    ]);
+    const kept = state.filters.names.filter((n) => known.has(n));
+    return { ...state.filters, names: kept.length > 0 ? kept : [...DEFAULT_NAMES] };
+  }, [state.usingDefaults, state.filters, available.data]);
+  const selectors = buildSelectors(filters);
+  const result = useCorrelation(
+    selectors,
+    state.range,
+    63,
+    !state.waiting && available.data !== null,
+  );
 
   if (available.error && available.data === null) {
     return (
@@ -343,7 +417,7 @@ function StrategyPicker({ state }: { state: ReturnType<typeof useCorrelationFilt
       />
     );
   }
-  if (available.data === null) return <SkeletonRows rows={6} />;
+  if (available.data === null || state.waiting) return <SkeletonRows rows={6} />;
   if (available.data.strategies.length === 0) {
     return (
       <StateMessage
@@ -356,10 +430,16 @@ function StrategyPicker({ state }: { state: ReturnType<typeof useCorrelationFilt
 
   return (
     <div className="space-y-5">
-      <Filters available={available.data} state={state} />
+      <Filters available={available.data} state={{ ...state, filters }} favourites={favourites} />
       <div className="flex items-center justify-between gap-3 text-xs text-muted">
         <span>
-          Comparing <span className="font-mono">{selectors}</span>
+          Comparing{' '}
+          <span className="font-mono">
+            {selectors
+              .split(',')
+              .map((part) => selectorLabel(part))
+              .join(', ')}
+          </span>
         </span>
         <Button
           size="sm"
@@ -405,7 +485,15 @@ const MODE_OPTIONS: SegmentedOption<Mode>[] = [
  */
 export function CorrelationPanel() {
   const [modeQ, setModeQ] = useQueryState('mode');
-  const state = useCorrelationFilters();
+  const favourites = useFavourites();
+  // What the bare page opens on: the starred lists and strategies. null while they load; if they
+  // cannot be loaded at all, the built-in three (undefined) rather than waiting for ever.
+  const favouriteNames = favourites.set
+    ? favouriteSelectors(favourites.set)
+    : favourites.error !== null
+      ? undefined
+      : null;
+  const state = useCorrelationFilters(favouriteNames);
   const mode: Mode = modeQ === 'basket' ? 'basket' : 'picker';
   return (
     <div className="space-y-5">
@@ -425,7 +513,7 @@ export function CorrelationPanel() {
           }}
         />
       ) : (
-        <StrategyPicker state={state} />
+        <StrategyPicker state={state} favourites={favourites} />
       )}
     </div>
   );

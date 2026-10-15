@@ -21,7 +21,7 @@ basic options and momentum can read to understand every section, how to use it, 
 its results.
 
 Source material already in the repo: `docs/momentum-parameters-plain-english.md`,
-`docs/momentum-parameters-reference.md`,
+`docs/momentum-parameters-reference.md` (both moved to `research/momentum/` on 2026-10-14),
 `packages/momentum-backtesting/docs/how-backtests-run-and-how-we-sped-them-up.md` (§7 glossary),
 the package READMEs, `apps/scheduler/CLAUDE.md`.
 

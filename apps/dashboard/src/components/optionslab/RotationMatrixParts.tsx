@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 
 import { formatDay, formatInt } from '../../lib/format';
 import { tooltipPlacement } from '../../lib/momentumResult';
+import { listName } from '../../lib/rotationListNames';
 import {
   cellKind,
   legendSwatches,
@@ -206,13 +207,13 @@ export function CellReadout({
             <p className="text-muted">
               Picked:{' '}
               {LIST_ORDER.filter((k) => c.sel?.[k])
-                .map((k) => `${k} ${c.sel?.[k]}×`)
+                .map((k) => `${listName(k)} ${c.sel?.[k]}×`)
                 .join(', ')}{' '}
               of {formatInt(c.rec)} recorded strategy-days
             </p>
           ) : null}
           {picks && picks.length > 0 ? (
-            <p className="text-muted">Picked by {picks.join(', ')} (recorded)</p>
+            <p className="text-muted">Picked by {picks.map(listName).join(', ')} (recorded)</p>
           ) : null}
           {cell.thin ? (
             <p className="text-warning">

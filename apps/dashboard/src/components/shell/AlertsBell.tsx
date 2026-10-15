@@ -46,25 +46,23 @@ export function AlertsBell() {
 
   return (
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger asChild>
-        <button
-          type="button"
-          aria-label={label}
-          className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-muted transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <Bell className="h-4 w-4" aria-hidden="true" />
-          {worst ? (
-            <span
-              data-testid="alerts-count"
-              className={cn(
-                'absolute -right-1.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none',
-                BADGE_TONE[worst],
-              )}
-            >
-              {bellCount(open)}
-            </span>
-          ) : null}
-        </button>
+      <DropdownMenu.Trigger
+        type="button"
+        aria-label={label}
+        className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-muted transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Bell className="h-4 w-4" aria-hidden="true" />
+        {worst ? (
+          <span
+            data-testid="alerts-count"
+            className={cn(
+              'absolute -right-1.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none',
+              BADGE_TONE[worst],
+            )}
+          >
+            {bellCount(open)}
+          </span>
+        ) : null}
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content

@@ -116,7 +116,7 @@ export function App() {
   const { pathname, tab, rest, navigate, replace } = useAppRoute();
   const activeTab: Tab = tab ?? DEFAULT_TAB;
   // The path on screen, for its guide page. A bare tab path shows its default sub-section
-  // (/optionslab is Daily results), so that segment is filled in.
+  // (/optionslab is Today, the rotation page), so that segment is filled in.
   const activeItem = navItem(activeTab);
   const routeRest = tab ? rest : [];
   const defaultChild = activeItem ? activeNavChild(activeItem, routeRest)?.segment : undefined;

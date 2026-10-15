@@ -6,14 +6,19 @@ import {
   DEFAULT_FILTERS,
   averagePairwise,
   bandOf,
+  basisNote,
   buildSelectors,
+  displayResponse,
   diversificationNote,
   extremePairs,
   familyLabel,
+  isListSelector,
   matrixOf,
   pairReadout,
   pairsAtOrAbove,
+  reconstructedNotes,
   reorder,
+  selectorLabel,
   slotLabel,
 } from '../correlationView';
 
@@ -195,5 +200,87 @@ describe('reading a response', () => {
     );
     expect(diversificationNote(1)).toContain('no diversification');
     expect(diversificationNote(null)).toContain('Not enough');
+  });
+});
+
+describe('rotation lists in a comparison', () => {
+  const stats = { net: 1, max_dd: -1, worst_day: -1, loss_day_share: 0.4, mean_over_std: 0.1 };
+  const response = (names: string[], reconstructed?: Record<string, number>): CorrelationResponse =>
+    ({
+      names,
+      kinds: names.map((n) => (n.startsWith('list:') ? 'list' : 'variant')),
+      days: ['2026-01-01'],
+      n_days: 60,
+      window: 63,
+      order: names.map((_, i) => i),
+      pearson: [],
+      spearman: [],
+      loss_overlap: [],
+      loss_corr: [],
+      both_lose_days: [],
+      parts: Object.fromEntries(names.map((n) => [n, stats])),
+      basket: {
+        names,
+        net: 0,
+        max_dd: 0,
+        worst_day: 0,
+        loss_day_share: 0,
+        sum_of_part_dds: 0,
+        dd_ratio: null,
+        mean_over_std: null,
+      },
+      rolling: [],
+      selectors: names,
+      from: null,
+      to: null,
+      stale: [],
+      in_sample: true,
+      ...(reconstructed ? { reconstructed } : {}),
+    }) as unknown as CorrelationResponse;
+
+  it('shows a list by its name and a strategy as it is', () => {
+    expect(isListSelector('list:A')).toBe(true);
+    expect(isListSelector('N_wide_0917')).toBe(false);
+    expect(selectorLabel('list:A')).toBe('Steady');
+    expect(selectorLabel('list:B')).toBe('Calendar');
+    expect(selectorLabel('list:C')).toBe('Adaptive');
+    expect(selectorLabel('N_wide_0917')).toBe('N_wide_0917');
+  });
+
+  it('re-keys names, parts and the basket for display, and leaves the raw response alone', () => {
+    const raw = response(['list:A', 'N_wide_0917']);
+    const shown = displayResponse(raw);
+    expect(shown.names).toEqual(['Steady', 'N_wide_0917']);
+    expect(Object.keys(shown.parts)).toEqual(['Steady', 'N_wide_0917']);
+    expect(shown.basket.names).toEqual(['Steady', 'N_wide_0917']);
+    expect(raw.names).toEqual(['list:A', 'N_wide_0917']);
+    // Nothing to rename: the same object comes back.
+    const plain = response(['N_wide_0917', 'N_dir_0917']);
+    expect(displayResponse(plain)).toBe(plain);
+  });
+
+  it('says what a list and a strategy are measured in, only when both are compared', () => {
+    const basis = {
+      list: 'gross per lot-day',
+      legwise: 'net per lot, after costs',
+    };
+    const mixed = { ...response(['list:A', 'nifty_x']), basis } as CorrelationResponse;
+    expect(basisNote(mixed)).toContain(
+      'A list is gross per lot-day; a strategy is net per lot, after costs.',
+    );
+    const listsOnly = {
+      ...response(['list:A', 'list:B']),
+      basis: { list: 'gross per lot-day' },
+    } as CorrelationResponse;
+    expect(basisNote(listsOnly)).toBeNull();
+    expect(basisNote(response(['N_wide_0917']))).toBeNull();
+  });
+
+  it('says how many compared days were re-scored', () => {
+    expect(reconstructedNotes(response(['list:A', 'N_wide_0917'], { 'list:A': 30 }))).toEqual([
+      'Steady: 30 of 60 compared days were re-scored from history, not recorded forward.',
+    ]);
+    expect(reconstructedNotes(response(['list:A'], { 'list:A': 0 }))).toEqual([]);
+    expect(reconstructedNotes(response(['N_wide_0917']))).toEqual([]);
   });
 });

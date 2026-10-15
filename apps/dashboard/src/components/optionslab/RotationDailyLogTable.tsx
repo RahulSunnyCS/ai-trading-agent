@@ -17,6 +17,7 @@ import {
   placementTally,
   rowFlags,
 } from '../../lib/rotationDailyLogView';
+import { listLabel, listName } from '../../lib/rotationListNames';
 import { stopFlag } from '../../lib/rotationPortfolioView';
 import type { PlacementStatus, RotationListKey, RotationRow } from '../../types/rotationDailyLog';
 import { Badge, type Tone } from '../ui/Badge';
@@ -51,12 +52,12 @@ function ListCell({ row, list }: { row: RotationRow; list: RotationListKey }) {
         ? `No stored result yet for ${block.missing.join(', ')}`
         : 'No stored result yet';
     return (
-      <span className="text-faint" title={`${list}: ${why}`}>
+      <span className="text-faint" title={`${listLabel(list)}: ${why}`}>
         {EMPTY}
       </span>
     );
   }
-  const total = `${list}: ${formatInr(block.gross, { sign: true })} gross for ${block.lots} lots (${block.picks.length} strategies); ${formatInr(block.per_lot_day, { sign: true })} per lot-day`;
+  const total = `${listLabel(list)}: ${formatInr(block.gross, { sign: true })} gross for ${block.lots} lots (${block.picks.length} strategies); ${formatInr(block.per_lot_day, { sign: true })} per lot-day`;
   const pf = block.pf;
   const stopped = pf !== undefined && pf.stop_label !== null;
   const notes = [
@@ -96,7 +97,7 @@ function PlacedCell({ row }: { row: RotationRow }) {
   const title = LIST_KEYS.filter((k) => row.lists[k] !== undefined)
     .map((k) => {
       const p = row.placement[k];
-      return `${k}: ${p ? `${PLACEMENT_LABEL[p.status]}${p.note ? ` (${p.note})` : ''}` : 'not marked'}`;
+      return `${listLabel(k)}: ${p ? `${PLACEMENT_LABEL[p.status]}${p.note ? ` (${p.note})` : ''}` : 'not marked'}`;
     })
     .join('\n');
   return (
@@ -160,7 +161,7 @@ export function RotationDailyLogTable({
           </Th>
           {LIST_KEYS.map((k) => (
             <Th dense align="right" key={k} className={cn(k === focus && 'text-foreground')}>
-              {k}
+              {listName(k)} <span className="text-[10px] font-normal text-faint">{k}</span>
             </Th>
           ))}
           <Th dense>Flags</Th>

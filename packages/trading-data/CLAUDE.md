@@ -57,7 +57,9 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
   rank `iv_7d_1500`). Views of the same names (static placeholder columns in `db.LAKE_VIEWS`,
   checked against the schemas by a test, so `db` never imports numpy).
   Each file carries `derived_version` in its Parquet metadata; a rebuild redoes only missing
-  or out-of-version files. `obt legwise run --bars 5m` runs the unchanged engine on them
+  or out-of-version files; the default window starts at `DERIVED_FROM` (2024-10-01), an explicit
+  `--day` / `--days` may reach back before it (the 2013-2021 vendor history).
+  `obt legwise run --bars 5m` runs the unchanged engine on them
 - `raw/` — gzipped verbatim vendor responses
 
 A stock's identity is its literal exchange symbol at the time (one `instruments` row

@@ -114,7 +114,10 @@ The YAML schema (`legwise/schema.py`) mirrors AlgoTest's strategy page field for
 screen transcribes directly, and `extra="forbid"` rejects any AlgoTest setting not implemented
 yet (simple momentum, overall re-entry/trailing, RE MOMENTUM, trail SL to break-even, BTST) rather
 than silently ignoring it. `range_breakout.source`, not `on` — YAML 1.1 parses a bare `on` key as
-the boolean `true`.
+the boolean `true`. `range_breakout.gap_percent` (trigger a percentage beyond the range edge) and
+`valid_until` (last minute the breakout can still trigger) are optional; both are left out of the
+validated spec's dump while at their defaults (0 / none), so an existing range-breakout strategy
+keeps its `store.spec_hash`, its saved results and its frozen golden hashes.
 
 Every intrabar-ordering assumption (entry at the open of the entry minute, SL before trail within
 a bar, no SL check on an intrabar-entry bar, overall MTM at bar closes including realised P&L,

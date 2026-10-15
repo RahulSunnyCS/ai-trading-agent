@@ -1,0 +1,21 @@
+# BL-101 (research only; never copied into strategies/legwise/, which `obt daily` runs in full).
+# Long OTM4 weekly strangle: buy OTM4 CE + OTM4 PE at 09:16, hold to 15:28. No stop, trail, filter or target.
+strategy:
+  id: bl101_long_strangle_otm4_916
+  underlying: NIFTY
+  entry_time: "09:16"
+  exit_time: "15:28"
+  square_off: partial
+  legs:
+    - id: ce
+      lots: 1
+      position: buy
+      option_type: CE
+      expiry: weekly
+      strike: { strike_type: OTM4 }
+    - id: pe
+      lots: 1
+      position: buy
+      option_type: PE
+      expiry: weekly
+      strike: { strike_type: OTM4 }

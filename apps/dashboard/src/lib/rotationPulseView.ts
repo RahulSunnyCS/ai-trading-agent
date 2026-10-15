@@ -18,6 +18,7 @@ import type {
   PulseStat,
 } from '../types/rotationPulse';
 import { EMPTY, formatDay, formatInr, formatInt, formatPct } from './format';
+import { listName } from './rotationListNames';
 
 export const PULSE_LISTS: readonly PulseListKey[] = ['A', 'B', 'C', 'REF'];
 export const WINDOW_KEYS = ['5', '21', '63'] as const;
@@ -191,7 +192,7 @@ export function chipGroups(chips: PulseChip[] | undefined, focus: PulseListKey):
       list,
       count: mine.length,
       focus: list === focus,
-      title: `List ${list}: ${mine.map((c) => `${c.variant}${c.role === 'buy' ? ' (Buy add-on)' : ''}`).join(', ')}`,
+      title: `${listName(list)}: ${mine.map((c) => `${c.variant}${c.role === 'buy' ? ' (Buy add-on)' : ''}`).join(', ')}`,
     });
   }
   return out;
@@ -231,7 +232,7 @@ export function shareView(cell: PulseCell, r: PulseAvailable): ShareView {
   if (!summary || !one)
     return { text: EMPTY, title: 'No pick figure for this cell.', short: false };
   const basis =
-    `${source === 'recorded' ? 'Recorded' : 'Reconstructed'} picks of list ${summary.list}, ` +
+    `${source === 'recorded' ? 'Recorded' : 'Reconstructed'} picks of the ${listName(summary.list)} list, ` +
     `${formatInt(summary.sessions)} ${summary.sessions === 1 ? 'session' : 'sessions'} ` +
     `(${formatDay(summary.from)} to ${formatDay(summary.to)}).`;
   const short = source === 'recorded' && summary.sessions < r.share.sessions;
@@ -308,13 +309,15 @@ export function picksHeader(r: PulseAvailable): PicksHeader {
 // Header texts
 // ---------------------------------------------------------------------------
 
-/** "carries 5% of the composite in A, B and C and none in REF", from the lists' own weights. */
+/** "carries 5% of the composite in Steady, Calendar and Adaptive and none in Baseline". */
 export function criterionNote(r: PulseAvailable): string {
   const weights = r.rank.weights;
   const with_ = PULSE_LISTS.filter((k) => (weights[k] ?? 0) > 0);
   const without = PULSE_LISTS.filter((k) => (weights[k] ?? 0) === 0);
   const join = (xs: readonly string[]) =>
-    xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
+    xs.length <= 1
+      ? xs.map(listName).join('')
+      : `${xs.slice(0, -1).map(listName).join(', ')} and ${listName(xs[xs.length - 1] ?? '')}`;
   if (with_.length === 0) return 'The family-band criterion carries no weight in any list.';
   const pcts = Array.from(new Set(with_.map((k) => formatPct(weights[k], 0))));
   const share = pcts.length === 1 ? pcts[0] : 'a small share';

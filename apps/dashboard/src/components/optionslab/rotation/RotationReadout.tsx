@@ -49,7 +49,7 @@ export function RotationReadoutBanner({
       </span>
       <InfoTooltip
         label="About the read-out"
-        text="Per list: gross, max drawdown, and the share of random same-shape baskets it beats, with REF as the comparator and a 5-day block-bootstrap 90% interval of each list minus REF and minus the fixed base. A list beats the base when that interval's lower bound is above zero and its drawdown per lot is no worse. The rule was registered before the first entry and does not change."
+        text="Per list: gross, max drawdown, and the share of random same-shape baskets it beats, with Baseline as the comparator and a 5-day block-bootstrap 90% interval of each list minus Baseline and minus the fixed base. A list beats the base when that interval's lower bound is above zero and its drawdown per lot is no worse. The rule was registered before the first entry and does not change."
       />
     </section>
   );

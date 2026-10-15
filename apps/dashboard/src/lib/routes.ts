@@ -4,7 +4,7 @@
  *
  *   /overview
  *   /live  /trades  /personalities  /pnl  /regime
- *   /optionslab/{strategies|builder|runs|results|regimes|correlation|rotation|matrix}
+ *   /optionslab/{rotation|heatmap|matrix|correlation|strategies|builder|runs|regimes}
  *   /optionslab/builder/yaml        (the builder's YAML mode; /optionslab/builder is the form)
  *   /momentum/{backtest|scores|saved|week|rebalance|journal} (old /momentum/weekly redirects)
  *   /momentum/backtest/{etf|stock|custom_index|broad}
@@ -44,22 +44,29 @@ const TAB_BY_SEGMENT = new Map<string, Tab>(
   NAV_GROUPS.flatMap((group) => group.items.map((item) => [tabSegment(item.id), item.id])),
 );
 
-/** In display order. Must match the Options Lab nav item's children (a test checks it). */
+/**
+ * In display order, workspace by workspace (BL-102): Today, then Explore data, then Build and
+ * test, then Advanced (Regimes). Must match the Options Lab nav item's children (a test checks it). Daily results is not
+ * one: its page was retired and `/optionslab/results` redirects to Today (PATH_ALIASES), where
+ * the evening run's status and Run button now are.
+ */
 export const OPTIONS_LAB_SECTIONS = [
+  'rotation',
   'heatmap',
+  'matrix',
+  'correlation',
   'strategies',
   'builder',
   'runs',
-  'results',
   'regimes',
-  'correlation',
-  'rotation',
-  'matrix',
 ] as const;
 export type OptionsLabSection = (typeof OPTIONS_LAB_SECTIONS)[number];
 
-/** What `/optionslab` opens: the straddle heatmap (BL-094; it was Daily results before). */
-export const OPTIONS_LAB_DEFAULT_SECTION: OptionsLabSection = 'heatmap';
+/**
+ * What `/optionslab` opens: Today, how the Steady, Calendar and Adaptive lists are doing
+ * (BL-102; it was the straddle heatmap, BL-094, and Daily results before that).
+ */
+export const OPTIONS_LAB_DEFAULT_SECTION: OptionsLabSection = 'rotation';
 
 /** `/optionslab/builder` is the form; `/optionslab/builder/yaml` is the YAML engine. */
 export const BUILDER_MODES = ['form', 'yaml'] as const;
@@ -120,6 +127,8 @@ export const PATH_ALIASES: Readonly<Record<string, string>> = {
   '/replay': '/coverage/replay',
   '/data/backfill': '/coverage/backfill',
   '/data/replay': '/coverage/replay',
+  // Daily results was retired (BL-102): the evening run is on Today.
+  '/optionslab/results': '/optionslab/rotation',
   // The standalone YAML Backtest tab became the builder's YAML mode (BL-013 Phase 7).
   '/backtest': '/optionslab/builder/yaml',
   '/optionslab/yaml': '/optionslab/builder/yaml',

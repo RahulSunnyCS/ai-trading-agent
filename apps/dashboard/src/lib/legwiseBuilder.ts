@@ -7,7 +7,14 @@
  * schema (legwise/schema.py) stays the validator; nothing here decides what is valid.
  */
 
-import type { DayRow, Leg, LegwiseStrategy, ReEntry, Underlying } from '../types/legwise';
+import type {
+  DayRow,
+  Leg,
+  LegwiseStrategy,
+  ReEntry,
+  SavedStrategy,
+  Underlying,
+} from '../types/legwise';
 import { formatInt, formatNumber } from './format';
 
 export const UNDERLYINGS: readonly Underlying[] = [
@@ -92,7 +99,8 @@ export function toPayload(strategy: LegwiseStrategy): LegwiseStrategy {
 // Dirty comparison
 // ---------------------------------------------------------------------------
 
-function canonical(value: unknown): unknown {
+/** The value with keys sorted at every depth and unset/null keys dropped, so equal strategies read equal. */
+export function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {};
@@ -183,8 +191,15 @@ export function summarizeLeg(leg: Leg, underlying: string): string {
   if (leg.reentry_on_target) parts.push(`re-entry on target ${reentryText(leg.reentry_on_target)}`);
   if (leg.range_breakout) {
     const on = leg.range_breakout.source === 'underlying' ? 'index' : 'premium';
+    const { gap_percent: gap, valid_until: validUntil } = leg.range_breakout;
+    const extras = [
+      gap ? `${num(gap)}% beyond the range` : '',
+      validUntil ? `valid until ${validUntil}` : '',
+    ].filter(Boolean);
     parts.push(
-      `enters on ${on} ${leg.range_breakout.side} break after ${leg.range_breakout.until}`,
+      `enters on ${on} ${leg.range_breakout.side} break after ${leg.range_breakout.until}${
+        extras.length ? ` (${extras.join(', ')})` : ''
+      }`,
     );
   }
   return parts.join(' · ');
@@ -194,81 +209,233 @@ export function summarizeLeg(leg: Leg, underlying: string): string {
 // Templates
 // ---------------------------------------------------------------------------
 
-export type TemplateId = 'short_straddle' | 'short_strangle' | 'iron_condor';
+export type TemplateId = 'short_strangle' | 'buy_range_breakout' | 'short_strangle_premium';
 
-export const TEMPLATES: readonly { id: TemplateId; label: string; description: string }[] = [
-  {
-    id: 'short_straddle',
-    label: 'Short straddle',
-    description: 'Sell the ATM call and put, 25% stop on each',
-  },
+export interface TemplateInfo {
+  id: TemplateId;
+  label: string;
+  /** One line saying what it trades, in the words the card shows. */
+  description: string;
+  /** True when the template needs a premium (rupees) from the person starting it. */
+  needsPremium: boolean;
+}
+
+/**
+ * Three starting points, each modelled on a strategy the owner runs every evening
+ * (strategies/legwise/nifty_widesl_917_otm1, nifty_buy_range_breakout and
+ * nifty_widesl_917_closest_premium). They are written out here, not read from those files, so
+ * editing a live strategy never changes a template.
+ */
+export const TEMPLATES: readonly TemplateInfo[] = [
   {
     id: 'short_strangle',
     label: 'Short strangle',
-    description: 'Sell a call and a put two strikes out of the money, 30% stop on each',
+    description:
+      'Sell the call and put one strike out of the money at 09:17. Each leg stops at 115% and trails; everything closes at a ₹2,500 loss or 15:28.',
+    needsPremium: false,
   },
   {
-    id: 'iron_condor',
-    label: 'Iron condor',
-    description: 'Short strangle two strikes out, hedged with bought wings five strikes out',
+    id: 'buy_range_breakout',
+    label: 'Buy range breakout',
+    description:
+      'Buy the call and put priced near ₹50 when one breaks its own 09:35 to 09:45 high. Each leg stops at 25% and trails; ₹2,000 overall loss, out at 15:14.',
+    needsPremium: false,
+  },
+  {
+    id: 'short_strangle_premium',
+    label: 'Short strangle at a premium',
+    description:
+      'Sell the call and put whose premium is closest to a price you choose, at 09:17. Each leg stops at 115% and trails; ₹2,500 overall loss, out at 15:25.',
+    needsPremium: true,
   },
 ];
+
+/** The premium the third template opens with, per index. Other indexes must be told one. */
+export const DEFAULT_TEMPLATE_PREMIUM: Readonly<Partial<Record<Underlying, number>>> = {
+  NIFTY: 65,
+};
+
+export function templateInfo(id: TemplateId): TemplateInfo {
+  return TEMPLATES.find((t) => t.id === id) ?? (TEMPLATES[0] as TemplateInfo);
+}
 
 function templateLeg(
   id: string,
   position: Leg['position'],
   optionType: Leg['option_type'],
-  strikeType: string,
-  stopPercent?: number,
+  strike: Leg['strike'],
+  extra: Partial<Leg> = {},
 ): Leg {
+  return { id, lots: 1, position, option_type: optionType, expiry: 'weekly', strike, ...extra };
+}
+
+/** A premium as part of a file name: 65 -> "65", 62.5 -> "62p5"; never a dot or an exponent. */
+function premiumTag(premium: number): string {
+  const rounded = Math.round(premium * 100) / 100;
+  const text =
+    Number.isFinite(rounded) && rounded < 1e6 ? String(rounded) : String(Math.round(premium));
+  return text.replace(/[^0-9]/g, 'p').slice(0, 12);
+}
+
+/**
+ * A valid starting strategy for `underlying`, using only what the form can edit. `premium`
+ * (rupees) is read by `short_strangle_premium` only; without one it falls back to the index's
+ * default, then 65.
+ */
+export function buildTemplate(
+  id: TemplateId,
+  underlying: Underlying,
+  options: { premium?: number } = {},
+): LegwiseStrategy {
+  const base = newStrategy(underlying);
+  const prefix = underlying.toLowerCase();
+  if (id === 'buy_range_breakout') {
+    const leg = (legId: string, type: Leg['option_type']): Leg =>
+      templateLeg(
+        legId,
+        'buy',
+        type,
+        { closest_premium: 50 },
+        {
+          stop_loss: { percent: 25 },
+          trail_sl: { points: [1, 1] },
+          range_breakout: { until: '09:45', side: 'high', source: 'instrument' },
+        },
+      );
+    return {
+      ...base,
+      id: `${prefix}_buy_range_breakout`,
+      entry_time: '09:35',
+      exit_time: '15:14',
+      legs: [leg('ce', 'CE'), leg('pe', 'PE')],
+      overall: { stop_loss_inr: 2000 },
+    };
+  }
+  if (id === 'short_strangle_premium') {
+    const premium = options.premium ?? DEFAULT_TEMPLATE_PREMIUM[underlying] ?? 65;
+    const leg = (legId: string, type: Leg['option_type']): Leg =>
+      templateLeg(
+        legId,
+        'sell',
+        type,
+        { closest_premium: premium },
+        {
+          stop_loss: { percent: 115 },
+          trail_sl: { points: [15, 10] },
+        },
+      );
+    return {
+      ...base,
+      id: `${prefix}_short_strangle_premium_${premiumTag(premium)}`,
+      entry_time: '09:17',
+      exit_time: '15:25',
+      legs: [leg('ce', 'CE'), leg('pe', 'PE')],
+      overall: { stop_loss_inr: 2500 },
+    };
+  }
+  const leg = (legId: string, type: Leg['option_type']): Leg =>
+    templateLeg(
+      legId,
+      'sell',
+      type,
+      { strike_type: 'OTM1' },
+      {
+        stop_loss: { percent: 115 },
+        trail_sl: { percent: [15, 10] },
+      },
+    );
   return {
-    id,
-    lots: 1,
-    position,
-    option_type: optionType,
-    expiry: 'weekly',
-    strike: { strike_type: strikeType },
-    ...(stopPercent !== undefined ? { stop_loss: { percent: stopPercent } } : {}),
+    ...base,
+    id: `${prefix}_short_strangle`,
+    entry_time: '09:17',
+    exit_time: '15:28',
+    legs: [leg('ce', 'CE'), leg('pe', 'PE')],
+    overall: { stop_loss_inr: 2500 },
   };
 }
 
-/** A valid starting strategy for `underlying`, using only what the form can edit. */
-export function buildTemplate(id: TemplateId, underlying: Underlying): LegwiseStrategy {
-  const base = newStrategy(underlying);
-  const prefix = underlying.toLowerCase();
-  if (id === 'short_straddle') {
-    return {
-      ...base,
-      id: `${prefix}_short_straddle`,
-      legs: [
-        templateLeg('ce', 'sell', 'CE', 'ATM', 25),
-        templateLeg('pe', 'sell', 'PE', 'ATM', 25),
-      ],
-    };
+// ---------------------------------------------------------------------------
+// Starting a strategy (the "Start a strategy" dialog)
+// ---------------------------------------------------------------------------
+
+/** What the person chose in the Start a strategy dialog. */
+export type StartSpec =
+  | { kind: 'blank'; underlying: Underlying }
+  | { kind: 'template'; id: TemplateId; underlying: Underlying; premium?: number | undefined }
+  | { kind: 'copy'; name: string };
+
+/** The name a copy is saved under: `<name>_copy`, then `_copy2`, `_copy3`…, none already taken. */
+export function copyName(base: string, taken: ReadonlySet<string>): string {
+  const room = 64 - '_copy999'.length;
+  const stem = base.slice(0, room);
+  let candidate = `${stem}_copy`;
+  for (let n = 2; taken.has(candidate); n++) candidate = `${stem}_copy${n}`;
+  return candidate;
+}
+
+/** The address query that starts a strategy in the Builder (`?new=…` or `?copy=…`). */
+export function startToParams(spec: StartSpec): URLSearchParams {
+  const q = new URLSearchParams();
+  if (spec.kind === 'copy') {
+    q.set('copy', spec.name);
+  } else if (spec.kind === 'blank') {
+    q.set('new', 'blank');
+    q.set('index', spec.underlying);
+  } else {
+    q.set('new', spec.id);
+    q.set('index', spec.underlying);
+    if (spec.premium !== undefined) q.set('premium', String(spec.premium));
   }
-  if (id === 'short_strangle') {
-    return {
-      ...base,
-      id: `${prefix}_short_strangle`,
-      legs: [
-        templateLeg('ce', 'sell', 'CE', 'OTM2', 30),
-        templateLeg('pe', 'sell', 'PE', 'OTM2', 30),
-      ],
-    };
-  }
+  return q;
+}
+
+/** The inverse of `startToParams`; null when the query names no (valid) start. */
+export function startFromParams(q: URLSearchParams): StartSpec | null {
+  const copy = q.get('copy');
+  if (copy) return { kind: 'copy', name: copy };
+  const wanted = q.get('new');
+  if (!wanted) return null;
+  const index = q.get('index');
+  const underlying = UNDERLYINGS.find((u) => u === index) ?? 'NIFTY';
+  if (wanted === 'blank') return { kind: 'blank', underlying };
+  const template = TEMPLATES.find((t) => t.id === wanted);
+  if (!template) return null;
+  const premium = Number(q.get('premium'));
   return {
-    ...base,
-    id: `${prefix}_iron_condor`,
-    // Complete square-off: when a short leg stops out, the wings go with it rather than
-    // being left on as naked long options.
-    square_off: 'complete',
-    legs: [
-      templateLeg('sell_ce', 'sell', 'CE', 'OTM2', 50),
-      templateLeg('sell_pe', 'sell', 'PE', 'OTM2', 50),
-      templateLeg('buy_ce', 'buy', 'CE', 'OTM5'),
-      templateLeg('buy_pe', 'buy', 'PE', 'OTM5'),
-    ],
+    kind: 'template',
+    id: template.id,
+    underlying,
+    ...(Number.isFinite(premium) && premium > 0 ? { premium } : {}),
   };
+}
+
+/**
+ * The strategy a start spec opens with, or null (a copy of a strategy that is not saved).
+ * Nothing is written: the Builder holds it unsaved until the person presses Save.
+ */
+export function strategyFromStart(
+  spec: StartSpec,
+  saved: readonly SavedStrategy[],
+): { name: string; strategy: LegwiseStrategy } | null {
+  if (spec.kind === 'blank') {
+    const strategy = newStrategy(spec.underlying);
+    return { name: strategy.id, strategy };
+  }
+  if (spec.kind === 'template') {
+    const built = buildTemplate(spec.id, spec.underlying, {
+      ...(spec.premium !== undefined ? { premium: spec.premium } : {}),
+    });
+    // A template never opens under the name of a strategy that already exists (the live
+    // nifty_buy_range_breakout, say), so a Save cannot overwrite it by accident.
+    const taken = new Set(saved.flatMap((s) => [s.name, s.strategy.id]));
+    const name = taken.has(built.id) ? copyName(built.id.replace(/_copy$/, ''), taken) : built.id;
+    return { name, strategy: { ...built, id: name } };
+  }
+  const source = saved.find((s) => s.name === spec.name);
+  if (!source) return null;
+  const taken = new Set(saved.flatMap((s) => [s.name, s.strategy.id]));
+  const name = copyName(source.name, taken);
+  return { name, strategy: { ...fromSaved(source.strategy), id: name } };
 }
 
 // ---------------------------------------------------------------------------
@@ -343,6 +510,10 @@ const PLAIN: readonly [RegExp, (m: RegExpMatchArray) => string][] = [
   [
     /range_breakout\.until must be inside entry-exit$/,
     () => 'Range end must be between the entry and exit times',
+  ],
+  [
+    /range_breakout\.valid_until must be after until and no later than exit$/,
+    () => 'Range breakout "valid until" must be after the range end and not after the exit time',
   ],
   [
     /^re-entry with square_off: complete is not supported yet$/,

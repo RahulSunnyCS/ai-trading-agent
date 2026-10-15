@@ -13,6 +13,7 @@ import { useMemo, useState } from 'react';
 
 import { useBacktestRun, useBacktestRuns } from '../../hooks/useBacktestRuns';
 import { useLegwiseResults, useLegwiseStrategies } from '../../hooks/useLegwise';
+import { useQueryState } from '../../hooks/useQueryState';
 import { cn } from '../../lib/cn';
 import {
   EMPTY,
@@ -274,7 +275,10 @@ export function RunsPanel() {
   const legwise = useLegwiseResults();
   const strategies = useLegwiseStrategies();
   const [kind, setKind] = useState<RunKindFilter>('all');
-  const [text, setText] = useState('');
+  // `?strategy=<id>` opens Runs already filtered to one strategy (Strategies › View results).
+  const [strategyQuery, setStrategyQuery] = useQueryState('strategy');
+  const text = strategyQuery ?? '';
+  const setText = (value: string) => setStrategyQuery(value === '' ? null : value);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [comparing, setComparing] = useState(false);

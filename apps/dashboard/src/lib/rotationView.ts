@@ -12,13 +12,14 @@ import type {
   RotationListStats,
   RotationSummary,
 } from '../types/rotation';
+import { listName } from './rotationListNames';
 
 export const LIST_KEYS: readonly RotationListKey[] = ['A', 'B', 'C', 'REF'];
 
 export type RotationBenchmark = 'REF' | 'base' | 'random';
 
 export const BENCHMARK_LABEL: Record<RotationBenchmark, string> = {
-  REF: 'REF',
+  REF: listName('REF'),
   base: 'Fixed base',
   random: 'Random median',
 };
@@ -51,7 +52,7 @@ export function benchmarkFigures(
   if (pick === 'REF') {
     const ref = summary.lists.REF;
     return {
-      label: 'REF',
+      label: listName('REF'),
       total: ref?.total ?? null,
       maxDrawdown: ref?.max_drawdown ?? null,
       maxDrawdownPerLot: ref?.max_drawdown_per_lot ?? null,
@@ -186,7 +187,7 @@ export function headline(
 }
 
 export interface VerdictLine {
-  /** What is being compared, e.g. "List A minus the fixed base". */
+  /** What is being compared, e.g. "Steady minus the fixed base". */
   label: string;
   mean: number;
   lower: number;
@@ -207,14 +208,16 @@ export function verdict(summary: RotationSummary, focus: RotationListKey, minDay
   const f = summary.lists[focus];
   const lines: VerdictLine[] = [];
   if (f) {
-    if (f.vs_ref) lines.push({ label: `List ${focus} minus REF`, ...f.vs_ref, rule: null });
+    // The fixed base first: it is what the page compares with by default and it carries the rule.
     lines.push({
-      label: `List ${focus} minus the fixed base`,
+      label: `${listName(focus)} minus the fixed base`,
       mean: f.vs_base.mean,
       lower: f.vs_base.lower,
       upper: f.vs_base.upper,
       rule: { drawdownNoWorse: f.vs_base.drawdown_no_worse, beats: f.vs_base.beats_base },
     });
+    if (f.vs_ref)
+      lines.push({ label: `${listName(focus)} minus ${listName('REF')}`, ...f.vs_ref, rule: null });
   }
   return { readable: summary.n_days >= minDays, nDays: summary.n_days, minDays, lines };
 }
