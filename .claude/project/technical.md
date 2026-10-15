@@ -132,8 +132,8 @@ uv run tdata quality rebuild  # re-judge every lake day -> data_quality (usable 
 uv run obt legwise run strategies/legwise/*.yaml [--trades] [--include-excluded] [--bars 5m]   # AlgoTest-style leg-wise backtests over that data; skips (and counts) days data_quality excludes
 uv run obt legwise rerun    # re-run every strategy over every collected day and save (after editing a strategy)
 uv run obt rotation update [--day D]   # BL-058: run the 298 rotation variants over a collected day, store results (idempotent; default day = the newest collected day not yet stored; scheduler 19:45)
-uv run obt rotation pick [--dry-run]     # record lists A / B / C / REF before 09:17, hash-chained, + Telegram (scheduler 09:16; never late-recorded silently)
-uv run obt rotation result               # after the evening run, Telegram today's net paper gain for Steady / Calendar / Adaptive to both destinations
+uv run obt rotation pick [--dry-run]     # record lists A / B / C / REF before 09:17, hash-chained, + Telegram with the Adaptive picks and a separate next-best optional Widesl / Dir line (scheduler 09:16; never late-recorded silently)
+uv run obt rotation result [--no-tomorrow]  # after the evening run, Telegram today's net paper gain for Adaptive to both destinations, plus a Tomorrow section: the expected picks and the win rate / mean ₹ per lot-day of Adaptive and the fixed base on all days, the same weekday and the same NIFTY/SENSEX days to expiry (rows fixed in advance; recorded-forward vs re-scored days labelled)
 uv run obt rotation verify | show        # re-compute the chain | recent entries with each list's P&L once scored
 uv run obt rotation triggers [--day D]  # BL-083: score the day's intraday triggers (event vs placebo simulations); also run by `rotation update`, isolated
 uv run obt rotation triggers-show        # event minus placebo per trigger and template over every scored day (forward, unseen days only)

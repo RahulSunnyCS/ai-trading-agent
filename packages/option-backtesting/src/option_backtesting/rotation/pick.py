@@ -17,9 +17,9 @@ import numpy as np
 from ..fyers.daily import data_dir
 from . import journal, store
 from .attrs import last_collected_before
-from .lists import DISPLAY_NAMES, LISTS, LOTS_PER, WARMUP
+from .lists import DISPLAY_NAMES, LISTS, LOTS_PER, PUBLIC_KEYS, WARMUP
 from .live import listed_dte_labels, vix_open_with_source
-from .score import composite, dte_matrix, family_index, select, vix_band
+from .score import composite, dte_matrix, family_index, runners_up, select, vix_band
 from .variants import variant_names
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -135,8 +135,8 @@ def load_history(day: date, root: Path, names: list[str]) -> History:
     )
 
 
-def score_history(hist: History, day: date, vix_open: float | None, dte: dict[str, str]) -> dict:
-    """{list: {core, buy, overridden, composite}} for `day`."""
+def _rank(hist: History, day: date, vix_open: float | None, dte: dict[str, str]):
+    """Per list key: (composite over every variant, the selected picks), for `day`."""
     weekday = np.array([*hist.weekday, day.strftime("%a")])
     band = np.array([*hist.band, vix_band(vix_open)])
     dn = np.array([*hist.dte_n, dte["dte_n"]])
@@ -145,10 +145,15 @@ def score_history(hist: History, day: date, vix_open: float | None, dte: dict[st
     Pv = np.vstack([hist.values, np.zeros((1, len(cols)))])
     dmat = dte_matrix(dn, ds, cols)
     fam = family_index(cols)
-    out = {}
     for key, lst in LISTS.items():
         comp = composite(Pv, weekday, band, dmat, cols, lst, fam)
-        picks = select(comp, cols)
+        yield key, cols, comp, select(comp, cols)
+
+
+def score_history(hist: History, day: date, vix_open: float | None, dte: dict[str, str]) -> dict:
+    """{list: {core, buy, overridden, composite}} for `day`."""
+    out = {}
+    for key, _cols, _comp, picks in _rank(hist, day, vix_open, dte):
         out[key] = {
             "core": picks.core,
             "buy": picks.buy,
@@ -156,6 +161,18 @@ def score_history(hist: History, day: date, vix_open: float | None, dte: dict[st
             "composite": {k: round(v, 4) for k, v in picks.composite.items()},
         }
     return out
+
+
+def next_best(
+    hist: History, day: date, vix_open: float | None, dte: dict[str, str]
+) -> dict[str, dict[str, str | None]]:
+    """{list: {wide, dir}}: the best Widesl and the best Dir variant that were not picked, for the
+    public lists. Message text only; it is not part of the journal entry."""
+    return {
+        key: runners_up(comp, cols, picks)
+        for key, cols, comp, picks in _rank(hist, day, vix_open, dte)
+        if key in PUBLIC_KEYS
+    }
 
 
 def score_lists(
@@ -217,16 +234,29 @@ def record(
         entry = {**fields, "prev": journal.head(path), "hash": "(dry run)"}
     else:
         entry = journal.append(path, fields)
-    return PickResult(entry, render(entry))
+    return PickResult(entry, render(entry, next_best(hist, day, vix_open, dte)))
 
 
-def render(entry: dict) -> str:
+def next_best_line(options: dict[str, str | None] | None) -> str:
+    """The separate line naming the next best optional Widesl and Dir, or ''."""
+    parts = [
+        f"{label} {options[kind]}"
+        for kind, label in (("wide", "Widesl"), ("dir", "Dir"))
+        if options and options.get(kind)
+    ]
+    return "Next best, optional: " + "; ".join(parts) if parts else ""
+
+
+def render(entry: dict, options: dict[str, dict[str, str | None]] | None = None) -> str:
     lines = [f"Rotation picks {entry['day']} ({entry['weekday']})"]
     for key, p in entry["lists"].items():
-        if key == "REF":
+        if key not in PUBLIC_KEYS:  # Steady and Adaptive only; the entry still records every list
             continue
         picked = ", ".join(p["core"]) + (f" + Buy {', '.join(p['buy'])}" if p["buy"] else "")
         lines.append(f"{DISPLAY_NAMES.get(key, key)}: {picked}")
+        extra = next_best_line((options or {}).get(key))
+        if extra:
+            lines.append(extra)
     lines.append(f"chain {entry['hash'][:12]}  recorded {entry['recorded_at'][11:19]} IST")
     if not entry["before_first_entry"]:
         lines.append("LATE: recorded after 09:17 IST, this entry is NOT forward")

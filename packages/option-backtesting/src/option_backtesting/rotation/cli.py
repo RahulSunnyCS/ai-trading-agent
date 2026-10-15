@@ -122,8 +122,11 @@ def result(
     day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
     telegram: bool = typer.Option(True, "--telegram/--no-telegram"),
     force: bool = typer.Option(False, "--force", help="Resend even if this result was sent."),
+    tomorrow: bool = typer.Option(
+        True, "--tomorrow/--no-tomorrow", help="Add how days like the next session have gone."
+    ),
 ) -> None:
-    """Send the completed day's net paper gain for Steady, Calendar and Adaptive."""
+    """Send the completed day's net paper gain for Steady and Adaptive."""
     from ..notify import Notification
     from .result import ResultUnavailable, calculate, mark_sent, render, was_sent
 
@@ -134,6 +137,15 @@ def result(
     except ResultUnavailable as error:
         typer.echo(f"result not ready: {error}", err=True)
         raise typer.Exit(2) from error
+    already_sent = telegram and not force and was_sent(completed)
+    if tomorrow and not already_sent:
+        # never let the extra section stop the result going out
+        try:
+            from . import tomorrow as tomorrow_mod
+
+            text += "\n\n" + tomorrow_mod.render(tomorrow_mod.for_next_session(d))
+        except Exception as error:  # noqa: BLE001
+            typer.echo(f"tomorrow section skipped: {type(error).__name__}: {error}", err=True)
     typer.echo(text)
     if telegram:
         if not force and was_sent(completed):

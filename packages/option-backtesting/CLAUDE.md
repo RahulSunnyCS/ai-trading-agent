@@ -128,12 +128,23 @@ Otherwise:
   `send(..., chat_id=...)` supports an explicit destination for the rotation pick's group copy;
   its environment configuration lives in the root `technical.md`.
   Rotation messages use `rotation/list_names.json` (also imported by the dashboard) for
-  display names, and omit Baseline / VIX / days to expiry from the text; the journal still stores them.
+  display names, add a separate "Next best, optional: Widesl …; Dir …" line under the picks (the best-ranked
+  unpicked variant of each kind; message text only, not stored in the journal entry), and omit Baseline and VIX from the picks and result text (the Tomorrow header shows days to
+  expiry); the journal still stores all of them.
   `rotation/result.py` reads the completed picked variants' net results (after estimated costs),
   reports one lot per strategy with every picked strategy's contribution under its section, and
-  sends Steady / Calendar / Adaptive after the evening pipeline finishes (normally around 16:00).
+  sends Adaptive only after the evening pipeline finishes (Steady, Calendar and the baseline are recorded in the journal but not sent; `lists.PUBLIC_KEYS`) (normally around 16:00).
   A per-entry marker prevents a retry from sending it twice;
   `obt rotation result --force` explicitly resends it.
+  `rotation/tomorrow.py` appends a "Tomorrow" section to that message (`--no-tomorrow` drops it; a failure in
+  it never blocks the result, and it is skipped when the result was already sent): the expected picks for the
+  next session (the 09:16 ranking re-run on the stored results with tonight's VIX close standing in for the
+  open, a chance for each pick across the plausible opening bands, and the likely changes), then the win rate
+  and mean per-lot-day gross of Adaptive and the fixed base on all days, the same weekday and the same
+  NIFTY/SENSEX days to expiry (daylog, since 2025-01-10; late recordings and days missing a list are left
+  out; thin samples flagged). The rows are fixed in advance and never chosen by their results. Most of those
+  days were re-scored from history, so they are in-sample: the message says how many were recorded forward.
+  A historical frequency, not a forecast and not evidence of an edge over the base.
 - `api/legwise_routes.py` — `/legwise/*` on `obt-api` for the dashboard's Options Lab: `/day` and `/anatomy` (see above; `/anatomy` also overlays apps/server's T-33 `daily_regime_tags` as `t33` when `DATABASE_URL` is set in this process, with an explicit status), list/
   validate/save strategies (slug-checked name, `yaml.safe_dump` of the validated model — never
   raw client text), ad-hoc backtest over collected days, saved results, data/token status, and
