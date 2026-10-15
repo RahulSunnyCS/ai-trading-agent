@@ -49,6 +49,7 @@ vi.mock('../RotationExplain', () => ({ RotationExplain: stub('Explain') }));
 vi.mock('../RotationPulse', () => ({ RotationPulse: stub('Pulse') }));
 vi.mock('../RotationRegime', () => ({ RotationRegime: stub('Regime') }));
 vi.mock('../RotationShadowScoreboard', () => ({ RotationShadowScoreboard: stub('Shadow') }));
+vi.mock('../results/EveningRunBar', () => ({ EveningRunBar: stub('EveningRun') }));
 vi.mock('../PortfolioStopButton', () => ({ PortfolioStopButton: () => null }));
 vi.mock('../rotation/RotationBaskets', () => ({ RotationBaskets: () => null }));
 vi.mock('../rotation/RotationHeadline', () => ({ RotationHeadline: () => null }));
@@ -113,6 +114,11 @@ describe('RotationPanel as one page', () => {
     expect(screen.queryByRole('radio', { name: 'Overview' })).toBeNull();
     expect(screen.queryByRole('radio', { name: 'Journal' })).toBeNull();
     expect(screen.queryByRole('radio', { name: 'Research' })).toBeNull();
+  });
+
+  it('carries the evening run (its status and Run button) at the top', () => {
+    render(<RotationPanel />);
+    expect(screen.getByTestId('EveningRun')).toBeTruthy();
   });
 
   it('opens on the three list cards, then the day-by-day log', () => {

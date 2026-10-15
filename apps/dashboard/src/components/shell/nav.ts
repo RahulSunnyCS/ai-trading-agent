@@ -41,12 +41,12 @@ export interface NavChild {
   label: string;
   /**
    * A heading the sidebar shows above the first child of each run of children sharing it
-   * (Options Lab's workspaces: Today, Explore data, Build and test).
+   * (Options Lab's workspaces: Today, Explore data, Build and test, Advanced).
    */
   group?: string;
   /**
    * Reachable by URL and still a valid sub-route, but not listed in the sidebar (Options Lab's
-   * Daily results, hidden in BL-102; its links and Guide walkthroughs keep working).
+   * a page kept out of the sidebar but still routed).
    */
   hidden?: boolean;
 }
@@ -128,11 +128,11 @@ export const NAV_GROUPS: NavGroup[] = [
           { segment: 'heatmap', label: 'Heatmap', group: 'Explore data' },
           { segment: 'matrix', label: 'Matrix', group: 'Explore data' },
           { segment: 'correlation', label: 'Correlation', group: 'Explore data' },
-          { segment: 'regimes', label: 'Regimes', group: 'Explore data' },
           { segment: 'strategies', label: 'Strategies and baskets', group: 'Build and test' },
           { segment: 'builder', label: 'Builder', group: 'Build and test' },
           { segment: 'runs', label: 'Runs', group: 'Build and test' },
-          { segment: 'results', label: 'Daily results', group: 'Build and test', hidden: true },
+          // Kept, but out of the daily path (BL-102): index regimes are only known after the day.
+          { segment: 'regimes', label: 'Regimes', group: 'Advanced' },
         ],
       },
     ],

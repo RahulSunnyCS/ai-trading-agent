@@ -7,8 +7,8 @@
 import type { OptionsLabSection } from './routes';
 
 export interface SectionMeta {
-  /** The workspace: Today, Explore data or Build and test. Matches the sidebar's group headings. */
-  workspace: 'Today' | 'Explore data' | 'Build and test';
+  /** The workspace: Today, Explore data, Build and test or Advanced. Matches the sidebar's groups. */
+  workspace: 'Today' | 'Explore data' | 'Build and test' | 'Advanced';
   /** The screen's title, written as the question it answers. */
   question: string;
   /** One sentence saying what is on the screen and how to read it. */
@@ -41,7 +41,7 @@ export const SECTION_META: Readonly<Record<OptionsLabSection, SectionMeta>> = {
       'How alike the strategies’ daily results are. Strategies that lose together give little protection to each other.',
   },
   regimes: {
-    workspace: 'Explore data',
+    workspace: 'Advanced',
     question: 'Do quiet or trending days come in runs?',
     explanation:
       'Each day is labelled Quiet, Chop or Trend from the index and India VIX, then tested for whether the labels persist.',
@@ -62,11 +62,5 @@ export const SECTION_META: Readonly<Record<OptionsLabSection, SectionMeta>> = {
     workspace: 'Build and test',
     question: 'What have I tested, and did it get better?',
     explanation: 'Every backtest in one list. Tick two of the same kind to compare them.',
-  },
-  results: {
-    workspace: 'Build and test',
-    question: 'How did each saved strategy do, day by day?',
-    explanation:
-      'Daily results are no longer part of the main workflow; the evening run and its history are still here.',
   },
 };

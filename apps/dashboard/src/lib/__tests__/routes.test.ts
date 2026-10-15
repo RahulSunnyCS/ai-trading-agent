@@ -71,7 +71,6 @@ describe('routes', () => {
     ['/optionslab/builder', 'optionslab', ['builder']],
     ['/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
     ['/optionslab/runs', 'optionslab', ['runs']],
-    ['/optionslab/results', 'optionslab', ['results']],
     ['/optionslab/regimes', 'optionslab', ['regimes']],
     ['/optionslab/correlation', 'optionslab', ['correlation']],
     ['/optionslab/rotation', 'optionslab', ['rotation']],
@@ -107,6 +106,8 @@ describe('routes', () => {
     ['/replay', '/coverage/replay', 'coverage', ['replay']],
     ['/data/backfill', '/coverage/backfill', 'coverage', ['backfill']],
     ['/data/replay', '/coverage/replay', 'coverage', ['replay']],
+    ['/optionslab/results', '/optionslab/rotation', 'optionslab', ['rotation']],
+    ['/optionslab/results/', '/optionslab/rotation', 'optionslab', ['rotation']],
     ['/backtest', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
     ['/backtest/', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
     ['/optionslab/yaml', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
@@ -161,11 +162,10 @@ describe('routes', () => {
       'heatmap',
       'matrix',
       'correlation',
-      'regimes',
       'strategies',
       'builder',
       'runs',
-      'results',
+      'regimes',
     ]);
   });
 
@@ -211,7 +211,6 @@ describe('routes', () => {
     ['optionslab', ['builder'], 'Options Lab › Builder · AI Trading Agent'],
     ['optionslab', ['builder', 'yaml'], 'Options Lab › Builder › YAML · AI Trading Agent'],
     ['optionslab', ['runs'], 'Options Lab › Runs · AI Trading Agent'],
-    ['optionslab', ['results'], 'Options Lab › Daily results · AI Trading Agent'],
     ['optionslab', ['regimes'], 'Options Lab › Regimes · AI Trading Agent'],
     ['optionslab', ['correlation'], 'Options Lab › Correlation · AI Trading Agent'],
     ['optionslab', ['rotation'], 'Options Lab › Today · AI Trading Agent'],

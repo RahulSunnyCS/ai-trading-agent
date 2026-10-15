@@ -47,6 +47,7 @@ import { RotationExplain } from './RotationExplain';
 import { RotationPulse } from './RotationPulse';
 import { RotationRegime } from './RotationRegime';
 import { RotationShadowScoreboard } from './RotationShadowScoreboard';
+import { EveningRunBar } from './results/EveningRunBar';
 import { RotationBaskets } from './rotation/RotationBaskets';
 import { RotationHeadline } from './rotation/RotationHeadline';
 import { RotationHealthStrip } from './rotation/RotationHealth';
@@ -148,6 +149,8 @@ export function RotationPanel() {
         />
       </div>
       <p className="text-xs text-faint">{BENCHMARK_NOTE[benchmark]}</p>
+
+      <EveningRunBar underlying={null} onFinished={reload} />
 
       {overview.error && overview.data ? (
         <StateMessage

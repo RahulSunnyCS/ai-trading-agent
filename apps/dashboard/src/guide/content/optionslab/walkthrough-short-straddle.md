@@ -8,8 +8,8 @@ the ATM call and sell the ATM put, weekly expiry.
 
 ## 2. Set the times
 
-Entry **09:20**, exit **15:15**. Leave **Square off** on **Partial** for now: if the call's stop
-is hit, the put stays open.
+Entry **09:20**, exit **15:15**. Leave **Leg stops** on **exit that leg** for now: if the call's
+stop is hit, the put stays open.
 
 ## 3. Add stops
 
@@ -17,8 +17,9 @@ On each leg, set **Stop loss** to **25%** (of the entry premium). Leave targets 
 
 ## 4. Set realistic costs
 
-Under execution, set **Slippage %** to **0.5** and **Cost per order** to a figure close to your
-broker's per-order charges plus taxes. Do not skip this.
+Add the optional **Slippage %** token (under **+ More** in the strip) and set it to **0.5**, then
+set **Cost / order ₹** to a figure close to your broker's per-order charges plus taxes. Do not
+skip this.
 
 ## 5. Backtest
 
@@ -27,15 +28,16 @@ Pick a date range covering all the collected data and press **Backtest**. Read, 
 
 ## 6. Try one change
 
-Change **Square off** to **Complete** and run again. Now one stop closes both legs. The
-previous run is shown alongside so you can see the difference. Keep whichever you understand
+Change **Leg stops** to **exit all legs** and run again. Now one stop closes both legs. The panel
+shows the change against the saved version's results (once the strategy is saved) so you can see
+the difference. Keep whichever you understand
 better, not just whichever made more; over a short sample the difference may be luck.
 
 ## 7. Save
 
 Give it a clear file name and **Save**. It appears under [Strategies](app:/optionslab/strategies),
 and from the next evening run its daily result shows in
-[Daily results](app:/optionslab/results).
+[Runs](app:/optionslab/runs).
 
 > [!TIP]
 > To see how it would have done on every day already collected, ask for a re-run of all

@@ -1,9 +1,23 @@
 'use client';
 
-import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import {
+  type KeyboardEvent,
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 
 import { cn } from '../../../lib/cn';
 import { OFF } from '../../../lib/legwiseGrid';
+
+/**
+ * Lets the page know while a cell holds a value it refused, so Backtest and Save are not run
+ * against the old value under a cell that still shows the refused one.
+ */
+export const PendingEdits = createContext<((id: string, pending: boolean) => void) | null>(null);
 
 /**
  * A value that reads as text and is edited in place (BL-102 Phase 1c): click or press Enter on
@@ -41,6 +55,13 @@ export function EditableCell({
   const [draft, setDraft] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const report = useContext(PendingEdits);
+  const cellId = useId();
+  const refused = problem !== null;
+  useEffect(() => {
+    report?.(cellId, refused);
+    return () => report?.(cellId, false);
+  }, [report, cellId, refused]);
   const opener = useRef<HTMLButtonElement>(null);
   /** Set by Enter and Esc so the blur that follows the input unmounting does not act again. */
   const done = useRef(false);

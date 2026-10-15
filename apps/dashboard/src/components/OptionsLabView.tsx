@@ -11,14 +11,15 @@
  *   - Matrix: where do the rotation variants make or lose money, by start time, date and
  *     condition, with the recorded picks laid over it (the Strategy Matrix; read-only)
  *   - Correlation: do the strategies lose on the same days? (BL-090)
- *   - Regimes: does the index come in persistent periods? (index + VIX history)
  *  Build and test
  *   - Strategies: the saved leg-wise strategies and each one's latest saved result.
- *   - Builder: Form (the leg-wise strategy builder) or YAML (the YAML DSL engine, which
+ *   - Builder: Leg grid (the leg-wise strategy builder) or YAML engine (the YAML DSL engine, which
  *     was the standalone Backtest tab; /backtest redirects to /optionslab/builder/yaml).
  *   - Runs: the YAML run registry and the leg-wise runs in one list, clickable and comparable.
- *  Hidden from the sidebar, still reachable at /optionslab/results:
- *   - Daily results: saved `obt daily` results, the evening run button, trade logs.
+ *  Advanced
+ *   - Regimes: does the index come in persistent periods? (index + VIX history)
+ *  Retired: Daily results (saved `obt daily` results, trade logs). `/optionslab/results` redirects
+ *  to Today, whose status bar carries the evening run and its Run button.
  *
  * /optionslab with no section opens Today (the rotation page).
  */
@@ -35,7 +36,6 @@ import {
 import { CorrelationPanel } from './optionslab/CorrelationPanel';
 import { HeatmapPanel } from './optionslab/HeatmapPanel';
 import { RegimesPanel } from './optionslab/RegimesPanel';
-import { ResultsPanel } from './optionslab/ResultsPanel';
 import { RotationMatrixPanel } from './optionslab/RotationMatrixPanel';
 import { RotationPanel } from './optionslab/RotationPanel';
 import { RunsPanel } from './optionslab/RunsPanel';
@@ -45,13 +45,13 @@ import { YamlBacktest } from './optionslab/yaml/YamlBacktest';
 import { SegmentedControl, type SegmentedOption } from './ui/SegmentedControl';
 
 const BUILDER_MODE_OPTIONS: SegmentedOption<BuilderMode>[] = [
-  { value: 'form', label: 'Form' },
-  { value: 'yaml', label: 'YAML' },
+  { value: 'form', label: 'Leg grid' },
+  { value: 'yaml', label: 'YAML engine (advanced)' },
 ];
 
 const BUILDER_MODE_NOTE: Record<BuilderMode, string> = {
-  form: 'Leg-wise strategies on the 1-minute Fyers data.',
-  yaml: 'The YAML strategy DSL on the cached AlgoTest bars.',
+  form: 'Leg-wise strategies on the collected 1-minute Fyers data (5-minute bars on request).',
+  yaml: 'Advanced: the older YAML strategy DSL on the cached AlgoTest bars, a different engine and data from the leg grid.',
 };
 
 function BuilderSection({
@@ -97,7 +97,6 @@ export function OptionsLabView() {
         />
       )}
       {section === 'runs' && <RunsPanel />}
-      {section === 'results' && <ResultsPanel />}
       {section === 'regimes' && <RegimesPanel />}
       {section === 'correlation' && <CorrelationPanel />}
       {section === 'rotation' && <RotationPanel />}

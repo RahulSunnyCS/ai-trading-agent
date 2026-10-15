@@ -341,3 +341,45 @@ export function slugId(name: string, underlying: Underlying): string {
   const joined = led === prefix || led.startsWith(`${prefix}_`) ? led : `${prefix}_${led}`;
   return joined.slice(0, 64).replace(/_+$/g, '');
 }
+
+// ---------------------------------------------------------------------------
+// Backtest period
+// ---------------------------------------------------------------------------
+
+export type PeriodKey = '3m' | '1y' | 'all';
+
+export const PERIOD_LABEL: Record<PeriodKey, string> = {
+  '3m': '3 months',
+  '1y': '1 year',
+  all: 'All data',
+};
+
+/** Whole calendar months back from a YYYY-MM-DD, clamped to the month's last day. */
+function monthsBack(day: string, months: number): string {
+  const [y, m, d] = day.split('-').map(Number) as [number, number, number];
+  const total = y * 12 + (m - 1) - months;
+  const year = Math.floor(total / 12);
+  const month = (total % 12) + 1;
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${year}-${pad(month)}-${pad(Math.min(d, last))}`;
+}
+
+/**
+ * The from/to a period means, counted back from the last collected day. "All" is both empty
+ * (the API's "everything collected"). Strings, so nothing depends on the viewer's time zone.
+ */
+export function periodRange(lastDay: string | null, key: PeriodKey): { from: string; to: string } {
+  if (key === 'all' || lastDay === null) return { from: '', to: '' };
+  return { from: monthsBack(lastDay, key === '3m' ? 3 : 12), to: lastDay };
+}
+
+/** Which period a from/to pair is, for highlighting its chip; null for a custom range. */
+export function periodOf(from: string, to: string, lastDay: string | null): PeriodKey | null {
+  if (from === '' && to === '') return 'all';
+  for (const key of ['3m', '1y'] as const) {
+    const range = periodRange(lastDay, key);
+    if (range.from === from && range.to === to && from !== '') return key;
+  }
+  return null;
+}

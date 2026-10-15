@@ -16,8 +16,8 @@ to the screen with the detail. [Open](app:/overview) · [Guide](guide:operations
 
 ## Options Lab
 
-The sidebar groups it into three workspaces: what to check today, data to explore, and strategies to
-build and test.
+The sidebar groups it into three workspaces (what to check today, data to explore, and strategies to
+build and test) and an Advanced group at the end.
 
 | Workspace | Screen | What it is for |
 |---|---|---|
@@ -25,12 +25,12 @@ build and test.
 | Explore data | [Heatmap](app:/optionslab/heatmap) | What an ATM short straddle made at each entry time and stop loss. [Guide](guide:optionslab/heatmap) |
 | Explore data | [Matrix](app:/optionslab/matrix) | Where the strategy variants make or lose money, by start time, date and condition. [Guide](guide:optionslab/rotation-matrix) |
 | Explore data | [Correlation](app:/optionslab/correlation) | Which strategies lose on the same days. [Guide](guide:optionslab/correlation) |
-| Explore data | [Regimes](app:/optionslab/regimes) | Labels each day Quiet, Chop, Trend up or Trend down, and tests whether those labels last. [Guide](guide:optionslab/regimes) |
 | Build and test | [Strategies and baskets](app:/optionslab/strategies) | The rotation baskets and the saved strategies the evening run tests every trading day, each with its latest result; star your favourites. [Guide](guide:optionslab/strategies) |
-| Build and test | [Builder](app:/optionslab/builder) | Build a strategy leg by leg, backtest it over a date range, save it. A YAML mode writes strategies as text instead. [Guide](guide:optionslab/builder-form) |
+| Build and test | [Builder](app:/optionslab/builder) | Build a strategy leg by leg, backtest it over a date range, save it. The advanced YAML engine writes strategies as text instead. [Guide](guide:optionslab/builder-form) |
 | Build and test | [Runs](app:/optionslab/runs) | Every backtest run in one list; tick two to compare. [Guide](guide:optionslab/runs) |
+| Advanced | [Regimes](app:/optionslab/regimes) | Labels each day Quiet, Chop, Trend up or Trend down, and tests whether those labels last. [Guide](guide:optionslab/regimes) |
 
-[Daily results](app:/optionslab/results) is no longer in the sidebar; the page is still there. [Guide](guide:optionslab/daily-results)
+The evening run's status and its **Run** button are at the top of Today.
 
 ## Momentum
 

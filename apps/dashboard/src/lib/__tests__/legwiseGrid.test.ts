@@ -12,6 +12,8 @@ import {
   parseReentry,
   parseStrike,
   parseTrail,
+  periodOf,
+  periodRange,
   readBack,
   reentryCell,
   slugId,
@@ -344,5 +346,24 @@ describe('review fixes', () => {
   it('gives a name with no letters or digits a usable id', () => {
     expect(slugId('रणनीति', 'NIFTY')).toBe('nifty_strategy');
     expect(slugId('!!!', 'SENSEX')).toBe('sensex_strategy');
+  });
+});
+
+describe('periodRange / periodOf', () => {
+  it('counts back from the last day and clamps to the end of a shorter month', () => {
+    expect(periodRange('2026-05-31', '3m')).toEqual({ from: '2026-02-28', to: '2026-05-31' });
+    expect(periodRange('2026-01-15', '3m')).toEqual({ from: '2025-10-15', to: '2026-01-15' });
+    expect(periodRange('2026-10-14', '1y')).toEqual({ from: '2025-10-14', to: '2026-10-14' });
+  });
+
+  it('means everything for "all" and when no day is known', () => {
+    expect(periodRange('2026-10-14', 'all')).toEqual({ from: '', to: '' });
+    expect(periodRange(null, '3m')).toEqual({ from: '', to: '' });
+  });
+
+  it('names the chip a range is, and null for a custom one', () => {
+    expect(periodOf('', '', '2026-10-14')).toBe('all');
+    expect(periodOf('2026-07-14', '2026-10-14', '2026-10-14')).toBe('3m');
+    expect(periodOf('2026-07-01', '2026-10-14', '2026-10-14')).toBeNull();
   });
 });
