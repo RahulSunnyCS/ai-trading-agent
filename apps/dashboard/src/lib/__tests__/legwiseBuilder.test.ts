@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Leg, LegwiseStrategy } from '../../types/legwise';
+import type { Leg, LegwiseStrategy, SavedStrategy } from '../../types/legwise';
 import {
+  DEFAULT_TEMPLATE_PREMIUM,
   STRATEGY_NAME_RE,
+  type StartSpec,
   TEMPLATES,
   UNDERLYINGS,
   backtestLabel,
   buildTemplate,
+  copyName,
   fromSaved,
   isDirty,
   newLeg,
@@ -19,8 +22,12 @@ import {
   runTotals,
   shortRunId,
   sparkline,
+  startFromParams,
+  startToParams,
   strategiesEqual,
+  strategyFromStart,
   summarizeLeg,
+  templateInfo,
   toPayload,
 } from '../legwiseBuilder';
 
@@ -164,9 +171,9 @@ describe('templates', () => {
   it('builds each template for each index with unique leg ids and a valid file name', () => {
     for (const t of TEMPLATES) {
       for (const u of UNDERLYINGS) {
-        const s = buildTemplate(t.id, u);
+        const s = buildTemplate(t.id, u, t.needsPremium ? { premium: 70 } : {});
         expect(s.underlying).toBe(u);
-        expect(STRATEGY_NAME_RE.test(s.id)).toBe(true);
+        expect(STRATEGY_NAME_RE.test(s.id), s.id).toBe(true);
         expect(new Set(s.legs.map((l) => l.id)).size).toBe(s.legs.length);
         // The schema refuses re-entry with complete square-off; templates must not combine them.
         if (s.square_off === 'complete')
@@ -175,20 +182,139 @@ describe('templates', () => {
     }
   });
 
-  it('shapes the three structures', () => {
-    expect(buildTemplate('short_straddle', 'NIFTY').legs.map((l) => l.strike.strike_type)).toEqual([
-      'ATM',
-      'ATM',
+  it('short strangle matches the live nifty_widesl_917_otm1 strategy', () => {
+    const s = buildTemplate('short_strangle', 'NIFTY');
+    expect(s.id).toBe('nifty_short_strangle');
+    expect([s.entry_time, s.exit_time, s.square_off]).toEqual(['09:17', '15:28', 'partial']);
+    expect(s.overall).toEqual({ stop_loss_inr: 2500 });
+    expect(s.legs.map((l) => [l.position, l.option_type, l.strike.strike_type])).toEqual([
+      ['sell', 'CE', 'OTM1'],
+      ['sell', 'PE', 'OTM1'],
     ]);
-    expect(buildTemplate('short_strangle', 'NIFTY').legs.map((l) => l.strike.strike_type)).toEqual([
-      'OTM2',
-      'OTM2',
-    ]);
-    const condor = buildTemplate('iron_condor', 'SENSEX');
+    for (const l of s.legs) {
+      expect(l.stop_loss).toEqual({ percent: 115 });
+      expect(l.trail_sl).toEqual({ percent: [15, 10] });
+    }
+  });
+
+  it('buy range breakout matches the live nifty_buy_range_breakout strategy', () => {
+    const s = buildTemplate('buy_range_breakout', 'NIFTY');
+    expect([s.entry_time, s.exit_time]).toEqual(['09:35', '15:14']);
+    expect(s.overall).toEqual({ stop_loss_inr: 2000 });
+    for (const l of s.legs) {
+      expect(l.position).toBe('buy');
+      expect(l.strike).toEqual({ closest_premium: 50 });
+      expect(l.stop_loss).toEqual({ percent: 25 });
+      expect(l.trail_sl).toEqual({ points: [1, 1] });
+      expect(l.range_breakout).toEqual({ until: '09:45', side: 'high', source: 'instrument' });
+    }
+  });
+
+  it('short strangle at a premium uses the premium it is given, else the index default', () => {
+    const s = buildTemplate('short_strangle_premium', 'NIFTY', { premium: 80 });
+    expect(s.id).toBe('nifty_short_strangle_premium_80');
+    expect(s.legs.every((l) => l.strike.closest_premium === 80)).toBe(true);
+    expect([s.entry_time, s.exit_time]).toEqual(['09:17', '15:25']);
+    expect(s.legs[0]?.trail_sl).toEqual({ points: [15, 10] });
+    const fallback = buildTemplate('short_strangle_premium', 'NIFTY');
+    expect(fallback.legs[0]?.strike.closest_premium).toBe(DEFAULT_TEMPLATE_PREMIUM.NIFTY);
+    expect(templateInfo('short_strangle_premium').needsPremium).toBe(true);
+    expect(templateInfo('short_strangle').needsPremium).toBe(false);
+  });
+});
+
+describe('template names', () => {
+  it('writes a decimal premium into a valid file name', () => {
+    for (const premium of [62.5, 0.5, 65.333, 1e-7, 1e21, 100]) {
+      const s = buildTemplate('short_strangle_premium', 'NIFTY', { premium });
+      expect(STRATEGY_NAME_RE.test(s.id), `${premium} -> ${s.id}`).toBe(true);
+    }
+    expect(buildTemplate('short_strangle_premium', 'NIFTY', { premium: 62.5 }).id).toBe(
+      'nifty_short_strangle_premium_62p5',
+    );
+  });
+
+  it('never opens a template under the name of a saved strategy', () => {
+    const live = {
+      name: 'nifty_buy_range_breakout',
+      sha: 'a',
+      strategy: { ...newStrategy('NIFTY'), id: 'nifty_buy_range_breakout' },
+    } as SavedStrategy;
+    const started = strategyFromStart(
+      { kind: 'template', id: 'buy_range_breakout', underlying: 'NIFTY' },
+      [live],
+    );
+    expect(started?.name).toBe('nifty_buy_range_breakout_copy');
+    expect(started?.strategy.id).toBe('nifty_buy_range_breakout_copy');
+    // With nothing in the way it keeps its own name.
     expect(
-      condor.legs.map((l) => `${l.position} ${l.option_type} ${l.strike.strike_type}`),
-    ).toEqual(['sell CE OTM2', 'sell PE OTM2', 'buy CE OTM5', 'buy PE OTM5']);
-    expect(condor.id).toBe('sensex_iron_condor');
+      strategyFromStart({ kind: 'template', id: 'buy_range_breakout', underlying: 'NIFTY' }, [])
+        ?.name,
+    ).toBe('nifty_buy_range_breakout');
+  });
+});
+
+describe('starting a strategy', () => {
+  const saved = [
+    {
+      name: 'nifty_widesl_917_otm1',
+      sha: 'a',
+      strategy: { ...newStrategy('NIFTY'), id: 'nifty_widesl_917_otm1' },
+    },
+    {
+      name: 'nifty_widesl_917_otm1_copy',
+      sha: 'b',
+      strategy: { ...newStrategy('NIFTY'), id: 'nifty_widesl_917_otm1_copy' },
+    },
+  ] as SavedStrategy[];
+
+  it('names a copy so it never collides', () => {
+    expect(copyName('abc', new Set())).toBe('abc_copy');
+    expect(copyName('abc', new Set(['abc_copy']))).toBe('abc_copy2');
+    expect(copyName('abc', new Set(['abc_copy', 'abc_copy2']))).toBe('abc_copy3');
+    expect(STRATEGY_NAME_RE.test(copyName('x'.repeat(64), new Set()))).toBe(true);
+  });
+
+  it('round-trips every kind of start through the address query', () => {
+    const specs: StartSpec[] = [
+      { kind: 'blank', underlying: 'SENSEX' },
+      { kind: 'template', id: 'buy_range_breakout', underlying: 'NIFTY' },
+      { kind: 'template', id: 'short_strangle_premium', underlying: 'SENSEX', premium: 120 },
+      { kind: 'copy', name: 'nifty_widesl_917_otm1' },
+    ];
+    for (const spec of specs) {
+      expect(startFromParams(startToParams(spec))).toEqual(spec);
+    }
+  });
+
+  it('ignores a query that names no start, or a template that does not exist', () => {
+    expect(startFromParams(new URLSearchParams(''))).toBeNull();
+    expect(startFromParams(new URLSearchParams('new=iron_condor'))).toBeNull();
+    expect(startFromParams(new URLSearchParams('load=abc'))).toBeNull();
+    // A bad index falls back to NIFTY; a bad premium is dropped, not guessed.
+    expect(
+      startFromParams(new URLSearchParams('new=short_strangle_premium&index=XX&premium=-5')),
+    ).toEqual({
+      kind: 'template',
+      id: 'short_strangle_premium',
+      underlying: 'NIFTY',
+    });
+  });
+
+  it('opens a blank, a template and a copy unsaved, never touching the saved ones', () => {
+    expect(
+      strategyFromStart({ kind: 'blank', underlying: 'SENSEX' }, saved)?.strategy.underlying,
+    ).toBe('SENSEX');
+    const t = strategyFromStart(
+      { kind: 'template', id: 'short_strangle', underlying: 'NIFTY' },
+      saved,
+    );
+    expect(t?.name).toBe('nifty_short_strangle');
+    const c = strategyFromStart({ kind: 'copy', name: 'nifty_widesl_917_otm1' }, saved);
+    expect(c?.name).toBe('nifty_widesl_917_otm1_copy2');
+    expect(c?.strategy.id).toBe('nifty_widesl_917_otm1_copy2');
+    expect(saved[0]?.strategy.id).toBe('nifty_widesl_917_otm1');
+    expect(strategyFromStart({ kind: 'copy', name: 'gone' }, saved)).toBeNull();
   });
 });
 

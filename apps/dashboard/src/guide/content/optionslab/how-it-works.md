@@ -54,7 +54,7 @@ trading 2 lots and one trading 1 lot can be compared fairly. Multiply by your ow
 
 ## Where the data comes from
 
-Every trading day at 16:15 the [evening run](glossary:evening-run) downloads that day's
+Every trading day at 15:45 the [evening run](glossary:evening-run) downloads that day's
 [1-minute data](glossary:one-minute-data) for the index and its options from Fyers, then runs
 every saved strategy over it. Option contracts disappear after expiry, so a day that was not
 collected cannot be backtested later. The number of days a strategy has been tested on is
@@ -69,8 +69,8 @@ over every collected day fills in results for the new version.
 
 ## Two engines
 
-The **Form** builder uses the leg-wise engine described here. The **YAML** mode is an older
+The **Leg grid** builder uses the leg-wise engine described here. The **YAML engine (advanced)** mode is an older
 rule engine that reads a cache of AlgoTest data; it is kept for experiments that need its
-richer condition language. See [Builder: YAML mode](guide:optionslab/builder-yaml).
+richer condition language. See [Builder: YAML engine](guide:optionslab/builder-yaml).
 
 Next: [the Strategies screen](guide:optionslab/strategies).

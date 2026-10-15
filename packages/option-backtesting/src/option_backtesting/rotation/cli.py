@@ -285,7 +285,9 @@ def show(last: int = typer.Option(5, "--last", help="How many recent entries."))
 
 _SELECTORS_HELP = (
     "Strategies: a name, a glob (N_*_0917), all, slot:0917, family:wide|dir|buy|p80, "
-    "index:N|S, kind:legwise|variant; a+b is both (slot:0917+index:N). Default slot:0917."
+    "index:N|S, kind:legwise|variant; a+b is both (slot:0917+index:N). A rotation list is "
+    "list:A|B|C|REF (Steady, Calendar, Adaptive, Baseline; built from the journal, about 8 s). "
+    "Default slot:0917."
 )
 
 
@@ -299,11 +301,39 @@ def _window(start: str | None, end: str | None) -> tuple[date | None, date | Non
         raise typer.BadParameter(str(error)) from error
 
 
+def _reconstructed(series, report) -> dict[str, int]:
+    """Per rotation list: how many of the compared days were re-scored from history."""
+    days = set(report.days)
+    return {s.name: len(days & s.reconstructed) for s in series if s.kind == "list"}
+
+
+def _list_notes(series, report) -> list[str]:
+    """What a mixed comparison must say: the basis of a list's figures, and its re-scored days."""
+    counts = _reconstructed(series, report)
+    if not counts:
+        return []
+    out = [
+        "Lists are gross per lot-day (the average one-lot gross of the picks); strategies are "
+        "net per lot after costs. The header above says net."
+    ]
+    for name, n in counts.items():
+        if n:
+            out.append(
+                f"{name}: {n} of {report.n_days} compared days were re-scored from history, "
+                "not recorded forward."
+            )
+    return out
+
+
 def _load(selectors: list[str], include_stale: bool):
+    from . import journal
     from .series import SelectorError, load
 
     try:
         return load(selectors, include_stale=include_stale)
+    except journal.JournalCorrupt as error:
+        typer.echo(f"the rotation journal cannot be read: {error}", err=True)
+        raise typer.Exit(2) from error
     except SelectorError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(2) from error
@@ -311,12 +341,14 @@ def _load(selectors: list[str], include_stale: bool):
 
 @rotation_app.command("corr-list")
 def corr_list(
-    kind: str = typer.Option(None, "--kind", help="variant | legwise"),
+    kind: str = typer.Option(None, "--kind", help="variant | legwise | list"),
 ) -> None:
     """Every strategy that has daily results now, with its days and date range."""
-    from .series import available
+    from .series import available, lists_available
 
     rows = [a for a in available() if kind is None or a.kind == kind]
+    if kind == "list":  # built from the journal, so only when asked for
+        rows = lists_available()
     if not rows:
         typer.echo("no strategy has results yet", err=True)
         raise typer.Exit(2)
@@ -364,9 +396,12 @@ def corr(
         typer.echo(str(error), err=True)
         raise typer.Exit(2) from error
     typer.echo(c.render_text(report))
+    notes = _list_notes(series, report)
+    for line in notes:
+        typer.echo(line)
     if json_path:
         with open(json_path, "w") as f:
-            json.dump(c.to_json(report), f)
+            json.dump({**c.to_json(report), "reconstructed": _reconstructed(series, report)}, f)
         typer.echo(f"wrote {json_path}")
     if csv_path:
         with open(csv_path, "w", newline="") as f:

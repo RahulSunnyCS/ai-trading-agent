@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Options Lab mockups</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+:root{--surface-0:#f4f3ee;--surface-1:#efeee8;--surface-2:#ffffff;--text-primary:#1f1e1c;--text-secondary:#5f5e5a;--text-muted:#888780;--border:rgba(0,0,0,.12);--border-strong:rgba(0,0,0,.22);--bg-accent:#e6f1fb;--text-accent:#185fa5;--border-accent:#85b7eb;--bg-success:#eaf3de;--text-success:#3b6d11;--border-success:#97c459;--bg-danger:#fcebeb;--text-danger:#a32d2d;--bg-warning:#faeeda;--text-warning:#854f0b;--radius:8px;--font-mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--surface-0:#141413;--surface-1:#1f1f1d;--surface-2:#262624;--text-primary:#f1efe8;--text-secondary:#b4b2a9;--text-muted:#888780;--border:rgba(255,255,255,.12);--border-strong:rgba(255,255,255,.22);--bg-accent:#0c447c;--text-accent:#b5d4f4;--border-accent:#378add;--bg-success:#27500a;--text-success:#c0dd97;--border-success:#639922;--bg-danger:#791f1f;--text-danger:#f7c1c1;--bg-warning:#633806;--text-warning:#fac775}}
+:root[data-theme="dark"]{--surface-0:#141413;--surface-1:#1f1f1d;--surface-2:#262624;--text-primary:#f1efe8;--text-secondary:#b4b2a9;--text-muted:#888780;--border:rgba(255,255,255,.12);--border-strong:rgba(255,255,255,.22);--bg-accent:#0c447c;--text-accent:#b5d4f4;--border-accent:#378add;--bg-success:#27500a;--text-success:#c0dd97;--border-success:#639922;--bg-danger:#791f1f;--text-danger:#f7c1c1;--bg-warning:#633806;--text-warning:#fac775}
+*{box-sizing:border-box}
+body{margin:0;background:var(--surface-0);color:var(--text-primary);font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:22px;font-weight:500;margin:0 0 4px}h2{font-size:17px;font-weight:500;margin:36px 0 4px}
+.lead{color:var(--text-secondary);margin:0 0 8px}
+.frame{background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:16px;overflow-x:auto}
+.r{font-size:12px;color:var(--text-secondary)}.dim{color:var(--text-muted)}.mono{font-family:var(--font-mono)}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:3px 8px;border:0.5px solid var(--border-strong);border-radius:var(--radius);white-space:nowrap}
+.tok{display:inline-flex;gap:4px;font-size:12px;padding:2px 8px;border-radius:var(--radius);background:var(--surface-1);white-space:nowrap}.tok b{font-weight:500}
+.card{border:0.5px solid var(--border);border-radius:12px;padding:10px 12px}
+.m{background:var(--surface-1);border-radius:var(--radius);padding:10px 12px}.mv{font-size:19px;font-weight:500}
+.grid{display:grid;gap:8px}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.up{color:var(--text-success)}.dn{color:var(--text-danger)}.star{color:var(--text-warning)}
+.title{font-size:16px;font-weight:500}.bc{font-size:11px;color:var(--text-muted)}
+button{font:inherit;font-size:12px;padding:3px 10px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:transparent;color:var(--text-primary)}
+button.p{background:var(--bg-accent);color:var(--text-accent);border-color:var(--border-accent)}
+table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}th{font-weight:400;color:var(--text-muted);text-align:left;padding:4px 6px;font-size:11px}td{padding:5px 6px;border-top:0.5px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bs{font-size:11px;font-weight:500;padding:1px 6px;border-radius:3px;background:var(--bg-danger);color:var(--text-danger)}.bs.b{background:var(--bg-success);color:var(--text-success)}
+.sw{display:inline-block;width:10px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.kv{display:flex;justify-content:space-between;font-size:12px;padding:2px 0}
+.badge{font-size:11px;padding:1px 7px;border-radius:var(--radius)}
+.nav a{display:flex;gap:8px;align-items:center;font-size:13px;padding:5px 8px;border-radius:var(--radius);color:var(--text-secondary)}.nav .on{background:var(--bg-accent);color:var(--text-accent)}.grp{font-size:11px;color:var(--text-muted);margin:10px 8px 4px}
+@media (max-width:700px){.g3,.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.shell{grid-template-columns:1fr!important}.nav{display:none}}
+</style>
+</head>
+<body>
+<main>
+<h1>Options Lab redesign: mockups</h1>
+<p class="lead">BL-102, agreed with the owner on 14 Oct 2026. Figures marked –– are placeholders; named strategy figures are from the 14 Oct screens.</p>
+
+<h2>1. Today: the three lists</h2>
+<p class="lead">The landing page. It is about Steady, Calendar and Adaptive; individual strategies appear only inside a list's picks.</p>
+<div class="frame">
+<div class="shell" style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px">
+<div class="nav" style="border-right:0.5px solid var(--border);padding-right:8px">
+<div style="font-size:13px;font-weight:500;padding:4px 8px">Options Lab</div>
+<div class="grp">Today</div><a class="on"><i class="ti ti-sun"></i>Today</a>
+<div class="grp">Explore data</div><a><i class="ti ti-grid-dots"></i>Heatmap</a><a><i class="ti ti-table"></i>Matrix</a><a><i class="ti ti-arrows-shuffle"></i>Correlation</a><a><i class="ti ti-cloud"></i>Regimes</a>
+<div class="grp">Build and test</div><a><i class="ti ti-stack-2"></i>Strategies and baskets</a><a><i class="ti ti-tool"></i>Builder</a><a><i class="ti ti-history"></i>Runs</a>
+</div>
+<div>
+<div class="bc">Today</div>
+<div class="title">How are the three rotation lists doing?</div>
+<div class="r" style="margin-bottom:10px">Each list picks its strategies at 09:16, before the market opens, and is scored every evening on days nobody had seen. <span style="color:var(--text-accent)">How to read this</span></div>
+<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:12px"><span class="chip">Since 12 Oct</span><span class="chip">2 lots per strategy</span><span class="chip">Portfolio stop ₹10,000</span><span style="flex:1"></span><span class="chip" style="color:var(--text-success);border-color:var(--border-success)"><i class="ti ti-circle-check"></i> Day 3 of 60 · recorded 09:16 · scored 22:02</span><button><i class="ti ti-adjustments"></i> Change</button></div>
+<div class="grid g3" style="margin-bottom:12px">
+<div class="card" style="border:2px solid var(--border-accent)"><div style="display:flex;justify-content:space-between"><b style="font-weight:500"><span class="sw" style="background:#378ADD"></span>Steady</b><i class="ti ti-star star"></i></div><div class="r">The safest weighting</div><div class="r" style="margin-top:6px">Today</div><div class="mv up">+₹ ––</div><div class="kv"><span class="r">Since 12 Oct</span><span>₹ ––</span></div><div class="kv"><span class="r">Max drawdown</span><span>₹ ––</span></div><div class="kv"><span class="r">vs fixed base</span><span>₹ ––</span></div><div class="r" style="border-top:0.5px solid var(--border);padding-top:6px;margin-top:6px"><i class="ti ti-chevron-down"></i> Today's 4 picks</div></div>
+<div class="card"><div style="display:flex;justify-content:space-between"><b style="font-weight:500"><span class="sw" style="background:#D85A30"></span>Calendar</b><i class="ti ti-star star"></i></div><div class="r">Leans on weekday and expiry</div><div class="r" style="margin-top:6px">Today</div><div class="mv dn">−₹ ––</div><div class="kv"><span class="r">Since 12 Oct</span><span>₹ ––</span></div><div class="kv"><span class="r">Max drawdown</span><span>₹ ––</span></div><div class="kv"><span class="r">vs fixed base</span><span>₹ ––</span></div><div class="r" style="border-top:0.5px solid var(--border);padding-top:6px;margin-top:6px"><i class="ti ti-chevron-down"></i> Today's 4 picks</div></div>
+<div class="card"><div style="display:flex;justify-content:space-between"><b style="font-weight:500"><span class="sw" style="background:#1D9E75"></span>Adaptive</b><i class="ti ti-star star"></i></div><div class="r">Follows its own recent results</div><div class="r" style="margin-top:6px">Today</div><div class="mv up">+₹ ––</div><div class="kv"><span class="r">Since 12 Oct</span><span>₹ ––</span></div><div class="kv"><span class="r">Max drawdown</span><span>₹ ––</span></div><div class="kv"><span class="r">vs fixed base</span><span>₹ ––</span></div><div class="r" style="border-top:0.5px solid var(--border);padding-top:6px;margin-top:6px"><i class="ti ti-chevron-down"></i> Today's 4 picks</div></div>
+</div>
+<div class="card"><div class="r" style="display:flex;gap:14px;flex-wrap:wrap"><span>Cumulative gross</span><span><span class="sw" style="background:#378ADD"></span>Steady</span><span><span class="sw" style="background:#D85A30"></span>Calendar</span><span><span class="sw" style="background:#1D9E75"></span>Adaptive</span><span><span class="sw" style="background:#888780"></span>Fixed base (dashed)</span></div>
+<svg viewBox="0 0 400 80" style="width:100%;height:120px"><polyline fill="none" stroke="#378ADD" stroke-width="2" points="0,60 50,54 100,56 150,44 200,40 250,36 300,30 350,26 400,20"/><polyline fill="none" stroke="#D85A30" stroke-width="2" points="0,60 50,62 100,58 150,60 200,52 250,54 300,48 350,50 400,44"/><polyline fill="none" stroke="#1D9E75" stroke-width="2" points="0,60 50,50 100,52 150,46 200,48 250,38 300,40 350,32 400,28"/><polyline fill="none" stroke="#888780" stroke-width="1.5" stroke-dasharray="4 3" points="0,60 50,59 100,58 150,56 200,55 250,53 300,52 350,50 400,48"/></svg></div>
+</div></div></div>
+
+<h2>2. Today: every widget below the first screen</h2>
+<p class="lead">The Overview / Journal / Research switch goes; existing widgets become bands of cards, each titled as a question.</p>
+<div class="frame">
+<div style="font-size:13px;font-weight:500;margin-bottom:6px"><i class="ti ti-list-details"></i> Track: what happened</div>
+<div class="grid g2">
+<div class="card" style="grid-column:1/-1"><b style="font-weight:500">Day by day</b> <span class="badge" style="background:var(--bg-accent);color:var(--text-accent)">all 3 lists</span><div class="r">What did each list pick, and what did it make that day? Calendar or table; a day opens its drawer with the portfolio replay.</div><div class="r mono dim">RotationDailyLog, PortfolioReplay</div></div>
+<div class="card"><b style="font-weight:500">Drawdowns</b><div class="r">How deep and how long were the falls, against the fixed base?</div><div class="r mono dim">RotationDrawdowns</div></div>
+<div class="card"><b style="font-weight:500">Why these picks?</b><div class="r">Today's picks, criterion by criterion.</div><div class="r mono dim">RotationWhyThisPick</div></div>
+</div>
+<div style="font-size:13px;font-weight:500;margin:14px 0 6px"><i class="ti ti-stethoscope"></i> Diagnose: is the rule still working? <span class="r" style="font-weight:400">loads when scrolled to</span></div>
+<div class="grid g2">
+<div class="card"><b style="font-weight:500">Is morning short-premium working now?</b><div class="r mono dim">RotationPulse</div></div>
+<div class="card"><b style="font-weight:500">Is a list drifting?</b><div class="r mono dim">RotationDrift</div></div>
+<div class="card"><b style="font-weight:500">Does the ranking predict results?</b><div class="r mono dim">RotationRankPredicts</div></div>
+<div class="card"><b style="font-weight:500">What market did we test?</b><div class="r mono dim">RotationRegime</div></div>
+</div>
+<div style="font-size:13px;font-weight:500;margin:14px 0 6px"><i class="ti ti-flask"></i> Experiments <span class="r" style="font-weight:400">collapsed by default</span></div>
+<div class="card"><b style="font-weight:500">Ideas being watched</b><div class="r">Triggers and candidates as "idea minus what it replaced"; never a standalone profit.</div><div class="r mono dim">RotationShadowScoreboard</div></div>
+</div>
+
+<h2>3. Strategies and baskets</h2>
+<p class="lead">Everything you can trade in one place. Stars are the default selection in Correlation and other pickers.</p>
+<div class="frame">
+<div class="bc">Build and test › Strategies and baskets</div><div class="title">Everything you can trade, in one place</div>
+<div style="display:flex;gap:6px;margin:8px 0"><span class="chip">All</span><span class="chip" style="background:var(--bg-accent);color:var(--text-accent);border-color:var(--border-accent)"><i class="ti ti-star"></i> Starred only</span><span style="flex:1"></span><span class="chip"><i class="ti ti-plus"></i> New strategy</span></div>
+<div style="font-size:14px;font-weight:500;margin:10px 0 6px"><i class="ti ti-stack-2"></i> Baskets <span class="r" style="font-weight:400">rotation lists: pick 3 strategies + 1 Buy each morning</span></div>
+<div class="grid g3">
+<div class="card"><div style="display:flex;justify-content:space-between"><b style="font-weight:500">Steady</b><i class="ti ti-star star"></i></div><div class="r">The safest weighting</div><div class="kv"><span class="r">Since 12 Oct</span><span>₹ ––</span></div><div class="kv"><span class="r">Weights</span><span class="r">5 · 34 · 33 · 23</span></div><div style="display:flex;gap:6px;margin-top:6px"><button>Open in Today</button><button>Correlate</button></div></div>
+<div class="card"><div style="display:flex;justify-content:space-between"><b style="font-weight:500">Calendar</b><i class="ti ti-star star"></i></div><div class="r">Leans on weekday and expiry</div><div class="kv"><span class="r">Since 12 Oct</span><span>₹ ––</span></div><div class="kv"><span class="r">Weights</span><span class="r">0 · 36 · 35 · 24</span></div><div style="display:flex;gap:6px;margin-top:6px"><button>Open in Today</button><button>Correlate</button></div></div>
+<div class="card"><div style="display:flex;justify-content:space-between"><b style="font-weight:500">Adaptive</b><i class="ti ti-star star"></i></div><div class="r">Follows its own recent results</div><div class="kv"><span class="r">Since 12 Oct</span><span>₹ ––</span></div><div class="kv"><span class="r">Weights</span><span class="r">15 · 30 · 30 · 20</span></div><div style="display:flex;gap:6px;margin-top:6px"><button>Open in Today</button><button>Correlate</button></div></div>
+</div>
+<div class="r" style="margin-top:6px">Comparators: <i class="ti ti-star dim"></i> Baseline (REF), the old live rotation · <i class="ti ti-star dim"></i> Fixed base, 2 × Widesl OTM1 09:17 + 1 × Dir ATM 09:24</div>
+<div style="font-size:14px;font-weight:500;margin:14px 0 6px"><i class="ti ti-route"></i> Strategies <span class="r" style="font-weight:400">run every evening</span></div>
+<div class="card" style="padding:4px 10px"><table><colgroup><col style="width:6%"><col style="width:50%"><col style="width:18%"><col style="width:26%"></colgroup>
+<tr><th></th><th>Strategy</th><th>Since 23 Sep</th><th></th></tr>
+<tr><td><i class="ti ti-star star"></i></td><td>Buy range breakout, NIFTY<div class="r">Buy CE + PE ₹50 · 09:35–15:14</div></td><td class="up">+7,599</td><td>Open · Correlate</td></tr>
+<tr><td><i class="ti ti-star star"></i></td><td>Directional ITM1, 09:24<div class="r">Sell CE ITM1 + PE ITM1 · SL 21%</div></td><td class="up">+6,568</td><td>Open · Correlate</td></tr>
+<tr><td><i class="ti ti-star dim"></i></td><td>Short strangle OTM1, 09:17<div class="r">Sell CE OTM1 + PE OTM1</div></td><td class="dn">−8,421</td><td>Open · Correlate</td></tr>
+<tr><td><i class="ti ti-star dim"></i></td><td>Short strangle ₹65, 09:17<div class="r">Sell CE + PE ₹65 premium</div></td><td class="dn">−12,854</td><td>Open · Correlate</td></tr>
+<tr><td><i class="ti ti-star dim"></i></td><td>Short strangle OTM2, SENSEX<div class="r">Sell CE OTM2 + PE OTM2</div></td><td class="dn">−9,893</td><td>Open · Correlate</td></tr>
+</table></div>
+</div>
+
+<h2>4. New strategy dialog</h2>
+<p class="lead">Templates modelled on the live strategies; nothing is saved until Save in the Builder.</p>
+<div class="frame" style="background:var(--surface-1)">
+<div style="background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:16px;max-width:560px;margin:0 auto">
+<div style="display:flex;justify-content:space-between"><span class="title">Start a strategy</span><i class="ti ti-x r"></i></div>
+<div class="r" style="margin-bottom:10px">Nothing is saved until you press Save in the Builder.</div>
+<div class="r">Index</div><div style="display:flex;gap:4px;margin:4px 0 12px;flex-wrap:wrap"><span class="chip" style="background:var(--bg-accent);color:var(--text-accent)">NIFTY</span><span class="chip">SENSEX</span><span class="chip">BANKNIFTY</span><span class="chip">FINNIFTY</span><span class="chip">MIDCPNIFTY</span></div>
+<div class="card" style="border:2px solid var(--border-accent);margin-bottom:8px"><b style="font-weight:500"><i class="ti ti-template"></i> From a template</b>
+<div class="grid g3" style="margin-top:6px">
+<div class="m" style="background:var(--bg-accent);color:var(--text-accent)"><b style="font-weight:500">Short strangle</b><div style="font-size:11px">Sell CE + PE OTM1 · 09:17–15:28 · SL 115% trail 15/10% · max loss ₹2,500</div></div>
+<div class="m"><b style="font-weight:500">Buy range breakout</b><div class="r" style="font-size:11px">Buy CE + PE ~₹50 on a break of the 09:35–09:45 high · SL 25% · out 15:14</div></div>
+<div class="m"><b style="font-weight:500">Short strangle at a premium</b><div class="r" style="font-size:11px">Sell CE + PE closest to ₹<span class="chip" style="padding:0 4px">65</span> · 09:17–15:25 · SL 115%</div></div>
+</div></div>
+<div class="card" style="margin-bottom:8px"><b style="font-weight:500"><i class="ti ti-copy"></i> Copy an existing strategy</b><div class="r">Starred first, then the rest. Saved under a new name.</div></div>
+<div class="card"><b style="font-weight:500"><i class="ti ti-file"></i> Blank</b><div class="r">One empty leg.</div></div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button>Cancel</button><button class="p">Open in Builder</button></div>
+</div></div>
+
+<h2>5. Builder, design A: leg grid with backtest settings</h2>
+<p class="lead">Chosen by the owner over a sentence design and a collapsible-sections draft. Click any cell or token to edit it in place.</p>
+<div class="frame">
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+<span style="font-size:15px;font-weight:500">Short strangle OTM1 · 09:17</span><span class="badge" style="background:var(--bg-warning);color:var(--text-warning)">Unsaved changes</span><span style="flex:1"></span><button>Open…</button><button>New</button><button>Save</button><button class="p"><i class="ti ti-player-play"></i> Backtest · 1 year <i class="ti ti-chevron-down"></i></button></div>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:14px">
+<div>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"><span class="tok"><span class="dim">Index</span><b>NIFTY</b></span><span class="tok"><span class="dim">Enter</span><b>09:17</b></span><span class="tok"><span class="dim">Exit</span><b>15:28</b></span><span class="tok"><span class="dim">Max loss</span><b>₹2,500</b></span><span class="tok"><span class="dim">Target</span><b class="dim">none</b></span><span class="tok"><span class="dim">Leg stops</span><b>exit that leg</b></span><span class="tok dim"><i class="ti ti-plus"></i> filter, costs…</span></div>
+<div class="card" style="padding:2px 4px"><table><colgroup><col style="width:11%"><col style="width:7%"><col style="width:8%"><col style="width:12%"><col style="width:11%"><col style="width:11%"><col style="width:13%"><col style="width:9%"><col style="width:10%"><col style="width:8%"></colgroup>
+<tr><th></th><th>Lots</th><th>Type</th><th>Expiry</th><th>Strike</th><th>Stop</th><th>Trail</th><th>Target</th><th>Re-entry</th><th></th></tr>
+<tr><td><span class="bs">SELL</span></td><td class="mono">1</td><td>CE</td><td>Weekly</td><td>OTM1</td><td class="mono">115%</td><td class="mono">15/10%</td><td class="dim">—</td><td class="dim">—</td><td class="r"><i class="ti ti-link"></i></td></tr>
+<tr><td><span class="bs">SELL</span></td><td class="mono">1</td><td>PE</td><td>Weekly</td><td>OTM1</td><td class="mono">115%</td><td class="mono">15/10%</td><td class="dim">—</td><td class="dim">—</td><td class="r"><i class="ti ti-link"></i></td></tr>
+<tr><td colspan="10"><span class="r"><i class="ti ti-plus"></i> Add leg &nbsp; <i class="ti ti-plus"></i> Add CE + PE pair &nbsp; <i class="ti ti-link"></i> Edit both legs together</span></td></tr></table></div>
+<div class="grid g2" style="margin-top:8px"><div class="m" style="font-size:12px"><b style="font-weight:500">In plain words:</b> every day at 09:17, sell 1 lot each of the NIFTY weekly call and put one strike out of the money; 115% stop per leg, trailed; all out at a ₹2,500 loss or 15:28.</div><div class="card" style="font-size:12px"><span class="up"><i class="ti ti-circle-check"></i> Ready to run</span> · <span class="r"><i class="ti ti-code"></i> View as YAML</span></div></div>
+</div>
+<div class="card" style="font-size:12px;align-self:start"><b style="font-weight:500">Backtest settings</b>
+<div class="kv"><span>Period</span><span><span class="chip">3m</span> <span class="chip" style="background:var(--bg-accent);color:var(--text-accent)">1y</span> <span class="chip">All</span> <span class="chip">Custom</span></span></div>
+<div class="kv"><span>Lot size</span><span class="r">Today's · As it was</span></div>
+<div class="kv"><span>Bars</span><span class="r">1 min · 5 min</span></div>
+<div class="kv"><span>Bad-data days</span><span class="r">Skip · Include</span></div>
+<div class="kv"><span>Costs</span><span class="r">0% slip · ₹0/order ›</span></div>
+<div class="kv"><span>Compare with</span><span class="r">Last saved version ›</span></div>
+<div class="r" style="margin-top:4px">Remembered per strategy.</div></div>
+</div>
+<div style="border-top:0.5px solid var(--border);margin-top:14px;padding-top:10px">
+<div style="display:flex;gap:8px;align-items:baseline"><b style="font-weight:500">Result</b><span class="r">1 year · vs last saved version</span></div>
+<div class="grid g4" style="margin:8px 0"><div class="m"><div class="r">Net per lot</div><div class="mv">₹ ––</div></div><div class="m"><div class="r">Max drawdown</div><div class="mv">₹ ––</div></div><div class="m"><div class="r">Win rate</div><div class="mv">–– %</div></div><div class="m"><div class="r">Return on margin</div><div class="mv">–– %</div></div></div>
+<div class="grid g2">
+<div class="card"><b style="font-weight:500"><i class="ti ti-shield-check"></i> Is this real?</b> <span class="r">(BL-103)</span><div class="kv"><span>Unseen period (walk-forward)</span><span>––</span></div><div class="kv"><span>Chance it's overfit (PBO)</span><span>–– %</span></div><div class="kv"><span>90% range of net</span><span>₹ –– to ₹ ––</span></div><div class="kv"><span>Monte Carlo worst drawdown</span><span>₹ ––</span></div></div>
+<div class="card"><b style="font-weight:500"><i class="ti ti-calendar-stats"></i> When does it work?</b> <span class="r">(BL-103)</span><div class="kv"><span>By weekday</span><span class="r">Mon–Fri</span></div><div class="kv"><span>By days to expiry</span><span class="r">0 · 1 · 2–3 · 4+</span></div><div class="kv"><span>By VIX band</span><span class="r">low · mid · high</span></div><div class="kv"><span>By opening gap</span><span class="r">down · flat · up</span></div></div>
+</div></div>
+</div>
+
+<h2>6. Correlation: lists and strategies, favourites first</h2>
+<div class="frame">
+<div class="bc">Explore data › Correlation</div><div class="title">Do these lose on the same days?</div>
+<div style="display:grid;grid-template-columns:200px minmax(0,1fr);gap:12px;margin-top:8px">
+<div class="card" style="padding:6px;font-size:12px">
+<div class="dim" style="margin:4px 6px">Lists</div>
+<div style="padding:3px 6px;background:var(--bg-accent);color:var(--text-accent);border-radius:var(--radius)"><i class="ti ti-square-check"></i> Steady <i class="ti ti-star star" style="float:right"></i></div>
+<div style="padding:3px 6px;background:var(--bg-accent);color:var(--text-accent);border-radius:var(--radius);margin-top:2px"><i class="ti ti-square-check"></i> Calendar <i class="ti ti-star star" style="float:right"></i></div>
+<div style="padding:3px 6px;background:var(--bg-accent);color:var(--text-accent);border-radius:var(--radius);margin-top:2px"><i class="ti ti-square-check"></i> Adaptive <i class="ti ti-star star" style="float:right"></i></div>
+<div style="padding:3px 6px"><i class="ti ti-square"></i> Fixed base</div>
+<div class="dim" style="margin:6px 6px 2px">Strategies</div>
+<div style="padding:3px 6px;background:var(--bg-accent);color:var(--text-accent);border-radius:var(--radius)"><i class="ti ti-square-check"></i> Buy range breakout <i class="ti ti-star star" style="float:right"></i></div>
+<div style="padding:3px 6px"><i class="ti ti-square"></i> Short strangle OTM1</div>
+<div style="padding:3px 6px" class="dim">298 rotation variants…</div>
+<div class="r" style="margin:6px">Reset to favourites</div></div>
+<div><div style="display:flex;gap:6px;margin-bottom:8px"><span class="chip">4 selected</span><span class="chip">Last 63 days</span><span class="chip">Pearson</span><span class="chip">Pick | A day's basket</span></div>
+<div class="card"><table><tr><th></th><th>Steady</th><th>Calendar</th><th>Adaptive</th><th>Buy RB</th></tr>
+<tr><td class="r">Steady</td><td>1</td><td style="background:var(--bg-warning)">0.81</td><td style="background:var(--bg-warning)">0.64</td><td>0.05</td></tr>
+<tr><td class="r">Calendar</td><td style="background:var(--bg-warning)">0.81</td><td>1</td><td style="background:var(--bg-warning)">0.57</td><td>0.02</td></tr>
+<tr><td class="r">Adaptive</td><td style="background:var(--bg-warning)">0.64</td><td style="background:var(--bg-warning)">0.57</td><td>1</td><td style="background:var(--bg-accent)">−0.18</td></tr>
+<tr><td class="r">Buy RB</td><td>0.05</td><td>0.02</td><td style="background:var(--bg-accent)">−0.18</td><td>1</td></tr></table>
+<div class="r" style="margin-top:6px">"Steady and Calendar move together (0.81); Buy range breakout offsets Adaptive." List days before 12 Oct are reconstructed and labelled. Values are placeholders.</div></div></div></div>
+</div>
+
+<h2>7. Heatmap</h2>
+<div class="frame">
+<div class="bc">Explore data › Heatmap</div><div class="title">When is a short straddle worth entering, and with what stop?</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0"><span class="chip">NIFTY</span><span class="chip">14 Oct 2026</span><span class="chip">Entry time × stop</span><span class="chip">Exit 15:30</span><span class="chip">₹ per lot</span><span style="flex:1"></span><button><i class="ti ti-adjustments"></i> Change</button></div>
+<div class="grid g3"><div class="m"><div class="r">Best cell</div><div class="mv up">+₹2,896</div><div class="r">09:45 · 10% stop</div></div><div class="m"><div class="r">Worst cell</div><div class="mv dn">−₹6,123</div><div class="r">09:16 · 30% stop</div></div><div class="m"><div class="r">Whole grid</div><div class="mv">−₹10,124</div><div class="r">1 day · before costs</div></div></div>
+<div class="r" style="margin-top:8px">Then the grid (unchanged) with a three-step legend, and "Entry time by strategy type" as a widget.</div>
+</div>
+
+<h2>8. Runs and Regimes</h2>
+<div class="frame grid g2">
+<div class="card"><div class="bc">Build and test › Runs</div><div style="font-weight:500">What have I tested, and did it get better?</div><div style="display:flex;gap:4px;margin:6px 0"><span class="chip">All kinds</span><span class="chip">Last 30 days</span><span style="flex:1"></span><span class="chip">Compare 2</span></div><div class="r">Builder runs listed too; a registry failure becomes a small retry line.</div></div>
+<div class="card"><div class="bc">Explore data › Regimes</div><div style="font-weight:500">Do quiet or trending days come in runs?</div><div style="display:flex;gap:4px;margin:6px 0;flex-wrap:wrap"><span class="chip">NIFTY</span><span class="chip">All history</span><span class="chip">Cuts 10:30, 13:30</span></div><div class="r">A headline sentence first; the whole-day calendar; per-segment calendars and tests as widgets.</div></div>
+</div>
+</main>
+</body>
+</html>

@@ -141,7 +141,7 @@ uv run obt rotation readout [--from D --to D] [--json]  # BL-058: the registered
 uv run obt rotation base [--backfill]    # BL-058: the owner's fixed base (2 x Widesl OTM1 09:17 + 1 x Dir ATM 09:24): score its Dir leg (also run by `rotation update`, isolated) or show its series
 # the Options Lab › Rotation page reads GET /legwise/rotation/overview and /summary (api/rotation_routes.py; proxied at /api/backtest/legwise/rotation/*), the same code as `rotation readout`
 uv run obt rotation corr [slot:0917 | N_*_0917 | family:dir kind:legwise | all]  # BL-090: correlation of the strategies' daily P&L, loss-day overlap, basket drawdown, rolling drift; any strategy with results is found, no list to edit (--json/--csv, --from/--to)
-uv run obt heatmap build [-u NIFTY | --stocks] [--from D --to D] [--force]  # BL-094: ATM short-straddle grid (entry time x exit x SL) per day, stored under TRADING_DATA_ROOT/heatmap/; `show NIFTY --view time_sl --day D [--exit 15:15]` prints a view, `list` what is stored; the Options Lab Heatmap tab (default page) reads GET /legwise/heatmap* (proxied at /api/backtest/legwise/heatmap*)
+uv run obt heatmap build [-u NIFTY | --stocks] [--from D --to D] [--force]  # BL-094: ATM short-straddle grid (entry time x exit x SL) per day, stored under TRADING_DATA_ROOT/heatmap/; `show NIFTY --view time_sl --day D [--exit 15:15]` prints a view, `list` what is stored; the Options Lab Heatmap page (Explore data) reads GET /legwise/heatmap* (proxied at /api/backtest/legwise/heatmap*)
 uv run obt rotation portfolio-warm [--from D --to D]  # BL-095: replay every list-day's baskets once so the Rotation page's portfolio stop is fast the first time; fills the disposable path cache (ATA_PORTFOLIO_CACHE_DIR), read-only, not scheduled
 # the portfolio stop (BL-095) reads GET /legwise/rotation/portfolio/day|days (api/rotation_portfolio_routes.py over rotation/portfolio.py; proxied at /api/backtest/legwise/rotation/portfolio/*) and /legwise/rotation/drawdowns?stop=&trail=; /days answers 202 {"status":"warming"} past 20 s of a cold replay (the work carries on; the dashboard asks again)
 uv run obt rotation corr-list | corr-pick slot:0917 --k 3 --max-corr 0.6 [--require N_wide_0917]  # what has results | a basket none of whose members are alike (diagnostic, in-sample)
@@ -236,6 +236,9 @@ ai-trading-agent/
 ├── scripts/install-biome.sh         # root-level tooling (downloads the Biome binary), not app code
 ├── deploy/cloudflared/              # tunnel config template for serving the research APIs from a laptop (docs/remote-dashboard.md)
 ├── deploy/launchd/                  # the one LaunchAgent that keeps apps/scheduler running + install/uninstall (BL-012)
+├── research/                        # findings notes only, one page per strategy × variable: options/strategies/<family>/,
+│                                     # options/common/, momentum/ (rules: research/README.md). Not the research CODE,
+│                                     # which lives in packages/option-backtesting/research/blNNN/ and momentum's search_spaces/
 ├── apps/
 │   ├── server/                      # @ata/server — the Fastify/Bun backend
 │   │   ├── package.json · tsconfig.json · vitest.config.ts · vitest.workspace.ts
@@ -272,7 +275,7 @@ ai-trading-agent/
 │       ├── e2e/                     # Playwright specs
 │       └── src/                     # App.tsx, components/, hooks/, lib/, store/, types/
 │                                     # components/optionslab/ + hooks/useBacktest*.ts, useLegwise*.ts — Options
-│                                     # Lab (Strategies, Builder with Form | YAML modes, Runs, Daily results,
+│                                     # Lab (Strategies, Builder with Form | YAML modes, Runs,
 │                                     # Regimes); the YAML engine's tab (M-4) is now the Builder's YAML mode.
 │                                     # Fed entirely through /api/backtest/* (never the Python service directly)
 └── packages/

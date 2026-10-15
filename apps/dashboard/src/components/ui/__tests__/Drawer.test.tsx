@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Drawer } from '../Drawer';
@@ -49,5 +50,34 @@ describe('Drawer', () => {
     const onOpenChange = setup();
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('gives focus back to the button that opened it', async () => {
+    function Host() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Change
+          </button>
+          <Drawer open={open} onOpenChange={setOpen} title="Settings">
+            <p>Body</p>
+          </Drawer>
+        </>
+      );
+    }
+    render(<Host />);
+    const opener = screen.getByRole('button', { name: 'Change' });
+    opener.focus();
+    fireEvent.click(opener);
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // Radix hands focus back on the next tick, after the content has unmounted.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Change' })),
+    );
   });
 });

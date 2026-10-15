@@ -70,6 +70,11 @@ included. Rankings use each strategy's registered balanced criteria.
 
 This report keeps only the combined winner in each index/timing section. The winner is selected from the best Directional, Buy and Widesl candidate using the balanced post-charge criteria. It is not an automatic live recommendation; fit-to-holdout stability, tail risk and forward validation still apply.
 
+## Note (2026-10-14)
+
+The holdout above was used to choose these rows, so it is no longer unseen for any later
+selection. BL-104 fits on the full 2024-10-09 → 2026-10-09 window and says so.
+
 ## Sources
 
 - `packages/option-backtesting/research/bl096/results/primary_diagnostics_charged.csv`

@@ -244,7 +244,7 @@ Otherwise:
   As-of is the last COMPLETE session (every variant stored; a part-stored day is reported under `store.partial`
   and left out of windows and rank); the route's snapshot is keyed on the cube object plus the journal's stat, not a TTL.
   Journal figures are those on or before as-of. A stored variant outside the 12 cells is listed in `store.unplaced`.
-- `heatmap/` + `api/heatmap_routes.py` — BL-094, the Options Lab's Heatmap tab (default page): the P&L of an ATM
+- `heatmap/` + `api/heatmap_routes.py` — BL-094, the Options Lab's Heatmap page (Explore data): the P&L of an ATM
   short straddle for every entry time (09:16, then each half hour to 14:45), exit (15:30, 15:15) and per-leg SL
   (10..100 %, then "No SL": no stop, both legs held to the exit; `grid.NO_SL`, stored as `sl = 0`). `grid.py` restates the legwise engine's fills for the fixed two-leg shape (a test pins every cell to
   `simulate_day`); indices take ATM from the index spot, a stock (no spot, no strike step, mostly no lot size in the
@@ -281,6 +281,14 @@ Otherwise:
   into an absent regime section plus a status (CLI line, `regime_status` /
   `regime_message` on `POST /runs`, `regime_status` in the MCP `run_backtest`
   output, `t33.status` on `/legwise/anatomy`). Any other query error still raises.
+
+- `research/bl104/` — BL-104, the full-factorial parameter sweep over the Widesl / Dir / Buy families:
+  `grid.py` (the registered axes, cells and their SHA; `tests/unit/test_bl104_grid.py` holds the counts),
+  `run_grid.py` (one job per cohort, resumable parts + day × cell series under `results/<tag>/`),
+  `score.py` (gates, Martin / Calmar, the plateau rule, band tables), `robust.py` (numpy CSCV,
+  half-years, bootstrap vs template, DTE / VIX / weekday strata, breadth over the 25 slots),
+  `stage2.py` (the winners' neighbourhoods and the flatness verdict), `check_regression.py`. Research only:
+  never writes a strategy YAML; the pre-registration is the backlog item's Phase 0.
 
 ## Commands
 

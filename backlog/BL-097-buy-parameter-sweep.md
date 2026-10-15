@@ -224,3 +224,4 @@ or adoption decision; the targeted interaction phase is not yet run.
   requested variation study.
 - 2026-10-12 — Phase 2 one-factor sweep completed with post-charge accounting;
   report generated. Phase 3 remains pending.
+- 2026-10-14 — Phase 3 superseded by BL-104 (full grid with a target axis and MTM ₹1,000; SENSEX premiums at 3× NIFTY).
