@@ -198,6 +198,35 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   `research/options/strategies/widesl/nifty-otm1-candidates.md`. An expiry-day switch would need its
   own registration.
 
+### 2026-10-15 — NIFTY Widesl OTM1 by day type: the same search on expiry days only and on other days only
+- **Hypothesis:** the best OTM1 setting differs between NIFTY weekly expiry days and the other days,
+  because the template earns about 80 % of its profit on expiry days (₹517 a lot-day against ₹35) and
+  the 2026-10-15 split showed the SL 150 % setting's gain moving between the two day types across the
+  years. One setting per day type beats the template on its own days where one setting for all days
+  does not.
+- **Universe:** the same 216 OTM1 cells with a day MTM stop and the same 7 slots (stored Stage 1 day ×
+  cell series, after charges); the template cell is the comparator on the same days. Day sets: the 104
+  NIFTY weekly expiry days (53 first year, 51 test year) from `expiries_observed.csv`, and the 384
+  other weekdays (of the 488 usable). Both run on the same stored series, so nothing is re-simulated.
+- **Look-ahead check:** as the 2026-10-15 experiment above: paired daily differences, selection on the
+  first year, the test year read once, the reverse split reported. Whether a day is an expiry day is
+  known the morning of, so a rule that switches on it is tradable.
+- **Pass / kill rule:** identical to the OTM1 experiment above, applied to each day set on its own
+  days (5 of 7 slots with the risk gates; 90 % block-bootstrap interval above zero; above the luck
+  line; plateau; slippage only if the first four pass). Kill: nothing passes in a day set; the
+  template stands for that day type.
+- **Known weakness, stated before the run:** an expiry-day set has about 50 days per year. The
+  bootstrap interval and the luck line will be wide, and a pass there would need a gain that is large
+  against a 216-candidate noise floor. A kill on expiry days is the expected outcome and is not
+  evidence of no effect. A ranking on all 488 days pooled (both years) is printed as a descriptive
+  list only; it is in-sample by construction and is never a pass.
+- **Hold-out:** none unseen. The two years were used by earlier items; "A on expiry days, B
+  otherwise" (candidates page) was formed after looking at both. This run is a registered re-test
+  of that idea, not an unseen confirmation.
+- **Will not run:** per-slot settings; strikes other than OTM1; values outside the Stage 1 grid;
+  SENSEX; a joint rule that picks the expiry-day and other-day settings together (it would be a
+  second registration if either day set passes).
+
 ## Risks
 
 - Nothing is unseen: a result here is in-sample by construction; the forward test is the only
