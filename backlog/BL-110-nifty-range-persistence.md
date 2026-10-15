@@ -96,4 +96,15 @@ Committed before `research/bl110/persistence.py` is run.
   The owner asked whether daily candles would do: for the day-range tests they give the same
   numbers; the opening-range test needs minutes. A 2016 to 2021 daily-candle confirmation is a
   possible follow-up (needs the Fyers token); not run.
+- 2026-10-15 — **Amendment 1 (registered before it is run; the main result above is unchanged).**
+  The owner pointed to Momentum's daily NIFTY file. It holds `date, open, close` only, 2016-01-01
+  to 2026-10-09 (no high or low), so it cannot give the day range `R`. A confirmation on the 2016
+  to 2021 sessions, which the main run never saw, uses the standard proxy
+  `M_t = |ln(close_t / close_{t-1})| × 100`. Rule, fixed now: same `B_t` (median of `M` over the
+  prior 20 sessions), same states (`E ≥ 1.25` expanded, `E ≤ 0.80` range-bound), same
+  20-session-block bootstrap (seed 20261015). **Supported** if, over 2016-02-01 to 2021-12-31,
+  the lag-1 autocorrelation's 90% interval is above zero AND the mean next-day ratio after an
+  expanded session exceeds that after a range-bound one with its interval above zero. Also
+  reported over 2022-01-03 to 2026-10-09 (to see how the proxy compares with the range result).
+  No opening-range or VIX test (not available in this file). Script `research/bl110/proxy_2016.py`.
 
