@@ -40,6 +40,10 @@ GATES = {
     "mtm_stop_frequency": 0.30,
     "entry_hit_rate": 0.40,  # Buy only
 }
+# Tail gate (owner, 2026-10-15; backlog/BL-104 Log): a cell may not have a worst day, or a sum of
+# its five worst days, more than 1.5x its cohort template's, with the template's magnitude floored
+# so a template with almost no tail (Buy) does not cap everything at a few hundred rupees.
+TAIL = {"ratio": 1.5, "worst_day_floor_inr": 3000.0, "worst5_floor_inr": 15000.0}
 BIG = 1e9  # an infinite ratio (no drawdown at all) ranks above every finite one
 TOP_N = 10
 
@@ -142,14 +146,45 @@ def load_summary(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def score_cohort(rows: list[dict[str, Any]]) -> None:
+def tail_failures(row: dict[str, Any], template: dict[str, Any] | None) -> list[str]:
+    if template is None or row["key"] is None:
+        return []
+    cap_day = TAIL["ratio"] * max(abs(template["worst_day_inr"]), TAIL["worst_day_floor_inr"])
+    cap_5 = TAIL["ratio"] * max(abs(template["worst5_inr"]), TAIL["worst5_floor_inr"])
+    out = []
+    if row["worst_day_inr"] < -cap_day:
+        out.append("tail_worst_day")
+    if row["worst5_inr"] < -cap_5:
+        out.append("tail_worst5")
+    return out
+
+
+def attach_worst5(out_dir: Path, cohort: str, rows: list[dict[str, Any]]) -> None:
+    """Sum of each cell's five worst days, from the stored day x cell series."""
+    import json
+
+    import numpy as np
+
+    matrix = np.load(out_dir / "series" / f"{cohort}.npy").astype(float)
+    labels = json.loads((out_dir / "series" / f"{cohort}.json").read_text())["labels"]
+    index = {label: i for i, label in enumerate(labels)}
+    worst5 = np.sort(matrix, axis=0)[:5].sum(axis=0)
+    for r in rows:
+        r["worst5_inr"] = float(worst5[index[r["label"]]])
+
+
+def score_cohort(rows: list[dict[str, Any]], tail: bool = False) -> None:
     """Adds gate / neighbour / robust columns in place for one cohort's rows."""
     family = rows[0]["family"]
     sessions = int(max(r["n_days"] for r in rows))
     by_key = {r["key"]: r for r in rows if r["key"] is not None}
+    template = next((r for r in rows if r["key"] is None), None)
     for r in rows:
         r["sessions"] = sessions
-        r["gates_failed"] = ";".join(failed_gates(r, sessions))
+        failed = failed_gates(r, sessions)
+        if tail:
+            failed += tail_failures(r, template)
+        r["gates_failed"] = ";".join(failed)
         r["passes"] = r["gates_failed"] == ""
         r["martin_f"] = finite(martin_floored(r))
         r["tail_ratio_worst"] = ratio_or_nan(r["worst_day_inr"], r["avg_day_inr"])
@@ -376,18 +411,21 @@ def write_csv(
 
 
 def score_family(
-    out_dir: Path, family: str
+    out_dir: Path, family: str, tail: bool = False
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
+    suffix = "_tail" if tail else ""
     rows = load_summary(out_dir / f"{family}_summary.csv")
     cohorts: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for r in rows:
         cohorts[r["cohort"]].append(r)
-    for members in cohorts.values():
-        score_cohort(members)
+    for cohort, members in cohorts.items():
+        if tail:
+            attach_worst5(out_dir, cohort, members)
+        score_cohort(members, tail)
     rows.sort(key=lambda r: (r["cohort"], r["cohort_rank"]))
-    write_csv(out_dir / f"{family}_ranked.csv", rows)
+    write_csv(out_dir / f"{family}_ranked{suffix}.csv", rows)
     winners = band_winners(rows)
-    write_csv(out_dir / f"{family}_band_winners.csv", winners)
+    write_csv(out_dir / f"{family}_band_winners{suffix}.csv", winners)
     strikes = strike_table(winners)
     text = render_markdown(family, winners, strikes, out_dir.name)
     print(
@@ -403,6 +441,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--tag", default="stage1")
     parser.add_argument("--family", default="all")
+    parser.add_argument(
+        "--tail-gate",
+        action="store_true",
+        help="also gate on worst day / worst-five-days vs the template; files get a _tail suffix",
+    )
     args = parser.parse_args()
     out_dir = RESULTS / args.tag
     families = grid.FAMILIES if args.family == "all" else tuple(args.family.split(","))
@@ -411,10 +454,11 @@ def main() -> None:
         if not (out_dir / f"{family}_summary.csv").exists():
             print(f"{family}: no summary under {out_dir}", flush=True)
             continue
-        texts.append(score_family(out_dir, family)[2])
+        texts.append(score_family(out_dir, family, args.tail_gate)[2])
     if texts:
-        (out_dir / "band_tables.md").write_text("\n\n".join(texts) + "\n")
-        print(f"wrote {out_dir / 'band_tables.md'}", flush=True)
+        name = "band_tables_tail.md" if args.tail_gate else "band_tables.md"
+        (out_dir / name).write_text("\n\n".join(texts) + "\n")
+        print(f"wrote {out_dir / name}", flush=True)
 
 
 if __name__ == "__main__":

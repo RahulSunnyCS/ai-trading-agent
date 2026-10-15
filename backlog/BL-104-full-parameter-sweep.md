@@ -242,3 +242,20 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   23:01 on 14 Oct, this item 23:28) and IDs are never reused. Folder `research/bl104/`, tests
   `test_bl104_*`. The grid's internal label stays `bl102-stage1-2026-10-14`, since it is part of
   the registered SHA `6a1078bb4fe68786`; PR #218 and its commits carry the old number.
+- 2026-10-15 — **Tail gate and a second selection (owner instruction, recorded for the research
+  gate).** After reading the Stage 1 band tables the owner asked (chat, 2026-10-15) that winners
+  be considered with worst-day behaviour ("I have doubt for worst day performance would be bad",
+  then "Parallely run and add the winners considering these categories too") and to "do both and
+  compare in a long view". Applied as a gate on top of the registered rules, tightening only:
+  a cell's worst day and its five-worst-days sum may not exceed 1.5 × its cohort template's
+  (magnitudes floored at ₹3,000 and ₹15,000). It was added after the Stage 1 results were read, so
+  it is a post-hoc rule and is recorded as such. Consequences, all with their cell lists committed
+  before the run: a second band-winner selection (`*_band_winners_tail.csv`; 5 of 20 winners
+  change), its own Stage 2 (`stage2_tail`), and a NIFTY 2022-01 → 2024-10 advisory run for **both**
+  selections (the Phase 4 advisory run, extended). The "will not run: a second pass on the grid
+  after reading results" line needs the owner's `override:`; the owner's instruction above is the
+  basis, and the formal `override:` line is theirs to confirm here.
+- 2026-10-15 — runner fixes after a crash (a cell whose exit precedes its entry slot): a failing
+  cohort is reported and the run exits non-zero, schema-invalid cells are named, pre-2024-10
+  lookups use the earliest reference row (historical lot sizing before 2024-10-03 is refused),
+  and `robust.py` refuses to mix the tail and return-only selections' Stage 2 results.

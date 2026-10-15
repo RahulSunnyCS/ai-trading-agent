@@ -65,6 +65,30 @@ BROKERAGE_PER_ORDER = 20.0
 ORDERS_PER_TRADE = 2  # entry + exit, what the brokerage line assumes
 
 
+class EarliestRowReference:
+    """default_reference_data() with a lookup before a table's first row (lot sizes and strike
+    steps start in 2024-10) answered by that row, as research/bl071 does for the 2022-24 days.
+    Only reached when the real lookup raises, so it never changes a 2024-10+ result."""
+
+    def __init__(self, ref: Any) -> None:
+        self._ref = ref
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._ref, name)
+
+    def _early(self, call: Any, underlying: str, when: date) -> Any:
+        try:
+            return call(underlying, when)
+        except MissingReferenceData:
+            return call(underlying, date(2024, 10, 3))
+
+    def lot_size(self, underlying: str, expiry: date) -> Any:
+        return self._early(self._ref.lot_size, underlying, expiry)
+
+    def strike_step(self, underlying: str, as_of: date) -> Any:
+        return self._early(self._ref.strike_step, underlying, as_of)
+
+
 def stt_rate(day: date) -> float:
     return [rate for start, rate in STT_SELL if day >= start][-1]
 
@@ -303,13 +327,21 @@ def run_cohort(
     run: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     started = time.monotonic()
-    reference = default_reference_data()
+    reference = EarliestRowReference(default_reference_data())
     sizing_date = date.fromisoformat(SIZING_DATE)
     underlying = grid.INDICES[index]
     template = grid.load_template(family, index, slot)
     execution = execution_for(slippage, lot_sizing)
-    cells = [grid.Cell(family, index, slot, p) for p in params_list]
-    strategies = [grid.build(c, template, execution=execution) for c in cells]
+    cells, strategies = [], []
+    invalid: dict[str, str] = {}  # a cell the schema rejects at this slot (e.g. exit before entry)
+    for p in params_list:
+        c = grid.Cell(family, index, slot, p)
+        try:
+            strategies.append(grid.build(c, template, execution=execution))
+        except ValueError as error:  # a TypeError is a bug in build(): let it fail the cohort
+            invalid[c.label] = " ".join(str(error).split())[:160]
+            continue
+        cells.append(c)
     stats = [Stats(underlying) for _ in cells]
     # Owner (2026-10-15): the unit is rupees per lot; no return-on-margin view. The capital
     # column is kept only where a margin row happens to exist, never required.
@@ -357,7 +389,7 @@ def run_cohort(
         "matrix": matrix,
         "labels": [c.label for c in cells],
         "days": [d.isoformat() for d in used],
-        "skipped": skipped,
+        "skipped": {**skipped, **{f"cell:{k}": v for k, v in invalid.items()}},
         "run": run,
         "seconds": seconds,
         "ms_per_cell_day": 1000 * seconds / max(1, len(cells) * len(used)),
@@ -381,7 +413,9 @@ def load_cells_file(path: Path) -> dict[tuple[str, str, str], list[dict[str, Any
         params = item["params"]
         if params is not None:
             params = {k: tuple(v) if isinstance(v, list) else v for k, v in params.items()}
-        jobs.setdefault((item["family"], item["index"], item["slot"]), []).append(params)
+        bucket = jobs.setdefault((item["family"], item["index"], item["slot"]), [])
+        if params not in bucket:  # the same cell listed for several winners runs once
+            bucket.append(params)
     return jobs
 
 
@@ -553,19 +587,40 @@ def main() -> None:
         f"days={ {u: len(d) for u, d in days_cache.items()} } workers={args.workers} grid={grid.grid_sha()}",
         flush=True,
     )
+    failed: list[str] = []
+    if args.lot_sizing == "historical" and start < date(2024, 10, 3):
+        raise SystemExit(
+            "historical lot sizing before 2024-10-03 would use the first lot_sizes row for every "
+            "earlier day (the reference tables start then); refuse rather than mis-size"
+        )
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         futures = {pool.submit(run_cohort, *a, signature(args, a)): n for n, a in pending}
         for future in as_completed(futures):
             name = futures[future]
-            result = future.result()
+            try:
+                result = future.result()
+            except Exception as error:  # one cohort failing must not discard the others
+                failed.append(name)
+                print(f"FAILED {name}: {type(error).__name__}: {str(error)[:200]}", flush=True)
+                continue
             write_part(out_dir, name, result)
             print(
                 f"done {name}: {len(result['rows'])} cells x {len(result['days'])} days in "
                 f"{result['seconds']:.0f}s ({result['ms_per_cell_day']:.2f} ms/cell-day, "
-                f"rss {result['rss_mb']:.0f} MB, skipped {len(result['skipped'])})",
+                f"rss {result['rss_mb']:.0f} MB, skipped {len(result['skipped'])})"
+                + "".join(
+                    f"\n  dropped cell {k[5:]}: {v}"
+                    for k, v in result["skipped"].items()
+                    if k.startswith("cell:")
+                ),
                 flush=True,
             )
     summarise(out_dir)
+    if failed:
+        print(
+            f"{len(failed)} cohort(s) FAILED and are missing from the summary: {failed}", flush=True
+        )
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
