@@ -385,6 +385,13 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   10:47, 12:17, 13:17, 13:47, 14:02 get every cell the lists use (tag `slots12`, cells
   `slots12_cells_2026-10-16.json`). A band setting must beat the template at 3 of its 4 slots; the
   all-times group at 9 of the 12. The refine step runs at all 12 slots.
+- **Amendment 9 (2026-10-16, owner, before any list was read): leaderboards and an all-days
+  choice.** (a) For every group (three bands and all times) and day type, a leaderboard of every
+  family's pick ranked by net ₹ per lot-day, with win rate, slot-mean max drawdown and worst day —
+  descriptive, so the owner sees which strategies work best on expiry days and on other days. (b) A
+  third day type, **all days**, chosen by the same rule (margin ₹15; default = the template for
+  every family, N_wide included), and a "works on both" table: each family's all-days pick with its
+  gain over the template on expiry days and on non-expiry days, flagged when both are positive.
 
 ## Risks
 

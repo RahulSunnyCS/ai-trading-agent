@@ -32,6 +32,7 @@ sys.path.insert(0, str(HERE))
 import grid  # noqa: E402
 
 from option_backtesting.legwise.schema import LegwiseStrategy, load_legwise  # noqa: E402
+from option_backtesting.rotation.readout import max_drawdown  # noqa: E402
 
 PACKAGE = HERE.parents[1]
 RESULTS = HERE / "results"
@@ -39,10 +40,10 @@ OUT = RESULTS / "daytype"
 STRATEGIES = PACKAGE / "strategies" / "daytype"
 REFERENCE = PACKAGE / "src" / "option_backtesting" / "data" / "reference"
 CUT = date(2025, 10, 9)  # first year < CUT <= test year
-MARGIN = {"expiry": 25.0, "other": 15.0}
+MARGIN = {"expiry": 25.0, "other": 15.0, "all": 15.0}
 WORST_X = 1.25
 MAX_CORR = 0.7
-KINDS = {"expiry": ("expiry", "EXP"), "other": ("non_expiry", "NONEXP")}
+KINDS = {"expiry": ("expiry", "EXP"), "other": ("non_expiry", "NONEXP"), "all": ("all_days", "ALL")}
 R1 = ("cost", 1, None)
 OWNER_DEFAULT = {  # N_wide only (owner, 2026-10-15)
     "expiry": {"strike": "OTM1", "sl": 150, "trail": (25, 15), "mtm": 4000, "exit": "15:28", "reentry": R1},
@@ -299,7 +300,7 @@ def evaluate(f: Family, slot: str, exp: set[date]) -> dict[str, Any]:
     first = d < CUT
     is_exp = np.array([x in exp for x in tdays])
     out = {}
-    for kind, mask in (("expiry", is_exp), ("other", ~is_exp)):
+    for kind, mask in (("expiry", is_exp), ("other", ~is_exp), ("all", np.ones(len(is_exp), dtype=bool))):
         # comparator: the better of the family's current files on these days (Amendment 2)
         tname = max(tvals, key=lambda n: tvals[n][mask].mean())
         t = tvals[tname][mask]
@@ -372,6 +373,9 @@ def aggregate(f: Family, results: dict[str, dict], kind: str, slots: tuple[str, 
             "slots_pos": sum(r["gain"] > 0 for r in per),
             "values": np.mean([r["values"] for r in per], axis=0),
             "slots": slots,
+            "max_dd": float(np.mean([max_drawdown(r["values"]) for r in per])),
+            "win": float(np.mean([np.mean(r["values"] > 0) for r in per])),
+            "worst": float(np.mean([r["worst"] for r in per])),
         }
     for r in agg.values():
         nb = [agg[key(q)] for q in neighbours(f, r["params"]) if key(q) in agg]
@@ -386,6 +390,9 @@ def aggregate(f: Family, results: dict[str, dict], kind: str, slots: tuple[str, 
         "worst_x": 1.0, "slots_pos": 0, "nb_beat": 0, "is_template": True,
         "values": np.mean([x["values"] for x in t], axis=0),
         "names": [x["name"] for x in t], "slots": slots,
+        "max_dd": float(np.mean([max_drawdown(x["values"]) for x in t])),
+        "win": float(np.mean([np.mean(x["values"] > 0) for x in t])),
+        "worst": float(np.mean([x["worst"] for x in t])),
     }
     return agg
 
@@ -424,7 +431,7 @@ def family_premiums(agg: dict[str, dict]) -> tuple[list[float], dict[float, floa
 
 def decide(f: Family, agg: dict[str, dict], kind: str, allowed: list[float] | None) -> dict[str, Any]:
     tmpl = agg["__template__"]
-    dflt = agg[key(OWNER_DEFAULT[kind])] if f.name == "N_wide" else tmpl
+    dflt = agg[key(OWNER_DEFAULT[kind])] if f.name == "N_wide" and kind in OWNER_DEFAULT else tmpl
 
     def clears(r: dict) -> bool:
         return (
@@ -540,12 +547,14 @@ def main() -> None:
         if folder.exists():
             for old in folder.glob("*.yaml"):
                 old.unlink()
-    lists: dict[str, list[dict]] = {"expiry": [], "other": []}
+    lists: dict[str, list[dict]] = {k: [] for k in KINDS}
     premium_report: list[str] = []
     for f in FAMILIES:
         results = {slot: evaluate(f, slot, exp[grid.INDICES[f.idx]]) for slot in ALL_SLOTS}
+        aggs: dict[tuple[str, str], dict] = {}
         for kind, (band, slots) in ((k, b) for k in KINDS for b in BANDS.items()):
             agg = aggregate(f, results, kind, slots)
+            aggs[(kind, band)] = agg
             allowed = None
             if f.is_premium:
                 allowed, score = family_premiums(agg)
@@ -576,6 +585,12 @@ def main() -> None:
                     "gain_by_slot": ", ".join(f"{s} {g:+.0f}" for s, g in zip(slots, r["slot_gain"], strict=True)),
                     "net_by_slot": ", ".join(f"{s} {g:.0f}" for s, g in zip(slots, r["slot_net"], strict=True)),
                     "worst_day_x_template": round(r["worst_x"], 2),
+                    "win_rate": round(r["win"], 3), "max_drawdown": round(r["max_dd"]),
+                    "worst_day": round(r["worst"]), "template_max_drawdown": round(tmpl["max_dd"]),
+                    "gain_on_expiry_days": "" if kind != "all" or params is None else round(
+                        aggs_lookup(f, results, "expiry", slots, params)),
+                    "gain_on_non_expiry_days": "" if kind != "all" or params is None else round(
+                        aggs_lookup(f, results, "other", slots, params)),
                     "corr_with_pick_1": "" if rank == 1 else round(r.get("corr_with_first", float("nan")), 2),
                     "settings_clearing_rule": dec["n_clear"],
                     "alternatives": " || ".join(
@@ -599,6 +614,17 @@ def main() -> None:
     for kind, rows in lists.items():
         print(f"{KINDS[kind][0]}: {len(rows)} rows, {sum(r['status'].startswith('chosen') for r in rows)} "
               f"differ from the default, {sum(r['status'] == 'owner to choose' for r in rows)} owner-to-choose")
+
+
+_AGG_CACHE: dict = {}
+
+
+def aggs_lookup(f: Family, results: dict, kind: str, slots: tuple[str, ...], params: dict) -> float:
+    """A setting's band-mean gain over the template on one day type (for the "works on both" table)."""
+    ck = (f.name, kind, slots)
+    if ck not in _AGG_CACHE:
+        _AGG_CACHE[ck] = aggregate(f, results, kind, slots)
+    return _AGG_CACHE[ck][key(params)]["gain"]
 
 
 def _template_params(f: Family, results: dict, slot: str, kind: str) -> dict | None:
@@ -642,7 +668,7 @@ def write_readme(lists: dict[str, list[dict]], premium_report: list[str]) -> Non
             grouped[f"{kind}|{band}"] = [r for r in rows if r["band"] == band]
     for gkey, rows in grouped.items():
         kind, band = gkey.split("|")
-        title = ("Expiry days" if kind == "expiry" else "Non-expiry days") + f" — {band}"
+        title = {"expiry": "Expiry days", "other": "Non-expiry days", "all": "All days"}[kind] + f" — {band}"
         lines += [f"## {title}", "",
                   "| Family | Band | Status | Index | Strategy | Strike | Range | Leg SL | Trail SL | MTM SL | Target | Re-entry | Exit | Net/lot-day (1st / test) | Template (1st / test) | Gain (1st / test) | Times better | Worst day × template |",
                   "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
@@ -665,6 +691,41 @@ def write_readme(lists: dict[str, list[dict]], premium_report: list[str]) -> Non
             for r in alts:
                 lines.append(f"- **{r['family']} {r['band']}**: {r['alternatives']}")
         lines.append("")
+    lines += ["# Leaderboards — which strategies work best (descriptive)", "",
+              "Every family's pick (or its default) in each group, ranked by net ₹ per lot-day. Win rate,",
+              "max drawdown and worst day are means over the group's entry times. Expiry-day figures cover",
+              "about 50 days a year, non-expiry about 190.", ""]
+    for band in BANDS:
+        for kind in ("expiry", "other"):
+            rows = sorted((r for r in lists[kind] if r["band"] == band), key=lambda r: -r["net_per_lot_day"])
+            title = ("Expiry days" if kind == "expiry" else "Non-expiry days") + f" — {band}"
+            lines += [f"## Leaderboard: {title}", "",
+                      "| # | Family | Setting | Net/lot-day (1st / test) | Gain vs template | Times better | Win rate | Max DD | Worst day | Status |",
+                      "|---|---|---|---|---|---|---|---|---|---|"]
+            for i, r in enumerate(rows, 1):
+                setting = (f"{r['strike']} · {r.get('range') + ' · ' if r.get('range') else ''}SL {r['leg SL']} · TSL {r['trail SL']} · "
+                           f"MTM {r['MTM SL']} · target {r['target']} · RE {r['re-entry']} · exit {r['exit']}")
+                lines.append(
+                    f"| {i} | {r['family']} | {setting} | {r['net_per_lot_day']} ({r['net_first_year']} / {r['net_test_year']}) | "
+                    f"{r['gain_vs_template']:+d} | {r['slots_better']} | {r['win_rate']:.0%} | {r['max_drawdown']} | "
+                    f"{r['worst_day']} | {r['status']} |"
+                )
+            lines.append("")
+    rows = [r for r in lists["all"] if r["band"] == "all times"]
+    lines += ["## Works on both day types — all times, all days", "",
+              "Each family's setting chosen on all days (expiry and non-expiry together) across all 12 entry",
+              "times, with its gain over the template on each day type. **Both** = it beats the template on",
+              "expiry days and on non-expiry days.", "",
+              "| Family | Setting | Net/lot-day all days (1st / test) | Gain all days | Gain on expiry days | Gain on non-expiry days | Both? | Status |",
+              "|---|---|---|---|---|---|---|---|"]
+    for r in sorted(rows, key=lambda r: -r["net_per_lot_day"]):
+        setting = (f"{r['strike']} · {r.get('range') + ' · ' if r.get('range') else ''}SL {r['leg SL']} · TSL {r['trail SL']} · "
+                   f"MTM {r['MTM SL']} · target {r['target']} · RE {r['re-entry']} · exit {r['exit']}")
+        ge, gn = r["gain_on_expiry_days"], r["gain_on_non_expiry_days"]
+        both = "yes" if ge != "" and gn != "" and ge > 0 and gn > 0 else ("template" if ge == "" else "no")
+        lines.append(f"| {r['family']} | {setting} | {r['net_per_lot_day']} ({r['net_first_year']} / {r['net_test_year']}) | "
+                     f"{r['gain_vs_template']:+d} | {ge if ge == '' else f'{ge:+d}'} | {gn if gn == '' else f'{gn:+d}'} | {both} | {r['status']} |")
+    lines.append("")
     (STRATEGIES / "README.md").write_text("\n".join(lines))
 
 
