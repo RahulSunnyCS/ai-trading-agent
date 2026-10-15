@@ -173,7 +173,20 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   selections). The 18 unsampled entry times are simulated afresh for the top 3 only, after the grid
   answer, as the "most time zones" check across all 25.
 - **Will not run:** per-slot settings; strikes other than OTM1; values outside the Stage 1 grid.
-- **Result:** (after the run)
+- **Result (grid part, 2026-10-15): kill — the template stands.** 216 candidates, 7 slots, 488
+  days. Chosen on the first year, the best is SL 150 %, trail 25/15, MTM ₹4,000, exit 15:28,
+  re-entry at cost ×1: +₹47 per lot-day over the template in the first year and **+₹70 in the test
+  year, positive at all 7 slots (+48 to +97)**, 90 % interval [−2, +140], max drawdown 0.94 × the
+  template's, but worst day 1.39 × and five worst days 1.31 ×, so it passes the risk gates at only
+  1 of 7 slots; the luck line (95th percentile of the best-of-216 under paired sign flips) is
+  +₹197, above every candidate; 0 of 216 pass. The reverse split (chosen on the test year, checked
+  on the first) picks SL 60 %, no trail, MTM ₹3,000 (+94 in the test year, −20 in the first year),
+  so tight-stop winners do not carry across years; the loose SL 150 / MTM 4,000 / re-entry family is
+  +37 to +47 in the first year from the reverse ranking too, which is the one consistent
+  direction: more return (about ₹50–70 per lot-day), a smaller drawdown, a fatter single-day
+  tail. PBO at 8 blocks per slot 0.00–0.77 (09:17 and 11:32 highest). The template itself fell
+  from 389 → 33 (09:17), 372 → 59 (09:32), 277 → 97 (10:17) net per lot-day between the years.
+  The 18 unsampled slots are being simulated for the top 3 (`otm1_other18`) as the all-25 check.
 
 ## Risks
 
