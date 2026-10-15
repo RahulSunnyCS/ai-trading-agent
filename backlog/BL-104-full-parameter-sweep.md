@@ -375,6 +375,9 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
 - **Amendment 6 (2026-10-16, owner, same): a fourth group, "all times"** — the Amendment 4 choice
   across all 7 slots (beat the template at 5 or more of the 7), reported as its own table beside
   the three bands.
+- **Amendment 7 (2026-10-16, owner, same): 13:02 also counts in the middle band.** Bands:
+  09:15–10:30 (09:17, 09:32, 09:47, 10:17), 10:30–13:02 (11:32, 13:02), 13:00–15:30 (13:02, 14:32);
+  13:02 sits in both later bands. No extra slots are sampled.
 
 ## Risks
 

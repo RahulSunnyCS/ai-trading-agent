@@ -329,7 +329,7 @@ def evaluate(f: Family, slot: str, exp: set[date]) -> dict[str, Any]:
 
 BANDS = {  # Amendment 5 (owner, 2026-10-16)
     "09:15-10:30": ("09:17", "09:32", "09:47", "10:17"),
-    "10:30-13:00": ("11:32",),
+    "10:30-13:02": ("11:32", "13:02"),  # Amendment 7: 13:02 also counts here
     "13:00-15:30": ("13:02", "14:32"),
     "all times": grid.SLOTS,  # Amendment 6: the best across every time, no band
 }
@@ -603,7 +603,7 @@ def write_readme(lists: dict[str, list[dict]], premium_report: list[str]) -> Non
         "# Day-type strategy lists (BL-104, research leads — not adopted)",
         "",
         "For every Core-298 family, for each of three time bands — **09:15–10:30** (09:17, 09:32, 09:47,",
-        "10:17), **10:30–13:00** (11:32) and **13:00–15:30** (13:02, 14:32) — and for **all times** (one",
+        "10:17), **10:30–13:02** (11:32, 13:02) and **13:00–15:30** (13:02, 14:32) — and for **all times** (one",
         "setting across all 7, beating the template at 5 or more of them): **one setting per day type",
         "that works across the band's entry times**, for **expiry days** and for",
         "**non-expiry days** (each index's own weekly expiries). The premium families (NIFTY / SENSEX",
