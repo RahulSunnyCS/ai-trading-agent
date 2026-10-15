@@ -186,7 +186,8 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   direction: more return (about ₹50–70 per lot-day), a smaller drawdown, a fatter single-day
   tail. PBO at 8 blocks per slot 0.00–0.77 (09:17 and 11:32 highest). The template itself fell
   from 389 → 33 (09:17), 372 → 59 (09:32), 277 → 97 (10:17) net per lot-day between the years.
-  The 18 unsampled slots are being simulated for the top 3 (`otm1_other18`) as the all-25 check.
+  The 18-unsampled-slot check was started and then stopped at the owner's request (2026-10-15:
+  the 7 sampled times suffice); its cell list is removed and no result is recorded.
 
 ## Risks
 
