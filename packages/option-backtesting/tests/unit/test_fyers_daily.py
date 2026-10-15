@@ -7,9 +7,29 @@ from option_backtesting.fyers.symbols import Contract, parse_master
 TUE = date(2026, 9, 29)
 
 
-def test_weekly_takes_current_and_next():
-    listed = [date(2026, 9, 22), TUE, date(2026, 10, 6), date(2026, 10, 13)]
-    assert select_expiries(listed, TUE, "weekly") == [TUE, date(2026, 10, 6)]
+def test_weekly_takes_current_and_next_plus_the_monthly():
+    listed = [
+        date(2026, 9, 22),
+        TUE,
+        date(2026, 10, 6),
+        date(2026, 10, 13),
+        date(2026, 10, 20),
+        date(2026, 10, 27),
+        date(2026, 11, 24),
+    ]
+    # 29 Sep is itself the September monthly, so the October monthly rides along as the roll
+    assert select_expiries(listed, TUE, "weekly") == [TUE, date(2026, 10, 6), date(2026, 10, 27)]
+    # mid-October: nearest two weeklies + the 27 Oct monthly, no November yet
+    assert select_expiries(listed, date(2026, 10, 7), "weekly") == [
+        date(2026, 10, 13),
+        date(2026, 10, 20),
+        date(2026, 10, 27),
+    ]
+    # on the monthly's own day: that day, the next weekly, and November's monthly
+    assert select_expiries(listed, date(2026, 10, 27), "weekly") == [
+        date(2026, 10, 27),
+        date(2026, 11, 24),
+    ]
 
 
 def test_monthly_takes_current_only_except_on_its_expiry_day():
