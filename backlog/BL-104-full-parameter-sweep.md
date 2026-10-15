@@ -392,6 +392,14 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   third day type, **all days**, chosen by the same rule (margin ₹15; default = the template for
   every family, N_wide included), and a "works on both" table: each family's all-days pick with its
   gain over the template on expiry days and on non-expiry days, flagged when both are positive.
+- **Amendment 10 (2026-10-16, owner, before any list or winner was read): rank, then walk to rank
+  3.** Settings are ranked on period 1 only (the period-1 forms of the conditions: beat the default
+  by the margin, the slot count, the worst-day cap, two neighbours beating the template); the rank-1
+  setting is taken when it also beats the template in period 2, else rank 2, else rank 3, never
+  further; nothing passes → the default. A second (low-correlation) pick may come only from the same
+  top three. Premiums are ranked on period 1; each kept premium walks its own top three. Period 1 /
+  2 are the first / second year for the lists here, and the first / second half of the first year
+  for BL-107's selection (`--window first`), so BL-107's test year is never read at selection.
 
 ## Risks
 

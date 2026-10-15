@@ -163,9 +163,6 @@ def main() -> None:
         ("Core-298", None, False, (0.0,)),
         ("T1-25", "T1", False, (WEIGHT, 0.0)),
         ("T2-25", "T2", False, (WEIGHT, 0.0)),
-        ("Core-144", None, True, (0.0,)),
-        ("T1-12", "T1", True, (WEIGHT, 0.0)),
-        ("T2-12", "T2", True, (WEIGHT, 0.0)),
     ):
         names, gross, net, tags = build(label, uni, only12)
         for b in boosts:

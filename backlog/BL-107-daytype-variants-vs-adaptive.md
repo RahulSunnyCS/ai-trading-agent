@@ -25,8 +25,7 @@ The owner (2026-10-16) asked whether Adaptive, with its registered weights and 5
 lookbacks unchanged, does better over a universe that adds day-type settings (BL-104's lists) than
 over Core-298. Adaptive scores every strategy daily and trades the top ones wherever they fall: no
 quota per band. A day-type weight (below) is the only change to the picker. Owner choices: boost
-only, no deduction; both variant types are available every day; compare against Core-298 and
-against Core-144 (the sampled times only); gross is the unit, net beside it where simulated.
+only, no deduction; both variant types are available every day; compare against Core-298; gross is the unit, net beside it where simulated.
 
 ## Goal
 
@@ -54,9 +53,13 @@ mismatched day type; Steady and Calendar boosts (reported unboosted for informat
   worst day ≤ 1.25 × the template's; ≥ 2 neighbours beating the template). A winner equal to the
   family's template adds nothing; N_wide's owner settings are always added. Premium families keep up
   to three premiums.
-- **Universes at 25 entry times** (the rotation's 09:17 … 15:17 at 15-minute gaps): Core-298; T1 =
-  Core + each all-times winner at all 25; T2 = Core + each band winner at its band's slots (09:17–
-  10:17, 10:32–13:02, 13:17–15:17). **At the 12 sampled times:** Core-144, T1-12, T2-12.
+- **Selection rule (BL-104 Amendment 10, owner 2026-10-16):** rank on the first half of the first
+  year (2024-10-09 → 2025-04-08), take rank 1 if it also beats the template in the second half
+  (2025-04-09 → 2025-10-08), else rank 2, else rank 3, never further.
+- **Universes at 25 entry times** (the rotation's 09:17 … 15:17 at 15-minute gaps; owner 2026-10-16:
+  the replay uses 25, the 12-time versions are dropped): Core-298; T1 = Core + each all-times winner
+  at all 25; T2 = Core + each band winner at its band's slots only (09:17–10:17, 10:32–13:02,
+  13:17–15:17).
 - **Day-type weight (Adaptive only):** a variant tagged expiry on its index's weekly expiry day, or
   tagged non-expiry on any other day, has its composite score raised by 10 % of its absolute value.
   Composite scores are weighted percentile ranks and are never negative, so this is ×1.10. Reported

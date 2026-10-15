@@ -370,6 +370,7 @@ def aggregate(f: Family, results: dict[str, dict], kind: str, slots: tuple[str, 
         agg[k] = {
             "params": per[0]["params"],
             "slot_gain": [r["gain"] for r in per],
+            "slot_gain_first": [r["gain_first"] for r in per],
             "slot_net": [r["net"] for r in per],
             "gain": float(np.mean([r["gain"] for r in per])),
             "gain_first": float(np.mean([r["gain_first"] for r in per])),
@@ -388,6 +389,8 @@ def aggregate(f: Family, results: dict[str, dict], kind: str, slots: tuple[str, 
     for r in agg.values():
         nb = [agg[key(q)] for q in neighbours(f, r["params"]) if key(q) in agg]
         r["nb_beat"] = sum(x["gain"] > 0 for x in nb)
+        r["nb_beat_first"] = sum(x["gain_first"] > 0 for x in nb)
+        r["slots_pos_first"] = sum(g > 0 for g in r["slot_gain_first"])
     t = [results[s][kind]["template"] for s in slots]
     agg["__template__"] = {
         "params": "template", "slot_gain": [0.0] * len(t), "slot_net": [x["net"] for x in t],
@@ -396,6 +399,7 @@ def aggregate(f: Family, results: dict[str, dict], kind: str, slots: tuple[str, 
         "net_first": float(np.mean([x["net_first"] for x in t])),
         "net_test": float(np.mean([x["net_test"] for x in t])),
         "worst_x": 1.0, "slots_pos": 0, "nb_beat": 0, "is_template": True,
+        "slot_gain_first": [0.0] * len(t), "slots_pos_first": 0, "nb_beat_first": 0,
         "values": np.mean([x["values"] for x in t], axis=0),
         "names": [x["name"] for x in t], "slots": slots,
         "max_dd": float(np.mean([max_drawdown(x["values"]) for x in t])),
@@ -406,13 +410,14 @@ def aggregate(f: Family, results: dict[str, dict], kind: str, slots: tuple[str, 
 
 
 def premium_scores(agg: dict[str, dict]) -> dict[float, float]:
-    """Amendment 4: a premium's score is its best time-generic setting's slot-mean gain."""
+    """A premium's score is its best setting's slot-mean gain over the template in period 1 (the first
+    year; with WINDOW "first", the first half of it) — Amendment 10: ranking reads period 1 only."""
     score: dict[float, float] = {}
     for k, r in agg.items():
         if k == "__template__":
             continue
         pr = r["params"]["strike"]
-        score[pr] = max(score.get(pr, -1e18), r["gain"])
+        score[pr] = max(score.get(pr, -1e18), r["gain_first"])
     return score
 
 
@@ -425,7 +430,7 @@ def family_premiums(agg: dict[str, dict]) -> tuple[list[float], dict[float, floa
         if k == "__template__":
             continue
         pr = r["params"]["strike"]
-        if pr not in best or r["gain"] > best[pr]["gain"]:
+        if pr not in best or r["gain_first"] > best[pr]["gain_first"]:
             best[pr] = r
     kept: list[float] = []
     for pr in sorted(score, key=lambda p: -score[p]):
@@ -437,44 +442,60 @@ def family_premiums(agg: dict[str, dict]) -> tuple[list[float], dict[float, floa
     return kept, score
 
 
+TOP_RANKS = 3  # Amendment 10: walk at most to the third-ranked setting
+
+
 def decide(f: Family, agg: dict[str, dict], kind: str, allowed: list[float] | None) -> dict[str, Any]:
+    """Amendment 10 (owner, 2026-10-16): rank on period 1, walk ranks 1 → 3, take the first that also
+    beats the template in period 2. Period 1 / 2 = first / second year (the lists), or the first /
+    second half of the first year (WINDOW "first", BL-107: the test year is never read)."""
     tmpl = agg["__template__"]
     dflt = agg[key(OWNER_DEFAULT[kind])] if f.name == "N_wide" and kind in OWNER_DEFAULT else tmpl
 
-    def clears(r: dict) -> bool:
+    def eligible(r: dict) -> bool:  # period-1 conditions only
         return (
             r is not dflt and not r.get("is_template")
-            and r["gain_first"] > 0 and r["gain_test"] > 0
-            and r["slots_pos"] >= slots_needed(len(r["slots"]))
-            and r["gain"] >= dflt["gain"] + MARGIN[kind]
-            and not (r["worst_x"] > WORST_X) and r["nb_beat"] >= 2
+            and r["gain_first"] > 0
+            and r["gain_first"] >= dflt["gain_first"] + MARGIN[kind]
+            and r["slots_pos_first"] >= slots_needed(len(r["slots"]))
+            and not (r["worst_x"] > WORST_X) and r["nb_beat_first"] >= 2
         )
 
-    ok = sorted((r for r in agg.values() if clears(r)), key=lambda r: -r["gain"])
+    def walk(pool: list[dict]) -> tuple[dict | None, int, list[dict]]:
+        ranked = sorted(pool, key=lambda r: -r["gain_first"])[:TOP_RANKS]
+        for i, r in enumerate(ranked, 1):
+            if r["gain_test"] > 0:  # beats the template in period 2 as well
+                return r, i, ranked
+        return None, 0, ranked
+
+    pool = [r for r in agg.values() if eligible(r)]
     if f.is_premium and allowed is not None:
-        ok = [r for r in ok if r["params"]["strike"] in allowed]
-    if ok and f.is_premium:
         picks: list[dict] = []
-        for r in ok:
-            if any(r["params"]["strike"] == k["params"]["strike"] for k in picks):
-                continue
-            if picks:
-                r["corr_with_first"] = float(np.corrcoef(picks[0]["values"], r["values"])[0, 1])
-            picks.append(r)
-            if len(picks) == 3:
-                break
-        return {"status": f"chosen ({len(picks)} premium{'s' if len(picks) > 1 else ''})", "picks": picks,
-                "alts": [], "n_clear": len(ok)}
-    if ok:
-        picks = [ok[0]]
-        for r in ok[1:]:
-            c = float(np.corrcoef(ok[0]["values"], r["values"])[0, 1])
-            if c < MAX_CORR:
-                r["corr_with_first"] = c
+        for pr in allowed:
+            r, rank, _ = walk([x for x in pool if x["params"]["strike"] == pr])
+            if r is not None:
+                r["rank_used"] = rank
+                if picks:
+                    r["corr_with_first"] = float(np.corrcoef(picks[0]["values"], r["values"])[0, 1])
                 picks.append(r)
-                break
-        return {"status": "chosen" if len(picks) == 1 else "chosen (2, low correlation)", "picks": picks,
-                "alts": [], "n_clear": len(ok)}
+        if picks:
+            return {"status": f"chosen ({len(picks)} premium{'s' if len(picks) > 1 else ''})", "picks": picks,
+                    "alts": [], "n_clear": len(pool)}
+    else:
+        first, rank, ranked = walk(pool)
+        if first is not None:
+            first["rank_used"] = rank
+            picks = [first]
+            for r in ranked[rank:]:
+                if r["gain_test"] > 0:
+                    c = float(np.corrcoef(first["values"], r["values"])[0, 1])
+                    if c < MAX_CORR:
+                        r["corr_with_first"] = c
+                        r["rank_used"] = ranked.index(r) + 1
+                        picks.append(r)
+                        break
+            return {"status": "chosen" if len(picks) == 1 else "chosen (2, low correlation)", "picks": picks,
+                    "alts": [], "n_clear": len(pool)}
     if dflt["gain_first"] < 0 and dflt["gain_test"] < 0:
         top = sorted((r for r in agg.values() if not r.get("is_template")), key=lambda r: -r["gain"])[:3]
         return {"status": "owner to choose", "picks": [dflt], "alts": top, "n_clear": 0}
@@ -586,7 +607,7 @@ def main() -> None:
                 files = []
                 winners.append({
                     "family": f.name, "fam": f.fam, "index": f.idx, "kind": kind, "band": band,
-                    "rank": rank, "status": dec["status"], "params": params,
+                    "rank": rank, "status": dec["status"], "params": params, "rank_used": r.get("rank_used", ""),
                     "gain": r["gain"], "gain_first": r["gain_first"], "gain_test": r["gain_test"],
                 })
                 for slot in slots if write else ():
@@ -613,6 +634,7 @@ def main() -> None:
                     "gain_on_non_expiry_days": "" if kind != "all" or params is None else round(
                         aggs_lookup(f, results, "other", slots, params)),
                     "corr_with_pick_1": "" if rank == 1 else round(r.get("corr_with_first", float("nan")), 2),
+                    "rank_used": r.get("rank_used", ""),
                     "settings_clearing_rule": dec["n_clear"],
                     "alternatives": " || ".join(
                         f"{one_line(describe_params(f, a['params'], slots))} (gain {a['gain']:+.0f}; "
@@ -672,11 +694,11 @@ def write_readme(lists: dict[str, list[dict]], premium_report: list[str]) -> Non
         "How a row was chosen (registered in `backlog/BL-104-full-parameter-sweep.md` → Experiments,",
         "day-type lists, Amendments 1–4): the default is the family's own rotation file (for N_wide, the",
         "owner's settings: expiry SL 150 % / trail 25/15 / MTM ₹4,000 / RE cost ×1; other days SL 60 % /",
-        "trail 15/10 / MTM ₹3,000 / no re-entry). Another setting replaces it only when, averaged over the",
-        "band, it beats the template in **both** years, beats it at 3 of the band's 4 times (9 of 12 for all",
-        "times), beats the",
-        "default by ₹25 (expiry) or ₹15 (other days) a lot-day, has a worst day no more than 1.25 × the",
-        "template's and at least two grid neighbours that also beat the template. A second pick is kept",
+        "trail 15/10 / MTM ₹3,000 / no re-entry). Settings are ranked on the **first year** (band means):",
+        "beat the default by ₹25 (expiry) or ₹15 (other days) a lot-day, beat the template at 3 of the band's",
+        "4 times (9 of 12 for all times), a worst day no more than 1.25 × the template's and at least two",
+        "grid neighbours that also beat it. The rank-1 setting is taken if it **also beats the template in",
+        "the second year**; otherwise rank 2, then rank 3, and no further (Amendment 10). A second pick is kept",
         "only when its daily P&L correlates below 0.7 with the first.",
         "",
         "The engine has no day filter: each file trades every day if run. The day type is in its folder",
