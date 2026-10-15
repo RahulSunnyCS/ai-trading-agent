@@ -5,7 +5,9 @@ from datetime import date
 from option_backtesting.rotation import tomorrow
 
 
-def _row(day, weekday, dte_n, dte_s, a, b=None, c=None, scored=True):
+def _row(
+    day, weekday, dte_n, dte_s, a, b=None, c=None, scored=True, source="reconstructed", status=""
+):
     def block(v):
         return None if v is None else {"per_lot_day": v}
 
@@ -13,7 +15,8 @@ def _row(day, weekday, dte_n, dte_s, a, b=None, c=None, scored=True):
         "day": day,
         "weekday": weekday,
         "scored": scored,
-        "source": "reconstructed",
+        "source": source,
+        "status": status,
         "dte": {"NIFTY": dte_n, "SENSEX": dte_s},
         "lists": {
             "A": block(a),
@@ -48,9 +51,9 @@ def test_next_session_skips_weekend_and_holidays():
     )
 
 
-def test_conditions_describe_an_expiry_day():
-    labels = [c.label for c in tomorrow.conditions("Thu", "3", "0")]
-    assert labels == ["all days", "Thu sessions", "SENSEX expiry day", "Thu and SENSEX expiry day"]
+def test_the_rows_are_fixed_in_advance_and_the_same_on_an_expiry_day():
+    expiry = [c.label for c in tomorrow.conditions("Thu", "3", "0")]
+    assert expiry == ["all days", "Thu sessions", "NIFTY 3 / SENSEX 0 days to expiry"]
     plain = [c.label for c in tomorrow.conditions("Mon", "2", "1")]
     assert plain == ["all days", "Mon sessions", "NIFTY 2 / SENSEX 1 days to expiry"]
 
@@ -62,7 +65,7 @@ def test_build_counts_only_scored_days_before_the_target_day():
     ]
     t = tomorrow.build(date(2026, 3, 1), rows, "Thu", "3", "0")
     by_label = {label: (n, stats) for label, n, stats in t.rows}
-    n, stats = by_label["SENSEX expiry day"]
+    n, stats = by_label["NIFTY 3 / SENSEX 0 days to expiry"]
     assert n == 12  # the Thursdays; the 2026-03-30 row is after the day
     assert stats["A"] == (1.0, 100.0)
     assert by_label["all days"][0] == 59
@@ -77,7 +80,7 @@ def test_render_flags_thin_samples_and_says_it_is_not_a_forecast():
     t = tomorrow.build(date(2026, 3, 1), _history(), "Thu", "3", "0")
     text = tomorrow.render(t)
     assert "Tomorrow 2026-03-01 (Thu)" in text
-    assert "SENSEX expiry day (12d (thin))" in text
+    assert "NIFTY 3 / SENSEX 0 days to expiry (12d, thin)" in text
     assert "not a forecast" in text
     assert "Steady" in text and "Adaptive" in text and "Calendar" not in text
 
@@ -111,7 +114,7 @@ def test_render_shows_the_picks_with_probabilities_and_no_vix_wording():
     e = tomorrow.build_expected(
         base, by_band, order, "mid", {"low": 0.25, "mid": 0.5, "high": 0.25}
     )
-    t = tomorrow.Tomorrow(date(2026, 10, 15), "Thu", "4", "0", "calendar", [], {}, 10, e)
+    t = tomorrow.Tomorrow(date(2026, 10, 15), "Thu", "4", "0", [], {}, 10, 0, 0, e)
     text = tomorrow.render(t)
     assert "Expected picks if the conditions at the close stay the same:" in text
     assert "Steady: s1 (75%), s2 (100%), s3 (100%)" in text
@@ -119,3 +122,51 @@ def test_render_shows_the_picks_with_probabilities_and_no_vix_wording():
     assert "Adaptive +" not in text  # Adaptive does not change in that scenario
     assert "VIX" not in text and "Calendar" not in text
     assert "The final picks are recorded at 09:16." in text
+
+
+def test_history_says_how_many_days_were_recorded_forward_and_how_many_re_scored():
+    rows = _history()
+    rows[-1] = {**rows[-1], "source": "recorded"}
+    rows[-2] = {**rows[-2], "source": "recorded"}
+    t = tomorrow.build(date(2026, 3, 2), rows, "Thu", "3", "0")
+    assert (t.sessions, t.forward) == (60, 2)
+    text = tomorrow.render(t)
+    assert (
+        "60 sessions, of which 2 recorded forward and 58 re-scored from history (in-sample)" in text
+    )
+
+
+def test_a_late_recording_and_a_day_missing_a_list_are_not_used():
+    rows = _history() + [
+        _row("2026-02-20", "Mon", "2", "2", 5000.0, source="recorded", status="late"),
+        _row("2026-02-21", "Mon", "2", "2", 5000.0, c=None, source="recorded"),
+    ]
+    rows[-1]["lists"]["C"] = None
+    t = tomorrow.build(date(2026, 3, 2), rows, "Mon", "2", "2")
+    assert t.sessions == 60  # neither extra row counts
+    assert t.forward == 0
+
+
+def test_the_fixed_base_is_shown_next_to_the_lists_over_the_same_days():
+    rows = _history()
+    base = {r["day"]: 50.0 for r in rows}
+    t = tomorrow.build(date(2026, 3, 2), rows, "Thu", "3", "0", base)
+    by_label = {label: stats for label, _, stats in t.rows}
+    assert by_label["all days"]["base"] == (1.0, 50.0)
+    assert t.base_days == 60
+    assert "Base 100% +50" in tomorrow.render(t)
+    without = tomorrow.build(date(2026, 3, 2), rows, "Thu", "3", "0")
+    assert all("base" not in stats for _, _, stats in without.rows)
+
+
+def test_an_unlikely_scenario_is_not_listed():
+    order = ["low", "mid", "high"]
+    base = _picks(["s1", "s2", "s3"], ["s1", "s2", "s3"])
+    by_band = {"low": _picks(["s9", "s2", "s3"], ["s9", "s2", "s3"]), "mid": base, "high": base}
+    e = tomorrow.build_expected(
+        base, by_band, order, "mid", {"low": 0.01, "mid": 0.9, "high": 0.09}
+    )
+    text = tomorrow.render(
+        tomorrow.Tomorrow(date(2026, 10, 15), "Thu", "4", "0", [], {}, 0, 0, 0, e)
+    )
+    assert "calmer open" not in text

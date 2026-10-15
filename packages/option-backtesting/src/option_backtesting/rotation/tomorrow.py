@@ -1,10 +1,14 @@
-"""The "tomorrow" section of the evening result message: how the three public strategies have done
-on days like the next session, from the stored history. Read-only.
+"""The "tomorrow" section of the evening result message: the expected picks for the next session
+and how Steady and Adaptive (and the fixed base) have done on days like it, from the stored history.
+Read-only.
 
-It is a historical frequency, not a forecast. The next session's weekday and days to expiry are
-known tonight; its gap, opening range and VIX are not, and none of those separated winning from
-losing days in the study behind this, so they are left out. Every figure is a one-lot gross
-per-lot-day basket result (what the research log holds), over the days since `HISTORY_FROM`."""
+It is a historical frequency, not a forecast. The rows are fixed in advance and do not depend on
+any result: all days, the same weekday, and the same (NIFTY, SENSEX) days to expiry. A row is never
+added or dropped because of how it performed. The next session's gap, opening range and VIX are not
+known tonight and none of them separated winning from losing days in the study behind this, so they
+are left out. Every figure is a one-lot gross per-lot-day basket result, over the days since
+`HISTORY_FROM`. Most of those days were re-scored from history, after the rule's weights were
+chosen on them, so they are in-sample; the message says how many were recorded forward."""
 
 from __future__ import annotations
 
@@ -14,12 +18,14 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from . import daylog
-from .lists import DISPLAY_NAMES
+from .lists import DISPLAY_NAMES, PUBLIC_KEYS
 
-#: the lists shown: Steady (A) and Adaptive (C); Calendar is left out of the tomorrow section
-LIST_KEYS = ("A", "C")
+#: the lists shown: the public ones (Steady and Adaptive); the base is a separate column
+LIST_KEYS = PUBLIC_KEYS
+BASE_KEY = "base"
 #: the first scored day of the recent history (63 days of warm-up after the store began)
 HISTORY_FROM = date(2025, 1, 10)
+MIN_SCENARIO = 0.05  # a change less likely than this is not worth a line
 MIN_DAYS = 10  # a condition with fewer days than this is not shown
 THIN_DAYS = 30  # fewer than this is flagged
 RECENT = 21  # sessions in the "recent form" line
@@ -60,10 +66,11 @@ class Tomorrow:
     weekday: str
     dte_n: str
     dte_s: str
-    source: str
     rows: list[tuple[str, int, dict[str, tuple[float, float]]]]  # label, days, {list: (win, avg)}
     recent: dict[str, float]  # list -> win rate of the last RECENT scored sessions
     sessions: int
+    forward: int = 0  # of `sessions`, recorded forward (the rest were re-scored from history)
+    base_days: int = 0  # sessions with a scored base figure
     expected: Expected | None = None
 
 
@@ -77,7 +84,15 @@ def next_session(day: date, holidays: dict[date, str] | None = None) -> date:
 
 
 def _scored(rows: Iterable[dict]) -> list[dict]:
-    return [r for r in rows if r.get("scored") and r.get("source") in ("recorded", "reconstructed")]
+    """Recorded-forward and re-scored days that have a figure for every list shown; a late
+    recording is not a pick that was fixed before the open, so it is left out."""
+    return [
+        r
+        for r in rows
+        if r.get("source") in ("recorded", "reconstructed")
+        and r.get("status") != "late"
+        and all(_per_lot_day(r, k) is not None for k in LIST_KEYS)
+    ]
 
 
 def _per_lot_day(row: dict, key: str) -> float | None:
@@ -85,43 +100,41 @@ def _per_lot_day(row: dict, key: str) -> float | None:
     return None if not block else block.get("per_lot_day")
 
 
-def _stats(rows: list[dict]) -> dict[str, tuple[float, float]]:
+def _win_avg(values: list[float]) -> tuple[float, float]:
+    return sum(1 for v in values if v > 0) / len(values), sum(values) / len(values)
+
+
+def _stats(
+    rows: list[dict], base: dict[str, float] | None = None
+) -> dict[str, tuple[float, float]]:
+    """Win rate and mean ₹ per lot-day of each list over `rows`, plus the fixed base over the
+    same days when `base` (day -> per-lot gross) has them."""
     out: dict[str, tuple[float, float]] = {}
     for key in LIST_KEYS:
         values = [v for v in (_per_lot_day(r, key) for r in rows) if v is not None]
         if values:
-            out[key] = (sum(1 for v in values if v > 0) / len(values), sum(values) / len(values))
+            out[key] = _win_avg(values)
+    if base:
+        values = [base[r["day"]] for r in rows if r["day"] in base]
+        if values:
+            out[BASE_KEY] = _win_avg(values)
     return out
 
 
 def conditions(weekday: str, dte_n: str, dte_s: str) -> list[Condition]:
-    """The conditions that describe the next session and are known tonight."""
+    """The rows: fixed in advance from what is known tonight, never picked by their results."""
 
     def dte(row: dict, index: str) -> str | None:
         return (row.get("dte") or {}).get(index)
 
-    out = [
+    return [
         Condition("all days", lambda r: True),
         Condition(f"{weekday} sessions", lambda r: r.get("weekday") == weekday),
+        Condition(
+            f"NIFTY {dte_n} / SENSEX {dte_s} days to expiry",
+            lambda r: dte(r, "NIFTY") == dte_n and dte(r, "SENSEX") == dte_s,
+        ),
     ]
-    if dte_s == "0":
-        out.append(Condition("SENSEX expiry day", lambda r: dte(r, "SENSEX") == "0"))
-        out.append(
-            Condition(
-                f"{weekday} and SENSEX expiry day",
-                lambda r: r.get("weekday") == weekday and dte(r, "SENSEX") == "0",
-            )
-        )
-    if dte_n == "0":
-        out.append(Condition("NIFTY expiry day", lambda r: dte(r, "NIFTY") == "0"))
-    if dte_n != "0" and dte_s != "0":
-        out.append(
-            Condition(
-                f"NIFTY {dte_n} / SENSEX {dte_s} days to expiry",
-                lambda r: dte(r, "NIFTY") == dte_n and dte(r, "SENSEX") == dte_s,
-            )
-        )
-    return out
 
 
 def build(
@@ -130,18 +143,21 @@ def build(
     weekday: str,
     dte_n: str,
     dte_s: str,
-    source: str = "calendar",
+    base: dict[str, float] | None = None,
 ) -> Tomorrow:
-    """`rows` are daylog rows from before `day`; only scored ones are used."""
+    """`rows` are daylog rows; only scored ones from before `day` are used. `base` maps a day
+    ('YYYY-MM-DD') to the fixed base's gross per lot."""
     scored = [r for r in _scored(rows) if r["day"] < day.isoformat()]
     table: list[tuple[str, int, dict[str, tuple[float, float]]]] = []
     for cond in conditions(weekday, dte_n, dte_s):
         matched = [r for r in scored if cond.matches(r)]
         if len(matched) >= MIN_DAYS:
-            table.append((cond.label, len(matched), _stats(matched)))
+            table.append((cond.label, len(matched), _stats(matched, base)))
     tail = scored[-RECENT:]
     recent = {k: w for k, (w, _) in _stats(tail).items()} if len(tail) >= 5 else {}
-    return Tomorrow(day, weekday, dte_n, dte_s, source, table, recent, len(scored))
+    forward = sum(1 for r in scored if r.get("source") == "recorded")
+    base_days = sum(1 for r in scored if base and r["day"] in base)
+    return Tomorrow(day, weekday, dte_n, dte_s, table, recent, len(scored), forward, base_days)
 
 
 def _flat(picks: tuple[list[str], list[str]]) -> list[str]:
@@ -182,14 +198,15 @@ def build_expected(
     return Expected(base, likelihood, same, scenarios)
 
 
-def vix_transitions(root: Path) -> dict[str, dict[str, float]]:
-    """P(open band of the next session | band of this session's close), from the stored days."""
+def vix_transitions(root: Path, last_day: date | None = None) -> dict[str, dict[str, float]]:
+    """P(open band of the next session | band of this session's close), from the stored days up
+    to `last_day` (so a re-run for a past day never sees what came after it)."""
     from . import attrs as attrs_mod
     from . import store
     from .score import vix_band
 
     days = store.read_days(root)
-    ordered = sorted(days)
+    ordered = sorted(d for d in days if last_day is None or d <= last_day)
     counts: dict[str, dict[str, int]] = {}
     for prev, nxt in zip(ordered, ordered[1:], strict=False):
         close = attrs_mod.vix_close_from_lake(root, prev)
@@ -234,7 +251,7 @@ def expected_picks(
     base_band = score.vix_band(vix)
     if base_band not in by_band:
         return None
-    trans = vix_transitions(root).get(base_band) or {}
+    trans = vix_transitions(root, last_day).get(base_band) or {}
     weights = trans or {b: 1.0 if b == base_band else 0.0 for b in order}
     return build_expected(picks_at(vix), by_band, order, base_band, weights)
 
@@ -242,13 +259,18 @@ def expected_picks(
 def for_next_session(today: date, root: Path | None = None) -> Tomorrow:
     """The section for the session after `today`, from the stored history."""
     from ..fyers.daily import data_dir
+    from . import base as base_mod
     from .live import calendar_dte_labels
 
     root = root or data_dir()
     nxt = next_session(today)
     labels = calendar_dte_labels(nxt)
     log = daylog.build_log(root, start=HISTORY_FROM, source="all")
-    section = build(nxt, log["rows"], nxt.strftime("%a"), labels["dte_n"], labels["dte_s"])
+    try:  # the base is shown next to the lists; without its series the lists still go out
+        base = {d.isoformat(): v for d, v in base_mod.base_per_lot(root, "gross").items()}
+    except Exception:  # noqa: BLE001
+        base = {}
+    section = build(nxt, log["rows"], nxt.strftime("%a"), labels["dte_n"], labels["dte_s"], base)
     try:
         expected = expected_picks(nxt, root, labels["dte_n"], labels["dte_s"], today)
     except Exception:  # noqa: BLE001 - the base rates still go out without the picks
@@ -265,9 +287,10 @@ def render(t: Tomorrow) -> str:
             core, buy = e.picks[key]
             names = [f"{n} ({100 * e.likelihood[key].get(n, 0):.0f}%)" for n in [*core, *buy]]
             lines.append(f"  {DISPLAY_NAMES[key]}: {', '.join(names)}")
-        if e.scenarios:
+        shown = [sc for sc in e.scenarios if sc.probability >= MIN_SCENARIO][:3]
+        if shown:
             lines.append("Probable changes if the opening conditions shift:")
-            for sc in e.scenarios[:3]:
+            for sc in shown:
                 grouped: dict[tuple, list[str]] = {}
                 for key in LIST_KEYS:
                     added, dropped = sc.changes[key]
@@ -283,17 +306,26 @@ def render(t: Tomorrow) -> str:
                 ]
                 lines.append(f"  {sc.label} (~{100 * sc.probability:.0f}%): " + "; ".join(parts))
         lines.append("The final picks are recorded at 09:16.")
-    lines.append(f"History: {t.sessions} sessions · win rate and average ₹ per lot-day, gross")
+    inside = t.sessions - t.forward
+    lines.append(
+        f"History: {t.sessions} sessions, of which {t.forward} recorded forward and {inside} "
+        "re-scored from history (in-sample). Win rate and average ₹ per lot-day, gross."
+    )
     for label, n, stats in t.rows:
-        flag = " (thin)" if n < THIN_DAYS else ""
+        flag = ", thin" if n < THIN_DAYS else ""
         cells = "  ".join(
             f"{DISPLAY_NAMES[k]} {100 * stats[k][0]:.0f}% {stats[k][1]:+,.0f}"
             for k in LIST_KEYS
             if k in stats
         )
+        if BASE_KEY in stats:
+            cells += f"  Base {100 * stats[BASE_KEY][0]:.0f}% {stats[BASE_KEY][1]:+,.0f}"
         lines.append(f"  {label} ({n}d{flag}): {cells}")
     if t.recent:
         cells = ", ".join(f"{DISPLAY_NAMES[k]} {100 * w:.0f}%" for k, w in t.recent.items())
         lines.append(f"  Last {RECENT} sessions' win rate: {cells}")
-    lines.append("Historical frequency, not a forecast; the opening conditions are not known yet.")
+    lines.append(
+        "Historical frequency, not a forecast and not evidence of an edge over the base; the "
+        "opening conditions are not known yet."
+    )
     return "\n".join(lines)

@@ -137,7 +137,8 @@ def result(
     except ResultUnavailable as error:
         typer.echo(f"result not ready: {error}", err=True)
         raise typer.Exit(2) from error
-    if tomorrow:
+    already_sent = telegram and not force and was_sent(completed)
+    if tomorrow and not already_sent:
         # never let the extra section stop the result going out
         try:
             from . import tomorrow as tomorrow_mod
