@@ -87,11 +87,11 @@ Nothing is adopted from this item; a survivor goes to Stage 2 (engine-exact) and
   | A1 cut at a profit target | T (₹) | 2,000, 3,000, 4,000 | 3 |
   | A2 profit lock | arm A, then close when profit falls back to A / 2 | A = 2,000, 3,000, 4,000 | 3 |
   | A3 lock and trail | as A2, then the lock rises A / 4 for every A / 2 more profit | A = 2,000, 3,000, 4,000 | 3 |
-  | B roll the decayed leg | leg price ≤ f × its entry | f = 15 %, 25 %, 35 % | |
+  | B roll the decayed leg | leg price ≤ f × its entry | f = 15 %, 25 %, 35 %, 45 %, 50 %, 70 % (owner, 2026-10-15) | |
   | | only after day profit ≥ ₹3,000, or at any time | 2 | |
   | | fresh stop on the new leg | 21 %, 30 % | |
-  | | new leg strike | the base's own strike type | 12 |
-  | B′ roll to ATM | as B with the new leg at ATM, 21 %, profit ≥ ₹3,000, ITM bases only | f = 15 %, 25 %, 35 % | 3 (ITM1, ITM2 bases: 6) |
+  | | new leg strike | the base's own strike type (ATM bases roll to ATM, ITM1 to ITM1, ITM2 to ITM2) | 24 |
+  | B′ roll to ATM | as B with the new leg at ATM, 21 %, profit ≥ ₹3,000; ITM1 and ITM2 bases only (an ATM base already rolls to ATM) | f = 15 %, 25 %, 35 %, 45 %, 50 %, 70 % | 6 |
   | C restart after a cut | after A1 target T, 1 or 2 restarts | T = 2,000, 3,000, 4,000 | 6 |
   | | after an A2 lock cut, 1 or 2 restarts | A = 3,000, 4,000 | 4 |
 
@@ -99,7 +99,9 @@ Nothing is adopted from this item; a survivor goes to Stage 2 (engine-exact) and
   stop applies afresh); no restart or roll after 14:00 (roll: 13:30); one roll per leg. The
   restart comparator also includes the same strategy entered at the next later slot. The MTM stop
   is not varied here; a survivor's ₹2,000 / ₹3,000 / ₹4,000 sensitivity is a Phase 3 check.
-  About 35 variants per base, about 3,000 cells.
+  About 19 screen variants (A, C) per base now, 24 more roll variants per base (plus 6 roll-to-ATM on
+  ITM bases) in Phase 2: about 4,000 cells in all. ATM, ITM1 and ITM2 are all bases: the screen is
+  not ITM only.
 - **Look-ahead check:** a trigger reads only the minute's own bar and earlier; a roll / restart
   enters at the next minute's open, as RE ASAP does. No trigger reads the day's final result.
 - **Charges:** the BL-096 model on every order, including the extra ones from rolls and restarts.
@@ -198,3 +200,6 @@ Nothing is adopted from this item; a survivor goes to Stage 2 (engine-exact) and
   realised plus open, immediate restart at the next minute, decay 15 / 25 / 35 %). Strike axis
   widened to ATM / ITM1 / ITM2 from the BL-104 winners. Phase 0 values frozen here; Phase 1
   (A and C) builds first, B waits for engine support.
+- 2026-10-15 — owner amended the roll trigger before any run: f = 15 / 25 / 35 / 45 / 50 / 70 %
+  (was 15 / 25 / 35), and confirmed the screen runs ATM bases as well as ITM1 / ITM2, not ITM only.
+  Phase 2 roll count rises from 12 + 3 to 24 + 6 per base.
