@@ -264,11 +264,14 @@ Nothing is adopted from this item; a survivor goes to Stage 2 (engine-exact) and
 
   Roll to ATM (ITM bases only): −34 to +4 on NIFTY, −9 to +13 on SENSEX. Tight triggers do
   almost nothing because they seldom fire; looser ones fire more and lose money, with a deeper
-  drawdown (up to +17 % on NIFTY at 70 % any time) and a worse worst day (₹0 to ₹170 on the
-  mean, ₹168 at NIFTY 70 % any time). The best case in any slot-count is 1 of 7 slots with a
-  gain of ₹10–21, under the ₹25 kill line and not significant. The owner's reasoning that the new
+  maximum drawdown (up to +17 % on NIFTY at 70 % any time) while the single worst day is slightly
+  *better* than the base's (the mean change is ₹0 to +₹170; e.g. −₹4,324 against −₹5,264 at
+  NIFTY 70 % any time): closing the decayed leg early trims one bad day but gives up the leg's
+  remaining decay over many days. The best case in any slot-count is 1 of 7 slots with a gain
+  of ₹10–21, under the ₹25 kill line and not significant. The owner's reasoning that the new
   leg's own 21–30 % stop bounds the risk holds (the downside is small), but there is no edge to
   collect against it: the base's decay on the other leg is already the profit, and a roll adds two
-  orders and re-opens gamma at a new ATM. A 30 % stop on the new leg was no better than 21 %.
+  orders and re-opens gamma at a new ATM. A 30 % stop on the new leg against 21 % changes the
+  mean gain by only −4 to +12 per lot-day depending on the trigger, with no consistent winner.
   All three ideas are closed under their registered rules; the SENSEX morning restart lead (above)
   remains the one thing to carry forward, as a hypothesis for a new registered test, not a result.
