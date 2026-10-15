@@ -266,6 +266,14 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   luck line will be higher than the 216-candidate one (+₹458), so a kill is the expected outcome and
   is not evidence of no effect.
 - **Will not run:** ATM and premium strikes; per-slot settings; values outside the Stage 1 grid.
+- **Result (2026-10-15): kill — the template stands on expiry days.** `otm1_one_setting.py --days
+  expiry --strikes OTM1,OTM2,OTM3` (outputs `results/otm1-2-3_expiry/`). Every top-5 setting in
+  both directions is OTM1, the same as the OTM1-only expiry run; the luck line is +₹460 (first →
+  test) and +₹357 (test → first); 0 of 648 pass. Best per strike, pooled over both years
+  (descriptive, gain over the template a lot-day): OTM1 SL 150 % / trail 25/15 / MTM ₹4,000 / RE ×1
+  +117; OTM2 SL 150 % / no trail / MTM ₹4,000 / RE ×1 −2; OTM3 SL 150 % / no trail / MTM ₹3,000 /
+  RE ×1 −135. Moving further out of the money loses on expiry days; the loosest leg stop leads every
+  strike.
 
 ## Risks
 

@@ -75,13 +75,13 @@ def load(tag: str, slots: tuple[str, ...], days_kind: str = "all"):
     return out
 
 
-def candidates(labels: list[str]) -> list[dict]:
-    """Cells with strike OTM1 and a day MTM stop; params decoded from the label via grid.cells."""
+def candidates(labels: list[str], strikes: tuple[str, ...] = (STRIKE,)) -> list[dict]:
+    """Cells with one of `strikes` and a day MTM stop; params decoded via grid.cells."""
     out = []
     for slot_cells in [grid.cells("W", "N", grid.SLOTS[0], with_template=False)]:
         for c in slot_cells:
             p = c.params
-            if p["strike"] == STRIKE and p["mtm"] is not None:
+            if p["strike"] in strikes and p["mtm"] is not None:
                 out.append(p)
     return out
 
@@ -169,23 +169,27 @@ def neighbours(p: dict) -> list[dict]:
 def pretty(p: dict) -> str:
     tr = "no trail" if p["trail"] is None else f"trail {p['trail'][0]}/{p['trail'][1]}"
     re = "no RE" if p["reentry"] is None else "RE cost×1"
-    return f"SL {p['sl']}%, {tr}, MTM ₹{p['mtm']:,}, exit {p['exit']}, {re}"
+    head = "" if p["strike"] == STRIKE else f"{p['strike']} "
+    return f"{head}SL {p['sl']}%, {tr}, MTM ₹{p['mtm']:,}, exit {p['exit']}, {re}"
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", default="stage1")
     ap.add_argument("--days", default="all", choices=("all", "expiry", "other"))
+    ap.add_argument("--strikes", default=STRIKE, help="comma list, e.g. OTM1,OTM2,OTM3")
     args = ap.parse_args()
     data = load(args.tag, grid.SLOTS, args.days)
     labels = data[grid.SLOTS[0]][1]
-    cands = candidates(labels)
+    strikes = tuple(args.strikes.split(","))
+    cands = candidates(labels, strikes)
     first = lambda d: d < CUT  # noqa: E731
     test = lambda d: d >= CUT  # noqa: E731
-    out_dir = HERE / "results" / ("otm1" if args.days == "all" else f"otm1_{args.days}")
+    stem = "otm1" if strikes == (STRIKE,) else "otm" + "-".join(x.removeprefix("OTM") for x in strikes)
+    out_dir = HERE / "results" / (stem if args.days == "all" else f"{stem}_{args.days}")
     out_dir.mkdir(parents=True, exist_ok=True)
     print(
-        f"{len(cands)} OTM1 candidates with a day stop, {len(grid.SLOTS)} slots, days={args.days}: "
+        f"{len(cands)} candidates ({','.join(strikes)}) with a day stop, {len(grid.SLOTS)} slots, days={args.days}: "
         f"{len(data[grid.SLOTS[0]][0])} per slot "
         f"({sum(d < CUT for d in data[grid.SLOTS[0]][0])} first year)\n"
     )
@@ -287,6 +291,11 @@ def main() -> None:
         w.writerow(["settings", "mean_gain", "lo90", "hi90", "slots_pos", "slots_risk_ok", *[f"gain_{s}" for s in grid.SLOTS]])
         for r in pooled_rows:
             w.writerow([pretty(r["params"]), r["chk_mean"], r["chk_lo"], r["chk_hi"], sum(g > 0 for g in r["chk_gain"]), r["chk_pass"], *r["chk_gain"]])
+    if len(strikes) > 1:
+        print("best per strike, pooled (descriptive):")
+        for k in strikes:
+            r = next(x for x in pooled_rows if x["params"]["strike"] == k)
+            print(f"   {pretty(r['params']):52s}{r['chk_mean']:+7.0f}  slots>0 {sum(g > 0 for g in r['chk_gain'])}/7  risk-ok {r['chk_pass']}/7")
     print()
     # PBO over the 216 at each slot (test year), 8 blocks
     pbos = []
