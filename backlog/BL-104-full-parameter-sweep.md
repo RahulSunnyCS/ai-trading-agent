@@ -283,7 +283,7 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   | Widesl SENSEX 12:17–14:02 | ₹320 premium, SL 40 %, trail 25/15, MTM ₹4,000, RE cost ×1 | 242 | 76 | regime flag |
   | Dir SENSEX 09:17–10:02 (tail) | ATM, SL 20 %, trail 10/5, MTM ₹3,000, RE cost ×2 | 355 | 251 | re-entry parity (BL-009) |
   | Dir SENSEX 10:17–12:02 (tail) | ITM2, SL 15 %, trail 10/5, MTM ₹3,000, RE cost ×2 | 495 | 287 | re-entry parity |
-  | Dir SENSEX 12:17–14:02 (tail) | ITM1, SL 30 %, trail 10/5, MTM none, RE cost ×2 | 258 | 127 | re-entry parity |
+  | Dir SENSEX 12:17–14:02 (tail) | ITM1, SL 30 %, trail 10/5, MTM none, RE cost ×2 | 258 | 127 | re-entry parity; no day stop (fails the owner's real-stop rule) |
 
   Breadth (rule 4) removed Buy SENSEX 10:17 and 13:02, Widesl NIFTY 10:17–11:32 and 14:32, and Dir
   NIFTY 13:02. **Slippage** (Phase 3; winner minus template at its band slots): at 0.25 % per fill
