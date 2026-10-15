@@ -335,6 +335,21 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   when they behave differently, otherwise the best). Nothing clears → the default stays; the slot
   is "owner to choose" (top three listed) only when the default loses to the template in both years.
   Every row spells out every parameter (owner, 2026-10-16), read from the built strategy.
+- **Amendment 2 (2026-10-16, owner, before any list was read): premium is searched, not fixed.**
+  The premium families are consolidated into four: NIFTY Widesl premium (was N_p80 / N_p100), SENSEX
+  Widesl premium (S_p250 / S_p320), NIFTY Buy premium (N_buy), SENSEX Buy premium (S_buy). Coarse
+  premiums (₹, closest premium): NIFTY Widesl 40, 60, 80, 100, 120, 150; SENSEX Widesl 100, 150, 200,
+  250, 320, 400; NIFTY Buy 20, 30, 50, 75, 100; SENSEX Buy 30, 50, 90, 150, 225; each with every
+  setting of its family (216 Widesl with a day MTM stop, 324 Buy), 7 slots (new cells tag
+  `premium_coarse`). **Refine:** per family, slot and day type, the premium whose best setting has the
+  highest gain over the template is the area; the midpoints to its coarse neighbours (rounded to ₹5;
+  one step beyond at an end of the range) are run with every setting (tag `premium_refine`).
+  **Choose:** comparator and default = the better (higher net on those days) of the family's current
+  rotation files at that slot; the four conditions as Amendment 1; up to **three** picks with
+  different premiums are kept (owner: "top 2 or 3"), a later one dropped only when its daily P&L
+  correlates ≥ 0.9 with a kept one (a near-duplicate); correlations are printed for every pair.
+  Separately for expiry and non-expiry days. The strike families (N_wide, S_wide, the four Dir)
+  are unchanged from Amendment 1.
 
 ## Risks
 
