@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — owner's question; descriptive, nothing in the rotation changes |
-| **Status** | In progress |
+| **Status** | Done |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-15 |
@@ -84,3 +84,16 @@ Committed before `research/bl110/persistence.py` is run.
 ## Log
 
 - 2026-10-15 — created; Phase 0 registered before any run.
+- 2026-10-15 — **Run** (`research/bl110/persistence.py`; `persistence_2026-10-15.json`). 1,175
+  sessions, 2022-01-03 to 2026-10-15; median day range 0.86%, opening range 0.40%. Registered rule:
+  **range persists: supported** (lag-1 autocorrelation 0.41 [0.32, 0.48] and 0.35 [0.23, 0.43];
+  next-day ratio expanded minus range-bound +0.34 and +0.26, both ≥ 0.15); **beyond VIX: supported**
+  (coefficient 0.20 [0.14, 0.25] and 0.13 [0.05, 0.21] with VIX in the model); **opening range
+  informative: supported** (Spearman 0.30 and 0.33). Read the result as: expansion persists (next
+  five sessions about 1.2 to 1.3 times the norm); range-bound does **not** shrink the next ranges
+  (0.95 to 1.09 times) and only raises the chance of another quiet day (0.42 to 0.44 vs 0.32).
+  Not a trading rule; findings page `research/options/common/index-range-persistence.md`.
+  The owner asked whether daily candles would do: for the day-range tests they give the same
+  numbers; the opening-range test needs minutes. A 2016 to 2021 daily-candle confirmation is a
+  possible follow-up (needs the Fyers token); not run.
+
