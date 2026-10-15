@@ -148,6 +148,33 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   `obt legwise rerun --strategies-dir strategies/sweep_finalists` after `obt daily` (no
   evening-pipeline change); read-out after 60 forward days.
 
+## Experiments
+
+### 2026-10-15 — NIFTY Widesl OTM1: does one setting beat the Core-298 template at most times of day?
+- **Hypothesis:** with NIFTY, Widesl and OTM1 fixed, one combination of leg stop, trail, MTM stop,
+  exit and re-entry beats the Core-298 template (`N_wide_*`: 115 %, trail 15/10, MTM ₹2,500, 15:28,
+  no re-entry) at most entry times, on return without a worse drawdown or worst day.
+- **Universe:** the 216 Stage 1 cells with strike OTM1 and a day MTM stop (leg SL 40–150 % × trail
+  none / 15/10 / 25/15 × MTM 2,000 / 3,000 / 4,000 × exit 15:10 / 15:28 × re-entry none / cost ×1;
+  "MTM none" excluded by the owner's real-stop rule and reported separately), at the 7 sampled slots,
+  from the stored day × cell series (after charges); the template cell is the same series.
+- **Look-ahead check:** paired daily differences against the template on the same days; selection on
+  the first year only (2024-10-09 → 2025-10-08), the test year (2025-10-09 → 2026-10-09) read once;
+  the reverse split reported too.
+- **Pass / kill rule (owner: return first, drawdown and worst day as priorities, balanced):** a
+  candidate passes a slot when its mean gain per lot-day > 0 and its max drawdown ≤ 1.1 × and its
+  worst day and five worst days ≤ 1.25 × the template's. It passes the experiment when, chosen on
+  the first year, it (1) passes ≥ 5 of the 7 slots in the test year, (2) has a 5-day block-bootstrap
+  90 % interval of the mean gain over the 7 slots above zero in the test year, (3) beats the
+  95th percentile of the best-of-216 gain under 1,000 paired sign flips (the luck line), (4) sits on a
+  plateau (median gain of its grid neighbours ≥ 70 % of its own), and (5) stays ahead at 0.5 %
+  slippage. Kill: nothing passes; the template stands.
+- **Hold-out:** none unseen beyond the two-way split (both years were used by earlier items for other
+  selections). The 18 unsampled entry times are simulated afresh for the top 3 only, after the grid
+  answer, as the "most time zones" check across all 25.
+- **Will not run:** per-slot settings; strikes other than OTM1; values outside the Stage 1 grid.
+- **Result:** (after the run)
+
 ## Risks
 
 - Nothing is unseen: a result here is in-sample by construction; the forward test is the only
