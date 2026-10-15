@@ -67,7 +67,7 @@ def test_build_counts_only_scored_days_before_the_target_day():
     by_label = {label: (n, stats) for label, n, stats in t.rows}
     n, stats = by_label["NIFTY 3 / SENSEX 0 days to expiry"]
     assert n == 12  # the Thursdays; the 2026-03-30 row is after the day
-    assert stats["A"] == (1.0, 100.0)
+    assert stats["C"] == (1.0, 100.0)
     assert by_label["all days"][0] == 59
 
 
@@ -82,7 +82,7 @@ def test_render_flags_thin_samples_and_says_it_is_not_a_forecast():
     assert "Tomorrow 2026-03-01 (Thu)" in text
     assert "NIFTY 3 / SENSEX 0 days to expiry (12d, thin)" in text
     assert "not a forecast" in text
-    assert "Steady" in text and "Adaptive" in text and "Calendar" not in text
+    assert "Adaptive" in text and "Steady" not in text and "Calendar" not in text
 
 
 def _picks(a_core, c_core):
@@ -110,16 +110,16 @@ def test_expected_picks_carry_probabilities_and_probable_changes():
 def test_render_shows_the_picks_with_probabilities_and_no_vix_wording():
     order = ["low", "mid", "high"]
     base = _picks(["s1", "s2", "s3"], ["s1", "s2", "s4"])
-    by_band = {"low": _picks(["s9", "s2", "s3"], ["s1", "s2", "s4"]), "mid": base, "high": base}
+    by_band = {"low": _picks(["s1", "s2", "s3"], ["s9", "s2", "s4"]), "mid": base, "high": base}
     e = tomorrow.build_expected(
         base, by_band, order, "mid", {"low": 0.25, "mid": 0.5, "high": 0.25}
     )
     t = tomorrow.Tomorrow(date(2026, 10, 15), "Thu", "4", "0", [], {}, 10, 0, 0, e)
     text = tomorrow.render(t)
     assert "Expected picks if the conditions at the close stay the same:" in text
-    assert "Steady: s1 (75%), s2 (100%), s3 (100%)" in text
-    assert "calmer open (~25%): Steady +s9 -s1" in text
-    assert "Adaptive +" not in text  # Adaptive does not change in that scenario
+    assert "Adaptive: s1 (75%), s2 (100%), s4 (100%)" in text
+    assert "calmer open (~25%): Adaptive +s9 -s1" in text
+    assert "Steady" not in text
     assert "VIX" not in text and "Calendar" not in text
     assert "The final picks are recorded at 09:16." in text
 
@@ -170,3 +170,29 @@ def test_an_unlikely_scenario_is_not_listed():
         tomorrow.Tomorrow(date(2026, 10, 15), "Thu", "4", "0", [], {}, 0, 0, 0, e)
     )
     assert "calmer open" not in text
+
+
+def test_runners_up_are_the_best_unpicked_widesl_and_dir():
+    import numpy as np
+
+    from option_backtesting.rotation.score import Picks, runners_up
+
+    names = ["N_wide_0917", "N_wide_0932", "N_ditm1_0917", "N_ditm1_0932", "N_buy_1117"]
+    comp = np.array([5.0, 1.0, 4.0, 3.0, 9.0])
+    picks = Picks(["N_wide_0917", "N_ditm1_0917"], ["N_buy_1117"], False, {})
+    assert runners_up(comp, names, picks) == {"wide": "N_wide_0932", "dir": "N_ditm1_0932"}
+    assert runners_up(comp, names[:3], Picks(["N_wide_0917", "N_wide_0932"], [], False, {})) == {
+        "wide": None,
+        "dir": "N_ditm1_0917",
+    }
+
+
+def test_the_tomorrow_section_names_the_next_best_options_on_a_separate_line():
+    base = _picks(["s1", "s2", "s3"], ["s1", "s2", "s3"])
+    e = tomorrow.Expected(
+        base, {"C": {"s1": 1.0, "s2": 1.0, "s3": 1.0}}, 1.0, [], {"C": {"wide": "w9", "dir": "d9"}}
+    )
+    t = tomorrow.Tomorrow(date(2026, 10, 16), "Fri", "3", "6", [], {}, 0, 0, 0, e)
+    lines = tomorrow.render(t).splitlines()
+    assert lines[2].startswith("  Adaptive: s1")
+    assert lines[3] == "  Next best, optional: Widesl w9; Dir d9"

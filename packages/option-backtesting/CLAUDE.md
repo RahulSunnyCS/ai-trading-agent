@@ -128,18 +128,19 @@ Otherwise:
   `send(..., chat_id=...)` supports an explicit destination for the rotation pick's group copy;
   its environment configuration lives in the root `technical.md`.
   Rotation messages use `rotation/list_names.json` (also imported by the dashboard) for
-  display names, and omit Baseline and VIX from the picks and result text (the Tomorrow header shows days to
+  display names, add a separate "Next best, optional: Widesl …; Dir …" line under the picks (the best-ranked
+  unpicked variant of each kind; message text only, not stored in the journal entry), and omit Baseline and VIX from the picks and result text (the Tomorrow header shows days to
   expiry); the journal still stores all of them.
   `rotation/result.py` reads the completed picked variants' net results (after estimated costs),
   reports one lot per strategy with every picked strategy's contribution under its section, and
-  sends Steady / Adaptive after the evening pipeline finishes (Calendar and the baseline are recorded in the journal but not sent) (normally around 16:00).
+  sends Adaptive only after the evening pipeline finishes (Steady, Calendar and the baseline are recorded in the journal but not sent; `lists.PUBLIC_KEYS`) (normally around 16:00).
   A per-entry marker prevents a retry from sending it twice;
   `obt rotation result --force` explicitly resends it.
   `rotation/tomorrow.py` appends a "Tomorrow" section to that message (`--no-tomorrow` drops it; a failure in
   it never blocks the result, and it is skipped when the result was already sent): the expected picks for the
   next session (the 09:16 ranking re-run on the stored results with tonight's VIX close standing in for the
   open, a chance for each pick across the plausible opening bands, and the likely changes), then the win rate
-  and mean per-lot-day gross of Steady, Adaptive and the fixed base on all days, the same weekday and the same
+  and mean per-lot-day gross of Adaptive and the fixed base on all days, the same weekday and the same
   NIFTY/SENSEX days to expiry (daylog, since 2025-01-10; late recordings and days missing a list are left
   out; thin samples flagged). The rows are fixed in advance and never chosen by their results. Most of those
   days were re-scored from history, so they are in-sample: the message says how many were recorded forward.

@@ -58,6 +58,7 @@ class Expected:
     likelihood: dict[str, dict[str, float]]  # list -> strategy -> probability it is picked
     same: float  # probability the opening leaves the picks as they are
     scenarios: list[Scenario]
+    next_best: dict[str, dict[str, str | None]] | None = None  # list -> {wide, dir}
 
 
 @dataclass(frozen=True)
@@ -253,7 +254,15 @@ def expected_picks(
         return None
     trans = vix_transitions(root, last_day).get(base_band) or {}
     weights = trans or {b: 1.0 if b == base_band else 0.0 for b in order}
-    return build_expected(picks_at(vix), by_band, order, base_band, weights)
+    expected = build_expected(picks_at(vix), by_band, order, base_band, weights)
+    options = {k: v for k, v in pick.next_best(hist, day, vix, dte).items() if k in LIST_KEYS}
+    return Expected(
+        expected.picks,
+        expected.likelihood,
+        expected.same,
+        expected.scenarios,
+        options,
+    )
 
 
 def for_next_session(today: date, root: Path | None = None) -> Tomorrow:
@@ -279,6 +288,8 @@ def for_next_session(today: date, root: Path | None = None) -> Tomorrow:
 
 
 def render(t: Tomorrow) -> str:
+    from . import pick as pick_mod
+
     lines = [f"Tomorrow {t.day} ({t.weekday}): NIFTY {t.dte_n} / SENSEX {t.dte_s} days to expiry"]
     e = t.expected
     if e is not None:
@@ -287,6 +298,9 @@ def render(t: Tomorrow) -> str:
             core, buy = e.picks[key]
             names = [f"{n} ({100 * e.likelihood[key].get(n, 0):.0f}%)" for n in [*core, *buy]]
             lines.append(f"  {DISPLAY_NAMES[key]}: {', '.join(names)}")
+            extra = pick_mod.next_best_line((e.next_best or {}).get(key))
+            if extra:
+                lines.append(f"  {extra}")
         shown = [sc for sc in e.scenarios if sc.probability >= MIN_SCENARIO][:3]
         if shown:
             lines.append("Probable changes if the opening conditions shift:")
@@ -304,6 +318,8 @@ def render(t: Tomorrow) -> str:
                     + " ".join([*(f"+{n}" for n in a_), *(f"-{n}" for n in d_)])
                     for (a_, d_), who in grouped.items()
                 ]
+                if not parts:  # only a list that is not shown would change
+                    continue
                 lines.append(f"  {sc.label} (~{100 * sc.probability:.0f}%): " + "; ".join(parts))
         lines.append("The final picks are recorded at 09:16.")
     inside = t.sessions - t.forward
