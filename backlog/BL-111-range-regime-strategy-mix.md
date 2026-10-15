@@ -19,10 +19,11 @@ can switch to four or five wider (Widesl) sells."
 
 What the repo already says:
 
-- **BL-110:** NIFTY's day range persists. After an expanded session (range ≥ 1.25× the 20-session
-  median) the next five sessions average 1.2 to 1.3× the norm. After a quiet session (≤ 0.80×)
-  they are about normal (0.95 to 1.09×), not smaller; only the chance of another quiet day is
-  higher (0.42 to 0.44 vs 0.32). About half of the persistence is also in VIX.
+- **BL-110 (as corrected in its review):** NIFTY's day range persists in both directions. Against
+  the all-session average, the next day's range is about 0.14 of the baseline higher after an
+  expanded session (range ≥ 1.25× the 20-session median) and 0.12 to 0.15 lower after a quiet one
+  (≤ 0.80×), for several days. The coefficient on the previous range roughly halves once VIX is in
+  the model (R² 0.17 → 0.28), so VIX carries part of it and the range keeps the rest.
 - **BL-053 (killed):** a 10:00 VIX-move switch between 2 Dir + 2 Buy + 2 Widesl and 4 Widesl +
   1 Dir + 1 Buy beat each fixed mix by only +7.6% (needed 10%) with a worse drawdown, and most of
   its gain came from starting at 10:00, not from switching. Per lot, VIX-up days vs quiet days:
