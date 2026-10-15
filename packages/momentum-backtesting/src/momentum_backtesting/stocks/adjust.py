@@ -1340,7 +1340,8 @@ def refresh_core_benchmarks_csv(data_dir: Path, as_of: date | None = None) -> pd
     fresh = fresh[fresh.index <= pd.Timestamp(as_of or date.today())]
     existing = pd.read_csv(path, index_col=0, parse_dates=True)
     kept = existing.drop(columns=[c for c in fresh.columns if c in existing.columns])
-    fresh.join(kept, how="outer").to_csv(path)
+    # a row kept only for core columns (a part week written by a mid-week fetch) is now empty
+    fresh.join(kept, how="outer").dropna(how="all").to_csv(path)
     return fresh
 
 
