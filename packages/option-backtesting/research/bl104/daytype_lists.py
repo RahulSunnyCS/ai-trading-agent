@@ -331,11 +331,14 @@ BANDS = {  # Amendment 5 (owner, 2026-10-16)
     "09:15-10:30": ("09:17", "09:32", "09:47", "10:17"),
     "10:30-13:00": ("11:32",),
     "13:00-15:30": ("13:02", "14:32"),
+    "all times": grid.SLOTS,  # Amendment 6: the best across every time, no band
 }
 
 
 def slots_needed(n: int) -> int:
-    """Beat the template at all but one slot of a band of three or more, at every slot otherwise."""
+    """All 7 times (Amendment 6): 5 of 7. A band of three or more: all but one. Otherwise: all."""
+    if n == len(grid.SLOTS):
+        return 5
     return n - 1 if n >= 3 else n
 
 
@@ -599,8 +602,9 @@ def write_readme(lists: dict[str, list[dict]], premium_report: list[str]) -> Non
     lines = [
         "# Day-type strategy lists (BL-104, research leads — not adopted)",
         "",
-        "For every Core-298 family and each of three time bands — **09:15–10:30** (09:17, 09:32, 09:47,",
-        "10:17), **10:30–13:00** (11:32) and **13:00–15:30** (13:02, 14:32) — **one setting per day type",
+        "For every Core-298 family, for each of three time bands — **09:15–10:30** (09:17, 09:32, 09:47,",
+        "10:17), **10:30–13:00** (11:32) and **13:00–15:30** (13:02, 14:32) — and for **all times** (one",
+        "setting across all 7, beating the template at 5 or more of them): **one setting per day type",
         "that works across the band's entry times**, for **expiry days** and for",
         "**non-expiry days** (each index's own weekly expiries). The premium families (NIFTY / SENSEX",
         "Widesl, NIFTY / SENSEX Buy) also choose up to three premiums, each with its own setting.",
@@ -623,8 +627,13 @@ def write_readme(lists: dict[str, list[dict]], premium_report: list[str]) -> Non
         *[f"- {line}" for line in premium_report],
         "",
     ]
+    grouped: dict[str, list[dict]] = {}
     for kind, rows in lists.items():
-        title = "Expiry days" if kind == "expiry" else "Non-expiry days"
+        for band in BANDS:
+            grouped[f"{kind}|{band}"] = [r for r in rows if r["band"] == band]
+    for gkey, rows in grouped.items():
+        kind, band = gkey.split("|")
+        title = ("Expiry days" if kind == "expiry" else "Non-expiry days") + f" — {band}"
         lines += [f"## {title}", "",
                   "| Family | Band | Status | Index | Strategy | Strike | Range | Leg SL | Trail SL | MTM SL | Target | Re-entry | Exit | Net/lot-day (1st / test) | Template (1st / test) | Gain (1st / test) | Times better | Worst day × template |",
                   "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]

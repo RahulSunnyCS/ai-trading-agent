@@ -372,6 +372,9 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   union over bands and day types. Known weakness: the 10:30–13:00 band has one sampled slot and the
   13:00–15:30 band two, so "across the band" is barely tested there; adding sampled slots in those
   bands is the owner's call.
+- **Amendment 6 (2026-10-16, owner, same): a fourth group, "all times"** — the Amendment 4 choice
+  across all 7 slots (beat the template at 5 or more of the 7), reported as its own table beside
+  the three bands.
 
 ## Risks
 
