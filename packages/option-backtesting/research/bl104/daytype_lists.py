@@ -325,7 +325,7 @@ def evaluate(f: Family, slot: str, exp: set[date]) -> dict[str, Any]:
     return out
 
 
-def decide(f: Family, res: dict, kind: str) -> dict[str, Any]:
+def decide(f: Family, res: dict, kind: str, allowed: list[float] | None = None) -> dict[str, Any]:
     rows, tmpl = res["rows"], res["template"]
     dflt = rows[key(OWNER_DEFAULT[kind])] if f.name == "N_wide" else tmpl
 
@@ -337,14 +337,14 @@ def decide(f: Family, res: dict, kind: str) -> dict[str, Any]:
         )
 
     ok = sorted((r for r in rows.values() if clears(r)), key=lambda r: -r["gain"])
+    if f.is_premium and allowed is not None:
+        ok = [r for r in ok if r["params"]["strike"] in allowed]
     if ok and f.is_premium:
         picks: list[dict] = []
         for r in ok:
             if any(r["params"]["strike"] == k["params"]["strike"] for k in picks):
                 continue
             corr = [float(np.corrcoef(k["values"], r["values"])[0, 1]) for k in picks]
-            if any(c >= PREMIUM_DUP_CORR for c in corr):
-                continue
             if picks:
                 r["corr_with_first"] = corr[0]
             picks.append(r)
@@ -388,37 +388,44 @@ def write_yaml(f: Family, slot: str, kind: str, st: LegwiseStrategy, status: str
     return path
 
 
+def premium_scores(f: Family, kind: str, exp: dict, results: dict | None = None) -> dict[float, float]:
+    """Amendment 3: per premium, the mean over the 7 slots of the best setting's gain over the
+    template on this day type (the premium is chosen across entry times, never per slot)."""
+    per: dict[float, list[float]] = {}
+    for slot in grid.SLOTS:
+        res = (results or {}).get(slot) or evaluate(f, slot, exp[grid.INDICES[f.idx]])
+        best: dict[float, float] = {}
+        for r in res[kind]["rows"].values():
+            pr = r["params"]["strike"]
+            best[pr] = max(best.get(pr, -1e18), r["gain"])
+        for pr, g in best.items():
+            per.setdefault(pr, []).append(g)
+    return {pr: float(np.mean(v)) for pr, v in per.items() if len(v) == len(grid.SLOTS)}
+
+
 def refine_cells() -> None:
-    """Amendment 2 refine step: per premium family, slot and day type, the coarse premium whose
-    best setting gains most over the template is the area; add the midpoints to its coarse
-    neighbours (₹5 rounding), or one step beyond at an end of the range."""
+    """Amendment 3 refine step: per premium family and day type, the coarse premium with the best
+    slot-mean score is the area; add the midpoints to its coarse neighbours (₹5 rounding), or one
+    step beyond at an end of the range; the union over the two day types is run at all 7 slots."""
     exp = expiries()
     out, report = [], []
     for f in (x for x in FAMILIES if x.is_premium):
         coarse = sorted(f.premiums)
         base_strike = {"W": "OTM1", "B": "ATM"}[f.fam]
+        results = {slot: evaluate(f, slot, exp[grid.INDICES[f.idx]]) for slot in grid.SLOTS}
+        new: set[float] = set()
+        for kind in KINDS:
+            score = premium_scores(f, kind, exp, results)
+            area = max((p for p in score if p in coarse), key=score.get)
+            i = coarse.index(area)
+            lo = 5 * round((area + coarse[i - 1]) / 10) if i > 0 else max(5, 5 * round((2 * area - coarse[1]) / 5))
+            hi = (5 * round((area + coarse[i + 1]) / 10) if i < len(coarse) - 1
+                  else 5 * round((2 * area - coarse[-2]) / 5))
+            pts = [x for x in (lo, hi) if x not in coarse and x > 0]
+            new |= set(pts)
+            report.append(f"{f.name} {kind}: scores " + ", ".join(f"₹{p:g} {score[p]:+.0f}" for p in sorted(score))
+                          + f" -> area ₹{area:g}, add {pts}")
         for slot in grid.SLOTS:
-            res = evaluate(f, slot, exp[grid.INDICES[f.idx]])
-            new: set[float] = set()
-            for kind in KINDS:
-                best: dict[float, float] = {}
-                for r in res[kind]["rows"].values():
-                    pr = r["params"]["strike"]
-                    best[pr] = max(best.get(pr, -1e18), r["gain"])
-                area = max(best, key=best.get)
-                i = coarse.index(area)
-                pts = []
-                if i > 0:
-                    pts.append(5 * round((area + coarse[i - 1]) / 10))
-                else:
-                    pts.append(max(5, 5 * round((2 * area - coarse[1]) / 5)))
-                if i < len(coarse) - 1:
-                    pts.append(5 * round((area + coarse[i + 1]) / 10))
-                else:
-                    pts.append(5 * round((2 * area - coarse[-2]) / 5))
-                pts = [x for x in pts if x not in coarse and x > 0]
-                new |= set(pts)
-                report.append(f"{f.name} {slot} {kind}: area ₹{area:g} (best gain {best[area]:+.0f}) -> add {pts}")
             for c in grid.cells(f.fam, f.idx, slot, with_template=False):
                 prm = c.params
                 if prm["strike"] != base_strike or (f.fam == "W" and prm["mtm"] is None):
@@ -429,6 +436,27 @@ def refine_cells() -> None:
     path.write_text(json.dumps(out, default=list))
     print("\n".join(report))
     print(f"wrote {len(out)} cells to {path.name}")
+
+
+def family_premiums(f: Family, kind: str, exp: dict, results: dict) -> tuple[list[float], dict[float, float]]:
+    """Amendment 3: the family's premiums for a day type, top three by slot-mean score, a later one
+    dropped when its slot-mean daily P&L (best setting per slot) correlates >= 0.9 with a kept one."""
+    score = premium_scores(f, kind, exp, results)
+    curves: dict[float, np.ndarray] = {}
+    for pr in score:
+        parts = []
+        for slot in grid.SLOTS:
+            rows = [r for r in results[slot][kind]["rows"].values() if r["params"]["strike"] == pr]
+            parts.append(max(rows, key=lambda r: r["gain"])["values"])
+        curves[pr] = np.mean(parts, axis=0)
+    kept: list[float] = []
+    for pr in sorted(score, key=lambda p: -score[p]):
+        if any(float(np.corrcoef(curves[k], curves[pr])[0, 1]) >= PREMIUM_DUP_CORR for k in kept):
+            continue
+        kept.append(pr)
+        if len(kept) == 3:
+            break
+    return kept, score
 
 
 def main() -> None:
@@ -443,12 +471,22 @@ def main() -> None:
             for old in folder.glob("*.yaml"):
                 old.unlink()
     lists: dict[str, list[dict]] = {"expiry": [], "other": []}
+    premium_report = []
     for f in FAMILIES:
         underlying = grid.INDICES[f.idx]
-        for slot in grid.SLOTS:
-            res = evaluate(f, slot, exp[underlying])
+        results = {slot: evaluate(f, slot, exp[underlying]) for slot in grid.SLOTS}
+        allowed: dict[str, list[float] | None] = {k: None for k in KINDS}
+        if f.is_premium:
             for kind in KINDS:
-                dec = decide(f, res[kind], kind)
+                allowed[kind], score = family_premiums(f, kind, exp, results)
+                premium_report.append(
+                    f"{f.name} {KINDS[kind][0]}: premiums kept {['₹%g' % p for p in allowed[kind]]}; scores "
+                    + ", ".join(f"₹{p:g} {score[p]:+.0f}" for p in sorted(score))
+                )
+        for slot in grid.SLOTS:
+            res = results[slot]
+            for kind in KINDS:
+                dec = decide(f, res[kind], kind, allowed[kind])
                 t = res[kind]["template"]
                 for rank, r in enumerate(dec["picks"], 1):
                     st = build(f, slot, r["params"])
@@ -485,14 +523,15 @@ def main() -> None:
             w = csv.DictWriter(h, fieldnames=fields)
             w.writeheader()
             w.writerows(rows)
-    write_readme(lists)
+    write_readme(lists, premium_report)
+    print("\n".join(premium_report))
     for kind, rows in lists.items():
         changed = [r for r in rows if r["status"].startswith("chosen")]
         print(f"{KINDS[kind][0]}: {len(rows)} rows, {len(changed)} picks differ from the default, "
               f"{sum(r['status'] == 'owner to choose' for r in rows)} owner-to-choose")
 
 
-def write_readme(lists: dict[str, list[dict]]) -> None:
+def write_readme(lists: dict[str, list[dict]], premium_report: list[str]) -> None:
     lines = [
         "# Day-type strategy lists (BL-104, research leads — not adopted)",
         "",
@@ -513,6 +552,11 @@ def write_readme(lists: dict[str, list[dict]]) -> None:
         "to choosing noise. These files are for the forward journal, not proof. The engine has no day",
         "filter, so a file trades every day if run; the day type is in its folder and in its name (`EXP` /",
         "`NONEXP`).",
+        "",
+        "Premium families: the premium is chosen across all 7 entry times (Amendment 3), then the",
+        "settings per entry time among those premiums.",
+        "",
+        *[f"- {line}" for line in premium_report],
         "",
     ]
     for kind, rows in lists.items():

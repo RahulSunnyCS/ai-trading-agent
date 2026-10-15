@@ -350,6 +350,16 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   correlates ≥ 0.9 with a kept one (a near-duplicate); correlations are printed for every pair.
   Separately for expiry and non-expiry days. The strike families (N_wide, S_wide, the four Dir)
   are unchanged from Amendment 1.
+- **Amendment 3 (2026-10-16, owner, before the coarse premium results were read): the premium is
+  chosen across entry times, not per slot** (owner: "entry time we can consider as a constant … the
+  things which are working throughout the time"). Premium score, per family and day type = the mean
+  over the 7 slots of the best setting's gain over the template at that premium. **Refine:** only
+  around the top-scoring coarse premium (the midpoints to its coarse neighbours, ₹5 rounding; one
+  step beyond at an end), the union of the expiry and non-expiry areas, run at all 7 slots.
+  **Choose:** after the refine, the family's premiums for a day type are the top three by the same
+  score, dropping a premium whose slot-mean daily P&L correlates ≥ 0.9 with a kept one; the same
+  premiums hold at every slot. Within each slot, the Amendment 1 rule then picks the settings among
+  those premiums, keeping at most one setting per premium.
 
 ## Risks
 
