@@ -22,10 +22,10 @@ None.
 
 - NIFTY loses ₹20–44 per lot-day against the base after a target; SENSEX gains ₹18–33 at T = ₹3,000 or
   ₹4,000 on average, with at most 2 of 7 slots passing.
-- **Lead, not a result:** SENSEX restart after a ₹3,000 target gains ₹100–240 per lot-day in the
-  09:17–10:17 slots and loses ₹25–90 from 11:32 on (ITM1 and ITM2 bases, no leg trail). Its bootstrap
-  interval includes zero, and a morning-only rule would be chosen after seeing the result: it needs its
-  own registered test.
+- **Lead, not a result:** SENSEX restart after a ₹3,000 target gains ₹66–237 per lot-day in the
+  09:17–10:17 slots and loses ₹12–87 from 11:32 on (ITM1 and ITM2 bases, no leg trail). The bootstrap
+  lower bound is above zero in only 6 of the 16 morning cells, and a morning-only rule would be chosen
+  after seeing the result: it needs its own registered test.
 - Unlike a cut, a restart re-opens risk: the worst-day gate bound in 2 of the 1,596 cases.
 - Not computed: restart against simply entering at a later slot the same day (the registered
   comparator), so overlap with the rotation's later slots is unmeasured.
@@ -39,4 +39,3 @@ None.
 - [Profit target, lock and trail](profit-lock.md), [entry time](entry-time.md).
 
 [bl105]: ../../../../backlog/BL-105-dir-trade-management-tests.md
-[bl095]: ../../../../backlog/BL-095-portfolio-mtm-stop-in-rotation.md

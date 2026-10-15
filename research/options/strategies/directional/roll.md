@@ -27,16 +27,18 @@ Mean change against the unrolled base, ₹ per lot-day, 21 % stop on the new leg
 | 15 % | +5 / +7 | −1 / +2 |
 | 25 % | +1 / +2 | −13 / −5 |
 | 35 % | −15 / −6 | −15 / −10 |
+| 45 % | −20 / −13 | −19 / −5 |
 | 50 % | −21 / −18 | −30 / −8 |
 | 70 % | −35 / −31 | −33 / +6 |
 
 ## What we know
 
-- Rolls are rare at tight triggers (4 % of days at f = 15 %) and common at loose ones (53 % at 70 %);
-  tight triggers change nothing, loose ones lose money.
-- The risk is bounded as the owner expected: the worst single day is slightly better than the base's
-  and the maximum drawdown is 1–17 % deeper. There is simply no edge: the other leg's decay is already
-  the profit, and a roll adds two orders and re-opens risk at a new strike.
+- Rolls are rare at tight triggers (0.04 rolls per day at f = 15 %) and common at loose ones (0.53 per
+  day at 70 %; a day can hold two); tight triggers change nothing, loose ones lose money.
+- On average the risk is bounded as the owner expected: the worst single day is slightly better than
+  the base's and the maximum drawdown is 1–17 % deeper (means). Individual cases are worse: drawdown
+  up to 111 % deeper and a worst day up to ₹815 worse. There is no edge either way: the other leg's
+  decay is already the profit, and a roll adds two orders and re-opens risk at a new strike.
 - A 30 % stop on the new leg, and rolling to ATM, change the mean gain by only a few rupees either way.
 
 ## Not yet tested
@@ -48,4 +50,3 @@ Mean change against the unrolled base, ₹ per lot-day, 21 % stop on the new leg
 - [Re-entry](re-entry.md) (a roll uses the ASAP re-entry path), [profit rules](profit-lock.md).
 
 [bl105]: ../../../../backlog/BL-105-dir-trade-management-tests.md
-[bl095]: ../../../../backlog/BL-095-portfolio-mtm-stop-in-rotation.md
