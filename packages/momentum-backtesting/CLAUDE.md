@@ -590,7 +590,7 @@ contract, not a shared service).
 - `levers.py` / `reversal.py` — research levers from the 2026-10-01 alpha study (rank tables,
   `no_buy` masks, post-hoc overlays; the turnaround sleeve). `scripts/alpha_experiments.py`,
   `scripts/reversal_experiment.py` and `scripts/param_dry_run.py` reproduce every number in
-  `docs/momentum-parameters-reference.md`. Score any new lever over `sweep.rolling_windows`
+  `research/momentum/` (one page per parameter; was `docs/momentum-parameters-reference.md`). Score any new lever over `sweep.rolling_windows`
   with `sweep.rerun_windows` + `compare_rolling`, never on the full sample alone.
 - Broad Momentum gotcha: `engine.run_backtest` skips weeks with fewer than `top_n` ranked
   names unless `Config.min_ranked` is set; Broad needs `min_ranked=1` (API

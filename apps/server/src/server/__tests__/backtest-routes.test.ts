@@ -435,6 +435,27 @@ describe('leg-wise routes', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('POST backtest forwards bars and include_excluded and refuses an unknown bar size', async () => {
+    server = await buildTestServer();
+    const bad = await server.inject({
+      method: 'POST',
+      url: '/api/backtest/legwise/backtest',
+      payload: { strategy, bars: '15m' },
+    });
+    expect(bad.statusCode).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { days: [] }));
+    const ok = await server.inject({
+      method: 'POST',
+      url: '/api/backtest/legwise/backtest',
+      payload: { strategy, from: '2026-09-23', bars: '5m', include_excluded: true },
+    });
+    expect(ok.statusCode).toBe(200);
+    const init = (fetchMock.mock.calls[0] as [string, RequestInit])[1];
+    expect(JSON.parse(String(init.body))).toMatchObject({ bars: '5m', include_excluded: true });
+  });
+
   it('POST daily rejects a malformed date and forwards a good one', async () => {
     server = await buildTestServer();
     const bad = await server.inject({

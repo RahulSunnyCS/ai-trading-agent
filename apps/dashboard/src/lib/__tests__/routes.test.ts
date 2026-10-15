@@ -71,7 +71,6 @@ describe('routes', () => {
     ['/optionslab/builder', 'optionslab', ['builder']],
     ['/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
     ['/optionslab/runs', 'optionslab', ['runs']],
-    ['/optionslab/results', 'optionslab', ['results']],
     ['/optionslab/regimes', 'optionslab', ['regimes']],
     ['/optionslab/correlation', 'optionslab', ['correlation']],
     ['/optionslab/rotation', 'optionslab', ['rotation']],
@@ -107,6 +106,8 @@ describe('routes', () => {
     ['/replay', '/coverage/replay', 'coverage', ['replay']],
     ['/data/backfill', '/coverage/backfill', 'coverage', ['backfill']],
     ['/data/replay', '/coverage/replay', 'coverage', ['replay']],
+    ['/optionslab/results', '/optionslab/rotation', 'optionslab', ['rotation']],
+    ['/optionslab/results/', '/optionslab/rotation', 'optionslab', ['rotation']],
     ['/backtest', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
     ['/backtest/', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
     ['/optionslab/yaml', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
@@ -153,19 +154,18 @@ describe('routes', () => {
     expect(builderMode(parsePath('/backtest').rest)).toBe('yaml');
   });
 
-  it('opens the Heatmap for the bare Options Lab path', () => {
-    expect(OPTIONS_LAB_DEFAULT_SECTION).toBe('heatmap');
+  it('opens Today (the rotation page) for the bare Options Lab path', () => {
+    expect(OPTIONS_LAB_DEFAULT_SECTION).toBe('rotation');
     expect(oneOf(OPTIONS_LAB_SECTIONS, parsePath('/optionslab').rest[0])).toBeNull();
     expect(OPTIONS_LAB_SECTIONS).toEqual([
+      'rotation',
       'heatmap',
+      'matrix',
+      'correlation',
       'strategies',
       'builder',
       'runs',
-      'results',
       'regimes',
-      'correlation',
-      'rotation',
-      'matrix',
     ]);
   });
 
@@ -207,17 +207,16 @@ describe('routes', () => {
     ['momentum', ['scores', 'sectors'], 'Momentum › Scores · AI Trading Agent'],
     ['momentum', [], 'Momentum › Backtest · AI Trading Agent'],
     ['momentum', ['nope'], 'Momentum › Backtest · AI Trading Agent'],
-    ['optionslab', ['strategies'], 'Options Lab › Strategies · AI Trading Agent'],
+    ['optionslab', ['strategies'], 'Options Lab › Strategies and baskets · AI Trading Agent'],
     ['optionslab', ['builder'], 'Options Lab › Builder · AI Trading Agent'],
     ['optionslab', ['builder', 'yaml'], 'Options Lab › Builder › YAML · AI Trading Agent'],
     ['optionslab', ['runs'], 'Options Lab › Runs · AI Trading Agent'],
-    ['optionslab', ['results'], 'Options Lab › Daily results · AI Trading Agent'],
     ['optionslab', ['regimes'], 'Options Lab › Regimes · AI Trading Agent'],
     ['optionslab', ['correlation'], 'Options Lab › Correlation · AI Trading Agent'],
-    ['optionslab', ['rotation'], 'Options Lab › Rotation · AI Trading Agent'],
+    ['optionslab', ['rotation'], 'Options Lab › Today · AI Trading Agent'],
     ['optionslab', ['heatmap'], 'Options Lab › Heatmap · AI Trading Agent'],
-    ['optionslab', [], 'Options Lab › Heatmap · AI Trading Agent'],
-    ['optionslab', ['nope'], 'Options Lab › Heatmap · AI Trading Agent'],
+    ['optionslab', [], 'Options Lab › Today · AI Trading Agent'],
+    ['optionslab', ['nope'], 'Options Lab › Today · AI Trading Agent'],
     ['coverage', [], 'Coverage › Backfill · AI Trading Agent'],
     ['coverage', ['backfill'], 'Coverage › Backfill · AI Trading Agent'],
     ['coverage', ['replay'], 'Coverage › Replay · AI Trading Agent'],
