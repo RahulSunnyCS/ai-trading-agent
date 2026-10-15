@@ -54,13 +54,30 @@ beyond VIX in both; the opening range is informative about the rest of the day i
 - **Volatility clustering is a standard property of index returns**, so a positive result was
   expected; this is not evidence of a tradable edge.
 
+## Confirmation on 2016 to 2021 (Amendment 1)
+
+Momentum's daily NIFTY file (open and close only) was used on the sessions the main run never saw,
+with `|ln close_t / close_{t-1}|` as the proxy and the same states and intervals.
+
+| 2016-02 → 2021-12, 1,465 sessions | Result |
+|---|---|
+| Lag-1 autocorrelation of log |return| | 0.11 [0.05, 0.16] |
+| Next-day ratio, expanded vs range-bound | 1.43 vs 1.24, difference +0.19 [+0.06, +0.32] |
+| Same state next day (expanded / range-bound) vs overall | 0.41 vs 0.40 / 0.41 vs 0.42 |
+
+Expansion carrying into the next sessions is **supported out of sample**; range-bound sessions
+being followed by more range-bound ones is **not shown** on the proxy. The proxy is noisier
+(autocorrelation 0.11 against 0.38 for the real range), so the numbers are not comparable to the
+table above; only the direction is.
+
 ## Not yet tested
 
 - Whether any of this can time a strategy: BL-053 and BL-081 tried VIX and 14 intraday state
   variables for the rotation and found nothing that holds ([Intraday state](intraday-state.md)); a
   range-based timing rule would be a new registered test.
-- Daily-candle history before 2022 (the daily candle's high and low give the same day range; the
-  opening-range test needs 1-minute bars).
+- The day range itself before 2022 (needs daily high and low; Momentum's NIFTY file has only open
+  and close, so the 2016 to 2021 check below uses |close-to-close| as a proxy). The opening-range
+  test needs 1-minute bars.
 - Event days (budget, policy, results) are in the sample as they came; not separated.
 
 ## Related

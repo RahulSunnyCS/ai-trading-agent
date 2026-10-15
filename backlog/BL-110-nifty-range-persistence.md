@@ -107,4 +107,15 @@ Committed before `research/bl110/persistence.py` is run.
   expanded session exceeds that after a range-bound one with its interval above zero. Also
   reported over 2022-01-03 to 2026-10-09 (to see how the proxy compares with the range result).
   No opening-range or VIX test (not available in this file). Script `research/bl110/proxy_2016.py`.
+- 2026-10-15 — **Amendment 1 run** (`research/bl110/proxy_2016.py`; `proxy_2016_2026-10-15.json`),
+  2,668 sessions from Momentum's file, on `|ln close/close|`. **2016-02 to 2021-12 (1,465
+  sessions, unseen by the main run): supported.** Lag-1 autocorrelation of log |return| 0.11
+  [0.05, 0.16]; next-day ratio after an expanded session 1.43 vs 1.24 after a range-bound one,
+  difference +0.19 [+0.06, +0.32]. On 2022 to 2026 the same proxy gives 0.12 [0.06, 0.18] and
+  +0.37 [+0.21, +0.52], so the proxy and the true range agree on direction. The proxy is much
+  noisier (autocorrelation 0.11 against 0.38 for the true range): a day's absolute return can be
+  small while its range is large. Compare the two states with each other, not with 1.0: a mean
+  of ratios to a median baseline sits above 1 for any skewed series. The same-state probabilities
+  barely differ from the base rates (0.41 vs 0.40, 0.41 vs 0.42), so on this proxy
+  "range-bound continues" is not shown, consistent with the main result.
 
