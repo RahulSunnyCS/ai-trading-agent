@@ -237,8 +237,11 @@ def pooled(
     return np.mean(series, axis=0), days_ref
 
 
+WINNERS_SUFFIX = ""  # set from --suffix: "_tail" reads and writes the tail-gated selection
+
+
 def read_winners(out_dir: Path, family: str, top: int) -> list[dict[str, Any]]:
-    path = out_dir / f"{family}_band_winners.csv"
+    path = out_dir / f"{family}_band_winners{WINNERS_SUFFIX}.csv"
     if not path.exists():
         return []
     with path.open(newline="") as handle:
@@ -280,7 +283,7 @@ def joined_rules(
     if pbo and all(c in pbo for c in cohorts):
         out["rule6_pbo"] = all(pbo[c]["pbo_ok"] == "True" for c in cohorts)
     if breadth_dir is not None:
-        for r in read_csv(breadth_dir / "breadth.csv"):
+        for r in read_csv(breadth_dir / f"breadth{WINNERS_SUFFIX}.csv"):
             if r["finalist"] == name:
                 out["rule4_breadth"] = r["rule4_breadth"] == "True"
     return out
@@ -517,12 +520,16 @@ def main() -> None:
     c.add_argument("--family", default="all")
     c.add_argument("--top", type=int, default=1)
     c.add_argument("--out", type=Path, default=None)
+    for sp in (f, b, c):
+        sp.add_argument("--suffix", default="", help="winners file suffix, e.g. _tail")
     args = parser.parse_args()
+    global WINNERS_SUFFIX
+    WINNERS_SUFFIX = getattr(args, "suffix", "") or ""
     out_dir = RESULTS / getattr(args, "tag", "stage1")
     families = grid.FAMILIES if args.family == "all" else tuple(args.family.split(","))
     if args.command == "breadth":
         rows = breadth(out_dir, families, RESULTS / args.stage1, args.top)
-        write_csv(out_dir / "breadth.csv", rows)
+        write_csv(out_dir / f"breadth{WINNERS_SUFFIX}.csv", rows)
         print(f"wrote {out_dir / 'breadth.csv'}", flush=True)
         return
     if args.command == "slots-cells":
@@ -549,9 +556,9 @@ def main() -> None:
             RESULTS / args.stage2 if args.stage2 else None,
             RESULTS / args.breadth if args.breadth else None,
         )
-        write_csv(out_dir / "finalists.csv", summary)
-        write_csv(out_dir / "finalists_detail.csv", detail)
-        (out_dir / "robust.md").write_text(text)
+        write_csv(out_dir / f"finalists{WINNERS_SUFFIX}.csv", summary)
+        write_csv(out_dir / f"finalists_detail{WINNERS_SUFFIX}.csv", detail)
+        (out_dir / f"robust{WINNERS_SUFFIX}.md").write_text(text)
         print(
             f"wrote {out_dir / 'finalists.csv'} and robust.md ({len(summary)} finalists)",
             flush=True,

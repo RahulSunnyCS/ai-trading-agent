@@ -114,8 +114,8 @@ def neighbourhood(
     return out
 
 
-def read_winners(stage1_dir: Path, family: str) -> list[dict[str, Any]]:
-    path = stage1_dir / f"{family}_band_winners.csv"
+def read_winners(stage1_dir: Path, family: str, suffix: str = "") -> list[dict[str, Any]]:
+    path = stage1_dir / f"{family}_band_winners{suffix}.csv"
     if not path.exists():
         return []
     with path.open(newline="") as handle:
@@ -129,11 +129,11 @@ def read_winners(stage1_dir: Path, family: str) -> list[dict[str, Any]]:
     return rows
 
 
-def generate(stage1_dir: Path, out_dir: Path, families: tuple[str, ...]) -> None:
+def generate(stage1_dir: Path, out_dir: Path, families: tuple[str, ...], suffix: str = "") -> None:
     items: list[dict[str, Any]] = []
     dropped: list[str] = []
     for family in families:
-        for w in read_winners(stage1_dir, family):
+        for w in read_winners(stage1_dir, family, suffix):
             index, band_ = w["index"], w["band"]
             slots = w["slots"].split(",")
             winner = f"{family}_{index}_{band_}"
@@ -236,12 +236,13 @@ def main() -> None:
     g.add_argument("--stage1", default="stage1")
     g.add_argument("--tag", default="stage2")
     g.add_argument("--family", default="all")
+    g.add_argument("--suffix", default="", help="winners file suffix, e.g. _tail")
     e = sub.add_parser("evaluate")
     e.add_argument("--tag", default="stage2")
     args = parser.parse_args()
     if args.command == "generate":
         families = grid.FAMILIES if args.family == "all" else tuple(args.family.split(","))
-        generate(RESULTS / args.stage1, RESULTS / args.tag, families)
+        generate(RESULTS / args.stage1, RESULTS / args.tag, families, args.suffix)
     else:
         evaluate(RESULTS / args.tag)
 
