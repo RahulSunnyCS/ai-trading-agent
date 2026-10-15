@@ -1,4 +1,4 @@
-# BL-111 — Switch the strategy mix by the range regime: more Dir when ranges are expanding, more Widesl when they are quiet
+# BL-111 — Lots by rank (2-2-1-1) and by range regime: more Dir when ranges expand, more Widesl when quiet
 
 | | |
 |---|---|
@@ -7,136 +7,165 @@
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-15 |
-| **Depends on** | BL-110 (range persistence), BL-058 (the lists and their stored results) |
+| **Depends on** | BL-110 (range persistence), BL-058 (the lists), BL-109 (weekday DTE) |
 | **TODO.md row** | — |
 
 ## Context
 
-Owner (2026-10-15, chat): "if there is a big range happening, then we can have either directional or
-buy opportunities, which is better during the large-range thing. So if we are having six, we can
-increase the directional up to three. And during non-directional, when the range contracts, maybe we
-can switch to four or five wider (Widesl) sells."
+Owner (2026-10-15, chat): "if there is a big range happening … we can have directional or buy, which
+is better during the large-range thing. If we are having six, we can increase the directional up to
+three. And when the range contracts, switch to four or five wider sells." Then: the 6 lots should be
+split **2-2-1-1** (top two strategies 2 lots each, next two 1 lot each) instead of 3 strategies × 2
+lots; the owner trades **3 lots on ordinary days and 6 lots on expiry days** (cash), and asked the
+assistant to take the open decisions and to stage the quiet mix "four, then five".
 
 What the repo already says:
 
-- **BL-110 (as corrected in its review):** NIFTY's day range persists in both directions. Against
-  the all-session average, the next day's range is about 0.14 of the baseline higher after an
-  expanded session (range ≥ 1.25× the 20-session median) and 0.12 to 0.15 lower after a quiet one
-  (≤ 0.80×), for several days. The coefficient on the previous range roughly halves once VIX is in
-  the model (R² 0.17 → 0.28), so VIX carries part of it and the range keeps the rest.
-- **BL-053 (killed):** a 10:00 VIX-move switch between 2 Dir + 2 Buy + 2 Widesl and 4 Widesl +
-  1 Dir + 1 Buy beat each fixed mix by only +7.6% (needed 10%) with a worse drawdown, and most of
-  its gain came from starting at 10:00, not from switching. Per lot, VIX-up days vs quiet days:
-  Widesl ₹66 vs ₹241, Dir ₹453 vs ₹374, Buy −₹77 vs −₹17 (Buy lost on both).
-- **BL-081 / BL-083:** triggers that find "more movement" suit Dir and Buy shapes and hurt
-  short-volatility Widesl, but no hourly state variable passed, and the Dir lead is regime-dependent
-  (from mid-2024).
+- **What "Dir" is.** The rotation's Dir strategies are **short** ATM (or ITM1) CE + PE with a 21%
+  stop per leg and one re-entry, not long options (`strategies/rotation/N_dir_*.yaml`). Widesl is a
+  short wide strangle. So the premise "directional buyers gain when the range is large" does not
+  apply literally; only the measured per-lot behaviour matters.
+- **BL-110 (as corrected in its review).** The day range persists in both directions. Against the
+  all-session average, the next day's range is about 0.14 of the baseline higher after an expanded
+  session (≥ 1.25× the 20-session median) and 0.12 to 0.15 lower after a quiet one (≤ 0.80×), for
+  several days. The coefficient on the previous range roughly halves once VIX is in the model
+  (R² 0.17 → 0.28 in the first period, 0.12 → 0.23 in the second).
+- **BL-053 (killed).** A 10:00 VIX-**move** switch between 2 Dir + 2 Buy + 2 Widesl and 4 Widesl +
+  1 Dir + 1 Buy beat each fixed mix by +7.6% (needed 10%) with a worse drawdown, and most of its
+  gain came from the 10:00 start. Per lot at a 10:00 entry, VIX-up days vs quiet days: Widesl ₹66
+  vs ₹241, Dir ₹453 vs ₹374, Buy −₹77 vs −₹17. Those are VIX-move states, not range states.
+- **BL-081 / BL-083.** No hourly state variable passed; the Dir **trigger** lead (not Dir in
+  general) appears from mid-2024.
 - The lists already carry a VIX-band fit (20 to 24% of the score) and a days-to-expiry fit.
 
 ## Goal
 
-An answer, on days not used to choose the rule, to two separate questions, at the owner's real
-sizes (3 lots on ordinary days, 6 lots on expiry days):
+An answer to two separate questions, at the owner's real sizes:
 
-1. **Lots by rank:** does splitting the lots 2-2-1-1 over the top four strategies (6 lots) or 2-1
-   over the top two (3 lots) earn more, with no worse drawdown, than today's 3 strategies × 2 lots?
-2. **Lots by range regime:** does moving lots between Dir and Widesl by the previous session's
-   range state beat the same basket held fixed?
+1. **Lots by rank:** does 2-2-1-1 over the top four (6 lots), or 2-1 over the top two (3 lots),
+   earn more than today's equal split?
+2. **Lots by range regime:** does moving lots between Dir and Widesl by the previous session's range
+   state beat the same ladder held fixed?
 
 ## Out of scope
 
 - Any change to the live lists, weights or the journal (this recombines stored results).
-- A new entry time (BL-053 showed a later start is a separate question).
-- Buy as a lever (decision below). The list's own Buy add-on is left as the list makes it.
-- Margin and cash: noted under Risks; sized in Phase 1 with the repo's margin model.
+- A new entry time (BL-053: a later start is a separate question).
+- Buy as a lever and the Buy add-on (decision below): every arm is Dir and Widesl only.
+- SENSEX (the hold-out data is NIFTY only).
 
 ## Plan
 
-### Phase 0 — Pre-register (draft: decisions below were taken by the assistant at the owner's
-request, 2026-10-15; the owner can overrule any of them before a run)
+### Phase 0 — Pre-register
+Committed before any run. The decisions were taken by the assistant at the owner's request
+(2026-10-15) and may be overruled by the owner before a run.
 
-**Decisions**
+- **Hypotheses.** H1: the rank ladder earns more than the equal split. H2: the range-regime switch
+  earns more than the fixed ladder, than the equal split, and than the always-expanded and
+  always-quiet mixes.
+- **Universe.** NIFTY variants only: the 149 `N_*` variants (both periods). Dir = `is_dir`
+  (including ITM1 variants), Widesl = `is_wide` (including closest-premium). The Buy add-on is
+  excluded from every arm, including the baseline, which is recomputed without it (the live list's
+  own basket is shown for reference only).
+- **List.** Ranking = **list C (Adaptive)**, the public one. List A is reported descriptively and
+  is not part of the decision. Within a kind, "#k" is the k-th highest composite of that kind on
+  that day (the 09:16 ranking, no new fit). The list's minimum of 2 Widesl strategies is kept in
+  every ladder (a Dir slot is swapped for the next Widesl, as `score.select` does).
+- **Sizes and ladders (lots per ranked slot).**
 
-- **Directional lever = Dir only.** Buy lost on both quiet and expanding days in BL-053 (−₹77 vs
-  −₹17 per lot) and would be given more lots on exactly the days it did worse. The owner first
-  chose "Dir and Buy"; the later instruction was to decide, so this is the decision, with the
-  reason.
-- **Quiet-range mix: stage it, 4 Widesl lots first, 5 later.** The primary arm is 4 Widesl + 2
-  Dir lots (the BL-053 quiet shape, so it can be compared). 5 Widesl + 1 Dir is reported as a
-  second arm, descriptive only, and is the step to take only after the 4-lot step has held
-  forward.
-- **Sizes tested:** 3 lots and 6 lots, both reported, because the owner trades 3 on ordinary days
-  and 6 on expiry days. An *expiry day* is a day the traded index expires (NIFTY basket: NIFTY
-  expiry, label `dte_n = 0` on the weekday basis).
+  | Size | Equal split (baseline) | Rank ladder (H1) | Expanded regime (H2) | Quiet regime (H2) |
+  |---|---|---|---|---|
+  | 6 lots (expiry days) | top 3 non-Buy × 2 | top 4 × (2, 2, 1, 1) | Dir#1 ×2, Widesl#1 ×2, Dir#2 ×1, Widesl#2 ×1 | Widesl#1 ×2, Widesl#2 ×2, Dir#1 ×1, Dir#2 ×1 |
+  | 3 lots (ordinary days) | top 3 non-Buy × 1 | top 2 × (2, 1) | Dir#1 ×2, Widesl#1 ×1 | Widesl#1 ×2, Dir#1 ×1 |
 
-**Ladders (lots per ranked slot)**
+  Quiet-regime staging: **4 Widesl lots first** (the arm above). 5 Widesl + 1 Dir is a second arm,
+  descriptive, taken as a step only after the 4-lot step has held forward.
+- **Signal, known at 09:16.** `E = R_{t-1} / median(R over the 20 sessions before t-1)` from the
+  previous session's NIFTY index bars (BL-110). Expanded `E ≥ 1.25`, range-bound `E ≤ 0.80`,
+  otherwise normal (the fixed ladder). If the previous session is missing or excluded the day is
+  normal. Thresholds are BL-110's, not tuned.
+- **Expiry day.** A day on which NIFTY expires: label `dte_n = 0` on the weekday basis (BL-109).
+- **The book.** The owner's real sizing as one daily series: ordinary days at 3 lots, expiry days at
+  6 lots. This is the **primary endpoint** for H1 and for H2. The two day types are reported
+  separately, descriptively.
+- **Data and periods.**
+  - *In-sample (rule fixed here):* 2025-01-10 → 2026-10-08, the live rotation store (298 variants,
+    NIFTY ones used).
+  - *Confirmation, not a blind hold-out:* 2022-04-05 → 2024-10-08 (P3). P3 has been read for other
+    questions (BL-071, BL-075, BL-081, BL-083, and BL-110's first sub-period measured this very
+    signal); what it has not seen is P&L by range state and these lot ladders. Per-variant, per-lot
+    P3 results already exist for the 149 NIFTY variants (`research/bl071/results/`, the Dir ITM1
+    files from `research/bl080/results/`); no engine run is needed. They are read into a separate
+    research root under `research/bl111/` with a P3 day file on the **weekday** DTE basis built
+    from `rotation.score` / `rotation.dte` (not from `research/bl057/rotate.py`, which counts
+    calendar days). Nothing is ever written to the live append-only store.
+  - *Real confirmation:* forward journal days after this item is committed (Phase 3).
+- **Costs.** Net of the repo's charge model (BL-063: flat per order, as in
+  `research/options/common/charges.md`); the 4-slot ladder pays for more orders per lot.
+- **Look-ahead check.** The signal uses only the previous session's bars; the ranking uses only
+  results before day `t`; P3 is read once, after this block is committed; the placebo uses the
+  same signal series shifted, not new data.
+- **Comparators.** Equal split at the same size; the fixed rank ladder; always-expanded; always-
+  quiet (the BL-053 lesson: a switch must beat both fixed mixes).
+- **Placebo.** The regime labels circularly shifted by every offset of at least 20 sessions
+  (keeps their persistence; BL-081's design). The switch must beat the **90th percentile** of the
+  shifted totals.
+- **Pass / kill rule.** H1 and H2 are each judged once, on the book, on the confirmation period,
+  in the same units: pass only if (a) net total of the arm is at least 10% above each comparator
+  (if a comparator's total is zero or negative, the arm must be positive and exceed it by at least
+  10% of its absolute value), (b) maximum drawdown no worse, (c) the 90% circular block-bootstrap
+  interval (5-day blocks, 2,000 resamples, seed 20261015) of the daily difference to the
+  best comparator is above zero, and (d) for H2, it also beats the placebo P90. In-sample results
+  are reported but never decide. Otherwise killed. Two endpoints (H1, H2) share one rule; no
+  per-size or per-day-type cell decides.
+- **Will not run:** other thresholds, ladders or lists, 2-day or VIX-based signals, intraday
+  signals, Buy as a lever, SENSEX, the 5-Widesl arm as a decision arm. Each needs a new dated block
+  and `override: <reason>`.
 
-| Size | Fixed ladder (question 1) | Expanded regime (question 2) | Quiet regime (question 2) |
-|---|---|---|---|
-| 6 lots | top 4 by the list's composite: 2, 2, 1, 1 | Dir#1 ×2, Widesl#1 ×2, Dir#2 ×1, Widesl#2 ×1 (3 Dir + 3 Widesl) | Widesl#1 ×2, Widesl#2 ×2, Dir#1 ×1, Dir#2 ×1 (4 Widesl + 2 Dir) |
-| 3 lots | top 2 by composite: 2, 1 | Dir#1 ×2, Widesl#1 ×1 | Widesl#1 ×2, Dir#1 ×1 |
+### Phase 1 — Build the research root and rerun the baseline
+- **Tasks:** `research/bl111/` loader for the P3 per-variant results and the in-sample store; the
+  weekday-basis P3 day file; a check that the equal-split baseline reproduces BL-100's / BL-071's
+  Adaptive totals within rounding; peak margin per day with the repo's margin model (Dir and Widesl
+  are both short premium, so lots moved between them are roughly margin-neutral; the cash limit is
+  total lots, reported anyway).
+- **Done when:** the baseline reproduces and the P3 day file passes a label check against BL-109's.
 
-"Dir#k" and "Widesl#k" are the k-th highest-scoring variant of that kind under the list's own
-composite on that day (the ranking the 09:16 job already computes); no new fit.
+### Phase 2 — Run once and decide
+- **Tasks:** run H1 and H2 on the confirmation period exactly as registered; record the table.
+- **Done when:** the rule is applied and the owner has the table.
 
-**Signal, known at 09:16:** `E = R_{t-1} / median(R over the 20 sessions before t-1)` from the
-NIFTY index bars of the previous session (as BL-110). Expanded `E ≥ 1.25`; range-bound `E ≤ 0.80`;
-otherwise normal (the list's own basket in the same ladder). Thresholds are BL-110's, not tuned.
-
-**Hypotheses**
-
-- H1 (question 1): the 2-2-1-1 / 2-1 ladder earns at least as much per lot as 3 × 2 with no
-  deeper drawdown.
-- H2 (question 2): the regime switch beats both the fixed split of the same size and the list's own
-  basket.
-
-**Controls:** the list's own 3 × 2 basket; the fixed 2-2-1-1 (2-1) ladder on the list's own top
-ranks; always-expanded and always-quiet mixes; and a **placebo** in which the regime labels are
-shuffled across days (500 shuffles) to check that the state matters at all.
-
-**Data / periods:** stored per-variant, per-lot daily results. Rule fixed on 2025-01-10 →
-2026-10-08 (already seen). Hold-out: **2022-04-05 → 2024-10-08 (P3, NIFTY only)**, unseen, read
-once, only after this block is committed. If per-variant P3 results are not in the store they are
-built from the lake with the same variant files before the rule is run.
-
-**Look-ahead check:** the signal uses only the previous session; the ranking uses only results
-before day `t`; the hold-out is untouched until the rule is committed.
-
-**Pass / kill rule** (each of H1 and H2 on the hold-out, at each size, expiry days and ordinary
-days reported separately): pass only if the arm beats its comparators in total gross ₹ by at least
-10% with maximum drawdown no worse, and (H2) beats the median placebo shuffle. A pass at one size
-only is reported as such, not generalised. Otherwise killed.
-
-**Will not run:** other thresholds or ladders, 2-day or VIX-based signals, intraday signals, Buy
-as a lever, the 5 Widesl arm as a decision arm. Each needs a new dated block and `override:`.
+### Phase 3 — Forward read-out (only if Phase 2 passes)
+- Record the signal and both arms' picks in a shadow log from the commit date; read out after 60
+  journal days, as BL-058 does.
 
 ## Risks
 
-- **BL-053 is a close precedent that failed** on a similar switch; the previous day's range is
-  information VIX largely carries (BL-110: the coefficient on the range roughly halves with VIX
-  in the model, R² rises 0.17 to 0.28).
-- **Both sides have support, but only the expanded side has a precedent of failing.** BL-110
-  reviewed: after a quiet session the next day's range is lower than after an average session
-  (about −0.12 to −0.15 of the baseline), so quiet persists too; but "lower range" does not by
-  itself mean Widesl earns more.
-- **Dir's edge appears only from mid-2024** (BL-083); a 2022-24 hold-out may not have it.
-- **Cash.** Widesl is short premium: its margin per lot is larger than a long Dir. A switch toward
-  4 to 5 Widesl lots raises margin on quiet days. Phase 1 reports peak margin per day with the
-  repo's margin model, and a rule that does not fit the owner's cash is not usable whatever it
-  earns.
-- **Small samples.** Expanded days are about 30% of sessions, expiry days about 1 in 5; at 6 lots
-  on expiry days only, the hold-out has on the order of 120 days.
+- **BL-053 is a close precedent that failed** on a similar switch; VIX already carries part of the
+  range information (BL-110), and the lists carry a VIX-band fit.
+- **Low power.** Expiry days are about 1 in 5 and expanded days about 30% of sessions; the lot
+  switch changes the basket on only a part of roughly 124 expiry days in P3. A failure may be
+  "cannot tell", which the rule treats as killed.
+- **Ranks inside a kind are close.** BL-090 found Widesl variants near-copies (0.85 to 0.92
+  correlation); a 2-2-1-1 ladder over near-copies may be little more than 3 × 2 with fewer
+  strategies.
+- **Regime dependence.** The Dir trigger lead appears only from mid-2024 (BL-083); P3 may not have
+  it.
+- **Cash.** The cash limit is total lots, not the Dir/Widesl split; the real constraint is the
+  number of lots on each day type, which this keeps at the owner's 3 and 6.
 
 ## Open questions
 
-None blocking. The owner may overrule the decisions above; the signal and thresholds are the
-BL-110 ones.
+None for Phase 0: the owner delegated the decisions above. The owner may overrule any of them, and
+should say if the 3-lot ordinary-day basket is not "top 3 non-Buy × 1 lot".
 
 ## Log
 
 - 2026-10-15 — created from the owner's chat idea; drafted against BL-110 and BL-053.
-- 2026-10-15 — owner clarified: today's live basket is 3 strategies × 2 lots; the owner meant
-  splitting the 6 lots as 2-2-1-1 (top two get 2 lots, next two get 1), and trades 3 lots on
-  ordinary days and 6 lots on expiry days because of cash. Asked the assistant to take the
-  decisions and to stage the quiet mix "four, then five". Decisions recorded in Phase 0.
-
+- 2026-10-15 — owner clarified: today's basket is 3 strategies × 2 lots; the idea is 2-2-1-1 by
+  rank; the owner trades 3 lots on ordinary days and 6 on expiry days because of cash, and asked
+  the assistant to decide and to stage the quiet mix "four, then five".
+- 2026-10-15 — Opus review (PR #235): P3 is not blind (reworded as confirmation, forward read-out
+  added); the hold-out comes from `research/bl071/results` and `research/bl080/results`, not the
+  live store; list C named; NIFTY-only; ladders tied to `score.select` (Widesl minimum kept, no
+  Buy add-on); one primary endpoint (the book); net of charges; placebo made a circular shift
+  with a P90 bar; the margin premise corrected (Dir is short premium too).
