@@ -25,6 +25,7 @@ RES = HERE / "results"
 TEST_FROM = date(2025, 10, 9)
 BOOT_SEED = 20261012
 FAMILY = {"w": "wide", "d": "dir", "b": "buy"}
+UNIVERSE_NAME = {"298": "Core-298", "pool536": "New-536", "pool556": "New-556", "stored": "stored"}
 
 
 def patch_parts() -> None:
@@ -142,7 +143,7 @@ def main() -> None:
             rows.append(
                 {
                     "list": names[key],
-                    "universe": label,
+                    "universe": UNIVERSE_NAME[label],
                     "days": len(common),
                     "gross_per_lot_day": g.mean(),
                     "gross_total_per_lot": g.sum(),
@@ -164,7 +165,7 @@ def main() -> None:
                 series_out.append(
                     {
                         "list": names[key],
-                        "universe": label,
+                        "universe": UNIVERSE_NAME[label],
                         "day": d.isoformat(),
                         "gross_per_lot": g,
                         "net_per_lot": n,
@@ -199,7 +200,7 @@ def main() -> None:
             f"maxDD {r['max_drawdown_per_lot']:8.0f}  win {r['win_rate']:.0%}"
             + (
                 f"  diff {r['diff_vs_298_mean']:6.1f} [{r['diff_lo90']:6.1f},{r['diff_hi90']:6.1f}]  winner={r['winner']}  net/lot-day {r['net_per_lot_day']:6.1f}"
-                if r.get("diff_lo90") is not None and r["universe"] not in ("298", "stored")
+                if r.get("diff_lo90") is not None and r["universe"] not in ("Core-298", "stored")
                 else ""
             )
         )

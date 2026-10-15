@@ -10,6 +10,16 @@
 | **Depends on** | BL-104 (Stage 1 results, scorecard, tail gate); BL-058 (the registered lists A / B / C / REF) |
 | **TODO.md row** | 3.10.28 |
 
+## Names used in this item (owner, 2026-10-15)
+
+| Name | What it is |
+|---|---|
+| **Core-298** | The live rotation's 298 variants in `strategies/rotation/` (frozen; one fixed configuration per family, repeated at every entry time) |
+| **New-536** | The candidate pool selected from the first year only: 91 sets, 536 variants, settings differing by time band |
+| **New-556** | New-536 plus the ITM amendment (three NIFTY Dir ITM1 sets, 20 variants) |
+
+A list over a universe is written "Steady on Core-298", "Adaptive on New-556".
+
 ## Context
 
 The owner (2026-10-15) asked for a proof of concept: run the rotation's registered lists — Steady (A),
