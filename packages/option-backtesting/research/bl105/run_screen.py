@@ -42,14 +42,16 @@ FROM, TO = date(2024, 10, 9), date(2026, 10, 9)
 REACH_LEVELS = (1500, 2000, 3000, 4000, 6000)
 
 
-def run_job(index: str, slot: str, days: list[date], root: str) -> dict[str, Any]:
+def run_job(index: str, slot: str, days: list[date], root: str, phase: int = 1) -> dict[str, Any]:
     started = time.monotonic()
     ref = default_reference_data()
     sizing = date.fromisoformat(SIZING_DATE)
     underlying = g.INDICES[index]
-    spec = g.variants()
+    spec = g.variants() if phase == 1 else g.phase2_variants()
     bases = {g.base_id(s, t): g.build_base(index, slot, s, t) for s in g.STRIKES for t in g.TRAILS}
-    stats = {(b, v.id): Stats(underlying) for b in bases for v in spec}
+    stats = {
+        (b, v.id): Stats(underlying) for b in bases for v in spec if g.applies(v, b.split("_")[0])
+    }
     series: dict[tuple[str, str], list[float]] = {k: [] for k in stats}
     cut_days = {k: 0 for k in stats}
     restarts = {k: 0 for k in stats}
@@ -67,10 +69,11 @@ def run_job(index: str, slot: str, days: list[date], root: str) -> dict[str, Any
             continue
         used.append(day)
         for bid, strategy in bases.items():
-            results, made, best = lib.day_variants(strategy, data, ref, sizing, spec)
+            todo = [v for v in spec if g.applies(v, bid.split("_")[0])]
+            results, made, best = lib.day_variants(strategy, data, ref, sizing, todo)
             for lv in REACH_LEVELS:
                 reach[bid][lv] += best >= lv
-            for v in spec:
+            for v in todo:
                 res = results[v.id]
                 key = (bid, v.id)
                 stats[key].add(res)
@@ -150,6 +153,7 @@ def main() -> None:
     ap.add_argument("--from", dest="start", default=FROM.isoformat())
     ap.add_argument("--to", dest="end", default=TO.isoformat())
     ap.add_argument("--workers", type=int, default=3)
+    ap.add_argument("--phase", type=int, default=1, choices=(1, 2), help="2 = the roll variants")
     ap.add_argument("--root", type=Path, default=None)
     args = ap.parse_args()
     root = args.root or data_dir()
@@ -168,7 +172,9 @@ def main() -> None:
         flush=True,
     )
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
-        futures = {pool.submit(run_job, i, s, days[i], str(root)): (i, s) for i, s in pending}
+        futures = {
+            pool.submit(run_job, i, s, days[i], str(root), args.phase): (i, s) for i, s in pending
+        }
         for f in as_completed(futures):
             i, s = futures[f]
             r = f.result()

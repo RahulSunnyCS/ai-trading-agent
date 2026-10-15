@@ -59,7 +59,7 @@ def main() -> None:
         summary = {
             (r["index"], r["slot"], r["base"], r["variant"]): r for r in csv.DictReader(handle)
         }
-    spec = {v.id: v for v in g.variants()}
+    spec = {v.id: v for v in g.all_variants()}
     rows = []
     for idx in g.INDICES:
         for slot in g.SLOTS:
@@ -72,7 +72,7 @@ def main() -> None:
                 b = m[:, col[f"{base}|base"]]
                 dd_b, ul_b, wd_b, w5_b = max_drawdown(b), ulcer(b), b.min(), five(b)
                 for vid in spec:
-                    if vid == "base":
+                    if vid == "base" or f"{base}|{vid}" not in col:
                         continue
                     v = m[:, col[f"{base}|{vid}"]]
                     diff = v - b

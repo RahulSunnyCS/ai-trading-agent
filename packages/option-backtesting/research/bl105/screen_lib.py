@@ -16,7 +16,7 @@ from typing import Any
 
 from option_backtesting.legwise.engine import DayResult, simulate_day
 from option_backtesting.legwise.market import DayData, minute_index, minute_label
-from option_backtesting.legwise.schema import LegwiseStrategy
+from option_backtesting.legwise.schema import LegwiseStrategy, RollSpec
 from option_backtesting.rotation.portfolio import Trail, _candidates
 
 Curve = list[tuple[int, float]]
@@ -31,6 +31,15 @@ def with_target(strategy: LegwiseStrategy, target: float) -> LegwiseStrategy:
 def with_entry(strategy: LegwiseStrategy, label: str) -> LegwiseStrategy:
     c = strategy.model_copy(deep=True)
     c.entry_time = label
+    return LegwiseStrategy.model_validate(c.model_dump())
+
+
+def with_roll(
+    strategy: LegwiseStrategy, decay: float, gate: float | None, stop: float | None, to_atm: bool
+) -> LegwiseStrategy:
+    c = strategy.model_copy(deep=True)
+    for leg in c.legs:
+        leg.roll = RollSpec(decay=decay, min_day_profit=gate, stop_loss_percent=stop, to_atm=to_atm)
     return LegwiseStrategy.model_validate(c.model_dump())
 
 
@@ -171,6 +180,10 @@ def day_variants(
         elif v.kind in ("lock", "locktrail"):
             m = lock_cut_minute(base_res.mtm, lock_trail(v.kind, v.level))
             out[v.id] = base_res if m is None else cut_at(base_res, data, m, f"{v.kind} {v.level}")
+        elif v.kind == "roll":
+            res = sim(with_roll(base, *v.roll))
+            out[v.id] = res
+            restarts[v.id] = sum(t.exit_reason == "ROLL" for t in res.trades)
         elif v.kind == "restart_target":
             if v.level not in target_cache:
                 target_cache[v.level] = sim(with_target(base, v.level))

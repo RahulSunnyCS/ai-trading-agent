@@ -66,6 +66,7 @@ class Variant:
     kind: str  # base | target | lock | locktrail | restart_target | restart_lock
     level: int | None = None
     restarts: int = 0
+    roll: tuple | None = None  # (decay, min_day_profit, fresh stop %, to_atm), Phase 2
 
 
 def variants() -> list[Variant]:
@@ -86,6 +87,35 @@ def variants() -> list[Variant]:
     return out
 
 
+def roll_variants() -> list[Variant]:
+    """Phase 2 (owner-approved, amended 2026-10-15): B roll to the base's own strike type, and
+    B' roll to ATM on the ITM bases. Decay f = leg price / its entry price."""
+    out: list[Variant] = []
+    for f in ROLL_REGISTERED["decay"]:
+        for gate in ROLL_REGISTERED["profit_gate"]:
+            for stop in ROLL_REGISTERED["fresh_stop_pct"]:
+                tag = f"B_f{round(f * 100)}_{'any' if gate is None else f'p{gate}'}_s{stop}"
+                out.append(Variant(tag, "B", "roll", roll=(f, gate, stop, False)))
+    for f in ROLL_REGISTERED["decay"]:
+        out.append(
+            Variant(f"B2_f{round(f * 100)}_p3000_s21", "B2", "roll", roll=(f, 3000, 21, True))
+        )
+    return out
+
+
+def all_variants() -> list[Variant]:
+    return variants() + roll_variants()
+
+
+def phase2_variants() -> list[Variant]:
+    return [Variant("base", "base", "base")] + roll_variants()
+
+
+def applies(v: Variant, strike: str) -> bool:
+    """B' (roll to ATM) is only meaningful on the ITM bases."""
+    return not (v.idea == "B2" and strike == "ATM")
+
+
 def registered() -> dict:
     return {
         "version": VERSION,
@@ -96,6 +126,7 @@ def registered() -> dict:
         "variants": [v.__dict__ for v in variants()],
         "restart_not_after": RESTART_NOT_AFTER,
         "roll": ROLL_REGISTERED,
+        "roll_variants": [v.__dict__ for v in roll_variants()],
     }
 
 
