@@ -400,6 +400,12 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   top three. Premiums are ranked on period 1; each kept premium walks its own top three. Period 1 /
   2 are the first / second year for the lists here, and the first / second half of the first year
   for BL-107's selection (`--window first`), so BL-107's test year is never read at selection.
+- **Amendment 11 (2026-10-16, owner, before any list or winner was read): a stricter period-2
+  check.** "Beats the template in period 2" means a period-2 gain of at least half the margin (₹12.5
+  a lot-day on expiry days, ₹7.5 on other and all days) **and** beating the template at a majority of
+  the group's times in period 2 (2 of 4 in a band, 7 of 12 for all times). Why: a setting with no
+  edge passes "gain > 0" about half the time, so with three tries about 7 in 8 families would pass by
+  luck. The rank used (1, 2 or 3) is reported for every pick.
 
 ## Risks
 

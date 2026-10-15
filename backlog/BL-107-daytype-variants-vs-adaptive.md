@@ -55,7 +55,8 @@ mismatched day type; Steady and Calendar boosts (reported unboosted for informat
   to three premiums.
 - **Selection rule (BL-104 Amendment 10, owner 2026-10-16):** rank on the first half of the first
   year (2024-10-09 → 2025-04-08), take rank 1 if it also beats the template in the second half
-  (2025-04-09 → 2025-10-08), else rank 2, else rank 3, never further.
+  (2025-04-09 → 2025-10-08) by half the margin and at a majority of the times (Amendment 11), else rank
+  2, else rank 3, never further.
 - **Universes at 25 entry times** (the rotation's 09:17 … 15:17 at 15-minute gaps; owner 2026-10-16:
   the replay uses 25, the 12-time versions are dropped): Core-298; T1 = Core + each all-times winner
   at all 25; T2 = Core + each band winner at its band's slots only (09:17–10:17, 10:32–13:02,

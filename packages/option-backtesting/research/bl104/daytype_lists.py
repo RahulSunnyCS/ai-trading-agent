@@ -371,6 +371,7 @@ def aggregate(f: Family, results: dict[str, dict], kind: str, slots: tuple[str, 
             "params": per[0]["params"],
             "slot_gain": [r["gain"] for r in per],
             "slot_gain_first": [r["gain_first"] for r in per],
+            "slot_gain_test": [r["gain_test"] for r in per],
             "slot_net": [r["net"] for r in per],
             "gain": float(np.mean([r["gain"] for r in per])),
             "gain_first": float(np.mean([r["gain_first"] for r in per])),
@@ -391,6 +392,7 @@ def aggregate(f: Family, results: dict[str, dict], kind: str, slots: tuple[str, 
         r["nb_beat"] = sum(x["gain"] > 0 for x in nb)
         r["nb_beat_first"] = sum(x["gain_first"] > 0 for x in nb)
         r["slots_pos_first"] = sum(g > 0 for g in r["slot_gain_first"])
+        r["slots_pos_test"] = sum(g > 0 for g in r["slot_gain_test"])
     t = [results[s][kind]["template"] for s in slots]
     agg["__template__"] = {
         "params": "template", "slot_gain": [0.0] * len(t), "slot_net": [x["net"] for x in t],
@@ -400,6 +402,7 @@ def aggregate(f: Family, results: dict[str, dict], kind: str, slots: tuple[str, 
         "net_test": float(np.mean([x["net_test"] for x in t])),
         "worst_x": 1.0, "slots_pos": 0, "nb_beat": 0, "is_template": True,
         "slot_gain_first": [0.0] * len(t), "slots_pos_first": 0, "nb_beat_first": 0,
+        "slot_gain_test": [0.0] * len(t), "slots_pos_test": 0,
         "values": np.mean([x["values"] for x in t], axis=0),
         "names": [x["name"] for x in t], "slots": slots,
         "max_dd": float(np.mean([max_drawdown(x["values"]) for x in t])),
@@ -445,6 +448,12 @@ def family_premiums(agg: dict[str, dict]) -> tuple[list[float], dict[float, floa
 TOP_RANKS = 3  # Amendment 10: walk at most to the third-ranked setting
 
 
+def period2_slots_needed(n: int) -> int:
+    """Amendment 11: in period 2 a setting beats the template at a majority of the group's times:
+    2 of 4 in a band, 7 of 12 for all times."""
+    return 7 if n == len(ALL_SLOTS) else (n + 1) // 2
+
+
 def decide(f: Family, agg: dict[str, dict], kind: str, allowed: list[float] | None) -> dict[str, Any]:
     """Amendment 10 (owner, 2026-10-16): rank on period 1, walk ranks 1 → 3, take the first that also
     beats the template in period 2. Period 1 / 2 = first / second year (the lists), or the first /
@@ -461,10 +470,16 @@ def decide(f: Family, agg: dict[str, dict], kind: str, allowed: list[float] | No
             and not (r["worst_x"] > WORST_X) and r["nb_beat_first"] >= 2
         )
 
+    def passes_period2(r: dict) -> bool:
+        return (
+            r["gain_test"] >= MARGIN[kind] / 2
+            and r["slots_pos_test"] >= period2_slots_needed(len(r["slots"]))
+        )
+
     def walk(pool: list[dict]) -> tuple[dict | None, int, list[dict]]:
         ranked = sorted(pool, key=lambda r: -r["gain_first"])[:TOP_RANKS]
         for i, r in enumerate(ranked, 1):
-            if r["gain_test"] > 0:  # beats the template in period 2 as well
+            if passes_period2(r):  # Amendment 11: the stricter period-2 check
                 return r, i, ranked
         return None, 0, ranked
 
@@ -487,7 +502,7 @@ def decide(f: Family, agg: dict[str, dict], kind: str, allowed: list[float] | No
             first["rank_used"] = rank
             picks = [first]
             for r in ranked[rank:]:
-                if r["gain_test"] > 0:
+                if passes_period2(r):
                     c = float(np.corrcoef(first["values"], r["values"])[0, 1])
                     if c < MAX_CORR:
                         r["corr_with_first"] = c
@@ -698,7 +713,8 @@ def write_readme(lists: dict[str, list[dict]], premium_report: list[str]) -> Non
         "beat the default by ₹25 (expiry) or ₹15 (other days) a lot-day, beat the template at 3 of the band's",
         "4 times (9 of 12 for all times), a worst day no more than 1.25 × the template's and at least two",
         "grid neighbours that also beat it. The rank-1 setting is taken if it **also beats the template in",
-        "the second year**; otherwise rank 2, then rank 3, and no further (Amendment 10). A second pick is kept",
+        "the second year** by at least half the margin (₹12.5 expiry, ₹7.5 other days) and at a majority of the",
+        "times (2 of 4; 7 of 12); otherwise rank 2, then rank 3, and no further (Amendments 10–11). A second pick is kept",
         "only when its daily P&L correlates below 0.7 with the first.",
         "",
         "The engine has no day filter: each file trades every day if run. The day type is in its folder",
