@@ -68,6 +68,14 @@ mismatched day type; Steady and Calendar boosts (reported unboosted for informat
   family, so even first-year-only selection carries a selection effect that the test year must
   overcome; the new variants are simulated after charges and gross (Core-298 results are gross
   only); re-entry types ASAP and COST ×2 are unverified against AlgoTest (BL-009).
+- **Data coverage, checked 2026-10-16:** every entry time exists for every usable day (the lake holds
+  1-minute bars; Core-298 has stored results for all 25 slots on every usable day). The test year has
+  241 usable weekday sessions per index of about 247 trading days: the gap is mid-to-late September
+  2026, before the Fyers collector's first migrated day (2026-09-23): NIFTY options are missing on
+  09-16, 09-17, 09-18, 09-21 and 09-22; SENSEX options on 09-18, 09-21, 09-22, 09-23 and 09-24. The
+  vendor data ends at the 2026-09-15 (NIFTY) and 2026-09-17 (SENSEX) expiries, and expired weekly
+  contracts cannot be re-downloaded, so these days cannot be filled. The replay uses only days
+  every universe has (the same days for all), and the day count is printed.
 - **Will not run:** per-slot winners; changing the list weights or lookbacks; pooling the all-days
   winner into the universe; any deduction.
 
