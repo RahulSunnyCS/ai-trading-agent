@@ -7,9 +7,8 @@ stored results and writes only under this folder. The rule it applies is the ite
 
 from __future__ import annotations
 
-import dataclasses
 import json
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -24,29 +23,6 @@ LISTS = {"A": "Steady", "C": "Adaptive"}
 ADOPT_DD_LIMIT = 1.20  # not adopted if Adaptive's drawdown is more than 20% deeper
 
 
-def weekdays_to_expiry(day: date, calendar_days: int) -> int:
-    """Monday-to-Friday dates in (day, day + calendar_days]."""
-    return sum(1 for k in range(1, calendar_days + 1) if (day + timedelta(days=k)).weekday() < 5)
-
-
-def relabel(label: str, day: date) -> str:
-    return str(weekdays_to_expiry(day, int(label))) if str(label).isdigit() else label
-
-
-def newer(rec):
-    attrs = {
-        d: {**a, "dte_n": relabel(a["dte_n"], d), "dte_s": relabel(a["dte_s"], d)}
-        for d, a in rec.attrs.items()
-    }
-    return dataclasses.replace(
-        rec,
-        attrs=attrs,
-        memo={},
-        dte_n=[relabel(x, d) for x, d in zip(rec.dte_n, rec.days, strict=True)],
-        dte_s=[relabel(x, d) for x, d in zip(rec.dte_s, rec.days, strict=True)],
-    )
-
-
 def summary(values: np.ndarray) -> dict:
     return {
         "days": int(values.size),
@@ -59,10 +35,13 @@ def summary(values: np.ndarray) -> dict:
 
 def main() -> None:
     root = data_dir()
-    rec = daylog.reconstruction(root)
-    assert rec.error is None, rec.error
-    arms = {"older": rec, "newer": newer(rec)}
-    days = [d for d in rec.days_available() if FROM <= d <= TO]
+    # older: the stored calendar-day labels as written; newer: the weekday basis (store default)
+    arms = {
+        "older": daylog.reconstruction(root, basis="calendar"),
+        "newer": daylog.reconstruction(root, basis="weekdays"),
+    }
+    assert all(r.error is None for r in arms.values())
+    days = [d for d in arms["older"].days_available() if FROM <= d <= TO]
     results = daylog._Results(root)
     rows = []
     series: dict[tuple[str, str], dict[date, float]] = {}

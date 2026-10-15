@@ -38,7 +38,7 @@ the period ("1 weekend session left out of P1"), so the numbers reconcile with t
 |---|---|---|---|
 | Family × start | The 12 strategy kinds (NIFTY and SENSEX: Widesl, closest-premium Widesl, Dir ATM, Dir ITM1, Buy) | The 25 start times, 09:17 to 15:17 | One variant over the period |
 | Date × start | Each session | The 25 start times | One variant on one date. Pick one strategy kind first |
-| DTE × start | Days to the index's own nearest expiry (0 to 7+) | Start time | The chosen kind, pooled over days with that DTE |
+| DTE × start | Weekdays to the index's own nearest expiry (0 to 4, then 7+ for an expiry a week or more away) | Start time | The chosen kind, pooled over days with that DTE |
 | VIX × family | Opening India VIX band | Strategy kinds | A kind pooled over its 25 start times, on days in that band |
 | Weekday × family | Monday to Friday | Strategy kinds | A kind pooled over its 25 start times, on that weekday |
 | Pulse | Strategy kinds | The last 5, 21 and 63 sessions, and all stored days | A kind pooled over its 25 start times in that window. It is as of one day (the latest, or the date you pick), not a period: the Period control does not apply |

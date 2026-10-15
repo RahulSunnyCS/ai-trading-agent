@@ -70,3 +70,36 @@ def test_the_listed_master_labels_count_weekdays(monkeypatch):
     labels, source = live.listed_dte_labels(date(2026, 10, 16))
     assert source == "master"
     assert labels == {"dte_n": "1", "dte_s": "4"}
+
+
+def test_calendar_basis_reads_the_labels_as_written(tmp_path):
+    store.append_day(
+        {
+            "day": "2026-10-16",
+            "weekday": "Fri",
+            "vix_open": "14",
+            "vix_band": "12-15",
+            "dte_n": "3",
+            "dte_s": "6",
+        },
+        tmp_path,
+    )
+    raw = store.read_days(tmp_path, "calendar")[date(2026, 10, 16)]
+    assert (raw["dte_n"], raw["dte_s"]) == ("3", "6")
+
+
+def test_readers_of_journal_entries_use_the_weekday_basis_for_a_legacy_entry():
+    from option_backtesting.rotation import regime
+
+    legacy = {
+        "day": "2026-10-15",
+        "before_first_entry": True,
+        "weekday": "Thu",
+        "vix_open": 14.0,
+        "vix_band": "12-15",
+        "dte": {"NIFTY": "4", "SENSEX": "0"},  # recorded in calendar days: Thu to Mon 19 Oct
+    }
+    row = regime._forward_rows([legacy])[date(2026, 10, 15)]
+    assert (row["dte_n"], row["dte_s"]) == ("2", "0")
+    assert dte.entry_basis(legacy) == "calendar"
+    assert dte.recorded_labels(legacy) == {"NIFTY": "4", "SENSEX": "0"}

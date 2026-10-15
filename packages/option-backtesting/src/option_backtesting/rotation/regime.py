@@ -36,6 +36,7 @@ from trading_data import lake
 
 from ..fyers.daily import data_dir
 from . import journal, store
+from .dte import entry_labels
 from .matrix import NAMED
 from .score import VIX_LABELS
 
@@ -203,7 +204,7 @@ def _forward_rows(entries: list[dict]) -> dict[date, dict]:
         if not e.get("before_first_entry"):
             continue
         d = date.fromisoformat(e["day"])
-        dte = e.get("dte") or {}
+        dte = entry_labels(e)
         out[d] = {
             "weekday": e.get("weekday") or d.strftime("%a"),
             "vix_open": e.get("vix_open"),

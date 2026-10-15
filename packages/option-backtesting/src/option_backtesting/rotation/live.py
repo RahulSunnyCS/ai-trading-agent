@@ -17,7 +17,7 @@ from ..fyers.daily import VIX_SYMBOL
 from ..fyers.symbols import download_master, parse_master
 from ..legwise.anatomy import dte_for
 from .attrs import vix_bar_epoch
-from .dte import weekdays_after, weekdays_between
+from .dte import from_calendar_label
 from .score import dte_label
 
 
@@ -104,7 +104,7 @@ def listed_dte_labels(day: date) -> tuple[dict[str, str], str]:
             )
             if not upcoming:
                 raise ValueError(f"no listed {name} expiry on or after {day}")
-            out[key] = dte_label(weekdays_between(day, upcoming[0]))
+            out[key] = from_calendar_label(dte_label((upcoming[0] - day).days), day)
         return out, "master"
     except Exception as error:  # noqa: BLE001
         print(
@@ -120,6 +120,6 @@ def calendar_dte_labels(day: date) -> dict[str, str]:
 
     def label(underlying: str) -> str:
         calendar_days = dte_for(underlying, day, ref)
-        return dte_label(None if calendar_days is None else weekdays_after(day, calendar_days))
+        return from_calendar_label(dte_label(calendar_days), day)
 
     return {"dte_n": label("NIFTY"), "dte_s": label("SENSEX")}

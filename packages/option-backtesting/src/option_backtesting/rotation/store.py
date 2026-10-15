@@ -104,9 +104,11 @@ def load_matrix(names: list[str], root: Path | None = None, through: date | None
     return Matrix(days, list(names), values)
 
 
-def read_days(root: Path | None = None) -> dict[date, dict[str, str]]:
+def read_days(root: Path | None = None, basis: str = "weekdays") -> dict[date, dict[str, str]]:
     """The stored day attributes. The file keeps calendar-day DTE labels as they were written;
-    they are returned on the weekday basis (BL-109), so every reader agrees with the live label."""
+    they are returned on the weekday basis (BL-109), so every reader agrees with the live label.
+    `basis="calendar"` returns them as written: only for checking an entry recorded before the
+    change, and for research that must stay on the calendar-day definition."""
     path = days_path(root)
     if not path.exists():
         return {}
@@ -114,7 +116,7 @@ def read_days(root: Path | None = None) -> dict[date, dict[str, str]]:
     with path.open() as f:
         for r in csv.DictReader(f):
             day = date.fromisoformat(r["day"])
-            for key in ("dte_n", "dte_s"):
+            for key in ("dte_n", "dte_s") if basis == "weekdays" else ():
                 if key in r:
                     r[key] = from_calendar_label(r[key], day)
             out[day] = r

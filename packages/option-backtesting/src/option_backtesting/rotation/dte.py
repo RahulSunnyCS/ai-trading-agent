@@ -31,6 +31,18 @@ def from_calendar_label(label: object, day: date) -> str:
     return str(weekdays_after(day, int(text))) if text.isdigit() else text
 
 
+def entry_basis(entry: dict) -> str:
+    """What the journal entry's labels count: `weekdays`, or `calendar` for an entry recorded before
+    BL-109 (no `dte_basis` field)."""
+    return str(entry.get("dte_basis") or LEGACY_BASIS)
+
+
+def recorded_labels(entry: dict) -> dict[str, str]:
+    """{'NIFTY': ..., 'SENSEX': ...} exactly as the entry holds them (on `entry_basis`)."""
+    recorded = entry.get("dte") or {}
+    return {index: str(recorded.get(index, "unknown")) for index in ("NIFTY", "SENSEX")}
+
+
 def entry_labels(entry: dict) -> dict[str, str]:
     """{'NIFTY': ..., 'SENSEX': ...} of a journal entry on the weekday basis, whatever it was
     recorded under."""

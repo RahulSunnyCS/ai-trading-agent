@@ -98,13 +98,13 @@ class History:
     digest: str
 
 
-def load_history(day: date, root: Path, names: list[str]) -> History:
+def load_history(day: date, root: Path, names: list[str], basis: str = "weekdays") -> History:
     """Everything the pick reads from disk. Raises PickError when the history is short or does not
     reach the last collected trading day."""
     if not names:
         raise PickError("no variant strategy files found")
     m = store.load_matrix(names, root, through=day - timedelta(days=1))
-    attrs = store.read_days(root)
+    attrs = store.read_days(root, basis)
     keep = [i for i, d in enumerate(m.days) if d in attrs]
     days = [m.days[i] for i in keep]
     if len(days) < WARMUP:

@@ -133,3 +133,19 @@ Committed before any run of `research/bl109/`.
   log, the explain view and the overview read journal entries through `entry_labels`. Tomorrow's
   header and rows say "weekdays to expiry". Guide, `technical.md`, package CLAUDE.md and TODO
   updated. The four forward entries (12 to 15 Oct) stay on the calendar basis as recorded.
+- 2026-10-15 — **Review follow-up** (PR #233). Disclosed plainly: the registration was **not blind**.
+  The exploratory full-history look above covered the registered window before Phase 0 was
+  written; the rule and window were fixed before the registered run, and its numbers reproduce
+  exactly from the merged code (`rescore.py` now reads both bases straight from the store).
+  Phase 2 differs from its plan: instead of a one-time relabel of `days.csv`, the file is never
+  rewritten and labels are converted on read (`store.read_days(basis=...)`), so there is nothing
+  to run twice; the "done when" dry run of `obt rotation pick` is recorded in the PR. Entries
+  recorded before the change are checked on the calendar days they were scored on
+  (`entry_basis`), and every other reader converts them to weekdays. Fixed from the review:
+  rank IC, regime forward mix and the selection view now read entries through `entry_labels`;
+  live and history labels both go through `from_calendar_label` (a 7 or 8 day gap stays `7+`);
+  `scripts/rotation-parity.py` and `research/bl100/replay_lastyear.py` stay on `basis="calendar"`.
+  **Open for the owner:** `obt rotation readout` still pools every forward entry from 12 Oct, so
+  its 60-day count spans both bases (the first four entries are calendar-day). Split it at
+  16 Oct, or restart the count?
+
