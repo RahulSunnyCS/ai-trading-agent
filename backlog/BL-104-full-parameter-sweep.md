@@ -275,6 +275,18 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   RE ×1 −135. Moving further out of the money loses on expiry days; the loosest leg stop leads every
   strike.
 
+### 2026-10-15 — NIFTY Widesl OTM1–OTM3 on non-expiry days only
+- **Hypothesis:** on NIFTY days that are not a weekly expiry, where the template earned ₹120 a
+  lot-day in the first year and lost ₹51 in the test year, some OTM strike (OTM1–OTM3) with some
+  combination of leg stop, trail, MTM stop, exit and re-entry beats the template at most entry times.
+- **Universe:** the same 648 cells as the expiry-day OTM1–OTM3 experiment above, the 7 slots, the 384
+  non-expiry weekdays (194 first year, 190 test year), stored series after charges; comparator the
+  OTM1 template on the same days.
+- **Look-ahead check, pass / kill rule, hold-out:** identical to the expiry-day OTM1–OTM3 experiment
+  (first-year selection, test year read once, reverse split, the five conditions, luck line over
+  all 648); pooled two-year ranking and best per strike reported as descriptive.
+- **Will not run:** ATM and premium strikes; per-slot settings; values outside the Stage 1 grid.
+
 ## Risks
 
 - Nothing is unseen: a result here is in-sample by construction; the forward test is the only
