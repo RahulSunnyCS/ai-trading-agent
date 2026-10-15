@@ -251,7 +251,9 @@ def valid_until_for(until: str, exit_time: str, minutes: int | None) -> str | No
     return value if value > until else None
 
 
-def strike_for(family: str, underlying: str, value: str) -> Strike:
+def strike_for(family: str, underlying: str, value: str | float) -> Strike:
+    if isinstance(value, (int, float)):  # an off-grid closest premium (day-type lists, 2026-10-15)
+        return Strike(closest_premium=value)
     if value in PREMIUM.get(family, {}).get(underlying, {}):
         return Strike(closest_premium=PREMIUM[family][underlying][value])
     return Strike(strike_type=value)
@@ -274,6 +276,10 @@ def build(
     if p is None:
         return LegwiseStrategy.model_validate(strategy.model_dump())
     underlying = cell.underlying
+    if set(p) == {"strike"}:  # the rotation file with only its strike changed (N_p80 from N_wide, …)
+        for leg in strategy.legs:
+            leg.strike = strike_for(cell.family, underlying, p["strike"])
+        return LegwiseStrategy.model_validate(strategy.model_dump())
     scale = POINT_SCALE[underlying]
     # Stage-2 extras (off-grid controls, backlog/BL-104 Phase 2): exit for D and B,
     # square_off, Buy gap_percent and valid_until (minutes after the range end).

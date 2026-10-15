@@ -318,6 +318,23 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   days in both years the slot is marked "owner to choose" too.
 - **Known weakness:** per-slot choice over 216 settings on ~50 expiry days a year is close to
   choosing noise; the list is a starting point for the forward journal, not evidence.
+- **Amendment 1 (2026-10-16, owner, before any list was read): scope is every Core-298 family at
+  the 7 sampled slots, not N_wide at 25.** The 25-slot run was stopped unread (owner: "only 7 time
+  zone is required"). Families and the strike each keeps: N_wide OTM1, N_p80 ₹80, N_p100 ₹100,
+  S_wide OTM2, S_p250 ₹250, S_p320 ₹320 (Widesl, 216 cells with a day MTM stop); N_dir ATM, N_ditm1
+  ITM1, S_dir ATM, S_ditm1 ITM1 (Dir, the D cells with a day MTM stop); N_buy ₹50, S_buy ₹50 (Buy,
+  324 cells). Comparator: the family's own rotation file (verified equal to its base file with only
+  the strike changed). Off-grid premiums (₹80, ₹250, SENSEX Buy ₹50) and the strike-swapped
+  templates simulated with the Stage 1 code (tag `daytype`, cells
+  `daytype_cells_2026-10-16.json`). Default per family: its template, except N_wide, whose defaults
+  are the owner's two settings. Expiry days per index from `expiries_observed.csv`.
+- **Amendment 1 choosing rule:** the four conditions above (both years positive; beat the default
+  by ₹25 on expiry days / ₹15 on other days; worst day ≤ 1.25 × the template's; ≥ 2 grid
+  neighbours beat the template). Of the settings that clear, the best is chosen; the second best is
+  also kept when its daily P&L on those days correlates below 0.7 with the first (owner: keep both
+  when they behave differently, otherwise the best). Nothing clears → the default stays; the slot
+  is "owner to choose" (top three listed) only when the default loses to the template in both years.
+  Every row spells out every parameter (owner, 2026-10-16), read from the built strategy.
 
 ## Risks
 
