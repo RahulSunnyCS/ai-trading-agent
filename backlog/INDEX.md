@@ -30,6 +30,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
 | [BL-022](BL-022-analog-day-search.md) | "Days like today": analog-day search for intraday options | P1 | Idea | research | options |
 | [BL-025](BL-025-live-money-rules.md) | Live-money rules for Momentum: written before the first rupee, enforced by alerts | P1 | In progress | feature | momentum |
+| [BL-109](BL-109-rotation-weekday-dte.md) | Rotation days to expiry: count weekdays only, not calendar days | P1 | In progress | research | options |
 | [BL-026](BL-026-realised-vs-backtest-options.md) | Options: realised P&L against the backtest of the same days | P1 | Planned | feature | options |
 | [BL-030](BL-030-choose-journal-favourites.md) | Choose the ~8 favourites to track and trade | P1 | Idea | research | momentum |
 | [BL-035](BL-035-consolidation-tightness-feature.md) | Consolidation tightness as a Momentum ranking feature (the cheap "flag") | P1 | Idea | research | momentum |
