@@ -1,14 +1,15 @@
 """The "tomorrow" section of the evening result message: the expected picks for the next session
-and how Steady and Adaptive (and the fixed base) have done on days like it, from the stored history.
+and how Adaptive (and the fixed base) have done on days like it, from the stored history.
 Read-only.
 
 It is a historical frequency, not a forecast. The rows are fixed in advance and do not depend on
-any result: all days, the same weekday, and the same (NIFTY, SENSEX) days to expiry. A row is never
-added or dropped because of how it performed. The next session's gap, opening range and VIX are not
-known tonight and none of them separated winning from losing days in the study behind this, so they
-are left out. Every figure is a one-lot gross per-lot-day basket result, over the days since
-`HISTORY_FROM`. Most of those days were re-scored from history, after the rule's weights were
-chosen on them, so they are in-sample; the message says how many were recorded forward."""
+any result: all days, the same weekday, and the same (NIFTY, SENSEX) weekdays to expiry. A row is
+never added or dropped because of how it performed. The next session's gap, opening range and
+VIX are not known tonight and none of them separated winning from losing days in the study behind
+this, so they are left out. Every figure is a one-lot gross per-lot-day basket result, over the
+days since `HISTORY_FROM`. Most of those days were re-scored from history, after the rule's
+weights were chosen on them, so they are in-sample; the message says how many were recorded
+forward."""
 
 from __future__ import annotations
 
@@ -132,7 +133,7 @@ def conditions(weekday: str, dte_n: str, dte_s: str) -> list[Condition]:
         Condition("all days", lambda r: True),
         Condition(f"{weekday} sessions", lambda r: r.get("weekday") == weekday),
         Condition(
-            f"NIFTY {dte_n} / SENSEX {dte_s} days to expiry",
+            f"NIFTY {dte_n} / SENSEX {dte_s} weekdays to expiry",
             lambda r: dte(r, "NIFTY") == dte_n and dte(r, "SENSEX") == dte_s,
         ),
     ]
@@ -290,7 +291,9 @@ def for_next_session(today: date, root: Path | None = None) -> Tomorrow:
 def render(t: Tomorrow) -> str:
     from . import pick as pick_mod
 
-    lines = [f"Tomorrow {t.day} ({t.weekday}): NIFTY {t.dte_n} / SENSEX {t.dte_s} days to expiry"]
+    lines = [
+        f"Tomorrow {t.day} ({t.weekday}): NIFTY {t.dte_n} / SENSEX {t.dte_s} weekdays to expiry"
+    ]
     e = t.expected
     if e is not None:
         lines.append("Expected picks if the conditions at the close stay the same:")

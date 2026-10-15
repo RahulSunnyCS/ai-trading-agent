@@ -36,6 +36,7 @@ import numpy as np
 
 from ..data.reference.loader import default_reference_data
 from . import journal, store
+from .dte import entry_labels
 from .lists import BUY_TOP, LISTS, LOTS_PER, MIN_WIDE_N, N_BUY, N_CORE, WARMUP, RotationList
 from .score import (
     VIX_LABELS,
@@ -178,7 +179,7 @@ class DayContext:
 def _day_context(snap: Snapshot, day: date) -> DayContext:
     entry = snap.entries.get(day.isoformat())
     if entry is not None:
-        dte = entry.get("dte") or {}
+        dte = entry_labels(entry)
         return DayContext(
             day,
             str(entry["weekday"]),

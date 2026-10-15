@@ -53,9 +53,9 @@ def test_next_session_skips_weekend_and_holidays():
 
 def test_the_rows_are_fixed_in_advance_and_the_same_on_an_expiry_day():
     expiry = [c.label for c in tomorrow.conditions("Thu", "3", "0")]
-    assert expiry == ["all days", "Thu sessions", "NIFTY 3 / SENSEX 0 days to expiry"]
+    assert expiry == ["all days", "Thu sessions", "NIFTY 3 / SENSEX 0 weekdays to expiry"]
     plain = [c.label for c in tomorrow.conditions("Mon", "2", "1")]
-    assert plain == ["all days", "Mon sessions", "NIFTY 2 / SENSEX 1 days to expiry"]
+    assert plain == ["all days", "Mon sessions", "NIFTY 2 / SENSEX 1 weekdays to expiry"]
 
 
 def test_build_counts_only_scored_days_before_the_target_day():
@@ -65,7 +65,7 @@ def test_build_counts_only_scored_days_before_the_target_day():
     ]
     t = tomorrow.build(date(2026, 3, 1), rows, "Thu", "3", "0")
     by_label = {label: (n, stats) for label, n, stats in t.rows}
-    n, stats = by_label["NIFTY 3 / SENSEX 0 days to expiry"]
+    n, stats = by_label["NIFTY 3 / SENSEX 0 weekdays to expiry"]
     assert n == 12  # the Thursdays; the 2026-03-30 row is after the day
     assert stats["C"] == (1.0, 100.0)
     assert by_label["all days"][0] == 59
@@ -80,7 +80,7 @@ def test_render_flags_thin_samples_and_says_it_is_not_a_forecast():
     t = tomorrow.build(date(2026, 3, 1), _history(), "Thu", "3", "0")
     text = tomorrow.render(t)
     assert "Tomorrow 2026-03-01 (Thu)" in text
-    assert "NIFTY 3 / SENSEX 0 days to expiry (12d, thin)" in text
+    assert "NIFTY 3 / SENSEX 0 weekdays to expiry (12d, thin)" in text
     assert "not a forecast" in text
     assert "Adaptive" in text and "Steady" not in text and "Calendar" not in text
 

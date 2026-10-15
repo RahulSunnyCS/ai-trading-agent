@@ -17,6 +17,7 @@ import numpy as np
 from ..fyers.daily import data_dir
 from . import journal, store
 from .attrs import last_collected_before
+from .dte import DTE_BASIS
 from .lists import DISPLAY_NAMES, LISTS, LOTS_PER, PUBLIC_KEYS, WARMUP
 from .live import listed_dte_labels, vix_open_with_source
 from .score import composite, dte_matrix, family_index, runners_up, select, vix_band
@@ -219,6 +220,7 @@ def record(
         "vix_band": vix_band(vix_open),
         "dte": {"NIFTY": dte["dte_n"], "SENSEX": dte["dte_s"]},
         "dte_source": dte_source,
+        "dte_basis": DTE_BASIS,
         "lists": lists,
         "commit": commit,
         "universe": universe_fingerprint(names),

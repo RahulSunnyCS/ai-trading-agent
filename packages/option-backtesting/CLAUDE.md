@@ -136,6 +136,12 @@ Otherwise:
   sends Adaptive only after the evening pipeline finishes (Steady, Calendar and the baseline are recorded in the journal but not sent; `lists.PUBLIC_KEYS`) (normally around 16:00).
   A per-entry marker prevents a retry from sending it twice;
   `obt rotation result --force` explicitly resends it.
+  Days to expiry in the rotation are **weekdays** (Monday to Friday dates after the session up to the expiry;
+  holidays are not excluded; BL-109, 2026-10-15): `rotation/dte.py` holds the count, `live.py` builds the live
+  labels with it, and the stored `days.csv` and the journal entries recorded before the change keep calendar
+  days as written and are converted on read (`store.read_days`, `dte.entry_labels`), so nothing is rewritten.
+  New entries carry `dte_basis: weekdays`. The Options Lab anatomy `dte` and the YAML engine's `days_to_expiry`
+  stay calendar days.
   `rotation/tomorrow.py` appends a "Tomorrow" section to that message (`--no-tomorrow` drops it; a failure in
   it never blocks the result, and it is skipped when the result was already sent): the expected picks for the
   next session (the 09:16 ranking re-run on the stored results with tonight's VIX close standing in for the

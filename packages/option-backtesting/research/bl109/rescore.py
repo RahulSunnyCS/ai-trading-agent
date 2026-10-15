@@ -78,7 +78,8 @@ def main() -> None:
             for name, b in blocks.items():
                 series.setdefault((key, name), {})[d] = float(b["per_lot_day"])
             chosen = {
-                name: [*r.picks(d)[key]["core"], *r.picks(d)[key]["buy"]] for name, r in arms.items()
+                name: [*r.picks(d)[key]["core"], *r.picks(d)[key]["buy"]]
+                for name, r in arms.items()
             }
             picks_differ[key] += 0 if chosen["older"] == chosen["newer"] else 1
             rows.append(
@@ -118,7 +119,9 @@ def main() -> None:
     a = report["lists"]["Adaptive"]
     worse = a["newer_minus_older"]["hi90"] < 0
     # drawdowns are non-positive: "more than 20% deeper" means newer < older * 1.2
-    deeper = a["newer"]["max_drawdown_per_lot"] < a["older"]["max_drawdown_per_lot"] * ADOPT_DD_LIMIT
+    deeper = (
+        a["newer"]["max_drawdown_per_lot"] < a["older"]["max_drawdown_per_lot"] * ADOPT_DD_LIMIT
+    )
     report["decision"] = {
         "interval_entirely_below_zero": worse,
         "drawdown_more_than_20pct_deeper": deeper,

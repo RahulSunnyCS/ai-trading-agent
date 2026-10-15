@@ -20,6 +20,7 @@ from pathlib import Path
 import numpy as np
 
 from ..fyers.daily import data_dir
+from .dte import from_calendar_label
 
 RESULT_COLUMNS = ["day", "net", "gross", "costs", "worst_mtm", "stopped_by", "n_trades"]
 DAY_COLUMNS = ["day", "weekday", "vix_open", "vix_band", "dte_n", "dte_s"]
@@ -104,11 +105,20 @@ def load_matrix(names: list[str], root: Path | None = None, through: date | None
 
 
 def read_days(root: Path | None = None) -> dict[date, dict[str, str]]:
+    """The stored day attributes. The file keeps calendar-day DTE labels as they were written;
+    they are returned on the weekday basis (BL-109), so every reader agrees with the live label."""
     path = days_path(root)
     if not path.exists():
         return {}
+    out: dict[date, dict[str, str]] = {}
     with path.open() as f:
-        return {date.fromisoformat(r["day"]): r for r in csv.DictReader(f)}
+        for r in csv.DictReader(f):
+            day = date.fromisoformat(r["day"])
+            for key in ("dte_n", "dte_s"):
+                if key in r:
+                    r[key] = from_calendar_label(r[key], day)
+            out[day] = r
+    return out
 
 
 def append_day(row: dict, root: Path | None = None) -> bool:

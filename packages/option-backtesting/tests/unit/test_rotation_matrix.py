@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from option_backtesting.api.app import create_app
 from option_backtesting.rotation import journal, store
 from option_backtesting.rotation import matrix as m
+from option_backtesting.rotation.dte import from_calendar_label
 
 START = date(2025, 1, 6)  # a Monday: 60 weekdays reach 2025-03-28, inside P2 (from 2025-01-10)
 BANDS = ["13-15", "15-18", "11.5-13"]
@@ -31,6 +32,11 @@ def weekdays(n: int, start: date = START) -> list[date]:
 
 
 DAYS = weekdays(60)
+
+
+def weekday_dte(calendar_label, day):
+    """The label the engine reads: the synthetic store keeps calendar-day labels (BL-109)."""
+    return from_calendar_label(calendar_label, day)
 
 
 def gross_of(name: str, i: int) -> float:
@@ -258,7 +264,7 @@ def test_dte_uses_each_variants_own_index(root):
         root, view="dte_slot", period="P2", filters=m.parse_filters(index="SENSEX", family="wide")
     )
     keep = [i for i, d in enumerate(DAYS) if d >= date(2025, 1, 10)]
-    own = [i for i in keep if DTE["S"][i % 5] == "0"]
+    own = [i for i in keep if weekday_dte(DTE["S"][i % 5], DAYS[i]) == "0"]
     c = cell(resp, "0", "0917")
     assert c["n"] == len(own)
     assert c["v"] == pytest.approx(
@@ -268,7 +274,7 @@ def test_dte_uses_each_variants_own_index(root):
     n = run(
         root, view="dte_slot", period="P2", filters=m.parse_filters(index="NIFTY", family="wide")
     )
-    own_n = [i for i in keep if DTE["N"][i % 5] == "0"]
+    own_n = [i for i in keep if weekday_dte(DTE["N"][i % 5], DAYS[i]) == "0"]
     assert cell(n, "0", "0917")["n"] == len(own_n)
     assert resp["filters"]["index"] == "SENSEX" and n["filters"]["family"] == ["wide"]
 
@@ -278,7 +284,7 @@ def test_the_dte_filter_applies_to_each_variants_own_index(root):
     resp = run(root, view="vix_family", period="P2", filters=f)
     keep = [i for i, d in enumerate(DAYS) if d >= date(2025, 1, 10)]
     got = sum(cell(resp, b, "S:wide")["n"] for b in BANDS if cell(resp, b, "S:wide").get("n"))
-    assert got == len([i for i in keep if DTE["S"][i % 5] == "0"])
+    assert got == len([i for i in keep if weekday_dte(DTE["S"][i % 5], DAYS[i]) == "0"])
 
 
 def test_the_date_view_needs_one_family_and_lists_each_session(root):

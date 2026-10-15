@@ -43,7 +43,7 @@ the period ("1 weekend session left out of P1"), so the numbers reconcile with t
 | Weekday × family | Monday to Friday | Strategy kinds | A kind pooled over its 25 start times, on that weekday |
 | Pulse | Strategy kinds | The last 5, 21 and 63 sessions, and all stored days | A kind pooled over its 25 start times in that window. It is as of one day (the latest, or the date you pick), not a period: the Period control does not apply |
 
-DTE is each strategy's **own** index's days to expiry: a SENSEX variant uses SENSEX's.
+DTE is each strategy's **own** index's days to expiry, counted in **weekdays** (Saturdays and Sundays are not counted; a Friday before a Monday expiry is 1): a SENSEX variant uses SENSEX's.
 
 ## The layout and the default
 

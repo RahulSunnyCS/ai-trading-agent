@@ -40,6 +40,7 @@ import numpy as np
 from ..data.reference.loader import REFERENCE_DIR, default_reference_data
 from ..fyers.daily import data_dir
 from . import journal, pick, placements, store
+from .dte import LEGACY_BASIS, entry_labels
 from .lists import LISTS, LOTS_PER, WARMUP
 from .variants import UNDERLYING, is_buy, is_dir, is_wide, parts, variant_names
 
@@ -414,7 +415,7 @@ def recorded_row(
     row = _row_common(day, lists)
     at = entry.get("recorded_at") or ""
     on_time = bool(entry.get("before_first_entry", False))
-    dte = entry.get("dte") or {}
+    dte = entry_labels(entry)
     time_text = at[11:19] if len(at) >= 19 else None
     if not on_time:
         status, detail = "late", _status_counts_note(on_time, time_text)
@@ -442,6 +443,7 @@ def recorded_row(
             "NIFTY": dte.get("NIFTY"),
             "SENSEX": dte.get("SENSEX"),
             "source": entry.get("dte_source") or None,
+            "basis": entry.get("dte_basis") or LEGACY_BASIS,
         },
         "recorded": {
             "at": at or None,
@@ -686,7 +688,7 @@ def _rescore(entry: dict, root: Path, names: list[str] | None) -> dict:
     except pick.PickError as error:
         return {"checked": False, "note": str(error)}
     vix = _number(entry.get("vix_open"))
-    dte = entry.get("dte") or {}
+    dte = entry_labels(entry)
     again = pick.score_history(
         hist, day, vix, {"dte_n": dte.get("NIFTY"), "dte_s": dte.get("SENSEX")}
     )

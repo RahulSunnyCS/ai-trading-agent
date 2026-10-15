@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner asked for it; it changes the registered rotation rule's DTE input |
-| **Status** | In progress |
+| **Status** | Done |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-15 |
 | **Depends on** | BL-058 (the rotation lists and forward journal) |
-| **TODO.md row** | — |
+| **TODO.md row** | 3.11.25 |
 
 ## Context
 
@@ -126,4 +126,10 @@ Committed before any run of `research/bl109/`.
   deeper (limit 20%), so the change is **adopted as "no worse"**. It is **not** shown to be
   better: both intervals include zero, the lists were fitted on the calendar labels, and all
   of it is in-sample. Steady's second half is slightly lower; reported, not part of the rule.
-
+- 2026-10-15 — **Phase 2 done.** `rotation/dte.py` (weekday count, `from_calendar_label`,
+  `entry_labels`); `store.read_days` converts the stored calendar labels on read and the file is
+  never rewritten (so there is no relabel step to run twice); `live.listed_dte_labels` and
+  `live.calendar_dte_labels` count weekdays; `pick.record` writes `dte_basis: weekdays`; the daily
+  log, the explain view and the overview read journal entries through `entry_labels`. Tomorrow's
+  header and rows say "weekdays to expiry". Guide, `technical.md`, package CLAUDE.md and TODO
+  updated. The four forward entries (12 to 15 Oct) stay on the calendar basis as recorded.
