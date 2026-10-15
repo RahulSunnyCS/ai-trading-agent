@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — tells whether a wider, safer universe improves the live rotation's lists |
-| **Status** | In progress (Phase 0 registered 2026-10-15) |
+| **Status** | Done 2026-10-15: no list won; New-556's lists are shallower in drawdown, not higher in return |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-15 |
@@ -97,3 +97,36 @@ unverified re-entry types; any adoption from this item alone.
   first-year scoring ITM1 / ITM2 ranked a few points below ATM and OTM1 for NIFTY Dir and fell out of
   the top four, so the pool had no ITM exposure on NIFTY. +3 sets, +20 variants (556 in all). The
   main simulation had started; the extras run as a separate job set and are merged in the replay.
+- 2026-10-15 — **Result** (239 common test days, 2025-10-09 → 2026-10-09; gross per lot, before
+  charges, the same basis as Core-298's stored results; replay with the picker's own `score_history`
+  and the registered weights and lookbacks; the 90 % interval is the 5-day block bootstrap of the daily
+  difference against the same list on Core-298, seed 20261012).
+
+  | List | Universe | ₹/lot-day | Max drawdown | Difference vs Core-298 [90 % interval] | Net after charges | Winner |
+  |---|---|---:|---:|---|---:|---|
+  | Steady | Core-298 | 384 | −11,073 | | | |
+  | | New-536 | 348 | −12,965 | −36 [−234, +141] | 198 | no |
+  | | New-556 | 359 | −9,368 | −24 [−219, +155] | 210 | no |
+  | Calendar | Core-298 | 366 | −13,838 | | | |
+  | | New-536 | 405 | −10,114 | +39 [−178, +237] | 255 | no |
+  | | New-556 | 417 | −7,605 | +51 [−162, +247] | 269 | no |
+  | Adaptive | Core-298 | 393 | −10,089 | | | |
+  | | New-536 | 292 | −11,107 | −101 [−295, +86] | 142 | no |
+  | | New-556 | 324 | −8,565 | −69 [−258, +111] | 174 | no |
+  | Baseline | Core-298 | 344 | −12,988 | | | |
+  | | New-536 | 322 | −10,526 | −23 [−246, +177] | 172 | no |
+  | | New-556 | 300 | −10,201 | −44 [−266, +152] | 150 | no |
+
+  Fixed base: ₹193 per lot-day, max drawdown −30,365. **No list passed the registered rule** (interval
+  above zero and drawdown no worse): every interval straddles zero and is about ±₹200 a day wide, so
+  twelve months cannot separate differences smaller than that. Direction: Steady, Adaptive and
+  Baseline are lower on New-536 and New-556 in gross return; Calendar is higher. **The owner's ITM
+  amendment (New-556 against New-536):** drawdown is shallower for all four lists (Steady −9.4k vs
+  −13.0k, Calendar −7.6k vs −10.1k, Adaptive −8.6k vs −11.1k, Baseline −10.2k vs −10.5k) and gross
+  return is higher for three of four (+12, +13, +32; Baseline −21). **New-556's drawdown is shallower
+  than Core-298's for every list**, at a gross return from −69 to +51 per lot-day below or above it,
+  all inside the noise. Picks: on Core-298 Steady took 45 % NIFTY Widesl and no SENSEX Buy; on
+  New-536 it took 27 % NIFTY Widesl, 35 % SENSEX Widesl, 22 % SENSEX Dir and 10 % SENSEX Buy.
+  Disclosed: the pool's selection year overlaps BL-099's earlier use of the test year only through the
+  grid's axes; the comparison is gross because Core-298's stored results are; after-charges figures
+  for Core-298 were not recomputed (owner's choice).
