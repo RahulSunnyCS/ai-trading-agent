@@ -48,6 +48,20 @@ const nextConfig: NextConfig = {
               source: '/api/backtest/legwise/:path*',
               destination: `${optionsDirectOrigin}/legwise/:path*`,
             },
+            // The YAML engine's own endpoints (presets, validate, coverage, runs, health) live at
+            // the Python service's root. Without these they fell through to the /api/* catch-all
+            // and a 500 from the absent apps/server (the YAML builder's "Couldn't load presets").
+            ...['health', 'presets', 'validate', 'coverage', 'runs'].flatMap((name) => [
+              { source: `/api/backtest/${name}`, destination: `${optionsDirectOrigin}/${name}` },
+              ...(name === 'presets' || name === 'runs'
+                ? [
+                    {
+                      source: `/api/backtest/${name}/:id`,
+                      destination: `${optionsDirectOrigin}/${name}/:id`,
+                    },
+                  ]
+                : []),
+            ]),
           ]
         : []),
       // Same idea for the Momentum tab: talk to its private FastAPI service
