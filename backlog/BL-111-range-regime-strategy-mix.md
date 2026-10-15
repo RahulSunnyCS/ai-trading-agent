@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — owner's idea; builds on BL-110; a close cousin of BL-053 (killed) |
-| **Status** | Idea |
+| **Status** | Planned |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-15 |
@@ -34,64 +34,108 @@ What the repo already says:
 
 ## Goal
 
-An answer, on days not used to choose the rule, to: does setting the Dir / Widesl split by the
-previous session's range state earn more, with no worse drawdown, than the list's own basket and
-than any fixed split of the same size?
+An answer, on days not used to choose the rule, to two separate questions, at the owner's real
+sizes (3 lots on ordinary days, 6 lots on expiry days):
+
+1. **Lots by rank:** does splitting the lots 2-2-1-1 over the top four strategies (6 lots) or 2-1
+   over the top two (3 lots) earn more, with no worse drawdown, than today's 3 strategies × 2 lots?
+2. **Lots by range regime:** does moving lots between Dir and Widesl by the previous session's
+   range state beat the same basket held fixed?
 
 ## Out of scope
 
-- Any change to the live lists, weights or the journal (this is a recombination of stored results).
+- Any change to the live lists, weights or the journal (this recombines stored results).
 - A new entry time (BL-053 showed a later start is a separate question).
-- Buy as an extra "directional" lever unless the owner says so (it lost on both kinds of day in
-  BL-053).
+- Buy as a lever (decision below). The list's own Buy add-on is left as the list makes it.
+- Margin and cash: noted under Risks; sized in Phase 1 with the repo's margin model.
 
 ## Plan
 
-### Phase 0 — Pre-register (draft: to be confirmed by the owner before any run)
+### Phase 0 — Pre-register (draft: decisions below were taken by the assistant at the owner's
+request, 2026-10-15; the owner can overrule any of them before a run)
 
-- **Hypothesis:** on days following an expanded session, a basket with 3 Dir + 3 Widesl earns more
-  than 1 Dir + 5 Widesl of the same 6 lots; on days following a quiet session the reverse holds
-  or the difference is small; and the state-based switch earns more than both fixed splits.
-- **Signal, known at 09:16:** `E = R_{t-1} / median(R over the 20 sessions before t-1)` from the
-  NIFTY index bars of the previous session (as BL-110). **Expanded** if `E ≥ 1.25`, **range-bound**
-  if `E ≤ 0.80`, otherwise **normal**. Thresholds are the BL-110 ones, not tuned here.
-- **Baskets (6 lots, NIFTY variants only):**
-  - *Switch:* expanded → 3 Dir + 3 Widesl; range-bound → 1 Dir + 5 Widesl; normal → the list's
-    own mix (A and C each).
-  - Within a kind, the variants are the highest-scoring ones of that kind under the list's own
-    composite on that day (the same ranking the 09:16 job already computes), no new fit.
-  - *Controls:* the list's own basket; always 3 Dir + 3 Widesl; always 1 Dir + 5 Widesl; and a
-    **placebo** in which the state labels are shuffled across days (500 shuffles) to see whether
-    the state matters at all.
-- **Data / periods:** stored per-variant daily results. Rule fixed on 2025-01-10 → 2026-10-08
-  (P2 + P1, already seen). Hold-out: **2022-04-05 → 2024-10-08 (P3, NIFTY only)**, unseen, run
-  once, only if the rule is fixed first. If P3 per-variant results are not in the store, they
-  are built from the lake by the same variant files before the rule is run (to be confirmed).
-- **Look-ahead check:** the signal uses only the previous session's bars; the ranking uses only
-  results before day `t`; the hold-out is not read until the rule and thresholds are committed.
-- **Pass / kill rule:** pass only if, on the hold-out, the switch beats the list's own basket
-  and both fixed splits in total gross ₹ by at least 10%, with maximum drawdown no worse, **and**
-  beats the median of the 500 placebo shuffles. Otherwise killed.
-- **Will not run:** other thresholds, other splits, 2-day or VIX-based signals, intraday signals,
-  Buy as a lever. Each needs a new dated block and `override: <reason>`.
+**Decisions**
+
+- **Directional lever = Dir only.** Buy lost on both quiet and expanding days in BL-053 (−₹77 vs
+  −₹17 per lot) and would be given more lots on exactly the days it did worse. The owner first
+  chose "Dir and Buy"; the later instruction was to decide, so this is the decision, with the
+  reason.
+- **Quiet-range mix: stage it, 4 Widesl lots first, 5 later.** The primary arm is 4 Widesl + 2
+  Dir lots (the BL-053 quiet shape, so it can be compared). 5 Widesl + 1 Dir is reported as a
+  second arm, descriptive only, and is the step to take only after the 4-lot step has held
+  forward.
+- **Sizes tested:** 3 lots and 6 lots, both reported, because the owner trades 3 on ordinary days
+  and 6 on expiry days. An *expiry day* is a day the traded index expires (NIFTY basket: NIFTY
+  expiry, label `dte_n = 0` on the weekday basis).
+
+**Ladders (lots per ranked slot)**
+
+| Size | Fixed ladder (question 1) | Expanded regime (question 2) | Quiet regime (question 2) |
+|---|---|---|---|
+| 6 lots | top 4 by the list's composite: 2, 2, 1, 1 | Dir#1 ×2, Widesl#1 ×2, Dir#2 ×1, Widesl#2 ×1 (3 Dir + 3 Widesl) | Widesl#1 ×2, Widesl#2 ×2, Dir#1 ×1, Dir#2 ×1 (4 Widesl + 2 Dir) |
+| 3 lots | top 2 by composite: 2, 1 | Dir#1 ×2, Widesl#1 ×1 | Widesl#1 ×2, Dir#1 ×1 |
+
+"Dir#k" and "Widesl#k" are the k-th highest-scoring variant of that kind under the list's own
+composite on that day (the ranking the 09:16 job already computes); no new fit.
+
+**Signal, known at 09:16:** `E = R_{t-1} / median(R over the 20 sessions before t-1)` from the
+NIFTY index bars of the previous session (as BL-110). Expanded `E ≥ 1.25`; range-bound `E ≤ 0.80`;
+otherwise normal (the list's own basket in the same ladder). Thresholds are BL-110's, not tuned.
+
+**Hypotheses**
+
+- H1 (question 1): the 2-2-1-1 / 2-1 ladder earns at least as much per lot as 3 × 2 with no
+  deeper drawdown.
+- H2 (question 2): the regime switch beats both the fixed split of the same size and the list's own
+  basket.
+
+**Controls:** the list's own 3 × 2 basket; the fixed 2-2-1-1 (2-1) ladder on the list's own top
+ranks; always-expanded and always-quiet mixes; and a **placebo** in which the regime labels are
+shuffled across days (500 shuffles) to check that the state matters at all.
+
+**Data / periods:** stored per-variant, per-lot daily results. Rule fixed on 2025-01-10 →
+2026-10-08 (already seen). Hold-out: **2022-04-05 → 2024-10-08 (P3, NIFTY only)**, unseen, read
+once, only after this block is committed. If per-variant P3 results are not in the store they are
+built from the lake with the same variant files before the rule is run.
+
+**Look-ahead check:** the signal uses only the previous session; the ranking uses only results
+before day `t`; the hold-out is untouched until the rule is committed.
+
+**Pass / kill rule** (each of H1 and H2 on the hold-out, at each size, expiry days and ordinary
+days reported separately): pass only if the arm beats its comparators in total gross ₹ by at least
+10% with maximum drawdown no worse, and (H2) beats the median placebo shuffle. A pass at one size
+only is reported as such, not generalised. Otherwise killed.
+
+**Will not run:** other thresholds or ladders, 2-day or VIX-based signals, intraday signals, Buy
+as a lever, the 5 Widesl arm as a decision arm. Each needs a new dated block and `override:`.
 
 ## Risks
 
-- BL-053 is a close precedent that failed on exactly this kind of switch; the previous-day range
-  is information VIX largely already carries (BL-110).
-- The range-bound side has the weakest footing: BL-110 found quiet sessions are not followed by
-  smaller ranges.
-- Dir's edge appears only from mid-2024 (BL-083); a hold-out in 2022 to 2024 may simply not have
-  it, which would kill a rule that works now.
+- **BL-053 is a close precedent that failed** on a similar switch; the previous day's range is
+  information VIX largely carries (BL-110: the coefficient on the range roughly halves with VIX
+  in the model, R² rises 0.17 to 0.28).
+- **Both sides have support, but only the expanded side has a precedent of failing.** BL-110
+  reviewed: after a quiet session the next day's range is lower than after an average session
+  (about −0.12 to −0.15 of the baseline), so quiet persists too; but "lower range" does not by
+  itself mean Widesl earns more.
+- **Dir's edge appears only from mid-2024** (BL-083); a 2022-24 hold-out may not have it.
+- **Cash.** Widesl is short premium: its margin per lot is larger than a long Dir. A switch toward
+  4 to 5 Widesl lots raises margin on quiet days. Phase 1 reports peak margin per day with the
+  repo's margin model, and a rule that does not fit the owner's cash is not usable whatever it
+  earns.
+- **Small samples.** Expanded days are about 30% of sessions, expiry days about 1 in 5; at 6 lots
+  on expiry days only, the hold-out has on the order of 120 days.
 
 ## Open questions
 
-1. What does "six" mean: 6 strategies at 1 lot, or today's 3 strategies × 2 lots (6 lots)?
-   Draft above assumes 6 lots, as in BL-053.
-2. Dir only, or Dir + Buy, as the "directional" lever? Draft: Dir only.
-3. Range-bound mix: 1 Dir + 5 Widesl, or 2 Dir + 4 Widesl?
-4. Signal: previous session's range only, or also today's 09:15 VIX band?
+None blocking. The owner may overrule the decisions above; the signal and thresholds are the
+BL-110 ones.
 
 ## Log
 
 - 2026-10-15 — created from the owner's chat idea; drafted against BL-110 and BL-053.
+- 2026-10-15 — owner clarified: today's live basket is 3 strategies × 2 lots; the owner meant
+  splitting the 6 lots as 2-2-1-1 (top two get 2 lots, next two get 1), and trades 3 lots on
+  ordinary days and 6 lots on expiry days because of cash. Asked the assistant to take the
+  decisions and to stage the quiet mix "four, then five". Decisions recorded in Phase 0.
+
