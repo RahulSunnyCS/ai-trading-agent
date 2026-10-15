@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — three management ideas for the Dir family; informative whatever the answer |
-| **Status** | In progress (Phase 1 screen done 2026-10-15: lock / trail and restart closed by the Phase 0 rule; roll waits for engine support) |
+| **Status** | In progress (Phase 1 closed by the Phase 0 rule; engine roll built and reviewed; Phase 2 roll screen running) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-15 |
@@ -217,8 +217,13 @@ Nothing is adopted from this item; a survivor goes to Stage 2 (engine-exact) and
   | C restart after a target | NIFTY −20 to −44; SENSEX −56 / −51 at T = 2,000, +26 / +33 at 3,000, +18 / +19 at 4,000 | fails: no setting passes in 4 of 7 slots (best 2 of 7, bootstrap lower bound below 0) |
   | C restart after a lock cut | −2 to −9 on both indices | fails: gain < ₹25 |
 
-  **No setting passed the registered rule (0 of 228 index × base × setting cases).** The worst-day
-  gate never bound (every variant is within 1.5 × its base): a cut can only shorten the tail.
+  **No setting passed the registered rule (0 of 228 index × base × setting cases; reproduced by
+  `score_screen.py` from the stored series, which now also computes the cross-slot rule, the
+  ₹25 kill, the neighbour plateau and a pooled PBO where an idea has at least six cells; the
+  restart-vs-later-slot comparator is not computed).** The worst-day
+  gate bound in 2 of 1,596 cases (SENSEX 09:17 ITM1 no-trail restart after a lock cut: worst day
+  −6,970 against a base of −4,564; a restart re-opens risk, so it can lengthen the tail); every
+  other variant is within 1.5 × its base.
   Lock / trail change almost nothing because the arm level is reached on a minority of days and
   the lock often sits near where the base would end anyway; cutting at a target gives up the
   decay that is the strategy's profit. One lead, **not a result**: SENSEX restart after a ₹3,000
@@ -227,3 +232,17 @@ Nothing is adopted from this item; a survivor goes to Stage 2 (engine-exact) and
   morning-only rule would be a choice made after seeing the result, so it needs its own registered
   item and the forward test before it counts. Roll (B, B′) is untested and still needs the Phase 2
   engine feature; it is the owner's remaining idea.
+- 2026-10-15 — **PR 229 review (Opus)**: fixes and clarifications.
+  - *Engine:* the roll's fresh stop and ATM override applied to every later entry of a rolled leg
+    (an SL re-entry would inherit them). They now apply to the roll's own entry only, and a roll
+    honours `no_reentry_after` like any re-entry. The first Phase 2 screen ran on the buggy engine
+    for about an hour and was discarded; Phase 2 reruns on the fixed engine from zero.
+  - *Tests:* the registered Phase 2 "done when" asked for new golden scenarios. The golden catalog
+    is a fixed thirty named scenarios and unchanged; the roll is covered by ten unit tests
+    (trigger, strike rule, ATM override, day-profit gate, cutoff, cap, fresh stop, re-entry
+    interaction, failed selection, two legs in one minute, last minute, overall stop across a
+    rolled leg) on top of the unchanged goldens and the byte-identical spec hashes of all 987
+    existing strategy files.
+  - *Phase 0 wording, as run:* a restart enters at the close of the cut minute (the engine's
+    fixed-time entry convention, which is the next minute's start) and only when the cut is
+    before 14:00, not at 14:00. Rolled legs share the leg's SL re-entry counter.

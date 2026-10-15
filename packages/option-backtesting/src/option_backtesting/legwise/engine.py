@@ -163,6 +163,7 @@ class _LegRun:
     reentry_mode: str | None = None
     reentry_price: float = 0.0
     rolls_done: int = 0  # BL-105: how many times this leg has been rolled today
+    roll_pending: bool = False  # BL-105: the next entry is the roll's (consumed by _enter)
 
     @property
     def sign(self) -> int:
@@ -212,13 +213,14 @@ class _DaySim:
         run.best = price
         spec = run.spec
         stop = spec.stop_loss
-        if run.rolls_done and spec.roll is not None and spec.roll.stop_loss_percent is not None:
+        if run.roll_pending and spec.roll is not None and spec.roll.stop_loss_percent is not None:
             stop = Amount(percent=spec.roll.stop_loss_percent)  # the rolled leg's own stop (BL-105)
         run.initial_sl = run.sl = to_tick(price - run.sign * stop.distance(price)) if stop else None
         run.target = (
             to_tick(price + run.sign * spec.target.distance(price)) if spec.target else None
         )
         run.fresh_intrabar = intrabar
+        run.roll_pending = False  # only the roll's own entry takes the roll overrides
         run.state = "open"
 
     def _exit(self, run: _LegRun, minute: int, raw: float, reason: str) -> None:
@@ -239,7 +241,7 @@ class _DaySim:
             self.notes.append(f"{spec.id}: no {spec.expiry} expiry listed")
             return False
         strike_rule = spec.strike
-        if run.rolls_done and spec.roll is not None and spec.roll.to_atm:
+        if run.roll_pending and spec.roll is not None and spec.roll.to_atm:
             strike_rule = Strike(strike_type="ATM")  # a rolled leg re-enters at ATM (BL-105)
         if strike_rule.strike_type is not None:
             spot = self.data.spot.price_at(minute)
@@ -433,6 +435,7 @@ class _DaySim:
             roll = run.spec.roll
             if (
                 roll is None
+                or minute + 1 > self.last_reentry_min  # a roll is a re-entry: same cutoff
                 or run.state != "open"
                 or run.series is None
                 or run.rolls_done >= roll.max_rolls
@@ -451,6 +454,7 @@ class _DaySim:
                     continue
             self._exit(run, minute, close, "ROLL")
             run.rolls_done += 1
+            run.roll_pending = True
             run.reentry_mode = "asap"
             run.state = "reentry"
 

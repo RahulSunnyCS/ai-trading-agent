@@ -275,6 +275,11 @@ def joined_rules(
     """Rules 3, 4 and 6 come from other files; absent = not yet run (None), never a pass."""
     out: dict[str, Any] = {"rule3_flat": None, "rule4_breadth": None, "rule6_pbo": None}
     if stage2_dir is not None:
+        if ("tail" in stage2_dir.name) != (WINNERS_SUFFIX == "_tail"):
+            raise SystemExit(
+                f"--suffix {WINNERS_SUFFIX!r} but the Stage 2 directory is {stage2_dir.name!r}: "
+                "the tail-gated and return-only selections share winner names; refusing to mix"
+            )
         for r in read_csv(stage2_dir / "flatness.csv"):
             if r["winner"] == name:
                 out["rule3_flat"] = r["rule3_flat"] == "True"

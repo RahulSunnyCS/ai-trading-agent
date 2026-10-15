@@ -131,3 +131,84 @@ def test_schema_rejects_roll_on_a_bought_leg_and_omits_it_from_the_dump_when_uns
         strat({"position": "buy", "roll": {"decay": 0.25}})
     assert "roll" not in strat({}).model_dump()["legs"][0]
     assert strat({"roll": {"decay": 0.25}}).model_dump()["legs"][0]["roll"] == {"decay": 0.25}
+
+
+def test_roll_overrides_apply_to_the_rolls_own_entry_only():
+    """Review of PR 229: a later SL re-entry of a rolled leg takes the leg's own stop and strike
+    rule, not the roll's fresh stop / ATM override."""
+    new = bars(80, {"11:00": (80, 110, 79, 100), "13:00": (80, 106, 79, 90)})
+    chain = {(22050.0, "CE"): DECAYED, (22100.0, "CE"): new}
+    leg = {
+        "strike": {"strike_type": "OTM1"},
+        "stop_loss": {"percent": 50},
+        "reentry_on_sl": {"mode": "cost", "count": 1},
+        "roll": {"decay": 0.25, "to_atm": True, "stop_loss_percent": 30},
+    }
+    trades = simulate_day(strat(leg), day(chain, SPOT)).trades
+    assert [t.exit_reason for t in trades] == ["ROLL", "SL", "EXIT_TIME"]
+    assert trades[1].exit_price == 104  # the roll's 30 % stop on the rolled entry
+    # the cost re-entry (80) takes the leg's own 50 % stop (120): 106 on 13:00 does not stop it
+    assert trades[2].entry_price == 80
+    # ASAP re-entry re-selects the leg's own OTM1 (spot is 22010 again by then), not ATM
+    asap = {**leg, "reentry_on_sl": {"mode": "asap", "count": 1}}
+    chain[(22050.0, "CE")] = bars(100, {"10:00": (30, 31, 18, 20)})  # still the original leg
+    chain[(22000.0, "CE")] = bars(60)
+    third = simulate_day(strat(asap), day(chain, SPOT)).trades[2]
+    assert third.contract[1] == 22050.0  # OTM1 of a 22010 spot, not the 22000 ATM
+
+
+def test_roll_honours_no_reentry_after_and_a_failed_selection_keeps_the_pnl():
+    data = day({(22000.0, "CE"): DECAYED, (22100.0, "CE"): bars(80)}, SPOT)
+    [t] = simulate_day(strat({"roll": {"decay": 0.25}}, no_reentry_after="09:45"), data).trades
+    assert t.exit_reason == "EXIT_TIME"  # the roll is a re-entry: not allowed after the cutoff
+    missing = day({(22000.0, "CE"): DECAYED}, SPOT)  # the new ATM was never collected
+    result = simulate_day(strat({"roll": {"decay": 0.25}}), missing)
+    [t] = result.trades
+    assert (t.exit_reason, result.gross) == ("ROLL", pytest.approx(80 * LOT))
+    assert any("not collected" in n for n in result.notes)
+
+
+def test_two_legs_roll_in_the_same_minute_and_a_roll_at_the_last_minute_does_not_reenter():
+    legs = [
+        {
+            "id": side.lower(),
+            "lots": 1,
+            "position": "sell",
+            "option_type": side,
+            "strike": {"strike_type": "ATM"},
+            "roll": {"decay": 0.25},
+        }
+        for side in ("CE", "PE")
+    ]
+    spec = LegwiseStrategy.model_validate(
+        {
+            "id": "t",
+            "underlying": "NIFTY",
+            "entry_time": "09:20",
+            "exit_time": "15:00",
+            "legs": legs,
+        }
+    )
+    chain = {
+        (22000.0, "CE"): DECAYED,
+        (22000.0, "PE"): DECAYED,
+        (22100.0, "CE"): bars(80),
+        (22100.0, "PE"): bars(80),
+    }
+    trades = simulate_day(spec, day(chain, SPOT)).trades
+    assert sorted(t.exit_reason for t in trades) == ["EXIT_TIME", "EXIT_TIME", "ROLL", "ROLL"]
+    late = bars(100, {"14:59": (30, 31, 18, 20)})  # decays on the last bar before the 15:00 exit
+    result = simulate_day(
+        strat({"roll": {"decay": 0.25, "not_after": "15:00"}}), day({(22000.0, "CE"): late}, SPOT)
+    )
+    [t] = result.trades
+    assert (t.exit_reason, t.exit_price) == ("ROLL", 20)
+
+
+def test_overall_stop_fires_across_a_rolled_leg():
+    blow = bars(80, {"11:00": (80, 210, 79, 200)})
+    data = day({(22000.0, "CE"): DECAYED, (22100.0, "CE"): blow}, SPOT)
+    leg = {"stop_loss": None, "roll": {"decay": 0.25}}
+    result = simulate_day(strat(leg, overall={"stop_loss_inr": 1000}), data)
+    assert result.stopped_by == "overall SL at 11:00"
+    assert [t.exit_reason for t in result.trades] == ["ROLL", "OVERALL_SL"]

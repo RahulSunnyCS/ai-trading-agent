@@ -338,7 +338,7 @@ def run_cohort(
         c = grid.Cell(family, index, slot, p)
         try:
             strategies.append(grid.build(c, template, execution=execution))
-        except (ValueError, TypeError) as error:
+        except ValueError as error:  # a TypeError is a bug in build(): let it fail the cohort
             invalid[c.label] = " ".join(str(error).split())[:160]
             continue
         cells.append(c)
@@ -587,6 +587,12 @@ def main() -> None:
         f"days={ {u: len(d) for u, d in days_cache.items()} } workers={args.workers} grid={grid.grid_sha()}",
         flush=True,
     )
+    failed: list[str] = []
+    if args.lot_sizing == "historical" and start < date(2024, 10, 3):
+        raise SystemExit(
+            "historical lot sizing before 2024-10-03 would use the first lot_sizes row for every "
+            "earlier day (the reference tables start then); refuse rather than mis-size"
+        )
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         futures = {pool.submit(run_cohort, *a, signature(args, a)): n for n, a in pending}
         for future in as_completed(futures):
@@ -594,16 +600,27 @@ def main() -> None:
             try:
                 result = future.result()
             except Exception as error:  # one cohort failing must not discard the others
+                failed.append(name)
                 print(f"FAILED {name}: {type(error).__name__}: {str(error)[:200]}", flush=True)
                 continue
             write_part(out_dir, name, result)
             print(
                 f"done {name}: {len(result['rows'])} cells x {len(result['days'])} days in "
                 f"{result['seconds']:.0f}s ({result['ms_per_cell_day']:.2f} ms/cell-day, "
-                f"rss {result['rss_mb']:.0f} MB, skipped {len(result['skipped'])})",
+                f"rss {result['rss_mb']:.0f} MB, skipped {len(result['skipped'])})"
+                + "".join(
+                    f"\n  dropped cell {k[5:]}: {v}"
+                    for k, v in result["skipped"].items()
+                    if k.startswith("cell:")
+                ),
                 flush=True,
             )
     summarise(out_dir)
+    if failed:
+        print(
+            f"{len(failed)} cohort(s) FAILED and are missing from the summary: {failed}", flush=True
+        )
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

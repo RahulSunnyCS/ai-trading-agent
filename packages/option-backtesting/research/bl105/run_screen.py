@@ -168,7 +168,7 @@ def main() -> None:
     ]
     print(
         f"tag={args.tag} jobs={len(jobs)} pending={len(pending)} days={ {i: len(d) for i, d in days.items()} } "
-        f"grid={g.grid_sha()} variants={len(g.variants())}",
+        f"grid={g.grid_sha()} variants={len(g.variants() if args.phase == 1 else g.phase2_variants())}",
         flush=True,
     )
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
