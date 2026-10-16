@@ -276,3 +276,49 @@ def test_the_journal_view_shows_the_paper_start_as_all_buys_and_leaves_other_wee
     before = api._journal_entry_view(row("2026-10-09"), "2026-10-16")
     assert before["config_name"] == "Quad · Friday 4 of 4" and not before["first_week"]
     assert api._journal_entry_view(row("2026-10-16"))["holdings_before"]["OLD"] == 0.5
+
+
+def test_sleeves_without_a_friday_suffix_or_cadence_are_left_alone_under_a_paper_start():
+    def signal(rebalance):
+        return {
+            "week": "2026-12-04",
+            "rows": [{"asset": "AAA", "action": "ADD", "rank": 1, "held": True}],
+            "weights": {"AAA": 1.0},
+            "target_weights": {"AAA": 1.0},
+            "rebalance": rebalance,
+        }
+
+    group = {
+        **_favourite("g1", "Mix", "paper", "broad", group=["a", "b", "c"], active=True),
+        "members": [
+            # An ensemble sleeve: a cadence but no "Friday n of K" in its name.
+            _favourite("a", "Mix 1281e8ed (4w, ph0)", None, "broad", member_of="g1"),
+            # A monthly sleeve: a "Friday" name but no weekly cadence (every is None).
+            _favourite("b", "Mix · Friday 2 of 4", None, "broad", member_of="g1"),
+            _favourite("c", "Mix · Friday 1 of 4", None, "broad", member_of="g1"),
+        ],
+    }
+    rows = [
+        _entry(1, "a", "final", signal({"on_cadence": True, "every": 4, "next": "2026-12-11"})),
+        _entry(2, "b", "final", signal({"on_cadence": True, "every": None, "next": None})),
+        _entry(3, "c", "final", signal({"on_cadence": False, "every": 4, "next": "2026-12-11"})),
+    ]
+    card = this_week.week_view("2026-12-04", rows, [], [group], [group], start_week="2026-12-04")[0]
+    names = {s["id"]: s["name"] for s in card["sleeves"]}
+    assert names["a"] == "Mix 1281e8ed (4w, ph0)"  # no suffix to renumber
+    assert names["b"] == "Mix · Friday 2 of 4"  # no cadence to number from
+    assert names["c"] == "Mix · Friday 2 of 4"  # trades a week after the start: Friday 2
+    assert this_week.sleeve_number("Mix · Friday 3 of 4") == 3
+    assert this_week.sleeve_number("Phase 6 (4w, ph0)") is None
+
+
+def test_the_first_week_of_an_ungrouped_favourite_is_all_buys_from_its_own_target():
+    etf = _favourite("e1", "ETF Core", "paper", exit_rank=5, active=True)
+    rows = [_entry(1, "e1", "final", ETF_FINAL)]
+    (plain,) = this_week.week_view("2026-12-04", rows, [], [etf], [])
+    assert any(r["action"] == "SELL" for r in plain["rows"]) and not plain["first_week"]
+    (first,) = this_week.week_view("2026-12-04", rows, [], [etf], [], start_week="2026-12-04")
+    assert first["first_week"] is True and first["trades"] == len(first["rows"])
+    assert {r["action"] for r in first["rows"]} == {"BUY"}
+    # Exactly the names the card holds after the week, each at its target weight.
+    assert {r["asset"]: r["after"] for r in first["rows"]} == ETF_FINAL["weights"]

@@ -213,6 +213,7 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
               <TelegramMessage
                 message={view.data?.message ?? null}
                 onResend={() => setPanel('run')}
+                firstWeek={view.data?.first_week ?? false}
               />
             ) : null}
           </div>

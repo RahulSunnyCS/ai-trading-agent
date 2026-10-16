@@ -2932,11 +2932,7 @@ def _rebalance_group_preview(req: RebalanceRequest, now: datetime) -> dict:
             }
         )
     if start:
-        sleeves.sort(
-            key=lambda s: (
-                int(x.group(1)) if (x := this_week._SLEEVE_NUMBER.search(s["name"])) else 99
-            )
-        )
+        this_week.sort_sleeves(sleeves)
     return _rebalance_response(
         req,
         now,

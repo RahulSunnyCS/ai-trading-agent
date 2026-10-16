@@ -390,6 +390,7 @@ function DrawerBody({
                   blend={strategy.blend.strategy}
                   sleeves={(strategy.members ?? []).map((m) => ({
                     name: m.name,
+                    dates: m.latest.dates,
                     values: m.latest.strategy,
                   }))}
                 />

@@ -220,6 +220,17 @@ _SLEEVE_NAME = re.compile(r"Friday \d+ of \d+$")
 _SLEEVE_NUMBER = re.compile(r"Friday (\d+) of \d+$")
 
 
+def sleeve_number(name: str) -> int | None:
+    """The n of a sleeve's "Friday n of K" suffix, or None when it has none."""
+    found = _SLEEVE_NUMBER.search(name)
+    return int(found.group(1)) if found else None
+
+
+def sort_sleeves(sleeves: list[dict[str, Any]]) -> None:
+    """Order sleeve dicts by their "Friday n of K" number, those without one last."""
+    sleeves.sort(key=lambda s: sleeve_number(str(s["name"])) or 99)
+
+
 def sleeve_label(name: str, week: str, start: str, rebalance: dict[str, Any] | None) -> str | None:
     """A sleeve's name numbered from the paper start (None when it has no cadence or no
     "Friday n of K" suffix): the sleeve that trades on `start` is "Friday 1 of K". `rebalance` is
@@ -246,9 +257,7 @@ def _renumber_sleeves(card: dict[str, Any], week: str, start: str) -> None:
             names[sleeve["name"]] = label
             sleeve["name"] = label
     if names:
-        sleeves.sort(
-            key=lambda s: int(m.group(1)) if (m := _SLEEVE_NUMBER.search(s["name"])) else 99
-        )
+        sort_sleeves(sleeves)
     edge = card.get("edge")
     if edge and edge.get("sleeve") in names:
         edge["sleeve"] = names[edge["sleeve"]]
