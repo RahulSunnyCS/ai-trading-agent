@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — tells whether settings chosen for expiry and non-expiry days improve the live Adaptive list |
-| **Status** | Planned — selection and replay scripts being built; runs after BL-104's day-type lists |
+| **Status** | Result 2026-10-16: the registered 10 % weight fails on drawdown; T1 without the weight wins (ablation); T2 does not win |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-16 |
@@ -83,7 +83,41 @@ mismatched day type; Steady and Calendar boosts (reported unboosted for informat
 - **Will not run:** per-slot winners; changing the list weights or lookbacks; pooling the all-days
   winner into the universe; any deduction.
 
+## Result (2026-10-16)
+
+Run: `daytype_lists.py --window first` → `build_universe.py` (T1: 9 time-generic settings, 223
+variants; T2: 44 band settings, 379 variants) → `simulate.py` → `replay.py` → `net_check.py`. 239
+common test days 2025-10-09 → 2026-10-09. Parity: a fresh simulation reproduces Core-298's stored
+results to the paisa (5 variants × 6 days), so gross is like-for-like. Charges for every Core-298 pick
+were simulated on its pick day for the net comparison.
+
+| Adaptive | Gross ₹/lot-day | Diff vs Core (90 %) | Gross max DD | Net ₹/lot-day | Net diff (90 %) | Net max DD | New picks |
+|---|---|---|---|---|---|---|---|
+| Core-298 | 417 | — | −10,688 | 285 | — | −12,675 | 0 % |
+| **T1, weight 10 % (registered)** | 598 | +181 [+17, +360] | **−13,064** | 443 | +159 [−7, +337] | −14,698 | 96 % |
+| T1, weight 0 % (ablation) | 640 | **+223 [+82, +362]** | −7,767 | 488 | **+204 [+63, +342]** | −8,905 | 70 % |
+| T2, weight 10 % | 418 | +1 [−165, +179] | −8,838 | 257 | −27 [−193, +152] | −10,521 | 98 % |
+| T2, weight 0 % | 476 | +59 [−98, +219] | −10,665 | 325 | +41 [−116, +200] | −12,576 | 69 % |
+
+- **Registered verdict: kill.** T1 with the 10 % day-type weight earns more (interval above zero on
+  gross) but its drawdown is deeper than Core's, which the pass rule forbids; net, its interval
+  touches zero. T2 does not win at either weight.
+- **Ablation (reported, not the registered test): T1 without the weight passes every condition**,
+  gross and net, with a shallower drawdown. The gain comes from the time-generic settings themselves;
+  the day-type weight concentrates picks (96 % new, 82 % matching the day type) and deepens the
+  drawdown.
+- Steady, Calendar and Baseline over T1 also beat their Core-298 versions (gross +157 to +282, every
+  interval above zero; the weight applies to Adaptive only), so the T1 settings help every list.
+- What Adaptive picked over T1 (no weight): SENSEX Widesl closest ₹285 expiry setting (SL 40 %, trail
+  25/15, MTM ₹4,000, RE cost ×1) 19 %; NIFTY Widesl closest ₹150 expiry setting 13 %; N_wide owner
+  settings 10 % (expiry) and 8 % (other days); N_ditm1 and S_ditm1 non-expiry settings with RE COST ×2
+  8 % each (re-entry parity unverified, BL-009).
+- Caveats: one test year; the winners are the best of hundreds per family (first-year selection,
+  test year unseen); 16 % of T1's picks rely on RE COST ×2. Not adopted; the forward journal is the
+  next evidence.
+
 ## Log
 
 - 2026-10-16 — created from the owner's request; Phase 0 registered before the first-year selection
   was run.
+- 2026-10-16 — run overnight; result recorded (registered weight fails on drawdown; unweighted T1 wins as an ablation; T2 no win).
