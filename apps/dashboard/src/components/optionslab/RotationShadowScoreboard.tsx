@@ -9,7 +9,8 @@
  *   2. The override against the pick it displaces: on a day with a pivot-cross or RSI event, the
  *      Dir at that minute minus the list's next not-yet-started core pick, per day and running.
  *   3. The research comparison: what the research found for the same override.
- *   4. The two forward candidates from the hourly-checkpoint study, which have no scoring yet.
+ *   4. The forward candidates from the hourly-checkpoint study (those of the shown lists), which
+ *      have no scoring yet.
  *
  * The figures come from `GET /legwise/rotation/shadow` (`rotation/shadow.py`), read-only. Gross
  * rupees throughout. A day that is not scored shows why; it is never a zero. Nothing here changes
@@ -20,7 +21,7 @@ import { useState } from 'react';
 
 import { useRotationShadow } from '../../hooks/useRotationShadow';
 import { EMPTY, formatDay, formatInr, formatInt, formatPct } from '../../lib/format';
-import { listName, renameListsIn } from '../../lib/rotationListNames';
+import { DEFAULT_LIST, isVisibleList, listName, renameListsIn } from '../../lib/rotationListNames';
 import {
   bannerText,
   dayCells,
@@ -39,12 +40,12 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { RefreshButton } from '../ui/RefreshButton';
-import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StatCard } from '../ui/StatCard';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { RotationShadowChart } from './RotationShadowChart';
+import { ListPicker } from './rotation/ListPicker';
 
 const TONE_CLASS = {
   positive: 'text-positive',
@@ -170,16 +171,18 @@ function TriggerTable({ r }: { r: RotationShadowResponse }) {
 // 2. Override against the displaced pick
 // ---------------------------------------------------------------------------
 
-function listOptions(lists: readonly ShadowListSummary[]): SegmentedOption<ShadowListKey>[] {
-  return lists.map((l) => ({
-    value: l.list,
-    label: l.candidate ? `${listName(l.list)} (candidate)` : listName(l.list),
-  }));
+/** "Adaptive", or "Calendar (candidate)" for a list the override is shadowed on. */
+function listOption(lists: readonly ShadowListSummary[], key: ShadowListKey): string {
+  return lists.find((l) => l.list === key)?.candidate
+    ? `${listName(key)} (candidate)`
+    : listName(key);
 }
 
 function OverrideCard({ r }: { r: RotationShadowResponse }) {
-  const [key, setKey] = useState<ShadowListKey>('B');
-  const list = r.override.lists.find((l) => l.list === key) ?? r.override.lists[0];
+  const [key, setKey] = useState<ShadowListKey>(DEFAULT_LIST);
+  // The response scores the override on every recorded list; only the shown ones are offered.
+  const shown = r.override.lists.filter((l) => isVisibleList(l.list));
+  const list = shown.find((l) => l.list === key) ?? shown[0];
   if (!list) return null;
   const rule = r.override.rule;
   const rows = r.override.days.filter((d) => d.list === list.list);
@@ -194,12 +197,12 @@ function OverrideCard({ r }: { r: RotationShadowResponse }) {
         title="Override against the pick it displaces"
         description={`On a day with a pivot-cross (T1) or RSI-exhaustion (T4) event, the earliest one fires a Dir at that minute and replaces the list's next not-yet-started core pick, one starting ${rule.min_lead_minutes} or more minutes later; skipped if fewer than ${rule.min_widesl} Widesl would remain. Lots are conserved (${rule.lots_per_strategy} per strategy). Each figure is the Dir minus the pick it replaced, gross.`}
         actions={
-          <SegmentedControl
-            value={key}
-            options={listOptions(r.override.lists)}
+          <ListPicker
+            value={list.list}
             onChange={setKey}
             ariaLabel="List"
-            size="sm"
+            keys={shown.map((l) => l.list)}
+            format={(k) => listOption(shown, k)}
           />
         }
       />
@@ -427,14 +430,21 @@ function ResearchCard({ r }: { r: RotationShadowResponse }) {
 // ---------------------------------------------------------------------------
 
 function CandidatesCard({ r }: { r: RotationShadowResponse }) {
+  // Each candidate belongs to one list; only the shown lists' candidates are drawn.
+  const candidates = r.candidates.filter((c) => isVisibleList(c.list));
+  if (candidates.length === 0) return null;
   return (
     <Card>
       <CardHeader
-        title="Other candidates kept for forward observation"
-        description="Two small versions of the hourly-checkpoint study passed every control on the last two years and lost on 2022 to 2024. They are kept for observation only."
+        title={
+          candidates.length === 1
+            ? 'Another candidate kept for forward observation'
+            : 'Other candidates kept for forward observation'
+        }
+        description={`${candidates.length === 1 ? 'A small version' : 'Small versions'} of the hourly-checkpoint study passed every control on the last two years and lost on 2022 to 2024. Kept for observation only.`}
       />
       <div className="grid gap-4 lg:grid-cols-2">
-        {r.candidates.map((c) => (
+        {candidates.map((c) => (
           <div key={c.id} className="rounded-lg border border-border bg-surface-2/60 px-4 py-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-medium text-foreground">{renameListsIn(c.title)}</p>

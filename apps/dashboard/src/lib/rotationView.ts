@@ -12,11 +12,17 @@ import type {
   RotationListStats,
   RotationSummary,
 } from '../types/rotation';
-import { listName } from './rotationListNames';
+import { VISIBLE_LIST_KEYS, isVisibleList, listName } from './rotationListNames';
 
-export const LIST_KEYS: readonly RotationListKey[] = ['A', 'B', 'C', 'REF'];
+/** The lists the page shows (`VISIBLE_LIST_KEYS`); the read-out still carries all four. */
+export const LIST_KEYS: readonly RotationListKey[] = VISIBLE_LIST_KEYS;
 
 export type RotationBenchmark = 'REF' | 'base' | 'random';
+
+/** The benchmarks the picker offers: Baseline (REF) only while that list is shown. */
+export const BENCHMARKS: readonly RotationBenchmark[] = isVisibleList('REF')
+  ? ['base', 'REF', 'random']
+  : ['base', 'random'];
 
 export const BENCHMARK_LABEL: Record<RotationBenchmark, string> = {
   REF: listName('REF'),
@@ -187,7 +193,7 @@ export function headline(
 }
 
 export interface VerdictLine {
-  /** What is being compared, e.g. "Steady minus the fixed base". */
+  /** What is being compared, e.g. "Adaptive minus the fixed base". */
   label: string;
   mean: number;
   lower: number;
@@ -216,7 +222,7 @@ export function verdict(summary: RotationSummary, focus: RotationListKey, minDay
       upper: f.vs_base.upper,
       rule: { drawdownNoWorse: f.vs_base.drawdown_no_worse, beats: f.vs_base.beats_base },
     });
-    if (f.vs_ref)
+    if (f.vs_ref && isVisibleList('REF'))
       lines.push({ label: `${listName(focus)} minus ${listName('REF')}`, ...f.vs_ref, rule: null });
   }
   return { readable: summary.n_days >= minDays, nDays: summary.n_days, minDays, lines };
@@ -234,7 +240,7 @@ export function readoutProgress(
 export interface HeroPoint {
   day: string;
   base: number;
-  /** Cumulative 2-lot gross per list; REF and the base are lines of their own. */
+  /** Cumulative 2-lot gross per shown list; the base is a line of its own. */
   lists: Partial<Record<RotationListKey, number>>;
   band: { p10: number; p50: number; p90: number } | null;
 }

@@ -26,7 +26,7 @@ and the reading line below it show the stopped series.
 |---|---|
 | Window | **P1** and **P2** are the research periods, re-scored. **Last 63** is the latest 63 scored sessions, recorded and re-scored together. **Forward** is only the on-time recorded entries. |
 | Smallest fall | A fall counts as an episode when it reached at least this many rupees per lot below the peak. The default is ₹500. Smaller ones are counted and said, not hidden silently. |
-| List | The focus list at the top of the page. |
+| List | Adaptive, the list the page shows. |
 
 ## The episodes
 

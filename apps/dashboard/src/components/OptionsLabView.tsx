@@ -5,7 +5,7 @@
  * Three workspaces (BL-102), one navigation (the sidebar's nested links; there is no tab bar):
  *
  *  Today
- *   - Rotation: how the forward lists are doing against Baseline, the base and luck (BL-058)
+ *   - Rotation: how the followed list (Adaptive) is doing against the fixed base and luck (BL-058)
  *  Explore data
  *   - Heatmap: ATM short-straddle P&L by entry time, date and stop loss, every index and stock (BL-094)
  *   - Matrix: where do the rotation variants make or lose money, by start time, date and

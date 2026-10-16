@@ -441,32 +441,37 @@ describe('niceTicks', () => {
 });
 
 describe('researchRows', () => {
-  it('puts the research gain and controls beside the forward total', () => {
+  it('puts the research gain and controls beside the forward total, for the shown list only', () => {
     const r = response({
       override: {
         ...response().override,
         lists: [
           listSummary('A'),
           listSummary('B', { scored: 2, total_basket: 1000, event_days: 3, pending: 1 }),
-          listSummary('C', { pending: 2, event_days: 2 }),
+          listSummary('C', { scored: 3, total_basket: -1500, event_days: 3 }),
           listSummary('REF'),
         ],
       },
     });
     const rows = researchRows(r);
-    const b = rows.find((x) => x.list === 'B')!;
-    expect(b.exploreGain).toBe('+₹79,389');
-    expect(b.exploreTime).toBe('+₹45,514');
-    expect(b.exploreDay).toBe('+₹9,604');
-    expect(b.exploreAbove).toBe('Above both');
-    expect(b.confirmGain).toBe('-₹26,749');
-    expect(b.forward).toBe('+₹1,000 (2 days)');
-    const ref = rows.find((x) => x.list === 'REF')!;
-    expect(ref.exploreGain).toBe('+₹54,556');
-    expect(ref.confirmGain).toBe('+₹16,268');
-    expect(ref.forward).toBe('—');
-    expect(rows.find((x) => x.list === 'A')!.exploreAbove).toBe('Not above both');
-    expect(rows.find((x) => x.list === 'C')!.forward).toBe('pending (2 days)');
-    expect(rows.filter((x) => x.candidate).map((x) => x.list)).toEqual(['B', 'REF']);
+    // the response scores every recorded list; Steady, Calendar and Baseline are not shown
+    expect(rows.map((x) => x.list)).toEqual(['C']);
+    const c = rows[0]!;
+    expect(c.exploreGain).toBe('+₹21,494');
+    expect(c.exploreTime).toBe('+₹39,352');
+    expect(c.exploreDay).toBe('+₹19,822');
+    expect(c.exploreAbove).toBe('Not above both');
+    expect(c.confirmGain).toBe('-₹9,972');
+    expect(c.forward).toBe('-₹1,500 (3 days)');
+    expect(c.candidate).toBe(false);
+    const pending = researchRows(
+      response({
+        override: {
+          ...response().override,
+          lists: [listSummary('C', { pending: 2, event_days: 2 })],
+        },
+      }),
+    );
+    expect(pending[0]?.forward).toBe('pending (2 days)');
   });
 });

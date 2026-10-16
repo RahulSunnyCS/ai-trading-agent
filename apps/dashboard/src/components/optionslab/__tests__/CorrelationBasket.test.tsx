@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CorrelationResponse } from '../../../types/legwise';
@@ -100,7 +100,7 @@ function basket(over: Partial<RotationBasketResponse> = {}): RotationBasketRespo
     to: '2026-10-08',
   };
   return {
-    list: 'A',
+    list: 'C',
     label: 'List A',
     day: '2026-10-12',
     weekday: 'Mon',
@@ -144,6 +144,25 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('CorrelationBasket', () => {
+  it('opens on Adaptive and offers only Adaptive and the fixed base', () => {
+    hook.state.data = basket();
+    render(<CorrelationBasket onOpenCustom={() => undefined} />);
+    expect(hook.lastArgs).toMatchObject({ list: 'C' });
+    const group = screen.getByRole('radiogroup', { name: 'List' });
+    expect(
+      within(group)
+        .getAllByRole('radio')
+        .map((r) => r.textContent),
+    ).toEqual(['Adaptive', 'Base']);
+  });
+
+  it('lands an old link to a hidden list on Adaptive', () => {
+    window.history.replaceState(null, '', '/?blist=A');
+    hook.state.data = basket();
+    render(<CorrelationBasket onOpenCustom={() => undefined} />);
+    expect(hook.lastArgs).toMatchObject({ list: 'C' });
+  });
+
   it('shows the picks in start-time order with where they came from, and the figures', () => {
     hook.state.data = basket();
     render(<CorrelationBasket onOpenCustom={() => undefined} />);

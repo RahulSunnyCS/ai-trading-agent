@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   strategies: [] as unknown[],
   results: [] as unknown[],
-  starred: { lists: ['A'] as string[], strategies: ['nifty_buy_range_breakout'] as string[] },
+  starred: { lists: ['C'] as string[], strategies: ['nifty_buy_range_breakout'] as string[] },
   loaded: true,
   toggleList: vi.fn(),
   toggleStrategy: vi.fn(),
@@ -118,7 +118,7 @@ beforeEach(() => {
     strategy('nifty_widesl_917_otm1'),
     strategy('sensex_widesl_917_otm2'),
   ];
-  mocks.starred = { lists: ['A'], strategies: ['nifty_buy_range_breakout'] };
+  mocks.starred = { lists: ['C'], strategies: ['nifty_buy_range_breakout'] };
   mocks.loaded = true;
   mocks.summaryError = null;
   mocks.toggleList.mockClear();
@@ -126,8 +126,8 @@ beforeEach(() => {
   mocks.summary = {
     first_day: '2026-10-12',
     lists: {
-      A: { total: 25025, max_drawdown: 0 },
-      B: { total: -1200, max_drawdown: -3400 },
+      A: { total: -1200, max_drawdown: -3400 },
+      C: { total: 25025, max_drawdown: 0 },
     },
   };
   window.history.replaceState(null, '', '/optionslab/strategies');
@@ -135,12 +135,24 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('StrategiesAndBasketsPanel', () => {
-  it('lists the three baskets by name with their forward figures', () => {
+  it('lists the Adaptive basket alone, with its forward figures and its universe', () => {
     render(<StrategiesAndBasketsPanel />);
-    for (const name of ['Steady', 'Calendar', 'Adaptive']) {
-      expect(screen.getByRole('heading', { name })).toBeTruthy();
+    const adaptive = screen.getByRole('region', { name: 'Adaptive basket' });
+    expect(within(adaptive).getByText('+₹25,025')).toBeTruthy();
+    for (const name of ['Steady', 'Calendar', 'Baseline']) {
+      expect(screen.queryByRole('heading', { name })).toBeNull();
     }
-    // A list with no scored days yet shows a dash, never a zero.
+    expect(screen.queryByText(/Steady|Calendar|Baseline/)).toBeNull();
+    // Steady's figures are in the read-out, never on the page
+    expect(screen.queryByText('-₹1,200')).toBeNull();
+    expect(screen.getByText(/ranked over Core \(298 variants\)/)).toBeTruthy();
+    // the fixed base stays as the comparator
+    expect(screen.getByRole('button', { name: 'Star Fixed base' })).toBeTruthy();
+  });
+
+  it('shows a dash, never a zero, for a list with no scored days yet', () => {
+    mocks.summary = { first_day: null, lists: {} };
+    render(<StrategiesAndBasketsPanel />);
     const adaptive = screen.getByRole('region', { name: 'Adaptive basket' });
     expect(within(adaptive).getAllByText('—').length).toBeGreaterThan(0);
   });
@@ -158,15 +170,14 @@ describe('StrategiesAndBasketsPanel', () => {
     render(<StrategiesAndBasketsPanel />);
     fireEvent.click(screen.getByRole('button', { name: 'Star nifty_widesl_917_otm1' }));
     expect(mocks.toggleStrategy).toHaveBeenCalledWith('nifty_widesl_917_otm1');
-    fireEvent.click(screen.getByRole('button', { name: 'Star Calendar' }));
-    expect(mocks.toggleList).toHaveBeenCalledWith('B');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove the star from Adaptive' }));
+    expect(mocks.toggleList).toHaveBeenCalledWith('C');
   });
 
   it('narrows to the starred ones, baskets and strategies alike', () => {
     render(<StrategiesAndBasketsPanel />);
     fireEvent.click(screen.getByRole('radio', { name: 'Starred only' }));
-    expect(screen.getByRole('heading', { name: 'Steady' })).toBeTruthy();
-    expect(screen.queryByRole('heading', { name: 'Calendar' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Adaptive' })).toBeTruthy();
     expect(screen.getByText('nifty_buy_range_breakout')).toBeTruthy();
     expect(screen.queryByText('nifty_widesl_917_otm1')).toBeNull();
   });
@@ -185,7 +196,7 @@ describe('StrategiesAndBasketsPanel', () => {
     fireEvent.click(within(row).getByRole('button', { name: 'Correlate' }));
     expect(window.location.pathname).toBe('/optionslab/correlation');
     expect(new URLSearchParams(window.location.search).get('names')).toBe(
-      'nifty_widesl_917_otm1,list:A,nifty_buy_range_breakout',
+      'nifty_widesl_917_otm1,list:C,nifty_buy_range_breakout',
     );
   });
 
@@ -220,7 +231,7 @@ describe('StrategiesAndBasketsPanel', () => {
       within(row).getByRole('button', { name: 'Remove the star from file_name_one' }),
     ).toBeTruthy();
     fireEvent.click(within(row).getByRole('button', { name: 'Correlate' }));
-    expect(new URLSearchParams(window.location.search).get('names')).toBe('the_strategy_id,list:A');
+    expect(new URLSearchParams(window.location.search).get('names')).toBe('the_strategy_id,list:C');
     fireEvent.click(within(row).getByRole('button', { name: /Remove the star from/ }));
     expect(mocks.toggleStrategy).toHaveBeenCalledWith('the_strategy_id');
   });
@@ -240,12 +251,14 @@ describe('StrategiesAndBasketsPanel', () => {
     expect(screen.queryByText('No strategy is starred')).toBeNull();
     // And nothing can be starred or correlated before they are there.
     fireEvent.click(screen.getByRole('radio', { name: 'All' }));
-    expect(screen.getByRole('button', { name: 'Star Calendar' })).toHaveProperty('disabled', true);
+    const adaptive = screen.getByRole('region', { name: 'Adaptive basket' });
     expect(
-      within(screen.getByRole('region', { name: 'Steady basket' })).getByRole('button', {
-        name: 'Correlate',
-      }),
+      within(adaptive).getByRole('button', { name: 'Remove the star from Adaptive' }),
     ).toHaveProperty('disabled', true);
+    expect(within(adaptive).getByRole('button', { name: 'Correlate' })).toHaveProperty(
+      'disabled',
+      true,
+    );
   });
 
   it('says when the forward figures could not be read, rather than showing dashes quietly', () => {

@@ -44,7 +44,7 @@ function body(over: Partial<PortfolioDay['book']> = {}): PortfolioDay {
   const stopped = combined.map((v, i) => (i <= 100 ? v : (combined[100] ?? v)));
   return {
     day: '2026-09-11',
-    list: 'A',
+    list: 'C',
     basis: 'gross',
     setting: { amount: 10000, trail: null },
     book: {
@@ -101,14 +101,14 @@ describe('PortfolioReplay', () => {
     render(
       <PortfolioReplay
         day="2026-09-11"
-        list="A"
+        list="C"
         source="reconstructed"
         setting={DEFAULT_SETTING}
         onClose={() => {}}
       />,
     );
     expect(await screen.findByText(/Closed by the portfolio stop at 10:55/)).toBeTruthy();
-    expect(screen.getByText(/Steady \(A\) as one basket/)).toBeTruthy();
+    expect(screen.getByText(/Adaptive \(C\) as one basket/)).toBeTruthy();
     // The series are added by an effect that runs after the chart reports ready, one commit after
     // the text above appears, so wait for them rather than reading `added` straight away.
     await waitFor(() => {
@@ -132,7 +132,7 @@ describe('PortfolioReplay', () => {
     render(
       <PortfolioReplay
         day="2026-09-11"
-        list="A"
+        list="C"
         source="recorded"
         setting={DEFAULT_SETTING}
         onClose={() => {}}
@@ -151,7 +151,7 @@ describe('PortfolioReplay', () => {
     render(
       <PortfolioReplay
         day="2026-09-11"
-        list="A"
+        list="C"
         source="recorded"
         setting={DEFAULT_SETTING}
         onClose={() => {}}

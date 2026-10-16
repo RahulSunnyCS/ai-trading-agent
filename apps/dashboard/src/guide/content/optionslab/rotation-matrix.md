@@ -2,10 +2,10 @@
 
 Shows where the rotation's strategy variants make or lose money: by start time, by date, and by
 market condition (days to expiry, opening VIX band, weekday). Then it lays over that picture what
-the forward journal's lists actually picked.
+the Adaptive list actually picked, as the forward journal recorded it.
 
 It answers four questions. Are the profitable areas broad or isolated? Does the same pattern show
-up in different periods? Is a good cell a lot of days or a few? And did a list pick the good
+up in different periods? Is a good cell a lot of days or a few? And did Adaptive pick the good
 areas on the days it chose?
 
 It describes. A strong cell is something that happened, not a rule to change a registered list.
@@ -13,7 +13,7 @@ It describes. A strong cell is something that happened, not a rule to change a r
 ## What a number is
 
 Every cell is **gross profit and loss per one-lot strategy-day**: one lot of one strategy file, on
-one day, before brokerage and charges. The lists trade two lots per strategy; their figures are
+one day, before brokerage and charges. The list trades two lots per strategy; its figures are
 not these.
 
 | Word | Meaning |
@@ -76,7 +76,7 @@ These are the drawer's settings; the view and the metric are on the bar.
 | Start time, Weekday, Days to expiry, Opening VIX band | Keep only those days or start times. |
 | Start time (from the Family pulse) | A row clicked on the Rotation page's Family pulse opens the Pulse view with the family set and Start time showing a band, for example "09:17 to 10:02 (4 start times)". Choose Any start time to clear it. |
 | Minimum sessions | Below this a cell is thin. |
-| Recorded picks of list | Marks the cells the Steady, Calendar, Adaptive or Baseline list picked, as the journal recorded them. |
+| Recorded picks of list | *None*, or *Adaptive*: marks the cells Adaptive picked, as the journal recorded them. (Steady, Calendar and Baseline are still recorded in the journal but no longer shown; an old link naming one opens with no marks.) |
 | Cells show | **All opportunities** uses every day. **Selected only** keeps just the strategy-days the list picked. A cell then reads, for example, "2 of 56 sessions" and its tooltip and drawer give the all-opportunities figure beside it; the two cover different days. |
 
 The metrics:

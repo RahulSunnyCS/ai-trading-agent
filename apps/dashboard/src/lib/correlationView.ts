@@ -11,7 +11,7 @@ import type {
   CorrelationResponse,
   CorrelationRollingRow,
 } from '../types/legwise';
-import { listName } from './rotationListNames';
+import { isVisibleList, listName } from './rotationListNames';
 
 export const ANY = 'any';
 
@@ -35,6 +35,14 @@ export const LIST_PREFIX = 'list:';
 
 export function isListSelector(name: string): boolean {
   return name.startsWith(LIST_PREFIX);
+}
+
+/**
+ * May the tab offer or compare this selector? Every strategy may; a rotation list only when the
+ * dashboard shows it (`VISIBLE_LIST_KEYS`). An old link naming `list:A` simply leaves it out.
+ */
+export function isShownSelector(name: string): boolean {
+  return !isListSelector(name) || isVisibleList(name.slice(LIST_PREFIX.length));
 }
 
 /** What a reader sees for a selector name: a list by its name, a strategy as it is. */

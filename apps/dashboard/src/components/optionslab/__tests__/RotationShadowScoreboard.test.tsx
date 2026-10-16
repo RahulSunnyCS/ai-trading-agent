@@ -111,8 +111,10 @@ function base(over: Partial<RotationShadowResponse> = {}): RotationShadowRespons
       periods: { explore: '2024-10-09 to 2026-10-08', confirm: 'NIFTY 2022-01-03 to 2024-10-08' },
       override: [
         ['explore', 'B', 79389, true],
+        ['explore', 'C', 21494, false],
         ['explore', 'REF', 54556, true],
         ['confirm', 'B', -26749, false],
+        ['confirm', 'C', -9972, false],
         ['confirm', 'REF', 16268, false],
       ].map(([period, l, gain, above]) => ({
         period: period as 'explore' | 'confirm',
@@ -207,14 +209,19 @@ describe('RotationShadowScoreboard', () => {
     ).toBeTruthy();
     expect(screen.getByText('No forward session has been scored yet')).toBeTruthy();
     expect(screen.getByText(/19:45 update/)).toBeTruthy();
-    // the research comparison is there now: the two figures the owner named
-    expect(screen.getByText('+₹79,389')).toBeTruthy();
-    expect(screen.getByText('-₹26,749')).toBeTruthy();
-    expect(screen.getByText('+₹54,556')).toBeTruthy();
-    expect(screen.getByText('+₹16,268')).toBeTruthy();
-    // the not-scored candidates, with no figure of their own
-    expect(screen.getAllByText('Not scored')).toHaveLength(2);
-    expect(screen.getAllByText('No nightly scoring exists for this candidate.')).toHaveLength(2);
+    // the research comparison is there now, for Adaptive only
+    expect(screen.getByText('+₹21,494')).toBeTruthy();
+    expect(screen.getByText('-₹9,972')).toBeTruthy();
+    // Calendar's and Baseline's research rows are in the response, not on the page
+    for (const hidden of ['+₹79,389', '-₹26,749', '+₹54,556', '+₹16,268']) {
+      expect(screen.queryByText(hidden)).toBeNull();
+    }
+    expect(document.body.textContent).not.toMatch(/Steady|Calendar|Baseline/);
+    // the not-scored candidate of the shown list, with no figure of its own
+    expect(screen.getAllByText('Not scored')).toHaveLength(1);
+    expect(screen.getByText('Adaptive list: VIX x live Widesl, free swap, 50% blend')).toBeTruthy();
+    expect(screen.getByText('Another candidate kept for forward observation')).toBeTruthy();
+    expect(screen.getAllByText('No nightly scoring exists for this candidate.')).toHaveLength(1);
     // the override panel explains its empty state
     expect(screen.getByText('No override day yet')).toBeTruthy();
   });
@@ -259,8 +266,12 @@ describe('RotationShadowScoreboard', () => {
 
   it('shows a pending day as pending with no figure, and a scored day with its difference', () => {
     const rows = [
-      day(),
+      day({ list: 'C', candidate: false }),
+      // a hidden list's day in the payload is not drawn
+      day({ list: 'B', day: '2026-10-14' }),
       day({
+        list: 'C',
+        candidate: false,
         day: '2026-10-13',
         status: 'pending',
         reason: 'N_wide_1202 has no stored result for 2026-10-13 yet',
@@ -283,7 +294,8 @@ describe('RotationShadowScoreboard', () => {
         ...base().override,
         lists: [
           list('A'),
-          list('B', {
+          list('B'),
+          list('C', {
             forward_days: 2,
             event_days: 2,
             scored: 1,
@@ -303,7 +315,6 @@ describe('RotationShadowScoreboard', () => {
               },
             ],
           }),
-          list('C'),
           list('REF'),
         ],
         days: rows,
@@ -311,7 +322,7 @@ describe('RotationShadowScoreboard', () => {
     });
     hook.state = { data, loading: false, error: null, refetch: vi.fn() };
     render(<RotationShadowScoreboard />);
-    // the chart for the chosen list (B by default) and its table
+    // the chart for the shown list (Adaptive) and its table
     expect(
       screen.getByLabelText(/Running total of the override minus the displaced pick/),
     ).toBeTruthy();
@@ -330,10 +341,11 @@ describe('RotationShadowScoreboard', () => {
     expect(screen.getByText(/Random-time control/)).toBeTruthy();
   });
 
-  it('switches lists', () => {
+  it('offers no list switch with one list shown, and scores the override on Adaptive', () => {
     hook.state = { data: base(), loading: false, error: null, refetch: vi.fn() };
     render(<RotationShadowScoreboard />);
-    fireEvent.click(screen.getByRole('radio', { name: 'Steady' }));
+    expect(screen.queryByRole('radiogroup', { name: 'List' })).toBeNull();
+    expect(screen.queryByRole('radio', { name: /Steady|Calendar|Baseline/ })).toBeNull();
     expect(screen.getByText('No override day yet')).toBeTruthy();
   });
 });

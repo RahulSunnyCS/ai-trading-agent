@@ -18,9 +18,9 @@ export interface SectionMeta {
 export const SECTION_META: Readonly<Record<OptionsLabSection, SectionMeta>> = {
   rotation: {
     workspace: 'Today',
-    question: 'How are the rotation lists doing?',
+    question: 'How is the Adaptive list doing?',
     explanation:
-      'Each list picks its strategies at 09:16, before the market opens, and is scored every evening on days nobody had seen.',
+      'Adaptive picks its strategies from the Core pool (298 variants) at 09:16, before the market opens, and is scored every evening on days nobody had seen.',
   },
   heatmap: {
     workspace: 'Explore data',

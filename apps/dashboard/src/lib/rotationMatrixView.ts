@@ -20,7 +20,7 @@ import type {
   MatrixView,
 } from '../types/rotationMatrix';
 import { formatInr, formatNumber, formatPct, formatPp } from './format';
-import { listName } from './rotationListNames';
+import { isVisibleList, listName } from './rotationListNames';
 
 export const ANY = 'any';
 export const DEFAULT_MIN_N = 20;
@@ -571,6 +571,11 @@ export function stepActive(
   }
 }
 
+/** The lists that picked a cell or a session, narrowed to the shown lists (`VISIBLE_LIST_KEYS`). */
+export function shownPicks(picks: MatrixListId[] | undefined): MatrixListId[] | undefined {
+  return picks?.filter((k) => isVisibleList(k));
+}
+
 /** A cell's accessible name: the value, the sample, the thin state, and who picked it. */
 export function cellLabel(
   rowLabel: string,
@@ -594,7 +599,9 @@ export function cellLabel(
   if (c.all && c.all.n !== c.n) parts.push(`of ${c.all.n} sessions`);
   if (picks && picks.length > 0) parts.push(`picked by ${picks.map(listName).join(' and ')}`);
   else if (c.sel) {
-    const named = Object.entries(c.sel).map(([k, v]) => `${listName(k)} ${v} times`);
+    const named = Object.entries(c.sel)
+      .filter(([k]) => isVisibleList(k))
+      .map(([k, v]) => `${listName(k)} ${v} times`);
     if (named.length > 0) parts.push(`picked: ${named.join(', ')}`);
   }
   return `${head}: ${parts.join(', ')}`;

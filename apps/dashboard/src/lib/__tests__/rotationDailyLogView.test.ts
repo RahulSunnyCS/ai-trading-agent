@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { addDays } from '../regimeTags';
 import {
   ALL_FROM,
+  FILTERS,
   NOTE_MAX,
   applyFilter,
   cellDescription,
@@ -14,6 +15,7 @@ import {
   initialMonth,
   isFlagged,
   logMatches,
+  markedText,
   monthGrid,
   monthOf,
   monthTitle,
@@ -26,9 +28,10 @@ import {
   shadeScale,
   shadeStep,
   shiftMonth,
+  stopDays,
   windowRange,
 } from '../rotationDailyLogView';
-import { COUNTERS, ROWS, log, pick, placement, row } from './rotationDailyLogFixture';
+import { COUNTERS, ROWS, block, log, pick, placement, row } from './rotationDailyLogFixture';
 
 const byDay = (day: string) => {
   const r = ROWS.find((x) => x.day === day);
@@ -216,7 +219,7 @@ describe('shading', () => {
 });
 
 describe('placement', () => {
-  it('counts how many of the day lists are marked and how', () => {
+  it('counts how the shown list is marked, never a hidden list the day also carries', () => {
     const r = {
       ...byDay('2026-10-12'),
       placement: {
@@ -225,8 +228,15 @@ describe('placement', () => {
         C: placement('2026-10-12', 'C', 'not_placed', 'AlgoTest down'),
       },
     };
-    expect(placementTally(r)).toEqual({ marked: 3, of: 4, placed: 1, changed: 1, notPlaced: 1 });
-    expect(placementTally(byDay('2026-10-12'))).toMatchObject({ marked: 0, of: 4 });
+    expect(placementTally(r)).toEqual({ marked: 1, of: 1, placed: 0, changed: 0, notPlaced: 1 });
+    expect(placementTally(byDay('2026-10-12'))).toMatchObject({ marked: 0, of: 1 });
+  });
+
+  it('says marked or not marked for one list, and counts for several', () => {
+    const t = { placed: 0, changed: 0, notPlaced: 0 };
+    expect(markedText({ ...t, marked: 0, of: 1 })).toBe('Not marked');
+    expect(markedText({ ...t, marked: 1, of: 1 })).toBe('Marked');
+    expect(markedText({ ...t, marked: 1, of: 4 })).toBe('1 of 4 lists marked');
   });
 
   it('refuses an unchosen status, a changed with no note and a long note', () => {
@@ -240,20 +250,46 @@ describe('placement', () => {
 });
 
 describe('counters and the empty state', () => {
-  it('lists the structural counters per list and says what they are over', () => {
-    const parts = counterParts(COUNTERS, 'recorded');
+  it('lists the structural counters of the shown list and says what they are over', () => {
+    const parts = counterParts(COUNTERS, 'recorded', ROWS);
     const get = (id: string) => parts.find((p) => p.id === id);
     expect(get('days')?.value).toBe('5');
     expect(get('late')?.value).toBe('1');
     expect(get('not_recorded')?.value).toBe('1');
-    expect(get('buy')?.value).toBe('Steady 1/5 · Calendar 1/5 · Adaptive 0/5 · Baseline 0/5');
-    expect(get('override')?.value).toBe('Steady 0/5 · Calendar 0/5 · Adaptive 1/5 · Baseline 0/5');
-    expect(get('identical')?.value).toBe('3/5');
+    // Adaptive's own counts; Steady, Calendar and Baseline are still in the payload, never shown
+    expect(get('buy')?.value).toBe('0/5');
+    expect(get('override')?.value).toBe('1/5');
+    expect(parts.map((p) => `${p.value} ${p.title}`).join(' ')).not.toMatch(
+      /Steady|Calendar|Baseline/,
+    );
+    // "the four lists agreed" means nothing with one list shown
+    expect(get('identical')).toBeUndefined();
     expect(get('stops')?.value).toBe('1/5');
   });
 
+  it('counts a stop only in the shown list, not in a hidden list of the same day', () => {
+    const stoppedElsewhere = row('2026-10-22', 'Thu', {
+      A: block([pick('N_wide_1017', -2500, { stop: true })]),
+      C: block([pick('N_wide_0917', 400)]),
+    });
+    expect(stopDays([stoppedElsewhere])).toBe(0);
+    expect(rowFlags(stoppedElsewhere).map((f) => f.id)).not.toContain('stop');
+    expect(applyFilter([stoppedElsewhere], 'stops', 'C')).toEqual([]);
+    const stoppedHere = row('2026-10-22', 'Thu', {
+      C: block([pick('N_wide_1017', -2500, { stop: true })]),
+    });
+    expect(stopDays([stoppedHere])).toBe(1);
+    expect(rowFlags(stoppedHere).find((f) => f.id === 'stop')?.title).toBe(
+      'An overall stop-loss fired in: Adaptive.',
+    );
+  });
+
+  it('offers no "Lists disagree" filter with one list shown', () => {
+    expect(FILTERS).toEqual(['all', 'losing', 'stops']);
+  });
+
   it('leaves late and not-recorded out of a reconstructed footer, which has neither', () => {
-    const ids = counterParts(COUNTERS, 'reconstructed').map((p) => p.id);
+    const ids = counterParts(COUNTERS, 'reconstructed', ROWS).map((p) => p.id);
     expect(ids).not.toContain('late');
     expect(ids).not.toContain('not_recorded');
   });

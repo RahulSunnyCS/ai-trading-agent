@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_LIST,
   LIST_INFO,
+  SEVERAL_LISTS_VISIBLE,
+  UNIVERSE_LABEL,
+  VISIBLE_LIST_KEYS,
+  isVisibleList,
   listLabel,
   listName,
   listPhrase,
   listShort,
+  listWithUniverse,
   renameListsIn,
 } from '../rotationListNames';
 
@@ -39,6 +45,24 @@ describe('rotation list names', () => {
   it('has a two-letter tag for a corner mark, distinct from every key', () => {
     expect(['A', 'B', 'C', 'REF'].map(listShort)).toEqual(['St', 'Ca', 'Ad', 'Ba']);
     expect(listShort('BASE')).toBe('BASE');
+  });
+
+  it('shows Adaptive alone; the other three keys still have names for old rows', () => {
+    expect(VISIBLE_LIST_KEYS).toEqual(['C']);
+    expect(DEFAULT_LIST).toBe('C');
+    expect(SEVERAL_LISTS_VISIBLE).toBe(false);
+    expect(isVisibleList('C')).toBe(true);
+    for (const hidden of ['A', 'B', 'REF', 'BASE', 'base', 'D', '']) {
+      expect(isVisibleList(hidden)).toBe(false);
+    }
+    // a hidden key is still named, so journal rows and server text keep reading right
+    expect(['A', 'B', 'REF'].map(listName)).toEqual(['Steady', 'Calendar', 'Baseline']);
+  });
+
+  it('names the live universe Core, never "base", with its size', () => {
+    expect(UNIVERSE_LABEL).toBe('Core (298 variants)');
+    expect(listWithUniverse('C')).toBe('Adaptive · Core (298 variants)');
+    expect(UNIVERSE_LABEL.toLowerCase()).not.toContain('base');
   });
 
   it('carries the registered weights, summing to 100 for a weighted list', () => {
