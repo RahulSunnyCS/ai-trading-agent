@@ -217,6 +217,9 @@ unchanged and still pending; this arm neither replaces nor decides them.
   410 / 507 (−416 / day [−691, −147]); test max DD −₹52,372 and −₹56,672 vs −₹50,267. Gross: E 671,
   D2 623, D3 629. Over Core-298 D3 ties E (353 vs 351 net) and D2 trails (321). Capping Dir pushes a
   lower-ranked Widesl into a 2-lot slot, and on T1 that costs more than it saves.
+- **Addendum 3 (2026-10-17, descriptive only, decides nothing).** No limit on the mix: pure rank order,
+  no Widesl minimum (`MIN_WIDE_N = 0`). E0 = top 3 × 2 lots; L0 = top 4 × (2, 2, 1, 1). Same script,
+  run once.
 
 ## Risks
 

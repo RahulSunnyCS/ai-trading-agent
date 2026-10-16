@@ -41,7 +41,8 @@ from option_backtesting.rotation.variants import is_buy, is_dir, variant_names  
 SEED = 20261015
 ARMS = {"E": (3, 2, (2, 2, 2)), "L2": (4, 2, (2, 2, 1, 1)), "L1": (4, 1, (2, 2, 1, 1)),
         "L3": (4, 3, (2, 2, 1, 1)), "L4": (4, 4, (2, 2, 1, 1)),  # L3 / L4: the descriptive addendum
-        "D2": (4, -2, (2, 2, 1, 1)), "D3": (4, -3, (2, 2, 1, 1))}  # addendum 2: at most 2 / 3 Dir lots
+        "D2": (4, -2, (2, 2, 1, 1)), "D3": (4, -3, (2, 2, 1, 1)),  # addendum 2: at most 2 / 3 Dir lots
+        "E0": (3, 0, (2, 2, 2)), "L0": (4, 0, (2, 2, 1, 1))}  # addendum 3: no Widesl minimum
 FLAT = ORDERS_PER_TRADE * BROKERAGE_PER_ORDER * (1 + GST)  # per closed trade, whatever the lots
 OUT = HERE / "results" / "lot_ladder"
 
