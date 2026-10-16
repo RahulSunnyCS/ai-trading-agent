@@ -52,8 +52,11 @@ Core templates; is T1 still ahead of Core-298's Adaptive.
      interval below the history's 10th percentile.
   3. **Setting edge:** each T1 setting's day P&L minus its Core template at the same entry time, averaged
      over the 223; 60-day rolling. Alarm: rolling mean below zero with the 90 % interval below zero.
-  4. **Gap to Core:** T1 Adaptive minus Core-298 Adaptive per lot-day, CUSUM against the expected
-     +₹100 (the walk-forward-adjusted estimate). Alarm: the CUSUM crosses −2 standard errors of the gap.
+  4. **Gap to Core:** T1 Adaptive minus Core-298 Adaptive per lot-day, two views: (a) the **rolling
+     60-day gap** (owner, 2026-10-17: "whether the advantage is getting reduced"), with its 90 %
+     block-bootstrap interval, watched for a falling trend; (b) a CUSUM against the expected +₹100 (the
+     walk-forward-adjusted estimate). Alarm: the rolling 60-day gap's interval falls entirely below
+     zero, or the CUSUM crosses −2 standard errors of the gap.
 - **Context, not alarms:** each signal split by VIX band and expiry / non-expiry, so "edge gone" can be
   told from "a regime where T1 never had an edge".
 - **Calibration:** the thresholds are set from the 2025-01 → 2026-10 history above and written here
@@ -78,3 +81,5 @@ Core templates; is T1 still ahead of Core-298's Adaptive.
 ## Log
 
 - 2026-10-17 — created from the owner's idea (percentile of the picks); history measured; P1.
+- 2026-10-17 — owner: keep it P1, high priority; add the rolling 60-day gap to Core (signal 4a);
+  the open questions are settled together with the owner when the item is started.
