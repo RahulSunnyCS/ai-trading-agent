@@ -217,6 +217,30 @@ were simulated on its pick day for the net comparison.
   (a)'s has a 90 % block-bootstrap interval above zero and its max drawdown per lot is no worse.
   Two alternatives are tested, so the stricter 95 % interval is also reported.
 
+## Experiment 7 — wings (iron condor) on T1's Widesl picks (registered 2026-10-17, before any run)
+
+- **Margin, from Zerodha's SPAN calculator (2026-10-16 SPAN file, 1 lot):** NIFTY OTM1 strangle (19-Oct
+  expiry, 23200 CE / 23100 PE) ₹1,97,770 (SPAN 1,35,377 + exposure 62,393); with wings at closest premium
+  ₹20 / ₹10 / ₹5 (23300/22800, 23450/22650, 23600/22400) ₹81,040 / ₹90,350 / ₹1,06,380; ATM straddle
+  ₹2,01,224; the 27-Oct contract at the same strikes ₹1,94,821 and ₹90,602 with the ₹10-distance wings.
+  SENSEX OTM2 strangle (22-Oct, 74900/74500) ₹2,09,171; with wings at ₹60 / ₹30 / ₹15
+  (76000/72600, 76500/71900, 77100/70700) ₹1,06,209 / ₹1,20,036 / ₹1,44,044.
+- **Margin model (fitted to those points):** short leg exposure 2 % of notional each; unhedged SPAN 9 %
+  (NIFTY) / 9.5 % (SENSEX) of one leg's notional for a strangle or straddle; hedged SPAN = min(unhedged,
+  1.27 × mean wing width in points × lot size); on the index's expiry day + 2 % of notional per short
+  leg (SEBI additional ELM; an estimate, the calculator does not show it). Dir picks: unhedged; Buy:
+  premium paid.
+- **Wings:** a long CE and a long PE at closest premium X entered with the Widesl pick's short legs, 1 lot,
+  no stop or target, closed at the exit or by the overall MTM stop; the short legs keep their settings.
+  The day's T1 Adaptive picks are unchanged (only Widesl picks get wings).
+- **Coarse grid:** NIFTY X ∈ {5, 10, 20}, SENSEX X ∈ {15, 30, 60} (paired by step); then refine: the
+  midpoints between the best coarse pair and its neighbours, and one step beyond if the best is at an
+  end (NIFTY 3 / 30, SENSEX 10 / 90). Two scopes: wings on all days, wings on expiry days only.
+- **Choose on the first year** (2025-01-10 → 2025-10-08): the (X, scope) with the highest net return on
+  margin (net book P&L ÷ mean daily book margin) whose net P&L is at least 85 % of the unwinged book's.
+- **Pass rule on the test year:** worst day and worst-5-days sum improve by at least 30 %, net P&L falls by
+  at most 15 %, and net return on margin rises. Otherwise no wings.
+
 ## Log
 
 - 2026-10-16 — created from the owner's request; Phase 0 registered before the first-year selection
