@@ -24,8 +24,8 @@ import { addDays } from './regimeTags';
 import { SEVERAL_LISTS_VISIBLE, VISIBLE_LIST_KEYS, listName } from './rotationListNames';
 
 /**
- * The lists the log shows (`VISIBLE_LIST_KEYS`; Adaptive alone since 2026-10-16). A row's payload
- * still carries every recorded list; only these are read, counted or drawn.
+ * The lists the log shows (`VISIBLE_LIST_KEYS`). A row's payload still carries every recorded
+ * list; only these are read, counted or drawn.
  */
 export const LIST_KEYS: readonly RotationListKey[] = VISIBLE_LIST_KEYS;
 
@@ -310,6 +310,12 @@ export function placementTally(row: RotationRow): PlacementTally {
     else t.notPlaced += 1;
   }
   return t;
+}
+
+/** "1 of 2 lists marked"; with one list shown, "Marked" or "Not marked". */
+export function markedText(t: PlacementTally): string {
+  if (t.of === 1) return t.marked === 1 ? 'Marked' : 'Not marked';
+  return `${t.marked} of ${t.of} lists marked`;
 }
 
 /** A placement draft is valid when its status is set and a "changed" says what changed. */

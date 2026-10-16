@@ -11,8 +11,15 @@ import { type PointerEvent, useMemo, useRef, useState } from 'react';
 
 import { useRotationMatrixCell } from '../../hooks/useRotationMatrix';
 import { EMPTY, formatDay, formatInr, formatInt, formatPct } from '../../lib/format';
-import { curveGeometry, histogram, stoppedShare, valueText } from '../../lib/rotationMatrixView';
-import type { MatrixCellDay, MatrixCellDetail } from '../../types/rotationMatrix';
+import { listName } from '../../lib/rotationListNames';
+import {
+  curveGeometry,
+  histogram,
+  shownPicks,
+  stoppedShare,
+  valueText,
+} from '../../lib/rotationMatrixView';
+import type { MatrixCellDay, MatrixCellDetail, MatrixListId } from '../../types/rotationMatrix';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Drawer } from '../ui/Drawer';
@@ -224,7 +231,7 @@ function Curve({ d }: { d: MatrixCellDetail }) {
         />
         <polyline points={g.path} fill="none" strokeWidth={1.75} className="stroke-series-1" />
         {d.days.map((x, i) =>
-          x.picked_by && x.picked_by.length > 0 ? (
+          pickedBy(x).length > 0 ? (
             <circle
               key={x.day}
               cx={xOf(i)}
@@ -242,9 +249,9 @@ function Curve({ d }: { d: MatrixCellDetail }) {
         <span>{formatDay(d.cumulative[0]?.day)}</span>
         <span>{formatDay(d.cumulative[last]?.day)}</span>
       </div>
-      {d.days.some((x) => x.picked_by?.length) ? (
+      {d.days.some((x) => pickedBy(x).length > 0) ? (
         <p className="mt-1 text-[11px] text-muted">
-          Dots mark sessions a list recorded a pick in this cell.
+          Dots mark sessions {pickedNames(d.days)} recorded a pick in this cell.
         </p>
       ) : null}
       <FollowTip cursor={at ? { x: at.x, y: at.y } : null}>
@@ -255,8 +262,8 @@ function Curve({ d }: { d: MatrixCellDetail }) {
             </p>
             <p className="font-mono">day {valueText(day.gross, 'inr')}</p>
             <p className="font-mono text-muted">total {valueText(point.cum, 'inr')}</p>
-            {day.picked_by?.length ? (
-              <p className="text-muted">picked by {day.picked_by.join(', ')}</p>
+            {pickedBy(day).length > 0 ? (
+              <p className="text-muted">picked by {pickedBy(day).map(listName).join(', ')}</p>
             ) : null}
           </div>
         ) : null}
@@ -382,6 +389,20 @@ function Variants({ d }: { d: MatrixCellDetail }) {
   );
 }
 
+/**
+ * The shown lists (VISIBLE_LIST_KEYS) that picked a session. The server's `picked_by` names every
+ * recorded list; a session picked only by hidden lists gets no dot and no "Picked by" entry.
+ */
+export function pickedBy(day: Pick<MatrixCellDay, 'picked_by'>): MatrixListId[] {
+  return shownPicks(day.picked_by) ?? [];
+}
+
+/** "Adaptive", or "a list" when several shown lists picked in the cell. */
+function pickedNames(days: readonly MatrixCellDay[]): string {
+  const keys = new Set(days.flatMap(pickedBy));
+  return keys.size === 1 ? listName([...keys][0] ?? '') : 'a list';
+}
+
 function Days({ days }: { days: readonly MatrixCellDay[] }) {
   const single = days.every((d) => d.n_variants === 1);
   return (
@@ -411,7 +432,7 @@ function Days({ days }: { days: readonly MatrixCellDay[] }) {
               </span>
             </Td>
             <Td dense>
-              <span className="font-mono text-xs">{x.picked_by?.join(' ') ?? ''}</span>
+              <span className="text-xs">{pickedBy(x).map(listName).join(', ')}</span>
             </Td>
           </TRow>
         ))}

@@ -1,6 +1,6 @@
 /**
- * Today's baskets: the shown lists side by side (`VISIBLE_LIST_KEYS`; Adaptive alone since
- * 2026-10-16). Each pick shows its start time, its family, and its composite score; with several
+ * Today's baskets: the shown lists side by side (`VISIBLE_LIST_KEYS`). Each pick shows its start
+ * time, its family, and its composite score; with several
  * lists shown the dots say how many of the journal's four lists hold the same pick, and the footer
  * says what changed since the entry before (the work list for re-setting AlgoTest).
  *

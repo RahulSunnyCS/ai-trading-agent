@@ -1,9 +1,8 @@
 /**
  * Options Lab › Rotation › Daily log: the decision-to-result record.
  *
- * For each trading day, what the shown list picked at 09:16 (VISIBLE_LIST_KEYS: Adaptive alone
- * since 2026-10-16; the journal still records all four registered lists) and what those picks then
- * did on the day's data, beside the context the entry was scored on and what the owner placed.
+ * For each trading day, what the shown lists (VISIBLE_LIST_KEYS; the journal still records all four
+ * registered lists) picked at 09:16 and what those picks then did on the day's data, beside the context the entry was scored on and what the owner placed.
  * A calendar to scan, a dense day table to read, a drawer for one day in full. Counters at the
  * foot say how often the structural things happened (a Buy qualified, the Widesl minimum applied,
  * the lists agreed, a stop fired).

@@ -80,7 +80,7 @@ day is kept; days are never pooled.
 |---|---|
 | Bars | The correlation for each day. Dark bars are forward days, the others research days. |
 | Line and band | The running mean, with a 95% band (mean ± the Student t multiple of the standard error over days, which is wide on few days). The band is drawn, and read, only from the tenth day. |
-| Dashed line | The research mean of the pre-registered study. It exists for the Steady list only, which is no longer shown, so with Adaptive it is not drawn and the Research column is a dash. |
+| Dashed line | The research mean of the pre-registered study, where one exists for the list. Adaptive has none, so the line is not drawn and the Research column is a dash. |
 | Top 30 − bottom 30 | Mean gross per lot of the 30 best-ranked strategies minus the 30 worst, in rupees. The ranking's effect in money. |
 
 ### Forward days and research days

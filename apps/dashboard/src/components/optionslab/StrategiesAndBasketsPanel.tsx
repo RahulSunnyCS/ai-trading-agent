@@ -1,8 +1,8 @@
 /**
  * Options Lab › Strategies and baskets (BL-102): everything that can be traded, in one place.
  *
- *  - Baskets: the shown rotation lists (VISIBLE_LIST_KEYS: Adaptive alone since 2026-10-16; the
- *    journal still records Steady, Calendar and Baseline), each a basket of three strategies and a
+ *  - Baskets: the shown rotation lists (VISIBLE_LIST_KEYS; the journal still records all four),
+ *    each a basket of three strategies and a
  *    Buy picked every morning, with its forward figures; the fixed base (and Baseline, while that
  *    list is shown) sit beneath as comparators.
  *  - Strategies: the saved leg-wise strategies (strategies/legwise/*.yaml, via

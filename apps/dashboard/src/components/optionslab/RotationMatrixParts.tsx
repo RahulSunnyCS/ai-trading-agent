@@ -204,7 +204,7 @@ export function CellReadout({
               {formatInt(c.zt)} strategy-day{c.zt === 1 ? '' : 's'} with no trades, counted as zero.
             </p>
           ) : null}
-          {c?.sel ? (
+          {c && LIST_ORDER.some((k) => c.sel?.[k]) ? (
             <p className="text-muted">
               Picked:{' '}
               {LIST_ORDER.filter((k) => c.sel?.[k])

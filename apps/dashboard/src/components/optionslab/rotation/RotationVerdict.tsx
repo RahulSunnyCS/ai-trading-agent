@@ -1,7 +1,8 @@
 /**
  * The registered comparisons for the focus list, in words: the difference per lot-day against the
- * fixed base (and against Baseline while that list is shown) with its 5-day block-bootstrap 90% interval, and whether the base's
- * pass rule is met. Under the minimum number of days the intervals are shown and the rule says so.
+ * fixed base (and against Baseline while that list is shown) with its 5-day block-bootstrap 90%
+ * interval, and whether the base's pass rule is met. Under the minimum number of days the
+ * intervals are shown and the rule says so.
  */
 
 import { formatInr } from '../../../lib/format';

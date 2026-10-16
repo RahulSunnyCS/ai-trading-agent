@@ -571,12 +571,12 @@ export function stepActive(
   }
 }
 
-/** A cell's accessible name: the value, the sample, the thin state, and who picked it. */
-/** The date view's lists that picked a cell, narrowed to the shown lists (`VISIBLE_LIST_KEYS`). */
+/** The lists that picked a cell or a session, narrowed to the shown lists (`VISIBLE_LIST_KEYS`). */
 export function shownPicks(picks: MatrixListId[] | undefined): MatrixListId[] | undefined {
   return picks?.filter((k) => isVisibleList(k));
 }
 
+/** A cell's accessible name: the value, the sample, the thin state, and who picked it. */
 export function cellLabel(
   rowLabel: string,
   colLabel: string,

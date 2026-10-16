@@ -1,5 +1,5 @@
 /**
- * The Today page's list cards (BL-102): one per shown list (Adaptive alone since 2026-10-16),
+ * The Today page's list cards (BL-102): one per shown list (VISIBLE_LIST_KEYS),
  * answering "how is the list doing?" before anything else. With several lists a card is a button
  * that makes its list the page's focus, and the focus list is outlined. Today's picks sit inside,
  * collapsed.

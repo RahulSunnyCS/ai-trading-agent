@@ -1,8 +1,8 @@
 /**
  * Options Lab → Rotation: how the followed list is doing on days nobody had seen, against the
  * owner's fixed base and random baskets, and whether today's data can be trusted (BL-058 Phase 4).
- * The page shows the lists in `VISIBLE_LIST_KEYS` (Adaptive, C, since 2026-10-16); the journal
- * still records all four registered lists (Steady A, Calendar B, Adaptive C, Baseline REF).
+ * The page shows the lists in `VISIBLE_LIST_KEYS`; the journal still records all four registered
+ * lists (Steady A, Calendar B, Adaptive C, Baseline REF).
  *
  * One page, in reading order (BL-102): the list cards, health/read-out, the headline, chart and
  * current baskets once a forward session has been scored; then What happened (the day log),
@@ -222,7 +222,7 @@ export function RotationPanel() {
                     }
                     description={
                       overview.data.baskets.entry === null
-                        ? "The lists to be recorded at 09:16, before the day's results are known."
+                        ? `${SEVERAL_LISTS_VISIBLE ? 'The lists' : 'The list'} to be recorded at 09:16, before the day's results are known.`
                         : overview.data.baskets.entry.day === istToday()
                           ? "Recorded at 09:16, before the day's results were known; scored after the evening run."
                           : `Recorded on ${formatDay(overview.data.baskets.entry.day)}; the next entry is recorded at 09:16 on the next session.`

@@ -15,6 +15,7 @@ import {
   initialMonth,
   isFlagged,
   logMatches,
+  markedText,
   monthGrid,
   monthOf,
   monthTitle,
@@ -229,6 +230,13 @@ describe('placement', () => {
     };
     expect(placementTally(r)).toEqual({ marked: 1, of: 1, placed: 0, changed: 0, notPlaced: 1 });
     expect(placementTally(byDay('2026-10-12'))).toMatchObject({ marked: 0, of: 1 });
+  });
+
+  it('says marked or not marked for one list, and counts for several', () => {
+    const t = { placed: 0, changed: 0, notPlaced: 0 };
+    expect(markedText({ ...t, marked: 0, of: 1 })).toBe('Not marked');
+    expect(markedText({ ...t, marked: 1, of: 1 })).toBe('Marked');
+    expect(markedText({ ...t, marked: 1, of: 4 })).toBe('1 of 4 lists marked');
   });
 
   it('refuses an unchosen status, a changed with no note and a long note', () => {

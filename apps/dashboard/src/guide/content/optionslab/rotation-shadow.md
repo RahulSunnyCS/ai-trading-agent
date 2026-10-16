@@ -74,9 +74,8 @@ place of that pick on that day", which may have nothing to do with the trigger. 
 is drawn only on days with enough earlier non-event days, and the page says when it covers fewer
 days than the solid line.
 
-The override is shown on Adaptive, the list the page follows; there is no list switch. The
-research's two candidates were Calendar and Baseline (the two it found above both of its
-controls); those lists are still recorded in the journal and scored, but no longer shown.
+The override is shown on Adaptive, the list the page follows; there is no list switch. Steady,
+Calendar and Baseline are still recorded in the journal, but no longer shown.
 
 > [!NOTE]
 > The research also compared the override with a Dir entered at a random minute. That control is
@@ -96,8 +95,7 @@ until the judgement point.
 A small version from the hourly-checkpoint study passed every control on the last two years and
 lost about ₹10,000 on 2022 to 2024: the Adaptive list swapping pending picks by VIX and the running
 Widesl's result. It is kept for observation, but nothing scores it each night yet. It is shown with
-its definition and marked Not scored; no number here is its own. (The study's second candidate was for
-the Steady list, which is no longer shown.)
+its definition and marked Not scored; no number here is its own.
 
 ## What it does not tell you
 

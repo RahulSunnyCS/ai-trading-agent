@@ -1,7 +1,8 @@
 /**
- * The Today page's list cards (BL-102): one per shown list (`VISIBLE_LIST_KEYS`; Adaptive alone
- * since 2026-10-16), each with its latest scored day, its total and drawdown since the forward test began, and how it stands against the
- * fixed base. Pure, so it is unit-tested; the figures are the read-out's, nothing is recomputed.
+ * The Today page's list cards (BL-102): one per shown list (`VISIBLE_LIST_KEYS`), each with its
+ * latest scored day, its total and drawdown since the forward test began, and how it stands
+ * against the fixed base. Pure, so it is unit-tested; the figures are the read-out's, nothing is
+ * recomputed.
  *
  * Gross, two lots a strategy. A day not yet scored is absent, never a zero. Baseline (REF) is a
  * comparator in the page's settings, not a card.

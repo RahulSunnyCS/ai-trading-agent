@@ -122,7 +122,7 @@ describe('RotationDailyLog', () => {
     const row = within(table).getByText('13 Oct 2026').closest('tr') as HTMLElement;
     expect(row.textContent).toMatch(/\+₹350/);
     // one placement dot, for the one list shown
-    expect(within(row).getByText('0 of 1 lists marked')).toBeTruthy();
+    expect(within(row).getByText('Not marked')).toBeTruthy();
     // no "Lists disagree" filter and no list switch with one list
     expect(screen.queryByRole('radio', { name: 'Lists disagree' })).toBeNull();
     expect(screen.queryByRole('radiogroup', { name: /List the calendar is shaded by/ })).toBeNull();
