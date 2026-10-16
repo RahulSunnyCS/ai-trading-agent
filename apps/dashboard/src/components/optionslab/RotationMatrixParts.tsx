@@ -10,7 +10,7 @@ import { createPortal } from 'react-dom';
 
 import { formatDay, formatInt } from '../../lib/format';
 import { tooltipPlacement } from '../../lib/momentumResult';
-import { listName } from '../../lib/rotationListNames';
+import { VISIBLE_LIST_KEYS, listName } from '../../lib/rotationListNames';
 import {
   cellKind,
   legendSwatches,
@@ -144,7 +144,8 @@ export function Legend({
 // The cell readout (tooltip body)
 // ---------------------------------------------------------------------------
 
-const LIST_ORDER: MatrixListId[] = ['A', 'B', 'C', 'REF'];
+/** The lists a cell's "Picked" line names: the shown ones only (`VISIBLE_LIST_KEYS`). */
+const LIST_ORDER: readonly MatrixListId[] = VISIBLE_LIST_KEYS;
 
 export function CellReadout({
   rowLabel,

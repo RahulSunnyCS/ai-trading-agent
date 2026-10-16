@@ -63,7 +63,7 @@ export const OPTIONS_LAB_SECTIONS = [
 export type OptionsLabSection = (typeof OPTIONS_LAB_SECTIONS)[number];
 
 /**
- * What `/optionslab` opens: Today, how the Steady, Calendar and Adaptive lists are doing
+ * What `/optionslab` opens: Today, how the Adaptive list is doing
  * (BL-102; it was the straddle heatmap, BL-094, and Daily results before that).
  */
 export const OPTIONS_LAB_DEFAULT_SECTION: OptionsLabSection = 'rotation';

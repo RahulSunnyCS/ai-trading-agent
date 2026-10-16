@@ -46,14 +46,20 @@ describe('favourites', () => {
   });
 
   it('turns stars into correlation selectors, leaving out what cannot be correlated', () => {
-    expect(listSelector('A')).toBe('list:A');
+    expect(listSelector('C')).toBe('list:C');
     expect(listSelector('base')).toBeNull();
     expect(favouriteSelectors(set(['A', 'base', 'C'], ['nifty_buy_range_breakout']))).toEqual([
-      'list:A',
       'list:C',
       'nifty_buy_range_breakout',
     ]);
     expect(favouriteSelectors(set([]))).toEqual([]);
+  });
+
+  it('keeps a hidden list star saved but opens nothing on it (only Adaptive is shown)', () => {
+    for (const hidden of ['A', 'B', 'REF'] as const) expect(listSelector(hidden)).toBeNull();
+    // the star itself survives a toggle of another list: the server's record is not rewritten
+    expect(toggleList(set(['A', 'REF']), 'C').lists).toEqual(['A', 'C', 'REF']);
+    expect(favouriteSelectors(set(['A', 'B', 'REF']))).toEqual([]);
   });
 
   it('copies a server answer into a set', () => {
@@ -64,16 +70,22 @@ describe('favourites', () => {
 
 describe('correlateHref', () => {
   it('compares an item with the starred ones, the item first and never twice', () => {
-    expect(correlateHref('list:A', set(['A', 'B'], ['x']))).toBe(
-      '/optionslab/correlation?names=list%3AA,list%3AB,x',
+    expect(correlateHref('list:C', set(['C'], ['x', 'y']))).toBe(
+      '/optionslab/correlation?names=list%3AC,x,y',
     );
-    expect(correlateHref('x', set(['A'], ['x']))).toBe('/optionslab/correlation?names=x,list%3AA');
+    expect(correlateHref('x', set(['C'], ['x']))).toBe('/optionslab/correlation?names=x,list%3AC');
   });
 
-  it('pairs a lone item with Steady, or with Calendar when it is Steady', () => {
-    expect(correlateHref('x', set([], []))).toBe('/optionslab/correlation?names=x,list%3AA');
-    expect(correlateHref('list:A', set([], []))).toBe(
-      '/optionslab/correlation?names=list%3AA,list%3AB',
+  it('never brings a hidden list into the comparison, even when it is starred', () => {
+    expect(correlateHref('x', set(['A', 'B', 'REF'], ['x']))).toBe(
+      '/optionslab/correlation?names=x,list%3AC',
+    );
+  });
+
+  it('pairs a lone item with Adaptive, or with the base Widesl when it is Adaptive', () => {
+    expect(correlateHref('x', set([], []))).toBe('/optionslab/correlation?names=x,list%3AC');
+    expect(correlateHref('list:C', set([], []))).toBe(
+      '/optionslab/correlation?names=list%3AC,N_wide_0917',
     );
   });
 });

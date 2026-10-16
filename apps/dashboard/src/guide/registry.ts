@@ -303,8 +303,7 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     chapter: 'optionslab',
     slug: 'rotation',
     title: 'Rotation',
-    summary:
-      'The four forward lists against Baseline, the fixed base and random baskets, and today’s picks.',
+    summary: 'The Adaptive list against the fixed base and random baskets, and today’s picks.',
     kind: 'Screen',
     body: optionsRotation,
     screen: { tab: 'optionslab', rest: ['rotation'] },
@@ -316,7 +315,7 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     slug: 'rotation-explain',
     title: 'Rotation: why a pick, and does rank predict results',
     summary:
-      'Why each list picked what it did, criterion by criterion, and whether the morning ranking orders the day.',
+      'Why Adaptive picked what it did, criterion by criterion, and whether the morning ranking orders the day.',
     kind: 'Screen',
     body: optionsRotationExplain,
     screen: { tab: 'optionslab', rest: ['rotation'] },
@@ -372,7 +371,7 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     slug: 'rotation-daily-log',
     title: 'Rotation: the daily log',
     summary:
-      'What each list picked at 09:16 and what those picks did, day by day, with what you placed.',
+      'What Adaptive picked at 09:16 and what those picks did, day by day, with what you placed.',
     kind: 'Screen',
     body: optionsRotationDailyLog,
     screen: { tab: 'optionslab', rest: ['rotation'] },

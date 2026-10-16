@@ -1,6 +1,7 @@
 /**
- * The hero chart: cumulative gross by list (2 lots per strategy), the fixed base and, behind
- * them, the band of 1,000 random same-shape baskets for the focus list. Hand-drawn SVG, like the
+ * The hero chart: cumulative gross of the shown lists (VISIBLE_LIST_KEYS; Adaptive alone since
+ * 2026-10-16), 2 lots per strategy, the fixed base and, behind them, the band of 1,000 random
+ * same-shape baskets for the focus list. Hand-drawn SVG, like the
  * Correlation tab's heatmap, so nothing here pulls in a chart library.
  *
  * Follow tooltip below the cursor. A click pins a day; the slider under the chart does the same
@@ -11,7 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { formatDay, formatInr } from '../../../lib/format';
 import { tooltipPlacement } from '../../../lib/momentumResult';
-import { listName } from '../../../lib/rotationListNames';
+import { SEVERAL_LISTS_VISIBLE, listName } from '../../../lib/rotationListNames';
 import { type HeroPoint, LIST_KEYS, nearestIndex, niceTicks } from '../../../lib/rotationView';
 import type { RotationListKey } from '../../../types/rotation';
 
@@ -152,7 +153,9 @@ export function RotationHero({
           >
             <span className={`h-2 w-2 rounded-full ${SWATCH[k]}`} />
             {listName(k)}
-            {k === focus ? <span className="text-faint">focus</span> : null}
+            {k === focus && SEVERAL_LISTS_VISIBLE ? (
+              <span className="text-faint">focus</span>
+            ) : null}
           </button>
         ))}
         <button
@@ -182,7 +185,7 @@ export function RotationHero({
         <svg
           viewBox={`0 0 ${W} ${H}`}
           role="img"
-          aria-label="Cumulative gross by list, the fixed base and the random-basket band, by day"
+          aria-label={`Cumulative gross of ${LIST_KEYS.map(listName).join(', ')}, the fixed base and the random-basket band, by day`}
           className="h-auto w-full"
         >
           {scale.ticks.map((t) => (

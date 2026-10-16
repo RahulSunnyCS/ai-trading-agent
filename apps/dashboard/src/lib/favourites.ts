@@ -5,6 +5,7 @@
  */
 
 import type { FavouriteListKey, Favourites } from '../types/legwise';
+import { DEFAULT_LIST, isVisibleList } from './rotationListNames';
 
 /** Canonical order, the same as the server's: lists never reorder when starred. */
 export const FAVOURITE_LIST_KEYS: readonly FavouriteListKey[] = ['A', 'B', 'C', 'REF', 'base'];
@@ -43,14 +44,19 @@ export function toggleStrategy(set: FavouriteSet, name: string): FavouriteSet {
   };
 }
 
-/** A rotation list as a Correlation selector (`list:A`); the fixed base has none yet. */
+/**
+ * A rotation list as a Correlation selector (`list:C`). The fixed base has none yet, and a list
+ * the dashboard does not show (`VISIBLE_LIST_KEYS`) has none either: its star stays saved on the
+ * server, but nothing opens on it.
+ */
 export function listSelector(key: FavouriteListKey): string | null {
-  return key === 'base' ? null : `list:${key}`;
+  return key === 'base' || !isVisibleList(key) ? null : `list:${key}`;
 }
 
 /**
- * The selectors a picker opens on: the starred lists that can be correlated, then the starred
- * strategies. An empty result means nothing is starred, so the page falls back to its own default.
+ * The selectors a picker opens on: the starred shown lists that can be correlated, then the
+ * starred strategies. An empty result means nothing is starred, so the page falls back to its own
+ * default.
  */
 export function favouriteSelectors(set: FavouriteSet): string[] {
   const lists = set.lists.map(listSelector).filter((s): s is string => s !== null);
@@ -58,12 +64,13 @@ export function favouriteSelectors(set: FavouriteSet): string[] {
 }
 
 /**
- * The Correlation address that compares `item` (a `list:A` selector or a strategy name) with the
- * other starred items. A comparison needs two, so a lone item is paired with Steady (or with
- * Calendar when the item is Steady itself).
+ * The Correlation address that compares `item` (a `list:C` selector or a strategy name) with the
+ * other starred items. A comparison needs two, so a lone item is paired with the first shown list
+ * (or, when the item is that list, with N_wide_0917, the fixed base's Widesl OTM1 09:17).
  */
 export function correlateHref(item: string, set: FavouriteSet): string {
   const names = [item, ...favouriteSelectors(set).filter((s) => s !== item)];
-  if (names.length < 2) names.push(item === 'list:A' ? 'list:B' : 'list:A');
+  const shown = `list:${DEFAULT_LIST}`;
+  if (names.length < 2) names.push(item === shown ? 'N_wide_0917' : shown);
   return `/optionslab/correlation?names=${names.map(encodeURIComponent).join(',')}`;
 }

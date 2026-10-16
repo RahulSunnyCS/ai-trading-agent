@@ -1,7 +1,8 @@
 /**
- * Options Lab → Rotation: how the four registered lists (Steady A, Calendar B, Adaptive C,
- * Baseline REF) are doing on days nobody had seen, against Baseline, the owner's fixed base and random baskets, and whether today's data can
- * be trusted (BL-058 Phase 4).
+ * Options Lab → Rotation: how the followed list is doing on days nobody had seen, against the
+ * owner's fixed base and random baskets, and whether today's data can be trusted (BL-058 Phase 4).
+ * The page shows the lists in `VISIBLE_LIST_KEYS` (Adaptive, C, since 2026-10-16); the journal
+ * still records all four registered lists (Steady A, Calendar B, Adaptive C, Baseline REF).
  *
  * One page, in reading order (BL-102): the list cards, health/read-out, the headline, chart and
  * current baskets once a forward session has been scored; then What happened (the day log),
@@ -20,12 +21,17 @@ import { useRotationOverview, useRotationSummary } from '../../hooks/useRotation
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { formatDay, formatIstTime, istToday } from '../../lib/format';
 import { amountOf, buttonLabel, isOn, sameTrail, trailParam } from '../../lib/portfolioStop';
-import { listName } from '../../lib/rotationListNames';
+import {
+  DEFAULT_LIST,
+  SEVERAL_LISTS_VISIBLE,
+  listName,
+  listWithUniverse,
+} from '../../lib/rotationListNames';
 import { overlaySummary, unmatched } from '../../lib/rotationPortfolioView';
 import {
+  BENCHMARKS,
   BENCHMARK_LABEL,
   BENCHMARK_NOTE,
-  LIST_KEYS,
   type RotationBenchmark,
   benchmarkFigures,
   verdict as buildVerdict,
@@ -48,6 +54,7 @@ import { RotationPulse } from './RotationPulse';
 import { RotationRegime } from './RotationRegime';
 import { RotationShadowScoreboard } from './RotationShadowScoreboard';
 import { EveningRunBar } from './results/EveningRunBar';
+import { ListPicker } from './rotation/ListPicker';
 import { RotationBaskets } from './rotation/RotationBaskets';
 import { RotationHeadline } from './rotation/RotationHeadline';
 import { RotationHealthStrip } from './rotation/RotationHealth';
@@ -56,21 +63,17 @@ import { RotationListCards } from './rotation/RotationListCards';
 import { RotationReadoutBanner } from './rotation/RotationReadout';
 import { RotationVerdict } from './rotation/RotationVerdict';
 
-const FOCUS_OPTIONS: SegmentedOption<RotationListKey>[] = LIST_KEYS.map((value) => ({
+const BENCHMARK_OPTIONS: SegmentedOption<RotationBenchmark>[] = BENCHMARKS.map((value) => ({
   value,
-  label: listName(value),
+  label: BENCHMARK_LABEL[value],
 }));
-
-const BENCHMARK_OPTIONS: SegmentedOption<RotationBenchmark>[] = (
-  ['base', 'REF', 'random'] as const
-).map((value) => ({ value, label: BENCHMARK_LABEL[value] }));
 
 export function RotationPanel() {
   const overview = useRotationOverview();
   const summary = useRotationSummary();
-  const [focus, setFocus] = useState<RotationListKey>('A');
+  const [focus, setFocus] = useState<RotationListKey>(DEFAULT_LIST);
   const [benchmark, setBenchmark] = useState<RotationBenchmark>('base');
-  const [shown, setShown] = useState<ReadonlySet<RotationListKey>>(new Set(['A']));
+  const [shown, setShown] = useState<ReadonlySet<RotationListKey>>(new Set([DEFAULT_LIST]));
   const [showBase, setShowBase] = useState(true);
   // BL-095: one portfolio stop for every widget below that shows stopped figures.
   const [portfolio, setPortfolio] = usePortfolioStop();
@@ -117,16 +120,14 @@ export function RotationPanel() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex items-center gap-2 text-xs text-muted">
-          Focus
-          <SegmentedControl
-            value={focus}
-            options={FOCUS_OPTIONS}
-            onChange={setFocus}
-            ariaLabel="Focus list"
-            size="sm"
-          />
-        </div>
+        <ListPicker
+          value={focus}
+          onChange={setFocus}
+          ariaLabel="Focus list"
+          label="Focus"
+          format={listWithUniverse}
+          single="text"
+        />
         <div className="flex items-center gap-2 text-xs text-muted">
           Compare with
           <SegmentedControl
@@ -267,7 +268,11 @@ export function RotationPanel() {
               {verdictFor ? <RotationVerdict verdict={verdictFor} /> : null}
               <Card>
                 <CardHeader
-                  title="Cumulative gross by list"
+                  title={
+                    SEVERAL_LISTS_VISIBLE
+                      ? 'Cumulative gross by list'
+                      : `Cumulative gross, ${listName(focus)} and the fixed base`
+                  }
                   description={`${s.n_days} scored forward sessions, 2 lots per strategy.${stopped ? ' With the portfolio stop applied.' : ''} Late entries and unscored days are left out.`}
                 />
                 <RotationHero
@@ -302,7 +307,7 @@ export function RotationPanel() {
                         ? "Today's baskets"
                         : 'Latest baskets'
                     }
-                    description="What each list holds and what changed since the entry before."
+                    description="What the list holds and what changed since the entry before."
                   />
                   <RotationBaskets
                     baskets={overview.data.baskets}
@@ -322,7 +327,7 @@ export function RotationPanel() {
             What happened
           </h2>
           <p className="mt-0.5 text-sm text-muted">
-            What each list picked, what happened afterwards, and where the risk came from.
+            What the list picked, what happened afterwards, and where the risk came from.
           </p>
         </header>
         <RotationDailyLog focus={focus} portfolio={portfolio} />

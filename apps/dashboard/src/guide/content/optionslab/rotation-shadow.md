@@ -74,8 +74,9 @@ place of that pick on that day", which may have nothing to do with the trigger. 
 is drawn only on days with enough earlier non-event days, and the page says when it covers fewer
 days than the solid line.
 
-Switch lists with the control above: all four are shown, and Calendar and Baseline are marked as candidates
-because those were the two the research found above both of its controls.
+The override is shown on Adaptive, the list the page follows; there is no list switch. The
+research's two candidates were Calendar and Baseline (the two it found above both of its
+controls); those lists are still recorded in the journal and scored, but no longer shown.
 
 > [!NOTE]
 > The research also compared the override with a Dir entered at a random minute. That control is
@@ -84,19 +85,19 @@ because those were the two the research found above both of its controls.
 
 ## What the research found
 
-The same override in the research, for all four lists: the gain over the plain list, and the 90th
-percentile of 200 random draws for each of its two controls. On the last two years, the Calendar and
-Baseline lists beat both controls (+₹79,389 and +₹54,556). On 2022 to 2024 Calendar lost (−₹26,749) and Baseline gained
-a little (+₹16,268), below its controls. The forward column puts the running total so far next to
-those; it is much shorter than two years and means nothing until the judgement point.
+The same override in the research, for Adaptive: the gain over the plain list, and the 90th
+percentile of 200 random draws for each of its two controls. On the last two years Adaptive's gain
+(+₹21,494) did not beat both controls, and on 2022 to 2024 it lost (−₹9,972). The forward column
+puts the running total so far next to those; it is much shorter than two years and means nothing
+until the judgement point.
 
 ## Candidates with no scoring yet
 
-Two small versions from the hourly-checkpoint study passed every control on the last two years and
-lost about ₹10,000 on 2022 to 2024: the Steady list dropping a pending pick when the VIX state says it
-will lose, and the Adaptive list swapping pending picks by VIX and the running Widesl's result. They are
-kept for observation, but nothing scores them each night yet. They are shown with their
-definitions and marked Not scored; no number here is theirs.
+A small version from the hourly-checkpoint study passed every control on the last two years and
+lost about ₹10,000 on 2022 to 2024: the Adaptive list swapping pending picks by VIX and the running
+Widesl's result. It is kept for observation, but nothing scores it each night yet. It is shown with
+its definition and marked Not scored; no number here is its own. (The study's second candidate was for
+the Steady list, which is no longer shown.)
 
 ## What it does not tell you
 

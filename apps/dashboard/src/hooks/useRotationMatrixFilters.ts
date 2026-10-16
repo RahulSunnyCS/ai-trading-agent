@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from 'react';
 
+import { VISIBLE_LIST_KEYS } from '../lib/rotationListNames';
 import type { Explicit } from '../lib/rotationMatrixDefault';
 import {
   ANY,
@@ -22,7 +23,8 @@ import { useQueryState } from './useQueryState';
 
 const METRICS: readonly MatrixMetric[] = ['avg', 'win_rate', 'stop_rate', 'worst', 'selection'];
 const PERIODS: readonly MatrixPeriodId[] = ['P1', 'P2', 'P3', 'forward', 'custom'];
-const LISTS: readonly MatrixListId[] = ['A', 'B', 'C', 'REF'];
+/** The lists whose recorded picks can be overlaid: the shown ones; an old `list=A` link falls to none. */
+const LISTS: readonly MatrixListId[] = VISIBLE_LIST_KEYS;
 const INDICES = ['both', 'NIFTY', 'SENSEX'] as const;
 
 function pick<T extends string>(allowed: readonly T[], value: string | null, fallback: T): T {

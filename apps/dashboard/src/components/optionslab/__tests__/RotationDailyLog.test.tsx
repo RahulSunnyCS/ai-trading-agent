@@ -57,7 +57,7 @@ afterEach(() => {
 });
 
 describe('RotationDailyLog', () => {
-  it('says when the first entry is due and lists the registered lists before there is one', async () => {
+  it('says when the first entry is due and names the followed list before there is one', async () => {
     const empty = log({
       today: '2026-10-10',
       rows: [],
@@ -67,9 +67,13 @@ describe('RotationDailyLog', () => {
     const calls = stubFetch(() => ({ body: empty }));
     render(<RotationDailyLog />);
     expect(await screen.findByText('First entry Monday 12 October, 09:16')).toBeTruthy();
-    for (const key of ['A', 'B', 'C', 'REF'])
-      expect(screen.getAllByText(key).length).toBeGreaterThan(0);
-    expect(screen.getByText(/the live baseline/)).toBeTruthy();
+    expect(screen.getByText('The list followed')).toBeTruthy();
+    expect(screen.getByText('Adaptive')).toBeTruthy();
+    expect(screen.getByText(/own 15 \/ weekday 30/)).toBeTruthy();
+    // the journal registers four lists; Steady, Calendar and Baseline are not shown
+    expect(screen.queryByText(/the live baseline/)).toBeNull();
+    expect(screen.queryByText(/own 5 \/ weekday 34/)).toBeNull();
+    expect(screen.queryByText(/Steady|Calendar|Baseline/)).toBeNull();
     // the research history is offered, labelled, and asks for the reconstructed source
     fireEvent.click(screen.getByRole('button', { name: /Browse the reconstructed history/ }));
     await waitFor(() =>
@@ -92,22 +96,44 @@ describe('RotationDailyLog', () => {
     expect(text(3)).not.toMatch(/₹/);
     expect(text(4)).toMatch(/14 Oct 2026.*Late.*Late/); // the flag and the status
     expect(text(6)).toMatch(/12 Oct 2026.*Scored/);
-    // counters line
+    // counters line: Adaptive's own, and no "all four identical"
     const counters = screen.getByLabelText('Counters');
     expect(counters.textContent).toMatch(/Recorded\s*5/);
-    expect(counters.textContent).toMatch(/Buy qualified\s*Steady 1\/5/);
-    expect(counters.textContent).toMatch(
-      /Widesl min applied\s*Steady 0\/5 · Calendar 0\/5 · Adaptive 1\/5/,
-    );
+    expect(counters.textContent).toMatch(/Buy qualified\s*0\/5/);
+    expect(counters.textContent).toMatch(/Widesl min applied\s*1\/5/);
+    expect(counters.textContent).not.toMatch(/identical|Steady|Calendar|Baseline/);
     expect(COUNTERS.days).toBe(5);
+  });
+
+  it('draws one list column, Adaptive, though each row carries all four lists', async () => {
+    stubFetch(() => ({ body: log() }));
+    render(<RotationDailyLog />);
+    const table = await screen.findByRole('table');
+    // every fixture row's payload holds Steady, Calendar, Adaptive and Baseline
+    const thirteenth = ROWS.find((r) => r.day === '2026-10-13');
+    expect(Object.keys(thirteenth?.lists ?? {}).sort()).toEqual(['A', 'B', 'C', 'REF']);
+    const header = within(table)
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent ?? '');
+    expect(header.filter((h) => /Adaptive/.test(h))).toHaveLength(1);
+    expect(header.join(' ')).not.toMatch(/Steady|Calendar|Baseline/);
+    expect(table.textContent).not.toMatch(/Steady|Calendar|Baseline/);
+    // 13 Oct: Adaptive's own per lot-day ((1200 - 450 + 300) / 3 = +350), not Steady's
+    const row = within(table).getByText('13 Oct 2026').closest('tr') as HTMLElement;
+    expect(row.textContent).toMatch(/\+₹350/);
+    // one placement dot, for the one list shown
+    expect(within(row).getByText('0 of 1 lists marked')).toBeTruthy();
+    // no "Lists disagree" filter and no list switch with one list
+    expect(screen.queryByRole('radio', { name: 'Lists disagree' })).toBeNull();
+    expect(screen.queryByRole('radiogroup', { name: /List the calendar is shaded by/ })).toBeNull();
   });
 
   it("takes the page's focus list and then offers no second control for it", async () => {
     stubFetch(() => ({ body: log() }));
-    render(<RotationDailyLog focus="REF" />);
+    render(<RotationDailyLog focus="C" />);
     await screen.findByRole('table');
     expect(screen.queryByRole('radiogroup', { name: /List the calendar is shaded by/ })).toBeNull();
-    expect(screen.getByText(/Shaded by the Baseline list/)).toBeTruthy();
+    expect(screen.getByText(/Shaded by the Adaptive list/)).toBeTruthy();
   });
 
   it('labels the filters as browsing and filters to the losing days', async () => {
@@ -137,7 +163,7 @@ describe('RotationDailyLog', () => {
     expect(await screen.findByRole('table')).toBeTruthy();
   });
 
-  it('opens a day with every list in full and saves a placement as the server read it back', async () => {
+  it('opens a day with the Adaptive basket in full and saves a placement as the server read it back', async () => {
     const saved: RotationPlacement[] = [];
     const calls = stubFetch((url, init) => {
       if (init?.method === 'POST') {
@@ -148,7 +174,7 @@ describe('RotationDailyLog', () => {
           note: string;
         };
         const row = {
-          ...placement(body.day, body.list as 'A', body.status as 'placed', body.note),
+          ...placement(body.day, body.list as 'C', body.status as 'placed', body.note),
         };
         saved.push(row);
         return { body: { row } };
@@ -160,11 +186,16 @@ describe('RotationDailyLog', () => {
     await screen.findByRole('table');
     fireEvent.click(within(screen.getByRole('table')).getByText('13 Oct 2026'));
     const dialog = await screen.findByRole('dialog');
-    await within(dialog).findAllByText('Steady (A)');
-    for (const key of ['A', 'B', 'C', 'REF']) {
-      expect(within(dialog).getAllByText(listLabel(key)).length).toBeGreaterThan(0);
+    await within(dialog).findAllByText(listLabel('C'));
+    // the day's payload has all four baskets; only Adaptive's is drawn
+    for (const key of ['A', 'B', 'REF']) {
+      expect(within(dialog).queryAllByText(listLabel(key))).toHaveLength(0);
     }
+    expect(dialog.textContent).not.toMatch(/Steady|Calendar|Baseline/);
+    // Steady's own pick that day (S_wide_0917) is not in Adaptive's basket
+    expect(within(dialog).queryByText(/SENSEX Widesl OTM1 09:17/)).toBeNull();
     expect(within(dialog).getAllByText(/Widesl OTM1 09:17/).length).toBeGreaterThan(0);
+    expect(within(dialog).getAllByRole('radiogroup', { name: /Placement of the/ })).toHaveLength(1);
     expect(within(dialog).getByText(/Executed: what you placed/i)).toBeTruthy();
 
     // Save is disabled until a status is chosen; "changed" needs a note
@@ -176,7 +207,7 @@ describe('RotationDailyLog', () => {
       (within(dialog).getAllByRole('button', { name: 'Save' })[0] as HTMLButtonElement).disabled,
     ).toBe(true);
     fireEvent.change(
-      within(dialog).getAllByLabelText(/Note for the Steady list/)[0] as HTMLElement,
+      within(dialog).getAllByLabelText(/Note for the Adaptive list/)[0] as HTMLElement,
       {
         target: { value: 'dropped the Buy leg' },
       },
@@ -190,7 +221,7 @@ describe('RotationDailyLog', () => {
     expect(post?.url).toBe('/api/backtest/legwise/rotation/placement');
     expect(JSON.parse(String(post?.init?.body))).toEqual({
       day: '2026-10-13',
-      list: 'A',
+      list: 'C',
       status: 'changed',
       note: 'dropped the Buy leg',
     });
@@ -317,7 +348,7 @@ describe('RotationDailyLog', () => {
     expect(alert.textContent).toMatch(/Not saved: note is 320 characters; at most 300/);
     expect(alert.className).toMatch(/text-negative/);
     fireEvent.change(
-      within(dialog).getAllByLabelText(/Note for the Steady list/)[0] as HTMLElement,
+      within(dialog).getAllByLabelText(/Note for the Adaptive list/)[0] as HTMLElement,
       {
         target: { value: 'x' },
       },
@@ -331,7 +362,7 @@ describe('RotationDailyLog', () => {
     stubFetch((url, init) => {
       if (init?.method === 'POST') {
         posted += 1;
-        return { body: { row: placement('2026-10-13', 'A', 'placed'), written: true } };
+        return { body: { row: placement('2026-10-13', 'C', 'placed'), written: true } };
       }
       if (url.includes('/day/')) {
         dayCalls += 1;
@@ -360,14 +391,21 @@ describe('RotationDailyLog', () => {
   });
 
   it('keeps the earlier mark visible once it has been corrected', async () => {
-    const first = placement('2026-10-13', 'A', 'placed');
+    const first = placement('2026-10-13', 'C', 'placed');
     const second = {
-      ...placement('2026-10-13', 'A', 'changed', 'dropped the Buy'),
+      ...placement('2026-10-13', 'C', 'changed', 'dropped the Buy'),
       at: '2026-10-13T09:40:00+05:30',
     };
+    // a mark on a list no longer shown stays in the file, not in the drawer's history
+    const hidden = placement('2026-10-13', 'A', 'placed');
     stubFetch((url) =>
       url.includes('/day/')
-        ? { body: { ...dayBody('2026-10-13', [second]), placement_history: [first, second] } }
+        ? {
+            body: {
+              ...dayBody('2026-10-13', [second]),
+              placement_history: [first, hidden, second],
+            },
+          }
         : { body: log() },
     );
     render(<RotationDailyLog />);

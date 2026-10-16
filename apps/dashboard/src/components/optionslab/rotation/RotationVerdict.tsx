@@ -1,6 +1,6 @@
 /**
- * The registered comparisons for the focus list, in words: the difference per lot-day against Baseline
- * and against the fixed base with its 5-day block-bootstrap 90% interval, and whether the base's
+ * The registered comparisons for the focus list, in words: the difference per lot-day against the
+ * fixed base (and against Baseline while that list is shown) with its 5-day block-bootstrap 90% interval, and whether the base's
  * pass rule is met. Under the minimum number of days the intervals are shown and the rule says so.
  */
 
@@ -34,7 +34,7 @@ export function RotationVerdict({ verdict }: { verdict: Verdict }) {
                 }
               >
                 {!verdict.readable
-                  ? 'Not readable yet: too few days for any list to pass.'
+                  ? 'Not readable yet: too few days to pass.'
                   : l.rule.beats
                     ? 'Beats the base on the registered rule.'
                     : 'Does not beat the base on the registered rule.'}
