@@ -1,0 +1,47 @@
+# T1 forward shadow (BL-104 time-generic setting #22: SENSEX_Widesl_premium expiry-day winner,
+# chosen on 2024-10-09 -> 2025-10-08 only). Frozen: never edit; read by `obt rotation update/pick --universe t1`.
+strategy:
+  id: S_p285-t1s22_1032
+  underlying: SENSEX
+  entry_time: '10:32'
+  exit_time: '15:28'
+  square_off: partial
+  legs:
+  - id: ce
+    lots: 1
+    position: sell
+    option_type: CE
+    expiry: weekly
+    strike:
+      closest_premium: 285.0
+    stop_loss:
+      percent: 40.0
+    trail_sl:
+      percent:
+      - 25.0
+      - 15.0
+    reentry_on_sl:
+      mode: cost
+      count: 1
+  - id: pe
+    lots: 1
+    position: sell
+    option_type: PE
+    expiry: weekly
+    strike:
+      closest_premium: 285.0
+    stop_loss:
+      percent: 40.0
+    trail_sl:
+      percent:
+      - 25.0
+      - 15.0
+    reentry_on_sl:
+      mode: cost
+      count: 1
+  overall:
+    stop_loss_inr: 4000.0
+  execution:
+    slippage_pct: 0.0
+    cost_per_order_inr: 0.0
+    lot_sizing: current

@@ -1,0 +1,47 @@
+# T1 forward shadow (BL-104 time-generic setting #36: N_ditm1 other-day winner,
+# chosen on 2024-10-09 -> 2025-10-08 only). Frozen: never edit; read by `obt rotation update/pick --universe t1`.
+strategy:
+  id: N_ditm1-t1s36_1502
+  underlying: NIFTY
+  entry_time: '15:02'
+  exit_time: '15:28'
+  square_off: partial
+  legs:
+  - id: ce
+    lots: 1
+    position: sell
+    option_type: CE
+    expiry: weekly
+    strike:
+      strike_type: ITM1
+    stop_loss:
+      percent: 20.0
+    trail_sl:
+      percent:
+      - 10.0
+      - 5.0
+    reentry_on_sl:
+      mode: cost
+      count: 2
+  - id: pe
+    lots: 1
+    position: sell
+    option_type: PE
+    expiry: weekly
+    strike:
+      strike_type: ITM1
+    stop_loss:
+      percent: 20.0
+    trail_sl:
+      percent:
+      - 10.0
+      - 5.0
+    reentry_on_sl:
+      mode: cost
+      count: 2
+  overall:
+    stop_loss_inr: 4000.0
+  execution:
+    slippage_pct: 0.0
+    cost_per_order_inr: 0.0
+    lot_sizing: current

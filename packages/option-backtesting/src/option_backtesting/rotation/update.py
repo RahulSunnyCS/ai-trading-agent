@@ -22,14 +22,16 @@ from .lists import SIZING_DATE
 from .variants import strategy_path, underlying_of, variant_names
 
 
-def default_day(root: Path | None = None, today: date | None = None) -> date | None:
+def default_day(
+    root: Path | None = None, today: date | None = None, names: list[str] | None = None
+) -> date | None:
     """The newest weekday in the last two weeks (today first) with both indices collected and not
     excluded whose variants are not all stored yet: what an unattended run should do. None when
     everything collected is stored."""
     root = root or data_dir()
     d = today or date.today()
     excluded = excluded_map(root)
-    names = variant_names()
+    names = names or variant_names()
     for _ in range(14):
         if is_collected(root, d, excluded) and any(
             d not in store.result_days(n, root) for n in names
@@ -37,6 +39,15 @@ def default_day(root: Path | None = None, today: date | None = None) -> date | N
             return d
         d -= timedelta(days=1)
     return None
+
+
+def backfill_days(names: list[str], root: Path | None = None) -> list[date]:
+    """Every day Core-298 has stored where any of `names` has not: a shadow universe's history is
+    built over exactly the live history's days (so the two rank on the same rows)."""
+    root = root or data_dir()
+    core_days = store.result_days(variant_names()[0], root)
+    have = [store.result_days(n, root) for n in names]
+    return sorted(d for d in core_days if any(d not in h for h in have))
 
 
 def update_day(

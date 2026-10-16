@@ -103,7 +103,7 @@ Otherwise:
   which strategies have daily results now — variant CSVs plus saved legwise results at the file's current
   version — and the selectors `slot:` / `family:` / `index:` / `kind:` / globs / `a+b` that name them; nothing
   is a fixed list, so a new strategy is found once it has results), `cli.py`
-  (`obt rotation update|pick|verify|show|readout|base|triggers|triggers-show|corr|corr-list|corr-pick`), `triggers.py` (BL-083: the four intraday triggers scored forward each evening from the day's bars,
+  (`obt rotation update|pick|verify|show|readout|base|triggers|triggers-show|corr|corr-list|corr-pick|shadow-readout`; `update`/`pick --universe t1` run the BL-113 T1 forward shadow: `strategies/rotation_t1/` variants named `<N|S>_<base>-t1s<set>_<HHMM>`, results and journal under `rotation/shadow_t1/`, never the live folder or chain — `variants.shadow_of`, `store.result_path`, `shadow_universe.py`), `triggers.py` (BL-083: the four intraday triggers scored forward each evening from the day's bars,
   event and placebo simulations in `rotation/triggers/`; run by `obt rotation update`, isolated so a
   failure never fails it, and `obt rotation triggers|triggers-show`;
   `scripts/rotation-triggers-parity.py` must print PARITY OK). Weekend sessions are excluded from the ranking history, as

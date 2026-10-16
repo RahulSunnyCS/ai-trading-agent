@@ -212,14 +212,36 @@ const BASE_JOBS: Job[] = [
       'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt daily && uv run --directory packages/option-backtesting obt rotation update && uv run --directory packages/option-backtesting obt rotation result',
   },
   {
+    id: 'options-rotation-t1-update',
+    description:
+      "Store the T1 forward shadow's results for the day (`obt rotation update --universe t1`): its 223 extra variants only, in their own folder; the live results are never touched",
+    // After the evening run's last retry (20:15). Idempotent: it scores the newest collected day the
+    // shadow has not stored yet, so a run before the day is collected writes nothing and succeeds.
+    schedule: { at: '21:00', on: tradingDays, label: 'trading days 21:00' },
+    steps: [['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'update', '--universe', 't1']],
+    cwd: '.',
+    timeoutMinutes: 20,
+    retries: 2,
+    retryDelayMinutes: 60,
+    catchUpHours: 2.5, // until 23:30
+    group: 'catalog',
+    fixHint:
+      'uv run --directory packages/option-backtesting obt rotation update --universe t1  (add --backfill to fill every missing day)',
+  },
+  {
     id: 'options-rotation-pick',
     description:
-      "Record the day's rotation picks (lists A, B, C, REF) before 09:17 and Telegram them (BL-058)",
+      "Record the day's rotation picks (lists A, B, C, REF) before 09:17 and Telegram them (BL-058), then the T1 forward shadow's Adaptive pick in its own journal (private Telegram, labelled SHADOW)",
     // Needs the 09:15 VIX bar, which Fyers serves from 09:16, and yesterday's results (the nightly
     // job above). A late entry is flagged (before_first_entry: false), never silently accepted,
     // and a missed slot is not caught up: it would not be forward.
     schedule: { at: '09:16', on: tradingDays, label: 'trading days 09:16' },
-    steps: [['uv', 'run', 'obt', 'rotation', 'pick']],
+    // The live pick first, always: a failed shadow step retries the job, and the live step then
+    // answers "already recorded" (exit 0) without writing anything.
+    steps: [
+      ['uv', 'run', 'obt', 'rotation', 'pick'],
+      ['uv', 'run', 'obt', 'rotation', 'pick', '--universe', 't1'],
+    ],
     cwd: OPTIONS,
     timeoutMinutes: 3,
     retries: 2,
@@ -227,7 +249,7 @@ const BASE_JOBS: Job[] = [
     catchUpHours: 0,
     alertsItself: true,
     fixHint:
-      'cd packages/option-backtesting && uv run obt rotation pick  (a late entry is flagged, not forward)',
+      'cd packages/option-backtesting && uv run obt rotation pick, then uv run obt rotation pick --universe t1  (a late entry is flagged, not forward)',
   },
   {
     id: 'backup',
