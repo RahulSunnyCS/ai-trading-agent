@@ -103,3 +103,5 @@ Filled in and committed before any selection or replay. Drafted defaults, to con
 ## Log
 
 - 2026-10-17 — created at the owner's request after BL-115 Experiment 3 failed; P1 (owner).
+- 2026-10-17 — BL-115 Experiment 8 (growing window): no pass, pooled +66 vs the fixed window's +70, so
+  per the Phase 0 draft both schemes are run and judged.

@@ -315,6 +315,13 @@ were simulated on its pick day for the net comparison.
   are not independent; the frozen T1 quarter-by-quarter figures were seen before this was registered.
 - `research/bl107/walkforward.py --scheme expanding --stage all --workers 2` →
   `results/walkforward_expanding/`.
+- **Result (2026-10-17): no pass.** Gross per lot-day by quarter, growing window vs Core-298 (fixed
+  window, Experiment 3, in brackets): +345 (+345), +53 (+255), +30 (−214), −133 (−75); 7–14 settings per
+  fold. Pooled 483 vs Core 417: +66, 90 % [−76, +214], 3 of 4 quarters won, max DD −₹10,649 (Core
+  −₹10,688; fixed window −₹13,973). Wins three quarters and keeps the drawdown at Core's level, but the
+  pooled gain is no larger than the fixed window's (+70) and its interval includes zero. By the
+  registered rule BL-116 runs both schemes. Both re-selected versions trail the frozen T1 sets (+341,
+  +241, +343, −10) and both lose the latest quarter.
 
 ## Log
 
