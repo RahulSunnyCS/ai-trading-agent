@@ -195,6 +195,28 @@ were simulated on its pick day for the net comparison.
 - **Known weaknesses:** more candidates mean more chances to fit noise in the selection year; the
   first-half / second-half check is the guard.
 
+## Experiment 5 — book overlays on T1's Adaptive picks (registered 2026-10-16, before any run)
+
+- **What:** the day's T1 Adaptive picks (list C over Core-298 + T1, no weight) as one book, minute by
+  minute (BL-095 `portfolio.apply_book`; each pick 1 lot unless sized), gross.
+- **Grid:** book stop {none, ₹6,000, ₹8,000, ₹10,000} × profit lock {none, lock ₹3,000 once the book
+  is +₹6,000, lock ₹4,000 once +₹8,000} × sizing {1-1-1, 2-1-1: 2 lots on the highest-scored core
+  pick}.
+- **Choose on the first year** (2025-01-10 → 2025-10-08, after the warm-up; T1 is in-sample there):
+  the combination with the best Calmar (annualised book P&L ÷ |max drawdown|) whose total is at least
+  95 % of the plain book's (no stop, no lock, 1-1-1). **Check once on the test year.**
+- **Pass rule:** in the test year the chosen combination's Calmar beats the plain book's AND its total
+  is at least 95 % of the plain total. Otherwise no overlay.
+
+## Experiment 6 — picker mix (registered 2026-10-16, before any run)
+
+- **Rules compared:** (a) today: 3 core picks with at least 2 Widesl, + 1 Buy if in the top 10;
+  (b) at least 1 Widesl; (c) 4 core picks with at least 2 Widesl. Adaptive weights and lookbacks
+  unchanged; universes Core-298 and Core-298 + T1; first year shown, test year judged.
+- **Pass rule (per universe):** a rule replaces (a) only if its test-year mean gross per lot-day minus
+  (a)'s has a 90 % block-bootstrap interval above zero and its max drawdown per lot is no worse.
+  Two alternatives are tested, so the stricter 95 % interval is also reported.
+
 ## Log
 
 - 2026-10-16 — created from the owner's request; Phase 0 registered before the first-year selection
