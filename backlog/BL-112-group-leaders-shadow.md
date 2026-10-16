@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner will follow only Adaptive and wants two universes side by side |
-| **Status** | Planned |
+| **Status** | Superseded 2026-10-16 by [BL-113](BL-113-t1-parallel-track.md) (owner: track T1 only) |
 | **Type** | feature |
 | **Area** | options |
 | **Created** | 2026-10-16 |
@@ -150,3 +150,12 @@ descriptively at 60 on-time days and decisively at 250.
   return plus a drawdown margin, decision moved from 60 to 250 days after the power check; pool
   freezing, paired-day rules, isolation traps and the shadow/Shadow and Core/core name collisions
   recorded.
+
+## Superseded (2026-10-16)
+
+Owner: track **T1** only. On the same 239 test days and replay, Adaptive over Group Leaders v1
+(New-556) made 319 gross per lot-day against Core-298's 417 (−98, 90 % [−300, +80]); over Core plus
+Group Leaders 340 (−77). Adaptive over T1 (Core-298 plus nine time-generic settings, chosen on the
+first year only) made 640 (+223, 90 % [+82, +361]) with a shallower drawdown. BL-113 builds the
+parallel track for T1 with the same isolation this item planned (own folder and journal, after the
+live pick); a Group Leaders track can reuse it later (`--track`) if ever wanted.

@@ -38,25 +38,25 @@ def days_path(root: Path | None = None) -> Path:
     return rotation_dir(root) / "days.csv"
 
 
-def journal_path(root: Path | None = None, universe: str | None = None) -> Path:
-    """The live journal, or a shadow universe's own (never the same file)."""
-    if universe:
-        return shadow_dir(universe, root) / "journal.jsonl"
+def journal_path(root: Path | None = None, track: str | None = None) -> Path:
+    """The live journal, or a parallel track's own (never the same file)."""
+    if track:
+        return track_dir(track, root) / "journal.jsonl"
     return rotation_dir(root) / "journal.jsonl"
 
 
-def shadow_dir(universe: str, root: Path | None = None) -> Path:
-    """A shadow universe's own folder: its extra variants' results and its journal. The live
+def track_dir(track: str, root: Path | None = None) -> Path:
+    """A parallel track's own folder: its extra variants' results and its journal. The live
     results folder (Strategy Matrix, `rotation corr`) never sees them."""
-    return rotation_dir(root) / f"shadow_{universe}"
+    return rotation_dir(root) / f"track_{track}"
 
 
 def result_path(name: str, root: Path | None = None) -> Path:
-    """Where a variant's results live: the live folder for Core-298, its shadow's for the rest."""
-    from .variants import shadow_of
+    """Where a variant's results live: the live folder for Core-298, its track's for the rest."""
+    from .variants import track_of
 
-    universe = shadow_of(name)
-    folder = shadow_dir(universe, root) / "results" if universe else results_dir(root)
+    track = track_of(name)
+    folder = track_dir(track, root) / "results" if track else results_dir(root)
     return folder / f"{name}.csv"
 
 

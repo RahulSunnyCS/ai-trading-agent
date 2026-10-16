@@ -75,11 +75,11 @@ describe('job registry', () => {
   });
 });
 
-describe('T1 forward shadow', () => {
-  it('records the live pick before the shadow pick, and updates the shadow after the evening run', () => {
+describe('T1 parallel track', () => {
+  it('records the live pick before the track pick, and updates the track after the evening run', () => {
     const pick = JOBS.find((job) => job.id === 'options-rotation-pick');
     expect(pick?.steps[0]).toEqual(['uv', 'run', 'obt', 'rotation', 'pick']);
-    expect(pick?.steps[1]).toEqual(['uv', 'run', 'obt', 'rotation', 'pick', '--universe', 't1']);
+    expect(pick?.steps[1]).toEqual(['uv', 'run', 'obt', 'rotation', 'pick', '--track', 't1']);
     const t1 = JOBS.find((job) => job.id === 'options-rotation-t1-update');
     expect(t1?.schedule.at).toBe('21:00');
     expect(t1?.steps).toEqual([
@@ -91,7 +91,7 @@ describe('T1 forward shadow', () => {
         'obt',
         'rotation',
         'update',
-        '--universe',
+        '--track',
         't1',
       ],
     ]);

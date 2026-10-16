@@ -42,7 +42,7 @@ def default_day(
 
 
 def backfill_days(names: list[str], root: Path | None = None) -> list[date]:
-    """Every day Core-298 has stored where any of `names` has not: a shadow universe's history is
+    """Every day Core-298 has stored where any of `names` has not: a parallel track's history is
     built over exactly the live history's days (so the two rank on the same rows)."""
     root = root or data_dir()
     core_days = store.result_days(variant_names()[0], root)

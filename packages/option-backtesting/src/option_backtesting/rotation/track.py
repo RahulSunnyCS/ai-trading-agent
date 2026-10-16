@@ -1,11 +1,11 @@
-"""A shadow universe's forward read-out: its list against the live list on the same forward days.
+"""A parallel track's forward read-out: its list against the live list on the same forward days.
 
 T1 (owner, 2026-10-16): Core-298 plus the BL-104 time-generic settings; Adaptive only, recorded in
-its own journal (`rotation/shadow_t1/journal.jsonl`) before 09:17 like the live list, never traded.
-The registered read-out (60 forward days, BL-058 style): the shadow's Adaptive minus the live
+its own journal (`rotation/track_t1/journal.jsonl`) before 09:17 like the live list, never traded.
+The registered read-out (60 forward days, BL-058 style): the track's Adaptive minus the live
 Adaptive, ₹ per lot-day (the mean of the picks' one-lot gross), a two-sided 90% interval from the
 same circular 5-day block bootstrap as `readout`, and the pass rule: the interval's lower bound
-above zero AND the shadow's max drawdown per lot no worse than the live list's. Read-only.
+above zero AND the track's max drawdown per lot no worse than the live list's. Read-only.
 """
 
 from __future__ import annotations
@@ -37,22 +37,22 @@ def _per_lot_day(entry: dict, root: Path, cache: dict[str, dict[date, float]]) -
     return float(np.mean(values))
 
 
-def build(universe: str, root: Path | None = None) -> dict:
-    """{days, shadow, live, diff, ...} over the forward days both journals hold (each recorded
+def build(track: str, root: Path | None = None) -> dict:
+    """{days, track, live, diff, ...} over the forward days both journals hold (each recorded
     before 09:17) whose picks are all scored."""
     root = root or data_dir()
     live = {
         e["day"]: e for e in journal.read(store.journal_path(root)) if e.get("before_first_entry")
     }
-    shadow = {
+    tracked = {
         e["day"]: e
-        for e in journal.read(store.journal_path(root, universe))
+        for e in journal.read(store.journal_path(root, track))
         if e.get("before_first_entry")
     }
     cache: dict[str, dict[date, float]] = {}
     days, s_vals, l_vals, pending = [], [], [], []
-    for day in sorted(set(live) & set(shadow)):
-        s = _per_lot_day(shadow[day], root, cache)
+    for day in sorted(set(live) & set(tracked)):
+        s = _per_lot_day(tracked[day], root, cache)
         lv = _per_lot_day(live[day], root, cache)
         if s is None or lv is None:
             pending.append(day)
@@ -62,10 +62,10 @@ def build(universe: str, root: Path | None = None) -> dict:
         l_vals.append(lv)
     s_arr, l_arr = np.array(s_vals), np.array(l_vals)
     out: dict = {
-        "universe": universe,
+        "track": track,
         "days": days,
         "pending": pending,
-        "shadow_only": sorted(set(shadow) - set(live)),
+        "track_only": sorted(set(tracked) - set(live)),
         "n": len(days),
         "judged_at": READOUT_DAYS,
     }
@@ -77,9 +77,9 @@ def build(universe: str, root: Path | None = None) -> dict:
             else (float(diff[0]), float("nan"), float("nan"))
         )
         out.update(
-            shadow_per_lot_day=float(s_arr.mean()),
+            track_per_lot_day=float(s_arr.mean()),
             live_per_lot_day=float(l_arr.mean()),
-            shadow_max_dd=max_drawdown(s_arr),
+            track_max_dd=max_drawdown(s_arr),
             live_max_dd=max_drawdown(l_arr),
             diff=mean,
             lo90=lo,
@@ -92,7 +92,7 @@ def build(universe: str, root: Path | None = None) -> dict:
 
 
 def render(r: dict) -> str:
-    u = r["universe"].upper()
+    u = r["track"].upper()
     if not r["n"]:
         return (
             f"SHADOW {u}: no forward day with both entries scored yet (pending {len(r['pending'])})"
@@ -104,9 +104,9 @@ def render(r: dict) -> str:
     )
     return "\n".join(
         [
-            f"SHADOW {u} vs live Adaptive, {r['days'][0]} -> {r['days'][-1]}: {status}",
-            f"  {u} Adaptive   ₹{r['shadow_per_lot_day']:,.0f} per lot-day   "
-            f"max drawdown ₹{r['shadow_max_dd']:,.0f}",
+            f"{u} TRACK vs live Adaptive, {r['days'][0]} -> {r['days'][-1]}: {status}",
+            f"  {u} Adaptive   ₹{r['track_per_lot_day']:,.0f} per lot-day   "
+            f"max drawdown ₹{r['track_max_dd']:,.0f}",
             f"  live Adaptive  ₹{r['live_per_lot_day']:,.0f} per lot-day   "
             f"max drawdown ₹{r['live_max_dd']:,.0f}",
             f"  {u} minus live  {r['diff']:+,.0f} per lot-day, "

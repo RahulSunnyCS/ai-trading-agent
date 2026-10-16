@@ -1,6 +1,6 @@
 """`obt rotation …`: update | pick | verify | show | readout | base (BL-058); triggers,
-triggers-show (BL-083); corr, corr-list, corr-pick (BL-090); update / pick --universe t1 and
-shadow-readout (the T1 forward shadow)."""
+triggers-show (BL-083); corr, corr-list, corr-pick (BL-090); update / pick --track t1 and
+track-readout (the T1 parallel track)."""
 
 from __future__ import annotations
 
@@ -35,33 +35,33 @@ def _day(text: str | None) -> date:
 @rotation_app.command()
 def update(
     day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
-    universe: str = typer.Option(
-        None, "--universe", help="A shadow universe (t1): run only its extra variants."
+    track: str = typer.Option(
+        None, "--track", help="A parallel track (t1): run only its extra variants."
     ),
     backfill: bool = typer.Option(
-        False, "--backfill", help="With --universe: every day Core-298 has that the shadow lacks."
+        False, "--backfill", help="With --track: every day Core-298 has that the track lacks."
     ),
 ) -> None:
     """Run all 298 variants over one collected day and store the results (idempotent)."""
     from .update import backfill_days, default_day, update_day
-    from .variants import shadow_names
+    from .variants import track_names
 
-    if universe:
-        # A shadow universe's extra variants only: no base or trigger scoring, never the live files.
-        names = shadow_names(universe)
+    if track:
+        # A parallel track's extra variants only: no base or trigger scoring, never the live files.
+        names = track_names(track)
         days = (
             backfill_days(names) if backfill else [_day(day) if day else default_day(names=names)]
         )
         days = [d for d in days if d is not None]
         if not days:
-            typer.echo(f"{universe}: nothing to update")
+            typer.echo(f"{track}: nothing to update")
             return
         failed = 0
         for d in days:
             r = update_day(d, names=names, log=typer.echo)
             if r["skipped"] or r["errors"]:
                 failed += 1
-                typer.echo(f"{universe} {d}: {r['skipped'] or r['errors'][:3]}", err=True)
+                typer.echo(f"{track} {d}: {r['skipped'] or r['errors'][:3]}", err=True)
         if failed and not backfill:
             raise typer.Exit(2)
         return
@@ -108,8 +108,8 @@ def pick(
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Score and print; write nothing."),
     telegram: bool = typer.Option(True, "--telegram/--no-telegram"),
-    universe: str = typer.Option(
-        None, "--universe", help="A shadow universe (t1): its own journal, private Telegram only."
+    track: str = typer.Option(
+        None, "--track", help="A parallel track (t1): its own journal, private Telegram only."
     ),
 ) -> None:
     """Record today's picks for every list (before 09:17), hash-chained, and Telegram them."""
@@ -119,7 +119,7 @@ def pick(
 
     d = _day(day)
 
-    tag = f"SHADOW {universe.upper()} " if universe else ""
+    tag = f"{track.upper()} TRACK " if track else ""
 
     def alert(title: str, body: str) -> None:
         if telegram and not dry_run:
@@ -130,7 +130,7 @@ def pick(
             )
 
     try:
-        r = record(d, vix_open=vix_open, dry_run=dry_run, universe=universe)
+        r = record(d, vix_open=vix_open, dry_run=dry_run, track=track)
     except AlreadyRecorded as error:  # a retry after a success: the day has its entry
         typer.echo(f"already recorded: {error}")
         return
@@ -151,20 +151,20 @@ def pick(
             title=f"{tag}Rotation picks {d}",
             body=r.text,
         )
-        if universe:
-            send(notification)  # a shadow is private: never the friends' group
+        if track:
+            send(notification)  # a track is private: never the friends' group
         else:
             _send_private_and_group(notification)
 
 
-@rotation_app.command("shadow-readout")
-def shadow_readout(
-    universe: str = typer.Option("t1", "--universe", help="The shadow universe."),
+@rotation_app.command("track-readout")
+def track_readout(
+    track: str = typer.Option("t1", "--track", help="The parallel track."),
 ) -> None:
-    """A shadow universe's Adaptive against the live Adaptive over the forward days (read-only)."""
-    from .shadow_universe import build, render
+    """A parallel track's Adaptive against the live Adaptive over the forward days (read-only)."""
+    from .track import build, render
 
-    typer.echo(render(build(universe)))
+    typer.echo(render(build(track)))
 
 
 @rotation_app.command()

@@ -21,7 +21,7 @@ from .dte import DTE_BASIS
 from .lists import DISPLAY_NAMES, LISTS, LOTS_PER, PUBLIC_KEYS, WARMUP
 from .live import listed_dte_labels, vix_open_with_source
 from .score import composite, dte_matrix, family_index, runners_up, select, vix_band
-from .variants import shadow_names, variant_names
+from .variants import track_names, variant_names
 
 IST = ZoneInfo("Asia/Kolkata")
 FIRST_ENTRY = time(9, 17)
@@ -189,8 +189,8 @@ def score_lists(
     return score_history(hist, day, vix_open, dte)
 
 
-#: A shadow universe records only these lists (owner, 2026-10-16: Adaptive only for T1).
-SHADOW_LISTS = {"t1": ("C",)}
+#: A parallel track records only these lists (owner, 2026-10-16: Adaptive only for T1).
+TRACK_LISTS = {"t1": ("C",)}
 
 
 def record(
@@ -199,17 +199,17 @@ def record(
     vix_open: float | None = None,
     now_fn: Callable[[], datetime] = lambda: datetime.now(IST),
     dry_run: bool = False,
-    universe: str | None = None,
+    track: str | None = None,
 ) -> PickResult:
-    """Score and append today's entry. `universe` (e.g. "t1") records a shadow universe instead:
+    """Score and append today's entry. `track` (e.g. "t1") records a parallel track instead:
     Core-298 plus its extra variants, only its own lists, in its own journal; the live journal is
-    never touched by a shadow run."""
+    never touched by a track run."""
     root = root or data_dir()
     if not dry_run and day != now_fn().astimezone(IST).date():
         raise PickError(f"{day} is not today (IST): an entry can only be recorded on its own day")
     # everything slow and VIX-independent first: the 09:15 bar is served a few seconds after the
     # job starts, and only the band depends on it
-    names = variant_names() + (shadow_names(universe) if universe else [])
+    names = variant_names() + (track_names(track) if track else [])
     dte, dte_source = listed_dte_labels(day)
     commit = code_commit()
     hist = load_history(day, root, names)
@@ -219,8 +219,8 @@ def record(
     if vix_open is None:
         raise PickError(f"the 09:15 India VIX open for {day} could not be read; nothing recorded")
     lists = score_history(hist, day, vix_open, dte)
-    if universe:
-        lists = {k: v for k, v in lists.items() if k in SHADOW_LISTS[universe]}
+    if track:
+        lists = {k: v for k, v in lists.items() if k in TRACK_LISTS[track]}
     fields = {
         "v": 3,
         "day": day.isoformat(),
@@ -238,9 +238,9 @@ def record(
         "inputs_days": len(hist.days),
         "lots_per_strategy": LOTS_PER,
     }
-    if universe:
-        fields["shadow"] = universe
-    path = store.journal_path(root, universe)
+    if track:
+        fields["track"] = track
+    path = store.journal_path(root, track)
     stamp = now_fn().astimezone(IST)  # taken right before the write, so the flag describes it
     fields["recorded_at"] = stamp.isoformat(timespec="seconds")
     fields["before_first_entry"] = stamp.time() < FIRST_ENTRY
@@ -249,8 +249,8 @@ def record(
     else:
         entry = journal.append(path, fields)
     options = next_best(hist, day, vix_open, dte)
-    if universe:
-        options = {k: v for k, v in options.items() if k in SHADOW_LISTS[universe]}
+    if track:
+        options = {k: v for k, v in options.items() if k in TRACK_LISTS[track]}
     return PickResult(entry, render(entry, options))
 
 
@@ -265,8 +265,8 @@ def next_best_line(options: dict[str, str | None] | None) -> str:
 
 
 def render(entry: dict, options: dict[str, dict[str, str | None]] | None = None) -> str:
-    shadow = entry.get("shadow")
-    title = f"SHADOW {shadow.upper()} picks (not traded)" if shadow else "Rotation picks"
+    track = entry.get("track")
+    title = f"{track.upper()} TRACK picks (not traded)" if track else "Rotation picks"
     lines = [f"{title} {entry['day']} ({entry['weekday']})"]
     for key, p in entry["lists"].items():
         if key not in PUBLIC_KEYS:  # Steady and Adaptive only; the entry still records every list

@@ -1,5 +1,5 @@
-# T1 forward shadow (BL-104 time-generic setting #4: N_wide expiry-day winner,
-# chosen on 2024-10-09 -> 2025-10-08 only). Frozen: never edit; read by `obt rotation update/pick --universe t1`.
+# T1 parallel track (BL-104 time-generic setting #4: N_wide expiry-day winner,
+# chosen on 2024-10-09 -> 2025-10-08 only). Frozen: never edit; read by `obt rotation update/pick --track t1`.
 strategy:
   id: N_wide-t1s4_1102
   underlying: NIFTY
