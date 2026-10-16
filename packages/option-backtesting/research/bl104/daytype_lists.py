@@ -90,7 +90,16 @@ FAMILIES = [
     Family("NIFTY_Buy_premium", "B", "N", None, (("N_buy", None, None),), (20, 30, 50, 75, 100)),
     Family("SENSEX_Buy_premium", "B", "S", None, (("S_buy", None, None),), (30, 50, 90, 150, 225)),
 ]
-TAGS = ("stage1", "daytype", "premium_coarse", "premium_refine", "slots12")  # searched in order
+TAGS = ("stage1", "daytype", "premium_coarse", "premium_refine", "slots12", "edges")  # searched in order
+#: Experiment 4 (grid edges): off unless switched on, so every earlier run reads exactly as before.
+EDGES = False
+EDGE_MTM = {"W": (5000, 6000), "D": (5000, 6000)}
+EDGE_PREMIUMS = {
+    "NIFTY_Widesl_premium": (210, 250),
+    "SENSEX_Widesl_premium": (560, 640),
+    "NIFTY_Buy_premium": (150, 200),
+    "SENSEX_Buy_premium": (400, 500),
+}
 PREMIUM_DUP_CORR = 0.9  # Amendment 2: a later premium pick is dropped only as a near-duplicate
 GRID_STRIKE_FOR_OFFGRID = {"W": "OTM1", "B": "ATM"}  # how the off-grid cells were generated
 
@@ -164,8 +173,12 @@ def candidates(f: Family, slot: str) -> list[tuple[dict, str, dict]]:
     base_strike = {"W": "OTM1", "B": "ATM"}.get(f.fam)
     grid_names = {v: k for k, v in grid.PREMIUM.get(f.fam, {}).get(grid.INDICES[f.idx], {}).items()}
     premiums = sorted(set(f.premiums) | set(refined_premiums(f, slot))) if f.is_premium else []
-    for c in grid.cells(f.fam, f.idx, slot, with_template=False):
-        p = c.params
+    if EDGES and f.is_premium:
+        premiums = sorted(set(premiums) | set(EDGE_PREMIUMS[f.name]))
+    base = [c.params for c in grid.cells(f.fam, f.idx, slot, with_template=False)]
+    if EDGES and f.fam in EDGE_MTM:
+        base += [{**p, "mtm": m} for p in base if p["mtm"] == 4000 for m in EDGE_MTM[f.fam]]
+    for p in base:
         if f.fam in ("W", "D") and p["mtm"] is None:
             continue
         if not f.is_premium:
@@ -188,6 +201,8 @@ def neighbours(f: Family, p: dict) -> list[dict]:
     for axis, chains in grid.CHAINS[f.fam].items():
         if axis == "strike":
             continue
+        if EDGES and axis == "mtm" and f.fam in EDGE_MTM:
+            chains = tuple(tuple(c) + EDGE_MTM[f.fam] for c in chains)
         for chain in chains:
             if p[axis] in chain:
                 i = chain.index(p[axis])
@@ -610,6 +625,11 @@ def main() -> None:
         assert WINDOW == "first"
         OUT = RESULTS / "daytype_fy"
         write = False  # selection only: no strategy files, no README
+    if "--edges" in sys.argv:  # Experiment 4: the widened grid
+        global EDGES
+        EDGES = True
+        OUT = OUT.parent / f"{OUT.name}_edges"
+        write = False
     exp = expiries()
     OUT.mkdir(parents=True, exist_ok=True)
     winners: list[dict] = []
