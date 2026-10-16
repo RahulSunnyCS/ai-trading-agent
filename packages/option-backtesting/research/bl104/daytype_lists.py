@@ -243,9 +243,12 @@ def describe(st: LegwiseStrategy, fam: str) -> dict[str, str]:
     }
     rb = legs[0].range_breakout
     if rb is not None:
+        def minutes(t: str) -> int:
+            return int(t[:2]) * 60 + int(t[3:])
+
         d["range"] = (
-            f"until {rb.until} on {rb.source}, {rb.side} side, gap {rb.gap_percent:g}%"
-            + (f", valid until {rb.valid_until}" if rb.valid_until else "")
+            f"{minutes(rb.until) - minutes(st.entry_time)} min after entry on {rb.source}, {rb.side} side, "
+            f"gap {rb.gap_percent:g}%" + (f", valid until {rb.valid_until}" if rb.valid_until else "")
         )
     return d
 
@@ -574,7 +577,9 @@ def refine_cells() -> None:
 
 
 def describe_params(f: Family, params: Any, slots: tuple[str, ...] = ALL_SLOTS) -> dict[str, str]:
-    st = build(f, slots[0], None if params == "template" else params)
+    """`params` "template" describes the family's own first template file (strike-swapped where it
+    has one: N_ditm1 is ITM1, the NIFTY premium family ₹80)."""
+    st = build(f, slots[0], f.templates[0][2] if params == "template" else params)
     d = describe(st, f.fam)
     d["entry"] = ", ".join(slots)
     return d
@@ -619,6 +624,7 @@ def main() -> None:
             tmpl = agg["__template__"]
             for rank, r in enumerate(dec["picks"], 1):
                 params = None if r.get("is_template") else r["params"]
+                tmpl_params_first = _template_params(f, results, slots[0], kind)
                 files = []
                 winners.append({
                     "family": f.name, "fam": f.fam, "index": f.idx, "kind": kind, "band": band,
@@ -629,7 +635,8 @@ def main() -> None:
                     st = build(f, slot, params if params is not None else _template_params(f, results, slot, kind))
                     text = one_line(describe(st, f.fam))
                     files.append(str(write_yaml(f, slot, kind, st, dec["status"], text).relative_to(PACKAGE)))
-                desc = describe_params(f, params if params is not None else "template", slots)
+                desc = (describe_params(f, params, slots) if params is not None else
+                        describe(build(f, slots[0], tmpl_params_first), f.fam) | {"entry": ", ".join(slots)})
                 lists[kind].append({
                     "family": f.name, "band": band, "pick": rank, "status": dec["status"], **desc,
                     "net_per_lot_day": round(r["net"]), "net_first_year": round(r["net_first"]),
