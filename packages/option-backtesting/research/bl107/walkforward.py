@@ -36,6 +36,14 @@ FOLDS = [  # (fold, select start, half, select end exclusive, trade start, trade
     (4, date(2025, 7, 1), date(2025, 12, 31), date(2026, 7, 1), date(2026, 7, 1), date(2026, 10, 10)),
 ]
 VARIANTS = (1, 2)
+# Experiment 8: the same quarters, each selected on everything from 2024-10-09 up to its start
+# (ranked on the first half, confirmed on the second); variant 1 only.
+EXPANDING = [
+    (1, date(2024, 10, 9), date(2025, 4, 9), date(2025, 10, 9), date(2025, 10, 9), date(2026, 1, 1)),
+    (2, date(2024, 10, 9), date(2025, 5, 21), date(2026, 1, 1), date(2026, 1, 1), date(2026, 4, 1)),
+    (3, date(2024, 10, 9), date(2025, 7, 5), date(2026, 4, 1), date(2026, 4, 1), date(2026, 7, 1)),
+    (4, date(2024, 10, 9), date(2025, 8, 20), date(2026, 7, 1), date(2026, 7, 1), date(2026, 10, 10)),
+]
 ALL25 = [f"{h:02d}:{m:02d}" for h in range(9, 16) for m in (2, 17, 32, 47) if (9, 17) <= (h, m) <= (15, 17)]
 LETTER = {"W": "w", "D": "d", "B": "b"}
 TAG = {"expiry": "E", "other": "O"}
@@ -173,13 +181,15 @@ def stage_replay() -> None:
         rec["core_maxdd"] = max_drawdown(core)
         rows.append(rec)
         print(f"fold {fold}: {len(trade)} days  Core {rec['core']:.0f}  v1 {rec['v1']:.0f} ({rec['v1_settings']} settings)"
-              f"  v2 {rec['v2']:.0f} ({rec['v2_settings']} settings)", flush=True)
+              + (f"  v2 {rec['v2']:.0f} ({rec['v2_settings']} settings)" if 2 in VARIANTS else ""), flush=True)
     core = np.array(pooled["core"])
     print(f"\nWalk-forward, Adaptive gross per lot-day, {len(core)} days over 4 quarters")
     print(f"{'fold':>4s}{'days':>6s}{'Core':>8s}{'v1':>8s}{'v1-Core':>9s}{'v2':>8s}{'v2-Core':>9s}{'v1 n':>6s}{'v2 n':>6s}")
     for r in rows:
+        v2 = (f"{r['v2']:8.0f}{r['v2'] - r['core']:+9.0f}" if 2 in VARIANTS else f"{'-':>8s}{'-':>9s}")
+        n2 = r["v2_settings"] if 2 in VARIANTS else 0
         print(f"{r['fold']:4d}{r['days']:6d}{r['core']:8.0f}{r['v1']:8.0f}{r['v1'] - r['core']:+9.0f}"
-              f"{r['v2']:8.0f}{r['v2'] - r['core']:+9.0f}{r['v1_settings']:6d}{r['v2_settings']:6d}")
+              f"{v2}{r['v1_settings']:6d}{n2:6d}")
     verdict = {}
     for v in VARIANTS:
         g = np.array(pooled[v])
@@ -189,9 +199,10 @@ def stage_replay() -> None:
         print(f"variant {v}: pooled {g.mean():.0f} vs Core {core.mean():.0f}: diff {mean:+.0f} 90% [{lo:+.0f}, {hi:+.0f}]"
               f"  quarters won {wins}/4  maxDD {max_drawdown(g):,.0f} (Core {max_drawdown(core):,.0f})"
               f"  -> {'PASS' if verdict[v] else 'no pass'}")
-    mean, lo, hi = block_bootstrap_mean(np.array(pooled[2]) - np.array(pooled[1]))
-    print(f"variant 2 minus variant 1: {mean:+.0f} 90% [{lo:+.0f}, {hi:+.0f}]"
-          f" -> {'variant 2 preferred' if lo > 0 else 'variant 1 (the simpler) stands'}")
+    if 2 in VARIANTS:
+        mean, lo, hi = block_bootstrap_mean(np.array(pooled[2]) - np.array(pooled[1]))
+        print(f"variant 2 minus variant 1: {mean:+.0f} 90% [{lo:+.0f}, {hi:+.0f}]"
+              f" -> {'variant 2 preferred' if lo > 0 else 'variant 1 (the simpler) stands'}")
     with (RES / "summary.csv").open("w", newline="") as h:
         w = csv.DictWriter(h, fieldnames=list(rows[0]))
         w.writeheader()
@@ -202,7 +213,13 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", default="all", choices=("select", "cells", "sim", "replay", "all"))
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--scheme", default="fixed", choices=("fixed", "expanding"))
     args = ap.parse_args()
+    if args.scheme == "expanding":
+        global FOLDS, VARIANTS, RES, SIM
+        FOLDS, VARIANTS = EXPANDING, (1,)
+        RES = HERE / "results" / "walkforward_expanding"
+        SIM = RES / "sim"
     if args.stage in ("select", "all"):
         stage_select()
     if args.stage in ("cells", "all"):

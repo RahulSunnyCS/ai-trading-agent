@@ -291,6 +291,31 @@ were simulated on its pick day for the net comparison.
   margin up to 0.61) but cut net by 19–33 %, barely moved the worst day (−₹12.6k to −₹13.8k) and made the
   drawdown deeper (−₹34k to −₹35k).
 
+## Experiment 8 — walk-forward with a growing selection window (registered 2026-10-17, before any fold was selected)
+
+- **Owner (2026-10-17):** after Experiment 3, check whether selecting on more history gives steadier picks,
+  as a cheap step before the 4-year NIFTY walk-forward (BL-116).
+- **Same as Experiment 3** (quarters traded, selection method, 25 entry times, Adaptive list C, gross,
+  Core-298 on the same days) **except the window:** each quarter is selected on everything from 2024-10-09
+  up to its start, ranked on the first half and confirmed on the second half. Variant 1 only (one
+  setting per family and day type; Experiment 3 preferred it).
+
+  | Fold | Select (rank half → confirm half) | Trade |
+  |---|---|---|
+  | 1 | 2024-10-09 → 2025-04-09 → 2025-10-08 (same as Experiment 3) | 2025-10-09 → 2025-12-31 |
+  | 2 | 2024-10-09 → 2025-05-21 → 2025-12-31 | 2026-01-01 → 2026-03-31 |
+  | 3 | 2024-10-09 → 2025-07-05 → 2026-03-31 | 2026-04-01 → 2026-06-30 |
+  | 4 | 2024-10-09 → 2025-08-20 → 2026-06-30 | 2026-07-01 → 2026-10-09 |
+
+- **Pass rule (Experiment 3's):** beats Core in ≥ 3 of the 4 quarters and the pooled 90 % block-bootstrap
+  interval is above zero. Descriptive beside it: Experiment 3's fixed-window variant 1 and the frozen T1
+  sets, quarter by quarter. Read once. The growing window becomes BL-116's primary scheme only if it
+  passes or beats the fixed window pooled; otherwise BL-116 runs both.
+- **Known weaknesses:** fold 1 is identical to Experiment 3's; the windows overlap heavily, so the folds
+  are not independent; the frozen T1 quarter-by-quarter figures were seen before this was registered.
+- `research/bl107/walkforward.py --scheme expanding --stage all --workers 2` →
+  `results/walkforward_expanding/`.
+
 ## Log
 
 - 2026-10-16 — created from the owner's request; Phase 0 registered before the first-year selection
