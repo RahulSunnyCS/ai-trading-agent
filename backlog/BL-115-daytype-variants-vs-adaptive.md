@@ -265,6 +265,14 @@ were simulated on its pick day for the net comparison.
 - **Pass rule on the test year:** worst day and worst-5-days sum improve by at least 30 %, net P&L falls by
   at most 15 %, and net return on margin rises. Otherwise no wings.
 
+- **Result (2026-10-17): no wings.** `research/bl107/wings.py`, net of charges, 1 lot per pick. No wing
+  variant kept 85 % of the first year's unwinged net (₹2,15,995; the best, NIFTY ₹5 / SENSEX ₹15 on
+  expiry days only, ₹1,59,838 = 74 %), so nothing was chosen and the refine step did not run. Test year,
+  descriptive: unwinged net ₹3,65,415, mean margin ₹7,02,736, return on margin 0.52, worst day −₹14,173,
+  worst 5 days −₹58,294, max drawdown −₹26,715. Wings on all days cut margin to ₹4.4–4.8 lakh (return on
+  margin up to 0.61) but cut net by 19–33 %, barely moved the worst day (−₹12.6k to −₹13.8k) and made the
+  drawdown deeper (−₹34k to −₹35k).
+
 ## Log
 
 - 2026-10-16 — created from the owner's request; Phase 0 registered before the first-year selection
