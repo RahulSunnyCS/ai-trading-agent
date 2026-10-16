@@ -3324,6 +3324,26 @@ def _order_prices(
     return prices, (f"live {fyers.price_label(creds)} quotes" if live else "last close")
 
 
+def _find_favourite(favourites: list[dict], text: str) -> tuple[dict | None, str | None]:
+    """A favourite by id, exact name, or part of a name: (favourite, None), or (None, why not).
+    Exact matches win; among partial ones a group beats its own sleeves (which share its name)
+    but two different groups are ambiguous and are listed instead of guessing."""
+    wanted = text.strip().lower()
+    exact = [f for f in favourites if f["id"] == text or f["name"].lower() == wanted]
+    matches = exact or [f for f in favourites if wanted in f["name"].lower()]
+    groups_only = [f for f in matches if f.get("group")]
+    pool = groups_only or matches
+    if len(pool) == 1:
+        return pool[0], None
+    if not pool:
+        return None, f"No favourite matches '{text}'."
+    names = "; ".join(f["name"] for f in pool[:6])
+    return (
+        None,
+        f"'{text}' matches {len(pool)} favourites ({names}). Give more of the name or its id.",
+    )
+
+
 def _compute_orders(
     trigger: str = "manual", *, start_fresh: bool = False, favourite: str | None = None
 ) -> dict:
@@ -3340,6 +3360,9 @@ def _compute_orders(
     # On a Friday this is that Friday; on any other day, the coming one.
     target_week = pd.Timestamp(week_ending_on_or_before(today + timedelta(days=6)))
     # The paper start Friday is the first week of the portfolio: nothing is held going into it.
+    # An explicit ask for it needs the paper source; the automatic one never overrides real
+    # holdings (a synced Fyers portfolio is what it is).
+    explicit_fresh = start_fresh
     start_fresh = start_fresh or this_week.paper_start() == journal_week_string(target_week)
     try:
         with read_catalog() as con:
@@ -3352,14 +3375,19 @@ def _compute_orders(
     except FileNotFoundError:  # no catalog yet: no favourites either
         favourites = []
     if favourite:
-        wanted = favourite.lower()
-        matches = [f for f in favourites if f["id"] == favourite or wanted in f["name"].lower()]
-        # A group is the favourite; its sleeves match the same name but are not planned alone.
-        headline = next((f for f in matches if f.get("group")), None) or next(iter(matches), None)
+        headline, problem = _find_favourite(favourites, favourite)
+        if problem:
+            return {"week": journal_week_string(target_week), "error": problem}
     else:
         headline = next((f for f in favourites if f["active"]), None)
     if headline is None:
         return {"week": journal_week_string(target_week), "error": "No headline favourite."}
+    if explicit_fresh and settings["holdings_source"] != "paper":
+        return {
+            "week": journal_week_string(target_week),
+            "error": "--fresh plans from cash against the paper portfolio, but your holdings "
+            f"source is '{settings['holdings_source']}'. Change it to 'paper' or drop --fresh.",
+        }
     members = groups.get(headline["id"], {}).get("members", [])
     signal, kind, reason, rankings = _orders_signal(headline, members, target_week)
     payload: dict = {
