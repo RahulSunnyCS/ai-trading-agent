@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — owner's idea; builds on BL-110; a close cousin of BL-053 (killed) |
-| **Status** | Planned (Phase 0); Amendment A1 (T1 rank ladder) registered 2026-10-17 |
+| **Status** | Planned (Phase 0); Amendment A1 (T1 rank ladder) killed 2026-10-17 |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-15 |
@@ -180,6 +180,24 @@ unchanged and still pending; this arm neither replaces nor decides them.
 - **Script.** `packages/option-backtesting/research/bl107/lot_ladder.py` (BL-115's replay harness and
   simulations live in that folder).
 
+- **Result (2026-10-17): killed — keep 3 picks × 2 lots.** 423 replay days (184 first year, 239 test
+  year); 3,184 picks re-simulated, none differing from the stored one-lot result by more than ₹1.
+
+  | T1, 6 lots every day, test year | Net total | Net / lot-day | Gross / lot-day | Max DD (net) | Net vs E / day, 90 % |
+  |---|---|---|---|---|---|
+  | E: 3 picks (≥ 2 Widesl) × 2 | ₹8,26,402 | 576 | 671 | −₹50,267 | |
+  | L2: 4 picks (≥ 2 Widesl), 2-2-1-1 | ₹7,77,717 | 542 | 667 | −₹66,002 | −204 [−682, +265] |
+  | L1: 4 picks (≥ 1 Widesl), 2-2-1-1 | ₹6,84,344 | 477 | 610 | −₹64,166 | −594 [−1,205, −11] |
+
+  L2 fails all three parts (−5.9 % total, deeper drawdown, interval straddles zero); L1 fails all three
+  and is worse than L2 (−391 / day [−630, −157]). Before charges the ladder ties E (667 vs 671): the two
+  1-lot picks pay a full brokerage each, so charges rise from ₹95 to ₹125 per lot-day. First year
+  (descriptive): E 443, L2 436, L1 428 net per lot-day. The owner's book (3 lots ordinary, 6 expiry),
+  net, test year: E ₹6,68,001, L2 ₹6,56,267, L1 ₹5,97,766. Over Core-298 (descriptive) the ladder
+  helped a little in the test year (net per lot-day E 351, L2 366, L1 395; intervals straddle zero) and
+  hurt in the first year (250, 210, 209), with deeper drawdowns: on T1, where the top three are already
+  strong, a fourth pick dilutes them.
+
 ## Risks
 
 - **BL-053 is a close precedent that failed** on a similar switch; VIX already carries part of the
@@ -213,3 +231,4 @@ should say if the 3-lot ordinary-day basket is not "top 3 non-Buy × 1 lot".
   with a P90 bar; the margin premise corrected (Dir is short premium too).
 - 2026-10-17 — Amendment A1 registered at the owner's request (chat: "yes, register and run it under
   BL-111"): the 2-2-1-1 rank ladder on the T1 universe, net, test year decides; run after this commit.
+- 2026-10-17 — A1 run once: killed (L2 −5.9 % net, deeper drawdown; L1 worse). Keep 3 × 2.
