@@ -315,6 +315,31 @@ def test_a_groups_preview_is_the_value_weighted_mix_of_its_sleeves(client, monke
     )
 
 
+def test_the_paper_start_week_numbers_the_sleeves_from_it_and_says_first_week(client, monkeypatch):
+    import pandas as pd
+
+    from momentum_backtesting import this_week
+
+    run = _save(client)
+    group = client.patch(f"/api/saved-strategies/{run['id']}", json={"status": "watching"}).json()
+    week = pd.Timestamp("2026-10-02")
+    monkeypatch.setattr(api, "_rebalance_model", _fake_model(week, {"X": 1.0}, 1.0))
+    body = {"dataset": "etf", "group": group["id"], "holdings_pct": {}, "portfolio_value": 1000}
+
+    plain = client.post("/api/rebalance-preview", json=body).json()
+    assert plain["first_week"] is False and plain["paper_start"] is None
+
+    this_week.set_paper_start("2026-10-02")
+    started = client.post("/api/rebalance-preview", json=body).json()
+    assert started["first_week"] is True and started["paper_start"] == "2026-10-02"
+    sleeves = started["group"]["sleeves"]
+    assert [s["name"][-13:] for s in sleeves] == [f"Friday {n} of 4" for n in (1, 2, 3, 4)]
+    # The sleeve that trades on the start Friday is Friday 1.
+    assert [s["on_cadence"] for s in sleeves] == [True, False, False, False]
+    later = client.post("/api/rebalance-preview", json={**body, "group": group["id"]}).json()
+    assert later["first_week"] is True
+
+
 def test_a_group_preview_of_an_unknown_group_is_a_404(client):
     result = client.post(
         "/api/rebalance-preview",

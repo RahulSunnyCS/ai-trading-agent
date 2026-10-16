@@ -15,6 +15,7 @@ import {
   runPeriod,
   seriesEnds,
   settingLabel,
+  sharedScalePaths,
   sortSavedRuns,
   sparklinePath,
   toggleSelection,
@@ -263,5 +264,48 @@ describe('universe labels', () => {
         ],
       },
     ]);
+  });
+});
+
+describe('sharedScalePaths', () => {
+  it('draws every series on one scale, so a higher line sits higher', () => {
+    const [low, high] = sharedScalePaths(
+      [
+        [100, 110],
+        [100, 200],
+      ],
+      100,
+      50,
+    );
+    // y grows downwards: the line that ends higher ends nearer the top.
+    const endY = (path: string | null) => Number(path?.split(' ').pop()?.split(',')[1]);
+    expect(endY(high ?? null)).toBeLessThan(endY(low ?? null));
+    expect(low?.startsWith('M0,')).toBe(true);
+  });
+
+  it('breaks a line at a missing value and returns null for an unusable series', () => {
+    const [gap, empty] = sharedScalePaths(
+      [
+        [1, null, 3, 4],
+        [null, null, null, null],
+      ],
+      90,
+      30,
+    );
+    expect(gap?.match(/M/g)).toHaveLength(2);
+    expect(empty).toBeNull();
+  });
+
+  it('skips non-positive values on a log scale and samples all series at the same positions', () => {
+    const long = Array.from({ length: 500 }, (_, i) => 100 + i);
+    const [a, b] = sharedScalePaths([long, long.map((v) => v * 2)], 400, 100, {
+      log: true,
+      maxPoints: 50,
+    });
+    expect(a?.split(' ').length).toBe(b?.split(' ').length);
+    expect(a?.split(' ').length).toBeLessThanOrEqual(52);
+    const [zero] = sharedScalePaths([[0, 10, 20]], 10, 10, { log: true });
+    expect(zero?.match(/M/g)).toHaveLength(1);
+    expect(zero?.split(' ')).toHaveLength(2);
   });
 });

@@ -56,6 +56,15 @@ A group that follows [all Fridays](glossary:all-fridays) has one sleeve per Frid
 trades each week: its card says which (*Friday 2 of 4 trades*), and the other sleeves show when
 they next do. The orders are that sleeve's, shown as shares of the whole group.
 
+### Your first week
+
+When your portfolio starts from nothing, set its first Friday once (`mbt paper-start set
+2026-10-16`). On that Friday the page shows **First week**: nothing is held going into it, so every
+name a strategy holds is a **Buy** and nothing is sold, and Your orders plans the same. From then on
+a group's sleeves are numbered from that Friday: the one that trades on it is *Friday 1 of K*, the
+next *Friday 2 of K*. The saved runs, the backtests and the journal are not changed; only what this
+page shows and the orders it plans. `mbt paper-start clear` removes it.
+
 ## Classifying a possible split or bonus
 
 A stock that halves overnight has usually split, not crashed. When the automatic check cannot

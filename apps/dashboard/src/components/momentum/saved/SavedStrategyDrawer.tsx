@@ -32,6 +32,7 @@ import { Button } from '../../ui/Button';
 import { Drawer } from '../../ui/Drawer';
 import { Input, inputClass } from '../../ui/Input';
 import { THead, TRow, Table, Td, Th } from '../../ui/Table';
+import { SavedGroupCurve } from './SavedGroupCurve';
 import { StrategyStatusMenu } from './StrategyStatusMenu';
 
 const CURVE_WIDTH = 440;
@@ -357,18 +358,66 @@ function DrawerBody({
       </div>
 
       {isGroup ? (
-        <Section title="Members" meta="each a strategy of its own, run and journalled every Friday">
-          <ul className="space-y-1 text-sm">
-            {(strategy.members ?? []).map((member) => (
-              <li key={member.id} className="flex justify-between gap-2">
-                <span className="truncate">{member.name}</span>
-                <span className="font-mono text-xs text-muted">
-                  {formatPct(member.latest.kpis.cagr)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Section>
+        <>
+          {strategy.blend ? (
+            <Section
+              title="Result"
+              meta={`all ${strategy.blend.members} sleeves together · equal capital, reset each April${strategy.latest.data_through ? ` · data to ${formatDay(strategy.latest.data_through)}` : ''}`}
+            >
+              <dl className="grid grid-cols-4 gap-2">
+                {[
+                  ['CAGR', formatPct(strategy.blend.kpis.cagr), ''],
+                  [
+                    'vs benchmark',
+                    formatPp(strategy.blend.kpis.excess_cagr),
+                    (strategy.blend.kpis.excess_cagr ?? 0) >= 0 ? 'text-positive' : 'text-negative',
+                  ],
+                  ['Max DD', formatPct(strategy.blend.kpis.max_drawdown), 'text-negative'],
+                  ['Sharpe (est.)', formatNumber(strategy.blend.kpis.sharpe, 2), ''],
+                ].map(([label, value, tone]) => (
+                  <div key={label} className="rounded-lg border border-border px-2.5 py-2">
+                    <dt className="text-[10.5px] font-semibold uppercase tracking-wider text-faint">
+                      {label}
+                    </dt>
+                    <dd className={cn('font-mono text-base font-semibold', tone)}>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <div className="mt-3">
+                <SavedGroupCurve
+                  name={strategy.name}
+                  dates={strategy.blend.dates}
+                  blend={strategy.blend.strategy}
+                  sleeves={(strategy.members ?? []).map((m) => ({
+                    name: m.name,
+                    dates: m.latest.dates,
+                    values: m.latest.strategy,
+                  }))}
+                />
+              </div>
+            </Section>
+          ) : null}
+          <Section
+            title="Members"
+            meta="each a strategy of its own, run and journalled every Friday"
+          >
+            <ul className="space-y-1.5 text-sm">
+              {(strategy.members ?? []).map((member) => (
+                <li key={member.id} className="flex items-center justify-between gap-2">
+                  <span className="truncate">{member.name}</span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="font-mono text-xs text-muted">
+                      {formatPct(member.latest.kpis.cagr)}
+                    </span>
+                    <Button size="sm" onClick={() => onOpenInBacktest(member)}>
+                      Open
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        </>
       ) : (
         <>
           <Section

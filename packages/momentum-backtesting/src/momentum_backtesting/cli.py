@@ -1756,6 +1756,14 @@ def orders_run(
     sync: bool = typer.Option(
         True, help="Read the Fyers holdings first when the source is 'fyers'."
     ),
+    fresh: bool = typer.Option(
+        False,
+        help="Paper source only: plan from nothing held, so every target name is a buy "
+        "(the first week of a new portfolio).",
+    ),
+    favourite: str = typer.Option(
+        "", help="Plan for this favourite (id or part of its name) instead of the headline."
+    ),
 ) -> None:
     """Fri 14:15 (scheduler job `momentum-orders`): the headline's orders for this Friday against
     the paper portfolio or the synced Fyers holdings, saved for This week. Never trades."""
@@ -1786,11 +1794,41 @@ def orders_run(
                 raise typer.Exit(1) from error
             with open_catalog() as con:
                 holdings_store.save_holdings(con, holdings_store.owner(), "fyers", rows)
-    payload = api._compute_orders("scheduled")
+    payload = api._compute_orders(
+        "manual" if fresh or favourite else "scheduled",
+        start_fresh=fresh,
+        favourite=favourite or None,
+    )
     note = api._orders_message(payload)
     typer.echo(f"{note.title}\n{note.body}")
     if send:
         notify.send(note)
+
+
+@app.command("paper-start")
+def paper_start_cmd(
+    action: str = typer.Argument("show", help="show | set | clear"),
+    friday: str = typer.Argument(
+        "", help="For `set`: the Friday (YYYY-MM-DD) the portfolio starts."
+    ),
+) -> None:
+    """The Friday your portfolio starts from nothing. That week the page and the orders show every
+    held name as a buy, and each group's sleeves are numbered from it (Friday 1 of K trades that
+    day). Nothing else changes: the backtests, the journal and the saved runs are as they were."""
+    from . import this_week
+
+    if action == "show":
+        typer.echo(this_week.paper_start() or "not set")
+    elif action == "set":
+        try:
+            typer.echo(f"paper start: {this_week.set_paper_start(friday)}")
+        except ValueError as error:
+            raise typer.BadParameter(str(error)) from error
+    elif action == "clear":
+        this_week.set_paper_start(None)
+        typer.echo("paper start cleared")
+    else:
+        raise typer.BadParameter("use show, set or clear")
 
 
 saved_app = typer.Typer(

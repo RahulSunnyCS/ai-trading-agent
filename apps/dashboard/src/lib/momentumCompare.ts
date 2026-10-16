@@ -468,6 +468,53 @@ export function sparklinePath(
     .join(' ');
 }
 
+/**
+ * SVG paths for several equally spaced series drawn on ONE scale (log when `log`), so a line can
+ * be compared with the others. Every series is sampled at the same positions (at most
+ * `maxPoints`), which keeps them aligned; a missing value breaks that line. A series with fewer
+ * than two usable points gets null.
+ */
+export function sharedScalePaths(
+  series: ReadonlyArray<ReadonlyArray<number | null | undefined>>,
+  width: number,
+  height: number,
+  { log = false, maxPoints = 120 }: { log?: boolean; maxPoints?: number } = {},
+): Array<string | null> {
+  const length = Math.max(0, ...series.map((s) => s.length));
+  if (length < 2) return series.map(() => null);
+  const step = Math.max(1, Math.ceil(length / maxPoints));
+  const positions: number[] = [];
+  for (let i = 0; i < length; i += step) positions.push(i);
+  if (positions[positions.length - 1] !== length - 1) positions.push(length - 1);
+  const scale = (value: number | null | undefined): number | null =>
+    finite(value) && (!log || value > 0) ? (log ? Math.log(value) : value) : null;
+  const sampled = series.map((s) => positions.map((i) => scale(s[i])));
+  const all = sampled.flat().filter((v): v is number => v !== null);
+  if (all.length < 2) return series.map(() => null);
+  const min = Math.min(...all);
+  const span = Math.max(...all) - min;
+  const pad = 1;
+  return sampled.map((points) => {
+    if (points.filter((v) => v !== null).length < 2) return null;
+    let pen = 'M';
+    const parts: string[] = [];
+    points.forEach((value, index) => {
+      if (value === null) {
+        pen = 'M';
+        return;
+      }
+      const x = round1((index / (points.length - 1)) * width);
+      const y =
+        span === 0
+          ? round1(height / 2)
+          : round1(pad + (1 - (value - min) / span) * (height - 2 * pad));
+      parts.push(`${pen}${x},${y}`);
+      pen = 'L';
+    });
+    return parts.join(' ');
+  });
+}
+
 /** The first and last usable values of a series, or null when it has fewer than two. */
 export function seriesEnds(
   values: Array<number | null | undefined>,
