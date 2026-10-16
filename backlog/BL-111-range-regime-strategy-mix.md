@@ -212,6 +212,11 @@ unchanged and still pending; this arm neither replaces nor decides them.
   inside 2-2-1-1: D2 = at most 2 Dir lots (Dir only in the two 1-lot slots, 1 + 1); D3 = at most 3 Dir
   lots (one Dir may take a 2-lot slot and one a 1-lot slot, 2 + 1). Slots filled in rank order (no Buy)
   with the best pick allowed; both caps leave at least 2 Widesl. Same script, run once.
+  **Result:** both below today's split, and below plain 2-2-1-1 (L2). T1, 6 lots, net per lot-day (first
+  year / test year): E 443 / 576, L2 436 / 542, D2 401 / 504 (−433 / day vs E, 90 % [−640, −210]), D3
+  410 / 507 (−416 / day [−691, −147]); test max DD −₹52,372 and −₹56,672 vs −₹50,267. Gross: E 671,
+  D2 623, D3 629. Over Core-298 D3 ties E (353 vs 351 net) and D2 trails (321). Capping Dir pushes a
+  lower-ranked Widesl into a 2-lot slot, and on T1 that costs more than it saves.
 
 ## Risks
 
