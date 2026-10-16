@@ -173,6 +173,28 @@ were simulated on its pick day for the net comparison.
 - **Known weaknesses:** four quarters is a small sample; fold 1's window equals the first year, so
   fold 1 is close to the T1 replay already seen; the refine premiums were chosen on the first year.
 
+## Experiment 4 — beyond the grid's edges (registered 2026-10-16, before any new cell was simulated)
+
+- **Owner (2026-10-16):** many T1 winners sit at the grid's edge (MTM ₹4,000 was the highest stop
+  tried; SENSEX Widesl ₹480 the highest premium); test further out, same rule.
+- **New cells (net of charges, the 12 sampled slots, 2024-10-09 → 2026-10-09, tag `edges`):**
+  - Widesl and Dir: every existing setting of every family's strike again with MTM ₹5,000 and ₹6,000.
+  - Widesl closest premium: NIFTY ₹210 and ₹250, SENSEX ₹560 and ₹640, each with every Widesl setting
+    (the old MTM values and the two new ones).
+  - Buy closest premium: NIFTY ₹150 and ₹200, SENSEX ₹400 and ₹500, each with every Buy setting.
+  - Chains for the plateau rule: MTM … 4,000 → 5,000 → 6,000; premiums as an ordered list.
+- **Selection:** BL-104 `daytype_lists` with `--window first` (Amendments 1–11 unchanged: rank on the
+  first half of the first year, rank 1 → 3 must also beat the template in the second half) over the
+  widened candidates → "T1-edge" (time-generic, expiry and non-expiry), created at all 25 entry
+  times and simulated like T1.
+- **Test:** Adaptive (list C, no weight) on the test year 2025-10-09 → 2026-10-09 over Core-298 +
+  T1-edge, against Core-298 + T1 and Core-298 on the same days.
+- **Pass rule:** T1-edge replaces T1 only if its mean gross per lot-day minus T1's has a 90 %
+  block-bootstrap interval above zero and its drawdown is no worse. Otherwise T1 stands (the track
+  is not changed by this experiment either way without the owner).
+- **Known weaknesses:** more candidates mean more chances to fit noise in the selection year; the
+  first-half / second-half check is the guard.
+
 ## Log
 
 - 2026-10-16 — created from the owner's request; Phase 0 registered before the first-year selection

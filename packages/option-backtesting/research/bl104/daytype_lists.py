@@ -45,7 +45,9 @@ WORST_X = 1.25
 MAX_CORR = 0.7
 KINDS = {"expiry": ("expiry", "EXP"), "other": ("non_expiry", "NONEXP"), "all": ("all_days", "ALL")}
 HALF = date(2025, 4, 9)  # with WINDOW "first": the first year is split here for the both-halves rule
-WINDOW: str | None = None  # "first" = selection on the first year only (BL-107)
+WINDOW: str | None = None  # "first" = selection on the first year only (BL-107); "custom" = WIN
+WIN: tuple[date, date, date] | None = None  # (start, half, end): select on [start, end), split at half
+MAX_PICKS: int | None = None  # Experiment 3: cap picks per family and day type (None = Amendments 1-11)
 R1 = ("cost", 1, None)
 OWNER_DEFAULT = {  # N_wide only (owner, 2026-10-15)
     "expiry": {"strike": "OTM1", "sl": 150, "trail": (25, 15), "mtm": 4000, "exit": "15:28", "reentry": R1},
@@ -309,6 +311,14 @@ def evaluate(f: Family, slot: str, exp: set[date]) -> dict[str, Any]:
         tdays = [x for x, k in zip(tdays, first, strict=True) if k]
         d = d[first]
         first = d < HALF  # "both years positive" becomes "both halves of the first year positive"
+    elif WINDOW == "custom":  # walk-forward fold: only [start, end) is read
+        start, half, end = WIN
+        keep = (d >= start) & (d < end)
+        tvals = {n: v[keep] for n, v in tvals.items()}
+        vals = {k: v[keep] for k, v in vals.items()}
+        tdays = [x for x, k in zip(tdays, keep, strict=True) if k]
+        d = d[keep]
+        first = d < half
     is_exp = np.array([x in exp for x in tdays])
     out = {}
     for kind, mask in (("expiry", is_exp), ("other", ~is_exp), ("all", np.ones(len(is_exp), dtype=bool))):
@@ -495,7 +505,11 @@ def decide(f: Family, agg: dict[str, dict], kind: str, allowed: list[float] | No
                 r["rank_used"] = rank
                 if picks:
                     r["corr_with_first"] = float(np.corrcoef(picks[0]["values"], r["values"])[0, 1])
+                    if MAX_PICKS is not None and r["corr_with_first"] >= MAX_CORR:
+                        continue  # Experiment 3: a second premium only when it behaves differently
                 picks.append(r)
+                if MAX_PICKS is not None and len(picks) == MAX_PICKS:
+                    break
         if picks:
             return {"status": f"chosen ({len(picks)} premium{'s' if len(picks) > 1 else ''})", "picks": picks,
                     "alts": [], "n_clear": len(pool)}
@@ -504,7 +518,7 @@ def decide(f: Family, agg: dict[str, dict], kind: str, allowed: list[float] | No
         if first is not None:
             first["rank_used"] = rank
             picks = [first]
-            for r in ranked[rank:]:
+            for r in ranked[rank:] if MAX_PICKS is None or MAX_PICKS > 1 else []:
                 if passes_period2(r):
                     c = float(np.corrcoef(first["values"], r["values"])[0, 1])
                     if c < MAX_CORR:
