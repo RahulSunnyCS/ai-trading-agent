@@ -44,7 +44,7 @@ FROM = pd.Timestamp("2025-09-01")
 def main() -> None:
     names = [n for n in variant_names() if EXT_DIR or "_ditm1_" not in n]
     m = store.load_matrix(names)
-    attrs = store.read_days()
+    attrs = store.read_days(basis="calendar")  # rotate.py counts calendar days
     keep = [i for i, d in enumerate(m.days) if d in attrs and pd.Timestamp(d) >= FROM]
     days = [m.days[i] for i in keep]
     Pv = m.values[keep]

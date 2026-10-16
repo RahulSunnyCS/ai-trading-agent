@@ -1,6 +1,6 @@
 # Options: shared findings
 
-**Last updated:** 2026-10-14
+**Last updated:** 2026-10-15
 
 These pages hold findings that belong to no single strategy: they concern the basket, the money, the
 ranking that picks strategies each day, or the market state that might time them. A strategy's
@@ -12,6 +12,7 @@ variable page links here instead of repeating them.
 | [Charges](charges.md) | Descriptive | Charges take 19–37% of gross in the rotations; at ₹20 an order Buy turns negative, Dir and Widesl survive thinly |
 | [Rotation ranking](rotation-ranking.md) | Tested | The ranked basket beats random picks on the 2022–24 hold-out when the weekday / expiry / VIX fits carry it; recent return helps in one year and hurts in 2½ |
 | [Intraday state](intraday-state.md) | Tested | No hourly market-state variable or VIX reading passes; two Dir trigger leads hold only in 2024–26 |
+| [Index range persistence](index-range-persistence.md) | Tested | NIFTY's daily range persists in both directions: after an expanded session the next days run about 0.14 above a typical session, after a quiet one about 0.09–0.15 below it; VIX carries part of it, not all; expansion confirmed on 2016–21 with a close-to-close proxy |
 | [Correlation](correlation.md) | Descriptive | Widesl variants are near-copies (0.85–0.92); Buy moves against Widesl; a correlation cap is registered, not run |
 
 ## The periods these pages use

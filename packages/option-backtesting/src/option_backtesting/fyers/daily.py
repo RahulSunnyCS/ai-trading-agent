@@ -55,9 +55,10 @@ class UnderlyingSpec:
     name: str
     index_symbol: str
     segment: str
-    #: "weekly" → current + next expiry; "monthly" → current month only (plus
-    #: next month on the monthly expiry day itself, since that is the contract
-    #: anything entering that day would roll into).
+    #: "weekly" → the nearest two expiries plus the current month's monthly (and the
+    #: next month's monthly on the monthly expiry day itself); "monthly" → current
+    #: month only (plus next month on the monthly expiry day itself, since that is the
+    #: contract anything entering that day would roll into).
     cadence: str
 
 
@@ -84,7 +85,20 @@ def data_dir() -> Path:
 def select_expiries(listed: list[date], day: date, cadence: str) -> list[date]:
     upcoming = sorted({e for e in listed if e >= day})
     if cadence == "weekly":
-        return upcoming[:2]
+        # the nearest two weeklies, then the monthly (the last expiry of its calendar month)
+        # of the nearest expiry's month, and the next month's monthly on the day the
+        # current one expires.
+        picked = upcoming[:2]
+        if upcoming:
+            months = sorted({(e.year, e.month) for e in upcoming})
+            monthly = {m: max(e for e in upcoming if (e.year, e.month) == m) for m in months}
+            wanted = [monthly[months[0]]]
+            if wanted[0] == day and len(months) > 1:
+                wanted.append(monthly[months[1]])
+            for e in wanted:
+                if e not in picked:
+                    picked.append(e)
+        return sorted(picked)
     picked = upcoming[:1]
     if picked and picked[0] == day and len(upcoming) > 1:
         picked.append(upcoming[1])

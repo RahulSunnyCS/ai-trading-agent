@@ -114,8 +114,8 @@ def test_message_uses_strategy_names_and_keeps_recording_witness(on_time):
         "before_first_entry": on_time,
     }
     text = pick.render(entry)
-    for name in ["Steady", "Calendar", "Adaptive"]:
-        assert f"{name}: N_ditm1_0932, N_wide_1117 + Buy N_buy_1147" in text
+    assert "Adaptive: N_ditm1_0932, N_wide_1117 + Buy N_buy_1147" in text
+    assert "Steady" not in text and "Calendar" not in text
     assert "VIX" not in text and "DTE" not in text
     assert "Baseline" not in text and "REF:" not in text
     assert "REF" in entry["lists"]
@@ -145,11 +145,10 @@ def test_result_goes_to_private_chat_and_group(telegram, monkeypatch):
     assert marked == [calculated]
     assert [request["chat_id"] for request in telegram] == ["123", "-456"]
     for request in telegram:
-        assert "Steady: +₹1,200" in request["text"]
-        assert "Calendar: -₹450" in request["text"]
         assert "Adaptive: ₹0" in request["text"]
-        assert "• a: +₹1,400" in request["text"]
-        assert "• c: -₹450" in request["text"]
+        assert "Steady" not in request["text"] and "Calendar" not in request["text"]
+        assert "• d: ₹0" in request["text"]
+        assert "• a:" not in request["text"]
         assert "Baseline" not in request["text"]
 
 
@@ -177,3 +176,23 @@ def test_result_not_ready_sends_nothing(telegram, monkeypatch):
     assert response.exit_code == 2
     assert "result not ready" in response.output
     assert telegram == []
+
+
+def test_the_picks_message_names_the_next_best_widesl_and_dir_on_its_own_line():
+    entry = {
+        "day": "2026-10-16",
+        "weekday": "Fri",
+        "lists": {"C": {"core": ["N_wide_1117", "N_ditm1_1002"], "buy": []}},
+        "hash": "f1a772478960abcd",
+        "recorded_at": "2026-10-16T09:16:25+05:30",
+        "before_first_entry": True,
+    }
+    options = {"C": {"wide": "N_p100_1117", "dir": "N_ditm1_0932"}}
+    lines = pick.render(entry, options).splitlines()
+    assert lines[1] == "Adaptive: N_wide_1117, N_ditm1_1002"
+    assert lines[2] == "Next best, optional: Widesl N_p100_1117; Dir N_ditm1_0932"
+    assert "Next best" not in pick.render(entry)
+    assert pick.next_best_line({"wide": "N_p100_1117", "dir": None}) == (
+        "Next best, optional: Widesl N_p100_1117"
+    )
+    assert pick.next_best_line({"wide": None, "dir": None}) == ""
