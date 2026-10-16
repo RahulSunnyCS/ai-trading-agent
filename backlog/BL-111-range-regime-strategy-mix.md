@@ -202,6 +202,12 @@ unchanged and still pending; this arm neither replaces nor decides them.
   2-2-1-1 with at least 4 Widesl. Two arms added to the same script and run once: L3 = 4 picks (≥ 3
   Widesl) and L4 = 4 picks (all 4 Widesl), both 2-2-1-1. The test year is already read, so neither can
   pass; a strong showing would only justify a new item with a forward check.
+  **Result:** both worse than today's split, and worse than L2. T1, 6 lots, net per lot-day (first
+  year / test year): E 443 / 576, L2 436 / 542, L3 (≥ 3 Widesl) 388 / 496 (−484 / day vs E, 90 %
+  [−726, −238]), L4 (all 4 Widesl) 355 / 444 (−795 / day [−1,270, −312]); test max DD −₹56,428 and
+  −₹68,696 vs −₹50,267. Gross tells the same story (L3 608, L4 542 vs E 671), so it is not charges: the
+  extra Widesl forced in are weaker than the Dir picks they replace. Same on Core-298 (L3 311, L4 233 vs
+  E 351). A1's rows reproduced exactly on the rerun.
 
 ## Risks
 
