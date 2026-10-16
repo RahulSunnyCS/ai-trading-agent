@@ -21,7 +21,7 @@ from .dte import DTE_BASIS
 from .lists import DISPLAY_NAMES, LISTS, LOTS_PER, PUBLIC_KEYS, WARMUP
 from .live import listed_dte_labels, vix_open_with_source
 from .score import composite, dte_matrix, family_index, runners_up, select, vix_band
-from .variants import variant_names
+from .variants import track_names, variant_names
 
 IST = ZoneInfo("Asia/Kolkata")
 FIRST_ENTRY = time(9, 17)
@@ -66,6 +66,7 @@ def code_commit() -> str:
                 "--",
                 "src",
                 "strategies/rotation",
+                "strategies/rotation_t1",
             ],
             capture_output=True,
             text=True,
@@ -189,28 +190,59 @@ def score_lists(
     return score_history(hist, day, vix_open, dte)
 
 
+#: A parallel track records only these lists (owner, 2026-10-16: Adaptive only for T1).
+TRACK_LISTS = {"t1": ("C",)}
+
+
 def record(
     day: date,
     root: Path | None = None,
     vix_open: float | None = None,
     now_fn: Callable[[], datetime] = lambda: datetime.now(IST),
     dry_run: bool = False,
+    track: str | None = None,
 ) -> PickResult:
+    """Score and append today's entry. `track` (e.g. "t1") records a parallel track instead:
+    Core-298 plus its extra variants, only its own lists, in its own journal; the live journal is
+    never touched by a track run."""
     root = root or data_dir()
     if not dry_run and day != now_fn().astimezone(IST).date():
         raise PickError(f"{day} is not today (IST): an entry can only be recorded on its own day")
+    if not dry_run and any(
+        e["day"] == day.isoformat() for e in journal.read(store.journal_path(root, track))
+    ):
+        # a retry after a success: answer before any network read can fail and raise a false alert
+        raise journal.AlreadyRecorded(f"{day.isoformat()} is already in the journal")
     # everything slow and VIX-independent first: the 09:15 bar is served a few seconds after the
     # job starts, and only the band depends on it
-    names = variant_names()
+    names = variant_names() + (track_names(track) if track else [])
     dte, dte_source = listed_dte_labels(day)
     commit = code_commit()
-    hist = load_history(day, root, names)
+    try:
+        hist = load_history(day, root, names)
+    except PickError as error:
+        if track:  # the fix is the track's own update, not the live one
+            raise PickError(
+                str(error).replace("`obt rotation update", f"`obt rotation update --track {track}")
+            ) from error
+        raise
+    if track:
+        core_days = load_history(day, root, variant_names()).days
+        if hist.days != core_days:
+            missing = sorted(set(core_days) - set(hist.days))
+            raise PickError(
+                f"the {track} track lacks results for {len(missing)} day(s) Core-298 has "
+                f"(first {', '.join(d.isoformat() for d in missing[:3])}): "
+                f"run `obt rotation update --track {track}`"
+            )
     source = "given"
     if vix_open is None:
         vix_open, source = vix_open_with_source(day)
     if vix_open is None:
         raise PickError(f"the 09:15 India VIX open for {day} could not be read; nothing recorded")
     lists = score_history(hist, day, vix_open, dte)
+    if track:
+        lists = {k: v for k, v in lists.items() if k in TRACK_LISTS[track]}
     fields = {
         "v": 3,
         "day": day.isoformat(),
@@ -228,7 +260,9 @@ def record(
         "inputs_days": len(hist.days),
         "lots_per_strategy": LOTS_PER,
     }
-    path = store.journal_path(root)
+    if track:
+        fields["track"] = track
+    path = store.journal_path(root, track)
     stamp = now_fn().astimezone(IST)  # taken right before the write, so the flag describes it
     fields["recorded_at"] = stamp.isoformat(timespec="seconds")
     fields["before_first_entry"] = stamp.time() < FIRST_ENTRY
@@ -236,7 +270,10 @@ def record(
         entry = {**fields, "prev": journal.head(path), "hash": "(dry run)"}
     else:
         entry = journal.append(path, fields)
-    return PickResult(entry, render(entry, next_best(hist, day, vix_open, dte)))
+    options = next_best(hist, day, vix_open, dte)
+    if track:
+        options = {k: v for k, v in options.items() if k in TRACK_LISTS[track]}
+    return PickResult(entry, render(entry, options))
 
 
 def next_best_line(options: dict[str, str | None] | None) -> str:
@@ -250,7 +287,9 @@ def next_best_line(options: dict[str, str | None] | None) -> str:
 
 
 def render(entry: dict, options: dict[str, dict[str, str | None]] | None = None) -> str:
-    lines = [f"Rotation picks {entry['day']} ({entry['weekday']})"]
+    track = entry.get("track")
+    title = f"{track.upper()} TRACK picks (not traded)" if track else "Rotation picks"
+    lines = [f"{title} {entry['day']} ({entry['weekday']})"]
     for key, p in entry["lists"].items():
         if key not in PUBLIC_KEYS:  # Steady and Adaptive only; the entry still records every list
             continue

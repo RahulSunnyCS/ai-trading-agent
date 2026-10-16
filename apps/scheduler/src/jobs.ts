@@ -212,14 +212,40 @@ const BASE_JOBS: Job[] = [
       'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt daily && uv run --directory packages/option-backtesting obt rotation update && uv run --directory packages/option-backtesting obt rotation result',
   },
   {
+    id: 'options-rotation-t1-update',
+    description:
+      "Store the T1 parallel track's results for the day (`obt rotation update --track t1`): its 223 extra variants only, in their own folder; the live results are never touched",
+    // After the evening run's last retry (20:15). Idempotent: it scores the newest collected day the
+    // track has not stored yet (every missing day, so a missed evening is filled the next time);
+    // the 09:16 job repeats it as a catch-up before the track pick.
+    schedule: { at: '21:00', on: tradingDays, label: 'trading days 21:00' },
+    steps: [['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'update', '--track', 't1']],
+    cwd: '.',
+    timeoutMinutes: 20,
+    retries: 2,
+    retryDelayMinutes: 60,
+    catchUpHours: 2.5, // until 23:30
+    group: 'catalog',
+    fixHint:
+      'uv run --directory packages/option-backtesting obt rotation update --track t1  (add --backfill to fill every missing day)',
+  },
+  {
     id: 'options-rotation-pick',
     description:
-      "Record the day's rotation picks (lists A, B, C, REF) before 09:17 and Telegram them (BL-058)",
+      "Record the day's rotation picks (lists A, B, C, REF) before 09:17 and Telegram them (BL-058), then the T1 parallel track's Adaptive pick in its own journal (private Telegram, labelled T1 TRACK)",
     // Needs the 09:15 VIX bar, which Fyers serves from 09:16, and yesterday's results (the nightly
     // job above). A late entry is flagged (before_first_entry: false), never silently accepted,
     // and a missed slot is not caught up: it would not be forward.
     schedule: { at: '09:16', on: tradingDays, label: 'trading days 09:16' },
-    steps: [['uv', 'run', 'obt', 'rotation', 'pick']],
+    // The live pick first, always: a failed track step retries the job, and the live step then
+    // answers "already recorded" (exit 0) without writing anything.
+    // Then the track: a catch-up update first (fills any day the 21:00 job missed; usually a no-op),
+    // and its pick, which refuses rather than rank on fewer days than the live list.
+    steps: [
+      ['uv', 'run', 'obt', 'rotation', 'pick'],
+      ['uv', 'run', 'obt', 'rotation', 'update', '--track', 't1'],
+      ['uv', 'run', 'obt', 'rotation', 'pick', '--track', 't1'],
+    ],
     cwd: OPTIONS,
     timeoutMinutes: 3,
     retries: 2,
@@ -227,7 +253,7 @@ const BASE_JOBS: Job[] = [
     catchUpHours: 0,
     alertsItself: true,
     fixHint:
-      'cd packages/option-backtesting && uv run obt rotation pick  (a late entry is flagged, not forward)',
+      'cd packages/option-backtesting && uv run obt rotation pick, then uv run obt rotation pick --track t1  (a late entry is flagged, not forward)',
   },
   {
     id: 'backup',

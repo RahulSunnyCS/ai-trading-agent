@@ -51,7 +51,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-100](BL-100-restricted-rotation-lists-p3.md) | Rotation lists A/B/C restricted to the BL-099 families, tested on 2022-24 | P2 | Planned (pre-registration; not run) | research | options |
 | [BL-102](BL-102-options-lab-ux-redesign.md) | Options Lab redesign: three workspaces, lists first (Steady / Calendar / Adaptive), favourites, a leg-grid builder | P1 | In progress | improvement | dashboard |
 | [BL-109](BL-109-rotation-weekday-dte.md) | Rotation days to expiry: count weekdays only, not calendar days | P1 | Done | research | options |
-| [BL-112](BL-112-group-leaders-shadow.md) | Group Leaders: run Adaptive on the best-settings-per-group pool as a parallel forward track beside Core | P1 | Planned | feature | options |
+| [BL-112](BL-112-group-leaders-shadow.md) | Group Leaders: run Adaptive on the best-settings-per-group pool as a parallel forward track beside Core | P1 | Superseded by BL-113 | feature | options |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-039](BL-039-broad-warm-path-and-weekly-job-cost.md) | Broad warm path and weekly-job cost (follow-up to BL-005) | P2 | Planned | improvement | momentum |
 | [BL-041](BL-041-in-app-guide.md) | In-app Guide: what each dashboard section does and how to use it | P2 | In progress | feature | dashboard |
@@ -100,6 +100,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-094](BL-094-straddle-heatmap.md) | Straddle heatmap: ATM short-straddle P&L by time, date and stop loss for every index and F&O stock; becomes the Options Lab default, Correlation split into its own widget | P2 | Done: Phases 1–4 built; cells match the legwise engine and AlgoTest's grid within ~₹100 at exit 15:15 | feature | options |
 | [BL-110](BL-110-nifty-range-persistence.md) | Does NIFTY's daily range persist? Expansion continues, range-bound continues | P2 | Done: persists in both directions; VIX carries part of it | research | options |
 | [BL-111](BL-111-range-regime-strategy-mix.md) | Lots by rank (2-2-1-1) and by range regime: more Dir when expanding, more Widesl when quiet; 3 lots / 6 lots | P2 | Planned | research | options |
+| [BL-113](BL-113-t1-parallel-track.md) | T1 parallel track: Adaptive over Core-298 + 223 time-generic variants, own journal, private Telegram, 60-day read-out vs the live Adaptive (supersedes BL-112) | P1 | In progress | feature + research | options |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |

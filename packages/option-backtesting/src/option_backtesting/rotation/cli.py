@@ -1,5 +1,6 @@
 """`obt rotation …`: update | pick | verify | show | readout | base (BL-058); triggers,
-triggers-show (BL-083); corr, corr-list, corr-pick (BL-090)."""
+triggers-show (BL-083); corr, corr-list, corr-pick (BL-090); update / pick --track t1 and
+track-readout (the T1 parallel track)."""
 
 from __future__ import annotations
 
@@ -34,9 +35,43 @@ def _day(text: str | None) -> date:
 @rotation_app.command()
 def update(
     day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
+    track: str = typer.Option(
+        None, "--track", help="A parallel track (t1): run only its extra variants."
+    ),
+    backfill: bool = typer.Option(
+        False,
+        "--backfill",
+        help="With --track: kept for clarity; a track update always fills every missing day.",
+    ),
 ) -> None:
     """Run all 298 variants over one collected day and store the results (idempotent)."""
-    from .update import default_day, update_day
+    from .update import backfill_days, default_day, update_day
+    from .variants import TRACK_DIRS, track_names
+
+    if backfill and not track:
+        typer.echo("--backfill needs --track", err=True)
+        raise typer.Exit(2)
+    if track:
+        if track not in TRACK_DIRS:
+            typer.echo(f"unknown track {track!r} (known: {', '.join(TRACK_DIRS)})", err=True)
+            raise typer.Exit(2)
+        # A parallel track's extra variants only: every day Core-298 has stored that the track
+        # lacks (so a missed evening is filled the next time, never silently dropped), no base or
+        # trigger scoring, never the live results or days.csv.
+        names = track_names(track)
+        days = [_day(day)] if day else backfill_days(names)
+        if not days:
+            typer.echo(f"{track}: nothing to update (every Core-298 day is stored)")
+            return
+        failed = 0
+        for d in days:
+            r = update_day(d, names=names, log=typer.echo, write_days=False)
+            if r["skipped"] or r["errors"]:
+                failed += 1
+                typer.echo(f"{track} {d}: {r['skipped'] or r['errors'][:3]}", err=True)
+        if failed:
+            raise typer.Exit(2)
+        return
 
     d = _day(day) if day else default_day()
     if d is None:
@@ -80,6 +115,9 @@ def pick(
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Score and print; write nothing."),
     telegram: bool = typer.Option(True, "--telegram/--no-telegram"),
+    track: str = typer.Option(
+        None, "--track", help="A parallel track (t1): its own journal, private Telegram only."
+    ),
 ) -> None:
     """Record today's picks for every list (before 09:17), hash-chained, and Telegram them."""
     from ..notify import Notification, send
@@ -88,12 +126,23 @@ def pick(
 
     d = _day(day)
 
+    from .variants import TRACK_DIRS
+
+    if track and track not in TRACK_DIRS:
+        typer.echo(f"unknown track {track!r} (known: {', '.join(TRACK_DIRS)})", err=True)
+        raise typer.Exit(2)
+    tag = f"{track.upper()} TRACK " if track else ""
+
     def alert(title: str, body: str) -> None:
         if telegram and not dry_run:
-            send(Notification(source="options-rotation", severity="error", title=title, body=body))
+            send(
+                Notification(
+                    source="options-rotation", severity="error", title=tag + title, body=body
+                )
+            )
 
     try:
-        r = record(d, vix_open=vix_open, dry_run=dry_run)
+        r = record(d, vix_open=vix_open, dry_run=dry_run, track=track)
     except AlreadyRecorded as error:  # a retry after a success: the day has its entry
         typer.echo(f"already recorded: {error}")
         return
@@ -111,10 +160,23 @@ def pick(
         notification = Notification(
             source="options-rotation",
             severity=severity,
-            title=f"Rotation picks {d}",
+            title=f"{tag}Rotation picks {d}",
             body=r.text,
         )
-        _send_private_and_group(notification)
+        if track:
+            send(notification)  # a track is private: never the friends' group
+        else:
+            _send_private_and_group(notification)
+
+
+@rotation_app.command("track-readout")
+def track_readout(
+    track: str = typer.Option("t1", "--track", help="The parallel track."),
+) -> None:
+    """A parallel track's Adaptive against the live Adaptive over the forward days (read-only)."""
+    from .track import build, render
+
+    typer.echo(render(build(track)))
 
 
 @rotation_app.command()
