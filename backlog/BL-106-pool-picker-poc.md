@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — tells whether a wider, safer universe improves the live rotation's lists |
-| **Status** | Done 2026-10-15: no list won; New-556's lists are shallower in drawdown, not higher in return |
+| **Status** | Done 2026-10-15: no list won on the registered pool (New-536); New-556 (exploratory) had a shallower drawdown in one path, with no interval |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-15 |
@@ -15,8 +15,8 @@
 | Name | What it is |
 |---|---|
 | **Core-298** | The live rotation's 298 variants in `strategies/rotation/` (frozen; one fixed configuration per family, repeated at every entry time) |
-| **New-536** | The candidate pool selected from the first year only: 91 sets, 536 variants, settings differing by time band |
-| **New-556** | New-536 plus the ITM amendment (three NIFTY Dir ITM1 sets, 20 variants) |
+| **New-536** | The **registered** candidate pool, selected from the first year only: 91 sets, 536 variants, settings differing by time band. Only this pool decides pass or fail |
+| **New-556** | New-536 plus the ITM amendment (three NIFTY Dir ITM1 sets, 20 variants). **Exploratory**, added after registration: descriptive only, never decides pass or fail. Also called **Group Leaders v1** ([BL-112](BL-112-group-leaders-shadow.md)); the full list is in `research/bl106/group_leaders_v1.md` |
 
 A list over a universe is written "Steady on Core-298", "Adaptive on New-556".
 
@@ -81,8 +81,11 @@ unverified re-entry types; any adoption from this item alone.
 
 ## Risks
 
-- The pool and the 298 differ in family mix (the pool has no NIFTY Buy and no unverified re-entries),
-  so a difference may come from the mix, not from robustness.
+- The pool and the 298 differ in family mix (the pool has 52 NIFTY Buy variants in 11 sets, none in the
+  10:17 to 12:02 band, and no unverified re-entries), so a difference may come from the mix, not from
+  robustness.
+- The lists were chosen on data inside the test year (see the 2026-10-16 disclosures), which favours
+  Core-298.
 - Twelve months is short for a list that trades three or four strategies a day.
 
 ## Log
@@ -130,3 +133,34 @@ unverified re-entry types; any adoption from this item alone.
   Disclosed: the pool's selection year overlaps BL-099's earlier use of the test year only through the
   grid's axes; the comparison is gross because Core-298's stored results are; after-charges figures
   for Core-298 were not recomputed (owner's choice).
+- 2026-10-16 — **Review corrections and disclosures (PR #231); no change to the registered rule or
+  to any number.** The owner took the recommended option on both open decisions.
+  1. **Second pool.** Phase 0 allowed one pool without an `override:`. The ITM amendment was logged
+     before any replay but is a second pool. Decision: **New-536 is the registered pool and New-556 is
+     an exploratory post-registration amendment**; its results are descriptive only and never decide
+     pass or fail. No `override:` is written. The registered pass rule gives no winner on New-536 for
+     any list, so the verdict stands.
+  2. **BL-104 cap and tail gate.** The Buy 60 % day-stop cap and the tail gate used in the pool
+     selection were set after BL-104's two-year results had been read, and a full-window probe was run
+     with the cap first. BL-104's own Log calls the cap post-hoc and says it needs an `override:`;
+     that override is **still open**. No override line is written here. It sits beside the disclosed
+     day-stop-rate and entry-rate leak above.
+  3. **The lists were fitted inside the test year.** Phase 0 says the test year was one "neither the
+     pool nor the lists were fitted on". That holds for the pool but not for the lists: BL-075 chose
+     lists A, B and C on 2025-12-03 to 2026-10-08, and Core-298's Dir ITM1 family was kept by BL-080
+     on that period; both fall inside the test year (2025-10-09 to 2026-10-09). The bias favours
+     Core-298, so a pool that does not beat it here is a weaker statement than it reads.
+  4. **Drawdown is descriptive.** "New-556's drawdown is shallower than Core-298's for every list"
+     rests on a single path with no interval, on a pool added after registration, and on four lists
+     that share most of their scoring, so it is closer to one observation than four. Read it as a
+     lead, not a result.
+  5. **Traceability.** The result table now has its source committed:
+     `research/bl106/replay_summary_2026-10-15.csv` (the daily rows stay git-ignored).
+  6. **Factual fix.** The Risks line "the pool has no NIFTY Buy" was wrong: the pool has 52 NIFTY Buy
+     variants in 11 sets; only the 10:17 to 12:02 band has none.
+  7. **Known script facts, not changed after the run:** `first_year.py` writes under
+     `bl104/results/`, outside this folder, and `--buy-stop-cap` in BL-104's `score.py` reuses
+     BL-104's output file names, so re-running it can overwrite the registered Stage 1 scoring.
+  8. **Pool list.** `research/bl106/list_pool.py` writes the readable pool (94 sets, 23 groups, 556
+     variants) to `research/bl106/group_leaders_v1.md` from the frozen JSON files.
+
