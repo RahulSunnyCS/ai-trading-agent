@@ -1,8 +1,8 @@
 /**
  * Options Lab › Rotation › Daily log: the decision-to-result record.
  *
- * For each trading day, what the four registered lists picked at 09:16 and what those picks then
- * did on the day's data, beside the context the entry was scored on and what the owner placed.
+ * For each trading day, what the shown lists (VISIBLE_LIST_KEYS; the journal still records all four
+ * registered lists) picked at 09:16 and what those picks then did on the day's data, beside the context the entry was scored on and what the owner placed.
  * A calendar to scan, a dense day table to read, a drawer for one day in full. Counters at the
  * foot say how often the structural things happened (a Buy qualified, the Widesl minimum applied,
  * the lists agreed, a stop fired).
@@ -28,9 +28,9 @@ import {
   trailParam,
 } from '../../lib/portfolioStop';
 import {
+  FILTERS,
   FILTER_HELP,
   FILTER_LABEL,
-  LIST_KEYS,
   type Month,
   type RowFilter,
   WINDOW_LABEL,
@@ -44,7 +44,7 @@ import {
   monthOf,
   windowRange,
 } from '../../lib/rotationDailyLogView';
-import { listLabel, listName } from '../../lib/rotationListNames';
+import { DEFAULT_LIST, isVisibleList, listLabel, listName } from '../../lib/rotationListNames';
 import { hasOverlay, overlayBook, unmatched } from '../../lib/rotationPortfolioView';
 import type { RotationListKey, RotationLog, RotationLogSource } from '../../types/rotationDailyLog';
 import { Badge } from '../ui/Badge';
@@ -60,20 +60,17 @@ import { PortfolioStopButton } from './PortfolioStopButton';
 import { RotationDailyLogCalendar } from './RotationDailyLogCalendar';
 import { RotationDailyLogDrawer } from './RotationDailyLogDrawer';
 import { RotationDailyLogTable } from './RotationDailyLogTable';
+import { ListPicker } from './rotation/ListPicker';
 
 const SOURCE_OPTIONS: SegmentedOption<RotationLogSource>[] = [
   { value: 'recorded', label: 'Recorded' },
   { value: 'reconstructed', label: 'Reconstructed' },
 ];
 
-const FOCUS_OPTIONS: SegmentedOption<RotationListKey>[] = LIST_KEYS.map((value) => ({
+const FILTER_OPTIONS: SegmentedOption<RowFilter>[] = FILTERS.map((value) => ({
   value,
-  label: listLabel(value),
+  label: FILTER_LABEL[value],
 }));
-
-const FILTER_OPTIONS: SegmentedOption<RowFilter>[] = (
-  ['all', 'losing', 'stops', 'differ'] as const
-).map((value) => ({ value, label: FILTER_LABEL[value] }));
 
 const WINDOW_OPTIONS: SegmentedOption<WindowChoice>[] = (['all', '126', '63', '21'] as const).map(
   (value) => ({ value, label: WINDOW_LABEL[value] }),
@@ -85,20 +82,22 @@ function EmptyJournal({ log, onBrowseHistory }: { log: RotationLog; onBrowseHist
     <div className="rounded-lg border border-dashed border-border px-6 py-8">
       <p className="text-base font-semibold text-foreground">{emptyHeadline(log)}</p>
       <p className="mt-1 max-w-2xl text-sm text-muted">
-        Before {log.registered.cutoff_time} on each trading day the job writes down what every list
+        Before {log.registered.cutoff_time} on each trading day the job writes down what the list
         picks, in a chain that cannot be edited afterwards. After that evening's results arrive,
         each day appears here with what its picks did. Until then there is nothing to show.
       </p>
       <p className="mt-3 text-xs font-semibold uppercase tracking-wider text-faint">
-        The registered lists
+        The list followed
       </p>
       <ul className="mt-1 space-y-1 text-sm">
-        {log.registered.lists.map((l) => (
-          <li key={l.key} className="flex gap-2">
-            <span className="w-10 shrink-0 font-semibold text-foreground">{l.key}</span>
-            <span className="text-muted">{l.description}</span>
-          </li>
-        ))}
+        {log.registered.lists
+          .filter((l) => isVisibleList(l.key))
+          .map((l) => (
+            <li key={l.key} className="flex gap-2">
+              <span className="w-20 shrink-0 font-semibold text-foreground">{listName(l.key)}</span>
+              <span className="text-muted">{l.description}</span>
+            </li>
+          ))}
       </ul>
       <p className="mt-3 text-xs text-faint">
         Each holds {log.registered.lots_per_strategy} lots in each of 3 strategies, plus a Buy
@@ -133,8 +132,8 @@ export function RotationDailyLog({
   const setting = portfolio ?? ownPortfolio;
   const [source, setSource] = useState<RotationLogSource>('recorded');
   const [windowChoice, setWindowChoice] = useState<WindowChoice>(defaultWindow('recorded'));
-  // The page's focus list when it passes one; otherwise this widget's own (Steady, the owner's default).
-  const [ownFocus, setFocus] = useState<RotationListKey>('A');
+  // The page's focus list when it passes one; otherwise this widget's own (the first shown list).
+  const [ownFocus, setFocus] = useState<RotationListKey>(DEFAULT_LIST);
   const focus = focusProp ?? ownFocus;
   const [filter, setFilter] = useState<RowFilter>('all');
   const [openDay, setOpenDay] = useState<string | null>(null);
@@ -170,6 +169,8 @@ export function RotationDailyLog({
       ? book.data
       : null;
   const pending = isOn(setting) && bookNow === null && book.error === null;
+  // Replay failures of the shown lists only: a hidden list's figure is never drawn.
+  const replayErrors = (bookNow?.errors ?? []).filter((e) => isVisibleList(e.list));
 
   function pickSource(next: RotationLogSource) {
     setSource(next);
@@ -192,7 +193,7 @@ export function RotationDailyLog({
       <Card>
         <CardHeader
           title="Daily log"
-          description="What each list picked at 09:16, and what those picks then did. Gross, per lot-day; the lists are alternative baskets and are never added together."
+          description="What the list picked at 09:16, and what those picks then did. Gross, per lot-day."
           actions={<RefreshButton onClick={res.refetch} loading={res.loading} />}
         />
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -223,16 +224,13 @@ export function RotationDailyLog({
             <PortfolioStopButton setting={setting} onChange={setOwnPortfolio} />
           ) : null}
           {focusProp === undefined ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted">Shade by list</span>
-              <SegmentedControl
-                value={focus}
-                options={FOCUS_OPTIONS}
-                onChange={setFocus}
-                ariaLabel="List the calendar is shaded by"
-                size="sm"
-              />
-            </div>
+            <ListPicker
+              value={focus}
+              onChange={setFocus}
+              ariaLabel="List the calendar is shaded by"
+              label="Shade by list"
+              format={listLabel}
+            />
           ) : null}
           {log ? (
             <span
@@ -296,11 +294,11 @@ export function RotationDailyLog({
               description={`${book.error}. The log's own figures are shown.`}
             />
           ) : null}
-          {bookNow && bookNow.errors.length > 0 ? (
+          {replayErrors.length > 0 ? (
             <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-2.5 text-xs text-foreground">
-              {bookNow.errors.length} list-day{bookNow.errors.length === 1 ? '' : 's'} could not be
-              replayed (e.g. {bookNow.errors[0]?.day} {listLabel(bookNow.errors[0]?.list ?? '')}:{' '}
-              {bookNow.errors[0]?.error}) and show the log's own figure.
+              {replayErrors.length} list-day{replayErrors.length === 1 ? '' : 's'} could not be
+              replayed (e.g. {replayErrors[0]?.day} {listLabel(replayErrors[0]?.list ?? '')}:{' '}
+              {replayErrors[0]?.error}) and show the log's own figure.
             </div>
           ) : null}
           {bookNow && unmatched(bookNow) > 0 ? (
@@ -437,6 +435,7 @@ export function RotationDailyLog({
                     {counterParts(
                       counters,
                       source === 'reconstructed' ? 'reconstructed' : 'recorded',
+                      log.rows,
                     ).map((p) => (
                       <div key={p.id} className="flex items-baseline gap-1.5" title={p.title}>
                         <dt className="text-faint">{p.label}</dt>

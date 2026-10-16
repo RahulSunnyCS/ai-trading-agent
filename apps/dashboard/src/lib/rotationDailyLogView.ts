@@ -21,9 +21,13 @@ import type {
 } from '../types/rotationDailyLog';
 import { formatDay, formatInr } from './format';
 import { addDays } from './regimeTags';
-import { listName } from './rotationListNames';
+import { SEVERAL_LISTS_VISIBLE, VISIBLE_LIST_KEYS, listName } from './rotationListNames';
 
-export const LIST_KEYS: readonly RotationListKey[] = ['A', 'B', 'C', 'REF'];
+/**
+ * The lists the log shows (`VISIBLE_LIST_KEYS`). A row's payload still carries every recorded
+ * list; only these are read, counted or drawn.
+ */
+export const LIST_KEYS: readonly RotationListKey[] = VISIBLE_LIST_KEYS;
 
 /** The longest placement note the server accepts. */
 export const NOTE_MAX = 300;
@@ -186,7 +190,7 @@ export function rowFlags(row: RotationRow): RowFlag[] {
       id: 'stop',
       label: 'Stop',
       tone: 'negative',
-      title: `An overall stop-loss fired in: ${stopped.join(', ')}.`,
+      title: `An overall stop-loss fired in: ${stopped.map(listName).join(', ')}.`,
     });
   }
   return flags;
@@ -213,6 +217,11 @@ export function focusStopped(row: RotationRow | null, focus: RotationListKey): b
 
 export type RowFilter = 'all' | 'losing' | 'stops' | 'differ';
 
+/** The browsing filters offered: "Lists disagree" only while several lists are shown. */
+export const FILTERS: readonly RowFilter[] = SEVERAL_LISTS_VISIBLE
+  ? ['all', 'losing', 'stops', 'differ']
+  : ['all', 'losing', 'stops'];
+
 export const FILTER_LABEL: Record<RowFilter, string> = {
   all: 'All',
   losing: 'Losing',
@@ -223,7 +232,9 @@ export const FILTER_LABEL: Record<RowFilter, string> = {
 export const FILTER_HELP: Record<RowFilter, string> = {
   all: 'Every day in the window.',
   losing: 'Days the focus list lost money (gross).',
-  stops: 'Days an overall stop-loss fired on any pick of any list.',
+  stops: SEVERAL_LISTS_VISIBLE
+    ? 'Days an overall stop-loss fired on any pick of any list shown.'
+    : 'Days an overall stop-loss fired on any pick of the list.',
   differ: 'Days the four lists did not all pick the same strategies.',
 };
 
@@ -240,7 +251,7 @@ export function matchesFilter(
     const v = row.lists[focus]?.per_lot_day;
     return typeof v === 'number' && v < 0;
   }
-  if (filter === 'stops') return Object.values(row.lists).some((b) => (b?.stops ?? 0) > 0);
+  if (filter === 'stops') return listsWhere(row, (b) => b.stops > 0).length > 0;
   return row.all_identical === false;
 }
 
@@ -286,12 +297,12 @@ export interface PlacementTally {
   notPlaced: number;
 }
 
-/** How many of the day's lists the owner has marked, and how. */
+/** How many of the day's shown lists the owner has marked, and how. */
 export function placementTally(row: RotationRow): PlacementTally {
-  const keys = Object.keys(row.lists);
+  const keys = LIST_KEYS.filter((k) => row.lists[k] !== undefined);
   const t: PlacementTally = { marked: 0, of: keys.length, placed: 0, changed: 0, notPlaced: 0 };
   for (const k of keys) {
-    const p = row.placement[k as RotationListKey];
+    const p = row.placement[k];
     if (!p) continue;
     t.marked += 1;
     if (p.status === 'placed') t.placed += 1;
@@ -299,6 +310,12 @@ export function placementTally(row: RotationRow): PlacementTally {
     else t.notPlaced += 1;
   }
   return t;
+}
+
+/** "1 of 2 lists marked"; with one list shown, "Marked" or "Not marked". */
+export function markedText(t: PlacementTally): string {
+  if (t.of === 1) return t.marked === 1 ? 'Marked' : 'Not marked';
+  return `${t.marked} of ${t.of} lists marked`;
 }
 
 /** A placement draft is valid when its status is set and a "changed" says what changed. */
@@ -471,11 +488,32 @@ export interface CounterPart {
 }
 
 function perList(values: Record<RotationListKey, number>, of: number): string {
+  if (!SEVERAL_LISTS_VISIBLE) return `${values[LIST_KEYS[0] as RotationListKey] ?? 0}/${of}`;
   return LIST_KEYS.map((k) => `${listName(k)} ${values[k] ?? 0}/${of}`).join(' · ');
 }
 
-/** The footer line: how often each structural thing happened, over the days counted. */
-export function counterParts(c: RotationCounters, source: RotationLogSource): CounterPart[] {
+/**
+ * Days an overall stop-loss fired in a shown list, over the days the counters count (recorded or
+ * reconstructed, not late): the server's `days_with_stop` counts every recorded list, shown or not.
+ */
+export function stopDays(rows: readonly RotationRow[]): number {
+  return rows.filter(
+    (r) =>
+      (r.source === 'recorded' || r.source === 'reconstructed') &&
+      r.status !== 'late' &&
+      listsWhere(r, (b) => b.stops > 0).length > 0,
+  ).length;
+}
+
+/**
+ * The footer line: how often each structural thing happened, over the days counted. `rows` are the
+ * log's rows, from which the stop count is taken for the shown lists only.
+ */
+export function counterParts(
+  c: RotationCounters,
+  source: RotationLogSource,
+  rows: readonly RotationRow[],
+): CounterPart[] {
   const what = source === 'reconstructed' ? 'reconstructed days' : 'forward days';
   const parts: CounterPart[] = [
     {
@@ -512,27 +550,31 @@ export function counterParts(c: RotationCounters, source: RotationLogSource): Co
       id: 'buy',
       label: 'Buy qualified',
       value: perList(c.buy_qualified, c.days),
-      title: `Days a Buy strategy ranked in the overall top 10, per list, of ${c.days} ${what}.`,
+      title: `Days a Buy strategy ranked in the overall top 10${SEVERAL_LISTS_VISIBLE ? ', per list,' : ''} of ${c.days} ${what}.`,
     },
     {
       id: 'override',
       label: 'Widesl min applied',
       value: perList(c.widesl_minimum_applied, c.days),
-      title: `Days the Widesl minimum replaced a top-ranked Dir, per list, of ${c.days} ${what}.`,
+      title: `Days the Widesl minimum replaced a top-ranked Dir${SEVERAL_LISTS_VISIBLE ? ', per list,' : ''} of ${c.days} ${what}.`,
     },
-    {
+  );
+  if (SEVERAL_LISTS_VISIBLE) {
+    parts.push({
       id: 'identical',
       label: 'All four identical',
       value: `${c.all_lists_identical}/${c.days}`,
       title: 'Days the four lists picked the same strategies.',
-    },
-    {
-      id: 'stops',
-      label: 'Stop fired',
-      value: `${c.days_with_stop}/${c.days}`,
-      title: 'Days an overall stop-loss fired on any pick of any list.',
-    },
-  );
+    });
+  }
+  parts.push({
+    id: 'stops',
+    label: 'Stop fired',
+    value: `${stopDays(rows)}/${c.days}`,
+    title: SEVERAL_LISTS_VISIBLE
+      ? 'Days an overall stop-loss fired on any pick of any list shown.'
+      : 'Days an overall stop-loss fired on any pick of the list.',
+  });
   return parts;
 }
 

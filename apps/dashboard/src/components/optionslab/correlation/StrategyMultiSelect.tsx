@@ -32,10 +32,10 @@ interface Props {
 const SHOWN = 60;
 
 /**
- * The comparison's members (BL-094, BL-102): the rotation lists first (Steady, Calendar,
- * Adaptive and the rest), then any strategy that has results, ticked in or out. The strategy list
+ * The comparison's members (BL-094, BL-102): the shown rotation lists first (Adaptive; see
+ * VISIBLE_LIST_KEYS), then any strategy that has results, ticked in or out. The strategy list
  * is the API's enumeration, so a strategy created tomorrow appears here with no change; a text box
- * narrows both (`N_wide`, `dir`, `0932`, `steady`). Stale results are listed but cannot be
+ * narrows both (`N_wide`, `dir`, `0932`, `adaptive`). Stale results are listed but cannot be
  * ticked. A star marks a favourite: starred items are what the page opens on.
  */
 export function StrategyMultiSelect({
@@ -78,7 +78,7 @@ export function StrategyMultiSelect({
       <Input
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Filter the list: steady, N_wide, dir, 0932…"
+        placeholder="Filter the list: adaptive, N_wide, dir, 0932…"
         aria-label="Filter strategies"
       />
       <ul

@@ -1,17 +1,22 @@
 /**
- * The Today page's three list cards (BL-102): Steady, Calendar and Adaptive, each with its latest
- * scored day, its total and drawdown since the forward test began, and how it stands against the
- * fixed base. Pure, so it is unit-tested; the figures are the read-out's, nothing is recomputed.
+ * The Today page's list cards (BL-102): one per shown list (`VISIBLE_LIST_KEYS`), each with its
+ * latest scored day, its total and drawdown since the forward test began, and how it stands
+ * against the fixed base. Pure, so it is unit-tested; the figures are the read-out's, nothing is
+ * recomputed.
  *
  * Gross, two lots a strategy. A day not yet scored is absent, never a zero. Baseline (REF) is a
  * comparator in the page's settings, not a card.
  */
 
 import type { RotationListKey, RotationSummary } from '../types/rotation';
-import { LIST_INFO } from './rotationListNames';
+import { LIST_INFO, type ListKey, VISIBLE_LIST_KEYS } from './rotationListNames';
 
-export const CARD_KEYS = ['A', 'B', 'C'] as const;
-export type CardKey = (typeof CARD_KEYS)[number];
+export type CardKey = Exclude<ListKey, 'REF'>;
+
+/** The shown lists that get a card: Baseline never does, it is a comparator. */
+export const CARD_KEYS: readonly CardKey[] = (VISIBLE_LIST_KEYS as readonly ListKey[]).filter(
+  (k): k is CardKey => k !== 'REF',
+);
 
 export interface ListCard {
   key: CardKey;
@@ -40,7 +45,7 @@ function latestOf(summary: RotationSummary, key: RotationListKey) {
   return null;
 }
 
-/** One card per list in A, B, C order. `summary` null (not read yet) gives cards of dashes. */
+/** One card per shown list, in key order. `summary` null (not read yet) gives cards of dashes. */
 export function listCards(summary: RotationSummary | null): ListCard[] {
   return CARD_KEYS.map((key) => {
     const info = LIST_INFO[key];

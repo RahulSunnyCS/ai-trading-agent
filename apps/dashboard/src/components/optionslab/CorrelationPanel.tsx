@@ -33,6 +33,7 @@ import {
   extremePairs,
   familyLabel,
   isListSelector,
+  isShownSelector,
   matrixOf,
   pairReadout,
   pairsAtOrAbove,
@@ -106,7 +107,10 @@ function Filters({
     () => new Set(favourites.set ? favouriteSelectors(favourites.set) : []),
     [favourites.set],
   );
-  const lists = (available.lists ?? []).map((l) => ({ selector: l.selector, name: l.name }));
+  // Only the shown rotation lists are offered (VISIBLE_LIST_KEYS); the API enumerates all four.
+  const lists = (available.lists ?? [])
+    .filter((l) => isShownSelector(l.selector))
+    .map((l) => ({ selector: l.selector, name: l.name }));
   const g = available.groups;
   const variantsOnly = filters.kind !== 'legwise';
   return (
@@ -392,13 +396,23 @@ function StrategyPicker({
   // When the page is on its own defaults (no ?names=), drop starred items that no longer exist
   // (a strategy deleted since it was starred) so one stale star cannot break the comparison.
   const filters = useMemo(() => {
+    // A comparison needs two: a set the page chose (the favourites, or an old link narrowed below)
+    // that is left with one name is topped up with the built-in three, never shown as one.
+    const atLeastTwo = (names: string[]) =>
+      names.length >= 2 ? names : [...names, ...DEFAULT_NAMES.filter((n) => !names.includes(n))];
+    // A rotation list the dashboard does not show is never compared, even from an old link.
+    if (!state.filters.names.every(isShownSelector)) {
+      return { ...state.filters, names: atLeastTwo(state.filters.names.filter(isShownSelector)) };
+    }
     if (!state.usingDefaults || available.data === null) return state.filters;
     const known = new Set([
       ...available.data.strategies.map((s) => s.name),
       ...(available.data.lists ?? []).map((l) => l.selector),
     ]);
-    const kept = state.filters.names.filter((n) => known.has(n));
-    return { ...state.filters, names: kept.length > 0 ? kept : [...DEFAULT_NAMES] };
+    return {
+      ...state.filters,
+      names: atLeastTwo(state.filters.names.filter((n) => known.has(n))),
+    };
   }, [state.usingDefaults, state.filters, available.data]);
   const selectors = buildSelectors(filters);
   const result = useCorrelation(

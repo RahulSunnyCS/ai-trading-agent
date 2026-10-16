@@ -1,9 +1,10 @@
 /**
  * Options Lab › Strategies and baskets (BL-102): everything that can be traded, in one place.
  *
- *  - Baskets: the rotation lists (Steady, Calendar, Adaptive), each a basket of three strategies
- *    and a Buy picked every morning, with its forward figures; Baseline and the fixed base sit
- *    beneath as comparators.
+ *  - Baskets: the shown rotation lists (VISIBLE_LIST_KEYS; the journal still records all four),
+ *    each a basket of three strategies and a
+ *    Buy picked every morning, with its forward figures; the fixed base (and Baseline, while that
+ *    list is shown) sit beneath as comparators.
  *  - Strategies: the saved leg-wise strategies (strategies/legwise/*.yaml, via
  *    GET /api/backtest/legwise/strategies) with what the evening job has saved for each one's
  *    current version. Editing, backtesting and saving happen in the Builder.
@@ -23,7 +24,8 @@ import { correlateHref } from '../../lib/favourites';
 import { formatDay, formatInr, formatInt } from '../../lib/format';
 import { type StartSpec, startToParams } from '../../lib/legwiseBuilder';
 import { lastResultOf, legsSummary } from '../../lib/optionsRuns';
-import { LIST_INFO } from '../../lib/rotationListNames';
+import { CARD_KEYS, type CardKey } from '../../lib/rotationListCards';
+import { LIST_INFO, UNIVERSE_LABEL, isVisibleList } from '../../lib/rotationListNames';
 import { buildPath } from '../../lib/routes';
 import type { SavedStrategy } from '../../types/legwise';
 import type { RotationListStats } from '../../types/rotation';
@@ -63,7 +65,8 @@ const SHOW_OPTIONS: SegmentedOption<Show>[] = [
   { value: 'starred', label: 'Starred only' },
 ];
 
-const BASKETS = ['A', 'B', 'C'] as const;
+/** One basket card per shown list; Baseline is a comparator, never a card. */
+const BASKETS = CARD_KEYS;
 const WEIGHT_LABEL = ['own', 'weekday', 'dte', 'vix', 'family'] as const;
 const WEIGHT_TEXT: Record<(typeof WEIGHT_LABEL)[number], string> = {
   own: 'own results',
@@ -83,7 +86,7 @@ function BasketCard({
   onOpenToday,
   onCorrelate,
 }: {
-  listKey: (typeof BASKETS)[number];
+  listKey: CardKey;
   stats: RotationListStats | null;
   firstDay: string | null;
   starred: boolean;
@@ -232,7 +235,7 @@ export function StrategiesAndBasketsPanel() {
       <Card>
         <CardHeader
           title="Baskets"
-          description="Each rotation list picks three strategies and a Buy every morning at 09:16."
+          description={`${BASKETS.length === 1 ? 'The rotation list picks' : 'Each rotation list picks'} three strategies and a Buy every morning at 09:16, ranked over ${UNIVERSE_LABEL}.`}
         />
         {waitingForStars ? (
           <SkeletonRows rows={2} />
@@ -243,7 +246,7 @@ export function StrategiesAndBasketsPanel() {
             description="Star a basket to find it here under Starred only."
           />
         ) : (
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className={BASKETS.length > 1 ? 'grid gap-3 md:grid-cols-3' : 'grid max-w-md gap-3'}>
             {shownBaskets.map((key) => (
               <BasketCard
                 key={key}
@@ -260,16 +263,18 @@ export function StrategiesAndBasketsPanel() {
           </div>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted">
-          <span>Comparators</span>
-          <span className="inline-flex items-center gap-1">
-            <StarToggle
-              on={favourites.isListStarred('REF')}
-              label={LIST_INFO.REF.name}
-              disabled={!ready}
-              onClick={() => favourites.toggleList('REF')}
-            />
-            {LIST_INFO.REF.name}: {LIST_INFO.REF.note.toLowerCase()}
-          </span>
+          <span>{isVisibleList('REF') ? 'Comparators' : 'Comparator'}</span>
+          {isVisibleList('REF') ? (
+            <span className="inline-flex items-center gap-1">
+              <StarToggle
+                on={favourites.isListStarred('REF')}
+                label={LIST_INFO.REF.name}
+                disabled={!ready}
+                onClick={() => favourites.toggleList('REF')}
+              />
+              {LIST_INFO.REF.name}: {LIST_INFO.REF.note.toLowerCase()}
+            </span>
+          ) : null}
           <span className="inline-flex items-center gap-1">
             <StarToggle
               on={favourites.isListStarred('base')}

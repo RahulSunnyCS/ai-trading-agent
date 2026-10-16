@@ -22,7 +22,7 @@ import { useRotationMatrix } from '../../hooks/useRotationMatrix';
 import { useRotationMatrixFilters } from '../../hooks/useRotationMatrixFilters';
 import { useTodayIst } from '../../hooks/useTodayIst';
 import { formatDay, formatInt } from '../../lib/format';
-import { listName } from '../../lib/rotationListNames';
+import { DEFAULT_LIST, SEVERAL_LISTS_VISIBLE, listName } from '../../lib/rotationListNames';
 import {
   FALLBACK_NOTE,
   type MatrixPreset,
@@ -69,8 +69,10 @@ function Footnotes({ r }: { r: MatrixResponse }) {
       <OverlayStatus overlay={r.overlay} />
       {r.view === 'date_slot' && r.overlay.available ? (
         <p className="text-xs text-muted">
-          Letters in a cell are the lists that recorded a pick there. A late entry is not forward
-          and is left out of the selection statistics.
+          {SEVERAL_LISTS_VISIBLE
+            ? 'Letters in a cell are the lists that recorded a pick there.'
+            : `The mark in a cell means ${listName(DEFAULT_LIST)} recorded a pick there.`}{' '}
+          A late entry is not forward and is left out of the selection statistics.
         </p>
       ) : null}
       {r.selection_denominator ? (

@@ -1,13 +1,14 @@
 /**
- * Today's baskets: the four lists side by side. Each pick shows its start time, its family, and
- * its composite score; the dots say how many lists hold the same pick, and the footer says what
- * changed since the entry before (the work list for re-setting AlgoTest).
+ * Today's baskets: the shown lists side by side (`VISIBLE_LIST_KEYS`). Each pick shows its start
+ * time, its family, and its composite score; with several
+ * lists shown the dots say how many of the journal's four lists hold the same pick, and the footer
+ * says what changed since the entry before (the work list for re-setting AlgoTest).
  *
  * Before the first entry it shows the registered lists and when they start recording.
  */
 
 import { formatDay, formatIstTime, formatNumber } from '../../../lib/format';
-import { listName } from '../../../lib/rotationListNames';
+import { SEVERAL_LISTS_VISIBLE, listName } from '../../../lib/rotationListNames';
 import { LIST_KEYS } from '../../../lib/rotationView';
 import type {
   RotationBaskets as Baskets,
@@ -47,15 +48,17 @@ function Pick({ pick, highlight }: { pick: RotationPick; highlight?: boolean }) 
       <span className="font-mono text-muted">
         {pick.composite === null ? '' : formatNumber(pick.composite, 3)}
       </span>
-      <span
-        role="img"
-        aria-label={`held by ${pick.shared_by} of 4 lists`}
-        className="font-mono text-[10px] tracking-tighter text-faint"
-        title={`held by ${pick.shared_by} of 4 lists`}
-      >
-        {'●'.repeat(pick.shared_by)}
-        <span className="opacity-30">{'●'.repeat(4 - pick.shared_by)}</span>
-      </span>
+      {SEVERAL_LISTS_VISIBLE ? (
+        <span
+          role="img"
+          aria-label={`held by ${pick.shared_by} of 4 lists`}
+          className="font-mono text-[10px] tracking-tighter text-faint"
+          title={`held by ${pick.shared_by} of 4 lists`}
+        >
+          {'●'.repeat(pick.shared_by)}
+          <span className="opacity-30">{'●'.repeat(4 - pick.shared_by)}</span>
+        </span>
+      ) : null}
     </li>
   );
 }
@@ -98,11 +101,22 @@ function Basket({ k, basket }: { k: RotationListKey; basket: RotationBasket }) {
   );
 }
 
+const GRID = SEVERAL_LISTS_VISIBLE
+  ? 'grid gap-3 sm:grid-cols-2 lg:grid-cols-4'
+  : 'grid max-w-md gap-3';
+
 function Legend() {
   return (
     <p className="text-[11px] text-faint">
-      Strategies are in start-time order. <span className="font-mono">●●○○</span> shows how many of
-      the four lists hold the same strategy. Hover a row for its index and family.
+      Strategies are in start-time order.
+      {SEVERAL_LISTS_VISIBLE ? (
+        <>
+          {' '}
+          <span className="font-mono">●●○○</span> shows how many of the four lists hold the same
+          strategy.
+        </>
+      ) : null}{' '}
+      Hover a row for its index and family.
     </p>
   );
 }
@@ -121,11 +135,12 @@ export function RotationBaskets({
     return (
       <div className="space-y-3">
         <p className="text-sm text-muted">
-          First entry {formatDay(firstEntryDay)}, 09:16 IST. Each list's three strategies (and a Buy
+          First entry {formatDay(firstEntryDay)}, 09:16 IST. The list's three strategies (and a Buy
           add-on when one ranks in the top 10) will appear here, with their scores and what changed
-          since the day before. The registered lists:
+          since the day before.{' '}
+          {SEVERAL_LISTS_VISIBLE ? 'The registered lists:' : 'The list followed:'}
         </p>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className={GRID}>
           {LIST_KEYS.map((k) => (
             <div key={k} className="rounded-lg border border-border bg-surface px-3 py-2">
               <div className="text-sm font-semibold text-foreground">{listName(k)}</div>
@@ -158,7 +173,7 @@ export function RotationBaskets({
         </span>
         <span className="font-mono">chain {e.hash.slice(0, 8)}</span>
       </p>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={GRID}>
         {LIST_KEYS.map((k) => {
           const b = baskets.lists[k];
           return b ? <Basket key={k} k={k} basket={b} /> : null;

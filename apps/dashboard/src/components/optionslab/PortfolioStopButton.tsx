@@ -7,6 +7,7 @@ import { ShieldHalf } from 'lucide-react';
 import { useState } from 'react';
 
 import { type PortfolioStopSetting, buttonLabel, isOn } from '../../lib/portfolioStop';
+import { SEVERAL_LISTS_VISIBLE } from '../../lib/rotationListNames';
 import { Button } from '../ui/Button';
 import { PortfolioStopDialog } from './PortfolioStopDialog';
 
@@ -26,7 +27,7 @@ export function PortfolioStopButton({
         size="sm"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
-        title="Show the lists with a portfolio stop applied. Changes what is shown, not what is recorded."
+        title={`Show ${SEVERAL_LISTS_VISIBLE ? 'the lists' : 'the list'} with a portfolio stop applied. Changes what is shown, not what is recorded.`}
       >
         <ShieldHalf className="h-3.5 w-3.5" aria-hidden="true" />
         {buttonLabel(setting)}

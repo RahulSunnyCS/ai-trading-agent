@@ -125,7 +125,7 @@ export function summary(s: PortfolioStopSetting): string {
   const floor = amount === null ? '' : ` The stop stays at -${inr(amount)} until then.`;
   if (s.mode === 'none' || !ready) {
     return amount === null
-      ? 'No portfolio stop: every list shows its own figures.'
+      ? 'No portfolio stop: the figures are the logged ones.'
       : `No trailing: the stop stays at -${inr(amount)}.`;
   }
   if (s.mode === 'sl' && amount !== null && x !== null && y !== null) {
