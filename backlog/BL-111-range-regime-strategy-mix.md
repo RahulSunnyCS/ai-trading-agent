@@ -208,6 +208,10 @@ unchanged and still pending; this arm neither replaces nor decides them.
   −₹68,696 vs −₹50,267. Gross tells the same story (L3 608, L4 542 vs E 671), so it is not charges: the
   extra Widesl forced in are weaker than the Dir picks they replace. Same on Core-298 (L3 311, L4 233 vs
   E 351). A1's rows reproduced exactly on the rerun.
+- **Addendum 2 (2026-10-17, descriptive only, decides nothing).** The owner meant a cap on Dir **lots**
+  inside 2-2-1-1: D2 = at most 2 Dir lots (Dir only in the two 1-lot slots, 1 + 1); D3 = at most 3 Dir
+  lots (one Dir may take a 2-lot slot and one a 1-lot slot, 2 + 1). Slots filled in rank order (no Buy)
+  with the best pick allowed; both caps leave at least 2 Widesl. Same script, run once.
 
 ## Risks
 

@@ -36,16 +36,38 @@ from option_backtesting.legwise.schema import load_legwise  # noqa: E402
 from option_backtesting.rotation import pick, score, store  # noqa: E402
 from option_backtesting.rotation.lists import LISTS, SIZING_DATE, WARMUP  # noqa: E402
 from option_backtesting.rotation.readout import block_bootstrap_mean, max_drawdown  # noqa: E402
-from option_backtesting.rotation.variants import variant_names  # noqa: E402
+from option_backtesting.rotation.variants import is_buy, is_dir, variant_names  # noqa: E402
 
 SEED = 20261015
 ARMS = {"E": (3, 2, (2, 2, 2)), "L2": (4, 2, (2, 2, 1, 1)), "L1": (4, 1, (2, 2, 1, 1)),
-        "L3": (4, 3, (2, 2, 1, 1)), "L4": (4, 4, (2, 2, 1, 1))}  # L3 / L4: the descriptive addendum
+        "L3": (4, 3, (2, 2, 1, 1)), "L4": (4, 4, (2, 2, 1, 1)),  # L3 / L4: the descriptive addendum
+        "D2": (4, -2, (2, 2, 1, 1)), "D3": (4, -3, (2, 2, 1, 1))}  # addendum 2: at most 2 / 3 Dir lots
 FLAT = ORDERS_PER_TRADE * BROKERAGE_PER_ORDER * (1 + GST)  # per closed trade, whatever the lots
 OUT = HERE / "results" / "lot_ladder"
 
 
+def capped(comp: np.ndarray, names: list[str], cap: int, lots=(2, 2, 1, 1)) -> list[str]:
+    """Fill the slots in rank order (no Buy) with the best pick allowed: a Dir pick only while the Dir
+    lots stay within `cap`; with cap 2 a Dir pick never takes a 2-lot slot (the owner's 1 + 1)."""
+    order = sorted((v for v in range(len(names)) if not is_buy(names[v])), key=lambda v: (-comp[v], names[v]))
+    out, dir_lots = [], 0
+    for k in lots:
+        for v in order:
+            n = names[v]
+            if n in out:
+                continue
+            if is_dir(n):
+                if dir_lots + k > cap or (cap <= 2 and k == 2):
+                    continue
+                dir_lots += k
+            out.append(n)
+            break
+    return out
+
+
 def ranked(comp: np.ndarray, names: list[str], n_core: int, min_wide: int) -> list[str]:
+    if min_wide < 0:
+        return capped(comp, names, -min_wide)
     score.N_CORE, score.MIN_WIDE_N = n_core, min_wide
     p = score.select(comp, names)
     return sorted(p.core, key=lambda n: (-p.composite[n], n))
