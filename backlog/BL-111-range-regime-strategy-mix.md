@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — owner's idea; builds on BL-110; a close cousin of BL-053 (killed) |
-| **Status** | Planned |
+| **Status** | Planned (Phase 0); Amendment A1 (T1 rank ladder) registered 2026-10-17 |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-15 |
@@ -138,6 +138,48 @@ Committed before any run. The decisions were taken by the assistant at the owner
 - Record the signal and both arms' picks in a shadow log from the commit date; read out after 60
   journal days, as BL-058 does.
 
+### Amendment A1 (2026-10-17) — the rank ladder on the T1 universe (registered before any run)
+
+`override: owner, 2026-10-17 chat — "yes, register and run it under BL-111": a universe (T1, both
+indices) that Phase 0's will-not-run list excludes.` Phase 0's H1 and H2 (NIFTY only, P3) are
+unchanged and still pending; this arm neither replaces nor decides them.
+
+- **Question.** On T1, the universe now tracked forward (BL-113; built in BL-115), do 6 lots as
+  2-2-1-1 over Adaptive's top four earn more after charges than today's 3 picks × 2 lots?
+- **Universe.** T1 = Core-298 + the 223 time-generic day-type variants (BL-115), NIFTY and SENSEX.
+  Core from the stored rotation results; the 223 from BL-115's simulations
+  (`research/bl107/results/sim_early/t1t2`, `results/sim`).
+- **Ranking.** List C (Adaptive), registered weights and lookbacks, history from 2024-10-09, the
+  63-day warm-up; the composite computed once per day; `score.select` with `N_CORE` and
+  `MIN_WIDE_N` set per arm. The ladder's ranks are the selected picks ordered by composite (highest
+  first) after the Widesl swap. **The Buy add-on is excluded from every arm**, as in Phase 0.
+- **Arms, 6 lots every trading day.**
+
+  | Arm | Selection | Lots by rank |
+  |---|---|---|
+  | E (comparator) | 3 picks, ≥ 2 Widesl (today's list C) | 2, 2, 2 |
+  | L2 | 4 picks, ≥ 2 Widesl | 2, 2, 1, 1 |
+  | L1 | 4 picks, ≥ 1 Widesl | 2, 2, 1, 1 |
+
+- **P&L.** Every pick re-simulated on its day with the legwise engine (current lot sizing at
+  `SIZING_DATE`); k lots = k × the one-lot gross, minus charges at k lots under the BL-096 model
+  (brokerage ₹20 per order + GST is flat per order, every other charge scales with lots). The re-
+  simulated one-lot gross is checked against the stored results (difference > ₹1 counted).
+- **Periods.** First year 2025-01-10 → 2025-10-08, reported only. Test year 2025-10-09 →
+  2026-10-09, which decides. **Not blind:** the chat estimate of this ladder on 2026-10-16
+  (2-2-1-1 ≈ ₹667 vs ₹640 per lot-day, gross) used each rank's P&L in both years, and T1 itself was
+  compared with Core-298 on the test year. The real confirmation is forward (the T1 track journal).
+- **Pass rule (Phase 0's, on the test year, net).** L2 passes against E only if (a) its net total is
+  ≥ 1.10 × E's, (b) the maximum drawdown of its daily net is no worse, and (c) the 90 % circular
+  block-bootstrap interval (5-day blocks, 2,000 resamples, seed 20261015) of the daily net
+  difference is above zero. L1 is judged against E in the same way, and is preferred to L2 only if
+  it passes and its interval against L2 is also above zero. Otherwise killed: keep 3 × 2.
+- **Descriptive, never decides.** The owner's book (3 lots on ordinary days: E's top 3 × 1 vs its top
+  2 × (2, 1); 6 lots on a day either index has its weekly expiry, arms as above); gross figures; the
+  same arms over Core-298; the first year.
+- **Script.** `packages/option-backtesting/research/bl107/lot_ladder.py` (BL-115's replay harness and
+  simulations live in that folder).
+
 ## Risks
 
 - **BL-053 is a close precedent that failed** on a similar switch; VIX already carries part of the
@@ -169,3 +211,5 @@ should say if the 3-lot ordinary-day basket is not "top 3 non-Buy × 1 lot".
   live store; list C named; NIFTY-only; ladders tied to `score.select` (Widesl minimum kept, no
   Buy add-on); one primary endpoint (the book); net of charges; placebo made a circular shift
   with a P90 bar; the margin premise corrected (Dir is short premium too).
+- 2026-10-17 — Amendment A1 registered at the owner's request (chat: "yes, register and run it under
+  BL-111"): the 2-2-1-1 rank ladder on the T1 universe, net, test year decides; run after this commit.
