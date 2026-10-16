@@ -116,6 +116,26 @@ were simulated on its pick day for the net comparison.
   test year unseen); 16 % of T1's picks rely on RE COST ×2. Not adopted; the forward journal is the
   next evidence.
 
+## Experiment 2 (registered 2026-10-16, before the test-year replay of these rules)
+
+- **Owner:** learn from the first year only, verify on the test year. Profile and correlations:
+  `research/bl107/first_year_profile.py` (2024-10-09 → 2025-10-08 only; BL-104 stored series, 12
+  slots, net, slot-mean). The test year was not read to make these rules (the owner and Claude had
+  seen test-year pick breakdowns earlier; the rules below use first-year numbers only).
+- **R1, day-type exclusion:** on a given day, a strategy (a Core-298 family, or a T1 setting) is not
+  eligible on a day type (its own index's expiry day / other day) where its first-year average net
+  per lot-day was below zero. First-year exclusions: non-expiry days — Core S_wide, S_p250, S_p320,
+  N_buy, S_buy and T1 #22 (SENSEX ₹285), #47, #48 (NIFTY Buy); expiry days — Core N_buy.
+- **R2 = R1 + duplicates out:** also remove a Core family where a T1 setting correlates ≥ 0.9 with it
+  in the first year and has a higher first-year average: Core N_wide (T1 #4, 0.94) and Core N_ditm1
+  (T1 #36, 0.92).
+- **Replay:** Adaptive (no weight) on the test year over T1 under R1 and under R2; the day's
+  composite over the eligible universe only. Compared with T1 (no rule) and Core-298.
+- **Pass rule:** a rule is kept only if its mean gross per lot-day minus T1's (no rule) has a 5-day
+  block-bootstrap 90 % interval above zero and its drawdown is no worse; two rules are tested, so
+  each is judged at the 95 % interval as well and the stricter one is reported. Otherwise T1
+  stays unchanged.
+
 ## Log
 
 - 2026-10-16 — created from the owner's request; Phase 0 registered before the first-year selection
