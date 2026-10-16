@@ -53,7 +53,7 @@ def main() -> None:
             name = f"{w['index']}_{LETTER[w['fam']]}{TAG[w['kind']]}{n}_{slot.replace(':', '')}"
             try:
                 grid.build(grid.Cell(w["fam"], w["index"], slot, params))
-            except ValueError as e:
+            except (ValueError, FileNotFoundError) as e:  # FileNotFoundError: Buy has no 15:17 file
                 dropped.append(f"{slot}: {' '.join(str(e).split())[:60]}")
                 continue
             built.append(slot)
