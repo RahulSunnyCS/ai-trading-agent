@@ -100,6 +100,51 @@ def test_orders_against_the_paper_portfolio_are_saved_and_summarised(client, mon
     assert note.type == "momentum.orders"
 
 
+def test_start_fresh_buys_every_target_name_from_cash(client, monkeypatch):
+    _headline(client)
+    signal = {
+        "week": "2026-10-09",
+        "weights": {"AAA": 0.5, "BBB": 0.5},  # last week's model: ignored when starting fresh
+        "target_weights": {"AAA": 0.5, "CCC#2": 0.5},
+        "rows": [],
+        "sleeves": [],
+    }
+    monkeypatch.setattr(api, "_orders_signal", lambda *a: (signal, "exact", None, ["ranking"]))
+    _strategy(monkeypatch, {"AAA": 100.0, "BBB": 50.0, "CCC#2": 250.0})
+    payload = api._compute_orders("manual", start_fresh=True)
+    rows = {r["symbol"]: (r["action"], r["quantity"]) for r in payload["plan"]["rows"]}
+    assert payload["holdings"]["fresh"] is True
+    assert rows["AAA"] == ("BUY", 500) and rows["CCC#2"] == ("BUY", 200)
+    assert "BBB" not in rows and payload["plan"]["sells"] == 0
+
+
+def test_orders_can_be_planned_for_a_named_favourite_without_making_it_the_headline(
+    client, monkeypatch
+):
+    _headline(client)
+    other = client.post(
+        "/api/saved-runs",
+        json={
+            "dataset": "broad",
+            "name": "Other favourite",
+            "config": {"dataset": "broad", "signal_delay": 0},  # not a repeat of the headline
+            "kpis": {},
+            "dates": [],
+            "strategy": [],
+        },
+    ).json()
+    client.patch(f"/api/saved-runs/{other['id']}", json={"favorite": True})
+    seen = []
+    monkeypatch.setattr(
+        api,
+        "_orders_signal",
+        lambda headline, *a: seen.append(headline["name"]) or (None, "x", "r", []),
+    )
+    assert api._compute_orders(favourite="other fav")["headline"]["name"] == "Other favourite"
+    assert api._compute_orders()["headline"]["name"] == "Broad headline"
+    assert seen == ["Other favourite", "Broad headline"]
+
+
 def test_a_strategy_that_decides_on_fridays_close_says_why_there_are_no_orders_yet(
     client, monkeypatch
 ):

@@ -12,6 +12,7 @@ Pure apart from the message file: the API passes in the journal rows and the fav
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,9 @@ MESSAGES_FILE = "weekly_messages.json"
 #: they never touch the real `data/`.
 STATE_DIR_ENV = "MOMENTUM_STATE_DIR"
 KEEP_MESSAGES = 40
+#: The Friday the owner's own portfolio starts from nothing (a one-line JSON file in the state
+#: folder): that week every held name is a buy, and each group's sleeves are numbered from it.
+PAPER_START_FILE = "paper_start.json"
 #: Names shown in each "at the edge" list.
 EDGE_COUNT = 3
 
@@ -41,6 +45,28 @@ def state_dir() -> Path:
 
     override = os.environ.get(STATE_DIR_ENV)
     return Path(override) if override else DATA_DIR
+
+
+def paper_start(data_dir: Path | None = None) -> str | None:
+    """The Friday ('YYYY-MM-DD') the owner's portfolio starts from nothing, or None."""
+    try:
+        week = json.loads(((data_dir or state_dir()) / PAPER_START_FILE).read_text()).get("week")
+    except (FileNotFoundError, ValueError, AttributeError):
+        return None
+    return str(week) if week else None
+
+
+def set_paper_start(week: str | None, data_dir: Path | None = None) -> str | None:
+    """Record (or, with None, clear) the paper start Friday. Must be a Friday."""
+    path = (data_dir or state_dir()) / PAPER_START_FILE
+    if week is None:
+        path.unlink(missing_ok=True)
+        return None
+    day = pd.Timestamp(week)
+    if day.dayofweek != 4:
+        raise ValueError(f"{week} is not a Friday.")
+    path.write_text(json.dumps({"week": day.strftime("%Y-%m-%d")}))
+    return day.strftime("%Y-%m-%d")
 
 
 def save_message(
@@ -190,15 +216,78 @@ def _preview_diff(preview: dict[str, Any] | None, final: dict[str, Any]) -> dict
     }
 
 
+_SLEEVE_NAME = re.compile(r"Friday \d+ of \d+$")
+_SLEEVE_NUMBER = re.compile(r"Friday (\d+) of \d+$")
+
+
+def sleeve_label(name: str, week: str, start: str, rebalance: dict[str, Any] | None) -> str | None:
+    """A sleeve's name numbered from the paper start (None when it has no cadence or no
+    "Friday n of K" suffix): the sleeve that trades on `start` is "Friday 1 of K". `rebalance` is
+    the signal's cadence (`on_cadence`, `every`, `next`)."""
+    every = (rebalance or {}).get("every")
+    if not every or every <= 1 or not _SLEEVE_NAME.search(name):
+        return None
+    trades_on = week if rebalance.get("on_cadence") else rebalance.get("next")
+    if not trades_on:
+        return None
+    gap = (pd.Timestamp(trades_on) - pd.Timestamp(start)).days // 7
+    return _SLEEVE_NAME.sub(f"Friday {gap % every + 1} of {every}", name)
+
+
+def _renumber_sleeves(card: dict[str, Any], week: str, start: str) -> None:
+    """Number a group's sleeves from the paper start: the sleeve that trades on the start Friday
+    is "Friday 1 of K", the one after it "Friday 2 of K". The saved runs keep their names (and
+    ids, which the journal keys on); only what the page shows changes."""
+    sleeves = card.get("sleeves") or []
+    names: dict[str, str] = {}
+    for sleeve in sleeves:
+        label = sleeve_label(str(sleeve["name"]), week, start, sleeve)
+        if label:
+            names[sleeve["name"]] = label
+            sleeve["name"] = label
+    if names:
+        sleeves.sort(
+            key=lambda s: int(m.group(1)) if (m := _SLEEVE_NUMBER.search(s["name"])) else 99
+        )
+    edge = card.get("edge")
+    if edge and edge.get("sleeve") in names:
+        edge["sleeve"] = names[edge["sleeve"]]
+
+
+def first_week_actions(signal: dict[str, Any]) -> list[dict[str, Any]]:
+    """The paper start Friday as a journal entry shows it: a buy for every name the signal holds
+    afterwards, best rank first (nothing is held going into the first week)."""
+    weights = signal.get("target_weights") or signal.get("weights") or {}
+    ranks = {r.get("asset"): r.get("rank") for r in signal.get("rows", [])}
+    held = [a for a, w in weights.items() if w and a not in groups_mod.IDLE_NAMES]
+    held.sort(key=lambda a: (ranks.get(a) is None, ranks.get(a) or 0, a))
+    return [{"asset": a, "action": "BUY", "rank": ranks.get(a)} for a in held]
+
+
+def _start_from_cash(card: dict[str, Any]) -> None:
+    """The first week of a portfolio: nothing is held, so every name the strategy holds after
+    the week is a buy and nothing is sold (the rows' `after` weights are unchanged)."""
+    rows = []
+    for row in card["rows"]:
+        if not (row.get("after") or 0) > 0:
+            continue
+        rows.append({**row, "action": "BUY", "held": False, "before": 0.0, "rank_prev": None})
+    card["rows"] = rows
+    card["first_week"] = True
+
+
 def week_view(
     week: str,
     rows: list[dict[str, Any]],
     previous_rows: list[dict[str, Any]],
     favourites: list[dict[str, Any]],
     group_records: list[dict[str, Any]],
+    start_week: str | None = None,
 ) -> list[dict[str, Any]]:
     """One card per favourite (groups and ungrouped favourites; sleeves appear inside their
-    group), headline first, from the journal rows of `week` and of the week before."""
+    group), headline first, from the journal rows of `week` and of the week before. From
+    `start_week` (the paper start) groups' sleeves are numbered from it, and on that Friday every
+    card starts from nothing held."""
     latest, previous = _latest(rows), _latest(previous_rows)
 
     def entry(config_id: str) -> tuple[dict[str, Any] | None, str | None, str | None]:
@@ -276,6 +365,11 @@ def week_view(
                 )
         cards.append(card)
 
+    if start_week and week >= start_week:
+        for card in cards:
+            _renumber_sleeves(card, week, start_week)
+            if week == start_week and not card["blocked"]:
+                _start_from_cash(card)
     headline = next((c for c in cards if c["headline"]), None)
     shared = set(headline["held"]) if headline else set()
     for card in cards:
@@ -307,4 +401,5 @@ def _card(record: dict[str, Any], dataset: str) -> dict[str, Any]:
         "explain": None,
         "edge": None,
         "since_preview": None,
+        "first_week": False,
     }

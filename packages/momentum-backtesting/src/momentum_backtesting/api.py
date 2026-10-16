@@ -2823,9 +2823,12 @@ def _rebalance_response(
     except (ValueError, KeyError) as error:
         raise HTTPException(422, str(error)) from None
     price_mode = "live" if live else "last_close"
+    start = this_week.paper_start()
 
     return {
         **(extra or {}),
+        "paper_start": start,
+        "first_week": start == week.strftime("%Y-%m-%d"),
         "dataset": req.dataset,
         "as_of": now.isoformat(timespec="seconds") if live else week.strftime("%Y-%m-%d"),
         "signal_week": week.strftime("%Y-%m-%d"),
@@ -2904,17 +2907,36 @@ def _rebalance_group_preview(req: RebalanceRequest, now: datetime) -> dict:
         [(value, m["target"]) for value, (_, _, m) in zip(values, models, strict=True)]
     )
     total = sum(values)
-    sleeves = [
-        {
-            "id": member["id"],
-            "name": member["name"],
-            "value": round(value, 4),
-            "share": round(value / total, 4),
-            "target_pct": {n: round(w * 100, 4) for n, w in m["target"].items()},
-            **_rebalance_info(m["model_req"], m["week"]),
-        }
-        for value, (member, _, m) in zip(values, models, strict=True)
-    ]
+    sleeves = []
+    start = this_week.paper_start()
+    for value, (member, member_req, m) in zip(values, models, strict=True):
+        info = _rebalance_info(m["model_req"], m["week"])
+        week_label = m["week"].strftime("%Y-%m-%d")
+        # From the paper start a sleeve is numbered from it (display only), as on This week. A
+        # first allocation previews every sleeve as weekly, so its own saved cadence numbers it.
+        name = (
+            this_week.sleeve_label(
+                member["name"], week_label, start, _rebalance_info(member_req, m["week"])
+            )
+            if start and week_label >= start
+            else None
+        )
+        sleeves.append(
+            {
+                "id": member["id"],
+                "name": name or member["name"],
+                "value": round(value, 4),
+                "share": round(value / total, 4),
+                "target_pct": {n: round(w * 100, 4) for n, w in m["target"].items()},
+                **info,
+            }
+        )
+    if start:
+        sleeves.sort(
+            key=lambda s: (
+                int(x.group(1)) if (x := this_week._SLEEVE_NUMBER.search(s["name"])) else 99
+            )
+        )
     return _rebalance_response(
         req,
         now,
@@ -3079,11 +3101,14 @@ def _journal_weekly(
     }
 
 
-def _journal_entry_view(row: dict) -> dict:
+def _journal_entry_view(row: dict, start: str | None = None) -> dict:
     """One journal row for the dashboard: the stored text parsed, and the signal cut down to its
-    actions (a Broad signal ranks hundreds of names; the page needs the ones it acts on)."""
+    actions (a Broad signal ranks hundreds of names; the page needs the ones it acts on). From the
+    paper start `start` a sleeve is numbered from it, and on that Friday nothing is held going in
+    and every name held after is a buy; the stored entry is not touched."""
     signal = json.loads(row["signal"])
-    return {
+    week = str(row["week"])[:10]
+    view = {
         **{key: row[key] for key in row if key not in ("signal", "holdings_before", "settings")},
         "holdings_before": json.loads(row["holdings_before"]),
         "actions": [
@@ -3092,7 +3117,19 @@ def _journal_entry_view(row: dict) -> dict:
             if r.get("action")
         ],
         "level": signal.get("level"),
+        "first_week": False,
     }
+    if start and week >= start and row.get("source") != "benchmark":
+        label = this_week.sleeve_label(
+            str(row["config_name"]), week, start, signal.get("rebalance")
+        )
+        if label:
+            view["config_name"] = label
+        if week == start:
+            view["holdings_before"] = {}
+            view["actions"] = this_week.first_week_actions(signal)
+            view["first_week"] = True
+    return view
 
 
 def _journal_view(week: str | None) -> dict:
@@ -3120,11 +3157,25 @@ def _journal_view(week: str | None) -> dict:
                 )
             )
             favourites = runs_store.list_favorites(con)
-            entries = [_journal_entry_view(row) for row in journal.entries(con, selected)]
+            start = this_week.paper_start()
+            entries = [_journal_entry_view(row, start) for row in journal.entries(con, selected)]
             check = journal.check(con, selected, favourites, (NIFTY200_MOMENTUM30_TRI,))
     except FileNotFoundError:
         return {"available": False, "weeks": [], "week": None, "entries": [], "check": None}
-    return {"available": True, "weeks": weeks, "week": selected, "entries": entries, "check": check}
+    # The check lists favourites by their saved names: show a sleeve under the number the entry
+    # list gives it (numbered from the paper start).
+    shown = {e["config_id"]: e["config_name"] for e in entries}
+    for item in (check or {}).get("items", []):
+        item["name"] = shown.get(item["config_id"], item["name"])
+    return {
+        "available": True,
+        "weeks": weeks,
+        "week": selected,
+        "paper_start": start,
+        "first_week": start == selected,
+        "entries": entries,
+        "check": check,
+    }
 
 
 def _week_view(week: str | None) -> dict:
@@ -3136,6 +3187,7 @@ def _week_view(week: str | None) -> dict:
     target = journal.week_string(week_ending_on_or_before(datetime.now(IST).date()))
     selected = journal.week_string(week) if week else target
     previous = journal.week_string(pd.Timestamp(selected) - pd.Timedelta(weeks=1))
+    start = this_week.paper_start()
     try:
         with read_catalog() as con:
             favourites = runs_store.list_favorites(con, include_groups=True)
@@ -3158,7 +3210,11 @@ def _week_view(week: str | None) -> dict:
         "week": selected,
         "target_week": target,
         "weeks": weeks,
-        "favourites": this_week.week_view(selected, rows, prior, favourites, groups),
+        "paper_start": start,
+        "first_week": start == selected,
+        "favourites": this_week.week_view(
+            selected, rows, prior, favourites, groups, start_week=start
+        ),
         "message": this_week.message_for(this_week.load_messages(this_week.state_dir()), selected),
     }
 
@@ -3268,10 +3324,14 @@ def _order_prices(
     return prices, (f"live {fyers.price_label(creds)} quotes" if live else "last close")
 
 
-def _compute_orders(trigger: str = "manual") -> dict:
+def _compute_orders(
+    trigger: str = "manual", *, start_fresh: bool = False, favourite: str | None = None
+) -> dict:
     """The headline's orders for this Friday against the owner's holdings (the paper portfolio
     until money goes in), saved to `momentum_orders`. The body of the 14:15 job and of the page's
-    "Make orders now"."""
+    "Make orders now". `start_fresh` plans from nothing held (paper capital all in cash), so every
+    target name is a buy: the first week of a new portfolio, not a change to last week's model.
+    `favourite` (an id or a name fragment) plans for that favourite instead of the headline."""
     from . import holdings_store, orders
     from .weekly import week_ending_on_or_before
 
@@ -3279,6 +3339,8 @@ def _compute_orders(trigger: str = "manual") -> dict:
     today = datetime.now(IST).date()
     # On a Friday this is that Friday; on any other day, the coming one.
     target_week = pd.Timestamp(week_ending_on_or_before(today + timedelta(days=6)))
+    # The paper start Friday is the first week of the portfolio: nothing is held going into it.
+    start_fresh = start_fresh or this_week.paper_start() == journal_week_string(target_week)
     try:
         with read_catalog() as con:
             favourites = runs_store.list_favorites(con, include_groups=True)
@@ -3289,7 +3351,13 @@ def _compute_orders(trigger: str = "manual") -> dict:
             review = stock_actions.review_snapshot(con)
     except FileNotFoundError:  # no catalog yet: no favourites either
         favourites = []
-    headline = next((f for f in favourites if f["active"]), None)
+    if favourite:
+        wanted = favourite.lower()
+        matches = [f for f in favourites if f["id"] == favourite or wanted in f["name"].lower()]
+        # A group is the favourite; its sleeves match the same name but are not planned alone.
+        headline = next((f for f in matches if f.get("group")), None) or next(iter(matches), None)
+    else:
+        headline = next((f for f in favourites if f["active"]), None)
     if headline is None:
         return {"week": journal_week_string(target_week), "error": "No headline favourite."}
     members = groups.get(headline["id"], {}).get("members", [])
@@ -3319,10 +3387,12 @@ def _compute_orders(trigger: str = "manual") -> dict:
         holdings = {
             name: math.floor(capital * weight / prices[name])
             for name, weight in before.items()
-            if prices.get(name)
+            if prices.get(name) and not start_fresh
         }
         cash = capital - sum(q * prices[n] for n, q in holdings.items())
         payload["holdings"] = {"source": "paper", "capital": capital}
+        if start_fresh:
+            payload["holdings"]["fresh"] = True
     else:
         rows = (synced or {}).get("rows", [])
         cash = float(settings["extra_cash_rs"])

@@ -625,6 +625,13 @@ export function MomentumRebalanceView({
               <p className="mt-1 text-sm text-muted">{plan.live_unavailable}</p>
             </div>
           ) : null}
+          {plan.first_week ? (
+            <output className="mb-4 block rounded-lg border border-info/30 bg-info/10 px-4 py-3 text-sm text-foreground">
+              <span className="font-semibold">First week.</span> Your portfolio starts from nothing
+              this Friday. With no holdings entered, every name the strategy holds is a buy, and a
+              group's sleeves are numbered from here: Friday 1 trades today.
+            </output>
+          ) : null}
           {plan.group ? (
             <GroupPreview group={plan.group} firstAllocation={plan.first_allocation} />
           ) : null}

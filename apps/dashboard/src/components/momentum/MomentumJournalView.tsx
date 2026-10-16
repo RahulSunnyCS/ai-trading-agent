@@ -93,7 +93,7 @@ export function MomentumJournalView() {
         {check ? <JournalSummary check={check} /> : null}
       </Card>
       {check ? <JournalCheckCard items={check.items} week={check.week} /> : null}
-      <JournalEntriesCard entries={data.entries} />
+      <JournalEntriesCard entries={data.entries} firstWeek={data.first_week} />
     </div>
   );
 }
@@ -216,7 +216,13 @@ function topHoldings(holdings: Record<string, number>, limit: number): string {
     : shown.join(', ');
 }
 
-function JournalEntriesCard({ entries }: { entries: MomentumJournalEntry[] }) {
+function JournalEntriesCard({
+  entries,
+  firstWeek,
+}: {
+  entries: MomentumJournalEntry[];
+  firstWeek: boolean;
+}) {
   const [open, setOpen] = useState<number | null>(null);
   return (
     <Card>
@@ -224,6 +230,13 @@ function JournalEntriesCard({ entries }: { entries: MomentumJournalEntry[] }) {
         title="Entries"
         description="Oldest first. Click an entry for its full actions and holdings. 'Held before' is the model portfolio at the signal's close, before that signal's own trades; next week's entry shows the result."
       />
+      {firstWeek ? (
+        <output className="mb-3 block rounded-lg border border-info/30 bg-info/10 px-4 py-3 text-sm text-foreground">
+          <span className="font-semibold">First week.</span> Your portfolio starts from nothing this
+          Friday: nothing is held before, and every name a strategy holds after is shown as a buy.
+          The recorded entries themselves are unchanged.
+        </output>
+      ) : null}
       {entries.length === 0 ? (
         <p className="text-sm text-muted">No entries for this week.</p>
       ) : (
