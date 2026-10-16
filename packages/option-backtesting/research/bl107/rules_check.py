@@ -91,7 +91,10 @@ def main() -> None:
         if label in ("r1", "r2"):
             mean, lo, hi = block_bootstrap_mean(g - t)
             # 95 % interval from the same bootstrap draws (5-day blocks)
-            n = len(g); diffs = g - t; idx = np.arange(n); boots = []
+            n = len(g)
+            diffs = g - t
+            idx = np.arange(n)
+            boots = []
             for _ in range(2000):
                 starts = rng.integers(0, n, size=int(np.ceil(n / 5)))
                 b = np.concatenate([(idx[s0:s0 + 5] if s0 + 5 <= n else np.concatenate([idx[s0:], idx[: s0 + 5 - n]])) for s0 in starts])[:n]
