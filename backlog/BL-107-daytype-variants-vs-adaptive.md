@@ -149,3 +149,4 @@ were simulated on its pick day for the net comparison.
 - 2026-10-16 — created from the owner's request; Phase 0 registered before the first-year selection
   was run.
 - 2026-10-16 — run overnight; result recorded (registered weight fails on drawdown; unweighted T1 wins as an ablation; T2 no win).
+- 2026-10-16 — Adaptive's Core-298 picks by family × day type, first year vs test year: most first-year losers flipped; only SENSEX Widesl (OTM, ₹320) on non-expiry days lost in both. Owner: no blocking rule; T1 stays unchanged (no weight, no filter, no pruning).
