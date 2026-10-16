@@ -1,0 +1,68 @@
+[
+ {
+  "family": "D",
+  "index": "N",
+  "band": "A",
+  "k": 5,
+  "params": {
+   "strike": "ITM1",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 505.25779517942107,
+  "robust": 11.086724101559495
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "B",
+  "k": 5,
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 316.5095713708082,
+  "robust": 10.534729334145718
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "C",
+  "k": 5,
+  "params": {
+   "strike": "ITM1",
+   "sl": 20,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 290.9499658206214,
+  "robust": 16.03527778125682
+ }
+]

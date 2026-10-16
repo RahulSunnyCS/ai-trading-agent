@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-15
+Last updated: 2026-10-16
 
 ## Open
 
@@ -41,6 +41,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-074](BL-074-point-in-time-categories-nse-basic-industry.md) | Point-in-time categories from NSE's Basic Industry classification | P1 | Planned | research | momentum |
 | [BL-095](BL-095-portfolio-mtm-stop-in-rotation.md) | Portfolio MTM stop-loss on the Rotation page: a ₹ stop (default ₹10k; empty / 0 = none) with trailing (Trail SL, Lock, Lock and trail) set in a pop-up, applied to each list's basket — days table, calendar, "Replay the list", hero curve, drawdowns; read-out untouched | P1 | In progress (Phases 1–4 built; PR open) | feature | options / dashboard |
 | [BL-104](BL-104-full-parameter-sweep.md) | Full-factorial parameter sweep over Widesl (incl. ATM), Dir and Buy: strike, stops, trail, MTM, exit, re-entry, range and target at 7 slots × 2 indices (63,384 cells), Calmar-gated Martin ranking with a plateau rule; absorbs BL-096/097/098 Phase 3 | P1 | In progress (Stages 1–3 and advisory done; forward test and pool POC open) | research | options |
+| [BL-106](BL-106-pool-picker-poc.md) | Picker POC: Steady / Calendar / Adaptive / Baseline over a first-year-selected candidate pool vs the 298, test year 2025-10 → 2026-10, gross | P1 | Done: no list won on New-536; New-556 exploratory, shallower drawdown in one path | research | options |
 | [BL-114](BL-114-momentum-correlation-widget.md) | Momentum correlation widget: how alike are the strategies we follow? (saved groups measure as 1.2 independent bets of 11) | P1 | Planned | feature | momentum |
 | [BL-105](BL-105-dir-trade-management-tests.md) | Directional trade management: profit lock / trail on day MTM, roll the decayed leg to the new ATM, restart at a profit limit; a screen on existing machinery first, engine support only for survivors | P2 | Done: no idea passed its rule (lock / trail, restart, roll); engine roll kept | research | options |
 | [BL-096](BL-096-directional-parameter-sweep.md) | Directional stop, re-entry, trailing and exit sweep across NIFTY/SENSEX ATM and ITM1 variants | P2 | In progress | research | options |
@@ -50,6 +51,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-100](BL-100-restricted-rotation-lists-p3.md) | Rotation lists A/B/C restricted to the BL-099 families, tested on 2022-24 | P2 | Planned (pre-registration; not run) | research | options |
 | [BL-102](BL-102-options-lab-ux-redesign.md) | Options Lab redesign: three workspaces, lists first (Steady / Calendar / Adaptive), favourites, a leg-grid builder | P1 | In progress | improvement | dashboard |
 | [BL-109](BL-109-rotation-weekday-dte.md) | Rotation days to expiry: count weekdays only, not calendar days | P1 | Done | research | options |
+| [BL-112](BL-112-group-leaders-shadow.md) | Group Leaders: run Adaptive on the best-settings-per-group pool as a parallel forward track beside Core | P1 | Planned | feature | options |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-039](BL-039-broad-warm-path-and-weekly-job-cost.md) | Broad warm path and weekly-job cost (follow-up to BL-005) | P2 | Planned | improvement | momentum |
 | [BL-041](BL-041-in-app-guide.md) | In-app Guide: what each dashboard section does and how to use it | P2 | In progress | feature | dashboard |
