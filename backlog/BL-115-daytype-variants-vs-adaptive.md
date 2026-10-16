@@ -173,6 +173,24 @@ were simulated on its pick day for the net comparison.
   above zero); otherwise variant 1. Read once.
 - **Known weaknesses:** four quarters is a small sample; fold 1's window equals the first year, so
   fold 1 is close to the T1 replay already seen; the refine premiums were chosen on the first year.
+- **Result (2026-10-17): no pass — the method does not hold up when re-run.** `research/bl107/walkforward.py`,
+  Adaptive gross per lot-day, 239 days.
+
+  | Quarter traded | Days | Core-298 | Variant 1 | v1 − Core | Variant 2 | Settings (v1 / v2) |
+  |---|---|---|---|---|---|---|
+  | 2025-10-09 → 12-31 | 56 | 462 | 806 | +345 | 806 | 8 / 8 |
+  | 2026-01 → 03 | 59 | 470 | 725 | +255 | 725 | 11 / 11 |
+  | 2026-04 → 06 | 60 | 139 | −76 | −214 | −76 | 9 / 9 |
+  | 2026-07 → 10-09 | 64 | 591 | 516 | −75 | 490 | 11 / 12 |
+
+  Variant 1: pooled 487 vs Core 417, +70 [−81, +215], 2 of 4 quarters won, max DD −₹13,973 vs −₹10,688:
+  **no pass**. Variant 2: +63 [−87, +208], 2 of 4: no pass; variant 2 − variant 1 −7 [−19, −0], so the
+  simpler variant stands. **Reading:** the T1 settings selected once on the first year (the frozen
+  sets now tracked forward) beat Core over the whole test year (+223), but the same selection re-run on
+  later windows picked settings that won only the first two quarters. The two halves of 2026 are the
+  weak part, and fold 1 is nearly the T1 replay itself. So T1's test-year edge depends more on which
+  sets that one selection happened to pick than on a method that keeps working; the forward track
+  (BL-113) is the real check, and its +₹223 should be read as optimistic.
 
 ## Experiment 4 — beyond the grid's edges (registered 2026-10-16, before any new cell was simulated)
 
