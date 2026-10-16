@@ -7,7 +7,7 @@
 | **Type** | feature |
 | **Area** | options |
 | **Created** | 2026-10-16 |
-| **Depends on** | BL-106 (pool definition and result; PR #231, **must merge first**), BL-058 (the lists, the journal and its read-out rule) |
+| **Depends on** | BL-106 (pool definition and result; merged), BL-058 (the lists, the journal and its read-out rule) |
 | **TODO.md row** | — |
 
 ## Context
@@ -57,7 +57,8 @@ descriptively at 60 on-time days and decisively at 250.
   Core, by a margin, with a drawdown at least 10% shallower. (Non-inferiority in return, superiority in
   drawdown: the reason to want the pool is risk.)
 - **Universe / pool, frozen:** Group Leaders v1 = BL-106's New-556 exactly: the 94 sets and 556
-  variants in `research/bl106/pool_{sets,cells}{,_ext}_2026-10-15.json` (committed on #231), selected
+  variants in `research/bl106/pool_{sets,cells}{,_ext}_2026-10-15.json` (on `main`; the readable list
+  is `research/bl106/group_leaders_v1.md`), selected
   from 2024-10-09 → 2025-10-08. Disclosed, as in BL-106: day-stop and entry rates came from the two-year
   Stage 1 summary (a small leak of behaviour rates, not P&L), and three NIFTY Dir ITM1 sets were added
   by the owner's amendment before any replay. The 556 generated variant YAMLs are **committed** in
