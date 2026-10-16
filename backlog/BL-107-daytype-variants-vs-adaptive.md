@@ -135,6 +135,14 @@ were simulated on its pick day for the net comparison.
   block-bootstrap 90 % interval above zero and its drawdown is no worse; two rules are tested, so
   each is judged at the 95 % interval as well and the stricter one is reported. Otherwise T1
   stays unchanged.
+- **Result (2026-10-16): kill — T1 stays unchanged.** `research/bl107/rules_check.py`. Adaptive,
+  test year, gross per lot-day: T1 640; T1 + R1 557 (−83 vs T1, 90 % [−157, −9]); T1 + R2 503
+  (−136, 90 % [−236, −46]); both with a deeper drawdown than T1 (−10,299 and −9,218 vs −7,767).
+  The first-year non-expiry losers did not repeat (T1 SENSEX ₹285 earned +₹480 per non-expiry pick in
+  the test year), and removing near-duplicate Core templates took away days they won. Also run, as
+  information (SEEN, the idea came from the test-year breakdown): a hard expiry / non-expiry tag
+  filter, `hard_filter.py`: 493 per lot-day, −147 vs T1 (90 % [−235, −62]). Every pruning tried — the
+  10 % weight, the hard filter, R1, R2 — lowered the result.
 
 ## Log
 
