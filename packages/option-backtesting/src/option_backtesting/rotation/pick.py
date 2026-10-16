@@ -66,6 +66,7 @@ def code_commit() -> str:
                 "--",
                 "src",
                 "strategies/rotation",
+                "strategies/rotation_t1",
             ],
             capture_output=True,
             text=True,
@@ -207,12 +208,33 @@ def record(
     root = root or data_dir()
     if not dry_run and day != now_fn().astimezone(IST).date():
         raise PickError(f"{day} is not today (IST): an entry can only be recorded on its own day")
+    if not dry_run and any(
+        e["day"] == day.isoformat() for e in journal.read(store.journal_path(root, track))
+    ):
+        # a retry after a success: answer before any network read can fail and raise a false alert
+        raise journal.AlreadyRecorded(f"{day.isoformat()} is already in the journal")
     # everything slow and VIX-independent first: the 09:15 bar is served a few seconds after the
     # job starts, and only the band depends on it
     names = variant_names() + (track_names(track) if track else [])
     dte, dte_source = listed_dte_labels(day)
     commit = code_commit()
-    hist = load_history(day, root, names)
+    try:
+        hist = load_history(day, root, names)
+    except PickError as error:
+        if track:  # the fix is the track's own update, not the live one
+            raise PickError(
+                str(error).replace("`obt rotation update", f"`obt rotation update --track {track}")
+            ) from error
+        raise
+    if track:
+        core_days = load_history(day, root, variant_names()).days
+        if hist.days != core_days:
+            missing = sorted(set(core_days) - set(hist.days))
+            raise PickError(
+                f"the {track} track lacks results for {len(missing)} day(s) Core-298 has "
+                f"(first {', '.join(d.isoformat() for d in missing[:3])}): "
+                f"run `obt rotation update --track {track}`"
+            )
     source = "given"
     if vix_open is None:
         vix_open, source = vix_open_with_source(day)

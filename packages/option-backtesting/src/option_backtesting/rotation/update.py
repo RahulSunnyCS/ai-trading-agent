@@ -45,7 +45,7 @@ def backfill_days(names: list[str], root: Path | None = None) -> list[date]:
     """Every day Core-298 has stored where any of `names` has not: a parallel track's history is
     built over exactly the live history's days (so the two rank on the same rows)."""
     root = root or data_dir()
-    core_days = store.result_days(variant_names()[0], root)
+    core_days = store.load_matrix(variant_names(), root).days  # days every Core variant has
     have = [store.result_days(n, root) for n in names]
     return sorted(d for d in core_days if any(d not in h for h in have))
 
@@ -55,6 +55,7 @@ def update_day(
     root: Path | None = None,
     log: Callable[[str], None] = print,
     names: list[str] | None = None,
+    write_days: bool = True,
 ) -> dict:
     """Returns {'written': n, 'already': n, 'skipped': reason|None, 'errors': [...]}."""
     root = root or data_dir()
@@ -97,7 +98,7 @@ def update_day(
             root,
         )
         out["written"] += 1
-    if not out["errors"]:
+    if write_days and not out["errors"]:  # a parallel track never writes the live days.csv
         store.append_day(day_attributes(root, day), root)
     log(
         f"{day}: {out['written']} variants written, {out['already']} already there, "

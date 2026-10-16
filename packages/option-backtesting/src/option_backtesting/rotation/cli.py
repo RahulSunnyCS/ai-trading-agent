@@ -39,30 +39,37 @@ def update(
         None, "--track", help="A parallel track (t1): run only its extra variants."
     ),
     backfill: bool = typer.Option(
-        False, "--backfill", help="With --track: every day Core-298 has that the track lacks."
+        False,
+        "--backfill",
+        help="With --track: kept for clarity; a track update always fills every missing day.",
     ),
 ) -> None:
     """Run all 298 variants over one collected day and store the results (idempotent)."""
     from .update import backfill_days, default_day, update_day
-    from .variants import track_names
+    from .variants import TRACK_DIRS, track_names
 
+    if backfill and not track:
+        typer.echo("--backfill needs --track", err=True)
+        raise typer.Exit(2)
     if track:
-        # A parallel track's extra variants only: no base or trigger scoring, never the live files.
+        if track not in TRACK_DIRS:
+            typer.echo(f"unknown track {track!r} (known: {', '.join(TRACK_DIRS)})", err=True)
+            raise typer.Exit(2)
+        # A parallel track's extra variants only: every day Core-298 has stored that the track
+        # lacks (so a missed evening is filled the next time, never silently dropped), no base or
+        # trigger scoring, never the live results or days.csv.
         names = track_names(track)
-        days = (
-            backfill_days(names) if backfill else [_day(day) if day else default_day(names=names)]
-        )
-        days = [d for d in days if d is not None]
+        days = [_day(day)] if day else backfill_days(names)
         if not days:
-            typer.echo(f"{track}: nothing to update")
+            typer.echo(f"{track}: nothing to update (every Core-298 day is stored)")
             return
         failed = 0
         for d in days:
-            r = update_day(d, names=names, log=typer.echo)
+            r = update_day(d, names=names, log=typer.echo, write_days=False)
             if r["skipped"] or r["errors"]:
                 failed += 1
                 typer.echo(f"{track} {d}: {r['skipped'] or r['errors'][:3]}", err=True)
-        if failed and not backfill:
+        if failed:
             raise typer.Exit(2)
         return
 
@@ -119,6 +126,11 @@ def pick(
 
     d = _day(day)
 
+    from .variants import TRACK_DIRS
+
+    if track and track not in TRACK_DIRS:
+        typer.echo(f"unknown track {track!r} (known: {', '.join(TRACK_DIRS)})", err=True)
+        raise typer.Exit(2)
     tag = f"{track.upper()} TRACK " if track else ""
 
     def alert(title: str, body: str) -> None:

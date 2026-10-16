@@ -123,3 +123,69 @@ def test_backfill_covers_exactly_the_core_days_the_track_lacks(tmp_path, monkeyp
         date(2026, 10, 5),
         date(2026, 10, 7),
     ]
+
+
+def test_a_retry_after_a_recorded_day_answers_before_reading_the_vix(track_seeded, monkeypatch):
+    root, target = track_seeded
+    record(target, root, vix_open=14.2, now_fn=_at(target, 9, 16))
+
+    def no_network(day):
+        raise AssertionError("the VIX must not be read on a retry")
+
+    monkeypatch.setattr(pick, "vix_open_with_source", no_network)
+    with pytest.raises(journal.AlreadyRecorded):
+        record(target, root, now_fn=_at(target, 9, 16))
+
+
+def test_the_track_pick_refuses_when_it_lacks_a_day_core_has(track_seeded):
+    root, target = track_seeded
+    days = sorted(store.load_matrix(NAMES, root).days)
+    gap = days[-5]
+    # remove the gap day from one track variant's results file
+    path = store.result_path(TRACK[0], root)
+    path.write_text(
+        "".join(
+            line
+            for line in path.read_text().splitlines(True)
+            if not line.startswith(gap.isoformat())
+        )
+    )
+    with pytest.raises(pick.PickError, match="track lacks results for 1 day"):
+        record(target, root, vix_open=14.2, now_fn=_at(target, 9, 16), track="t1")
+
+
+def test_the_verdict_reads_the_first_60_days_only(tmp_path):
+    days = _weekdays(date(2026, 10, 12), 70)
+    for i, d in enumerate(days):
+        live = 100.0
+        trk = 300.0 if i < 60 else -5000.0  # later days must not move the verdict
+        store.append_result(
+            "N_wide_0917", {"day": d.isoformat(), "net": live, "gross": live}, tmp_path
+        )
+        store.append_result(
+            "N_wide-t1s4_0917", {"day": d.isoformat(), "net": trk, "gross": trk}, tmp_path
+        )
+        base = {"day": d.isoformat(), "before_first_entry": True}
+        journal.append(
+            store.journal_path(tmp_path),
+            {**base, "lists": {"C": {"core": ["N_wide_0917"], "buy": []}}},
+        )
+        journal.append(
+            store.journal_path(tmp_path, "t1"),
+            {**base, "lists": {"C": {"core": ["N_wide-t1s4_0917"], "buy": []}}},
+        )
+    r = track.build("t1", tmp_path)
+    assert r["judged_days"] == 60 and r["diff"] == pytest.approx(200.0)
+    assert r["after_readout"]["days"] == 10 and r["after_readout"]["diff"] == pytest.approx(-5100.0)
+    assert "judged on the first 60 days" in track.render(r)
+
+
+def test_a_track_update_never_writes_the_live_days_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(update, "UNDERLYINGS", ())  # no lake needed: nothing is loaded
+    monkeypatch.setattr(update, "excluded_map", lambda root: {})
+    name = "N_wide-t1s4_0917"
+    store.append_result(name, {"day": "2026-10-05", "net": 1.0}, tmp_path)  # already stored
+    r = update.update_day(
+        date(2026, 10, 5), tmp_path, log=lambda m: None, names=[name], write_days=False
+    )
+    assert (r["already"], r["errors"]) == (1, []) and not store.days_path(tmp_path).exists()

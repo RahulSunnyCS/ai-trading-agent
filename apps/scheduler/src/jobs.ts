@@ -216,7 +216,8 @@ const BASE_JOBS: Job[] = [
     description:
       "Store the T1 parallel track's results for the day (`obt rotation update --track t1`): its 223 extra variants only, in their own folder; the live results are never touched",
     // After the evening run's last retry (20:15). Idempotent: it scores the newest collected day the
-    // track has not stored yet, so a run before the day is collected writes nothing and succeeds.
+    // track has not stored yet (every missing day, so a missed evening is filled the next time);
+    // the 09:16 job repeats it as a catch-up before the track pick.
     schedule: { at: '21:00', on: tradingDays, label: 'trading days 21:00' },
     steps: [['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'update', '--track', 't1']],
     cwd: '.',
@@ -238,8 +239,11 @@ const BASE_JOBS: Job[] = [
     schedule: { at: '09:16', on: tradingDays, label: 'trading days 09:16' },
     // The live pick first, always: a failed track step retries the job, and the live step then
     // answers "already recorded" (exit 0) without writing anything.
+    // Then the track: a catch-up update first (fills any day the 21:00 job missed; usually a no-op),
+    // and its pick, which refuses rather than rank on fewer days than the live list.
     steps: [
       ['uv', 'run', 'obt', 'rotation', 'pick'],
+      ['uv', 'run', 'obt', 'rotation', 'update', '--track', 't1'],
       ['uv', 'run', 'obt', 'rotation', 'pick', '--track', 't1'],
     ],
     cwd: OPTIONS,
