@@ -209,6 +209,14 @@ were simulated on its pick day for the net comparison.
 - **Pass rule:** in the test year the chosen combination's Calmar beats the plain book's AND its total
   is at least 95 % of the plain total. Otherwise no overlay.
 
+- **Result (2026-10-17): no pass — no overlay.** `research/bl107/book_overlays.py`, book gross, first
+  year 184 days / test year 239 days. Chosen on the first year: no stop, lock ₹3k at +₹6k, 1-1-1
+  (Calmar 19.96 vs 19.29 plain). Test year: total ₹4,59,720 vs ₹4,78,909 plain, Calmar 20.80 vs 21.67,
+  max drawdown −₹23,300 both. Descriptive: the ₹8k stop at 1-1-1 was the best test-year row (₹4,83,240,
+  Calmar 23.78, DD −₹21,422) but was not the first-year choice; every 2-1-1 row has a deeper drawdown,
+  and its per-lot P&L is about the same as 1-1-1 (first year ₹546 vs ₹545 per lot-day; test year ₹678
+  vs ₹668): the top-scored pick is not much better than the others.
+
 ## Experiment 6 — picker mix (registered 2026-10-16, before any run)
 
 - **Rules compared:** (a) today: 3 core picks with at least 2 Widesl, + 1 Buy if in the top 10;
@@ -217,6 +225,21 @@ were simulated on its pick day for the net comparison.
 - **Pass rule (per universe):** a rule replaces (a) only if its test-year mean gross per lot-day minus
   (a)'s has a 90 % block-bootstrap interval above zero and its max drawdown per lot is no worse.
   Two alternatives are tested, so the stricter 95 % interval is also reported.
+
+- **Result (2026-10-17): killed — rule (a) stays for both universes.** `research/bl107/picker_mix.py`,
+  gross per lot-day, first year 184 days / test year 239 days.
+
+  | Universe | Rule | First year | Test year | Test max DD | vs (a), test | 90 % interval |
+  |---|---|---|---|---|---|---|
+  | Core-298 | (a) 3 picks, ≥ 2 Widesl | 301 | 417 | −10,688 | | |
+  | Core-298 | (b) 3 picks, ≥ 1 Widesl | 345 | 463 | −13,278 | +46 | [−24, +117] |
+  | Core-298 | (c) 4 picks, ≥ 2 Widesl | 297 | 416 | −12,001 | −1 | [−56, +53] |
+  | T1 | (a) | 517 | 640 | −7,767 | | |
+  | T1 | (b) | 524 | 583 | −9,320 | −56 | [−138, +27] |
+  | T1 | (c) | 523 | 600 | −7,928 | −40 | [−91, +11] |
+
+  The lot ladder over the top four (2-2-1-1) is a separate question, registered as BL-111
+  Amendment A1 (2026-10-17).
 
 ## Experiment 7 — wings (iron condor) on T1's Widesl picks (registered 2026-10-17, before any run)
 
