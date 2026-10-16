@@ -2,7 +2,7 @@
 
 The rule ranks all 298 variants every morning and keeps three. Nothing in it says the three must be
 spread across families, indexes or the day, so a list can slide toward, say, NIFTY Widesl at the
-open for weeks without any single pick looking odd. This card counts what the focus list has been
+open for weeks without any single pick looking odd. This card counts what Adaptive has been
 holding and tells you when the last four weeks are unlike its own past.
 
 It counts picks, not P&L. It never changes a list, a weight or the journal.

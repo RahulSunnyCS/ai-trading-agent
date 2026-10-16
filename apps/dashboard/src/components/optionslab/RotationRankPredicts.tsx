@@ -19,7 +19,6 @@ import { tooltipPlacement } from '../../lib/momentumResult';
 import {
   type ChartSize,
   type IcBar,
-  LIST_KEYS,
   formatIc,
   icDomain,
   icLayout,
@@ -42,8 +41,7 @@ import { SkeletonRows } from '../ui/Skeleton';
 import { StatCard } from '../ui/StatCard';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
-
-const LIST_OPTIONS = LIST_KEYS.map((value) => ({ value, label: listName(value) }));
+import { ListPicker } from './rotation/ListPicker';
 
 type View = 'forward' | 'research';
 type Window = '63' | 'p1' | 'all';
@@ -268,7 +266,7 @@ function IcChart({ ic, reference }: { ic: RotationIc; reference: number | null }
   );
 }
 
-function Legend({ hasReference }: { hasReference: boolean }) {
+function Legend({ referenceList }: { referenceList: string | null }) {
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
       <li className="flex items-center gap-1.5">
@@ -283,10 +281,10 @@ function Legend({ hasReference }: { hasReference: boolean }) {
         <span className="h-0.5 w-4 bg-foreground" aria-hidden="true" />
         Running mean, with its 95% band
       </li>
-      {hasReference ? (
+      {referenceList !== null ? (
         <li className="flex items-center gap-1.5">
           <span className="h-0.5 w-4 border-t-2 border-dashed border-info" aria-hidden="true" />
-          Research mean, {listName('A')}
+          Research mean, {listName(referenceList)}
         </li>
       ) : null}
     </ul>
@@ -346,7 +344,7 @@ function CriterionTable({
           title={
             ref
               ? `${ref.source}, ${listName(ref.list)} list, ${formatDay(ref.from)} to ${formatDay(ref.to)}, ${ref.variants} variants`
-              : `Only the ${listName('A')} list has a research reference`
+              : 'No research reference for this list'
           }
         >
           Research
@@ -467,15 +465,7 @@ export function RotationRankPredicts({
       <CardHeader
         title="Does rank predict results?"
         description="Each day, the rank correlation between the morning composite over all variants and that day's realised gross per variant."
-        actions={
-          <SegmentedControl
-            value={list}
-            options={LIST_OPTIONS}
-            onChange={onList}
-            ariaLabel="List"
-            size="sm"
-          />
-        }
+        actions={<ListPicker value={list} onChange={onList} ariaLabel="List" />}
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -572,7 +562,11 @@ export function RotationRankPredicts({
         />
       ) : (
         <div className="space-y-3">
-          <Legend hasReference={refComposite !== null && mode === 'research'} />
+          <Legend
+            referenceList={
+              refComposite !== null && mode === 'research' ? (ref?.list ?? null) : null
+            }
+          />
           <IcChart ic={ic} reference={mode === 'research' ? refComposite : null} />
           <p className="text-sm text-muted">{icVerdict(ic.summary.composite)}</p>
           {!ic.chain.intact ? (

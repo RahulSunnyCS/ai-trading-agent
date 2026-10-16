@@ -25,8 +25,10 @@ import type {
   RotationVariantRow,
 } from '../types/rotationExplain';
 import { EMPTY, formatDay, formatInr, formatInt, formatIstTime, formatNumber } from './format';
+import { VISIBLE_LIST_KEYS } from './rotationListNames';
 
-export const LIST_KEYS: readonly RotationListKey[] = ['A', 'B', 'C', 'REF'];
+/** The lists the explain cards offer: the shown ones (`VISIBLE_LIST_KEYS`). */
+export const LIST_KEYS: readonly RotationListKey[] = VISIBLE_LIST_KEYS;
 
 /** The order the criteria are shown in, as the composite lists them. */
 export const CRITERIA: readonly RotationCriterion[] = ['recent', 'weekday', 'dte', 'vix', 'rfam'];

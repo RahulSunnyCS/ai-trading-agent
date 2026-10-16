@@ -20,7 +20,6 @@ import {
   CRITERION_HINT,
   CRITERION_LABEL,
   CRITERION_SHORT,
-  LIST_KEYS,
   type ProvenanceFlag,
   boundaryLines,
   differsFromEntry,
@@ -33,7 +32,6 @@ import {
   supportOf,
   whyLine,
 } from '../../lib/rotationExplainView';
-import { listName } from '../../lib/rotationListNames';
 import type {
   RotationExplain,
   RotationListKey,
@@ -44,12 +42,10 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { Input } from '../ui/Input';
-import { SegmentedControl } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
-
-const LIST_OPTIONS = LIST_KEYS.map((value) => ({ value, label: listName(value) }));
+import { ListPicker } from './rotation/ListPicker';
 
 // ---------------------------------------------------------------------------
 // Small parts
@@ -598,15 +594,13 @@ export function RotationWhyThisPick({
         title="Why this pick?"
         description="Each criterion's value, percentile, weight and points, with the days behind every fit."
         actions={
-          <SegmentedControl
+          <ListPicker
             value={list}
-            options={LIST_OPTIONS}
             onChange={(next) => {
               onList(next);
               setSelected(null);
             }}
             ariaLabel="List"
-            size="sm"
           />
         }
       />

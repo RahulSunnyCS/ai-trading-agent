@@ -31,7 +31,7 @@ import {
   sourceBadge,
   sourceNote,
 } from '../../../lib/rotationBasketView';
-import { listLabel } from '../../../lib/rotationListNames';
+import { DEFAULT_LIST, listLabel } from '../../../lib/rotationListNames';
 import type { CorrelationResponse } from '../../../types/legwise';
 import type { BasketPick, RotationBasketResponse } from '../../../types/rotationBasket';
 import { Badge } from '../../ui/Badge';
@@ -303,7 +303,7 @@ export function CorrelationBasket({
             <SegmentedControl
               value={list}
               options={BASKET_LIST_OPTIONS}
-              onChange={(v) => setListQ(v === 'A' ? null : v)}
+              onChange={(v) => setListQ(v === DEFAULT_LIST ? null : v)}
               ariaLabel="List"
               size="sm"
             />

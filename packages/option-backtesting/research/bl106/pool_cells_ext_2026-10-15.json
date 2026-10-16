@@ -1,0 +1,402 @@
+[
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA5_0917"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:32",
+  "params": {
+   "strike": "ITM1",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA5_0932"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "09:47",
+  "params": {
+   "strike": "ITM1",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA5_0947"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:02",
+  "params": {
+   "strike": "ITM1",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dA5_1002"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB5_1017"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:32",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB5_1032"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "10:47",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB5_1047"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:02",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB5_1102"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB5_1117"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:32",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB5_1132"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "11:47",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB5_1147"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:02",
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dB5_1202"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 20,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC5_1217"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:32",
+  "params": {
+   "strike": "ITM1",
+   "sl": 20,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC5_1232"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "12:47",
+  "params": {
+   "strike": "ITM1",
+   "sl": 20,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC5_1247"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:02",
+  "params": {
+   "strike": "ITM1",
+   "sl": 20,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC5_1302"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:17",
+  "params": {
+   "strike": "ITM1",
+   "sl": 20,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC5_1317"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:32",
+  "params": {
+   "strike": "ITM1",
+   "sl": 20,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC5_1332"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "13:47",
+  "params": {
+   "strike": "ITM1",
+   "sl": 20,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC5_1347"
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "slot": "14:02",
+  "params": {
+   "strike": "ITM1",
+   "sl": 20,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "name": "N_dC5_1402"
+ }
+]

@@ -17,6 +17,7 @@ import type {
   ShadowTriggerRow,
 } from '../types/rotationShadow';
 import { EMPTY, formatDay, formatInr, formatInt, formatNumber } from './format';
+import { isVisibleList } from './rotationListNames';
 
 /** A trigger row with fewer event days than this shows no t (the API's own bar). */
 export const THIN_DAYS = 10;
@@ -402,26 +403,29 @@ export interface ResearchRow {
 /** One row per list: BL-083's gain and the two controls' P90 in both periods, beside the forward
  * running total (or why there is none). */
 export function researchRows(r: RotationShadowResponse): ResearchRow[] {
-  return r.override.lists.map((l) => {
-    const ex = r.research.override.find((x) => x.period === 'explore' && x.list === l.list);
-    const cf = r.research.override.find((x) => x.period === 'confirm' && x.list === l.list);
-    const forward =
-      l.total_basket !== null
-        ? `${formatInr(l.total_basket, { sign: true })} (${formatInt(l.scored)} ${plural(l.scored, 'day', 'days')})`
-        : l.pending > 0
-          ? `pending (${formatInt(l.pending)} ${plural(l.pending, 'day', 'days')})`
-          : EMPTY;
-    return {
-      list: l.list,
-      candidate: l.candidate,
-      exploreGain: formatInr(ex?.gain, { sign: true }),
-      exploreTime: formatInr(ex?.random_time_p90, { sign: true }),
-      exploreDay: formatInr(ex?.random_day_p90, { sign: true }),
-      exploreAbove: ex === undefined ? EMPTY : ex.above_controls ? 'Above both' : 'Not above both',
-      confirmGain: formatInr(cf?.gain, { sign: true }),
-      confirmTime: formatInr(cf?.random_time_p90, { sign: true }),
-      confirmDay: formatInr(cf?.random_day_p90, { sign: true }),
-      forward,
-    };
-  });
+  return r.override.lists
+    .filter((l) => isVisibleList(l.list))
+    .map((l) => {
+      const ex = r.research.override.find((x) => x.period === 'explore' && x.list === l.list);
+      const cf = r.research.override.find((x) => x.period === 'confirm' && x.list === l.list);
+      const forward =
+        l.total_basket !== null
+          ? `${formatInr(l.total_basket, { sign: true })} (${formatInt(l.scored)} ${plural(l.scored, 'day', 'days')})`
+          : l.pending > 0
+            ? `pending (${formatInt(l.pending)} ${plural(l.pending, 'day', 'days')})`
+            : EMPTY;
+      return {
+        list: l.list,
+        candidate: l.candidate,
+        exploreGain: formatInr(ex?.gain, { sign: true }),
+        exploreTime: formatInr(ex?.random_time_p90, { sign: true }),
+        exploreDay: formatInr(ex?.random_day_p90, { sign: true }),
+        exploreAbove:
+          ex === undefined ? EMPTY : ex.above_controls ? 'Above both' : 'Not above both',
+        confirmGain: formatInr(cf?.gain, { sign: true }),
+        confirmTime: formatInr(cf?.random_time_p90, { sign: true }),
+        confirmDay: formatInr(cf?.random_day_p90, { sign: true }),
+        forward,
+      };
+    });
 }

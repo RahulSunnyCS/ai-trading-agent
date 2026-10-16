@@ -1,7 +1,8 @@
 /**
- * The Today page's list cards (BL-102): Steady, Calendar and Adaptive side by side, answering
- * "how is each list doing?" before anything else. A card is a button that makes its list the
- * page's focus; the focus list is outlined. Today's picks sit inside, collapsed.
+ * The Today page's list cards (BL-102): one per shown list (VISIBLE_LIST_KEYS),
+ * answering "how is the list doing?" before anything else. With several lists a card is a button
+ * that makes its list the page's focus, and the focus list is outlined. Today's picks sit inside,
+ * collapsed.
  *
  * Figures come from the read-out (`lib/rotationListCards.ts`); a day not yet scored shows a
  * dash, never a zero.
@@ -10,6 +11,7 @@
 import { cn } from '../../../lib/cn';
 import { EMPTY, formatDay, formatInr } from '../../../lib/format';
 import { type ListCard, listCards } from '../../../lib/rotationListCards';
+import { SEVERAL_LISTS_VISIBLE } from '../../../lib/rotationListNames';
 import type { RotationBasket, RotationListKey, RotationSummary } from '../../../types/rotation';
 import { pnlClass } from '../shared';
 
@@ -46,21 +48,30 @@ function ListCardView({
       aria-label={`${card.name} list`}
       className={cn(
         'flex flex-col gap-2 rounded-xl border bg-surface p-4',
-        focused ? 'border-primary ring-1 ring-primary/40' : 'border-border',
+        focused && SEVERAL_LISTS_VISIBLE
+          ? 'border-primary ring-1 ring-primary/40'
+          : 'border-border',
       )}
     >
-      <button
-        type="button"
-        onClick={onFocus}
-        aria-pressed={focused}
-        className="flex flex-col items-start gap-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <span className="flex w-full items-center justify-between gap-2">
+      {SEVERAL_LISTS_VISIBLE ? (
+        <button
+          type="button"
+          onClick={onFocus}
+          aria-pressed={focused}
+          className="flex flex-col items-start gap-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span className="flex w-full items-center justify-between gap-2">
+            <span className="text-sm font-semibold text-foreground">{card.name}</span>
+            {focused ? <span className="text-[10px] font-medium text-primary">focus</span> : null}
+          </span>
+          <span className="text-xs text-muted">{card.note}</span>
+        </button>
+      ) : (
+        <div className="flex flex-col items-start gap-0.5">
           <span className="text-sm font-semibold text-foreground">{card.name}</span>
-          {focused ? <span className="text-[10px] font-medium text-primary">focus</span> : null}
-        </span>
-        <span className="text-xs text-muted">{card.note}</span>
-      </button>
+          <span className="text-xs text-muted">{card.note}</span>
+        </div>
+      )}
 
       <div>
         <div className="text-[11px] text-faint">
@@ -130,7 +141,7 @@ export function RotationListCards({
         ? `${count} picks recorded for ${formatDay(entryDay)}`
         : `${count} picks`;
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className={cn('grid gap-4', cards.length > 1 ? 'lg:grid-cols-3' : 'max-w-md')}>
       {cards.map((card) => (
         <ListCardView
           key={card.key}

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { RotationListStats, RotationSummary } from '../../types/rotation';
 import {
+  BENCHMARKS,
+  LIST_KEYS,
   benchmarkFigures,
   headline,
   heroSeries,
@@ -49,7 +51,7 @@ function summary(): RotationSummary {
     late_entries: [],
     short: true,
     lists: {
-      A: stats(),
+      C: stats(),
       REF: stats({
         total: 19000,
         max_drawdown: -8800,
@@ -68,18 +70,25 @@ function summary(): RotationSummary {
       max_drawdown: -5400,
     },
     days: [
-      { day: '2026-10-12', base: 100, base_total: 600, A_total: 1000, REF_total: 800 },
-      { day: '2026-10-13', base: 100, base_total: 600, A_total: -300, REF_total: 500 },
+      { day: '2026-10-12', base: 100, base_total: 600, C_total: 1000, REF_total: 800 },
+      { day: '2026-10-13', base: 100, base_total: 600, C_total: -300, REF_total: 500 },
     ],
   };
 }
 
+describe('the lists the page shows', () => {
+  it('shows Adaptive alone and offers no Baseline benchmark', () => {
+    expect(LIST_KEYS).toEqual(['C']);
+    expect(BENCHMARKS).toEqual(['base', 'random']);
+  });
+});
+
 describe('benchmarkFigures', () => {
   it('reads REF, the base and the random median from the summary', () => {
     const s = summary();
-    expect(benchmarkFigures(s, 'REF', 'A').total).toBe(19000);
-    expect(benchmarkFigures(s, 'base', 'A').perLotDay).toBe(100);
-    const r = benchmarkFigures(s, 'random', 'A');
+    expect(benchmarkFigures(s, 'REF', 'C').total).toBe(19000);
+    expect(benchmarkFigures(s, 'base', 'C').perLotDay).toBe(100);
+    const r = benchmarkFigures(s, 'random', 'C');
     expect(r.total).toBe(18000);
     expect(r.perLotDay).toBeCloseTo(18000 / (6 * 2));
     expect(r.beatsRandom).toBe(50);
@@ -87,14 +96,14 @@ describe('benchmarkFigures', () => {
 
   it('gives nulls, not zeros, when the benchmark has no data', () => {
     const s = { ...summary(), base: null };
-    expect(benchmarkFigures(s, 'base', 'A').total).toBeNull();
-    expect(benchmarkFigures({ ...s, lists: {} }, 'REF', 'A').perLotDay).toBeNull();
+    expect(benchmarkFigures(s, 'base', 'C').total).toBeNull();
+    expect(benchmarkFigures({ ...s, lists: {} }, 'REF', 'C').perLotDay).toBeNull();
   });
 });
 
 describe('headline', () => {
   it('compares per lot, and shows lots instead of a gap for totals', () => {
-    const h = headline(summary(), 'A', 'REF', 60);
+    const h = headline(summary(), 'C', 'REF', 60);
     const byId = Object.fromEntries(h.map((x) => [x.id, x]));
     expect(byId.perLotDay?.gap).toBe(80);
     expect(byId.perLotDay?.tone).toBe('positive');
@@ -109,34 +118,32 @@ describe('headline', () => {
 
   it('a smaller drawdown per lot is better even though the number is larger', () => {
     const s = summary();
-    s.lists.A = stats({ max_drawdown_per_lot: -1000 });
-    const dd = headline(s, 'A', 'REF', 60).find((x) => x.id === 'drawdownLot');
+    s.lists.C = stats({ max_drawdown_per_lot: -1000 });
+    const dd = headline(s, 'C', 'REF', 60).find((x) => x.id === 'drawdownLot');
     expect(dd?.gap).toBe(300);
     expect(dd?.tone).toBe('positive');
   });
 
   it('is not fooled by more lots: a bigger rupee drawdown on 8-lot days is no gap at all', () => {
     const s = summary();
-    s.lists.A = stats({ max_drawdown: -12000, max_drawdown_per_lot: -1300, lots_per_day: 8 });
-    const h = headline(s, 'A', 'REF', 60);
+    s.lists.C = stats({ max_drawdown: -12000, max_drawdown_per_lot: -1300, lots_per_day: 8 });
+    const h = headline(s, 'C', 'REF', 60);
     expect(h.find((x) => x.id === 'drawdownLot')?.tone).toBe('default');
     expect(h.some((x) => x.id === 'total' && x.gap !== null)).toBe(false);
   });
 
   it('is empty when the focus list has no figures yet', () => {
-    expect(headline({ ...summary(), lists: {} }, 'A', 'REF', 60)).toEqual([]);
+    expect(headline({ ...summary(), lists: {} }, 'C', 'REF', 60)).toEqual([]);
   });
 });
 
 describe('verdict', () => {
-  it('lists the base first, carrying the pass rule, then REF', () => {
-    const v = verdict(summary(), 'A');
-    expect(v.lines.map((l) => l.label)).toEqual([
-      'Steady minus the fixed base',
-      'Steady minus Baseline',
-    ]);
+  it('has the base line, carrying the pass rule, and no Baseline line while Baseline is hidden', () => {
+    const v = verdict(summary(), 'C');
+    // the read-out still carries vs_ref; it is not shown with only Adaptive visible
+    expect(summary().lists.C?.vs_ref).not.toBeNull();
+    expect(v.lines.map((l) => l.label)).toEqual(['Adaptive minus the fixed base']);
     expect(v.lines[0]?.rule).toEqual({ drawdownNoWorse: true, beats: false });
-    expect(v.lines[1]?.rule).toBeNull();
     expect(v.readable).toBe(false); // 2 days
   });
 
@@ -146,17 +153,18 @@ describe('verdict', () => {
 });
 
 describe('heroSeries', () => {
-  it('accumulates each list and the base day by day and carries the focus list band', () => {
-    const pts = heroSeries(summary(), 'A');
-    expect(pts.map((p) => p.lists.A)).toEqual([1000, 700]);
-    expect(pts.map((p) => p.lists.REF)).toEqual([800, 1300]);
+  it('accumulates the shown list and the base day by day and carries the focus list band', () => {
+    const pts = heroSeries(summary(), 'C');
+    expect(pts.map((p) => p.lists.C)).toEqual([1000, 700]);
+    // Baseline is in the read-out's days but is not a line on the chart
+    expect(pts.map((p) => p.lists.REF)).toEqual([undefined, undefined]);
     expect(pts.map((p) => p.base)).toEqual([600, 1200]);
     expect(pts[1]?.band).toEqual({ p10: 200, p50: 1800, p90: 3400 });
   });
 
   it('is empty before the first scored day', () => {
     const { days: _days, ...s } = summary();
-    expect(heroSeries(s, 'A')).toEqual([]);
+    expect(heroSeries(s, 'C')).toEqual([]);
   });
 });
 

@@ -1,0 +1,1764 @@
+[
+ {
+  "family": "W",
+  "index": "N",
+  "band": "A",
+  "k": 1,
+  "params": {
+   "strike": "OTM2",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 297.8938018345801
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "band": "A",
+  "k": 2,
+  "params": {
+   "strike": "OTM3",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 234.87833186971997
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "band": "A",
+  "k": 3,
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 276.4001422753701
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "band": "A",
+  "k": 4,
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 303.7142841927757
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "band": "B",
+  "k": 1,
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": null,
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "y1_avg_day_inr": 306.8526455091561
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "band": "B",
+  "k": 2,
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "y1_avg_day_inr": 291.5867205988541
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "band": "B",
+  "k": 3,
+  "params": {
+   "strike": "OTM1",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "y1_avg_day_inr": 276.537834970092
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "band": "B",
+  "k": 4,
+  "params": {
+   "strike": "OTM2",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 197.75121054198095
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "band": "C",
+  "k": 1,
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "y1_avg_day_inr": 183.13270814505665
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "band": "C",
+  "k": 2,
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "y1_avg_day_inr": 203.4650234847899
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "band": "C",
+  "k": 3,
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 242.62434791842935
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "band": "C",
+  "k": 4,
+  "params": {
+   "strike": "OTM1",
+   "sl": 60,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "y1_avg_day_inr": 168.56773122795198
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "band": "D",
+  "k": 1,
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 213.2255901293716
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "band": "D",
+  "k": 2,
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "y1_avg_day_inr": 230.67284210177087
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "band": "D",
+  "k": 3,
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "y1_avg_day_inr": 201.5149765697568
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "band": "D",
+  "k": 4,
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 218.76350657539328
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "A",
+  "k": 1,
+  "params": {
+   "strike": "OTM1",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 347.2691402975847
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "A",
+  "k": 2,
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 358.0647499525917
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "A",
+  "k": 3,
+  "params": {
+   "strike": "OTM2",
+   "sl": 60,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 295.6377338191919
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "A",
+  "k": 4,
+  "params": {
+   "strike": "OTM1",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 302.2867941592547
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "B",
+  "k": 1,
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 222.42416845352543
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "B",
+  "k": 2,
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 160.93181112034603
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "B",
+  "k": 3,
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 167.52301390837079
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "B",
+  "k": 4,
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 138.47092196429787
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "C",
+  "k": 1,
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 288.1983622520076
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "C",
+  "k": 2,
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "y1_avg_day_inr": 167.36943372155008
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "C",
+  "k": 3,
+  "params": {
+   "strike": "ATM",
+   "sl": 100,
+   "trail": [
+    15,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "y1_avg_day_inr": 141.38619013643458
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "C",
+  "k": 4,
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 207.2176723422309
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "D",
+  "k": 1,
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": null,
+   "mtm": 2000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 124.10104733729652
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "D",
+  "k": 2,
+  "params": {
+   "strike": "PLOW",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "y1_avg_day_inr": 97.93039687152816
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "D",
+  "k": 3,
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "y1_avg_day_inr": 102.7385741081315
+ },
+ {
+  "family": "W",
+  "index": "S",
+  "band": "D",
+  "k": 4,
+  "params": {
+   "strike": "PHIGH",
+   "sl": 40,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:10",
+   "reentry": null
+  },
+  "y1_avg_day_inr": 135.77271298358315
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "A",
+  "k": 1,
+  "params": {
+   "strike": "OTM1",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 381.65983213329446
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "A",
+  "k": 2,
+  "params": {
+   "strike": "ATM",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 490.1782936811769
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "A",
+  "k": 3,
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 441.2278691515749
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "A",
+  "k": 4,
+  "params": {
+   "strike": "OTM1",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 303.80306429805063
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "B",
+  "k": 1,
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 359.3001153946888
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "B",
+  "k": 2,
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "y1_avg_day_inr": 284.76961460383797
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "B",
+  "k": 3,
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 294.9280170284302
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "B",
+  "k": 4,
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "y1_avg_day_inr": 300.7056698171716
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "C",
+  "k": 1,
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 276.9464815715064
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "C",
+  "k": 2,
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 292.76301332958315
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "C",
+  "k": 3,
+  "params": {
+   "strike": "OTM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 270.1114389828825
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "C",
+  "k": 4,
+  "params": {
+   "strike": "OTM1",
+   "sl": 30,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 228.69618270947382
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "D",
+  "k": 1,
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "y1_avg_day_inr": 219.5282744253092
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "D",
+  "k": 2,
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "y1_avg_day_inr": 254.46499253453513
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "D",
+  "k": 3,
+  "params": {
+   "strike": "ATM",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": null,
+   "trail": null
+  },
+  "y1_avg_day_inr": 223.14313651361928
+ },
+ {
+  "family": "D",
+  "index": "N",
+  "band": "D",
+  "k": 4,
+  "params": {
+   "strike": "ATM",
+   "sl": 30,
+   "mtm": 4000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 227.08964862973102
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "A",
+  "k": 1,
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 439.7968489908175
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "A",
+  "k": 2,
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 370.64147709448815
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "A",
+  "k": 3,
+  "params": {
+   "strike": "ITM2",
+   "sl": 30,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 420.14193703865635
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "A",
+  "k": 4,
+  "params": {
+   "strike": "ITM2",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 445.15710683776297
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "B",
+  "k": 1,
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "y1_avg_day_inr": 500.55254113046743
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "B",
+  "k": 2,
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 451.8976075224548
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "B",
+  "k": 3,
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 479.30076898543945
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "B",
+  "k": 4,
+  "params": {
+   "strike": "ITM2",
+   "sl": 10,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    "13:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 380.93243895670184
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "C",
+  "k": 1,
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 413.3783478157723
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "C",
+  "k": 2,
+  "params": {
+   "strike": "ITM2",
+   "sl": 25,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "y1_avg_day_inr": 339.7635350883731
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "C",
+  "k": 3,
+  "params": {
+   "strike": "ITM1",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "y1_avg_day_inr": 310.58068570627375
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "C",
+  "k": 4,
+  "params": {
+   "strike": "ATM",
+   "sl": 25,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 287.41241542337394
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "D",
+  "k": 1,
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": null
+  },
+  "y1_avg_day_inr": 160.66240755942187
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "D",
+  "k": 2,
+  "params": {
+   "strike": "ITM2",
+   "sl": 40,
+   "mtm": 2000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 157.2461767090477
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "D",
+  "k": 3,
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 3000,
+   "reentry": null,
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 133.49781566882422
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "band": "D",
+  "k": 4,
+  "params": {
+   "strike": "ITM1",
+   "sl": 40,
+   "mtm": 4000,
+   "reentry": [
+    "cost",
+    1,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "y1_avg_day_inr": 134.0650143102113
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "band": "A",
+  "k": 1,
+  "params": {
+   "strike": "ATM",
+   "range": 15,
+   "source": "instrument",
+   "sl": 20,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "y1_avg_day_inr": 174.91685493465377
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "band": "A",
+  "k": 2,
+  "params": {
+   "strike": "PLOW",
+   "range": 30,
+   "source": "instrument",
+   "sl": 20,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "y1_avg_day_inr": 67.3036355288566
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "band": "A",
+  "k": 3,
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 20,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "y1_avg_day_inr": 117.00556064056241
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "band": "C",
+  "k": 1,
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "y1_avg_day_inr": 153.48713769796888
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "band": "C",
+  "k": 2,
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "y1_avg_day_inr": 108.6496801801056
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "band": "C",
+  "k": 3,
+  "params": {
+   "strike": "PHIGH",
+   "range": 15,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "y1_avg_day_inr": 119.84263441726746
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "band": "C",
+  "k": 4,
+  "params": {
+   "strike": "PMID",
+   "range": 15,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "y1_avg_day_inr": 133.73116685504374
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "band": "D",
+  "k": 1,
+  "params": {
+   "strike": "ATM",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": null,
+   "mtm": 1000
+  },
+  "y1_avg_day_inr": 67.57422814291981
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "band": "D",
+  "k": 2,
+  "params": {
+   "strike": "ATM",
+   "range": 30,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 1000
+  },
+  "y1_avg_day_inr": 67.25888704288343
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "band": "D",
+  "k": 3,
+  "params": {
+   "strike": "ATM",
+   "range": 30,
+   "source": "instrument",
+   "sl": 40,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "y1_avg_day_inr": 58.52131601383812
+ },
+ {
+  "family": "B",
+  "index": "N",
+  "band": "D",
+  "k": 4,
+  "params": {
+   "strike": "ATM",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "y1_avg_day_inr": 66.2629358112088
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "A",
+  "k": 1,
+  "params": {
+   "strike": "PHIGH",
+   "range": 15,
+   "source": "instrument",
+   "sl": 20,
+   "target": null,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "y1_avg_day_inr": 209.24514203337642
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "A",
+  "k": 2,
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 20,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "y1_avg_day_inr": 207.42967932652206
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "A",
+  "k": 3,
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "y1_avg_day_inr": 243.65851585295516
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "A",
+  "k": 4,
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 20,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 1000
+  },
+  "y1_avg_day_inr": 194.45951800661692
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "B",
+  "k": 1,
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "y1_avg_day_inr": 305.5970592846272
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "B",
+  "k": 2,
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "y1_avg_day_inr": 339.21217283715123
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "B",
+  "k": 3,
+  "params": {
+   "strike": "OTM1",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "y1_avg_day_inr": 295.4399338058132
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "B",
+  "k": 4,
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    1,
+    1
+   ],
+   "mtm": 2000
+  },
+  "y1_avg_day_inr": 182.88658702391604
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "C",
+  "k": 1,
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "y1_avg_day_inr": 210.94643314936866
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "C",
+  "k": 2,
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": null,
+   "mtm": 2000
+  },
+  "y1_avg_day_inr": 182.02378374748383
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "C",
+  "k": 3,
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 100,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 2000
+  },
+  "y1_avg_day_inr": 147.9277469677481
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "C",
+  "k": 4,
+  "params": {
+   "strike": "PHIGH",
+   "range": 10,
+   "source": "instrument",
+   "sl": 30,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 1000
+  },
+  "y1_avg_day_inr": 123.33823121993647
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "D",
+  "k": 1,
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 40,
+   "target": 100,
+   "trail": null,
+   "mtm": 1000
+  },
+  "y1_avg_day_inr": 54.151092013728764
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "D",
+  "k": 2,
+  "params": {
+   "strike": "PHIGH",
+   "range": 30,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": null,
+   "mtm": 1000
+  },
+  "y1_avg_day_inr": 73.91798872696727
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "D",
+  "k": 3,
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 30,
+   "target": null,
+   "trail": null,
+   "mtm": 1000
+  },
+  "y1_avg_day_inr": 63.8501940679695
+ },
+ {
+  "family": "B",
+  "index": "S",
+  "band": "D",
+  "k": 4,
+  "params": {
+   "strike": "OTM1",
+   "range": 30,
+   "source": "instrument",
+   "sl": 40,
+   "target": 50,
+   "trail": [
+    3,
+    1
+   ],
+   "mtm": 1000
+  },
+  "y1_avg_day_inr": 57.86658762908175
+ }
+]

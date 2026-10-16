@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 
-import { listName } from '../../lib/rotationListNames';
+import { VISIBLE_LIST_KEYS, listName } from '../../lib/rotationListNames';
 import {
   ANY,
   type MatrixFilters,
@@ -43,10 +43,7 @@ const PERIOD_OPTIONS: SegmentedOption<MatrixPeriodId>[] = (
 
 const LIST_OPTIONS: SegmentedOption<MatrixListId | typeof ANY>[] = [
   { value: ANY, label: 'None' },
-  { value: 'A', label: listName('A') },
-  { value: 'B', label: listName('B') },
-  { value: 'C', label: listName('C') },
-  { value: 'REF', label: listName('REF') },
+  ...VISIBLE_LIST_KEYS.map((value) => ({ value, label: listName(value) })),
 ];
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
