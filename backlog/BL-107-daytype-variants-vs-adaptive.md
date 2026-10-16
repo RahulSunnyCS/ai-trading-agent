@@ -144,6 +144,35 @@ were simulated on its pick day for the net comparison.
   filter, `hard_filter.py`: 493 per lot-day, −147 vs T1 (90 % [−235, −62]). Every pruning tried — the
   10 % weight, the hard filter, R1, R2 — lowered the result.
 
+## Experiment 3 — walk-forward of the T1 method, one vs up to two settings (registered 2026-10-16, before any fold was selected)
+
+- **Owner (2026-10-16):** test ideas 4 (walk-forward) and 5 (up to two settings per family) together.
+- **Question:** does the T1 *method* keep producing settings that beat Core-298 when it is re-run on
+  a rolling window, and does allowing a second setting per family help?
+- **Folds (select on 12 months, trade the next quarter; selection never reads its quarter):**
+  1. select 2024-10-09 → 2025-10-08, trade 2025-10-09 → 2025-12-31;
+  2. select 2025-01-01 → 2025-12-31, trade 2026-01-01 → 2026-03-31;
+  3. select 2025-04-01 → 2026-03-31, trade 2026-04-01 → 2026-06-30;
+  4. select 2025-07-01 → 2026-06-30, trade 2026-07-01 → 2026-10-09.
+- **Selection in a fold:** BL-104 `daytype_lists` (Amendments 1–11) on the window only: rank on its
+  first half, keep rank 1 → 3 only if it also beats the template in its second half (half the
+  margin, a majority of the 12 sampled slots), the all-times group, expiry and non-expiry; N_wide's
+  owner settings are the N_wide default as in T1. Premium candidates: the coarse premiums plus the
+  refine premiums already chosen on the first year (a fixed, earlier candidate list).
+  - **Variant 1:** at most one setting per family and day type (premium families: one premium).
+  - **Variant 2:** up to two, the second only if its daily P&L correlates below 0.7 with the first
+    (premium families: up to two premiums).
+- **Test in a fold:** the fold's winners created at all 25 entry times (the 13 unsampled times are
+  unseen), simulated 2024-10-09 → 2026-10-09 (gross); Adaptive (registered list C, no weight) replayed
+  on the fold's quarter over Core-298 + winners, history from 2024-10-09, against Adaptive over
+  Core-298 on the same days.
+- **Pass rule:** the method passes when Core + winners beats Core in **≥ 3 of the 4 quarters** (mean
+  gross per lot-day) **and** the pooled 90 % block-bootstrap interval over all quarters' days is above
+  zero. Variant 2 is preferred only if it also beats variant 1 over the pooled days (90 % interval
+  above zero); otherwise variant 1. Read once.
+- **Known weaknesses:** four quarters is a small sample; fold 1's window equals the first year, so
+  fold 1 is close to the T1 replay already seen; the refine premiums were chosen on the first year.
+
 ## Log
 
 - 2026-10-16 — created from the owner's request; Phase 0 registered before the first-year selection
