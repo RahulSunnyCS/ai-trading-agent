@@ -220,6 +220,14 @@ unchanged and still pending; this arm neither replaces nor decides them.
 - **Addendum 3 (2026-10-17, descriptive only, decides nothing).** No limit on the mix: pure rank order,
   no Widesl minimum (`MIN_WIDE_N = 0`). E0 = top 3 × 2 lots; L0 = top 4 × (2, 2, 1, 1). Same script,
   run once.
+  **Result:** on T1 both are worse than today's rule: net per lot-day (first year / test year) E 443 /
+  576, E0 392 / 498 (−471 / day [−1,132, +203]), L0 436 / 487 (−537 / day [−1,232, +154]); max DD
+  −₹69,557 and −₹65,620 vs −₹50,267. On Core-298 the opposite: E0 beats E in both years (291 vs 250
+  first year, 450 vs 351 test year; +594 / day [−128, +1,347], gross +702 [−24, +1,451]) with a deeper
+  drawdown (−₹76,252 vs −₹69,758); L0 371. Not significant, read after the test year, and the Widesl
+  minimum is part of the registered live list, so nothing changes; a note for any future Core-298 list
+  revision. On T1 the minimum protects the strong added Widesl sets from Dir variants that rank high on
+  short streaks.
 
 ## Risks
 
