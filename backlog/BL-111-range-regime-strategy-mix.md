@@ -198,6 +198,11 @@ unchanged and still pending; this arm neither replaces nor decides them.
   hurt in the first year (250, 210, 209), with deeper drawdowns: on T1, where the top three are already
   strong, a fourth pick dilutes them.
 
+- **Addendum (2026-10-17, after A1's result; descriptive only, decides nothing).** Owner asked about
+  2-2-1-1 with at least 4 Widesl. Two arms added to the same script and run once: L3 = 4 picks (≥ 3
+  Widesl) and L4 = 4 picks (all 4 Widesl), both 2-2-1-1. The test year is already read, so neither can
+  pass; a strong showing would only justify a new item with a forward check.
+
 ## Risks
 
 - **BL-053 is a close precedent that failed** on a similar switch; VIX already carries part of the

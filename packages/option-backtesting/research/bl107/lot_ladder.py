@@ -39,7 +39,8 @@ from option_backtesting.rotation.readout import block_bootstrap_mean, max_drawdo
 from option_backtesting.rotation.variants import variant_names  # noqa: E402
 
 SEED = 20261015
-ARMS = {"E": (3, 2, (2, 2, 2)), "L2": (4, 2, (2, 2, 1, 1)), "L1": (4, 1, (2, 2, 1, 1))}
+ARMS = {"E": (3, 2, (2, 2, 2)), "L2": (4, 2, (2, 2, 1, 1)), "L1": (4, 1, (2, 2, 1, 1)),
+        "L3": (4, 3, (2, 2, 1, 1)), "L4": (4, 4, (2, 2, 1, 1))}  # L3 / L4: the descriptive addendum
 FLAT = ORDERS_PER_TRADE * BROKERAGE_PER_ORDER * (1 + GST)  # per closed trade, whatever the lots
 OUT = HERE / "results" / "lot_ladder"
 
