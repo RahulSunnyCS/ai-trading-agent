@@ -1,0 +1,65 @@
+{
+ "source": "/Users/rahul/Projects/ai-trading-agent/packages/momentum-backtesting/data/daily/Nifty 50.csv",
+ "sessions": 2668,
+ "confirm_2016_2021": {
+  "autocorrelation_log_abs_return_lag1": {
+   "rho": 0.10758394233926767,
+   "ci90": [
+    0.050121350826055955,
+    0.15860612062289428
+   ],
+   "n": 1465
+  },
+  "expanded": {
+   "n": 580,
+   "mean_f1": 1.430086707332377,
+   "p_next_expanded": 0.4051724137931034
+  },
+  "range_bound": {
+   "n": 621,
+   "mean_f1": 1.235551210851052,
+   "p_next_range_bound": 0.4106280193236715
+  },
+  "p_expanded_overall": 0.39590443686006827,
+  "p_range_bound_overall": 0.42389078498293514,
+  "f1_expanded_minus_range_bound": {
+   "diff": 0.19453549648132507,
+   "ci90": [
+    0.06464019751525182,
+    0.321693026037655
+   ]
+  }
+ },
+ "bridge_2022_2026": {
+  "autocorrelation_log_abs_return_lag1": {
+   "rho": 0.12322760772745354,
+   "ci90": [
+    0.061347074688877574,
+    0.18395764698669612
+   ],
+   "n": 1182
+  },
+  "expanded": {
+   "n": 481,
+   "mean_f1": 1.5425429158302064,
+   "p_next_expanded": 0.4386694386694387
+  },
+  "range_bound": {
+   "n": 484,
+   "mean_f1": 1.1763116095924235,
+   "p_next_range_bound": 0.4359504132231405
+  },
+  "p_expanded_overall": 0.4069373942470389,
+  "p_range_bound_overall": 0.40947546531302875,
+  "f1_expanded_minus_range_bound": {
+   "diff": 0.3662313062377829,
+   "ci90": [
+    0.21142087342025334,
+    0.5237723403898275
+   ]
+  }
+ },
+ "verdict": {
+  "supported": true
+ }
+}

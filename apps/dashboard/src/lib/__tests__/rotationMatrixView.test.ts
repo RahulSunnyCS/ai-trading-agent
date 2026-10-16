@@ -442,7 +442,7 @@ describe('keyboard and screen readers', () => {
     const label = cellLabel(
       'NIFTY Widesl OTM1',
       '09:17',
-      { v: 148, n: 9, nv: 9, thin: true, sel: { A: 2 }, all: { v: 120, n: 40, nv: 40 } },
+      { v: 148, n: 9, nv: 9, thin: true, sel: { A: 3, C: 2 }, all: { v: 120, n: 40, nv: 40 } },
       'inr',
       false,
     );
@@ -450,7 +450,9 @@ describe('keyboard and screen readers', () => {
     expect(label).toContain('9 sessions');
     expect(label).toContain('thin sample');
     expect(label).toContain('of 40 sessions');
-    expect(label).toContain('Steady 2 times');
+    expect(label).toContain('picked: Adaptive 2 times');
+    // a hidden list's selections are in the payload but never named
+    expect(label).not.toContain('Steady');
     expect(
       cellLabel(
         'r',

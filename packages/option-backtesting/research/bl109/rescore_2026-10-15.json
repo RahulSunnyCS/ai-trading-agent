@@ -1,0 +1,130 @@
+{
+ "window": [
+  "2025-10-16",
+  "2026-10-15"
+ ],
+ "data_root": "/Volumes/TradingData",
+ "boot": {
+  "resamples": 2000,
+  "block": 5,
+  "seed": 20261012,
+  "level": 0.9
+ },
+ "lists": {
+  "Steady": {
+   "older": {
+    "days": 238,
+    "win_rate": 0.634453781512605,
+    "mean_per_lot_day": 394.96920168067226,
+    "cumulative_per_lot": 94002.67,
+    "max_drawdown_per_lot": -11072.830000000009
+   },
+   "newer": {
+    "days": 238,
+    "win_rate": 0.6302521008403361,
+    "mean_per_lot_day": 406.0915966386555,
+    "cumulative_per_lot": 96649.80000000002,
+    "max_drawdown_per_lot": -11609.600000000013
+   },
+   "newer_minus_older": {
+    "mean": 11.122394957983191,
+    "lo90": -15.996384453781513,
+    "hi90": 45.67849789915966
+   },
+   "days_with_different_picks": 33,
+   "first_half": {
+    "older": {
+     "days": 119,
+     "win_rate": 0.6218487394957983,
+     "mean_per_lot_day": 437.13403361344535,
+     "cumulative_per_lot": 52018.95,
+     "max_drawdown_per_lot": -10852.179999999993
+    },
+    "newer": {
+     "days": 119,
+     "win_rate": 0.6302521008403361,
+     "mean_per_lot_day": 470.8480672268908,
+     "cumulative_per_lot": 56030.920000000006,
+     "max_drawdown_per_lot": -11451.799999999996
+    },
+    "to": "2026-04-15"
+   },
+   "second_half": {
+    "older": {
+     "days": 119,
+     "win_rate": 0.6470588235294118,
+     "mean_per_lot_day": 352.80436974789916,
+     "cumulative_per_lot": 41983.72,
+     "max_drawdown_per_lot": -11072.83
+    },
+    "newer": {
+     "days": 119,
+     "win_rate": 0.6302521008403361,
+     "mean_per_lot_day": 341.33512605042023,
+     "cumulative_per_lot": 40618.880000000005,
+     "max_drawdown_per_lot": -11609.599999999999
+    }
+   }
+  },
+  "Adaptive": {
+   "older": {
+    "days": 238,
+    "win_rate": 0.6512605042016807,
+    "mean_per_lot_day": 405.66252100840336,
+    "cumulative_per_lot": 96547.68,
+    "max_drawdown_per_lot": -10088.740000000005
+   },
+   "newer": {
+    "days": 238,
+    "win_rate": 0.6512605042016807,
+    "mean_per_lot_day": 430.2838235294118,
+    "cumulative_per_lot": 102407.55,
+    "max_drawdown_per_lot": -10688.360000000008
+   },
+   "newer_minus_older": {
+    "mean": 24.621302521008403,
+    "lo90": -5.623867647058826,
+    "hi90": 63.080680672268905
+   },
+   "days_with_different_picks": 26,
+   "first_half": {
+    "older": {
+     "days": 119,
+     "win_rate": 0.6218487394957983,
+     "mean_per_lot_day": 377.10798319327733,
+     "cumulative_per_lot": 44875.850000000006,
+     "max_drawdown_per_lot": -10088.740000000005
+    },
+    "newer": {
+     "days": 119,
+     "win_rate": 0.6218487394957983,
+     "mean_per_lot_day": 424.5284033613446,
+     "cumulative_per_lot": 50518.880000000005,
+     "max_drawdown_per_lot": -10688.360000000008
+    },
+    "to": "2026-04-15"
+   },
+   "second_half": {
+    "older": {
+     "days": 119,
+     "win_rate": 0.680672268907563,
+     "mean_per_lot_day": 434.21705882352944,
+     "cumulative_per_lot": 51671.83,
+     "max_drawdown_per_lot": -8707.630000000001
+    },
+    "newer": {
+     "days": 119,
+     "win_rate": 0.680672268907563,
+     "mean_per_lot_day": 436.039243697479,
+     "cumulative_per_lot": 51888.67,
+     "max_drawdown_per_lot": -8514.79
+    }
+   }
+  }
+ },
+ "decision": {
+  "interval_entirely_below_zero": false,
+  "drawdown_more_than_20pct_deeper": false,
+  "adopt": true
+ }
+}

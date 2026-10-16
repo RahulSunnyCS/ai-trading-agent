@@ -181,21 +181,20 @@ describe('rank and flag', () => {
 });
 
 describe('picks and share', () => {
-  it('groups chips by list, in list order, with a count and the focus marked', () => {
+  it('groups the shown list’s chips with a count and the focus marked, never a hidden list’s', () => {
     const groups = chipGroups(
       [
         { list: 'REF', variant: 'N_dir_0917', role: 'core' },
+        { list: 'C', variant: 'N_dir_0932', role: 'core' },
         { list: 'A', variant: 'N_dir_0932', role: 'core' },
-        { list: 'A', variant: 'S_dir_0917', role: 'core' },
+        { list: 'C', variant: 'S_dir_0917', role: 'core' },
       ],
-      'A',
+      'C',
     );
-    expect(groups.map((g) => [g.list, g.count, g.focus])).toEqual([
-      ['A', 2, true],
-      ['REF', 1, false],
-    ]);
-    expect(groups[0]?.title).toContain('N_dir_0932');
-    expect(chipGroups(undefined, 'A')).toEqual([]);
+    expect(groups.map((g) => [g.list, g.count, g.focus])).toEqual([['C', 2, true]]);
+    expect(groups[0]?.title).toBe('Adaptive: N_dir_0932, S_dir_0917');
+    expect(chipGroups(undefined, 'C')).toEqual([]);
+    expect(chipGroups([{ list: 'A', variant: 'N_dir_0932', role: 'core' }], 'C')).toEqual([]);
   });
 
   it('labels the picks as recorded, reconstructed, late, or absent', () => {
@@ -277,12 +276,12 @@ describe('picks and share', () => {
 describe('header texts and links', () => {
   it('derives the criterion note from the lists’ own weights', () => {
     expect(criterionNote(pulse())).toBe(
-      'The family-band criterion carries 5% of the composite in Steady, Calendar and Adaptive and none in Baseline.',
+      'The family-band criterion carries 5% of the composite in Adaptive.',
     );
     const none = pulse({
-      rank: { ...pulse().rank, weights: { A: 0, B: 0, C: 0, REF: 0 } },
+      rank: { ...pulse().rank, weights: { A: 0.05, B: 0.05, C: 0, REF: 0 } },
     });
-    expect(criterionNote(none)).toBe('The family-band criterion carries no weight in any list.');
+    expect(criterionNote(none)).toBe('The family-band criterion carries no weight in Adaptive.');
   });
 
   it('says where the windows come from', () => {

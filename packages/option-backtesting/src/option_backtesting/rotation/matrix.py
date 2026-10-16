@@ -37,6 +37,7 @@ import numpy as np
 import yaml
 
 from . import journal, store
+from .dte import entry_labels
 from .lists import LISTS
 from .score import VIX_LABELS
 from .variants import CLOSEST, STRATEGIES_DIR, strategy_path
@@ -588,8 +589,8 @@ def selection_source(cube: Cube, jr: Journal, list_id: str) -> Source:
             dtype=str,
         ),
         np.array([e.get("vix_band") or unknown for e in entries], dtype=str),
-        np.array([str((e.get("dte") or {}).get("NIFTY") or unknown) for e in entries], dtype=str),
-        np.array([str((e.get("dte") or {}).get("SENSEX") or unknown) for e in entries], dtype=str),
+        np.array([entry_labels(e)["NIFTY"] for e in entries], dtype=str),
+        np.array([entry_labels(e)["SENSEX"] for e in entries], dtype=str),
     )
     pos = {n: i for i, n in enumerate(cube.names)}
     M = np.zeros((cube.n_variants, len(days)))

@@ -970,6 +970,7 @@ def list_strategies(
     for strategy in strategies:
         if strategy["group"]:
             strategy["members"] = [by_anchor[m] for m in strategy["group"] if m in by_anchor]
+            strategy["blend"] = group_blend(strategy["members"])
         holder = by_anchor.get(strategy["followed_by"] or "")
         if holder is None or not holder["group"]:
             strategy["followed_by"] = None
@@ -977,6 +978,103 @@ def list_strategies(
     top.sort(key=lambda s: s["last_run"], reverse=True)
     top.sort(key=lambda s: s["status"] not in FOLLOWED)
     return top
+
+
+def group_blend(members: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """A group's own result, so its collapsed row can show numbers and a chart: its members'
+    stored equity curves held as equal capital in each and reset to equal each April (the rule
+    `choose.ensemble_curve` and the live group signal share). None when fewer than two members
+    have a curve over common weeks.
+
+    `kpis` are worked out from the blended curve: CAGR, max drawdown and Sharpe (the members' own
+    cash rate is backed out of their stored Sharpe, since a saved run keeps no cash curve, so it
+    is an estimate close to the engine's), the edge over the benchmark the members share, and the
+    mean of the members' turnover. `members` counts the curves used."""
+    from . import choose, metrics
+
+    key = tuple(_blend_key(m) for m in members)
+    if key in _BLEND_CACHE:
+        return _BLEND_CACHE[key]
+    blend = _group_blend(members, choose, metrics)
+    if len(_BLEND_CACHE) >= _BLEND_CACHE_SIZE:
+        _BLEND_CACHE.pop(next(iter(_BLEND_CACHE)))
+    _BLEND_CACHE[key] = blend
+    return blend
+
+
+def _blend_key(member: dict[str, Any]) -> tuple:
+    """What a member's curve depends on: its latest run, and the curve's length and last value
+    (so two members with the same id and a different curve, as in tests, never share an entry)."""
+    latest = member.get("latest") or {}
+    curve = latest.get("strategy") or []
+    return (
+        member["id"],
+        latest.get("id"),
+        latest.get("created_at"),
+        len(curve),
+        curve[-1] if curve else None,
+    )
+
+
+#: A group's blend by its members' latest runs: it only changes when a member is run again, and
+#: the Saved runs page asks for every group on every poll.
+_BLEND_CACHE: dict[tuple, dict[str, Any] | None] = {}
+_BLEND_CACHE_SIZE = 64
+
+
+def _group_blend(members: list[dict[str, Any]], choose: Any, metrics: Any) -> dict[str, Any] | None:
+    import math
+
+    import pandas as pd
+
+    curves, kpis = {}, []
+    for member in members:
+        latest = member.get("latest") or {}
+        dates, values = latest.get("dates") or [], latest.get("strategy") or []
+        if len(dates) != len(values) or len(dates) < 2:
+            continue
+        series = pd.Series(values, index=pd.to_datetime(dates), dtype=float).dropna()
+        if len(series) >= 2:
+            curves[member["id"]] = series
+            kpis.append(latest.get("kpis") or {})
+    if len(curves) < 2:
+        return None
+    frame = pd.concat(curves, axis=1, join="inner").dropna()
+    if len(frame) < 2:
+        return None
+    blended = choose.ensemble_curve(frame, list(frame.columns))
+    weekly = blended.pct_change().dropna()
+    cash = []
+    for k, series in zip(kpis, curves.values(), strict=True):
+        sharpe, moves = k.get("sharpe"), series.pct_change().dropna()
+        if isinstance(sharpe, int | float) and moves.std() > 0:
+            cash.append(moves.mean() - sharpe * moves.std() / math.sqrt(metrics.WEEKS_PER_YEAR))
+    rate = sum(cash) / len(cash) if cash else 0.0
+    spread = weekly.std()
+    cagr = metrics.cagr(blended)
+    bench = [
+        k["cagr"] - k["excess_cagr"]
+        for k in kpis
+        if k.get("cagr") is not None and k.get("excess_cagr") is not None
+    ]
+    turnover = [k["turnover_per_year"] for k in kpis if k.get("turnover_per_year") is not None]
+    # In rupees of the common window's first week: the sleeves' mean value then, so the line
+    # starts where the sleeves did even when they were saved over different periods.
+    start = float(frame.iloc[0].mean())
+    return {
+        "kpis": {
+            "cagr": float(cagr),
+            "excess_cagr": float(cagr - sum(bench) / len(bench)) if bench else None,
+            "max_drawdown": float(metrics.max_drawdown(blended)[0]),
+            "sharpe": float((weekly.mean() - rate) / spread * math.sqrt(metrics.WEEKS_PER_YEAR))
+            if spread > 0
+            else None,
+            "turnover_per_year": sum(turnover) / len(turnover) if turnover else None,
+        },
+        "dates": [d.strftime("%Y-%m-%d") for d in blended.index],
+        "strategy": [round(float(v) * start) for v in blended],
+        "members": len(curves),
+    }
 
 
 def _strategy_runs(con: duckdb.DuckDBPyConnection, run_id: str) -> list[dict[str, Any]] | None:
@@ -1024,6 +1122,7 @@ def get_strategy(con: duckdb.DuckDBPyConnection, run_id: str) -> dict[str, Any] 
     )
     if strategy["group"]:
         strategy["members"] = _group_members(con, strategy)
+        strategy["blend"] = group_blend(strategy["members"])
     by_run = {c["run_id"]: c for c in changes}
     strategy["history"] = [
         {

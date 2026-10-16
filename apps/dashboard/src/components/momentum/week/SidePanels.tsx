@@ -156,9 +156,12 @@ export function EdgeNames({ card }: { card: MomentumWeekCard }) {
 export function TelegramMessage({
   message,
   onResend,
+  firstWeek = false,
 }: {
   message: MomentumWeekMessage | null;
   onResend: () => void;
+  /** The paper start Friday: the cards show every name as a buy, the sent message does not. */
+  firstWeek?: boolean;
 }) {
   return (
     <Card>
@@ -175,6 +178,13 @@ export function TelegramMessage({
           </Button>
         }
       />
+      {message && firstWeek ? (
+        <p className="mb-2 text-xs text-muted">
+          This is the message as it was sent: it lists the model's own changes this week (sells,
+          adds, trims), not your first buys, which the cards beside it show. It is a record, so it
+          is not rewritten.
+        </p>
+      ) : null}
       {message ? (
         <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-surface-2/40 p-3 font-mono text-xs leading-relaxed text-foreground">
           {message.title}

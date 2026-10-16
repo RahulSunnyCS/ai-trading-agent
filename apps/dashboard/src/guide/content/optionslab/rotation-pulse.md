@@ -2,8 +2,8 @@
 
 A card on the Rotation page that answers one question: is morning short-premium working right now?
 It lays out the twelve cells the ranking's family-band criterion pools, so you can see in one place
-what each kind of strategy has been doing lately, what the ranking makes of it, and where the lists'
-picks fall.
+what each kind of strategy has been doing lately, what the ranking makes of it, and where
+Adaptive's picks fall.
 
 It changes nothing. It does not touch a list, a weight, the journal or a stored result.
 
@@ -37,8 +37,8 @@ out of every cell and named under the table, never dropped silently.
 | P1, P2 | The same mean over the two reference periods the research used, so a recent number has something to be read against. |
 | Rolling 21 | The 21-session mean, drawn over up to the last 126 sessions. The dashed line is the P1 mean. Hover a point for its day. |
 | Ranking sees | The cell's rank, 1 to 12, on the family-band criterion for the next 09:16 pick. |
-| Picks | Chips for the lists whose latest picks fall in the cell (Steady, Calendar, Adaptive, Baseline). A count shows when a list picked twice there. |
-| Share of A | How often the focus list picked in the cell over its last 21 sessions. |
+| Picks | An Adaptive chip when its latest picks fall in the cell. A count shows when it picked twice there. (The journal also records Steady, Calendar and Baseline; their chips are no longer shown.) |
+| Share of Adaptive | How often Adaptive picked in the cell over its last 21 sessions. |
 
 Click a row to open the Strategy Matrix's pulse view, filtered to that kind and start band.
 
@@ -70,8 +70,8 @@ turned into a percentile among all 298. The card shows the same average ranked a
 so a cell at 1 of 12 is the one the criterion rewards most.
 
 It is the same value Why this pick shows as Family-band recent; a test checks they are equal. The
-criterion carries 5% of the composite in Steady, Calendar and Adaptive and none in Baseline, so a high rank here nudges the
-strategies in that cell up and decides nothing alone.
+criterion carries 5% of Adaptive's composite, so a high rank here nudges the strategies in that
+cell up and decides nothing alone.
 
 The ranking reads net results, which equal gross while the stored costs are zero. The card says gross
 because that is the unit of every other figure here.
@@ -84,7 +84,7 @@ because that is the unit of every other figure here.
   journal's hash chain is broken or unreadable (its entries are then not trusted, and the card says
   so beside the red badge). They are the picks the rule gives for the latest day with attributes, from
   the results before it: what it would have picked, not a record.
-- **Share of A** counts the focus list's core picks (three a day) that landed in the cell, over the
+- **Share of Adaptive** counts Adaptive's core picks (three a day) that landed in the cell, over the
   last 21 recorded on-time sessions. With no entry yet it uses the last 21 reconstructed sessions and
   says so. The two are never mixed. A recorded share over fewer than 21 sessions carries a star and
   its tooltip gives the reconstructed 21-session figure beside it, because "100% of 3 picks" is a

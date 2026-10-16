@@ -40,6 +40,7 @@ import numpy as np
 from ..data.reference.loader import REFERENCE_DIR, default_reference_data
 from ..fyers.daily import data_dir
 from . import journal, pick, placements, store
+from .dte import entry_basis, entry_labels, recorded_labels
 from .lists import LISTS, LOTS_PER, WARMUP
 from .variants import UNDERLYING, is_buy, is_dir, is_wide, parts, variant_names
 
@@ -318,9 +319,9 @@ def _signature(root: Path, names: list[str]) -> tuple:
     return (str(root), len(names), count, newest, day_sig)
 
 
-def reconstruction(root: Path, names: list[str] | None = None) -> _Recon:
+def reconstruction(root: Path, names: list[str] | None = None, basis: str = "weekdays") -> _Recon:
     names = names if names is not None else variant_names()
-    sig = _signature(root, names)
+    sig = (*_signature(root, names), basis)
     with _recon_lock:
         cached = _recon_cache.get(sig)
         if cached is not None:
@@ -329,7 +330,7 @@ def reconstruction(root: Path, names: list[str] | None = None) -> _Recon:
             del _recon_cache[stale]
         try:
             matrix = store.load_matrix(names, root)
-            attrs = store.read_days(root)
+            attrs = store.read_days(root, basis)
         except (ValueError, KeyError) as error:
             # a stored file with a row that does not parse: the recorded rows do not need the
             # matrix, so say why there is no reconstruction rather than failing the whole log
@@ -414,7 +415,7 @@ def recorded_row(
     row = _row_common(day, lists)
     at = entry.get("recorded_at") or ""
     on_time = bool(entry.get("before_first_entry", False))
-    dte = entry.get("dte") or {}
+    dte = entry_labels(entry)
     time_text = at[11:19] if len(at) >= 19 else None
     if not on_time:
         status, detail = "late", _status_counts_note(on_time, time_text)
@@ -442,6 +443,9 @@ def recorded_row(
             "NIFTY": dte.get("NIFTY"),
             "SENSEX": dte.get("SENSEX"),
             "source": entry.get("dte_source") or None,
+            "basis": "weekdays",
+            # exactly what the entry holds, and what it counted (old entries: calendar days)
+            "as_recorded": {**recorded_labels(entry), "basis": entry_basis(entry)},
         },
         "recorded": {
             "at": at or None,
@@ -681,12 +685,13 @@ def _rescore(entry: dict, root: Path, names: list[str] | None) -> dict:
     """Re-run the ranking on the stored results the entry saw (the same `load_history` and
     `score_history` calls the 09:16 job makes) and say whether it gives the entry's picks."""
     day = date.fromisoformat(entry["day"])
+    basis = entry_basis(entry)  # an entry recorded before BL-109 was scored on calendar days
     try:
-        hist = pick.load_history(day, root, names if names is not None else variant_names())
+        hist = pick.load_history(day, root, names if names is not None else variant_names(), basis)
     except pick.PickError as error:
         return {"checked": False, "note": str(error)}
     vix = _number(entry.get("vix_open"))
-    dte = entry.get("dte") or {}
+    dte = recorded_labels(entry)
     again = pick.score_history(
         hist, day, vix, {"dte_n": dte.get("NIFTY"), "dte_s": dte.get("SENSEX")}
     )

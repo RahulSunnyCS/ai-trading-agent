@@ -177,6 +177,13 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
         running={weekly.running}
       />
       <NeedsAttention items={attention} onAction={onAttention} />
+      {view.data?.first_week ? (
+        <output className="rounded-lg border border-info/30 bg-info/10 px-4 py-3 text-sm text-foreground">
+          <span className="font-semibold">First week.</span> Your portfolio starts from nothing this
+          Friday, so every name a strategy holds is a buy and nothing is sold. Sleeves are numbered
+          from here: Friday 1 trades today.
+        </output>
+      ) : null}
       <RulesStrip
         rules={rules.data ?? null}
         loading={rules.loading}
@@ -206,6 +213,7 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
               <TelegramMessage
                 message={view.data?.message ?? null}
                 onResend={() => setPanel('run')}
+                firstWeek={view.data?.first_week ?? false}
               />
             ) : null}
           </div>

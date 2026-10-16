@@ -9,7 +9,7 @@ import { DEFAULT_SETTING } from '../../../lib/portfolioStop';
 import type { PortfolioDays } from '../../../types/rotationPortfolio';
 import { RotationDailyLog } from '../RotationDailyLog';
 
-const scored = ROWS.find((r) => r.status === 'scored' && r.lists.A?.per_lot_day != null);
+const scored = ROWS.find((r) => r.status === 'scored' && r.lists.C?.per_lot_day != null);
 
 function book(day: string, lots: number): PortfolioDays {
   return {
@@ -20,7 +20,7 @@ function book(day: string, lots: number): PortfolioDays {
       {
         day,
         lists: {
-          A: {
+          C: {
             lots,
             gross_log: 0,
             gross_without: 0,
@@ -66,9 +66,9 @@ describe('the daily log with a portfolio stop', () => {
   it('lays the stopped figure and the flag over the log, keeping the log figure struck through', async () => {
     expect(scored).toBeDefined();
     const day = scored?.day ?? '';
-    const lots = scored?.lists.A?.lots ?? 6;
+    const lots = scored?.lists.C?.lots ?? 6;
     const calls = stub((url) => (url.includes('/portfolio/days') ? book(day, lots) : log()));
-    render(<RotationDailyLog focus="A" portfolio={DEFAULT_SETTING} />);
+    render(<RotationDailyLog focus="C" portfolio={DEFAULT_SETTING} />);
     await screen.findByRole('table');
     await waitFor(() => expect(screen.getByText('PF stop 11:14')).toBeTruthy());
     expect(calls.some((c) => /portfolio\/days\?.*stop=10000/.test(c))).toBe(true);
@@ -82,7 +82,7 @@ describe('the daily log with a portfolio stop', () => {
 
   it('fetches nothing for the stop and shows the log as is when there is no stop', async () => {
     const calls = stub(() => log());
-    render(<RotationDailyLog focus="A" portfolio={{ ...DEFAULT_SETTING, stop: '' }} />);
+    render(<RotationDailyLog focus="C" portfolio={{ ...DEFAULT_SETTING, stop: '' }} />);
     await screen.findByRole('table');
     expect(calls.some((c) => c.includes('/portfolio/'))).toBe(false);
     expect(screen.queryByText(/PF stop/)).toBeNull();
@@ -90,7 +90,7 @@ describe('the daily log with a portfolio stop', () => {
 
   it('keeps the log figures and says so while the stopped ones are replayed', async () => {
     stub((url) => (url.includes('/portfolio/days') ? new Promise(() => undefined) : log()));
-    render(<RotationDailyLog focus="A" portfolio={DEFAULT_SETTING} />);
+    render(<RotationDailyLog focus="C" portfolio={DEFAULT_SETTING} />);
     await screen.findByRole('table');
     expect(screen.getByText(/Replaying the baskets under the portfolio stop/)).toBeTruthy();
   });

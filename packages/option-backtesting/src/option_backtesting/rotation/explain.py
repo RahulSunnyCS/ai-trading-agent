@@ -36,6 +36,7 @@ import numpy as np
 
 from ..data.reference.loader import default_reference_data
 from . import journal, store
+from .dte import LEGACY_BASIS, entry_basis, recorded_labels
 from .lists import BUY_TOP, LISTS, LOTS_PER, MIN_WIDE_N, N_BUY, N_CORE, WARMUP, RotationList
 from .score import (
     VIX_LABELS,
@@ -93,6 +94,11 @@ class Snapshot:
     chain_problems: tuple[str, ...] = ()
     #: per-result memo for the heavier computations, cleared with the snapshot
     memo: dict = field(default_factory=dict, compare=False, repr=False)
+    #: the day attributes as written (calendar-day DTE labels): the basis an entry recorded
+    #: before BL-109 was scored on
+    calendar_attrs: dict[date, dict[str, str]] = field(
+        default_factory=dict, compare=False, repr=False
+    )
 
     @property
     def chain_intact(self) -> bool:
@@ -156,7 +162,17 @@ def load_snapshot(root: Path, names: Sequence[str] | None = None) -> Snapshot:
     except journal.JournalCorrupt as exc:
         error = str(exc)
     problems = tuple(journal.verify(path))
-    return Snapshot(names, days, net, gross, store.read_days(root), entries, error, problems)
+    return Snapshot(
+        names,
+        days,
+        net,
+        gross,
+        store.read_days(root),
+        entries,
+        error,
+        problems,
+        calendar_attrs=store.read_days(root, "calendar"),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +194,7 @@ class DayContext:
 def _day_context(snap: Snapshot, day: date) -> DayContext:
     entry = snap.entries.get(day.isoformat())
     if entry is not None:
-        dte = entry.get("dte") or {}
+        dte = recorded_labels(entry)  # what the entry was scored on, on its own basis
         return DayContext(
             day,
             str(entry["weekday"]),
@@ -212,12 +228,15 @@ def _history_rows(snap: Snapshot, day: date) -> list[int]:
     return [i for i, d in enumerate(snap.days) if d < day and d in snap.attrs]
 
 
-def history_digest(snap: Snapshot, rows: Sequence[int]) -> str:
+def history_digest(
+    snap: Snapshot, rows: Sequence[int], attrs: dict[date, dict[str, str]] | None = None
+) -> str:
     """The digest `pick.load_history` computes for the same rows (a test holds them equal)."""
+    attrs = snap.attrs if attrs is None else attrs
     h = hashlib.sha256()
     for i in rows:
         d = snap.days[i]
-        a = snap.attrs[d]
+        a = attrs[d]
         h.update(
             f"{d}|{a['weekday']}|{a['vix_band']}|{a['dte_n']}|{a['dte_s']}|".encode()
             + ",".join(f"{v:.2f}" for v in snap.net[i]).encode()
@@ -582,16 +601,20 @@ def explain(snap: Snapshot, day: date, list_key: str, top: int = 10) -> dict:
     names = snap.names
     values = snap.net[rows]
     hist_days = [snap.days[i] for i in rows]
-    weekday = np.array([*(snap.attrs[d]["weekday"] for d in hist_days), ctx.weekday])
-    band = np.array([*(snap.attrs[d]["vix_band"] for d in hist_days), ctx.band])
-    dn = np.array([*(snap.attrs[d]["dte_n"] for d in hist_days), ctx.dte_n])
-    ds = np.array([*(snap.attrs[d]["dte_s"] for d in hist_days), ctx.dte_s])
+    entry = snap.entries.get(day.isoformat())
+    # an entry recorded before BL-109 is rebuilt on the calendar days it was scored on
+    legacy = entry is not None and entry_basis(entry) == LEGACY_BASIS and bool(snap.calendar_attrs)
+    attrs = snap.calendar_attrs if legacy else snap.attrs
+    weekday = np.array([*(attrs[d]["weekday"] for d in hist_days), ctx.weekday])
+    band = np.array([*(attrs[d]["vix_band"] for d in hist_days), ctx.band])
+    dn = np.array([*(attrs[d]["dte_n"] for d in hist_days), ctx.dte_n])
+    ds = np.array([*(attrs[d]["dte_s"] for d in hist_days), ctx.dte_s])
     Pv = np.vstack([values, np.zeros((1, len(names)))])
     dmat = dte_matrix(dn, ds, names)
     fam = family_index(names)
     r = rank_day(Pv, weekday, band, dmat, names, lst, fam)
     picks = select(r.comp, names)
-    digest = history_digest(snap, rows)
+    digest = history_digest(snap, rows, attrs)
 
     order = order_by_composite(r.comp, names)
     rank_of = {v: k + 1 for k, v in enumerate(order)}
@@ -645,6 +668,7 @@ def explain(snap: Snapshot, day: date, list_key: str, top: int = 10) -> dict:
             "commit": entry.get("commit"),
             "vix_source": entry.get("vix_source"),
             "dte_source": entry.get("dte_source"),
+            "dte_basis": entry_basis(entry),
         }
         # what the entry itself says, kept apart from the rebuild
         rec = (entry.get("lists") or {}).get(list_key) or {}

@@ -10,6 +10,7 @@ import {
   cellLabel,
   cellText,
   settleActive,
+  shownPicks,
   stepActive,
   toneClass,
   valueText,
@@ -196,7 +197,7 @@ export function RotationMatrixTable({
             ) : null}
             {cols.map((col, c) => {
               const cell = line[c] ?? { st: 'na' as const };
-              const slotPicks = picks?.cells[col.key];
+              const slotPicks = shownPicks(picks?.cells[col.key]);
               return (
                 <Cell
                   key={col.key}
@@ -350,7 +351,7 @@ export function RotationMatrixTable({
             unit={unit}
             difference={difference}
             {...(periods ? { periods } : {})}
-            picks={datePicks?.[hoverRow.key]?.cells[hoverCol.key]}
+            picks={shownPicks(datePicks?.[hoverRow.key]?.cells[hoverCol.key])}
           />
         ) : null}
       </FollowTip>

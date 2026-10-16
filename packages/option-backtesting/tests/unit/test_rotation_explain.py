@@ -22,6 +22,7 @@ from trading_data import lake
 
 from option_backtesting.rotation import explain as ex
 from option_backtesting.rotation import journal, pick, rankic, store
+from option_backtesting.rotation.dte import from_calendar_label
 from option_backtesting.rotation.lists import LISTS, LOTS_PER, WARMUP
 from option_backtesting.rotation.score import (
     composite,
@@ -192,6 +193,9 @@ def test_matching_days_per_lookback_are_the_days_a_brute_force_count_finds(env):
     day = days[k]
     out = ex.explain(snap, day, "A")
     attrs = {d: _attrs(i, d) for i, d in enumerate(days)}
+    for d, a in attrs.items():  # the store keeps calendar-day labels; the engine reads weekdays
+        a["dte_n"] = from_calendar_label(a["dte_n"], d)
+        a["dte_s"] = from_calendar_label(a["dte_s"], d)
     hist = days[:k]
     p = out["picks"][0]
     j = NAMES.index(p["variant"])
@@ -724,6 +728,7 @@ def test_a_journal_day_is_scored_on_the_entrys_attributes_not_days_csv(env, monk
     assert vix_band(20.0) != a["vix_band"] and a["dte_n"] != "5"
     entry = pick.record(days[k], root, vix_open=20.0, now_fn=_at(days[k], 9, 16)).entry
     assert (entry["vix_band"], entry["dte"]["NIFTY"]) == ("18+", "5")
+    assert entry["dte_basis"] == "weekdays"
     snap = ex.load_snapshot(root, NAMES)
 
     out = ex.explain(snap, days[k], "A")

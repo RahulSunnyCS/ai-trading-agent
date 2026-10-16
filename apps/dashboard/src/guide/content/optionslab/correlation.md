@@ -8,7 +8,7 @@ look-alikes, and to build a basket whose parts are not.
 
 | Control | What it does |
 |---|---|
-| To compare | A tick list with two groups: the rotation **lists** (Steady, Calendar, Adaptive and the old live rotation) and every **strategy** that has results. The screen opens on your starred items; if nothing is starred it opens on three: NIFTY Widesl, Dir and Buy at 09:17. Tick more to add them, or type in the box to narrow the list. |
+| To compare | A tick list with two groups: the rotation **list** (Adaptive; Steady, Calendar and Baseline are still recorded in the journal but no longer shown) and every **strategy** that has results. The screen opens on your starred items; if nothing is starred it opens on three: NIFTY Widesl, Dir and Buy at 09:17 (and with a single starred item, those three are added to it so there is something to compare). Tick more to add them, or type in the box to narrow the list. |
 | Star | The star beside a list or strategy marks a favourite. Starred items are what the screen opens on, on any browser or device. **Reset to favourites** puts the ticks back to them. |
 | Start time | Adds a whole entry slot on top of the ticked strategies, e.g. every 09:32 variant. "Any start time" adds none (capped at 80 strategies at once). |
 | Family | Widesl, Dir or Buy, or one closest-premium family. "Widesl" includes the closest-premium variants. |
@@ -62,7 +62,7 @@ correlates exactly those strategies, with the same maths as the strategy picker.
 
 | Control | What it does |
 |---|---|
-| List | Steady, Calendar, Adaptive or Baseline: the picks that list made. **Base** is the owner's fixed reference, 2 × Widesl OTM1 09:17 and 1 × Dir ATM 09:24, traded every day with no ranking. |
+| List | **Adaptive**: the picks it made that day. **Base** is the owner's fixed reference, 2 × Widesl OTM1 09:17 and 1 × Dir ATM 09:24, traded every day with no ranking. |
 | Day | The day whose picks to use. Empty is the latest entry. A day before the journal began is re-scored from the results before it and labelled **Reconstructed**; a day with an entry says **Recorded**. Not used for the base. |
 | Window | The days the correlation is measured over: **P1** (3 Dec 2025 to 8 Oct 2026), **P2** (10 Jan to 29 Aug 2025), the **last 63** sessions the picks have in common, or **Forward** (only the on-time recorded days). |
 | Open as custom | Moves the same names and dates into the strategy picker for further browsing. Not offered for the base: its Dir leg is not one of the listed strategies. |

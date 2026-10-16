@@ -1,4 +1,4 @@
-# BL-107 — Day-type variants vs Adaptive: Core-298 plus time-generic and band winners
+# BL-115 — Day-type variants vs Adaptive: Core-298 plus time-generic and band winners
 
 | | |
 |---|---|
@@ -8,7 +8,8 @@
 | **Area** | options |
 | **Created** | 2026-10-16 |
 | **Depends on** | BL-104 (day-type lists, Stage 1 series), BL-106 (replay harness, the Core-298 / pool names), BL-058 (the registered lists) |
-| **TODO.md row** | 3.10.29 |
+| **TODO.md row** | 3.10.30 |
+| **Scripts** | `packages/option-backtesting/research/bl107/` and `research/bl104/daytype_lists.py` (the folder keeps the item's first local number, BL-107, renumbered to BL-115 on 2026-10-17 because main had taken BL-107) |
 
 ## Names
 

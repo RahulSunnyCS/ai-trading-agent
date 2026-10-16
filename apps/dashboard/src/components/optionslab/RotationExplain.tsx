@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 
+import { DEFAULT_LIST } from '../../lib/rotationListNames';
 import type { RotationListKey } from '../../types/rotationExplain';
 import { RotationRankPredicts } from './RotationRankPredicts';
 import { RotationWhyThisPick } from './RotationWhyThisPick';
@@ -20,7 +21,7 @@ export function RotationExplain({
   list?: RotationListKey;
   onList?: (list: RotationListKey) => void;
 }) {
-  const [own, setOwn] = useState<RotationListKey>('A');
+  const [own, setOwn] = useState<RotationListKey>(DEFAULT_LIST);
   const list = controlled ?? own;
   const setList = (next: RotationListKey) => {
     setOwn(next);

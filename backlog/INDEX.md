@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-15
+Last updated: 2026-10-16
 
 ## Open
 
@@ -24,6 +24,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-058](BL-058-options-rotation-forward-journal-and-ui.md) | Options rotation: forward paper journal from Mon 12 Oct (picks recorded before 09:17, scored nightly) and the Options Lab screens it needs | P0 | In progress: journal built, first entry Mon 12 Oct 09:16 (lists A, B, C, REF); Phase 4 view built 2026-10-11 (page, shadow, explain, matrix, daily log, basket mode, forward vs periods, drawdowns, drift, family pulse; paper vs real waits for the charge model and contract notes); day-60 read-out pending | feature | options |
 | [BL-087](BL-087-momentum-all-fridays-split.md) | Momentum: backtest and follow a config split across every rebalance Friday | P0 | Built; live migration pending | feature | momentum |
 | [BL-089](BL-089-backlog-tracks-and-github-board.md) | Backlog restructure: research / product / platform tracks, a generated index and `DONE.md`, one issue per item and a GitHub Projects board with a "Needs me" view | P0 | Ready | chore | cross-cutting |
+| [BL-107](BL-107-nse-fo-bhavcopy-daily.md) | Daily NSE F&O bhavcopy: official end-of-day record and a cross-check on the Fyers data | P0 | Planned | feature | options |
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-015](BL-015-research-gate.md) | Research gate: pre-register every experiment, log every override | P1 | In progress | chore | cross-cutting |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
@@ -40,8 +41,9 @@ Sorted by priority (P0 first), then ID.
 | [BL-074](BL-074-point-in-time-categories-nse-basic-industry.md) | Point-in-time categories from NSE's Basic Industry classification | P1 | Planned | research | momentum |
 | [BL-095](BL-095-portfolio-mtm-stop-in-rotation.md) | Portfolio MTM stop-loss on the Rotation page: a ₹ stop (default ₹10k; empty / 0 = none) with trailing (Trail SL, Lock, Lock and trail) set in a pop-up, applied to each list's basket — days table, calendar, "Replay the list", hero curve, drawdowns; read-out untouched | P1 | In progress (Phases 1–4 built; PR open) | feature | options / dashboard |
 | [BL-104](BL-104-full-parameter-sweep.md) | Full-factorial parameter sweep over Widesl (incl. ATM), Dir and Buy: strike, stops, trail, MTM, exit, re-entry, range and target at 7 slots × 2 indices (63,384 cells), Calmar-gated Martin ranking with a plateau rule; absorbs BL-096/097/098 Phase 3 | P1 | In progress (Stages 1–3 and advisory done; forward test and pool POC open) | research | options |
-| [BL-106](BL-106-pool-picker-poc.md) | Picker POC: Steady / Calendar / Adaptive / Baseline over a first-year-selected candidate pool vs the 298, test year 2025-10 → 2026-10, gross | P1 | Done: no list won; New-556 shallower drawdown, return within noise | research | options |
-| [BL-107](BL-107-daytype-variants-vs-adaptive.md) | Day-type variants vs Adaptive: Core-298 plus time-generic and band winners (expiry / non-expiry), first-year selection, test year 2025-10 → 2026-10, 10% day-type weight | P1 | Result: registered 10% weight fails on drawdown; unweighted T1 +₹223/lot-day gross, +₹204 net, shallower DD (ablation); T2 no win | research | options |
+| [BL-106](BL-106-pool-picker-poc.md) | Picker POC: Steady / Calendar / Adaptive / Baseline over a first-year-selected candidate pool vs the 298, test year 2025-10 → 2026-10, gross | P1 | Done: no list won on New-536; New-556 exploratory, shallower drawdown in one path | research | options |
+| [BL-114](BL-114-momentum-correlation-widget.md) | Momentum correlation widget: how alike are the strategies we follow? (saved groups measure as 1.2 independent bets of 11) | P1 | Planned | feature | momentum |
+| [BL-115](BL-115-daytype-variants-vs-adaptive.md) | Day-type variants vs Adaptive: Core-298 plus time-generic and band winners (expiry / non-expiry), first-year selection, test year 2025-10 → 2026-10, 10% day-type weight | P1 | Result: registered 10% weight fails on drawdown; unweighted T1 +₹223/lot-day gross, +₹204 net, shallower DD (ablation); T2 no win | research | options |
 | [BL-105](BL-105-dir-trade-management-tests.md) | Directional trade management: profit lock / trail on day MTM, roll the decayed leg to the new ATM, restart at a profit limit; a screen on existing machinery first, engine support only for survivors | P2 | Done: no idea passed its rule (lock / trail, restart, roll); engine roll kept | research | options |
 | [BL-096](BL-096-directional-parameter-sweep.md) | Directional stop, re-entry, trailing and exit sweep across NIFTY/SENSEX ATM and ITM1 variants | P2 | In progress | research | options |
 | [BL-097](BL-097-buy-parameter-sweep.md) | Buy parameter sweep: premium, leg SL, MTM SL, trail, breakout window and exit sensitivity over the existing NIFTY/SENSEX Buy rotation | P2 | In progress (Phase 2 complete) | research | options |
@@ -49,6 +51,8 @@ Sorted by priority (P0 first), then ID.
 | [BL-099](BL-099-combined-final-selection-post-charge.md) | Combined final qualified list: one Directional / Buy / Widesl configuration per index and timing band, post-charge holdout (reports only; no item file with a plan yet) | P2 | In progress | research | options |
 | [BL-100](BL-100-restricted-rotation-lists-p3.md) | Rotation lists A/B/C restricted to the BL-099 families, tested on 2022-24 | P2 | Planned (pre-registration; not run) | research | options |
 | [BL-102](BL-102-options-lab-ux-redesign.md) | Options Lab redesign: three workspaces, lists first (Steady / Calendar / Adaptive), favourites, a leg-grid builder | P1 | In progress | improvement | dashboard |
+| [BL-109](BL-109-rotation-weekday-dte.md) | Rotation days to expiry: count weekdays only, not calendar days | P1 | Done | research | options |
+| [BL-112](BL-112-group-leaders-shadow.md) | Group Leaders: run Adaptive on the best-settings-per-group pool as a parallel forward track beside Core | P1 | Planned | feature | options |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-039](BL-039-broad-warm-path-and-weekly-job-cost.md) | Broad warm path and weekly-job cost (follow-up to BL-005) | P2 | Planned | improvement | momentum |
 | [BL-041](BL-041-in-app-guide.md) | In-app Guide: what each dashboard section does and how to use it | P2 | In progress | feature | dashboard |
@@ -95,6 +99,8 @@ Sorted by priority (P0 first), then ID.
 | [BL-092](BL-092-forward-dated-themes-bess.md) | Forward-dated themes: `stock_groups_dated.csv` gives a Broad category a `launch_date`, so BESS (then the other pending themes) is selectable from the week of 2026-10-16, never in history | P2 | In progress | feature | momentum |
 | [BL-093](BL-093-rotation-paper-vs-real.md) | Rotation paper versus real: waterfall from the journal through charges, days not placed and changes to the contract-notes P&L (widget 10 of the Rotation workspace) | P2 | Blocked: contract-notes cutover, charge model in the nightly update, placement record in use | feature | options |
 | [BL-094](BL-094-straddle-heatmap.md) | Straddle heatmap: ATM short-straddle P&L by time, date and stop loss for every index and F&O stock; becomes the Options Lab default, Correlation split into its own widget | P2 | Done: Phases 1–4 built; cells match the legwise engine and AlgoTest's grid within ~₹100 at exit 15:15 | feature | options |
+| [BL-110](BL-110-nifty-range-persistence.md) | Does NIFTY's daily range persist? Expansion continues, range-bound continues | P2 | Done: persists in both directions; VIX carries part of it | research | options |
+| [BL-111](BL-111-range-regime-strategy-mix.md) | Lots by rank (2-2-1-1) and by range regime: more Dir when expanding, more Widesl when quiet; 3 lots / 6 lots | P2 | Planned | research | options |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
@@ -106,6 +112,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-108](BL-108-overnight-context-gift-nifty-global.md) | Overnight context: GIFT Nifty and global closes for the 09:17 entries | Dropped: the 09:16 pick already reads the 09:15 VIX open and the gap is derivable from the spot bars in the lake; nothing to collect | 2026-10-14 |
 | [BL-101](BL-101-early-long-straddle-hedge.md) | Early long ATM straddle (09:16 to 15:28, no stops) as a hedge for the fixed base | Killed by its pre-registered rule: base ES95 -31% and drawdown -40% worse, both halves, every year; pays only +277 on the base's worst 5% of days against -566/day carry | 2026-10-12 |
 | [BL-029](BL-029-point-in-time-universe-in-ui.md) | Point-in-time universe as a choice on the Broad tab | Done: delivered by BL-036 Phase 1 (the third universe card, the default, the universe on the result and in Saved runs); a default run went from 41.4% to 33.3% | 2026-10-10 |
 | [BL-052](BL-052-momentum-saved-runs-redesign.md) | Momentum Saved runs: one row per strategy, why a result moved, findings | Done: one strategy per normalised set of settings, run fingerprints and the why-it-moved log, the merge (applied live), the strategies page and drawer, findings; Phases 1–3 merged (#138, #139, Phase 3 PR). Follow-ups in its Log | 2026-10-08 |

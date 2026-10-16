@@ -381,6 +381,15 @@ export interface SavedStrategy {
   trust: StrategyTrust | null;
   /** A group's members, each a strategy of its own. */
   members?: SavedStrategy[];
+  /** A group's own result: its members' curves as equal capital reset each April, with the
+   * numbers worked out from it (Sharpe is estimated). Null when fewer than two members have a
+   * curve. */
+  blend?: {
+    kpis: Record<string, number | null>;
+    dates: string[];
+    strategy: number[];
+    members: number;
+  } | null;
   /** `/saved-strategies/{id}` only: every run, newest first. */
   history?: SavedStrategyRun[];
 }
@@ -549,6 +558,9 @@ export interface MomentumRebalanceResult {
   live_unavailable?: string | null;
   portfolio_value: number;
   first_allocation: boolean;
+  /** The Friday the portfolio starts from nothing (`mbt paper-start`), and whether this is it. */
+  paper_start?: string | null;
+  first_week?: boolean;
   rebalance_schedule: {
     strategy_start_date: string;
     cadence: 'weekly' | 'every_n_weeks' | 'monthly';
@@ -599,6 +611,8 @@ export interface MomentumJournalEntry {
   /** Model portfolio (fractions) at the signal's close, BEFORE the signal's own actions. */
   holdings_before: Record<string, number>;
   actions: Array<{ asset: string; action: string; rank: number | null }>;
+  /** The paper start Friday: shown as nothing held going in and a buy for every name held after. */
+  first_week: boolean;
   /** Benchmark rows only: the index level recorded. */
   level: number | null;
 }
@@ -630,6 +644,9 @@ export interface MomentumJournal {
   available: boolean;
   weeks: Array<{ week: string; entries: number }>;
   week: string | null;
+  /** The Friday the portfolio starts from nothing, if one is set (`mbt paper-start`). */
+  paper_start: string | null;
+  first_week: boolean;
   entries: MomentumJournalEntry[];
   check: MomentumJournalCheck | null;
 }
@@ -701,6 +718,8 @@ export interface MomentumWeekCard {
   } | null;
   trades: number;
   shared_with_headline: number | null;
+  /** The paper start Friday: nothing is held going into it, so every held name is a buy. */
+  first_week: boolean;
 }
 
 /** The message a weekly run produced for the headline, as sent (or held back). */
@@ -720,6 +739,9 @@ export interface MomentumWeekView {
   target_week: string;
   /** Weeks with journal entries, newest first. */
   weeks: string[];
+  /** The Friday the portfolio starts from nothing, if one is set (`mbt paper-start`). */
+  paper_start: string | null;
+  first_week: boolean;
   favourites: MomentumWeekCard[];
   message: MomentumWeekMessage | null;
 }

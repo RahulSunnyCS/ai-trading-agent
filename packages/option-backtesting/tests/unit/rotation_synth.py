@@ -18,6 +18,7 @@ import numpy as np
 from trading_data import lake
 
 from option_backtesting.rotation import pick, store
+from option_backtesting.rotation.dte import from_calendar_label
 from option_backtesting.rotation.score import vix_band
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -112,8 +113,11 @@ def record_entry(
 ) -> dict:
     """Write one genuine journal entry for `day` with `pick.record`, from the stored results before
     it, as if the job ran at `at` (IST). Live inputs are given, not fetched."""
-    a = store.read_days(root).get(day) or attrs_for(day)
-    labels = dte or {"dte_n": a["dte_n"], "dte_s": a["dte_s"]}
+    stored = store.read_days(root).get(day)  # read_days returns weekday-basis labels
+    a = stored or attrs_for(day)
+    labels = dte or {
+        key: a[key] if stored else from_calendar_label(a[key], day) for key in ("dte_n", "dte_s")
+    }
     vix = vix_open if vix_open is not None else float(a["vix_open"])
     saved = (
         pick.variant_names,

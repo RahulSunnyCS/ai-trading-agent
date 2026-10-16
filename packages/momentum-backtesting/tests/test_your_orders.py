@@ -100,6 +100,51 @@ def test_orders_against_the_paper_portfolio_are_saved_and_summarised(client, mon
     assert note.type == "momentum.orders"
 
 
+def test_start_fresh_buys_every_target_name_from_cash(client, monkeypatch):
+    _headline(client)
+    signal = {
+        "week": "2026-10-09",
+        "weights": {"AAA": 0.5, "BBB": 0.5},  # last week's model: ignored when starting fresh
+        "target_weights": {"AAA": 0.5, "CCC#2": 0.5},
+        "rows": [],
+        "sleeves": [],
+    }
+    monkeypatch.setattr(api, "_orders_signal", lambda *a: (signal, "exact", None, ["ranking"]))
+    _strategy(monkeypatch, {"AAA": 100.0, "BBB": 50.0, "CCC#2": 250.0})
+    payload = api._compute_orders("manual", start_fresh=True)
+    rows = {r["symbol"]: (r["action"], r["quantity"]) for r in payload["plan"]["rows"]}
+    assert payload["holdings"]["fresh"] is True
+    assert rows["AAA"] == ("BUY", 500) and rows["CCC#2"] == ("BUY", 200)
+    assert "BBB" not in rows and payload["plan"]["sells"] == 0
+
+
+def test_orders_can_be_planned_for_a_named_favourite_without_making_it_the_headline(
+    client, monkeypatch
+):
+    _headline(client)
+    other = client.post(
+        "/api/saved-runs",
+        json={
+            "dataset": "broad",
+            "name": "Other favourite",
+            "config": {"dataset": "broad", "signal_delay": 0},  # not a repeat of the headline
+            "kpis": {},
+            "dates": [],
+            "strategy": [],
+        },
+    ).json()
+    client.patch(f"/api/saved-runs/{other['id']}", json={"favorite": True})
+    seen = []
+    monkeypatch.setattr(
+        api,
+        "_orders_signal",
+        lambda headline, *a: seen.append(headline["name"]) or (None, "x", "r", []),
+    )
+    assert api._compute_orders(favourite="other fav")["headline"]["name"] == "Other favourite"
+    assert api._compute_orders()["headline"]["name"] == "Broad headline"
+    assert seen == ["Other favourite", "Broad headline"]
+
+
 def test_a_strategy_that_decides_on_fridays_close_says_why_there_are_no_orders_yet(
     client, monkeypatch
 ):
@@ -155,3 +200,26 @@ def test_fyers_holdings_map_to_the_strategys_names_and_others_are_never_sold(cli
     assert IDLE not in rows
     # LIQUIDBEES counted as cash (a paste has no average price, so 0) + the extra cash.
     assert payload["plan"]["cash"] == 1000
+
+
+def test_a_favourite_name_that_matches_two_groups_is_refused_not_guessed(client, monkeypatch):
+    favourites = [
+        {"id": "g1", "name": "Five Sectors, Rank Sum", "group": ["a"]},
+        {"id": "g2", "name": "Five Sectors, Wide Pool", "group": ["b"]},
+        {"id": "a", "name": "Five Sectors, Rank Sum · Friday 1 of 2", "group": None},
+    ]
+    assert api._find_favourite(favourites, "g2")[0]["id"] == "g2"
+    assert api._find_favourite(favourites, "five sectors, rank sum")[0]["id"] == "g1"
+    # A group beats its own sleeves, which share its name.
+    assert api._find_favourite(favourites, "Rank Sum")[0]["id"] == "g1"
+    found, why = api._find_favourite(favourites, "Five Sectors")
+    assert found is None and "matches 2 favourites" in why and "Wide Pool" in why
+    assert api._find_favourite(favourites, "nothing")[1] == "No favourite matches 'nothing'."
+
+
+def test_fresh_needs_the_paper_source(client, monkeypatch):
+    _headline(client)
+    client.put("/api/orders/settings", json={"holdings_source": "fyers"})
+    payload = api._compute_orders("manual", start_fresh=True)
+    assert "paper portfolio" in payload["error"] and "'fyers'" in payload["error"]
+    assert "plan" not in payload

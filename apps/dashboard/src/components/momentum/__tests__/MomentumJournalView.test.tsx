@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { MomentumJournal } from '../../../types/momentum';
+import type { MomentumJournal, MomentumJournalEntry } from '../../../types/momentum';
 
 const calls: string[] = [];
 let response: MomentumJournal | null = null;
@@ -28,6 +28,8 @@ const journal: MomentumJournal = {
     { week: '2026-10-02', entries: 1 },
   ],
   week: '2026-10-09',
+  paper_start: null,
+  first_week: false,
   entries: [
     {
       entry_id: 7,
@@ -50,6 +52,7 @@ const journal: MomentumJournal = {
         { asset: 'Gold', action: 'SELL', rank: 14 },
         { asset: 'Nifty Realty', action: 'HOLD', rank: 2 },
       ],
+      first_week: false,
       level: null,
     },
   ],
@@ -100,9 +103,35 @@ const journal: MomentumJournal = {
 
 describe('MomentumJournalView', () => {
   it('explains that nothing is recorded before the first Friday', () => {
-    response = { available: false, weeks: [], week: null, entries: [], check: null };
+    response = {
+      available: false,
+      weeks: [],
+      week: null,
+      paper_start: null,
+      first_week: false,
+      entries: [],
+      check: null,
+    };
     render(<MomentumJournalView />);
     expect(screen.getByText('Nothing recorded yet')).toBeTruthy();
+  });
+
+  it('says it is the first week and shows every name as a buy from nothing held', () => {
+    response = {
+      ...journal,
+      paper_start: '2026-10-09',
+      first_week: true,
+      entries: [
+        {
+          ...(journal.entries[0] as MomentumJournalEntry),
+          first_week: true,
+          holdings_before: {},
+          actions: [{ asset: 'Nifty IT', action: 'BUY', rank: 1 }],
+        },
+      ],
+    };
+    render(<MomentumJournalView />);
+    expect(screen.getByText('First week.')).toBeTruthy();
   });
 
   it("shows the week's check, the chain and the entries", () => {

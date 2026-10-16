@@ -56,7 +56,7 @@ function cell(over: Partial<PulseCell> = {}): PulseCell {
     spark: { days: ['2026-10-08', '2026-10-09'], values: [600, 676], p1_mean: 312 },
     flag: { state: 'above', windows: 190, p10: -181, p90: 640, last21: 676 },
     rank: { value: 4080, rank: 1, of: 12 },
-    chips: [{ list: 'A', variant: 'N_dir_0917', role: 'core' }],
+    chips: [{ list: 'C', variant: 'N_dir_0917', role: 'core' }],
     share: { recorded: null, reconstructed: { core: 3, share: 0.0476, buy_days: 0 } },
     matrix: { view: 'pulse', family: 'dirs', slot: '0917,1002', index: null },
     ...over,
@@ -79,7 +79,7 @@ function data(over: Partial<PulseAvailable> = {}): PulseAvailable {
       unplaced_count: 0,
     },
     next_pick_day: '2026-10-12',
-    list: 'A',
+    list: 'C',
     index: 'both',
     windows: [5, 21, 63],
     periods: {
@@ -100,16 +100,16 @@ function data(over: Partial<PulseAvailable> = {}): PulseAvailable {
       source: 'reconstructed',
       day: '2026-10-09',
       late: false,
-      lists: { A: [{ variant: 'N_dir_0917', role: 'core' }] },
+      lists: { C: [{ variant: 'N_dir_0917', role: 'core' }] },
     },
     share: {
-      list: 'A',
+      list: 'C',
       sessions: 21,
       recorded: null,
       reconstructed: {
         sessions: 21,
         core_total: 63,
-        list: 'A',
+        list: 'C',
         from: '2026-09-09',
         to: '2026-10-09',
       },
@@ -164,56 +164,76 @@ describe('RotationPulse', () => {
   });
 
   it('never shows a held response under other controls: the skeleton instead', () => {
-    // the hook still returns the list-A, both-indices payload after the controls moved on
+    // the hook still returns the list-C, both-indices payload after the controls moved on
     hook.state.data = data();
-    const view = render(<RotationPulse focus="A" />);
+    const view = render(<RotationPulse focus="C" />);
     expect(screen.getByText('Ranking sees')).toBeTruthy();
 
     view.rerender(<RotationPulse focus="B" />);
     expect(screen.queryByText('Ranking sees')).toBeNull();
     expect(screen.queryByText('₹676')).toBeNull();
 
-    view.rerender(<RotationPulse focus="A" />);
+    view.rerender(<RotationPulse focus="C" />);
     expect(screen.getByText('Ranking sees')).toBeTruthy();
     fireEvent.click(screen.getByRole('radio', { name: 'NIFTY' }));
     expect(screen.queryByText('Ranking sees')).toBeNull();
 
     // the matching response arrives: shown again
     hook.state.data = data({ index: 'NIFTY' });
-    view.rerender(<RotationPulse focus="A" />);
+    view.rerender(<RotationPulse focus="C" />);
     expect(screen.getByText('Ranking sees')).toBeTruthy();
   });
 
   it('shows the error with Retry, not the held mismatched response, when the new request fails', () => {
-    hook.state = { data: data(), loading: false, error: 'HTTP 502', refetch: vi.fn() };
-    render(<RotationPulse focus="C" />);
+    hook.state = {
+      data: data(), // held: the Adaptive payload, asked now for another list
+      loading: false,
+      error: 'HTTP 502',
+      refetch: vi.fn(),
+    };
+    render(<RotationPulse focus="B" />);
     expect(screen.getByText('Could not load the Family pulse')).toBeTruthy();
     expect(screen.queryByText('₹676')).toBeNull();
   });
 
   it('shows the figures, the rank, the drift flag, the chips and the share', () => {
     hook.state.data = data();
-    render(<RotationPulse focus="A" />);
+    render(<RotationPulse focus="C" />);
     const dir = screen.getByText('Dir').closest('tr') as HTMLElement;
     expect(within(dir).getByText('₹1,031')).toBeTruthy();
     expect(within(dir).getByText('₹676')).toBeTruthy();
     expect(within(dir).getByText('1/12')).toBeTruthy();
     expect(within(dir).getByText('Above')).toBeTruthy();
-    expect(within(dir).getByText('Steady')).toBeTruthy();
+    expect(within(dir).getByText('Adaptive')).toBeTruthy();
     expect(within(dir).getByText('5% · 3/63')).toBeTruthy();
     const buy = screen.getByText('Buy').closest('tr') as HTMLElement;
     expect(within(buy).getByText('Below')).toBeTruthy();
     expect(within(buy).getByText('4 of 21 d')).toBeTruthy();
-    expect(
-      screen.getByText(
-        /carries 5% of the composite in Steady, Calendar and Adaptive and none in Baseline/,
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText(/carries 5% of the composite in Adaptive\./)).toBeTruthy();
+  });
+
+  it('draws no chip for a hidden list that picked in a cell', () => {
+    const d = data();
+    hook.state.data = {
+      ...d,
+      cells: d.cells.map((c) => ({
+        ...c,
+        chips: [
+          { list: 'A', variant: 'N_dir_0917', role: 'core' },
+          { list: 'REF', variant: 'N_dir_0917', role: 'core' },
+          ...(c.chips ?? []),
+        ],
+      })),
+    } as typeof d;
+    render(<RotationPulse focus="C" />);
+    expect(document.body.textContent).not.toMatch(/Steady|Calendar|Baseline/);
+    const dir = screen.getByText('Dir').closest('tr') as HTMLElement;
+    expect(within(dir).getAllByText('Adaptive')).toHaveLength(1);
   });
 
   it('a missing window is a dash, never a zero', () => {
     hook.state.data = data();
-    render(<RotationPulse focus="A" />);
+    render(<RotationPulse focus="C" />);
     const dir = screen.getByText('Dir').closest('tr') as HTMLElement;
     const cells = within(dir).getAllByRole('cell');
     // cell, last 5, last 21, last 63, P1, P2: P2 has no stored result
@@ -223,7 +243,7 @@ describe('RotationPulse', () => {
 
   it('labels reconstructed picks as such and never as a record', () => {
     hook.state.data = data();
-    render(<RotationPulse focus="A" />);
+    render(<RotationPulse focus="C" />);
     expect(screen.getByText('Reconstructed 09 Oct 2026')).toBeTruthy();
     expect(screen.getByText(/not a record/)).toBeTruthy();
   });
@@ -234,7 +254,7 @@ describe('RotationPulse', () => {
         source: 'recorded',
         day: '2026-10-12',
         late: true,
-        lists: { A: [{ variant: 'N_dir_0917', role: 'core' }] },
+        lists: { C: [{ variant: 'N_dir_0917', role: 'core' }] },
       },
       journal: {
         entries: 1,
@@ -244,7 +264,7 @@ describe('RotationPulse', () => {
         chain: { intact: true, problems: [], error: null },
       },
     });
-    render(<RotationPulse focus="A" />);
+    render(<RotationPulse focus="C" />);
     expect(screen.getByText('Recorded 12 Oct 2026')).toBeTruthy();
     expect(screen.getByText(/not forward, and not counted anywhere/)).toBeTruthy();
     expect(screen.getByText(/1 late entry excluded/)).toBeTruthy();
@@ -260,7 +280,7 @@ describe('RotationPulse', () => {
         chain: { intact: false, problems: ['hash mismatch'], error: null },
       },
     });
-    render(<RotationPulse focus="A" />);
+    render(<RotationPulse focus="C" />);
     expect(screen.getByText(/Journal chain broken/)).toBeTruthy();
     expect(
       screen.getByText(/hash chain is broken, so its entries are not trusted and none/),
@@ -278,13 +298,13 @@ describe('RotationPulse', () => {
       },
       cells: [cell({ rank: null })],
     });
-    render(<RotationPulse focus="A" />);
+    render(<RotationPulse focus="C" />);
     expect(screen.getByText(/Ranking sees: the ranking needs 63 stored sessions/)).toBeTruthy();
   });
 
   it('opens the matrix pulse view for a clicked row', () => {
     hook.state.data = data();
-    render(<RotationPulse focus="A" />);
+    render(<RotationPulse focus="C" />);
     fireEvent.click(screen.getByText('Dir').closest('tr') as HTMLElement);
     expect(hook.navigate).toHaveBeenCalledWith(
       '/optionslab/matrix?view=pulse&family=dirs&slot=0917%2C1002',
@@ -293,7 +313,7 @@ describe('RotationPulse', () => {
 
   it('shows loading, an empty store, and an error with Retry', () => {
     hook.state.loading = true;
-    const { unmount } = render(<RotationPulse focus="A" />);
+    const { unmount } = render(<RotationPulse focus="C" />);
     expect(screen.queryByText('Ranking sees')).toBeNull();
     unmount();
 
@@ -303,12 +323,12 @@ describe('RotationPulse', () => {
       error: null,
       refetch: vi.fn(),
     };
-    const second = render(<RotationPulse focus="A" />);
+    const second = render(<RotationPulse focus="C" />);
     expect(screen.getByText('No strategy has stored results yet')).toBeTruthy();
     second.unmount();
 
     hook.state = { data: null, loading: false, error: 'HTTP 500', refetch: vi.fn() };
-    render(<RotationPulse focus="A" />);
+    render(<RotationPulse focus="C" />);
     expect(screen.getByText('Could not load the Family pulse')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(hook.state.refetch).toHaveBeenCalled();
@@ -316,7 +336,7 @@ describe('RotationPulse', () => {
 
   it('keeps the previous result on screen with a warning when a later request fails', () => {
     hook.state = { data: data(), loading: false, error: 'HTTP 502', refetch: vi.fn() };
-    render(<RotationPulse focus="A" />);
+    render(<RotationPulse focus="C" />);
     expect(screen.getByText('The latest request failed; this is the previous result')).toBeTruthy();
     expect(screen.getByText('₹676')).toBeTruthy();
   });
@@ -333,16 +353,16 @@ describe('RotationPulse', () => {
         unplaced_count: 0,
       },
       share: {
-        list: 'A',
+        list: 'C',
         sessions: 21,
-        recorded: { sessions: 3, core_total: 9, list: 'A', from: '2026-10-12', to: '2026-10-14' },
+        recorded: { sessions: 3, core_total: 9, list: 'C', from: '2026-10-12', to: '2026-10-14' },
         reconstructed: null,
       },
       cells: [
         cell({ share: { recorded: { core: 9, share: 1, buy_days: 0 }, reconstructed: null } }),
       ],
     });
-    render(<RotationPulse focus="A" />);
+    render(<RotationPulse focus="C" />);
     expect(screen.getByText(/120 of 298 variants/)).toBeTruthy();
     expect(screen.getByText('100% · 9/9*')).toBeTruthy();
   });
@@ -357,7 +377,7 @@ describe('RotationPulse', () => {
         }),
       ],
     });
-    render(<RotationPulse focus="A" />);
+    render(<RotationPulse focus="C" />);
     expect(screen.getByText('no variant of this strategy kind starts in this band')).toBeTruthy();
   });
 });

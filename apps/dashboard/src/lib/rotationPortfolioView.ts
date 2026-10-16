@@ -13,6 +13,7 @@ import type { RotationDayRow, RotationSummary } from '../types/rotation';
 import type { RotationListKey, RotationRow } from '../types/rotationDailyLog';
 import type { PortfolioDays } from '../types/rotationPortfolio';
 import { LIST_KEYS } from './rotationDailyLogView';
+import { listName } from './rotationListNames';
 
 export function overlayBook(
   rows: readonly RotationRow[],
@@ -70,7 +71,7 @@ export function stopFlag(
   if (!pf?.stop_label) return null;
   const kind = pf.fired_by === 'lock' ? 'profit lock' : 'portfolio stop';
   const title = fired
-    .map((k) => `${k}: ${kind} at ${row.lists[k]?.pf?.stop_label ?? ''}`)
+    .map((k) => `${listName(k)}: ${kind} at ${row.lists[k]?.pf?.stop_label ?? ''}`)
     .join('\n');
   return { label: `PF stop ${pf.stop_label}`, title };
 }

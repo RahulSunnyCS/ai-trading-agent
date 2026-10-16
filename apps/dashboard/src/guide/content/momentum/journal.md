@@ -18,6 +18,8 @@ the 16:45 final, and the 19:30 run for stock-based favourites.
 | Tamper check, Chain fingerprint | Each entry includes a fingerprint of the one before it, like a chain. If any old entry were edited, removed or reordered, the check would fail. |
 | Entries | Oldest first. Click one for its full actions and holdings. "Held before" is the model portfolio before that signal's own trades; next week's entry shows the result. |
 
+On your **paper start Friday** (set with `mbt paper-start`, see [This week](guide:momentum/this-week)) the page shows **First week**: "Held before" is *Nothing* and every name a strategy holds after is a Buy, and sleeves are numbered from that Friday. This is only how the page reads the entries; the recorded entries and their hash chain are unchanged.
+
 ## Common questions
 
 **What if a signal was wrong and re-run?** A rerun with the same signal adds nothing. A changed

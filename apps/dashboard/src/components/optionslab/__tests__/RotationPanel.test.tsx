@@ -121,13 +121,26 @@ describe('RotationPanel as one page', () => {
     expect(screen.getByTestId('EveningRun')).toBeTruthy();
   });
 
-  it('opens on the three list cards, then the day-by-day log', () => {
+  it('opens on the Adaptive card, then the day-by-day log', () => {
     render(<RotationPanel />);
-    for (const name of ['Steady', 'Calendar', 'Adaptive']) {
-      expect(screen.getByRole('region', { name: `${name} list` })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Adaptive list' })).toBeTruthy();
+    for (const name of ['Steady', 'Calendar', 'Baseline']) {
+      expect(screen.queryByRole('region', { name: `${name} list` })).toBeNull();
     }
     expect(screen.getByRole('heading', { name: 'What happened' })).toBeTruthy();
     expect(screen.getByTestId('DailyLog')).toBeTruthy();
+  });
+
+  it('names the list and its universe instead of a one-option focus control', () => {
+    render(<RotationPanel />);
+    expect(screen.queryByRole('radiogroup', { name: 'Focus list' })).toBeNull();
+    expect(screen.getByText('Adaptive · Core (298 variants)')).toBeTruthy();
+    // the comparison picker offers the fixed base and random baskets, not Baseline
+    const bench = screen.getByRole('radiogroup', { name: 'Benchmark' });
+    expect(Array.from(bench.querySelectorAll('[role="radio"]')).map((r) => r.textContent)).toEqual([
+      'Fixed base',
+      'Random median',
+    ]);
   });
 
   it('keeps the diagnostics closed, and loads each only when it is opened', () => {

@@ -18,9 +18,10 @@ import type {
   PulseStat,
 } from '../types/rotationPulse';
 import { EMPTY, formatDay, formatInr, formatInt, formatPct } from './format';
-import { listName } from './rotationListNames';
+import { VISIBLE_LIST_KEYS, listName } from './rotationListNames';
 
-export const PULSE_LISTS: readonly PulseListKey[] = ['A', 'B', 'C', 'REF'];
+/** The lists whose chips and weights the pulse shows: the shown ones (`VISIBLE_LIST_KEYS`). */
+export const PULSE_LISTS: readonly PulseListKey[] = VISIBLE_LIST_KEYS;
 export const WINDOW_KEYS = ['5', '21', '63'] as const;
 
 /** "09:17-10:02" as the page prints it, with an en dash. */
@@ -182,7 +183,7 @@ export interface ChipGroup {
   focus: boolean;
 }
 
-/** One chip per list that picked in the cell (A, B, C, REF in that order), with a count. */
+/** One chip per shown list that picked in the cell (in key order), with a count. */
 export function chipGroups(chips: PulseChip[] | undefined, focus: PulseListKey): ChipGroup[] {
   const out: ChipGroup[] = [];
   for (const list of PULSE_LISTS) {
@@ -309,7 +310,7 @@ export function picksHeader(r: PulseAvailable): PicksHeader {
 // Header texts
 // ---------------------------------------------------------------------------
 
-/** "carries 5% of the composite in Steady, Calendar and Adaptive and none in Baseline". */
+/** "carries 5% of the composite in Adaptive"; with several lists shown, "... and none in X". */
 export function criterionNote(r: PulseAvailable): string {
   const weights = r.rank.weights;
   const with_ = PULSE_LISTS.filter((k) => (weights[k] ?? 0) > 0);
@@ -318,7 +319,8 @@ export function criterionNote(r: PulseAvailable): string {
     xs.length <= 1
       ? xs.map(listName).join('')
       : `${xs.slice(0, -1).map(listName).join(', ')} and ${listName(xs[xs.length - 1] ?? '')}`;
-  if (with_.length === 0) return 'The family-band criterion carries no weight in any list.';
+  if (with_.length === 0)
+    return `The family-band criterion carries no weight in ${PULSE_LISTS.length === 1 ? join(PULSE_LISTS) : 'any list shown'}.`;
   const pcts = Array.from(new Set(with_.map((k) => formatPct(weights[k], 0))));
   const share = pcts.length === 1 ? pcts[0] : 'a small share';
   const tail = without.length ? ` and none in ${join(without)}.` : '.';

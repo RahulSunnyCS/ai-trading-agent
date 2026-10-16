@@ -132,8 +132,8 @@ uv run tdata quality rebuild  # re-judge every lake day -> data_quality (usable 
 uv run obt legwise run strategies/legwise/*.yaml [--trades] [--include-excluded] [--bars 5m]   # AlgoTest-style leg-wise backtests over that data; skips (and counts) days data_quality excludes
 uv run obt legwise rerun    # re-run every strategy over every collected day and save (after editing a strategy)
 uv run obt rotation update [--day D]   # BL-058: run the 298 rotation variants over a collected day, store results (idempotent; default day = the newest collected day not yet stored; scheduler 19:45)
-uv run obt rotation pick [--dry-run]     # record lists A / B / C / REF before 09:17, hash-chained, + Telegram (scheduler 09:16; never late-recorded silently)
-uv run obt rotation result               # after the evening run, Telegram today's net paper gain for Steady / Calendar / Adaptive to both destinations
+uv run obt rotation pick [--dry-run]     # record lists A / B / C / REF before 09:17, hash-chained, + Telegram with the Adaptive picks and a separate next-best optional Widesl / Dir line; days to expiry are weekdays, not calendar days (BL-109) (scheduler 09:16; never late-recorded silently)
+uv run obt rotation result [--no-tomorrow]  # after the evening run, Telegram today's net paper gain for Adaptive to both destinations, plus a Tomorrow section: the expected picks and the win rate / mean ₹ per lot-day of Adaptive and the fixed base on all days, the same weekday and the same NIFTY/SENSEX days to expiry (rows fixed in advance; recorded-forward vs re-scored days labelled)
 uv run obt rotation verify | show        # re-compute the chain | recent entries with each list's P&L once scored
 uv run obt rotation triggers [--day D]  # BL-083: score the day's intraday triggers (event vs placebo simulations); also run by `rotation update`, isolated
 uv run obt rotation triggers-show        # event minus placebo per trigger and template over every scored day (forward, unseen days only)
@@ -171,6 +171,8 @@ uv run mbt journal verify  # check no journal entry was changed, removed or reor
 uv run mbt saved merge [--apply]  # BL-052: fold saved runs with the same normalised settings into one strategy each (dry run by default; deletes nothing)
 uv run mbt saved split-fridays [--apply]  # BL-087: move every every-2+-weeks favourite from one Friday to a group of sleeves, one per Friday (dry run by default; keeps the old run)
 uv run mbt journal check [--send]  # did this week's runs record every favourite? (Fri 21:00 scheduler job)
+uv run mbt orders run [--send] [--fresh] [--favourite NAME]  # BL-051: the headline's orders (Fri 14:15 scheduler job); --fresh plans from nothing held (paper source: every target name is a buy, the first week of a new portfolio), --fresh needs the paper holdings source, --favourite plans for that favourite without making it the headline (an id, an exact name, or a name that matches one group; two groups is refused); never trades
+uv run mbt paper-start [show | set YYYY-MM-DD | clear]  # the Friday your portfolio starts from nothing (data/paper_start.json): that week This week shows every held name as a buy and Your orders plans from cash; groups' sleeves are numbered from it on the page only
 uv run mbt live-rules check [--send] [--simulate drawdown-cut|drawdown-exit|trailing|gate-ready]  # BL-025: the owner's live-money rules vs the followed money (Fri 21:30 scheduler job); never trades
 uv run python scripts/update-goldens.py   # check frozen results; --accept-results --reason "..." after an intended change
 uv run python scripts/bench-backtest.py [--scenario broad_default] [--live] [--profile out.prof]   # time one backtest cold/warm/cached/via jobs, with the seconds per stage; golden-fixture data by default
