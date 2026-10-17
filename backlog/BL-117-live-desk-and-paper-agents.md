@@ -138,7 +138,9 @@ the lake; the agent journal recorded before 09:16; Clockwork and Placebo as the 
   item first). Rule-triggered intraday agents, the owner's own rules and the evening post-mortems
   are [BL-119](BL-119-rule-agents-paper-and-retrospection.md). This item's agent tournament
   (Phases 0b, 1, 5) tests the pre-open pickers and is complementary to it; BL-119's live paper runs
-  on this item's Phase 2 feed and Phase 4 paper desk.
+  on this item's Phase 2 feed and Phase 4 paper desk. The screens beyond Phase 3's Live page (chain,
+  signals, paper desk, review, health) and a strategy tester are
+  [BL-120](BL-120-desk-screens-and-strategy-tester.md).
 - Showing any of this to anyone but the owner (`business.md`).
 
 ## Architecture (proposal)

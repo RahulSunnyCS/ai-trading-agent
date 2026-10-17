@@ -84,6 +84,9 @@ rule-triggered intraday agents.
   or a new item, never added after a run).
 - Changing BL-058's lists or journal, the T1 track, or BL-117's agent tournament.
 - Showing any of this to anyone but the owner (`business.md`).
+- The screens and the page where a strategy is stated and tested: [BL-120](BL-120-desk-screens-and-strategy-tester.md).
+  This item's Phase 1 study is a research script; BL-120's tester generalises the same method to any
+  stated rule.
 
 ## What an agent is
 
