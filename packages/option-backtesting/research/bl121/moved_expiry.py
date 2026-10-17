@@ -41,13 +41,18 @@ PENDING = {"2026-10-19"}  # the live forward event: no result yet, excluded
 INDEXES = ("NIFTY", "SENSEX")
 
 
-def event_days() -> tuple[dict[str, set[date]], dict[str, set[date]]]:
+def event_days(
+    exclude_cross_index: bool = False,
+) -> tuple[dict[str, set[date]], dict[str, set[date]]]:
+    """Moved days and normal expiry days per index, exactly as registered. The normal set keeps a day
+    that is moved for the OTHER index (the registration says only "an expiry on the regular weekday");
+    `exclude_cross_index=True` drops those, as the first recorded run did, as a sensitivity only."""
     moved = {
         i: {date.fromisoformat(m["expiry"]) for m in EVENTS["indices"][i]["moved"]}
         - {date.fromisoformat(x) for x in PENDING}
         for i in INDEXES
     }
-    every_moved = set().union(*moved.values())
+    every_moved = set().union(*moved.values()) if exclude_cross_index else set()
     normal = {
         i: {date.fromisoformat(x) for x in EVENTS["indices"][i]["normal_expiry_days"]} - every_moved
         for i in INDEXES
@@ -72,7 +77,8 @@ def pooled_deviation(series: dict[date, float], moved, normal, window, rng=None)
     return float(np.mean(devs)) if devs else None
 
 
-def interval(series, moved, normal, window) -> dict:
+def interval(series, moved, normal, window, leave_out: frozenset = frozenset()) -> dict:
+    moved = {i: {d for d in moved[i] if d not in leave_out} for i in moved}
     point = pooled_deviation(series, moved, normal, window)
     rng = np.random.default_rng(SEED)
     draws = [pooled_deviation(series, moved, normal, window, rng) for _ in range(RESAMPLES)]
@@ -189,12 +195,29 @@ def nifty_family_series(root: Path) -> tuple[dict[str, dict[date, float]], dict]
             vals = [per_variant[n][d] for n in members if d in per_variant[n]]
             if len(vals) >= max(3, len(members) // 2):
                 out[label][d] = float(np.mean(vals))
-    out["All NIFTY variants"] = {
-        d: float(np.mean([out[f][d] for f in fam if d in out[f]]))
-        for d in days
-        if all(d in out[f] for f in fam)
-    }
+    out["All NIFTY variants"] = {}
+    for d in days:
+        vals = [per_variant[n][d] for n in names if d in per_variant[n]]
+        if len(vals) >= len(names) // 2:
+            out["All NIFTY variants"][d] = float(np.mean(vals))
     cover["family_sizes"] = {k: len(v) for k, v in fam.items()}
+    assert not cover["missing_research"], (
+        f"P3 research files missing: {cover['missing_research'][:5]}"
+    )
+    # seam: where a research file also covers days the live store has, how far apart are they?
+    overlap, worst = 0, 0.0
+    for n in names:
+        for base in RESEARCH_DIRS:
+            f = base / "bl080/results" / f"{n}.csv"
+            if f.exists():
+                store_rows = daylog.read_rows(n, root)
+                for d, v in read_gross(f).items():
+                    if d >= SEAM and d in store_rows:
+                        overlap += 1
+                        worst = max(worst, abs(v - float(store_rows[d]["gross"])))
+                break
+    cover["seam_overlap_variant_days"] = overlap
+    cover["seam_max_abs_difference"] = worst
     return out, cover
 
 
@@ -207,6 +230,16 @@ def main() -> None:
     report["adaptive_days"] = {"core": len(core), "t1": len(t1)}
     report["adaptive_core"] = interval(core, moved, normal, ADAPTIVE_WINDOW)
     report["adaptive_t1"] = interval(t1, moved, normal, ADAPTIVE_WINDOW)
+    drop = frozenset({date(2025, 4, 9)})
+    report["leave_out_2025_04_09"] = {
+        "core": interval(core, moved, normal, ADAPTIVE_WINDOW, drop),
+        "t1": interval(t1, moved, normal, ADAPTIVE_WINDOW, drop),
+    }
+    moved_x, normal_x = event_days(exclude_cross_index=True)
+    report["sensitivity_cross_index_days_excluded_from_normal"] = {
+        "adaptive_core": interval(core, moved_x, normal_x, ADAPTIVE_WINDOW),
+        "adaptive_t1": interval(t1, moved_x, normal_x, ADAPTIVE_WINDOW),
+    }
     families, cover = nifty_family_series(root)
     report["coverage"] = cover
     nifty_only_moved = {"NIFTY": moved["NIFTY"], "SENSEX": set()}
@@ -214,15 +247,31 @@ def main() -> None:
         label: interval(series, nifty_only_moved, normal, FOUR_YEAR)
         for label, series in families.items()
     }
+    nifty_only_moved_x = {"NIFTY": moved_x["NIFTY"], "SENSEX": set()}
+    report["sensitivity_cross_index_days_excluded_from_normal"]["nifty_families_four_year"] = {
+        label: interval(series, nifty_only_moved_x, normal_x, FOUR_YEAR)
+        for label, series in families.items()
+    }
     # event table
     table = []
     mean_normal = {}
     for index in INDEXES:
         ds = [d for d in normal[index] if ADAPTIVE_WINDOW[0] <= d <= ADAPTIVE_WINDOW[1]]
+        have = [d for d in ds if d in core and d in t1]
+        mvd = [
+            d
+            for d in moved[index]
+            if d in core and d in t1 and ADAPTIVE_WINDOW[0] <= d <= ADAPTIVE_WINDOW[1]
+        ]
+        core_normal = float(np.mean([core[d] for d in have]))
         mean_normal[index] = {
-            "core": float(np.mean([core[d] for d in ds if d in core])),
-            "t1": float(np.mean([t1[d] for d in ds if d in t1])),
-            "n": len(ds),
+            "core": core_normal,
+            "t1": float(np.mean([t1[d] for d in have])),
+            "n": len(have),
+            "moved_core_mean": float(np.mean([core[d] for d in mvd])),
+            "moved_t1_mean": float(np.mean([t1[d] for d in mvd])),
+            "moved_n": len(mvd),
+            "moved_days_below_normal_mean_core": sum(1 for d in mvd if core[d] < core_normal),
         }
     report["mean_on_normal_expiry_days"] = mean_normal
     for index in INDEXES:

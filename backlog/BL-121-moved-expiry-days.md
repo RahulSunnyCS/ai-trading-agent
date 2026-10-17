@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — owner's question ahead of Mon 2026-10-19 (NIFTY expiry moved a day earlier by Dussehra); descriptive |
-| **Status** | Done: no evidence of lower earnings on moved expiry days; too few days to say more |
+| **Status** | Done: inconclusive (11 moved days); NIFTY Buy reads worse, borderline |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -106,4 +106,27 @@ None.
   missed the P3 research files (checkout path); both were fixed before this result, which is the one
   recorded. The four-year family means join the P3 research results (days to 2024-10-08) to the live
   store (from 2024-10-09).
+- 2026-10-18 — **Review corrections (PR #241); these supersede the Run entry's four-year figures.**
+  (1) The recorded run had silently removed two NIFTY regular-Thursday expiries (2024-10-31, 2024-11-14)
+  from NIFTY's normal days because they were SENSEX moved days; the registration says only "an expiry on the
+  regular weekday", so they belong in the normal set. The script now uses the registered set and keeps the
+  other as a sensitivity. The Adaptive window starts 2025-01-10, so the **primary results do not change**:
+  Core +217 [-1,014, +1,618], T1 +457 [-1,057, +2,021], both inconclusive. The four-year NIFTY families
+  (12 moved vs 236 normal NIFTY expiry days) become Widesl +272 [-203, +719], Dir +174 [-178, +546],
+  **Buy -168 [-337, -1] = "worse" under the registered rule, borderline (the upper bound is -1; with the
+  excluded days dropped it reads -167 [-340, +12], inconclusive; other seeds read inconclusive)**, all
+  variants +168 [-158, +467] (now the mean of all 149 variants, not of the three family means).
+  (2) **The headline is "inconclusive", not "no evidence of lower earnings":** the +217 rests on one day.
+  Without NIFTY 2025-04-09 the pooled result is **-562 [-1,270, +183] on Core and -258 [-1,411, +935] on
+  T1**. On Core, NIFTY moved days average +₹1,575 (with 2025-04-09) against ₹507 on normal days, SENSEX
+  moved days +₹14 against ₹818, and 7 of the 11 moved days are below their own index's normal mean.
+  (3) Three of the eleven events (2025-04-09, 2025-04-30, 2025-10-01) fall in T1's selection window
+  (2024-10-09 → 2025-10-08), so T1's figures are partly in-sample. (4) The normal-day count for SENSEX is
+  84, not 85 (2026-09-17 has no stored day). (5) The script now asserts the P3 research files are present
+  and checks the seam: 12,250 overlapping variant-days between the research files and the live store,
+  maximum difference 0.0.
+  **Composition on the moved days** (owner's question, picks only): of Adaptive's 34 picks on the 11 moved
+  days, 7 (20.6 %) were from the non-expiring index on Core and 4 (11.8 %) on T1; on NIFTY moved days 1 of
+  18 (5.6 %) for both, on SENSEX moved days 6 of 16 (37.5 %) on Core and 3 of 16 (18.8 %) on T1. On
+  ordinary expiry days the Core shares are 9.2 % (NIFTY) and 21.1 % (SENSEX).
 

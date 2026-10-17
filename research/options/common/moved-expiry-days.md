@@ -15,27 +15,35 @@ None. Nothing in the rotation reads it.
 
 ## Tested
 
-Moved minus normal expiry days, gross ₹ per lot-day, 90 % bootstrap interval (5,000 resamples).
+Moved minus normal expiry days, gross ₹ per lot-day, 90 % bootstrap interval (5,000 resamples, seed
+20261018). Inputs: the live store, the T1 results and the git-ignored P3 research results
+(`research/bl071/results`, `research/bl080/results`); regenerate with
+`uv run python research/bl121/moved_expiry.py` in the checkout that holds them.
 
-| Question | Moved days | Moved minus normal | Reading |
-|---|---|---|---|
-| Adaptive on Core-298, 2025-01-10 → 2026-10-16 | 11 (6 NIFTY, 5 SENSEX) | +217 [-1,014, +1,618] | Inconclusive |
-| Adaptive on T1, same window | 11 | +457 [-1,057, +2,021] | Inconclusive |
-| NIFTY Widesl, 2022 → 2026 | 12 | +277 [-201, +732] | Inconclusive |
-| NIFTY Dir | 12 | +175 [-173, +543] | Inconclusive |
-| NIFTY Buy | 12 | -167 [-340, +12] | Inconclusive |
-| All NIFTY variants | 12 | +95 [-157, +328] | Inconclusive |
+| Question | Moved days | Moved minus normal | Reading | Evidence |
+|---|---|---|---|---|
+| Adaptive on Core-298, 2025-01-10 → 2026-10-16 | 11 (6 NIFTY, 5 SENSEX) | +217 [-1,014, +1,618] | Inconclusive | [BL-121][bl121] Log |
+| Same, without NIFTY 2025-04-09 | 10 | -562 [-1,270, +183] | Inconclusive | same |
+| Adaptive on T1 (partly in-sample) | 11 | +457 [-1,057, +2,021] | Inconclusive | same |
+| Same, without 2025-04-09 | 10 | -258 [-1,411, +935] | Inconclusive | same |
+| NIFTY Widesl, 2022 → 2026 | 12 | +272 [-203, +719] | Inconclusive | same |
+| NIFTY Dir | 12 | +174 [-178, +546] | Inconclusive | same |
+| NIFTY Buy | 12 | -168 [-337, -1] | **Worse, borderline** (upper bound -1; other seeds and a variant of the normal set read inconclusive) | same |
+| All 149 NIFTY variants | 12 | +168 [-158, +467] | Inconclusive | same |
 
 ## What we know
 
 Leads, not findings.
 
-- No evidence that moved expiry days earn less; also no evidence that they earn the same or more. The
-  intervals are about ±₹1,000 to 1,500 for Adaptive because there are only 11 such days.
-- One day, NIFTY 2025-04-09 (+₹8,506 for Adaptive), carries most of the NIFTY moved-day mean. Without it
-  the other five NIFTY moved days average about +₹188 against ₹507 on normal expiry days.
-- NIFTY Buy is the only family whose point estimate is clearly negative (-₹167), with an interval that just
-  reaches zero.
+- **Inconclusive.** Eleven moved days cannot show whether Adaptive earns less, the same or more on them: the
+  intervals are about ±₹1,000 to 1,500.
+- **The positive point estimate rests on one day.** NIFTY 2025-04-09 (+₹8,506 for the Adaptive basket) carries
+  it; without it the pooled result is negative (Core -562, T1 -258, both inconclusive). On Core, SENSEX moved
+  days average +₹14 against ₹818 on normal days, and 7 of the 11 moved days are below their own index's
+  normal mean.
+- **NIFTY Buy is the only family reading worse**, and only just.
+- On the moved days Adaptive took 20.6 % of its picks (Core) and 11.8 % (T1) from the non-expiring index,
+  against 9.2 % and 21.1 % on ordinary NIFTY and SENSEX expiry days for Core.
 
 ## Not yet tested
 
