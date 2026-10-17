@@ -57,3 +57,46 @@ def detect(
         if held is not None and high - v >= give:
             return Event(held, m, m + 1, low, high, v, m + 1 <= M_1512)
     return None
+
+
+M_0920 = 5  # minute index of 09:20: block 2 reads the day's low from here
+
+
+def detect_b(
+    x: list[float],
+    rise: float,
+    *,
+    hold: int = HOLD,
+    give: float = GIVEBACK,
+    first: int = M_0920,
+    start: int = M_1430,
+    upto: int = M_1528,
+) -> Event | None:
+    """Block 2 (Phase 0b): the rise is measured from the day's running low since 09:20.
+
+    A value strictly below every earlier one is a new low and starts a new epoch (epoch high = highest
+    value since that low, hold restarts). Held = rise >= `rise` for `hold` consecutive minutes within
+    the epoch, and it stays held for the epoch. The give-back state is held and epoch high - x >= give.
+    Fire = the first minute m >= `start` at which that state becomes true (true at m, not true at m - 1
+    in the same epoch). Reads x[first..upto] only. `Event.held` is the minute the hold completed
+    (possibly before `start`); `low` / `high` are the epoch's.
+    """
+    low = float("inf")
+    high = float("-inf")
+    run = 0
+    held: int | None = None
+    was_gave = False
+    for m in range(first, upto + 1):
+        v = x[m]
+        if v < low:
+            low, high, run, held, was_gave = v, v, 0, None, False
+        else:
+            high = max(high, v)
+        run = run + 1 if v - low >= rise else 0
+        if held is None and run >= hold:
+            held = m
+        gave = held is not None and high - v >= give
+        if gave and not was_gave and m >= start:
+            return Event(held, m, m + 1, low, high, v, m + 1 <= M_1512)  # type: ignore[arg-type]
+        was_gave = gave
+    return None

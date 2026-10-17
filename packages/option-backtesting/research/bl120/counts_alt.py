@@ -25,39 +25,13 @@ from pathlib import Path
 
 import pandas as pd
 from periods import CELLS, assert_day, cell_days
-from rule import GIVEBACK, HOLD, M_1430, M_1512, RISE, detect
+from rule import RISE, detect, detect_b
 
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent / "common"))
 from straddle_series import first_priced, level, load_chain_day, rolling_straddle  # noqa: E402
 
 from option_backtesting.fyers.daily import data_dir  # noqa: E402
-
-M_0920 = 5
-M_1528 = 373
-
-
-def detect_b(x: list[float], rise: float) -> int | None:
-    """Reading B: fire minute, or None. A new running low starts a new epoch."""
-    low = float("inf")
-    high = float("-inf")
-    run = 0
-    held = False
-    was_gave = False
-    for m in range(M_0920, M_1528 + 1):
-        v = x[m]
-        if v < low:
-            low, high, run, held, was_gave = v, v, 0, False, False
-        else:
-            high = max(high, v)
-        run = run + 1 if v - low >= rise else 0
-        if run >= HOLD:
-            held = True
-        gave = held and high - v >= GIVEBACK
-        if gave and not was_gave and m >= M_1430:
-            return m
-        was_gave = gave
-    return None
 
 
 def day_counts(task: tuple[str, str, str]) -> dict:
@@ -82,7 +56,7 @@ def day_counts(task: tuple[str, str, str]) -> dict:
     ):
         row[name] = None if ev is None else int(ev.tradable)
     fb = detect_b(x, r)
-    row["B"] = None if fb is None else int(fb + 1 <= M_1512)
+    row["B"] = None if fb is None else int(fb.tradable)
     return row
 
 

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner's own rule (2026-10-18), the first rule-triggered intraday test that is not a re-entry habit; cheap to run |
-| **Status** | In progress. Phase 1 build and checks done; the registered rule is inconclusive by construction (4 / 8 / 7 tradable events against a floor of 30); no P&L read; owner to choose a reading (see Log) |
+| **Status** | In progress. Block 2 (the day's-low reading) run on NIFTY P2 + P3 pooled: **inconclusive** (mean net +₹151 per Widesl on 36 events, +₹126 over the causal placebo, t 0.94, above the random-minute P95); P1 not read (gate not met); owner to decide whether to go on |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -208,6 +208,8 @@ after 60 sessions. Not started by this item.
    (registered, too rare); (b) the rise measured from the day's low, possibly holding before 14:30,
    with the give-back at or after 14:30; (c) a window that starts earlier (13:30 or 13:00); or (d) a
    smaller rise? And may NIFTY P2 and P3 be pooled so a cell can reach 30 events?
+   **Answered 2026-10-18 by the owner:** reading (b): a rise already up 20 from the day's low at 14:30
+   counts. Pooling NIFTY P2 and P3 was offered with that reading and registered as block 2.
 
 ## Log
 
@@ -263,3 +265,45 @@ after 60 sessions. Not started by this item.
   NIFTY P2 + P3 pooled as the judged cell, SENSEX reported only. Prompted by the owner: "at 14:30, if it
   is already up 20 points from the day's low, that is also included." Committed in this commit; the run
   follows.
+- 2026-10-18 — **Block 2 build and checks** (before any simulation): `rule.detect_b`, `events.py
+  --reading B`, `selfcheck_b.py`. 18 synthetic cases pass (a spike already given back before 14:30 does
+  not fire; a rise held before 14:30 and given back after fires; a hold completing at 14:29 counts; a new
+  low resets the epoch; a fresh crossing after an earlier give-back fires; rise 19, hold 4, give-back 14
+  do not fire; 15:12 tradable, 15:13 not; SENSEX 30 versus 55; the rise is measured from the morning
+  low; truncation). On real days an independently written implementation (epochs from the
+  running-minimum records) agrees on 371 days (all 71 events and 300 no-event days), truncation holds on
+  every event, the series up to the fire minute is unchanged without later bars, and the tradable counts
+  equal those logged before registration (9 / 27 / 18). 35 of the 71 events completed their hold before
+  14:30. The shared detector replaced a local copy in `counts_alt.py`; its counts re-ran identical.
+- 2026-10-18 — **Block 2 result** (`run.py`: 1,708 simulations, 0 errors, 0 without an entry; `read.py`).
+  Rupees per Widesl strategy, ₹1,000 stop, after ₹20 an order (cost is 4 orders, ₹80, so gross is ₹80
+  higher). Causal placebo: 10 nearest days with no fire by the entry minute (median 10, minimum 6 per
+  event).
+
+  | cell | events | mean net | win rate | stopped | placebo mean | event − placebo | t | random-minute P95 |
+  |---|---|---|---|---|---|---|---|---|
+  | **NIFTY P2 + P3 pooled (judged)** | 36 | +151 | 61 % | 14 % | +25 | **+126** | **0.94** | 113 (event mean above 97 % of draws) |
+  | NIFTY P2 (sign check) | 9 | +261 | 67 % | 11 % | +65 | +196 | 0.75 | 334 |
+  | NIFTY P3 (sign check) | 27 | +114 | 59 % | 15 % | +11 | +103 | 0.65 | 97 |
+  | SENSEX P2 (reported, not judged) | 18 | +247 | 44 % | 11 % | +143 | +104 | 0.37 | 323 |
+
+  **Verdict under Phase 0b: inconclusive.** Test 1 (mean net > 0) holds, test 3 (above the random-minute
+  P95) holds, both periods are positive, but **test 2 fails: t = 0.94 against the bar of 2.0**. Not a
+  kill (nothing negative), not a pass. 90 % bootstrap interval of the mean net per event: [−69, +375];
+  of event minus placebo: [−91, +347]; 67 % of events beat their own placebo. At this effect size and
+  spread (standard deviation of event minus placebo ₹805) a t of 2 needs about **162 events, 4.5 times
+  the 36 seen**, which at one tradable event per 22 sessions is about 14 years of NIFTY sessions. P1 is
+  not read: the gate needs a screen pass.
+
+  **Description only, not judged: many splits of 36 events, so leads at most.** Hold completed before 14:30: 20 events, +₹282 (placebo difference +255); at or after 14:30:
+  16 events, −₹13 (−35). Entry before 14:45: 15 events, +₹418 (+397); 14:45 or later: 21 events, −₹40
+  (−67). By year: 2022 −₹161 (4 events), 2023 −₹177 (10), 2024 +₹423 (13), 2025 +₹261 (9). Expiry day:
+  4 events, +₹392; other days 32 events, +₹121. SENSEX is at 44 % wins with a larger average win
+  (₹1,193) than loss (₹510); expiry day 3 events, all losses.
+- 2026-10-18 — **Limits of this result.** Cost is brokerage only (₹20 an order); statutory charges and
+  slippage are not in the figures, and bar-close fills on thin late-day premium are the engine's weakest
+  part. The placebo is 6 to 10 days per event, so it is itself noisy. 2022 and 2023 are negative and 2024
+  and 2025 positive on 4 to 13 events each, which cannot say whether the edge is regime-dependent. The
+  series counts strike switches as movement (median 30 inside the window from 09:20), so a "rise" can be
+  the strike moving. P2 + P3 are not clean for this rule (see Context); a pass would only have been a
+  screen. Counted tries in this item: rule A (counts only), three other readings (counts only), block 2.
