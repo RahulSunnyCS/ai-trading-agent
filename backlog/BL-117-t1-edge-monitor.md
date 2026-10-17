@@ -59,6 +59,11 @@ Core templates; is T1 still ahead of Core-298's Adaptive.
      zero, or the CUSUM crosses −2 standard errors of the gap.
 - **Context, not alarms:** each signal split by VIX band and expiry / non-expiry, so "edge gone" can be
   told from "a regime where T1 never had an edge".
+  Also by NIFTY's day range (high − low ÷ open, terciles): measured 2026-10-17 on the test year, T1's gap
+  to Core was −₹106 per lot-day on the quietest third of days, +₹272 in the middle and +₹503 on the
+  widest-range third, but flat by VIX level (+215 / +200 / +252) and not predicted by the previous day's
+  range (+203 / +77 / +386; BL-110 states +173 / +244 / +248). So a quiet stretch (as Jul–Sep 2026: VIX
+  11.5–12.9, range 0.62–0.79 %) should show little gap without meaning the edge is gone.
 - **Calibration:** the thresholds are set from the 2025-01 → 2026-10 history above and written here
   before the first track day; never edited after.
 
@@ -83,3 +88,5 @@ Core templates; is T1 still ahead of Core-298's Adaptive.
 - 2026-10-17 — created from the owner's idea (percentile of the picks); history measured; P1.
 - 2026-10-17 — owner: keep it P1, high priority; add the rolling 60-day gap to Core (signal 4a);
   the open questions are settled together with the owner when the item is started.
+- 2026-10-17 — owner asked whether the Oct 2025 – Mar 2026 gain came from war-driven volatility; the
+  day-range split above added as context.
