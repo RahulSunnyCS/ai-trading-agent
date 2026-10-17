@@ -455,7 +455,7 @@ function Body({
     [data, differs],
   );
   const current = rows.find((r) => r.variant === selected) ?? rows[0] ?? null;
-  const lines = boundaryLines(data.boundary);
+  const lines = boundaryLines(data.boundary, data.expiry_rule);
   const flags = provenanceFlags(data);
   const ctx = data.context;
   const rec = data.reconstruction;

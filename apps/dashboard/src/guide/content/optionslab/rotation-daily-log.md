@@ -22,6 +22,10 @@ Three things are kept apart on this screen, and the words keep them apart:
 Passing an entry time does not prove a trade happened. Only the third line says so, and only
 because you wrote it.
 
+From Monday 19 October 2026, on a day when exactly one of NIFTY and SENSEX expires, Adaptive takes
+only that index's strategies (the expiry rule); the journal also keeps what it would have picked
+without the rule, and Reconstructed days are always re-scored without it.
+
 ## The two views
 
 | View | What it shows |

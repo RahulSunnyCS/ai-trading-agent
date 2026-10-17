@@ -333,6 +333,7 @@ def show(last: int = typer.Option(5, "--last", help="How many recent entries."))
         typer.echo(
             f"{e['day']} {e['weekday']} VIX {e['vix_open']} ({e['vix_band']}) "
             f"chain {e['hash'][:10]}"
+            + (f"  expiry rule: {e['expiry_only']} only (Adaptive)" if e.get("expiry_only") else "")
         )
         day = date.fromisoformat(e["day"])
         for key, p in e["lists"].items():

@@ -113,6 +113,16 @@ Otherwise:
   the 298 universe; its Dir results in `rotation/base/`) and the read-out (per list ₹ per lot-day, drawdown,
   random same-shape percentile, list minus REF and minus base by a circular 5-day block bootstrap, 2,000
   resamples, seed 20261012). Read-only over the journal; `obt rotation readout | base`.
+- `rotation/expiry.py` — the expiring-index rule (BL-122, owner 2026-10-18): from `EXPIRY_ONLY_FROM` (Mon
+  2026-10-19), on a day when exactly one index expires (weekday label `0`; both, neither or an unknown label =
+  no rule), Adaptive (list C, live and T1) is a FILTER of the unrestricted ranking: `filter_picks` runs
+  `score.select` over that index's variants only (Widesl minimum kept) and keeps the Buy add-on only when it is
+  already on that index. `pick.record` passes `rule_index(day, dte)` to `score_history(..., expiry_only=)`; the
+  entry gets `expiry_only` and list C's block `unfiltered` + `expiry_only` (omitted on other days, so those
+  entries are unchanged). Everything that re-derives a recorded pick passes the entry's `expiry_only`
+  (`daylog._rescore`, `explain`, `rankic`), `tomorrow.expected_picks` uses `rule_index(next session)`, and
+  reconstructed history never applies it. Kill switch `ROTATION_EXPIRY_ONLY_FROM` (`YYYY-MM-DD` | `off`, read
+  at call time; any other value makes the pick fail loudly).
 - `legwise/` — AlgoTest-style leg-wise engine over the Fyers data (`obt legwise run
   strategies/legwise/*.yaml`): `schema.py` (one field per AlgoTest setting), `market.py`
   (a day on the 375-minute grid), `engine.py` (the state machine — its docstring lists every

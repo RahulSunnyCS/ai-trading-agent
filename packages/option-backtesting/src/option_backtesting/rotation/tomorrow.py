@@ -13,6 +13,7 @@ forward."""
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -60,6 +61,8 @@ class Expected:
     same: float  # probability the opening leaves the picks as they are
     scenarios: list[Scenario]
     next_best: dict[str, dict[str, str | None]] | None = None  # list -> {wide, dir}
+    #: the index Adaptive is restricted to on that session (BL-122), or None
+    expiry_only: str | None = None
 
 
 @dataclass(frozen=True)
@@ -230,9 +233,13 @@ def expected_picks(
     """Re-run the 09:16 ranking for `day` from the stored results: with the market's last close
     standing in for tomorrow's opening conditions, and for each band the open could land in."""
     from . import attrs as attrs_mod
-    from . import pick, score, store
+    from . import expiry, pick, score, store
     from .variants import variant_names
 
+    dte = {"dte_n": dte_n, "dte_s": dte_s}
+    # the rule the 09:16 job will apply to that session (BL-122), so every figure below is for
+    # the picks it would actually record
+    rule = expiry.rule_index(day, dte)
     vix = attrs_mod.vix_close_from_lake(root, last_day)
     if vix is None:  # no close in the lake: the last stored open is the next best
         vix = (store.read_days(root).get(last_day) or {}).get("vix_open")
@@ -240,10 +247,9 @@ def expected_picks(
     if vix is None:
         return None
     hist = pick.load_history(day, root, variant_names())
-    dte = {"dte_n": dte_n, "dte_s": dte_s}
 
     def picks_at(v: float) -> Picks:
-        r = pick.score_history(hist, day, v, dte)
+        r = pick.score_history(hist, day, v, dte, expiry_only=rule)
         return {k: (r[k]["core"], r[k]["buy"]) for k in LIST_KEYS}
 
     order = list(score.VIX_LABELS)
@@ -256,13 +262,18 @@ def expected_picks(
     trans = vix_transitions(root, last_day).get(base_band) or {}
     weights = trans or {b: 1.0 if b == base_band else 0.0 for b in order}
     expected = build_expected(picks_at(vix), by_band, order, base_band, weights)
-    options = {k: v for k, v in pick.next_best(hist, day, vix, dte).items() if k in LIST_KEYS}
+    options = {
+        k: v
+        for k, v in pick.next_best(hist, day, vix, dte, expiry_only=rule).items()
+        if k in LIST_KEYS
+    }
     return Expected(
         expected.picks,
         expected.likelihood,
         expected.same,
         expected.scenarios,
         options,
+        rule,
     )
 
 
@@ -283,7 +294,11 @@ def for_next_session(today: date, root: Path | None = None) -> Tomorrow:
     section = build(nxt, log["rows"], nxt.strftime("%a"), labels["dte_n"], labels["dte_s"], base)
     try:
         expected = expected_picks(nxt, root, labels["dte_n"], labels["dte_s"], today)
-    except Exception:  # noqa: BLE001 - the base rates still go out without the picks
+    except Exception as error:  # noqa: BLE001 - the base rates still go out without the picks
+        print(
+            f"tomorrow: expected picks skipped ({type(error).__name__}: {str(error)[:200]})",
+            file=sys.stderr,
+        )
         expected = None
     return Tomorrow(**{**section.__dict__, "expected": expected})
 
@@ -296,6 +311,8 @@ def render(t: Tomorrow) -> str:
     ]
     e = t.expected
     if e is not None:
+        if e.expiry_only:
+            lines.append(pick_mod.expiry_rule_line(e.expiry_only))
         lines.append("Expected picks if the conditions at the close stay the same:")
         for key in LIST_KEYS:
             core, buy = e.picks[key]

@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-16
+Last updated: 2026-10-18
 
 ## Open
 
@@ -42,6 +42,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-095](BL-095-portfolio-mtm-stop-in-rotation.md) | Portfolio MTM stop-loss on the Rotation page: a ₹ stop (default ₹10k; empty / 0 = none) with trailing (Trail SL, Lock, Lock and trail) set in a pop-up, applied to each list's basket — days table, calendar, "Replay the list", hero curve, drawdowns; read-out untouched | P1 | In progress (Phases 1–4 built; PR open) | feature | options / dashboard |
 | [BL-104](BL-104-full-parameter-sweep.md) | Full-factorial parameter sweep over Widesl (incl. ATM), Dir and Buy: strike, stops, trail, MTM, exit, re-entry, range and target at 7 slots × 2 indices (63,384 cells), Calmar-gated Martin ranking with a plateau rule; absorbs BL-096/097/098 Phase 3 | P1 | In progress (Stages 1–3 and advisory done; forward test and pool POC open) | research | options |
 | [BL-106](BL-106-pool-picker-poc.md) | Picker POC: Steady / Calendar / Adaptive / Baseline over a first-year-selected candidate pool vs the 298, test year 2025-10 → 2026-10, gross | P1 | Done: no list won on New-536; New-556 exploratory, shallower drawdown in one path | research | options |
+| [BL-122](BL-122-expiring-index-only-rule.md) | Expiring-index rule: from Mon 2026-10-19, on a day exactly one index expires, Adaptive (live and T1) takes only that index's strategies (a filter of the ranking; unfiltered picks logged; owner override of BL-111 H3) | P1 | In progress | feature | options |
 | [BL-114](BL-114-momentum-correlation-widget.md) | Momentum correlation widget: how alike are the strategies we follow? (saved groups measure as 1.2 independent bets of 11) | P1 | Planned | feature | momentum |
 | [BL-105](BL-105-dir-trade-management-tests.md) | Directional trade management: profit lock / trail on day MTM, roll the decayed leg to the new ATM, restart at a profit limit; a screen on existing machinery first, engine support only for survivors | P2 | Done: no idea passed its rule (lock / trail, restart, roll); engine roll kept | research | options |
 | [BL-096](BL-096-directional-parameter-sweep.md) | Directional stop, re-entry, trailing and exit sweep across NIFTY/SENSEX ATM and ITM1 variants | P2 | In progress | research | options |

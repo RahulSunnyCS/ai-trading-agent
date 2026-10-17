@@ -9,7 +9,10 @@ never changes a list, a weight or an entry.
 
 Adaptive ranks the **Core** pool: the 298 rotation strategies (Widesl OTM and closest-premium,
 Dir ATM, Dir ITM1 and Buy at each start time, on NIFTY and SENSEX). The top of the page names both: "Adaptive · Core (298
-variants)". It mixes five criteria; the numbers are the weights in percent.
+variants)". It mixes five criteria; the numbers are the weights in percent. From Monday 19 October
+2026, on a day when exactly one of NIFTY and SENSEX expires, Adaptive takes only that index's
+strategies: the same ranking with the other index left out, and a Buy add-on kept only when it is
+on the expiring index (the expiry rule; the 09:16 message says so in one line).
 
 | Name | Key | Own recent results | Weekday | Days to expiry | VIX | Family band |
 |---|---|---|---|---|---|---|

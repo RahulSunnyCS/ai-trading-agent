@@ -35,7 +35,7 @@ from typing import Any
 import numpy as np
 
 from ..data.reference.loader import default_reference_data
-from . import journal, store
+from . import expiry, journal, store
 from .dte import LEGACY_BASIS, entry_basis, recorded_labels
 from .lists import BUY_TOP, LISTS, LOTS_PER, MIN_WIDE_N, N_BUY, N_CORE, WARMUP, RotationList
 from .score import (
@@ -443,15 +443,21 @@ def _ref(r: Ranking, v: int, rank: int, pool_rank: int | None = None) -> dict:
     }
 
 
-def _boundary(r: Ranking, order: list[int], picks, lst: RotationList) -> dict:
+def _boundary(
+    r: Ranking, order: list[int], picks, lst: RotationList, allowed: set[int] | None = None
+) -> dict:
+    """`allowed`: the variants the selection ran over (the expiring index's on a BL-122 rule day;
+    None = all). Ranks stay over the whole universe; the core, the swaps and the nearest
+    excluded are replayed over the allowed pool, as `expiry.filter_picks` selects."""
     names = r.names
     comp = r.comp
     rank_of = {v: k + 1 for k, v in enumerate(order)}
     wide = np.array([is_wide(n) for n in names])
     dir_ = np.array([is_dir(n) for n in names])
     buy_mask = np.array([is_buy(n) for n in names])
-    pool = [v for v in order if not buy_mask[v]]
-    pool_rank_of = {v: k + 1 for k, v in enumerate(pool)}
+    pool_all = [v for v in order if not buy_mask[v]]
+    pool_rank_of = {v: k + 1 for k, v in enumerate(pool_all)}
+    pool = [v for v in pool_all if allowed is None or v in allowed]
     idx = {n: v for v, n in enumerate(names)}
     core = [idx[n] for n in picks.core]
 
@@ -490,6 +496,9 @@ def _boundary(r: Ranking, order: list[int], picks, lst: RotationList) -> dict:
     buys = [v for v in order if buy_mask[v]]
     best_buy = buys[0] if buys else None
     picked_buy = [idx[n] for n in picks.buy]
+    # the Buy variants that qualified before any BL-122 rule; one left out only by the rule is not
+    # "outside the top 10"
+    qualified_before_rule = [v for v in top10 if buy_mask[v]][:N_BUY]
     buy_info: dict[str, Any] = {
         "top": BUY_TOP,
         "size": N_BUY,
@@ -498,8 +507,14 @@ def _boundary(r: Ranking, order: list[int], picks, lst: RotationList) -> dict:
         "best_buy": ref(best_buy) if best_buy is not None else None,
         "tenth_composite": _round(comp[top10[-1]]) if len(top10) >= BUY_TOP else None,
         "gap_to_top": None,
+        "dropped_by_rule": bool(qualified_before_rule) and not picked_buy,
     }
-    if best_buy is not None and len(top10) >= BUY_TOP and not picked_buy:
+    if (
+        best_buy is not None
+        and len(top10) >= BUY_TOP
+        and not picked_buy
+        and not qualified_before_rule
+    ):
         buy_info["gap_to_top"] = _round(comp[top10[-1]] - comp[best_buy])
     return {
         "n_core": N_CORE,
@@ -614,6 +629,14 @@ def explain(snap: Snapshot, day: date, list_key: str, top: int = 10) -> dict:
     fam = family_index(names)
     r = rank_day(Pv, weekday, band, dmat, names, lst, fam)
     picks = select(r.comp, names)
+    # BL-122: a journal entry that recorded the expiring-index rule is rebuilt under it (only the
+    # entry says so: a day without an entry is explained unfiltered, like reconstructed history)
+    rule = entry.get("expiry_only") if entry is not None and list_key in expiry.RULE_LISTS else None
+    unfiltered = picks
+    allowed = None
+    if rule:
+        picks = expiry.filter_picks(r.comp, names, unfiltered, rule)
+        allowed = {v for v, n in enumerate(names) if underlying_of(n) == rule}
     digest = history_digest(snap, rows, attrs)
 
     order = order_by_composite(r.comp, names)
@@ -624,7 +647,7 @@ def explain(snap: Snapshot, day: date, list_key: str, top: int = 10) -> dict:
     idx = {n: v for v, n in enumerate(names)}
     fam_names = _family_band_names(names)
 
-    boundary = _boundary(r, order, picks, lst)
+    boundary = _boundary(r, order, picks, lst, allowed)
     swapped_in = {s["added"]["variant"] for s in boundary["override"]["swaps"]}
 
     def role(name: str) -> str:
@@ -785,6 +808,15 @@ def explain(snap: Snapshot, day: date, list_key: str, top: int = 10) -> dict:
         "picks": pick_rows,
         "top": top_rows,
         "boundary": boundary,
+        # BL-122: None, or the index the list was restricted to and the picks without the rule
+        "expiry_rule": (
+            {
+                "index": rule,
+                "unfiltered": {"core": unfiltered.core, "buy": unfiltered.buy},
+            }
+            if rule
+            else None
+        ),
         "scored": scored,
         "warnings": warnings,
         "vix_bands": VIX_LABELS,
