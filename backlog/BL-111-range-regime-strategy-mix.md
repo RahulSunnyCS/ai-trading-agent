@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — owner's idea; builds on BL-110; a close cousin of BL-053 (killed) |
-| **Status** | Planned |
+| **Status** | Planned; H3 (Amendment 1) run 2026-10-18: exploratory, positive but fragile |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-15 |
@@ -285,6 +285,26 @@ should say if the 3-lot ordinary-day basket is not "top 3 non-Buy × 1 lot".
   days, so nothing is adopted from it. Under the registered next step a positive outcome may earn a
   proposal for a forward track for EXP as a new backlog item (read out on differing days); that proposal
   is the owner's decision.
+- 2026-10-18 — **H3 review (PR #240); the table above is unchanged and reproduces byte for byte. Read it with
+  these.** (1) **Net of charges was NOT computed** (the registration asked for it beside the gross). A rough
+  bound from the trade counts (EXP trades 0.06 more per strategy on Core, 0.30 more on T1) is about ₹5 to
+  ₹40 per lot-day, an estimate; the sign probably survives. (2) **The primary Core reading is fragile.**
+  Leave-one-out: the worst single day (2026-01-22) still leaves the lower bound at +54; dropping the top 2
+  days gives [+26, +656]; **dropping the top 3 gives +295 [-18, +618], which includes zero**; the top 5
+  [-70, +500]. Calendar 2025 alone is [-147, +841], 2026 alone [+148, +872]. The top 5 of the 53 days carry
+  55 % of the summed difference. (3) **"The SENSEX days drive it" holds for T1, not for Core.** On Core the
+  NIFTY mean is +449 and the SENSEX one +413; each Core split fails leave-one-out on its own (SENSEX
+  without 2026-01-22: lower bound -25; NIFTY without 2025-10-20: -64, and its top 5 days carry 94 % of its
+  sum). T1 NIFTY without its top 5 days is -290 [-583, -37]. (4) **T1 is not an independent replication:** it
+  is a superset of Core and its 223 extra variants were chosen on 2024-10-09 → 2025-10-08, which overlaps
+  the first nine months of the window. Up to 2025-10-08 T1 reads +751 [+246, +1,301]; after it +383 [+145,
+  +667]; after dropping its top 5 days +206 [+37, +397] (more robust than Core). (5) **+427 is per lot-day on
+  the differing days only.** Averaged over all 179 expiry days the effect is +₹127 per lot-day on Core and
+  +₹138 on T1. (6) Six readings were taken (2 universes × 3 splits); only the "both indices" rows are the
+  registered primary. 19 of 179 Core expiry days (16 on T1) also had a Buy add-on, which both arms leave
+  out as registered; SENSEX and NIFTY lots are not normalised for margin. **Reading under the registered
+  rule stays "positive (together)", but it is a fragile, exploratory, in-sample lead.** Script nits fixed
+  without changing any number (a bad trade count no longer drops a day's gross; skipped days counted: 0).
 - 2026-10-18 — Amendment 2 registered before any run: H3b, at most one non-expiring core pick (EXP1),
   with the owner's `override:` line quoted above. Same exploratory, in-sample status as H3.
 
