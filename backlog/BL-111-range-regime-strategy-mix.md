@@ -307,4 +307,27 @@ should say if the 3-lot ordinary-day basket is not "top 3 non-Buy × 1 lot".
   without changing any number (a bad trade count no longer drops a day's gross; skipped days counted: 0).
 - 2026-10-18 — Amendment 2 registered before any run: H3b, at most one non-expiring core pick (EXP1),
   with the owner's `override:` line quoted above. Same exploratory, in-sample status as H3.
+- 2026-10-18 — **H3b run** (`research/bl111/h3b_max_one_off.py`; `h3b_max_one_off_2026-10-18.json`), as
+  registered in Amendment 2: exploratory, in-sample 2025-01-10 → 2026-10-08, the same 179 expiry days, core
+  picks only, one lot each; EXP1 allows at most one non-expiring core pick, EXP0 none (H3's arm), FREE any.
+  **How many non-expiring picks FREE holds on the 179 expiry days (Core): 0 on 126, 1 on 33, 2 on 17, 3 on
+  3** (T1: 131, 33, 10, 5). **Mean gross per lot-day over all 179 expiry days, Core: FREE +677, EXP1 +711,
+  EXP0 +804** (T1: +958, +992, +1,096): fewer non-expiring picks, higher result, in-sample.
+  Paired, on the days where the two baskets differ, 90 % circular block bootstrap (5-day blocks over the
+  ordered days, 2,000, seed 20261015); "w/o top 3" drops the three largest days (descriptive):
+
+  | Comparison (together) | Core-298 | T1 |
+  |---|---|---|
+  | **EXP1 minus FREE (primary)** | 20 days: **+302 [+44, +552], positive**; w/o top 3 +151 [-64, +356] | 15 days: +411 [+4, +794], positive; w/o top 3 -125 [-524, +321] |
+  | EXP1 minus EXP0 (secondary) | 53 days: **-313 [-544, -79], negative**; w/o top 3 -444 [-667, -205] | 48 days: -385 [-564, -201], negative; w/o top 3 -499 [-648, -355] |
+  | EXP0 minus FREE (H3, for reference) | 53 days: +427 [+112, +733]; w/o top 3 +295 [-18, +618] | 48 days: +513 [+259, +781]; w/o top 3 +303 [+144, +488] |
+
+  Splits: Core NIFTY-expiry days EXP1 minus FREE has only 5 differing days (+491); SENSEX-expiry days 15
+  days, +239 [-34, +503], inconclusive. **Reading under the registered rule: EXP1 beats FREE (positive,
+  fragile: it falls to +151 [-64, +356] without three days, and only 20 days differ), and EXP1 does worse
+  than EXP0 (negative, robust to dropping three days).** In plain terms, in this window allowing one
+  non-expiring pick recovers only about a quarter of the full filter's gain (+34 against +127 per lot-day
+  over all expiry days on Core). Exploratory, in-sample, net of charges not computed; nothing adopted.
+  A bug in the first draft of the "w/o top 3" check (sorting scrambled the date order the block bootstrap
+  needs) was fixed before this entry; the main intervals were not affected.
 

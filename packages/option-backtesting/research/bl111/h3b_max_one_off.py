@@ -81,7 +81,7 @@ def interval(diff: np.ndarray) -> dict:
             share_better=float((diff > 0).mean()),
         )
         if diff.size >= 8:  # descriptive: drop the three days that carry the most
-            keep = np.sort(diff)[: diff.size - 3]
+            keep = np.delete(diff, np.argsort(diff)[-3:])  # drop the 3 largest, keep date order
             m3, l3, h3 = block_bootstrap_mean(keep, RESAMPLES, BLOCK, SEED, LEVEL)
             out["without_top_3_days"] = {"mean": m3, "ci90": [l3, h3]}
     elif diff.size:
