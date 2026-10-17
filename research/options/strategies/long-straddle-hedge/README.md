@@ -1,6 +1,6 @@
 # Long straddle as a hedge for the base
 
-**Status:** Tested — killed · **Last updated:** 2026-10-14
+**Status:** Tested — killed · **Last updated:** 2026-10-18
 
 ## What it is
 
@@ -22,6 +22,7 @@ Not live; not in the rotation universe.
 |---|---|---|---|---|
 | BL-101 | 1 lot ATM straddle added to the base (2 lots as sensitivity) | NIFTY, 2024-01-01 → 2026-10-09, 680 sessions, after charges (BL-096 model), slippage 0 / 1% / 2% | **Killed**: all four registered rules fail | [BL-101][bl101] |
 | BL-101 Phase 0b | 1 lot OTM4 strangle instead (owner's override, second trial) | same | **Killed**: all four rules fail | [BL-101][bl101] |
+| BL-121 | The same long ATM straddle, entered only after the rolling ATM straddle breaks its 09:17–09:30 high (R1: above it and 10 over the 09:17 value; R2: 10 above it), 25% leg stops, trail 3:2 in points, exit 15:14 | NIFTY, P2 (2025-01 → 08) and P3 (2022-04 → 2024-10), 39 to 123 events a cell, after ₹20 an order, causal placebo | **Killed**: every cell loses (−₹292 to −₹596 per straddle) and is no better than the same straddle on ordinary days (event minus placebo −₹26 to −₹243, t ≈ 0) | [BL-121][bl121] |
 
 The base is the journal's fixed base: 2 × NIFTY Widesl OTM1 09:17 + 1 × Dir ATM 09:24
 ([BL-058][bl058]). Pass required B+L to cut the base's 95% expected shortfall (ES95) and maximum
@@ -52,10 +53,17 @@ Net of charges, slippage 0 ([BL-101][bl101]; OTM4 row from the committed `resear
 - The base's own rules were picked in-sample on part of this window, so only the with / without
   difference is evidence.
 
+- A conditional entry (BL-121, a break of the opening straddle high) did not help: the straddle bought at
+  the break lost in both periods, about four in five with both legs stopped, and the same straddle at the
+  same minute on ordinary days lost almost as much. Random minutes on the break days were profitable, which
+  may mean much of the move is already priced by the time of the break (an untested reading, and a
+  hindsight comparison, not a rule).
+
 ## Not yet tested
 
 Needs a dated `override:` in BL-101 to run: smaller straddle sizes (1 lot is about a ₹20k premium
-against a base whose worst day is about ₹11k), a conditional entry, other strike depths.
+against a base whose worst day is about ₹11k), other strike depths. A conditional entry on the opening
+straddle break is tested and killed (BL-121); other conditions are untested.
 
 ## Related
 
@@ -67,3 +75,4 @@ against a base whose worst day is about ₹11k), a conditional entry, other stri
 
 [bl058]: ../../../../backlog/BL-058-options-rotation-forward-journal-and-ui.md
 [bl101]: ../../../../backlog/BL-101-early-long-straddle-hedge.md
+[bl121]: ../../../../backlog/BL-121-opening-straddle-break-long-straddle.md

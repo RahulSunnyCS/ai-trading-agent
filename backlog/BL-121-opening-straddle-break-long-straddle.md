@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner's second rule test (2026-10-18); cheap; the first one on the long side of the straddle |
-| **Status** | In progress (Phase 0 pre-registered; nothing run when this block was committed) |
+| **Status** | Done: **killed**. Both arms lose in both periods (net −₹292 to −₹596 per straddle) and are no better than the same straddle at the same minute on ordinary days (event minus placebo −₹26 to −₹243, t from −0.06 to −0.52). P1 unread |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -144,7 +144,7 @@ Not started by this item.
 
 ## Open questions
 
-1. R1 or R2 (or both): which did the owner mean? Both are registered.
+1. R1 or R2 (or both): which did the owner mean? Both were registered and run; both are killed.
 2. The watch window end (14:00) and the exit time (15:14) are my choices; the owner gave neither.
 3. Is "3:2" in points (assumed, like the owner's other strategies) or percent?
 
@@ -153,3 +153,48 @@ Not started by this item.
 - 2026-10-18 — created from the owner's chat. Defaults are mine: the high window is 09:17–09:30, the watch
   window ends at 14:00, exit 15:14, trail in points, two arms for the two readings. Phase 0 committed
   before any run.
+- 2026-10-18 — **Build and checks** (before any simulation): `research/common/long_straddle_trade.py`,
+  `research/common/event_design.py`, `research/bl121/` (`rule.py`, `periods.py`, `events.py`, `design.py`,
+  `selfcheck.py`, `run.py`, `read.py`). 17 synthetic cases pass (R1 fires where R2 does not; 10 over the noted
+  value without a break does not fire; equal to H is not a break; a spike at 09:30 raises H and does not fire,
+  one at 09:31 does; index 285 fires and 286 does not; truncation). On real days an independent array-mask
+  implementation of both arms agrees with the detector and the scan on 500 days, truncation holds on every
+  event, the series up to the fire bar is unchanged without later bars, and **an independent leg-by-leg
+  re-simulation from the raw option bars (entry at the prior bar's close, 25 % stop to the 0.05 tick,
+  trail [3, 2] on the highest high, gap fills, exit at the 15:14 price) matches the engine on all 48 legs
+  of 24 straddles**, so the straddle ran as specified. `out/` is git-ignored: regenerate with `events.py`,
+  `run.py`, `read.py`.
+- 2026-10-18 — **Result** (14,337 simulations, 0 errors, 0 without an entry). Rupees per long straddle
+  (both legs), after ₹20 an order (4 orders, ₹80, so gross is ₹80 higher). Causal placebo: median 10 days
+  per event (at worst 5).
+
+  | cell | events | mean net | win rate | mean win / loss | held / 1 / 2 legs stopped | placebo mean | event − placebo | t |
+  |---|---|---|---|---|---|---|---|---|
+  | R1 P2 | 60 | −408 | 32 % | +3,313 / −2,132 | 3 / 17 / 80 % | −381 | −26 | −0.06 |
+  | R1 P3 | 123 | −292 | 29 % | +2,986 / −1,648 | 2 / 21 / 76 % | −170 | −122 | −0.39 |
+  | R2 P2 | 39 | −596 | 36 % | +2,366 / −2,255 | 0 / 18 / 82 % | −353 | −243 | −0.52 |
+  | R2 P3 | 86 | −299 | 28 % | +3,703 / −1,847 | 3 / 20 / 77 % | −182 | −116 | −0.28 |
+
+  **Verdict under Phase 0: both arms killed.** In every cell the mean net is negative and event minus
+  placebo is negative (kill rule: mean net ≤ 0 or event minus placebo ≤ 0 in either cell). Gross is also
+  negative (−₹212 to −₹516), so charges are not the reason. The same straddle at the same minute on days
+  with no break also loses (−₹170 to −₹381): the unconditional long straddle bleeds, as BL-101 found, and
+  the break does not select better minutes. Roughly four in five straddles have both legs stopped out.
+  P1 is not read.
+- 2026-10-18 — **Test 3 is not a clean test here.** The random-minute draws are taken on the event days, so
+  a random minute can fall before the break on a day that later broke, which is hindsight. Their means are
+  positive (R1 +₹371 / +₹517, R2 +₹753 / +₹806 per straddle, P2 / P3) against the break minute's −₹292 to
+  −₹596, and the event mean is below every draw. One reading, not tested: on days that go on to break, buying earlier
+  than the break would have paid and buying at the break does not, perhaps because much of the move is
+  already in the premium by then and the stops are tight. It is not a tradable comparison, and the kill rests on tests 1 and 2, which are
+  causal.
+- 2026-10-18 — **Description only, not judged (many splits of 14 to 123 events, so no leads).** Entry
+  10:30 to 12:00 is negative in all four cells (−₹759 to −₹1,532 on 11 to 24 events). Where the opening
+  range had already moved 10 points by 09:30 (H − S0 ≥ 10): R1 P2 +₹553 on 25 events, R1 P3 −₹835 on 29;
+  R2 P2 +₹87 on 17, R2 P3 −₹1,691 on 14: opposite signs between periods. By year: 2023 is the worst
+  (R1 −₹1,005 on 26 events, win rate 8 %), 2024 about flat (R1 +₹65 on 63).
+- 2026-10-18 — **Limits.** Cost is brokerage only (₹20 an order); no statutory charges or slippage, and
+  both would make it worse. The trail is in points (3:2); a percent trail, another stop, a later exit or a
+  window end other than 14:00 were not run (the owner gave none of those, the choices are mine). The two
+  arms are nested, so four cells come from two signals. P2 + P3 are not clean for this rule; P1 was never
+  needed. Counted tries in this item: two arms in two cells.
