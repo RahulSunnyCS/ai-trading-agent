@@ -330,6 +330,27 @@ were simulated on its pick day for the net comparison.
   registered rule BL-116 runs both schemes. Both re-selected versions trail the frozen T1 sets (+341,
   +241, +343, −10) and both lose the latest quarter.
 
+## Experiment 9 — hedges held to the close (registered 2026-10-17, before any run)
+
+- **Owner (2026-10-17):** "whenever an SL hit, we only remove the main option … we will not remove the
+  hedges", keep them "till 3:30 every day", on Widesl or Dir.
+- **Hedge:** a long CE and a long PE at closest premium X, entered at the pick's entry time, 1 lot, **no
+  stop, target or re-entry, never closed by the pick's leg SL or its overall MTM stop**, exited 15:28 (the
+  rotation's last bar). The pick itself is unchanged: its stops see only its own legs, exactly as today.
+  Day P&L = the pick (as today) + its hedge. One hedge per pick per day (re-entries reuse it).
+- **Picks:** the day's T1 Adaptive picks (Experiment 5's `t1_picks.json`), unchanged; Buy picks never
+  hedged. Net of charges (BL-096 model, the hedge's two orders included), 1 lot per pick, book per day.
+- **Margin:** Experiment 7's broker-calculator model at the pick's first entry, with the hedge strikes as
+  the wings; an unhedged pick as Experiment 7.
+- **Grid:** X (NIFTY / SENSEX) ∈ {(5, 15), (10, 30), (20, 60)} × which picks {Widesl only, Dir only, both}
+  × days {all, expiry only}; then the midpoints next to the first-year best and one step beyond at an end
+  (as Experiment 7).
+- **Choose on the first year:** the highest net return on margin among variants keeping ≥ 85 % of the
+  unhedged first-year net. **Pass rule on the test year (Experiment 7's):** worst day and worst-5-days
+  sum improve by ≥ 30 %, net falls by ≤ 15 %, return on margin rises. Otherwise no hedge. Reported
+  beside it: the hedges' own P&L, and on the days a pick's stop or MTM stop fired.
+- `research/bl107/hedges_hold.py` → `results/hedges_hold/`.
+
 ## Log
 
 - 2026-10-16 — created from the owner's request; Phase 0 registered before the first-year selection
