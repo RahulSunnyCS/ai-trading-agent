@@ -267,6 +267,16 @@ A research block in the sense of `_TEMPLATE.md` Phase 0; the owner may overrule 
     same commit.
 - **Done when:** for 5 sessions both indices show within about 5 s of each minute close, and the
   rolling straddle series for a finished day equals the derived straddle table for that day.
+- **Built early, 2026-10-18, on replay data (owner: "make a proper Live page").** The page and its API
+  exist and read a collected day: `live/session.py` and `api/live_routes.py`
+  (`GET /legwise/live/days|session`, proxied at `/api/backtest/legwise/live/*`), `LiveView.tsx` with
+  `live/LiveSessionChart.tsx` and `live/LivePlayback.tsx`, a Guide page (`operations/live`). It shows
+  spot, India VIX, the ATM strike, the rolling and the held 09:15 straddle and the legs for NIFTY or
+  SENSEX, with a day picker and play / pause / speed / slider; the banner says it is a replay because
+  there is no live capture. The old WebSocket page (`useLiveTicks`, `StraddlePanel`) is no longer
+  mounted; it needed the frozen server's Redis stream. **Left for this phase:** a live reader behind
+  the same URL (needs Phase 2's `live/<day>/` files), polling each minute, IV, the 5-second latency
+  check against real minute closes.
 
 ### Phase 4 — Paper desk: live = replay (absorbs BL-118's old Phases 1–2)
 - **4a, the engine:** `_DaySim.run()` split into `step(minute)` / `finish()` with `run()` kept as
@@ -372,3 +382,9 @@ record.
   desk". Phase 0b written as a pre-registration block (not yet committed as such: this item is
   uncommitted; the block counts from the commit that adds it). The execution item renumbered to
   BL-118 and its Phases 1–2 moved here (Phase 4). No code, no runs.
+- 2026-10-18 — Phase 3 built ahead of Phases 0a and 2, on replay data, at the owner's request
+  ("lets make proper Live page"): the page, API, tests and Guide page are written; the live reader is
+  not (no live capture exists). Verified in a browser on NIFTY and SENSEX against the API's numbers;
+  replay, speed, slider and the day picker work, and the chart axis always spans the session. IV was
+  left out on purpose (the straddle as a percent of spot is shown instead). The running stack needs
+  an `obt-api` restart and a dashboard rebuild to serve it.

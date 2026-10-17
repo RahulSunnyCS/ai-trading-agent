@@ -52,6 +52,10 @@
  *                                                 Correlation). Both requireAccess, no credit
  *  GET  /api/backtest/legwise/rotation/basket   — one list's (or the fixed base's) picks for a day,
  *                                                 correlated over a window. requireAccess
+ *  GET  /api/backtest/legwise/live/days         — collected days the Live page can replay. requireAccess
+ *  GET  /api/backtest/legwise/live/session      — one day on the 1-minute grid (spot, VIX, the rolling and
+ *                                                 the fixed 09:15 straddle). requireAccess; underlying is an
+ *                                                 enum, the day a date, nothing else is forwarded
  *  GET  /api/backtest/legwise/rotation/regime   — the forward window's market mix beside P1, P2 and P3.
  *  GET  /api/backtest/legwise/rotation/drawdowns — a list's drawdown episodes against the fixed base.
  *                                                 requireAccess
@@ -799,6 +803,49 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation basket ---
+  // --- live page --- the Live tab's data (live/session.py, read-only). The underlying is an enum and
+  // the day a date; nothing else is forwarded.
+  fastify.get(
+    '/api/backtest/legwise/live/days',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { underlying: { type: 'string', enum: ['NIFTY', 'SENSEX'] } },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(reply, `/legwise/live/days${upstreamQuery(q, ['underlying'])}`);
+    },
+  );
+  fastify.get(
+    '/api/backtest/legwise/live/session',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            underlying: { type: 'string', enum: ['NIFTY', 'SENSEX'] },
+            day: { type: 'string', pattern: DATE_RE },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/live/session${upstreamQuery(q, ['underlying', 'day'])}`,
+      );
+    },
+  );
+  // --- end live page ---
   // --- rotation regime --- "Forward days vs research periods" (rotation/regime.py, read-only).
   // No parameters: the periods are the registered ones, so nothing from the query is forwarded.
   fastify.get(

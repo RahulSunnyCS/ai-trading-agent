@@ -45,6 +45,8 @@ The evening run's status and its **Run** button are at the top of Today.
 
 ## Data
 
+- [Live](app:/live) — spot, VIX and two straddles, minute by minute; a replay of a collected day until live capture exists.
+  [Guide](guide:operations/live)
 - [Coverage](app:/coverage) — historical candle backfill for the paused live engine.
   [Guide](guide:operations/coverage)
 - [Jobs](app:/jobs) — every scheduled job, when it runs, how its last run went.

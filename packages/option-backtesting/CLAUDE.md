@@ -151,6 +151,15 @@ Otherwise:
   dashboard's `POST /legwise/daily` job; add a step here, never in one caller), `store.py` (strategies, versions and
   results in the trading-data catalog — a version is a hash of the validated spec). Separate from `engine/` on purpose — see `DECISIONS.md`.
   Also `anatomy.py` (per-day, per-segment index shape — QUIET/CHOP/TREND from spot + India VIX, descriptive only: lag it a day before using it for anything actionable; `DTE_RELIABLE_FROM` guards a wrong pre-Sep-2025 expiry calendar) and `forensics.py` (one saved day re-simulated for the dashboard; `DayResult.mtm` is the per-minute curve, never persisted). `fyers/history.py` backfills index + VIX history (`obt fyers history`).
+- `live/session.py` + `api/live_routes.py` — the Live page's data (BL-117 Phase 3; `GET /legwise/live/days` and
+  `/session?underlying=NIFTY|SENSEX&day=`, proxied at `/api/backtest/legwise/live/*`), read-only. One day on the
+  375-minute grid, trimmed to the last real index bar: spot, India VIX, the ATM strike of each minute, the **rolling**
+  ATM straddle (CE + PE at each minute's own ATM, so it re-strikes) and the straddle **held** from the strike that was
+  ATM at the 09:15 open, both on the nearest weekly expiry; a missing leg is `None`, never carried; days to expiry are
+  weekdays (`rotation/dte.py`); the median full-session range of the last 20 sessions is context only. Today the
+  source is always a collected lake day (`source.kind: replay`, `live.available: false` with the reason); a live reader
+  over `TRADING_DATA_ROOT/live/<day>/` (BL-117 Phase 2) is meant to return the same shape. Replays are cached
+  (`lru_cache`); nothing is written.
 - `notify.py` — Telegram sender (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID), a deliberate copy of
   `momentum-backtesting`'s notify.py mirroring `@trading/notify`'s contract (never `parse_mode`,
   redacts known secrets, never raises; prints when unconfigured). Tests must stub `send` —
