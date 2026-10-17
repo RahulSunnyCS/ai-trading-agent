@@ -231,4 +231,27 @@ should say if the 3-lot ordinary-day basket is not "top 3 non-Buy × 1 lot".
   the amendment: `override: owner request 2026-10-18 (chat: "on expiry days we will be only using the
   expiry things; let me know whether this will increase or decrease our thing")` for the third hypothesis
   and the use of SENSEX results. **The owner confirms it on PR #240.**
+- 2026-10-18 — **H3 run** (`research/bl111/h3_expiring_index.py`; `h3_expiring_index_2026-10-18.json`), as
+  registered in Amendment 1: exploratory, in-sample 2025-01-10 → 2026-10-08, arm EXP = filter of the
+  unrestricted list-C ranking to the expiring index (core picks, one lot each), 179 expiry days, no day with
+  both indices expiring. Per-lot gross is the mean of the picks' one-lot gross. **EXP minus unrestricted on
+  the days where the baskets differ, 90 % circular block bootstrap (5-day blocks, 2,000, seed 20261015):**
+
+  | Universe | Days differing | Mean per lot-day | Interval | Reading |
+  |---|---|---|---|---|
+  | Core-298, both indices | 53 of 179 | +427 | [+112, +733] | **positive** |
+  | Core-298, NIFTY expiry days | 21 of 90 | +449 | [-2, +900] | inconclusive |
+  | Core-298, SENSEX expiry days | 32 of 89 | +413 | [+88, +704] | positive |
+  | T1, both indices | 48 of 179 | +513 | [+259, +781] | **positive** |
+  | T1, NIFTY expiry days | 22 of 90 | +182 | [-245, +538] | inconclusive |
+  | T1, SENSEX expiry days | 26 of 89 | +793 | [+405, +1,205] | positive |
+
+  EXP was better on 72 % of Core's differing days (67 % NIFTY, 75 % SENSEX) and 69 % of T1's. The summed
+  difference is +₹22,646 per lot on Core and +₹24,639 on T1 over the window. Net of charges was **not**
+  computed (it needs the BL-096 per-trade model; the registration said to report it beside the gross):
+  the mean number of trades on the differing days is in the JSON instead. **Reading under the registered
+  rule: positive (together, both universes).** It is exploratory and in-sample with about 50 informative
+  days, so nothing is adopted from it. Under the registered next step a positive outcome may earn a
+  proposal for a forward track for EXP as a new backlog item (read out on differing days); that proposal
+  is the owner's decision.
 

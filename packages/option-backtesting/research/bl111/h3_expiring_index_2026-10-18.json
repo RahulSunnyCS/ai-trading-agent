@@ -1,0 +1,6916 @@
+{
+ "window": [
+  "2025-01-10",
+  "2026-10-08"
+ ],
+ "arms": "EXP = filter of the unrestricted list-C ranking to the expiring index (core picks, one lot each)",
+ "core_298": {
+  "days_with_both_indices_expiring": 0,
+  "all": {
+   "expiry_days": 179,
+   "differing_days": 53,
+   "sum_difference_per_lot": 22645.749999999993,
+   "share_of_differing_days_exp_better": 0.7169811320754716,
+   "mean_difference_per_lot": 427.2783018867923,
+   "ci90": [
+    111.79691823899361,
+    733.4422955974843
+   ],
+   "reading": "positive",
+   "mean_trades_on_differing_days": {
+    "free": 2.2830188679245285,
+    "exp": 2.339622641509434
+   }
+  },
+  "NIFTY_expiry_days": {
+   "expiry_days": 90,
+   "differing_days": 21,
+   "sum_difference_per_lot": 9438.783333333333,
+   "share_of_differing_days_exp_better": 0.6666666666666666,
+   "mean_difference_per_lot": 449.465873015873,
+   "ci90": [
+    -1.9278571428571354,
+    899.8921428571426
+   ],
+   "reading": "inconclusive",
+   "mean_trades_on_differing_days": {
+    "free": 2.3015873015873014,
+    "exp": 2.396825396825397
+   }
+  },
+  "SENSEX_expiry_days": {
+   "expiry_days": 89,
+   "differing_days": 32,
+   "sum_difference_per_lot": 13206.966666666665,
+   "share_of_differing_days_exp_better": 0.75,
+   "mean_difference_per_lot": 412.7177083333333,
+   "ci90": [
+    88.35609374999989,
+    704.011640625
+   ],
+   "reading": "positive",
+   "mean_trades_on_differing_days": {
+    "free": 2.270833333333334,
+    "exp": 2.3020833333333335
+   }
+  },
+  "rows": [
+   {
+    "day": "2025-01-14",
+    "index": "SENSEX",
+    "free": [
+     "S_p320_0917",
+     "S_wide_0917",
+     "S_p250_0917"
+    ],
+    "exp": [
+     "S_p320_0917",
+     "S_wide_0917",
+     "S_p250_0917"
+    ],
+    "differs": false,
+    "free_gross": 4846.866666666667,
+    "exp_gross": 4846.866666666667,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-01-16",
+    "index": "NIFTY",
+    "free": [
+     "N_p100_0917",
+     "N_p80_0917",
+     "N_wide_0917"
+    ],
+    "exp": [
+     "N_p100_0917",
+     "N_p80_0917",
+     "N_wide_0917"
+    ],
+    "differs": false,
+    "free_gross": 3129.75,
+    "exp_gross": 3129.75,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-01-21",
+    "index": "SENSEX",
+    "free": [
+     "S_wide_0917",
+     "S_p320_0917",
+     "S_p250_0917"
+    ],
+    "exp": [
+     "S_wide_0917",
+     "S_p320_0917",
+     "S_p250_0917"
+    ],
+    "differs": false,
+    "free_gross": -3013.4,
+    "exp_gross": -3013.4,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-01-23",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_0917",
+     "N_p100_0932",
+     "N_wide_0947"
+    ],
+    "exp": [
+     "N_p80_0917",
+     "N_p100_0932",
+     "N_wide_0947"
+    ],
+    "differs": false,
+    "free_gross": -34.88333333333336,
+    "exp_gross": -34.88333333333336,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-01-28",
+    "index": "SENSEX",
+    "free": [
+     "N_wide_1032",
+     "N_p100_1032",
+     "N_wide_1047"
+    ],
+    "exp": [
+     "S_ditm1_1347",
+     "S_p320_1302",
+     "S_wide_1447"
+    ],
+    "differs": true,
+    "free_gross": -2574.866666666667,
+    "exp_gross": -2543.0,
+    "free_trades": 2.0,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-01-30",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_1102",
+     "N_p100_1002",
+     "S_dir_1017"
+    ],
+    "exp": [
+     "N_p80_1102",
+     "N_p100_1002",
+     "N_p100_1102"
+    ],
+    "differs": true,
+    "free_gross": 4185.083333333333,
+    "exp_gross": 2545.8333333333335,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-02-04",
+    "index": "SENSEX",
+    "free": [
+     "N_p80_1102",
+     "S_ditm1_1432",
+     "N_p100_1002"
+    ],
+    "exp": [
+     "S_ditm1_1432",
+     "S_p320_1117",
+     "S_wide_1102"
+    ],
+    "differs": true,
+    "free_gross": 803.2666666666668,
+    "exp_gross": -1657.3333333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-02-06",
+    "index": "NIFTY",
+    "free": [
+     "N_p100_0917",
+     "N_p80_0917",
+     "N_wide_0932"
+    ],
+    "exp": [
+     "N_p100_0917",
+     "N_p80_0917",
+     "N_wide_0932"
+    ],
+    "differs": false,
+    "free_gross": -393.25,
+    "exp_gross": -393.25,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-02-11",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1202",
+     "S_wide_1347",
+     "S_p320_1347"
+    ],
+    "exp": [
+     "S_ditm1_1202",
+     "S_wide_1347",
+     "S_p320_1347"
+    ],
+    "differs": false,
+    "free_gross": 3143.6666666666665,
+    "exp_gross": 3143.6666666666665,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-02-13",
+    "index": "NIFTY",
+    "free": [
+     "N_p100_0932",
+     "N_ditm1_0917",
+     "N_wide_0932"
+    ],
+    "exp": [
+     "N_p100_0932",
+     "N_ditm1_0917",
+     "N_wide_0932"
+    ],
+    "differs": false,
+    "free_gross": -588.25,
+    "exp_gross": -588.25,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-02-18",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1202",
+     "S_p250_1347",
+     "S_wide_1347"
+    ],
+    "exp": [
+     "S_ditm1_1202",
+     "S_p250_1347",
+     "S_wide_1347"
+    ],
+    "differs": false,
+    "free_gross": 2256.0,
+    "exp_gross": 2256.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-02-20",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_0947",
+     "N_wide_0947",
+     "N_p80_1002"
+    ],
+    "exp": [
+     "N_p80_0947",
+     "N_wide_0947",
+     "N_p80_1002"
+    ],
+    "differs": false,
+    "free_gross": 2575.0833333333335,
+    "exp_gross": 2575.0833333333335,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-02-25",
+    "index": "SENSEX",
+    "free": [
+     "S_p320_0917",
+     "S_wide_0917",
+     "S_p250_0917"
+    ],
+    "exp": [
+     "S_p320_0917",
+     "S_wide_0917",
+     "S_p250_0917"
+    ],
+    "differs": false,
+    "free_gross": 4893.333333333333,
+    "exp_gross": 4893.333333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-02-27",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_0917",
+     "N_wide_1002",
+     "N_p100_0917"
+    ],
+    "exp": [
+     "N_p80_0917",
+     "N_wide_1002",
+     "N_p100_0917"
+    ],
+    "differs": false,
+    "free_gross": 1496.0833333333333,
+    "exp_gross": 1496.0833333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-03-04",
+    "index": "SENSEX",
+    "free": [
+     "S_wide_0917",
+     "S_p250_0917",
+     "S_dir_1117"
+    ],
+    "exp": [
+     "S_wide_0917",
+     "S_p250_0917",
+     "S_dir_1117"
+    ],
+    "differs": false,
+    "free_gross": -737.6666666666666,
+    "exp_gross": -737.6666666666666,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-03-06",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_0917",
+     "N_wide_1002",
+     "N_wide_0947"
+    ],
+    "exp": [
+     "N_ditm1_0917",
+     "N_wide_1002",
+     "N_wide_0947"
+    ],
+    "differs": false,
+    "free_gross": -1041.0833333333333,
+    "exp_gross": -1041.0833333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-03-11",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0917",
+     "S_p320_0917",
+     "S_wide_0917"
+    ],
+    "exp": [
+     "S_ditm1_0917",
+     "S_p320_0917",
+     "S_wide_0917"
+    ],
+    "differs": false,
+    "free_gross": 1186.2666666666667,
+    "exp_gross": 1186.2666666666667,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-03-13",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1247",
+     "N_wide_0932",
+     "N_wide_1002"
+    ],
+    "exp": [
+     "N_ditm1_1247",
+     "N_wide_0932",
+     "N_wide_1002"
+    ],
+    "differs": false,
+    "free_gross": -400.8333333333333,
+    "exp_gross": -400.8333333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-03-18",
+    "index": "SENSEX",
+    "free": [
+     "S_p320_0917",
+     "S_ditm1_1302",
+     "S_wide_0917"
+    ],
+    "exp": [
+     "S_p320_0917",
+     "S_ditm1_1302",
+     "S_wide_0917"
+    ],
+    "differs": false,
+    "free_gross": 35.333333333333336,
+    "exp_gross": 35.333333333333336,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-03-20",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_0917",
+     "N_p100_0932",
+     "S_wide_0917"
+    ],
+    "exp": [
+     "N_ditm1_0917",
+     "N_p100_0932",
+     "N_wide_1147"
+    ],
+    "differs": true,
+    "free_gross": 536.4166666666666,
+    "exp_gross": -595.8333333333334,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-03-25",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0917",
+     "S_wide_0917",
+     "S_p250_1317"
+    ],
+    "exp": [
+     "S_ditm1_0917",
+     "S_wide_0917",
+     "S_p250_1317"
+    ],
+    "differs": false,
+    "free_gross": 1586.0,
+    "exp_gross": 1586.0,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-03-27",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1247",
+     "S_wide_0917",
+     "N_wide_1332"
+    ],
+    "exp": [
+     "N_ditm1_1247",
+     "N_wide_1332",
+     "N_wide_1347"
+    ],
+    "differs": true,
+    "free_gross": -569.5,
+    "exp_gross": 478.6166666666666,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-04-01",
+    "index": "SENSEX",
+    "free": [
+     "S_p250_1102",
+     "S_ditm1_1017",
+     "S_wide_1102"
+    ],
+    "exp": [
+     "S_p250_1102",
+     "S_ditm1_1017",
+     "S_wide_1102"
+    ],
+    "differs": false,
+    "free_gross": 466.6666666666667,
+    "exp_gross": 466.6666666666667,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-04-03",
+    "index": "NIFTY",
+    "free": [
+     "N_dir_1047",
+     "N_p80_0932",
+     "N_p100_0932"
+    ],
+    "exp": [
+     "N_dir_1047",
+     "N_p80_0932",
+     "N_p100_0932"
+    ],
+    "differs": false,
+    "free_gross": 2328.0833333333335,
+    "exp_gross": 2328.0833333333335,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-04-08",
+    "index": "SENSEX",
+    "free": [
+     "S_p320_1102",
+     "S_ditm1_1117",
+     "S_p320_1132"
+    ],
+    "exp": [
+     "S_p320_1102",
+     "S_ditm1_1117",
+     "S_p320_1132"
+    ],
+    "differs": false,
+    "free_gross": -3510.6666666666665,
+    "exp_gross": -3510.6666666666665,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-04-09",
+    "index": "NIFTY",
+    "free": [
+     "N_wide_0932",
+     "N_p100_1002",
+     "N_p80_0932"
+    ],
+    "exp": [
+     "N_wide_0932",
+     "N_p100_1002",
+     "N_p80_0932"
+    ],
+    "differs": false,
+    "free_gross": 8506.116666666667,
+    "exp_gross": 8506.116666666667,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-04-15",
+    "index": "SENSEX",
+    "free": [
+     "S_p320_1217",
+     "S_ditm1_1432",
+     "S_wide_1402"
+    ],
+    "exp": [
+     "S_p320_1217",
+     "S_ditm1_1432",
+     "S_wide_1402"
+    ],
+    "differs": false,
+    "free_gross": 471.0,
+    "exp_gross": 471.0,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-04-17",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1202",
+     "N_p100_0917",
+     "N_p100_0932"
+    ],
+    "exp": [
+     "N_ditm1_1202",
+     "N_p100_0917",
+     "N_p100_0932"
+    ],
+    "differs": false,
+    "free_gross": 615.1166666666668,
+    "exp_gross": 615.1166666666668,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-04-22",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1_0932",
+     "N_wide_0932",
+     "S_wide_0917"
+    ],
+    "exp": [
+     "S_dir_0932",
+     "S_wide_0917",
+     "S_p320_0917"
+    ],
+    "differs": true,
+    "free_gross": 2325.7000000000003,
+    "exp_gross": 4523.333333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-04-24",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1202",
+     "N_wide_0932",
+     "S_wide_1402"
+    ],
+    "exp": [
+     "N_ditm1_1202",
+     "N_wide_0932",
+     "N_wide_1047"
+    ],
+    "differs": true,
+    "free_gross": -684.8333333333334,
+    "exp_gross": 247.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-04-29",
+    "index": "SENSEX",
+    "free": [
+     "S_dir_0932",
+     "S_wide_0917",
+     "S_wide_1402"
+    ],
+    "exp": [
+     "S_dir_0932",
+     "S_wide_0917",
+     "S_wide_1402"
+    ],
+    "differs": false,
+    "free_gross": 613.6666666666666,
+    "exp_gross": 613.6666666666666,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-04-30",
+    "index": "NIFTY",
+    "free": [
+     "N_wide_1017",
+     "N_wide_1032",
+     "N_p80_1017"
+    ],
+    "exp": [
+     "N_wide_1017",
+     "N_wide_1032",
+     "N_p80_1017"
+    ],
+    "differs": false,
+    "free_gross": -18.19999999999997,
+    "exp_gross": -18.19999999999997,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-05-06",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0932",
+     "S_wide_0917",
+     "S_p320_1217"
+    ],
+    "exp": [
+     "S_ditm1_0932",
+     "S_wide_0917",
+     "S_p320_1217"
+    ],
+    "differs": false,
+    "free_gross": 1740.6666666666667,
+    "exp_gross": 1740.6666666666667,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-05-08",
+    "index": "NIFTY",
+    "free": [
+     "N_p100_0917",
+     "N_p80_0947",
+     "N_p80_1002"
+    ],
+    "exp": [
+     "N_p100_0917",
+     "N_p80_0947",
+     "N_p80_1002"
+    ],
+    "differs": false,
+    "free_gross": -423.5833333333333,
+    "exp_gross": -423.5833333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-05-13",
+    "index": "SENSEX",
+    "free": [
+     "S_wide_0917",
+     "S_ditm1_0917",
+     "S_p320_0917"
+    ],
+    "exp": [
+     "S_wide_0917",
+     "S_ditm1_0917",
+     "S_p320_0917"
+    ],
+    "differs": false,
+    "free_gross": -663.6666666666666,
+    "exp_gross": -663.6666666666666,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-05-15",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1217",
+     "N_p80_1132",
+     "N_p80_0947"
+    ],
+    "exp": [
+     "N_ditm1_1217",
+     "N_p80_1132",
+     "N_p80_0947"
+    ],
+    "differs": false,
+    "free_gross": -425.74999999999983,
+    "exp_gross": -425.74999999999983,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-05-20",
+    "index": "SENSEX",
+    "free": [
+     "S_dir_1302",
+     "N_wide_1047",
+     "N_p80_1047"
+    ],
+    "exp": [
+     "S_dir_1302",
+     "S_p250_1302",
+     "S_p320_1202"
+    ],
+    "differs": true,
+    "free_gross": -1409.8666666666668,
+    "exp_gross": 641.6666666666666,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-05-22",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1017",
+     "N_p80_1402",
+     "N_wide_1402"
+    ],
+    "exp": [
+     "N_ditm1_1017",
+     "N_p80_1402",
+     "N_wide_1402"
+    ],
+    "differs": false,
+    "free_gross": -2319.4166666666665,
+    "exp_gross": -2319.4166666666665,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-05-27",
+    "index": "SENSEX",
+    "free": [
+     "S_dir_1132",
+     "S_p250_1302",
+     "N_wide_1302"
+    ],
+    "exp": [
+     "S_dir_1132",
+     "S_p250_1302",
+     "S_p320_1302"
+    ],
+    "differs": true,
+    "free_gross": 2828.4500000000003,
+    "exp_gross": 3194.3333333333335,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-05-29",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1_0947",
+     "N_p100_0932",
+     "N_wide_0932"
+    ],
+    "exp": [
+     "N_ditm1_0917",
+     "N_p100_0932",
+     "N_wide_0932"
+    ],
+    "differs": true,
+    "free_gross": -539.2166666666667,
+    "exp_gross": 1011.6166666666667,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-06-03",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0947",
+     "S_p320_1302",
+     "N_wide_1302"
+    ],
+    "exp": [
+     "S_ditm1_0947",
+     "S_p320_1302",
+     "S_p320_1232"
+    ],
+    "differs": true,
+    "free_gross": 7590.75,
+    "exp_gross": 7601.333333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-06-05",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1302",
+     "S_wide_0932",
+     "S_p250_0917"
+    ],
+    "exp": [
+     "N_ditm1_1302",
+     "N_wide_0932",
+     "N_p80_1317"
+    ],
+    "differs": true,
+    "free_gross": -1619.0833333333333,
+    "exp_gross": 1185.1666666666667,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-06-10",
+    "index": "SENSEX",
+    "free": [
+     "S_wide_0932",
+     "S_p320_0932",
+     "S_ditm1_0917"
+    ],
+    "exp": [
+     "S_wide_0932",
+     "S_p320_0932",
+     "S_ditm1_0917"
+    ],
+    "differs": false,
+    "free_gross": 5697.333333333333,
+    "exp_gross": 5697.333333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-06-12",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1247",
+     "N_wide_0932",
+     "N_p100_1232"
+    ],
+    "exp": [
+     "N_ditm1_1247",
+     "N_wide_0932",
+     "N_p100_1232"
+    ],
+    "differs": false,
+    "free_gross": -397.5833333333333,
+    "exp_gross": -397.5833333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-06-17",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0947",
+     "S_wide_0932",
+     "S_p250_0932"
+    ],
+    "exp": [
+     "S_ditm1_0947",
+     "S_wide_0932",
+     "S_p250_0932"
+    ],
+    "differs": false,
+    "free_gross": 2128.6666666666665,
+    "exp_gross": 2128.6666666666665,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-06-19",
+    "index": "NIFTY",
+    "free": [
+     "S_dir_0932",
+     "N_p80_1302",
+     "N_p100_1347"
+    ],
+    "exp": [
+     "N_ditm1_1302",
+     "N_p80_1302",
+     "N_p100_1347"
+    ],
+    "differs": true,
+    "free_gross": -634.1666666666666,
+    "exp_gross": -253.5,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-06-24",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1002",
+     "S_wide_0917",
+     "S_p320_0917"
+    ],
+    "exp": [
+     "S_ditm1_1002",
+     "S_wide_0917",
+     "S_p320_0917"
+    ],
+    "differs": false,
+    "free_gross": -3006.0,
+    "exp_gross": -3006.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-06-26",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_0947",
+     "N_p100_1347",
+     "N_p80_1347"
+    ],
+    "exp": [
+     "N_ditm1_0947",
+     "N_p100_1347",
+     "N_p80_1347"
+    ],
+    "differs": false,
+    "free_gross": 1625.0,
+    "exp_gross": 1625.0,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-07-01",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1_1302",
+     "S_p250_1347",
+     "S_wide_1347"
+    ],
+    "exp": [
+     "S_ditm1_1232",
+     "S_p250_1347",
+     "S_wide_1347"
+    ],
+    "differs": true,
+    "free_gross": 532.0833333333334,
+    "exp_gross": 751.3333333333334,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-07-03",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_0917",
+     "N_p80_1347",
+     "N_wide_1402"
+    ],
+    "exp": [
+     "N_ditm1_0917",
+     "N_p80_1347",
+     "N_wide_1402"
+    ],
+    "differs": false,
+    "free_gross": -1381.25,
+    "exp_gross": -1381.25,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-07-08",
+    "index": "SENSEX",
+    "free": [
+     "S_p320_0917",
+     "S_p250_0917",
+     "S_p250_0932"
+    ],
+    "exp": [
+     "S_p320_0917",
+     "S_p250_0917",
+     "S_p250_0932"
+    ],
+    "differs": false,
+    "free_gross": 1682.6666666666667,
+    "exp_gross": 1682.6666666666667,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-07-10",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1347",
+     "N_p100_1002",
+     "N_wide_0932"
+    ],
+    "exp": [
+     "N_ditm1_1347",
+     "N_p100_1002",
+     "N_wide_0932"
+    ],
+    "differs": false,
+    "free_gross": -33.583333333333336,
+    "exp_gross": -33.583333333333336,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-07-15",
+    "index": "SENSEX",
+    "free": [
+     "S_wide_0917",
+     "S_ditm1_0917",
+     "S_p250_0932"
+    ],
+    "exp": [
+     "S_wide_0917",
+     "S_ditm1_0917",
+     "S_p250_0932"
+    ],
+    "differs": false,
+    "free_gross": -2739.6666666666665,
+    "exp_gross": -2739.6666666666665,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-07-17",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1017",
+     "N_wide_1017",
+     "N_p80_1102"
+    ],
+    "exp": [
+     "N_ditm1_1017",
+     "N_wide_1017",
+     "N_p80_1102"
+    ],
+    "differs": false,
+    "free_gross": 469.0833333333333,
+    "exp_gross": 469.0833333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-07-22",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0947",
+     "S_wide_1117",
+     "S_p250_1117"
+    ],
+    "exp": [
+     "S_ditm1_0947",
+     "S_wide_1117",
+     "S_p250_1117"
+    ],
+    "differs": false,
+    "free_gross": 1112.6666666666667,
+    "exp_gross": 1112.6666666666667,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-07-24",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_0932",
+     "N_wide_1017",
+     "N_p80_1017"
+    ],
+    "exp": [
+     "N_ditm1_0932",
+     "N_wide_1017",
+     "N_p80_1017"
+    ],
+    "differs": false,
+    "free_gross": 279.5,
+    "exp_gross": 279.5,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-07-29",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0917",
+     "S_p320_0917",
+     "S_wide_1117"
+    ],
+    "exp": [
+     "S_ditm1_0917",
+     "S_p320_0917",
+     "S_wide_1117"
+    ],
+    "differs": false,
+    "free_gross": 856.0,
+    "exp_gross": 856.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-07-31",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1102",
+     "N_p80_1217",
+     "N_wide_1017"
+    ],
+    "exp": [
+     "N_ditm1_1102",
+     "N_p80_1217",
+     "N_wide_1017"
+    ],
+    "differs": false,
+    "free_gross": 20.583333333333332,
+    "exp_gross": 20.583333333333332,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-08-05",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1_1047",
+     "S_p320_0932",
+     "S_p250_0947"
+    ],
+    "exp": [
+     "S_ditm1_1332",
+     "S_p320_0932",
+     "S_p250_0947"
+    ],
+    "differs": true,
+    "free_gross": 2544.6666666666665,
+    "exp_gross": 3186.6666666666665,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-08-07",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1017",
+     "N_wide_1017",
+     "N_p100_1002"
+    ],
+    "exp": [
+     "N_ditm1_1017",
+     "N_wide_1017",
+     "N_p100_1002"
+    ],
+    "differs": false,
+    "free_gross": -2931.5,
+    "exp_gross": -2931.5,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-08-12",
+    "index": "SENSEX",
+    "free": [
+     "S_dir_0947",
+     "S_p250_0932",
+     "S_p250_0947"
+    ],
+    "exp": [
+     "S_dir_0947",
+     "S_p250_0932",
+     "S_p250_0947"
+    ],
+    "differs": false,
+    "free_gross": -1142.3333333333333,
+    "exp_gross": -1142.3333333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-08-14",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1_1402",
+     "N_p100_1102",
+     "N_p80_1032"
+    ],
+    "exp": [
+     "N_ditm1_1347",
+     "N_p100_1102",
+     "N_p80_1032"
+    ],
+    "differs": true,
+    "free_gross": 843.0833333333334,
+    "exp_gross": 1543.75,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-08-19",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1002",
+     "N_wide_1117",
+     "N_wide_1132"
+    ],
+    "exp": [
+     "S_ditm1_1002",
+     "S_p250_1132",
+     "S_p250_1102"
+    ],
+    "differs": true,
+    "free_gross": 823.0833333333334,
+    "exp_gross": 214.33333333333334,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-08-21",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_1032",
+     "N_dir_0947",
+     "N_p80_1047"
+    ],
+    "exp": [
+     "N_p80_1032",
+     "N_dir_0947",
+     "N_p80_1047"
+    ],
+    "differs": false,
+    "free_gross": 1287.0,
+    "exp_gross": 1287.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-08-26",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1002",
+     "S_p320_0917",
+     "S_p320_0932"
+    ],
+    "exp": [
+     "S_ditm1_1002",
+     "S_p320_0917",
+     "S_p320_0932"
+    ],
+    "differs": false,
+    "free_gross": 1009.6666666666666,
+    "exp_gross": 1009.6666666666666,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-08-28",
+    "index": "NIFTY",
+    "free": [
+     "N_wide_1002",
+     "N_p100_0947",
+     "N_p80_1032"
+    ],
+    "exp": [
+     "N_wide_1002",
+     "N_p100_0947",
+     "N_p80_1032"
+    ],
+    "differs": false,
+    "free_gross": -2641.1666666666665,
+    "exp_gross": -2641.1666666666665,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-09-02",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1_0917",
+     "N_p100_1002",
+     "S_p320_1217"
+    ],
+    "exp": [
+     "N_dir_1132",
+     "N_p100_1002",
+     "N_wide_1132"
+    ],
+    "differs": true,
+    "free_gross": -1468.3333333333333,
+    "exp_gross": -1099.5833333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-09-04",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1_1032",
+     "N_p100_0917",
+     "N_p100_1002"
+    ],
+    "exp": [
+     "S_ditm1_1332",
+     "S_p250_0932",
+     "S_p320_0932"
+    ],
+    "differs": true,
+    "free_gross": -1939.1666666666667,
+    "exp_gross": 165.66666666666666,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-09-09",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1317",
+     "N_p100_1417",
+     "N_p80_0917"
+    ],
+    "exp": [
+     "N_ditm1_1317",
+     "N_p100_1417",
+     "N_p80_0917"
+    ],
+    "differs": false,
+    "free_gross": 357.5,
+    "exp_gross": 357.5,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-09-11",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1302",
+     "S_wide_1047",
+     "S_p320_1047"
+    ],
+    "exp": [
+     "S_ditm1_1302",
+     "S_wide_1047",
+     "S_p320_1047"
+    ],
+    "differs": false,
+    "free_gross": 860.0,
+    "exp_gross": 860.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-09-16",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_0917",
+     "N_p80_0932",
+     "N_p80_1132"
+    ],
+    "exp": [
+     "N_p80_0917",
+     "N_p80_0932",
+     "N_p80_1132"
+    ],
+    "differs": false,
+    "free_gross": 248.08333333333334,
+    "exp_gross": 248.08333333333334,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-09-18",
+    "index": "SENSEX",
+    "free": [
+     "S_dir_0932",
+     "N_p80_1047",
+     "S_p250_0917"
+    ],
+    "exp": [
+     "S_dir_0932",
+     "S_p250_0917",
+     "S_p250_1017"
+    ],
+    "differs": true,
+    "free_gross": 147.83333333333334,
+    "exp_gross": 260.6666666666667,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-09-23",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_0947",
+     "N_p80_1017",
+     "N_p80_1032"
+    ],
+    "exp": [
+     "N_ditm1_0947",
+     "N_p80_1017",
+     "N_p80_1032"
+    ],
+    "differs": false,
+    "free_gross": -1902.3333333333333,
+    "exp_gross": -1902.3333333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-09-25",
+    "index": "SENSEX",
+    "free": [
+     "S_dir_1017",
+     "S_p250_1017",
+     "S_p320_1017"
+    ],
+    "exp": [
+     "S_dir_1017",
+     "S_p250_1017",
+     "S_p320_1017"
+    ],
+    "differs": false,
+    "free_gross": 43.333333333333336,
+    "exp_gross": 43.333333333333336,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-09-30",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1117",
+     "N_wide_0917",
+     "N_wide_1032"
+    ],
+    "exp": [
+     "N_ditm1_1117",
+     "N_wide_0917",
+     "N_wide_1032"
+    ],
+    "differs": false,
+    "free_gross": 524.3333333333334,
+    "exp_gross": 524.3333333333334,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-10-01",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0917",
+     "N_wide_0917",
+     "N_wide_1032"
+    ],
+    "exp": [
+     "S_ditm1_0917",
+     "S_wide_0917",
+     "S_wide_1117"
+    ],
+    "differs": true,
+    "free_gross": -881.0,
+    "exp_gross": 1168.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-10-07",
+    "index": "NIFTY",
+    "free": [
+     "N_dir_1047",
+     "N_p80_1147",
+     "N_p80_1302"
+    ],
+    "exp": [
+     "N_dir_1047",
+     "N_p80_1147",
+     "N_p80_1302"
+    ],
+    "differs": false,
+    "free_gross": -973.9166666666666,
+    "exp_gross": -973.9166666666666,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-10-09",
+    "index": "SENSEX",
+    "free": [
+     "S_dir_1002",
+     "S_p320_1147",
+     "S_p320_1217"
+    ],
+    "exp": [
+     "S_dir_1002",
+     "S_p320_1147",
+     "S_p320_1217"
+    ],
+    "differs": false,
+    "free_gross": 1360.3333333333333,
+    "exp_gross": 1360.3333333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-10-14",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1002",
+     "N_p80_1302",
+     "N_wide_1032"
+    ],
+    "exp": [
+     "N_ditm1_1002",
+     "N_p80_1302",
+     "N_wide_1032"
+    ],
+    "differs": false,
+    "free_gross": 1513.4166666666667,
+    "exp_gross": 1513.4166666666667,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-10-16",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1002",
+     "S_wide_1117",
+     "N_wide_1132"
+    ],
+    "exp": [
+     "S_ditm1_1002",
+     "S_wide_1117",
+     "S_p250_1147"
+    ],
+    "differs": true,
+    "free_gross": -315.0833333333333,
+    "exp_gross": 36.0,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-10-20",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1_1002",
+     "N_p100_1132",
+     "N_p100_1202"
+    ],
+    "exp": [
+     "N_ditm1_0947",
+     "N_p100_1132",
+     "N_p100_1202"
+    ],
+    "differs": true,
+    "free_gross": 1100.75,
+    "exp_gross": 1990.0833333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-10-23",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1002",
+     "S_wide_1117",
+     "S_p250_1117"
+    ],
+    "exp": [
+     "S_ditm1_1002",
+     "S_wide_1117",
+     "S_p250_1117"
+    ],
+    "differs": false,
+    "free_gross": 1231.0,
+    "exp_gross": 1231.0,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-10-28",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_0917",
+     "N_p80_1032",
+     "N_wide_1032"
+    ],
+    "exp": [
+     "N_ditm1_0917",
+     "N_p80_1032",
+     "N_wide_1032"
+    ],
+    "differs": false,
+    "free_gross": 2395.25,
+    "exp_gross": 2395.25,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-10-30",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1_0947",
+     "S_p250_1117",
+     "S_p320_1117"
+    ],
+    "exp": [
+     "S_ditm1_0932",
+     "S_p250_1117",
+     "S_p320_1117"
+    ],
+    "differs": true,
+    "free_gross": 1339.0833333333333,
+    "exp_gross": 1440.6666666666667,
+    "free_trades": 2.0,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-11-04",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_1017",
+     "N_p80_1047",
+     "N_wide_1032"
+    ],
+    "exp": [
+     "N_p80_1017",
+     "N_p80_1047",
+     "N_wide_1032"
+    ],
+    "differs": false,
+    "free_gross": 240.5,
+    "exp_gross": 240.5,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-11-06",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1_0947",
+     "S_wide_0947",
+     "S_wide_1002"
+    ],
+    "exp": [
+     "S_ditm1_0932",
+     "S_wide_0947",
+     "S_wide_1002"
+    ],
+    "differs": true,
+    "free_gross": 519.4166666666666,
+    "exp_gross": 1025.3333333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-11-11",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_1132",
+     "S_ditm1_0932",
+     "N_p100_1017"
+    ],
+    "exp": [
+     "N_p80_1132",
+     "N_ditm1_1002",
+     "N_p100_1017"
+    ],
+    "differs": true,
+    "free_gross": 109.25,
+    "exp_gross": -2.1666666666666665,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-11-13",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0932",
+     "N_wide_1032",
+     "S_p250_1047"
+    ],
+    "exp": [
+     "S_ditm1_0932",
+     "S_p250_1047",
+     "S_p250_1017"
+    ],
+    "differs": true,
+    "free_gross": -1581.5833333333333,
+    "exp_gross": -2429.3333333333335,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-11-18",
+    "index": "NIFTY",
+    "free": [
+     "N_p100_1017",
+     "N_ditm1_1347",
+     "N_wide_1032"
+    ],
+    "exp": [
+     "N_p100_1017",
+     "N_ditm1_1347",
+     "N_wide_1032"
+    ],
+    "differs": false,
+    "free_gross": 1909.9166666666667,
+    "exp_gross": 1909.9166666666667,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-11-20",
+    "index": "SENSEX",
+    "free": [
+     "S_p320_1017",
+     "S_p250_1102",
+     "S_p320_1002"
+    ],
+    "exp": [
+     "S_p320_1017",
+     "S_p250_1102",
+     "S_p320_1002"
+    ],
+    "differs": false,
+    "free_gross": 652.3333333333334,
+    "exp_gross": 652.3333333333334,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-11-25",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1402",
+     "N_wide_0947",
+     "N_wide_0917"
+    ],
+    "exp": [
+     "N_ditm1_1402",
+     "N_wide_0947",
+     "N_wide_0917"
+    ],
+    "differs": false,
+    "free_gross": 940.3333333333334,
+    "exp_gross": 940.3333333333334,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-11-27",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1217",
+     "S_p250_1102",
+     "S_p320_1017"
+    ],
+    "exp": [
+     "S_ditm1_1217",
+     "S_p250_1102",
+     "S_p320_1017"
+    ],
+    "differs": false,
+    "free_gross": -769.3333333333334,
+    "exp_gross": -769.3333333333334,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-12-02",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1_1032",
+     "N_p80_0947",
+     "N_p80_1102"
+    ],
+    "exp": [
+     "N_ditm1_1017",
+     "N_p80_0947",
+     "N_p80_1102"
+    ],
+    "differs": true,
+    "free_gross": 1802.0,
+    "exp_gross": 1925.0833333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-12-04",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1032",
+     "N_wide_0932",
+     "S_p320_0917"
+    ],
+    "exp": [
+     "S_ditm1_1032",
+     "S_p320_0917",
+     "S_wide_1002"
+    ],
+    "differs": true,
+    "free_gross": 805.75,
+    "exp_gross": -406.3333333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-12-09",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1032",
+     "N_p80_1017",
+     "N_p100_1017"
+    ],
+    "exp": [
+     "N_ditm1_1032",
+     "N_p80_1017",
+     "N_p100_1017"
+    ],
+    "differs": false,
+    "free_gross": -2770.0833333333335,
+    "exp_gross": -2770.0833333333335,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-12-11",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1032",
+     "S_p250_0932",
+     "S_p250_1232"
+    ],
+    "exp": [
+     "S_ditm1_1032",
+     "S_p250_0932",
+     "S_p250_1232"
+    ],
+    "differs": false,
+    "free_gross": 1824.0,
+    "exp_gross": 1824.0,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-12-16",
+    "index": "NIFTY",
+    "free": [
+     "N_dir_1147",
+     "N_p80_0917",
+     "N_p80_1117"
+    ],
+    "exp": [
+     "N_dir_1147",
+     "N_p80_0917",
+     "N_p80_1117"
+    ],
+    "differs": false,
+    "free_gross": 1177.5833333333333,
+    "exp_gross": 1177.5833333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-12-18",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1002",
+     "N_p100_1032",
+     "S_p320_1017"
+    ],
+    "exp": [
+     "S_ditm1_1002",
+     "S_p320_1017",
+     "S_p250_1232"
+    ],
+    "differs": true,
+    "free_gross": 1619.6666666666667,
+    "exp_gross": 1331.3333333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-12-23",
+    "index": "NIFTY",
+    "free": [
+     "N_p100_0917",
+     "N_p80_1117",
+     "N_wide_1017"
+    ],
+    "exp": [
+     "N_p100_0917",
+     "N_p80_1117",
+     "N_wide_1017"
+    ],
+    "differs": false,
+    "free_gross": 1972.75,
+    "exp_gross": 1972.75,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-12-24",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0947",
+     "S_p250_1017",
+     "S_wide_1102"
+    ],
+    "exp": [
+     "S_ditm1_0947",
+     "S_p250_1017",
+     "S_wide_1102"
+    ],
+    "differs": false,
+    "free_gross": -1108.8,
+    "exp_gross": -1108.8,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-12-30",
+    "index": "NIFTY",
+    "free": [
+     "N_dir_1002",
+     "N_p80_0917",
+     "N_wide_0917"
+    ],
+    "exp": [
+     "N_dir_1002",
+     "N_p80_0917",
+     "N_wide_0917"
+    ],
+    "differs": false,
+    "free_gross": -1.0833333333333333,
+    "exp_gross": -1.0833333333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-01-01",
+    "index": "SENSEX",
+    "free": [
+     "S_dir_0917",
+     "N_wide_0932",
+     "N_p80_0932"
+    ],
+    "exp": [
+     "S_dir_0917",
+     "S_p320_0932",
+     "S_p320_1017"
+    ],
+    "differs": true,
+    "free_gross": 1384.0833333333333,
+    "exp_gross": 1054.2666666666667,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-01-06",
+    "index": "NIFTY",
+    "free": [
+     "N_dir_1047",
+     "N_wide_1002",
+     "N_p80_0932"
+    ],
+    "exp": [
+     "N_dir_1047",
+     "N_wide_1002",
+     "N_p80_0932"
+    ],
+    "differs": false,
+    "free_gross": 1352.0,
+    "exp_gross": 1352.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-01-08",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1102",
+     "N_p80_0932",
+     "N_p100_0932"
+    ],
+    "exp": [
+     "S_ditm1_1102",
+     "S_p320_0932",
+     "S_p250_0932"
+    ],
+    "differs": true,
+    "free_gross": -425.6333333333334,
+    "exp_gross": -31.0,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-01-13",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1002",
+     "S_p250_1247",
+     "N_wide_1247"
+    ],
+    "exp": [
+     "N_ditm1_1002",
+     "N_wide_1247",
+     "N_wide_1317"
+    ],
+    "differs": true,
+    "free_gross": -472.68333333333334,
+    "exp_gross": -1088.1000000000001,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-01-14",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1017",
+     "S_p250_1247",
+     "S_p250_1232"
+    ],
+    "exp": [
+     "S_ditm1_1017",
+     "S_p250_1247",
+     "S_p250_1232"
+    ],
+    "differs": false,
+    "free_gross": 586.3333333333334,
+    "exp_gross": 586.3333333333334,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-01-20",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1_1032",
+     "N_p80_0947",
+     "N_p80_1232"
+    ],
+    "exp": [
+     "N_p80_0947",
+     "N_ditm1_1032",
+     "N_p80_1232"
+    ],
+    "differs": true,
+    "free_gross": 2034.4000000000003,
+    "exp_gross": 1297.3999999999999,
+    "free_trades": 2.0,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-01-22",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1017",
+     "N_wide_0932",
+     "S_wide_1217"
+    ],
+    "exp": [
+     "S_ditm1_1017",
+     "S_wide_1217",
+     "S_p250_1232"
+    ],
+    "differs": true,
+    "free_gross": 1768.75,
+    "exp_gross": 4370.333333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-01-27",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1_1017",
+     "N_p80_1347",
+     "N_p80_1432"
+    ],
+    "exp": [
+     "N_ditm1_1032",
+     "N_p80_1347",
+     "N_p80_1432"
+    ],
+    "differs": true,
+    "free_gross": -1073.3333333333333,
+    "exp_gross": -1128.8333333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-01-29",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1202",
+     "S_p250_1032",
+     "S_p250_1232"
+    ],
+    "exp": [
+     "S_ditm1_1202",
+     "S_p250_1032",
+     "S_p250_1232"
+    ],
+    "differs": false,
+    "free_gross": -296.3333333333333,
+    "exp_gross": -296.3333333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-02-03",
+    "index": "NIFTY",
+    "free": [
+     "N_wide_0917",
+     "N_p80_0917",
+     "N_ditm1_1117"
+    ],
+    "exp": [
+     "N_wide_0917",
+     "N_p80_0917",
+     "N_ditm1_1117"
+    ],
+    "differs": false,
+    "free_gross": 10219.083333333334,
+    "exp_gross": 10219.083333333334,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-02-05",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1202",
+     "S_p250_1032",
+     "S_p250_1347"
+    ],
+    "exp": [
+     "S_ditm1_1202",
+     "S_p250_1032",
+     "S_p250_1347"
+    ],
+    "differs": false,
+    "free_gross": 1803.6666666666667,
+    "exp_gross": 1803.6666666666667,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-02-10",
+    "index": "NIFTY",
+    "free": [
+     "N_wide_0917",
+     "N_p100_0917",
+     "N_p100_0932"
+    ],
+    "exp": [
+     "N_wide_0917",
+     "N_p100_0917",
+     "N_p100_0932"
+    ],
+    "differs": false,
+    "free_gross": 3272.75,
+    "exp_gross": 3272.75,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-02-12",
+    "index": "SENSEX",
+    "free": [
+     "S_p250_0947",
+     "S_wide_0947",
+     "S_p250_1002"
+    ],
+    "exp": [
+     "S_p250_0947",
+     "S_wide_0947",
+     "S_p250_1002"
+    ],
+    "differs": false,
+    "free_gross": 1321.6666666666667,
+    "exp_gross": 1321.6666666666667,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-02-17",
+    "index": "NIFTY",
+    "free": [
+     "N_wide_0917",
+     "N_p80_0917",
+     "N_p100_0917"
+    ],
+    "exp": [
+     "N_wide_0917",
+     "N_p80_0917",
+     "N_p100_0917"
+    ],
+    "differs": false,
+    "free_gross": -1827.5833333333333,
+    "exp_gross": -1827.5833333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-02-19",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1002",
+     "S_wide_0947",
+     "S_p320_0947"
+    ],
+    "exp": [
+     "S_ditm1_1002",
+     "S_wide_0947",
+     "S_p320_0947"
+    ],
+    "differs": false,
+    "free_gross": 258.3333333333333,
+    "exp_gross": 258.3333333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-02-24",
+    "index": "NIFTY",
+    "free": [
+     "S_dir_0932",
+     "N_p80_1032",
+     "N_p100_1032"
+    ],
+    "exp": [
+     "N_ditm1_0932",
+     "N_p80_1032",
+     "N_p100_1032"
+    ],
+    "differs": true,
+    "free_gross": 540.6666666666666,
+    "exp_gross": 1303.25,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-02-26",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1047",
+     "S_wide_1102",
+     "S_p250_1247"
+    ],
+    "exp": [
+     "S_ditm1_1047",
+     "S_wide_1102",
+     "S_p250_1247"
+    ],
+    "differs": false,
+    "free_gross": -409.3333333333333,
+    "exp_gross": -409.3333333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-03-02",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1117",
+     "N_wide_0917",
+     "N_p80_1247"
+    ],
+    "exp": [
+     "N_ditm1_1117",
+     "N_wide_0917",
+     "N_p80_1247"
+    ],
+    "differs": false,
+    "free_gross": -1899.0833333333333,
+    "exp_gross": -1899.0833333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-03-05",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1017",
+     "S_p250_0932",
+     "S_wide_0932"
+    ],
+    "exp": [
+     "S_ditm1_1017",
+     "S_p250_0932",
+     "S_wide_0932"
+    ],
+    "differs": false,
+    "free_gross": -21.666666666666668,
+    "exp_gross": -21.666666666666668,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-03-10",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_0947",
+     "S_p250_1002",
+     "S_p250_1017"
+    ],
+    "exp": [
+     "N_ditm1_0947",
+     "N_p80_1302",
+     "N_wide_0917"
+    ],
+    "differs": true,
+    "free_gross": 864.5,
+    "exp_gross": 2932.5833333333335,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-03-12",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0932",
+     "N_wide_0917",
+     "S_p320_1247"
+    ],
+    "exp": [
+     "S_ditm1_0932",
+     "S_p320_1247",
+     "S_p320_1317"
+    ],
+    "differs": true,
+    "free_gross": 607.9166666666666,
+    "exp_gross": -1930.3333333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-03-17",
+    "index": "NIFTY",
+    "free": [
+     "N_dir_0917",
+     "N_p80_0917",
+     "N_wide_0917"
+    ],
+    "exp": [
+     "N_dir_0917",
+     "N_p80_0917",
+     "N_wide_0917"
+    ],
+    "differs": false,
+    "free_gross": -3306.3333333333335,
+    "exp_gross": -3306.3333333333335,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-03-19",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1017",
+     "S_p320_1047",
+     "S_wide_1047"
+    ],
+    "exp": [
+     "S_ditm1_1017",
+     "S_p320_1047",
+     "S_wide_1047"
+    ],
+    "differs": false,
+    "free_gross": -1069.6666666666667,
+    "exp_gross": -1069.6666666666667,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-03-24",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_1332",
+     "N_p100_1317",
+     "N_wide_1332"
+    ],
+    "exp": [
+     "N_p80_1332",
+     "N_p100_1317",
+     "N_wide_1332"
+    ],
+    "differs": false,
+    "free_gross": 2116.8333333333335,
+    "exp_gross": 2116.8333333333335,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-03-25",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1047",
+     "S_p320_1147",
+     "S_wide_1302"
+    ],
+    "exp": [
+     "S_ditm1_1047",
+     "S_p320_1147",
+     "S_wide_1302"
+    ],
+    "differs": false,
+    "free_gross": 2076.3333333333335,
+    "exp_gross": 2076.3333333333335,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-03-30",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1047",
+     "N_wide_1302",
+     "N_p80_1302"
+    ],
+    "exp": [
+     "N_ditm1_1047",
+     "N_wide_1302",
+     "N_p80_1302"
+    ],
+    "differs": false,
+    "free_gross": -741.0,
+    "exp_gross": -741.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-04-02",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0947",
+     "S_wide_1047",
+     "S_p320_1047"
+    ],
+    "exp": [
+     "S_ditm1_0947",
+     "S_wide_1047",
+     "S_p320_1047"
+    ],
+    "differs": false,
+    "free_gross": 1768.6666666666667,
+    "exp_gross": 1768.6666666666667,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-04-07",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1232",
+     "N_p80_1302",
+     "S_wide_1047"
+    ],
+    "exp": [
+     "N_ditm1_1232",
+     "N_p80_1302",
+     "N_p80_1017"
+    ],
+    "differs": true,
+    "free_gross": -653.6666666666666,
+    "exp_gross": 494.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-04-09",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0932",
+     "N_wide_1447",
+     "N_wide_1502"
+    ],
+    "exp": [
+     "S_ditm1_0932",
+     "S_p320_1417",
+     "S_p250_1047"
+    ],
+    "differs": true,
+    "free_gross": 1933.8333333333333,
+    "exp_gross": 2620.0,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-04-13",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1102",
+     "N_wide_1332",
+     "N_p80_1432"
+    ],
+    "exp": [
+     "N_ditm1_1102",
+     "N_wide_1332",
+     "N_p80_1432"
+    ],
+    "differs": false,
+    "free_gross": 2499.25,
+    "exp_gross": 2499.25,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-04-16",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0932",
+     "S_wide_1002",
+     "S_p250_1002"
+    ],
+    "exp": [
+     "S_ditm1_0932",
+     "S_wide_1002",
+     "S_p250_1002"
+    ],
+    "differs": false,
+    "free_gross": 1986.6666666666667,
+    "exp_gross": 1986.6666666666667,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-04-21",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1132",
+     "N_wide_1247",
+     "N_p100_1317"
+    ],
+    "exp": [
+     "N_ditm1_1132",
+     "N_wide_1247",
+     "N_p100_1317"
+    ],
+    "differs": false,
+    "free_gross": 1946.75,
+    "exp_gross": 1946.75,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-04-23",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0932",
+     "S_wide_1002",
+     "S_p250_1217"
+    ],
+    "exp": [
+     "S_ditm1_0932",
+     "S_wide_1002",
+     "S_p250_1217"
+    ],
+    "differs": false,
+    "free_gross": -636.0,
+    "exp_gross": -636.0,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-04-28",
+    "index": "NIFTY",
+    "free": [
+     "N_p100_0947",
+     "N_p80_0947",
+     "N_ditm1_0917"
+    ],
+    "exp": [
+     "N_p100_0947",
+     "N_p80_0947",
+     "N_ditm1_0917"
+    ],
+    "differs": false,
+    "free_gross": 1580.5833333333333,
+    "exp_gross": 1580.5833333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-04-30",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1_0947",
+     "N_wide_1002",
+     "S_p320_1002"
+    ],
+    "exp": [
+     "S_p320_1002",
+     "S_p250_1047",
+     "S_ditm1_1102"
+    ],
+    "differs": true,
+    "free_gross": -1052.0,
+    "exp_gross": 1418.3333333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-05-05",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1132",
+     "N_p80_1302",
+     "N_p100_1317"
+    ],
+    "exp": [
+     "N_ditm1_1132",
+     "N_p80_1302",
+     "N_p100_1317"
+    ],
+    "differs": false,
+    "free_gross": -126.75,
+    "exp_gross": -126.75,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-05-07",
+    "index": "SENSEX",
+    "free": [
+     "N_dir_1102",
+     "S_p320_1002",
+     "S_p250_1402"
+    ],
+    "exp": [
+     "S_ditm1_1232",
+     "S_p320_1002",
+     "S_p250_1402"
+    ],
+    "differs": true,
+    "free_gross": -1556.9166666666667,
+    "exp_gross": -1514.3333333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-05-12",
+    "index": "NIFTY",
+    "free": [
+     "N_p100_0917",
+     "S_wide_0917",
+     "S_ditm1_1147"
+    ],
+    "exp": [
+     "N_p100_0917",
+     "N_ditm1_1202",
+     "N_p80_1317"
+    ],
+    "differs": true,
+    "free_gross": -254.66666666666666,
+    "exp_gross": 1074.6666666666667,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-05-14",
+    "index": "SENSEX",
+    "free": [
+     "S_dir_1332",
+     "S_wide_1332",
+     "S_p250_1347"
+    ],
+    "exp": [
+     "S_dir_1332",
+     "S_wide_1332",
+     "S_p250_1347"
+    ],
+    "differs": false,
+    "free_gross": 956.3333333333334,
+    "exp_gross": 956.3333333333334,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-05-19",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1217",
+     "N_wide_1217",
+     "N_p100_1302"
+    ],
+    "exp": [
+     "N_ditm1_1217",
+     "N_wide_1217",
+     "N_p100_1302"
+    ],
+    "differs": false,
+    "free_gross": 632.6666666666666,
+    "exp_gross": 632.6666666666666,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-05-21",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1_1102",
+     "S_p250_1247",
+     "S_p250_1147"
+    ],
+    "exp": [
+     "S_p250_1247",
+     "S_p250_1147",
+     "S_p250_1302"
+    ],
+    "differs": true,
+    "free_gross": -689.5833333333334,
+    "exp_gross": 1610.3333333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-05-26",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1417",
+     "N_p100_0917",
+     "N_p80_0917"
+    ],
+    "exp": [
+     "N_ditm1_1417",
+     "N_p100_0917",
+     "N_p80_0917"
+    ],
+    "differs": false,
+    "free_gross": 736.6666666666666,
+    "exp_gross": 736.6666666666666,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-05-27",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1_1302",
+     "N_wide_1147",
+     "N_wide_1447"
+    ],
+    "exp": [
+     "S_ditm1_1017",
+     "S_p250_1302",
+     "S_wide_1447"
+    ],
+    "differs": true,
+    "free_gross": 16.25,
+    "exp_gross": 1086.0,
+    "free_trades": 2.0,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-06-02",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1232",
+     "N_p100_0917",
+     "N_p80_0917"
+    ],
+    "exp": [
+     "N_ditm1_1232",
+     "N_p100_0917",
+     "N_p80_0917"
+    ],
+    "differs": false,
+    "free_gross": 699.8333333333334,
+    "exp_gross": 699.8333333333334,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-06-04",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1132",
+     "S_p250_1347",
+     "S_p250_1402"
+    ],
+    "exp": [
+     "S_ditm1_1132",
+     "S_p250_1347",
+     "S_p250_1402"
+    ],
+    "differs": false,
+    "free_gross": -677.0,
+    "exp_gross": -677.0,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-06-09",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1217",
+     "N_p100_1002",
+     "N_p100_1047"
+    ],
+    "exp": [
+     "N_ditm1_1217",
+     "N_p100_1002",
+     "N_p100_1047"
+    ],
+    "differs": false,
+    "free_gross": 1992.25,
+    "exp_gross": 1992.25,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-06-11",
+    "index": "SENSEX",
+    "free": [
+     "S_p250_0947",
+     "S_p250_1002",
+     "S_p320_1002"
+    ],
+    "exp": [
+     "S_p250_0947",
+     "S_p250_1002",
+     "S_p320_1002"
+    ],
+    "differs": false,
+    "free_gross": -1389.0,
+    "exp_gross": -1389.0,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-06-16",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1202",
+     "N_p100_0917",
+     "N_p80_0947"
+    ],
+    "exp": [
+     "N_ditm1_1202",
+     "N_p100_0917",
+     "N_p80_0947"
+    ],
+    "differs": false,
+    "free_gross": 3200.1666666666665,
+    "exp_gross": 3200.1666666666665,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-06-18",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1102",
+     "N_p80_0932",
+     "N_p80_0947"
+    ],
+    "exp": [
+     "S_ditm1_1102",
+     "S_wide_1002",
+     "S_p250_1002"
+    ],
+    "differs": true,
+    "free_gross": 1215.5833333333333,
+    "exp_gross": 1515.6666666666667,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-06-23",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_0947",
+     "N_p100_0917",
+     "N_wide_0947"
+    ],
+    "exp": [
+     "N_p80_0947",
+     "N_p100_0917",
+     "N_wide_0947"
+    ],
+    "differs": false,
+    "free_gross": 808.1666666666666,
+    "exp_gross": 808.1666666666666,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-06-25",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0917",
+     "S_p250_1002",
+     "S_p250_1032"
+    ],
+    "exp": [
+     "S_ditm1_0917",
+     "S_p250_1002",
+     "S_p250_1032"
+    ],
+    "differs": false,
+    "free_gross": 1179.6666666666667,
+    "exp_gross": 1179.6666666666667,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-06-30",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1202",
+     "N_wide_1332",
+     "N_p100_1332"
+    ],
+    "exp": [
+     "N_ditm1_1202",
+     "N_wide_1332",
+     "N_p100_1332"
+    ],
+    "differs": false,
+    "free_gross": -900.25,
+    "exp_gross": -900.25,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-07-02",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0917",
+     "S_p320_1002",
+     "S_p250_1002"
+    ],
+    "exp": [
+     "S_ditm1_0917",
+     "S_p320_1002",
+     "S_p250_1002"
+    ],
+    "differs": false,
+    "free_gross": 3055.6666666666665,
+    "exp_gross": 3055.6666666666665,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-07-07",
+    "index": "NIFTY",
+    "free": [
+     "N_p100_0947",
+     "N_p80_0932",
+     "N_p80_0917"
+    ],
+    "exp": [
+     "N_p100_0947",
+     "N_p80_0932",
+     "N_p80_0917"
+    ],
+    "differs": false,
+    "free_gross": 2873.0,
+    "exp_gross": 2873.0,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-07-09",
+    "index": "SENSEX",
+    "free": [
+     "S_p250_1002",
+     "S_ditm1_0917",
+     "S_p320_0947"
+    ],
+    "exp": [
+     "S_p250_1002",
+     "S_ditm1_0917",
+     "S_p320_0947"
+    ],
+    "differs": false,
+    "free_gross": 1103.0,
+    "exp_gross": 1103.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-07-14",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1132",
+     "N_p80_0932",
+     "N_p80_0917"
+    ],
+    "exp": [
+     "N_ditm1_1132",
+     "N_p80_0932",
+     "N_p80_0917"
+    ],
+    "differs": false,
+    "free_gross": 4158.916666666667,
+    "exp_gross": 4158.916666666667,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-07-16",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1132",
+     "N_p100_0917",
+     "N_p80_0917"
+    ],
+    "exp": [
+     "S_ditm1_1132",
+     "S_p250_1002",
+     "S_p320_1002"
+    ],
+    "differs": true,
+    "free_gross": 1125.4166666666667,
+    "exp_gross": 1909.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-07-21",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1147",
+     "N_wide_0947",
+     "N_wide_1032"
+    ],
+    "exp": [
+     "N_ditm1_1147",
+     "N_wide_0947",
+     "N_wide_1032"
+    ],
+    "differs": false,
+    "free_gross": -498.3333333333333,
+    "exp_gross": -498.3333333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-07-23",
+    "index": "SENSEX",
+    "free": [
+     "S_wide_0917",
+     "N_p100_0917",
+     "N_p80_0917"
+    ],
+    "exp": [
+     "S_wide_0917",
+     "S_p250_1002",
+     "S_p320_0917"
+    ],
+    "differs": true,
+    "free_gross": 2471.75,
+    "exp_gross": 2367.3333333333335,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-07-28",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_0917",
+     "N_p100_0917",
+     "N_p80_0932"
+    ],
+    "exp": [
+     "N_p80_0917",
+     "N_p100_0917",
+     "N_p80_0932"
+    ],
+    "differs": false,
+    "free_gross": 2603.25,
+    "exp_gross": 2603.25,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-07-30",
+    "index": "SENSEX",
+    "free": [
+     "S_p250_0932",
+     "S_p320_0947",
+     "N_p80_0917"
+    ],
+    "exp": [
+     "S_p250_0932",
+     "S_p320_0947",
+     "S_wide_0917"
+    ],
+    "differs": true,
+    "free_gross": 1058.5,
+    "exp_gross": 1156.0,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-08-04",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_0917",
+     "N_p80_0932",
+     "N_p80_0947"
+    ],
+    "exp": [
+     "N_p80_0917",
+     "N_p80_0932",
+     "N_p80_0947"
+    ],
+    "differs": false,
+    "free_gross": -2592.2000000000003,
+    "exp_gross": -2592.2000000000003,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-08-06",
+    "index": "SENSEX",
+    "free": [
+     "S_p250_1247",
+     "S_p250_1302",
+     "S_ditm1_1047"
+    ],
+    "exp": [
+     "S_p250_1247",
+     "S_p250_1302",
+     "S_ditm1_1047"
+    ],
+    "differs": false,
+    "free_gross": 6134.333333333333,
+    "exp_gross": 6134.333333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-08-11",
+    "index": "NIFTY",
+    "free": [
+     "S_dir_1117",
+     "N_p100_1217",
+     "N_p100_1232"
+    ],
+    "exp": [
+     "N_p100_1217",
+     "N_ditm1_1102",
+     "N_p100_1232"
+    ],
+    "differs": true,
+    "free_gross": 1490.1666666666667,
+    "exp_gross": 1036.75,
+    "free_trades": 2.0,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-08-13",
+    "index": "SENSEX",
+    "free": [
+     "S_p320_0947",
+     "S_p320_1247",
+     "S_p320_1232"
+    ],
+    "exp": [
+     "S_p320_0947",
+     "S_p320_1247",
+     "S_p320_1232"
+    ],
+    "differs": false,
+    "free_gross": 1418.3333333333333,
+    "exp_gross": 1418.3333333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-08-18",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_0917",
+     "N_p80_0932",
+     "N_p80_0947"
+    ],
+    "exp": [
+     "N_p80_0917",
+     "N_p80_0932",
+     "N_p80_0947"
+    ],
+    "differs": false,
+    "free_gross": 131.08333333333334,
+    "exp_gross": 131.08333333333334,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-08-20",
+    "index": "SENSEX",
+    "free": [
+     "S_p250_0932",
+     "S_p250_0947",
+     "S_p320_0947"
+    ],
+    "exp": [
+     "S_p250_0932",
+     "S_p250_0947",
+     "S_p320_0947"
+    ],
+    "differs": false,
+    "free_gross": 1442.3333333333333,
+    "exp_gross": 1442.3333333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-08-25",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_0932",
+     "N_wide_0932",
+     "N_dir_0932"
+    ],
+    "exp": [
+     "N_p80_0932",
+     "N_wide_0932",
+     "N_dir_0932"
+    ],
+    "differs": false,
+    "free_gross": -1215.5,
+    "exp_gross": -1215.5,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-08-27",
+    "index": "SENSEX",
+    "free": [
+     "S_p250_1247",
+     "S_p250_1217",
+     "S_ditm1_1117"
+    ],
+    "exp": [
+     "S_p250_1247",
+     "S_p250_1217",
+     "S_ditm1_1117"
+    ],
+    "differs": false,
+    "free_gross": 743.0,
+    "exp_gross": 743.0,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-09-01",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1502",
+     "N_p100_1217",
+     "N_p100_1202"
+    ],
+    "exp": [
+     "N_ditm1_1502",
+     "N_p100_1217",
+     "N_p100_1202"
+    ],
+    "differs": false,
+    "free_gross": -2947.75,
+    "exp_gross": -2947.75,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-09-03",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1132",
+     "S_p250_0932",
+     "S_p250_1232"
+    ],
+    "exp": [
+     "S_ditm1_1132",
+     "S_p250_0932",
+     "S_p250_1232"
+    ],
+    "differs": false,
+    "free_gross": 587.0,
+    "exp_gross": 587.0,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-09-08",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1_1132",
+     "N_wide_1117",
+     "S_wide_0932"
+    ],
+    "exp": [
+     "N_ditm1_1232",
+     "N_wide_1117",
+     "N_wide_1147"
+    ],
+    "differs": true,
+    "free_gross": 1009.8333333333334,
+    "exp_gross": 1087.6666666666667,
+    "free_trades": 2.0,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-09-10",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1332",
+     "N_wide_1247",
+     "S_wide_0917"
+    ],
+    "exp": [
+     "S_ditm1_1332",
+     "S_wide_0917",
+     "S_p320_1117"
+    ],
+    "differs": true,
+    "free_gross": 226.83333333333334,
+    "exp_gross": 333.6666666666667,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-09-15",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1132",
+     "N_p100_1202",
+     "N_wide_1147"
+    ],
+    "exp": [
+     "N_ditm1_1132",
+     "N_p100_1202",
+     "N_wide_1147"
+    ],
+    "differs": false,
+    "free_gross": 2121.1666666666665,
+    "exp_gross": 2121.1666666666665,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-09-29",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1132",
+     "N_p80_1432",
+     "N_p100_1447"
+    ],
+    "exp": [
+     "N_ditm1_1132",
+     "N_p80_1432",
+     "N_p100_1447"
+    ],
+    "differs": false,
+    "free_gross": 2255.5,
+    "exp_gross": 2255.5,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-10-01",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1102",
+     "S_p320_1132",
+     "S_p250_1117"
+    ],
+    "exp": [
+     "S_ditm1_1102",
+     "S_p320_1132",
+     "S_p250_1117"
+    ],
+    "differs": false,
+    "free_gross": 583.6666666666666,
+    "exp_gross": 583.6666666666666,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-10-06",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1202",
+     "N_p80_1117",
+     "N_wide_1117"
+    ],
+    "exp": [
+     "N_ditm1_1202",
+     "N_p80_1117",
+     "N_wide_1117"
+    ],
+    "differs": false,
+    "free_gross": 1679.1666666666667,
+    "exp_gross": 1679.1666666666667,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-10-08",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1032",
+     "S_p320_1302",
+     "S_p320_1317"
+    ],
+    "exp": [
+     "S_ditm1_1032",
+     "S_p320_1302",
+     "S_p320_1317"
+    ],
+    "differs": false,
+    "free_gross": 2179.6666666666665,
+    "exp_gross": 2179.6666666666665,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   }
+  ]
+ },
+ "t1": {
+  "days_with_both_indices_expiring": 0,
+  "all": {
+   "expiry_days": 179,
+   "differing_days": 48,
+   "sum_difference_per_lot": 24639.0,
+   "share_of_differing_days_exp_better": 0.6875,
+   "mean_difference_per_lot": 513.3125,
+   "ci90": [
+    258.8931423611111,
+    781.2205208333334
+   ],
+   "reading": "positive",
+   "mean_trades_on_differing_days": {
+    "free": 2.569444444444444,
+    "exp": 2.868055555555556
+   }
+  },
+  "NIFTY_expiry_days": {
+   "expiry_days": 90,
+   "differing_days": 22,
+   "sum_difference_per_lot": 4009.9500000000007,
+   "share_of_differing_days_exp_better": 0.5454545454545454,
+   "mean_difference_per_lot": 182.27045454545458,
+   "ci90": [
+    -244.71598484848488,
+    537.6214772727272
+   ],
+   "reading": "inconclusive",
+   "mean_trades_on_differing_days": {
+    "free": 2.484848484848485,
+    "exp": 2.6363636363636362
+   }
+  },
+  "SENSEX_expiry_days": {
+   "expiry_days": 89,
+   "differing_days": 26,
+   "sum_difference_per_lot": 20629.05,
+   "share_of_differing_days_exp_better": 0.8076923076923077,
+   "mean_difference_per_lot": 793.425,
+   "ci90": [
+    404.7401282051282,
+    1205.2912820512822
+   ],
+   "reading": "positive",
+   "mean_trades_on_differing_days": {
+    "free": 2.6410256410256405,
+    "exp": 3.064102564102564
+   }
+  },
+  "rows": [
+   {
+    "day": "2025-01-14",
+    "index": "SENSEX",
+    "free": [
+     "S_p285-t1s22_0917",
+     "S_p320_0917",
+     "S_wide_0917"
+    ],
+    "exp": [
+     "S_p285-t1s22_0917",
+     "S_p320_0917",
+     "S_wide_0917"
+    ],
+    "differs": false,
+    "free_gross": 4671.2,
+    "exp_gross": 4671.2,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-01-16",
+    "index": "NIFTY",
+    "free": [
+     "N_p100_0917",
+     "N_p80_0917",
+     "N_p150-t1s11_0917"
+    ],
+    "exp": [
+     "N_p100_0917",
+     "N_p80_0917",
+     "N_p150-t1s11_0917"
+    ],
+    "differs": false,
+    "free_gross": 2443.133333333333,
+    "exp_gross": 2443.133333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-01-21",
+    "index": "SENSEX",
+    "free": [
+     "S_wide_0917",
+     "S_p320_0917",
+     "S_p250_0917"
+    ],
+    "exp": [
+     "S_wide_0917",
+     "S_p320_0917",
+     "S_p250_0917"
+    ],
+    "differs": false,
+    "free_gross": -3013.4,
+    "exp_gross": -3013.4,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-01-23",
+    "index": "NIFTY",
+    "free": [
+     "N_wide-t1s4_0917",
+     "N_p80_0917",
+     "N_p150-t1s11_0917"
+    ],
+    "exp": [
+     "N_wide-t1s4_0917",
+     "N_p80_0917",
+     "N_p150-t1s11_0917"
+    ],
+    "differs": false,
+    "free_gross": -1274.2166666666665,
+    "exp_gross": -1274.2166666666665,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-01-28",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_1332",
+     "N_wide_1032",
+     "N_wide-t1s4_1032"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1332",
+     "S_p285-t1s22_1417",
+     "S_p285-t1s22_1202"
+    ],
+    "differs": true,
+    "free_gross": -667.5833333333334,
+    "exp_gross": 1347.5333333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 3.6666666666666665
+   },
+   {
+    "day": "2025-01-30",
+    "index": "NIFTY",
+    "free": [
+     "N_wide-t1s4_0947",
+     "N_p80_1102",
+     "N_wide-t1s4_1002"
+    ],
+    "exp": [
+     "N_wide-t1s4_0947",
+     "N_p80_1102",
+     "N_wide-t1s4_1002"
+    ],
+    "differs": false,
+    "free_gross": 6301.533333333333,
+    "exp_gross": 6301.533333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-02-04",
+    "index": "SENSEX",
+    "free": [
+     "S_p285-t1s22_1132",
+     "S_p285-t1s22_1432",
+     "S_ditm1-t1s44_1132"
+    ],
+    "exp": [
+     "S_p285-t1s22_1132",
+     "S_p285-t1s22_1432",
+     "S_ditm1-t1s44_1132"
+    ],
+    "differs": false,
+    "free_gross": -1169.6666666666667,
+    "exp_gross": -1169.6666666666667,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-02-06",
+    "index": "NIFTY",
+    "free": [
+     "N_p100_0917",
+     "N_wide-t1s4_0947",
+     "N_p80_0917"
+    ],
+    "exp": [
+     "N_p100_0917",
+     "N_wide-t1s4_0947",
+     "N_p80_0917"
+    ],
+    "differs": false,
+    "free_gross": 39.0,
+    "exp_gross": 39.0,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-02-11",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1202",
+     "S_wide_1347",
+     "S_p285-t1s22_1102"
+    ],
+    "exp": [
+     "S_ditm1_1202",
+     "S_wide_1347",
+     "S_p285-t1s22_1102"
+    ],
+    "differs": false,
+    "free_gross": 2787.6666666666665,
+    "exp_gross": 2787.6666666666665,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-02-13",
+    "index": "NIFTY",
+    "free": [
+     "N_dir-t1s29_1002",
+     "N_p100_0932",
+     "N_wide_0932"
+    ],
+    "exp": [
+     "N_dir-t1s29_1002",
+     "N_p100_0932",
+     "N_wide_0932"
+    ],
+    "differs": false,
+    "free_gross": -329.3333333333333,
+    "exp_gross": -329.3333333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-02-18",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_1202",
+     "S_p250_1347",
+     "S_p285-t1s22_1202"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1202",
+     "S_p250_1347",
+     "S_p285-t1s22_1202"
+    ],
+    "differs": false,
+    "free_gross": 1625.6666666666667,
+    "exp_gross": 1625.6666666666667,
+    "free_trades": 3.6666666666666665,
+    "exp_trades": 3.6666666666666665
+   },
+   {
+    "day": "2025-02-20",
+    "index": "NIFTY",
+    "free": [
+     "N_wide-t1s4_0932",
+     "N_wide-t1s4_0947",
+     "N_wide_0947"
+    ],
+    "exp": [
+     "N_wide-t1s4_0932",
+     "N_wide-t1s4_0947",
+     "N_wide_0947"
+    ],
+    "differs": false,
+    "free_gross": 2249.0,
+    "exp_gross": 2249.0,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-02-25",
+    "index": "SENSEX",
+    "free": [
+     "S_wide_0917",
+     "S_p320_0917",
+     "S_p250_0917"
+    ],
+    "exp": [
+     "S_wide_0917",
+     "S_p320_0917",
+     "S_p250_0917"
+    ],
+    "differs": false,
+    "free_gross": 4893.333333333333,
+    "exp_gross": 4893.333333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-02-27",
+    "index": "NIFTY",
+    "free": [
+     "N_wide-t1s4_0932",
+     "N_wide-t1s4_0917",
+     "N_p80_0917"
+    ],
+    "exp": [
+     "N_wide-t1s4_0932",
+     "N_wide-t1s4_0917",
+     "N_p80_0917"
+    ],
+    "differs": false,
+    "free_gross": 1938.3,
+    "exp_gross": 1938.3,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-03-04",
+    "index": "SENSEX",
+    "free": [
+     "S_wide_0917",
+     "S_ditm1-t1s44_0932",
+     "S_p285-t1s22_0917"
+    ],
+    "exp": [
+     "S_wide_0917",
+     "S_ditm1-t1s44_0932",
+     "S_p285-t1s22_0917"
+    ],
+    "differs": false,
+    "free_gross": 1372.3333333333333,
+    "exp_gross": 1372.3333333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-03-06",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_0917",
+     "N_wide-t1s4_0917",
+     "N_wide_1002"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_0917",
+     "N_wide-t1s4_0917",
+     "N_wide_1002"
+    ],
+    "differs": false,
+    "free_gross": -2556.883333333333,
+    "exp_gross": -2556.883333333333,
+    "free_trades": 3.6666666666666665,
+    "exp_trades": 3.6666666666666665
+   },
+   {
+    "day": "2025-03-11",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_0932",
+     "S_p320_0917",
+     "S_p285-t1s22_0917"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_0932",
+     "S_p320_0917",
+     "S_p285-t1s22_0917"
+    ],
+    "differs": false,
+    "free_gross": 2518.5333333333333,
+    "exp_gross": 2518.5333333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-03-13",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_1132",
+     "N_p150-t1s11_0947",
+     "N_wide_0932"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1132",
+     "N_p150-t1s11_0947",
+     "N_wide_0932"
+    ],
+    "differs": false,
+    "free_gross": 1149.4166666666667,
+    "exp_gross": 1149.4166666666667,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-03-18",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_1302",
+     "S_p320_0917",
+     "S_p285-t1s22_0917"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1302",
+     "S_p320_0917",
+     "S_p285-t1s22_0917"
+    ],
+    "differs": false,
+    "free_gross": 1133.3333333333333,
+    "exp_gross": 1133.3333333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-03-20",
+    "index": "NIFTY",
+    "free": [
+     "N_p150-t1s11_1032",
+     "N_p150-t1s11_1017",
+     "N_p150-t1s11_1002"
+    ],
+    "exp": [
+     "N_p150-t1s11_1032",
+     "N_p150-t1s11_1017",
+     "N_p150-t1s11_1002"
+    ],
+    "differs": false,
+    "free_gross": 3758.9500000000003,
+    "exp_gross": 3758.9500000000003,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-03-25",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_0917",
+     "S_p285-t1s22_0947",
+     "S_p285-t1s22_0917"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_0917",
+     "S_p285-t1s22_0947",
+     "S_p285-t1s22_0917"
+    ],
+    "differs": false,
+    "free_gross": 993.3333333333334,
+    "exp_gross": 993.3333333333334,
+    "free_trades": 4.666666666666667,
+    "exp_trades": 4.666666666666667
+   },
+   {
+    "day": "2025-03-27",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1247",
+     "N_p150-t1s11_1047",
+     "N_p150-t1s11_0932"
+    ],
+    "exp": [
+     "N_ditm1_1247",
+     "N_p150-t1s11_1047",
+     "N_p150-t1s11_0932"
+    ],
+    "differs": false,
+    "free_gross": 1507.1333333333332,
+    "exp_gross": 1507.1333333333332,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-04-01",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_1017",
+     "S_p250_1102",
+     "N_p150-t1s11_1102"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1017",
+     "S_p250_1102",
+     "S_p285-t1s22_1017"
+    ],
+    "differs": true,
+    "free_gross": 1162.6666666666667,
+    "exp_gross": 2145.3333333333335,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-04-03",
+    "index": "NIFTY",
+    "free": [
+     "N_p150-t1s11_0932",
+     "N_p150-t1s11_0947",
+     "N_dir_1047"
+    ],
+    "exp": [
+     "N_p150-t1s11_0932",
+     "N_p150-t1s11_0947",
+     "N_dir_1047"
+    ],
+    "differs": false,
+    "free_gross": 1071.2,
+    "exp_gross": 1071.2,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-04-08",
+    "index": "SENSEX",
+    "free": [
+     "S_p320_1102",
+     "S_p285-t1s22_1047",
+     "S_ditm1-t1s44_1047"
+    ],
+    "exp": [
+     "S_p320_1102",
+     "S_p285-t1s22_1047",
+     "S_ditm1-t1s44_1047"
+    ],
+    "differs": false,
+    "free_gross": -713.3333333333334,
+    "exp_gross": -713.3333333333334,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-04-09",
+    "index": "NIFTY",
+    "free": [
+     "N_wide_0932",
+     "N_p100_1002",
+     "N_p80_0932"
+    ],
+    "exp": [
+     "N_wide_0932",
+     "N_p100_1002",
+     "N_p80_0932"
+    ],
+    "differs": false,
+    "free_gross": 8506.116666666667,
+    "exp_gross": 8506.116666666667,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-04-15",
+    "index": "SENSEX",
+    "free": [
+     "S_p320_1217",
+     "S_ditm1-t1s44_1417",
+     "S_p285-t1s22_1432"
+    ],
+    "exp": [
+     "S_p320_1217",
+     "S_ditm1-t1s44_1417",
+     "S_p285-t1s22_1432"
+    ],
+    "differs": false,
+    "free_gross": 322.3333333333333,
+    "exp_gross": 322.3333333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-04-17",
+    "index": "NIFTY",
+    "free": [
+     "N_p150-t1s11_0917",
+     "N_wide-t1s4_0917",
+     "N_wide-t1s4_0947"
+    ],
+    "exp": [
+     "N_p150-t1s11_0917",
+     "N_wide-t1s4_0917",
+     "N_wide-t1s4_0947"
+    ],
+    "differs": false,
+    "free_gross": -3085.7666666666664,
+    "exp_gross": -3085.7666666666664,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-04-22",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1-t1s36_0932",
+     "N_p150-t1s11_1002",
+     "N_wide_0932"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_0932",
+     "S_p320_0917",
+     "S_wide_0917"
+    ],
+    "differs": true,
+    "free_gross": 547.9499999999999,
+    "exp_gross": 5005.666666666667,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-04-24",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_1202",
+     "N_p150-t1s11_1047",
+     "N_p150-t1s11_1032"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1202",
+     "N_p150-t1s11_1047",
+     "N_p150-t1s11_1032"
+    ],
+    "differs": false,
+    "free_gross": 978.25,
+    "exp_gross": 978.25,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-04-29",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_0917",
+     "S_wide_0917",
+     "S_p285-t1s22_0917"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_0917",
+     "S_wide_0917",
+     "S_p285-t1s22_0917"
+    ],
+    "differs": false,
+    "free_gross": 2160.3333333333335,
+    "exp_gross": 2160.3333333333335,
+    "free_trades": 3.6666666666666665,
+    "exp_trades": 3.6666666666666665
+   },
+   {
+    "day": "2025-04-30",
+    "index": "NIFTY",
+    "free": [
+     "N_wide_1017",
+     "N_wide-t1s4_1017",
+     "N_p80_1017"
+    ],
+    "exp": [
+     "N_wide_1017",
+     "N_wide-t1s4_1017",
+     "N_p80_1017"
+    ],
+    "differs": false,
+    "free_gross": -185.0333333333333,
+    "exp_gross": -185.0333333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-05-06",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_0932",
+     "S_wide_0917",
+     "S_p285-t1s22_0917"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_0932",
+     "S_wide_0917",
+     "S_p285-t1s22_0917"
+    ],
+    "differs": false,
+    "free_gross": 2753.0,
+    "exp_gross": 2753.0,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2025-05-08",
+    "index": "NIFTY",
+    "free": [
+     "N_dir-t1s29_1002",
+     "N_p100_0917",
+     "N_p150-t1s11_1002"
+    ],
+    "exp": [
+     "N_dir-t1s29_1002",
+     "N_p100_0917",
+     "N_p150-t1s11_1002"
+    ],
+    "differs": false,
+    "free_gross": 399.75,
+    "exp_gross": 399.75,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-05-13",
+    "index": "SENSEX",
+    "free": [
+     "S_wide_0917",
+     "S_p285-t1s22_0917",
+     "S_ditm1_0917"
+    ],
+    "exp": [
+     "S_wide_0917",
+     "S_p285-t1s22_0917",
+     "S_ditm1_0917"
+    ],
+    "differs": false,
+    "free_gross": 2235.3333333333335,
+    "exp_gross": 2235.3333333333335,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-05-15",
+    "index": "NIFTY",
+    "free": [
+     "N_p150-t1s11_1002",
+     "N_ditm1-t1s36_1217",
+     "N_p150-t1s11_0947"
+    ],
+    "exp": [
+     "N_p150-t1s11_1002",
+     "N_ditm1-t1s36_1217",
+     "N_p150-t1s11_0947"
+    ],
+    "differs": false,
+    "free_gross": 4949.316666666667,
+    "exp_gross": 4949.316666666667,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-05-20",
+    "index": "SENSEX",
+    "free": [
+     "S_p285-t1s22_0917",
+     "S_dir_1132",
+     "N_p150-t1s11_1002"
+    ],
+    "exp": [
+     "S_p285-t1s22_0917",
+     "S_dir_1132",
+     "S_p285-t1s22_1302"
+    ],
+    "differs": true,
+    "free_gross": 2744.25,
+    "exp_gross": 3200.6666666666665,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-05-22",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_1102",
+     "N_p150-t1s11_1017",
+     "N_p150-t1s11_1317"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1102",
+     "N_p150-t1s11_1017",
+     "N_p150-t1s11_1317"
+    ],
+    "differs": false,
+    "free_gross": -352.95,
+    "exp_gross": -352.95,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2025-05-27",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1-t1s36_1132",
+     "S_p285-t1s22_1302",
+     "S_p250_1302"
+    ],
+    "exp": [
+     "S_p285-t1s22_1302",
+     "S_dir_1132",
+     "S_p250_1302"
+    ],
+    "differs": true,
+    "free_gross": 1940.9166666666667,
+    "exp_gross": 2335.6666666666665,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-05-29",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1_0947",
+     "N_p150-t1s11_1247",
+     "N_wide-t1s4_0917"
+    ],
+    "exp": [
+     "N_p150-t1s11_1247",
+     "N_wide-t1s4_0917",
+     "N_p150-t1s11_1232"
+    ],
+    "differs": true,
+    "free_gross": 1677.2833333333335,
+    "exp_gross": 3015.7833333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-06-03",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0947",
+     "S_p320_1302",
+     "N_wide-t1s8_1232"
+    ],
+    "exp": [
+     "S_ditm1_0947",
+     "S_p320_1302",
+     "S_p320_1232"
+    ],
+    "differs": true,
+    "free_gross": 7285.25,
+    "exp_gross": 7601.333333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-06-05",
+    "index": "NIFTY",
+    "free": [
+     "N_p150-t1s11_1232",
+     "N_p150-t1s11_1247",
+     "N_ditm1_1302"
+    ],
+    "exp": [
+     "N_p150-t1s11_1232",
+     "N_p150-t1s11_1247",
+     "N_ditm1_1302"
+    ],
+    "differs": false,
+    "free_gross": 124.58333333333333,
+    "exp_gross": 124.58333333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-06-10",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_0917",
+     "S_wide_0932",
+     "S_p320_0932"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_0917",
+     "S_wide_0932",
+     "S_p320_0932"
+    ],
+    "differs": false,
+    "free_gross": 3457.6666666666665,
+    "exp_gross": 3457.6666666666665,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-06-12",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_0917",
+     "N_p150-t1s11_0917",
+     "N_wide-t1s8_0917"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_0917",
+     "N_p150-t1s11_0917",
+     "N_wide-t1s8_0917"
+    ],
+    "differs": false,
+    "free_gross": 1813.5,
+    "exp_gross": 1813.5,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-06-17",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0947",
+     "S_p285-t1s22_0917",
+     "S_wide_0932"
+    ],
+    "exp": [
+     "S_ditm1_0947",
+     "S_p285-t1s22_0917",
+     "S_wide_0932"
+    ],
+    "differs": false,
+    "free_gross": 1573.0,
+    "exp_gross": 1573.0,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-06-19",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1-t1s44_0917",
+     "N_p150-t1s11_1232",
+     "N_p150-t1s11_1217"
+    ],
+    "exp": [
+     "N_p150-t1s11_1232",
+     "N_p150-t1s11_1217",
+     "N_p150-t1s11_0917"
+    ],
+    "differs": true,
+    "free_gross": -929.3333333333334,
+    "exp_gross": 1166.75,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-06-24",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_0917",
+     "S_wide_0917",
+     "S_p285-t1s22_0917"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_0917",
+     "S_wide_0917",
+     "S_p285-t1s22_0917"
+    ],
+    "differs": false,
+    "free_gross": -2802.6666666666665,
+    "exp_gross": -2802.6666666666665,
+    "free_trades": 3.6666666666666665,
+    "exp_trades": 3.6666666666666665
+   },
+   {
+    "day": "2025-06-26",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_0947",
+     "N_p150-t1s11_1102",
+     "N_wide-t1s4_1102"
+    ],
+    "exp": [
+     "N_ditm1_0947",
+     "N_p150-t1s11_1102",
+     "N_wide-t1s4_1102"
+    ],
+    "differs": false,
+    "free_gross": 438.75,
+    "exp_gross": 438.75,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-07-01",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1-t1s36_1302",
+     "S_p250_1347",
+     "N_p150-t1s11_1102"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1147",
+     "S_p250_1347",
+     "S_p285-t1s22_1302"
+    ],
+    "differs": true,
+    "free_gross": 977.25,
+    "exp_gross": 77.0,
+    "free_trades": 2.0,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-07-03",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_0917",
+     "N_p80_1347",
+     "N_wide-t1s4_1402"
+    ],
+    "exp": [
+     "N_ditm1_0917",
+     "N_p80_1347",
+     "N_wide-t1s4_1402"
+    ],
+    "differs": false,
+    "free_gross": -1605.5,
+    "exp_gross": -1605.5,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-07-08",
+    "index": "SENSEX",
+    "free": [
+     "S_p320_0917",
+     "S_p250_0917",
+     "S_p250_0932"
+    ],
+    "exp": [
+     "S_p320_0917",
+     "S_p250_0917",
+     "S_p250_0932"
+    ],
+    "differs": false,
+    "free_gross": 1682.6666666666667,
+    "exp_gross": 1682.6666666666667,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-07-10",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_1347",
+     "N_p100_1002",
+     "N_p150-t1s11_1347"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1347",
+     "N_p100_1002",
+     "N_p150-t1s11_1347"
+    ],
+    "differs": false,
+    "free_gross": 739.9166666666666,
+    "exp_gross": 739.9166666666666,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-07-15",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_0917",
+     "S_wide_0917",
+     "S_p285-t1s22_0917"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_0917",
+     "S_wide_0917",
+     "S_p285-t1s22_0917"
+    ],
+    "differs": false,
+    "free_gross": -1214.0,
+    "exp_gross": -1214.0,
+    "free_trades": 4.0,
+    "exp_trades": 4.0
+   },
+   {
+    "day": "2025-07-17",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1017",
+     "N_wide_1017",
+     "N_wide-t1s4_1017"
+    ],
+    "exp": [
+     "N_ditm1_1017",
+     "N_wide_1017",
+     "N_wide-t1s4_1017"
+    ],
+    "differs": false,
+    "free_gross": 828.75,
+    "exp_gross": 828.75,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-07-22",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_0947",
+     "S_p285-t1s22_1017",
+     "S_wide_1117"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_0947",
+     "S_p285-t1s22_1017",
+     "S_wide_1117"
+    ],
+    "differs": false,
+    "free_gross": 133.66666666666666,
+    "exp_gross": 133.66666666666666,
+    "free_trades": 3.6666666666666665,
+    "exp_trades": 3.6666666666666665
+   },
+   {
+    "day": "2025-07-24",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1-t1s44_0917",
+     "N_wide_1017",
+     "N_p80_1017"
+    ],
+    "exp": [
+     "N_ditm1_0932",
+     "N_wide_1017",
+     "N_p80_1017"
+    ],
+    "differs": true,
+    "free_gross": 342.3333333333333,
+    "exp_gross": 279.5,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-07-29",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_0917",
+     "S_p285-t1s22_0917",
+     "S_p285-t1s22_0947"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_0917",
+     "S_p285-t1s22_0917",
+     "S_p285-t1s22_0947"
+    ],
+    "differs": false,
+    "free_gross": 1557.3333333333333,
+    "exp_gross": 1557.3333333333333,
+    "free_trades": 4.666666666666667,
+    "exp_trades": 4.666666666666667
+   },
+   {
+    "day": "2025-07-31",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_1047",
+     "N_p150-t1s11_1102",
+     "N_p150-t1s11_1047"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1047",
+     "N_p150-t1s11_1102",
+     "N_p150-t1s11_1047"
+    ],
+    "differs": false,
+    "free_gross": -697.6666666666666,
+    "exp_gross": -697.6666666666666,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-08-05",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1_1047",
+     "S_p285-t1s22_1302",
+     "S_p285-t1s22_1232"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1332",
+     "S_p285-t1s22_1302",
+     "S_p285-t1s22_1232"
+    ],
+    "differs": true,
+    "free_gross": -1121.6666666666667,
+    "exp_gross": -388.0,
+    "free_trades": 3.0,
+    "exp_trades": 4.0
+   },
+   {
+    "day": "2025-08-07",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_1017",
+     "N_p150-t1s11_0917",
+     "N_p150-t1s11_1002"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1017",
+     "N_p150-t1s11_0917",
+     "N_p150-t1s11_1002"
+    ],
+    "differs": false,
+    "free_gross": -3140.5833333333335,
+    "exp_gross": -3140.5833333333335,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-08-12",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_0917",
+     "S_p285-t1s22_0947",
+     "S_p285-t1s22_0917"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_0917",
+     "S_p285-t1s22_0947",
+     "S_p285-t1s22_0917"
+    ],
+    "differs": false,
+    "free_gross": -1640.0,
+    "exp_gross": -1640.0,
+    "free_trades": 4.666666666666667,
+    "exp_trades": 4.666666666666667
+   },
+   {
+    "day": "2025-08-14",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1-t1s44_1347",
+     "N_p150-t1s11_1032",
+     "N_p150-t1s11_1302"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1347",
+     "N_p150-t1s11_1032",
+     "N_p150-t1s11_1302"
+    ],
+    "differs": true,
+    "free_gross": -51.083333333333336,
+    "exp_gross": -368.3333333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-08-19",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1002",
+     "S_p285-t1s22_1002",
+     "N_wide-t1s4_0917"
+    ],
+    "exp": [
+     "S_ditm1_1002",
+     "S_p285-t1s22_1002",
+     "S_p285-t1s22_1017"
+    ],
+    "differs": true,
+    "free_gross": 2084.3333333333335,
+    "exp_gross": 2607.6666666666665,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-08-21",
+    "index": "NIFTY",
+    "free": [
+     "N_dir-t1s29_1002",
+     "N_p150-t1s11_1032",
+     "N_wide-t1s4_0917"
+    ],
+    "exp": [
+     "N_dir-t1s29_1002",
+     "N_p150-t1s11_1032",
+     "N_wide-t1s4_0917"
+    ],
+    "differs": false,
+    "free_gross": 1873.0833333333333,
+    "exp_gross": 1873.0833333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-08-26",
+    "index": "SENSEX",
+    "free": [
+     "S_p285-t1s22_1002",
+     "S_p285-t1s22_1017",
+     "S_ditm1_1002"
+    ],
+    "exp": [
+     "S_p285-t1s22_1002",
+     "S_p285-t1s22_1017",
+     "S_ditm1_1002"
+    ],
+    "differs": false,
+    "free_gross": 2679.0,
+    "exp_gross": 2679.0,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2025-08-28",
+    "index": "NIFTY",
+    "free": [
+     "N_dir-t1s29_0917",
+     "N_wide-t1s4_0917",
+     "N_wide_1002"
+    ],
+    "exp": [
+     "N_dir-t1s29_0917",
+     "N_wide-t1s4_0917",
+     "N_wide_1002"
+    ],
+    "differs": false,
+    "free_gross": -2094.0833333333335,
+    "exp_gross": -2094.0833333333335,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-09-02",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1-t1s44_0917",
+     "S_p285-t1s22_0917",
+     "S_p285-t1s22_1017"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1032",
+     "N_wide-t1s8_1132",
+     "N_p100_1002"
+    ],
+    "differs": true,
+    "free_gross": 1283.6666666666667,
+    "exp_gross": 113.75,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2025-09-04",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1-t1s36_1032",
+     "N_p150-t1s11_1047",
+     "N_p150-t1s11_1102"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1132",
+     "S_p285-t1s22_1117",
+     "S_p285-t1s22_1332"
+    ],
+    "differs": true,
+    "free_gross": -1530.75,
+    "exp_gross": 912.6666666666666,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 4.0
+   },
+   {
+    "day": "2025-09-09",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_1317",
+     "N_p150-t1s11_1047",
+     "N_p150-t1s11_1117"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1317",
+     "N_p150-t1s11_1047",
+     "N_p150-t1s11_1117"
+    ],
+    "differs": false,
+    "free_gross": 504.8333333333333,
+    "exp_gross": 504.8333333333333,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-09-11",
+    "index": "SENSEX",
+    "free": [
+     "S_p285-t1s22_1017",
+     "S_ditm1-t1s44_1317",
+     "S_wide_1047"
+    ],
+    "exp": [
+     "S_p285-t1s22_1017",
+     "S_ditm1-t1s44_1317",
+     "S_wide_1047"
+    ],
+    "differs": false,
+    "free_gross": 762.3333333333334,
+    "exp_gross": 762.3333333333334,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2025-09-16",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_0917",
+     "N_p80_0932",
+     "N_wide-t1s8_0917"
+    ],
+    "exp": [
+     "N_p80_0917",
+     "N_p80_0932",
+     "N_wide-t1s8_0917"
+    ],
+    "differs": false,
+    "free_gross": 157.08333333333334,
+    "exp_gross": 157.08333333333334,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-09-18",
+    "index": "SENSEX",
+    "free": [
+     "S_dir_0932",
+     "S_p285-t1s22_0917",
+     "S_p285-t1s22_0932"
+    ],
+    "exp": [
+     "S_dir_0932",
+     "S_p285-t1s22_0917",
+     "S_p285-t1s22_0932"
+    ],
+    "differs": false,
+    "free_gross": 657.3333333333334,
+    "exp_gross": 657.3333333333334,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2025-09-23",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_0947",
+     "S_p285-t1s22_0947",
+     "N_p80_1017"
+    ],
+    "exp": [
+     "N_ditm1_0947",
+     "N_p80_1017",
+     "N_p150-t1s11_1047"
+    ],
+    "differs": true,
+    "free_gross": -1440.0,
+    "exp_gross": -2591.3333333333335,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-09-25",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1332",
+     "S_p285-t1s22_1302",
+     "S_p285-t1s22_0947"
+    ],
+    "exp": [
+     "S_ditm1_1332",
+     "S_p285-t1s22_1302",
+     "S_p285-t1s22_0947"
+    ],
+    "differs": false,
+    "free_gross": 3026.0,
+    "exp_gross": 3026.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-09-30",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1117",
+     "N_wide-t1s4_0917",
+     "N_wide_0917"
+    ],
+    "exp": [
+     "N_ditm1_1117",
+     "N_wide-t1s4_0917",
+     "N_wide_0917"
+    ],
+    "differs": false,
+    "free_gross": -1366.0833333333333,
+    "exp_gross": -1366.0833333333333,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2025-10-01",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0917",
+     "N_wide_0917",
+     "N_wide-t1s8_1002"
+    ],
+    "exp": [
+     "S_ditm1_0917",
+     "S_wide_0917",
+     "S_wide_1117"
+    ],
+    "differs": true,
+    "free_gross": 554.4166666666666,
+    "exp_gross": 1168.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-10-07",
+    "index": "NIFTY",
+    "free": [
+     "N_dir_1047",
+     "N_p150-t1s11_0917",
+     "N_p80_1147"
+    ],
+    "exp": [
+     "N_dir_1047",
+     "N_p150-t1s11_0917",
+     "N_p80_1147"
+    ],
+    "differs": false,
+    "free_gross": -3207.75,
+    "exp_gross": -3207.75,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-10-09",
+    "index": "SENSEX",
+    "free": [
+     "S_dir_1002",
+     "S_p285-t1s22_1317",
+     "S_p285-t1s22_0947"
+    ],
+    "exp": [
+     "S_dir_1002",
+     "S_p285-t1s22_1317",
+     "S_p285-t1s22_0947"
+    ],
+    "differs": false,
+    "free_gross": 227.0,
+    "exp_gross": 227.0,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-10-14",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1002",
+     "N_p80_1302",
+     "N_wide_1032"
+    ],
+    "exp": [
+     "N_ditm1_1002",
+     "N_p80_1302",
+     "N_wide_1032"
+    ],
+    "differs": false,
+    "free_gross": 1513.4166666666667,
+    "exp_gross": 1513.4166666666667,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-10-16",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_1002",
+     "S_p285-t1s22_1017",
+     "S_p285-t1s22_1002"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1002",
+     "S_p285-t1s22_1017",
+     "S_p285-t1s22_1002"
+    ],
+    "differs": false,
+    "free_gross": 3046.6666666666665,
+    "exp_gross": 3046.6666666666665,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-10-20",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_0947",
+     "S_p285-t1s22_0947",
+     "N_wide-t1s4_1132"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_0947",
+     "N_wide-t1s4_1132",
+     "N_p100_1132"
+    ],
+    "differs": true,
+    "free_gross": 2836.75,
+    "exp_gross": 2273.9166666666665,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2025-10-23",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_1002",
+     "S_p285-t1s22_0947",
+     "S_p285-t1s22_1002"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1002",
+     "S_p285-t1s22_0947",
+     "S_p285-t1s22_1002"
+    ],
+    "differs": false,
+    "free_gross": 1926.0,
+    "exp_gross": 1926.0,
+    "free_trades": 3.6666666666666665,
+    "exp_trades": 3.6666666666666665
+   },
+   {
+    "day": "2025-10-28",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_0917",
+     "N_wide-t1s4_1032",
+     "N_p80_1032"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_0917",
+     "N_wide-t1s4_1032",
+     "N_p80_1032"
+    ],
+    "differs": false,
+    "free_gross": 4903.166666666667,
+    "exp_gross": 4903.166666666667,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2025-10-30",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1-t1s36_0947",
+     "S_p285-t1s22_1032",
+     "S_p285-t1s22_1047"
+    ],
+    "exp": [
+     "S_p285-t1s22_1032",
+     "S_p285-t1s22_1047",
+     "S_ditm1_0932"
+    ],
+    "differs": true,
+    "free_gross": 440.4166666666667,
+    "exp_gross": 1179.0,
+    "free_trades": 3.6666666666666665,
+    "exp_trades": 3.6666666666666665
+   },
+   {
+    "day": "2025-11-04",
+    "index": "NIFTY",
+    "free": [
+     "N_wide-t1s4_1032",
+     "N_ditm1-t1s36_0947",
+     "N_p80_1047"
+    ],
+    "exp": [
+     "N_wide-t1s4_1032",
+     "N_ditm1-t1s36_0947",
+     "N_p80_1047"
+    ],
+    "differs": false,
+    "free_gross": 619.6666666666666,
+    "exp_gross": 619.6666666666666,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2025-11-06",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1_0947",
+     "S_wide_0947",
+     "S_p285-t1s22_0947"
+    ],
+    "exp": [
+     "S_ditm1_0932",
+     "S_wide_0947",
+     "S_p285-t1s22_0947"
+    ],
+    "differs": true,
+    "free_gross": 1507.0833333333333,
+    "exp_gross": 2013.0,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2025-11-11",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1-t1s44_0917",
+     "N_p80_1132",
+     "N_wide-t1s4_1132"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_0917",
+     "N_p80_1132",
+     "N_wide-t1s4_1132"
+    ],
+    "differs": true,
+    "free_gross": -46.916666666666664,
+    "exp_gross": -1561.0833333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-11-13",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1-t1s36_1002",
+     "S_p285-t1s22_0947",
+     "N_wide-t1s8_0932"
+    ],
+    "exp": [
+     "S_ditm1_0932",
+     "S_p285-t1s22_0947",
+     "S_p285-t1s22_0932"
+    ],
+    "differs": true,
+    "free_gross": -3934.9166666666665,
+    "exp_gross": -3121.6666666666665,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 4.0
+   },
+   {
+    "day": "2025-11-18",
+    "index": "NIFTY",
+    "free": [
+     "N_p150-t1s11_0932",
+     "N_p150-t1s11_1032",
+     "N_p150-t1s11_1102"
+    ],
+    "exp": [
+     "N_p150-t1s11_0932",
+     "N_p150-t1s11_1032",
+     "N_p150-t1s11_1102"
+    ],
+    "differs": false,
+    "free_gross": -614.25,
+    "exp_gross": -614.25,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-11-20",
+    "index": "SENSEX",
+    "free": [
+     "S_p285-t1s22_1117",
+     "S_p285-t1s22_1132",
+     "S_p285-t1s22_1302"
+    ],
+    "exp": [
+     "S_p285-t1s22_1117",
+     "S_p285-t1s22_1132",
+     "S_p285-t1s22_1302"
+    ],
+    "differs": false,
+    "free_gross": 1001.6666666666666,
+    "exp_gross": 1001.6666666666666,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-11-25",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_1147",
+     "N_p150-t1s11_0932",
+     "N_wide-t1s4_0947"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1147",
+     "N_p150-t1s11_0932",
+     "N_wide-t1s4_0947"
+    ],
+    "differs": false,
+    "free_gross": 2721.3333333333335,
+    "exp_gross": 2721.3333333333335,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-11-27",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1217",
+     "S_p285-t1s22_1117",
+     "S_p285-t1s22_0947"
+    ],
+    "exp": [
+     "S_ditm1_1217",
+     "S_p285-t1s22_1117",
+     "S_p285-t1s22_0947"
+    ],
+    "differs": false,
+    "free_gross": 886.6666666666666,
+    "exp_gross": 886.6666666666666,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-12-02",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1-t1s44_1032",
+     "N_p80_0947",
+     "N_wide-t1s4_0947"
+    ],
+    "exp": [
+     "N_ditm1_1017",
+     "N_p80_0947",
+     "N_wide-t1s4_0947"
+    ],
+    "differs": true,
+    "free_gross": 1886.0833333333333,
+    "exp_gross": 2190.5,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-12-04",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_1017",
+     "S_p285-t1s22_1032",
+     "S_p285-t1s22_1047"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1017",
+     "S_p285-t1s22_1032",
+     "S_p285-t1s22_1047"
+    ],
+    "differs": false,
+    "free_gross": 2080.6666666666665,
+    "exp_gross": 2080.6666666666665,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-12-09",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_1032",
+     "N_wide-t1s4_1132",
+     "N_wide-t1s4_1147"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1032",
+     "N_wide-t1s4_1132",
+     "N_wide-t1s4_1147"
+    ],
+    "differs": false,
+    "free_gross": -696.5833333333334,
+    "exp_gross": -696.5833333333334,
+    "free_trades": 3.6666666666666665,
+    "exp_trades": 3.6666666666666665
+   },
+   {
+    "day": "2025-12-11",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1032",
+     "S_p285-t1s22_1032",
+     "S_p285-t1s22_1117"
+    ],
+    "exp": [
+     "S_ditm1_1032",
+     "S_p285-t1s22_1032",
+     "S_p285-t1s22_1117"
+    ],
+    "differs": false,
+    "free_gross": 1825.3333333333333,
+    "exp_gross": 1825.3333333333333,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-12-16",
+    "index": "NIFTY",
+    "free": [
+     "N_dir_1147",
+     "N_wide-t1s4_1117",
+     "N_p80_0917"
+    ],
+    "exp": [
+     "N_dir_1147",
+     "N_wide-t1s4_1117",
+     "N_p80_0917"
+    ],
+    "differs": false,
+    "free_gross": 1157.0,
+    "exp_gross": 1157.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2025-12-18",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1002",
+     "S_p285-t1s22_1032",
+     "S_p285-t1s22_1102"
+    ],
+    "exp": [
+     "S_ditm1_1002",
+     "S_p285-t1s22_1032",
+     "S_p285-t1s22_1102"
+    ],
+    "differs": false,
+    "free_gross": 1570.0,
+    "exp_gross": 1570.0,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2025-12-23",
+    "index": "NIFTY",
+    "free": [
+     "N_wide-t1s4_1032",
+     "N_p100_0917",
+     "N_p80_0932"
+    ],
+    "exp": [
+     "N_wide-t1s4_1032",
+     "N_p100_0917",
+     "N_p80_0932"
+    ],
+    "differs": false,
+    "free_gross": 2593.5,
+    "exp_gross": 2593.5,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2025-12-24",
+    "index": "SENSEX",
+    "free": [
+     "S_p285-t1s22_1047",
+     "S_ditm1-t1s44_0947",
+     "S_p285-t1s22_1032"
+    ],
+    "exp": [
+     "S_p285-t1s22_1047",
+     "S_ditm1-t1s44_0947",
+     "S_p285-t1s22_1032"
+    ],
+    "differs": false,
+    "free_gross": 1368.3333333333333,
+    "exp_gross": 1368.3333333333333,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2025-12-30",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_0947",
+     "N_wide-t1s4_0917",
+     "N_p80_0917"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_0947",
+     "N_wide-t1s4_0917",
+     "N_p80_0917"
+    ],
+    "differs": false,
+    "free_gross": 186.33333333333334,
+    "exp_gross": 186.33333333333334,
+    "free_trades": 3.6666666666666665,
+    "exp_trades": 3.6666666666666665
+   },
+   {
+    "day": "2026-01-01",
+    "index": "SENSEX",
+    "free": [
+     "S_dir_0917",
+     "S_p285-t1s22_0947",
+     "S_p285-t1s22_1002"
+    ],
+    "exp": [
+     "S_dir_0917",
+     "S_p285-t1s22_0947",
+     "S_p285-t1s22_1002"
+    ],
+    "differs": false,
+    "free_gross": 60.86666666666664,
+    "exp_gross": 60.86666666666664,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2026-01-06",
+    "index": "NIFTY",
+    "free": [
+     "N_dir_1047",
+     "N_wide_1002",
+     "S_p285-t1s22_1017"
+    ],
+    "exp": [
+     "N_dir_1047",
+     "N_wide_1002",
+     "N_p80_0932"
+    ],
+    "differs": true,
+    "free_gross": 1034.0833333333333,
+    "exp_gross": 1352.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-01-08",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1102",
+     "N_p100_0932",
+     "N_p80_0932"
+    ],
+    "exp": [
+     "S_ditm1_1102",
+     "S_p285-t1s22_1102",
+     "S_p285-t1s22_1047"
+    ],
+    "differs": true,
+    "free_gross": -425.6333333333334,
+    "exp_gross": 3467.0,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-01-13",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_1032",
+     "S_p285-t1s22_1017",
+     "N_wide-t1s4_1247"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1032",
+     "N_wide-t1s4_1247",
+     "N_wide-t1s8_1132"
+    ],
+    "differs": true,
+    "free_gross": -426.0666666666666,
+    "exp_gross": 1219.1833333333334,
+    "free_trades": 3.0,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-01-14",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_1017",
+     "S_p285-t1s22_1302",
+     "S_p250_1247"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1017",
+     "S_p285-t1s22_1302",
+     "S_p250_1247"
+    ],
+    "differs": false,
+    "free_gross": 716.0,
+    "exp_gross": 716.0,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2026-01-20",
+    "index": "NIFTY",
+    "free": [
+     "N_dir-t1s29_1017",
+     "S_p285-t1s22_1132",
+     "S_p285-t1s22_1117"
+    ],
+    "exp": [
+     "N_dir-t1s29_1017",
+     "N_p80_0947",
+     "N_wide-t1s4_1002"
+    ],
+    "differs": true,
+    "free_gross": 1979.75,
+    "exp_gross": 1319.2833333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-01-22",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1017",
+     "S_p285-t1s22_1132",
+     "S_p285-t1s22_1302"
+    ],
+    "exp": [
+     "S_ditm1_1017",
+     "S_p285-t1s22_1132",
+     "S_p285-t1s22_1302"
+    ],
+    "differs": false,
+    "free_gross": -1644.6666666666667,
+    "exp_gross": -1644.6666666666667,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-01-27",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1_1017",
+     "N_p150-t1s11_0947",
+     "N_p150-t1s11_1417"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1147",
+     "N_p150-t1s11_0947",
+     "N_p150-t1s11_1417"
+    ],
+    "differs": true,
+    "free_gross": -1048.4166666666667,
+    "exp_gross": -436.5833333333333,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2026-01-29",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1-t1s36_1302",
+     "S_p250_1032",
+     "S_p250_1232"
+    ],
+    "exp": [
+     "S_ditm1_1202",
+     "S_p250_1032",
+     "S_p250_1232"
+    ],
+    "differs": true,
+    "free_gross": -1001.75,
+    "exp_gross": -296.3333333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-02-03",
+    "index": "NIFTY",
+    "free": [
+     "N_wide-t1s4_0947",
+     "N_wide_0917",
+     "N_wide-t1s4_0917"
+    ],
+    "exp": [
+     "N_wide-t1s4_0947",
+     "N_wide_0917",
+     "N_wide-t1s4_0917"
+    ],
+    "differs": false,
+    "free_gross": 14994.416666666666,
+    "exp_gross": 14994.416666666666,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-02-05",
+    "index": "SENSEX",
+    "free": [
+     "S_p285-t1s22_1002",
+     "S_ditm1-t1s44_1132",
+     "S_p285-t1s22_1117"
+    ],
+    "exp": [
+     "S_p285-t1s22_1002",
+     "S_ditm1-t1s44_1132",
+     "S_p285-t1s22_1117"
+    ],
+    "differs": false,
+    "free_gross": 1963.6666666666667,
+    "exp_gross": 1963.6666666666667,
+    "free_trades": 3.6666666666666665,
+    "exp_trades": 3.6666666666666665
+   },
+   {
+    "day": "2026-02-10",
+    "index": "NIFTY",
+    "free": [
+     "N_wide_0917",
+     "N_wide-t1s4_0917",
+     "N_p150-t1s11_0917"
+    ],
+    "exp": [
+     "N_wide_0917",
+     "N_wide-t1s4_0917",
+     "N_p150-t1s11_0917"
+    ],
+    "differs": false,
+    "free_gross": 3293.3333333333335,
+    "exp_gross": 3293.3333333333335,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-02-12",
+    "index": "SENSEX",
+    "free": [
+     "S_p250_0947",
+     "S_wide_0947",
+     "S_p250_1002"
+    ],
+    "exp": [
+     "S_p250_0947",
+     "S_wide_0947",
+     "S_p250_1002"
+    ],
+    "differs": false,
+    "free_gross": 1321.6666666666667,
+    "exp_gross": 1321.6666666666667,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-02-17",
+    "index": "NIFTY",
+    "free": [
+     "N_dir-t1s29_0947",
+     "N_wide_0917",
+     "N_wide-t1s8_0917"
+    ],
+    "exp": [
+     "N_dir-t1s29_0947",
+     "N_wide_0917",
+     "N_wide-t1s8_0917"
+    ],
+    "differs": false,
+    "free_gross": 447.4166666666667,
+    "exp_gross": 447.4166666666667,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-02-19",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1002",
+     "S_p285-t1s22_1032",
+     "S_p285-t1s22_1017"
+    ],
+    "exp": [
+     "S_ditm1_1002",
+     "S_p285-t1s22_1032",
+     "S_p285-t1s22_1017"
+    ],
+    "differs": false,
+    "free_gross": 3265.0,
+    "exp_gross": 3265.0,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-02-24",
+    "index": "NIFTY",
+    "free": [
+     "S_dir_0932",
+     "N_p80_1032",
+     "S_p285-t1s22_1032"
+    ],
+    "exp": [
+     "N_p80_1032",
+     "N_ditm1_0932",
+     "N_wide-t1s4_1032"
+    ],
+    "differs": true,
+    "free_gross": 402.5,
+    "exp_gross": -199.33333333333334,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-02-26",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1047",
+     "S_p285-t1s22_1032",
+     "S_p285-t1s22_1132"
+    ],
+    "exp": [
+     "S_ditm1_1047",
+     "S_p285-t1s22_1032",
+     "S_p285-t1s22_1132"
+    ],
+    "differs": false,
+    "free_gross": 1131.0,
+    "exp_gross": 1131.0,
+    "free_trades": 3.6666666666666665,
+    "exp_trades": 3.6666666666666665
+   },
+   {
+    "day": "2026-03-02",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1117",
+     "N_wide-t1s8_1047",
+     "N_wide_0917"
+    ],
+    "exp": [
+     "N_ditm1_1117",
+     "N_wide-t1s8_1047",
+     "N_wide_0917"
+    ],
+    "differs": false,
+    "free_gross": -3162.25,
+    "exp_gross": -3162.25,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-03-05",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_1017",
+     "S_p285-t1s22_1132",
+     "S_p250_0932"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1017",
+     "S_p285-t1s22_1132",
+     "S_p250_0932"
+    ],
+    "differs": false,
+    "free_gross": -1614.6666666666667,
+    "exp_gross": -1614.6666666666667,
+    "free_trades": 4.0,
+    "exp_trades": 4.0
+   },
+   {
+    "day": "2026-03-10",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_0947",
+     "S_p250_1002",
+     "N_wide-t1s4_0947"
+    ],
+    "exp": [
+     "N_ditm1_0947",
+     "N_wide-t1s4_0947",
+     "N_p80_1302"
+    ],
+    "differs": true,
+    "free_gross": 1195.5833333333333,
+    "exp_gross": 1514.5,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-03-12",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0932",
+     "S_p285-t1s22_1402",
+     "N_wide_0917"
+    ],
+    "exp": [
+     "S_ditm1_0932",
+     "S_p285-t1s22_1402",
+     "S_p285-t1s22_1417"
+    ],
+    "differs": true,
+    "free_gross": 1883.9166666666667,
+    "exp_gross": 1594.0,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2026-03-17",
+    "index": "NIFTY",
+    "free": [
+     "N_dir_0917",
+     "N_p80_0917",
+     "N_wide_0917"
+    ],
+    "exp": [
+     "N_dir_0917",
+     "N_p80_0917",
+     "N_wide_0917"
+    ],
+    "differs": false,
+    "free_gross": -3306.3333333333335,
+    "exp_gross": -3306.3333333333335,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-03-19",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_1017",
+     "S_p285-t1s22_1417",
+     "S_p285-t1s22_1432"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1017",
+     "S_p285-t1s22_1417",
+     "S_p285-t1s22_1432"
+    ],
+    "differs": false,
+    "free_gross": 1802.6666666666667,
+    "exp_gross": 1802.6666666666667,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2026-03-24",
+    "index": "NIFTY",
+    "free": [
+     "N_wide-t1s4_1317",
+     "N_p80_1332",
+     "N_p100_1317"
+    ],
+    "exp": [
+     "N_wide-t1s4_1317",
+     "N_p80_1332",
+     "N_p100_1317"
+    ],
+    "differs": false,
+    "free_gross": 3387.5833333333335,
+    "exp_gross": 3387.5833333333335,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-03-25",
+    "index": "SENSEX",
+    "free": [
+     "S_p285-t1s22_1232",
+     "S_p285-t1s22_1247",
+     "S_p285-t1s22_1317"
+    ],
+    "exp": [
+     "S_p285-t1s22_1232",
+     "S_p285-t1s22_1247",
+     "S_p285-t1s22_1317"
+    ],
+    "differs": false,
+    "free_gross": 2100.3333333333335,
+    "exp_gross": 2100.3333333333335,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2026-03-30",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1047",
+     "N_wide_1302",
+     "N_wide-t1s4_1302"
+    ],
+    "exp": [
+     "N_ditm1_1047",
+     "N_wide_1302",
+     "N_wide-t1s4_1302"
+    ],
+    "differs": false,
+    "free_gross": -1526.4166666666667,
+    "exp_gross": -1526.4166666666667,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-04-02",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0947",
+     "S_wide_1047",
+     "S_p320_1047"
+    ],
+    "exp": [
+     "S_ditm1_0947",
+     "S_wide_1047",
+     "S_p320_1047"
+    ],
+    "differs": false,
+    "free_gross": 1768.6666666666667,
+    "exp_gross": 1768.6666666666667,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-04-07",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_1232",
+     "N_p80_1302",
+     "N_p150-t1s11_1002"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1232",
+     "N_p80_1302",
+     "N_p150-t1s11_1002"
+    ],
+    "differs": false,
+    "free_gross": 2580.5,
+    "exp_gross": 2580.5,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2026-04-09",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0932",
+     "S_p285-t1s22_0947",
+     "S_p285-t1s22_0917"
+    ],
+    "exp": [
+     "S_ditm1_0932",
+     "S_p285-t1s22_0947",
+     "S_p285-t1s22_0917"
+    ],
+    "differs": false,
+    "free_gross": 703.6666666666666,
+    "exp_gross": 703.6666666666666,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2026-04-13",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_1102",
+     "N_p150-t1s11_1002",
+     "N_p150-t1s11_0947"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1102",
+     "N_p150-t1s11_1002",
+     "N_p150-t1s11_0947"
+    ],
+    "differs": false,
+    "free_gross": 5027.75,
+    "exp_gross": 5027.75,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-04-16",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0932",
+     "S_wide_1002",
+     "S_p285-t1s22_1002"
+    ],
+    "exp": [
+     "S_ditm1_0932",
+     "S_wide_1002",
+     "S_p285-t1s22_1002"
+    ],
+    "differs": false,
+    "free_gross": 2581.0,
+    "exp_gross": 2581.0,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-04-21",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1132",
+     "N_p150-t1s11_1002",
+     "N_wide_1247"
+    ],
+    "exp": [
+     "N_ditm1_1132",
+     "N_p150-t1s11_1002",
+     "N_wide_1247"
+    ],
+    "differs": false,
+    "free_gross": 2336.75,
+    "exp_gross": 2336.75,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-04-23",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_0932",
+     "S_p285-t1s22_1017",
+     "S_p285-t1s22_1032"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_0932",
+     "S_p285-t1s22_1017",
+     "S_p285-t1s22_1032"
+    ],
+    "differs": false,
+    "free_gross": 548.6666666666666,
+    "exp_gross": 548.6666666666666,
+    "free_trades": 4.333333333333333,
+    "exp_trades": 4.333333333333333
+   },
+   {
+    "day": "2026-04-28",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_0917",
+     "N_p100_0947",
+     "N_p80_0947"
+    ],
+    "exp": [
+     "N_ditm1_0917",
+     "N_p100_0947",
+     "N_p80_0947"
+    ],
+    "differs": false,
+    "free_gross": 1580.5833333333333,
+    "exp_gross": 1580.5833333333333,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-04-30",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1_0947",
+     "S_p285-t1s22_1132",
+     "S_p285-t1s22_1032"
+    ],
+    "exp": [
+     "S_p285-t1s22_1132",
+     "S_p285-t1s22_1032",
+     "S_ditm1-t1s44_1417"
+    ],
+    "differs": true,
+    "free_gross": 806.0,
+    "exp_gross": 1775.0,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 3.6666666666666665
+   },
+   {
+    "day": "2026-05-05",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1102",
+     "N_p150-t1s11_1102",
+     "N_p150-t1s11_1032"
+    ],
+    "exp": [
+     "N_ditm1_1102",
+     "N_p150-t1s11_1102",
+     "N_p150-t1s11_1032"
+    ],
+    "differs": false,
+    "free_gross": 173.33333333333334,
+    "exp_gross": 173.33333333333334,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-05-07",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1-t1s36_1132",
+     "S_p285-t1s22_1132",
+     "S_p285-t1s22_1347"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_0917",
+     "S_p285-t1s22_1132",
+     "S_p285-t1s22_1347"
+    ],
+    "differs": true,
+    "free_gross": -1854.5,
+    "exp_gross": -1788.0,
+    "free_trades": 3.6666666666666665,
+    "exp_trades": 4.333333333333333
+   },
+   {
+    "day": "2026-05-12",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1-t1s44_1147",
+     "N_p100_0917",
+     "S_wide_0917"
+    ],
+    "exp": [
+     "N_p100_0917",
+     "N_p150-t1s11_1102",
+     "N_ditm1-t1s36_1132"
+    ],
+    "differs": true,
+    "free_gross": -57.333333333333336,
+    "exp_gross": 2585.9166666666665,
+    "free_trades": 2.0,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-05-14",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_1302",
+     "N_wide-t1s4_1017",
+     "N_p150-t1s11_1202"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1302",
+     "S_p285-t1s22_1202",
+     "S_p285-t1s22_1302"
+    ],
+    "differs": true,
+    "free_gross": -780.1666666666666,
+    "exp_gross": -1753.6666666666667,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 4.0
+   },
+   {
+    "day": "2026-05-19",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1217",
+     "N_p150-t1s11_1232",
+     "N_p150-t1s11_1002"
+    ],
+    "exp": [
+     "N_ditm1_1217",
+     "N_p150-t1s11_1232",
+     "N_p150-t1s11_1002"
+    ],
+    "differs": false,
+    "free_gross": 2410.4166666666665,
+    "exp_gross": 2410.4166666666665,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-05-21",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1_1102",
+     "S_p250_1247",
+     "S_p250_1147"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1102",
+     "S_p250_1247",
+     "S_p250_1147"
+    ],
+    "differs": true,
+    "free_gross": -689.5833333333334,
+    "exp_gross": -222.66666666666666,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2026-05-26",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1-t1s44_0917",
+     "N_p150-t1s11_1002",
+     "N_p150-t1s11_0947"
+    ],
+    "exp": [
+     "N_p150-t1s11_1002",
+     "N_p150-t1s11_0947",
+     "N_ditm1-t1s36_1417"
+    ],
+    "differs": true,
+    "free_gross": 3430.6666666666665,
+    "exp_gross": 2463.5,
+    "free_trades": 3.0,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2026-05-27",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_0917",
+     "S_p285-t1s22_1202",
+     "S_p285-t1s22_0947"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_0917",
+     "S_p285-t1s22_1202",
+     "S_p285-t1s22_0947"
+    ],
+    "differs": false,
+    "free_gross": -447.0,
+    "exp_gross": -447.0,
+    "free_trades": 4.333333333333333,
+    "exp_trades": 4.333333333333333
+   },
+   {
+    "day": "2026-06-02",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_1147",
+     "N_p150-t1s11_1002",
+     "N_p150-t1s11_0947"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1147",
+     "N_p150-t1s11_1002",
+     "N_p150-t1s11_0947"
+    ],
+    "differs": false,
+    "free_gross": 801.6666666666666,
+    "exp_gross": 801.6666666666666,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-06-04",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_1132",
+     "S_p285-t1s22_1017",
+     "S_p285-t1s22_1132"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1132",
+     "S_p285-t1s22_1017",
+     "S_p285-t1s22_1132"
+    ],
+    "differs": false,
+    "free_gross": -1268.3333333333333,
+    "exp_gross": -1268.3333333333333,
+    "free_trades": 4.666666666666667,
+    "exp_trades": 4.666666666666667
+   },
+   {
+    "day": "2026-06-09",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_1217",
+     "N_p150-t1s11_0947",
+     "N_p150-t1s11_1032"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1217",
+     "N_p150-t1s11_0947",
+     "N_p150-t1s11_1032"
+    ],
+    "differs": false,
+    "free_gross": 232.91666666666666,
+    "exp_gross": 232.91666666666666,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2026-06-11",
+    "index": "SENSEX",
+    "free": [
+     "S_p320_1002",
+     "S_p250_0947",
+     "S_p320_0917"
+    ],
+    "exp": [
+     "S_p320_1002",
+     "S_p250_0947",
+     "S_p320_0917"
+    ],
+    "differs": false,
+    "free_gross": -1597.0,
+    "exp_gross": -1597.0,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-06-16",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1-t1s44_1132",
+     "N_p150-t1s11_1032",
+     "N_p100_0917"
+    ],
+    "exp": [
+     "N_ditm1_1132",
+     "N_p150-t1s11_1032",
+     "N_p100_0917"
+    ],
+    "differs": true,
+    "free_gross": 2327.0,
+    "exp_gross": 2993.25,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-06-18",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1102",
+     "S_p285-t1s22_0947",
+     "S_p285-t1s22_0932"
+    ],
+    "exp": [
+     "S_ditm1_1102",
+     "S_p285-t1s22_0947",
+     "S_p285-t1s22_0932"
+    ],
+    "differs": false,
+    "free_gross": 737.3333333333334,
+    "exp_gross": 737.3333333333334,
+    "free_trades": 4.0,
+    "exp_trades": 4.0
+   },
+   {
+    "day": "2026-06-23",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_0947",
+     "N_p100_0917",
+     "N_p150-t1s11_1032"
+    ],
+    "exp": [
+     "N_p80_0947",
+     "N_p100_0917",
+     "N_p150-t1s11_1032"
+    ],
+    "differs": false,
+    "free_gross": 2252.25,
+    "exp_gross": 2252.25,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-06-25",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0917",
+     "S_p285-t1s22_1147",
+     "S_p285-t1s22_1402"
+    ],
+    "exp": [
+     "S_ditm1_0917",
+     "S_p285-t1s22_1147",
+     "S_p285-t1s22_1402"
+    ],
+    "differs": false,
+    "free_gross": 2508.0,
+    "exp_gross": 2508.0,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2026-06-30",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1-t1s44_1132",
+     "N_p150-t1s11_1032",
+     "S_p285-t1s22_0947"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1132",
+     "N_p150-t1s11_1032",
+     "N_p150-t1s11_1217"
+    ],
+    "differs": true,
+    "free_gross": -1671.5833333333333,
+    "exp_gross": -447.4166666666667,
+    "free_trades": 3.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-07-02",
+    "index": "SENSEX",
+    "free": [
+     "S_p285-t1s22_1402",
+     "S_ditm1-t1s44_0932",
+     "S_p285-t1s22_1232"
+    ],
+    "exp": [
+     "S_p285-t1s22_1402",
+     "S_ditm1-t1s44_0932",
+     "S_p285-t1s22_1232"
+    ],
+    "differs": false,
+    "free_gross": 480.0,
+    "exp_gross": 480.0,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2026-07-07",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_0932",
+     "N_p100_0947",
+     "N_wide-t1s4_0917"
+    ],
+    "exp": [
+     "N_p80_0932",
+     "N_p100_0947",
+     "N_wide-t1s4_0917"
+    ],
+    "differs": false,
+    "free_gross": 2858.9166666666665,
+    "exp_gross": 2858.9166666666665,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-07-09",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_0917",
+     "S_p250_1002",
+     "S_p285-t1s22_1202"
+    ],
+    "exp": [
+     "S_ditm1_0917",
+     "S_p250_1002",
+     "S_p285-t1s22_1202"
+    ],
+    "differs": false,
+    "free_gross": 1539.0,
+    "exp_gross": 1539.0,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-07-14",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1132",
+     "N_wide-t1s4_0932",
+     "N_wide-t1s4_0917"
+    ],
+    "exp": [
+     "N_ditm1_1132",
+     "N_wide-t1s4_0932",
+     "N_wide-t1s4_0917"
+    ],
+    "differs": false,
+    "free_gross": 4350.666666666667,
+    "exp_gross": 4350.666666666667,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-07-16",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_1132",
+     "N_wide-t1s4_0917",
+     "S_p285-t1s22_0917"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1132",
+     "S_p285-t1s22_0917",
+     "S_p285-t1s22_1332"
+    ],
+    "differs": true,
+    "free_gross": 1309.5833333333333,
+    "exp_gross": 647.6666666666666,
+    "free_trades": 4.0,
+    "exp_trades": 4.666666666666667
+   },
+   {
+    "day": "2026-07-21",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1-t1s36_1132",
+     "N_wide_0947",
+     "N_p150-t1s11_0917"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1132",
+     "N_wide_0947",
+     "N_p150-t1s11_0917"
+    ],
+    "differs": false,
+    "free_gross": -1603.3333333333333,
+    "exp_gross": -1603.3333333333333,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2026-07-23",
+    "index": "SENSEX",
+    "free": [
+     "S_p285-t1s22_1232",
+     "N_wide-t1s4_0917",
+     "S_p285-t1s22_0917"
+    ],
+    "exp": [
+     "S_p285-t1s22_1232",
+     "S_p285-t1s22_0917",
+     "S_wide_0917"
+    ],
+    "differs": true,
+    "free_gross": -1100.6666666666667,
+    "exp_gross": -619.0,
+    "free_trades": 3.0,
+    "exp_trades": 3.0
+   },
+   {
+    "day": "2026-07-28",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_0917",
+     "N_p100_0917",
+     "N_wide-t1s4_0917"
+    ],
+    "exp": [
+     "N_p80_0917",
+     "N_p100_0917",
+     "N_wide-t1s4_0917"
+    ],
+    "differs": false,
+    "free_gross": 2618.4166666666665,
+    "exp_gross": 2618.4166666666665,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-07-30",
+    "index": "SENSEX",
+    "free": [
+     "N_wide-t1s4_0917",
+     "S_p250_0932",
+     "S_p320_0947"
+    ],
+    "exp": [
+     "S_p250_0932",
+     "S_p320_0947",
+     "S_ditm1-t1s44_1117"
+    ],
+    "differs": true,
+    "free_gross": 1065.0,
+    "exp_gross": 1182.3333333333333,
+    "free_trades": 2.0,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2026-08-04",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_0917",
+     "N_p80_0932",
+     "N_wide-t1s4_0917"
+    ],
+    "exp": [
+     "N_p80_0917",
+     "N_p80_0932",
+     "N_wide-t1s4_0917"
+    ],
+    "differs": false,
+    "free_gross": -1976.8666666666668,
+    "exp_gross": -1976.8666666666668,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-08-06",
+    "index": "SENSEX",
+    "free": [
+     "S_p285-t1s22_1332",
+     "S_p285-t1s22_1417",
+     "S_p250_1247"
+    ],
+    "exp": [
+     "S_p285-t1s22_1332",
+     "S_p285-t1s22_1417",
+     "S_p250_1247"
+    ],
+    "differs": false,
+    "free_gross": 5668.0,
+    "exp_gross": 5668.0,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-08-11",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1-t1s44_1117",
+     "N_p100_1217",
+     "N_p100_1232"
+    ],
+    "exp": [
+     "N_p100_1217",
+     "N_ditm1-t1s36_1102",
+     "N_p100_1232"
+    ],
+    "differs": true,
+    "free_gross": 1485.8333333333333,
+    "exp_gross": 1797.25,
+    "free_trades": 2.0,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-08-13",
+    "index": "SENSEX",
+    "free": [
+     "S_p320_0947",
+     "S_p285-t1s22_1117",
+     "S_p320_1002"
+    ],
+    "exp": [
+     "S_p320_0947",
+     "S_p285-t1s22_1117",
+     "S_p320_1002"
+    ],
+    "differs": false,
+    "free_gross": 2563.6666666666665,
+    "exp_gross": 2563.6666666666665,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-08-18",
+    "index": "NIFTY",
+    "free": [
+     "N_p80_0932",
+     "N_p80_0917",
+     "N_p80_0947"
+    ],
+    "exp": [
+     "N_p80_0932",
+     "N_p80_0917",
+     "N_p80_0947"
+    ],
+    "differs": false,
+    "free_gross": 131.08333333333334,
+    "exp_gross": 131.08333333333334,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-08-20",
+    "index": "SENSEX",
+    "free": [
+     "S_p250_0932",
+     "S_p250_0947",
+     "S_p320_0947"
+    ],
+    "exp": [
+     "S_p250_0932",
+     "S_p250_0947",
+     "S_p320_0947"
+    ],
+    "differs": false,
+    "free_gross": 1442.3333333333333,
+    "exp_gross": 1442.3333333333333,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-08-25",
+    "index": "NIFTY",
+    "free": [
+     "N_wide-t1s4_0932",
+     "N_p80_0932",
+     "N_wide_0932"
+    ],
+    "exp": [
+     "N_wide-t1s4_0932",
+     "N_p80_0932",
+     "N_wide_0932"
+    ],
+    "differs": false,
+    "free_gross": -601.25,
+    "exp_gross": -601.25,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-08-27",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1-t1s44_1117",
+     "S_p250_1217",
+     "S_p250_1247"
+    ],
+    "exp": [
+     "S_ditm1-t1s44_1117",
+     "S_p250_1217",
+     "S_p250_1247"
+    ],
+    "differs": false,
+    "free_gross": -1005.6666666666666,
+    "exp_gross": -1005.6666666666666,
+    "free_trades": 3.3333333333333335,
+    "exp_trades": 3.3333333333333335
+   },
+   {
+    "day": "2026-09-01",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1502",
+     "N_p150-t1s11_1217",
+     "N_p150-t1s11_1232"
+    ],
+    "exp": [
+     "N_ditm1_1502",
+     "N_p150-t1s11_1217",
+     "N_p150-t1s11_1232"
+    ],
+    "differs": false,
+    "free_gross": -1836.25,
+    "exp_gross": -1836.25,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-09-03",
+    "index": "SENSEX",
+    "free": [
+     "S_p285-t1s22_1332",
+     "S_ditm1_1132",
+     "S_p285-t1s22_1247"
+    ],
+    "exp": [
+     "S_p285-t1s22_1332",
+     "S_ditm1_1132",
+     "S_p285-t1s22_1247"
+    ],
+    "differs": false,
+    "free_gross": 2113.0,
+    "exp_gross": 2113.0,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-09-08",
+    "index": "NIFTY",
+    "free": [
+     "S_ditm1_1132",
+     "S_p285-t1s22_1132",
+     "S_p285-t1s22_1147"
+    ],
+    "exp": [
+     "N_ditm1-t1s36_1232",
+     "N_wide-t1s4_1147",
+     "N_wide-t1s8_1147"
+    ],
+    "differs": true,
+    "free_gross": 1295.3333333333333,
+    "exp_gross": 629.4166666666666,
+    "free_trades": 2.0,
+    "exp_trades": 3.6666666666666665
+   },
+   {
+    "day": "2026-09-10",
+    "index": "SENSEX",
+    "free": [
+     "S_ditm1_1132",
+     "S_p285-t1s22_1147",
+     "S_p285-t1s22_1047"
+    ],
+    "exp": [
+     "S_ditm1_1132",
+     "S_p285-t1s22_1147",
+     "S_p285-t1s22_1047"
+    ],
+    "differs": false,
+    "free_gross": -3163.6666666666665,
+    "exp_gross": -3163.6666666666665,
+    "free_trades": 4.0,
+    "exp_trades": 4.0
+   },
+   {
+    "day": "2026-09-15",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1032",
+     "N_wide-t1s8_0932",
+     "N_wide-t1s4_1147"
+    ],
+    "exp": [
+     "N_ditm1_1032",
+     "N_wide-t1s8_0932",
+     "N_wide-t1s4_1147"
+    ],
+    "differs": false,
+    "free_gross": 1833.0,
+    "exp_gross": 1833.0,
+    "free_trades": 2.0,
+    "exp_trades": 2.0
+   },
+   {
+    "day": "2026-09-29",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1132",
+     "N_p150-t1s11_0917",
+     "S_p285-t1s22_1017"
+    ],
+    "exp": [
+     "N_ditm1_1132",
+     "N_p150-t1s11_0917",
+     "N_p150-t1s11_1047"
+    ],
+    "differs": true,
+    "free_gross": -388.75,
+    "exp_gross": -183.08333333333334,
+    "free_trades": 2.3333333333333335,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-10-01",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1-t1s36_0947",
+     "N_wide-t1s4_0932",
+     "N_wide-t1s4_1147"
+    ],
+    "exp": [
+     "S_ditm1_1102",
+     "S_p320_1132",
+     "S_p250_1117"
+    ],
+    "differs": true,
+    "free_gross": -1772.3333333333333,
+    "exp_gross": 583.6666666666666,
+    "free_trades": 2.0,
+    "exp_trades": 2.3333333333333335
+   },
+   {
+    "day": "2026-10-06",
+    "index": "NIFTY",
+    "free": [
+     "N_ditm1_1202",
+     "N_p80_1117",
+     "N_wide_1117"
+    ],
+    "exp": [
+     "N_ditm1_1202",
+     "N_p80_1117",
+     "N_wide_1117"
+    ],
+    "differs": false,
+    "free_gross": 1679.1666666666667,
+    "exp_gross": 1679.1666666666667,
+    "free_trades": 2.6666666666666665,
+    "exp_trades": 2.6666666666666665
+   },
+   {
+    "day": "2026-10-08",
+    "index": "SENSEX",
+    "free": [
+     "N_ditm1-t1s36_0947",
+     "S_p320_1302",
+     "S_p285-t1s22_1147"
+    ],
+    "exp": [
+     "S_ditm1_1032",
+     "S_p320_1302",
+     "S_p285-t1s22_1147"
+    ],
+    "differs": true,
+    "free_gross": 3063.6666666666665,
+    "exp_gross": 2468.3333333333335,
+    "free_trades": 2.0,
+    "exp_trades": 2.3333333333333335
+   }
+  ]
+ },
+ "net_of_charges": "not computed: needs the BL-096 per-trade model; mean trades per differing day reported instead"
+}
