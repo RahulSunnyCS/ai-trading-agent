@@ -132,3 +132,5 @@ Filled in and committed before any selection or replay. Drafted defaults, to con
   positive on its own; (3) NIFTY Buy only if its premium strikes are priced on ≥ 90 % of vendor days;
   (4) gross and net must both pass; (5) R3's neighbours: SL, MTM and re-entry only. The selection rules
   are tested first on the current two years (BL-115 Experiment 10); the 4-year run is for a later night.
+- 2026-10-17 — BL-115 Experiment 10: R2 +85 (3 / 4), R3 +112 (2 / 4), R1 +70 (2 / 4); none passes and none
+  steadies the picks. All three stay arms here; the 4-year run is what can separate them.

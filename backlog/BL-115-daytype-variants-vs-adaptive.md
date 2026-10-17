@@ -383,6 +383,22 @@ were simulated on its pick day for the net comparison.
 - **Known weaknesses:** the four quarters were read for R1; R2 / R3 picks may need RE ASAP or RE COST ×2,
   whose AlgoTest parity is unverified (BL-009); four quarters is low power.
 - `research/bl107/walkforward.py --rule R2|R3 --stage all` → `results/walkforward_r2/`, `_r3/`.
+- **Result (2026-10-17): no rule passes.** Gross per lot-day minus Core-298 by quarter (Oct–Dec 2025,
+  Jan–Mar, Apr–Jun, Jul–Oct 2026), pooled 90 % interval, quarters won, max DD (Core −₹10,688), pick
+  stability (mean share kept fold to fold), settings per fold:
+
+  | Rule | Q1 | Q2 | Q3 | Q4 | Pooled | Won | Max DD | Stability | Settings |
+  |---|---|---|---|---|---|---|---|---|---|
+  | R1 (Experiment 3) | +345 | +255 | −214 | −75 | +70 [−81, +215] | 2 / 4 | −13,973 | 36 % | 8–11 |
+  | R2 whole window | +195 | +166 | +9 | −15 | +85 [−85, +255] | 3 / 4 | −13,897 | 16 % | 16–18 |
+  | R3 plateau | +322 | +226 | −40 | −34 | +112 [−69, +291] | 2 / 4 | −13,062 | 13 % | 15–18 |
+  | Frozen T1 (for reference) | +341 | +241 | +343 | −10 | +223 | 3 / 4 | −7,767 | — | 9 sets |
+
+  R2 wins three quarters but its interval includes zero (it would need 95 %); R3 has the largest pooled
+  gain but wins two. Neither steadies the picks: without R1's confirm half 15–18 settings clear the bar
+  each fold and only 7–21 % carry over. **Common pattern:** every re-selected version earns in Oct 2025 –
+  Mar 2026 and roughly nothing from Apr 2026; only the frozen sets also won Apr–Jun. The day-type gain
+  over Core looks concentrated in one stretch of the test year rather than a method that keeps working.
 
 ## Log
 
