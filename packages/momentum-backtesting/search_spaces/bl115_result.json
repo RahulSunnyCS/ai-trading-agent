@@ -1,0 +1,433 @@
+{
+ "criteria": "search_spaces/bl115_criteria.json",
+ "strategies": {
+  "four_sectors_monthly_no_tilt": {
+   "trades": 508,
+   "winners": 259,
+   "loser_share": 0.49015748031496065,
+   "decision_weeks": 239,
+   "open_at_end_excluded": 21,
+   "features": {
+    "F0_avg_weekly_score": {
+     "expected_sign": "+",
+     "n": 508,
+     "missing": 0,
+     "rho": 0.1537366768250236,
+     "t": 3.913429939713484,
+     "a_holds": true,
+     "worst_fifth_loser_share": 0.5980392156862745,
+     "overall_loser_share": 0.49015748031496065,
+     "gap": 0.10788173537131385,
+     "worst_fifth_n": 102,
+     "b_holds": true,
+     "winners_median": 8.969899396146785,
+     "losers_median": 8.086349712480613
+    },
+    "F1_steadiness": {
+     "expected_sign": "+",
+     "n": 508,
+     "missing": 0,
+     "rho": 0.11362607291083604,
+     "t": 2.686076229974181,
+     "a_holds": false,
+     "worst_fifth_loser_share": 0.5222929936305732,
+     "overall_loser_share": 0.49015748031496065,
+     "gap": 0.032135513315612596,
+     "worst_fifth_n": 157,
+     "b_holds": false,
+     "winners_median": 0.6538461538461539,
+     "losers_median": 0.6153846153846154
+    },
+    "F2_smoothness": {
+     "expected_sign": "+",
+     "n": 508,
+     "missing": 0,
+     "rho": 0.07805701127842708,
+     "t": 1.9002548170081528,
+     "a_holds": false,
+     "worst_fifth_loser_share": 0.49019607843137253,
+     "overall_loser_share": 0.49015748031496065,
+     "gap": 3.8598116411880934e-05,
+     "worst_fifth_n": 102,
+     "b_holds": false,
+     "winners_median": -0.09819560669456051,
+     "losers_median": -0.10620792819745695
+    },
+    "F3_distance_below_52w_high": {
+     "expected_sign": "+",
+     "n": 508,
+     "missing": 0,
+     "rho": 0.07411995797790884,
+     "t": 1.739810065874805,
+     "a_holds": false,
+     "worst_fifth_loser_share": 0.5588235294117647,
+     "overall_loser_share": 0.49015748031496065,
+     "gap": 0.06866604909680407,
+     "worst_fifth_n": 102,
+     "b_holds": false,
+     "winners_median": -0.0054121095952193166,
+     "losers_median": -0.008141614753592874
+    },
+    "F4_turnover_expansion": {
+     "expected_sign": "+",
+     "n": 458,
+     "missing": 50,
+     "rho": 0.14252572881846878,
+     "t": 2.85277987889667,
+     "a_holds": false,
+     "worst_fifth_loser_share": 0.5108695652173914,
+     "overall_loser_share": 0.47161572052401746,
+     "gap": 0.039253844693373896,
+     "worst_fifth_n": 92,
+     "b_holds": false,
+     "winners_median": 1.3503340677589684,
+     "losers_median": 1.149394726336514
+    },
+    "F5_circuit_days": {
+     "expected_sign": "-",
+     "n": 508,
+     "missing": 0,
+     "rho": 0.08502581015217904,
+     "t": 1.9592135511442865,
+     "a_holds": false,
+     "worst_fifth_loser_share": 0.46153846153846156,
+     "overall_loser_share": 0.49015748031496065,
+     "gap": -0.028619018776499083,
+     "worst_fifth_n": 117,
+     "b_holds": false,
+     "winners_median": 2.0,
+     "losers_median": 2.0
+    },
+    "F6_spike_dependence": {
+     "expected_sign": "-",
+     "n": 441,
+     "missing": 67,
+     "rho": -0.05932763497790636,
+     "t": -1.3634077414241306,
+     "a_holds": false,
+     "worst_fifth_loser_share": 0.5168539325842697,
+     "overall_loser_share": 0.47165532879818595,
+     "gap": 0.04519860378608376,
+     "worst_fifth_n": 89,
+     "b_holds": false,
+     "winners_median": 0.2656295549422323,
+     "losers_median": 0.28222323840191155
+    }
+   },
+   "report_only": {
+    "same_week_rho": {
+     "F0_avg_weekly_score": 0.17657608497944635,
+     "F1_steadiness": 0.010825785039863855,
+     "F2_smoothness": -0.0029393625991966993,
+     "F3_distance_below_52w_high": 0.053533256582756795,
+     "F4_turnover_expansion": 0.18901166725080068,
+     "F5_circuit_days": 0.16031179637127171,
+     "F6_spike_dependence": -0.07569733580851701
+    },
+    "same_week_n": {
+     "F0_avg_weekly_score": 441,
+     "F1_steadiness": 441,
+     "F2_smoothness": 441,
+     "F3_distance_below_52w_high": 441,
+     "F4_turnover_expansion": 379,
+     "F5_circuit_days": 441,
+     "F6_spike_dependence": 369
+    },
+    "rho_13w_excess": {
+     "F0_avg_weekly_score": 0.09141783743591753,
+     "F1_steadiness": 0.1512777609419726,
+     "F2_smoothness": 0.08080999192082407,
+     "F3_distance_below_52w_high": 0.010140621912008973,
+     "F4_turnover_expansion": 0.10780938282677212,
+     "F5_circuit_days": 0.06402911616339341,
+     "F6_spike_dependence": -0.05646587930450229,
+     "F0_per_vol": 0.11047524007059092,
+     "avg_weekly_13w": 0.1366947874911715,
+     "avg_weekly_26w": 0.12905259470046387,
+     "avg_weekly_52w": 0.0451909476661952,
+     "avg_weekly_4w": 0.004118703795845424
+    },
+    "rho_trade_excess": {
+     "F0_avg_weekly_score": 0.1537366768250236,
+     "F1_steadiness": 0.11362607291083604,
+     "F2_smoothness": 0.07805701127842708,
+     "F3_distance_below_52w_high": 0.07411995797790884,
+     "F4_turnover_expansion": 0.14252572881846878,
+     "F5_circuit_days": 0.08502581015217904,
+     "F6_spike_dependence": -0.05932763497790636,
+     "F0_per_vol": 0.16526645617665053,
+     "avg_weekly_13w": 0.15852666264335563,
+     "avg_weekly_26w": 0.16607206425605467,
+     "avg_weekly_52w": 0.06015396167224136,
+     "avg_weekly_4w": 0.11775654122912856
+    },
+    "worst20_share_by_quintile": {
+     "F0_avg_weekly_score": [
+      0.216,
+      0.228,
+      0.167,
+      0.218,
+      0.176
+     ],
+     "F1_steadiness": [
+      0.245,
+      0.238,
+      0.186,
+      0.168,
+      0.167
+     ],
+     "F2_smoothness": [
+      0.275,
+      0.188,
+      0.235,
+      0.168,
+      0.137
+     ],
+     "F3_distance_below_52w_high": [
+      0.265,
+      0.208,
+      0.206,
+      0.208,
+      0.118
+     ],
+     "F4_turnover_expansion": [
+      0.228,
+      0.242,
+      0.207,
+      0.143,
+      0.152
+     ],
+     "F5_circuit_days": [
+      0.245,
+      0.158,
+      0.206,
+      0.238,
+      0.157
+     ],
+     "F6_spike_dependence": [
+      0.225,
+      0.136,
+      0.148,
+      0.227,
+      0.216
+     ]
+    },
+    "entry_rank_rho": -0.11494035124443129
+   }
+  },
+  "trio_fortnightly": {
+   "trades": 384,
+   "winners": 164,
+   "loser_share": 0.5729166666666666,
+   "decision_weeks": 146,
+   "open_at_end_excluded": 16,
+   "features": {
+    "F0_avg_weekly_score": {
+     "expected_sign": "+",
+     "n": 384,
+     "missing": 0,
+     "rho": 0.08073903902885626,
+     "t": 1.6616676780611208,
+     "a_holds": false,
+     "worst_fifth_loser_share": 0.6103896103896104,
+     "overall_loser_share": 0.5729166666666666,
+     "gap": 0.03747294372294374,
+     "worst_fifth_n": 77,
+     "b_holds": false,
+     "winners_median": 6.6328475549618515,
+     "losers_median": 5.891669998432192
+    },
+    "F1_steadiness": {
+     "expected_sign": "+",
+     "n": 384,
+     "missing": 0,
+     "rho": 0.056980917175393865,
+     "t": 1.119092341693359,
+     "a_holds": false,
+     "worst_fifth_loser_share": 0.6385542168674698,
+     "overall_loser_share": 0.5729166666666666,
+     "gap": 0.0656375502008032,
+     "worst_fifth_n": 83,
+     "b_holds": false,
+     "winners_median": 0.6153846153846154,
+     "losers_median": 0.6153846153846154
+    },
+    "F2_smoothness": {
+     "expected_sign": "+",
+     "n": 384,
+     "missing": 0,
+     "rho": 0.01875027782909038,
+     "t": 0.3646771937606524,
+     "a_holds": false,
+     "worst_fifth_loser_share": 0.6233766233766234,
+     "overall_loser_share": 0.5729166666666666,
+     "gap": 0.05045995670995673,
+     "worst_fifth_n": 77,
+     "b_holds": false,
+     "winners_median": -0.11882585547643643,
+     "losers_median": -0.12063363119415105
+    },
+    "F3_distance_below_52w_high": {
+     "expected_sign": "+",
+     "n": 384,
+     "missing": 0,
+     "rho": 0.0949599282525044,
+     "t": 1.8164094808508242,
+     "a_holds": false,
+     "worst_fifth_loser_share": 0.5974025974025974,
+     "overall_loser_share": 0.5729166666666666,
+     "gap": 0.02448593073593075,
+     "worst_fifth_n": 77,
+     "b_holds": false,
+     "winners_median": 0.0,
+     "losers_median": -0.013506878474308814
+    },
+    "F4_turnover_expansion": {
+     "expected_sign": "+",
+     "n": 372,
+     "missing": 12,
+     "rho": -0.011541600415676641,
+     "t": -0.21355824927444553,
+     "a_holds": false,
+     "worst_fifth_loser_share": 0.6,
+     "overall_loser_share": 0.5618279569892473,
+     "gap": 0.03817204301075272,
+     "worst_fifth_n": 75,
+     "b_holds": false,
+     "winners_median": 1.2806781209786224,
+     "losers_median": 1.2918369061514188
+    },
+    "F5_circuit_days": {
+     "expected_sign": "-",
+     "n": 384,
+     "missing": 0,
+     "rho": 0.029807806049277075,
+     "t": 0.5775606196270645,
+     "a_holds": false,
+     "worst_fifth_loser_share": 0.5494505494505495,
+     "overall_loser_share": 0.5729166666666666,
+     "gap": -0.023466117216117133,
+     "worst_fifth_n": 91,
+     "b_holds": false,
+     "winners_median": 2.0,
+     "losers_median": 2.0
+    },
+    "F6_spike_dependence": {
+     "expected_sign": "-",
+     "n": 345,
+     "missing": 39,
+     "rho": -0.05496675282555716,
+     "t": -0.9338526254970048,
+     "a_holds": false,
+     "worst_fifth_loser_share": 0.5652173913043478,
+     "overall_loser_share": 0.5623188405797102,
+     "gap": 0.0028985507246376274,
+     "worst_fifth_n": 69,
+     "b_holds": false,
+     "winners_median": 0.2885182194303303,
+     "losers_median": 0.34112960632455047
+    }
+   },
+   "report_only": {
+    "same_week_rho": {
+     "F0_avg_weekly_score": 0.08118829874726242,
+     "F1_steadiness": 0.03115790536948099,
+     "F2_smoothness": 0.1202719248665751,
+     "F3_distance_below_52w_high": -0.00685459929330938,
+     "F4_turnover_expansion": 0.014052864623700121,
+     "F5_circuit_days": 0.047663834795475514,
+     "F6_spike_dependence": -0.0182079519851917
+    },
+    "same_week_n": {
+     "F0_avg_weekly_score": 339,
+     "F1_steadiness": 339,
+     "F2_smoothness": 339,
+     "F3_distance_below_52w_high": 339,
+     "F4_turnover_expansion": 329,
+     "F5_circuit_days": 339,
+     "F6_spike_dependence": 295
+    },
+    "rho_13w_excess": {
+     "F0_avg_weekly_score": -0.01547414328432356,
+     "F1_steadiness": 0.07387524772622854,
+     "F2_smoothness": 0.020442791610016917,
+     "F3_distance_below_52w_high": 0.0031720327404529715,
+     "F4_turnover_expansion": -0.055493781217213524,
+     "F5_circuit_days": -0.008757616230064404,
+     "F6_spike_dependence": 0.006777584434975927,
+     "F0_per_vol": -0.006953082456794014,
+     "avg_weekly_13w": -0.011505115932475423,
+     "avg_weekly_26w": 0.017517889044930405,
+     "avg_weekly_52w": -0.07481489973536633
+    },
+    "rho_trade_excess": {
+     "F0_avg_weekly_score": 0.08073903902885626,
+     "F1_steadiness": 0.056980917175393865,
+     "F2_smoothness": 0.01875027782909038,
+     "F3_distance_below_52w_high": 0.0949599282525044,
+     "F4_turnover_expansion": -0.011541600415676641,
+     "F5_circuit_days": 0.029807806049277075,
+     "F6_spike_dependence": -0.05496675282555716,
+     "F0_per_vol": 0.09842070462174901,
+     "avg_weekly_13w": 0.08361618798955613,
+     "avg_weekly_26w": 0.04444830626292767,
+     "avg_weekly_52w": 0.07415440303821505
+    },
+    "worst20_share_by_quintile": {
+     "F0_avg_weekly_score": [
+      0.208,
+      0.247,
+      0.132,
+      0.234,
+      0.182
+     ],
+     "F1_steadiness": [
+      0.208,
+      0.221,
+      0.158,
+      0.247,
+      0.169
+     ],
+     "F2_smoothness": [
+      0.195,
+      0.13,
+      0.276,
+      0.195,
+      0.208
+     ],
+     "F3_distance_below_52w_high": [
+      0.208,
+      0.208,
+      0.237,
+      0.182,
+      0.169
+     ],
+     "F4_turnover_expansion": [
+      0.187,
+      0.122,
+      0.135,
+      0.23,
+      0.267
+     ],
+     "F5_circuit_days": [
+      0.247,
+      0.169,
+      0.171,
+      0.182,
+      0.234
+     ],
+     "F6_spike_dependence": [
+      0.29,
+      0.029,
+      0.174,
+      0.319,
+      0.188
+     ]
+    },
+    "entry_rank_rho": -0.09959167818634207
+   }
+  }
+ },
+ "passing_features": [],
+ "verdict": "kill"
+}
