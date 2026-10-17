@@ -1,6 +1,6 @@
 # Broad Momentum: the funnel (pool, categories, picks)
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-10-17
 
 ## What it is
 
@@ -50,6 +50,7 @@ rolling 3-year windows; baseline 31.7% / 1.06 / -20.4%.
 | TODO 3.9.23 | coverage floor 0.25 (the 3.9.18 candidate), 0.60 | as above | Keep 0.40 (fork caveat) | 0.25: 29.0% / 0.97 / -24.1%, rolling 46 / 46 / 43%, median -1.0. 0.60 starves the strategy (20.4%) |
 | TODO 3.9.23 | categories 3 / 6 and 6 / 12 | as above | Keep 4 / 8 (fork caveat) | 3 / 6: median -1.8 (29 / 43 / 82%). 6 / 12: median -4.3, MaxDD -29.8% |
 | TODO 3.9.23 | picks 1 and 3 | as above | 3 wins most (more names, same categories); 1 loses | 1: 25.9% / 0.99 / -18.0%, median -5.4. 3: 34.1% / 1.16 / -20.6%, rolling 93 / 96 / 46%, median +3.0 |
+| [BL-116](../../../../backlog/BL-116-broad-sector-position-and-score.md) | Do picks from the best-placed sector held (position 1) beat Nifty 500 more often than picks from the other fresh positions? Decided on the 9 saved groups other than Trio and Four Sectors | 2017-2022, 5,244 stock picks, pre-tax | **Passed**: +13.4 pts (90% interval +7.3 to +19.6), above zero in 9 of 9 | Position 1: 58% beat, +7.3% mean excess; positions 2-6: 42-46%, +0.4% to +2.7%. Trio does not show it (+2.7). Fresh positions only: under a stock tilt lingering sectors also buy, and those picks were left out. [`bl116_result.json`](../../../../packages/momentum-backtesting/search_spaces/bl116_result.json) |
 | [BL-010](../../../../backlog/BL-010-momentum-evaluation-review.md) F5 / Phase 5 | number of holdings across the round 7 search | Broad, 2017-2026, pre-tax | Prefer 8-12 names | Median CAGR is flat at about 32% from 2 up to 24 holdings; the maximum rises from 51% (12-24 holdings) to 73% (2 or fewer): concentration plus picking the best is a winner's curse. Phase 5: 8-12 holdings match 2-6 on return with far shallower falls |
 
 ### Cold-start caveat
