@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — owner's question ahead of Mon 2026-10-19 (NIFTY expiry moved a day earlier by Dussehra); descriptive |
-| **Status** | In progress |
+| **Status** | Done: no evidence of lower earnings on moved expiry days; too few days to say more |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -87,3 +87,23 @@ None.
 ## Log
 
 - 2026-10-18 — created from the owner's request; events listed before any result was read.
+- 2026-10-18 — **Run** (`research/bl121/moved_expiry.py`; `moved_expiry_2026-10-18.json`). Eleven moved
+  expiry days fall in the Adaptive window (6 NIFTY, 5 SENSEX) against 168 normal expiry days (84 and 84).
+  Moved minus normal, gross ₹ per lot-day, 90 % bootstrap interval:
+  **Adaptive on Core-298 +217 [-1,014, +1,618]; on T1 +457 [-1,057, +2,021]; both inconclusive** under the
+  registered rule. Normal expiry days average Core ₹507 (NIFTY) and ₹818 (SENSEX), T1 ₹897 and ₹945.
+  Four years, NIFTY variants (12 moved vs 234 normal NIFTY expiry days, 2022-01 to 2026-10): Widesl +277
+  [-201, +732], Dir +175 [-173, +543], Buy -167 [-340, +12], all variants +95 [-157, +328]; all
+  inconclusive. So there is **no evidence that moved expiry days earn less**, and the data cannot show
+  that they earn more or the same: the intervals are ±₹1,000 to 1,500 for Adaptive. Per event (Core /
+  T1): NIFTY 2025-04-09 +8,506 / +8,506; 2025-04-30 -18 / -185; 2025-10-20 +1,101 / +2,837; 2026-03-02
+  -1,899 / -3,162; 2026-03-30 -741 / -1,526; 2026-04-13 +2,499 / +5,028; SENSEX 2025-10-01 -881 / +554;
+  2025-12-24 -1,109 / +1,368; 2026-01-14 -35 / +62; 2026-03-25 +2,076 / +2,100; 2026-05-27 +16 / -447.
+  Descriptive caveat (not a result): one day, NIFTY 2025-04-09 (+₹8,506), carries most of the NIFTY
+  moved-day mean; without it the five other NIFTY moved days average about +₹188 against ₹507 on normal
+  expiry days. 2026-10-19 (Dussehra) is read out on the evening of the day.
+  Method notes: the first run of the script read T1's results from the live folder (24 T1 days scored) and
+  missed the P3 research files (checkout path); both were fixed before this result, which is the one
+  recorded. The four-year family means join the P3 research results (days to 2024-10-08) to the live
+  store (from 2024-10-09).
+

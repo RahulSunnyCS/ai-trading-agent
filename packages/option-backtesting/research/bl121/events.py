@@ -84,7 +84,17 @@ def main() -> None:
         }
     (OUT / "events_2026-10-18.json").write_text(json.dumps(report, indent=1) + "\n")
     for index, v in report["indices"].items():
-        print(index, "expiries", v["expiries"], "| moved", len(v["moved"]), "| normal", len(v["normal_expiry_days"]), "| dropped", v["dropped_regime_changes"])
+        print(
+            index,
+            "expiries",
+            v["expiries"],
+            "| moved",
+            len(v["moved"]),
+            "| normal",
+            len(v["normal_expiry_days"]),
+            "| dropped",
+            v["dropped_regime_changes"],
+        )
         print("  moved:", ", ".join(m["expiry"] for m in v["moved"]))
 
 

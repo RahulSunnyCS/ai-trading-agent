@@ -1,0 +1,282 @@
+{
+ "events_file": "events_2026-10-18.json",
+ "excluded_pending": [
+  "2026-10-19"
+ ],
+ "adaptive_days": {
+  "core": 428,
+  "t1": 428
+ },
+ "adaptive_core": {
+  "moved_minus_normal": 216.63648268398282,
+  "ci90": [
+   -1014.073502164502,
+   1617.842600108226
+  ],
+  "moved_days": {
+   "NIFTY": 6,
+   "SENSEX": 5
+  },
+  "normal_days": {
+   "NIFTY": 84,
+   "SENSEX": 84
+  },
+  "reading": "inconclusive"
+ },
+ "adaptive_t1": {
+  "moved_minus_normal": 457.0052922077921,
+  "ci90": [
+   -1056.9018333333333,
+   2021.3945129870133
+  ],
+  "moved_days": {
+   "NIFTY": 6,
+   "SENSEX": 5
+  },
+  "normal_days": {
+   "NIFTY": 84,
+   "SENSEX": 84
+  },
+  "reading": "inconclusive"
+ },
+ "coverage": {
+  "research_variants": 149,
+  "store_variants": 149,
+  "missing_research": [],
+  "family_sizes": {
+   "Widesl": 75,
+   "Dir": 50,
+   "Buy": 24
+  }
+ },
+ "nifty_families_four_year": {
+  "Widesl": {
+   "moved_minus_normal": 276.86631481481476,
+   "ci90": [
+    -201.2478101851851,
+    732.0998055555556
+   ],
+   "moved_days": {
+    "NIFTY": 12,
+    "SENSEX": 0
+   },
+   "normal_days": {
+    "NIFTY": 234,
+    "SENSEX": 95
+   },
+   "reading": "inconclusive"
+  },
+  "Dir": {
+   "moved_minus_normal": 174.9630277777778,
+   "ci90": [
+    -172.8222486111112,
+    542.5287361111112
+   ],
+   "moved_days": {
+    "NIFTY": 12,
+    "SENSEX": 0
+   },
+   "normal_days": {
+    "NIFTY": 234,
+    "SENSEX": 95
+   },
+   "reading": "inconclusive"
+  },
+  "Buy": {
+   "moved_minus_normal": -167.4757523148148,
+   "ci90": [
+    -339.53662905092597,
+    11.796605902777781
+   ],
+   "moved_days": {
+    "NIFTY": 12,
+    "SENSEX": 0
+   },
+   "normal_days": {
+    "NIFTY": 234,
+    "SENSEX": 95
+   },
+   "reading": "inconclusive"
+  },
+  "All NIFTY variants": {
+   "moved_minus_normal": 94.7845300925926,
+   "ci90": [
+    -157.0288434027778,
+    327.5119650462964
+   ],
+   "moved_days": {
+    "NIFTY": 12,
+    "SENSEX": 0
+   },
+   "normal_days": {
+    "NIFTY": 234,
+    "SENSEX": 95
+   },
+   "reading": "inconclusive"
+  }
+ },
+ "mean_on_normal_expiry_days": {
+  "NIFTY": {
+   "core": 507.2186904761905,
+   "t1": 896.9525000000001,
+   "n": 84
+  },
+  "SENSEX": {
+   "core": 817.9113095238093,
+   "t1": 945.3453571428571,
+   "n": 85
+  }
+ },
+ "events": [
+  {
+   "index": "NIFTY",
+   "day": "2022-04-13",
+   "core_adaptive": null,
+   "t1_adaptive": null,
+   "nifty_widesl": 459.03,
+   "nifty_dir": 1097.85,
+   "nifty_buy": 204.20833333333334
+  },
+  {
+   "index": "NIFTY",
+   "day": "2023-01-25",
+   "core_adaptive": null,
+   "t1_adaptive": null,
+   "nifty_widesl": 416.4766666666667,
+   "nifty_dir": 910.39,
+   "nifty_buy": 216.9375
+  },
+  {
+   "index": "NIFTY",
+   "day": "2023-03-29",
+   "core_adaptive": null,
+   "t1_adaptive": null,
+   "nifty_widesl": 116.56666666666666,
+   "nifty_dir": -33.865,
+   "nifty_buy": 622.1041666666666
+  },
+  {
+   "index": "NIFTY",
+   "day": "2023-06-28",
+   "core_adaptive": null,
+   "t1_adaptive": null,
+   "nifty_widesl": 434.5466666666667,
+   "nifty_dir": 616.915,
+   "nifty_buy": -264.0625
+  },
+  {
+   "index": "NIFTY",
+   "day": "2024-04-10",
+   "core_adaptive": null,
+   "t1_adaptive": null,
+   "nifty_widesl": 1207.7,
+   "nifty_dir": 1022.905,
+   "nifty_buy": -223.30208333333334
+  },
+  {
+   "index": "NIFTY",
+   "day": "2024-08-14",
+   "core_adaptive": null,
+   "t1_adaptive": null,
+   "nifty_widesl": 1572.0033333333333,
+   "nifty_dir": 823.42,
+   "nifty_buy": -694.8229166666666
+  },
+  {
+   "index": "NIFTY",
+   "day": "2025-04-09",
+   "core_adaptive": 8506.12,
+   "t1_adaptive": 8506.12,
+   "nifty_widesl": 2066.6793333333335,
+   "nifty_dir": 1520.805,
+   "nifty_buy": -157.76041666666666
+  },
+  {
+   "index": "NIFTY",
+   "day": "2025-04-30",
+   "core_adaptive": -18.2,
+   "t1_adaptive": -185.03,
+   "nifty_widesl": 583.6046666666666,
+   "nifty_dir": -343.49899999999997,
+   "nifty_buy": -13.59583333333336
+  },
+  {
+   "index": "NIFTY",
+   "day": "2025-10-20",
+   "core_adaptive": 1100.75,
+   "t1_adaptive": 2836.75,
+   "nifty_widesl": 1668.03,
+   "nifty_dir": 353.99,
+   "nifty_buy": -140.29166666666666
+  },
+  {
+   "index": "NIFTY",
+   "day": "2026-03-02",
+   "core_adaptive": -1899.08,
+   "t1_adaptive": -3162.25,
+   "nifty_widesl": -1632.7133333333334,
+   "nifty_dir": -490.555,
+   "nifty_buy": -588.7916666666666
+  },
+  {
+   "index": "NIFTY",
+   "day": "2026-03-30",
+   "core_adaptive": -741.0,
+   "t1_adaptive": -1526.42,
+   "nifty_widesl": -378.86333333333334,
+   "nifty_dir": 498.81,
+   "nifty_buy": -179.15625
+  },
+  {
+   "index": "NIFTY",
+   "day": "2026-04-13",
+   "core_adaptive": 2499.25,
+   "t1_adaptive": 5027.75,
+   "nifty_widesl": 950.6466666666666,
+   "nifty_dir": 2289.885,
+   "nifty_buy": -254.98958333333334
+  },
+  {
+   "index": "SENSEX",
+   "day": "2024-10-31",
+   "core_adaptive": null,
+   "t1_adaptive": null
+  },
+  {
+   "index": "SENSEX",
+   "day": "2024-11-14",
+   "core_adaptive": null,
+   "t1_adaptive": null
+  },
+  {
+   "index": "SENSEX",
+   "day": "2025-10-01",
+   "core_adaptive": -881.0,
+   "t1_adaptive": 554.42
+  },
+  {
+   "index": "SENSEX",
+   "day": "2025-12-24",
+   "core_adaptive": -1108.8,
+   "t1_adaptive": 1368.33
+  },
+  {
+   "index": "SENSEX",
+   "day": "2026-01-14",
+   "core_adaptive": -34.75,
+   "t1_adaptive": 62.5
+  },
+  {
+   "index": "SENSEX",
+   "day": "2026-03-25",
+   "core_adaptive": 2076.33,
+   "t1_adaptive": 2100.33
+  },
+  {
+   "index": "SENSEX",
+   "day": "2026-05-27",
+   "core_adaptive": 16.25,
+   "t1_adaptive": -447.0
+  }
+ ]
+}
