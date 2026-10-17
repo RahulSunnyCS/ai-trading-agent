@@ -173,6 +173,37 @@ exploratory, in-sample, and cannot decide anything by itself.
   or inconclusive outcome is recorded and EXP is not pursued.
 - **Will not run:** restrictions on non-expiry days, other index rules, other lists.
 
+### Phase 0 — Amendment 2 (2026-10-18, before any run): H3b, at most one non-expiring pick
+
+Owner request (chat, 2026-10-18): "there are three lots, so maybe we can also do a POC: what if the
+maximum permitted non-expiry strategy will be only one?"
+
+`override: owner request 2026-10-18 (chat: "what if the maximum permitted non-expiry strategy will be
+only one?")` for a fourth question (same status as Amendment 1: exploratory, in-sample, nothing adopted
+from it).
+
+- **H3b (two-sided):** on a day an index expires, a basket with **at most one** non-expiring core pick
+  earns a different amount than the unrestricted basket (and than the expiring-only basket of H3).
+- **Arm EXP1 is a capped filter of the same ranking:** the unrestricted list-C composite over the full
+  universe, then the selection takes the top non-Buy variants by composite in order, accepting an
+  expiring-index variant always and a non-expiring variant only while fewer than one is already in the
+  basket, until 3 core picks are in; the Widesl minimum is applied as `score.select` does (the lowest
+  scoring Dir is swapped for the next best Widesl that respects the cap). No Buy add-on, one lot each, the
+  same population, window, days and read-out as H3 (Amendment 1).
+- **Comparators, all on the same expiry days:** the unrestricted basket (FREE), the expiring-only basket
+  (EXP0, H3's arm), and EXP1.
+- **Primary:** EXP1 minus FREE on the days where the two baskets differ (days where FREE holds two or
+  more non-expiring picks), both indices together, Core-298; 90 % circular block bootstrap (5-day blocks
+  over the ordered differing days, 2,000 resamples, seed 20261015); positive / negative / inconclusive as
+  in H3. **Secondary (descriptive):** EXP1 minus EXP0 on the days they differ (days where EXP1 keeps one
+  non-expiring pick that EXP0 replaces); each arm's mean gross per lot-day over **all** expiry days; the
+  number of days by how many non-expiring picks FREE holds (0, 1, 2, 3); NIFTY- and SENSEX-expiry days
+  separately; T1 repeated. Net of charges is not computed (as in H3); mean trades per differing day are
+  reported.
+- **What follows:** nothing is adopted. If EXP1 is positive against FREE and not worse than EXP0, a
+  proposal for it can be made as a new backlog item, as for H3.
+- **Will not run:** caps other than one, caps on non-expiry days, other lists.
+
 ### Phase 1 — Build the research root and rerun the baseline
 - **Tasks:** `research/bl111/` loader for the P3 per-variant results and the in-sample store; the
   weekday-basis P3 day file; a check that the equal-split baseline reproduces BL-100's / BL-071's
@@ -254,4 +285,6 @@ should say if the 3-lot ordinary-day basket is not "top 3 non-Buy × 1 lot".
   days, so nothing is adopted from it. Under the registered next step a positive outcome may earn a
   proposal for a forward track for EXP as a new backlog item (read out on differing days); that proposal
   is the owner's decision.
+- 2026-10-18 — Amendment 2 registered before any run: H3b, at most one non-expiring core pick (EXP1),
+  with the owner's `override:` line quoted above. Same exploratory, in-sample status as H3.
 
