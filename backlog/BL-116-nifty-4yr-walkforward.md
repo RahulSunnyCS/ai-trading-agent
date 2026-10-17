@@ -56,6 +56,24 @@ Filled in and committed before any selection or replay. Drafted defaults, to con
 - **Folds:** trade each calendar quarter from 2023-04 to 2026-10-09; select on the window before it
   (scheme from BL-115 Experiment 8: growing window if it passed or beat the fixed one, otherwise both
   schemes, each judged); never reads its quarter.
+- **Selection rules (owner, 2026-10-17)**, each run in every fold on the same window:
+  - **R1, the T1 method (primary):** rank on the window's first half, keep rank 1 → 3 only if it also
+    beats the template in the second half (BL-104 `daytype_lists`, Amendments 1–11).
+  - **R2, whole window:** rank on all 12 months (no confirm half); a setting must beat the template by
+    the same margin over the whole window. Twice the days per estimate (about ±₹78 per lot-day instead of
+    ±₹110), no fluke guard: tells whether the confirm half helps or only discards data.
+  - **R3, plateau:** over the whole window, a cell qualifies only if it beats the template **and** the
+    median gain of its ±1-step neighbours on the numeric axes (SL, MTM, trail, premium) also beats it;
+    the pick is the qualifying cell with the best robust score = min(own gain, neighbours' median)
+    (BL-104's plateau rule), i.e. the middle of a winning area rather than its luckiest cell. Expected to
+    give steadier picks quarter to quarter (BL-115 Experiments 3 and 8: only 2–3 of 7–14 settings
+    survived from one fold to the next).
+- **Windows:** fixed 12 months before the quarter (owner's scheme, primary) and growing from the first
+  usable day (BL-115 Experiment 8: no pass, so both run).
+- **Multiplicity:** six arms (2 windows × 3 rules). The primary arm (R1, fixed window) is judged at the
+  90 % interval; every other arm needs its pooled **95 %** interval above zero as well as the rest of the
+  rule. Reported for every arm: quarters won, pooled gain, drawdown, and **pick stability** (share of a
+  fold's settings kept in the next fold).
 - **Look-ahead check:** selection uses only days before the quarter; Adaptive ranks on results before each
   day; lot sizing `current`; expiry days from the observed expiry list of the time (Thursday weeklies
   before 2025).
@@ -99,9 +117,12 @@ Filled in and committed before any selection or replay. Drafted defaults, to con
 2. Pre-2024 quarters as equal evidence, or advisory (as BL-104 treated them)?
 3. Include NIFTY Buy if Phase 1 shows its premium strikes are mostly priced?
 4. Gross or net as the deciding unit (draft: both must pass)?
+5. R3's neighbour axes: SL and MTM only, or every numeric axis (draft: every one the family has)?
 
 ## Log
 
 - 2026-10-17 — created at the owner's request after BL-115 Experiment 3 failed; P1 (owner).
 - 2026-10-17 — BL-115 Experiment 8 (growing window): no pass, pooled +66 vs the fixed window's +70, so
   per the Phase 0 draft both schemes are run and judged.
+- 2026-10-17 — owner: add R2 (whole-window ranking) and R3 (plateau selection) beside the T1 method;
+  six arms, the non-primary ones at the 95 % interval.
