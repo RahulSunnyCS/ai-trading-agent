@@ -350,6 +350,16 @@ were simulated on its pick day for the net comparison.
   sum improve by ≥ 30 %, net falls by ≤ 15 %, return on margin rises. Otherwise no hedge. Reported
   beside it: the hedges' own P&L, and on the days a pick's stop or MTM stop fired.
 - `research/bl107/hedges_hold.py` → `results/hedges_hold/`.
+- **Result (2026-10-17): no pass — no hedge.** 30 variants (the ₹15 / ₹45 and ₹30 / ₹90 refine rows
+  added). Chosen on the first year: NIFTY ₹30 / SENSEX ₹90 on Widesl, expiry days only (first-year net
+  ₹2,01,468 = 93 % of unhedged, return on margin 0.34 vs 0.31). Test year vs no hedge: net ₹2,54,293 vs
+  ₹3,65,415 (−30 %), return on margin 0.43 vs 0.52, worst day −₹17,519 vs −₹14,173, worst 5 days
+  −₹77,948 vs −₹58,294. Across all 30, test year: the hedges lose money in every variant (−₹18k to
+  −₹1.76 lakh); the worst day never improves by more than ₹600 and the worst 5 days always get worse;
+  margin falls to ₹3.2–6.7 lakh. On the days a pick's stop fired the Widesl hedges did earn (up to
+  +₹1.57 lakh, ₹30 / ₹90 on all days) but lost more on the other days; the Dir hedges lost even on stop
+  days (Dir's 15–40 % stops fire on moves too small to lift a far hedge). Holding the hedge to the close
+  differs little from Experiment 7's wings (₹5 / ₹15 on Widesl, all days: ₹2,96,302 vs ₹2,94,713).
 
 ## Log
 
