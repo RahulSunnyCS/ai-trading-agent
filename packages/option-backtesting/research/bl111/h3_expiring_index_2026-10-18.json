@@ -6,6 +6,7 @@
  "arms": "EXP = filter of the unrestricted list-C ranking to the expiring index (core picks, one lot each)",
  "core_298": {
   "days_with_both_indices_expiring": 0,
+  "expiry_days_skipped_for_missing_results": 0,
   "all": {
    "expiry_days": 179,
    "differing_days": 53,
@@ -3460,6 +3461,7 @@
  },
  "t1": {
   "days_with_both_indices_expiring": 0,
+  "expiry_days_skipped_for_missing_results": 0,
   "all": {
    "expiry_days": 179,
    "differing_days": 48,

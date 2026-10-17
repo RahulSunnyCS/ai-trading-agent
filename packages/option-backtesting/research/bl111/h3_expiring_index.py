@@ -37,10 +37,14 @@ def read_gross(name: str, root: Path) -> dict[date, tuple[float, int | None]]:
     with path.open(newline="") as f:
         for r in csv.DictReader(f):
             try:
-                n = int(float(r["n_trades"])) if r.get("n_trades") not in (None, "") else None
-                out[date.fromisoformat(r["day"])] = (float(r["gross"]), n)
+                day, gross = date.fromisoformat(r["day"]), float(r["gross"])
             except (KeyError, ValueError):
                 continue
+            try:  # a bad trade count must not drop the day's gross
+                n = int(float(r["n_trades"])) if r.get("n_trades") not in (None, "") else None
+            except ValueError:
+                n = None
+            out[day] = (gross, n)
     return out
 
 
@@ -56,6 +60,7 @@ def run(root: Path, names: list[str]) -> dict:
 
     rows = []
     both_expire = 0
+    skipped = 0  # expiry days dropped for a missing result (a day is never read as zero)
     for d in rec.days_available():
         if not (WINDOW[0] <= d <= WINDOW[1]):
             continue
@@ -92,11 +97,13 @@ def run(root: Path, names: list[str]) -> dict:
                 if any(g is None for g in got):
                     vals = {}
                     break
+                trades = [g[1] for g in got if g[1] is not None]
                 vals[label] = (
                     float(np.mean([g[0] for g in got])),
-                    float(np.mean([g[1] for g in got if g[1] is not None])),
+                    float(np.mean(trades)) if trades else None,
                 )
             if not vals:
+                skipped += 1
                 continue
             rows.append(
                 {
@@ -141,6 +148,7 @@ def run(root: Path, names: list[str]) -> dict:
 
     return {
         "days_with_both_indices_expiring": both_expire,
+        "expiry_days_skipped_for_missing_results": skipped,
         "all": summary(rows),
         "NIFTY_expiry_days": summary([r for r in rows if r["index"] == "NIFTY"]),
         "SENSEX_expiry_days": summary([r for r in rows if r["index"] == "SENSEX"]),
