@@ -314,20 +314,32 @@ should say if the 3-lot ordinary-day basket is not "top 3 non-Buy × 1 lot".
   3** (T1: 131, 33, 10, 5). **Mean gross per lot-day over all 179 expiry days, Core: FREE +677, EXP1 +711,
   EXP0 +804** (T1: +958, +992, +1,096): fewer non-expiring picks, higher result, in-sample.
   Paired, on the days where the two baskets differ, 90 % circular block bootstrap (5-day blocks over the
-  ordered days, 2,000, seed 20261015); "w/o top 3" drops the three largest days (descriptive):
+  ordered days, 2,000, seed 20261015; an interval needs at least two blocks, i.e. 10 differing days, else
+  "too few days"). "w/o 3" drops the three days most favourable to the observed sign (descriptive; date
+  order kept). Corrected after review: the first write-up dropped the largest days whatever the sign, which
+  flattered the negative EXP1 minus EXP0 claim.
 
   | Comparison (together) | Core-298 | T1 |
   |---|---|---|
-  | **EXP1 minus FREE (primary)** | 20 days: **+302 [+44, +552], positive**; w/o top 3 +151 [-64, +356] | 15 days: +411 [+4, +794], positive; w/o top 3 -125 [-524, +321] |
-  | EXP1 minus EXP0 (secondary) | 53 days: **-313 [-544, -79], negative**; w/o top 3 -444 [-667, -205] | 48 days: -385 [-564, -201], negative; w/o top 3 -499 [-648, -355] |
-  | EXP0 minus FREE (H3, for reference) | 53 days: +427 [+112, +733]; w/o top 3 +295 [-18, +618] | 48 days: +513 [+259, +781]; w/o top 3 +303 [+144, +488] |
+  | **EXP1 minus FREE (primary)** | 20 days: **+302 [+44, +552], positive**; median +340, better on 65 %, top 3 days = 57 % of the sum; w/o 3: +151 [-64, +356] | 15 days: +411 [+4, +794], positive; median -267, better on 47 %, top 3 days = 124 % of the sum; w/o 3: -125 [-524, +321] |
+  | EXP1 minus EXP0 (secondary) | 53 days: **-313 [-544, -79], negative**; w/o 3: **-196 [-414, +24], inconclusive** | 48 days: -385 [-564, -201], negative; w/o 3: -262 [-437, -102], negative |
+  | EXP0 minus FREE (H3, for reference) | 53 days: +427 [+112, +733]; w/o 3: +295 [-18, +618] | 48 days: +513 [+259, +781]; w/o 3: +303 [+144, +488] |
 
-  Splits: Core NIFTY-expiry days EXP1 minus FREE has only 5 differing days (+491); SENSEX-expiry days 15
-  days, +239 [-34, +503], inconclusive. **Reading under the registered rule: EXP1 beats FREE (positive,
-  fragile: it falls to +151 [-64, +356] without three days, and only 20 days differ), and EXP1 does worse
-  than EXP0 (negative, robust to dropping three days).** In plain terms, in this window allowing one
-  non-expiring pick recovers only about a quarter of the full filter's gain (+34 against +127 per lot-day
-  over all expiry days on Core). Exploratory, in-sample, net of charges not computed; nothing adopted.
+  Splits: Core NIFTY-expiry days EXP1 minus FREE has only 5 differing days (+491, too few days); SENSEX-expiry
+  days 15 days, +239 [-34, +503], inconclusive. T1 splits have 6 and 9 differing days (too few days).
+  Mean trades per strategy-day on the differing days (registered output): Core EXP1 2.28 vs FREE 2.27 and
+  vs EXP0 2.29 / 2.34; T1 EXP1 2.62 vs FREE 2.49, EXP1 2.61 vs EXP0 2.87. EXP1 minus EXP0 is not independent
+  of H3: by how many non-expiring picks FREE holds (Core, 1 / 2 / 3 picks): -162 (33 days), -481 (17),
+  -1,024 (3); T1: -277 (33), -837 (10), -192 (5): the more non-expiring picks the full filter removes, the
+  more it gains over the capped basket.
+  **Reading** (no "not worse than EXP0" rule was registered; applied here: worse = the EXP1 minus EXP0
+  interval lies entirely below zero): on **Core only**, EXP1 beats FREE (positive, fragile: +151 [-64, +356]
+  without three days, 20 days differ, top 3 = 57 % of the sum). **T1's primary rests on three days** (median
+  negative, better on 47 %, falls to -125 without them): read it as not supported. EXP1 does worse than EXP0
+  on the full sample in both tracks, but on Core that is **inconclusive** once the three most favourable
+  days are dropped. In plain terms, in this window allowing one non-expiring pick recovers about a quarter of
+  the full filter's gain (+34 against +127 per lot-day over all expiry days on Core). Exploratory, in-sample,
+  net of charges not computed; nothing adopted.
   A bug in the first draft of the "w/o top 3" check (sorting scrambled the date order the block bootstrap
   needs) was fixed before this entry; the main intervals were not affected.
 

@@ -72,20 +72,25 @@ def select_capped(comp: np.ndarray, names: list[str], index: str, max_off: int) 
 
 def interval(diff: np.ndarray) -> dict:
     out = {"days": int(diff.size), "sum_per_lot": float(diff.sum()) if diff.size else 0.0}
-    if diff.size >= 5:
+    if diff.size:
+        out["median"] = float(np.median(diff))
+        out["share_better"] = float((diff > 0).mean())
+    if diff.size >= 2 * BLOCK:  # fewer days than two blocks cannot be bootstrapped
         mean, lo, hi = block_bootstrap_mean(diff, RESAMPLES, BLOCK, SEED, LEVEL)
         out.update(
             mean=mean,
             ci90=[lo, hi],
             reading="positive" if lo > 0 else "negative" if hi < 0 else "inconclusive",
-            share_better=float((diff > 0).mean()),
         )
-        if diff.size >= 8:  # descriptive: drop the three days that carry the most
-            keep = np.delete(diff, np.argsort(diff)[-3:])  # drop the 3 largest, keep date order
-            m3, l3, h3 = block_bootstrap_mean(keep, RESAMPLES, BLOCK, SEED, LEVEL)
-            out["without_top_3_days"] = {"mean": m3, "ci90": [l3, h3]}
+        # descriptive: drop the three days MOST FAVOURABLE to the observed sign, keeping date order
+        order = np.argsort(diff)
+        drop = order[-3:] if mean > 0 else order[:3]
+        total = float(diff.sum())
+        out["top_3_days_share_of_sum"] = float(diff[drop].sum() / total) if total else None
+        m3, l3, h3 = block_bootstrap_mean(np.delete(diff, drop), RESAMPLES, BLOCK, SEED, LEVEL)
+        out["without_3_most_favourable_days"] = {"mean": m3, "ci90": [l3, h3]}
     elif diff.size:
-        out.update(mean=float(diff.mean()), reading="too few days")
+        out.update(mean=float(diff.mean()), reading="too few days (fewer than 2 blocks)")
     return out
 
 
@@ -140,12 +145,37 @@ def run(root: Path, names: list[str]) -> dict:
             for k, b in baskets.items():
                 row[k] = b
                 row[f"{k}_gross"] = float(np.mean([g[0] for g in got[k]]))
+                trades = [g[1] for g in got[k] if g[1] is not None]
+                row[f"{k}_trades"] = float(np.mean(trades)) if trades else None
             rows.append(row)
 
     def diffs(subset, a, b):
         return np.array(
             [r[f"{a}_gross"] - r[f"{b}_gross"] for r in subset if set(r[a]) != set(r[b])]
         )
+
+    def trades(subset, a, b):
+        """Mean trades per strategy-day of each arm on the days the two baskets differ."""
+        sel = [r for r in subset if set(r[a]) != set(r[b])]
+
+        def mean(k):
+            vals = [r[f"{k}_trades"] for r in sel if r[f"{k}_trades"] is not None]
+            return float(np.mean(vals)) if vals else None
+
+        return {a: mean(a), b: mean(b)}
+
+    def by_count(subset):
+        """EXP1 minus EXP0 on the days they differ, by how many non-expiring picks FREE holds."""
+        out = {}
+        for n in sorted({r["off_in_free"] for r in subset}):
+            d = [
+                r["exp1_gross"] - r["exp0_gross"]
+                for r in subset
+                if r["off_in_free"] == n and set(r["exp1"]) != set(r["exp0"])
+            ]
+            if d:
+                out[str(n)] = {"days": len(d), "mean": float(np.mean(d))}
+        return out
 
     def block(subset):
         return {
@@ -157,9 +187,13 @@ def run(root: Path, names: list[str]) -> dict:
             "free_basket_non_expiring_picks": dict(
                 sorted(Counter(r["off_in_free"] for r in subset).items())
             ),
-            "exp1_minus_free": interval(diffs(subset, "exp1", "free")),
-            "exp1_minus_exp0": interval(diffs(subset, "exp1", "exp0")),
-            "exp0_minus_free": interval(diffs(subset, "exp0", "free")),
+            "exp1_minus_free": interval(diffs(subset, "exp1", "free"))
+            | {"mean_trades_per_strategy_day": trades(subset, "exp1", "free")},
+            "exp1_minus_exp0": interval(diffs(subset, "exp1", "exp0"))
+            | {"mean_trades_per_strategy_day": trades(subset, "exp1", "exp0")},
+            "exp1_minus_exp0_by_free_non_expiring_picks": by_count(subset),
+            "exp0_minus_free": interval(diffs(subset, "exp0", "free"))
+            | {"mean_trades_per_strategy_day": trades(subset, "exp0", "free")},
         }
 
     return {
@@ -194,9 +228,9 @@ def main() -> None:
             for name in ("exp1_minus_free", "exp1_minus_exp0", "exp0_minus_free"):
                 x = b[name]
                 ci = f" CI90 [{x['ci90'][0]:+.0f}, {x['ci90'][1]:+.0f}]" if "ci90" in x else ""
-                w3 = x.get("without_top_3_days")
+                w3 = x.get("without_3_most_favourable_days")
                 w3t = (
-                    f" | w/o top 3 days {w3['mean']:+.0f} [{w3['ci90'][0]:+.0f}, {w3['ci90'][1]:+.0f}]"
+                    f" | w/o 3 most favourable days {w3['mean']:+.0f} [{w3['ci90'][0]:+.0f}, {w3['ci90'][1]:+.0f}]"
                     if w3
                     else ""
                 )
