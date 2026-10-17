@@ -26,6 +26,7 @@ from typing import Any
 
 import numpy as np
 
+from . import expiry
 from .dte import entry_labels
 from .explain import CRITERIA, Snapshot, rank_day
 from .lists import LISTS, WARMUP
@@ -200,6 +201,8 @@ def day_row(snap: Snapshot, key: str, position: int) -> dict[str, Any]:
         rec = (entry.get("lists") or {}).get(key)
         if rec is not None:
             picks = select(r.comp, names)
+            if entry.get("expiry_only") and key in expiry.RULE_LISTS:  # BL-122, as recorded
+                picks = expiry.filter_picks(r.comp, names, picks, entry["expiry_only"])
             idx = {n: v for v, n in enumerate(names)}
             same = set(picks.core) == set(rec.get("core", [])) and set(picks.buy) == set(
                 rec.get("buy", [])

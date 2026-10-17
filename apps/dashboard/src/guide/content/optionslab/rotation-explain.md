@@ -17,7 +17,10 @@ Each morning Adaptive ranks all 298 strategies of the Core pool by a composite s
 least two of them Widesl), plus the best Buy when it ranks in the overall top ten. The journal
 keeps the picks and their composites. It does not keep the breakdown, so this card rebuilds it from
 the stored results before that day, the way the 09:16 ranking computes it, and then checks the
-rebuild against the entry.
+rebuild against the entry. From 19 October 2026, on a day when exactly one of NIFTY and SENSEX
+expires, Adaptive keeps only that index's strategies (the same ranking, with the other index's
+strategies left out); a day recorded under that rule is rebuilt under it, and the picks it would
+have made without the rule come with the explanation.
 
 ### The controls
 

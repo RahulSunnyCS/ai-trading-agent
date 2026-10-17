@@ -190,7 +190,15 @@ def list_block(day: date, picked: dict, results: _Results, lots_per: int = LOTS_
     scored = bool(picks) and not missing
     core_bands = [p["band"] for p in picks if p["role"] == "core"]
     total = round(sum(p["result"]["gross"] for p in picks), 2) if scored else None
+    rule = {}
+    if picked.get("expiry_only"):  # BL-122: the list kept only the expiring index's strategies
+        unfiltered = picked.get("unfiltered") or {}
+        rule = {
+            "expiry_only": picked["expiry_only"],
+            "unfiltered": {"core": unfiltered.get("core", []), "buy": unfiltered.get("buy", [])},
+        }
     return {
+        **rule,
         "picks": picks,
         "overridden": bool(picked.get("overridden", False)),
         "buy_qualified": any(p["role"] == "buy" for p in picks),
@@ -693,7 +701,12 @@ def _rescore(entry: dict, root: Path, names: list[str] | None) -> dict:
     vix = _number(entry.get("vix_open"))
     dte = recorded_labels(entry)
     again = pick.score_history(
-        hist, day, vix, {"dte_n": dte.get("NIFTY"), "dte_s": dte.get("SENSEX")}
+        hist,
+        day,
+        vix,
+        {"dte_n": dte.get("NIFTY"), "dte_s": dte.get("SENSEX")},
+        # the expiring-index rule as the entry recorded it (BL-122), so a rule day is no mismatch
+        expiry_only=entry.get("expiry_only"),
     )
     differs = [
         k

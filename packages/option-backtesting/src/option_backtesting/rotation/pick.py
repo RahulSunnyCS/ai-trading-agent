@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 
 from ..fyers.daily import data_dir
-from . import journal, store
+from . import expiry, journal, store
 from .attrs import last_collected_before
 from .dte import DTE_BASIS
 from .lists import DISPLAY_NAMES, LISTS, LOTS_PER, PUBLIC_KEYS, WARMUP
@@ -152,29 +152,65 @@ def _rank(hist: History, day: date, vix_open: float | None, dte: dict[str, str])
         yield key, cols, comp, select(comp, cols)
 
 
-def score_history(hist: History, day: date, vix_open: float | None, dte: dict[str, str]) -> dict:
-    """{list: {core, buy, overridden, composite}} for `day`."""
+def _check_expiry_only(expiry_only: str | None) -> None:
+    if expiry_only is not None and expiry_only not in expiry.INDICES:
+        raise ValueError(
+            f"expiry_only must be one of {', '.join(expiry.INDICES)} or None, not {expiry_only!r}"
+        )
+
+
+def score_history(
+    hist: History,
+    day: date,
+    vix_open: float | None,
+    dte: dict[str, str],
+    expiry_only: str | None = None,
+) -> dict:
+    """{list: {core, buy, overridden, composite}} for `day`.
+
+    `expiry_only` ('NIFTY' | 'SENSEX', BL-122): the lists in `expiry.RULE_LISTS` (Adaptive) take
+    only that index's variants (a filter of the same ranking, `expiry.filter_picks`), and their
+    block also carries `unfiltered` (the picks without the rule) and `expiry_only`. None, the
+    default, is the ranking exactly as before; reconstructed history never passes it."""
+    _check_expiry_only(expiry_only)
     out = {}
-    for key, _cols, _comp, picks in _rank(hist, day, vix_open, dte):
+    for key, cols, comp, picks in _rank(hist, day, vix_open, dte):
+        chosen = picks
+        if expiry_only and key in expiry.RULE_LISTS:
+            chosen = expiry.filter_picks(comp, cols, picks, expiry_only)
         out[key] = {
-            "core": picks.core,
-            "buy": picks.buy,
-            "overridden": picks.overridden,
-            "composite": {k: round(v, 4) for k, v in picks.composite.items()},
+            "core": chosen.core,
+            "buy": chosen.buy,
+            "overridden": chosen.overridden,
+            "composite": {k: round(v, 4) for k, v in chosen.composite.items()},
         }
+        if chosen is not picks:
+            out[key]["unfiltered"] = {"core": picks.core, "buy": picks.buy}
+            out[key]["expiry_only"] = expiry_only
     return out
 
 
 def next_best(
-    hist: History, day: date, vix_open: float | None, dte: dict[str, str]
+    hist: History,
+    day: date,
+    vix_open: float | None,
+    dte: dict[str, str],
+    expiry_only: str | None = None,
 ) -> dict[str, dict[str, str | None]]:
     """{list: {wide, dir}}: the best Widesl and the best Dir variant that were not picked, for the
-    public lists. Message text only; it is not part of the journal entry."""
-    return {
-        key: runners_up(comp, cols, picks)
-        for key, cols, comp, picks in _rank(hist, day, vix_open, dte)
-        if key in PUBLIC_KEYS
-    }
+    public lists. Message text only; it is not part of the journal entry. With `expiry_only`, a
+    rule list's options come from that index only, like its picks."""
+    _check_expiry_only(expiry_only)
+    out: dict[str, dict[str, str | None]] = {}
+    for key, cols, comp, picks in _rank(hist, day, vix_open, dte):
+        if key not in PUBLIC_KEYS:
+            continue
+        if expiry_only and key in expiry.RULE_LISTS:
+            chosen = expiry.filter_picks(comp, cols, picks, expiry_only)
+            out[key] = expiry.filtered_runners_up(comp, cols, chosen, expiry_only)
+        else:
+            out[key] = runners_up(comp, cols, picks)
+    return out
 
 
 def score_lists(
@@ -217,6 +253,9 @@ def record(
     # job starts, and only the band depends on it
     names = variant_names() + (track_names(track) if track else [])
     dte, dte_source = listed_dte_labels(day)
+    # BL-122: from 2026-10-19, on a day exactly one index expires, Adaptive takes only its
+    # strategies. Read before any network wait, so a bad kill-switch value fails at once, loudly.
+    rule = expiry.rule_index(day, dte)
     commit = code_commit()
     try:
         hist = load_history(day, root, names)
@@ -240,7 +279,7 @@ def record(
         vix_open, source = vix_open_with_source(day)
     if vix_open is None:
         raise PickError(f"the 09:15 India VIX open for {day} could not be read; nothing recorded")
-    lists = score_history(hist, day, vix_open, dte)
+    lists = score_history(hist, day, vix_open, dte, expiry_only=rule)
     if track:
         lists = {k: v for k, v in lists.items() if k in TRACK_LISTS[track]}
     fields = {
@@ -262,6 +301,8 @@ def record(
     }
     if track:
         fields["track"] = track
+    if rule:  # omitted on every other day, so those entries are exactly what they were
+        fields["expiry_only"] = rule
     path = store.journal_path(root, track)
     stamp = now_fn().astimezone(IST)  # taken right before the write, so the flag describes it
     fields["recorded_at"] = stamp.isoformat(timespec="seconds")
@@ -270,7 +311,7 @@ def record(
         entry = {**fields, "prev": journal.head(path), "hash": "(dry run)"}
     else:
         entry = journal.append(path, fields)
-    options = next_best(hist, day, vix_open, dte)
+    options = next_best(hist, day, vix_open, dte, expiry_only=rule)
     if track:
         options = {k: v for k, v in options.items() if k in TRACK_LISTS[track]}
     return PickResult(entry, render(entry, options))
@@ -286,10 +327,17 @@ def next_best_line(options: dict[str, str | None] | None) -> str:
     return "Next best, optional: " + "; ".join(parts) if parts else ""
 
 
+def expiry_rule_line(index: str) -> str:
+    """The one line a rule day's message adds (BL-122); the unfiltered picks stay in the journal."""
+    return f"Expiry rule ({index}): only {index} strategies"
+
+
 def render(entry: dict, options: dict[str, dict[str, str | None]] | None = None) -> str:
     track = entry.get("track")
     title = f"{track.upper()} TRACK picks (not traded)" if track else "Rotation picks"
     lines = [f"{title} {entry['day']} ({entry['weekday']})"]
+    if entry.get("expiry_only"):
+        lines.append(expiry_rule_line(entry["expiry_only"]))
     for key, p in entry["lists"].items():
         if key not in PUBLIC_KEYS:  # Steady and Adaptive only; the entry still records every list
             continue

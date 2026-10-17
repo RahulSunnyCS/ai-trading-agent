@@ -280,22 +280,31 @@ def test_reconstructed_rows_exist_only_before_the_journal_began(world):
 
 def test_a_reconstructed_day_is_what_pick_record_would_have_written(world):
     """Reconstruction calls `score_history` with the rows before the day: the day recorded the
-    normal way (inputs given) must come out identical, list by list."""
+    normal way (inputs given) must come out identical, list by list. Reconstruction never applies
+    the expiring-index rule (BL-122): on a rule day it gives the entry's `unfiltered` picks."""
     root, sc = world
     rec = daylog.reconstruction(root, syn.NAMES)
-    checked = 0
+    checked = rule_days = 0
     for day, entry in sc["entries"].items():
         if sc["events"][day] in ("angelone", "waiting"):
             continue  # a VIX that differs from the stored open / a day with no stored attributes
         got = rec.picks(day)
         assert got is not None
         for key, picked in entry["lists"].items():
+            if picked.get("expiry_only"):
+                assert entry["expiry_only"] == picked["expiry_only"]
+                assert got[key]["core"] == picked["unfiltered"]["core"]
+                assert got[key]["buy"] == picked["unfiltered"]["buy"]
+                assert "unfiltered" not in got[key] and "expiry_only" not in got[key]
+                rule_days += 1
+                continue
             assert got[key]["core"] == picked["core"]
             assert got[key]["buy"] == picked["buy"]
             assert got[key]["overridden"] == picked["overridden"]
             assert got[key]["composite"] == picked["composite"]
         checked += 1
     assert checked >= 5
+    assert rule_days >= 1  # the scenario runs past 2026-10-19 and has an expiry day after it
 
 
 def test_a_later_day_cannot_move_an_earlier_reconstructed_day(world):
