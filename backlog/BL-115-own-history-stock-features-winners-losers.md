@@ -126,35 +126,26 @@ week say little about which picks will lag the index. A follow-up on the score i
 would be a new, post-hoc question and needs its own pre-registration; the 2023-2026 window stays
 unread.
 
-## Descriptive follow-up (2026-10-17): Trio's pick order inside a sector
+## Descriptive follow-up (2026-10-17): Trio's pick order inside a sector — CORRECTED
 
-Not pre-registered; a lead, not a finding. From the same 2017-2022 trades
-(`data/search/bl115/trades.csv`): the engine's buy rank encodes the sector position and the pick
-order inside it (Trio: rank = (sector position - 1) x 3 + pick order).
+Not pre-registered; a lead, not a finding. **The first version of this section read the sector
+position and pick order from the engine's logged buy rank. That is wrong for Trio:** with a stock
+tilt on (`broad_reversal_tilt` 0.5), the engine re-ranks every stock of every held sector by the tilt
+score, so the logged rank no longer encodes sector or slot (found in BL-116 Phase 1). The pick-order
+table is withdrawn. Four Sectors Monthly, No Tilt has no tilt, so its rank arithmetic held.
 
-| Trio, stocks only | Trades | Beat Nifty 500 | Mean excess | In the worst 20% |
-|---|---|---|---|---|
-| 1st pick in its sector | 164 | 43% | +2.2% | 18% |
-| 2nd pick | 120 | 42% | +1.2% | 19% |
-| 3rd pick | 88 | 48% | +2.0% | 25% |
+Read from the week's held sector list instead (BL-116, fresh positions only, stocks only), the
+picks' share beating Nifty 500 by the sector's place:
 
-1st minus 3rd beat rate: -4 pts (90% block bootstrap -14 to +5): no sign that Trio's extra losers
-come from its 2nd and 3rd picks; year by year the order flips (small counts).
-
-The sector's own position matters more, in both strategies:
-
-| Sector position | Trio beat / mean excess | Four Sectors beat / mean excess |
+| Sector position | Trio | Four Sectors Monthly, No Tilt |
 |---|---|---|
-| 1 (best-ranked sector held) | 47% / +3.4% (199) | 60% / +11.5% (101) |
-| 2 | 38% / +0.1% (132) | 48% / +2.1% (114) |
-| 3 | 39% / -2.2% (52) | 47% / +1.4% (132) |
-| 4 | — | 54% / +4.3% (138) |
+| 1 | 47% (58) | 63% (89) |
+| 2 | 41% (88) | 50% (102) |
+| 3 | 46% (133) | 48% (122) |
+| 4 | — | 55% (125) |
 
-The non-stock picks (Gold, Silver, Nasdaq 100, Hang Seng) lag Nifty 500 most (Trio 1 of 12, Four
-Sectors 34% of 50), as expected of a diversifier judged against an equity index.
-
-Lead for the sector-level test (Context of the next item): the first-placed sector's picks beat the
-index clearly more often than the others'.
+The non-stock picks (Gold, Silver, Nasdaq 100, Hang Seng) lag Nifty 500 most, as expected of a
+diversifier judged against an equity index. The sector question is tested in BL-116.
 
 ## Risks
 
@@ -174,4 +165,4 @@ features and the report-only views as listed.
 
 - 2026-10-17 — created; Phase 0 pre-registration committed before any feature was computed (96d6e2d2).
 - 2026-10-17 — Phase 1 run: killed. No Phase 2.
-- 2026-10-17 — descriptive follow-up on Trio's pick order: no difference by pick order; sector position 1 stands out (a lead).
+- 2026-10-17 — descriptive follow-up on Trio's pick order; corrected the same day: the logged rank does not encode sector or slot under a stock tilt, so the Trio pick-order table is withdrawn (see BL-116).

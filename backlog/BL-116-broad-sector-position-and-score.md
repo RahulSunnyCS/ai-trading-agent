@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — BL-115 found the stock's own numbers say little; the sector choice decides most of a Broad portfolio |
-| **Status** | In progress — Phase 0 committed |
+| **Status** | Phase 1 done — H1 (sector position) passes; H2 (sector score) killed. Phase 2 needs its own pre-registration |
 | **Type** | research |
 | **Area** | momentum |
 | **Created** | 2026-10-17 |
@@ -67,6 +67,76 @@ The binding rule is `packages/momentum-backtesting/search_spaces/bl116_criteria.
 Pre-registered as an addendum before it runs (for example more weight on the best-placed sector, or a
 sector-score floor), backtested on 2017-2022, then one check on the sealed window.
 
+## Result (2026-10-17)
+
+`search_spaces/bl116_result.json` (rule: `bl116_criteria.json`, committed and pushed before the run,
+371911fa); trades `data/search/bl116/trades.csv` (git-ignored; regenerate with
+`uv run python scripts/bl116_sector_tests.py`). 2017-2022 only.
+
+### H1 — sector position: PASS
+
+Nine groups, 5,244 stock picks from fresh sector positions. Beat rate of picks from the best-placed
+sector minus that of the other fresh positions:
+
+| Group | Position 1 minus the rest |
+|---|---|
+| Five Sectors, Wide Pool | +20.5 pts |
+| Six Sectors Monthly, No Tilt | +19.0 |
+| Six Sectors, Make Room | +17.9 |
+| Five Sectors Monthly | +14.1 |
+| Phase 6 ensemble | +13.4 |
+| Four Sectors, Half Tilt | +11.4 |
+| Five Sectors, Stock Tilt | +9.9 |
+| Four Sectors, Quick Exit | +9.9 |
+| Five Sectors, Rank Sum | +1.3 |
+
+Above zero in 9 of 9; over all nine **+13.4 pts (90% interval +7.3 to +19.6)**. Rule: at least 7 of 9
+and at least +5 pts with the interval above zero, so it passes.
+
+| Position (all nine) | Picks | Beat Nifty 500 | Mean excess |
+|---|---|---|---|
+| 1 | 689 | 58% | +7.3% |
+| 2 | 829 | 45% | +2.3% |
+| 3 | 940 | 42% | +2.1% |
+| 4 | 1,095 | 46% | +2.7% |
+| 5 | 1,044 | 46% | +0.7% |
+| 6 | 577 | 44% | +0.4% |
+
+Shown, not judged (already seen): Four Sectors Monthly, No Tilt +11.6 pts (63% / 50% / 48% / 55%);
+Trio +2.7 pts (47% / 41% / 46%), so Trio does not show it.
+
+### H2 — the sector's own average-weekly score: KILLED
+
+| | Four Sectors Monthly, No Tilt | Trio |
+|---|---|---|
+| Picks with a score | 191 (247 missing: fewer than 3 members with a full year of prices) | 137 (142 missing) |
+| Rank correlation / t | +0.12 / 1.7 | -0.09 / -1.1 |
+| Lowest fifth: losers vs overall | 59% vs 50% | 61% vs 58% |
+
+Neither strategy passes. Report only: within the same week it is -0.04 and -0.25; it correlates
++0.81 / +0.74 with the stock's own score (BL-115), so it adds little; winners' and losers' medians
+are 7.4 vs 7.5 and 5.7 vs 6.3.
+
+### What the run found about the engine (affects reading these tables)
+
+Picks from sector positions beyond the fresh ones were excluded, as registered, on the belief that a
+lingering sector never buys. That belief is wrong under a stock tilt (`broad_reversal_tilt` > 0):
+the engine re-ranks every stock of every held sector by the tilt score and buys the top of that list,
+so lingering sectors do buy. Excluded picks: Phase 6 281, Rank Sum 174, Five Sectors Monthly 166,
+Wide Pool 153, Stock Tilt 145, Half Tilt 130, Make Room 67, Quick Exit 46, Six Sectors Monthly No Tilt
+39 (Trio 93, Four Sectors 20). The tilt explains most of them; the few in the untilted groups are not
+explained yet. H1 compares fresh positions only, as registered; it does not say how lingering-sector
+picks did.
+
+### What it means
+
+Picks from the best-placed sector beat Nifty 500 clearly more often than the rest (58% vs 42-46%,
++7.3% vs +0.4-2.7% average excess), in every one of the nine unseen groups, though not in Trio. Two
+caveats: position 1 is by construction the sector with the strongest momentum, so this says where
+the edge sits rather than that a change would help; and the nine groups share sectors and stocks.
+A Phase 2 (for example more weight on the best-placed sector, tested in the backtest on 2017-2022,
+then once on the sealed window) needs its own pre-registration. The sector score adds nothing.
+
 ## Risks
 
 - Position 1 is also the sector with the strongest momentum, so H1 may just restate that momentum
@@ -81,4 +151,5 @@ score against beating Nifty 500, on 2017-2022.
 
 ## Log
 
-- 2026-10-17 — created; Phase 0 pre-registration committed before any sector score was computed.
+- 2026-10-17 — created; Phase 0 pre-registration committed and pushed before any sector score was computed (371911fa).
+- 2026-10-17 — Phase 1: H1 passes (+13.4 pts, 9 of 9 groups), H2 killed. Found that a stock tilt lets lingering sectors buy; BL-115's Trio pick-order table corrected.

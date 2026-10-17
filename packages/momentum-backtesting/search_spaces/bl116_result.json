@@ -1,0 +1,867 @@
+{
+  "criteria": "search_spaces/bl116_criteria.json",
+  "counts": {
+    "78eba5bfc02948de985bbf64a7adc5da": {
+      "open_at_end": 6,
+      "atomic": 10,
+      "lingering_position": 43,
+      "no_sector": 0
+    },
+    "4e0c34e3035748beb5e0e43feb63f88d": {
+      "open_at_end": 7,
+      "atomic": 11,
+      "lingering_position": 50,
+      "no_sector": 0
+    },
+    "19171daebdd34f4c8e2f08c5ae586ccf": {
+      "open_at_end": 6,
+      "atomic": 10,
+      "lingering_position": 38,
+      "no_sector": 0
+    },
+    "ebf6e79843524dc495f743c0c83f1f53": {
+      "open_at_end": 5,
+      "atomic": 7,
+      "lingering_position": 43,
+      "no_sector": 0
+    },
+    "4dd2d5f3543047ebb397ca16e1051ef9": {
+      "open_at_end": 6,
+      "atomic": 17,
+      "lingering_position": 38,
+      "no_sector": 0
+    },
+    "1c78b7322f464457b440b4b8ab3f8366": {
+      "open_at_end": 5,
+      "atomic": 18,
+      "lingering_position": 34,
+      "no_sector": 0
+    },
+    "65407a91110f4fcda55f3779133ee2ad": {
+      "open_at_end": 7,
+      "atomic": 14,
+      "lingering_position": 40,
+      "no_sector": 0
+    },
+    "416f69bf4862456b82923881352dd3b2": {
+      "open_at_end": 7,
+      "atomic": 15,
+      "lingering_position": 41,
+      "no_sector": 0
+    },
+    "feb32ac8675343abbbe99dd14bda0654": {
+      "open_at_end": 6,
+      "atomic": 19,
+      "lingering_position": 15,
+      "no_sector": 0
+    },
+    "0cac763037e449b5a144c20a5e197e73": {
+      "open_at_end": 6,
+      "atomic": 18,
+      "lingering_position": 17,
+      "no_sector": 0
+    },
+    "ead11580a888475e8208d8bc3d6800d1": {
+      "open_at_end": 6,
+      "atomic": 16,
+      "lingering_position": 19,
+      "no_sector": 0
+    },
+    "15b17fa8dbf84c878ae91a086a1c8b5c": {
+      "open_at_end": 6,
+      "atomic": 14,
+      "lingering_position": 16,
+      "no_sector": 0
+    },
+    "e242eb1c686a4198b9529f2c9410c75a": {
+      "open_at_end": 5,
+      "atomic": 16,
+      "lingering_position": 30,
+      "no_sector": 0
+    },
+    "eb01bc6167e045bf9a55809a825ea8dc": {
+      "open_at_end": 4,
+      "atomic": 18,
+      "lingering_position": 30,
+      "no_sector": 0
+    },
+    "5496ba5b926f4410ba2b399b8718a9d5": {
+      "open_at_end": 5,
+      "atomic": 14,
+      "lingering_position": 33,
+      "no_sector": 0
+    },
+    "b1e37feb07f443e29b2b1831e38a1db7": {
+      "open_at_end": 5,
+      "atomic": 13,
+      "lingering_position": 37,
+      "no_sector": 0
+    },
+    "2458faf54cbd487aa5a1640a430aad1d": {
+      "open_at_end": 5,
+      "atomic": 18,
+      "lingering_position": 13,
+      "no_sector": 0
+    },
+    "34917a966fa447ca92a6241336b13e4d": {
+      "open_at_end": 4,
+      "atomic": 19,
+      "lingering_position": 10,
+      "no_sector": 0
+    },
+    "1b3bd57cb3774b9a9ddcbda304516fc5": {
+      "open_at_end": 4,
+      "atomic": 17,
+      "lingering_position": 8,
+      "no_sector": 0
+    },
+    "ade3121c132140a484841d388e8bd1ed": {
+      "open_at_end": 4,
+      "atomic": 14,
+      "lingering_position": 15,
+      "no_sector": 0
+    },
+    "7c5a5afc16ce40f7b922fbecb18a172e": {
+      "open_at_end": 6,
+      "atomic": 15,
+      "lingering_position": 36,
+      "no_sector": 0
+    },
+    "b3273b1d213f4c38846cdaab8c0c274f": {
+      "open_at_end": 6,
+      "atomic": 18,
+      "lingering_position": 33,
+      "no_sector": 0
+    },
+    "88723484619d4e9b984942f517970c8d": {
+      "open_at_end": 6,
+      "atomic": 13,
+      "lingering_position": 36,
+      "no_sector": 0
+    },
+    "cf58b0df92524ec8becf7e711d1f4353": {
+      "open_at_end": 5,
+      "atomic": 14,
+      "lingering_position": 40,
+      "no_sector": 0
+    },
+    "395730e8609e4b64a986d9443cc337d8": {
+      "open_at_end": 6,
+      "atomic": 12,
+      "lingering_position": 44,
+      "no_sector": 0
+    },
+    "0afece8f5f594b3f800356b1d11f85b5": {
+      "open_at_end": 6,
+      "atomic": 13,
+      "lingering_position": 37,
+      "no_sector": 0
+    },
+    "62daf0a94cbe4a068f6926ba97f35d96": {
+      "open_at_end": 7,
+      "atomic": 12,
+      "lingering_position": 41,
+      "no_sector": 0
+    },
+    "fdd16ffd52a54b238c9fad8f098f31a4": {
+      "open_at_end": 6,
+      "atomic": 11,
+      "lingering_position": 44,
+      "no_sector": 0
+    },
+    "735ca04adeb7465d9a86ce1668a072ab": {
+      "open_at_end": 7,
+      "atomic": 17,
+      "lingering_position": 8,
+      "no_sector": 0
+    },
+    "8b75339b65cc4751ba5e352c508a1c7b": {
+      "open_at_end": 8,
+      "atomic": 17,
+      "lingering_position": 9,
+      "no_sector": 0
+    },
+    "5da756b46f8f4ca69a1622c8c7fee5fe": {
+      "open_at_end": 8,
+      "atomic": 16,
+      "lingering_position": 9,
+      "no_sector": 0
+    },
+    "7d483330e50849beb6cab0812983cff1": {
+      "open_at_end": 7,
+      "atomic": 13,
+      "lingering_position": 13,
+      "no_sector": 0
+    },
+    "0ece9a0a83074e9a9e6916bfac98a893": {
+      "open_at_end": 10,
+      "atomic": 19,
+      "lingering_position": 21,
+      "no_sector": 0
+    },
+    "2e6716049f444e078e6a3541304cd8be": {
+      "open_at_end": 8,
+      "atomic": 10,
+      "lingering_position": 55,
+      "no_sector": 0
+    },
+    "d9ebefe07f5147a9bffe729cfc75b721": {
+      "open_at_end": 14,
+      "atomic": 15,
+      "lingering_position": 85,
+      "no_sector": 0
+    },
+    "81e66ed4c755428cb18bba584d9767af": {
+      "open_at_end": 12,
+      "atomic": 23,
+      "lingering_position": 120,
+      "no_sector": 0
+    },
+    "b2346e4f76564acd85e3b60661a8e803": {
+      "open_at_end": 8,
+      "atomic": 6,
+      "lingering_position": 47,
+      "no_sector": 0
+    },
+    "9633357266ee4300819a7ab203145b87": {
+      "open_at_end": 8,
+      "atomic": 6,
+      "lingering_position": 46,
+      "no_sector": 0
+    },
+    "79c93a8fcffd46a3ba04881509e25170": {
+      "open_at_end": 6,
+      "atomic": 15,
+      "lingering_position": 6,
+      "no_sector": 0
+    },
+    "d468f277a0214753b84ac632e1ffc5f2": {
+      "open_at_end": 5,
+      "atomic": 13,
+      "lingering_position": 2,
+      "no_sector": 0
+    },
+    "a1480efe183247bd9f5bda28af80d6c5": {
+      "open_at_end": 5,
+      "atomic": 13,
+      "lingering_position": 5,
+      "no_sector": 0
+    },
+    "3d68ddf8cee74df28433aa1fa912de0c": {
+      "open_at_end": 5,
+      "atomic": 9,
+      "lingering_position": 7,
+      "no_sector": 0
+    }
+  },
+  "H1": {
+    "trades": 5244,
+    "per_group_gap": {
+      "Five Sectors Monthly \u00b7 all Fridays": 0.14119083141190836,
+      "Five Sectors, Rank Sum \u00b7 all Fridays": 0.012931034482758619,
+      "Five Sectors, Stock Tilt \u00b7 all Fridays": 0.09881157753498176,
+      "Five Sectors, Wide Pool \u00b7 all Fridays": 0.20529704419081068,
+      "Four Sectors, Half Tilt \u00b7 all Fridays": 0.11411532417294601,
+      "Four Sectors, Quick Exit \u00b7 all Fridays": 0.09900284900284906,
+      "Phase 6 ensemble": 0.1339794620566207,
+      "Six Sectors Monthly, No Tilt \u00b7 all Fridays": 0.1898954703832753,
+      "Six Sectors, Make Room \u00b7 all Fridays": 0.17888221046021346
+    },
+    "groups_above_zero": 9,
+    "pooled_gap": 0.13444834063271194,
+    "pooled_90pct_interval": [0.07294738120645809, 0.195657048209684],
+    "verdict": "pass",
+    "by_position_per_group": {
+      "Five Sectors Monthly \u00b7 all Fridays": [
+        {
+          "position": 1,
+          "trades": 73,
+          "beat": 0.6164383561643836,
+          "mean_excess": 0.09410499976221146,
+          "median_excess": 0.03979583332661929,
+          "worst20_share": 0.1643835616438356
+        },
+        {
+          "position": 2,
+          "trades": 84,
+          "beat": 0.47619047619047616,
+          "mean_excess": 0.043731670762966225,
+          "median_excess": -0.0012223565642486278,
+          "worst20_share": 0.17857142857142858
+        },
+        {
+          "position": 3,
+          "trades": 96,
+          "beat": 0.4375,
+          "mean_excess": 0.021452704573150724,
+          "median_excess": -0.009841266726208553,
+          "worst20_share": 0.20833333333333334
+        },
+        {
+          "position": 4,
+          "trades": 98,
+          "beat": 0.47959183673469385,
+          "mean_excess": 0.03319589068744742,
+          "median_excess": -0.009423570300304773,
+          "worst20_share": 0.20408163265306123
+        },
+        {
+          "position": 5,
+          "trades": 126,
+          "beat": 0.5,
+          "mean_excess": 0.021433157637155816,
+          "median_excess": -0.0010019531987079389,
+          "worst20_share": 0.23015873015873015
+        }
+      ],
+      "Five Sectors, Rank Sum \u00b7 all Fridays": [
+        {
+          "position": 1,
+          "trades": 87,
+          "beat": 0.47126436781609193,
+          "mean_excess": 0.020024782887304887,
+          "median_excess": -0.01869806705596122,
+          "worst20_share": 0.20689655172413793
+        },
+        {
+          "position": 2,
+          "trades": 112,
+          "beat": 0.4642857142857143,
+          "mean_excess": 0.016255566138803877,
+          "median_excess": -0.017283644919036445,
+          "worst20_share": 0.25
+        },
+        {
+          "position": 3,
+          "trades": 129,
+          "beat": 0.4418604651162791,
+          "mean_excess": 0.020108516506204554,
+          "median_excess": -0.010244091903771402,
+          "worst20_share": 0.17829457364341086
+        },
+        {
+          "position": 4,
+          "trades": 131,
+          "beat": 0.46564885496183206,
+          "mean_excess": 0.021221483574480733,
+          "median_excess": -0.012520535663439025,
+          "worst20_share": 0.2366412213740458
+        },
+        {
+          "position": 5,
+          "trades": 132,
+          "beat": 0.4621212121212121,
+          "mean_excess": 0.02845086388374822,
+          "median_excess": -0.005200258145939385,
+          "worst20_share": 0.14393939393939395
+        }
+      ],
+      "Five Sectors, Stock Tilt \u00b7 all Fridays": [
+        {
+          "position": 1,
+          "trades": 74,
+          "beat": 0.581081081081081,
+          "mean_excess": 0.07134236632192896,
+          "median_excess": 0.017627102405466166,
+          "worst20_share": 0.12162162162162163
+        },
+        {
+          "position": 2,
+          "trades": 89,
+          "beat": 0.449438202247191,
+          "mean_excess": 0.012519648741866868,
+          "median_excess": -0.01609782921390157,
+          "worst20_share": 0.20224719101123595
+        },
+        {
+          "position": 3,
+          "trades": 94,
+          "beat": 0.43617021276595747,
+          "mean_excess": 0.002320732965405824,
+          "median_excess": -0.01388017666260466,
+          "worst20_share": 0.2553191489361702
+        },
+        {
+          "position": 4,
+          "trades": 93,
+          "beat": 0.5268817204301075,
+          "mean_excess": 0.03317458474822098,
+          "median_excess": 0.00562500577964431,
+          "worst20_share": 0.24731182795698925
+        },
+        {
+          "position": 5,
+          "trades": 147,
+          "beat": 0.5034013605442177,
+          "mean_excess": 0.011051509298345074,
+          "median_excess": 0.005021069579577264,
+          "worst20_share": 0.17687074829931973
+        }
+      ],
+      "Five Sectors, Wide Pool \u00b7 all Fridays": [
+        {
+          "position": 1,
+          "trades": 67,
+          "beat": 0.6268656716417911,
+          "mean_excess": 0.08826979447820149,
+          "median_excess": 0.02562452924302039,
+          "worst20_share": 0.1044776119402985
+        },
+        {
+          "position": 2,
+          "trades": 82,
+          "beat": 0.4024390243902439,
+          "mean_excess": -0.0038026555537518307,
+          "median_excess": -0.02296150350447418,
+          "worst20_share": 0.17073170731707318
+        },
+        {
+          "position": 3,
+          "trades": 84,
+          "beat": 0.38095238095238093,
+          "mean_excess": 0.030537793918053176,
+          "median_excess": -0.028059244092112023,
+          "worst20_share": 0.2619047619047619
+        },
+        {
+          "position": 4,
+          "trades": 109,
+          "beat": 0.45871559633027525,
+          "mean_excess": 0.029140819884045283,
+          "median_excess": -0.005481001087785042,
+          "worst20_share": 0.22018348623853212
+        },
+        {
+          "position": 5,
+          "trades": 133,
+          "beat": 0.42857142857142855,
+          "mean_excess": -0.005651294983971344,
+          "median_excess": -0.019716154784412687,
+          "worst20_share": 0.21052631578947367
+        }
+      ],
+      "Four Sectors, Half Tilt \u00b7 all Fridays": [
+        {
+          "position": 1,
+          "trades": 83,
+          "beat": 0.6024096385542169,
+          "mean_excess": 0.08248376863235723,
+          "median_excess": 0.02908699403295445,
+          "worst20_share": 0.13253012048192772
+        },
+        {
+          "position": 2,
+          "trades": 93,
+          "beat": 0.44086021505376344,
+          "mean_excess": 0.01827637652206485,
+          "median_excess": -0.00566081316926903,
+          "worst20_share": 0.1827956989247312
+        },
+        {
+          "position": 3,
+          "trades": 105,
+          "beat": 0.4380952380952381,
+          "mean_excess": 0.01014472811176009,
+          "median_excess": -0.01214142246147154,
+          "worst20_share": 0.2571428571428571
+        },
+        {
+          "position": 4,
+          "trades": 101,
+          "beat": 0.5841584158415841,
+          "mean_excess": 0.06556063848328234,
+          "median_excess": 0.022661124873015526,
+          "worst20_share": 0.21782178217821782
+        }
+      ],
+      "Four Sectors, Quick Exit \u00b7 all Fridays": [
+        {
+          "position": 1,
+          "trades": 72,
+          "beat": 0.5833333333333334,
+          "mean_excess": 0.10864484192748307,
+          "median_excess": 0.03369723174798567,
+          "worst20_share": 0.18055555555555555
+        },
+        {
+          "position": 2,
+          "trades": 103,
+          "beat": 0.5145631067961165,
+          "mean_excess": 0.04027680266201703,
+          "median_excess": 0.005862351358453699,
+          "worst20_share": 0.1650485436893204
+        },
+        {
+          "position": 3,
+          "trades": 104,
+          "beat": 0.4519230769230769,
+          "mean_excess": 0.031606757492715694,
+          "median_excess": -0.01655802689309399,
+          "worst20_share": 0.23076923076923078
+        },
+        {
+          "position": 4,
+          "trades": 144,
+          "beat": 0.4861111111111111,
+          "mean_excess": 0.052071573947750034,
+          "median_excess": -0.0023750474867938465,
+          "worst20_share": 0.2152777777777778
+        }
+      ],
+      "Phase 6 ensemble": [
+        {
+          "position": 1,
+          "trades": 92,
+          "beat": 0.5543478260869565,
+          "mean_excess": 0.01547948038601009,
+          "median_excess": 0.009405344616314315,
+          "worst20_share": 0.1956521739130435
+        },
+        {
+          "position": 2,
+          "trades": 89,
+          "beat": 0.42696629213483145,
+          "mean_excess": 0.035051158994131935,
+          "median_excess": -0.023507259345333487,
+          "worst20_share": 0.2247191011235955
+        },
+        {
+          "position": 3,
+          "trades": 136,
+          "beat": 0.4338235294117647,
+          "mean_excess": 0.03430819214960082,
+          "median_excess": -0.02351790994313485,
+          "worst20_share": 0.19117647058823528
+        },
+        {
+          "position": 4,
+          "trades": 182,
+          "beat": 0.4230769230769231,
+          "mean_excess": -0.007200361339608591,
+          "median_excess": -0.01626588563751774,
+          "worst20_share": 0.2032967032967033
+        },
+        {
+          "position": 5,
+          "trades": 207,
+          "beat": 0.43478260869565216,
+          "mean_excess": -0.005231070162599952,
+          "median_excess": -0.015878842561980466,
+          "worst20_share": 0.19806763285024154
+        },
+        {
+          "position": 6,
+          "trades": 239,
+          "beat": 0.4100418410041841,
+          "mean_excess": -0.008471176600530903,
+          "median_excess": -0.0221845179064174,
+          "worst20_share": 0.20920502092050208
+        },
+        {
+          "position": 7,
+          "trades": 34,
+          "beat": 0.35294117647058826,
+          "mean_excess": -0.008350191198030096,
+          "median_excess": -0.042054606668491756,
+          "worst20_share": 0.17647058823529413
+        },
+        {
+          "position": 8,
+          "trades": 36,
+          "beat": 0.3888888888888889,
+          "mean_excess": -0.01075025608542894,
+          "median_excess": -0.020755196558509104,
+          "worst20_share": 0.1388888888888889
+        }
+      ],
+      "Six Sectors Monthly, No Tilt \u00b7 all Fridays": [
+        {
+          "position": 1,
+          "trades": 70,
+          "beat": 0.6142857142857143,
+          "mean_excess": 0.11557771920763978,
+          "median_excess": 0.0300606125027999,
+          "worst20_share": 0.11428571428571428
+        },
+        {
+          "position": 2,
+          "trades": 85,
+          "beat": 0.4,
+          "mean_excess": 0.024577490368025725,
+          "median_excess": -0.018751760825450825,
+          "worst20_share": 0.15294117647058825
+        },
+        {
+          "position": 3,
+          "trades": 98,
+          "beat": 0.35714285714285715,
+          "mean_excess": 0.014872080310574439,
+          "median_excess": -0.026191035261389106,
+          "worst20_share": 0.23469387755102042
+        },
+        {
+          "position": 4,
+          "trades": 115,
+          "beat": 0.4,
+          "mean_excess": 0.028112578669269018,
+          "median_excess": -0.02359076969456464,
+          "worst20_share": 0.20869565217391303
+        },
+        {
+          "position": 5,
+          "trades": 146,
+          "beat": 0.4246575342465753,
+          "mean_excess": 0.0047041924579534645,
+          "median_excess": -0.018016708386833558,
+          "worst20_share": 0.2328767123287671
+        },
+        {
+          "position": 6,
+          "trades": 171,
+          "beat": 0.49122807017543857,
+          "mean_excess": 0.01898363551233877,
+          "median_excess": -0.0010981615127196864,
+          "worst20_share": 0.2046783625730994
+        }
+      ],
+      "Six Sectors, Make Room \u00b7 all Fridays": [
+        {
+          "position": 1,
+          "trades": 71,
+          "beat": 0.6056338028169014,
+          "mean_excess": 0.09320368774289829,
+          "median_excess": 0.018235021441007637,
+          "worst20_share": 0.056338028169014086
+        },
+        {
+          "position": 2,
+          "trades": 92,
+          "beat": 0.41304347826086957,
+          "mean_excess": 0.01736997513405941,
+          "median_excess": -0.01188275053943988,
+          "worst20_share": 0.20652173913043478
+        },
+        {
+          "position": 3,
+          "trades": 94,
+          "beat": 0.4148936170212766,
+          "mean_excess": 0.02028269229912048,
+          "median_excess": -0.017921819980674658,
+          "worst20_share": 0.20212765957446807
+        },
+        {
+          "position": 4,
+          "trades": 122,
+          "beat": 0.39344262295081966,
+          "mean_excess": 0.00670450591294999,
+          "median_excess": -0.024088049268836675,
+          "worst20_share": 0.20491803278688525
+        },
+        {
+          "position": 5,
+          "trades": 153,
+          "beat": 0.45098039215686275,
+          "mean_excess": -9.938959326945664e-5,
+          "median_excess": -0.013275118761679083,
+          "worst20_share": 0.26143790849673204
+        },
+        {
+          "position": 6,
+          "trades": 167,
+          "beat": 0.4431137724550898,
+          "mean_excess": 0.007786601543702185,
+          "median_excess": -0.00789326846352778,
+          "worst20_share": 0.19760479041916168
+        }
+      ]
+    },
+    "by_position_pooled": [
+      {
+        "position": 1,
+        "trades": 689,
+        "beat": 0.5805515239477503,
+        "mean_excess": 0.07344822672969102,
+        "median_excess": 0.019339218266123392,
+        "worst20_share": 0.14513788098693758
+      },
+      {
+        "position": 2,
+        "trades": 829,
+        "beat": 0.4451145958986731,
+        "mean_excess": 0.022860562085750154,
+        "median_excess": -0.01322574596559134,
+        "worst20_share": 0.195416164053076
+      },
+      {
+        "position": 3,
+        "trades": 940,
+        "beat": 0.42340425531914894,
+        "mean_excess": 0.021084076772408557,
+        "median_excess": -0.016585873625829917,
+        "worst20_share": 0.21914893617021278
+      },
+      {
+        "position": 4,
+        "trades": 1095,
+        "beat": 0.46301369863013697,
+        "mean_excess": 0.026625716004015434,
+        "median_excess": -0.010015058823094058,
+        "worst20_share": 0.20821917808219179
+      },
+      {
+        "position": 5,
+        "trades": 1044,
+        "beat": 0.4559386973180077,
+        "mean_excess": 0.006626260053982495,
+        "median_excess": -0.009719102341826436,
+        "worst20_share": 0.20977011494252873
+      },
+      {
+        "position": 6,
+        "trades": 577,
+        "beat": 0.4436741767764298,
+        "mean_excess": 0.004370802292688576,
+        "median_excess": -0.012026987031678038,
+        "worst20_share": 0.20797227036395147
+      },
+      {
+        "position": 7,
+        "trades": 34,
+        "beat": 0.35294117647058826,
+        "mean_excess": -0.008350191198030096,
+        "median_excess": -0.042054606668491756,
+        "worst20_share": 0.20588235294117646
+      },
+      {
+        "position": 8,
+        "trades": 36,
+        "beat": 0.3888888888888889,
+        "mean_excess": -0.01075025608542894,
+        "median_excess": -0.020755196558509104,
+        "worst20_share": 0.19444444444444445
+      }
+    ]
+  },
+  "H1_seen_strategies": {
+    "four_sectors_monthly_no_tilt": {
+      "gap": 0.1163195003380445,
+      "by_position": [
+        {
+          "position": 1,
+          "trades": 89,
+          "beat": 0.6292134831460674,
+          "mean_excess": 0.13313685675618914,
+          "median_excess": 0.04205508584258044,
+          "worst20_share": 0.16853932584269662
+        },
+        {
+          "position": 2,
+          "trades": 102,
+          "beat": 0.5,
+          "mean_excess": 0.024122917653091172,
+          "median_excess": 0.001819924158583286,
+          "worst20_share": 0.19607843137254902
+        },
+        {
+          "position": 3,
+          "trades": 122,
+          "beat": 0.48360655737704916,
+          "mean_excess": 0.01837325375751705,
+          "median_excess": -0.0027613663089539053,
+          "worst20_share": 0.21311475409836064
+        },
+        {
+          "position": 4,
+          "trades": 125,
+          "beat": 0.552,
+          "mean_excess": 0.04812311805267187,
+          "median_excess": 0.00676109742500608,
+          "worst20_share": 0.216
+        }
+      ]
+    },
+    "trio_fortnightly": {
+      "gap": 0.02660321422998907,
+      "by_position": [
+        {
+          "position": 1,
+          "trades": 58,
+          "beat": 0.46551724137931033,
+          "mean_excess": 0.018503972207890705,
+          "median_excess": -0.011009793766143694,
+          "worst20_share": 0.1724137931034483
+        },
+        {
+          "position": 2,
+          "trades": 88,
+          "beat": 0.4090909090909091,
+          "mean_excess": 0.004741909462059838,
+          "median_excess": -0.027402851447217713,
+          "worst20_share": 0.22727272727272727
+        },
+        {
+          "position": 3,
+          "trades": 133,
+          "beat": 0.45864661654135336,
+          "mean_excess": 0.03804983397508264,
+          "median_excess": -0.018359382323997586,
+          "worst20_share": 0.19548872180451127
+        }
+      ]
+    }
+  },
+  "H2": {
+    "four_sectors_monthly_no_tilt": {
+      "trades": 438,
+      "missing_score": 247,
+      "rho": 0.12077535133645632,
+      "t": 1.6739923240108059,
+      "n": 191,
+      "a_holds": false,
+      "worst_fifth_loser_share": 0.5897435897435898,
+      "overall_loser_share": 0.4973821989528796,
+      "gap": 0.09236139079071015,
+      "worst_fifth_n": 39,
+      "b_holds": false,
+      "report_only": {
+        "same_week_rho": -0.040670009602048446,
+        "same_week_n": 104,
+        "rho_inside_position": {
+          "1": -0.18464144551101075,
+          "2": 0.2844947735191638,
+          "3": -0.07696514012303488,
+          "4": 0.1096211975046627
+        },
+        "sector_vs_stock_score_rho": 0.8085388536786994,
+        "winners_median": 7.400974962917493,
+        "losers_median": 7.5326934512466694
+      }
+    },
+    "trio_fortnightly": {
+      "trades": 279,
+      "missing_score": 142,
+      "rho": -0.09213882888010881,
+      "t": -1.0599717035699532,
+      "n": 137,
+      "a_holds": false,
+      "worst_fifth_loser_share": 0.6071428571428571,
+      "overall_loser_share": 0.583941605839416,
+      "gap": 0.023201251303441084,
+      "worst_fifth_n": 28,
+      "b_holds": false,
+      "report_only": {
+        "same_week_rho": -0.24565548108712196,
+        "same_week_n": 40,
+        "rho_inside_position": {
+          "1": -0.5111582592620784,
+          "2": -0.0032617581745260837,
+          "3": 0.012321663380371658
+        },
+        "sector_vs_stock_score_rho": 0.7346203924224891,
+        "winners_median": 5.72096325982188,
+        "losers_median": 6.275953635896566
+      }
+    }
+  },
+  "H2_verdict": "kill"
+}
