@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — BL-115 found the stock's own numbers say little; the sector choice decides most of a Broad portfolio |
-| **Status** | Phase 1 done — H1 (sector position) passes; H2 (sector score) killed. Phase 2 needs its own pre-registration |
+| **Status** | Phase 2 development passed (top-sector weight 2x, after tax); the one check on 2023-2026 is not run yet |
 | **Type** | research |
 | **Area** | momentum |
 | **Created** | 2026-10-17 |
@@ -127,6 +127,31 @@ Neither strategy passes. Report only: within the same week it is -0.04 and -0.25
 +0.81 / +0.74 with the stock's own score (BL-115), so it adds little; winners' and losers' medians
 are 7.4 vs 7.5 and 5.7 vs 6.3.
 
+### Phase 2 development (2017-2022): PASSED
+
+`search_spaces/bl116_phase2_result.json` (rule: `bl116_criteria_addendum_1.json`, pushed before the
+run, a8d124f2); curves `data/search/bl116/phase2/` (git-ignored; regenerate with
+`uv run python scripts/bl116_phase2_top_sector_weight.py`). After tax at Rs 5 lakh per group:
+
+| Group | CAGR 1x -> 2x | Worst fall 1x -> 2x |
+|---|---|---|
+| Six Sectors Monthly, No Tilt | 27.4% -> 29.1% | -27.0% -> -26.9% |
+| Five Sectors, Wide Pool | 27.0% -> 28.2% | -28.2% -> -27.6% |
+| Six Sectors, Make Room | 26.3% -> 27.4% | -27.3% -> -27.1% |
+| Four Sectors Monthly, No Tilt | 27.9% -> 28.9% | -27.5% -> -27.5% |
+| Five Sectors Monthly | 27.7% -> 28.7% | -26.7% -> -26.7% |
+| Four Sectors, Half Tilt | 27.6% -> 28.4% | -28.4% -> -27.7% |
+| Four Sectors, Quick Exit | 28.3% -> 28.5% | -28.4% -> -28.7% |
+| Five Sectors, Stock Tilt | 29.1% -> 29.3% | -28.2% -> -27.1% |
+| Phase 6 ensemble | 21.9% -> 21.9% | -31.7% -> -31.8% |
+| Trio Fortnightly | 33.9% -> 33.1% | -26.8% -> -28.1% |
+| Five Sectors, Rank Sum | 31.4% -> 30.4% | -27.9% -> -29.4% |
+
+Median CAGR change **+0.86 pts**; not lower in **8 of 11**; worst fall within 2 pts in **11 of 11**;
+median Ulcer change +0.0025. Both parts of the rule hold, so development passes. Pre-tax (report
+only): the same direction. Trio and Rank Sum get worse, as Trio's missing H1 pattern suggested.
+The confirmation on 2023-01-06 to 2026-10-16 is read once, and only on the owner's go.
+
 ### What the run found about the engine (affects reading these tables)
 
 Picks from sector positions beyond the fresh ones were excluded, as registered, on the belief that a
@@ -162,4 +187,5 @@ score against beating Nifty 500, on 2017-2022.
 ## Log
 
 - 2026-10-17 — created; Phase 0 pre-registration committed and pushed before any sector score was computed (371911fa).
+- 2026-10-17 — Phase 2 pre-registered (a8d124f2) and run on 2017-2022: development passes (+0.86 pts median after tax, 8 of 11, falls within 2 pts in 11 of 11). Confirmation not run.
 - 2026-10-17 — Phase 1: H1 passes (+13.4 pts, 9 of 9 groups), H2 killed. Found that a stock tilt lets lingering sectors buy; BL-115's Trio pick-order table corrected.

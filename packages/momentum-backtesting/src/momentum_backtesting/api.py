@@ -1939,7 +1939,10 @@ def _run_broad(
     outer_prices: pd.DataFrame,
     *,
     top_sector_weight: float = 1.0,
+    tax: TaxRules | None = None,
 ) -> broad.BroadBacktestResult:
+    """`top_sector_weight` and `tax` are for research scripts (BL-116, after-tax runs); the API's
+    own Broad requests leave both at their defaults."""
     weights = tuple(req.weights) if req.weights else None
     stock_tilt_ranks = None
     if req.broad_reversal_tilt > 0:
@@ -1999,6 +2002,7 @@ def _run_broad(
         uc_locked=uc_locked,
         lc_locked=lc_locked,
         top_sector_weight=top_sector_weight,
+        tax=tax,
     )
 
 
