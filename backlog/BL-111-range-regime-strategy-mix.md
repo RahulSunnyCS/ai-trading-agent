@@ -122,6 +122,43 @@ Committed before any run. The decisions were taken by the assistant at the owner
   signals, Buy as a lever, SENSEX, the 5-Widesl arm as a decision arm. Each needs a new dated block
   and `override: <reason>`.
 
+### Phase 0 — Amendment 1 (2026-10-18, before any run): H3, the expiring-index-only basket
+
+Owner request (chat, 2026-10-18): "on expiry days we will be only using the expiry things; let me
+know whether this increases or decreases" our result, and how much of the current basket is
+non-expiring items.
+
+`override: owner request 2026-10-18` for the two things this block does that Phase 0 excluded:
+it adds a third hypothesis, and it uses SENSEX results ("Will not run" left SENSEX out because the
+P3 confirmation period is NIFTY-only). H3 therefore has **no confirmation period**: it is
+exploratory, in-sample, and cannot decide anything by itself.
+
+- **H3:** on a day an index expires, a basket drawn only from that index's variants earns at least
+  as much as the unrestricted Adaptive basket (list C) of the same size.
+- **Expiry day for an index:** the day its nearest weekly expiry is that day (label `0` on the
+  weekday basis: `dte_n = 0` for NIFTY, `dte_s = 0` for SENSEX). A day on which both expire is left
+  unrestricted.
+- **Arm EXP:** the list's composite is computed over the expiring index's variants only; the same
+  selection rule (top by composite, at least 2 Widesl, same ladder and size, no Buy add-on) as the
+  equal split. **Comparator:** the same list C, unrestricted, in the same ladder.
+- **Context recorded before any outcome (picks only, no P&L):** on the reconstructed Adaptive picks
+  of 2025-01-10 → 2026-10-16 (428 days), Core-298 takes 90.8 % of its NIFTY-expiry-day picks from
+  NIFTY and 78.9 % of its SENSEX-expiry-day picks from SENSEX; T1 (Core-298 + 223) 89.3 % and 83.5 %.
+  A day carries at least one non-expiring pick on 21 of 91 NIFTY-expiry days and 40 of 90 SENSEX-expiry
+  days for Core (22 and 32 for T1). Only those days (about 60) can differ between EXP and the
+  comparator, so the test is small.
+- **Data / period:** 2025-01-10 → 2026-10-08 only (SENSEX results exist from 2024-10; before that
+  the restriction is vacuous because P3 holds NIFTY only).
+- **Read-out (exploratory):** on the days where EXP's basket differs from the comparator's, the daily
+  gross per lot of EXP minus the comparator: mean and 90 % circular block-bootstrap interval (5-day
+  blocks, 2,000 resamples, seed 20261015), NIFTY-expiry days, SENSEX-expiry days and both together
+  (together is the primary). Outcomes: **positive** if the lower bound is above zero, **negative**
+  if the upper bound is below zero, otherwise **inconclusive**. Net of charges reported beside it.
+- **What follows:** nothing is adopted from this. A positive outcome earns a forward parallel track
+  for EXP (a T1-style journal and results), read out after 60 on-time expiry days; a negative or
+  inconclusive one is recorded and EXP is not pursued.
+- **Will not run:** restrictions on non-expiry days, other index rules, other lists.
+
 ### Phase 1 — Build the research root and rerun the baseline
 - **Tasks:** `research/bl111/` loader for the P3 per-variant results and the in-sample store; the
   weekday-basis P3 day file; a check that the equal-split baseline reproduces BL-100's / BL-071's
@@ -169,3 +206,9 @@ should say if the 3-lot ordinary-day basket is not "top 3 non-Buy × 1 lot".
   live store; list C named; NIFTY-only; ladders tied to `score.select` (Widesl minimum kept, no
   Buy add-on); one primary endpoint (the book); net of charges; placebo made a circular shift
   with a P90 bar; the margin premise corrected (Dir is short premium too).
+- 2026-10-18 — owner asked to add the expiring-index-only basket (H3) and to report how much of
+  the current basket is non-expiring on expiry days. Amendment 1 registered before any run with an
+  `override:` for SENSEX use; H3 is exploratory (no confirmation period). Composition measured
+  (picks only): Core-298 non-expiring-index picks 9.2 % on NIFTY-expiry days and 21.1 % on
+  SENSEX-expiry days; T1 10.7 % and 16.5 %.
+
