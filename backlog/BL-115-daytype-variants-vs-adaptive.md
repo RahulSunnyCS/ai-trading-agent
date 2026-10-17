@@ -214,6 +214,13 @@ were simulated on its pick day for the net comparison.
 - **Known weaknesses:** more candidates mean more chances to fit noise in the selection year; the
   first-half / second-half check is the guard.
 
+- **Result (2026-10-17): no pass — T1 stands.** 77,472 edge cells simulated (72 jobs, none failed);
+  the first-year selection with the edges added gave 10 settings (249 variants), several at the new edges
+  (MTM ₹6,000; SL 40 %; NIFTY ₹90 and SENSEX ₹480 premiums; RE COST ×2). Adaptive, test year, gross per
+  lot-day: Core-298 417 (DD −₹10,688), T1 640 (−₹7,767), T1-edge 552 (−₹10,457; +134 vs Core,
+  [−14, +293]). T1-edge minus T1: −88, 90 % [−180, +3], deeper drawdown. Widening the grid found settings
+  that won the first year by more and did worse in the test year: more choice, more overfitting.
+
 ## Experiment 5 — book overlays on T1's Adaptive picks (registered 2026-10-16, before any run)
 
 - **What:** the day's T1 Adaptive picks (list C over Core-298 + T1, no weight) as one book, minute by
