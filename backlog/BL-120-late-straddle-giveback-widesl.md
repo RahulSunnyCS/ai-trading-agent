@@ -108,6 +108,56 @@ event days, after charges, and whether it survives one read of P1.
   winner and loser, share stopped out, expiry versus other days, strike switches inside the rise.
 - **Done when:** this block is in a commit named in the Log, before `research/bl120/` holds a run.
 
+### Phase 0b — Block 2: the day's-low reading (registered 2026-10-18, after the event counts, before any placebo or trade P&L)
+
+Owner, 2026-10-18, on seeing that rule A almost never fires: "at 14:30, if it is already up 20 points
+from the day's low, that is also included." Rule A measured the rise only from 14:30 on, so it missed
+exactly that case. Block 2 is the rule as the owner meant it. **Rule A stays registered, is
+inconclusive by construction (4 / 8 / 7 tradable events), and is not run for P&L.** Everything in Phase 0
+not restated here stands (series, trade, stop, costs, comparators, tests, read guard, P1 gate).
+
+- **Why this block and not another:** the owner's own clarification. The event counts (Log) were seen
+  before choosing among readings; no P&L of any reading has been computed. Counts of the readings not
+  chosen (13:30, 13:00, halved rise) are in the Log and are not run.
+- **Definitions (one each):**
+  - *Low and epoch:* L(t) is the lowest value of the rolling ATM straddle from 09:20 to minute t. A
+    value strictly below every earlier one is a new low and starts a new **epoch**: the epoch high H(t)
+    is the highest value since that low's minute, and the hold below restarts.
+  - *Rise and hold:* rise R(t) = x(t) − L(t). **Held** when R(t) ≥ **20** (NIFTY) / **50** (SENSEX) for
+    **5 consecutive** minutes inside the epoch; once held, the epoch stays held (the owner's "stays or
+    stayed": the hold may complete before 14:30).
+  - *Give-back state:* held and H(t) − x(t) ≥ **15** points (both indices, as in Phase 0).
+  - *Fire:* the first minute m ≥ 14:30 (index 315) at which the give-back state **becomes** true: true
+    at m, not true at m − 1 in the same epoch (a new epoch counts as not true before it). A give-back
+    that was already in place at 14:29 does not fire at 14:30; only a later fresh crossing does. One
+    event per index per day, the first.
+  - *Entry, trade, stop, costs:* as Phase 0 (entry at m + 1, not tradable if 15:13 or later; the live
+    Widesl, ₹1,000 overall stop, ₹20 an order).
+- **Look-ahead check:** as Phase 0 (reads x(≤ m) only; truncation test; placebo chosen from bars up to
+  the entry minute), plus: an independent implementation of block 2's rule must agree with this one
+  on a sample of real days, and a day's epoch state at 14:30 must be computed from bars up to 14:30 only.
+- **Judged cell:** **NIFTY, P2 and P3 pooled, as one cell** (the owner allowed pooling to reach the
+  floor). **SENSEX P2 is reported and not judged** (its event count is below the floor). The placebo for
+  an event is drawn within its own period (5 days each side), the random-minute pool is the pooled
+  NIFTY events' entry minutes (200 draws, seed 20261018).
+- **Pass / kill rule (Phase 0's three tests, applied to the pooled cell):**
+  1. mean net (₹20 an order) per event > 0;
+  2. event minus the causal placebo > 0 with t ≥ 2.0 over events;
+  3. the event mean above the 95th percentile of the 200 random-minute means.
+  **Pass** = all three, **and** tests 1 and the sign of test 2 positive in P2 and in P3 separately.
+  **Kill** = mean net ≤ 0 or event minus placebo ≤ 0 in the pooled cell. **Inconclusive** = fewer than 30
+  pooled tradable events, or anything else (for example tests 1 and 2 hold but t < 2, or test 3 or a
+  period's sign fails).
+- **Counted tries:** block 2 is one rule in one judged cell (plus the SENSEX report). Ledger of what was
+  counted or run in this item: rule A (counts only); A from 13:30, A from 13:00, A with the rise halved
+  (counts only); block 2 (this). BL-091's 31 arms and BL-083's four triggers read these days first.
+- **Will not run:** a different rise, hold, give-back, stop or start time; the 13:30 / 13:00 / halved
+  readings; firing on a give-back already in place at 14:30; the Dir or Buy template; re-entries; P1
+  before the gate; a per-expiry or per-VIX sweep (descriptive only). A block 3 would be dated and
+  committed before its P&L.
+- **Done when:** this block is in a commit, named in the Log, before any placebo or trade simulation
+  for block 2 is computed.
+
 ### Phase 1 — Build, check, run P2 and P3
 
 - **Tasks:** `research/common/straddle_series.py` (the series builder BL-091 uses, copied; BL-091 can be
@@ -209,3 +259,7 @@ after 60 sessions. Not started by this item.
   block 2 adds to the disclosure.
 - 2026-10-18 — Status: waiting for the owner. A block 2 must be committed before any placebo or trade
   P&L is computed. The owner's answer to open question 4 below decides it.
+- 2026-10-18 — **Block 2 registered** (Phase 0b), before any placebo or trade P&L: the day's-low reading,
+  NIFTY P2 + P3 pooled as the judged cell, SENSEX reported only. Prompted by the owner: "at 14:30, if it
+  is already up 20 points from the day's low, that is also included." Committed in this commit; the run
+  follows.
