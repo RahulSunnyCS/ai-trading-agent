@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner wants a way to avoid the losing picks of the two strategies they follow, before more money goes in |
-| **Status** | In progress — Phase 0 committed |
+| **Status** | Done — killed: no feature passes in both strategies (the average-weekly score passes in Four Sectors Monthly only) |
 | **Type** | research |
 | **Area** | momentum |
 | **Created** | 2026-10-17 |
@@ -78,6 +78,54 @@ The binding rule is `packages/momentum-backtesting/search_spaces/bl115_criteria.
 - Pre-registered as an addendum before it runs: the floor's value from the 2017-2022 trades, the
   backtest on 2017-2022 against the strategy as it is, then one check on the sealed window.
 
+## Result (2026-10-17): killed
+
+`search_spaces/bl115_result.json` (rule: `bl115_criteria.json`, committed before the run); trade
+table `data/search/bl115/trades.csv` (git-ignored; regenerate with
+`uv run python scripts/bl115_own_history_features.py`). 2017-2022 only; nothing after 30 Dec 2022 was
+read.
+
+| | Trio Fortnightly | Four Sectors Monthly, No Tilt |
+|---|---|---|
+| Trades (closed, 2017-2022) | 384 (16 open at the end, left out) | 508 (21 open) |
+| Losers (did not beat Nifty 500) | 57% | 49% |
+
+Rank correlation with the trade's return over Nifty 500 (t from 2,000 bootstraps over decision
+weeks), and the loser share of each feature's worst fifth against the strategy's overall share:
+
+| Feature | Trio rho / t | Trio worst fifth | Four Sectors rho / t | Four Sectors worst fifth | Passes |
+|---|---|---|---|---|---|
+| F0 average-weekly score (owner) | +0.08 / 1.7 | 61% vs 57% | **+0.15 / 3.9** | **60% vs 49%** | Four Sectors only |
+| F1 steadiness | +0.06 / 1.1 | 64% vs 57% | +0.11 / 2.7 | 52% vs 49% | no |
+| F2 smoothness | +0.02 / 0.4 | 62% vs 57% | +0.08 / 1.9 | 49% vs 49% | no |
+| F3 distance below 52-week high | +0.10 / 1.8 | 60% vs 57% | +0.07 / 1.7 | 56% vs 49% | no |
+| F4 turnover expansion | -0.01 / -0.2 | 60% vs 56% | +0.14 / 2.9 | 51% vs 47% | no |
+| F5 circuit days (expected -) | +0.03 / 0.6 | 55% vs 57% | +0.09 / 2.0 | 46% vs 49% | no (wrong way in Four Sectors) |
+| F6 spike dependence (expected -) | -0.06 / -0.9 | 57% vs 56% | -0.06 / -1.4 | 52% vs 47% | no |
+
+**Verdict under the rule: killed.** No feature passes in both strategies. The owner's score has the
+expected sign in both and passes both tests in Four Sectors Monthly, but not in Trio.
+
+Report only (no verdict):
+
+- **Same week:** taking the feature and the outcome relative to the other picks decided that week,
+  the score's correlation is +0.18 in Four Sectors and +0.08 in Trio, so where it works it is not
+  only market timing.
+- **The engine's own entry rank** correlates about as much (-0.11 and -0.10; rank 1 is best), so the
+  score adds little a rank does not already carry.
+- **Components:** in Four Sectors the 13- and 26-week average weekly returns carry it (+0.16, +0.17);
+  the 4- and 52-week parts add little. Score / 26-week volatility: +0.17 and +0.10.
+- **Fixed 13 weeks after the fill** (fills to Sep 2022): score +0.09 and -0.02; steadiness +0.15 and
+  +0.07.
+- **Big losers:** the worst 20% of trades are spread about evenly over the score's quintiles (Four
+  Sectors 22%, 23%, 17%, 22%, 18% from lowest score to highest), so a floor would not avoid them.
+- **Medians:** winners 9.0 vs losers 8.1 (Four Sectors), 6.6 vs 5.9 (Trio): heavy overlap.
+
+What this means: among stocks these strategies already chose, the stock's own numbers at the buy
+week say little about which picks will lag the index. A follow-up on the score in Four Sectors alone
+would be a new, post-hoc question and needs its own pre-registration; the 2023-2026 window stays
+unread.
+
 ## Risks
 
 - The trades are only stocks the strategy already picked, so every score is high; the test asks
@@ -94,4 +142,5 @@ features and the report-only views as listed.
 
 ## Log
 
-- 2026-10-17 — created; Phase 0 pre-registration committed before any feature was computed.
+- 2026-10-17 — created; Phase 0 pre-registration committed before any feature was computed (96d6e2d2).
+- 2026-10-17 — Phase 1 run: killed. No Phase 2.
