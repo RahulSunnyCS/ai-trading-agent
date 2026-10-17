@@ -1,0 +1,108 @@
+{
+  "item": "BL-115",
+  "committed": "2026-10-17",
+  "note": "Pre-registered before any feature was computed or any 2017-2022 trade outcome was looked at. Never edit after a run; supersede with bl115_criteria_addendum_N.json naming what it replaces and why.",
+  "question": "At the week a stock was chosen, do measures computed from the stock's OWN history only (no ranking against other stocks) separate the trades that went on to beat Nifty 500 from those that did not?",
+  "strategies": {
+    "trio_fortnightly": {
+      "group": "1258177078c9468e90329185848a4895",
+      "sleeves": {
+        "b2346e4f76564acd85e3b60661a8e803": "c91c330dc5a1",
+        "9633357266ee4300819a7ab203145b87": "a398b1ffd51f"
+      },
+      "lookbacks_weeks": [13, 26, 52]
+    },
+    "four_sectors_monthly_no_tilt": {
+      "group": "80be04f664714f70b0d4017e6b681eef",
+      "sleeves": {
+        "79c93a8fcffd46a3ba04881509e25170": "3a031da9a4e7",
+        "d468f277a0214753b84ac632e1ffc5f2": "f0813ef775be",
+        "a1480efe183247bd9f5bda28af80d6c5": "9467a8921c3e",
+        "3d68ddf8cee74df28433aa1fa912de0c": "a92aeeec1adc"
+      },
+      "lookbacks_weeks": [4, 13, 26, 52]
+    },
+    "sleeve_map_format": "saved run id -> settings fingerprint (saved_identity.fingerprint); each sleeve is re-run with its saved config_full, only `end` changed"
+  },
+  "windows": {
+    "phase_1": {"start": "2017-01-01", "end": "2022-12-30"},
+    "embargo_weeks": 13,
+    "sealed": {
+      "from": "2023-01-06",
+      "to": "2026-10-16",
+      "use": "Not read in Phase 1. Only a Phase 2 that a passing feature earns may read it, once, under its own pre-registration."
+    },
+    "caveat": "Both strategies were chosen on results that include 2023-2026, so that window is a weak check, not a clean hold-out. The clean hold-out (2012-2016) was already used once by BL-010."
+  },
+  "trades": {
+    "which": "every new position (engine action BUY, not ADD or top-up) in each sleeve's re-run with end = 2022-12-30, filled from 2017-01-06 and closed by 2022-12-30",
+    "open_at_end": "positions still open on 2022-12-30 are excluded and counted",
+    "decision_week": "the Friday whose ranks chose the stock: one week before the fill week (signal_delay = 1 for every sleeve)",
+    "sleeves_pooled": "a strategy's trades are its sleeves' trades together; the same stock bought by two sleeves counts twice"
+  },
+  "outcome": {
+    "primary": "excess = the position's own return from the engine (position_return: sell value / cost) minus Nifty 500 TRI's return from the fill week to the exit week",
+    "winner": "excess > 0",
+    "loser": "excess <= 0"
+  },
+  "features": {
+    "price_source": "the engine's own weekly price series for the stock (UniverseRanking.prices: Friday closes, back-adjusted for confirmed splits and bonuses, one column per series segment); daily inputs from bars_1d_stock (EQ series), daily moves split-adjusted as in categories/daily_moves.py",
+    "point_in_time": "every feature uses data up to and including the decision week's Friday only",
+    "F0_avg_weekly_score": {
+      "owner": true,
+      "definition": "sum over the strategy's own lookbacks k of (p[d] / p[d-k] - 1) / k, in percent: each window's average weekly return, added up",
+      "expected_sign": "+"
+    },
+    "F1_steadiness": {
+      "definition": "share of the 26 weekly returns ending at d that are above zero",
+      "expected_sign": "+"
+    },
+    "F2_smoothness": {
+      "definition": "deepest peak-to-trough fall of the weekly price within the 26 weeks ending at d (0 or negative; nearer 0 = smoother)",
+      "expected_sign": "+"
+    },
+    "F3_distance_below_52w_high": {
+      "definition": "p[d] / max(weekly p over the 52 weeks ending at d) - 1 (0 or negative)",
+      "expected_sign": "+"
+    },
+    "F4_turnover_expansion": {
+      "definition": "mean daily rupee turnover over the 20 sessions ending at d divided by the mean over the 130 sessions ending at d",
+      "expected_sign": "+"
+    },
+    "F5_circuit_days": {
+      "definition": "number of sessions in the 65 sessions ending at d whose close / prevclose - 1 sits on a circuit band edge (circuit_exposure._BANDS), up or down",
+      "expected_sign": "-"
+    },
+    "F6_spike_dependence": {
+      "definition": "the largest single-session log move in the 65 sessions ending at d divided by the 13-week log return ln(p[d] / p[d-13]); defined only when that 13-week log return is at least 0.05, otherwise missing (counted, not imputed)",
+      "expected_sign": "-"
+    },
+    "missing": "a trade with a missing feature is left out of that feature's test only, and the count is reported"
+  },
+  "tests_per_feature_per_strategy": {
+    "a_rank_correlation": "Spearman rho between the feature at the decision week and the trade's excess return; its spread from 2,000 block-bootstrap resamples of decision weeks (seed 115); t = rho / bootstrap standard deviation. Holds when rho has the expected sign and |t| >= 3",
+    "b_losers_in_worst_fifth": "the feature's worst fifth of trades (by the expected sign; cut points from that strategy's own 2017-2022 trades) has a loser share at least 10 percentage points above the strategy's overall loser share",
+    "why_t_3": "seven features in two strategies are fourteen tests; t >= 3 keeps the chance of any lucky pass near 5%"
+  },
+  "verdict": {
+    "feature_passes": "a and b both hold in BOTH strategies",
+    "pass": "at least one feature passes: its Phase 2 (a floor in the backtest on 2017-2022, then one check on the sealed window) is pre-registered as a new addendum before it runs",
+    "kill": "no feature passes: the item closes with the tables below; nothing in the engine changes"
+  },
+  "report_only": {
+    "same_week_view": "Spearman with the feature and the excess each taken relative to the average of the trades decided in the same week (weeks with at least two entries across all sleeves of the strategy), to separate 'the stock was weak' from 'the market was weak'",
+    "fixed_horizon_outcome": "13 weeks after the fill: stock weekly return minus Nifty 500 TRI over the same 13 weeks, for fills up to 2022-09-30 only, so nothing after 2022-12-30 is read",
+    "components": "each lookback's average weekly return on its own, and F0 divided by the stock's 26-week weekly volatility",
+    "big_losers": "share of the worst 20% of trades (by excess) in each feature quintile",
+    "current_score": "the engine's own entry rank against the excess, for comparison"
+  },
+  "look_ahead_check": "a test recomputes every feature with all prices after the decision week removed and requires identical values; the Phase 1 run reads nothing after 2022-12-30",
+  "survivorship": "the sleeves' universe is turnover_rank (each year's 750 most-traded stocks from the six months before it began, delisted names included); Nifty 500 TRI is the comparator",
+  "will_not_run": [
+    "other features (accumulation, volatility, worst day, 40-week average, liquidity, EQ series moves)",
+    "other lookback sets or weights for F0",
+    "thresholds tuned on the outcome",
+    "other strategies or the ETF track",
+    "reading 2023-01-06 onwards"
+  ]
+}
