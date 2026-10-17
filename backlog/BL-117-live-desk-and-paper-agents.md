@@ -135,7 +135,10 @@ the lake; the agent journal recorded before 09:16; Clockwork and Placebo as the 
 - Changing the BL-058 lists, universe, pass rule or journal, or the T1 track.
 - Mixing live-captured bars into the research lake.
 - Intraday discretion for agents (no intraday signal has passed; a new one is its own research
-  item first).
+  item first). Rule-triggered intraday agents, the owner's own rules and the evening post-mortems
+  are [BL-119](BL-119-rule-agents-paper-and-retrospection.md). This item's agent tournament
+  (Phases 0b, 1, 5) tests the pre-open pickers and is complementary to it; BL-119's live paper runs
+  on this item's Phase 2 feed and Phase 4 paper desk.
 - Showing any of this to anyone but the owner (`business.md`).
 
 ## Architecture (proposal)
