@@ -361,6 +361,29 @@ were simulated on its pick day for the net comparison.
   days (Dir's 15–40 % stops fire on moves too small to lift a far hedge). Holding the hedge to the close
   differs little from Experiment 7's wings (₹5 / ₹15 on Widesl, all days: ₹2,96,302 vs ₹2,94,713).
 
+## Experiment 10 — three ways of choosing settings, R1 / R2 / R3 (registered 2026-10-17, before any selection ran)
+
+- **Owner (2026-10-17):** test the selection rules now on the two years we have (both indices), the
+  4-year run (BL-116) later.
+- **Same as Experiment 3** (the fixed 12-month window before each quarter, the same four quarters, 25
+  entry times, Adaptive list C, gross, Core-298 on the same days, one setting per family and day type),
+  **except how a setting is chosen inside the window:**
+  - **R1, the T1 method:** Experiment 3's variant 1 itself (rank on the first half, confirm on the
+    second); its result is reused, not re-run.
+  - **R2, whole window:** rank on all 12 months; the same margin, slot and worst-day conditions as R1 and
+    at least two neighbours beating the comparator; no confirm half.
+  - **R3, plateau:** as R2, and the median gain of the ±1-step neighbours on **SL, MTM and re-entry**
+    (owner) must also beat the comparator; the pick maximises min(own gain, neighbours' median).
+  - Premium families rank their premiums on the same field (R1: first half; R2 / R3: whole window).
+- **Pass rule:** Experiment 3's (≥ 3 of 4 quarters won and the pooled interval above zero), with the
+  pooled interval at **95 %** for R2 and R3 (two new arms). Reported for each: quarters won, pooled gain,
+  drawdown and **pick stability** (share of a fold's settings kept in the next fold; R1: about 25–40 %).
+  Read once. A rule that passes becomes BL-116's primary candidate; the forward track (BL-113) is
+  untouched either way.
+- **Known weaknesses:** the four quarters were read for R1; R2 / R3 picks may need RE ASAP or RE COST ×2,
+  whose AlgoTest parity is unverified (BL-009); four quarters is low power.
+- `research/bl107/walkforward.py --rule R2|R3 --stage all` → `results/walkforward_r2/`, `_r3/`.
+
 ## Log
 
 - 2026-10-16 — created from the owner's request; Phase 0 registered before the first-year selection

@@ -36,6 +36,7 @@ FOLDS = [  # (fold, select start, half, select end exclusive, trade start, trade
     (4, date(2025, 7, 1), date(2025, 12, 31), date(2026, 7, 1), date(2026, 7, 1), date(2026, 10, 10)),
 ]
 VARIANTS = (1, 2)
+RULE = "R1"
 # Experiment 8: the same quarters, each selected on everything from 2024-10-09 up to its start
 # (ranked on the first half, confirmed on the second); variant 1 only.
 EXPANDING = [
@@ -55,7 +56,7 @@ def stage_select() -> None:
     exp = dl.expiries()
     out = []
     for fold, start, half, end, _, _ in FOLDS:
-        dl.WINDOW, dl.WIN = "custom", (start, half, end)
+        dl.WINDOW, dl.WIN, dl.RULE = "custom", (start, half, end), RULE
         for f in dl.FAMILIES:
             results = {slot: dl.evaluate(f, slot, exp[dl.grid.INDICES[f.idx]]) for slot in dl.ALL_SLOTS}
             for variant in VARIANTS:
@@ -203,6 +204,16 @@ def stage_replay() -> None:
         mean, lo, hi = block_bootstrap_mean(np.array(pooled[2]) - np.array(pooled[1]))
         print(f"variant 2 minus variant 1: {mean:+.0f} 90% [{lo:+.0f}, {hi:+.0f}]"
               f" -> {'variant 2 preferred' if lo > 0 else 'variant 1 (the simpler) stands'}")
+    winners = json.loads((RES / "winners.json").read_text())
+    for v in VARIANTS:
+        sets = {}
+        for x in winners:
+            if x["variant"] == v:
+                sets.setdefault(x["fold"], set()).add(json.dumps([x["family"], x["kind"], x["params"]], sort_keys=True, default=list))
+        kept = [len(sets.get(f, set()) & sets.get(f - 1, set())) / max(1, len(sets.get(f - 1, set())))
+                for f in sorted(sets) if f > min(sets)]
+        print(f"variant {v} pick stability (share of a fold's settings kept in the next): "
+              + ", ".join(f"{k:.0%}" for k in kept) + f"; mean {np.mean(kept):.0%}")
     with (RES / "summary.csv").open("w", newline="") as h:
         w = csv.DictWriter(h, fieldnames=list(rows[0]))
         w.writeheader()
@@ -214,9 +225,15 @@ def main() -> None:
     ap.add_argument("--stage", default="all", choices=("select", "cells", "sim", "replay", "all"))
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--scheme", default="fixed", choices=("fixed", "expanding"))
+    ap.add_argument("--rule", default="R1", choices=("R1", "R2", "R3"))
     args = ap.parse_args()
+    global RULE, FOLDS, VARIANTS, RES, SIM
+    RULE = args.rule
+    if args.rule != "R1":  # BL-115 Experiment 10: the fixed window, variant 1, its own folder
+        VARIANTS = (1,)
+        RES = HERE / "results" / f"walkforward_{args.rule.lower()}"
+        SIM = RES / "sim"
     if args.scheme == "expanding":
-        global FOLDS, VARIANTS, RES, SIM
         FOLDS, VARIANTS = EXPANDING, (1,)
         RES = HERE / "results" / "walkforward_expanding"
         SIM = RES / "sim"

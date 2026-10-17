@@ -196,10 +196,10 @@ def candidates(f: Family, slot: str) -> list[tuple[dict, str, dict]]:
     return out
 
 
-def neighbours(f: Family, p: dict) -> list[dict]:
+def neighbours(f: Family, p: dict, axes: tuple[str, ...] | None = None) -> list[dict]:
     out = []
     for axis, chains in grid.CHAINS[f.fam].items():
-        if axis == "strike":
+        if axis == "strike" or (axes is not None and axis not in axes):
             continue
         if EDGES and axis == "mtm" and f.fam in EDGE_MTM:
             chains = tuple(tuple(c) + EDGE_MTM[f.fam] for c in chains)
@@ -440,6 +440,11 @@ def aggregate(f: Family, results: dict[str, dict], kind: str, slots: tuple[str, 
     return agg
 
 
+def rank_field() -> str:
+    """R1 ranks on period 1; R2 and R3 on the whole window (BL-115 Experiment 10)."""
+    return "gain_first" if RULE == "R1" else "gain"
+
+
 def premium_scores(agg: dict[str, dict]) -> dict[float, float]:
     """A premium's score is its best setting's slot-mean gain over the template in period 1 (the first
     year; with WINDOW "first", the first half of it) — Amendment 10: ranking reads period 1 only."""
@@ -448,7 +453,7 @@ def premium_scores(agg: dict[str, dict]) -> dict[float, float]:
         if k == "__template__":
             continue
         pr = r["params"]["strike"]
-        score[pr] = max(score.get(pr, -1e18), r["gain_first"])
+        score[pr] = max(score.get(pr, -1e18), r[rank_field()])
     return score
 
 
@@ -461,7 +466,7 @@ def family_premiums(agg: dict[str, dict]) -> tuple[list[float], dict[float, floa
         if k == "__template__":
             continue
         pr = r["params"]["strike"]
-        if pr not in best or r["gain_first"] > best[pr]["gain_first"]:
+        if pr not in best or r[rank_field()] > best[pr][rank_field()]:
             best[pr] = r
     kept: list[float] = []
     for pr in sorted(score, key=lambda p: -score[p]):
@@ -474,6 +479,8 @@ def family_premiums(agg: dict[str, dict]) -> tuple[list[float], dict[float, floa
 
 
 TOP_RANKS = 3  # Amendment 10: walk at most to the third-ranked setting
+RULE = "R1"  # BL-115 Experiment 10: R1 (Amendments 10-11), R2 whole window, R3 plateau
+PLATEAU_AXES = ("sl", "mtm", "reentry")  # owner, 2026-10-17
 
 
 def period2_slots_needed(n: int) -> int:
@@ -486,6 +493,8 @@ def decide(f: Family, agg: dict[str, dict], kind: str, allowed: list[float] | No
     """Amendment 10 (owner, 2026-10-16): rank on period 1, walk ranks 1 → 3, take the first that also
     beats the template in period 2. Period 1 / 2 = first / second year (the lists), or the first /
     second half of the first year (WINDOW "first", BL-107: the test year is never read)."""
+    if RULE != "R1":
+        return decide_whole(f, agg, kind, allowed)
     tmpl = agg["__template__"]
     dflt = agg[key(OWNER_DEFAULT[kind])] if f.name == "N_wide" and kind in OWNER_DEFAULT else tmpl
 
@@ -546,6 +555,52 @@ def decide(f: Family, agg: dict[str, dict], kind: str, allowed: list[float] | No
     if dflt["gain_first"] < 0 and dflt["gain_test"] < 0:
         top = sorted((r for r in agg.values() if not r.get("is_template")), key=lambda r: -r["gain"])[:3]
         return {"status": "owner to choose", "picks": [dflt], "alts": top, "n_clear": 0}
+    return {"status": "default (template)" if dflt is tmpl else "default (owner setting)", "picks": [dflt],
+            "alts": [], "n_clear": 0}
+
+
+def decide_whole(f: Family, agg: dict[str, dict], kind: str, allowed: list[float] | None) -> dict[str, Any]:
+    """BL-115 Experiment 10. R2: rank on the whole window, the same margin and slot conditions as R1,
+    no period-2 check. R3 (plateau): also the median gain of the ±1-step neighbours on SL, MTM and
+    re-entry beats the comparator; score = min(own gain, neighbours' median gain)."""
+    tmpl = agg["__template__"]
+    dflt = agg[key(OWNER_DEFAULT[kind])] if f.name == "N_wide" and kind in OWNER_DEFAULT else tmpl
+
+    def score(r: dict) -> float | None:
+        if r is dflt or r.get("is_template"):
+            return None
+        if not (r["gain"] > 0 and r["gain"] >= dflt["gain"] + MARGIN[kind]
+                and r["slots_pos"] >= slots_needed(len(r["slots"])) and not (r["worst_x"] > WORST_X)):
+            return None
+        if RULE == "R2":
+            return r["gain"] if r["nb_beat"] >= 2 else None
+        nb = [agg[key(q)]["gain"] for q in neighbours(f, r["params"], PLATEAU_AXES) if key(q) in agg]
+        if len(nb) < 2:
+            return None
+        med = float(np.median(nb))
+        if med <= dflt["gain"]:
+            return None
+        r["plateau_median"] = med
+        return min(r["gain"], med)
+
+    scored = [(sc, r) for r in agg.values() if (sc := score(r)) is not None]
+    pools = ([[(sc, r) for sc, r in scored if r["params"]["strike"] == pr] for pr in allowed]
+             if f.is_premium and allowed is not None else [scored])
+    picks: list[dict] = []
+    for pool in pools:
+        if not pool:
+            continue
+        sc, r = max(pool, key=lambda x: x[0])
+        r["rank_used"], r["robust_score"] = 1, sc
+        if picks:
+            r["corr_with_first"] = float(np.corrcoef(picks[0]["values"], r["values"])[0, 1])
+            if MAX_PICKS is not None and r["corr_with_first"] >= MAX_CORR:
+                continue
+        picks.append(r)
+        if MAX_PICKS is not None and len(picks) == MAX_PICKS:
+            break
+    if picks:
+        return {"status": f"chosen ({RULE})", "picks": picks, "alts": [], "n_clear": len(scored)}
     return {"status": "default (template)" if dflt is tmpl else "default (owner setting)", "picks": [dflt],
             "alts": [], "n_clear": 0}
 

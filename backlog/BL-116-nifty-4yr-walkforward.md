@@ -1,4 +1,4 @@
-# BL-116 — 4-year NIFTY walk-forward of the T1 selection method
+# BL-116 — 4-year walk-forward of the T1 selection method (NIFTY from 2022, both indices from 2024-10)
 
 | | |
 |---|---|
@@ -126,3 +126,9 @@ Filled in and committed before any selection or replay. Drafted defaults, to con
   per the Phase 0 draft both schemes are run and judged.
 - 2026-10-17 — owner: add R2 (whole-window ranking) and R3 (plateau selection) beside the T1 method;
   six arms, the non-primary ones at the 95 % interval.
+- 2026-10-17 — owner's answers (as recommended): (1) **not NIFTY-only**: both indices wherever data
+  exists (from 2024-10), NIFTY alone only before it (SENSEX has no history), so the window changes and
+  everything else run on SENSEX too; (2) pre-2024 quarters are equal evidence, but each era must be
+  positive on its own; (3) NIFTY Buy only if its premium strikes are priced on ≥ 90 % of vendor days;
+  (4) gross and net must both pass; (5) R3's neighbours: SL, MTM and re-entry only. The selection rules
+  are tested first on the current two years (BL-115 Experiment 10); the 4-year run is for a later night.
