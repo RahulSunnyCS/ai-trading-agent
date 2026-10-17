@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner's own rule (2026-10-18), the first rule-triggered intraday test that is not a re-entry habit; cheap to run |
-| **Status** | In progress (Phase 0 pre-registered; nothing run when this block was committed) |
+| **Status** | In progress. Phase 1 build and checks done; the registered rule is inconclusive by construction (4 / 8 / 7 tradable events against a floor of 30); no P&L read; owner to choose a reading (see Log) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -152,9 +152,60 @@ after 60 sessions. Not started by this item.
 1. SENSEX give-back: 15 as said (default), or scaled to about 37? A dated block 2 if wanted.
 2. Is "1000 sl" an overall ₹1,000 stop per Widesl strategy (default), or a per-leg figure?
 3. After P2 + P3, should P1 be read straight away if a cell passes, or after the owner says so?
+4. (2026-10-18) The rule as registered fires about once in 25 sessions on NIFTY (tradable once in 65),
+   mostly at 15:12 or later.
+   Which reading did the owner mean: (a) the rise, its 5-minute hold and the give-back all after 14:30
+   (registered, too rare); (b) the rise measured from the day's low, possibly holding before 14:30,
+   with the give-back at or after 14:30; (c) a window that starts earlier (13:30 or 13:00); or (d) a
+   smaller rise? And may NIFTY P2 and P3 be pooled so a cell can reach 30 events?
 
 ## Log
 
 - 2026-10-18 — created from the owner's chat. Defaults above are mine (give-back 15 on both indices;
   ₹1,000 as the overall stop; the series, trade and periods from BL-091). Phase 0 committed before any
-  run.
+  run (commit 8e5918e4).
+- 2026-10-18 — **Phase 1, build and checks.** `research/common/straddle_series.py` (BL-091's series
+  builder, copied) and `widesl_trade.py` (BL-091's Widesl runner, copied); `research/bl120/`:
+  `rule.py`, `periods.py` (read guard: only the three registered cells open), `design.py` (placebo and
+  random-minute selection, written, not yet used), `events.py`, `selfcheck.py`. Checks, all passing:
+  15 synthetic cases (known fire, rise held 4 minutes, give-back 14, rise 19, fall inside the hold,
+  a strike-switch jump, fire at 15:12 versus 15:13, a rise before 14:30, SENSEX 30 versus 55, truncation);
+  an independent numpy implementation of the rule agrees with `rule.detect` and with the scan on 400
+  real days; truncation holds on every real event in that sample; the series at minutes up to the fire
+  minute is unchanged when later bars are removed; a Widesl at 12:02 equals the stored `N_wide_1202`
+  gross on 5 P2 days. `out/` is git-ignored: regenerate with `events.py`.
+- 2026-10-18 — **Event counts (no P&L read).** The rule as registered fires on very few days.
+  Fires (first event of the day) and, in brackets, those with an entry by 15:12:
+
+  | cell | weekday sessions | fires | tradable | fires on expiry day |
+  |---|---|---|---|---|
+  | NIFTY P2 | 157 | 9 | 4 | 4 |
+  | NIFTY P3 | 618 | 22 | 8 | 13 |
+  | SENSEX P2 | 157 | 17 | 7 | 4 |
+
+  All three cells are below the registered floor of 30, so under Phase 0 **each is inconclusive by
+  construction** and nothing is judged. Most fires are late: 29 of the 48 fire at 15:12 or later, so
+  their entry would fall at 15:13 or after (the same 29 are the not-tradable ones), and 21 of the 48
+  are on expiry day. On expiry day the straddle's low is a median 10.6 points and its high 56.7, and
+  the window holds a median of 7.5 ATM strike switches (7 on expiry day, 8 on other days), each of which
+  re-prices the straddle; whether these rises are premium expanding or the strike moving was not
+  separated. NIFTY: 31 fires in 775 sessions (one in 25), 12 tradable (one in 65). No placebo or trade
+  P&L was computed, deliberately: the rule is not to be loosened after reading outcomes.
+- 2026-10-18 — **Counts for other readings, counts only** (`counts_alt.py`, `out/counts_alt.csv`; none
+  registered, none judged, listed here because choosing among them must rest on testability, not on
+  results). Tradable events by cell:
+
+  | reading | NIFTY P2 (157 d) | NIFTY P3 (618 d) | SENSEX P2 (157 d) | NIFTY P2 + P3 |
+  |---|---|---|---|---|
+  | A: registered (from 14:30) | 4 | 8 | 7 | 12 |
+  | A from 13:30 | 17 | 27 | 24 | 44 |
+  | A from 13:00 | 22 | 32 | 34 | 54 |
+  | A with the rise halved (10 / 25) from 14:30 | 13 | 31 | 24 | 44 |
+  | B: rise from the day's low since 09:20, give-back crosses 15 at or after 14:30 | 9 | 27 | 18 | 36 |
+
+  No reading reaches 30 in NIFTY P2 alone; SENSEX P2 reaches it only from 13:00. Readings that reach 30
+  need NIFTY P2 and P3 pooled (a change to Phase 0's per-cell judging) or an earlier start or a smaller
+  rise (a different rule from the owner's). Four variants and one reading were counted besides A; any
+  block 2 adds to the disclosure.
+- 2026-10-18 — Status: waiting for the owner. A block 2 must be committed before any placebo or trade
+  P&L is computed. The owner's answer to open question 4 below decides it.
