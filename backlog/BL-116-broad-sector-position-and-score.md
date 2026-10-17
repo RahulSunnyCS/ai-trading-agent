@@ -63,9 +63,19 @@ The binding rule is `packages/momentum-backtesting/search_spaces/bl116_criteria.
   the result below, the findings pages.
 - **Done when:** both verdicts are written here under the rule.
 
-### Phase 2 — Only if a hypothesis passes
-Pre-registered as an addendum before it runs (for example more weight on the best-placed sector, or a
-sector-score floor), backtested on 2017-2022, then one check on the sealed window.
+### Phase 2 — More money for the best-placed sector (pre-registered 2026-10-17)
+
+The binding rule is `search_spaces/bl116_criteria_addendum_1.json`, committed before any Phase 2
+run. One setting: a buy week's money goes to picks from the best-placed sector at twice the share of
+the others (`top_sector_weight=2.0`, a new opt-in engine hook that is off by default). All eleven
+saved groups, after tax at Rs 5 lakh, judged on 2017-2022:
+
+- **Passes** when the median CAGR gain is at least +0.5 pts and CAGR is not lower in at least 7 of 11,
+  AND the worst fall is no more than 2 pts deeper in at least 9 of 11 with the median Ulcer change at
+  most +0.01.
+- **Then one check on 2023-01-06 to 2026-10-16:** median CAGR change at least 0 and the worst fall no
+  more than 2 pts deeper in at least 8 of 11. Passing both makes it a candidate for the owner; nothing
+  in the live signal changes by itself.
 
 ## Result (2026-10-17)
 

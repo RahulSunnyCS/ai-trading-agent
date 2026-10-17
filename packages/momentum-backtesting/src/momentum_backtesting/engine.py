@@ -884,8 +884,14 @@ def run_backtest(
     uc_locked: pd.DataFrame | None = None,
     lc_locked: pd.DataFrame | None = None,
     daily: "DailyMoves | None" = None,
+    buy_weights: pd.DataFrame | None = None,
 ) -> Result:
-    """`rank_cache` lets a sweep reuse the (slow) ranking when only top_n/exit/mode differ.
+    """`buy_weights` (BL-116 Phase 2; signal week x instrument, None = off) sets how a buy week's
+    money is shared between the names bought: in proportion to these numbers instead of equally
+    (the same path as `weight_by="inverse_vol"`, which it cannot be combined with). Shifted by
+    `signal_delay` with the ranks. Caps still apply. Off by default, so no result moves.
+
+    `rank_cache` lets a sweep reuse the (slow) ranking when only top_n/exit/mode differ.
     `trade_prices` (signal week x instrument) is what trades fill at and holdings are valued
     at; None means the signal prices themselves (index, Friday close). `membership` (week x
     company_id booleans) gates new buys to instruments that are actually in the index that week
@@ -942,6 +948,12 @@ def run_backtest(
     if config.weight_by == "inverse_vol":
         std = fills.pct_change().rolling(config.vol_window).std()
         inv_vol = (1 / std.where(std > 0)).shift(config.signal_delay)
+    if buy_weights is not None:
+        if inv_vol is not None:
+            raise ValueError("buy_weights cannot be combined with weight_by='inverse_vol'")
+        if config.portfolio != "buffer":
+            raise ValueError("buy_weights needs portfolio='buffer'")
+        inv_vol = buy_weights.reindex(prices.index).shift(config.signal_delay)
     missing = [n for n in [*names, CASH, config.benchmark] if n not in fills]
     if missing:
         raise ValueError(f"trade prices are missing {missing}")

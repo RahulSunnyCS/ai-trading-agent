@@ -1937,6 +1937,8 @@ def _run_broad(
     req: BacktestRequest,
     ranking: broad.UniverseRanking,
     outer_prices: pd.DataFrame,
+    *,
+    top_sector_weight: float = 1.0,
 ) -> broad.BroadBacktestResult:
     weights = tuple(req.weights) if req.weights else None
     stock_tilt_ranks = None
@@ -1996,6 +1998,7 @@ def _run_broad(
         stock_tilt_ranks=stock_tilt_ranks,
         uc_locked=uc_locked,
         lc_locked=lc_locked,
+        top_sector_weight=top_sector_weight,
     )
 
 
