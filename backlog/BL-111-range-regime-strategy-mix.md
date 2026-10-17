@@ -40,19 +40,21 @@ What the repo already says:
 
 ## Goal
 
-An answer to two separate questions, at the owner's real sizes:
+An answer to three separate questions, at the owner's real sizes:
 
 1. **Lots by rank:** does 2-2-1-1 over the top four (6 lots), or 2-1 over the top two (3 lots),
    earn more than today's equal split?
 2. **Lots by range regime:** does moving lots between Dir and Widesl by the previous session's range
    state beat the same ladder held fixed?
+3. **Expiring index only (H3, Amendment 1, exploratory):** on an expiry day, does drawing the basket only
+   from the expiring index's variants change the result against the unrestricted Adaptive basket?
 
 ## Out of scope
 
 - Any change to the live lists, weights or the journal (this recombines stored results).
 - A new entry time (BL-053: a later start is a separate question).
 - Buy as a lever and the Buy add-on (decision below): every arm is Dir and Widesl only.
-- SENSEX (the hold-out data is NIFTY only).
+- SENSEX in H1 and H2 (the confirmation period is NIFTY-only). H3 (Amendment 1) is the one exception.
 
 ## Plan
 
@@ -128,35 +130,47 @@ Owner request (chat, 2026-10-18): "on expiry days we will be only using the expi
 know whether this increases or decreases" our result, and how much of the current basket is
 non-expiring items.
 
-`override: owner request 2026-10-18` for the two things this block does that Phase 0 excluded:
+`override: owner request 2026-10-18 (chat: "on expiry days we will be only using the expiry things; let
+me know whether this will increase or decrease our thing")` for the two things this block does that Phase 0 excluded:
 it adds a third hypothesis, and it uses SENSEX results ("Will not run" left SENSEX out because the
 P3 confirmation period is NIFTY-only). H3 therefore has **no confirmation period**: it is
 exploratory, in-sample, and cannot decide anything by itself.
 
-- **H3:** on a day an index expires, a basket drawn only from that index's variants earns at least
-  as much as the unrestricted Adaptive basket (list C) of the same size.
+- **H3 (two-sided):** on a day an index expires, a basket drawn only from that index's variants earns
+  a different amount, more or less, than the unrestricted Adaptive basket (list C) of the same size.
 - **Expiry day for an index:** the day its nearest weekly expiry is that day (label `0` on the
   weekday basis: `dte_n = 0` for NIFTY, `dte_s = 0` for SENSEX). A day on which both expire is left
   unrestricted.
-- **Arm EXP:** the list's composite is computed over the expiring index's variants only; the same
-  selection rule (top by composite, at least 2 Widesl, same ladder and size, no Buy add-on) as the
-  equal split. **Comparator:** the same list C, unrestricted, in the same ladder.
+- **Arm EXP is a filter, not a re-ranking:** the list's composite is computed over the full universe
+  exactly as for the comparator, and the selection (`select`: top by composite, at least 2 Widesl, same
+  ladder and size, no Buy add-on) then runs over the expiring index's variants only. Re-computing the
+  composite over the restricted set would change picks even on days when the basket is already all from
+  the expiring index (the composite pools one criterion across both indices), so it is not used.
+  **Comparator:** the same list C over the same full universe, unrestricted, equal split of the same
+  size (it is not the H1 / H2 baseline, which is NIFTY-only). The primary universe is Core-298; T1
+  (Core-298 + 223) is repeated as a descriptive second run.
 - **Context recorded before any outcome (picks only, no P&L):** on the reconstructed Adaptive picks
   of 2025-01-10 → 2026-10-16 (428 days), Core-298 takes 90.8 % of its NIFTY-expiry-day picks from
   NIFTY and 78.9 % of its SENSEX-expiry-day picks from SENSEX; T1 (Core-298 + 223) 89.3 % and 83.5 %.
-  A day carries at least one non-expiring pick on 21 of 91 NIFTY-expiry days and 40 of 90 SENSEX-expiry
-  days for Core (22 and 32 for T1). Only those days (about 60) can differ between EXP and the
-  comparator, so the test is small.
+  (Those shares count the Buy add-on too.) Counting **core picks only**, as both arms do (no Buy add-on),
+  a day carries at least one non-expiring pick on 21 of 91 NIFTY-expiry days and 32 of 90 SENSEX-expiry
+  days for Core (22 and 26 for T1), so only **about 50 days** (Core 53, T1 48) can differ between EXP and
+  the comparator, and the test is small. The core-only SENSEX-expiry share from NIFTY is 18.5 % for Core
+  (14.1 % for T1). The composition window ends 2026-10-16; H3's window ends 2026-10-08.
 - **Data / period:** 2025-01-10 → 2026-10-08 only (SENSEX results exist from 2024-10; before that
   the restriction is vacuous because P3 holds NIFTY only).
-- **Read-out (exploratory):** on the days where EXP's basket differs from the comparator's, the daily
-  gross per lot of EXP minus the comparator: mean and 90 % circular block-bootstrap interval (5-day
-  blocks, 2,000 resamples, seed 20261015), NIFTY-expiry days, SENSEX-expiry days and both together
-  (together is the primary). Outcomes: **positive** if the lower bound is above zero, **negative**
-  if the upper bound is below zero, otherwise **inconclusive**. Net of charges reported beside it.
-- **What follows:** nothing is adopted from this. A positive outcome earns a forward parallel track
-  for EXP (a T1-style journal and results), read out after 60 on-time expiry days; a negative or
-  inconclusive one is recorded and EXP is not pursued.
+- **Read-out (exploratory):** H3 uses the equal split and is **not** judged on the book (SENSEX-expiry
+  days are 3-lot days in the book). "Gross per lot" is the basket's gross P&L per one-lot strategy, as
+  the daily log's `per_lot_day`. On the days where EXP's basket differs from the comparator's, EXP minus
+  the comparator per day: mean and 90 % circular block bootstrap (5-day blocks run over the ordered
+  differing days, 2,000 resamples, seed 20261015), NIFTY-expiry days, SENSEX-expiry days and both
+  together (together is the primary). Outcomes: **positive** if the lower bound is above zero,
+  **negative** if the upper bound is below zero, otherwise **inconclusive**. Net of charges is reported
+  beside it.
+- **What follows:** nothing is adopted from this. A positive outcome may earn a proposal for a forward
+  track for EXP, as a **new backlog item** (a forward journal is outside BL-111), read out on its
+  **differing days**, not on expiry days (60 expiry days hold only about 18 informative ones). A negative
+  or inconclusive outcome is recorded and EXP is not pursued.
 - **Will not run:** restrictions on non-expiry days, other index rules, other lists.
 
 ### Phase 1 — Build the research root and rerun the baseline
@@ -211,4 +225,10 @@ should say if the 3-lot ordinary-day basket is not "top 3 non-Buy × 1 lot".
   `override:` for SENSEX use; H3 is exploratory (no confirmation period). Composition measured
   (picks only): Core-298 non-expiring-index picks 9.2 % on NIFTY-expiry days and 21.1 % on
   SENSEX-expiry days; T1 10.7 % and 16.5 %.
+- 2026-10-18 — review of PR #240: the EXP arm is a filter of the unrestricted ranking, not a re-ranking;
+  informative days counted on core picks only (about 50: Core 53, T1 48); H3 two-sided; contradictions in
+  Goal and Out of scope fixed; read-out definitions added. The override line, copied here as written in
+  the amendment: `override: owner request 2026-10-18 (chat: "on expiry days we will be only using the
+  expiry things; let me know whether this will increase or decrease our thing")` for the third hypothesis
+  and the use of SENSEX results. **The owner confirms it on PR #240.**
 
