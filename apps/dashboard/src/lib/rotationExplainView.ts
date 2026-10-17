@@ -336,8 +336,20 @@ function excludedText(x: RotationExcluded): string {
 }
 
 /** The boundary facts as sentences: the Widesl minimum, the nearest alternative, the Buy test. */
-export function boundaryLines(b: RotationBoundary): BoundaryLine[] {
+export function boundaryLines(
+  b: RotationBoundary,
+  rule?: RotationExplain['expiry_rule'],
+): BoundaryLine[] {
   const lines: BoundaryLine[] = [];
+  const pool = rule ? `${rule.index} ` : '';
+  if (rule) {
+    const unfiltered = [...rule.unfiltered.core, ...rule.unfiltered.buy].join(', ');
+    lines.push({
+      id: 'rule',
+      tone: 'warning',
+      text: `Expiry rule: ${rule.index} expires today, so the list holds only ${rule.index} strategies. The ranks below count every strategy; the core, the swaps and the nearest alternative are from the ${rule.index} ones. Without the rule: ${unfiltered}.`,
+    });
+  }
   if (b.override.fired) {
     const swaps = b.override.swaps
       .map((s) => `${ref(s.dropped)} replaced by ${ref(s.added)}`)
@@ -345,13 +357,13 @@ export function boundaryLines(b: RotationBoundary): BoundaryLine[] {
     lines.push({
       id: 'override',
       tone: 'warning',
-      text: `Widesl minimum overrode rank: the top ${formatInt(b.n_core)} non-Buy held ${formatInt(b.override.wide_in_unconstrained)} Widesl and ${formatInt(b.min_wide)} are required. ${swaps}.`,
+      text: `Widesl minimum overrode rank: the top ${formatInt(b.n_core)} ${pool}non-Buy held ${formatInt(b.override.wide_in_unconstrained)} Widesl and ${formatInt(b.min_wide)} are required. ${swaps}.`,
     });
   } else {
     lines.push({
       id: 'override',
       tone: 'neutral',
-      text: `Rank decided the core: the top ${formatInt(b.n_core)} non-Buy already held ${formatInt(b.override.wide_in_unconstrained)} Widesl (${formatInt(b.min_wide)} required).`,
+      text: `Rank decided the core: the top ${formatInt(b.n_core)} ${pool}non-Buy already held ${formatInt(b.override.wide_in_unconstrained)} Widesl (${formatInt(b.min_wide)} required).`,
     });
   }
   if (b.best_excluded) {
@@ -367,6 +379,12 @@ export function boundaryLines(b: RotationBoundary): BoundaryLine[] {
       id: 'buy',
       tone: 'positive',
       text: `Buy qualified: ${refOverall(buy.picked[0])} is inside the overall top ${formatInt(buy.top)}.`,
+    });
+  } else if (buy.dropped_by_rule && rule) {
+    lines.push({
+      id: 'buy',
+      tone: 'neutral',
+      text: `No Buy: the Buy variant that qualified overall belongs to the other index, so the ${rule.index} rule left it out.`,
     });
   } else if (buy.best_buy) {
     const short =

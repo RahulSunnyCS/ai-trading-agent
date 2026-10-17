@@ -496,6 +496,9 @@ def _boundary(
     buys = [v for v in order if buy_mask[v]]
     best_buy = buys[0] if buys else None
     picked_buy = [idx[n] for n in picks.buy]
+    # the Buy variants that qualified before any BL-122 rule; one left out only by the rule is not
+    # "outside the top 10"
+    qualified_before_rule = [v for v in top10 if buy_mask[v]][:N_BUY]
     buy_info: dict[str, Any] = {
         "top": BUY_TOP,
         "size": N_BUY,
@@ -504,8 +507,14 @@ def _boundary(
         "best_buy": ref(best_buy) if best_buy is not None else None,
         "tenth_composite": _round(comp[top10[-1]]) if len(top10) >= BUY_TOP else None,
         "gap_to_top": None,
+        "dropped_by_rule": bool(qualified_before_rule) and not picked_buy,
     }
-    if best_buy is not None and len(top10) >= BUY_TOP and not picked_buy:
+    if (
+        best_buy is not None
+        and len(top10) >= BUY_TOP
+        and not picked_buy
+        and not qualified_before_rule
+    ):
         buy_info["gap_to_top"] = _round(comp[top10[-1]] - comp[best_buy])
     return {
         "n_core": N_CORE,

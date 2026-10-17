@@ -533,3 +533,28 @@ def test_reconstructed_history_stays_unfiltered_after_the_effective_date(monkeyp
 
 def test_the_rule_names_adaptive_only_a_registered_list():
     assert expiry.RULE_LISTS == ("C",) and set(expiry.RULE_LISTS) <= set(LISTS)
+
+
+def test_explain_buy_line_does_not_call_a_rule_dropped_buy_outside_the_top_ten():
+    """The other index's Buy sits in the overall top 10 and the rule drops it: the boundary says
+    the rule dropped it, never "short of the top 10" with a negative gap."""
+    from option_backtesting.rotation.expiry import filter_picks
+
+    names = [
+        "S_buy_0917", "S_wide_0917", "S_wide_1117", "S_ditm1_0917",
+        "N_wide_0917", "N_wide_1117", "N_ditm1_0917", "N_wide_1202", "N_ditm1_0947", "N_buy_0917",
+    ]  # fmt: skip
+    comp = np.array([0.99, 0.95, 0.94, 0.93, 0.90, 0.89, 0.88, 0.40, 0.35, 0.30])
+    unfiltered = select(comp, names)
+    assert unfiltered.buy == ["S_buy_0917"]
+    picks = filter_picks(comp, names, unfiltered, "NIFTY")
+    assert picks.buy == []
+    r = ex.Ranking(names, {}, {}, {}, comp, {})
+    order = sorted(range(len(names)), key=lambda v: (-comp[v], names[v]))
+    allowed = {v for v, n in enumerate(names) if underlying_of(n) == "NIFTY"}
+    buy = ex._boundary(r, order, picks, LISTS["C"], allowed)["buy"]
+    assert buy["qualified"] is False and buy["dropped_by_rule"] is True
+    assert buy["gap_to_top"] is None
+    # the unfiltered list, and a Buy genuinely outside the top 10, are unchanged
+    plain = ex._boundary(r, order, unfiltered, LISTS["C"])["buy"]
+    assert plain["qualified"] is True and plain["dropped_by_rule"] is False
