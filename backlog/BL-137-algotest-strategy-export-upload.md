@@ -198,7 +198,9 @@ entry, so the strategies must already be in AlgoTest the evening before.
 
 1. ~~Library or daily?~~ **Answered 2026-10-19:** daily. After the evening message, delete the strategies
    from the evening before and upload the predicted picks. At 09:16, add only the picks that changed.
-2. ~~Route?~~ **Answered 2026-10-19:** HTTP if the spike finds a plain save call, Playwright otherwise.
+2. **Route (reopened 2026-10-19):** first answered "HTTP if possible". AlgoTest's terms forbid reverse
+   engineering (BL-138 Log), so the choice waits for AlgoTest support's written reply, sent by the owner
+   2026-10-19: website through Playwright, or the Signals API (which would make the upload and delete unneeded).
 3. ~~Naming?~~ **Answered 2026-10-19:** a book prefix plus the variant id (`T1 · N_p150-t1s11_0917`, later
    `Core · N_wide_1117`). If AlgoTest refuses `·` the spike picks the nearest allowed separator.
 4. **`LotConfig` `LotType.Quantity` `Value: 1`:** is that 1 lot or a quantity of 1? (Check in the UI
@@ -236,3 +238,4 @@ entry, so the strategies must already be in AlgoTest the evening before.
   a trail in points were guessed right. The four exports are the test fixtures; all 521 Core-298 and T1
   files export. Not yet known: how AlgoTest encodes a range on the index (`source: underlying`) or
   side low, so both are refused.
+- 2026-10-19 — Q2 reopened after reading AlgoTest's terms (BL-138). Phases 2–4 wait for support's reply.

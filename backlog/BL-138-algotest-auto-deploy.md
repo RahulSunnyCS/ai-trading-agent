@@ -204,3 +204,4 @@ Claude.
   Signals API (sanctioned), then the website through Playwright (acts as the user), then internal
   HTTP (reverse-engineering clause). Next: ask AlgoTest support in writing whether automating
   deploys of one's own saved strategies is allowed, and the current Signals price.
+- 2026-10-19 — the owner emailed AlgoTest support (automation allowed? Signals price and payload). The route is chosen on the reply.
