@@ -181,3 +181,26 @@ Claude.
 
 - 2026-10-19 — created at the owner's request ("I want the tool to deploy the strategies in AlgoTest
   as well"). Plan only; nothing built or run.
+- 2026-10-19 — Phase 0, terms read (algotest.in/tnc, "Terms of Use", no date shown; read from the
+  page's script because the page is drawn by JavaScript). What it says that bears on this item:
+  - **No clause forbids automating actions on your own account**, and nothing says "no bots". The
+    08:00 broker login has automated the website through Playwright for weeks.
+  - **Data gathering:** the user shall not exploit content "not submitted or provided by the user",
+    including by "automated data gathering or extraction tools, programs, scripts, deep links",
+    without prior written consent. Reading back our own strategies and deploys is our own content,
+    but the clause shows AlgoTest wants consent for scripted access.
+  - **Reverse engineering:** the user shall not "reverse engineer ... any information, software,
+    products or services obtained through the Platform". Calling the web app's internal requests,
+    found by watching its network traffic, is the route closest to this. It weighs against BL-137's
+    "HTTP if possible" for anything beyond the documented login.
+  - **Responsibility:** the user is "solely responsible for all the activities in his / her / its
+    account", and rapid clicks can place multiple orders. The company "can refuse access ... or
+    terminate access for an existing user without providing reasons".
+
+  The **Signals API** is AlgoTest's documented route (official SDK `Algo-Test/algotest-api-trading`:
+  login, contracts, a strategy payload with legs, lots, SL / target, then a start call). AlgoTest's
+  blog gives 1,299 credits for 28 days or 4,999 for 168 days, and elsewhere 999 with unlimited live
+  trades and forward tests; the current price is to be confirmed. Ranked by risk under the terms:
+  Signals API (sanctioned), then the website through Playwright (acts as the user), then internal
+  HTTP (reverse-engineering clause). Next: ask AlgoTest support in writing whether automating
+  deploys of one's own saved strategies is allowed, and the current Signals price.
