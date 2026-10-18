@@ -1,6 +1,6 @@
 # Widesl: leg stop
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Descriptive · **Last updated:** 2026-10-18
 
 ## What it is
 
@@ -19,6 +19,7 @@ AlgoTest). Every rotation Widesl file keeps its base file's stops.
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
 | BL-098 Phase 2 | 80, 90, 100, 110, 115, 120, 130, 140, 150% (both legs), one factor at a time, all 150 rotation Widesl files | fit 2024-10-09 → 2025-10-08, holdout 2025-10-09 → 2026-10-09, **after charges** (₹20 an order + statutory), no slippage | Descriptive ranking; registered pass rule not yet applied; Phase 3 pending | [BL-098][bl098], [report][bl098q] |
+| BL-126 (POC) | NIFTY ₹100 at 75 % and ₹120 at 60 % vs ₹100 at 115 %, trail 15/10, MTM ₹2,500, all 25 rotation slots | 2024-10-09 → 2026-10-16, gross (no charges), in-sample, no hold-out | Not positive: +₹41 [−5, +89] and +₹47 [−18, +111] per lot-day standalone, deeper drawdown; in Adaptive −₹7 / +₹23, intervals include zero. Repeats BL-098 Phase 2's morning look | [BL-126][bl126] |
 
 Leg-stop rows in the post-charge top four (holdout, mean over the band's start-time files):
 
@@ -58,3 +59,4 @@ Leg-stop rows in the post-charge top four (holdout, mean over the band's start-t
 
 [bl098]: ../../../../backlog/BL-098-widesl-parameter-sweep.md
 [bl098q]: ../../../../backlog/BL-098-widesl-qualified-list-post-charge.md
+[bl126]: ../../../../backlog/BL-126-nifty-premium-widesl-tight-sl-poc.md
