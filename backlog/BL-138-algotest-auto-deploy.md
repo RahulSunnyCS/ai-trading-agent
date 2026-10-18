@@ -108,7 +108,14 @@ Claude.
   - **Kill switch:** `ALGOTEST_DEPLOY=off` (read at start) and a Telegram button "Stop all today",
     which undeploys every deployed tool strategy (callback data, never a URL; `@trading/notify`).
   - A ledger row before every send; one attempt; never a blind retry.
-  - **Evening:** undeploy every tool strategy before BL-137's delete.
+  - **Deploy window:** AlgoTest deploys only between 08:00 and 15:40 IST ("Strategies can only be deployed
+    during 08:00 IST to 15:40 IST", seen 2026-10-19 at night). Because an activation repeats on its weekdays,
+    every tool-activated strategy is **deactivated at 15:30–15:39, after the 15:28 exit**, so each day starts
+    with nothing active. The 09:16 run then activates only that day's picks. This avoids yesterday's 09:17
+    pick trading at 09:17 before a morning deactivation could run. If the 15:30 deactivation fails, the owner
+    is alerted at once, while there is still time to do it by hand. Whether deactivating is also limited to
+    the window is checked in Phase 1.
+  - **Evening:** BL-137's delete and upload run after 16:00 and need no deploy window; only activation does.
   - **Scheduler:** right after the 09:16 entry is recorded (inside `pick --with-t1`, or a job
     triggered by it), never on a fixed clock that could run before the entry.
   - **The 09:17 budget:** the entry is recorded at about 09:16:20, leaving about 40 s. So at 09:14 the
@@ -220,4 +227,6 @@ Claude.
   the owner deploys by hand, for 10 days. Claude's own clicks on `/live` controls are refused by the session's
   safety check (a real-money action), so the Setup Execution dialog is recorded by the owner (screenshot, or
   the `record-strategies` script).
-
+- 2026-10-19 — AlgoTest refuses deploys outside 08:00–15:40 IST (the owner's recorder run at about 02:30
+  showed it). Phase 2: deactivate everything at 15:30–15:39 each day and activate only the recorded picks
+  after 09:16; the Setup Execution dialog is recorded after 08:00.
