@@ -107,6 +107,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-121](BL-121-moved-expiry-days.md) | Holiday-shifted expiry days: does the rotation earn less on them? | P2 | Done: inconclusive, 11 days; NIFTY Buy reads worse (borderline) | research | options |
 | [BL-113](BL-113-t1-parallel-track.md) | T1 parallel track: Adaptive over Core-298 + 223 time-generic variants, own journal, private Telegram, 60-day read-out vs the live Adaptive (supersedes BL-112) | P1 | In progress | feature + research | options |
 | [BL-137](BL-137-algotest-strategy-export-upload.md) | Rotation picks to AlgoTest: export the day's Core and T1 picks to `.algtst` and upload them (read back, never deployed) | P1 | In progress | feature | options + broker-login |
+| [BL-138](BL-138-algotest-auto-deploy.md) | Deploy the rotation picks in AlgoTest automatically: only the recorded 09:16 picks, paper (Forward Test) for 10 days, then live on the owner's go; the 09:17 budget, kill switch, reconciliation | P1 | Planned | feature | broker-login + options |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
