@@ -1,0 +1,179 @@
+{
+ "core_298": {
+  "two_years": {
+   "days": 428,
+   "A": {
+    "net_per_day": 902.7045560747663,
+    "net_max_drawdown": -42325.94999999998,
+    "net_worst_day": -10862.4,
+    "gross_max_drawdown": -35456.850000000006
+   },
+   "M1": {
+    "days_merged": 104,
+    "net_per_day": 908.2716121495328,
+    "m_minus_a_net": {
+     "mean": 5.567056074766354,
+     "ci90": [
+      -42.697015186915905,
+      56.61619742990655
+     ],
+     "reading": "inconclusive"
+    },
+    "m_minus_a_gross_per_day": -17.81238317757009,
+    "brokerage_saved_per_day": 23.379439252336446,
+    "net_max_drawdown": -44633.29999999999,
+    "net_worst_day": -12337.0,
+    "gross_max_drawdown": -37270.100000000006
+   },
+   "M2": {
+    "days_merged": 282,
+    "net_per_day": 900.1344626168226,
+    "m_minus_a_net": {
+     "mean": -2.5700934579439165,
+     "ci90": [
+      -121.50929906542058,
+      120.17054906542057
+     ],
+     "reading": "inconclusive"
+    },
+    "m_minus_a_gross_per_day": -74.803738317757,
+    "brokerage_saved_per_day": 72.2336448598131,
+    "net_max_drawdown": -50034.75000000003,
+    "net_worst_day": -12337.0,
+    "gross_max_drawdown": -43709.950000000004
+   }
+  },
+  "last_year": {
+   "days": 244,
+   "A": {
+    "net_per_day": 1078.8067622950819,
+    "net_max_drawdown": -35928.999999999956,
+    "net_worst_day": -10249.4,
+    "gross_max_drawdown": -31485.5
+   },
+   "M1": {
+    "days_merged": 60,
+    "net_per_day": 1105.6842213114753,
+    "m_minus_a_net": {
+     "mean": 26.87745901639346,
+     "ci90": [
+      -23.77460040983605,
+      76.60671106557376
+     ],
+     "reading": "inconclusive"
+    },
+    "m_minus_a_gross_per_day": 2.8905737704918057,
+    "brokerage_saved_per_day": 23.98688524590165,
+    "net_max_drawdown": -35928.99999999997,
+    "net_worst_day": -10249.4,
+    "gross_max_drawdown": -31485.5
+   },
+   "M2": {
+    "days_merged": 152,
+    "net_per_day": 1158.9061475409835,
+    "m_minus_a_net": {
+     "mean": 80.09938524590162,
+     "ci90": [
+      -51.174057377049216,
+      222.3238319672131
+     ],
+     "reading": "inconclusive"
+    },
+    "m_minus_a_gross_per_day": 11.620696721311475,
+    "brokerage_saved_per_day": 68.47868852459013,
+    "net_max_drawdown": -42887.84999999998,
+    "net_worst_day": -9739.0,
+    "gross_max_drawdown": -39482.75
+   }
+  }
+ },
+ "t1": {
+  "two_years": {
+   "days": 428,
+   "A": {
+    "net_per_day": 1529.2134345794395,
+    "net_max_drawdown": -25887.04999999999,
+    "net_worst_day": -14092.45,
+    "gross_max_drawdown": -23300.25
+   },
+   "M1": {
+    "days_merged": 109,
+    "net_per_day": 1636.6942757009344,
+    "m_minus_a_net": {
+     "mean": 107.48084112149533,
+     "ci90": [
+      29.84081191588784,
+      186.27575934579443
+     ],
+     "reading": "positive"
+    },
+    "m_minus_a_gross_per_day": 79.02850467289721,
+    "brokerage_saved_per_day": 28.452336448598125,
+    "net_max_drawdown": -25659.100000000093,
+    "net_worst_day": -13331.8,
+    "gross_max_drawdown": -23840.949999999997
+   },
+   "M2": {
+    "days_merged": 264,
+    "net_per_day": 1818.8786214953273,
+    "m_minus_a_net": {
+     "mean": 289.6651869158879,
+     "ci90": [
+      141.36041471962616,
+      436.8114778037384
+     ],
+     "reading": "positive"
+    },
+    "m_minus_a_gross_per_day": 217.76238317757014,
+    "brokerage_saved_per_day": 71.90280373831777,
+    "net_max_drawdown": -28302.99999999994,
+    "net_worst_day": -15197.15,
+    "gross_max_drawdown": -24645.25
+   }
+  },
+  "last_year": {
+   "days": 244,
+   "A": {
+    "net_per_day": 1746.0590163934428,
+    "net_max_drawdown": -25672.40000000014,
+    "net_worst_day": -14092.45,
+    "gross_max_drawdown": -23300.25
+   },
+   "M1": {
+    "days_merged": 68,
+    "net_per_day": 1836.468442622951,
+    "m_minus_a_net": {
+     "mean": 90.40942622950817,
+     "ci90": [
+      -26.708278688524594,
+      222.56443647540974
+     ],
+     "reading": "inconclusive"
+    },
+    "m_minus_a_gross_per_day": 60.03893442622951,
+    "brokerage_saved_per_day": 30.370491803278654,
+    "net_max_drawdown": -25659.100000000093,
+    "net_worst_day": -13331.8,
+    "gross_max_drawdown": -22685.5
+   },
+   "M2": {
+    "days_merged": 142,
+    "net_per_day": 1962.5874999999999,
+    "m_minus_a_net": {
+     "mean": 216.52848360655733,
+     "ci90": [
+      50.19364754098357,
+      403.21028688524586
+     ],
+     "reading": "positive"
+    },
+    "m_minus_a_gross_per_day": 150.56454918032787,
+    "brokerage_saved_per_day": 65.96393442622947,
+    "net_max_drawdown": -27430.050000000105,
+    "net_worst_day": -15197.15,
+    "gross_max_drawdown": -24645.25
+   }
+  }
+ },
+ "note": "one lot per pick, core only; net = gross minus brokerage (turnover charges equal in all books)"
+}

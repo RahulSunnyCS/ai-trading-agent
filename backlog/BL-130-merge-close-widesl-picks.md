@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P3 — owner's idea; fewer orders and less brokerage if it holds |
-| **Status** | In progress |
+| **Status** | Done — informative, not adopted: Core-298 no effect; T1 gains from the earlier entry, one cell passes, partly in T1's selection year |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -56,3 +56,25 @@ saves. Nothing live changes.
 ## Log
 
 - 2026-10-18 — Created; Phase 0 registered before any return of the books was compared (pick counts above only).
+- 2026-10-18 — **Run as registered** (`research/bl130/merge_close.py`; `merge_close_2026-10-18.json`). One lot per
+  pick, core only; net = gross minus brokerage (turnover charges taken as equal). Descriptive, in-sample.
+
+  | Universe, window | A net / day (drawdown) | M1 identical: days merged, M − A net (90 %), gross part, drawdown | M2 any Widesl: days merged, M − A net (90 %), gross part, drawdown |
+  |---|---|---|---|
+  | Core-298, 2025-01-10 → 2026-10-16 (428 d) | +903 (−42,326) | 104 d, +6 [−43, +57], gross −18, −44,633 | 282 d, −3 [−122, +120], gross −75, −50,035 |
+  | Core-298, last year (244 d) | +1,079 (−35,929) | 60 d, +27 [−24, +77], gross +3, −35,929 | 152 d, +80 [−51, +222], gross +12, −42,888 |
+  | T1, 2025-01-10 → 2026-10-16 (428 d) | +1,529 (−25,887) | 109 d, **+107 [+30, +186]**, gross +79, −25,659 | 264 d, **+290 [+141, +437]**, gross +218, −28,303 |
+  | T1, last year (244 d) | +1,746 (−25,672) | 68 d, +90 [−27, +223], gross +60, −25,659 | 142 d, **+217 [+50, +403]**, gross +151, −27,430 |
+
+  Brokerage saved: about ₹23–30 a day for M1 and ₹66–72 for M2 (per one-lot book).
+
+  **Read under the registered rule.** Positive in one cell only: **T1, two years, M1** (interval above zero, drawdown
+  no deeper). T1 M2 has its interval above zero in both windows but a deeper drawdown, so not positive; every
+  Core-298 cell is inconclusive. **What it says:** on Core-298 merging changes nothing beyond the brokerage, which is
+  within noise. On T1 the gain comes mostly from the gross part, not the charges: the earlier of two close Widesl
+  picks earned more than the later one, so taking both lots at the earlier time added return, with somewhat bigger
+  swings for M2. **Weaknesses:** in-sample; T1's two-year window overlaps the year its settings were chosen on
+  (2024-10-09 → 2025-10-08), and on the last year alone M1 is inconclusive; one gap (30 minutes) and one rule (keep
+  the earlier) were tested; turnover charges approximated as equal; one-lot framing (the live book trades two lots a
+  strategy, which doubles the gross part but not the brokerage saving). Nothing adopted; a forward-only check on the
+  T1 track would be the next step if wanted.
