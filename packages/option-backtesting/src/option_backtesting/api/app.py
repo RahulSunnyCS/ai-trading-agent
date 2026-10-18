@@ -17,6 +17,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from ..config import resolve_cache_dir
 from ..data.cache import InvalidUnderlyingError
+from .angel_routes import router as angel_router
 from .correlation_routes import router as correlation_router
 from .favourites_routes import router as favourites_router
 from .heatmap_routes import router as heatmap_router
@@ -59,6 +60,7 @@ def create_app(cache_dir: Path | None = None) -> FastAPI:
     app.include_router(correlation_router)
     app.include_router(heatmap_router)
     app.include_router(favourites_router)
+    app.include_router(angel_router)
     app.include_router(rotation_log_router)
     app.include_router(rotation_explain_router)
     app.include_router(rotation_router)

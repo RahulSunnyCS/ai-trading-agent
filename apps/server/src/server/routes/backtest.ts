@@ -64,6 +64,12 @@
  *  GET  /api/backtest/legwise/rotation/portfolio/days — every scored list-day with and without the stop.
  *                                                 Both requireAccess; the stop and trail are echoed back
  *                                                 as typed, bad values are refused here.
+ *  GET  /api/backtest/legwise/angel/status      — the Broker logins page's Angel One card: which
+ *                                                 credentials are set (names only), the last
+ *                                                 check and collection, the guard. requireAccess
+ *  POST /api/backtest/legwise/angel/test        — start ONE SmartAPI login (no body): 202 at once,
+ *                                                 the login runs in the background upstream; the
+ *                                                 guard's 409 / 429 pass through. requireAccess
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
  *  GET  /api/backtest/legwise/daily             — that run's state/log. requireAccess
@@ -1252,6 +1258,33 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation pulse ---
+
+  // --- angel one connection (Broker logins) ---
+  // The Angel One card (angelone/check.py): a read-only status and ONE SmartAPI login on demand.
+  // The guard (one login at a time, a 60 s cool-down, a hold after a refused login) lives
+  // upstream, shared with the 08:00 scheduler job and the collector; no client body is
+  // forwarded, so nothing from the browser reaches the login. The POST answers at once (202,
+  // the login runs in the background upstream), so the normal timeout applies.
+  fastify.get(
+    '/api/backtest/legwise/angel/status',
+    { preHandler: requireAccess },
+    async (_request, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/angel/status');
+    },
+  );
+
+  fastify.post(
+    '/api/backtest/legwise/angel/test',
+    { preHandler: requireAccess, bodyLimit: 1024 },
+    async (_request, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/angel/test', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: '{}',
+      });
+    },
+  );
+  // --- end angel one connection ---
 
   fastify.post(
     '/api/backtest/legwise/daily',

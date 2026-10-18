@@ -11,6 +11,7 @@ API marks its job failed). Neither sends the failure message from here.
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
@@ -72,30 +73,33 @@ def collect_detailed(
             "warning: the symbol master only lists live contracts - anything that expired "
             f"between {day} and today is missing from this run."
         )
-    if source == "angelone":
-        from ..angelone.auth import load_credentials, login
-        from ..angelone.client import AngelClient
+    with contextlib.ExitStack() as stack:
+        if source == "angelone":
+            from ..angelone import check
+            from ..angelone.client import AngelClient
 
-        client = AngelClient(login(load_credentials()))
-    elif source == "fyers":
-        from ..fyers.auth import resolve_credentials
-        from ..fyers.client import FyersClient
+            # The login and the whole collection under the Angel One guard's lock, so a
+            # connection test cannot log in on the same account while this session is in use.
+            client = AngelClient(stack.enter_context(check.session()))
+        elif source == "fyers":
+            from ..fyers.auth import resolve_credentials
+            from ..fyers.client import FyersClient
 
-        client = FyersClient(resolve_credentials())
-    else:
-        raise ValueError(f"unknown source {source!r}")
-    manifest = collect_day(
-        client,
-        day,
-        underlyings,
-        root,
-        premium_floor=premium_floor,
-        max_extra=max_extra,
-        force=force,
-        log=log,
-        source=source,
-        merge_existing=merge_existing,
-    )
+            client = FyersClient(resolve_credentials())
+        else:
+            raise ValueError(f"unknown source {source!r}")
+        manifest = collect_day(
+            client,
+            day,
+            underlyings,
+            root,
+            premium_floor=premium_floor,
+            max_extra=max_extra,
+            force=force,
+            log=log,
+            source=source,
+            merge_existing=merge_existing,
+        )
     errors = sum(len(v.get("errors", [])) for v in manifest.values() if isinstance(v, dict))
     log(f"done: {client.calls} requests, {errors} errors -> {root}")
     return errors, manifest

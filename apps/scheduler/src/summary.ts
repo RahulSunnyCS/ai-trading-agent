@@ -92,7 +92,7 @@ function algotestCheck(ctx: BuiltinContext): Check {
       url: string;
     }>;
     // Any successful run today counts: GitHub's late backstop cron can fail hours after
-    // the 08:00 dispatch already logged both brokers in.
+    // the 08:00 dispatch already logged the brokers in (BROKER_LOGIN_ONLY may limit it to one).
     const today = runs.filter((r) => istDay(new Date(r.createdAt)) === istDay(ctx.now()));
     const run = today.find((r) => r.conclusion === 'success') ?? today[0];
     if (!run) {
@@ -104,7 +104,7 @@ function algotestCheck(ctx: BuiltinContext): Check {
     }
     if (run.status !== 'completed') return { ok: true, label, detail: `still ${run.status}` };
     return run.conclusion === 'success'
-      ? { ok: true, label, detail: 'both brokers logged in' }
+      ? { ok: true, label, detail: 'broker login succeeded' }
       : { ok: false, label, detail: `${run.conclusion} → ${run.url}` };
   } catch {
     return {

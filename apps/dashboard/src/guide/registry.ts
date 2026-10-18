@@ -429,7 +429,7 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     slug: 'broker-logins',
     title: 'Broker logins',
     summary:
-      'The Fyers market-data login, why it expires daily, and the automatic AlgoTest logins.',
+      'The Fyers market-data login, why it expires daily, the Angel One connection check, and the automatic AlgoTest logins.',
     kind: 'Screen',
     body: opsBrokerLogins,
     screen: { tab: 'brokerLogins' },

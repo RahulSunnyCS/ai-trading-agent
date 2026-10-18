@@ -517,3 +517,32 @@ def test_update_day_skips_a_day_either_index_lacks(tmp_path):
     r = update.update_day(day, tmp_path, log=lambda s: None, names=NAMES)
     assert r["skipped"] and r["written"] == 0
     assert store.read_days(tmp_path) == {}
+
+
+def test_angel_vix_fallback_skips_during_a_refusal_hold(monkeypatch, capsys):
+    """A login Angel One refused is never repeated with the same settings (BL-122 / the Angel
+    check's hold): the 09:16 fallback skips instead of sending one more wrong attempt."""
+    from option_backtesting.angelone import auth as angel_auth
+    from option_backtesting.angelone import check as angel_check
+
+    monkeypatch.setattr(angel_check, "current_env", lambda: {"ANGELONE_CLIENT_CODE": "X"})
+    monkeypatch.setattr(angel_check, "refusal_hold", lambda env=None: "held until 08:15")
+    monkeypatch.setattr(angel_auth, "login", lambda *a, **k: pytest.fail("must not log in"))
+    assert live.vix_open_angel(date(2026, 10, 19)) is None
+    assert "skipped" in capsys.readouterr().err
+
+
+def test_angel_check_refusal_hold_follows_the_settings(tmp_path):
+    from option_backtesting.angelone import check as angel_check
+
+    env = {k: "v" for k in angel_check.KEYS}
+    now = 1_800_000_000.0
+    state = {
+        "last": {"reason": "rejected", "checked_at": angel_check._iso(now - 60)},
+        "rejected_fingerprint": angel_check.fingerprint(env),
+    }
+    angel_check._write_state(tmp_path, state)
+    assert angel_check.refusal_hold(tmp_path, env, lambda: now)
+    changed = {**env, "ANGELONE_MPIN": "w"}
+    assert angel_check.refusal_hold(tmp_path, changed, lambda: now) is None
+    assert angel_check.refusal_hold(tmp_path, env, lambda: now + 16 * 60) is None

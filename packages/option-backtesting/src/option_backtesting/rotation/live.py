@@ -43,12 +43,18 @@ def vix_open_angel(day: date) -> float | None:
     any step fails (the reason goes to stderr, scrubbed by that module)."""
     try:
         from ..angelone.auth import load_credentials, login
+        from ..angelone.check import current_env, refusal_hold
         from ..angelone.client import AngelClient
         from ..angelone.symbols import build_targets, download_master
     except ImportError:
         return None
     try:
-        client = AngelClient(login(load_credentials()))
+        env = current_env()  # the .env file's ANGELONE_* values, as the guarded checks use
+        held = refusal_hold(env=env)
+        if held:  # a wrong attempt counts toward a lockout: never repeat a refused login
+            print(f"Angel One VIX fallback skipped: {held}", file=sys.stderr)
+            return None
+        client = AngelClient(login(load_credentials(env)))
         client.targets = build_targets(download_master(), [], {VIX_SYMBOL: "INDIAVIX"})
         return _open_at_0915(client.minute_candles(VIX_SYMBOL, day), day)
     except Exception as error:  # noqa: BLE001 - a fallback must never raise into the pick

@@ -65,3 +65,19 @@ describe('MOMENTUM_DIRECT rewrites', () => {
     expect(called.filter((path) => !direct.some((pattern) => pattern.test(path)))).toEqual([]);
   });
 });
+
+describe('OBT_DIRECT rewrites', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('route the Angel One card to the options API', async () => {
+    vi.stubEnv('OBT_DIRECT', '1');
+    const rewrites = await nextConfig.rewrites?.();
+    if (!Array.isArray(rewrites)) throw new Error('next.config rewrites() should return an array');
+    for (const path of ['/api/backtest/legwise/angel/status', '/api/backtest/legwise/angel/test']) {
+      const rule = rewrites.find((r) => sourcePattern(r.source).test(path));
+      expect(rule?.destination).toBe('http://127.0.0.1:8000/legwise/:path*');
+    }
+  });
+});
