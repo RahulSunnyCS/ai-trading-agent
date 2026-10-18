@@ -79,9 +79,13 @@ const BASE_JOBS: Job[] = [
     // flight or the 60 s cool-down rather than fail, and its retry (5 minutes later, past its
     // own cool-down) is for a network blip; a login Angel One refused is never sent again by the
     // retry (`--scheduled`), since each wrong attempt counts toward a lockout. 08:00 is the
-    // owner's choice (2026-10-18) and does not collide with `broker-login` above: AlgoTest's
-    // Angel One login is off (repository variable BROKER_LOGIN_ONLY=finvasia) and AlgoTest logs
-    // in from 08:15 anyway.
+    // owner's choice (2026-10-18). `broker-login` above also logs in to Angel One with the same
+    // account, from GitHub, where this job's refusal hold can't see it: AlgoTest's Angel One login
+    // (off while BROKER_LOGIN_ONLY=finvasia; from 08:15) and, with QUANTIPLY_LOGIN on, Quantiply's
+    // at about 08:02. A wrong PIN is therefore refused once here and once or twice there per day
+    // (that workflow never resends a refused PIN, and its backstops skip Quantiply once a run
+    // happened). They seldom share a 30-second TOTP window; when they do and Angel refuses the
+    // reused code, the GitHub side retries with the next window's code.
     id: 'angel-login-check',
     description: 'Angel One: one SmartAPI login, to check the fallback data source works',
     schedule: { at: '08:00', on: tradingDays, label: 'trading days 08:00' },

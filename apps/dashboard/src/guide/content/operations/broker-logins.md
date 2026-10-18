@@ -71,6 +71,9 @@ The broker accounts (Angel One, Finvasia) are logged into [AlgoTest](glossary:al
 08:00 `broker-login` job, not from this screen. See [Jobs](app:/jobs). The Angel One card above
 checks this tool's own data login, not AlgoTest's.
 
+When it is switched on, the same job also logs in to Quantiply, Angel One's algo platform, with the
+same Angel One account. Its result is a line of its own in the job's Telegram report.
+
 ## Common questions
 
 **Is Fyers used for trading?** No. This tool uses Fyers for market data only and places no
