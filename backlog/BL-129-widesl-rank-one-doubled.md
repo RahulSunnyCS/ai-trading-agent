@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P3 — owner's question; a cheaper book if it holds |
-| **Status** | Done — informative, not adopted: Widesl rank 1 earned less than rank 2; doubling it lowers the book |
+| **Status** | Done — informative, not adopted: Widesl rank 1 earned no more than rank 2 (usually the Widesl the minimum swapped in); the doubled book is not better |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -55,7 +55,7 @@ Say, descriptively, whether Widesl rank 1 earns more than Widesl rank 2 among Ad
 - 2026-10-18 — **Run as registered** (`research/bl129/rank_double.py`; `rank_double_2026-10-18.json`). Gross per lot
   from the stored results; net B − A adds only the brokerage B saves (₹94–103 a day). Descriptive, in-sample.
 
-  | Universe, window | Days (3-Widesl) | W1 / W2 / X mean | W1 − W2 (90 %) | W1 better | Book A / B per day | B − A net (90 %) | Max drawdown A / B |
+  | Universe, window | Days (3-Widesl) | W1 / W2 / X mean | W1 − W2 (90 %) | W1 better | Book A / B per day (gross) | B − A net (90 %) | Max drawdown A / B (gross; net below) |
   |---|---|---|---|---|---|---|---|
   | Core-298, 2025-01-10 → 2026-10-16 | 428 (78) | +227 / +409 / +580 | −183 [−339, −36] negative | 50 % | +1,216 / +1,034 | −89 [−245, +58] | −35,457 / −42,928 |
   | Core-298, last year | 244 (35) | +404 / +413 / +576 | −9 [−189, +177] | 50 % | +1,393 / +1,384 | +85 [−94, +271] | −31,486 / −32,987 |
@@ -68,3 +68,17 @@ Say, descriptively, whether Widesl rank 1 earns more than Widesl rank 2 among Ad
   the drawdown (T1: −23k → −41k). The composite separates "picked" from "not picked", not the order inside the picks.
   Weaknesses: in-sample (these days were read by BL-115 and others); turnover charges assumed equal in both books;
   Buy add-on left out.
+- 2026-10-18 — **Review corrections (Opus, PR #250; no number changes, the reading stands).**
+  - **What "rank 2" is.** On 310 of 428 days (Core-298) and 313 of 428 (T1) `score.select` swapped in a Widesl that
+    ranks below the Dir to meet the Widesl minimum, so W2 was usually not picked on its composite. W1 − W2 by day type:
+    swap days Core −124, T1 −279; natural two-Widesl days −80 / −26; three-Widesl days −468 / +47. The finding is
+    therefore that the Widesl forced in by the minimum earned at least as much as the one that made the top three on
+    merit; the earlier sentence "the composite separates picked from not picked, not the order inside the picks" said
+    more than this shows and is withdrawn.
+  - **Drawdown on net, as Phase 0 registered** (each book's own brokerage taken off), A / B: Core two years −42,326 /
+    −46,633; Core last year −35,929 / −35,751 (B no deeper); T1 two years −25,887 / −44,265; T1 last year −25,672 /
+    −44,265. The reading is unchanged (the interval leg fails in every cell), but "deeper drawdown" does not hold for
+    Core's last year. T1's two windows share their drawdowns because both books' worst episodes fall inside the last
+    year (A 2026-09-09 → 09-11, B 2026-05-26 → 06-15).
+  - "W1 better" counts ties as not better; T1 has 7–10 % tied days. The one-lot framing favours B: the live list
+    trades two lots per strategy, so the gross difference doubles while the per-order brokerage saving does not.
