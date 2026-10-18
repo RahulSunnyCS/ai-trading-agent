@@ -212,4 +212,12 @@ Claude.
   "Manage Plan", "Auto Activation" and "Auto restart paused executions". **An activation repeats on the
   chosen weekdays until stopped, not once**: a dropped pick must be deactivated, not merely left out.
   Activating needs a slot, i.e. credits (197 on the account); stopped there for the owner's go.
+- 2026-10-19 — the owner deploys on **`/live`** (Algo Trade), not Forward Test. `/live` has the same
+  Activation table; a selected row offers "Setup Execution" and "Activate". The header shows "0/6 Strategy
+  Deployed" (the plan's live limit, exactly 3 Core + 3 T1, so a Buy add-on day needs a slot freed first) and
+  "Broker Login 0/0". Forward Test has no slots, so Phase 3's paper run becomes a **dry run on `/live`**: the
+  deployer does everything up to Setup Execution, records what it would set, and never clicks Activate, while
+  the owner deploys by hand, for 10 days. Claude's own clicks on `/live` controls are refused by the session's
+  safety check (a real-money action), so the Setup Execution dialog is recorded by the owner (screenshot, or
+  the `record-strategies` script).
 
