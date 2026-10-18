@@ -43,6 +43,8 @@ The screen is one page, in the order you read it:
   next entry instead of reserving a large empty chart area.
 - **What happened** — the recorded or reconstructed day log. Below it, *Drawdowns and selection
   drift* opens the risk review for the list.
+- **Lot plans** — the same morning picks traded three ways (As picked, Dir Boost, Duo), followed
+  from 19 Oct 2026 for Core and T1. See [Rotation: lot plans](guide:optionslab/rotation-lot-plans).
 - **Is the rule still working?** — optional diagnostics, each closed until you open it: why a pick
   was selected, the family pulse, rank correlation, and what market the forward days tested.
 - **Experiments** — *Ideas being watched*: the unregistered candidates and trigger studies, each

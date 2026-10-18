@@ -50,6 +50,7 @@ import { RotationDailyLog } from './RotationDailyLog';
 import { RotationDrawdowns } from './RotationDrawdowns';
 import { RotationDrift } from './RotationDrift';
 import { RotationExplain } from './RotationExplain';
+import { RotationLotPlans } from './RotationLotPlans';
 import { RotationPulse } from './RotationPulse';
 import { RotationRegime } from './RotationRegime';
 import { RotationShadowScoreboard } from './RotationShadowScoreboard';
@@ -339,6 +340,21 @@ export function RotationPanel() {
           <RotationDrawdowns list={focus} portfolio={portfolio} />
           <RotationDrift list={focus} />
         </Accordion>
+      </section>
+
+      <section aria-labelledby="band-lot-plans" className="space-y-3">
+        <header>
+          <h2
+            id="band-lot-plans"
+            className="text-base font-semibold tracking-tight text-foreground"
+          >
+            Lot plans
+          </h2>
+          <p className="mt-0.5 text-sm text-muted">
+            The same morning picks traded three ways, tracked forward for the live book and T1.
+          </p>
+        </header>
+        <RotationLotPlans />
       </section>
 
       <section aria-labelledby="band-working" className="space-y-3">

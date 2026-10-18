@@ -107,3 +107,7 @@ picks, the scoring or the Telegram messages.
 ## Log
 
 - 2026-10-18 — Created; Phase 0 registered before the first forward entry (owner named the plans). TODO 3.10.32.
+- 2026-10-18 — Phase 1 built: `rotation/lot_plans.py`, `GET /legwise/rotation/lot-plans?book=core|t1` (+ Fastify proxy
+  route), `obt rotation lot-plans`, the Rotation page's "Lot plans" card and its Guide page. Checked read-only on the
+  real store: both books answer with no forward entry and "Tracking starts Mon 19 Oct"; with the start moved back to
+  12 Oct in a scratch run, the best unpicked Dir re-derived and verified on all five recorded entries (digest equal).
