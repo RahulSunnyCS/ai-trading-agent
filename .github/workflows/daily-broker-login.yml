@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: 'Single broker to run (angelone or finvasia). Blank runs both.'
+        description: 'Single broker to run (angelone or finvasia). Blank uses the BROKER_LOGIN_ONLY repository variable; both blank runs both.'
         required: false
         default: ''
       trace:
@@ -117,7 +117,11 @@ jobs:
           SHOONYA_TOTP_SECRET: ${{ secrets.SHOONYA_TOTP_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          ONLY: ${{ inputs.only }}
+          # A dispatch's own input wins; otherwise the repository variable BROKER_LOGIN_ONLY (set in
+          # Settings > Secrets and variables > Actions > Variables) decides for the 08:00 dispatch and
+          # the cron backstop alike. Unset or empty = both brokers. A value other than angelone or
+          # finvasia fails the run loudly (config.ts), with the usual Telegram alert.
+          ONLY: ${{ inputs.only || vars.BROKER_LOGIN_ONLY }}
           TRACE: ${{ inputs.trace && '1' || '' }}
           SKIP_WINDOW_GUARD: ${{ inputs.skip_window_guard && '1' || '' }}
         run: bun run login
