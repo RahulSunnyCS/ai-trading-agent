@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner trades both books with real money (3 lots each, ₹8.5 lakh per account) |
-| **Status** | Done — informative: Core's extra lot on the Dir beat an even spread; T1's extra Widesl lot did not |
+| **Status** | Done — informative: the Dir is the best home for the fourth lot in both books (Core and, by Amendment 1, T1), but the edge over an even spread rests on a few days; no Widesl placement beats it |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -114,3 +114,19 @@ lots spread evenly; nothing live changes.
     C-D2 − B4 is the Dir minus the mean pick each day, the comparison BL-129 already made on these days, so the
     agreement with BL-129 restates it rather than confirming it.
 - 2026-10-18 — Amendment 1 committed before T-D2 was run: the owner's override for T1's Dir placement.
+- 2026-10-18 — **Amendment 1 run** (T-D2, and the top-days checks for C-D2 and T-D2; same script and JSON).
+
+  | Book, window | Arm | Per day | Max drawdown | Worst day | Extra lot (90 %) | vs B4 (90 %) | after brokerage | vs B4 w/o top 5 (share) | w/o top 10 (share) |
+  |---|---|---|---|---|---|---|---|---|---|
+  | T1, two years | **T-D2 Dir ×2** | +2,200 | −33,690 | −17,598 | +315 [+168, +456] | +98 [−20, +215] | +87 [−32, +205] | +33 [−84, +146] (66 %) | −20 [−135, +91] (120 %) |
+  | T1, last year | **T-D2** | +2,513 | −24,811 | −13,734 | +413 [+246, +570] | **+150 [+27, +270]** | +141 [+17, +262] | +48 [−67, +162] (68 %) | −22 [−141, +88] (114 %) |
+  | Core, two years | C-D2 | | | | | +161 [+28, +292] | +149 [+14, +279] | +102 [−22, +229] (37 %) | +52 [−76, +170] (68 %) |
+  | Core, last year | C-D2 | | | | | +239 [+100, +388] | +230 [+90, +379] | +151 [+14, +286] (38 %) | +74 [−52, +201] (70 %) |
+
+  **Read (descriptive; the arm was chosen after the first results).** T1's Dir at two lots earns the most of any T1
+  placement (+315 / +413 a day over 3 lots), is above the even spread on the last year (+150 [+27, +270]) but not
+  over the 21 months (+98 [−20, +215]), and its edge over the even spread is carried by a handful of days (the top 5
+  give two-thirds of it; without the top 10 it is gone). Its drawdown over 21 months (−33,690) is as deep as T-W1's;
+  on the last year it is near B3's. Core's Dir is the sturdier of the two (without its top 5 days still +102 / +151).
+  Both say the same thing: the Dir is at least as good a home for the fourth lot as any other pick, and probably
+  better, but not by a margin these days can pin down.

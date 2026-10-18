@@ -28,7 +28,11 @@ WINDOWS = {
 }
 BLOCK, RESAMPLES, SEED, LEVEL = 5, 2000, 20261025, 0.90
 BROKERAGE = 20.0 * 1.18  # per order, with GST
-PLACEMENTS = {"core_298": ("C-D2", "C-D+"), "t1": ("T-W1", "T-W2", "T-W+")}
+PLACEMENTS = {
+    "core_298": ("C-D2", "C-D+"),
+    "t1": ("T-W1", "T-W2", "T-W+", "T-D2"),
+}  # T-D2: Amendment 1
+CONCENTRATION = ("C-D2", "T-D2")  # Amendment 1: top-days removed
 
 
 def read(name: str, root: Path) -> dict[date, tuple[float, int]]:
@@ -108,6 +112,7 @@ def run(root: Path, names: list[str], book: str) -> dict:
                     "T-W1": add(wide[0], False),
                     "T-W2": add(wide[-1], False),
                     "T-W+": add(ru.get("wide"), True),
+                    "T-D2": add(dirs[0], False) if dirs else add(ru.get("dir"), True),
                 }
             else:
                 d2 = add(dirs[0], False) if dirs else add(ru.get("dir"), True)
@@ -150,6 +155,17 @@ def run(root: Path, names: list[str], book: str) -> dict:
                 "vs_B4_after_added_brokerage": interval(g - brk - b4),
                 "added_brokerage_per_day": float(brk.mean()),
             }
+            if k in CONCENTRATION:
+                excess = g - b4
+                order = np.argsort(excess)[::-1]
+                total = float(excess.sum())
+                for top in (5, 10):
+                    keep = np.delete(excess, order[:top])
+                    w[k][f"vs_B4_without_top_{top}"] = interval(keep) | {
+                        "share_of_excess": float(excess[order[:top]].sum() / total)
+                        if total
+                        else None
+                    }
         out[wname] = w
     return out
 
@@ -177,6 +193,12 @@ def main() -> None:
                     f"[{e['ci90'][0]:+.0f},{e['ci90'][1]:+.0f}] | vs B4 {v['mean']:+.0f} [{v['ci90'][0]:+.0f},{v['ci90'][1]:+.0f}] {v['reading']} "
                     f"| after brokerage {vn['mean']:+.0f} [{vn['ci90'][0]:+.0f},{vn['ci90'][1]:+.0f}]"
                 )
+                for top in (5, 10):
+                    c = x.get(f"vs_B4_without_top_{top}")
+                    if c:
+                        print(
+                            f"      w/o top {top}: {c['mean']:+.0f} [{c['ci90'][0]:+.0f},{c['ci90'][1]:+.0f}] (top {top} share {c['share_of_excess']:.0%})"
+                        )
 
 
 if __name__ == "__main__":

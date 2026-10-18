@@ -41,7 +41,25 @@
      ],
      "reading": "above zero"
     },
-    "added_brokerage_per_day": 12.682242990654203
+    "added_brokerage_per_day": 12.682242990654203,
+    "vs_B4_without_top_5": {
+     "mean": 102.10224586288419,
+     "ci90": [
+      -21.979125295508304,
+      228.97611111111112
+     ],
+     "reading": "includes zero",
+     "share_of_excess": 0.3748928043397869
+    },
+    "vs_B4_without_top_10": {
+     "mean": 52.135087719298255,
+     "ci90": [
+      -76.27976674641148,
+      170.3011543062201
+     ],
+     "reading": "includes zero",
+     "share_of_excess": 0.684582906058367
+    }
    },
    "C-D+": {
     "per_day": 1359.0775700934578,
@@ -115,7 +133,25 @@
      ],
      "reading": "above zero"
     },
-    "added_brokerage_per_day": 8.898360655737704
+    "added_brokerage_per_day": 8.898360655737704,
+    "vs_B4_without_top_5": {
+     "mean": 150.86582984658298,
+     "ci90": [
+      14.245376569037667,
+      285.78458856345884
+     ],
+     "reading": "above zero",
+     "share_of_excess": 0.38138996649053636
+    },
+    "vs_B4_without_top_10": {
+     "mean": 73.68027065527065,
+     "ci90": [
+      -51.82933404558405,
+      200.77517450142446
+     ],
+     "reading": "includes zero",
+     "share_of_excess": 0.7042019935257167
+    }
    },
    "C-D+": {
     "per_day": 1672.0483606557377,
@@ -252,6 +288,54 @@
      "reading": "below zero"
     },
     "added_brokerage_per_day": 56.13271028037382
+   },
+   "T-D2": {
+    "per_day": 2200.2432242990653,
+    "max_drawdown": -33690.40000000001,
+    "worst_day": -17598.4,
+    "extra_vs_B3": {
+     "mean": 314.93446261682243,
+     "ci90": [
+      168.48004672897196,
+      455.9309345794393
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4": {
+     "mean": 97.58298286604362,
+     "ci90": [
+      -19.85354556074767,
+      214.6703738317757
+     ],
+     "reading": "includes zero"
+    },
+    "vs_B4_after_added_brokerage": {
+     "mean": 86.88578660436137,
+     "ci90": [
+      -31.517418224299085,
+      204.80872663551398
+     ],
+     "reading": "includes zero"
+    },
+    "added_brokerage_per_day": 10.697196261682242,
+    "vs_B4_without_top_5": {
+     "mean": 33.36162332545312,
+     "ci90": [
+      -84.36390661938542,
+      145.65624704491722
+     ],
+     "reading": "includes zero",
+     "share_of_excess": 0.6621143997979193
+    },
+    "vs_B4_without_top_10": {
+     "mean": -20.308971291866026,
+     "ci90": [
+      -135.14866626794262,
+      91.49225079744815
+     ],
+     "reading": "includes zero",
+     "share_of_excess": 1.203257392162833
+    }
    }
   },
   "last_year": {
@@ -356,6 +440,54 @@
      "reading": "below zero"
     },
     "added_brokerage_per_day": 55.904918032786874
+   },
+   "T-D2": {
+    "per_day": 2512.848155737705,
+    "max_drawdown": -24810.75,
+    "worst_day": -13734.5,
+    "extra_vs_B3": {
+     "mean": 412.5956967213115,
+     "ci90": [
+      246.34018442622948,
+      569.5589549180328
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4": {
+     "mean": 150.07834699453554,
+     "ci90": [
+      26.57185109289612,
+      270.2710826502732
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4_after_added_brokerage": {
+     "mean": 140.986543715847,
+     "ci90": [
+      16.880474726775965,
+      261.75413251366126
+     ],
+     "reading": "above zero"
+    },
+    "added_brokerage_per_day": 9.091803278688523,
+    "vs_B4_without_top_5": {
+     "mean": 48.413179916318,
+     "ci90": [
+      -66.55288005578801,
+      162.0460355648535
+     ],
+     "reading": "includes zero",
+     "share_of_excess": 0.6840243279125156
+    },
+    "vs_B4_without_top_10": {
+     "mean": -21.707977207977194,
+     "ci90": [
+      -140.66201923076923,
+      88.01717236467233
+     ],
+     "reading": "includes zero",
+     "share_of_excess": 1.138716253395881
+    }
    }
   }
  },
