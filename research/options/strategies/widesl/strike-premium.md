@@ -27,6 +27,7 @@ file sells the NIFTY strike closest to ₹65 (`nifty_widesl_917_closest_premium.
 | BL-098 | All six rotation families × one-factor stops | holdout 2025-10-09 → 2026-10-09, **after charges** | Descriptive: NIFTY leaders ₹100 / ₹80 (morning, afternoon) and OTM1 (midday); SENSEX ₹250 in every band | [BL-098 report][bl098q] |
 | BL-126 (POC) | NIFTY ₹120 at SL 60 % (and ₹100 at SL 75 %) added beside Core ₹100, all 25 slots | 2024-10-09 → 2026-10-16, gross, in-sample | Not positive standalone or in Adaptive (₹120: +₹23 [−33, +81] per lot-day in Adaptive, shallower drawdown) | [BL-126][bl126] |
 | BL-127 | NIFTY ₹80, ₹100, ₹120 × six leg stops (60–115 %), a stop chosen per premium on 2024-10 → 2025-10, the best two added to Adaptive and read on 2025-10 → 2026-10 | Gross, selection and test years | Standalone in the selection year ₹120 (SL 70 %, +295) > ₹100 (SL 70 %, +281) > ₹80 (SL 80 %, +230) per lot-day; Adaptive with ₹80 SL 80 % and ₹120 SL 70 % added: −₹10 [−82, +63] on the test year, deeper drawdown. **Not positive**; ₹120's own first-year Stage B gain (+₹15) did not repeat | [BL-127][bl127] |
+| BL-128 | SENSEX ₹240, ₹300, ₹350 × six leg stops (60–115 %), a stop chosen per premium on 2024-10 → 2025-10, the best two added to Adaptive and read on 2025-10 → 2026-10 | Gross, selection and test years | Standalone in the selection year ₹300 (SL 60 %, +160) > ₹350 (SL 60 %, +155) > ₹240 (SL 60 %, +153) per lot-day; Adaptive with ₹300 and ₹240 at SL 60 % added: −₹2 [−88, +79] on the test year, drawdown deeper (₹300 alone +₹20, ₹240 alone +₹25, intervals include zero). **Not positive**; ₹300's first-year Stage B gain (+₹79 [+15, +149]) did not repeat | [BL-128][bl128] |
 
 Fixed mixes, no portfolio stop, total / max drawdown, OTM1 | ₹80 | ₹100 ([BL-055][bl055], before
 charges): 5 × Widesl ₹8.73L / −₹2.26L | ₹7.02L / −₹1.99L | ₹7.37L / −₹1.76L; 3 Widesl + 2 Dir ₹9.47L /
@@ -76,3 +77,4 @@ charges): 5 × Widesl ₹8.73L / −₹2.26L | ₹7.02L / −₹1.99L | ₹7.37L
 [bl098q]: ../../../../backlog/BL-098-widesl-qualified-list-post-charge.md
 [bl126]: ../../../../backlog/BL-126-nifty-premium-widesl-tight-sl-poc.md
 [bl127]: ../../../../backlog/BL-127-nifty-premium-widesl-sl-selection.md
+[bl128]: ../../../../backlog/BL-128-sensex-premium-widesl-sl-selection.md
