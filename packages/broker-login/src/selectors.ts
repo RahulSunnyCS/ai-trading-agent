@@ -149,9 +149,9 @@ export const angelOneForm = {
  * navigates to Angel's SmartAPI publisher login ("Login to Quantiply") - the same page as
  * AlgoTest's Angel One login, so the verified `angelOneForm` locators above fill it.
  *
- * PROVISIONAL - seen read-only on 2026-10-18 (no credentials entered), not yet confirmed by a
- * real login. If a step fails, the run's diagnostics artifact holds a screenshot (inputs
- * blanked) and redacted HTML named after the step (`fail-quantiply-...`); tighten these from it.
+ * Confirmed by a real headed login on 2026-10-18 (auth -> SmartAPI publisher login -> /algos in
+ * 11 s). If a step fails after a redesign, the run's diagnostics artifact holds a screenshot
+ * (inputs blanked) and redacted HTML named after the step (`fail-quantiply-...`); fix it from that.
  */
 export const quantiplyPage = {
   /** The single button on the /auth screen. Also the logged-OUT marker after the round trip. */
