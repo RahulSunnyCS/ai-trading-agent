@@ -4,6 +4,7 @@ date and market condition, with the journal's recorded picks laid over it (read-
 Everything is read from files the nightly job already wrote and this module never writes:
 
     rotation/results/<variant>.csv   day,net,gross,costs,worst_mtm,stopped_by,n_trades
+    rotation/track_t1/results/*.csv  the same, for the T1 track's settings (universe "t1" only)
     rotation/days.csv                day,weekday,vix_open,vix_band,dte_n,dte_s
     rotation/journal.jsonl           the hash chain: the recorded picks of A / B / C / REF
 
@@ -224,57 +225,97 @@ def load_cube(root: Path | None = None, universe: str = "core") -> Cube:
     return cube
 
 
-#: one variant file's parsed rows, keyed on its path and reused while its size and mtime hold, so
-#: the T1 cube does not parse the 298 Core files the Core cube already read (and vice versa)
-_FILE_CACHE: dict[str, tuple[tuple[int, int], dict, set]] = {}
+Rows = dict[str, dict[date, tuple[float, float, str, float]]]
 
 
-def _read_file(path: Path) -> tuple[dict[date, tuple[float, float, str, float]], set[date]]:
-    """{day: (gross, worst_mtm, stopped_by, n_trades)} of one variant file, and its weekend days."""
-    try:
-        st = path.stat()
-        stamp = (st.st_mtime_ns, st.st_size)
-    except OSError:
-        stamp = (0, 0)
-    hit = _FILE_CACHE.get(str(path))
-    if hit and hit[0] == stamp:
-        return hit[1], hit[2]
-    by_day: dict[date, tuple[float, float, str, float]] = {}
+def _read_rows(paths: list[Path]) -> tuple[Rows, set[date]]:
+    """{variant: {day: (gross, worst_mtm, stopped_by, n_trades)}} and the weekend days left out."""
+    rows: Rows = {}
     weekend: set[date] = set()
-    with path.open(newline="") as f:
-        for r in csv.DictReader(f):
-            try:
-                d = date.fromisoformat(r["day"])
-            except (KeyError, ValueError):
-                continue
-            if d.weekday() >= 5:
-                # as in the ranking history (store.load_matrix): a Saturday or Sunday
-                # special session (the Budget Sunday once shifted every later pick) is left
-                # out of every figure, and counted so the page can say so
-                weekend.add(d)
-                continue
-            by_day[d] = (
-                _float(r.get("gross")),
-                _float(r.get("worst_mtm")),
-                (r.get("stopped_by") or "").strip(),
-                _float(r.get("n_trades")),
-            )
-    _FILE_CACHE[str(path)] = (stamp, by_day, weekend)
-    return by_day, weekend
+    for path in paths:
+        if _split_name(path.stem) is None:
+            continue
+        by_day: dict[date, tuple[float, float, str, float]] = {}
+        with path.open(newline="") as f:
+            for r in csv.DictReader(f):
+                try:
+                    d = date.fromisoformat(r["day"])
+                except (KeyError, ValueError):
+                    continue
+                if d.weekday() >= 5:
+                    # as in the ranking history (store.load_matrix): a Saturday or Sunday
+                    # special session (the Budget Sunday once shifted every later pick) is left
+                    # out of every figure, and counted so the page can say so
+                    weekend.add(d)
+                    continue
+                by_day[d] = (
+                    _float(r.get("gross")),
+                    _float(r.get("worst_mtm")),
+                    (r.get("stopped_by") or "").strip(),
+                    _float(r.get("n_trades")),
+                )
+        if by_day:
+            rows[path.stem] = by_day
+    return rows, weekend
 
 
 def _read_cube(root: Path, universe: str = "core") -> Cube:
-    rows: dict[str, dict[date, tuple[float, float, str, float]]] = {}
-    weekend: set[date] = set()
-    for path in _result_files(root, universe):
-        if _split_name(path.stem) is None:
-            continue
-        by_day, off = _read_file(path)
-        weekend |= off
-        if by_day:
-            rows[path.stem] = by_day
+    if universe == "core":
+        rows, weekend = _read_rows(_result_files(root, "core"))
+        return _assemble(root, rows, weekend, "core")
+    # T1: the Core cube as already loaded (never parsed twice) plus the track's own files
+    core = load_cube(root, "core")
+    live = store.results_dir(root)
+    rows, weekend = _read_rows([p for p in _result_files(root, universe) if p.parent != live])
+    days = sorted(set(core.days) | {d for by_day in rows.values() for d in by_day})
+    extra = _assemble(root, rows, weekend | set(core.weekend_days), universe, days=days)
+    return _merge(core, extra)
+
+
+def _merge(core: Cube, extra: Cube) -> Cube:
+    """Core's variants laid onto `extra`'s day axis (a superset of Core's), then both in name
+    order. Day attributes come from `extra`, which read them for every day."""
+    col = np.searchsorted(extra.ordinal, core.ordinal)
+
+    def widen(a: np.ndarray, fill) -> np.ndarray:
+        out = np.full((a.shape[0], len(extra.days)), fill, dtype=a.dtype)
+        out[:, col] = a
+        return out
+
+    names = [*core.names, *extra.names]
+    order = np.argsort(np.array(names, dtype=str), kind="stable")
+
+    def stack(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        return np.concatenate([a, b])[order]
+
+    return Cube(
+        names=[names[i] for i in order],
+        index=stack(core.index, extra.index),
+        family=stack(core.family, extra.family),
+        slot=stack(core.slot, extra.slot),
+        days=extra.days,
+        ordinal=extra.ordinal,
+        G=stack(widen(core.G, np.nan), extra.G),
+        WORST=stack(widen(core.WORST, np.nan), extra.WORST),
+        STOP=stack(widen(core.STOP, False), extra.STOP),
+        STOPTXT=stack(widen(core.STOPTXT, ""), extra.STOPTXT),
+        weekday=extra.weekday,
+        band=extra.band,
+        dte_n=extra.dte_n,
+        dte_s=extra.dte_s,
+        has_attrs=extra.has_attrs,
+        NTRADES=stack(widen(core.NTRADES, np.nan), extra.NTRADES),
+        weekend_days=extra.weekend_days,
+        universe=extra.universe,
+    )
+
+
+def _assemble(
+    root: Path, rows: Rows, weekend: set[date], universe: str, days: list[date] | None = None
+) -> Cube:
     names = sorted(rows)
-    days = sorted({d for by_day in rows.values() for d in by_day})
+    if days is None:
+        days = sorted({d for by_day in rows.values() for d in by_day})
     pos = {d: i for i, d in enumerate(days)}
     G = np.full((len(names), len(days)), np.nan)
     W = np.full((len(names), len(days)), np.nan)
@@ -504,6 +545,12 @@ def parse_filters(
     )
 
 
+def _check_universe(cube: Cube, f: Filters) -> None:
+    track = [t for t in f.families or () if "-" in t]
+    if track and cube.universe == "core":
+        raise MatrixError(f"{track[0]} is a T1 setting: switch the matrix to T1 to see it")
+
+
 def effective_filters(view: str, f: Filters) -> Filters:
     """The date and DTE views are about one kind of strategy, so an unset index means NIFTY and an
     unset family means Widesl (the research's anchor family). The response echoes the result."""
@@ -721,12 +768,20 @@ def _base_variants(cube: Cube, f: Filters) -> np.ndarray:
     if f.families:
         fm = np.isin(cube.family, f.families)
         if f.groups:  # an alias also takes a track's settings of its kinds (T1 universe)
-            bases = [b for g in f.groups for b in FAMILY_ALIASES[g]]
-            fm |= np.isin(cube.base, bases)
+            for g in f.groups:
+                fm |= np.array([_in_group(g, str(b)) for b in cube.base], dtype=bool)
         m &= fm
     if f.slots:
         m &= np.isin(cube.slot, f.slots)
     return m
+
+
+def _in_group(group: str, base: str) -> bool:
+    """A base family in an alias by kind, as `variants.is_wide` / `is_dir` read it: any
+    closest-premium level is a Widesl (a track's p150 / p285 too), not only Core's four."""
+    if group == "widesl":
+        return base == "wide" or (base[:1] == "p" and base[1:].isdigit())
+    return base in FAMILY_ALIASES[group]
 
 
 def _family_pairs(cube: Cube, base_v: np.ndarray) -> list[tuple[str, str]]:
@@ -1095,9 +1150,19 @@ def matrix_for(
         else "no stored result in this period"
     )
     why_cond, why_sel = _reasons(ctx)
+    # the live journal can never pick a parallel track's setting: under selection frequency those
+    # rows are not opportunities (n/a, not a measured 0 %) and stay out of the summaries
+    track = np.array(["-" in str(f) for f in ctx.cube.family], dtype=bool)
+    if ctx.src.kind == "selection" and track.any():
+        base_v = base_v & ~track
 
     def make(vm: np.ndarray, items: tuple[Item, ...], obs: bool) -> dict:
         if not vm.any():
+            if ctx.src.kind == "selection" and any(
+                it.v is not None and (it.v & track).any() and not (it.v & ~track).any()
+                for it in items
+            ):
+                return {"st": "na", "reason": "the live journal never picks a T1 setting"}
             return dict(NA_CELL)
         return cell_dict(
             pool(ctx, vm, items),
@@ -1366,6 +1431,7 @@ def compute(
             "meta": meta_for(cube, jr),
         }
     f = effective_filters(view, filters or Filters())
+    _check_universe(cube, f)
     as_of = _as_of(view, hi, cube)
     periods = _periods_for(view, period, compare, jr, lo, hi, as_of)
     info = METRIC_INFO[metric]
@@ -1448,8 +1514,27 @@ def compute(
             for p in ("P1", "P2", "P3", "forward")
         ],
         "universe": cube.universe,
-        "notes": [*NOTES, T1_NOTE] if cube.universe == "t1" else NOTES,
+        "notes": _notes(cube, periods),
     }
+
+
+def _notes(cube: Cube, periods: list[PeriodSel]) -> list[str]:
+    if cube.universe != "t1":
+        return NOTES
+    out = [*NOTES, T1_NOTE]
+    a, b = T1_CHOSEN_ON
+    for p in periods:
+        if p.status != "ok" or p.id == "asof":
+            continue
+        days = [d for d in cube.days if _within(p, d)]
+        inside = sum(a <= d <= b for d in days)
+        if inside:
+            share = "entirely" if inside == len(days) else f"{inside} of its {len(days)} sessions"
+            out.append(
+                f"{p.id} lies {share} inside the window the T1 settings were chosen on "
+                f"({a.isoformat()} to {b.isoformat()}): their rows there are in-sample."
+            )
+    return out
 
 
 def _difference(matrices: list[dict], unit: str) -> dict:
@@ -1544,6 +1629,7 @@ def drill(
     if cube.n_variants == 0:
         raise MatrixError("no strategy has stored results yet")
     f = effective_filters(view, filters or Filters())
+    _check_universe(cube, f)
     as_of = _as_of(view, hi, cube)
     p = _periods_for(view, period, None, jr, lo, hi, as_of)[0]
     if p.status != "ok":

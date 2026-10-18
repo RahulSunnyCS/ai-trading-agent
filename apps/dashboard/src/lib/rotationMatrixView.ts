@@ -119,13 +119,10 @@ export interface MatrixFilters {
   universe: MatrixUniverse;
 }
 
-export const UNIVERSE_OPTIONS: { value: MatrixUniverse; label: string; hint: string }[] = [
-  { value: 'core', label: 'Core 298', hint: 'The 298 strategies the live Adaptive list ranks.' },
-  {
-    value: 't1',
-    label: 'T1',
-    hint: 'Core 298 plus the T1 track’s nine extra settings at every start time (BL-113, testing phase, not traded).',
-  },
+/** The bar's switch: Core-298 (the live Adaptive's strategies), or Core plus the T1 track's settings. */
+export const UNIVERSE_OPTIONS: { value: MatrixUniverse; label: string }[] = [
+  { value: 'core', label: 'Core 298' },
+  { value: 't1', label: 'T1' },
 ];
 
 export const DEFAULT_FILTERS: MatrixFilters = {
