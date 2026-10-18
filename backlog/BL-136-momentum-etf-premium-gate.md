@@ -71,9 +71,10 @@ show in the journal and on This week.
 - **Universe:** the ETF rotation's `core` names with an `amfi_code` (`universe.csv`), their
   real premium series (`etf_premium.csv` as rebuilt by Phase 2 task 1), P&L on the ETF
   (`--track etf`, the live setting), Friday close fills.
-- **Look-ahead check:** the gate on week W reads the newest premium dated **on or before
-  Thursday of W** (`latest_premiums` already stops at W's close; the test pins it a day earlier,
-  matching what the 16:45 run can know). A re-run with the premium series cut off at each
+- **Look-ahead check:** the gate on week W reads the newest premium dated **before W's Friday**
+  (`latest_premiums` stops at the previous session whatever the file holds, so a rerun after
+  AMFI has published Friday's NAV decides the same way the 16:45 run did; pinned in
+  `test_weekly.py`). A re-run with the premium series cut off at each
   decision date must give identical decisions (the pattern of `tests/golden/test_lookahead.py`).
 - **Arms:** (A) no gate (the baseline, today's backtest); (B) hard gate at 2% domestic / 5%
   international (the live numbers); (C) hard gate at 1% / 2% (the warning levels); (D)
@@ -94,8 +95,8 @@ show in the journal and on This week.
 - **Tasks:** `premium_block_pct` / `premium_block_international_pct` in `live_config.toml`
   (2% / 5%, 0 = off), read by `load_live_config` and shared with every ETF favourite through
   `settings_from_saved_config` (`live_premium_settings`). `compute_signal` builds a one-week
-  `no_buy` table from `latest_premiums` (newest premium on or before the week's close, with its
-  date) + `premium_blocked` and passes it to `analysis.latest_signal`; a skipped name is relabelled
+  `no_buy` table from `latest_premiums` (newest premium dated before the signal Friday, with its
+  date; Friday's own NAV is never read, even on a later rerun) + `premium_blocked` and passes it to `analysis.latest_signal`; a skipped name is relabelled
   `SKIP (premium)` with `premium`, `premium_date`, `premium_limit` and a `reason`. `format_message`
   lists them under "NOT BOUGHT · ETF too far above NAV". `groups.combine` keeps a sleeve's skip as
   a skip (it used to read before = after = 0 as a TRIM); the group message says "not bought:".
@@ -157,3 +158,7 @@ show in the journal and on This week.
 - 2026-10-18 — created from the owner's question after MON100 read +16.89% above NAV. Phase 0
   committed. Phase 1 built in the same change: the live gate (2% domestic / 5% international),
   the Telegram "NOT BOUGHT" group, the journal and This week rows, the group combine fix.
+- 2026-10-18 — PR review (Codex) found two real gaps, fixed before merge: the lookup read a
+  premium dated on the signal Friday when a rerun found one (now strictly before it), and the
+  paper-start views rebuilt the first week from the ungated weights, showing the refused name
+  as a BUY (now the skip row is kept).

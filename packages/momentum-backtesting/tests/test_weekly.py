@@ -449,11 +449,14 @@ def test_the_newest_premium_known_at_the_close_decides_and_the_limit_is_per_tax_
     )
     latest = weekly.latest_premiums(premiums, week)
     assert latest["Nasdaq 100"] == (pytest.approx(0.1689), "2026-10-15")
-    assert latest["Nifty IT"] == (pytest.approx(0.03), "2026-10-16")
-    # A later day's row is never read for an earlier week.
-    assert weekly.latest_premiums(premiums, pd.Timestamp("2026-10-14"))["Nifty IT"][1] == (
+    # Friday's own NAV is published after the close the signal is decided at: even when a later
+    # rerun finds it in the file, the gate reads Thursday's (BL-136 Phase 0's look-ahead rule).
+    assert latest["Nifty IT"] == (pytest.approx(0.025), "2026-10-15")
+    assert weekly.latest_premiums(premiums, pd.Timestamp("2026-10-15"))["Nifty IT"][1] == (
         "2026-10-14"
     )
+    assert "Gold" in weekly.latest_premiums(premiums, pd.Timestamp("2026-10-15"))
+    assert weekly.latest_premiums(premiums, pd.Timestamp("2026-10-14")) == {}
     by_name = {i.name: i for i in load_universe()}
     settings = weekly.load_live_config()
     blocked = weekly.premium_blocked(latest, by_name, settings)

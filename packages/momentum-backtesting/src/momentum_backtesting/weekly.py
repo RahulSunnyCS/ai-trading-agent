@@ -478,15 +478,18 @@ def compute_signal(data_dir: Path, settings: LiveSettings) -> dict:
 
 
 def latest_premiums(premiums: pd.DataFrame, week: pd.Timestamp) -> dict[str, tuple[float, str]]:
-    """Each ETF's newest premium to NAV known on or before `week`'s close, with its date.
+    """Each ETF's newest premium to NAV dated BEFORE `week` (the signal Friday), with its date.
 
-    AMFI publishes a NAV in the evening, so at Friday's 16:45 run the newest premium is normally
-    Thursday's: a Friday close against a Friday NAV would be look-ahead for the live gate, and the
-    date is kept on the row so the journal says which day's premium decided."""
+    AMFI publishes a NAV in the evening, after the close the signal is decided at, so Friday's own
+    premium is never known at the 14:40 or 16:45 run. A rerun later that night or at the weekend
+    would find it in `etf_premium.csv`; reading it would make the same week skip differently on
+    information the decision could not have had, so the lookup stops at the previous session's
+    date whatever the file holds (BL-136 Phase 0's look-ahead rule). The date is kept on the row
+    so the journal says which day's premium decided."""
     out: dict[str, tuple[float, str]] = {}
     if premiums.empty:
         return out
-    known = premiums[premiums.index <= week]
+    known = premiums[premiums.index < week]
     for name in known.columns:
         series = known[name].dropna()
         if len(series):

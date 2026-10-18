@@ -176,8 +176,9 @@ the biggest rank moves, and ends with a data-health line.
 `premium_block_pct` (2%) above NAV, or `premium_block_international_pct` (5%) for Nasdaq 100
 and Hang Seng, is not bought: the row becomes `SKIP (premium)` with the premium, the limit and
 the reason, and the next-best name within the exit rank takes its slot
-(`analysis.latest_signal`'s `no_buy` refill). The premium is the newest one known at the run
-(AMFI publishes NAV in the evening, so Friday's run uses Thursday's), never a same-day NAV. The
+(`analysis.latest_signal`'s `no_buy` refill). The premium is the newest one dated before the
+signal Friday (AMFI publishes NAV in the evening, so Friday's run uses Thursday's); Friday's own
+NAV is never read, even by a rerun that finds it in the file. The
 limits in `live_config.toml` apply to every ETF favourite. The gate is a decision for the week
 only: the backtest behind the model portfolio runs without it, so the model still records the
 buy next week; the item's Phase 2 decides whether it enters the engine. A held name is never
