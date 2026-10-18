@@ -715,8 +715,8 @@ them. Every evening after the result message, delete what the tool uploaded and 
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.30.1 | Phase 1: `legwise/algtst.py` + `obt rotation algotest-export`: YAML → `.algtst`, unmapped settings refused | claude | **Built 2026-10-19.** Every mapping read off four AlgoTest exports (the test fixtures); three earlier guesses corrected; all 521 Core-298 and T1 files export |
-| 3.30.2 | Phase 2: spike with the owner — how AlgoTest saves, lists, reads back and deletes an imported strategy; HTTP or Playwright | owner + claude | Planned; the owner runs the login (its password is never typed by Claude) |
-| 3.30.3 | Phase 3: uploader in `packages/broker-login` (dry run by default, ledger, read-back, delete only its own) | claude | Planned |
+| 3.30.2 | Phase 2: how AlgoTest imports, saves, lists and deletes a strategy | owner + claude | **Mostly done 2026-10-19:** website route (Playwright, AlgoTest's verbal OK); import, save and list seen; the delete dialog still to be seen |
+| 3.30.3 | Phase 3: uploader in `packages/broker-login` (dry run by default, ledger, read-back, delete only its own) | claude | In progress 2026-10-19 |
 | 3.30.4 | Phase 4: evening replace + 09:16 top-up in the scheduler; one line in the 09:16 message | claude | Planned |
 | 3.30.5 | Phase 5: compare the first week's AlgoTest trades with the files | claude | Planned |
 

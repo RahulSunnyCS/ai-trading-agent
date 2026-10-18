@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades the T1 picks with real money and asked for the deploy to be automatic (2026-10-19); a wrong or duplicate deploy costs money, so it is planned with its own gates |
-| **Status** | Planned |
+| **Status** | Dropped (owner, 2026-10-19): deploying stays a manual click; the plan is kept for a later revival |
 | **Type** | feature |
 | **Area** | broker-login (AlgoTest automation), options (picks), infra (scheduler) |
 | **Created** | 2026-10-19 |
@@ -230,3 +230,4 @@ Claude.
 - 2026-10-19 — AlgoTest refuses deploys outside 08:00–15:40 IST (the owner's recorder run at about 02:30
   showed it). Phase 2: deactivate everything at 15:30–15:39 each day and activate only the recorded picks
   after 09:16; the Setup Execution dialog is recorded after 08:00.
+- 2026-10-19 — **Dropped by the owner**: "stop deploying, do all other things as discussed". Deploying stays the owner's click in AlgoTest's `/live`; BL-137 (export, evening delete-and-upload, 09:16 top-up) continues. The findings above (the `/live` table, the 6-strategy limit, the 08:00–15:40 window, activations repeating on weekdays) are kept for a revival.

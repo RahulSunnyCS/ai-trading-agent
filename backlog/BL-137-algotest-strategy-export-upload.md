@@ -198,7 +198,7 @@ entry, so the strategies must already be in AlgoTest the evening before.
 
 1. ~~Library or daily?~~ **Answered 2026-10-19:** daily. After the evening message, delete the strategies
    from the evening before and upload the predicted picks. At 09:16, add only the picks that changed.
-2. **Route (reopened 2026-10-19):** first answered "HTTP if possible". AlgoTest's terms forbid reverse
+2. ~~Route~~ **Settled 2026-10-19: the website, through Playwright** (AlgoTest support OK'd it by phone). Earlier: first answered "HTTP if possible". AlgoTest's terms forbid reverse
    engineering (BL-138 Log), so the choice waits for AlgoTest support's written reply, sent by the owner
    2026-10-19: website through Playwright, or the Signals API (which would make the upload and delete unneeded).
 3. ~~Naming?~~ **Answered 2026-10-19:** a book prefix plus the variant id (`T1 · N_p150-t1s11_0917`, later
@@ -253,4 +253,4 @@ entry, so the strategies must already be in AlgoTest the evening before.
   - **List:** Backtest's left sidebar, Saved Strategies › MY STRATEGIES; each row's ⋮ has Add to folder and
     Delete.
   - Not yet seen: the delete request (Delete is the owner's click; Claude does not delete).
-
+- 2026-10-19 — Q2 settled: the website route (Playwright), after AlgoTest support's verbal OK. BL-138 (auto-deploy) dropped by the owner, so this item stops at saved strategies; the owner deploys. Phase 3 begun.
