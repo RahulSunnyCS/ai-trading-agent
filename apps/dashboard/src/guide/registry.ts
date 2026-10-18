@@ -42,6 +42,7 @@ import optionsRotationDailyLog from './content/optionslab/rotation-daily-log.md?
 import optionsRotationDrawdowns from './content/optionslab/rotation-drawdowns.md?raw';
 import optionsRotationDrift from './content/optionslab/rotation-drift.md?raw';
 import optionsRotationExplain from './content/optionslab/rotation-explain.md?raw';
+import optionsRotationLotPlans from './content/optionslab/rotation-lot-plans.md?raw';
 import optionsRotationMatrix from './content/optionslab/rotation-matrix.md?raw';
 import optionsRotationPulse from './content/optionslab/rotation-pulse.md?raw';
 import optionsRotationRegime from './content/optionslab/rotation-regime.md?raw';
@@ -374,6 +375,16 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
       'What Adaptive picked at 09:16 and what those picks did, day by day, with what you placed.',
     kind: 'Screen',
     body: optionsRotationDailyLog,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-lot-plans',
+    title: 'Rotation: lot plans',
+    summary:
+      'As picked, Dir Boost and Duo: the same morning picks traded three ways, followed forward for Core and T1.',
+    kind: 'Screen',
+    body: optionsRotationLotPlans,
     screen: { tab: 'optionslab', rest: ['rotation'] },
   },
   {

@@ -1,6 +1,6 @@
 """`obt rotation …`: update | pick | verify | show | readout | base (BL-058); triggers,
 triggers-show (BL-083); corr, corr-list, corr-pick (BL-090); update / pick --track t1 and
-track-readout (the T1 parallel track)."""
+track-readout (the T1 parallel track); lot-plans (BL-135)."""
 
 from __future__ import annotations
 
@@ -170,6 +170,23 @@ def track_readout(
     from .track import build, render
 
     typer.echo(render(build(track)))
+
+
+@rotation_app.command("lot-plans")
+def lot_plans_cmd(
+    book: str = typer.Option("core", "--book", help="core (live Adaptive) or t1 (the T1 track)."),
+    as_json: bool = typer.Option(False, "--json", help="The whole response as JSON."),
+    last: int = typer.Option(10, "--last", help="Daily rows to print."),
+) -> None:
+    """As picked, Dir Boost and Duo for one book, forward from 2026-10-19 (BL-135, read-only)."""
+    import json
+
+    from .lot_plans import BOOKS, build, render
+
+    if book not in BOOKS:
+        raise typer.BadParameter(f"--book must be one of {', '.join(BOOKS)}")
+    r = build(book)
+    typer.echo(json.dumps(r, indent=2, default=str) if as_json else render(r, last))
 
 
 @rotation_app.command()

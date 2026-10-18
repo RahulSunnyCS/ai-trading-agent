@@ -26,6 +26,7 @@ from .rotation_drawdowns_routes import router as rotation_drawdowns_router
 from .rotation_drift_routes import router as rotation_drift_router
 from .rotation_explain_routes import router as rotation_explain_router
 from .rotation_log_routes import router as rotation_log_router
+from .rotation_lot_plans_routes import router as rotation_lot_plans_router
 from .rotation_matrix_routes import router as rotation_matrix_router
 from .rotation_portfolio_routes import router as rotation_portfolio_router
 from .rotation_pulse_routes import router as rotation_pulse_router
@@ -69,6 +70,7 @@ def create_app(cache_dir: Path | None = None) -> FastAPI:
     app.include_router(rotation_matrix_router)
     app.include_router(rotation_pulse_router)
     app.include_router(rotation_portfolio_router)
+    app.include_router(rotation_lot_plans_router)
     return app
 
 

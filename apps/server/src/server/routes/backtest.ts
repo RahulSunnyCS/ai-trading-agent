@@ -57,6 +57,8 @@
  *                                                 requireAccess
  *  GET  /api/backtest/legwise/rotation/drift    — what a list has held, by family, index, strike method and
  *                                                 start band, against its own past. requireAccess
+ *  GET  /api/backtest/legwise/rotation/lot-plans — As picked, Dir Boost and Duo for one book's Adaptive
+ *                                                 picks, forward from 2026-10-19 (BL-135). requireAccess
  *  GET  /api/backtest/legwise/rotation/portfolio/day  — one list's basket under a portfolio MTM stop
  *                                                 (BL-095): the day replayed, stop level and minute.
  *  GET  /api/backtest/legwise/rotation/portfolio/days — every scored list-day with and without the stop.
@@ -856,6 +858,27 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation drift ---
+
+  // --- rotation lot plans --- the Rotation page's "Lot plans" card (BL-135, rotation/lot_plans.py,
+  // read-only). Only the book is forwarded, as an enum.
+  fastify.get(
+    '/api/backtest/legwise/rotation/lot-plans',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { book: { type: 'string', enum: ['core', 't1'] } },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(reply, `/legwise/rotation/lot-plans${upstreamQuery(q, ['book'])}`);
+    },
+  );
+  // --- end rotation lot plans ---
 
   // --- rotation portfolio stop --- BL-095: what a list's basket did under a portfolio MTM stop
   // (rotation/portfolio.py, read-only). `stop` is rupees (empty, 0 or below = none) and `trail`

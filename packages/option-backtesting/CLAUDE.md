@@ -303,6 +303,25 @@ Otherwise:
   only entries made before the first entry time, `research` mode any window. `/legwise/rotation/explain` and `/ic`
   cache the loaded store for 30 s; errors are `{"error": ...}`. If `score.py`'s criteria change, `rank_day`'s
   consistency check against `score.composite` fails loudly rather than explaining a different ranking.
+- `rotation/lot_plans.py` + `api/rotation_lot_plans_routes.py` — BL-135, lot plans tracked forward from 2026-10-19
+  (`GET /legwise/rotation/lot-plans?book=core|t1`, `obt rotation lot-plans [--book t1] [--json]`), read-only over the
+  live or the T1 journal (list C) and the stored one-lot results (`store.result_path`). Three plans, Buy left out: As
+  picked (1 lot per core pick), Dir Boost (the Dir pick at 2 lots on a non-expiry day; on a three-Widesl day the best
+  unpicked Dir added at 1 lot; expiry day = As picked) and Duo (W1, the higher recorded composite, ties by name, and
+  the Dir: 2 + 2, or 2 + 1 on an expiry day). Expiry = the entry's weekday label `0` for NIFTY or SENSEX
+  (`dte.entry_labels`). The best unpicked Dir is the 09:16 message's (`pick.next_best`, BL-122's
+  `filtered_runners_up` on a rule day), re-derived from the history the ENTRY ranked on by `HistorySource` (the matrix read
+  once per request, sliced to the first `inputs_days` stored days before the day, with no "reaches the last collected
+  day" check, so a later repair or backfill cannot unverify a day; a test holds the digests equal to
+  `pick.load_history`'s), in the entry's universe (the current one if its fingerprint matches, else the strategy files
+  at the entry's `commit` via `git ls-tree`, else `unverified` with the reason). Verified only when `inputs_sha`, the
+  picks, list C's recorded composites and the VIX band all match; otherwise `unverified` (never guessed). Answers are
+  cached on the entry hash plus a stamp of the result files and `days.csv`, so they do not depend on API restarts. Net = gross × lots − ₹20 × 1.18 × 2 × `n_trades` per strategy placed. Day status
+  scored / waiting (never zero) / late (not before 09:17) / unverified; only scored days count, all plans at once. The
+  read-out (registered) judges the first 60 scored days: plan − As picked, `readout.block_bootstrap_mean` seed
+  20261019, beats if the interval is above zero and drawdown per lot is no deeper. It is computed afresh each
+  request (`READOUT_NOTE`: the BL-135 Log entry at the 60th day is the record; a later status change can move the
+  shown window); days after the 60th are `after_readout`, descriptive.
 - `analytics/regime_source.py` — reads `daily_regime_tags` from Postgres,
   gated on `DATABASE_URL` being exported in *this process* specifically (not
   just present in a `.env` the server reads) — see the root `technical.md`
