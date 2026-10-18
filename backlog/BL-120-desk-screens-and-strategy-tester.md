@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner asked for the screens on 2026-10-18, apart from strategy work |
-| **Status** | Planned |
+| **Status** | In progress (Phase 0 done; Phase 1 started 2026-10-18) |
 | **Type** | feature |
 | **Area** | dashboard, options |
 | **Created** | 2026-10-18 |
 | **Depends on** | BL-117 (feed Phase 2, the Live page already built on replay, paper desk Phase 4), BL-102 (the Options Lab workspaces), BL-083 (trigger code the tester generalises) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.10.31 |
 
 ## Context
 
@@ -106,9 +106,10 @@ result against the controls. Nothing about any particular condition is decided h
   puts them next to the number.
 - **A simulation cache** keyed by (template hash, day, entry minute) makes placebo and random-time draws
   lookups after the first fill. The first test of a new template fills it in the background; later tests of
-  that template are minutes. Estimate, to measure in Phase 1: BL-083 timed 0.2 s per simulation, so one
-  template over four years on a 5-minute entry grid is about 115,000 simulations, around an hour on 8
-  workers.
+  that template are fast. Measured in Phase 1 (6 workers): about 6 ms of wall time per simulation, so one template
+  over four years on a 5-minute entry grid (about 115,000 simulations) is on the order of 12 minutes cold; a full
+  two-year test of one rule took 49 s with its events and placebo cached, and 22 s on a second run (all of it
+  loading 1,506 sessions of bars; no simulation).
 - **The result page:** a verdict strip (events, net per trade after charges, win rate, event minus placebo
   with its t, the random-time percentile), the cumulative curve by event, by half-year, by weekday and
   days-to-expiry, the event table with each event's chart (S5's), the slippage line. The strip is headed
@@ -212,3 +213,35 @@ The owner's answers to the open questions below; the screen order and placement 
 - 2026-10-18 — created from the owner's request to separate the screens from strategy work, after reading
   the dashboard nav and routes, the new Live page and `live/session.py`, the Builder and its `ReadBack`, the
   legwise `/backtest` route, the MCP server's tools, and BL-083, BL-117, BL-119. Planning only: no code.
+- 2026-10-18 — **Start BL-120.** Owner's answers to the open questions: (1) placement: Live tab for Chain,
+  Signals, Paper desk, Review and Health; Options Lab › Build and test for the Rule tester and Tested
+  strategies; nothing new in the top-level nav. (2) Order: the tester first, chat route before any screen
+  (the owner asked for Phases 0 and 1 now). (3) The confirmation period is locked by default, with a
+  labelled exploratory "open all data" mode. (4) Chat first: the on-page text box waits for Phase 7.
+  (5) The four frozen Live-group tabs (Trades, P&L, Personalities, Regimes) are **hidden** from the sidebar
+  (still reachable by URL): done with Phase 3's nav change, with the nav and route tests updated together.
+  Phase 0 done; Phase 1 started.
+- 2026-10-18 — **Phase 1 built** (not committed). `ruletest/` (`expr.py` grammar and evaluator, `spec.py`, `frame.py`,
+  `sim.py`, `charges.py`, `study.py`, `store.py`, `cli.py`), `api/rule_routes.py` (`/legwise/rules/validate|test|job|tests|
+  tests/{id}|reveal|periods`; no Fastify proxy route yet, that is Phase 3), `obt rule validate|test|reveal|ledger`,
+  `scripts/ruletest-acceptance.py`, fixtures `tests/fixtures/rules/bl083_t1..t4_dir.yaml`, 73 new unit tests (the whole
+  package suite, 1,337 tests, passes), package `CLAUDE.md` and `technical.md` updated, TODO 3.10.31.
+  **Acceptance (the five checks):**
+  (i) the four BL-083 triggers, said in the grammar, fire on exactly the research's days and stamps: T1 109 / 152 / 99,
+  T2 148 / 193 / 149, T3 272 / 347 / 249, T4 292 / 396 / 283 (NIFTY explore / NIFTY confirm / SENSEX explore), none
+  missing, extra or moved; and T1 and T4 with the Dir template reproduce every event and placebo row of
+  `research/bl083/out/event_rows.csv` to the rupee (0 of 108 / 152 / 290 / 396 differ), giving event minus placebo
+  +₹630 (t 2.57) and −₹20 (−0.12) for T1, +₹440 (3.40) and +₹156 (1.67) for T4, BL-083's published cells.
+  (ii) no condition reads a later stamp: a causality test scrambles everything after a stamp and every later session
+  and checks each operator's earlier values do not move. (iii) a placebo is never an event day (unit test, and the
+  research rows match). (iv) the charges equal `research/bl063/charges.py` on two hand trades (₹50.7138 and ₹39.0481).
+  (v) **restated, not met as written:** the criterion said the second test of a template is 10 times faster than the first.
+  Measured, the second run simulated 0 of 4,841 entries but took 22 s against 49 s, because loading the index sessions
+  costs about 21 s each run; the first run's simulations were also partly cached by the acceptance run. The simulation
+  work is gone; the page can live with 22 s. A frame cache would cut the rest, and is left for when it matters.
+  **Also done when:** a two-year test of one rule returned in 49 s, well inside the 5 minutes aimed at.
+  Two exploratory runs of BL-083's T1 → Dir (the timing runs) are in the real ledger, tests 1 and 2: the ledger is
+  append-only by design, so they stay. T1 → Dir was already a BL-083 lead; they are plumbing checks, not new tests of an idea.
+  Two behaviours worth knowing: `strict_open` is on (a session with a bar before 09:15, about a dozen Angel One days, is
+  left out, as BL-083's study did), and the confirmation lock is enforced in the CLI and API but a determined reader
+  of the cache or the files can of course read those days: it is a discipline, not security.
