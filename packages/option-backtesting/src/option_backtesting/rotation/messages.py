@@ -22,6 +22,10 @@ NUMBERS = ("1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7�
 SEPARATOR = "━━━━━━━━━━━━━━━"
 T1_HEAD = "🧪 T1 · TESTING PHASE · not traded"
 T1_NOT_RECORDED = "🧪 T1 · TESTING PHASE · not recorded today"
+#: the evening message's T1 notes
+T1_RESULT_NOT_READY = "🧪 T1 · result not ready"
+T1_RESULT_NOT_RECORDED = "🧪 T1 · not recorded today"
+T1_TOMORROW_NOT_READY = "🧪 T1 · not ready"
 LATE_LINE = "⚠️ LATE · not a forward entry"
 MINUS = "−"
 

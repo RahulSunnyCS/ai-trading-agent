@@ -4,24 +4,26 @@ The text itself is `messages.py`; this module decides when it is sent. Nothing h
 picked, scored or journaled: it calls `pick.record` and `result.calculate` exactly as before and
 only chooses how their output reaches Telegram.
 
-Morning (`pick_and_send`): Adaptive is recorded first and is never held back by T1. T1 is recorded
-right after (it reuses the live entry's VIX read); both go out as ONE message when T1 is ready
-within `T1_WAIT_S`. If T1 fails or is slow, the Adaptive message goes at once with T1 marked "not
-recorded today", the failure alerts the owner as before, and if T1 records later (a catch-up of its
-results, or the job's retry) it follows as a message of its own. The friends' group copy is always
-Adaptive alone.
+Morning (`pick_and_send`): Adaptive is recorded first and is never held back by T1. The friends'
+group gets its copy (Adaptive alone) the moment the entry is written. T1 is recorded right after
+(reusing the live entry's VIX read); the owner's message carries both when T1 is in by
+`t1_deadline` (09:16:50 IST, or 20 s after Adaptive's entry when that is sooner or the run is
+later). Otherwise the owner gets Adaptive with T1 marked "not recorded today", a T1 failure alerts
+as before, and if T1 records later (after a catch-up of its results, or the job's retry) it
+follows as a message of its own.
 
-Evening (`send_result`): one message for both lists plus tomorrow's strategies. See `send_result`
-for the sent-marker design.
+Evening (`send_result`): one message for both lists plus tomorrow's strategies, under a per-day
+lock. See `send_result` for the sent-marker design.
 """
 
 from __future__ import annotations
 
 import os
+import sys
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -31,9 +33,10 @@ from .journal import AlreadyRecorded
 from .pick import PickError, PickResult
 
 IST = ZoneInfo("Asia/Kolkata")
-NOT_READY = "🧪 T1 · not ready"
-#: how long the Adaptive message waits for T1 to be recorded after Adaptive's own entry is written
-T1_WAIT_S = 30.0
+#: the owner's 09:16 message waits for T1 until this IST time at the latest ...
+T1_DEADLINE = time(9, 16, 50)
+#: ... and never longer than this after Adaptive's entry is written
+T1_MAX_WAIT_S = 20.0
 
 Echo = Callable[[str], None]
 #: (text, severity, chat_id or None for the owner's chat) -> delivered
@@ -67,6 +70,10 @@ def group_chat_id() -> str | None:
     return None
 
 
+def _stderr(message: str) -> None:
+    print(message, file=sys.stderr)
+
+
 def _journal_entry(day: date, root: Path | None, track: str | None) -> dict | None:
     path = store.journal_path(root, track)
     return next((e for e in journal.read(path) if e.get("day") == day.isoformat()), None)
@@ -79,10 +86,20 @@ def _needs_catch_up(error: Exception, track: str) -> bool:
     return f"obt rotation update --track {track}" in str(error)
 
 
-def _default_catch_up(track: str) -> tuple[int, int]:
+def t1_deadline(recorded: datetime) -> datetime:
+    """How long the owner's message may wait for T1 once Adaptive's entry is written: until 09:16:50
+    IST, and never more than `T1_MAX_WAIT_S` after the entry (a later run, a retry or a run by hand,
+    waits those 20 s)."""
+    recorded = recorded.astimezone(IST)
+    cap = recorded + timedelta(seconds=T1_MAX_WAIT_S)
+    clock = datetime.combine(recorded.date(), T1_DEADLINE, tzinfo=IST)
+    return min(cap, clock) if recorded < clock else cap
+
+
+def _default_catch_up(track: str, root: Path | None = None) -> tuple[int, int]:
     from .update import update_track
 
-    return update_track(track)
+    return update_track(track, root=root)
 
 
 def pick_and_send(
@@ -98,12 +115,13 @@ def pick_and_send(
     record_fn: Callable[..., PickResult] | None = None,
     send: SendText = send_text,
     alert: Callable[[str, str], None] = send_alert,
-    catch_up: Callable[[str], tuple[int, int]] | None = None,
+    catch_up: Callable[..., tuple[int, int]] | None = None,
     root: Path | None = None,
-    t1_wait_s: float = T1_WAIT_S,
+    now_fn: Callable[[], datetime] = lambda: datetime.now(IST),
 ) -> int:
     """Record the day's entry and send it. Returns the process exit code (0 ok, 2 not recorded or
-    the T1 step failed: the job retries and, for T1, the owner is alerted)."""
+    the T1 step failed: the job retries and, for T1, the owner is alerted). A dry run writes
+    nothing: no journal entry, no T1 catch-up, no message."""
     err = err or echo
     tag = f"{track.upper()} TRACK " if track else ""
     send_live = telegram and not dry_run
@@ -115,9 +133,8 @@ def pick_and_send(
     def attempt(t: str | None, vix: float | None = None, source: str | None = None):
         """(PickResult | None, error | None, already): one record() with its outcome sorted."""
         try:
-            r = (record_fn or pick_mod.record)(
-                day, vix_open=vix, dry_run=dry_run, track=t, vix_source=source
-            )
+            do_record = record_fn or pick_mod.record
+            r = do_record(day, vix_open=vix, dry_run=dry_run, track=t, vix_source=source)
             return r, None, False
         except AlreadyRecorded:
             return None, None, True
@@ -149,14 +166,21 @@ def pick_and_send(
                 _send_to_all(live.text, live.text, _severity(live.entry), send)
         return 0
 
-    # Adaptive and T1 together. T1 shares the live entry's VIX read: one poll, one value.
+    # The group's copy is Adaptive alone: it never waits for T1.
+    group_id = group_chat_id()
+    if live is not None and send_live and group_id:
+        _, group = messages.render_morning(live.entry, live.options, None)
+        send(group, _severity(live.entry), chat_id=group_id)
+
+    # T1 next, sharing the live entry's VIX read: one poll, one value.
     entry = live.entry if live else _journal_entry(day, root, None)
     vix = entry.get("vix_open") if entry else None
     source = entry.get("vix_source") if entry else None
+    wait_s = max(0.0, (t1_deadline(now_fn()) - now_fn().astimezone(IST)).total_seconds())
     pool = ThreadPoolExecutor(max_workers=1)
     future = pool.submit(attempt, "t1", vix, source)
     try:
-        t1, t1_error, t1_already = future.result(timeout=t1_wait_s)
+        t1, t1_error, t1_already = future.result(timeout=wait_s)
         in_time = True
     except FutureTimeout:
         t1 = t1_error = None
@@ -164,20 +188,20 @@ def pick_and_send(
         in_time = False
 
     if live is not None:
-        # Adaptive goes out now, with T1 beside it when it is in, whatever happens to T1 next.
+        # The owner's message: Adaptive, with T1 beside it when it is in, whatever happens next.
         if in_time and (t1 is not None or t1_already):
             t1_entry = t1.entry if t1 else _journal_entry(day, root, "t1")
             t1_options = t1.options if t1 else None
-            private, group = messages.render_morning(live.entry, live.options, t1_entry, t1_options)
+            private, _ = messages.render_morning(live.entry, live.options, t1_entry, t1_options)
             echo(private)
             if send_live:
-                _send_to_all(private, group, _severity(live.entry), send)
+                send(private, _severity(live.entry))
             pool.shutdown(wait=False)
             return 0
-        private, group = messages.render_morning(live.entry, live.options, None)
+        private, _ = messages.render_morning(live.entry, live.options, None)
         echo(private)
         if send_live:
-            _send_to_all(private, group, _severity(live.entry), send)
+            send(private, _severity(live.entry))
 
     # T1 did not make the message. If it records (after a catch-up of its results, or on a retry)
     # it follows as a message of its own; if it fails the owner is alerted and the job retries.
@@ -185,12 +209,15 @@ def pick_and_send(
         t1, t1_error, t1_already = future.result()
     pool.shutdown(wait=False)
     if t1_error is not None and _needs_catch_up(t1_error, "t1"):
-        echo(f"T1 track: {t1_error}; storing its missing results now")
-        try:
-            (catch_up or _default_catch_up)("t1")
-            t1, t1_error, t1_already = attempt("t1", vix, source)
-        except Exception as error:  # noqa: BLE001
-            t1_error = error
+        if dry_run:
+            echo(f"T1 track: {t1_error}; a real run would store its missing results (dry run: not)")
+        else:
+            echo(f"T1 track: {t1_error}; storing its missing results now")
+            try:
+                (catch_up or _default_catch_up)("t1", root=root)
+                t1, t1_error, t1_already = attempt("t1", vix, source)
+            except Exception as error:  # noqa: BLE001
+                t1_error = error
     if t1_already:
         echo("T1 track: already recorded")
         return 0
@@ -228,14 +255,21 @@ def _failed(error: Exception, day: date, alert_if, err: Echo, tag: str = "") -> 
 # -- evening ------------------------------------------------------------------------------------
 
 
-def _t1_state(day: date, root: Path | None):
-    """('ready', DailyResult) | ('pending', reason) | ('none', reason)."""
+def _t1_state(day: date, root: Path | None, err: Echo):
+    """('ready', DailyResult) | ('pending', reason) | ('none', reason) | ('error', reason).
+
+    Any other failure reading T1 (a corrupt T1 journal, a results row read while it is being
+    appended) is 'error': logged, never allowed to stop Adaptive's result, and left unsettled so a
+    later run delivers T1."""
     try:
         return "ready", result.calculate(day, root, track="t1")
     except result.NoEntry as error:
         return "none", str(error)
     except result.ResultUnavailable as error:
         return "pending", str(error)
+    except Exception as error:  # noqa: BLE001 - T1 must never hold Adaptive's result back
+        err(f"T1 result could not be read ({type(error).__name__}: {error}); sending without it")
+        return "error", f"{type(error).__name__}: {error}"
 
 
 def _tomorrow_adaptive(today: date, root: Path | None, echo: Echo):
@@ -251,10 +285,11 @@ def _tomorrow_adaptive(today: date, root: Path | None, echo: Echo):
 def _tomorrow_t1(today: date, root: Path | None, echo: Echo):
     """T1's expected picks, or the note saying they are not ready."""
     try:
-        return tomorrow.next_session_picks(today, root, track="t1") or NOT_READY
+        picks = tomorrow.next_session_picks(today, root, track="t1")
     except Exception as error:  # noqa: BLE001
         echo(f"T1 tomorrow skipped: {type(error).__name__}: {error}")
-        return NOT_READY
+        return messages.T1_TOMORROW_NOT_READY
+    return picks or messages.T1_TOMORROW_NOT_READY
 
 
 def send_result(
@@ -265,6 +300,7 @@ def send_result(
     with_tomorrow: bool = True,
     wait_until: time | None = None,
     echo: Echo = print,
+    err: Echo = _stderr,
     now_fn: Callable[[], datetime] = lambda: datetime.now(IST),
     send: SendText = send_text,
     root: Path | None = None,
@@ -280,17 +316,33 @@ def send_result(
       is sent and the exit code is 2, so the scheduler's retry runs again in a few minutes. At or
       after it the message goes out with `🧪 T1 · result not ready`, and T1 stays unsettled so the
       next run (a retry, the 21:00 catch-up job, or by hand) sends T1's result as a message of its
-      own once it is there.
+      own once it is there;
+    - T1 cannot be read at all (an error): the message goes out now with the same note, and T1
+      stays unsettled.
 
     Sent markers (`result.sent_marker`) are per destination and per piece, so a retry never sends
     the owner's chat the same message twice, a failed group copy is retried alone, and a late T1
-    result is still delivered."""
+    result is still delivered. Deciding, sending and marking happen under `result.sending_lock`,
+    so two overlapping runs cannot both send."""
     try:
         adaptive = result.calculate(day, root)
     except result.ResultUnavailable as error:
         echo(f"result not ready: {error}")
         return 2
-    kind, t1 = _t1_state(day, root)
+    if not telegram:  # print only: no lock, no marker, nothing written
+        return _send_result_locked(
+            day, adaptive, False, force, with_tomorrow, wait_until, echo, err, now_fn, send, root
+        )
+    with result.sending_lock(day, root):
+        return _send_result_locked(
+            day, adaptive, True, force, with_tomorrow, wait_until, echo, err, now_fn, send, root
+        )
+
+
+def _send_result_locked(
+    day, adaptive, telegram, force, with_tomorrow, wait_until, echo, err, now_fn, send, root
+) -> int:
+    kind, t1 = _t1_state(day, root, err)
     group_id = group_chat_id()
     marked = telegram and not force
 
@@ -316,10 +368,10 @@ def send_result(
         next_t1 = _tomorrow_t1(day, root, echo) if next_adaptive is not None else None
         if kind == "ready":
             t1_part = t1
-        elif kind == "pending":
-            t1_part = "🧪 T1 · result not ready"
-        else:
-            t1_part = "🧪 T1 · not recorded today"
+        elif kind == "none":
+            t1_part = messages.T1_RESULT_NOT_RECORDED
+        else:  # pending or error
+            t1_part = messages.T1_RESULT_NOT_READY
         private = result.render(adaptive, t1_part, next_adaptive, next_t1)
         group = result.render(adaptive, None, next_adaptive, None)
         echo(private)
@@ -329,7 +381,7 @@ def send_result(
         if owner_needed:
             if send(private):
                 result.mark_sent(adaptive, root)
-                if kind != "pending":
+                if kind in ("ready", "none"):
                     result.mark_sent(adaptive, root, "t1")
             else:
                 ok = False
@@ -351,7 +403,7 @@ def send_result(
         result.mark_sent(adaptive, root, "t1")
         echo("already sent to Telegram")
         return 0
-    if kind == "pending":
+    if kind in ("pending", "error"):
         echo(f"T1 result still not ready: {t1}")
         return 0
     next_t1 = _tomorrow_t1(day, root, echo) if with_tomorrow else None

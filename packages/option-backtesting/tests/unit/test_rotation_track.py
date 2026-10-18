@@ -189,3 +189,48 @@ def test_a_track_update_never_writes_the_live_days_file(tmp_path, monkeypatch):
         date(2026, 10, 5), tmp_path, log=lambda m: None, names=[name], write_days=False
     )
     assert (r["already"], r["errors"]) == (1, []) and not store.days_path(tmp_path).exists()
+
+
+@pytest.mark.parametrize(
+    ("outcome", "soft", "code", "alerted"),
+    [
+        ((1, 0), True, 0, False),  # stored: nothing to say
+        ((1, 1), False, 2, False),  # a failed day fails the command, as before
+        ((1, 1), True, 0, True),  # in the evening chain: alert, exit 0, the chain is not retried
+        (RuntimeError("lake unreadable"), True, 0, True),  # an exception too
+    ],
+)
+def test_a_soft_failing_track_update_alerts_and_never_fails_the_chain(
+    monkeypatch, outcome, soft, code, alerted
+):
+    from typer.testing import CliRunner
+
+    from option_backtesting import notify
+    from option_backtesting.rotation.cli import rotation_app
+
+    def fake(track, day=None, root=None, log=print, err=print):
+        if isinstance(outcome, Exception):
+            raise outcome
+        if outcome[1]:
+            err(f"{track} 2026-10-19: skipped")
+        return outcome
+
+    sent = []
+    monkeypatch.setattr(update, "update_track", fake)
+    monkeypatch.setattr(notify, "send", lambda n, **kw: sent.append(n) or (True, ""))
+    args = ["update", "--track", "t1", *(["--soft-fail"] if soft else [])]
+    r = CliRunner().invoke(rotation_app, args)
+    assert r.exit_code == code
+    assert bool(sent) is alerted
+    if alerted:
+        assert sent[0].severity == "error" and "T1 TRACK update failed" in sent[0].title
+        assert "obt rotation update --track t1" in sent[0].body
+
+
+def test_soft_fail_needs_a_track():
+    from typer.testing import CliRunner
+
+    from option_backtesting.rotation.cli import rotation_app
+
+    r = CliRunner().invoke(rotation_app, ["update", "--soft-fail"])
+    assert r.exit_code == 2 and "need --track" in r.output

@@ -193,14 +193,26 @@ const BASE_JOBS: Job[] = [
     // One job, four steps in order: each needs the day the one before it collected, and the run
     // stops at the first failure. Every step is idempotent (obt daily skips data already
     // collected, a stored rotation variant-day is never rewritten, derived rebuilds only what is
-    // missing), so a retry re-runs the whole chain cheaply. The T1 update (BL-125) is last and
-    // takes seconds: a persistent T1 problem fails and alerts the run without ever keeping the
-    // live results or the derived tables from being built first. The result message waits for it.
+    // missing), so a retry re-runs the whole chain cheaply. The T1 update (BL-125) is last, takes
+    // seconds, and is `--soft-fail`: a T1 problem Telegrams its own alert and exits 0, so it never
+    // fails this job (whose retries would re-run `obt daily` and resend its summary). The 16:00
+    // message then says T1 is not ready, and the 21:00 job is the catch-up.
     steps: [
       ['uv', 'run', '--directory', OPTIONS, 'obt', 'daily'],
       ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'update'],
       ['uv', 'run', '--directory', TRADING_DATA, 'tdata', 'derived', 'rebuild'],
-      ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'update', '--track', 't1'],
+      [
+        'uv',
+        'run',
+        '--directory',
+        OPTIONS,
+        'obt',
+        'rotation',
+        'update',
+        '--track',
+        't1',
+        '--soft-fail',
+      ],
     ],
     cwd: '.',
     timeoutMinutes: 90, // per step
@@ -230,7 +242,10 @@ const BASE_JOBS: Job[] = [
     timeoutMinutes: 10,
     retries: 7, // 16:00, 16:05 ... 16:35
     retryDelayMinutes: 5,
-    catchUpHours: 6, // until 22:00; the evening run's late retries still get their message
+    // Catch-up covers a 16:00 slot missed while the laptop slept (until 22:00), not a failed run:
+    // when the evening run only succeeds on a late retry, the 21:00 job's `rotation result` step
+    // sends the message.
+    catchUpHours: 6,
     fixHint:
       'uv run --directory packages/option-backtesting obt rotation result  (the evening run must have stored the results first; add --force to resend)',
   },

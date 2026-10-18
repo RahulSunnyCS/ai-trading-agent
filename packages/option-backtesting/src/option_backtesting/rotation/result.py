@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import fcntl
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -92,27 +95,51 @@ def calculate(day: date, root: Path | None = None, track: str | None = None) -> 
 #
 # Each destination has its own marker, so a failure on the group never makes a retry send the
 # owner's chat the same message again.
+#
+# Before BL-125 a single `.sent` marker meant "sent to the owner AND the group" (and the message had
+# no T1 part). Such a marker is recognised by its text and still covers every piece, so a day marked
+# under the old scheme is never sent again in part (no group copy, no T1 follow-up).
 
 MARKER_KINDS = {"": ".sent", "group": ".group.sent", "t1": ".t1.sent"}
+LEGACY_MARKER_TEXT = "sent to the configured Telegram destinations\n"
+
+
+def _notifications_dir(root: Path | None) -> Path:
+    return store.rotation_dir(root or data_dir()) / "result-notifications"
 
 
 def sent_marker(result: DailyResult, root: Path | None = None, kind: str = "") -> Path:
-    root = root or data_dir()
-    return (
-        store.rotation_dir(root)
-        / "result-notifications"
-        / f"{result.day}-{result.entry_hash[:16]}{MARKER_KINDS[kind]}"
-    )
+    return _notifications_dir(root) / f"{result.day}-{result.entry_hash[:16]}{MARKER_KINDS[kind]}"
+
+
+def _legacy(result: DailyResult, root: Path | None) -> bool:
+    """A pre-BL-125 marker: one file for the owner and the group together."""
+    try:
+        return sent_marker(result, root).read_text() == LEGACY_MARKER_TEXT
+    except OSError:
+        return False
 
 
 def was_sent(result: DailyResult, root: Path | None = None, kind: str = "") -> bool:
-    return sent_marker(result, root, kind).exists()
+    return sent_marker(result, root, kind).exists() or _legacy(result, root)
 
 
 def mark_sent(result: DailyResult, root: Path | None = None, kind: str = "") -> None:
     path = sent_marker(result, root, kind)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("sent to the configured Telegram destinations\n")
+    path.write_text(f"{kind or 'owner'}: sent\n")
+
+
+@contextmanager
+def sending_lock(day: date, root: Path | None = None) -> Iterator[None]:
+    """One exclusive lock per day around deciding, sending and marking the evening message, so two
+    runs that overlap (the 16:00 job's retries, the 21:00 job's step, a run by hand) can never both
+    send it. The same `fcntl.flock` the journal append and the results store use."""
+    folder = _notifications_dir(root)
+    folder.mkdir(parents=True, exist_ok=True)
+    with open(folder / f"{day.isoformat()}.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
 
 
 def _total_and_rows(result: DailyResult) -> tuple[float, list[tuple[str, float]]]:

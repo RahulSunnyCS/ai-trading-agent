@@ -30,13 +30,19 @@ def update(
         "--backfill",
         help="With --track: kept for clarity; a track update always fills every missing day.",
     ),
+    soft_fail: bool = typer.Option(
+        False,
+        "--soft-fail",
+        help="With --track: on failure Telegram an alert and exit 0, so a scheduled chain is not "
+        "failed and retried for it (the evening run; the 21:00 job remains the catch-up).",
+    ),
 ) -> None:
     """Run all 298 variants over one collected day and store the results (idempotent)."""
     from .update import default_day, update_day, update_track
     from .variants import TRACK_DIRS
 
-    if backfill and not track:
-        typer.echo("--backfill needs --track", err=True)
+    if (backfill or soft_fail) and not track:
+        typer.echo("--backfill and --soft-fail need --track", err=True)
         raise typer.Exit(2)
     if track:
         if track not in TRACK_DIRS:
@@ -45,13 +51,38 @@ def update(
         # A parallel track's extra variants only: every day Core-298 has stored that the track
         # lacks (so a missed evening is filled the next time, never silently dropped), no base or
         # trigger scoring, never the live results or days.csv.
-        tried, failed = update_track(
-            track, _day(day) if day else None, log=typer.echo, err=lambda m: typer.echo(m, err=True)
-        )
+        problems: list[str] = []
+
+        def err(message: str) -> None:
+            problems.append(message)
+            typer.echo(message, err=True)
+
+        try:
+            tried, failed = update_track(track, _day(day) if day else None, log=typer.echo, err=err)
+        except Exception as error:  # noqa: BLE001 - reported below, like a failed day
+            if not soft_fail:
+                raise
+            err(f"{type(error).__name__}: {error}")
+            tried, failed = 1, 1
         if not tried:
             typer.echo(f"{track}: nothing to update (every Core-298 day is stored)")
             return
         if failed:
+            if soft_fail:
+                from ..notify import Notification, send
+
+                send(
+                    Notification(
+                        source="options-rotation",
+                        severity="error",
+                        title=f"{track.upper()} TRACK update failed ({failed} day(s))",
+                        body="\n".join(problems)[:1500]
+                        + f"\nThe live results are stored. Fix, then: obt rotation update --track "
+                        f"{track} (the 21:00 job retries it).",
+                    )
+                )
+                typer.echo(f"{track}: {failed} day(s) failed; alerted, exiting 0 (--soft-fail)")
+                return
             raise typer.Exit(2)
         return
 
@@ -172,6 +203,7 @@ def result(
         with_tomorrow=tomorrow,
         wait_until=until,
         echo=typer.echo,
+        err=lambda message: typer.echo(message, err=True),
     )
     if code:
         raise typer.Exit(code)

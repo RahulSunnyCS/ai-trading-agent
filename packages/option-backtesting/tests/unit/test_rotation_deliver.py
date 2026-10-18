@@ -27,14 +27,19 @@ def groups(monkeypatch):
 
 
 class Sent:
-    """Records every message: (chat, text); `fail` makes the sends to a chat fail."""
+    """Records every message: (chat, text); `fail` makes the sends to a chat fail; `events` (shared
+    with a Recorder) keeps the order of sends and records."""
 
-    def __init__(self):
+    def __init__(self, events=None, pause=0.0):
         self.messages: list[tuple[str | None, str]] = []
         self.fail: set[str | None] = set()
+        self.events = events if events is not None else []
+        self.pause = pause
 
     def __call__(self, text, severity="info", chat_id=None):
+        clock.sleep(self.pause)
         self.messages.append((chat_id, text))
+        self.events.append(("send", chat_id))
         return chat_id not in self.fail
 
     def to(self, chat):
@@ -64,7 +69,8 @@ def _entry(core, track=None, **extra):
 class Recorder:
     """A stand-in for `pick.record`: returns a result per track or raises what it was given."""
 
-    def __init__(self, live=None, t1=None, delay_t1=0.0):
+    def __init__(self, live=None, t1=None, delay_t1=0.0, events=None):
+        self.events = events if events is not None else []
         self.live = live if live is not None else _entry(LIVE_CORE)
         self.t1 = t1
         self.calls: list[dict] = []
@@ -76,6 +82,7 @@ class Recorder:
     def __call__(self, day, **kw):
         self.calls.append({"day": day, **kw})
         track = kw.get("track")
+        self.events.append(("record", track))
         if track:
             clock.sleep(self.delay_t1)
             outcome = self.t1_outcomes.pop(0) if len(self.t1_outcomes) > 1 else self.t1_outcomes[0]
@@ -94,7 +101,7 @@ def _run(recorder, sent, alerts=None, catch_up=None, **kw):
         record_fn=recorder,
         send=sent,
         alert=lambda title, body: alerts.append((title, body)),
-        catch_up=catch_up or (lambda t: (0, 0)),
+        catch_up=catch_up or (lambda t, root=None: (0, 0)),
         echo=lambda m: None,
         err=lambda m: None,
         **kw,
@@ -155,22 +162,61 @@ def test_missing_t1_results_are_stored_then_t1_follows_as_its_own_message():
         _entry(T1_CORE, track="t1", before_first_entry=False),
     ]
     sent, alerts, caught = Sent(), [], []
-    assert _run(rec, sent, alerts, catch_up=lambda t: caught.append(t) or (1, 0)) == 0
+    catch = lambda t, root=None: caught.append(t) or (1, 0)  # noqa: E731
+    assert _run(rec, sent, alerts, catch_up=catch) == 0
     assert caught == ["t1"] and alerts == []
-    first, follow = sent.messages[0][1], sent.to(None)[-1]
+    first, follow = sent.to(None)[0], sent.to(None)[-1]
     assert "not recorded today" in first  # Adaptive did not wait for the catch-up
     assert follow.startswith("⚠️ LATE · not a forward entry\n🧪 T1 · TESTING PHASE · not traded")
     assert "ADAPTIVE" not in follow
-    assert sent.to("-456") == [sent.messages[1][1]]  # the group heard about Adaptive only
+    assert len(sent.to("-456")) == 1  # the group heard about Adaptive only
 
 
-def test_a_slow_t1_does_not_hold_adaptive_back():
+def _at(hh, mm, ss, micro=0):
+    return lambda: datetime(2026, 10, 20, hh, mm, ss, micro, tzinfo=IST)
+
+
+def test_a_slow_t1_does_not_hold_adaptive_back_past_the_clock_deadline():
     rec = Recorder(delay_t1=0.4)
     sent = Sent()
-    assert _run(rec, sent, t1_wait_s=0.05) == 0
-    texts = [t for _, t in sent.messages]
-    assert "not recorded today" in texts[0]  # Adaptive first, T1 marked as not recorded yet
-    assert texts[-1].startswith("🧪 T1 · TESTING PHASE · not traded · Tue 20 Oct")
+    # Adaptive written at 09:16:49.9: T1 may hold the owner's message for 0.1 s at most
+    assert _run(rec, sent, now_fn=_at(9, 16, 49, 900_000)) == 0
+    owner = sent.to(None)
+    assert "not recorded today" in owner[0]  # Adaptive first, T1 marked as not recorded yet
+    assert owner[-1].startswith("🧪 T1 · TESTING PHASE · not traded · Tue 20 Oct")
+    assert len(sent.to("-456")) == 1
+
+
+def test_the_owner_waits_for_t1_until_09_16_50_or_20_seconds_whichever_is_sooner():
+    def at(*t):
+        return datetime(2026, 10, 19, *t, tzinfo=IST)
+
+    assert deliver.t1_deadline(at(9, 16, 7)) == at(9, 16, 27)  # 20 s cap
+    assert deliver.t1_deadline(at(9, 16, 40)) == at(9, 16, 50)  # the clock deadline
+    assert deliver.t1_deadline(at(9, 16, 55)) == at(9, 17, 15)  # a late run: 20 s
+    assert deliver.t1_deadline(at(14, 0, 0)) == at(14, 0, 20)  # a run by hand
+
+
+def test_the_group_copy_goes_out_before_t1_is_even_attempted():
+    events: list = []
+    rec, sent = Recorder(events=events), Sent(events=events)
+    assert _run(rec, sent) == 0
+    assert events == [
+        ("record", None),
+        ("send", "-456"),  # the group: Adaptive alone, at once
+        ("record", "t1"),
+        ("send", None),  # the owner: Adaptive and T1 together
+    ]
+
+
+def test_a_dry_run_never_stores_missing_t1_results():
+    rec = Recorder()
+    rec.t1_outcomes = [pick_mod.PickError("lacks results: run `obt rotation update --track t1`")]
+    sent, caught = Sent(), []
+    catch = lambda t, root=None: caught.append(t) or (1, 0)  # noqa: E731
+    assert _run(rec, sent, catch_up=catch, dry_run=True) == 2
+    assert caught == [] and sent.messages == []
+    assert all(call["dry_run"] for call in rec.calls)
 
 
 def test_a_failed_adaptive_pick_alerts_and_sends_no_message():
@@ -396,3 +442,98 @@ def test_markers_are_per_destination_and_keyed_on_the_live_entry(evening):
         assert rotation_result.was_sent(done, evening, kind)
     names = sorted(p.name for p in (store.rotation_dir(evening) / "result-notifications").iterdir())
     assert [n[len("2026-10-20-") + 16 :] for n in names] == [".group.sent", ".sent", ".t1.sent"]
+
+
+# -- evening robustness (review S2, S3, old markers) ---------------------------------------------
+
+
+def test_an_unreadable_t1_never_stops_adaptives_result_and_t1_follows_once_fixed(evening):
+    _t1_ready(evening)
+    path = store.journal_path(evening, "t1")
+    good = path.read_text()
+    path.write_text(good + '{"day": "2026-10-21", "lis')  # a torn line: JournalCorrupt
+    sent, errors = Sent(), []
+    assert (
+        _send(evening, sent, wait_until=time(16, 25), now_fn=_at(16, 0, 0), err=errors.append) == 0
+    )
+    owner, group = sent.to(None)[0], sent.to("-456")[0]
+    assert "🎯 Adaptive   +₹300" in owner and "🧪 T1 · result not ready" in owner
+    assert "🎯 Adaptive   +₹300" in group
+    assert errors and "JournalCorrupt" in errors[0]
+    # T1 stays owed: once the journal is readable again, it follows on its own
+    path.write_text(good)
+    assert _send(evening, sent) == 0
+    assert sent.messages[-1][1].startswith("📊 Tue 20 Oct · T1 result")
+    assert len(sent.messages) == 3
+
+
+def test_a_broken_t1_results_row_is_an_error_not_a_crash(evening, monkeypatch):
+    _journal(evening, T1_CORE, "t1")
+    real = store.read_net
+
+    def torn(name, root=None):
+        if "-t1" in name:
+            raise ValueError("could not convert string to float: ''")
+        return real(name, root)
+
+    monkeypatch.setattr(store, "read_net", torn)
+    sent = Sent()
+    assert _send(evening, sent, err=lambda m: None) == 0
+    assert "🧪 T1 · result not ready" in sent.to(None)[0]
+    done = rotation_result.calculate(DAY, evening)
+    assert not rotation_result.was_sent(done, evening, "t1")
+
+
+def test_two_overlapping_runs_send_the_evening_message_once(evening):
+    import threading
+
+    _t1_ready(evening)
+    sent = Sent(pause=0.2)  # a slow Telegram widens the window the lock has to close
+    codes: list[int] = []
+    runs = [threading.Thread(target=lambda: codes.append(_send(evening, sent))) for _ in range(3)]
+    for run in runs:
+        run.start()
+    for run in runs:
+        run.join()
+    assert codes == [0, 0, 0]
+    assert len(sent.to(None)) == 1 and len(sent.to("-456")) == 1
+
+
+def test_a_held_lock_makes_a_second_run_wait(evening):
+    import threading
+
+    _t1_ready(evening)
+    sent = Sent()
+    with rotation_result.sending_lock(DAY, evening):
+        run = threading.Thread(target=lambda: _send(evening, sent))
+        run.start()
+        run.join(0.3)
+        assert run.is_alive() and sent.messages == []
+    run.join(5)
+    assert len(sent.messages) == 2
+
+
+def test_a_print_only_run_takes_no_lock_and_writes_nothing(evening):
+    _t1_ready(evening)
+    sent = Sent()
+    folder = store.rotation_dir(evening) / "result-notifications"
+    assert _send(evening, sent, telegram=False) == 0
+    assert not folder.exists() and sent.messages == []
+
+
+def test_a_day_marked_under_the_old_scheme_is_not_sent_again_in_part(evening):
+    """Before BL-125 one `.sent` marker covered the owner and the group; it still does."""
+    _t1_ready(evening)
+    done = rotation_result.calculate(DAY, evening)
+    marker = rotation_result.sent_marker(done, evening)
+    marker.parent.mkdir(parents=True)
+    marker.write_text(rotation_result.LEGACY_MARKER_TEXT)
+    sent = Sent()
+    assert _send(evening, sent) == 0
+    assert sent.messages == []  # no group copy, no T1 follow-up
+    # a marker written by the new scheme covers the owner only
+    marker.write_text("owner: sent\n")
+    assert _send(evening, sent) == 0
+    assert [c for c, _ in sent.messages] == ["-456"]  # the group copy it had not had
+    assert _send(evening, sent) == 0
+    assert [c for c, _ in sent.messages] == ["-456", None]  # then T1, owed, on its own

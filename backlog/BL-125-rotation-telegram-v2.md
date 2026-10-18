@@ -40,8 +40,8 @@ hash, `inputs_sha` or journal field, no pick, no score, not the BL-122 rule.
    `⚠️ LATE · not a forward entry` first. The friends' group gets Adaptive alone (T1 stays private).
 3. **T1 never delays or loses Adaptive.** `obt rotation pick --with-t1` records Adaptive, then T1 in the same
    process (reusing the live VIX read, recorded with its true source), and sends one message. If T1 fails,
-   is not ready or is slow (30 s), Adaptive goes out alone with `🧪 T1 · TESTING PHASE · not recorded today`,
-   the failure still alerts the owner as before and the job exits 2 (retry); missing T1 results are stored
+   is not ready by 09:16:50 IST (or 20 s after Adaptive's entry on a later run), Adaptive goes out alone with `🧪 T1 · TESTING PHASE · not recorded today`,
+   the friends' group copy never waits for T1 at all; the failure still alerts the owner as before and the job exits 2 (retry); missing T1 results are stored
    in-process after Adaptive is sent, and T1 then follows as its own message in the T1 layout.
 4. **Evening: one short message** for both lists: each list's total and per-strategy result (real minus sign),
    then tomorrow's strategies in full with their settings (`tomorrow.next_session_picks`, the same expected-pick
@@ -86,3 +86,9 @@ Lists A / B / REF, the journal, scoring, the dashboard's rotation pages, per-tra
   phase, vertical with icons, self-explaining strategy names, short evening message with tomorrow's strategies
   in full, evening at 16:00". Measured: `obt rotation update --track t1` for one collected day (223 variants)
   took 2.4 s of simulation on the real data (read-only run, writes patched out); Core-298 0.8 s warm.
+- 2026-10-18 — review fixes (PR #245, Opus review): the group copy is sent the moment Adaptive is
+  recorded, and the owner's message waits for T1 only until 09:16:50 IST (20 s cap); any error reading
+  T1 in the evening degrades to `T1 · result not ready` and never stops Adaptive's result; a per-day
+  `flock` around the evening's decide-send-mark; `--dry-run` never runs the T1 catch-up; the evening
+  run's T1 step is `--soft-fail` (alerts, exits 0, so `obt daily` is never re-run for it); a pre-BL-125
+  `.sent` marker still covers owner + group.
