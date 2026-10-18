@@ -956,3 +956,80 @@ def test_the_stop_rate_denominator_is_the_strategy_days_it_has_results_for(tmp_p
     write_days(tmp_path)
     c = cell(run(tmp_path, view="family_slot", period="P2"), "N:wide", "0917")
     assert c["n"] == 12 and c["m"]["stop_rate"] == pytest.approx(0.25)
+
+
+# --- the T1 universe (BL-113's extra settings beside Core-298) ---------------------------------
+
+T1_NAMES = ["N_ditm1-t1s36_0917", "N_ditm1-t1s36_0932", "N_dir-t1s29_0917", "S_p285-t1s22_0917"]
+
+
+@pytest.fixture
+def t1_root(root: Path) -> Path:
+    for n in T1_NAMES:
+        write(root, n)  # store.result_path routes these to rotation/track_t1/results/
+    assert (store.track_dir("t1", root) / "results" / f"{T1_NAMES[0]}.csv").exists()
+    return root
+
+
+def test_the_core_universe_never_sees_the_t1_settings(t1_root):
+    cube = m._read_cube(t1_root)
+    assert cube.universe == "core" and set(cube.names) == set(NAMES)
+    resp = m.compute(cube, m.load_journal(t1_root), view="family_slot", period="P2")
+    assert all("-t1" not in r["key"] for r in resp["rows"]) and m.T1_NOTE not in resp["notes"]
+
+
+def test_the_t1_universe_adds_its_settings_as_rows_after_their_core_kind(t1_root):
+    cube = m._read_cube(t1_root, "t1")
+    assert set(cube.names) == {*NAMES, *T1_NAMES}
+    resp = m.compute(cube, m.load_journal(t1_root), view="family_slot", period="P2")
+    keys = [r["key"] for r in resp["rows"]]
+    assert keys == [
+        "N:wide", "N:dir", "N:dir-t1s29", "N:ditm1-t1s36", "N:buy",
+        "S:wide", "S:p250", "S:p285-t1s22", "S:dir",
+    ]  # fmt: skip
+    label = {r["key"]: r["label"] for r in resp["rows"]}
+    assert label["N:ditm1-t1s36"] == "NIFTY Dir ITM1 · T1 #36, SL 20%"
+    assert label["S:p285-t1s22"] == "SENSEX Widesl p285 · T1 #22, SL 40%"
+    assert resp["universe"] == "t1" and resp["notes"][-1] == m.T1_NOTE
+    # a T1 row is its own files' mean, like any other row
+    lo, hi = date(2025, 1, 10), date(2025, 8, 29)
+    keep = [i for i, d in enumerate(DAYS) if lo <= d <= hi]
+    expect = np.mean([gross_of("N_ditm1-t1s36_0917", i) for i in keep])
+    assert cell(resp, "N:ditm1-t1s36", "0917")["v"] == pytest.approx(round(float(expect), 2))
+    # Core rows are unchanged by the extra settings
+    core = m.compute(
+        m._read_cube(t1_root), m.load_journal(t1_root), view="family_slot", period="P2"
+    )
+    assert cell(resp, "N:wide", "0917") == cell(core, "N:wide", "0917")
+
+
+def test_an_alias_takes_the_t1_settings_of_its_kinds_and_a_tag_only_itself(t1_root):
+    cube = m._read_cube(t1_root, "t1")
+    jr = m.load_journal(t1_root)
+    dirs = m.compute(
+        cube, jr, view="family_slot", period="P2", filters=m.parse_filters(family="dirs")
+    )
+    assert [r["key"] for r in dirs["rows"]] == ["N:dir", "N:dir-t1s29", "N:ditm1-t1s36", "S:dir"]
+    one = m.compute(
+        cube, jr, view="family_slot", period="P2", filters=m.parse_filters(family="ditm1-t1s36")
+    )
+    assert [r["key"] for r in one["rows"]] == ["N:ditm1-t1s36"]
+    with pytest.raises(m.MatrixError, match="unknown family"):
+        m.parse_filters(family="ditm1_t1s36")
+
+
+def test_the_routes_take_a_universe_and_refuse_an_unknown_one(t1_root, monkeypatch):
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(t1_root))
+    client = TestClient(create_app(t1_root / "cache"))
+    core = client.get("/legwise/rotation/matrix", params={"period": "P2"}).json()
+    t1 = client.get("/legwise/rotation/matrix", params={"period": "P2", "universe": "t1"}).json()
+    assert core["universe"] == "core" and len(t1["rows"]) == len(core["rows"]) + 3
+    assert t1["meta"]["universe"] == "t1" and t1["meta"]["store"]["variants"] == 14
+    drawer = client.get(
+        "/legwise/rotation/matrix/cell",
+        params={"row": "N:ditm1-t1s36", "col": "0917", "period": "P2", "universe": "t1"},
+    ).json()
+    assert drawer["stats"]["sessions"] == 56
+    assert drawer["variants"][0]["settings"]["leg_stop_percent"] == 20.0
+    bad = client.get("/legwise/rotation/matrix", params={"universe": "t2"})
+    assert bad.status_code == 422 and "universe" in bad.json()["error"]

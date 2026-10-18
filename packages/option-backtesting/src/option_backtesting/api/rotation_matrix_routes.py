@@ -9,7 +9,8 @@ pulse; `metric` avg | win_rate | stop_rate | worst | selection; `period` P1 | P2
 custom (`from` / `to` alone mean custom); `compare` two period ids ("P1,P2": shared colour
 scale and a difference); filters `index` NIFTY | SENSEX | both, `family` (comma tags or
 `widesl` / `dirs`), `slot` HHMM list, `weekday`, `dte`, `vix_band`; `min_n` (default 20);
-`list` A | B | C | REF and `basis` all | selected for the selection overlay.
+`list` A | B | C | REF and `basis` all | selected for the selection overlay; `universe` core
+(default: the 298 live variants) | t1 (Core-298 plus the T1 track's extra settings, BL-113).
 
 A period whose data is not in the store (P3, or forward before the first entry) is returned with
 `status: "unavailable"` and a reason, never as an error. Errors are `{"error": ...}`.
@@ -65,6 +66,7 @@ def matrix(
     min_n: int = Query(default=m.DEFAULT_MIN_N, ge=1, le=1000),
     list_: str | None = Query(default=None, alias="list"),
     basis: str = "all",
+    universe: str = "core",
 ) -> Any:
     try:
         lo, hi = _day(from_, "from"), _day(to, "to")
@@ -72,7 +74,7 @@ def matrix(
         if pair is not None and len(pair) != 2:
             raise m.MatrixError("compare takes two period ids, e.g. P1,P2")
         out = m.compute(
-            m.load_cube(),
+            m.load_cube(universe=universe),
             m.load_journal(),
             view=view,
             metric=metric,
@@ -106,13 +108,14 @@ def cell(
     vix_band: str | None = None,
     list_: str | None = Query(default=None, alias="list"),
     basis: str = "all",
+    universe: str = "core",
 ) -> Any:
     if not (_KEY_RE.match(row) and _KEY_RE.match(col)):
         return _error(422, "row and col must be keys the matrix returned")
     try:
         lo, hi = _day(from_, "from"), _day(to, "to")
         return m.drill(
-            m.load_cube(),
+            m.load_cube(universe=universe),
             m.load_journal(),
             view=view,
             row=row,

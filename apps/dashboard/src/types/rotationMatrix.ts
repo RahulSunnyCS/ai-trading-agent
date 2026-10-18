@@ -130,7 +130,12 @@ export interface MatrixOverlay {
   reconstructed: string;
 }
 
+/** core = the 298 live variants; t1 = Core-298 plus the T1 track's extra settings (BL-113). */
+export type MatrixUniverse = 'core' | 't1';
+
 export interface MatrixMeta {
+  universe?: MatrixUniverse;
+  universes?: MatrixUniverse[];
   slots: string[];
   families: { index: string; family: string; key: string; label: string }[];
   weekdays: string[];

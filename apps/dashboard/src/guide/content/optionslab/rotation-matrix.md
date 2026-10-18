@@ -47,8 +47,8 @@ DTE is each strategy's **own** index's days to expiry, counted in **weekdays** (
 
 ## The layout and the default
 
-The grid is the first thing on the page. Above it is one slim bar with the two switches you use
-most, the **view** and the **metric**, a one-line summary of the active settings (for example
+The grid is the first thing on the page. Above it is one slim bar with the switches you use
+most, **Core 298 | T1**, the **view** and the **metric**, a one-line summary of the active settings (for example
 "Today · 12 Oct 2026 · Both indices · All families") and a **Settings** button. The button opens a
 drawer from the right with everything else; a small number on it counts the settings that differ
 from the opening view.
@@ -66,13 +66,14 @@ always opens on the newest day.
 
 ## The controls
 
-These are the drawer's settings; the view and the metric are on the bar.
+These are the drawer's settings; Core 298 | T1, the view and the metric are on the bar.
 
 | Control | What it does |
 |---|---|
+| Core 298 \| T1 (on the bar) | **Core 298**, the default, is the 298 strategies the live Adaptive list ranks. **T1** adds the T1 track's nine extra settings (testing phase, not traded) at every start time, 223 more strategies. Each setting is its own row, right after the Core kind it varies, for example "NIFTY Dir ITM1 · T1 #36, SL 20%". The T1 settings were chosen on 9 Oct 2024 to 8 Oct 2025, so on those days their figures are in-sample by construction. Recorded picks stay the live Adaptive list's, so a T1 row is never marked as selected. |
 | Metric | Average ₹, win rate, stop-hit rate, worst strategy-day, or selection frequency. |
 | Period | P1 (Dec 2025 – Oct 2026), P2 (Jan – Aug 2025), P3, Forward (recorded days), or a custom range (From and To; one day if they are equal). "P1 and P2" shows both on one colour scale, with a Difference view. |
-| Index, Family | Which strategies. "Widesl (all)" includes the closest-premium variants. |
+| Index, Family | Which strategies. "Widesl (all)" includes the closest-premium variants; with T1 on, "Widesl (all)" and "Dir (ATM and ITM1)" also take the T1 settings of those kinds, and each T1 setting can be picked on its own. |
 | Start time, Weekday, Days to expiry, Opening VIX band | Keep only those days or start times. |
 | Start time (from the Family pulse) | A row clicked on the Rotation page's Family pulse opens the Pulse view with the family set and Start time showing a band, for example "09:17 to 10:02 (4 start times)". Choose Any start time to clear it. |
 | Minimum sessions | Below this a cell is thin. |

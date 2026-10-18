@@ -47,7 +47,7 @@ def journal_path(root: Path | None = None, track: str | None = None) -> Path:
 
 def track_dir(track: str, root: Path | None = None) -> Path:
     """A parallel track's own folder: its extra variants' results and its journal. The live
-    results folder (Strategy Matrix, `rotation corr`) never sees them."""
+    results folder never holds them; the Strategy Matrix reads them only with `universe=t1`."""
     return rotation_dir(root) / f"track_{track}"
 
 
