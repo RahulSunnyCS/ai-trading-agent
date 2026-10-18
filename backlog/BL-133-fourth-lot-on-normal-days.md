@@ -50,6 +50,17 @@ lots spread evenly; nothing live changes.
 - **Look-ahead check:** day d is ranked on results before d; runners-up come from day d's composite only.
 - **Will not run:** other placements, 5+ lots, Buy, the 2-2-1-1 ladder (BL-111 H1, registered separately).
 
+### Phase 0 — Amendment 1 (2026-10-18, owner override, after the first results were read)
+
+- **Override (owner):** proposed text "override: test T1's 4th lot on the Dir pick (2 lots) on non-expiry days, same
+  rules as BL-133"; owner, 2026-10-18: "ok". Reason given earlier by the owner: "I think on T1 also it would be better
+  if we add dir in non expiry days." The first run's results (Core's Dir placement leading, T1's Widesl placements
+  not beating the even spread) had been read, so this arm is chosen with knowledge of them.
+- **New arm T-D2** (T1 book): the Dir pick at two lots on non-expiry days; on a three-Widesl day the best unpicked Dir
+  is added instead (as C-D2), paying its brokerage. Everything else as Phase 0 (B3, B4, windows, seed 20261025).
+- **Also reported for C-D2 and T-D2 (registered now):** the result against B4 with the 5 and the 10 best non-expiry
+  days removed (date order kept), and the share of the excess those days carry.
+
 ### Phase 1 — Run
 
 - **Tasks:** `packages/option-backtesting/research/bl133/fourth_lot.py`; JSON; Log.
@@ -102,3 +113,4 @@ lots spread evenly; nothing live changes.
     yardstick that cannot be traded (it equals placing the fourth lot on a random pick). "Two years" is 21 months.
     C-D2 − B4 is the Dir minus the mean pick each day, the comparison BL-129 already made on these days, so the
     agreement with BL-129 restates it rather than confirming it.
+- 2026-10-18 — Amendment 1 committed before T-D2 was run: the owner's override for T1's Dir placement.
