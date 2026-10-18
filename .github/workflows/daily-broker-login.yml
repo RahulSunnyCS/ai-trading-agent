@@ -22,6 +22,10 @@ on:
         description: 'Single broker to run (angelone or finvasia). Blank uses the BROKER_LOGIN_ONLY repository variable; both blank runs both.'
         required: false
         default: ''
+      quantiply:
+        description: 'Quantiply login via Angel One (on or off). Blank uses the QUANTIPLY_LOGIN repository variable; both blank = off.'
+        required: false
+        default: ''
       trace:
         description: 'Capture a Playwright trace (contains sensitive DOM snapshots)'
         type: boolean
@@ -122,6 +126,11 @@ jobs:
           # the cron backstop alike. Unset or empty = both brokers. A value other than angelone or
           # finvasia fails the run loudly (config.ts), with the usual Telegram alert.
           ONLY: ${{ inputs.only || vars.BROKER_LOGIN_ONLY }}
+          # Also log in to Quantiply (Angel One's algo platform) with the ANGELONE_* secrets above,
+          # before AlgoTest's 08:15 window opens. Off unless the repository variable QUANTIPLY_LOGIN
+          # (or a dispatch's quantiply input) says on: `gh variable set QUANTIPLY_LOGIN --body on`.
+          # Independent of ONLY; any value other than on/off fails the run with a Telegram alert.
+          QUANTIPLY_LOGIN: ${{ inputs.quantiply || vars.QUANTIPLY_LOGIN }}
           TRACE: ${{ inputs.trace && '1' || '' }}
           SKIP_WINDOW_GUARD: ${{ inputs.skip_window_guard && '1' || '' }}
         run: bun run login

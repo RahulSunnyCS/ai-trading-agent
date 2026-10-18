@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { parseQuantiplyFlag } from './quantiply-rules.js';
 import { registerSecret } from './secrets.js';
 
 export interface TelegramConfig {
@@ -15,6 +16,8 @@ export interface Config {
   slowMo: number;
   skipWindowGuard: boolean;
   only: string | null;
+  /** Also log in to Quantiply through Angel One (QUANTIPLY_LOGIN=on). Independent of `only`. */
+  quantiply: boolean;
   runUrl: string | null;
 }
 
@@ -90,9 +93,17 @@ export function loadConfig(): Config {
     ? [only as keyof typeof BROKER_SECRET_KEYS]
     : (Object.keys(BROKER_SECRET_KEYS) as (keyof typeof BROKER_SECRET_KEYS)[]);
 
+  // Quantiply logs in through Angel One with the same three secrets, so they are needed
+  // whenever it runs - even when ONLY=finvasia leaves AlgoTest's Angel One login out.
+  const quantiply = parseQuantiplyFlag(process.env.QUANTIPLY_LOGIN);
+  const needsAngel = activeBrokers.includes('angelone') || quantiply;
+
   const required: readonly SecretKey[] = [
-    ...ALWAYS_REQUIRED,
-    ...activeBrokers.flatMap((broker) => BROKER_SECRET_KEYS[broker]),
+    ...new Set<SecretKey>([
+      ...ALWAYS_REQUIRED,
+      ...activeBrokers.flatMap((broker) => BROKER_SECRET_KEYS[broker]),
+      ...(quantiply ? BROKER_SECRET_KEYS.angelone : []),
+    ]),
   ];
 
   const missing = required.filter((key) => !process.env[key]?.trim());
@@ -111,8 +122,9 @@ export function loadConfig(): Config {
 
   // A skipped broker never reaches broker.login() - main.ts filters by `only`
   // before that - so an empty placeholder here is inert, not a silent credential gap.
+  // Angel One's are read for Quantiply too.
   const readOrBlank = (broker: keyof typeof BROKER_SECRET_KEYS, key: SecretKey): string =>
-    activeBrokers.includes(broker) ? read(key) : '';
+    (broker === 'angelone' ? needsAngel : activeBrokers.includes(broker)) ? read(key) : '';
 
   return {
     algotest: {
@@ -134,6 +146,7 @@ export function loadConfig(): Config {
     slowMo: Number(process.env.SLOW_MO ?? 0),
     skipWindowGuard: process.env.SKIP_WINDOW_GUARD === '1',
     only,
+    quantiply,
     runUrl: runUrl(),
   };
 }

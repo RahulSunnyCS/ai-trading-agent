@@ -143,6 +143,25 @@ export const angelOneForm = {
   error: (page: Page): Locator => page.locator('#login-error'),
 };
 
+/**
+ * Quantiply (Angel One's algo platform), used by src/quantiply.ts. Its login screen
+ * (app.quantiply.angelone.in/auth?resume=/algos) shows one "Login / Sign Up" button, which
+ * navigates to Angel's SmartAPI publisher login ("Login to Quantiply") - the same page as
+ * AlgoTest's Angel One login, so the verified `angelOneForm` locators above fill it.
+ *
+ * PROVISIONAL - seen read-only on 2026-10-18 (no credentials entered), not yet confirmed by a
+ * real login. If a step fails, the run's diagnostics artifact holds a screenshot (inputs
+ * blanked) and redacted HTML named after the step (`fail-quantiply-...`); tighten these from it.
+ */
+export const quantiplyPage = {
+  /** The single button on the /auth screen. Also the logged-OUT marker after the round trip. */
+  loginButton: (page: Page): Locator =>
+    page
+      .getByRole('button', { name: /log\s*in\s*\/\s*sign\s*up/i })
+      .or(page.getByRole('link', { name: /log\s*in\s*\/\s*sign\s*up/i }))
+      .first(),
+};
+
 /** Matched against error text to decide whether a retry is safe. */
 export const errorPatterns = {
   totpRejected:

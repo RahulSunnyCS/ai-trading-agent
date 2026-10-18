@@ -1,6 +1,6 @@
 import { mkdir } from 'node:fs/promises';
 import { istTimestamp, sendText } from '@trading/notify';
-import { type BrowserContext, type Page, chromium } from 'playwright';
+import { type Browser, type BrowserContext, type Page, chromium } from 'playwright';
 import {
   algotestLogin,
   classifyError,
@@ -22,6 +22,7 @@ import { type Config, loadConfig, readTelegramConfig } from './config.js';
 import { ARTIFACTS_DIR, describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { formatReport } from './notify.js';
 import { installOverlayHandlers } from './overlays.js';
+import { QUANTIPLY_NAME, runQuantiply } from './quantiply.js';
 import { brokerPage } from './selectors.js';
 import { waitForNextWindow } from './totp.js';
 
@@ -159,6 +160,40 @@ async function attemptBroker(page: Page, broker: Broker, config: Config): Promis
   return result('FAIL', lastDetail);
 }
 
+const CONTEXT_OPTIONS = {
+  viewport: { width: 1440, height: 900 },
+  locale: 'en-IN',
+  timezoneId: 'Asia/Kolkata',
+} as const;
+
+/**
+ * Quantiply in a browser context of its own, closed afterwards: the Angel One session cookies it
+ * leaves must not change what AlgoTest's Angel One login (same SmartAPI page) sees later. Never
+ * throws - a failure becomes the Quantiply result line and the AlgoTest logins still run.
+ */
+async function quantiplyInOwnContext(
+  browser: Browser,
+  config: Config,
+  tracing: boolean,
+): Promise<BrokerResult> {
+  let context: BrowserContext | undefined;
+  try {
+    context = await browser.newContext(CONTEXT_OPTIONS);
+    installOverlayHandlers(context);
+    if (tracing) await context.tracing.start({ screenshots: true, snapshots: true });
+    return await runQuantiply(context, config.angelone);
+  } catch (error) {
+    return { name: QUANTIPLY_NAME, status: 'FAIL', detail: describe(error) };
+  } finally {
+    if (context && tracing) {
+      await context.tracing
+        .stop({ path: `${ARTIFACTS_DIR}/trace-quantiply.zip` })
+        .catch(() => undefined);
+    }
+    if (context) await context.close().catch(() => undefined);
+  }
+}
+
 async function run(config: Config, context: BrowserContext): Promise<BrokerResult[]> {
   const page = await context.newPage();
   page.setDefaultTimeout(15_000);
@@ -202,20 +237,23 @@ async function main(): Promise<number> {
   }
 
   await mkdir(ARTIFACTS_DIR, { recursive: true }).catch(() => undefined);
-  await waitForLoginWindow(config);
 
   const tracing = process.env.TRACE === '1';
   let results: BrokerResult[] = [];
+  let quantiply: BrokerResult | null = null;
   let fatal: string | null = null;
-  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  let browser: Browser | undefined;
 
   try {
     browser = await chromium.launch({ headless: !config.headed, slowMo: config.slowMo });
-    const context: BrowserContext = await browser.newContext({
-      viewport: { width: 1440, height: 900 },
-      locale: 'en-IN',
-      timezoneId: 'Asia/Kolkata',
-    });
+
+    // Quantiply first: Angel One's login has no 08:15 window, so it runs in the minutes the
+    // AlgoTest guard below would only spend waiting, and it can't be delayed by it.
+    if (config.quantiply) quantiply = await quantiplyInOwnContext(browser, config, tracing);
+
+    await waitForLoginWindow(config);
+
+    const context: BrowserContext = await browser.newContext(CONTEXT_OPTIONS);
 
     // Close any notice that covers the page (AlgoTest, Finvasia's popup) instead of timing out on it.
     installOverlayHandlers(context);
@@ -235,15 +273,22 @@ async function main(): Promise<number> {
     if (browser) await browser.close().catch(() => undefined);
   }
 
-  const report = fatal
-    ? `${formatReport(results, config.runUrl)}\nfatal: ${fatal}`
-    : formatReport(results, config.runUrl);
+  // Switched on but never reached (the browser did not start): still a line, and a failure.
+  if (config.quantiply && !quantiply) {
+    quantiply = { name: QUANTIPLY_NAME, status: 'FAIL', detail: 'did not run' };
+  }
+
+  const body = formatReport(results, config.runUrl, quantiply);
+  const report = fatal ? `${body}\nfatal${quantiply ? ' (AlgoTest)' : ''}: ${fatal}` : body;
 
   console.log(`\n${report}`);
   await sendText(config.telegram, report, 'broker.algotest');
 
-  const failed = results.some((r) => r.status === 'FAIL');
-  return fatal || failed ? 1 : 0;
+  // Either platform failing fails the run, so the scheduler's morning summary (which reads this
+  // workflow's conclusion) flags it; the Telegram report above says which one.
+  const failed =
+    results.some((r) => r.status === 'FAIL') || quantiply?.status === 'FAIL' || fatal !== null;
+  return failed ? 1 : 0;
 }
 
 /**

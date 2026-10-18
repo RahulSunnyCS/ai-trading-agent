@@ -66,7 +66,10 @@ function capture(cmd: string, args: string[], cwd: string, env: Record<string, s
   return `${out.stdout ?? ''}${out.stderr ?? ''}`.trim();
 }
 
-/** Did today's AlgoTest login workflow (dispatched at 08:00) succeed? */
+/**
+ * Did today's AlgoTest login workflow (dispatched at 08:00) succeed? With QUANTIPLY_LOGIN on, the
+ * same run also logs in to Quantiply and fails if either login does; its Telegram report says which.
+ */
 function algotestCheck(ctx: BuiltinContext): Check {
   const label = 'AlgoTest login';
   const raw = capture(
