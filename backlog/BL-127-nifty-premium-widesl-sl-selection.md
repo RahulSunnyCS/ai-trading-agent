@@ -170,3 +170,8 @@ lists. A forward track is a separate proposal, only after a positive Stage C.
   the catalog's size; it does not walk the Parquet lake. Code paths that touch the real root only read it
   (`load_day`, `excluded_map`, the stored Core results, `days.csv`); the replays use temporary roots under
   `research/bl127/results/` (filtered copies for Stages A and B, symlinks for Stage C).
+- 2026-10-18 — Review notes (Opus, PR #247; no number changes). The test year has 244 days, not the 247 with
+  results: `days.csv` has no rows for 2026-09-23 and 2026-09-24 and Sunday 2026-02-01 is not a weekday, so the replay
+  drops them on both sides equally (no bias; the two missing `days.csv` rows are worth a separate look). The
+  leg-SL findings page wording was corrected (not every 70–80 % cell beat 115 %; one replay does not show why Adaptive
+  gains nothing) and the page is now "Tested".

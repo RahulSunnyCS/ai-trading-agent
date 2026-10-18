@@ -1,6 +1,6 @@
 # Widesl: leg stop
 
-**Status:** Descriptive · **Last updated:** 2026-10-18
+**Status:** Tested · **Last updated:** 2026-10-18
 
 ## What it is
 
@@ -20,7 +20,7 @@ AlgoTest). Every rotation Widesl file keeps its base file's stops.
 |---|---|---|---|---|
 | BL-098 Phase 2 | 80, 90, 100, 110, 115, 120, 130, 140, 150% (both legs), one factor at a time, all 150 rotation Widesl files | fit 2024-10-09 → 2025-10-08, holdout 2025-10-09 → 2026-10-09, **after charges** (₹20 an order + statutory), no slippage | Descriptive ranking; registered pass rule not yet applied; Phase 3 pending | [BL-098][bl098], [report][bl098q] |
 | BL-126 (POC) | NIFTY ₹100 at 75 % and ₹120 at 60 % vs ₹100 at 115 %, trail 15/10, MTM ₹2,500, all 25 rotation slots | 2024-10-09 → 2026-10-16, gross (no charges), in-sample, no hold-out | Not positive: +₹41 [−5, +89] and +₹47 [−18, +111] per lot-day standalone, deeper drawdown; in Adaptive −₹7 / +₹23, intervals include zero. Repeats BL-098 Phase 2's morning look | [BL-126][bl126] |
-| BL-127 | NIFTY ₹80 / ₹100 / ₹120 × SL 60, 70, 80, 90, 100, 115 %, trail 15/10, MTM ₹2,500, all 25 slots; a stop chosen per premium on the first year, then the best two in Adaptive on the second | Selection 2024-10-09 → 2025-10-08, test 2025-10-09 → 2026-10-16, gross (no charges) | Selection year: SL 70–80 % best (₹80 SL 80 % +230, ₹100 SL 70 % +281, ₹120 SL 70 % +295 per lot-day, vs +207 / +230 / +247 at 115 %; drawdown 35–60 % of the 115 % cell's). Test year, Adaptive with the best two added: −₹10 [−82, +63], drawdown deeper. **Not positive**; the 115 % files already in Adaptive's universe leave nothing to add | [BL-127][bl127] |
+| BL-127 | NIFTY ₹80 / ₹100 / ₹120 × SL 60, 70, 80, 90, 100, 115 %, trail 15/10, MTM ₹2,500, all 25 slots; a stop chosen per premium on the first year, then the best two in Adaptive on the second | Selection 2024-10-09 → 2025-10-08, test 2025-10-09 → 2026-10-16, gross (no charges) | Selection year: SL 70–80 % best (₹80 SL 80 % +230, ₹100 SL 70 % +281, ₹120 SL 70 % +295 per lot-day, vs +207 / +230 / +247 at 115 %; drawdown 35–60 % of the 115 % cell's). Test year, Adaptive with the best two added: −₹10 [−82, +63], drawdown deeper. **Not positive** (one replay; the interval includes zero) | [BL-127][bl127] |
 
 Leg-stop rows in the post-charge top four (holdout, mean over the band's start-time files):
 
@@ -43,7 +43,7 @@ Leg-stop rows in the post-charge top four (holdout, mean over the band's start-t
 - Tighter stops are not uniform: the NIFTY afternoon list has a 150% row, and NIFTY OTM1 midday at 80%
   still has a drawdown of −₹28.6k on a ₹15k net.
 - One holdout year, one factor at a time, ranked after viewing the holdout. Nothing is adopted.
-- NIFTY closest-premium Widesl, gross, selection year 2024-10 → 2025-10 (BL-127): at every premium a stop of 70–80 % beat 115 % on the mean (+₹23 to +₹50 per lot-day) and cut the drawdown to roughly 35–60 % of it, positive at all 25 slots. That did not carry into Adaptive on the next year (adding the two chosen stops: −₹10, interval includes zero, deeper drawdown). Standalone benefit, no Adaptive benefit; the test year had already been seen by BL-098 and BL-126.
+- NIFTY closest-premium Widesl, gross, selection year 2024-10 → 2025-10 (BL-127): the stop chosen per premium (₹80 SL 80 %, ₹100 SL 70 %, ₹120 SL 70 %) beat 115 % on the mean (+₹23 to +₹48 per lot-day; not every 70–80 % cell did: ₹120 at 80 % equals 115 %) and cut the drawdown to roughly 35–60 % of it, positive at all 25 slots. That did not carry into Adaptive on the next year (adding the two chosen stops: −₹10, interval includes zero, deeper drawdown). Standalone benefit, no Adaptive benefit; the test year had already been seen by BL-098 and BL-126.
 
 ## Not yet tested
 
