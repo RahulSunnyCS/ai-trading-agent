@@ -610,7 +610,16 @@ export interface MomentumJournalEntry {
   row_hash: string;
   /** Model portfolio (fractions) at the signal's close, BEFORE the signal's own actions. */
   holdings_before: Record<string, number>;
-  actions: Array<{ asset: string; action: string; rank: number | null }>;
+  actions: Array<{
+    asset: string;
+    action: string;
+    rank: number | null;
+    /** A gate's row (BL-136 "SKIP (premium)"): why the name was not bought. */
+    reason?: string | null;
+    /** The ETF's premium to NAV that decided, as a fraction. */
+    premium?: number | null;
+    premium_limit?: number | null;
+  }>;
   /** The paper start Friday: shown as nothing held going in and a buy for every name held after. */
   first_week: boolean;
   /** Benchmark rows only: the index level recorded. */
@@ -656,7 +665,10 @@ export interface MomentumJournal {
 /** One name on a favourite's card: what the signal does with it this week. */
 export interface MomentumWeekRow {
   asset: string;
-  /** BUY, SELL, TRIM, ADD, HOLD, or an engine action such as TOP UP / WAIT. */
+  /**
+   * BUY, SELL, TRIM, ADD, HOLD, an engine action such as TOP UP / WAIT, or a gate's
+   * "SKIP (premium)" (BL-136: a top-N name not bought because its ETF was too far above NAV).
+   */
   action: string;
   /** The strategy's own rank (a group: the rank in the sleeve that acted on it). */
   rank: number | null;
@@ -667,6 +679,10 @@ export interface MomentumWeekRow {
   /** Groups only: share before the trades, and the sleeves holding or trading it. */
   before?: number;
   sleeves?: string[] | null;
+  /** A skip's reason, in words, and the premium to NAV (a fraction) and limit that decided. */
+  reason?: string | null;
+  premium?: number | null;
+  premium_limit?: number | null;
 }
 
 /** One configuration inside a group, and its rebalance cadence. */

@@ -158,3 +158,35 @@ def test_held_names_count_every_name_held_after_the_trades_and_sleeves_lose_the_
     x = next(r for r in signal["rows"] if r["asset"] == "X")
     assert x["action"] == "TRIM" and x["rank"] == 4  # the acting sleeve's rank, not the best one
     assert "• X — TRIM 75.0% → 62.5%" in note.body
+
+
+def test_a_sleeves_premium_skip_stays_a_skip_and_never_becomes_a_trim():
+    """BL-136: the sleeve wanted X, the gate kept it out. Nobody holds X, so before = after = 0;
+    the old rule would have read that as a TRIM of nothing."""
+    skip = {
+        "asset": "X",
+        "action": "SKIP (premium)",
+        "rank": 1,
+        "premium": 0.17,
+        "premium_limit": 0.05,
+        "reason": "MON100 trades +17.0% above NAV, over the 5% limit.",
+    }
+    members = [
+        _member("a", {"K": 1.0}, {"K": 1.0}, [skip, {"asset": "K", "action": "HOLD", "rank": 2}]),
+        _member("b", {"K": 1.0}, {"K": 1.0}, [{"asset": "K", "action": "HOLD", "rank": 2}]),
+    ]
+    signal = groups.combine({"name": "G"}, members, "2026-10-16")
+    by_asset = {r["asset"]: r for r in signal["rows"]}
+    assert by_asset["K"]["action"] == "HOLD"
+    x = by_asset["X"]
+    assert x["action"] == "SKIP (premium)" and x["sleeves"] == ["a"] and not x["held"]
+    assert x["reason"].startswith("MON100") and x["premium"] == 0.17 and x["after"] == 0.0
+    assert [r["asset"] for r in signal["rows"]] == ["K", "X"]  # skips after the holds
+    note = groups.notification(signal)
+    assert "• X — not bought: MON100 trades +17.0% above NAV" in note.body
+    assert note.severity == "info"  # a skip is not a trade to place
+    # A name another sleeve holds is shown as that holding, not as a skip.
+    members[1]["signal"]["weights"] = members[1]["signal"]["target_weights"] = {"X": 1.0}
+    members[1]["signal"]["rows"] = [{"asset": "X", "action": "HOLD", "rank": 1}]
+    rows = groups.combine({"name": "G"}, members, "2026-10-16")["rows"]
+    assert sorted((r["asset"], r["action"]) for r in rows) == [("K", "HOLD"), ("X", "HOLD")]

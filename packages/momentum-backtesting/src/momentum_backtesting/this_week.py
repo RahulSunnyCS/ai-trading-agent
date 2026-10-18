@@ -159,22 +159,30 @@ def _rows(signal: dict[str, Any], previous: dict[str, Any] | None) -> list[dict[
         asset = row.get("asset")
         if asset is None or asset in groups_mod.IDLE_NAMES:
             continue
-        action = str(row.get("action") or "").upper()
+        raw_action = str(row.get("action") or "")
+        action = raw_action.upper()
         held = bool(row.get("held"))
         if not action and not held and asset not in target:
             continue
         rank = row.get("rank")
+        if action.startswith("SKIP"):
+            # A gate label ("SKIP (premium)", BL-136) keeps its case: a sentence, not a verb.
+            shown = raw_action
+        elif action in groups_mod.QUIET_ACTIONS:
+            shown = "HOLD" if held or asset in target else action
+        else:
+            shown = action
         out.append(
             {
                 "asset": asset,
-                "action": action
-                if action not in groups_mod.QUIET_ACTIONS
-                else ("HOLD" if held or asset in target else action),
+                "action": shown,
                 "rank": None if rank is None or pd.isna(rank) else rank,
                 "rank_prev": row.get("previous_rank", before.get(asset)),
                 "held": held,
                 "after": target.get(asset),
                 "sleeves": None,
+                # Why a name was not bought (a gate's row), and the ETF's premium to NAV.
+                **{k: row[k] for k in ("reason", "premium", "premium_limit") if k in row},
             }
         )
     return out

@@ -17,3 +17,12 @@ track = "etf"
 # Flag a buy whose ETF trades this far above NAV (needs amfi_code in universe.csv).
 premium_warn_pct = 1.0
 premium_warn_international_pct = 2.0
+
+# BL-136: do not open a NEW position whose ETF trades this far above NAV (the latest NAV known
+# at the run, normally Thursday's). The next-best name within the exit rank takes its slot, the
+# row is recorded as "SKIP (premium)" in the journal and on This week, and a top-up of a name
+# already held is only flagged (above), never blocked. These limits apply to every ETF
+# favourite, not just this fallback strategy. 0 = off. The owner's starting numbers
+# (2026-10-18): 2% domestic, 5% international (about a year of the strategy's backtested edge).
+premium_block_pct = 2.0
+premium_block_international_pct = 5.0

@@ -200,7 +200,7 @@ export function needsAttention({
   return items;
 }
 
-export type RowSection = 'sell' | 'buy' | 'hold';
+export type RowSection = 'sell' | 'buy' | 'skip' | 'hold';
 
 const SECTION_OF: Record<string, RowSection> = {
   SELL: 'sell',
@@ -211,24 +211,34 @@ const SECTION_OF: Record<string, RowSection> = {
   'TOP UP': 'buy',
 };
 
-/** A row's place on the card: what is sold or cut, what is bought or added, what is kept. */
+/** True for a gate's row: a name the strategy wanted and did not buy ("SKIP (premium)"). */
+export function isSkipAction(action: string): boolean {
+  return action.trim().toUpperCase().startsWith('SKIP');
+}
+
+/**
+ * A row's place on the card: what is sold or cut, what is bought or added, what a gate kept
+ * out this week (BL-136), what is kept.
+ */
 export function rowSection(row: MomentumWeekRow): RowSection {
+  if (isSkipAction(row.action)) return 'skip';
   return SECTION_OF[row.action.toUpperCase()] ?? 'hold';
 }
 
 export const SECTION_LABEL: Record<RowSection, string> = {
   sell: 'Sell',
   buy: 'Buy',
+  skip: 'Not bought',
   hold: 'Hold',
 };
 
-/** Rows split Sell / Buy / Hold, each by rank (unranked last); empty sections left out. */
+/** Rows split Sell / Buy / Not bought / Hold, each by rank (unranked last); empty sections left out. */
 export function groupRows(
   rows: readonly MomentumWeekRow[],
 ): Array<{ section: RowSection; rows: MomentumWeekRow[] }> {
   const byRank = (a: MomentumWeekRow, b: MomentumWeekRow) =>
     (a.rank ?? Number.POSITIVE_INFINITY) - (b.rank ?? Number.POSITIVE_INFINITY);
-  return (['sell', 'buy', 'hold'] as const)
+  return (['sell', 'buy', 'skip', 'hold'] as const)
     .map((section) => ({
       section,
       rows: rows.filter((row) => rowSection(row) === section).sort(byRank),

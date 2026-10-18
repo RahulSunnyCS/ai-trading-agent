@@ -8,6 +8,7 @@ import type {
 import {
   countdown,
   groupRows,
+  isSkipAction,
   istDay,
   needsAttention,
   rankDelta,
@@ -221,6 +222,22 @@ describe('a favourite’s rows', () => {
       ['sell', ['B', 'A']],
       ['hold', ['D', 'C']],
     ]);
+  });
+
+  it('puts a gate’s skip in its own Not bought section, after the buys (BL-136)', () => {
+    const skip: MomentumWeekRow = {
+      ...row('Nasdaq 100', 'SKIP (premium)', 1),
+      held: false,
+      reason: 'MON100 trades +16.9% above NAV, over the 5% limit.',
+    };
+    const groups = groupRows([row('C', 'HOLD', 3), skip, row('B', 'BUY', 2)]);
+    expect(groups.map((g) => [g.section, g.rows.map((r) => r.asset)])).toEqual([
+      ['buy', ['B']],
+      ['skip', ['Nasdaq 100']],
+      ['hold', ['C']],
+    ]);
+    expect(isSkipAction('SKIP (premium)')).toBe(true);
+    expect(isSkipAction('BUY')).toBe(false);
   });
 
   it('measures rank change and room to exit', () => {

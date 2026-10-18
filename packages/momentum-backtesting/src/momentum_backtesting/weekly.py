@@ -53,22 +53,55 @@ STALE_LIMIT = 0.25  # more than this share of ranked series stale -> no signal
 LAST_SAFE_PREVIEW = (15, 15)  # after 15:15 IST there isn't time to trade before the close
 
 
+#: The action of a top-N name the premium gate (BL-136) kept out of the model portfolio this week.
+PREMIUM_SKIP = "SKIP (premium)"
+
+
 @dataclass
 class LiveSettings:
     config: Config
     premium_warn: float = 0.01
     premium_warn_international: float = 0.02
+    # BL-136: a NEW buy whose ETF trades above this much over NAV is skipped (None = off).
+    premium_block: float | None = 0.02
+    premium_block_international: float | None = 0.05
+
+    def premium_limits(self, international: bool) -> tuple[float, float | None]:
+        """(warn, block) for a name: the international ETFs have their own, wider pair."""
+        if international:
+            return self.premium_warn_international, self.premium_block_international
+        return self.premium_warn, self.premium_block
+
+
+def _premium_settings(raw: dict) -> dict:
+    """Pop the premium keys out of a live_config.toml mapping, as LiveSettings fields."""
+
+    def block(key: str, default: float) -> float | None:
+        value = raw.pop(key, default)
+        return None if not value or value <= 0 else value / 100
+
+    return {
+        "premium_warn": raw.pop("premium_warn_pct", 1.0) / 100,
+        "premium_warn_international": raw.pop("premium_warn_international_pct", 2.0) / 100,
+        "premium_block": block("premium_block_pct", 2.0),
+        "premium_block_international": block("premium_block_international_pct", 5.0),
+    }
 
 
 def load_live_config(path: Path = LIVE_CONFIG) -> LiveSettings:
     raw = tomllib.loads(path.read_text())
-    warn = raw.pop("premium_warn_pct", 1.0) / 100
-    warn_intl = raw.pop("premium_warn_international_pct", 2.0) / 100
+    premium = _premium_settings(raw)
     if "lookbacks" in raw:
         raw["lookbacks"] = tuple(raw["lookbacks"])
     if raw.get("weights"):
         raw["weights"] = tuple(raw["weights"])
-    return LiveSettings(Config(**raw), warn, warn_intl)
+    return LiveSettings(Config(**raw), **premium)
+
+
+def live_premium_settings(path: Path = LIVE_CONFIG) -> dict:
+    """The premium warn / block limits of live_config.toml alone: the one place they are set,
+    shared by every ETF favourite (`settings_from_saved_config`), not just the fallback strategy."""
+    return _premium_settings(tomllib.loads(path.read_text()))
 
 
 # --- refresh ------------------------------------------------------------------------------------
@@ -392,29 +425,42 @@ def compute_signal(data_dir: Path, settings: LiveSettings) -> dict:
         tax_classes=tax_classes,
         trade_prices=fills.prices if fills is not None else None,
     )
-    signal = analysis.latest_signal(result, prices, config)
     by_name = {i.name: i for i in universe}
-    premiums = load_premiums(data_dir)
+    week = prices.index[-1]
+    latest = latest_premiums(load_premiums(data_dir), week)
+    blocked = premium_blocked(latest, by_name, settings)
+    # BL-136: the gate is a decision for THIS week only. The backtest above still runs without
+    # it, so the model portfolio records the buy next week; whether the gate belongs in the
+    # engine is the item's Phase 2 question, not something the live path decides on its own.
+    no_buy = pd.DataFrame({name: [True] for name in blocked}, index=[week]) if blocked else None
+    signal = analysis.latest_signal(result, prices, config, no_buy=no_buy)
     previous = result.ranks.iloc[-2] if len(result.ranks) > 1 else pd.Series(dtype=float)
     rows = []
     for row in signal["rows"]:
         name = row["asset"]
         inst = by_name.get(name)
-        premium = None
-        if name in premiums and premiums[name].notna().any():
-            premium = float(premiums[name].dropna().iloc[-1])
-        rows.append(
-            {
-                "asset": name,
-                "etf": inst.trade_etf if inst else name,
-                "group": inst.group if inst else "",
-                "rank": None if pd.isna(row["rank"]) else int(row["rank"]),
-                "previous_rank": None if pd.isna(previous.get(name)) else int(previous[name]),
-                "action": row["action"],
-                "held": row["held"],
-                "premium": premium,
-            }
-        )
+        premium, premium_date = latest.get(name, (None, None))
+        action = row["action"]
+        out = {
+            "asset": name,
+            "etf": inst.trade_etf if inst else name,
+            "group": inst.group if inst else "",
+            "rank": None if pd.isna(row["rank"]) else int(row["rank"]),
+            "previous_rank": None if pd.isna(previous.get(name)) else int(previous[name]),
+            "action": action,
+            "held": row["held"],
+            "premium": premium,
+            "premium_date": premium_date,
+        }
+        if action == analysis.NO_BUY_SKIP and name in blocked:
+            limit = blocked[name]
+            out["action"] = PREMIUM_SKIP
+            out["premium_limit"] = limit
+            out["reason"] = (
+                f"{out['etf']} trades {premium:+.1%} above NAV ({premium_date}), over the "
+                f"{limit:.0%} limit: not bought, the next-best name takes its slot (BL-136)."
+            )
+        rows.append(out)
     weights = result.weights.iloc[-1] if len(result.weights) else pd.Series(dtype=float)
     return {
         "week": f"{signal['week']:%Y-%m-%d}",
@@ -429,6 +475,39 @@ def compute_signal(data_dir: Path, settings: LiveSettings) -> dict:
             "lookbacks": list(config.lookbacks),
         },
     }
+
+
+def latest_premiums(premiums: pd.DataFrame, week: pd.Timestamp) -> dict[str, tuple[float, str]]:
+    """Each ETF's newest premium to NAV known on or before `week`'s close, with its date.
+
+    AMFI publishes a NAV in the evening, so at Friday's 16:45 run the newest premium is normally
+    Thursday's: a Friday close against a Friday NAV would be look-ahead for the live gate, and the
+    date is kept on the row so the journal says which day's premium decided."""
+    out: dict[str, tuple[float, str]] = {}
+    if premiums.empty:
+        return out
+    known = premiums[premiums.index <= week]
+    for name in known.columns:
+        series = known[name].dropna()
+        if len(series):
+            out[name] = (float(series.iloc[-1]), f"{series.index[-1]:%Y-%m-%d}")
+    return out
+
+
+def premium_blocked(
+    latest: dict[str, tuple[float, str]], by_name: dict[str, Instrument], settings: LiveSettings
+) -> dict[str, float]:
+    """BL-136: the names a new buy is refused for this week, each with the limit it is over.
+    Only an entry gate: a name already held is never sold or trimmed for its premium."""
+    blocked: dict[str, float] = {}
+    for name, (premium, _date) in latest.items():
+        inst = by_name.get(name)
+        _warn, limit = settings.premium_limits(
+            inst is not None and inst.tax_class == "international"
+        )
+        if limit is not None and premium > limit:
+            blocked[name] = limit
+    return blocked
 
 
 def changes(preview: dict | None, final: dict) -> list[str]:
@@ -462,10 +541,12 @@ def format_message(
 
     def line(r: dict) -> str:
         text = f"• {r['asset']} ({r['etf']}) — rank {r['rank'] if r['rank'] else '-'}"
-        limit = settings.premium_warn_international if r["asset"] in intl else settings.premium_warn
+        limit, _block = settings.premium_limits(r["asset"] in intl)
         if r["premium"] is not None:
             text += f" · premium {_pct(r['premium'])}"
-            if r["action"].startswith(("BUY", "ADD")) and r["premium"] > limit:
+            if r["action"] == PREMIUM_SKIP:
+                text += f" · over the {r.get('premium_limit', 0):.0%} limit, next-best name instead"
+            elif r["action"].startswith(("BUY", "ADD")) and r["premium"] > limit:
                 text += " ⚠️ buying above NAV"
         return text
 
@@ -473,6 +554,7 @@ def format_message(
         ("SELL", lambda a: a == "SELL"),
         ("TRIM", lambda a: a.startswith("TRIM")),
         ("BUY / TOP UP", lambda a: a.startswith(("BUY", "ADD"))),
+        ("NOT BOUGHT · ETF too far above NAV", lambda a: a == PREMIUM_SKIP),
         ("HOLD", lambda a: a in ("HOLD", "AT CAP")),
         ("WAITING FOR A SALE", lambda a: a == "WAIT"),
     ]
@@ -589,7 +671,7 @@ def settings_from_saved_config(config: dict) -> LiveSettings:
     for key in ("lookbacks", "weights", "universe"):
         if isinstance(engine_config.get(key), list):
             engine_config[key] = tuple(engine_config[key])
-    return LiveSettings(Config(**engine_config))
+    return LiveSettings(Config(**engine_config), **live_premium_settings())
 
 
 def run_weekly(

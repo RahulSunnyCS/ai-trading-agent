@@ -11,6 +11,9 @@ import pandas as pd
 from . import metrics, reference_benchmarks
 from .engine import CASH, IDLE, Config, Result, cadence_weeks
 
+#: The action `latest_signal` gives a top-N name a `no_buy` gate kept out this week.
+NO_BUY_SKIP = "SKIP (no new buy)"
+
 CAPITAL = 100_000  # rupee figures are shown for Rs 1 lakh invested at the start
 #: A closed trade whose return is within this of zero is flat, not a win. `position_return` is
 #: `value / entry_value - 1`, so a position that did not move comes out as 0 or as 2e-16 depending
@@ -379,7 +382,7 @@ def latest_signal(
     not_a_member = {n for n in tops if n not in held and not eligible_to_buy(n)}
     actions: dict[str, str] = {n: "SELL" for n in sells}
     actions.update(dict.fromkeys(not_a_member, "NOT A MEMBER"))
-    actions.update(dict.fromkeys(skipped, "SKIP (no new buy)"))
+    actions.update(dict.fromkeys(skipped, NO_BUY_SKIP))
     if config.portfolio == "slots":
         open_slots = config.top_n - (len(held) - len(sells))
         candidates = [n for n in tops if n not in held and eligible_to_buy(n)]
