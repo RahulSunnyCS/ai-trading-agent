@@ -1,0 +1,49 @@
+# T1 parallel track (BL-104 time-generic setting #47: NIFTY_Buy_premium expiry-day winner,
+# chosen on 2024-10-09 -> 2025-10-08 only). Frozen: never edit; read by `obt rotation update/pick --track t1`.
+strategy:
+  id: N_buy-t1s47_1332
+  underlying: NIFTY
+  entry_time: '13:32'
+  exit_time: '15:14'
+  square_off: partial
+  legs:
+  - id: ce
+    lots: 1
+    position: buy
+    option_type: CE
+    expiry: weekly
+    strike:
+      closest_premium: 75.0
+    stop_loss:
+      percent: 20.0
+    trail_sl:
+      points:
+      - 1.0
+      - 1.0
+    range_breakout:
+      until: '13:42'
+      side: high
+      source: instrument
+  - id: pe
+    lots: 1
+    position: buy
+    option_type: PE
+    expiry: weekly
+    strike:
+      closest_premium: 75.0
+    stop_loss:
+      percent: 20.0
+    trail_sl:
+      points:
+      - 1.0
+      - 1.0
+    range_breakout:
+      until: '13:42'
+      side: high
+      source: instrument
+  overall:
+    stop_loss_inr: 2000.0
+  execution:
+    slippage_pct: 0.0
+    cost_per_order_inr: 0.0
+    lot_sizing: current

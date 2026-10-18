@@ -26,6 +26,8 @@ from typing import Any
 
 import numpy as np
 
+from . import expiry
+from .dte import entry_labels
 from .explain import CRITERIA, Snapshot, rank_day
 from .lists import LISTS, WARMUP
 from .score import dte_matrix, family_index, pct_rank, select
@@ -174,7 +176,7 @@ def day_row(snap: Snapshot, key: str, position: int) -> dict[str, Any]:
         # the day itself is scored on what the 09:16 entry recorded
         weekday[-1] = entry["weekday"]
         band[-1] = entry["vix_band"]
-        dte = entry.get("dte") or {}
+        dte = entry_labels(entry)  # on the history's weekday basis, whichever the entry used
         dmat[-1] = dte_matrix(
             np.array([str(dte.get("NIFTY", "unknown"))]),
             np.array([str(dte.get("SENSEX", "unknown"))]),
@@ -199,6 +201,8 @@ def day_row(snap: Snapshot, key: str, position: int) -> dict[str, Any]:
         rec = (entry.get("lists") or {}).get(key)
         if rec is not None:
             picks = select(r.comp, names)
+            if entry.get("expiry_only") and key in expiry.RULE_LISTS:  # BL-122, as recorded
+                picks = expiry.filter_picks(r.comp, names, picks, entry["expiry_only"])
             idx = {n: v for v, n in enumerate(names)}
             same = set(picks.core) == set(rec.get("core", [])) and set(picks.buy) == set(
                 rec.get("buy", [])

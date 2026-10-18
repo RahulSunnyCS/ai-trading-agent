@@ -14,13 +14,11 @@ import type {
 } from '../types/rotationBasket';
 import { type PairRef, diversificationNote } from './correlationView';
 import { formatNumber } from './format';
-import { listName } from './rotationListNames';
+import { DEFAULT_LIST, VISIBLE_LIST_KEYS, listName } from './rotationListNames';
 
+/** The shown lists (`VISIBLE_LIST_KEYS`), then the fixed base, which is not a list and stays. */
 export const BASKET_LIST_OPTIONS: { value: BasketListKey; label: string }[] = [
-  { value: 'A', label: listName('A') },
-  { value: 'B', label: listName('B') },
-  { value: 'C', label: listName('C') },
-  { value: 'REF', label: listName('REF') },
+  ...VISIBLE_LIST_KEYS.map((value) => ({ value, label: listName(value) })),
   { value: 'BASE', label: 'Base' },
 ];
 
@@ -31,11 +29,11 @@ export const BASKET_WINDOW_OPTIONS: { value: BasketWindowId; label: string }[] =
   { value: 'forward', label: 'Forward' },
 ];
 
-const LISTS: readonly BasketListKey[] = ['A', 'B', 'C', 'REF', 'BASE'];
+const LISTS: readonly BasketListKey[] = BASKET_LIST_OPTIONS.map((o) => o.value);
 const WINDOWS: readonly BasketWindowId[] = ['P1', 'P2', 'last63', 'forward'];
 
 export function asBasketList(raw: string | null): BasketListKey {
-  return LISTS.find((k) => k === raw) ?? 'A';
+  return LISTS.find((k) => k === raw) ?? DEFAULT_LIST;
 }
 
 export function asBasketWindow(raw: string | null): BasketWindowId {

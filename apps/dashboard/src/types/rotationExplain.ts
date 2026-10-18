@@ -107,6 +107,8 @@ export interface RotationBoundary {
     best_buy: RotationVariantRef | null;
     tenth_composite: number | null;
     gap_to_top: number | null;
+    /** BL-122: the Buy variant was in the top 10 but belongs to the index the rule left out. */
+    dropped_by_rule?: boolean;
   };
 }
 
@@ -196,6 +198,8 @@ export interface RotationExplain {
   picks: RotationVariantRow[];
   top: RotationVariantRow[];
   boundary: RotationBoundary;
+  /** BL-122: null, or the index the list was restricted to and the picks without the rule. */
+  expiry_rule?: { index: string; unfiltered: { core: string[]; buy: string[] } } | null;
   scored: { n: number; picked_gross: Record<string, number> } | null;
   warnings: string[];
   available: RotationExplainRange;

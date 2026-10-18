@@ -20,6 +20,7 @@ from pathlib import Path
 import numpy as np
 
 from ..fyers.daily import data_dir
+from .dte import from_calendar_label
 
 RESULT_COLUMNS = ["day", "net", "gross", "costs", "worst_mtm", "stopped_by", "n_trades"]
 DAY_COLUMNS = ["day", "weekday", "vix_open", "vix_band", "dte_n", "dte_s"]
@@ -37,8 +38,26 @@ def days_path(root: Path | None = None) -> Path:
     return rotation_dir(root) / "days.csv"
 
 
-def journal_path(root: Path | None = None) -> Path:
+def journal_path(root: Path | None = None, track: str | None = None) -> Path:
+    """The live journal, or a parallel track's own (never the same file)."""
+    if track:
+        return track_dir(track, root) / "journal.jsonl"
     return rotation_dir(root) / "journal.jsonl"
+
+
+def track_dir(track: str, root: Path | None = None) -> Path:
+    """A parallel track's own folder: its extra variants' results and its journal. The live
+    results folder never holds them; the Strategy Matrix reads them only with `universe=t1`."""
+    return rotation_dir(root) / f"track_{track}"
+
+
+def result_path(name: str, root: Path | None = None) -> Path:
+    """Where a variant's results live: the live folder for Core-298, its track's for the rest."""
+    from .variants import track_of
+
+    track = track_of(name)
+    folder = track_dir(track, root) / "results" if track else results_dir(root)
+    return folder / f"{name}.csv"
 
 
 @contextmanager
@@ -54,7 +73,7 @@ def _write_lock(root: Path | None) -> Iterator[None]:
 
 def read_net(name: str, root: Path | None = None) -> dict[date, float]:
     """{day: net P&L} of one variant."""
-    path = results_dir(root) / f"{name}.csv"
+    path = result_path(name, root)
     if not path.exists():
         return {}
     with path.open() as f:
@@ -68,7 +87,7 @@ def result_days(name: str, root: Path | None = None) -> set[date]:
 def append_result(name: str, row: dict, root: Path | None = None) -> bool:
     """Append one day's result for a variant. Returns False (and writes nothing) when the day is
     already there: a stored day is never rewritten."""
-    path = results_dir(root) / f"{name}.csv"
+    path = result_path(name, root)
     path.parent.mkdir(parents=True, exist_ok=True)
     with _write_lock(root):
         if str(row["day"]) in {d.isoformat() for d in read_net(name, root)}:
@@ -103,12 +122,23 @@ def load_matrix(names: list[str], root: Path | None = None, through: date | None
     return Matrix(days, list(names), values)
 
 
-def read_days(root: Path | None = None) -> dict[date, dict[str, str]]:
+def read_days(root: Path | None = None, basis: str = "weekdays") -> dict[date, dict[str, str]]:
+    """The stored day attributes. The file keeps calendar-day DTE labels as they were written;
+    they are returned on the weekday basis (BL-109), so every reader agrees with the live label.
+    `basis="calendar"` returns them as written: only for checking an entry recorded before the
+    change, and for research that must stay on the calendar-day definition."""
     path = days_path(root)
     if not path.exists():
         return {}
+    out: dict[date, dict[str, str]] = {}
     with path.open() as f:
-        return {date.fromisoformat(r["day"]): r for r in csv.DictReader(f)}
+        for r in csv.DictReader(f):
+            day = date.fromisoformat(r["day"])
+            for key in ("dte_n", "dte_s") if basis == "weekdays" else ():
+                if key in r:
+                    r[key] = from_calendar_label(r[key], day)
+            out[day] = r
+    return out
 
 
 def append_day(row: dict, root: Path | None = None) -> bool:

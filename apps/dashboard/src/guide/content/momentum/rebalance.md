@@ -40,6 +40,8 @@ you hold. The card above the table names the sleeve that trades this week (one a
 Fridays) and shows each sleeve's share of the account and when the others next trade. On a first
 allocation every sleeve invests now, with an equal share.
 
+On your paper start Friday (`mbt paper-start`, see [This week](guide:momentum/this-week)) the page says **First week**: with no holdings entered every name is a buy, and the sleeves are numbered from that Friday, so *Friday 1 of K* is the one that trades.
+
 ## Common questions
 
 **Should I match the model exactly?** Not necessarily. Tiny differences cost more in brokerage

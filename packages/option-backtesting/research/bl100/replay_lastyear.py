@@ -21,7 +21,7 @@ START = date(2025, 10, 9)
 root = data_dir()
 names = variant_names()
 m = store.load_matrix(names, root)
-attrs = store.read_days(root)
+attrs = store.read_days(root, "calendar")  # BL-100 was a calendar-day record
 keep = [i for i, d in enumerate(m.days) if d in attrs]
 days = [m.days[i] for i in keep]
 P = m.values[keep]
@@ -67,7 +67,15 @@ for pk, ix in pools.items():
                 continue
             sub = P[: i + 1, ix].copy()
             sub[-1, :] = 0.0
-            comp = composite(sub, wd[: i + 1], bd[: i + 1], dte_matrix(dn[: i + 1], ds[: i + 1], cn), cn, lst, fam)
+            comp = composite(
+                sub,
+                wd[: i + 1],
+                bd[: i + 1],
+                dte_matrix(dn[: i + 1], ds[: i + 1], cn),
+                cn,
+                lst,
+                fam,
+            )
             pk_ = select(comp, cn)
             chosen = pk_.core + pk_.buy
             for c in chosen:
@@ -86,13 +94,21 @@ def mdd(x):
     return float((e - np.maximum.accumulate(np.maximum(e, 0))).min())
 
 
-print(f"days scored {len(sel_days)}  base per lot-day {np.nanmean(base):.0f}  base days {np.isfinite(base).sum()}")
-print(f"{'pool':9s}{'list':5s}{'₹/lot-day':>10s}{'cum/lot':>10s}{'maxDD/lot':>11s}{'pos-days':>9s}{'vs base':>9s}{'top pick':>26s}")
+print(
+    f"days scored {len(sel_days)}  base per lot-day {np.nanmean(base):.0f}  base days {np.isfinite(base).sum()}"
+)
+print(
+    f"{'pool':9s}{'list':5s}{'₹/lot-day':>10s}{'cum/lot':>10s}{'maxDD/lot':>11s}{'pos-days':>9s}{'vs base':>9s}{'top pick':>26s}"
+)
 for (pk, lk), s in series.items():
     top = max(picks_log[(pk, lk)].items(), key=lambda kv: kv[1])
     ok = np.isfinite(base)
-    print(f"{pk:9s}{lk:5s}{s.mean():10.0f}{s.sum():10.0f}{mdd(s):11.0f}{(s>0).mean():9.2f}{(s[ok]-base[ok]).mean():9.0f}{top[0]+' '+str(top[1]):>26s}")
-    rows.append([pk, lk, round(s.mean(), 1), round(s.sum(), 1), round(mdd(s), 1), round((s > 0).mean(), 3)])
+    print(
+        f"{pk:9s}{lk:5s}{s.mean():10.0f}{s.sum():10.0f}{mdd(s):11.0f}{(s > 0).mean():9.2f}{(s[ok] - base[ok]).mean():9.0f}{top[0] + ' ' + str(top[1]):>26s}"
+    )
+    rows.append(
+        [pk, lk, round(s.mean(), 1), round(s.sum(), 1), round(mdd(s), 1), round((s > 0).mean(), 3)]
+    )
 with (Path(__file__).parent / "replay_lastyear.csv").open("w", newline="") as f:
     w = csv.writer(f)
     w.writerow(["pool", "list", "per_lot_day", "cum_per_lot", "max_dd_per_lot", "pos_day_share"])

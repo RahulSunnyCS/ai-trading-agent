@@ -2,7 +2,8 @@
 
 > **Executed 2026-10-01 on real data (branch `feat/momentum-alpha`).** Results, verdicts and the
 > owner decisions they lead to are in `TODO.md` row 3.9.23 and
-> `docs/momentum-parameters-reference.md`. The plan below is kept as written.
+> `docs/momentum-parameters-reference.md` (moved to `research/momentum/` on 2026-10-14). The plan
+> below is kept as written.
 
 Written 2026-09-30 from a read-only analysis session. Nothing was run and no code was changed.
 No real price data exists in the cloud container, so every performance claim below is a

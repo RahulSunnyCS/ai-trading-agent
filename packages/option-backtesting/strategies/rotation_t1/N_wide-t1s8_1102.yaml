@@ -1,0 +1,41 @@
+# T1 parallel track (BL-104 time-generic setting #8: N_wide other-day winner,
+# chosen on 2024-10-09 -> 2025-10-08 only). Frozen: never edit; read by `obt rotation update/pick --track t1`.
+strategy:
+  id: N_wide-t1s8_1102
+  underlying: NIFTY
+  entry_time: '11:02'
+  exit_time: '15:28'
+  square_off: partial
+  legs:
+  - id: ce
+    lots: 1
+    position: sell
+    option_type: CE
+    expiry: weekly
+    strike:
+      strike_type: OTM1
+    stop_loss:
+      percent: 60.0
+    trail_sl:
+      percent:
+      - 15.0
+      - 10.0
+  - id: pe
+    lots: 1
+    position: sell
+    option_type: PE
+    expiry: weekly
+    strike:
+      strike_type: OTM1
+    stop_loss:
+      percent: 60.0
+    trail_sl:
+      percent:
+      - 15.0
+      - 10.0
+  overall:
+    stop_loss_inr: 3000.0
+  execution:
+    slippage_pct: 0.0
+    cost_per_order_inr: 0.0
+    lot_sizing: current

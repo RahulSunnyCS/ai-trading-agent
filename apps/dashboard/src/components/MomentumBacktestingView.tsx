@@ -41,6 +41,7 @@ import {
   type MomentumSettingsSection,
   describeConfig,
   diffConfigs,
+  formEndDate,
   modifiedSections,
 } from '../lib/momentumConfig';
 import { usualDuration } from '../lib/momentumDurations';
@@ -509,7 +510,7 @@ export function MomentumBacktestingView() {
       start: seed
         ? stringDefault(base, 'start', nextMeta.first_week)
         : defaultStart(nextMeta, base),
-      end: stringDefault(base, 'end', nextMeta.last_week),
+      end: formEndDate(base, seed !== null && seed !== undefined, nextMeta.last_week),
       topN: numberDefault(base, 'top_n', 5),
       exitRank: numberDefault(base, 'exit_rank', 10),
       lookbacks: lookbacksFromConfig({

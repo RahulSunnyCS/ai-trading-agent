@@ -35,7 +35,6 @@ import opsSettings from './content/operations/settings.md?raw';
 import optionsBuilderForm from './content/optionslab/builder-form.md?raw';
 import optionsBuilderYaml from './content/optionslab/builder-yaml.md?raw';
 import optionsCorrelation from './content/optionslab/correlation.md?raw';
-import optionsDailyResults from './content/optionslab/daily-results.md?raw';
 import optionsHeatmap from './content/optionslab/heatmap.md?raw';
 import optionsHowItWorks from './content/optionslab/how-it-works.md?raw';
 import optionsRegimes from './content/optionslab/regimes.md?raw';
@@ -43,6 +42,7 @@ import optionsRotationDailyLog from './content/optionslab/rotation-daily-log.md?
 import optionsRotationDrawdowns from './content/optionslab/rotation-drawdowns.md?raw';
 import optionsRotationDrift from './content/optionslab/rotation-drift.md?raw';
 import optionsRotationExplain from './content/optionslab/rotation-explain.md?raw';
+import optionsRotationLotPlans from './content/optionslab/rotation-lot-plans.md?raw';
 import optionsRotationMatrix from './content/optionslab/rotation-matrix.md?raw';
 import optionsRotationPulse from './content/optionslab/rotation-pulse.md?raw';
 import optionsRotationRegime from './content/optionslab/rotation-regime.md?raw';
@@ -50,7 +50,6 @@ import optionsRotationShadow from './content/optionslab/rotation-shadow.md?raw';
 import optionsRotation from './content/optionslab/rotation.md?raw';
 import optionsRuns from './content/optionslab/runs.md?raw';
 import optionsStrategies from './content/optionslab/strategies.md?raw';
-import optionsLosingDays from './content/optionslab/walkthrough-losing-days.md?raw';
 import optionsShortStraddle from './content/optionslab/walkthrough-short-straddle.md?raw';
 import startAlerts from './content/start/alerts.md?raw';
 import startDailyRoutine from './content/start/daily-routine.md?raw';
@@ -248,8 +247,9 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
   {
     chapter: 'optionslab',
     slug: 'strategies',
-    title: 'Strategies',
-    summary: 'The saved strategies the evening run tests every trading day.',
+    title: 'Strategies and baskets',
+    summary:
+      'The rotation baskets and the saved strategies the evening run tests every day; star your favourites.',
     kind: 'Screen',
     body: optionsStrategies,
     screen: { tab: 'optionslab', rest: ['strategies'] },
@@ -257,7 +257,7 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
   {
     chapter: 'optionslab',
     slug: 'builder-form',
-    title: 'Builder: Form mode',
+    title: 'Builder: leg grid',
     summary: 'Build a strategy leg by leg, backtest it over a date range, and save it.',
     kind: 'Screen',
     body: optionsBuilderForm,
@@ -266,7 +266,7 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
   {
     chapter: 'optionslab',
     slug: 'builder-yaml',
-    title: 'Builder: YAML mode',
+    title: 'Builder: YAML engine',
     summary:
       'The older rule engine, where a strategy is written as text rather than built in a form.',
     kind: 'Screen',
@@ -281,15 +281,6 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     kind: 'Screen',
     body: optionsRuns,
     screen: { tab: 'optionslab', rest: ['runs'] },
-  },
-  {
-    chapter: 'optionslab',
-    slug: 'daily-results',
-    title: 'Daily results',
-    summary: 'How each saved strategy did on every collected day, with a minute-by-minute replay.',
-    kind: 'Screen',
-    body: optionsDailyResults,
-    screen: { tab: 'optionslab', rest: ['results'] },
   },
   {
     chapter: 'optionslab',
@@ -313,8 +304,7 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     chapter: 'optionslab',
     slug: 'rotation',
     title: 'Rotation',
-    summary:
-      'The four forward lists against Baseline, the fixed base and random baskets, and today’s picks.',
+    summary: 'The Adaptive list against the fixed base and random baskets, and today’s picks.',
     kind: 'Screen',
     body: optionsRotation,
     screen: { tab: 'optionslab', rest: ['rotation'] },
@@ -326,7 +316,7 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     slug: 'rotation-explain',
     title: 'Rotation: why a pick, and does rank predict results',
     summary:
-      'Why each list picked what it did, criterion by criterion, and whether the morning ranking orders the day.',
+      'Why Adaptive picked what it did, criterion by criterion, and whether the morning ranking orders the day.',
     kind: 'Screen',
     body: optionsRotationExplain,
     screen: { tab: 'optionslab', rest: ['rotation'] },
@@ -382,9 +372,19 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     slug: 'rotation-daily-log',
     title: 'Rotation: the daily log',
     summary:
-      'What each list picked at 09:16 and what those picks did, day by day, with what you placed.',
+      'What Adaptive picked at 09:16 and what those picks did, day by day, with what you placed.',
     kind: 'Screen',
     body: optionsRotationDailyLog,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-lot-plans',
+    title: 'Rotation: lot plans',
+    summary:
+      'As picked, Dir Boost and Duo: the same morning picks traded three ways, followed forward for Core and T1.',
+    kind: 'Screen',
+    body: optionsRotationLotPlans,
     screen: { tab: 'optionslab', rest: ['rotation'] },
   },
   {
@@ -403,14 +403,6 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     summary: 'From the template to a saved strategy the evening run will track.',
     kind: 'Walkthrough',
     body: optionsShortStraddle,
-  },
-  {
-    chapter: 'optionslab',
-    slug: 'walkthrough-losing-days',
-    title: 'Walkthrough: find the days a strategy loses on',
-    summary: 'Use the day grid, the replay and the day-type card to understand bad days.',
-    kind: 'Walkthrough',
-    body: optionsLosingDays,
   },
 
   // ---- Data & operations ---------------------------------------------------------------

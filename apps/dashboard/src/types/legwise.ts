@@ -92,6 +92,9 @@ export interface BacktestResponse {
   /** Every builder run is stored as an `adhoc` run under this id (legwise_routes.py). */
   run_id?: string | undefined;
   days: DayRow[];
+  /** Echoed by the API: the bar size the run used and whether unusable days were included. */
+  bars?: '1m' | '5m' | undefined;
+  include_excluded?: boolean | undefined;
 }
 
 export interface SavedResult extends DayRow {
@@ -260,8 +263,17 @@ export interface CorrelationGroups {
   kind: Record<string, number>;
 }
 
+/** A rotation list a `list:<key>` selector can name (BL-102). */
+export interface CorrelationList {
+  key: string;
+  selector: string;
+  name: string;
+}
+
 export interface CorrelationAvailable {
   strategies: CorrelationStrategy[];
+  /** Absent from an older service; treat as none. */
+  lists?: CorrelationList[];
   groups: CorrelationGroups;
   max_strategies: number;
   default_selectors: string[];
@@ -321,6 +333,10 @@ export interface CorrelationResponse {
   from: string | null;
   to: string | null;
   stale: string[];
+  /** Per rotation list: how many compared days were re-scored from history, not recorded. */
+  reconstructed?: Record<string, number>;
+  /** What each kind of series is measured in (`list`, `variant`, `legwise`), as plain words. */
+  basis?: Record<string, string>;
   in_sample: boolean;
 }
 
@@ -340,4 +356,22 @@ export interface CorrelationPick {
   from: string;
   to: string;
   candidates: number;
+}
+
+// ---------------------------------------------------------------------------
+// Favourites (BL-102): the stars on Strategies and baskets
+// ---------------------------------------------------------------------------
+
+/** The rotation lists, the old live rotation (REF) and the owner's fixed base. */
+export type FavouriteListKey = 'A' | 'B' | 'C' | 'REF' | 'base';
+
+/** GET / PUT /api/backtest/legwise/favourites. */
+export interface Favourites {
+  lists: FavouriteListKey[];
+  strategies: string[];
+  /** When the owner last saved; null while the defaults are showing. */
+  updated_at: string | null;
+  is_default: boolean;
+  /** Why the stored file was not used, when it was not. */
+  warning: string | null;
 }

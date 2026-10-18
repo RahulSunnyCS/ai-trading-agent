@@ -305,6 +305,13 @@ Market filled 745/755 symbols (2,980 rows) in a few minutes, and a subsequent `m
 produced real BUY/SELL/ADD signals for all three previously-blocked favourites (Stock
 Weekly Core, Broad Weekly Core, Fav 1).
 
+**The benchmark TRIs do not depend on NSE (2026-10-11).** `mbt stocks sync` refreshes the TRI raw
+snapshots from niftyindices.com first, but `stocks fetch` alone rewrites the core
+`benchmarks_weekly.csv` columns, so a failed NSE fetch left the Nifty200 Momentum 30 level two weeks
+behind and the journal's benchmark entry "missing". The fallback branch now calls
+`adjust.refresh_core_benchmarks_csv` + `db_migrate.import_core_benchmarks` (the CSV and the
+catalog's `stock_weekly_series`, core columns only; never fails the sync).
+
 Python callers here do not import `@trading/notify` — `notify.py` mirrors
 the `Notification` shape directly rather than importing the TypeScript
 package (see that package's `CLAUDE.md` for why the boundary is the
@@ -475,7 +482,7 @@ contract, not a shared service).
   headline's message (`save_message` → `weekly_messages.json`, last 40) and the live-rules check
   keeps its last report (`live_rules.save_last` → `live_rules_last.json`, written by `mbt
   live-rules check` and by `POST /api/live-rules/run`, a background job; `GET /api/live-rules`).
-  Both files live in `this_week.state_dir()`: `data/`, or `MOMENTUM_STATE_DIR`, which
+  `paper_start.json` (same folder, `mbt paper-start`) is the Friday the owner's portfolio starts from nothing: `week_view(start_week=)` turns every card's rows into buys that week (`_start_from_cash`) and, from it on, renumbers a group's sleeves (`_renumber_sleeves`: the sleeve trading on that Friday is "Friday 1 of K"; display only, saved names and ids unchanged), `_rebalance_response` / `_rebalance_group_preview` add `paper_start` / `first_week` to the Rebalance preview and number its group sleeves the same way (the preview already starts from nothing when no holdings are entered), `api._journal_entry_view(row, start)` does the same to the Journal page's entries (display only; the stored, hash-chained rows never change), and `_compute_orders` plans from cash that week. Both files live in `this_week.state_dir()`: `data/`, or `MOMENTUM_STATE_DIR`, which
   `tests/conftest.py` points at a temp folder so no test writes the real ones. "Room to exit" is
   only given for a strategy with a single exit rank (`_exit_rank`); Broad in category mode sells on
   its category and pool ranks too, so it gets none.
@@ -486,7 +493,7 @@ contract, not a shared service).
   default `rahul`; paper capital ₹1 lakh), holdings snapshots (Fyers `fyers.holdings`, read-only,
   or pasted), holding rules and the orders made (trading-data migration 012). `api._compute_orders`
   is the body of `mbt orders run [--send]` (scheduler job `momentum-orders`, Fri 14:15) and of
-  `POST /api/orders/run`: the headline's target from `_orders_signal`, which for a stored week one
+  `POST /api/orders/run` (`mbt orders run --fresh` plans from nothing held, `--favourite` for a named one; CLI only): the headline's target from `_orders_signal`, which for a stored week one
   short of the target and a signal delay of 1 uses `_broad_sentinel_run(ahead=True)` - deciding the
   NEXT week on a flat stand-in row. `tests/test_broad_parity.py` pins that the week-ahead decision
   buys and fully sells exactly what the full backtest did; trims and top-ups read the week's own
@@ -590,7 +597,7 @@ contract, not a shared service).
 - `levers.py` / `reversal.py` — research levers from the 2026-10-01 alpha study (rank tables,
   `no_buy` masks, post-hoc overlays; the turnaround sleeve). `scripts/alpha_experiments.py`,
   `scripts/reversal_experiment.py` and `scripts/param_dry_run.py` reproduce every number in
-  `docs/momentum-parameters-reference.md`. Score any new lever over `sweep.rolling_windows`
+  `research/momentum/` (one page per parameter; was `docs/momentum-parameters-reference.md`). Score any new lever over `sweep.rolling_windows`
   with `sweep.rerun_windows` + `compare_rolling`, never on the full sample alone.
 - Broad Momentum gotcha: `engine.run_backtest` skips weeks with fewer than `top_n` ranked
   names unless `Config.min_ranked` is set; Broad needs `min_ranked=1` (API
@@ -657,7 +664,7 @@ contract, not a shared service).
   unknown. Strategy state (name, notes, status) stays on the *anchor* run (the favourite, else the
   oldest), so the run ids the journal keys on never change; a run's config is
   `backtest_runs.params`. Each strategy keeps its last 3 repeats; each dataset its newest 10
-  unkept strategies. `/api/saved-strategies*` and `/api/result-changes*` serve it;
+  unkept strategies. A group strategy also carries `blend` (`runs_store.group_blend`: its members' stored curves as equal capital reset each April via `choose.ensemble_curve`, with CAGR, edge, drawdown, a Sharpe estimate and mean turnover from it) so Saved runs can show the group's own numbers and chart; the dashboard's `asSavedRun` uses it for sorting and Compare. `/api/saved-strategies*` and `/api/result-changes*` serve it;
   `mbt saved merge [--apply]` folded the runs saved before. `api.py`'s `/api/saved-runs` routes call this;
   the Fastify proxy (`apps/server/src/server/routes/momentum-backtest.ts`)
   forwards `/api/momentum/saved-runs*` to it unchanged.

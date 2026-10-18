@@ -6,6 +6,7 @@ import {
   companionLine,
   describeConfig,
   diffConfigs,
+  formEndDate,
   hindsightWarning,
   modifiedSections,
   settingsSectionOf,
@@ -470,5 +471,17 @@ describe('companionLine', () => {
     expect(companionLine({ status: 'skipped', reason: 'weekly run' })).toBeNull();
     expect(companionLine(undefined)).toBeNull();
     expect(companionLine(null)).toBeNull();
+  });
+});
+
+describe('formEndDate', () => {
+  it('keeps a saved open-ended strategy open-ended so a re-run is the same strategy', () => {
+    expect(formEndDate({ end: null }, true, '2026-10-16')).toBe('');
+    expect(formEndDate({}, true, '2026-10-16')).toBe('');
+  });
+
+  it('keeps a saved end date, and starts a fresh form on the data last week', () => {
+    expect(formEndDate({ end: '2025-03-28' }, true, '2026-10-16')).toBe('2025-03-28');
+    expect(formEndDate({}, false, '2026-10-16')).toBe('2026-10-16');
   });
 });

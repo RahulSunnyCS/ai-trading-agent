@@ -22,7 +22,7 @@ It describes markets and tests nothing. It never changes a list, a weight or the
 | Row | What it shows |
 |---|---|
 | Opening VIX band | The share of sessions in each band of the 09:15 VIX open, light (low VIX) to dark (high). |
-| NIFTY and SENSEX days to expiry | The share of sessions 0, 1, 2, 3 and 4 or more days from the index's nearest expiry. |
+| NIFTY and SENSEX days to expiry | The share of sessions 0, 1, 2, 3 and 4 or more **weekdays** from the index's nearest expiry (Saturdays and Sundays are not counted, so a Friday before a Monday expiry is 1; holidays are). |
 | Weekday | The share of sessions on each weekday. |
 | VIX open | The 10th percentile, the median and the 90th percentile of the open. |
 | NIFTY and SENSEX day range | The same three percentiles of (high − low) ÷ open, from the session's 1-minute index bars. Read from the data when the card loads; never stored. |

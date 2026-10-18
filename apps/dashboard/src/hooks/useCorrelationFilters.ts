@@ -16,10 +16,16 @@ const MEASURES: readonly CorrelationMeasure[] = ['pearson', 'spearman', 'loss'];
 /**
  * What Options Lab › Correlation is showing, kept in the URL query so a link or a refresh lands
  * on the same comparison: `?slot=0917&family=wide&index=N&kind=legwise&names=a,b&from=…&to=…`.
- * An absent key is its default ("any" for the filters, the three NIFTY 09:17 strategies for
- * `names`), so the bare page is those three; an emptied list is stored as `names=-`.
+ * An absent key is its default ("any" for the filters; for `names` the starred favourites, else
+ * the three NIFTY 09:17 strategies), so the bare page is those; an emptied list is stored as
+ * `names=-`.
+ *
+ * `favouriteNames` is what the favourites say the bare page opens on: undefined means "use the
+ * built-in three" (no favourites to wait for), null means "the favourites have not loaded yet",
+ * and `waiting` is then true so the caller can hold its request until they have. An empty list of
+ * favourites falls back to the built-in three.
  */
-export function useCorrelationFilters() {
+export function useCorrelationFilters(favouriteNames?: readonly string[] | null) {
   const [slot, setSlot] = useQueryState('slot');
   const [family, setFamily] = useQueryState('family');
   const [index, setIndex] = useQueryState('index');
@@ -29,6 +35,10 @@ export function useCorrelationFilters() {
   const [to, setTo] = useQueryState('to');
   const [measure, setMeasure] = useQueryState('measure');
 
+  const defaultNames: readonly string[] =
+    favouriteNames && favouriteNames.length > 0 ? favouriteNames : DEFAULT_NAMES;
+  const waiting = names === null && favouriteNames === null;
+
   const filters: CorrelationFilters = useMemo(
     () => ({
       slot: slot ?? DEFAULT_FILTERS.slot,
@@ -36,9 +46,9 @@ export function useCorrelationFilters() {
       index: index ?? ANY,
       kind: kind ?? ANY,
       names:
-        names === null ? [...DEFAULT_NAMES] : names === '-' ? [] : names.split(',').filter(Boolean),
+        names === null ? [...defaultNames] : names === '-' ? [] : names.split(',').filter(Boolean),
     }),
-    [slot, family, index, kind, names],
+    [slot, family, index, kind, names, defaultNames],
   );
 
   const setFilters = useCallback(
@@ -50,18 +60,24 @@ export function useCorrelationFilters() {
       if (patch.kind !== undefined) setKind(patch.kind === ANY ? null : patch.kind);
       if (patch.names !== undefined) {
         const same =
-          patch.names.length === DEFAULT_NAMES.length &&
-          patch.names.every((n, i) => n === DEFAULT_NAMES[i]);
+          patch.names.length === defaultNames.length &&
+          patch.names.every((n, i) => n === defaultNames[i]);
         setNames(same ? null : patch.names.length ? patch.names.join(',') : '-');
       }
     },
-    [setSlot, setFamily, setIndex, setKind, setNames],
+    [setSlot, setFamily, setIndex, setKind, setNames, defaultNames],
   );
 
   const picked = MEASURES.find((m) => m === measure) ?? 'pearson';
   return {
     filters,
     setFilters,
+    /** True while the bare page is waiting for the favourites it opens on. */
+    waiting,
+    /** True when the names are the page's own defaults (no `?names=` in the address). */
+    usingDefaults: names === null,
+    /** What the bare page opens on, for a "Reset to favourites" action. */
+    defaultNames,
     range: { from: from ?? undefined, to: to ?? undefined },
     setRange: (next: { from?: string | null; to?: string | null }) => {
       if (next.from !== undefined) setFrom(next.from || null);

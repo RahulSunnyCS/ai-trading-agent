@@ -209,6 +209,23 @@ describe('boundaryLines', () => {
     },
   };
 
+  it('names the expiry rule and what the list would have held without it', () => {
+    const rule = { index: 'NIFTY', unfiltered: { core: ['S_a', 'N_b'], buy: ['S_buy'] } };
+    const lines = boundaryLines(
+      {
+        ...base,
+        buy: { ...base.buy, best_buy: v('S_buy', 2, 0.9, null), dropped_by_rule: true },
+      },
+      rule,
+    );
+    expect(lines[0]?.id).toBe('rule');
+    expect(lines[0]?.text).toContain('only NIFTY strategies');
+    expect(lines[0]?.text).toContain('Without the rule: S_a, N_b, S_buy');
+    expect(lines.find((l) => l.id === 'override')?.text).toContain('top 3 NIFTY non-Buy');
+    expect(lines.find((l) => l.id === 'buy')?.text).toContain('left it out');
+    expect(lines.find((l) => l.id === 'buy')?.text).not.toContain('outside the overall top');
+  });
+
   it('says rank decided the core when no swap happened', () => {
     const lines = boundaryLines(base);
     expect(lines[0]?.text).toContain('Rank decided the core');

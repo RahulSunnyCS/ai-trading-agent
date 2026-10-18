@@ -253,6 +253,49 @@ describe('RotationMatrixPanel', () => {
     expect(screen.getByText('Running total by session')).toBeTruthy();
   });
 
+  it('lands an old list=A link on no overlay, and asks for Adaptive when list=C', async () => {
+    window.history.replaceState(null, '', '/optionslab/matrix?period=P1&list=A');
+    const fetchMock = stub(() => ok(matrixResponse()));
+    render(<RotationMatrixPanel />);
+    await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17: \+₹148/);
+    const calls = fetchMock.mock.calls.map(([u]) => String(u)).filter((u) => u.includes('matrix'));
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((u) => !/[?&]list=/.test(u))).toBe(true);
+    cleanup();
+    clearPolledResourceCache();
+    window.history.replaceState(null, '', '/optionslab/matrix?period=P1&list=C');
+    const again = stub(() => ok(matrixResponse()));
+    render(<RotationMatrixPanel />);
+    await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17: \+₹148/);
+    expect(again.mock.calls.map(([u]) => String(u)).some((u) => /[?&]list=C(&|$)/.test(u))).toBe(
+      true,
+    );
+  });
+
+  it('marks and names only the shown list in the drawer, never a session only hidden lists picked', async () => {
+    const picked: MatrixCellDetail = {
+      ...detail,
+      days: [
+        { ...detail.days[0]!, picked_by: ['A', 'REF'] },
+        { ...detail.days[1]!, picked_by: ['A', 'C'] },
+      ],
+    };
+    stub((url) => (url.includes('/matrix/cell') ? ok(picked) : ok(matrixResponse())));
+    render(<RotationMatrixPanel />);
+    fireEvent.click(await screen.findByLabelText(/NIFTY Widesl OTM1, 09:17: \+₹148/));
+    await screen.findByText('Running total by session');
+    const dialog = screen.getByRole('dialog');
+    // one dot: the Tuesday Adaptive picked; Monday was picked only by Steady and Baseline
+    expect(dialog.querySelectorAll('circle')).toHaveLength(1);
+    expect(screen.getByText(/Dots mark sessions Adaptive recorded a pick/)).toBeTruthy();
+    const rows = Array.from(dialog.querySelectorAll('tr')).map((r) => r.textContent ?? '');
+    const monday = rows.find((t) => t.includes('Mon'));
+    const tuesday = rows.find((t) => t.includes('Tue'));
+    expect(tuesday).toMatch(/Adaptive$/);
+    expect(monday).not.toMatch(/Adaptive|Steady|Baseline|REF/);
+    expect(dialog.textContent).not.toMatch(/Steady|Calendar|Baseline|\bREF\b/);
+  });
+
   it('asks the API for both periods when compare is on', async () => {
     const fetchMock = stub(() => ok(matrixResponse()));
     render(<RotationMatrixPanel />);

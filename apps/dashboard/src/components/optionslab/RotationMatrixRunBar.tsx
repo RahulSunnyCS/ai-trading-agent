@@ -11,8 +11,10 @@ import { RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { type MatrixPreset, PRESET_OPTIONS } from '../../lib/rotationMatrixDefault';
 import {
   ANY,
+  DEFAULT_FILTERS,
   METRIC_OPTIONS,
   type MatrixFilters,
+  UNIVERSE_OPTIONS,
   VIEW_OPTIONS,
 } from '../../lib/rotationMatrixView';
 import type { MatrixMeta } from '../../types/rotationMatrix';
@@ -41,9 +43,25 @@ export function RotationMatrixRunBar({
   onOpenSettings: () => void;
 }) {
   const hint = VIEW_OPTIONS.find((o) => o.value === f.view)?.hint;
+  /** A T1 setting picked as the family or strategy kind does not exist in Core: drop it too. */
+  const setUniverse = (universe: MatrixFilters['universe']) => {
+    const patch: Partial<MatrixFilters> = { universe };
+    if (universe === 'core') {
+      if (f.family.includes('-')) patch.family = ANY;
+      if (f.strategy.includes('-')) patch.strategy = DEFAULT_FILTERS.strategy;
+    }
+    set(patch);
+  };
   return (
     <Card className="space-y-1.5 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <SegmentedControl
+          value={f.universe}
+          options={UNIVERSE_OPTIONS.map(({ value, label }) => ({ value, label }))}
+          onChange={setUniverse}
+          ariaLabel="Strategies"
+          size="sm"
+        />
         <SegmentedControl
           value={f.view}
           options={VIEW_OPTIONS.map(({ value, label }) => ({ value, label }))}

@@ -16,6 +16,7 @@ from ..data.reference.loader import default_reference_data
 from ..fyers.daily import data_dir
 from . import base as base_mod
 from . import journal, store
+from .dte import entry_labels
 from .lists import LISTS, LOTS_PER, WARMUP
 from .pick import FIRST_ENTRY
 from .variants import is_buy, is_dir, is_wide, parts, variant_names
@@ -274,7 +275,7 @@ def baskets(root: Path | None = None, day: date | None = None) -> dict:
         "weekday": e["weekday"],
         "vix_open": e["vix_open"],
         "vix_band": e["vix_band"],
-        "dte": e["dte"],
+        "dte": entry_labels(e),
         "recorded_at": e["recorded_at"],
         "on_time": bool(e.get("before_first_entry")),
         "hash": e["hash"],

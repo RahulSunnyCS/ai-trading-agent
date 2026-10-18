@@ -16,13 +16,21 @@ to the screen with the detail. [Open](app:/overview) · [Guide](guide:operations
 
 ## Options Lab
 
-| Screen | What it is for |
-|---|---|
-| [Strategies](app:/optionslab/strategies) | The saved strategies the evening run tests every trading day, with each one's latest result. [Guide](guide:optionslab/strategies) |
-| [Builder](app:/optionslab/builder) | Build a strategy leg by leg, backtest it over a date range, save it. A YAML mode writes strategies as text instead. [Guide](guide:optionslab/builder-form) |
-| [Runs](app:/optionslab/runs) | Every backtest run in one list; tick two to compare. [Guide](guide:optionslab/runs) |
-| [Daily results](app:/optionslab/results) | How every saved strategy did on every collected day, with a minute-by-minute replay of any day. [Guide](guide:optionslab/daily-results) |
-| [Regimes](app:/optionslab/regimes) | Labels each day Quiet, Chop, Trend up or Trend down, and tests whether those labels last. [Guide](guide:optionslab/regimes) |
+The sidebar groups it into three workspaces (what to check today, data to explore, and strategies to
+build and test) and an Advanced group at the end.
+
+| Workspace | Screen | What it is for |
+|---|---|---|
+| Today | [Today](app:/optionslab/rotation) | How the rotation lists are doing on days nobody had seen, and today's picks. [Guide](guide:optionslab/rotation) |
+| Explore data | [Heatmap](app:/optionslab/heatmap) | What an ATM short straddle made at each entry time and stop loss. [Guide](guide:optionslab/heatmap) |
+| Explore data | [Matrix](app:/optionslab/matrix) | Where the strategy variants make or lose money, by start time, date and condition. [Guide](guide:optionslab/rotation-matrix) |
+| Explore data | [Correlation](app:/optionslab/correlation) | Which strategies lose on the same days. [Guide](guide:optionslab/correlation) |
+| Build and test | [Strategies and baskets](app:/optionslab/strategies) | The rotation baskets and the saved strategies the evening run tests every trading day, each with its latest result; star your favourites. [Guide](guide:optionslab/strategies) |
+| Build and test | [Builder](app:/optionslab/builder) | Build a strategy leg by leg, backtest it over a date range, save it. The advanced YAML engine writes strategies as text instead. [Guide](guide:optionslab/builder-form) |
+| Build and test | [Runs](app:/optionslab/runs) | Every backtest run in one list; tick two to compare. [Guide](guide:optionslab/runs) |
+| Advanced | [Regimes](app:/optionslab/regimes) | Labels each day Quiet, Chop, Trend up or Trend down, and tests whether those labels last. [Guide](guide:optionslab/regimes) |
+
+The evening run's status and its **Run** button are at the top of Today.
 
 ## Momentum
 

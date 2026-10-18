@@ -385,7 +385,9 @@ export function SavedStrategiesView({
 
   function row(strategy: SavedStrategy, member = false) {
     const name = nameOf(strategy);
-    const kpis = strategy.latest.kpis;
+    // A group has no run of its own: show the blend of its sleeves (equal capital, reset each April).
+    const blend = strategy.group !== null ? (strategy.blend ?? null) : null;
+    const kpis = blend ? blend.kpis : strategy.latest.kpis;
     const trust = strategy.trust ? TRUST[strategy.trust] : null;
     const change = strategy.change ? CHANGE[strategy.change.label] : null;
     const isGroup = strategy.group !== null;
@@ -505,10 +507,24 @@ export function SavedStrategiesView({
           {isGroup ? EMPTY : `×${strategy.runs}`}
         </Td>
         <Td dense className="whitespace-nowrap">
-          {isGroup ? null : <SavedRunSparkline values={strategy.latest.strategy} name={name} />}
+          {blend ? (
+            <SavedRunSparkline values={blend.strategy} name={name} />
+          ) : isGroup ? null : (
+            <SavedRunSparkline values={strategy.latest.strategy} name={name} />
+          )}
         </Td>
-        <Td dense align="right" numeric className="whitespace-nowrap">
-          {isGroup && memberCagrs.length
+        <Td
+          dense
+          align="right"
+          numeric
+          className="whitespace-nowrap"
+          title={
+            blend && memberCagrs.length
+              ? `All sleeves together. One sleeve alone: ${formatPct(Math.min(...memberCagrs), 0)}–${formatPct(Math.max(...memberCagrs), 0)}`
+              : undefined
+          }
+        >
+          {isGroup && !blend && memberCagrs.length
             ? `${formatPct(Math.min(...memberCagrs), 0)}–${formatPct(Math.max(...memberCagrs), 0)}`
             : formatPct(kpis.cagr)}
           {extended ? (
@@ -523,13 +539,13 @@ export function SavedStrategiesView({
           numeric
           className={(kpis.excess_cagr ?? 0) >= 0 ? 'text-positive' : 'text-negative'}
         >
-          {isGroup ? EMPTY : formatPp(kpis.excess_cagr)}
+          {isGroup && !blend ? EMPTY : formatPp(kpis.excess_cagr)}
         </Td>
         <Td dense align="right" numeric className="text-negative">
-          {isGroup ? EMPTY : formatPct(kpis.max_drawdown)}
+          {isGroup && !blend ? EMPTY : formatPct(kpis.max_drawdown)}
         </Td>
         <Td dense align="right" numeric>
-          {isGroup ? EMPTY : formatNumber(kpis.sharpe, 2)}
+          {isGroup && !blend ? EMPTY : formatNumber(kpis.sharpe, 2)}
         </Td>
         <Td dense className="whitespace-nowrap">
           <span className="flex items-center gap-1">

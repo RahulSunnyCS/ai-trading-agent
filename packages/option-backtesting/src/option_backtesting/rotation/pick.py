@@ -15,12 +15,13 @@ from zoneinfo import ZoneInfo
 import numpy as np
 
 from ..fyers.daily import data_dir
-from . import journal, store
+from . import expiry, journal, messages, store
 from .attrs import last_collected_before
-from .lists import DISPLAY_NAMES, LISTS, LOTS_PER, WARMUP
+from .dte import DTE_BASIS
+from .lists import LISTS, LOTS_PER, PUBLIC_KEYS, WARMUP
 from .live import listed_dte_labels, vix_open_with_source
-from .score import composite, dte_matrix, family_index, select, vix_band
-from .variants import variant_names
+from .score import composite, dte_matrix, family_index, runners_up, select, vix_band
+from .variants import track_names, variant_names
 
 IST = ZoneInfo("Asia/Kolkata")
 FIRST_ENTRY = time(9, 17)
@@ -34,6 +35,8 @@ class PickError(RuntimeError):
 class PickResult:
     entry: dict
     text: str
+    #: {list: {wide, dir}}: the optional next best of the public lists (message text only)
+    options: dict | None = None
 
 
 def previous_data_day(root: Path, day: date) -> date:
@@ -65,6 +68,7 @@ def code_commit() -> str:
                 "--",
                 "src",
                 "strategies/rotation",
+                "strategies/rotation_t1",
             ],
             capture_output=True,
             text=True,
@@ -97,13 +101,13 @@ class History:
     digest: str
 
 
-def load_history(day: date, root: Path, names: list[str]) -> History:
+def load_history(day: date, root: Path, names: list[str], basis: str = "weekdays") -> History:
     """Everything the pick reads from disk. Raises PickError when the history is short or does not
     reach the last collected trading day."""
     if not names:
         raise PickError("no variant strategy files found")
     m = store.load_matrix(names, root, through=day - timedelta(days=1))
-    attrs = store.read_days(root)
+    attrs = store.read_days(root, basis)
     keep = [i for i, d in enumerate(m.days) if d in attrs]
     days = [m.days[i] for i in keep]
     if len(days) < WARMUP:
@@ -135,8 +139,8 @@ def load_history(day: date, root: Path, names: list[str]) -> History:
     )
 
 
-def score_history(hist: History, day: date, vix_open: float | None, dte: dict[str, str]) -> dict:
-    """{list: {core, buy, overridden, composite}} for `day`."""
+def _rank(hist: History, day: date, vix_open: float | None, dte: dict[str, str]):
+    """Per list key: (composite over every variant, the selected picks), for `day`."""
     weekday = np.array([*hist.weekday, day.strftime("%a")])
     band = np.array([*hist.band, vix_band(vix_open)])
     dn = np.array([*hist.dte_n, dte["dte_n"]])
@@ -145,16 +149,69 @@ def score_history(hist: History, day: date, vix_open: float | None, dte: dict[st
     Pv = np.vstack([hist.values, np.zeros((1, len(cols)))])
     dmat = dte_matrix(dn, ds, cols)
     fam = family_index(cols)
-    out = {}
     for key, lst in LISTS.items():
         comp = composite(Pv, weekday, band, dmat, cols, lst, fam)
-        picks = select(comp, cols)
+        yield key, cols, comp, select(comp, cols)
+
+
+def _check_expiry_only(expiry_only: str | None) -> None:
+    if expiry_only is not None and expiry_only not in expiry.INDICES:
+        raise ValueError(
+            f"expiry_only must be one of {', '.join(expiry.INDICES)} or None, not {expiry_only!r}"
+        )
+
+
+def score_history(
+    hist: History,
+    day: date,
+    vix_open: float | None,
+    dte: dict[str, str],
+    expiry_only: str | None = None,
+) -> dict:
+    """{list: {core, buy, overridden, composite}} for `day`.
+
+    `expiry_only` ('NIFTY' | 'SENSEX', BL-122): the lists in `expiry.RULE_LISTS` (Adaptive) take
+    only that index's variants (a filter of the same ranking, `expiry.filter_picks`), and their
+    block also carries `unfiltered` (the picks without the rule) and `expiry_only`. None, the
+    default, is the ranking exactly as before; reconstructed history never passes it."""
+    _check_expiry_only(expiry_only)
+    out = {}
+    for key, cols, comp, picks in _rank(hist, day, vix_open, dte):
+        chosen = picks
+        if expiry_only and key in expiry.RULE_LISTS:
+            chosen = expiry.filter_picks(comp, cols, picks, expiry_only)
         out[key] = {
-            "core": picks.core,
-            "buy": picks.buy,
-            "overridden": picks.overridden,
-            "composite": {k: round(v, 4) for k, v in picks.composite.items()},
+            "core": chosen.core,
+            "buy": chosen.buy,
+            "overridden": chosen.overridden,
+            "composite": {k: round(v, 4) for k, v in chosen.composite.items()},
         }
+        if chosen is not picks:
+            out[key]["unfiltered"] = {"core": picks.core, "buy": picks.buy}
+            out[key]["expiry_only"] = expiry_only
+    return out
+
+
+def next_best(
+    hist: History,
+    day: date,
+    vix_open: float | None,
+    dte: dict[str, str],
+    expiry_only: str | None = None,
+) -> dict[str, dict[str, str | None]]:
+    """{list: {wide, dir}}: the best Widesl and the best Dir variant that were not picked, for the
+    public lists. Message text only; it is not part of the journal entry. With `expiry_only`, a
+    rule list's options come from that index only, like its picks."""
+    _check_expiry_only(expiry_only)
+    out: dict[str, dict[str, str | None]] = {}
+    for key, cols, comp, picks in _rank(hist, day, vix_open, dte):
+        if key not in PUBLIC_KEYS:
+            continue
+        if expiry_only and key in expiry.RULE_LISTS:
+            chosen = expiry.filter_picks(comp, cols, picks, expiry_only)
+            out[key] = expiry.filtered_runners_up(comp, cols, chosen, expiry_only)
+        else:
+            out[key] = runners_up(comp, cols, picks)
     return out
 
 
@@ -171,28 +228,65 @@ def score_lists(
     return score_history(hist, day, vix_open, dte)
 
 
+#: A parallel track records only these lists (owner, 2026-10-16: Adaptive only for T1).
+TRACK_LISTS = {"t1": ("C",)}
+
+
 def record(
     day: date,
     root: Path | None = None,
     vix_open: float | None = None,
     now_fn: Callable[[], datetime] = lambda: datetime.now(IST),
     dry_run: bool = False,
+    track: str | None = None,
+    vix_source: str | None = None,
 ) -> PickResult:
+    """Score and append today's entry. `track` (e.g. "t1") records a parallel track instead:
+    Core-298 plus its extra variants, only its own lists, in its own journal; the live journal is
+    never touched by a track run. `vix_open` given (the live entry's own read, handed to the track
+    so the two never poll twice) is recorded as read from `vix_source` when that is also given,
+    else as "given"."""
     root = root or data_dir()
     if not dry_run and day != now_fn().astimezone(IST).date():
         raise PickError(f"{day} is not today (IST): an entry can only be recorded on its own day")
+    if not dry_run and any(
+        e["day"] == day.isoformat() for e in journal.read(store.journal_path(root, track))
+    ):
+        # a retry after a success: answer before any network read can fail and raise a false alert
+        raise journal.AlreadyRecorded(f"{day.isoformat()} is already in the journal")
     # everything slow and VIX-independent first: the 09:15 bar is served a few seconds after the
     # job starts, and only the band depends on it
-    names = variant_names()
+    names = variant_names() + (track_names(track) if track else [])
     dte, dte_source = listed_dte_labels(day)
+    # BL-122: from 2026-10-19, on a day exactly one index expires, Adaptive takes only its
+    # strategies. Read before any network wait, so a bad kill-switch value fails at once, loudly.
+    rule = expiry.rule_index(day, dte)
     commit = code_commit()
-    hist = load_history(day, root, names)
-    source = "given"
+    try:
+        hist = load_history(day, root, names)
+    except PickError as error:
+        if track:  # the fix is the track's own update, not the live one
+            raise PickError(
+                str(error).replace("`obt rotation update", f"`obt rotation update --track {track}")
+            ) from error
+        raise
+    if track:
+        core_days = load_history(day, root, variant_names()).days
+        if hist.days != core_days:
+            missing = sorted(set(core_days) - set(hist.days))
+            raise PickError(
+                f"the {track} track lacks results for {len(missing)} day(s) Core-298 has "
+                f"(first {', '.join(d.isoformat() for d in missing[:3])}): "
+                f"run `obt rotation update --track {track}`"
+            )
+    source = vix_source or "given"
     if vix_open is None:
         vix_open, source = vix_open_with_source(day)
     if vix_open is None:
         raise PickError(f"the 09:15 India VIX open for {day} could not be read; nothing recorded")
-    lists = score_history(hist, day, vix_open, dte)
+    lists = score_history(hist, day, vix_open, dte, expiry_only=rule)
+    if track:
+        lists = {k: v for k, v in lists.items() if k in TRACK_LISTS[track]}
     fields = {
         "v": 3,
         "day": day.isoformat(),
@@ -202,6 +296,7 @@ def record(
         "vix_band": vix_band(vix_open),
         "dte": {"NIFTY": dte["dte_n"], "SENSEX": dte["dte_s"]},
         "dte_source": dte_source,
+        "dte_basis": DTE_BASIS,
         "lists": lists,
         "commit": commit,
         "universe": universe_fingerprint(names),
@@ -209,7 +304,11 @@ def record(
         "inputs_days": len(hist.days),
         "lots_per_strategy": LOTS_PER,
     }
-    path = store.journal_path(root)
+    if track:
+        fields["track"] = track
+    if rule:  # omitted on every other day, so those entries are exactly what they were
+        fields["expiry_only"] = rule
+    path = store.journal_path(root, track)
     stamp = now_fn().astimezone(IST)  # taken right before the write, so the flag describes it
     fields["recorded_at"] = stamp.isoformat(timespec="seconds")
     fields["before_first_entry"] = stamp.time() < FIRST_ENTRY
@@ -217,17 +316,13 @@ def record(
         entry = {**fields, "prev": journal.head(path), "hash": "(dry run)"}
     else:
         entry = journal.append(path, fields)
-    return PickResult(entry, render(entry))
+    options = next_best(hist, day, vix_open, dte, expiry_only=rule)
+    if track:
+        options = {k: v for k, v in options.items() if k in TRACK_LISTS[track]}
+    return PickResult(entry, render(entry, options), options)
 
 
-def render(entry: dict) -> str:
-    lines = [f"Rotation picks {entry['day']} ({entry['weekday']})"]
-    for key, p in entry["lists"].items():
-        if key == "REF":
-            continue
-        picked = ", ".join(p["core"]) + (f" + Buy {', '.join(p['buy'])}" if p["buy"] else "")
-        lines.append(f"{DISPLAY_NAMES.get(key, key)}: {picked}")
-    lines.append(f"chain {entry['hash'][:12]}  recorded {entry['recorded_at'][11:19]} IST")
-    if not entry["before_first_entry"]:
-        lines.append("LATE: recorded after 09:17 IST, this entry is NOT forward")
-    return "\n".join(lines)
+def render(entry: dict, options: dict[str, dict[str, str | None]] | None = None) -> str:
+    """The message for one entry: Adaptive's layout, or the T1 layout for a track entry
+    (`messages.render_entry`; BL-125)."""
+    return messages.render_entry(entry, options)

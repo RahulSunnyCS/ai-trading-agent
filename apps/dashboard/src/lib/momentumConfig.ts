@@ -533,3 +533,19 @@ export function companionLine(
   }
   return null;
 }
+
+/**
+ * The form's "To" date for a config. A saved strategy with no end date (a group's sleeve, or any
+ * run saved open-ended) stays open-ended (''), so running it again is the same strategy: filling
+ * in the data's last week would give it a different identity and save a duplicate. Only a form
+ * that starts from the dataset defaults (no seed) begins on the last week.
+ */
+export function formEndDate(
+  config: Record<string, unknown>,
+  seeded: boolean,
+  lastWeek: string,
+): string {
+  const end = config.end;
+  if (typeof end === 'string') return end;
+  return seeded ? '' : lastWeek;
+}

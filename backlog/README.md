@@ -71,3 +71,9 @@ Side exits: `Blocked` (say on what), `Dropped` (keep the file; record why).
 Whenever an item is added, re-prioritised or changes status, update its row in
 `INDEX.md` in the same change. Keep the table sorted by priority (P0 first),
 then by ID. Move finished items to the **Done / Dropped** table at the bottom.
+
+## Research findings
+
+When a `research` item closes (or records a verdict), update the `research/` page of every
+variable it tested in the same change, and add a page for any variable tested for the first
+time (`research/README.md` has the template).

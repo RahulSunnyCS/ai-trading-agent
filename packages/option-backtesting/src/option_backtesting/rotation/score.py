@@ -57,7 +57,7 @@ def family_index(names: list[str]) -> np.ndarray:
     keys = []
     for n in names:
         _, family, tag = parts(n)
-        kind = "wide" if is_wide(n) else "dir" if is_dir(n) else family
+        kind = "wide" if is_wide(n) else "dir" if is_dir(n) else family.split("-", 1)[0]
         keys.append(f"{kind}_{band(tag)}")
     return np.unique(keys, return_inverse=True)[1]
 
@@ -153,6 +153,27 @@ def select(comp: np.ndarray, names: list[str]) -> Picks:
         overridden=overridden,
         composite={names[v]: float(comp[v]) for v in picked},
     )
+
+
+def runners_up(comp: np.ndarray, names: list[str], picks: Picks) -> dict[str, str | None]:
+    """The best-ranked Widesl and the best-ranked Dir variant that were not picked (the same
+    ranking `select` uses, before its Widesl minimum): the optional next best of each kind."""
+    chosen = {*picks.core, *picks.buy}
+    order = sorted(
+        (v for v in range(len(names)) if not is_buy(names[v])), key=lambda v: (-comp[v], names[v])
+    )
+    out: dict[str, str | None] = {"wide": None, "dir": None}
+    for v in order:
+        name = names[v]
+        if name in chosen:
+            continue
+        if out["wide"] is None and is_wide(name):
+            out["wide"] = name
+        elif out["dir"] is None and is_dir(name):
+            out["dir"] = name
+        if out["wide"] and out["dir"]:
+            break
+    return out
 
 
 def dte_matrix(dte_n: np.ndarray, dte_s: np.ndarray, names: list[str]) -> np.ndarray:

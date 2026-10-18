@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from 'react';
 
+import { VISIBLE_LIST_KEYS } from '../lib/rotationListNames';
 import type { Explicit } from '../lib/rotationMatrixDefault';
 import {
   ANY,
@@ -16,14 +17,17 @@ import type {
   MatrixListId,
   MatrixMetric,
   MatrixPeriodId,
+  MatrixUniverse,
   MatrixView,
 } from '../types/rotationMatrix';
 import { useQueryState } from './useQueryState';
 
 const METRICS: readonly MatrixMetric[] = ['avg', 'win_rate', 'stop_rate', 'worst', 'selection'];
 const PERIODS: readonly MatrixPeriodId[] = ['P1', 'P2', 'P3', 'forward', 'custom'];
-const LISTS: readonly MatrixListId[] = ['A', 'B', 'C', 'REF'];
+/** The lists whose recorded picks can be overlaid: the shown ones; an old `list=A` link falls to none. */
+const LISTS: readonly MatrixListId[] = VISIBLE_LIST_KEYS;
 const INDICES = ['both', 'NIFTY', 'SENSEX'] as const;
+const UNIVERSES: readonly MatrixUniverse[] = ['core', 't1'];
 
 function pick<T extends string>(allowed: readonly T[], value: string | null, fallback: T): T {
   return allowed.find((a) => a === value) ?? fallback;
@@ -51,6 +55,7 @@ export function useRotationMatrixFilters() {
   const [minN, setMinN] = useQueryState('minn');
   const [list, setList] = useQueryState('list');
   const [basis, setBasis] = useQueryState('basis');
+  const [universe, setUniverse] = useQueryState('universe');
 
   const filters: MatrixFilters = useMemo(() => {
     const v = pick(
@@ -76,6 +81,7 @@ export function useRotationMatrixFilters() {
       minN: Number.isInteger(n) && n >= 1 && n <= 1000 ? n : DEFAULT_MIN_N,
       list: pick([ANY, ...LISTS] as const, list, ANY),
       basis: pick(['all', 'selected'] as readonly MatrixBasis[], basis, 'all'),
+      universe: pick(UNIVERSES, universe, DEFAULT_FILTERS.universe),
     };
   }, [
     view,
@@ -94,6 +100,7 @@ export function useRotationMatrixFilters() {
     minN,
     list,
     basis,
+    universe,
   ]);
 
   /** Defaults are stored as an absent key, so the bare page is the default view. */
@@ -126,6 +133,7 @@ export function useRotationMatrixFilters() {
       if (patch.minN !== undefined) setMinN(String(patch.minN));
       some(patch.list, ANY, setList);
       some(patch.basis, 'all', setBasis);
+      some(patch.universe, DEFAULT_FILTERS.universe, setUniverse);
     },
     [
       period,
@@ -145,6 +153,7 @@ export function useRotationMatrixFilters() {
       setMinN,
       setList,
       setBasis,
+      setUniverse,
     ],
   );
 
@@ -173,6 +182,7 @@ export function useRotationMatrixFilters() {
       setMinN,
       setList,
       setBasis,
+      setUniverse,
     ]) {
       clear(null);
     }
@@ -193,6 +203,7 @@ export function useRotationMatrixFilters() {
     setMinN,
     setList,
     setBasis,
+    setUniverse,
   ]);
 
   /** Only the time keys: the period, P1/P2 side by side and the dates (an explicit minimum stays). */

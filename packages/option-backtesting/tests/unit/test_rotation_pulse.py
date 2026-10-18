@@ -714,7 +714,7 @@ def client(env, monkeypatch):
     monkeypatch.setattr(rotation_explain_routes, "variant_names", lambda: NAMES)
     monkeypatch.setattr(daylog, "variant_names", lambda: NAMES)
     rotation_pulse_routes._snap_cache.update(root=None, cube=None, journal=None, value=None)
-    mx._CUBE_CACHE.update(key=None, cube=None)
+    mx._CUBE_CACHE.clear()
     return TestClient(create_app(root / "cache")), root, days
 
 

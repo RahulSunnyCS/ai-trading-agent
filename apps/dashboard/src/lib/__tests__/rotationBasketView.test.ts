@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { CorrelationResponse } from '../../types/legwise';
 import type { BasketPick, RotationBasketResponse } from '../../types/rotationBasket';
 import {
+  BASKET_LIST_OPTIONS,
   asBasketList,
   asBasketWindow,
   customNames,
@@ -124,9 +125,19 @@ function basket(over: Partial<RotationBasketResponse> = {}): RotationBasketRespo
 }
 
 describe('controls', () => {
-  it('falls back to list A and window P1 for anything it does not know', () => {
-    expect(asBasketList(null)).toBe('A');
-    expect(asBasketList('Z')).toBe('A');
+  it('offers Adaptive and the fixed base only', () => {
+    expect(BASKET_LIST_OPTIONS).toEqual([
+      { value: 'C', label: 'Adaptive' },
+      { value: 'BASE', label: 'Base' },
+    ]);
+  });
+
+  it('falls back to Adaptive and window P1 for anything it does not know', () => {
+    expect(asBasketList(null)).toBe('C');
+    expect(asBasketList('Z')).toBe('C');
+    // an old link to a list no longer shown lands on Adaptive too
+    expect(asBasketList('A')).toBe('C');
+    expect(asBasketList('REF')).toBe('C');
     expect(asBasketList('BASE')).toBe('BASE');
     expect(asBasketWindow(null)).toBe('P1');
     expect(asBasketWindow('custom')).toBe('P1'); // not offered in the UI

@@ -215,15 +215,17 @@ export function strategyCounts(strategies: ReadonlyArray<SavedStrategy>): {
  * latest run's numbers and curve, under the strategy's id and shown name.
  */
 export function asSavedRun(strategy: SavedStrategy, name: string): MomentumSavedRun {
+  // A group has no run of its own: its blend of the sleeves stands in for sorting and Compare.
+  const result = strategy.group && strategy.blend ? strategy.blend : strategy.latest;
   return {
     id: strategy.id,
     created_at: strategy.last_run,
     n: 0,
     name,
     config: { dataset: strategy.dataset, ...strategy.config },
-    kpis: strategy.latest.kpis,
-    dates: strategy.latest.dates,
-    strategy: strategy.latest.strategy,
+    kpis: result.kpis,
+    dates: result.dates,
+    strategy: result.strategy,
     overlay: strategy.overlay,
     favorite: strategy.favorite,
     active: strategy.active,

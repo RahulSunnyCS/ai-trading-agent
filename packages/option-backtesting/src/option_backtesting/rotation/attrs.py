@@ -69,6 +69,22 @@ def vix_open_from_lake(root: Path, day: date) -> float | None:
     return float(row[0]) if row and row[0] is not None else None
 
 
+def vix_close_from_lake(root: Path, day: date) -> float | None:
+    """India VIX at the close of `day` (the last 1-minute bar's close), or None."""
+    path = lake.bars_1m_path(root, "index", VIX_NAME, day)
+    if not path.exists():
+        return None
+    con = duckdb.connect()
+    try:
+        row = con.execute(
+            "SELECT close FROM read_parquet(?) WHERE close IS NOT NULL ORDER BY ts DESC LIMIT 1",
+            [str(path)],
+        ).fetchone()
+    finally:
+        con.close()
+    return float(row[0]) if row and row[0] is not None else None
+
+
 def nearest_expiry(root: Path, underlying: str, day: date) -> date | None:
     """The nearest expiry on or after `day` among the contracts that have bars that day."""
     path = lake.bars_1m_path(root, "option", underlying, day)

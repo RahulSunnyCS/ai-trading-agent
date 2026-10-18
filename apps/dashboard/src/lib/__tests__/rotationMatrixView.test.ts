@@ -144,6 +144,12 @@ describe('the request', () => {
     expect(toQuery(matrixParams(f()))).toBe('?view=family_slot&period=P1&metric=avg');
   });
 
+  it('sends the T1 universe to both endpoints and leaves Core as the default', () => {
+    expect(matrixParams(f()).universe).toBeUndefined();
+    expect(matrixParams(f({ universe: 't1' })).universe).toBe('t1');
+    expect(cellParams(f({ universe: 't1' }), 'N:ditm1-t1s36', '0917', 'P1').universe).toBe('t1');
+  });
+
   it('turns the compare switch into P1,P2 and drops the single period', () => {
     const p = matrixParams(f({ compare: true, period: 'P2' }));
     expect(p.compare).toBe('P1,P2');
@@ -442,7 +448,7 @@ describe('keyboard and screen readers', () => {
     const label = cellLabel(
       'NIFTY Widesl OTM1',
       '09:17',
-      { v: 148, n: 9, nv: 9, thin: true, sel: { A: 2 }, all: { v: 120, n: 40, nv: 40 } },
+      { v: 148, n: 9, nv: 9, thin: true, sel: { A: 3, C: 2 }, all: { v: 120, n: 40, nv: 40 } },
       'inr',
       false,
     );
@@ -450,7 +456,9 @@ describe('keyboard and screen readers', () => {
     expect(label).toContain('9 sessions');
     expect(label).toContain('thin sample');
     expect(label).toContain('of 40 sessions');
-    expect(label).toContain('Steady 2 times');
+    expect(label).toContain('picked: Adaptive 2 times');
+    // a hidden list's selections are in the payload but never named
+    expect(label).not.toContain('Steady');
     expect(
       cellLabel(
         'r',

@@ -2,7 +2,7 @@
 
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import type { KeyboardEvent, ReactNode, Ref } from 'react';
+import { type KeyboardEvent, type ReactNode, type Ref, useRef } from 'react';
 
 import { cn } from '../../lib/cn';
 import { Button } from './Button';
@@ -41,6 +41,9 @@ export function Drawer({
   footer?: ReactNode;
   children: ReactNode;
 }) {
+  // The drawer is opened by a button that is not a Radix trigger, so Radix has nowhere to send
+  // focus back to on close. Remember what had focus as the drawer opened and return it there.
+  const opener = useRef<HTMLElement | null>(null);
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -48,6 +51,22 @@ export function Drawer({
         <Dialog.Content
           aria-describedby={undefined}
           onKeyDown={onKeyDown}
+          onOpenAutoFocus={() => {
+            // First capture wins: a repeat call (focus already inside the drawer) must not
+            // replace the opener with something that disappears on close.
+            const active = document.activeElement;
+            if (!opener.current && active instanceof HTMLElement && active !== document.body) {
+              opener.current = active;
+            }
+          }}
+          onCloseAutoFocus={(event) => {
+            const target = opener.current;
+            opener.current = null;
+            if (target && document.contains(target)) {
+              event.preventDefault();
+              target.focus();
+            }
+          }}
           className={cn(
             'fixed inset-y-0 z-50 flex w-full max-w-[30rem] flex-col border-border-strong bg-surface shadow-elevated focus:outline-none data-[state=open]:animate-fade-in',
             side === 'right' ? 'right-0 border-l' : 'left-0 border-r',

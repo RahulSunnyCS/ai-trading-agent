@@ -1,9 +1,9 @@
 """`obt rotation …`: update | pick | verify | show | readout | base (BL-058); triggers,
-triggers-show (BL-083); corr, corr-list, corr-pick (BL-090)."""
+triggers-show (BL-083); corr, corr-list, corr-pick (BL-090); update / pick --track t1 and
+track-readout (the T1 parallel track); lot-plans (BL-135)."""
 
 from __future__ import annotations
 
-import os
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
@@ -15,18 +15,6 @@ rotation_app = typer.Typer(
 IST = ZoneInfo("Asia/Kolkata")
 
 
-def _send_private_and_group(notification) -> bool:
-    """Send a rotation message to the owner and, when configured, the friends' group."""
-    from ..notify import send
-
-    private_ok, _ = send(notification)
-    group = os.environ.get("TELEGRAM_ROTATION_CHAT_ID", "").strip()
-    if group and group != os.environ.get("TELEGRAM_CHAT_ID", "").strip():
-        group_ok, _ = send(notification, chat_id=group)
-        return private_ok and group_ok
-    return private_ok
-
-
 def _day(text: str | None) -> date:
     return date.fromisoformat(text) if text else datetime.now(IST).date()
 
@@ -34,9 +22,69 @@ def _day(text: str | None) -> date:
 @rotation_app.command()
 def update(
     day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
+    track: str = typer.Option(
+        None, "--track", help="A parallel track (t1): run only its extra variants."
+    ),
+    backfill: bool = typer.Option(
+        False,
+        "--backfill",
+        help="With --track: kept for clarity; a track update always fills every missing day.",
+    ),
+    soft_fail: bool = typer.Option(
+        False,
+        "--soft-fail",
+        help="With --track: on failure Telegram an alert and exit 0, so a scheduled chain is not "
+        "failed and retried for it (the evening run; the 21:00 job remains the catch-up).",
+    ),
 ) -> None:
     """Run all 298 variants over one collected day and store the results (idempotent)."""
-    from .update import default_day, update_day
+    from .update import default_day, update_day, update_track
+    from .variants import TRACK_DIRS
+
+    if (backfill or soft_fail) and not track:
+        typer.echo("--backfill and --soft-fail need --track", err=True)
+        raise typer.Exit(2)
+    if track:
+        if track not in TRACK_DIRS:
+            typer.echo(f"unknown track {track!r} (known: {', '.join(TRACK_DIRS)})", err=True)
+            raise typer.Exit(2)
+        # A parallel track's extra variants only: every day Core-298 has stored that the track
+        # lacks (so a missed evening is filled the next time, never silently dropped), no base or
+        # trigger scoring, never the live results or days.csv.
+        problems: list[str] = []
+
+        def err(message: str) -> None:
+            problems.append(message)
+            typer.echo(message, err=True)
+
+        try:
+            tried, failed = update_track(track, _day(day) if day else None, log=typer.echo, err=err)
+        except Exception as error:  # noqa: BLE001 - reported below, like a failed day
+            if not soft_fail:
+                raise
+            err(f"{type(error).__name__}: {error}")
+            tried, failed = 1, 1
+        if not tried:
+            typer.echo(f"{track}: nothing to update (every Core-298 day is stored)")
+            return
+        if failed:
+            if soft_fail:
+                from ..notify import Notification, send
+
+                send(
+                    Notification(
+                        source="options-rotation",
+                        severity="error",
+                        title=f"{track.upper()} TRACK update failed ({failed} day(s))",
+                        body="\n".join(problems)[:1500]
+                        + f"\nThe live results are stored. Fix, then: obt rotation update --track "
+                        f"{track} (the 21:00 job retries it).",
+                    )
+                )
+                typer.echo(f"{track}: {failed} day(s) failed; alerted, exiting 0 (--soft-fail)")
+                return
+            raise typer.Exit(2)
+        return
 
     d = _day(day) if day else default_day()
     if d is None:
@@ -80,41 +128,65 @@ def pick(
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Score and print; write nothing."),
     telegram: bool = typer.Option(True, "--telegram/--no-telegram"),
+    track: str = typer.Option(
+        None, "--track", help="A parallel track (t1): its own journal, private Telegram only."
+    ),
+    with_t1: bool = typer.Option(
+        False,
+        "--with-t1",
+        help="Also record the T1 track and send ONE message with both (the 09:16 job). "
+        "Adaptive is never held back by T1.",
+    ),
 ) -> None:
     """Record today's picks for every list (before 09:17), hash-chained, and Telegram them."""
-    from ..notify import Notification, send
-    from .journal import AlreadyRecorded
-    from .pick import PickError, record
+    from .deliver import pick_and_send
+    from .variants import TRACK_DIRS
 
-    d = _day(day)
+    if track and track not in TRACK_DIRS:
+        typer.echo(f"unknown track {track!r} (known: {', '.join(TRACK_DIRS)})", err=True)
+        raise typer.Exit(2)
+    if track and with_t1:
+        typer.echo("--with-t1 and --track are different modes: use one", err=True)
+        raise typer.Exit(2)
+    code = pick_and_send(
+        _day(day),
+        vix_open=vix_open,
+        dry_run=dry_run,
+        telegram=telegram,
+        track=track,
+        with_t1=with_t1,
+        echo=typer.echo,
+        err=lambda message: typer.echo(message, err=True),
+    )
+    if code:
+        raise typer.Exit(code)
 
-    def alert(title: str, body: str) -> None:
-        if telegram and not dry_run:
-            send(Notification(source="options-rotation", severity="error", title=title, body=body))
 
-    try:
-        r = record(d, vix_open=vix_open, dry_run=dry_run)
-    except AlreadyRecorded as error:  # a retry after a success: the day has its entry
-        typer.echo(f"already recorded: {error}")
-        return
-    except (PickError, ValueError) as error:
-        typer.echo(f"not recorded: {error}", err=True)
-        alert(f"Rotation pick NOT recorded for {d}", str(error))
-        raise typer.Exit(2) from error
-    except Exception as error:  # noqa: BLE001 - an unexpected failure must still alert and retry
-        typer.echo(f"not recorded: {type(error).__name__}: {error}", err=True)
-        alert(f"Rotation pick FAILED for {d}", f"{type(error).__name__}: {str(error)[:300]}")
-        raise typer.Exit(2) from error
-    typer.echo(r.text)
-    if telegram and not dry_run:
-        severity = "info" if r.entry["before_first_entry"] else "warn"
-        notification = Notification(
-            source="options-rotation",
-            severity=severity,
-            title=f"Rotation picks {d}",
-            body=r.text,
-        )
-        _send_private_and_group(notification)
+@rotation_app.command("track-readout")
+def track_readout(
+    track: str = typer.Option("t1", "--track", help="The parallel track."),
+) -> None:
+    """A parallel track's Adaptive against the live Adaptive over the forward days (read-only)."""
+    from .track import build, render
+
+    typer.echo(render(build(track)))
+
+
+@rotation_app.command("lot-plans")
+def lot_plans_cmd(
+    book: str = typer.Option("core", "--book", help="core (live Adaptive) or t1 (the T1 track)."),
+    as_json: bool = typer.Option(False, "--json", help="The whole response as JSON."),
+    last: int = typer.Option(10, "--last", help="Daily rows to print."),
+) -> None:
+    """As picked, Dir Boost and Duo for one book, forward from 2026-10-19 (BL-135, read-only)."""
+    import json
+
+    from .lot_plans import BOOKS, build, render
+
+    if book not in BOOKS:
+        raise typer.BadParameter(f"--book must be one of {', '.join(BOOKS)}")
+    r = build(book)
+    typer.echo(json.dumps(r, indent=2, default=str) if as_json else render(r, last))
 
 
 @rotation_app.command()
@@ -122,35 +194,66 @@ def result(
     day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
     telegram: bool = typer.Option(True, "--telegram/--no-telegram"),
     force: bool = typer.Option(False, "--force", help="Resend even if this result was sent."),
+    tomorrow: bool = typer.Option(
+        True, "--tomorrow/--no-tomorrow", help="Add tomorrow's strategies in full."
+    ),
+    wait_until: str = typer.Option(
+        None,
+        "--wait-until",
+        help="HH:MM IST. While T1's results are incomplete before this time, send nothing and "
+        "exit 2 (the scheduler retries); after it, send without T1 and deliver T1 later. "
+        "Default: no waiting.",
+    ),
+    not_before: str = typer.Option(
+        None,
+        "--not-before",
+        help="HH:MM IST. Earlier than this, send nothing and exit 0 (the scheduled result job "
+        "sends). The evening run's last step, so a late retry still sends that evening.",
+    ),
+    soft_fail: bool = typer.Option(
+        False,
+        "--soft-fail",
+        help="Never exit non-zero: report and alert instead, so a scheduled chain is not failed "
+        "and retried for it (the evening run; the 21:00 job runs the result again).",
+    ),
 ) -> None:
-    """Send the completed day's net paper gain for Steady, Calendar and Adaptive."""
-    from ..notify import Notification
-    from .result import ResultUnavailable, calculate, mark_sent, render, was_sent
+    """Send the completed day's net paper gain for Adaptive and the T1 track, and tomorrow's
+    strategies. Idempotent: markers stop a retry sending twice, and a T1 result that was not
+    ready follows on its own the next time this runs."""
+    from datetime import time
 
+    from .deliver import send_alert, send_result
+
+    until = time.fromisoformat(wait_until) if wait_until else None
+    earliest = time.fromisoformat(not_before) if not_before else None
     d = _day(day)
     try:
-        completed = calculate(d)
-        text = render(completed)
-    except ResultUnavailable as error:
-        typer.echo(f"result not ready: {error}", err=True)
-        raise typer.Exit(2) from error
-    typer.echo(text)
-    if telegram:
-        if not force and was_sent(completed):
-            typer.echo("already sent to Telegram")
-            return
-        delivered = _send_private_and_group(
-            Notification(
-                source="options-rotation",
-                severity="info",
-                title=f"Option results {d}",
-                body=text,
-            )
+        code = send_result(
+            d,
+            telegram=telegram,
+            force=force,
+            with_tomorrow=tomorrow,
+            wait_until=until,
+            not_before=earliest,
+            echo=typer.echo,
+            err=lambda message: typer.echo(message, err=True),
         )
-        if not delivered:
-            typer.echo("Telegram delivery was incomplete; result not marked sent", err=True)
-            raise typer.Exit(2)
-        mark_sent(completed)
+    except Exception as error:  # noqa: BLE001 - reported below
+        if not soft_fail:
+            raise
+        typer.echo(f"result failed: {type(error).__name__}: {error}", err=True)
+        code = 1
+    if code and soft_fail:
+        if telegram:
+            send_alert(
+                f"Rotation result for {d}: not everything was sent (exit {code})",
+                "Already-sent parts are never sent again; what is missing is retried by the 16:00 "
+                "result job's retries and the 21:00 job, or run `obt rotation result` by hand.",
+            )
+        typer.echo(f"result not sent (exit {code}); alerted, exiting 0 (--soft-fail)")
+        return
+    if code:
+        raise typer.Exit(code)
 
 
 @rotation_app.command()
@@ -232,11 +335,17 @@ def readout(
 
 
 @rotation_app.command()
-def verify() -> None:
-    """Re-compute the hash chain; exit 1 on any problem."""
+def verify(
+    track: str = typer.Option(None, "--track", help="A parallel track's journal (t1)."),
+) -> None:
+    """Re-compute the hash chain (the live journal, or a track's); exit 1 on any problem."""
     from . import journal, store
+    from .variants import TRACK_DIRS
 
-    path = store.journal_path()
+    if track and track not in TRACK_DIRS:
+        typer.echo(f"unknown track {track!r} (known: {', '.join(TRACK_DIRS)})", err=True)
+        raise typer.Exit(2)
+    path = store.journal_path(None, track)
     problems = journal.verify(path)
     n = len(journal.read(path))
     if problems:
@@ -259,6 +368,7 @@ def show(last: int = typer.Option(5, "--last", help="How many recent entries."))
         typer.echo(
             f"{e['day']} {e['weekday']} VIX {e['vix_open']} ({e['vix_band']}) "
             f"chain {e['hash'][:10]}"
+            + (f"  expiry rule: {e['expiry_only']} only (Adaptive)" if e.get("expiry_only") else "")
         )
         day = date.fromisoformat(e["day"])
         for key, p in e["lists"].items():
@@ -274,7 +384,9 @@ def show(last: int = typer.Option(5, "--last", help="How many recent entries."))
 
 _SELECTORS_HELP = (
     "Strategies: a name, a glob (N_*_0917), all, slot:0917, family:wide|dir|buy|p80, "
-    "index:N|S, kind:legwise|variant; a+b is both (slot:0917+index:N). Default slot:0917."
+    "index:N|S, kind:legwise|variant; a+b is both (slot:0917+index:N). A rotation list is "
+    "list:A|B|C|REF (Steady, Calendar, Adaptive, Baseline; built from the journal, about 8 s). "
+    "Default slot:0917."
 )
 
 
@@ -288,11 +400,39 @@ def _window(start: str | None, end: str | None) -> tuple[date | None, date | Non
         raise typer.BadParameter(str(error)) from error
 
 
+def _reconstructed(series, report) -> dict[str, int]:
+    """Per rotation list: how many of the compared days were re-scored from history."""
+    days = set(report.days)
+    return {s.name: len(days & s.reconstructed) for s in series if s.kind == "list"}
+
+
+def _list_notes(series, report) -> list[str]:
+    """What a mixed comparison must say: the basis of a list's figures, and its re-scored days."""
+    counts = _reconstructed(series, report)
+    if not counts:
+        return []
+    out = [
+        "Lists are gross per lot-day (the average one-lot gross of the picks); strategies are "
+        "net per lot after costs. The header above says net."
+    ]
+    for name, n in counts.items():
+        if n:
+            out.append(
+                f"{name}: {n} of {report.n_days} compared days were re-scored from history, "
+                "not recorded forward."
+            )
+    return out
+
+
 def _load(selectors: list[str], include_stale: bool):
+    from . import journal
     from .series import SelectorError, load
 
     try:
         return load(selectors, include_stale=include_stale)
+    except journal.JournalCorrupt as error:
+        typer.echo(f"the rotation journal cannot be read: {error}", err=True)
+        raise typer.Exit(2) from error
     except SelectorError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(2) from error
@@ -300,12 +440,14 @@ def _load(selectors: list[str], include_stale: bool):
 
 @rotation_app.command("corr-list")
 def corr_list(
-    kind: str = typer.Option(None, "--kind", help="variant | legwise"),
+    kind: str = typer.Option(None, "--kind", help="variant | legwise | list"),
 ) -> None:
     """Every strategy that has daily results now, with its days and date range."""
-    from .series import available
+    from .series import available, lists_available
 
     rows = [a for a in available() if kind is None or a.kind == kind]
+    if kind == "list":  # built from the journal, so only when asked for
+        rows = lists_available()
     if not rows:
         typer.echo("no strategy has results yet", err=True)
         raise typer.Exit(2)
@@ -353,9 +495,12 @@ def corr(
         typer.echo(str(error), err=True)
         raise typer.Exit(2) from error
     typer.echo(c.render_text(report))
+    notes = _list_notes(series, report)
+    for line in notes:
+        typer.echo(line)
     if json_path:
         with open(json_path, "w") as f:
-            json.dump(c.to_json(report), f)
+            json.dump({**c.to_json(report), "reconstructed": _reconstructed(series, report)}, f)
         typer.echo(f"wrote {json_path}")
     if csv_path:
         with open(csv_path, "w", newline="") as f:

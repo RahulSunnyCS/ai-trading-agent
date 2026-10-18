@@ -22,14 +22,16 @@ from .lists import SIZING_DATE
 from .variants import strategy_path, underlying_of, variant_names
 
 
-def default_day(root: Path | None = None, today: date | None = None) -> date | None:
+def default_day(
+    root: Path | None = None, today: date | None = None, names: list[str] | None = None
+) -> date | None:
     """The newest weekday in the last two weeks (today first) with both indices collected and not
     excluded whose variants are not all stored yet: what an unattended run should do. None when
     everything collected is stored."""
     root = root or data_dir()
     d = today or date.today()
     excluded = excluded_map(root)
-    names = variant_names()
+    names = names or variant_names()
     for _ in range(14):
         if is_collected(root, d, excluded) and any(
             d not in store.result_days(n, root) for n in names
@@ -39,11 +41,21 @@ def default_day(root: Path | None = None, today: date | None = None) -> date | N
     return None
 
 
+def backfill_days(names: list[str], root: Path | None = None) -> list[date]:
+    """Every day Core-298 has stored where any of `names` has not: a parallel track's history is
+    built over exactly the live history's days (so the two rank on the same rows)."""
+    root = root or data_dir()
+    core_days = store.load_matrix(variant_names(), root).days  # days every Core variant has
+    have = [store.result_days(n, root) for n in names]
+    return sorted(d for d in core_days if any(d not in h for h in have))
+
+
 def update_day(
     day: date,
     root: Path | None = None,
     log: Callable[[str], None] = print,
     names: list[str] | None = None,
+    write_days: bool = True,
 ) -> dict:
     """Returns {'written': n, 'already': n, 'skipped': reason|None, 'errors': [...]}."""
     root = root or data_dir()
@@ -86,10 +98,35 @@ def update_day(
             root,
         )
         out["written"] += 1
-    if not out["errors"]:
+    if write_days and not out["errors"]:  # a parallel track never writes the live days.csv
         store.append_day(day_attributes(root, day), root)
     log(
         f"{day}: {out['written']} variants written, {out['already']} already there, "
         f"{len(out['errors'])} errors"
     )
     return out
+
+
+def update_track(
+    track: str,
+    day: date | None = None,
+    root: Path | None = None,
+    log: Callable[[str], None] = print,
+    err: Callable[[str], None] = print,
+) -> tuple[int, int]:
+    """Store a parallel track's extra variants (never the live results or days.csv): `day`, or
+    every day Core-298 has stored that the track lacks, so a missed evening is filled the next
+    time and never silently dropped. Returns (days tried, days that failed); (0, 0) when every
+    Core-298 day is already stored. Shared by `obt rotation update --track` and the morning
+    pick's catch-up."""
+    from .variants import track_names
+
+    names = track_names(track)
+    days = [day] if day else backfill_days(names, root)
+    failed = 0
+    for d in days:
+        r = update_day(d, root=root, names=names, log=log, write_days=False)
+        if r["skipped"] or r["errors"]:
+            failed += 1
+            err(f"{track} {d}: {r['skipped'] or r['errors'][:3]}")
+    return len(days), failed

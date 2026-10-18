@@ -1,0 +1,2589 @@
+[
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "winner",
+  "change": ""
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "winner": "W_N_A",
+  "params": null,
+  "role": "template",
+  "change": ""
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 2500,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=2500"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3500,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=3500"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": [
+    10,
+    5
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[10,5]"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": [
+    20,
+    10
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[20,10]"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": [
+    20,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[20,15]"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "14:50",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "exit=14:50"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:00",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "exit=15:00"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:20",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "exit=15:20"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    2,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "reentry=cost\u00d72"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "asap",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "reentry=asap\u00d71"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:17",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null,
+   "square_off": "complete"
+  },
+  "role": "neighbour",
+  "change": "square_off=complete"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "winner",
+  "change": ""
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "winner": "W_N_A",
+  "params": null,
+  "role": "template",
+  "change": ""
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 2500,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=2500"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3500,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=3500"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": [
+    10,
+    5
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[10,5]"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": [
+    20,
+    10
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[20,10]"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": [
+    20,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[20,15]"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "14:50",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "exit=14:50"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:00",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "exit=15:00"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:20",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "exit=15:20"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    2,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "reentry=cost\u00d72"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "asap",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "reentry=asap\u00d71"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:32",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null,
+   "square_off": "complete"
+  },
+  "role": "neighbour",
+  "change": "square_off=complete"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "winner",
+  "change": ""
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "winner": "W_N_A",
+  "params": null,
+  "role": "template",
+  "change": ""
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 2500,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=2500"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3500,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=3500"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": [
+    10,
+    5
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[10,5]"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": [
+    20,
+    10
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[20,10]"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": [
+    20,
+    15
+   ],
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[20,15]"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "14:50",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "exit=14:50"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:00",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "exit=15:00"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:20",
+   "reentry": [
+    "cost",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "exit=15:20"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "cost",
+    2,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "reentry=cost\u00d72"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": [
+    "asap",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "reentry=asap\u00d71"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "09:47",
+  "winner": "W_N_A",
+  "params": {
+   "strike": "PHIGH",
+   "sl": 60,
+   "trail": null,
+   "mtm": 3000,
+   "exit": "15:10",
+   "reentry": null,
+   "square_off": "complete"
+  },
+  "role": "neighbour",
+  "change": "square_off=complete"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "role": "winner",
+  "change": ""
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "winner": "W_N_B",
+  "params": null,
+  "role": "template",
+  "change": ""
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 90,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "sl=90"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3500,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "mtm=3500"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 5000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "mtm=5000"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    10,
+    5
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "trail=[10,5]"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    20,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "trail=[20,10]"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    20,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "trail=[20,15]"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "14:50",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "exit=14:50"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:00",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "exit=15:00"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:20",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "exit=15:20"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    2,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "reentry=cost\u00d72"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": [
+    "asap",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "reentry=asap\u00d71"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "10:17",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null,
+   "square_off": "complete"
+  },
+  "role": "neighbour",
+  "change": "square_off=complete"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "role": "winner",
+  "change": ""
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "winner": "W_N_B",
+  "params": null,
+  "role": "template",
+  "change": ""
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 90,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "sl=90"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 3500,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "mtm=3500"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 5000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "mtm=5000"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    10,
+    5
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "trail=[10,5]"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    20,
+    10
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "trail=[20,10]"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    20,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "trail=[20,15]"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "14:50",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "exit=14:50"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:00",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "exit=15:00"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:20",
+   "reentry": null
+  },
+  "role": "neighbour",
+  "change": "exit=15:20"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": [
+    "cost",
+    2,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "reentry=cost\u00d72"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": [
+    "asap",
+    1,
+    null
+   ]
+  },
+  "role": "neighbour",
+  "change": "reentry=asap\u00d71"
+ },
+ {
+  "family": "W",
+  "index": "N",
+  "slot": "11:32",
+  "winner": "W_N_B",
+  "params": {
+   "strike": "ATM",
+   "sl": 80,
+   "trail": [
+    25,
+    15
+   ],
+   "mtm": 4000,
+   "exit": "15:28",
+   "reentry": null,
+   "square_off": "complete"
+  },
+  "role": "neighbour",
+  "change": "square_off=complete"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:17",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "winner",
+  "change": ""
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:17",
+  "winner": "D_S_A",
+  "params": null,
+  "role": "template",
+  "change": ""
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:17",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 2500,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=2500"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:17",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3500,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=3500"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:17",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 17,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "sl=17"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:17",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 23,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "sl=23"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:17",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    5,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[5,5]"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:17",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    15,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[15,5]"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:17",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ],
+   "exit": "15:10"
+  },
+  "role": "neighbour",
+  "change": "exit=15:10"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:17",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    "11:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "cutoff=11:00"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:17",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    "12:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "cutoff=12:00"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:32",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "winner",
+  "change": ""
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:32",
+  "winner": "D_S_A",
+  "params": null,
+  "role": "template",
+  "change": ""
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:32",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 2500,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=2500"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:32",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3500,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=3500"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:32",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 17,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "sl=17"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:32",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 23,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "sl=23"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:32",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    5,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[5,5]"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:32",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    15,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[15,5]"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:32",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ],
+   "exit": "15:10"
+  },
+  "role": "neighbour",
+  "change": "exit=15:10"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:32",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    "11:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "cutoff=11:00"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:32",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    "12:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "cutoff=12:00"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:47",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "winner",
+  "change": ""
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:47",
+  "winner": "D_S_A",
+  "params": null,
+  "role": "template",
+  "change": ""
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:47",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 2500,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=2500"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:47",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3500,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=3500"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:47",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 17,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "sl=17"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:47",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 23,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "sl=23"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:47",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    5,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[5,5]"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:47",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    15,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[15,5]"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:47",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ],
+   "exit": "15:10"
+  },
+  "role": "neighbour",
+  "change": "exit=15:10"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:47",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    "11:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "cutoff=11:00"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "09:47",
+  "winner": "D_S_A",
+  "params": {
+   "strike": "ATM",
+   "sl": 20,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    "12:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "cutoff=12:00"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:17",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "winner",
+  "change": ""
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:17",
+  "winner": "D_S_B",
+  "params": null,
+  "role": "template",
+  "change": ""
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:17",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 2500,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=2500"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:17",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 3500,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=3500"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:17",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 12,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "sl=12"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:17",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 18,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "sl=18"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:17",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    5,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[5,5]"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:17",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    15,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[15,5]"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:17",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ],
+   "exit": "15:10"
+  },
+  "role": "neighbour",
+  "change": "exit=15:10"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:17",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    "11:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "cutoff=11:00"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "10:17",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    "12:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "cutoff=12:00"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:32",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "winner",
+  "change": ""
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:32",
+  "winner": "D_S_B",
+  "params": null,
+  "role": "template",
+  "change": ""
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:32",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 2500,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=2500"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:32",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 3500,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=3500"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:32",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 12,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "sl=12"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:32",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 18,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "sl=18"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:32",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    5,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[5,5]"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:32",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    15,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[15,5]"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:32",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ],
+   "exit": "15:10"
+  },
+  "role": "neighbour",
+  "change": "exit=15:10"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "11:32",
+  "winner": "D_S_B",
+  "params": {
+   "strike": "ITM2",
+   "sl": 15,
+   "mtm": 3000,
+   "reentry": [
+    "cost",
+    2,
+    "12:00"
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "cutoff=12:00"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:02",
+  "winner": "D_S_C",
+  "params": {
+   "strike": "ITM1",
+   "sl": 30,
+   "mtm": null,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "winner",
+  "change": ""
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:02",
+  "winner": "D_S_C",
+  "params": null,
+  "role": "template",
+  "change": ""
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:02",
+  "winner": "D_S_C",
+  "params": {
+   "strike": "ITM1",
+   "sl": 30,
+   "mtm": 5000,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "mtm=5000"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:02",
+  "winner": "D_S_C",
+  "params": {
+   "strike": "ITM1",
+   "sl": 27,
+   "mtm": null,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "sl=27"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:02",
+  "winner": "D_S_C",
+  "params": {
+   "strike": "ITM1",
+   "sl": 33,
+   "mtm": null,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "sl=33"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:02",
+  "winner": "D_S_C",
+  "params": {
+   "strike": "ITM1",
+   "sl": 30,
+   "mtm": null,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    5,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[5,5]"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:02",
+  "winner": "D_S_C",
+  "params": {
+   "strike": "ITM1",
+   "sl": 30,
+   "mtm": null,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    15,
+    5
+   ]
+  },
+  "role": "neighbour",
+  "change": "trail=[15,5]"
+ },
+ {
+  "family": "D",
+  "index": "S",
+  "slot": "13:02",
+  "winner": "D_S_C",
+  "params": {
+   "strike": "ITM1",
+   "sl": 30,
+   "mtm": null,
+   "reentry": [
+    "cost",
+    2,
+    null
+   ],
+   "trail": [
+    10,
+    5
+   ],
+   "exit": "15:10"
+  },
+  "role": "neighbour",
+  "change": "exit=15:10"
+ }
+]

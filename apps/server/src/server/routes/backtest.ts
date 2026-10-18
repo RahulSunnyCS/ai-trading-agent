@@ -47,6 +47,9 @@
  *  GET  /api/backtest/legwise/rotation/pulse        — the Family pulse: the 12 family-band cells' recent
  *                                                 gross, the ranking's rank for each, today's picks.
  *                                                 requireAccess
+ *  GET  /api/backtest/legwise/favourites       — the lists and strategies starred on the Options Lab's
+ *  PUT  /api/backtest/legwise/favourites         Strategies and baskets page (the default picks in
+ *                                                 Correlation). Both requireAccess, no credit
  *  GET  /api/backtest/legwise/rotation/basket   — one list's (or the fixed base's) picks for a day,
  *                                                 correlated over a window. requireAccess
  *  GET  /api/backtest/legwise/rotation/regime   — the forward window's market mix beside P1, P2 and P3.
@@ -54,6 +57,8 @@
  *                                                 requireAccess
  *  GET  /api/backtest/legwise/rotation/drift    — what a list has held, by family, index, strike method and
  *                                                 start band, against its own past. requireAccess
+ *  GET  /api/backtest/legwise/rotation/lot-plans — As picked, Dir Boost and Duo for one book's Adaptive
+ *                                                 picks, forward from 2026-10-19 (BL-135). requireAccess
  *  GET  /api/backtest/legwise/rotation/portfolio/day  — one list's basket under a portfolio MTM stop
  *                                                 (BL-095): the day replayed, stop level and minute.
  *  GET  /api/backtest/legwise/rotation/portfolio/days — every scored list-day with and without the stop.
@@ -392,6 +397,10 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
             strategy: { type: 'object' },
             from: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
             to: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+            // 1-minute bars by default; 5-minute bars run the same engine on the chain snapshots.
+            bars: { type: 'string', enum: ['1m', '5m'] },
+            // Also run the days data_quality judged unusable.
+            include_excluded: { type: 'boolean' },
           },
           required: ['strategy'],
           additionalProperties: false,
@@ -850,6 +859,27 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
   );
   // --- end rotation drift ---
 
+  // --- rotation lot plans --- the Rotation page's "Lot plans" card (BL-135, rotation/lot_plans.py,
+  // read-only). Only the book is forwarded, as an enum.
+  fastify.get(
+    '/api/backtest/legwise/rotation/lot-plans',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { book: { type: 'string', enum: ['core', 't1'] } },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(reply, `/legwise/rotation/lot-plans${upstreamQuery(q, ['book'])}`);
+    },
+  );
+  // --- end rotation lot plans ---
+
   // --- rotation portfolio stop --- BL-095: what a list's basket did under a portfolio MTM stop
   // (rotation/portfolio.py, read-only). `stop` is rupees (empty, 0 or below = none) and `trail`
   // is sl:X,Y | lock:A,B | locktrail:A,B,X,Y; both are matched to a strict shape before they are
@@ -1142,6 +1172,57 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation daily log -----------------------------------------------------------
+
+  // --- options lab favourites ---
+  // The stars on the Strategies and baskets page (favourites.py): which rotation lists and which
+  // strategies are the default selection in the pickers. One small file upstream; both verbs are
+  // access-gated and free. The upstream body is rebuilt from validated fields.
+  const FAVOURITE_LISTS = ['A', 'B', 'C', 'REF', 'base'] as const;
+  const FAVOURITE_NAME_RE = '^[A-Za-z0-9_]{1,80}$';
+
+  fastify.get(
+    '/api/backtest/legwise/favourites',
+    { preHandler: requireAccess },
+    async (_request, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/favourites');
+    },
+  );
+
+  fastify.put(
+    '/api/backtest/legwise/favourites',
+    {
+      preHandler: requireAccess,
+      bodyLimit: 16 * 1024,
+      schema: {
+        body: {
+          type: 'object',
+          properties: {
+            lists: {
+              type: 'array',
+              items: { type: 'string', enum: [...FAVOURITE_LISTS] },
+              maxItems: FAVOURITE_LISTS.length,
+            },
+            strategies: {
+              type: 'array',
+              items: { type: 'string', pattern: FAVOURITE_NAME_RE },
+              maxItems: 200,
+            },
+          },
+          required: ['lists', 'strategies'],
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const b = request.body as { lists: string[]; strategies: string[] };
+      await forwardToBacktestApi(reply, '/legwise/favourites', {
+        method: 'PUT',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ lists: b.lists, strategies: b.strategies }),
+      });
+    },
+  );
+  // --- end options lab favourites -----------------------------------------------------------
 
   // --- rotation pulse ---
   // The Family pulse card (rotation/pulse.py, read-only): three optional parameters, validated

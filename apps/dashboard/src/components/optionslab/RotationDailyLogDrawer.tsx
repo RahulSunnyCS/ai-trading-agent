@@ -1,6 +1,7 @@
 /**
- * One day of the rotation log in a drawer: what each list picked at 09:16, what each pick then did,
- * the context the entry was scored on, the chain hash, and the owner's placement record.
+ * One day of the rotation log in a drawer: what the shown list picked at 09:16 (VISIBLE_LIST_KEYS;
+ * the day's payload carries every recorded list, only the shown ones are drawn), what each pick then
+ * did, the context the entry was scored on, the chain hash, and the owner's placement record.
  *
  * The three things are kept apart in the words: SCHEDULED is the journal (what the rule picked),
  * SIMULATED is the stored result (what the pick did on the data), EXECUTED is what the owner
@@ -29,7 +30,7 @@ import {
   placementProblem,
   rowFlags,
 } from '../../lib/rotationDailyLogView';
-import { listLabel, listName } from '../../lib/rotationListNames';
+import { isVisibleList, listLabel, listName } from '../../lib/rotationListNames';
 import type {
   PlacementStatus,
   RotationDay,
@@ -339,13 +340,19 @@ function DayBody({
 }) {
   const flags = rowFlags(d);
   const keys = LIST_KEYS.filter((k) => d.lists[k] !== undefined);
+  // Only a shown list is named as "the same strategies as": a hidden list never surfaces here.
   const sameAs = (k: RotationListKey): RotationListKey | null => {
     const group = d.groups.find((g) => g.includes(k));
-    const first = group?.[0] as RotationListKey | undefined;
+    const first = group?.find(isVisibleList);
     return first && first !== k ? first : null;
   };
   const recorded = d.recorded;
   const rescore = d.rescore;
+  const differs = (rescore?.differs ?? []).filter(isVisibleList);
+  const samePicks =
+    rescore?.same_picks === true || (rescore?.differs !== undefined && differs.length === 0);
+  const history = d.placement_history.filter((p) => isVisibleList(p.list));
+  const marked = keys.filter((k) => d.placement[k] !== undefined).length;
   return (
     <div className="space-y-5">
       {refreshError ? (
@@ -462,11 +469,11 @@ function DayBody({
             </Fact>
             {rescore?.checked ? (
               <Fact label="Re-scored today">
-                {rescore.same_picks ? (
+                {samePicks ? (
                   <span className="text-positive">same picks</span>
                 ) : (
                   <span className="text-negative">
-                    different picks in {(rescore.differs ?? []).join(', ')}
+                    different picks in {differs.map(listName).join(', ')}
                   </span>
                 )}
                 <span className="ml-1.5 text-faint">
@@ -489,9 +496,9 @@ function DayBody({
       {d.source === 'recorded' ? (
         <Section title="Executed: what you placed on AlgoTest">
           <p className="text-xs text-muted">
-            Mark each list by hand. This is your own record; it never changes a pick or a result,
-            and a later mark for a list replaces the earlier one in the view (the earlier rows are
-            kept).
+            Mark what you placed by hand. This is your own record; it never changes a pick or a
+            result, and a later mark for a list replaces the earlier one in the view (the earlier
+            rows are kept).
           </p>
           <div className="space-y-3">
             {keys.map((k) => (
@@ -504,13 +511,11 @@ function DayBody({
               />
             ))}
           </div>
-          {d.placement_history.length > Object.keys(d.placement).length ? (
+          {history.length > marked ? (
             <details className="text-xs text-muted">
-              <summary className="cursor-pointer">
-                History ({d.placement_history.length} rows)
-              </summary>
+              <summary className="cursor-pointer">History ({history.length} rows)</summary>
               <ul className="mt-1 space-y-0.5">
-                {d.placement_history.map((p, i) => (
+                {history.map((p, i) => (
                   <li key={`${i}-${p.list}-${p.at}`}>
                     {formatIstDateTimeShort(p.at)}: {listLabel(p.list)}{' '}
                     {PLACEMENT_LABEL[p.status].toLowerCase()}

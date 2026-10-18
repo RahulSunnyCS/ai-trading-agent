@@ -14,7 +14,7 @@ when it is back.
 | Column | Meaning |
 |---|---|
 | Job | Its id, such as `options-daily`. |
-| Schedule | When it runs, in IST: "trading days 16:15", "Fri 14:40", "1st Sunday of the month 10:00". |
+| Schedule | When it runs, in IST: "trading days 15:45", "Fri 14:40", "1st Sunday of the month 10:00". |
 | Next run, Last run | When it will run next; when it last ran and whether it succeeded. |
 | Group | Jobs in the same group never run at the same time (for example, two jobs that write the same data). |
 | Needs | What it depends on, such as the laptop or a broker login. |
@@ -28,7 +28,10 @@ Click a job to read the last 200 lines of its latest log.
 |---|---|
 | `broker-login` (08:00) | Logs the broker accounts into [AlgoTest](glossary:algotest). |
 | `morning-summary` (09:00) | One Telegram message: did the logins work, is the data current. |
-| `options-evening` (15:45) | The [evening run](glossary:evening-run), in three steps: collects the day from Fyers when you are logged in (otherwise from Angel One, and says which in its Telegram message), stores the rotation results, then builds any missing 5-minute snapshots and IV tables. |
+| `options-evening` (15:45) | The [evening run](glossary:evening-run), in five steps: collects the day from Fyers when you are logged in (otherwise from Angel One, and says which in its Telegram message), stores the rotation results, builds any missing 5-minute snapshots and IV tables, stores the T1 parallel track's results, then sends the rotation result, but only from 16:00, so on a normal day the 16:00 job sends it. If the run only succeeds on a later retry (17:15 and so on), this last step sends the result as soon as the data is in. A problem in either of the last two steps sends its own alert and never fails the run. |
+| `options-rotation-result` (16:00) | One Telegram message: the day's net paper gain for Adaptive and the T1 track (one lot per strategy, after costs) and tomorrow's strategies in full. If the evening run has not finished it tries again every 5 minutes; at 16:25 it sends what exists (T1 follows on its own if it was missing). If Adaptive's result never completes, the job fails and you are alerted. |
+| `options-rotation-pick` (09:16) | Records the day's rotation picks before the first entry, then the T1 track's Adaptive pick in its own journal, and sends one Telegram message: Adaptive, then T1 marked as a testing phase and not traded. The friends' group gets Adaptive alone, as soon as it is recorded. Your message waits for T1 until 09:16:50 at most; if T1 is later, Adaptive comes alone with "T1 · follows in a separate message", and T1 follows as its own message. "T1 · not recorded today" means T1 failed: you get an alert and the job tries again. |
+| `options-rotation-t1-update` (21:00) | Catch-up: first sends whatever part of the day's result has not gone out yet, then stores any T1 day the evening run missed, then sends the T1 part if it was not ready at 16:00. If storing T1 fails, the job fails and tries again at 22:00 and 23:00; the result already sent is never held back. The live rotation results are never touched. |
 | `momentum-preview` (Fri 14:40) | The momentum preview on live prices. |
 | `momentum-final` (Fri 16:45) | The momentum final signal. |
 | `momentum-stock-ingest` (Fri 19:30) | Refreshes NSE stock data, then the stock-based finals. |

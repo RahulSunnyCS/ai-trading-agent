@@ -1,9 +1,15 @@
 ## What it is for
 
-A day-by-day record of the rotation: what each of the four lists picked at 09:16, and what those
-picks then did on that day's data. Read it to answer "what did the rule say on Tuesday, what
-happened to it, and did I put it on AlgoTest?". It records and shows; it never changes a pick, a
-list or a result.
+A day-by-day record of the rotation: what the Adaptive list picked at 09:16, and what those picks
+then did on that day's data. Read it to answer "what did the rule say on Tuesday, what happened to
+it, and did I put it on AlgoTest?". It records and shows; it never changes a pick, a list or a
+result.
+
+> [!NOTE]
+> The journal records four lists every morning: Steady, Calendar, Adaptive and Baseline. Only
+> Adaptive is followed, so only Adaptive is shown here. Steady, Calendar and Baseline are still
+> recorded in the journal but no longer shown: not as columns, not in the drawer, the counters or
+> the placement history.
 
 Three things are kept apart on this screen, and the words keep them apart:
 
@@ -16,6 +22,10 @@ Three things are kept apart on this screen, and the words keep them apart:
 Passing an entry time does not prove a trade happened. Only the third line says so, and only
 because you wrote it.
 
+From Monday 19 October 2026, on a day when exactly one of NIFTY and SENSEX expires, Adaptive takes
+only that index's strategies (the expiry rule); the journal also keeps what it would have picked
+without the rule, and Reconstructed days are always re-scored without it.
+
 ## The two views
 
 | View | What it shows |
@@ -23,21 +33,20 @@ because you wrote it.
 | Recorded | The journal's entries, from the first registered trading day. A trading day with no entry is listed as *Not recorded*, never left out and never shown as zero. |
 | Reconstructed | Research-history days from before the journal began, re-scored afterwards with only the results before each day. It says what the rule *would* have picked. The weights were chosen on this history, so these rows describe the rule; they are not evidence that it works. They are never mixed into the forward counters. |
 
-Before the first entry (Monday 12 October, 09:16) the Recorded view says so and lists the four
-registered lists. The Reconstructed view is there to look around in meanwhile.
+Before the first entry (Monday 12 October, 09:16) the Recorded view says so and names the list
+followed with its weights. The Reconstructed view is there to look around in meanwhile.
 
 ## The calendar
 
-One cell a trading day, Monday to Friday. The shading is the focus list's gross per lot-day:
-green gained, red lost, scaled to the largest day in view. The focus list is the Rotation page's
-Focus choice; when this log is used on its own it has its own *Shade by list* control.
+One cell a trading day, Monday to Friday. The shading is Adaptive's gross per lot-day: green
+gained, red lost, scaled to the largest day in view.
 
 | Cell | Meaning |
 |---|---|
 | Hatched | An exchange holiday |
 | Dashed | A trading day still to come |
 | Red outline | The record is not the ordinary one: the entry was late or missing, or an input did not come from the primary source (VIX from a hand-typed value, days to expiry from the calendar) |
-| "stop" under the figure | An overall stop-loss fired on the shaded list that day |
+| "stop" under the figure | An overall stop-loss fired on the list that day |
 | "waiting" or "not recorded" | There is no figure, and this says why |
 
 A stop is a result, not a record problem, so it does not get the red outline. Every cell also
@@ -51,17 +60,15 @@ One 32 px line a day, newest first.
 | Column | What it shows |
 |---|---|
 | VIX open | The 09:15 India VIX open the entry was scored on, and where it was read from: Fyers, Angel One (the fallback when there is no Fyers login that morning), or given (typed by hand) |
-| DTE N / S | Days to the nearest listed expiry for NIFTY and SENSEX |
+| DTE N / S | Weekdays to the nearest listed expiry for NIFTY and SENSEX (Saturdays and Sundays are not counted). The four entries recorded before 16 Oct were scored on calendar days; they are shown converted, and the drawer says what the entry itself holds |
 | Recorded | The time the entry was written. After 09:17 it is *late* |
-| Steady, Calendar, Adaptive, Baseline | Gross per lot-day of the list's basket that day. Each header carries the journal key (A, B, C, REF) in small type. Hover for the list's total in rupees and its lots. **W** marks that the Widesl minimum replaced a top-ranked Dir; **B** that a Buy strategy qualified and was added |
+| Adaptive | Gross per lot-day of the list's basket that day. The header carries the journal key (C) in small type. Hover for the list's total in rupees and its lots. **W** marks that the Widesl minimum replaced a top-ranked Dir; **B** that a Buy strategy qualified and was added |
 | Flags | Late, VIX from Angel One or by hand, days to expiry from the calendar, a stop, and **PF stop 11:14** when the portfolio stop closed the basket (below) |
-| Placed | Four dots, in the order Steady, Calendar, Adaptive, Baseline: green placed, amber changed, red not placed, hollow not marked |
+| Placed | A dot: green placed, amber changed, red not placed, hollow not marked |
 | Status | Scored, Waiting, Late or Not recorded |
 
 > [!NOTE]
-> The four lists are alternative baskets of the same shape, not four positions held together.
-> Their figures are never added up, and they are compared per lot-day because a list holds 6 lots,
-> or 8 when the Buy add-on was taken.
+> The figure is per lot-day because the list holds 6 lots, or 8 when the Buy add-on was taken.
 
 ### Status
 
@@ -75,7 +82,7 @@ One 32 px line a day, newest first.
 ## The portfolio stop
 
 The **Portfolio stop** button in the run bar shows the stop that is applied and opens its pop-up.
-It is the stop you trade the lists under: one level on the *combined* P&L of the basket, on top of
+It is the stop you trade the list under: one level on the *combined* P&L of the basket, on top of
 each strategy's own stop. The first minute the basket's mark-to-market reaches the level, every
 pick closes at that minute's close and nothing that has not entered yet enters that day.
 
@@ -86,7 +93,7 @@ pick closes at that minute's close and nothing that has not entered yet enters t
 | Lock profit | Once profit reaches ₹A, lock ₹B: the basket closes if it falls back to ₹B. Works with no stop loss |
 | Lock and trail | Lock ₹B once profit reaches ₹A, then every further ₹X of profit raises the level ₹Y |
 
-With a stop set, each list's figure in the table and the calendar is the stopped one, with the
+With a stop set, the list's figure in the table and the calendar is the stopped one, with the
 log's own figure struck through where the stop fired and the minute in the **PF stop** flag. Hover
 for both totals. Days the stop never reached are unchanged.
 
@@ -103,9 +110,9 @@ A day whose bars were repaired after the nightly update (Fyers, after an Angel O
 
 ## Browsing filters
 
-*All*, *Losing* (the shaded list lost money), *Stops* (an overall stop fired on any pick of any
-list) and *Lists disagree*. These are for finding days to look at. A set chosen by its outcome is
-biased, so no average or total is shown for a filtered set, and you should not read one off it.
+*All*, *Losing* (the list lost money) and *Stops* (an overall stop fired on any pick of the list).
+These are for finding days to look at. A set chosen by its outcome is biased, so no average or
+total is shown for a filtered set, and you should not read one off it.
 
 ## The counters
 
@@ -115,15 +122,14 @@ At the foot of the table, over the forward days only (or the reconstructed days,
 |---|---|
 | Recorded, Scored | Forward entries, and how many have every result |
 | Late, Not recorded | Entries after 09:17, and trading days with none |
-| Buy qualified | Days a Buy strategy ranked in the overall top 10 and was added, per list |
-| Widesl min applied | Days the minimum of two Widesl strategies replaced a top-ranked Dir, per list |
-| All four identical | Days the four lists picked the same strategies |
-| Stop fired | Days an overall stop-loss fired on any pick of any list |
+| Buy qualified | Days a Buy strategy ranked in the overall top 10 and was added |
+| Widesl min applied | Days the minimum of two Widesl strategies replaced a top-ranked Dir |
+| Stop fired | Days an overall stop-loss fired on any pick of the list |
 
 ## One day in full
 
-Click a day to open it. The drawer shows each list's basket with every pick's one-lot gross, worst
-mark-to-market, stop reason and score; the VIX and days to expiry the entry was scored on; and the
+Click a day to open it. The drawer shows Adaptive's basket with every pick's one-lot gross, worst
+mark-to-market, stop reason and score; the VIX and weekdays to expiry the entry was scored on (an entry recorded before 16 Oct shows the calendar days it was scored on, and its re-score is checked on those days); and the
 record: when it was written, the chain hash (copyable), the code commit, whether the chain still
 verifies, and whether re-scoring today's stored results gives the same picks.
 
@@ -139,8 +145,8 @@ repaired after the nightly update, or the strategy file was edited since. It nee
 
 ### Marking what you placed
 
-For each list choose *Placed*, *Changed* or *Not placed* and add a note ("changed" needs one, up
-to 300 characters). Save writes one new row to its own file. A later mark for the same list
+Choose *Placed*, *Changed* or *Not placed* and add a note ("changed" needs one, up to 300
+characters). Save writes one new row to its own file. A later mark for the same list
 replaces the earlier one in the view; the earlier rows are kept and listed under *History* once
 a mark has been corrected. Saving exactly the mark a list already has writes nothing. What the
 drawer shows after a save is what the server answered, not what you typed; a refused save says
@@ -155,5 +161,6 @@ A placement can only be marked on a day with a recorded entry.
 - Not a result of the strategy. Days are few, and a day-by-day log of a handful of entries says
   nothing about whether the rule works. The forward read-out has its own screen and its own
   registered review.
-- Not the whole basket's day. Replay shows one strategy at a time; the four lists' baskets are
-  not replayed together.
+- Not what a pick does inside the basket. *Replay* beside a pick shows one strategy at a time;
+  *Replay the list* in the drawer replays the whole basket minute by minute, with the portfolio
+  stop.

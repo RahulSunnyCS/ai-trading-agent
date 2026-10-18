@@ -2,10 +2,10 @@
 
 Shows where the rotation's strategy variants make or lose money: by start time, by date, and by
 market condition (days to expiry, opening VIX band, weekday). Then it lays over that picture what
-the forward journal's lists actually picked.
+the Adaptive list actually picked, as the forward journal recorded it.
 
 It answers four questions. Are the profitable areas broad or isolated? Does the same pattern show
-up in different periods? Is a good cell a lot of days or a few? And did a list pick the good
+up in different periods? Is a good cell a lot of days or a few? And did Adaptive pick the good
 areas on the days it chose?
 
 It describes. A strong cell is something that happened, not a rule to change a registered list.
@@ -13,7 +13,7 @@ It describes. A strong cell is something that happened, not a rule to change a r
 ## What a number is
 
 Every cell is **gross profit and loss per one-lot strategy-day**: one lot of one strategy file, on
-one day, before brokerage and charges. The lists trade two lots per strategy; their figures are
+one day, before brokerage and charges. The list trades two lots per strategy; its figures are
 not these.
 
 | Word | Meaning |
@@ -38,17 +38,17 @@ the period ("1 weekend session left out of P1"), so the numbers reconcile with t
 |---|---|---|---|
 | Family × start | The 12 strategy kinds (NIFTY and SENSEX: Widesl, closest-premium Widesl, Dir ATM, Dir ITM1, Buy) | The 25 start times, 09:17 to 15:17 | One variant over the period |
 | Date × start | Each session | The 25 start times | One variant on one date. Pick one strategy kind first |
-| DTE × start | Days to the index's own nearest expiry (0 to 7+) | Start time | The chosen kind, pooled over days with that DTE |
+| DTE × start | Weekdays to the index's own nearest expiry (0 to 4, then 7+ for an expiry a week or more away) | Start time | The chosen kind, pooled over days with that DTE |
 | VIX × family | Opening India VIX band | Strategy kinds | A kind pooled over its 25 start times, on days in that band |
 | Weekday × family | Monday to Friday | Strategy kinds | A kind pooled over its 25 start times, on that weekday |
 | Pulse | Strategy kinds | The last 5, 21 and 63 sessions, and all stored days | A kind pooled over its 25 start times in that window. It is as of one day (the latest, or the date you pick), not a period: the Period control does not apply |
 
-DTE is each strategy's **own** index's days to expiry: a SENSEX variant uses SENSEX's.
+DTE is each strategy's **own** index's days to expiry, counted in **weekdays** (Saturdays and Sundays are not counted; a Friday before a Monday expiry is 1): a SENSEX variant uses SENSEX's.
 
 ## The layout and the default
 
-The grid is the first thing on the page. Above it is one slim bar with the two switches you use
-most, the **view** and the **metric**, a one-line summary of the active settings (for example
+The grid is the first thing on the page. Above it is one slim bar with the switches you use
+most, **Core 298 | T1**, the **view** and the **metric**, a one-line summary of the active settings (for example
 "Today · 12 Oct 2026 · Both indices · All families") and a **Settings** button. The button opens a
 drawer from the right with everything else; a small number on it counts the settings that differ
 from the opening view.
@@ -66,17 +66,18 @@ always opens on the newest day.
 
 ## The controls
 
-These are the drawer's settings; the view and the metric are on the bar.
+These are the drawer's settings; Core 298 | T1, the view and the metric are on the bar.
 
 | Control | What it does |
 |---|---|
+| Core 298 \| T1 (on the bar) | **Core 298**, the default, is the 298 strategies the live Adaptive list ranks. **T1** adds the T1 track's nine extra settings (testing phase, not traded) at every start time, 223 more strategies. Each setting is its own row, right after the Core kind it varies, for example "NIFTY Dir ITM1 · T1 #36, SL 20%". The T1 settings were chosen on 9 Oct 2024 to 8 Oct 2025, so on those days their figures are in-sample by construction; a period that overlaps that window (all of P2) says so in the notes under the grid. Recorded picks stay the live Adaptive list's: a T1 row is never marked, and under Selected its cells read n/a (not 0%) and stay out of the column means. A link naming a T1 setting with Core on says to switch to T1. |
 | Metric | Average ₹, win rate, stop-hit rate, worst strategy-day, or selection frequency. |
 | Period | P1 (Dec 2025 – Oct 2026), P2 (Jan – Aug 2025), P3, Forward (recorded days), or a custom range (From and To; one day if they are equal). "P1 and P2" shows both on one colour scale, with a Difference view. |
-| Index, Family | Which strategies. "Widesl (all)" includes the closest-premium variants. |
+| Index, Family | Which strategies. "Widesl (all)" includes the closest-premium variants; with T1 on, "Widesl (all)" and "Dir (ATM and ITM1)" also take the T1 settings of those kinds, and each T1 setting can be picked on its own. |
 | Start time, Weekday, Days to expiry, Opening VIX band | Keep only those days or start times. |
 | Start time (from the Family pulse) | A row clicked on the Rotation page's Family pulse opens the Pulse view with the family set and Start time showing a band, for example "09:17 to 10:02 (4 start times)". Choose Any start time to clear it. |
 | Minimum sessions | Below this a cell is thin. |
-| Recorded picks of list | Marks the cells the Steady, Calendar, Adaptive or Baseline list picked, as the journal recorded them. |
+| Recorded picks of list | *None*, or *Adaptive*: marks the cells Adaptive picked, as the journal recorded them. (Steady, Calendar and Baseline are still recorded in the journal but no longer shown; an old link naming one opens with no marks.) |
 | Cells show | **All opportunities** uses every day. **Selected only** keeps just the strategy-days the list picked. A cell then reads, for example, "2 of 56 sessions" and its tooltip and drawer give the all-opportunities figure beside it; the two cover different days. |
 
 The metrics:

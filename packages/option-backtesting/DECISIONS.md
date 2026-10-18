@@ -86,7 +86,8 @@ Verified live on 2026-09-29 before building anything on it:
   contracts, so this data is concrete-contract by construction — the gap that section says to
   revisit "when a REST transport is wired".
 
-Expiries collected (owner's choice): NIFTY and SENSEX current + next weekly; BANKNIFTY,
+Expiries collected (owner's choice): NIFTY and SENSEX the nearest two weeklies plus the current
+month's monthly (and next month's monthly on the monthly expiry day; added 2026-10-13); BANKNIFTY,
 MIDCPNIFTY, FINNIFTY current monthly, plus the next monthly on the monthly expiry day itself.
 
 Width is data-driven, not a fixed ±N: every strike inside the day's index low-high, then walk

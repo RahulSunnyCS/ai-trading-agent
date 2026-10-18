@@ -573,7 +573,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     term: 'Evening run',
     group: 'Data & tools',
     short:
-      'The 16:15 job on trading days: collects that day’s 1-minute option data from Fyers and runs every saved Options Lab strategy over it.',
+      'The 15:45 job on trading days: collects that day’s 1-minute option data from Fyers, runs every saved Options Lab strategy over it and stores the rotation results. The result message follows at 16:00.',
   },
   {
     id: 'one-minute-data',

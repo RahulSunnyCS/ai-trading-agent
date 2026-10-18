@@ -1,25 +1,31 @@
 # Rotation: why a pick, and does rank predict results
 
-Two cards on the Rotation page. The first explains one list's pick on one day, criterion by
-criterion. The second asks the question that matters before any pick does: does the morning ranking
+Two cards on the Rotation page. The first explains the Adaptive list's pick on one day, criterion
+by criterion. The second asks the question that matters before any pick does: does the morning ranking
 order the day's results at all.
 
 Neither card changes a list, a weight or a journal entry. They read what is stored and say what it
 means.
 
+> [!NOTE]
+> Both cards explain Adaptive, the list the page follows. There is no list switch: Steady, Calendar
+> and Baseline are still recorded in the journal but no longer shown.
+
 ## Why this pick?
 
-Each morning a list ranks all 298 strategies by a composite score and takes the top three (at
+Each morning Adaptive ranks all 298 strategies of the Core pool by a composite score and takes the top three (at
 least two of them Widesl), plus the best Buy when it ranks in the overall top ten. The journal
 keeps the picks and their composites. It does not keep the breakdown, so this card rebuilds it from
 the stored results before that day, the way the 09:16 ranking computes it, and then checks the
-rebuild against the entry.
+rebuild against the entry. From 19 October 2026, on a day when exactly one of NIFTY and SENSEX
+expires, Adaptive keeps only that index's strategies (the same ranking, with the other index's
+strategies left out); a day recorded under that rule is rebuilt under it, and the picks it would
+have made without the rule come with the explanation.
 
 ### The controls
 
 | Control | What it does |
 |---|---|
-| List | Steady, Calendar, Adaptive or Baseline. The same switch drives the other card. |
 | Day | The day to explain. The arrows step through the days that can be explained; a typed date snaps to the nearest one on or before it. "Latest recorded" jumps to the newest journal entry, or the newest day with enough history when there is no entry yet. |
 | A row | Click a strategy to see its criterion table. The picks are listed first by rank, with the best-ranked strategies they beat beneath. |
 
@@ -77,7 +83,7 @@ day is kept; days are never pooled.
 |---|---|
 | Bars | The correlation for each day. Dark bars are forward days, the others research days. |
 | Line and band | The running mean, with a 95% band (mean ± the Student t multiple of the standard error over days, which is wide on few days). The band is drawn, and read, only from the tenth day. |
-| Dashed line | The research mean for the Steady list over 2025-12-03 to 2026-10-08 (+0.048, the calibration of the pre-registered study), for the Steady list only. |
+| Dashed line | The research mean of the pre-registered study, where one exists for the list. Adaptive has none, so the line is not drawn and the Research column is a dash. |
 | Top 30 − bottom 30 | Mean gross per lot of the 30 best-ranked strategies minus the 30 worst, in rupees. The ranking's effect in money. |
 
 ### Forward days and research days

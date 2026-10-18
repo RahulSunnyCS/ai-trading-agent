@@ -180,6 +180,7 @@ export function settingsSummary(
   } else {
     parts.push(f.period === 'forward' ? 'Forward' : f.period);
   }
+  if (f.universe === 't1') parts.push('Core + T1 settings');
   if (needsStrategy(f.view)) parts.push(ctx.strategyLabel ?? f.strategy);
   else {
     parts.push(indexText(f.index));

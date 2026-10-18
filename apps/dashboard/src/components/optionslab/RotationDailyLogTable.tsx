@@ -14,6 +14,7 @@ import {
   type RowFlag,
   STATUS_LABEL,
   STATUS_TONE,
+  markedText,
   placementTally,
   rowFlags,
 } from '../../lib/rotationDailyLogView';
@@ -101,10 +102,7 @@ function PlacedCell({ row }: { row: RotationRow }) {
     })
     .join('\n');
   return (
-    <span
-      className="inline-flex items-center gap-1"
-      title={`${tally.marked} of ${tally.of} lists marked\n${title}`}
-    >
+    <span className="inline-flex items-center gap-1" title={`${markedText(tally)}\n${title}`}>
       {LIST_KEYS.map((k) => (
         <span
           key={k}
@@ -116,7 +114,7 @@ function PlacedCell({ row }: { row: RotationRow }) {
           )}
         />
       ))}
-      <span className="sr-only">{`${tally.marked} of ${tally.of} lists marked`}</span>
+      <span className="sr-only">{markedText(tally)}</span>
     </span>
   );
 }

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 
-import { listName } from '../../lib/rotationListNames';
+import { VISIBLE_LIST_KEYS, listName } from '../../lib/rotationListNames';
 import {
   ANY,
   type MatrixFilters,
@@ -43,10 +43,7 @@ const PERIOD_OPTIONS: SegmentedOption<MatrixPeriodId>[] = (
 
 const LIST_OPTIONS: SegmentedOption<MatrixListId | typeof ANY>[] = [
   { value: ANY, label: 'None' },
-  { value: 'A', label: listName('A') },
-  { value: 'B', label: listName('B') },
-  { value: 'C', label: listName('C') },
-  { value: 'REF', label: listName('REF') },
+  ...VISIBLE_LIST_KEYS.map((value) => ({ value, label: listName(value) })),
 ];
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -86,6 +83,9 @@ export function RotationMatrixControls({
   periodExtras?: ReactNode;
 }) {
   const tags = Array.from(new Set((meta?.families ?? []).map((x) => x.family)));
+  /** A track's setting ("ditm1-t1s36") has no short name: its API label says what it is. */
+  const tagLabel = (t: string) =>
+    FAMILY_NAME[t] ?? meta?.families.find((x) => x.family === t)?.label ?? t;
   const compareOk = canCompare(f.view);
   const strategySelect = (
     <Field label="Strategy kind">
@@ -208,7 +208,7 @@ export function RotationMatrixControls({
               <option value="dirs">Dir (ATM and ITM1)</option>
               {tags.map((t) => (
                 <option key={t} value={t}>
-                  {FAMILY_NAME[t] ?? t}
+                  {tagLabel(t)}
                 </option>
               ))}
             </Select>

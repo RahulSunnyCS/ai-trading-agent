@@ -1,0 +1,1 @@
+B_S_1432_strikeOTM1_range30_sourceinstrument_sl40_target100_trailnone_mtm1000_exit1500: 1 validation error for LegwiseStrategy Value error, leg 'ce': range_breakout.until must be inside entry-exit [type=value_error, input_value={'id': 'B_S_1432_strikeOT...lot_sizing': 'current'}}, input_

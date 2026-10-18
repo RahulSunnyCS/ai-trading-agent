@@ -103,7 +103,7 @@ Otherwise:
   which strategies have daily results now — variant CSVs plus saved legwise results at the file's current
   version — and the selectors `slot:` / `family:` / `index:` / `kind:` / globs / `a+b` that name them; nothing
   is a fixed list, so a new strategy is found once it has results), `cli.py`
-  (`obt rotation update|pick|verify|show|readout|base|triggers|triggers-show|corr|corr-list|corr-pick`), `triggers.py` (BL-083: the four intraday triggers scored forward each evening from the day's bars,
+  (`obt rotation update|pick|verify|show|readout|base|triggers|triggers-show|corr|corr-list|corr-pick|track-readout`; `update`/`pick --track t1` run the BL-113 T1 parallel track: `strategies/rotation_t1/` variants named `<N|S>_<base>-t1s<set>_<HHMM>`, results and journal under `rotation/track_t1/`, never the live folder or chain — `variants.track_of`, `store.result_path`, `track.py`), `triggers.py` (BL-083: the four intraday triggers scored forward each evening from the day's bars,
   event and placebo simulations in `rotation/triggers/`; run by `obt rotation update`, isolated so a
   failure never fails it, and `obt rotation triggers|triggers-show`;
   `scripts/rotation-triggers-parity.py` must print PARITY OK). Weekend sessions are excluded from the ranking history, as
@@ -113,6 +113,16 @@ Otherwise:
   the 298 universe; its Dir results in `rotation/base/`) and the read-out (per list ₹ per lot-day, drawdown,
   random same-shape percentile, list minus REF and minus base by a circular 5-day block bootstrap, 2,000
   resamples, seed 20261012). Read-only over the journal; `obt rotation readout | base`.
+- `rotation/expiry.py` — the expiring-index rule (BL-122, owner 2026-10-18): from `EXPIRY_ONLY_FROM` (Mon
+  2026-10-19), on a day when exactly one index expires (weekday label `0`; both, neither or an unknown label =
+  no rule), Adaptive (list C, live and T1) is a FILTER of the unrestricted ranking: `filter_picks` runs
+  `score.select` over that index's variants only (Widesl minimum kept) and keeps the Buy add-on only when it is
+  already on that index. `pick.record` passes `rule_index(day, dte)` to `score_history(..., expiry_only=)`; the
+  entry gets `expiry_only` and list C's block `unfiltered` + `expiry_only` (omitted on other days, so those
+  entries are unchanged). Everything that re-derives a recorded pick passes the entry's `expiry_only`
+  (`daylog._rescore`, `explain`, `rankic`), `tomorrow.expected_picks` uses `rule_index(next session)`, and
+  reconstructed history never applies it. Kill switch `ROTATION_EXPIRY_ONLY_FROM` (`YYYY-MM-DD` | `off`, read
+  at call time; any other value makes the pick fail loudly).
 - `legwise/` — AlgoTest-style leg-wise engine over the Fyers data (`obt legwise run
   strategies/legwise/*.yaml`): `schema.py` (one field per AlgoTest setting), `market.py`
   (a day on the 375-minute grid), `engine.py` (the state machine — its docstring lists every
@@ -127,13 +137,34 @@ Otherwise:
   `load_dotenv()` would otherwise pick up the real bot token from the repo `.env`.
   `send(..., chat_id=...)` supports an explicit destination for the rotation pick's group copy;
   its environment configuration lives in the root `technical.md`.
-  Rotation messages use `rotation/list_names.json` (also imported by the dashboard) for
-  display names, and omit Baseline / VIX / days to expiry from the text; the journal still stores them.
-  `rotation/result.py` reads the completed picked variants' net results (after estimated costs),
-  reports one lot per strategy with every picked strategy's contribution under its section, and
-  sends Steady / Calendar / Adaptive after the evening pipeline finishes (normally around 16:00).
-  A per-entry marker prevents a retry from sending it twice;
-  `obt rotation result --force` explicitly resends it.
+  Rotation messages (BL-125) are plain text (`Notification(plain=True)`: no icon or source line) built by pure functions
+  in `rotation/messages.py`; strategy names come from `rotation/labels.py` (`label(name)` -> head `N_widesl_OTM1` +
+  params `SL115% · TSL15%/10% · REnone · MTMSL2500`, read from the variant's own YAML; an id with no file is shown
+  raw, never an error) and `rotation/list_names.json` (also imported by the dashboard) for list names. `rotation/deliver.py`
+  decides when they go: `pick_and_send` (the 09:16 job: Adaptive recorded first and sent to the friends' group at once,
+  T1 right after reusing its VIX read; the owner's message carries both if T1 is in by `t1_deadline` (09:16:50 IST, or
+  20 s after Adaptive's entry), else Adaptive alone with `T1 · follows in a separate message` (or `not recorded today` when T1
+  failed) and T1 follows; a dry run writes nothing, not even the T1 catch-up)
+  and `send_result` (the evening message, under `result.sending_lock`, a per-day `flock`; any error reading T1 degrades
+  to `T1 · result not ready`, alerts the owner and never stops Adaptive's result; the owner's message goes first and a
+  failing group copy is retried on its own, never holding back the owner's T1 follow-up; `--not-before 16:00 --soft-fail` is
+  the evening run's last step, so a run that succeeds only on a late retry still sends that evening). `obt rotation verify
+  --track t1` checks the T1 journal. Nothing in them touches a pick, a score, a hash or a journal field.
+  `rotation/result.py` reads the completed picked variants' net results (after estimated costs) for the live list or
+  `track="t1"`, one lot per strategy (`NoEntry` = never picked, `NotScored` = results still coming). Sent markers are per
+  destination and piece (`.sent` owner, `.group.sent`, `.t1.sent`; a pre-BL-125 `.sent`, recognised by its text, still
+  covers owner + group), so a retry never double-sends and a late T1 result still follows as its own message; `obt rotation result --force` resends.
+  Days to expiry in the rotation are **weekdays** (Monday to Friday dates after the session up to the expiry;
+  holidays are not excluded; BL-109, 2026-10-15): `rotation/dte.py` holds the count, `live.py` builds the live
+  labels with it, and the stored `days.csv` and the journal entries recorded before the change keep calendar
+  days as written and are converted on read (`store.read_days`, `dte.entry_labels`), so nothing is rewritten.
+  New entries carry `dte_basis: weekdays`. The Options Lab anatomy `dte` and the YAML engine's `days_to_expiry`
+  stay calendar days.
+  `rotation/tomorrow.py` supplies the evening message's "tomorrow" part (`--no-tomorrow` drops it; a failure in it never
+  blocks the result): `next_session_picks(today, root, track=)` is the 09:16 ranking re-run on the stored results with
+  tonight's VIX close standing in for the open, under the BL-122 rule for that session, for Core-298 or Core-298 plus a
+  track's variants; the message lists those strategies in full. The old history tables, probabilities and likely changes
+  are no longer sent (`build`/`Tomorrow` are kept, tested, unused by the message).
 - `api/legwise_routes.py` — `/legwise/*` on `obt-api` for the dashboard's Options Lab: `/day` and `/anatomy` (see above; `/anatomy` also overlays apps/server's T-33 `daily_regime_tags` as `t33` when `DATABASE_URL` is set in this process, with an explicit status), list/
   validate/save strategies (slug-checked name, `yaml.safe_dump` of the validated model — never
   raw client text), ad-hoc backtest over collected days, saved results, data/token status, and
@@ -216,7 +247,11 @@ Otherwise:
   `pulse`; metrics `avg` / `win_rate` / `stop_rate` / `worst` / `selection`; periods P1, P2, P3 (returned as
   `unavailable`: not in the store), `forward`, `custom`; `compare=P1,P2` returns both grids on one scale plus the
   difference) and `GET /legwise/rotation/matrix/cell` (daily values, running total, pooled variants with their
-  settings). Reads `rotation/results/*.csv`, `days.csv` and the journal and writes nothing. Gross per ONE-lot
+  settings). Reads `rotation/results/*.csv`, `days.csv` and the journal and writes nothing. `universe=t1` (both
+  routes; default `core`) adds the T1 track's extra settings from `rotation/track_t1/results/` as their own rows
+  (after their Core kind, labelled "… · T1 #36, SL 20%", with an in-sample note for their BL-113 selection window);
+  the `widesl` / `dirs` aliases then take them too (`Filters.groups`), the overlay stays the live journal's, and
+  `universe=core` (and the pulse) never read them. One cached cube per universe. Gross per ONE-lot
   strategy-day, pooled as mean / rate / worst, never summed; `n` is distinct sessions, a cell under `min_n`
   (default 20) is flagged `thin`, never hidden; a missing value is `missing` / `excluded` / `na`, never zero.
   The selection overlay is journal entries only (late entries excluded from selection statistics); picks are never
@@ -240,7 +275,7 @@ Otherwise:
   As-of is the last COMPLETE session (every variant stored; a part-stored day is reported under `store.partial`
   and left out of windows and rank); the route's snapshot is keyed on the cube object plus the journal's stat, not a TTL.
   Journal figures are those on or before as-of. A stored variant outside the 12 cells is listed in `store.unplaced`.
-- `heatmap/` + `api/heatmap_routes.py` — BL-094, the Options Lab's Heatmap tab (default page): the P&L of an ATM
+- `heatmap/` + `api/heatmap_routes.py` — BL-094, the Options Lab's Heatmap page (Explore data): the P&L of an ATM
   short straddle for every entry time (09:16, then each half hour to 14:45), exit (15:30, 15:15) and per-leg SL
   (10..100 %, then "No SL": no stop, both legs held to the exit; `grid.NO_SL`, stored as `sl = 0`). `grid.py` restates the legwise engine's fills for the fixed two-leg shape (a test pins every cell to
   `simulate_day`); indices take ATM from the index spot, a stock (no spot, no strike step, mostly no lot size in the
@@ -268,6 +303,25 @@ Otherwise:
   only entries made before the first entry time, `research` mode any window. `/legwise/rotation/explain` and `/ic`
   cache the loaded store for 30 s; errors are `{"error": ...}`. If `score.py`'s criteria change, `rank_day`'s
   consistency check against `score.composite` fails loudly rather than explaining a different ranking.
+- `rotation/lot_plans.py` + `api/rotation_lot_plans_routes.py` — BL-135, lot plans tracked forward from 2026-10-19
+  (`GET /legwise/rotation/lot-plans?book=core|t1`, `obt rotation lot-plans [--book t1] [--json]`), read-only over the
+  live or the T1 journal (list C) and the stored one-lot results (`store.result_path`). Three plans, Buy left out: As
+  picked (1 lot per core pick), Dir Boost (the Dir pick at 2 lots on a non-expiry day; on a three-Widesl day the best
+  unpicked Dir added at 1 lot; expiry day = As picked) and Duo (W1, the higher recorded composite, ties by name, and
+  the Dir: 2 + 2, or 2 + 1 on an expiry day). Expiry = the entry's weekday label `0` for NIFTY or SENSEX
+  (`dte.entry_labels`). The best unpicked Dir is the 09:16 message's (`pick.next_best`, BL-122's
+  `filtered_runners_up` on a rule day), re-derived from the history the ENTRY ranked on by `HistorySource` (the matrix read
+  once per request, sliced to the first `inputs_days` stored days before the day, with no "reaches the last collected
+  day" check, so a later repair or backfill cannot unverify a day; a test holds the digests equal to
+  `pick.load_history`'s), in the entry's universe (the current one if its fingerprint matches, else the strategy files
+  at the entry's `commit` via `git ls-tree`, else `unverified` with the reason). Verified only when `inputs_sha`, the
+  picks, list C's recorded composites and the VIX band all match; otherwise `unverified` (never guessed). Answers are
+  cached on the entry hash plus a stamp of the result files and `days.csv`, so they do not depend on API restarts. Net = gross × lots − ₹20 × 1.18 × 2 × `n_trades` per strategy placed. Day status
+  scored / waiting (never zero) / late (not before 09:17) / unverified; only scored days count, all plans at once. The
+  read-out (registered) judges the first 60 scored days: plan − As picked, `readout.block_bootstrap_mean` seed
+  20261019, beats if the interval is above zero and drawdown per lot is no deeper. It is computed afresh each
+  request (`READOUT_NOTE`: the BL-135 Log entry at the 60th day is the record; a later status change can move the
+  shown window); days after the 60th are `after_readout`, descriptive.
 - `analytics/regime_source.py` — reads `daily_regime_tags` from Postgres,
   gated on `DATABASE_URL` being exported in *this process* specifically (not
   just present in a `.env` the server reads) — see the root `technical.md`
@@ -277,6 +331,14 @@ Otherwise:
   into an absent regime section plus a status (CLI line, `regime_status` /
   `regime_message` on `POST /runs`, `regime_status` in the MCP `run_backtest`
   output, `t33.status` on `/legwise/anatomy`). Any other query error still raises.
+
+- `research/bl104/` — BL-104, the full-factorial parameter sweep over the Widesl / Dir / Buy families:
+  `grid.py` (the registered axes, cells and their SHA; `tests/unit/test_bl104_grid.py` holds the counts),
+  `run_grid.py` (one job per cohort, resumable parts + day × cell series under `results/<tag>/`),
+  `score.py` (gates, Martin / Calmar, the plateau rule, band tables), `robust.py` (numpy CSCV,
+  half-years, bootstrap vs template, DTE / VIX / weekday strata, breadth over the 25 slots),
+  `stage2.py` (the winners' neighbourhoods and the flatness verdict), `check_regression.py`. Research only:
+  never writes a strategy YAML; the pre-registration is the backlog item's Phase 0.
 
 ## Commands
 
