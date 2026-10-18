@@ -54,7 +54,7 @@ Doubling a strategy assumes its own stop doubles with it.
 | Status | Meaning |
 |---|---|
 | Scored | Every result the plans need is stored. Counted. |
-| Waiting | A result is not stored yet (the evening run has not finished). Shown blank, never as zero. |
+| Waiting | A result is not stored: the evening run has not finished, or that day's data was excluded (then it stays waiting). Shown blank, never as zero. |
 | Late | The morning record was made at or after 09:17. Shown, never counted. |
 | Unverified | The best unpicked Dir could not be confirmed. Shown, never counted. |
 
@@ -65,5 +65,11 @@ days. Point at a day's figure to see what each plan placed.
 
 After 60 scored days in a book, the card compares Dir Boost and Duo with As picked: the difference
 in net per day, with a 90% range for how sure that is. A plan **beats As picked** only if the whole
-range is above zero and its drawdown per lot is no deeper. This rule was fixed before the first
+range is above zero and its drawdown per lot is no deeper. The card shows the dates those 60 days
+span. Days after them are shown as a plain difference, without a verdict. This rule was fixed before the first
 forward day, and the result changes nothing by itself; trading a plan stays the owner's decision.
+
+> [!NOTE]
+> The card works the read-out out afresh from the stored files each time. The written record is
+> the note made when the 60th day is scored. If a day's status changes later (a result stored
+> late, a day becoming unverified), the 60 days shown here can shift, and the figures with them.

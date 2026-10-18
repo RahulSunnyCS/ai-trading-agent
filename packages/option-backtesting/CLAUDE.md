@@ -310,13 +310,18 @@ Otherwise:
   unpicked Dir added at 1 lot; expiry day = As picked) and Duo (W1, the higher recorded composite, ties by name, and
   the Dir: 2 + 2, or 2 + 1 on an expiry day). Expiry = the entry's weekday label `0` for NIFTY or SENSEX
   (`dte.entry_labels`). The best unpicked Dir is the 09:16 message's (`pick.next_best`, BL-122's
-  `filtered_runners_up` on a rule day), re-derived from the results before the day by `HistorySource` (the matrix read
-  once per request, sliced into exactly `pick.load_history`'s History; a test holds the digests equal) and verified
-  against the entry's picks, `inputs_sha` and `universe`, else the day is `unverified` (never guessed; verified answers
-  are cached per entry hash). Net = gross × lots − ₹20 × 1.18 × 2 × `n_trades` per strategy placed. Day status
+  `filtered_runners_up` on a rule day), re-derived from the history the ENTRY ranked on by `HistorySource` (the matrix read
+  once per request, sliced to the first `inputs_days` stored days before the day, with no "reaches the last collected
+  day" check, so a later repair or backfill cannot unverify a day; a test holds the digests equal to
+  `pick.load_history`'s), in the entry's universe (the current one if its fingerprint matches, else the strategy files
+  at the entry's `commit` via `git ls-tree`, else `unverified` with the reason). Verified only when `inputs_sha`, the
+  picks, list C's recorded composites and the VIX band all match; otherwise `unverified` (never guessed). Answers are
+  cached on the entry hash plus a stamp of the result files and `days.csv`, so they do not depend on API restarts. Net = gross × lots − ₹20 × 1.18 × 2 × `n_trades` per strategy placed. Day status
   scored / waiting (never zero) / late (not before 09:17) / unverified; only scored days count, all plans at once. The
   read-out (registered) judges the first 60 scored days: plan − As picked, `readout.block_bootstrap_mean` seed
-  20261019, beats if the interval is above zero and drawdown per lot is no deeper.
+  20261019, beats if the interval is above zero and drawdown per lot is no deeper. It is computed afresh each
+  request (`READOUT_NOTE`: the BL-135 Log entry at the 60th day is the record; a later status change can move the
+  shown window); days after the 60th are `after_readout`, descriptive.
 - `analytics/regime_source.py` — reads `daily_regime_tags` from Postgres,
   gated on `DATABASE_URL` being exported in *this process* specifically (not
   just present in a `.env` the server reads) — see the root `technical.md`

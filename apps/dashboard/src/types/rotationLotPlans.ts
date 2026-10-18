@@ -78,7 +78,15 @@ export interface LotPlanReadoutPlan {
 }
 
 export type LotPlanReadout =
-  | { status: 'n/a'; days: number; needed: number }
+  | {
+      status: 'n/a';
+      days: number;
+      needed: number;
+      /** The scored days so far (null before the first). */
+      from?: string | null;
+      to?: string | null;
+      note?: string;
+    }
   | {
       status: 'judged';
       days: number;
@@ -86,7 +94,14 @@ export type LotPlanReadout =
       from: string;
       to: string;
       plans: Partial<Record<LotPlanId, LotPlanReadoutPlan>>;
-      after_readout?: { days: number; diff_per_day: Partial<Record<LotPlanId, number>> };
+      /** Computed afresh from the files: the BL-135 Log entry is the record. */
+      note?: string;
+      after_readout?: {
+        days: number;
+        from: string;
+        to: string;
+        diff_per_day: Partial<Record<LotPlanId, number>>;
+      };
     };
 
 export type LotPlanCumulativePoint = { day: string } & Record<LotPlanId, number>;

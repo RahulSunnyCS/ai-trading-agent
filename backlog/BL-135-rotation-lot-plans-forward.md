@@ -111,3 +111,17 @@ picks, the scoring or the Telegram messages.
   route), `obt rotation lot-plans`, the Rotation page's "Lot plans" card and its Guide page. Checked read-only on the
   real store: both books answer with no forward entry and "Tracking starts Mon 19 Oct"; with the start moved back to
   12 Oct in a scratch run, the best unpicked Dir re-derived and verified on all five recorded entries (digest equal).
+- 2026-10-18 — **Amendment (code review, PR #256; before the first forward entry, so no forward day has been
+  read).** The re-derivation is made robust and stricter, Phase 0's rule otherwise unchanged:
+  - **The history the entry saw.** The best unpicked Dir is re-derived from the first `inputs_days` stored days
+    before the day, with no requirement that the history reach the last collected day. A day stored later (a
+    Fyers repair of an excluded day, a T1 backfill) can therefore no longer turn a correct day `unverified`. The
+    `inputs_sha` digest must still match.
+  - **The universe the entry ranked.** If strategy files were added since, the universe is rebuilt from the
+    entry's `commit` (`git ls-tree`) and must match the entry's fingerprint. Otherwise the day is `unverified`, with
+    the reason.
+  - **Extra checks.** List C's recorded composites (4 dp) and the VIX band of the recorded open must also match.
+  - **Caching.** Answers are cached against a stamp of the stored files, so they do not depend on API restarts.
+  - **The read-out.** It is computed afresh from the files on each request, and the card and CLI show the dates
+    judged. **This Log's entry at the 60th scored day is the record**; a later status change can move the shown
+    window. Days after the 60th are shown as descriptive.

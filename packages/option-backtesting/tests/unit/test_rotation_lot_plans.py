@@ -293,7 +293,7 @@ def test_waiting_and_late_days_are_shown_but_never_counted(world):
     out = _build(root)
     waiting = _row(out, date(2026, 10, 27))
     assert all(waiting["plans"][p]["net"] is None for p in lot_plans.PLANS)  # never zero
-    assert "waiting for the result of" in waiting["note"]
+    assert "result not stored (data excluded or evening run pending)" in waiting["note"]
     late = _row(out, date(2026, 10, 21))
     assert late["note"].startswith("recorded at 09:41:12")
     assert late["plans"]["as_picked"]["net"] is not None  # its figures exist, but are not counted
@@ -327,6 +327,7 @@ def test_lots_today_are_the_newest_entrys_when_it_is_today(world):
 
 def test_a_re_derivation_that_does_not_reproduce_the_entry_is_unverified(world):
     root, _, _ = world
+    assert _build(root)["counts"]["unverified"] == 0  # verified answers are now cached
     # rewrite one stored result of a history day: the inputs the pick read are no longer there
     path = store.result_path(syn.NAMES[0], root)
     rows = list(csv.DictReader(path.open()))
@@ -335,7 +336,7 @@ def test_a_re_derivation_that_does_not_reproduce_the_entry_is_unverified(world):
         w = csv.DictWriter(f, fieldnames=store.RESULT_COLUMNS)
         w.writeheader()
         w.writerows(rows)
-    out = _build(root)
+    out = _build(root)  # the cache is keyed on the files' stamp: no restart needed to see it
     for d in (date(2026, 10, 22), date(2026, 10, 26)):
         row = _row(out, d)
         assert row["status"] == "unverified"
@@ -356,6 +357,8 @@ def test_history_source_gives_the_picks_own_history(world):
         mine = source.history(d)
         theirs = pick.load_history(d, root, syn.NAMES)
         assert mine.digest == theirs.digest == entries[d]["inputs_sha"]
+        sliced = source.history(d, n_days=entries[d]["inputs_days"])
+        assert sliced.digest == entries[d]["inputs_sha"]
         assert mine.days == theirs.days and np.array_equal(mine.values, theirs.values)
         assert (mine.weekday, mine.band, mine.dte_n, mine.dte_s) == (
             theirs.weekday,
@@ -377,7 +380,10 @@ def test_an_empty_store_says_tracking_starts_on_monday(tmp_path):
     out = lot_plans.build("core", tmp_path, names=syn.NAMES, today=date(2026, 10, 18))
     assert out["rows"] == [] and out["cumulative"] == []
     assert out["message"].startswith("Tracking starts Mon 19 Oct")
-    assert out["readout"] == {"status": "n/a", "days": 0, "needed": 60}
+    ro = out["readout"]
+    assert (ro["status"], ro["days"], ro["needed"], ro["from"]) == ("n/a", 0, 60, None)
+    later = lot_plans.build("core", tmp_path, names=syn.NAMES, today=date(2026, 10, 21))
+    assert later["message"] == "No forward entries yet in this book's journal."
     assert all(p["days"] == 0 and p["net_per_day"] is None for p in out["plans"])
     assert lot_plans.render(out).count("Tracking starts") == 1
     with pytest.raises(lot_plans.LotPlanError):
@@ -411,7 +417,7 @@ def test_the_t1_book_reads_its_own_journal_and_track_results(tmp_path, monkeypat
     assert store.result_path(T1[0], root).parent == store.track_dir("t1", root) / "results"
     assert lot_plans.read_results(T1[0], root)
     core = lot_plans.build("core", root, names=syn.NAMES, today=date(2026, 10, 20))
-    assert core["rows"] == [] and core["message"].startswith("Tracking starts")
+    assert core["rows"] == [] and core["message"].startswith("No forward entries yet")
     assert journal.verify(store.journal_path(root, "t1")) == []
 
 
@@ -445,7 +451,11 @@ def _synthetic_rows(n: int, seed: int = 3) -> list[dict]:
 
 
 def test_the_read_out_waits_for_sixty_scored_days():
-    assert lot_plans.readout(_synthetic_rows(59)) == {"status": "n/a", "days": 59, "needed": 60}
+    rows = _synthetic_rows(59)
+    ro = lot_plans.readout(rows)
+    assert (ro["status"], ro["days"], ro["needed"]) == ("n/a", 59, 60)
+    assert (ro["from"], ro["to"]) == (rows[0]["day"], rows[-1]["day"])
+    assert "Log entry" in ro["note"]
 
 
 def test_the_read_out_judges_the_first_sixty_days_with_the_registered_bootstrap():
@@ -466,6 +476,23 @@ def test_the_read_out_judges_the_first_sixty_days_with_the_registered_bootstrap(
         beats = lo > 0 and got["dd_per_lot"] >= ref_dd
         assert got["verdict"] == ("beats" if beats else "costs" if hi < 0 else "inconclusive")
     assert out["after_readout"]["days"] == 15  # later days are descriptive only
+    assert out["after_readout"]["from"] == rows[60]["day"]
+    assert out["after_readout"]["to"] == rows[-1]["day"]
+    assert "Log entry" in out["note"]
+    text = lot_plans.render(
+        {
+            "book": "core",
+            "forward_from": "2026-10-19",
+            "chain": {"intact": True, "problems": []},
+            "counts": {"entries": 75, "scored": 75, "waiting": 0, "late": 0, "unverified": 0},
+            "message": None,
+            "plans": [],
+            "readout": out,
+            "rows": [],
+        }
+    )
+    assert f"read-out on 60 days {rows[0]['day']} -> {rows[59]['day']}" in text
+    assert "after the read-out (15 days" in text and "Log entry" in text
     assert lot_plans.readout(rows[:60])["plans"] == out["plans"]
 
 
@@ -487,3 +514,92 @@ def test_the_route_answers_for_each_book_and_refuses_another(world, monkeypatch)
     bad = c.get("/legwise/rotation/lot-plans", params={"book": "x"})
     assert bad.status_code == 422 and "error" in bad.json()
     assert (root / "rotation").exists()
+
+
+# --- re-deriving from what the entry saw (review fixes) ----------------------------------------
+
+
+@pytest.fixture
+def repaired(tmp_path, monkeypatch):
+    """An entry on Mon 19 Oct ranked through Thu 15 Oct (Fri 16 Oct not collected), then Fri 16
+    Oct stored afterwards, as a Fyers repair of an excluded day would be."""
+    monkeypatch.delenv(expiry.ENV, raising=False)
+    root = tmp_path / "TradingData"
+    syn.build_store(root, _history(date(2026, 10, 15)))
+    captured: dict = {}
+    real = pick.next_best
+
+    def spy(hist, day, *args, **kwargs):
+        out = real(hist, day, *args, **kwargs)
+        captured[day] = out
+        return out
+
+    monkeypatch.setattr(pick, "next_best", spy)
+    entry = syn.record_entry(root, date(2026, 10, 19))
+    monkeypatch.setattr(pick, "next_best", real)
+    syn.build_store(root, [date(2026, 10, 16)])  # the repair
+    lot_plans._rederive_cache.clear()
+    return root, entry, captured[date(2026, 10, 19)]["C"]["dir"]
+
+
+def test_a_day_stored_later_does_not_unverify_an_earlier_entry(repaired):
+    root, entry, runner = repaired
+    # the 09:16 job's own load now reaches 16 Oct, which the entry never saw
+    assert pick.load_history(date(2026, 10, 19), root, syn.NAMES).digest != entry["inputs_sha"]
+    got = lot_plans.rederive_runner_up(entry, root, syn.NAMES)
+    assert got == {"verified": True, "dir": runner, "note": None}
+
+
+def test_a_changed_universe_is_rebuilt_from_the_commit_or_named(repaired, monkeypatch):
+    root, entry, runner = repaired
+    grown = [*syn.NAMES, "S_dir-t1s9_1517"]  # a strategy file added after the pick
+    got = lot_plans.rederive_runner_up(entry, root, grown, "t1")
+    assert got["verified"] is False
+    assert "universe has changed since the pick (40 variants then, 41 now)" in got["note"]
+    # the entry's commit gives the universe back: verified again
+    monkeypatch.setattr(lot_plans, "universe_at", lambda commit, book: list(syn.NAMES))
+    lot_plans._rederive_cache.clear()
+    assert lot_plans.rederive_runner_up(entry, root, grown, "t1")["dir"] == runner
+
+
+def test_composites_and_the_vix_band_must_match_the_entry(repaired):
+    root, entry, _ = repaired
+    c = entry["lists"]["C"]
+    first = c["core"][0]
+    off = {**c, "composite": {**c["composite"], first: c["composite"][first] + 0.0001}}
+    tampered = {**entry, "hash": "x1", "lists": {**entry["lists"], "C": off}}
+    got = lot_plans.rederive_runner_up(tampered, root, syn.NAMES)
+    assert got["verified"] is False and "composites differ" in got["note"]
+    band = {**entry, "hash": "x2", "vix_band": "nonsense"}
+    got = lot_plans.rederive_runner_up(band, root, syn.NAMES)
+    assert got["verified"] is False and "VIX band" in got["note"]
+
+
+def test_universe_at_reads_the_strategy_files_of_a_commit():
+    import subprocess
+
+    try:
+        head = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=lot_plans.REPO_PACKAGE,
+            check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        pytest.skip("no git checkout")
+    from option_backtesting.rotation.variants import track_names, variant_names
+
+    core = lot_plans.universe_at(head + "+dirty", "core")
+    if core != variant_names():  # uncommitted strategy files in this checkout
+        pytest.skip("the checkout's strategy files differ from HEAD")
+    assert lot_plans.universe_at(head, "t1") == variant_names() + track_names("t1")
+    assert lot_plans.universe_at("unknown", "core") is None
+    assert lot_plans.universe_at("0000000", "core") is None
+
+
+def test_the_route_answers_an_unmounted_root_as_an_error(monkeypatch):
+    monkeypatch.setenv("TRADING_DATA_ROOT", "/Volumes/NoSuchVolume-lot-plans/TradingData")
+    rotation_lot_plans_routes._cache.clear()
+    r = TestClient(create_app()).get("/legwise/rotation/lot-plans", params={"book": "core"})
+    assert r.status_code == 503 and "not mounted" in r.json()["error"]

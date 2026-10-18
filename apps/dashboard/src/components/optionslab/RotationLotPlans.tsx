@@ -239,6 +239,7 @@ export function RotationLotPlans() {
             {readoutLines(d.readout).map((line) => (
               <p key={line}>{line}</p>
             ))}
+            {d.readout.note ? <p className="text-[11px] text-faint">{d.readout.note}</p> : null}
             <p className="text-[11px] text-faint">
               {countsText(d)}. Only scored days count, for all three plans at once. Dir Boost and
               Duo were chosen after looking at past days; these forward days are the test. Brokerage

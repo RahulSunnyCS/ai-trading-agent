@@ -92,10 +92,16 @@ export function emptyState(
   r: RotationLotPlansResponse,
 ): { title: string; description: string } | null {
   if (r.counts.scored > 0) return null;
-  if (r.rows.length === 0) {
+  if (r.rows.length === 0 && r.today < r.forward_from) {
     return {
       title: 'Tracking starts Mon 19 Oct',
       description: `The first forward entry is recorded at 09:16 on ${formatDay(r.forward_from)}; its figures appear once that evening's results are stored.`,
+    };
+  }
+  if (r.rows.length === 0) {
+    return {
+      title: 'No forward entries yet',
+      description: r.message ?? 'This book has no entry recorded since tracking started.',
     };
   }
   return {
@@ -122,7 +128,9 @@ export function lotsText(lots: number | null): string {
 /** What a plan places on a day, for a tooltip: "N_wide_0917 ×2 · N_dir_0932 ×2 (best unpicked Dir)". */
 export function legsText(row: LotPlanRow, plan: LotPlanId): string {
   const p = row.plans[plan];
-  if (p.lots.length === 0) return 'Not known: the best unpicked Dir could not be verified';
+  if (p.lots.length === 0) {
+    return `Not known: ${row.note ?? 'the best unpicked Dir could not be verified'}`;
+  }
   return p.lots
     .map((l) => `${l.name} ×${l.lots}${l.runner_up ? ' (best unpicked Dir)' : ''}`)
     .join(' · ');
@@ -135,14 +143,39 @@ export function dayNetText(row: LotPlanRow, plan: LotPlanId): string {
   return formatInr(p.net, { sign: true });
 }
 
-/** The read-out in a sentence per plan, or how far it is from being read. */
+/** "19 Oct 2026 to 13 Jan 2027", or an empty string without days. */
+function spanText(from: string | null | undefined, to: string | null | undefined): string {
+  if (!from || !to) return '';
+  return from === to ? formatDay(from) : `${formatDay(from)} to ${formatDay(to)}`;
+}
+
+/**
+ * The read-out in sentences: how far it is from being read, or each plan against As picked over
+ * the dates judged, then the days after it (descriptive). The note on what is authoritative is
+ * `readout.note`, shown separately.
+ */
 export function readoutLines(readout: LotPlanReadout): string[] {
   if (readout.status === 'n/a') {
+    const span = spanText(readout.from, readout.to);
     return [
-      `Read-out at ${formatInt(readout.needed)} forward scored days: ${formatInt(readout.days)} so far.`,
+      `Read-out at ${formatInt(readout.needed)} forward scored days: ${formatInt(readout.days)} so far${span ? ` (${span})` : ''}.`,
     ];
   }
-  return PLAN_ORDER.flatMap((id) => {
+  const head = `Read-out on the first ${formatInt(readout.judged_days)} scored days, ${spanText(readout.from, readout.to)}:`;
+  const after = readout.after_readout;
+  const afterLine = after
+    ? [
+        `After the read-out, ${formatInt(after.days)} more ${after.days === 1 ? 'day' : 'days'} (${spanText(after.from, after.to)}), descriptive only: ${PLAN_ORDER.flatMap(
+          (id) => {
+            const v = after.diff_per_day[id];
+            return v === undefined
+              ? []
+              : [`${PLAN_LABEL[id]} ${formatInr(v, { sign: true })} a day against As picked`];
+          },
+        ).join(', ')}.`,
+      ]
+    : [];
+  const verdicts = PLAN_ORDER.flatMap((id) => {
     const p = readout.plans[id];
     if (!p) return [];
     const verdict =
@@ -155,6 +188,7 @@ export function readoutLines(readout: LotPlanReadout): string[] {
       `${p.name} minus As picked: ${formatInr(p.diff_per_day, { sign: true })} a day, 90% interval ${formatInr(p.lo90, { sign: true })} to ${formatInr(p.hi90, { sign: true })}; drawdown per lot ${formatInr(p.dd_per_lot)} vs ${formatInr(p.comparator_dd_per_lot)}: ${verdict}.`,
     ];
   });
+  return [head, ...verdicts, ...afterLine];
 }
 
 /** Counts under the table: "3 scored · 1 waiting · 1 late". Zero counts are left out. */

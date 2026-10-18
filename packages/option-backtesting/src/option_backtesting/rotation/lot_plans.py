@@ -30,6 +30,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import math
+import subprocess
 import threading
 from datetime import date, datetime
 from pathlib import Path
@@ -42,6 +43,7 @@ from . import journal, pick, store
 from .dte import entry_basis, entry_labels, recorded_labels
 from .lists import WARMUP
 from .readout import block_bootstrap_mean, max_drawdown
+from .score import vix_band
 from .variants import is_dir, is_wide, track_names, variant_names
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -64,6 +66,15 @@ READOUT_DAYS = 60
 BOOT_SEED = 20261019
 
 STATUSES: tuple[str, ...] = ("scored", "waiting", "late", "unverified")
+
+#: The read-out is computed afresh from the stored files on every request: the first 60 scored
+#: forward days as they stand now. A day that changes status later (a result stored late, a day
+#: turning unverified) moves that window, so the shown figure is not a frozen record.
+READOUT_NOTE = (
+    "Judged on the first 60 scored forward days as the files stand now. The BL-135 Log entry "
+    "written when the 60th day is scored is the record; if a day's status changes later, the "
+    "window shown here can move and the figures with it."
+)
 
 
 class LotPlanError(ValueError):
@@ -190,17 +201,23 @@ def _track(book: str) -> str | None:
 
 
 class HistorySource:
-    """The stored results read once per request, sliced per day into exactly the `pick.History`
-    that `pick.load_history(day, root, names, basis)` returns (same rows, same checks, same
-    digest; a test holds them equal). Reading every variant file once instead of once per day
-    keeps a request under the proxy's timeout when several days need a re-derivation."""
+    """The stored results read once per request, sliced per day into the `pick.History` the
+    entry ranked on: the first `n_days` stored days before the day (the entry's `inputs_days`),
+    with `pick.load_history`'s rows and digest (a test holds them equal). It deliberately does not
+    require the history to reach the last collected day, as the 09:16 job did: a day stored later
+    (a Fyers repair of an excluded day, a T1 backfill) must not change what an earlier entry saw.
+    The digest comparison with the entry's `inputs_sha` proves the slice is the one it ranked on.
+    Reading every variant file once instead of once per day keeps a request under the proxy's
+    timeout when several days need a re-derivation."""
 
     def __init__(self, root: Path, names: list[str]) -> None:
         self.root, self.names = root, names
         self._matrix: store.Matrix | None = None
         self._attrs: dict[str, dict[date, dict[str, str]]] = {}
 
-    def history(self, day: date, basis: str = "weekdays") -> pick.History:
+    def history(
+        self, day: date, basis: str = "weekdays", n_days: int | None = None
+    ) -> pick.History:
         if not self.names:
             raise pick.PickError("no variant strategy files found")
         if self._matrix is None:
@@ -209,14 +226,16 @@ class HistorySource:
             self._attrs[basis] = store.read_days(self.root, basis)
         m, attrs = self._matrix, self._attrs[basis]
         keep = [i for i, d in enumerate(m.days) if d < day and d in attrs]
+        if n_days is not None:
+            if len(keep) < n_days:
+                raise pick.PickError(
+                    f"only {len(keep)} days of results are stored before {day}; "
+                    f"the entry ranked on {n_days}"
+                )
+            keep = keep[:n_days]
         days = [m.days[i] for i in keep]
         if len(days) < WARMUP:
             raise pick.PickError(f"only {len(days)} days of results (need {WARMUP})")
-        prev = pick.previous_data_day(self.root, day)
-        if days[-1] != prev:
-            raise pick.PickError(
-                f"results end {days[-1]} but the last collected trading day is {prev}"
-            )
         values = m.values[keep]
         h = hashlib.sha256()
         for i, d in enumerate(days):
@@ -238,10 +257,92 @@ class HistorySource:
         )
 
 
+class Sources:
+    """One `HistorySource` per universe within a request (the current one, or an entry's own
+    universe rebuilt from its commit)."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self._by_names: dict[tuple[str, ...], HistorySource] = {}
+
+    def get(self, names: list[str]) -> HistorySource:
+        key = tuple(names)
+        if key not in self._by_names:
+            self._by_names[key] = HistorySource(self.root, names)
+        return self._by_names[key]
+
+
+REPO_PACKAGE = Path(__file__).resolve().parents[3]  # packages/option-backtesting
+
+
+def universe_at(commit: str | None, book: str) -> list[str] | None:
+    """The variant names the book ranked at `commit` (the entry's `commit` field), read from git:
+    Core-298's `strategies/rotation/`, plus `strategies/rotation_t1/` for T1, in the order
+    `variant_names` gives them. None when git cannot answer (no checkout, unknown commit)."""
+    if not commit or commit == "unknown":
+        return None
+    sha = commit.split("+", 1)[0]
+    track = _track(book)
+    folders = ["strategies/rotation"] + ([f"strategies/rotation_{track}"] if track else [])
+    try:
+        out = subprocess.run(
+            ["git", "ls-tree", "-r", "--name-only", sha, "--", *folders],
+            capture_output=True,
+            text=True,
+            cwd=REPO_PACKAGE,
+            check=True,
+            timeout=10,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    by_folder: dict[str, list[str]] = {f: [] for f in folders}
+    for line in out.splitlines():
+        path = Path(line)
+        if path.suffix == ".yaml" and str(path.parent) in by_folder:
+            by_folder[str(path.parent)].append(path.stem)
+    names = [n for f in folders for n in sorted(by_folder[f])]
+    return names or None
+
+
+def _stamp(root: Path, names: list[str]) -> tuple:
+    """A cheap signature of what a re-derivation reads (the variants' result files and
+    `days.csv`): a cached answer is reused only while none of them has changed, so a figure never
+    depends on when obt-api last restarted."""
+    newest, count = 0, 0
+    for n in names:
+        try:
+            st = store.result_path(n, root).stat()
+        except OSError:
+            continue
+        newest = max(newest, st.st_mtime_ns)
+        count += 1
+    try:
+        d = store.days_path(root).stat()
+        days = (d.st_mtime_ns, d.st_size)
+    except OSError:
+        days = (0, 0)
+    return (len(names), count, newest, days)
+
+
 _rederive_lock = threading.Lock()
-#: (root, book, day, entry hash) -> a verified re-derivation. The results before a day are never
-#: rewritten, so a verified answer stays true; a failed one is not cached (it may be fixed).
+#: (root, book, entry hash, store stamp) -> the re-derivation's answer, verified or not.
 _rederive_cache: dict[tuple, dict] = {}
+
+
+def _universe(entry: dict, names: list[str], book: str) -> tuple[list[str] | None, str | None]:
+    """The universe the entry ranked: the current one when its fingerprint matches the entry's,
+    else the one at the entry's commit when that matches, else (None, why)."""
+    recorded = entry.get("universe")
+    if not recorded or pick.universe_fingerprint(names) == recorded:
+        return names, None
+    then = universe_at(entry.get("commit"), book)
+    if then is not None and pick.universe_fingerprint(then) == recorded:
+        return then, None
+    return None, (
+        f"the strategy universe has changed since the pick ({recorded.get('variants')} variants "
+        f"then, {len(names)} now) and the entry's commit {entry.get('commit')!r} does not give "
+        "it back (the entry stores only a count and a hash)"
+    )
 
 
 def rederive_runner_up(
@@ -249,23 +350,43 @@ def rederive_runner_up(
     root: Path,
     names: list[str],
     book: str = "core",
-    source: HistorySource | None = None,
+    sources: Sources | None = None,
+    stamp: tuple | None = None,
 ) -> dict:
     """The best unpicked Dir of list C for the entry's day, as the 09:16 message gave it:
-    {verified, dir, note}. Re-runs the pick's history load, `pick.score_history` and
-    `pick.next_best` on the results before the day with the entry's VIX open, labels and rule;
-    verified only when the re-derived picks, the inputs digest and the universe all equal the
-    entry's."""
-    key = (str(root), book, entry.get("day"), entry.get("hash"))
+    {verified, dir, note}. Re-runs `pick.score_history` and `pick.next_best` on the history the
+    entry ranked on (its universe, its first `inputs_days` days) with the entry's VIX open,
+    labels and rule. Verified only when the inputs digest, the universe, the picks, list C's
+    recorded composites and the VIX band all equal the entry's."""
+    stamp = stamp if stamp is not None else _stamp(root, names)
+    key = (str(root), book, entry.get("day"), entry.get("hash"), stamp)
     with _rederive_lock:
         hit = _rederive_cache.get(key)
     if hit is not None:
         return hit
+    out = _rederive(entry, root, names, book, sources or Sources(root))
+    with _rederive_lock:
+        _rederive_cache[key] = out
+    return out
+
+
+def _rederive(entry: dict, root: Path, names: list[str], book: str, sources: Sources) -> dict:
+    def fail(note: str) -> dict:
+        return {"verified": False, "dir": None, "note": note}
+
+    universe, why = _universe(entry, names, book)
+    if universe is None:
+        return fail(why or "the strategy universe differs from the one the pick ranked")
     day = date.fromisoformat(str(entry["day"]))
+    n_days = entry.get("inputs_days")
     try:
-        hist = (source or HistorySource(root, names)).history(day, entry_basis(entry))
+        hist = sources.get(universe).history(
+            day, entry_basis(entry), int(n_days) if n_days is not None else None
+        )
     except pick.PickError as error:
-        return {"verified": False, "dir": None, "note": f"cannot re-derive: {error}"}
+        return fail(f"cannot re-derive: {error}")
+    if entry.get("inputs_sha") and hist.digest != entry["inputs_sha"]:
+        return fail("the stored results before the day differ from those the pick read")
     labels = recorded_labels(entry)
     dte_in = {"dte_n": labels["NIFTY"], "dte_s": labels["SENSEX"]}
     vix = _number(str(entry.get("vix_open")))
@@ -275,22 +396,16 @@ def rederive_runner_up(
     problems = []
     if any(again.get(k) != recorded.get(k) for k in ("core", "buy", "overridden")):
         problems.append("the re-derived picks differ from the entry")
-    if entry.get("inputs_sha") and hist.digest != entry["inputs_sha"]:
-        problems.append("the stored results before the day differ from those the pick read")
-    if entry.get("universe") and pick.universe_fingerprint(names) != entry["universe"]:
-        problems.append("the strategy universe differs from the one the pick ranked")
+    if again.get("composite") != recorded.get("composite"):
+        problems.append("the re-derived composites differ from the entry's")
+    if entry.get("vix_band") is not None and vix_band(vix) != entry["vix_band"]:
+        problems.append("the VIX band of the recorded open differs from the entry's")
+    if problems:
+        return fail("; ".join(problems))
     best = pick.next_best(hist, day, vix, dte_in, expiry_only=rule).get(LIST_KEY) or {}
-    if not problems and best.get("dir") is None:
-        problems.append("no unpicked Dir to add")
-    out = {
-        "verified": not problems,
-        "dir": None if problems else best["dir"],
-        "note": "; ".join(problems) or None,
-    }
-    if out["verified"]:
-        with _rederive_lock:
-            _rederive_cache[key] = out
-    return out
+    if best.get("dir") is None:
+        return fail("no unpicked Dir to add")
+    return {"verified": True, "dir": best["dir"], "note": None}
 
 
 # --- one day ------------------------------------------------------------------------------------
@@ -302,7 +417,8 @@ def day_row(
     root: Path,
     names: list[str],
     results: dict[str, dict[date, dict]],
-    source: HistorySource | None = None,
+    sources: Sources | None = None,
+    stamp: tuple | None = None,
 ) -> dict:
     """One forward entry as a row: its picks, each plan's lots and figures, and the day status."""
     day = date.fromisoformat(str(entry["day"]))
@@ -329,7 +445,7 @@ def day_row(
         notes.append("the entry does not hold three core picks with a Widesl")
     need = needs_runner_up(core, expiry)
     if not malformed and any(need.values()):
-        runner = rederive_runner_up(entry, root, names, book, source)
+        runner = rederive_runner_up(entry, root, names, book, sources, stamp)
         if not runner["verified"]:
             notes.append(runner["note"] or "the best unpicked Dir could not be verified")
 
@@ -389,7 +505,9 @@ def day_row(
         missing = sorted(
             {x["name"] for p in plans.values() for x in p["lots"] if x["gross"] is None}
         )
-        notes.append(f"waiting for the result of {', '.join(missing)}")
+        notes.append(
+            "result not stored (data excluded or evening run pending): " + ", ".join(missing)
+        )
     return {
         "day": day.isoformat(),
         "book": book,
@@ -444,7 +562,14 @@ def readout(rows: list[dict]) -> dict:
     net per day, with the 90 % block bootstrap interval and drawdown per lot. `n/a` before then."""
     n = len(rows)
     if n < READOUT_DAYS:
-        return {"status": "n/a", "days": n, "needed": READOUT_DAYS}
+        return {
+            "status": "n/a",
+            "days": n,
+            "needed": READOUT_DAYS,
+            "from": rows[0]["day"] if rows else None,
+            "to": rows[-1]["day"] if rows else None,
+            "note": READOUT_NOTE,
+        }
     judged = rows[:READOUT_DAYS]
 
     def series(plan: str, key: str) -> np.ndarray:
@@ -476,11 +601,14 @@ def readout(rows: list[dict]) -> dict:
         "from": judged[0]["day"],
         "to": judged[-1]["day"],
         "plans": plans,
+        "note": READOUT_NOTE,
     }
-    if n > READOUT_DAYS:  # descriptive only: the verdict above does not move
+    if n > READOUT_DAYS:  # descriptive only: never re-judged
         later = rows[READOUT_DAYS:]
         out["after_readout"] = {
             "days": len(later),
+            "from": later[0]["day"],
+            "to": later[-1]["day"],
             "diff_per_day": {
                 p: float(
                     np.mean([r["plans"][p]["net"] - r["plans"][COMPARATOR]["net"] for r in later])
@@ -495,8 +623,10 @@ def readout(rows: list[dict]) -> dict:
 def _message(today: date, counts: dict[str, int], entries: int) -> str | None:
     if counts["scored"]:
         return None
-    if today < FORWARD_FROM or not entries:
+    if today < FORWARD_FROM:
         return "Tracking starts Mon 19 Oct 2026: no forward day has been recorded yet."
+    if not entries:
+        return "No forward entries yet in this book's journal."
     waiting = counts["waiting"]
     return (
         f"No forward day scored yet: {entries} recorded"
@@ -527,8 +657,9 @@ def build(
     ]
     entries.sort(key=lambda e: e["day"])
     results: dict[str, dict[date, dict]] = {}
-    source = HistorySource(root, names)  # read lazily, only when a day needs a re-derivation
-    rows = [day_row(e, book, root, names, results, source) for e in entries]
+    sources = Sources(root)  # read lazily, only when a day needs a re-derivation
+    stamp = _stamp(root, names) if entries else ()
+    rows = [day_row(e, book, root, names, results, sources, stamp) for e in entries]
     scored = [r for r in rows if r["status"] == "scored"]
     counts = {s: sum(r["status"] == s for r in rows) for s in STATUSES}
     cumulative, running = [], dict.fromkeys(PLANS, 0.0)
@@ -608,7 +739,8 @@ def render(r: dict, last: int = 10) -> str:
         )
     ro = r["readout"]
     if ro["status"] == "n/a":
-        lines.append(f"  read-out: n/a ({ro['days']} of {ro['needed']} scored days)")
+        span = f", {ro['from']} -> {ro['to']}" if ro.get("from") else ""
+        lines.append(f"  read-out: n/a ({ro['days']} of {ro['needed']} scored days{span})")
     else:
         lines.append(f"  read-out on {ro['judged_days']} days {ro['from']} -> {ro['to']}:")
         for p in ro["plans"].values():
@@ -617,6 +749,16 @@ def render(r: dict, last: int = 10) -> str:
                 f"[{p['lo90']:+,.0f}, {p['hi90']:+,.0f}], drawdown per lot {p['dd_per_lot']:,.0f} "
                 f"vs {p['comparator_dd_per_lot']:,.0f}: {p['verdict']}"
             )
+        after = ro.get("after_readout")
+        if after:
+            diffs = ", ".join(
+                f"{PLAN_NAMES[k]} {v:+,.0f}" for k, v in after["diff_per_day"].items()
+            )
+            lines.append(
+                f"    after the read-out ({after['days']} days {after['from']} -> {after['to']}, "
+                f"descriptive): minus As picked a day {diffs}"
+            )
+    lines.append(f"  note: {READOUT_NOTE}")
     for row in r["rows"][-last:]:
         figures = "  ".join(
             f"{PLAN_NAMES[p]} {plan['total_lots'] or '-'}L {_inr(plan['net'])}"

@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import type {
-  LotPlanDay,
-  LotPlanRow,
-  LotPlanSummary,
-  RotationLotPlansResponse,
-} from '../../types/rotationLotPlans';
 import {
   PLAN_ORDER,
   chartLines,
@@ -19,77 +13,7 @@ import {
   perDayVsComparator,
   readoutLines,
 } from '../rotationLotPlansView';
-
-function summary(over: Partial<LotPlanSummary> & Pick<LotPlanSummary, 'plan'>): LotPlanSummary {
-  return {
-    name: over.plan,
-    days: 0,
-    lot_days: 0,
-    mean_lots: null,
-    gross: 0,
-    brokerage: 0,
-    net: 0,
-    gross_per_day: null,
-    brokerage_per_day: null,
-    net_per_day: null,
-    max_drawdown: null,
-    worst_day: null,
-    lots_today: null,
-    ...over,
-  };
-}
-
-function response(over: Partial<RotationLotPlansResponse> = {}): RotationLotPlansResponse {
-  return {
-    book: 'core',
-    list: 'C',
-    forward_from: '2026-10-19',
-    today: '2026-10-18',
-    plans: [
-      summary({ plan: 'duo' }),
-      summary({ plan: 'as_picked' }),
-      summary({ plan: 'dir_boost' }),
-    ],
-    comparator: 'as_picked',
-    counts: { scored: 0, waiting: 0, late: 0, unverified: 0, entries: 0 },
-    cumulative: [],
-    rows: [],
-    readout: { status: 'n/a', days: 0, needed: 60 },
-    chain: { intact: true, problems: [] },
-    message: 'Tracking starts Mon 19 Oct 2026: no forward day has been recorded yet.',
-    ...over,
-  };
-}
-
-function day(over: Partial<LotPlanDay> = {}): LotPlanDay {
-  return {
-    lots: [],
-    total_lots: 3,
-    status: 'scored',
-    gross: 1000,
-    brokerage: 200,
-    net: 800,
-    ...over,
-  };
-}
-
-function row(over: Partial<LotPlanRow> = {}): LotPlanRow {
-  return {
-    day: '2026-10-22',
-    book: 'core',
-    weekday: 'Thu',
-    expiry: false,
-    dte: { NIFTY: '1', SENSEX: '2' },
-    expiry_only: null,
-    recorded_at: '2026-10-22T09:16:04+05:30',
-    status: 'scored',
-    note: null,
-    picks: [],
-    runner_up_dir: null,
-    plans: { as_picked: day(), dir_boost: day({ total_lots: 4 }), duo: day({ total_lots: 4 }) },
-    ...over,
-  };
-}
+import { day, response, row, summary } from './rotationLotPlansFixture';
 
 describe('before the first forward day', () => {
   it('says tracking starts on Monday and draws no chart', () => {
@@ -102,6 +26,17 @@ describe('before the first forward day', () => {
     expect(chartLines(r)).toEqual([]);
     expect(countsText(r)).toBe('No forward entry yet');
     expect(readoutLines(r.readout)).toEqual(['Read-out at 60 forward scored days: 0 so far.']);
+  });
+
+  it('says there are no entries yet, not that tracking starts, once 19 Oct has passed', () => {
+    const r = response({
+      today: '2026-10-21',
+      message: "No forward entries yet in this book's journal.",
+    });
+    expect(emptyState(r)).toEqual({
+      title: 'No forward entries yet',
+      description: "No forward entries yet in this book's journal.",
+    });
   });
 
   it('says nothing is scored yet once entries exist but wait for results', () => {
@@ -194,6 +129,13 @@ describe('daily rows', () => {
     });
     expect(legsText(r, 'duo')).toBe('N_wide_0917 ×2 · S_dir_0917 ×2 (best unpicked Dir)');
     expect(legsText(r, 'as_picked')).toBe('Not known: the best unpicked Dir could not be verified');
+    const malformed = row({
+      note: 'the entry does not hold three core picks with a Widesl',
+      plans: { as_picked: day({ lots: [] }), dir_boost: day(), duo: day() },
+    });
+    expect(legsText(malformed, 'as_picked')).toBe(
+      'Not known: the entry does not hold three core picks with a Widesl',
+    );
   });
 
   it('counts each status, leaving out zeros', () => {
@@ -230,10 +172,24 @@ describe('the read-out', () => {
           verdict: 'inconclusive',
         },
       },
+      after_readout: {
+        days: 3,
+        from: '2027-01-14',
+        to: '2027-01-18',
+        diff_per_day: { dir_boost: 50, duo: -20 },
+      },
     });
     expect(lines).toEqual([
+      'Read-out on the first 60 scored days, 19 Oct 2026 to 13 Jan 2027:',
       'Dir Boost minus As picked: +₹240 a day, 90% interval +₹30 to +₹450; drawdown per lot -₹2,000 vs -₹2,100: beats As picked.',
       'Duo minus As picked: -₹120 a day, 90% interval -₹400 to +₹150; drawdown per lot -₹3,000 vs -₹2,100: inconclusive.',
+      'After the read-out, 3 more days (14 Jan 2027 to 18 Jan 2027), descriptive only: Dir Boost +₹50 a day against As picked, Duo -₹20 a day against As picked.',
     ]);
+  });
+
+  it('gives the dates of the scored days before it is read', () => {
+    expect(
+      readoutLines({ status: 'n/a', days: 2, needed: 60, from: '2026-10-19', to: '2026-10-21' }),
+    ).toEqual(['Read-out at 60 forward scored days: 2 so far (19 Oct 2026 to 21 Oct 2026).']);
   });
 });
