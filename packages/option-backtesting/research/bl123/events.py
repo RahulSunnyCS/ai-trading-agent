@@ -1,6 +1,6 @@
-"""BL-120 Phase 1, step 1: the rule's first event (if any) on every judged day.
+"""BL-123 Phase 1, step 1: the rule's first event (if any) on every judged day.
 
-    uv run --with pandas python research/bl120/events.py [--reading A|B] [--workers 6]
+    uv run --with pandas python research/bl123/events.py [--reading A|B] [--workers 6]
 
 Reading A is Phase 0's rule (rise measured from 14:30), B is block 2's (rise from the day's low, Phase
 0b). Writes out/events.csv (A) or out/events_b.csv (B): one row per cell-day (status ok / no_data), with

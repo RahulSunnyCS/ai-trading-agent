@@ -1,6 +1,6 @@
 """The rolling (dynamic) ATM straddle at one-minute cadence, shared by research items.
 
-Copied from `research/bl091/series.py` (BL-091 E.1) on 2026-10-18 for BL-120, because research code is
+Copied from `research/bl091/series.py` (BL-091 E.1) on 2026-10-18 for BL-123, because research code is
 not imported across item folders. The copy drops the learning-period guard (the caller applies its own
 read guard), the spliced diagnostic and the stale mask. BL-091 can be pointed here later; until then a
 fix to one copy must be made in both.

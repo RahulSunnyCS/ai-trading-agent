@@ -1,4 +1,4 @@
-"""BL-120: the rule, as registered in the item's Phase 0 (one definition each; nothing here is tuned).
+"""BL-123: the rule, as registered in the item's Phase 0 (one definition each; nothing here is tuned).
 
 From 14:30 (minute index 315, 09:15 = 0) on the rolling ATM straddle series x:
   low(t)  = min x[315..t],  high(t) = max x[315..t],  rise(t) = x[t] - low(t)

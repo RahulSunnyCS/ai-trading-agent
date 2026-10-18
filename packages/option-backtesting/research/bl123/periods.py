@@ -1,4 +1,4 @@
-"""BL-120: the read guard. Only the registered screening cells may be opened.
+"""BL-123: the read guard. Only the registered screening cells may be opened.
 
 Judged cells (Phase 0): NIFTY in P2 and P3, SENSEX in P2. P1 (2025-12-03 -> 2026-10-08), the days
 between P2 and P1, and every day after 2026-10-08 stay unread until Phase 2's gate is met (a cell
@@ -31,7 +31,7 @@ def period_of(underlying: str, day: date) -> str | None:
 def assert_day(underlying: str, day: date) -> str:
     period = period_of(underlying, day)
     if period is None:
-        raise ForbiddenDay(f"{underlying} {day} is outside the BL-120 screening cells")
+        raise ForbiddenDay(f"{underlying} {day} is outside the BL-123 screening cells")
     return period
 
 
@@ -40,7 +40,7 @@ def cell_days(root: Path, underlying: str, period: str) -> tuple[list[date], dic
     from option_backtesting.legwise.market import backtest_days
 
     if (period, underlying) not in CELLS:
-        raise ForbiddenDay(f"{underlying} {period} is not a BL-120 cell")
+        raise ForbiddenDay(f"{underlying} {period} is not a BL-123 cell")
     lo, hi = PERIODS[period]
     days, skipped = backtest_days(root, underlying, lo, hi)
     days = [d for d in days if d.weekday() < 5]

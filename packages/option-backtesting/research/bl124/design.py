@@ -1,4 +1,4 @@
-"""BL-121: the whole comparator design from out/events.csv, one function used by run.py and read.py so the
+"""BL-124: the whole comparator design from out/events.csv, one function used by run.py and read.py so the
 simulations that are run are exactly the ones that are read. Comparator rules: research/common/event_design.py.
 
 Cells are (arm, period): R1 and R2 in P2 and in P3. Per cell: the events (sorted by day), each event's causal

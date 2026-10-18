@@ -1,7 +1,7 @@
-"""BL-120: the checks the item's Phase 1 requires before any result is read.
+"""BL-123: the checks the item's Phase 1 requires before any result is read.
 
-    uv run --with pandas python research/bl120/selfcheck.py            # synthetic checks only
-    uv run --with pandas python research/bl120/selfcheck.py --real     # plus real-data checks (needs out/events.csv)
+    uv run --with pandas python research/bl123/selfcheck.py            # synthetic checks only
+    uv run --with pandas python research/bl123/selfcheck.py --real     # plus real-data checks (needs out/events.csv)
 
 Synthetic: a series that must fire at a known minute, and seven that must not or must fire differently.
 Real: (1) truncation: the detector on the series cut at the fire minute gives the same event, cut one

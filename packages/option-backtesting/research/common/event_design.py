@@ -1,7 +1,7 @@
 """How comparators are chosen for an event-versus-placebo study. Shared by research items.
 
-Copied from `research/bl120/design.py` on 2026-10-18 for BL-121 (research code is not imported across
-item folders; BL-120 keeps its own copy and can be pointed here later).
+Copied from `research/bl123/design.py` on 2026-10-18 for BL-124 (research code is not imported across
+item folders; BL-123 keeps its own copy and can be pointed here later).
 
 Causal placebo: for an event on day d with fire minute j, the 10 nearest days (5 before, 5 after) of the
 same cell on which the rule had NOT fired at or before j: a day with no fire at all, or a fire at a later

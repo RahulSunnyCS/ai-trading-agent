@@ -1,4 +1,4 @@
-"""BL-120: how comparators are chosen. One definition, used by run.py (to know what to simulate) and
+"""BL-123: how comparators are chosen. One definition, used by run.py (to know what to simulate) and
 read.py (to read it), so the two cannot drift.
 
 Causal placebo (Phase 0, comparator 1): for an event on day d with fire minute j, the 10 nearest days

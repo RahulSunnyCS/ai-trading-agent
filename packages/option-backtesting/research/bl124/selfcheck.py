@@ -1,7 +1,7 @@
-"""BL-121: the checks Phase 1 requires before any result is read.
+"""BL-124: the checks Phase 1 requires before any result is read.
 
-    uv run --with pandas python research/bl121/selfcheck.py            # synthetic checks only
-    uv run --with pandas python research/bl121/selfcheck.py --real     # plus real-data checks (needs out/events.csv)
+    uv run --with pandas python research/bl124/selfcheck.py            # synthetic checks only
+    uv run --with pandas python research/bl124/selfcheck.py --real     # plus real-data checks (needs out/events.csv)
 
 Synthetic: each arm fires where it should and not where it should not. Real: (1) an independent numpy
 implementation of both arms agrees with rule.detect on a sample of real days and with the scan file; (2)

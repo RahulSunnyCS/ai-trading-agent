@@ -1,4 +1,4 @@
-"""BL-121: the read guard. Only the registered cells may be opened.
+"""BL-124: the read guard. Only the registered cells may be opened.
 
 Judged cells (Phase 0): NIFTY in P2 and in P3, each arm separately. P1 (2025-12-03 -> 2026-10-08), the days
 between P2 and P1, and every day after 2026-10-08 stay unread until Phase 2's gate is met (an arm
@@ -32,7 +32,7 @@ def period_of(underlying: str, day: date) -> str | None:
 def assert_day(underlying: str, day: date) -> str:
     period = period_of(underlying, day)
     if period is None:
-        raise ForbiddenDay(f"{underlying} {day} is outside the BL-121 cells")
+        raise ForbiddenDay(f"{underlying} {day} is outside the BL-124 cells")
     return period
 
 

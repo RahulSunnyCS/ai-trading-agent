@@ -1,4 +1,4 @@
-"""BL-121: the rule, as registered in the item's Phase 0 (one definition each; nothing here is tuned).
+"""BL-124: the rule, as registered in the item's Phase 0 (one definition each; nothing here is tuned).
 
 On the rolling ATM straddle series x (minute index, 09:15 = 0):
   S0 = x[2]                      the value noted at 09:17

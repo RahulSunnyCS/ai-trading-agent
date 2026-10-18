@@ -1,6 +1,6 @@
-"""BL-120 block 2: the read-out, exactly as registered in Phase 0b.
+"""BL-123 block 2: the read-out, exactly as registered in Phase 0b.
 
-    uv run --with pandas python research/bl120/read.py
+    uv run --with pandas python research/bl123/read.py
 
 Reads out/events_b.csv and out/sims_b.csv. Judged cell: NIFTY, P2 and P3 pooled. SENSEX P2 is reported
 and never judged. Net = after Rs 20 an order. Writes out/readout_b.md and out/readout_b.json.
@@ -152,7 +152,7 @@ def main() -> int:
         "event - placebo | t | random-minute P95 | draws below event |\n|---|---|---|---|---|---|---|---|---|---|---|---|"
     )
     lines = [
-        "# BL-120 block 2 read-out (rupees per Widesl strategy, after Rs 20 an order; gross has no cost)\n",
+        "# BL-123 block 2 read-out (rupees per Widesl strategy, after Rs 20 an order; gross has no cost)\n",
         head,
         row("NIFTY P2 + P3 pooled (judged)", pooled),
         row("NIFTY P2 (sign check)", p2),

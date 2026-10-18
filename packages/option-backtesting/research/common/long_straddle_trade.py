@@ -2,7 +2,7 @@
 
 Built from the structure of `strategies/rotation/N_dir_1202.yaml` (ATM weekly legs, 1 lot each) with the
 legs flipped to `buy`, a percentage stop on each leg, a trailing stop in points and no re-entry or overall
-stop. Defaults are BL-121's: leg stop 25 %, trail [3, 2] points (every 3 points of favourable move moves
+stop. Defaults are BL-124's: leg stop 25 %, trail [3, 2] points (every 3 points of favourable move moves
 the stop 2), exit 15:14 (the Buy family's exit). Rupees per straddle (both legs). `lot_sizing: current`,
 sizing date 2026-10-12, cost 20 rupees an order (entry and exit of each leg are one order each).
 """

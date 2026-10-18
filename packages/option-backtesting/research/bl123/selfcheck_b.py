@@ -1,7 +1,7 @@
-"""BL-120 block 2: the checks required before any block-2 P&L is computed.
+"""BL-123 block 2: the checks required before any block-2 P&L is computed.
 
-    uv run --with pandas python research/bl120/selfcheck_b.py            # synthetic checks only
-    uv run --with pandas python research/bl120/selfcheck_b.py --real     # plus real-data checks
+    uv run --with pandas python research/bl123/selfcheck_b.py            # synthetic checks only
+    uv run --with pandas python research/bl123/selfcheck_b.py --real     # plus real-data checks
 
 Synthetic: a spike already held before 14:30 that gives back after it fires; one already given back
 before 14:30 does not; a new low resets the epoch; and the Phase 0 cases that still apply. Real: an

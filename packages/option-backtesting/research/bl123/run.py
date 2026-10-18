@@ -1,6 +1,6 @@
-"""BL-120 block 2: simulate every Widesl the read-out needs (events, placebo days, random minutes).
+"""BL-123 block 2: simulate every Widesl the read-out needs (events, placebo days, random minutes).
 
-    uv run --with pandas python research/bl120/run.py [--workers 6]
+    uv run --with pandas python research/bl123/run.py [--workers 6]
 
 Reads out/events_b.csv, builds the design (design.build), and runs one Widesl (live shape, ₹1,000 overall
 stop, ₹20 an order) for each unique (index, day, entry minute) it needs: the events' own entries, the

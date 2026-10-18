@@ -1,6 +1,6 @@
-"""BL-121 Phase 1, step 1: each arm's first event (if any) on every judged day. No P&L here.
+"""BL-124 Phase 1, step 1: each arm's first event (if any) on every judged day. No P&L here.
 
-    uv run --with pandas python research/bl121/events.py [--workers 6]
+    uv run --with pandas python research/bl124/events.py [--workers 6]
 
 Writes out/events.csv: one row per cell-day (status ok / no_data / no_priced), with S0, H, the fire and
 entry minutes of each arm, strike switches inside the window and days to expiry.

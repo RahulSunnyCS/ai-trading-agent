@@ -1,9 +1,9 @@
-# BL-120 — Late-day straddle give-back: after 14:30, a held rise in the rolling ATM straddle that gives back 15 points starts a Widesl with a ₹1,000 stop
+# BL-123 — Late-day straddle give-back: after 14:30, a held rise in the rolling ATM straddle that gives back 15 points starts a Widesl with a ₹1,000 stop
 
 | | |
 |---|---|
 | **Priority** | P1 — the owner's own rule (2026-10-18), the first rule-triggered intraday test that is not a re-entry habit; cheap to run |
-| **Status** | In progress. Block 2 (the day's-low reading) run on NIFTY P2 + P3 pooled: **inconclusive** (mean net +₹151 per Widesl on 36 events, +₹126 over the causal placebo, t 0.94, above the random-minute P95); P1 not read (gate not met); owner to decide whether to go on |
+| **Status** | Parked (owner, 2026-10-18): block 2 inconclusive, +₹151 per Widesl on 36 NIFTY events, +₹126 over the causal placebo, t 0.94; about 160 events would be needed; P1 unread. Reopen only with a new reason |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -106,7 +106,7 @@ event days, after charges, and whether it survives one read of P1.
   unread day before the gate; a per-expiry or per-VIX sweep (reported as description only).
 - **Reported, not judged:** events by year and half-year, entry-minute distribution, win rate, mean
   winner and loser, share stopped out, expiry versus other days, strike switches inside the rise.
-- **Done when:** this block is in a commit named in the Log, before `research/bl120/` holds a run.
+- **Done when:** this block is in a commit named in the Log, before `research/bl123/` holds a run.
 
 ### Phase 0b — Block 2: the day's-low reading (registered 2026-10-18, after the event counts, before any placebo or trade P&L)
 
@@ -161,7 +161,7 @@ not restated here stands (series, trade, stop, costs, comparators, tests, read g
 ### Phase 1 — Build, check, run P2 and P3
 
 - **Tasks:** `research/common/straddle_series.py` (the series builder BL-091 uses, copied; BL-091 can be
-  pointed at it later, since research code is not imported across item folders); `research/bl120/`:
+  pointed at it later, since research code is not imported across item folders); `research/bl123/`:
   `rule.py` (the detector), `periods.py` (the read guard: P2 and P3 only until the gate is met),
   `selfcheck.py`, `run.py` (events, placebo and random-minute simulations, memoised by day and minute),
   `read.py` (the read-out).
@@ -217,7 +217,7 @@ after 60 sessions. Not started by this item.
   ₹1,000 as the overall stop; the series, trade and periods from BL-091). Phase 0 committed before any
   run (commit 8e5918e4).
 - 2026-10-18 — **Phase 1, build and checks.** `research/common/straddle_series.py` (BL-091's series
-  builder, copied) and `widesl_trade.py` (BL-091's Widesl runner, copied); `research/bl120/`:
+  builder, copied) and `widesl_trade.py` (BL-091's Widesl runner, copied); `research/bl123/`:
   `rule.py`, `periods.py` (read guard: only the three registered cells open), `design.py` (placebo and
   random-minute selection, written, not yet used), `events.py`, `selfcheck.py`. Checks, all passing:
   15 synthetic cases (known fire, rise held 4 minutes, give-back 14, rise 19, fall inside the hold,
@@ -307,3 +307,4 @@ after 60 sessions. Not started by this item.
   series counts strike switches as movement (median 30 inside the window from 09:20), so a "rise" can be
   the strike moving. P2 + P3 are not clean for this rule (see Context); a pass would only have been a
   screen. Counted tries in this item: rule A (counts only), three other readings (counts only), block 2.
+- 2026-10-18 — **Parked by the owner** ("park BL-120 and BL-121 as they stand"). **Renumbered from BL-120**: that number was taken on `main`'s line of work (BL-120 desk screens and strategy tester); nothing of this item had been pushed. Folder `research/bl120` is now `research/bl123`.

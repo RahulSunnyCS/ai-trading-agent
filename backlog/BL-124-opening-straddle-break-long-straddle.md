@@ -1,4 +1,4 @@
-# BL-121 — Opening-range break of the rolling ATM straddle: after 09:30, a break of the 09:17–09:30 high that is 10 points up buys a long straddle (25% leg stop, trail 3:2)
+# BL-124 — Opening-range break of the rolling ATM straddle: after 09:30, a break of the 09:17–09:30 high that is 10 points up buys a long straddle (25% leg stop, trail 3:2)
 
 | | |
 |---|---|
@@ -7,7 +7,7 @@
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
-| **Depends on** | BL-120 (series builder, read guard, placebo design: copied, not imported), BL-091 (the rolling-ATM series), BL-083 (event-versus-placebo method) |
+| **Depends on** | BL-123 (series builder, read guard, placebo design: copied, not imported), BL-091 (the rolling-ATM series), BL-083 (event-versus-placebo method) |
 | **TODO.md row** | — (added with the result) |
 
 ## Context
@@ -40,7 +40,7 @@ the event days, after charges, in two periods; and a decision whether to read P1
 ## Out of scope
 
 - Short straddles or any other template, a break to the downside, SENSEX, other windows or sizes.
-- Any change to the lists, the journal, BL-119's or BL-120's rules.
+- Any change to the lists, the journal, BL-119's or BL-123's rules.
 - Live or forward running (a later dated block, only after a P1 pass).
 
 ## Plan
@@ -54,7 +54,7 @@ the event days, after charges, in two periods; and a decision whether to read P1
   **P2** (2025-01-10 → 2025-08-29) and **P3** (2022-04-05 → 2024-10-08), each judged separately for each
   arm. **P1** (2025-12-03 → 2026-10-08), the days between P2 and P1, and every day after 2026-10-08 are
   **not read** until Phase 2's gate is met. SENSEX is not run (the owner named NIFTY).
-- **Series:** the rolling ATM straddle at one value per minute, exactly as BL-091 E.1 / BL-120 build it
+- **Series:** the rolling ATM straddle at one value per minute, exactly as BL-091 E.1 / BL-123 build it
   (`level(rolling_straddle(chain)).x`; a strike switch counts as movement; each leg priced from a trade at
   most 5 minutes old, an unpriced minute holds the last value).
 - **Definitions (one each; any other value is a new dated block):**
@@ -86,7 +86,7 @@ the event days, after charges, in two periods; and a decision whether to read P1
   2. **Random minute:** on the event days, the same straddle at an entry minute drawn at random from the
      cell's own event entry minutes; 200 draws, seed 20261018 plus a per-cell offset. The event mean is
      compared with the 95th percentile of the 200 draw means.
-- **Pass / kill rule (two arms, so the t bar is 2.5; the screening bar of BL-091 / BL-120 otherwise):**
+- **Pass / kill rule (two arms, so the t bar is 2.5; the screening bar of BL-091 / BL-123 otherwise):**
   1. mean **net** (after ₹20 an order) per event > 0;
   2. event minus the causal placebo > 0 with t ≥ **2.5** over events;
   3. the event mean above the 95th percentile of the 200 random-minute means.
@@ -95,7 +95,7 @@ the event days, after charges, in two periods; and a decision whether to read P1
   example tests 1 and 2's sign hold but t < 2.5, or test 3 fails).
 - **Counted tries:** two arms in two cells (four judged cells, one trade template, no tuning). Lineage
   disclosed: BL-081 (14 state variables, one of them the straddle's move), BL-083 (four triggers incl. a
-  straddle turn), BL-091 (31 straddle-sell arms), BL-101 (an unconditional long straddle), BL-120 (a late
+  straddle turn), BL-091 (31 straddle-sell arms), BL-101 (an unconditional long straddle), BL-123 (a late
   short-side rule) all read these days; the owner's rule was formed knowing some of those results, so a
   P2 + P3 pass is a **screen** and only a P1 read is evidence.
 - **Hold-out:** P1 only (Phase 2), read once, only if an arm screen-passed. No parameter is fitted.
@@ -110,7 +110,7 @@ the event days, after charges, in two periods; and a decision whether to read P1
 ### Phase 1 — Build, check, run P2 and P3
 
 - **Tasks:** `research/common/long_straddle_trade.py` (the trade; done), `research/common/event_design.py`
-  (placebo and random-minute selection, copied from BL-120's `design.py`); `research/bl121/`: `rule.py`,
+  (placebo and random-minute selection, copied from BL-123's `design.py`); `research/bl124/`: `rule.py`,
   `periods.py` (the read guard), `events.py`, `design.py`, `selfcheck.py`, `run.py`, `read.py`.
 - **Checks before any result is read:** synthetic series for each arm (break without the 10 points; 10
   points without a break; R1 fires where R2 has not; a break at 09:30 versus 09:31; a break after 14:00; a
@@ -134,7 +134,7 @@ Not started by this item.
 
 - **Theta.** A long straddle loses premium every minute; only the placebo difference says the break adds
   anything, and the Buy family and BL-101 argue against.
-- **The rolling series moves when the strike moves.** A "10-point rise" can be the ATM switching (BL-120
+- **The rolling series moves when the strike moves.** A "10-point rise" can be the ATM switching (BL-123
   saw a median of about 30 switches in a day's window); the owner's definition counts it, and the share of
   events carried by switches is reported.
 - **Tight stops, bar fills.** A 25 % stop with a 3:2 trail ratchets quickly; the engine fills stops at the
@@ -154,7 +154,7 @@ Not started by this item.
   window ends at 14:00, exit 15:14, trail in points, two arms for the two readings. Phase 0 committed
   before any run.
 - 2026-10-18 — **Build and checks** (before any simulation): `research/common/long_straddle_trade.py`,
-  `research/common/event_design.py`, `research/bl121/` (`rule.py`, `periods.py`, `events.py`, `design.py`,
+  `research/common/event_design.py`, `research/bl124/` (`rule.py`, `periods.py`, `events.py`, `design.py`,
   `selfcheck.py`, `run.py`, `read.py`). 17 synthetic cases pass (R1 fires where R2 does not; 10 over the noted
   value without a break does not fire; equal to H is not a break; a spike at 09:30 raises H and does not fire,
   one at 09:31 does; index 285 fires and 286 does not; truncation). On real days an independent array-mask
@@ -198,3 +198,4 @@ Not started by this item.
   window end other than 14:00 were not run (the owner gave none of those, the choices are mine). The two
   arms are nested, so four cells come from two signals. P2 + P3 are not clean for this rule; P1 was never
   needed. Counted tries in this item: two arms in two cells.
+- 2026-10-18 — **Parked as it stands by the owner** (killed; nothing further). **Renumbered from BL-121**: that number was taken on `main` (BL-121 moved expiry days) and BL-120 by the desk-screens item; nothing of this item had been pushed. Folder `research/bl121` is now `research/bl124`.

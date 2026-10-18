@@ -1,6 +1,6 @@
-"""BL-121: the read-out, exactly as registered in Phase 0.
+"""BL-124: the read-out, exactly as registered in Phase 0.
 
-    uv run --with pandas python research/bl121/read.py
+    uv run --with pandas python research/bl124/read.py
 
 Reads out/events.csv and out/sims.csv. Cells: arm (R1, R2) x period (P2, P3), each judged separately.
 Net = after Rs 20 an order. Writes out/readout.md and out/readout.json. A simulation that is missing is
@@ -139,7 +139,7 @@ def main() -> int:
         "|---|---|---|---|---|---|---|---|---|---|---|---|"
     )
     lines = [
-        "# BL-121 read-out (rupees per long straddle, after Rs 20 an order; gross has no cost)\n",
+        "# BL-124 read-out (rupees per long straddle, after Rs 20 an order; gross has no cost)\n",
         head,
     ]
     results, dfs = {}, {}

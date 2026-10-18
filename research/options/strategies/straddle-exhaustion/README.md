@@ -34,7 +34,7 @@ so a forward shadow (trigger T5 in the nightly scoring) is the only unseen test.
 | 1b | Dir D2 at a level rejection or break | **No arm passes** (NIFTY 2025 −₹716 to −₹840 vs comparator) | [BL-091][bl091] |
 | 2 | 32 parameters to tell a true top from a pause | One separates for NIFTY (5-minute change of the ATM IV approximation, AUC 0.627 / 0.603); rule R1 built from it **does not pass** (2025: −₹1,234 vs comparator, t −3.6) | [BL-091][bl091] |
 | Time gates | 13 extra arms: no re-entry before 13:30 / 14:00 / 14:30 / 14:50 (G), or no entry at all before the gate (F) | **Post-hoc lead:** F1450 meets the screening bar (NIFTY 2025 +₹241 vs comparator, t 2.45; 2022–24 +₹160; +₹195 at ₹20 an order; SENSEX +₹349, t 2.46) | [BL-091][bl091] |
-| Late give-back (BL-120) | After 14:30, the straddle up 20 (SENSEX 50) from the day's low, held 5 minutes, then down 15 from its high: Widesl with a ₹1,000 stop. Causal placebo and random-minute comparators | **Inconclusive** on NIFTY P2 + P3 pooled (36 events, +₹151 per Widesl after ₹20 an order, +₹126 over the placebo, t 0.94, above the random-minute P95); SENSEX P2 18 events reported only; the rule as first stated (rise measured from 14:30) fired on 4 / 8 / 7 tradable days and was inconclusive by construction | [BL-120][bl120] |
+| Late give-back (BL-123) | After 14:30, the straddle up 20 (SENSEX 50) from the day's low, held 5 minutes, then down 15 from its high: Widesl with a ₹1,000 stop. Causal placebo and random-minute comparators | **Inconclusive** on NIFTY P2 + P3 pooled (36 events, +₹151 per Widesl after ₹20 an order, +₹126 over the placebo, t 0.94, above the random-minute P95); SENSEX P2 18 events reported only; the rule as first stated (rise measured from 14:30) fired on 4 / 8 / 7 tradable days and was inconclusive by construction | [BL-123][bl123] |
 
 ## What we know
 
@@ -52,7 +52,7 @@ so a forward shadow (trigger T5 in the nightly scoring) is the only unseen test.
   not re-run; the expected effect is small and a re-run is owed before any P1 test.
 - All rupees are per strategy at cost 0 and at ₹20 an order; no slippage.
 
-- BL-120 (2026-10-18): the owner's late-day version, a held rise from the day's low then a 15-point
+- BL-123 (2026-10-18): the owner's late-day version, a held rise from the day's low then a 15-point
   give-back after 14:30, was positive but not distinguishable from the same Widesl at the same minute on
   ordinary days (36 NIFTY events, t 0.94). About 160 events would be needed to see an effect this size.
   P1 is unread. Splits by hold-before-14:30 and entry-before-14:45 look better but are post hoc leads on
@@ -70,8 +70,8 @@ so a forward shadow (trigger T5 in the nightly scoring) is the only unseen test.
   [intraday state](../../common/intraday-state.md).
 - [Widesl re-entry](../widesl/re-entry.md), [Widesl entry time](../widesl/entry-time.md).
 - Scripts: `packages/option-backtesting/research/bl091/` (`sustained.py`, `stage1.py`, `stage1b.py`,
-  `stage2.py`, `report_stages.py`); BL-120: `packages/option-backtesting/research/bl120/`. Outputs (`out/stage1.md`, `out/gates.csv`) are git-ignored;
+  `stage2.py`, `report_stages.py`); BL-123: `packages/option-backtesting/research/bl123/`. Outputs (`out/stage1.md`, `out/gates.csv`) are git-ignored;
   regenerate with those scripts.
 
 [bl091]: ../../../../backlog/BL-091-straddle-premium-exhaustion-study.md
-[bl120]: ../../../../backlog/BL-120-late-straddle-giveback-widesl.md
+[bl123]: ../../../../backlog/BL-123-late-straddle-giveback-widesl.md

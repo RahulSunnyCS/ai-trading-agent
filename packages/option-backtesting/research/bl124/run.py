@@ -1,6 +1,6 @@
-"""BL-121: simulate every long straddle the read-out needs (events, placebo days, random minutes).
+"""BL-124: simulate every long straddle the read-out needs (events, placebo days, random minutes).
 
-    uv run --with pandas python research/bl121/run.py [--workers 6]
+    uv run --with pandas python research/bl124/run.py [--workers 6]
 
 Reads out/events.csv, builds the design, and runs one long ATM straddle (buy CE + PE, 25 % leg stop, trail
 [3, 2] points, exit 15:14, Rs 20 an order) for each unique (day, entry minute) it needs. Writes

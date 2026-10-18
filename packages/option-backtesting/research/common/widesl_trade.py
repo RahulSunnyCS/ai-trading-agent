@@ -1,6 +1,6 @@
 """One live Widesl, entered at a chosen minute with a chosen overall stop, run through the legwise engine.
 
-Copied from `research/bl091/r0.py` (BL-091) on 2026-10-18 for BL-120 (research code is not imported
+Copied from `research/bl091/r0.py` (BL-091) on 2026-10-18 for BL-123 (research code is not imported
 across item folders). The strategy is `strategies/rotation/{N|S}_wide_1202.yaml` (OTM1 NIFTY / OTM2
 SENSEX strangle, 115 % leg stops trailed 15/10, exit 15:28, 1 lot per leg) with only the entry time and
 `overall.stop_loss_inr` changed. Rupees are per strategy. `lot_sizing: current`, sizing date 2026-10-12.

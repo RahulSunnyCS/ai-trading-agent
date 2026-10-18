@@ -1,6 +1,6 @@
-"""BL-120: COUNTS ONLY. How many tradable events would other readings of the owner's sentence give?
+"""BL-123: COUNTS ONLY. How many tradable events would other readings of the owner's sentence give?
 
-    uv run --with pandas python research/bl120/counts_alt.py [--workers 6]
+    uv run --with pandas python research/bl123/counts_alt.py [--workers 6]
 
 No P&L is computed or read here. Each variant is a count of days on which the rule would fire with an
 entry by 15:12, so the owner can choose a reading by what is testable, not by how it performed. Every
