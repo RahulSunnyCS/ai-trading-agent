@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { appendFile, mkdir } from 'node:fs/promises';
 import { istTimestamp, sendText } from '@trading/notify';
 import { type Browser, type BrowserContext, type Page, chromium } from 'playwright';
 import {
@@ -22,28 +22,20 @@ import { type Config, loadConfig, readTelegramConfig } from './config.js';
 import { ARTIFACTS_DIR, describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { formatReport } from './notify.js';
 import { installOverlayHandlers } from './overlays.js';
-import { QUANTIPLY_NAME, runQuantiply } from './quantiply.js';
+import { QUANTIPLY_NAME, runQuantiplyIsolated } from './quantiply.js';
+import {
+  WINDOW_CLOSES_MINUTES,
+  WINDOW_OPENS_MINUTES,
+  exitCode,
+  istMinutesNow,
+  quantiplyOrder,
+} from './run-plan.js';
 import { brokerPage } from './selectors.js';
 import { waitForNextWindow } from './totp.js';
 
 const ALL_BROKERS: Broker[] = [angelone, finvasia];
 
-/** AlgoTest rejects broker logins outside 08:15-15:40 IST. */
-const WINDOW_OPENS_MINUTES = 8 * 60 + 16;
-const WINDOW_CLOSES_MINUTES = 15 * 60 + 40;
 const MAX_ATTEMPTS = 2;
-
-function istMinutesNow(): number {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Kolkata',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(new Date());
-  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? '0');
-  const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
-  return hour * 60 + minute;
-}
 
 /**
  * GitHub's scheduler drifts late, which is harmless, but can also fire early. Logging
@@ -160,38 +152,30 @@ async function attemptBroker(page: Page, broker: Broker, config: Config): Promis
   return result('FAIL', lastDetail);
 }
 
-const CONTEXT_OPTIONS = {
-  viewport: { width: 1440, height: 900 },
-  locale: 'en-IN',
-  timezoneId: 'Asia/Kolkata',
-} as const;
-
-/**
- * Quantiply in a browser context of its own, closed afterwards: the Angel One session cookies it
- * leaves must not change what AlgoTest's Angel One login (same SmartAPI page) sees later. Never
- * throws - a failure becomes the Quantiply result line and the AlgoTest logins still run.
- */
-async function quantiplyInOwnContext(
+/** The AlgoTest broker logins, in a context of their own (traced only with TRACE=1). */
+async function runAlgotest(
   browser: Browser,
   config: Config,
   tracing: boolean,
-): Promise<BrokerResult> {
-  let context: BrowserContext | undefined;
-  try {
-    context = await browser.newContext(CONTEXT_OPTIONS);
-    installOverlayHandlers(context);
-    if (tracing) await context.tracing.start({ screenshots: true, snapshots: true });
-    return await runQuantiply(context, config.angelone);
-  } catch (error) {
-    return { name: QUANTIPLY_NAME, status: 'FAIL', detail: describe(error) };
-  } finally {
-    if (context && tracing) {
-      await context.tracing
-        .stop({ path: `${ARTIFACTS_DIR}/trace-quantiply.zip` })
-        .catch(() => undefined);
-    }
-    if (context) await context.close().catch(() => undefined);
+): Promise<BrokerResult[]> {
+  const context: BrowserContext = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    locale: 'en-IN',
+    timezoneId: 'Asia/Kolkata',
+  });
+
+  // Close any notice that covers the page (AlgoTest, Finvasia's popup) instead of timing out on it.
+  installOverlayHandlers(context);
+
+  // Opt-in only: trace snapshots record input values, including the typed password.
+  if (tracing) await context.tracing.start({ screenshots: true, snapshots: true });
+
+  const results = await run(config, context);
+
+  if (tracing) {
+    await context.tracing.stop({ path: `${ARTIFACTS_DIR}/trace.zip` }).catch(() => undefined);
   }
+  return results;
 }
 
 async function run(config: Config, context: BrowserContext): Promise<BrokerResult[]> {
@@ -239,36 +223,51 @@ async function main(): Promise<number> {
   await mkdir(ARTIFACTS_DIR, { recursive: true }).catch(() => undefined);
 
   const tracing = process.env.TRACE === '1';
+  const order = quantiplyOrder(
+    config.quantiply && !config.quantiplyProblem,
+    config.skipWindowGuard,
+    istMinutesNow(),
+  );
+  const launch = () => chromium.launch({ headless: !config.headed, slowMo: config.slowMo });
+
   let results: BrokerResult[] = [];
-  let quantiply: BrokerResult | null = null;
+  // A Quantiply config problem is only its own FAIL line; the AlgoTest logins still run.
+  let quantiply: BrokerResult | null = config.quantiplyProblem
+    ? { name: QUANTIPLY_NAME, status: 'FAIL', detail: config.quantiplyProblem }
+    : null;
   let fatal: string | null = null;
+  let algotestStarted = false;
   let browser: Browser | undefined;
 
   try {
-    browser = await chromium.launch({ headless: !config.headed, slowMo: config.slowMo });
-
-    // Quantiply first: Angel One's login has no 08:15 window, so it runs in the minutes the
-    // AlgoTest guard below would only spend waiting, and it can't be delayed by it.
-    if (config.quantiply) quantiply = await quantiplyInOwnContext(browser, config, tracing);
-
-    await waitForLoginWindow(config);
-
-    const context: BrowserContext = await browser.newContext(CONTEXT_OPTIONS);
-
-    // Close any notice that covers the page (AlgoTest, Finvasia's popup) instead of timing out on it.
-    installOverlayHandlers(context);
-
-    // Opt-in only: trace snapshots record input values, including the typed password.
-    if (tracing) await context.tracing.start({ screenshots: true, snapshots: true });
-
-    results = await run(config, context);
-
-    if (tracing) {
-      await context.tracing.stop({ path: `${ARTIFACTS_DIR}/trace.zip` }).catch(() => undefined);
+    try {
+      if (order === 'first') {
+        // Before 08:16 IST the window guard would only sleep: Quantiply uses those minutes and
+        // costs AlgoTest nothing.
+        browser = await launch();
+        quantiply = await runQuantiplyIsolated(browser, config.angelone);
+        await waitForLoginWindow(config);
+      } else {
+        // Without Quantiply, or once the window is open: exactly as before, and the real-money
+        // AlgoTest logins are never held up by Quantiply.
+        await waitForLoginWindow(config);
+        browser = await launch();
+      }
+      algotestStarted = true;
+      results = await runAlgotest(browser, config, tracing);
+    } catch (error) {
+      fatal = describe(error);
+      console.error(`\nfatal: ${fatal}`);
     }
-  } catch (error) {
-    fatal = describe(error);
-    console.error(`\nfatal: ${fatal}`);
+
+    if (order === 'last') {
+      try {
+        browser ??= await launch();
+        quantiply = await runQuantiplyIsolated(browser, config.angelone);
+      } catch (error) {
+        quantiply = { name: QUANTIPLY_NAME, status: 'FAIL', detail: describe(error) };
+      }
+    }
   } finally {
     if (browser) await browser.close().catch(() => undefined);
   }
@@ -279,16 +278,21 @@ async function main(): Promise<number> {
   }
 
   const body = formatReport(results, config.runUrl, quantiply);
-  const report = fatal ? `${body}\nfatal${quantiply ? ' (AlgoTest)' : ''}: ${fatal}` : body;
+  const fatalLabel = quantiply && algotestStarted ? 'fatal (AlgoTest)' : 'fatal';
+  const report = fatal ? `${body}\n${fatalLabel}: ${fatal}` : body;
 
   console.log(`\n${report}`);
   await sendText(config.telegram, report, 'broker.algotest');
 
-  // Either platform failing fails the run, so the scheduler's morning summary (which reads this
-  // workflow's conclusion) flags it; the Telegram report above says which one.
-  const failed =
-    results.some((r) => r.status === 'FAIL') || quantiply?.status === 'FAIL' || fatal !== null;
-  return failed ? 1 : 0;
+  // In Actions, Quantiply's result goes to the workflow as a step output and its own step fails
+  // the job; this step's conclusion stays AlgoTest's alone (run-plan.ts exitCode).
+  const githubOutput = process.env.GITHUB_OUTPUT;
+  if (githubOutput) {
+    await appendFile(githubOutput, `quantiply=${quantiply?.status ?? 'OFF'}\n`).catch((error) =>
+      console.error(`could not write the step output: ${describe(error)}`),
+    );
+  }
+  return exitCode(results, quantiply, fatal, Boolean(githubOutput));
 }
 
 /**

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { type Browser, type BrowserContext, chromium } from 'playwright';
-import { runQuantiply } from './quantiply.js';
+import { runQuantiply, runQuantiplyIsolated } from './quantiply.js';
 import { resetAngelTotpWindow } from './totp.js';
 
 /**
@@ -20,7 +20,15 @@ process.chdir(mkdtempSync(join(tmpdir(), 'broker-login-quantiply-')));
 
 const CREDS = { clientCode: 'TEST01', mpin: '0000', totpSecret: 'JBSWY3DPEHPK3PXP' };
 
-type AngelOutcome = 'success' | 'invalid-pin' | 'bounce' | 'popup';
+type AngelOutcome =
+  | 'success'
+  | 'invalid-pin'
+  | 'bounce'
+  | 'popup'
+  | 'already'
+  | 'already-bounce'
+  | 'totp-once'
+  | 'hang';
 
 const ANGEL_URL =
   'https://smartapi.angelone.in/publisher-login/v1/?api_key=k&redirect_url=https%3A%2F%2Fapi-prod.quantiply.angelone.in%2Fauth%2Fangel%2Fredirect';
@@ -30,11 +38,12 @@ function quantiplyAuth(outcome: AngelOutcome): string {
   return `<!doctype html><title>Quantiply</title><button onclick="${open}">Login / Sign Up</button>`;
 }
 
-function angelPage(outcome: AngelOutcome): string {
-  const onSubmit =
-    outcome === 'invalid-pin'
-      ? "document.getElementById('login-error').textContent='Invalid PIN';document.getElementById('login-error').style.display='block'"
-      : "location.href='https://api-prod.quantiply.angelone.in/auth/angel/redirect?code=c'";
+const SHOW_ERROR = (text: string) =>
+  `document.getElementById('login-error').textContent='${text}';document.getElementById('login-error').style.display='block'`;
+const REDIRECT =
+  "location.href='https://api-prod.quantiply.angelone.in/auth/angel/redirect?code=c'";
+
+function angelPage(onSubmit: string): string {
   return `<!doctype html><title>Login to Quantiply</title>
     <label class="login-option">Mobile Number</label>
     <label class="login-option">Client ID</label>
@@ -49,6 +58,7 @@ function angelPage(outcome: AngelOutcome): string {
 const ALGOS = '<!doctype html><title>Algos</title><h1>My algos</h1>';
 const BOUNCING_ALGOS = `<!doctype html><title>Algos</title>
   <script>setTimeout(() => location.replace('/auth?resume=/algos'), 300)</script>`;
+const TO_ALGOS = "<script>location.replace('/algos')</script>";
 
 let browser: Browser | null = null;
 let skip: string | false = false;
@@ -65,38 +75,66 @@ after(async () => {
 });
 beforeEach(() => resetAngelTotpWindow());
 
+/** Answers every request from the stand-ins and aborts anything else: nothing leaves the machine. */
+async function install(context: BrowserContext, outcome: AngelOutcome, hits: string[]) {
+  const loads = (key: string) => hits.filter((h) => h === key).length;
+  await context.route('**/*', async (route) => {
+    const url = new URL(route.request().url());
+    const key = `${url.hostname}${url.pathname}`;
+    hits.push(key);
+    const html = (body: string) => route.fulfill({ contentType: 'text/html', body });
+    if (key === 'app.quantiply.angelone.in/auth') {
+      if (outcome === 'hang') return; // never answered
+      if (outcome === 'already') return html(TO_ALGOS);
+      if (outcome === 'already-bounce' && loads(key) === 1) return html(TO_ALGOS);
+      return html(quantiplyAuth(outcome));
+    }
+    if (key === 'smartapi.angelone.in/publisher-login/v1/') {
+      if (outcome === 'invalid-pin') return html(angelPage(SHOW_ERROR('Invalid PIN')));
+      if (outcome === 'totp-once' && loads(key) === 1) {
+        return html(angelPage(SHOW_ERROR('Invalid TOTP')));
+      }
+      return html(angelPage(REDIRECT));
+    }
+    if (key === 'api-prod.quantiply.angelone.in/auth/angel/redirect') {
+      return html("<script>location.replace('https://app.quantiply.angelone.in/algos')</script>");
+    }
+    if (key === 'app.quantiply.angelone.in/algos') {
+      const bounce = outcome === 'bounce' || (outcome === 'already-bounce' && loads(key) === 1);
+      return html(bounce ? BOUNCING_ALGOS : ALGOS);
+    }
+    return route.abort();
+  });
+}
+
 async function standIn(
   outcome: AngelOutcome,
 ): Promise<{ context: BrowserContext; hits: string[] }> {
   assert.ok(browser);
   const context = await browser.newContext();
   const hits: string[] = [];
-  await context.route('**/*', async (route) => {
-    const url = new URL(route.request().url());
-    const key = `${url.hostname}${url.pathname}`;
-    hits.push(key);
-    const html = (body: string) => route.fulfill({ contentType: 'text/html', body });
-    if (key === 'app.quantiply.angelone.in/auth') return html(quantiplyAuth(outcome));
-    if (key === 'smartapi.angelone.in/publisher-login/v1/') return html(angelPage(outcome));
-    if (key === 'api-prod.quantiply.angelone.in/auth/angel/redirect') {
-      return html("<script>location.replace('https://app.quantiply.angelone.in/algos')</script>");
-    }
-    if (key === 'app.quantiply.angelone.in/algos') {
-      return html(outcome === 'bounce' ? BOUNCING_ALGOS : ALGOS);
-    }
-    return route.abort();
-  });
+  await install(context, outcome, hits);
   return { context, hits };
 }
 
+const angelLoads = (hits: string[]) =>
+  hits.filter((h) => h.startsWith('smartapi.angelone.in')).length;
+
+/** Every capture a test left: the logged-in pages must never be among them. */
+function captures(): string[] {
+  return existsSync('artifacts') ? readdirSync('artifacts') : [];
+}
+
 describe('Quantiply login (stand-in pages)', () => {
-  it('logs in: Login / Sign Up -> Angel TOTP form -> back on /algos', async (t) => {
+  it('logs in: Login / Sign Up -> Angel TOTP form -> back on /algos, with no picture of it', async (t) => {
     if (skip) return t.skip(skip);
+    const before = captures();
     const { context, hits } = await standIn('success');
     const result = await runQuantiply(context, CREDS);
     assert.equal(result.status, 'OK', result.detail);
     assert.match(result.detail, /^logged in \(\d+s\)$/);
-    assert.ok(hits.includes('smartapi.angelone.in/publisher-login/v1/'));
+    assert.equal(angelLoads(hits), 1);
+    assert.deepEqual(captures(), before, 'a successful login must save no screenshot');
     await context.close();
   });
 
@@ -114,8 +152,16 @@ describe('Quantiply login (stand-in pages)', () => {
     const result = await runQuantiply(context, CREDS);
     assert.equal(result.status, 'FAIL');
     assert.match(result.detail, /Invalid PIN - NOT retried, check the ANGELONE_\* secrets/);
-    const angelLoads = hits.filter((h) => h.startsWith('smartapi.angelone.in')).length;
-    assert.equal(angelLoads, 1, 'the credentials must be sent once only');
+    assert.equal(angelLoads(hits), 1, 'the credentials must be sent once only');
+    await context.close();
+  });
+
+  it('a refused TOTP is retried once, with a code from the next window', async (t) => {
+    if (skip) return t.skip(skip);
+    const { context, hits } = await standIn('totp-once');
+    const result = await runQuantiply(context, CREDS);
+    assert.equal(result.status, 'OK', result.detail);
+    assert.equal(angelLoads(hits), 2);
     await context.close();
   });
 
@@ -126,5 +172,39 @@ describe('Quantiply login (stand-in pages)', () => {
     assert.equal(result.status, 'FAIL');
     assert.match(result.detail, /showed the login screen again.*NOT retried/);
     await context.close();
+  });
+
+  it('a session Quantiply already has counts once it holds, with no login sent', async (t) => {
+    if (skip) return t.skip(skip);
+    const { context, hits } = await standIn('already');
+    const result = await runQuantiply(context, CREDS);
+    assert.equal(result.status, 'SKIPPED', result.detail);
+    assert.equal(angelLoads(hits), 0);
+    await context.close();
+  });
+
+  it('a brief /algos that its auth guard sends back to /auth is not "already logged in"', async (t) => {
+    if (skip) return t.skip(skip);
+    const { context, hits } = await standIn('already-bounce');
+    const result = await runQuantiply(context, CREDS);
+    assert.equal(result.status, 'OK', result.detail);
+    assert.equal(angelLoads(hits), 1);
+    await context.close();
+  });
+
+  it('a hung page ends at the time limit, in a context of its own that is then closed', async (t) => {
+    if (skip || !browser) return t.skip(skip || 'no browser');
+    let used: BrowserContext | null = null;
+    const result = await runQuantiplyIsolated(browser, CREDS, {
+      timeLimitMs: 2_000,
+      onContext: async (context) => {
+        used = context;
+        await install(context, 'hang', []);
+      },
+    });
+    assert.equal(result.status, 'FAIL');
+    assert.match(result.detail, /timed out after 2s/);
+    assert.ok(used);
+    assert.equal(browser.contexts().includes(used), false, 'the context must be closed');
   });
 });

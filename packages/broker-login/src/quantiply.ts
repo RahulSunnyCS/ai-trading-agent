@@ -1,8 +1,8 @@
-import type { BrowserContext, Page } from 'playwright';
+import type { Browser, BrowserContext, Page } from 'playwright';
 import { visibleErrorText } from './algotest.js';
 import { BrokerLoginError, type BrokerResult, type FailureKind } from './brokers/types.js';
-import { describe, safeScreenshot, step } from './diagnose.js';
-import { dismissOverlays } from './overlays.js';
+import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
+import { dismissOverlays, installOverlayHandlers } from './overlays.js';
 import {
   QUANTIPLY_APP_HOST,
   QUANTIPLY_LOGIN_URL,
@@ -12,6 +12,7 @@ import {
   quantiplyFailureDetail,
   quantiplyRetryDecision,
 } from './quantiply-rules.js';
+import { QUANTIPLY_LIMIT_MINUTES } from './run-plan.js';
 import { angelOneForm, quantiplyPage } from './selectors.js';
 import { angelTotp } from './totp.js';
 
@@ -19,6 +20,12 @@ import { angelTotp } from './totp.js';
 export const QUANTIPLY_NAME = 'Quantiply · Angel One';
 
 const MAX_ATTEMPTS = 2;
+
+/** The most a whole Quantiply login may take, retries and diagnostics included. */
+export const QUANTIPLY_TIME_LIMIT_MS = QUANTIPLY_LIMIT_MINUTES * 60_000;
+
+/** How long Quantiply must stay outside /auth, with no login button, to count as logged in. */
+const SETTLE_MS = 4_000;
 
 export interface QuantiplyCredentials {
   clientCode: string;
@@ -42,6 +49,32 @@ function where(page: Page): string {
   }
 }
 
+/**
+ * The repo is public and diagnostics are a downloadable artifact: never capture the owner's
+ * logged-in Quantiply pages (their algos), only the login screens and Angel's page.
+ */
+function capturable(page: Page): boolean {
+  return !page.isClosed() && !isQuantiplyLoggedInUrl(page.url());
+}
+
+async function shot(page: Page, label: string): Promise<void> {
+  if (capturable(page)) await safeScreenshot(page, label);
+}
+
+/** diagnose.ts's step(), minus captures of logged-in Quantiply pages. */
+async function qstep<T>(page: Page, label: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    console.error(`  step failed: ${label} -> ${describe(error)}`);
+    if (capturable(page)) {
+      await safeScreenshot(page, `fail-${label}`);
+      await dumpHtml(page, `fail-${label}`);
+    }
+    throw error;
+  }
+}
+
 async function inlineAngelError(page: Page): Promise<string> {
   const error = angelOneForm.error(page);
   if (!(await error.isVisible().catch(() => false))) return '';
@@ -50,25 +83,41 @@ async function inlineAngelError(page: Page): Promise<string> {
 }
 
 /**
+ * Quantiply finishes the session on its side after the redirect, and a rejected one bounces the
+ * app back to /auth. Logged in = still outside /auth, with no login button, a few seconds later.
+ */
+async function staysLoggedIn(page: Page): Promise<boolean> {
+  await page.waitForLoadState('domcontentloaded').catch(() => undefined);
+  await page.waitForTimeout(SETTLE_MS).catch(() => undefined);
+  if (page.isClosed() || !isQuantiplyLoggedInUrl(page.url())) return false;
+  return !(await quantiplyPage
+    .loginButton(page)
+    .isVisible()
+    .catch(() => false));
+}
+
+/**
  * Quantiply's /auth screen -> "Login / Sign Up" -> Angel One's SmartAPI login (TOTP mode: client
  * code, PIN, TOTP) -> back to Quantiply, normally on /algos. Returns 'already' when Quantiply
- * skips its login screen (a session it already has), else 'logged_in'; throws BrokerLoginError
- * on failure. Whether Angel's page opens in the same tab or a popup is handled either way.
+ * skips its login screen and stays logged in (a session it already has), else 'logged_in';
+ * throws BrokerLoginError on failure. Angel's page in the same tab or a popup both work.
  */
 export async function quantiplyLogin(
   page: Page,
   creds: QuantiplyCredentials,
   progress: QuantiplyProgress,
 ): Promise<'logged_in' | 'already'> {
-  await step(page, 'quantiply-open', async () => {
+  await qstep(page, 'quantiply-open', async () => {
     await page.goto(QUANTIPLY_LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 });
   });
 
   const loginButton = quantiplyPage.loginButton(page);
-  const alreadyIn = await step(page, 'quantiply-await-login-button', async () => {
+  const alreadyIn = await qstep(page, 'quantiply-await-login-button', async () => {
     const deadline = Date.now() + 30_000;
     while (Date.now() < deadline) {
-      if (isQuantiplyLoggedInUrl(page.url())) return true;
+      // A logged-in URL counts only if it holds: an auth guard may still send it back to /auth,
+      // and then the login button appears and the login goes ahead as usual.
+      if (isQuantiplyLoggedInUrl(page.url()) && (await staysLoggedIn(page))) return true;
       if (await loginButton.isVisible().catch(() => false)) return false;
       await dismissOverlays(page);
       await page.waitForTimeout(500);
@@ -89,14 +138,14 @@ export async function quantiplyLogin(
     .then(() => null)
     .catch(() => null);
 
-  await step(page, 'quantiply-click-login', async () => {
+  await qstep(page, 'quantiply-click-login', async () => {
     await loginButton.click();
   });
 
   const popup = await Promise.race([popupPromise, sameTab]);
   const target = popup ?? page;
 
-  await step(target, 'quantiply-await-angel-page', async () => {
+  await qstep(target, 'quantiply-await-angel-page', async () => {
     await target.waitForLoadState('domcontentloaded');
     if (!isAngelLoginUrl(target.url())) {
       await target.waitForURL(isAngelLoginUrl, { timeout: 30_000 });
@@ -104,13 +153,13 @@ export async function quantiplyLogin(
   });
   console.log(`  Quantiply: on ${where(target)}${popup ? ' (popup)' : ''}`);
 
-  await step(target, 'quantiply-select-totp-mode', async () => {
+  await qstep(target, 'quantiply-select-totp-mode', async () => {
     const option = angelOneForm.totpModeOption(target);
     await option.waitFor({ state: 'visible', timeout: 20_000 });
     await option.click();
   });
 
-  await step(target, 'quantiply-fill-form', async () => {
+  await qstep(target, 'quantiply-fill-form', async () => {
     const clientCode = angelOneForm.clientCode(target);
     await clientCode.waitFor({ state: 'visible', timeout: 10_000 });
     await clientCode.fill(creds.clientCode);
@@ -120,7 +169,7 @@ export async function quantiplyLogin(
     await angelOneForm.totp(target).fill(await angelTotp(creds.totpSecret));
   });
 
-  await step(target, 'quantiply-submit', async () => {
+  await qstep(target, 'quantiply-submit', async () => {
     progress.submitted = true;
     await angelOneForm.submit(target).click();
   });
@@ -142,7 +191,7 @@ export async function quantiplyLogin(
       loginScreenSince = null;
       const error = await inlineAngelError(target);
       if (error) {
-        await safeScreenshot(target, 'quantiply-angel-error');
+        await shot(target, 'quantiply-angel-error');
         throw new BrokerLoginError(error, classifyQuantiplyError(error));
       }
     } else if (
@@ -155,7 +204,7 @@ export async function quantiplyLogin(
     ) {
       loginScreenSince ??= Date.now();
       if (Date.now() - loginScreenSince >= 5_000) {
-        await safeScreenshot(target, 'quantiply-bounced');
+        await shot(target, 'quantiply-bounced');
         throw new BrokerLoginError(
           `returned to Quantiply but it showed the login screen again (on ${where(target)})`,
           'UNKNOWN',
@@ -169,7 +218,7 @@ export async function quantiplyLogin(
 
   if (!landed) {
     const stuck = target.isClosed() ? page : target;
-    await safeScreenshot(stuck, 'quantiply-no-return');
+    await shot(stuck, 'quantiply-no-return');
     const error = isAngelLoginUrl(stuck.url()) ? await visibleErrorText(stuck) : '';
     if (error) throw new BrokerLoginError(error, classifyQuantiplyError(error));
     throw new BrokerLoginError(
@@ -178,25 +227,20 @@ export async function quantiplyLogin(
     );
   }
 
-  // Quantiply finishes the session on its side after the redirect; a rejected one bounces the
-  // app back to /auth. Give it a moment, then check it stayed outside /auth with no login button.
-  await landed.waitForLoadState('domcontentloaded').catch(() => undefined);
-  await page.waitForTimeout(4_000);
   // A popup that landed and then closed itself hands back to the first tab.
-  if (landed.isClosed()) landed = page;
-  const stillIn =
-    isQuantiplyLoggedInUrl(landed.url()) &&
-    !(await quantiplyPage
-      .loginButton(landed)
-      .isVisible()
-      .catch(() => false));
-  await safeScreenshot(landed, stillIn ? 'quantiply-logged-in' : 'quantiply-bounced');
-  if (!stillIn) {
+  let held = await staysLoggedIn(landed);
+  if (!held && landed.isClosed()) {
+    landed = page;
+    held = isQuantiplyLoggedInUrl(page.url()) && (await staysLoggedIn(page));
+  }
+  if (!held) {
+    await shot(landed, 'quantiply-bounced');
     throw new BrokerLoginError(
       `returned to Quantiply but it showed the login screen again (on ${where(landed)})`,
       'UNKNOWN',
     );
   }
+  // No screenshot here: the logged-in page is the owner's algos (see capturable()).
   console.log(`  Quantiply: landed on ${where(landed)}`);
 
   if (popup && !popup.isClosed()) await popup.close().catch(() => undefined);
@@ -248,8 +292,55 @@ export async function runQuantiply(
     if (decision === 'stop') {
       return result('FAIL', quantiplyFailureDetail(lastDetail, kind, progress.submitted));
     }
+    // A popup left by the failed attempt would otherwise sit there while the next one opens.
+    for (const other of context.pages()) {
+      if (other !== page) await other.close().catch(() => undefined);
+    }
     // 'retry-next-totp-window' needs no explicit wait: angelTotp never reuses this run's window.
     console.log(`  retrying (${decision})`);
   }
   return result('FAIL', lastDetail);
+}
+
+/**
+ * runQuantiply in a browser context of its own, never traced (a trace would hold the PIN typed
+ * into Angel's page and the redirect's session code) and closed afterwards, so Angel's cookies
+ * can't change what AlgoTest's Angel One login sees on the same page. Bounded by `timeLimitMs`
+ * whatever a hung page does: on the limit the context is closed, which ends anything in flight.
+ * Never throws.
+ */
+export async function runQuantiplyIsolated(
+  browser: Browser,
+  creds: QuantiplyCredentials,
+  options: {
+    timeLimitMs?: number;
+    /** Tests only: set up the fresh context (stand-in routes) before the login starts. */
+    onContext?: (context: BrowserContext) => Promise<void>;
+  } = {},
+): Promise<BrokerResult> {
+  const timeLimitMs = options.timeLimitMs ?? QUANTIPLY_TIME_LIMIT_MS;
+  let context: BrowserContext | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const fail = (detail: string): BrokerResult => ({ name: QUANTIPLY_NAME, status: 'FAIL', detail });
+  try {
+    context = await browser.newContext({
+      viewport: { width: 1440, height: 900 },
+      locale: 'en-IN',
+      timezoneId: 'Asia/Kolkata',
+    });
+    installOverlayHandlers(context);
+    await options.onContext?.(context);
+    const limit = new Promise<BrokerResult>((resolve) => {
+      timer = setTimeout(
+        () => resolve(fail(`timed out after ${Math.round(timeLimitMs / 1000)}s - NOT retried`)),
+        timeLimitMs,
+      );
+    });
+    return await Promise.race([runQuantiply(context, creds), limit]);
+  } catch (error) {
+    return fail(describe(error));
+  } finally {
+    clearTimeout(timer);
+    if (context) await context.close().catch(() => undefined);
+  }
 }

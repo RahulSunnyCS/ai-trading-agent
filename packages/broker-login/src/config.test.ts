@@ -49,11 +49,23 @@ describe('QUANTIPLY_LOGIN in loadConfig', () => {
     assert.equal(loadConfig().quantiply, false);
   });
 
-  it('on with ONLY=finvasia still requires the Angel One secrets', () => {
+  it('on with ONLY=finvasia and blank Angel One secrets: a Quantiply problem, AlgoTest still runs', () => {
     env({ ...ALGOTEST, ...FINVASIA, ONLY: 'finvasia', QUANTIPLY_LOGIN: 'on' });
+    const config = loadConfig();
+    assert.equal(config.quantiply, true);
+    assert.equal(
+      config.quantiplyProblem,
+      'not run - missing ANGELONE_CLIENT_CODE, ANGELONE_MPIN, ANGELONE_TOTP_SECRET',
+    );
+    assert.equal(config.finvasia.clientId, 'FA0000');
+    assert.equal(config.angelone.clientCode, '');
+  });
+
+  it('blank Angel One secrets still stop the run when AlgoTest itself needs them', () => {
+    env({ ...ALGOTEST, ...FINVASIA, QUANTIPLY_LOGIN: 'on' });
     assert.throws(
       () => loadConfig(),
-      /Missing required environment variables: ANGELONE_CLIENT_CODE, ANGELONE_MPIN, ANGELONE_TOTP_SECRET/,
+      /Missing required environment variables: ANGELONE_CLIENT_CODE/,
     );
   });
 
@@ -61,6 +73,7 @@ describe('QUANTIPLY_LOGIN in loadConfig', () => {
     env({ ...ALGOTEST, ...FINVASIA, ...ANGEL, ONLY: 'finvasia', QUANTIPLY_LOGIN: 'on' });
     const config = loadConfig();
     assert.equal(config.quantiply, true);
+    assert.equal(config.quantiplyProblem, null);
     assert.equal(config.only, 'finvasia');
     assert.equal(config.angelone.clientCode, 'TEST01');
     assert.equal(config.angelone.totpSecret, 'JBSWY3DPEHPK3PXP');
@@ -78,8 +91,10 @@ describe('QUANTIPLY_LOGIN in loadConfig', () => {
     assert.equal(loadConfig().quantiply, true);
   });
 
-  it('an unknown value fails loudly instead of guessing', () => {
+  it('an unknown value is a Quantiply FAIL line, never a guess and never a stopped run', () => {
     env({ ...ALGOTEST, ...ANGEL, ...FINVASIA, QUANTIPLY_LOGIN: 'maybe' });
-    assert.throws(() => loadConfig(), /QUANTIPLY_LOGIN=maybe is not on or off/);
+    const config = loadConfig();
+    assert.equal(config.quantiply, true);
+    assert.equal(config.quantiplyProblem, 'not run - QUANTIPLY_LOGIN=maybe is not on or off');
   });
 });

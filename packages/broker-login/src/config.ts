@@ -16,8 +16,17 @@ export interface Config {
   slowMo: number;
   skipWindowGuard: boolean;
   only: string | null;
-  /** Also log in to Quantiply through Angel One (QUANTIPLY_LOGIN=on). Independent of `only`. */
+  /**
+   * Quantiply (through Angel One) has a line in this run's report: QUANTIPLY_LOGIN is on, or is
+   * set to something that isn't on/off. Independent of `only`.
+   */
   quantiply: boolean;
+  /**
+   * Why Quantiply can't run (a bad QUANTIPLY_LOGIN value, or ANGELONE_* blank while AlgoTest's
+   * Angel One login is off), else null. Reported as a Quantiply FAIL line; it never stops the
+   * AlgoTest logins.
+   */
+  quantiplyProblem: string | null;
   runUrl: string | null;
 }
 
@@ -78,6 +87,24 @@ export function readTelegramConfig(): TelegramConfig | null {
   return botToken && chatId ? { botToken, chatId } : null;
 }
 
+/**
+ * QUANTIPLY_LOGIN and the Angel One secrets -> whether Quantiply gets a report line, and why it
+ * can't run if it can't. Never throws.
+ */
+export function quantiplyConfig(env: NodeJS.ProcessEnv): { line: boolean; problem: string | null } {
+  let on: boolean;
+  try {
+    on = parseQuantiplyFlag(env.QUANTIPLY_LOGIN);
+  } catch (error) {
+    return { line: true, problem: `not run - ${error instanceof Error ? error.message : error}` };
+  }
+  if (!on) return { line: false, problem: null };
+  const missing = BROKER_SECRET_KEYS.angelone.filter((key) => !env[key]?.trim());
+  return missing.length > 0
+    ? { line: true, problem: `not run - missing ${missing.join(', ')}` }
+    : { line: true, problem: null };
+}
+
 export function loadConfig(): Config {
   if (existsSync('.env')) process.loadEnvFile('.env');
 
@@ -93,17 +120,9 @@ export function loadConfig(): Config {
     ? [only as keyof typeof BROKER_SECRET_KEYS]
     : (Object.keys(BROKER_SECRET_KEYS) as (keyof typeof BROKER_SECRET_KEYS)[]);
 
-  // Quantiply logs in through Angel One with the same three secrets, so they are needed
-  // whenever it runs - even when ONLY=finvasia leaves AlgoTest's Angel One login out.
-  const quantiply = parseQuantiplyFlag(process.env.QUANTIPLY_LOGIN);
-  const needsAngel = activeBrokers.includes('angelone') || quantiply;
-
   const required: readonly SecretKey[] = [
-    ...new Set<SecretKey>([
-      ...ALWAYS_REQUIRED,
-      ...activeBrokers.flatMap((broker) => BROKER_SECRET_KEYS[broker]),
-      ...(quantiply ? BROKER_SECRET_KEYS.angelone : []),
-    ]),
+    ...ALWAYS_REQUIRED,
+    ...activeBrokers.flatMap((broker) => BROKER_SECRET_KEYS[broker]),
   ];
 
   const missing = required.filter((key) => !process.env[key]?.trim());
@@ -119,6 +138,13 @@ export function loadConfig(): Config {
     registerSecret(value);
     return value;
   };
+
+  // Quantiply logs in through Angel One with the same three secrets. Its own config problems
+  // (a mistyped flag, blank secrets) only fail its line: the AlgoTest logins must still run.
+  const quantiplySetting = quantiplyConfig(process.env);
+  const quantiply = quantiplySetting.line;
+  const quantiplyProblem = quantiplySetting.problem;
+  const needsAngel = activeBrokers.includes('angelone') || (quantiply && !quantiplyProblem);
 
   // A skipped broker never reaches broker.login() - main.ts filters by `only`
   // before that - so an empty placeholder here is inert, not a silent credential gap.
@@ -147,6 +173,7 @@ export function loadConfig(): Config {
     skipWindowGuard: process.env.SKIP_WINDOW_GUARD === '1',
     only,
     quantiply,
+    quantiplyProblem,
     runUrl: runUrl(),
   };
 }
