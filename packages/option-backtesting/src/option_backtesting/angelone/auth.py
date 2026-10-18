@@ -40,6 +40,10 @@ class AngelNetworkError(AngelCredentialsError):
     as a connection problem, not as a login to fix."""
 
 
+class AngelUnavailableError(AngelNetworkError):
+    """Angel One answered with a server error (HTTP 5xx): reached, but not serving logins."""
+
+
 @dataclass(frozen=True)
 class AngelCredentials:
     client_code: str
@@ -148,13 +152,32 @@ def login(
         if status == 0:
             raise AngelNetworkError(f"Angel One could not be reached: {detail}")
         if status >= 500:
-            raise AngelNetworkError(f"Angel One is unavailable (HTTP {status}): {detail}")
+            raise AngelUnavailableError(f"Angel One is unavailable (HTTP {status}): {detail}")
         raise AngelCredentialsError(f"Angel One login failed: {code} {detail}".strip())
     return Session(jwt=jwt, api_key=creds.api_key, public_ip=creds.public_ip)
 
 
+def mask_client(code: str | None) -> str | None:
+    """`R123456` -> `R1•••56`: enough to tell accounts apart, not the whole code."""
+    code = (code or "").strip()
+    if not code:
+        return None
+    if len(code) <= 4:
+        return code[0] + "•••"
+    return f"{code[:2]}•••{code[-2:]}"
+
+
+def redact(text: str, creds: AngelCredentials) -> str:
+    """The PIN, TOTP seed and API key replaced, longest first (a short PIN that occurs inside the
+    key must not leave part of the key behind), and the client code masked. No truncation."""
+    secrets = (creds.pin, creds.totp_secret, creds.api_key)
+    for secret in sorted((s for s in secrets if s and len(s) >= 4), key=len, reverse=True):
+        text = text.replace(secret, "<redacted>")
+    if len(creds.client_code) >= 4:
+        text = text.replace(creds.client_code, mask_client(creds.client_code) or "")
+    return text
+
+
 def _scrub(text: str, creds: AngelCredentials) -> str:
-    for secret in (creds.pin, creds.totp_secret, creds.api_key):
-        if secret and len(secret) >= 4:
-            text = text.replace(secret, "<redacted>")
-    return text[:160]
+    """`redact`, then cut to length (after masking, so a cut never leaves a code half-shown)."""
+    return redact(text, creds)[:160]

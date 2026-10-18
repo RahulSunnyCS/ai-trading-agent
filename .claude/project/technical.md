@@ -117,6 +117,8 @@ uv run obt sweep strategies/B_pyramid.yaml --changes changes.json --from YYYY-MM
 uv run obt export-personality <run_id>
 uv run obt fyers fetch [--date YYYY-MM-DD]   # daily 1m Fyers collector — same evening, expiring contracts vanish
 uv run obt angel fetch [--date YYYY-MM-DD] [--underlyings NIFTY,...]   # BL-079: the same collection from Angel One (REST login, no human check); runs recorded with source angelone and the day's gaps under details.flags
+uv run obt angel test [--scheduled]   # ONE Angel One SmartAPI login, nothing fetched, under the guard every Angel One login shares (Test connection, this, the collector): one at a time, 60 s cool-down from the attempt's end, a refused login held 15 min unless the .env's ANGELONE_* values change (re-read from .env on every check); result in TRADING_DATA_ROOT/angelone/last_check.json; exit 0 ok, 1 failed or held, 3 refused by the guard; `--scheduled` (scheduler `angel-login-check`, trading days 08:00) waits for the lock and out the cool-down
+# the Broker logins page's Angel One card reads GET /legwise/angel/status and POSTs /legwise/angel/test (202 at once, the login runs in the background; api/angel_routes.py over angelone/check.py; proxied at /api/backtest/legwise/angel/*)
 uv run obt fyers history [--underlying NIFTY] [--from D] # backfill index + India VIX 1m history (resumable; any time — indexes never expire)
 
 # trading-data (Python) — the shared local database; run from any package that depends on it

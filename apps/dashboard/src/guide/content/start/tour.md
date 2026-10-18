@@ -52,7 +52,7 @@ The evening run's status and its **Run** button are at the top of Today.
 
 ## Account
 
-- [Broker logins](app:/brokerLogins) — the daily Fyers market-data login.
+- [Broker logins](app:/brokerLogins) — the daily Fyers market-data login and the Angel One connection check.
   [Guide](guide:operations/broker-logins)
 - [Settings](app:/settings) — appearance, defaults, which tabs show, Telegram alerts.
   [Guide](guide:operations/settings)

@@ -155,6 +155,30 @@ describe('T1 parallel track', () => {
   });
 });
 
+describe('Angel One login check', () => {
+  const angel = JOBS.find((job) => job.id === 'angel-login-check');
+
+  it('runs the guarded check at 08:00 on trading days, as a scheduled run', () => {
+    expect(angel?.schedule.at).toBe('08:00');
+    expect(angel?.schedule.on('2026-10-17')).toBe(false); // Saturday
+    expect(angel?.schedule.on('2026-10-19')).toBe(true); // Monday
+    expect(angel?.cwd).toBe('packages/option-backtesting');
+    expect(angel?.steps).toEqual([['uv', 'run', 'obt', 'angel', 'test', '--scheduled']]);
+  });
+
+  it('retries once, after its own 60 s cool-down, and catches up only until 09:10', () => {
+    expect(angel?.retries).toBe(1);
+    expect((angel?.retryDelayMinutes ?? 0) * 60).toBeGreaterThan(60);
+    expect(angel?.catchUpHours).toBeCloseTo(70 / 60);
+    // the scheduler sends the failure alert: the CLI only exits non-zero
+    expect(angel?.alertsItself).toBeFalsy();
+  });
+
+  it('is the 23rd job', () => {
+    expect(JOBS).toHaveLength(23);
+  });
+});
+
 describe('.env parsing', () => {
   it('handles export, quotes and comments', () => {
     const env = parseDotenv(

@@ -93,6 +93,26 @@ Otherwise:
   underlying/expiry/strike/side; instruments keep their Fyers identity), `client.py` (volume
   lots->quantity, no-trade minutes carried forward, OI from `getOIData` for NFO only, the index
   gap 15:15-15:28 flagged not filled; what was missing lands in `ingest_runs.details.flags`).
+  `check.py` + `api/angel_routes.py` — the one guard every Angel One login goes through except
+  the 09:16 VIX fallback in `rotation/live.py`: the dashboard's Test connection (`POST
+  /legwise/angel/test`: `begin` takes the lock and passes the guard, then the login runs in a
+  background thread and the route answers 202 at once; the card reads the result from `GET
+  /legwise/angel/status`), the 08:00 job (`obt angel test --scheduled`), and the collector
+  (`check.session()` in `evening.collect_detailed`, holding the lock for the whole collection).
+  A check is ONE `auth.login`, nothing fetched, the session dropped, never stored. The guard: an
+  exclusive `flock` on `TRADING_DATA_ROOT/angelone/check.lock` (one login at a time, across
+  processes; "running" is a non-blocking probe of it, `running.json` only names the holder; a
+  manual test while it is held is 409), a 60 s cool-down from the attempt's END (manual = 429 +
+  `retry_after_s`; scheduled and collector wait it out), and a refused login held 15 minutes for
+  every source unless the `.env`'s ANGELONE_* values changed (`fingerprint`, a digest, never the
+  values; 429 `kind: held`). The ANGELONE_* keys are re-read from the repo `.env` file on every
+  check and status call, the file winning (`current_env`), because obt-api and the scheduler load
+  `.env` once. Failures are classified (`not_configured` / `rejected` / `network` /
+  `unavailable` (5xx, `AngelUnavailableError`) / `error`), messages pass `auth._scrub` (secrets
+  longest first, the client code masked, then cut), and the last result, with the client masked
+  (`R1•••56`), goes to `angelone/last_check.json`. The status lists the settings by name with a
+  yes/no only, and the newest `ingest_runs` row with source `angelone` as the last collection.
+  Tests fake the login; none sends a real one.
 - `rotation/` — the options rotation's forward paper journal (BL-058): `lists.py` (the registered lists
   A / B / C / REF, never edited after the first entry), `score.py` (a port of research/bl057/rotate.py's
   ranking, numpy only; `scripts/rotation-parity.py` must print PARITY OK), `update.py` (nightly one-day

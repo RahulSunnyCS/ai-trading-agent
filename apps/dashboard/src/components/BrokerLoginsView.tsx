@@ -1,3 +1,4 @@
+import { AngelOneCard } from './AngelOneCard';
 import { FyersAuthCard } from './FyersAuthCard';
 import { CardHeader } from './ui/Card';
 
@@ -19,6 +20,13 @@ export function BrokerLoginsView() {
           Fyers
         </h2>
         <FyersAuthCard />
+      </section>
+
+      <section aria-labelledby="angelone-heading" className="space-y-3">
+        <h2 id="angelone-heading" className="text-sm font-semibold text-foreground">
+          Angel One
+        </h2>
+        <AngelOneCard />
       </section>
     </div>
   );
