@@ -168,9 +168,21 @@ time from the dashboard's Momentum tab ("Weekly signal") or the CLI directly:
 | `preview` | Fri 14:40 | live: Fyers quotes, or each ETF's Yahoo quote (~15 min delayed) turned into its index level | trade 15:05-15:25, i.e. at (nearly) the Friday close the backtest assumes |
 | `final` | Fri 16:45 | official closes | lists anything the close changed versus the preview |
 
-The message lists SELL / TRIM / BUY and TOP UP / HOLD / WAITING. It flags a buy whose ETF
-trades above NAV (1%, or 2% for international ETFs; see `live_config.toml`), shows the
-biggest rank moves, and ends with a data-health line.
+The message lists SELL / TRIM / BUY and TOP UP / NOT BOUGHT / HOLD / WAITING. It flags a buy
+whose ETF trades above NAV (1%, or 2% for international ETFs; see `live_config.toml`), shows
+the biggest rank moves, and ends with a data-health line.
+
+**Premium gate (BL-136, 2026-10-18).** A NEW buy whose ETF trades more than
+`premium_block_pct` (2%) above NAV, or `premium_block_international_pct` (5%) for Nasdaq 100
+and Hang Seng, is not bought: the row becomes `SKIP (premium)` with the premium, the limit and
+the reason, and the next-best name within the exit rank takes its slot
+(`analysis.latest_signal`'s `no_buy` refill). The premium is the newest one dated before the
+signal Friday (AMFI publishes NAV in the evening, so Friday's run uses Thursday's); Friday's own
+NAV is never read, even by a rerun that finds it in the file. The
+limits in `live_config.toml` apply to every ETF favourite. The gate is a decision for the week
+only: the backtest behind the model portfolio runs without it, so the model still records the
+buy next week; the item's Phase 2 decides whether it enters the engine. A held name is never
+sold or trimmed for its premium; a top-up is only flagged. Set a limit to 0 to switch it off.
 
 The positions are each saved strategy's model portfolio, not your actual holdings. Every saved
 strategy retains its initial start date. `live_config.toml` supplies only the no-favourites

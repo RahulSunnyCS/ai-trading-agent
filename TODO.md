@@ -695,6 +695,17 @@ Steady / Calendar / Adaptive lists, favourites, a leg-grid builder. Features fol
 | 3.28.3 | Phase 1c: Builder design A (token strip, leg grid, backtest settings popover) | claude | **Built 2026-10-15.** On `main`: `bars` / `include_excluded` on `POST /legwise/backtest`, the grid helpers and components. The Builder page uses them (PR #227) with period, bar size and include-excluded in the Run panel |
 | 3.28.4 | Phase 2–3: Analytics page pattern on Today, Builder result, Runs, Heatmap, Correlation, Regimes; declutter | claude | **In progress.** Today is one page (list cards, What happened, Is the rule still working?, Experiments) with no mode switch; the evening run bar is on Today and Daily results is retired with a redirect (2026-10-15); Regimes and the YAML engine sit under Advanced (2026-10-15); Heatmap has chips and a settings drawer; correlation / regimes run-bar and drawer controls are not done |
 
+### 3.29 Momentum ETF premium gate — [BL-136](backlog/BL-136-momentum-etf-premium-gate.md)
+
+Owner (2026-10-18), after MON100 read +16.89% above NAV on a Friday the ranking put Nasdaq 100 first:
+never open a new position in an ETF too far above its NAV; the research decides whether the rule stays.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.29.1 | Phase 1: the live gate (`premium_block_pct` 2% / `premium_block_international_pct` 5% in `live_config.toml`, every ETF favourite): a new buy over the limit becomes `SKIP (premium)` with the premium, its date, the limit and the reason; the next-best name takes the slot; Telegram "NOT BOUGHT" group, journal rows, This week "Not bought" section, Journal page chips; a sleeve's skip never reads as a TRIM in a group | claude | **Built 2026-10-18.** Decision-only: the model portfolio still records the buy (Phase 2 task 3 decides whether the gate enters the engine) |
+| 3.29.2 | Phase 1b: the same gate on Broad and Custom Index atomics (Nasdaq 100, Hang Seng), on the Broad engine decision and the 14:15 orders; until then the followed Broad headline still buys MON100 at any premium | claude | Planned, next |
+| 3.29.3 | Phase 2: rebuild the premium history on matching units (MON100 from 2016, not 2021), run the pre-registered arms A–D, apply the pass / kill rule, findings page, keep or zero the limits | claude | Planned; Phase 0 committed with the item |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |
