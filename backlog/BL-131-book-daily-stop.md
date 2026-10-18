@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner trades both books with real money (3 lots each) |
-| **Status** | In progress |
+| **Status** | Done — informative: a book stop trims the worst day but adds no money; tight stops cost T1; ₹9k+ never binds on Core |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -66,3 +66,41 @@ Say what each stop would have done to each book and to the two together, against
 
 - 2026-10-18 — Created; Phase 0 registered before any run (owner chose the levels and per-book stops).
 - 2026-10-18 — Amendment 1 committed before any result was read: levels 6k–9k added at the owner's request.
+- 2026-10-18 — **Run as registered with Amendment 1** (`research/bl131/book_stop.py`; `book_stop_2026-10-18.json`).
+  2,151 pick-days replayed minute by minute; every replayed path ended at the stored gross (none left out). Gross per
+  3-lot book, one lot per pick. Change = with stop − no stop, per day, 90 % interval.
+
+  **Core-298 book** (no stop: two years +1,216/day, drawdown −35,457, worst day −10,532; last year +1,393, −31,486, −9,919)
+
+  | Stop | Two years: fired, change (90 %), drawdown, worst day | Last year: fired, change (90 %), drawdown, worst day |
+  |---|---|---|
+  | ₹6k | 57 d, +16 [−50, +81], −40,516, −8,258 | 24 d, +24 [−30, +80], −30,922, −8,258 |
+  | ₹7k | 38 d, +6 [−47, +56], −44,496, −8,721 | 12 d, **+37 [+10, +65]**, −29,956, −8,721 |
+  | ₹8k | 22 d, +3 [−30, +31], −41,289, −9,040 | 7 d, +13 [−2, +31], −30,858, −8,843 |
+  | ₹9k / ₹10k / ₹12k | 6 / 1 / 0 d, 0 (no change) | 2 / 0 / 0 d, 0 |
+
+  **T1 book** (no stop: two years +1,885/day, drawdown −23,300, worst day −13,809; last year +2,100, −23,300, −13,809)
+
+  | Stop | Two years: fired, change (90 %), drawdown, worst day | Last year: fired, change (90 %), drawdown, worst day |
+  |---|---|---|
+  | ₹6k | 60 d, −72 [−187, +39], −27,137, −8,752 | 31 d, −116 [−277, +38], −27,137, −8,752 |
+  | ₹7k | 39 d, −12 [−85, +54], −27,098, −9,005 | 18 d, −36 [−139, +61], −27,098, −8,990 |
+  | ₹8k | 30 d, −5 [−57, +44], −23,492, −9,040 | 11 d, +18 [−54, +86], −21,049, −8,990 |
+  | ₹9k | 18 d, −2 [−37, +33], −22,057, −9,919 | 7 d, +20 [−23, +63], −21,741, −9,919 |
+  | ₹10k | 5 d, +6 [−3, +19], −23,300, −13,809 | 3 d, +4 [+0, +9], −23,300, −13,809 |
+  | ₹12k | 2 d, +2 [+0, +6], −23,300, −13,809 | 1 d, 0 |
+
+  **Both books, each with its own stop** (no stop: two years +3,102/day, drawdown −44,957, worst day −22,802): ₹6k
+  +3,047 / −45,193 / −14,820; ₹7k +3,096 / −43,753 / −17,248; ₹8k +3,099 / −46,777 / −18,080; ₹9k +3,100 / −48,460 /
+  −19,838; ₹10k and ₹12k as no stop (worst day −22,802).
+
+  **Read under the rule.** One cell of 24 has its interval above zero (Core, last year, ₹7k), which six levels read on
+  the same days can produce by chance (Amendment 1's caveat): not positive. "Protective" (shallower drawdown and worst
+  day) holds only for T1 at ₹9k over two years and ₹8k / ₹9k on the last year, and Core at ₹6k / ₹7k on the last year.
+  **What it says:** (1) on Core a book stop of ₹9k or more never changes anything: each Core pick already stops at
+  ₹2,500–3,000, so three picks cap the book near −₹9k (the stop "fires" on days the book is already flat at that loss).
+  (2) A book stop does not add money in either book; tight stops (₹6k–7k) cost T1 money (they close days that
+  recover: at ₹6k, 33 such days −₹95k against 27 days saved +₹64k). (3) What a stop reliably does is trim the single
+  worst day: T1's −13.8k becomes about −9k at ₹6k–9k, and both books' −22.8k becomes −14.8k to −19.8k; the maximum
+  drawdown, a run of ordinary losing days, mostly does not improve. Weaknesses: in-sample, gross (a stop can only
+  lower charges), T1's window overlaps its selection year, fills at the stop minute's close (no slippage).
