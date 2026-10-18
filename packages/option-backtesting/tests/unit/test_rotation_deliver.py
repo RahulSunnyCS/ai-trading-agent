@@ -166,7 +166,8 @@ def test_missing_t1_results_are_stored_then_t1_follows_as_its_own_message():
     assert _run(rec, sent, alerts, catch_up=catch) == 0
     assert caught == ["t1"] and alerts == []
     first, follow = sent.to(None)[0], sent.to(None)[-1]
-    assert "not recorded today" in first  # Adaptive did not wait for the catch-up
+    # Adaptive did not wait for the catch-up, and says T1 is coming rather than "not recorded"
+    assert "🧪 T1 · TESTING PHASE · follows in a separate message" in first
     assert follow.startswith("⚠️ LATE · not a forward entry\n🧪 T1 · TESTING PHASE · not traded")
     assert "ADAPTIVE" not in follow
     assert len(sent.to("-456")) == 1  # the group heard about Adaptive only
@@ -182,7 +183,9 @@ def test_a_slow_t1_does_not_hold_adaptive_back_past_the_clock_deadline():
     # Adaptive written at 09:16:49.9: T1 may hold the owner's message for 0.1 s at most
     assert _run(rec, sent, now_fn=_at(9, 16, 49, 900_000)) == 0
     owner = sent.to(None)
-    assert "not recorded today" in owner[0]  # Adaptive first, T1 marked as not recorded yet
+    # Adaptive first; T1 is only slow, so it says it follows (it is not "not recorded")
+    assert "🧪 T1 · TESTING PHASE · follows in a separate message" in owner[0]
+    assert "not recorded today" not in owner[0]
     assert owner[-1].startswith("🧪 T1 · TESTING PHASE · not traded · Tue 20 Oct")
     assert len(sent.to("-456")) == 1
 
@@ -311,6 +314,7 @@ def _t1_ready(root):
 
 def _send(root, sent, **kw):
     kw.setdefault("echo", lambda m: None)
+    kw.setdefault("alert", lambda title, body: None)  # never the real Telegram
     return deliver.send_result(DAY, root=root, send=sent, **kw)
 
 
@@ -452,14 +456,23 @@ def test_an_unreadable_t1_never_stops_adaptives_result_and_t1_follows_once_fixed
     path = store.journal_path(evening, "t1")
     good = path.read_text()
     path.write_text(good + '{"day": "2026-10-21", "lis')  # a torn line: JournalCorrupt
-    sent, errors = Sent(), []
-    assert (
-        _send(evening, sent, wait_until=time(16, 25), now_fn=_at(16, 0, 0), err=errors.append) == 0
+    sent, errors, alerts = Sent(), [], []
+    run = _send(
+        evening,
+        sent,
+        wait_until=time(16, 25),
+        now_fn=_at(16, 0, 0),
+        err=errors.append,
+        alert=lambda title, body: alerts.append((title, body)),
     )
+    assert run == 0
     owner, group = sent.to(None)[0], sent.to("-456")[0]
     assert "🎯 Adaptive   +₹300" in owner and "🧪 T1 · result not ready" in owner
     assert "🎯 Adaptive   +₹300" in group
     assert errors and "JournalCorrupt" in errors[0]
+    # the owner is told, once, why T1 is missing
+    assert len(alerts) == 1 and alerts[0][0] == "T1 TRACK result for 2026-10-20 could not be read"
+    assert "JournalCorrupt" in alerts[0][1]
     # T1 stays owed: once the journal is readable again, it follows on its own
     path.write_text(good)
     assert _send(evening, sent) == 0
@@ -534,6 +547,60 @@ def test_a_day_marked_under_the_old_scheme_is_not_sent_again_in_part(evening):
     # a marker written by the new scheme covers the owner only
     marker.write_text("owner: sent\n")
     assert _send(evening, sent) == 0
-    assert [c for c, _ in sent.messages] == ["-456"]  # the group copy it had not had
+    # the group copy it had not had, and T1, owed, on its own, in the same run
+    assert [c for c, _ in sent.messages] == ["-456", None]
     assert _send(evening, sent) == 0
-    assert [c for c, _ in sent.messages] == ["-456", None]  # then T1, owed, on its own
+    assert [c for c, _ in sent.messages] == ["-456", None]  # nothing more
+
+
+def test_a_group_that_keeps_failing_never_holds_back_the_owners_t1_result(evening):
+    """The bot was removed from the friends' group: the owner still gets everything."""
+    _journal(evening, T1_CORE, "t1")  # T1 recorded, results not stored yet
+    sent = Sent()
+    sent.fail.add("-456")
+    # past the deadline: Adaptive goes to the owner without T1; the group copy fails
+    assert _send(evening, sent, wait_until=time(16, 25), now_fn=_at(16, 30, 0)) == 2
+    assert "🧪 T1 · result not ready" in sent.to(None)[0]
+    _write(evening, T1_CORE, -50.0)  # the T1 results arrive (the 21:00 catch-up)
+    assert _send(evening, sent) == 2  # the group still fails, so the job still says so
+    owner = sent.to(None)
+    assert len(owner) == 2 and owner[1].startswith("📊 Tue 20 Oct · T1 result")
+    assert _send(evening, sent) == 2
+    assert len(sent.to(None)) == 2  # T1 is never sent twice while the group keeps failing
+
+
+def test_before_not_before_the_evening_run_sends_nothing_and_after_it_sends(evening):
+    _t1_ready(evening)
+    sent = Sent()
+    assert _send(evening, sent, not_before=time(16, 0), now_fn=_at(15, 56, 0)) == 0
+    assert sent.messages == []
+    folder = store.rotation_dir(evening) / "result-notifications"
+    assert not folder.exists() or not any(folder.glob("*.sent"))
+    # a late retry of the evening run (17:15): the result goes out at once
+    assert _send(evening, sent, not_before=time(16, 0), now_fn=_at(17, 15, 0)) == 0
+    assert len(sent.to(None)) == 1 and len(sent.to("-456")) == 1
+    # and the 16:00 job (or the 21:00 one) then finds it sent
+    assert _send(evening, sent) == 0 and len(sent.messages) == 2
+
+
+def test_result_soft_fail_alerts_and_exits_zero(monkeypatch):
+    from typer.testing import CliRunner
+
+    from option_backtesting.rotation.cli import rotation_app
+
+    alerts = []
+    monkeypatch.setattr(deliver, "send_result", lambda *a, **k: 2)
+    monkeypatch.setattr(deliver, "send_alert", lambda title, body: alerts.append(title))
+    soft = CliRunner().invoke(rotation_app, ["result", "--day", "2026-10-20", "--soft-fail"])
+    assert soft.exit_code == 0 and alerts == [
+        "Rotation result for 2026-10-20 not sent by the evening run"
+    ]
+    hard = CliRunner().invoke(rotation_app, ["result", "--day", "2026-10-20"])
+    assert hard.exit_code == 2 and len(alerts) == 1
+
+    def boom(*a, **k):
+        raise ValueError("torn row")
+
+    monkeypatch.setattr(deliver, "send_result", boom)
+    soft = CliRunner().invoke(rotation_app, ["result", "--day", "2026-10-20", "--soft-fail"])
+    assert soft.exit_code == 0 and len(alerts) == 2
