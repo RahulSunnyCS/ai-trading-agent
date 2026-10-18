@@ -26,6 +26,7 @@ file sells the NIFTY strike closest to ₹65 (`nifty_widesl_917_closest_premium.
 | BL-080 | Add NIFTY ₹40 / ₹60, SENSEX ₹120 / ₹200 | P1, P2, P3, before charges | **Harmful**; then leave-one-out: NIFTY ₹80 / ₹100 carry weight, SENSEX ₹250 / ₹320 dead weight, but pruning them was **not adopted** | [BL-080][bl080] |
 | BL-098 | All six rotation families × one-factor stops | holdout 2025-10-09 → 2026-10-09, **after charges** | Descriptive: NIFTY leaders ₹100 / ₹80 (morning, afternoon) and OTM1 (midday); SENSEX ₹250 in every band | [BL-098 report][bl098q] |
 | BL-126 (POC) | NIFTY ₹120 at SL 60 % (and ₹100 at SL 75 %) added beside Core ₹100, all 25 slots | 2024-10-09 → 2026-10-16, gross, in-sample | Not positive standalone or in Adaptive (₹120: +₹23 [−33, +81] per lot-day in Adaptive, shallower drawdown) | [BL-126][bl126] |
+| BL-127 | NIFTY ₹80, ₹100, ₹120 × six leg stops (60–115 %), a stop chosen per premium on 2024-10 → 2025-10, the best two added to Adaptive and read on 2025-10 → 2026-10 | Gross, selection and test years | Standalone in the selection year ₹120 (SL 70 %, +295) > ₹100 (SL 70 %, +281) > ₹80 (SL 80 %, +230) per lot-day; Adaptive with ₹80 SL 80 % and ₹120 SL 70 % added: −₹10 [−82, +63] on the test year, deeper drawdown. **Not positive**; ₹120's own first-year Stage B gain (+₹15) did not repeat | [BL-127][bl127] |
 
 Fixed mixes, no portfolio stop, total / max drawdown, OTM1 | ₹80 | ₹100 ([BL-055][bl055], before
 charges): 5 × Widesl ₹8.73L / −₹2.26L | ₹7.02L / −₹1.99L | ₹7.37L / −₹1.76L; 3 Widesl + 2 Dir ₹9.47L /
@@ -74,3 +75,4 @@ charges): 5 × Widesl ₹8.73L / −₹2.26L | ₹7.02L / −₹1.99L | ₹7.37L
 [bl080]: ../../../../backlog/BL-080-drb-wider-closest-premium-families.md
 [bl098q]: ../../../../backlog/BL-098-widesl-qualified-list-post-charge.md
 [bl126]: ../../../../backlog/BL-126-nifty-premium-widesl-tight-sl-poc.md
+[bl127]: ../../../../backlog/BL-127-nifty-premium-widesl-sl-selection.md
