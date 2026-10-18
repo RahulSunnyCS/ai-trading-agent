@@ -1,0 +1,495 @@
+{
+ "core_298": {
+  "two_years": {
+   "days": 428,
+   "expiry_days": 181,
+   "B3": {
+    "per_day": 1216.452219626168,
+    "max_drawdown": -35456.850000000006,
+    "worst_day": -10532.0
+   },
+   "B4": {
+    "per_day": 1332.152570093458,
+    "max_drawdown": -45740.81666666665,
+    "worst_day": -12547.133333333333
+   },
+   "C-D2": {
+    "per_day": 1493.580023364486,
+    "max_drawdown": -38549.850000000006,
+    "worst_day": -13098.45,
+    "extra_vs_B3": {
+     "mean": 277.12780373831777,
+     "ci90": [
+      143.20286214953268,
+      406.8723598130841
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4": {
+     "mean": 161.42745327102804,
+     "ci90": [
+      28.45754283489093,
+      292.32145249221185
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4_after_added_brokerage": {
+     "mean": 148.7452102803738,
+     "ci90": [
+      13.582289719626147,
+      279.2551985981308
+     ],
+     "reading": "above zero"
+    },
+    "added_brokerage_per_day": 12.682242990654203,
+    "vs_B4_without_top_5": {
+     "mean": 102.10224586288419,
+     "ci90": [
+      -21.979125295508304,
+      228.97611111111112
+     ],
+     "reading": "includes zero",
+     "share_of_excess": 0.3748928043397869
+    },
+    "vs_B4_without_top_10": {
+     "mean": 52.135087719298255,
+     "ci90": [
+      -76.27976674641148,
+      170.3011543062201
+     ],
+     "reading": "includes zero",
+     "share_of_excess": 0.684582906058367
+    }
+   },
+   "C-D+": {
+    "per_day": 1359.0775700934578,
+    "max_drawdown": -40565.100000000006,
+    "worst_day": -13219.35,
+    "extra_vs_B3": {
+     "mean": 142.62535046728973,
+     "ci90": [
+      2.804988317756998,
+      272.91407710280373
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4": {
+     "mean": 26.92499999999997,
+     "ci90": [
+      -116.03313473520252,
+      169.41851440809972
+     ],
+     "reading": "includes zero"
+    },
+    "vs_B4_after_added_brokerage": {
+     "mean": -43.32359813084112,
+     "ci90": [
+      -187.73492211838013,
+      100.05483060747656
+     ],
+     "reading": "includes zero"
+    },
+    "added_brokerage_per_day": 70.24859813084112
+   }
+  },
+  "last_year": {
+   "days": 244,
+   "expiry_days": 104,
+   "B3": {
+    "per_day": 1392.764139344262,
+    "max_drawdown": -31485.5,
+    "worst_day": -9919.0
+   },
+   "B4": {
+    "per_day": 1505.3142759562843,
+    "max_drawdown": -38622.0,
+    "worst_day": -12098.666666666666
+   },
+   "C-D2": {
+    "per_day": 1744.1954918032784,
+    "max_drawdown": -32814.75,
+    "worst_day": -11986.0,
+    "extra_vs_B3": {
+     "mean": 351.4313524590164,
+     "ci90": [
+      196.3185963114754,
+      500.5142930327869
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4": {
+     "mean": 238.8812158469945,
+     "ci90": [
+      99.62751024590156,
+      387.74744193989056
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4_after_added_brokerage": {
+     "mean": 229.98285519125682,
+     "ci90": [
+      90.46400956284153,
+      378.5752732240436
+     ],
+     "reading": "above zero"
+    },
+    "added_brokerage_per_day": 8.898360655737704,
+    "vs_B4_without_top_5": {
+     "mean": 150.86582984658298,
+     "ci90": [
+      14.245376569037667,
+      285.78458856345884
+     ],
+     "reading": "above zero",
+     "share_of_excess": 0.38138996649053636
+    },
+    "vs_B4_without_top_10": {
+     "mean": 73.68027065527065,
+     "ci90": [
+      -51.82933404558405,
+      200.77517450142446
+     ],
+     "reading": "includes zero",
+     "share_of_excess": 0.7042019935257167
+    }
+   },
+   "C-D+": {
+    "per_day": 1672.0483606557377,
+    "max_drawdown": -34438.75,
+    "worst_day": -12096.5,
+    "extra_vs_B3": {
+     "mean": 279.28422131147545,
+     "ci90": [
+      129.26121926229504,
+      425.01587090163935
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4": {
+     "mean": 166.7340846994535,
+     "ci90": [
+      2.118565573770466,
+      332.83997609289605
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4_after_added_brokerage": {
+     "mean": 97.86851092896174,
+     "ci90": [
+      -67.54788934426227,
+      264.68975409836065
+     ],
+     "reading": "includes zero"
+    },
+    "added_brokerage_per_day": 68.86557377049179
+   }
+  }
+ },
+ "t1": {
+  "two_years": {
+   "days": 428,
+   "expiry_days": 181,
+   "B3": {
+    "per_day": 1885.3087616822434,
+    "max_drawdown": -23300.25,
+    "worst_day": -13809.25
+   },
+   "B4": {
+    "per_day": 2102.660241433022,
+    "max_drawdown": -30525.999999999993,
+    "worst_day": -18412.333333333332
+   },
+   "T-W1": {
+    "per_day": 2071.338317757009,
+    "max_drawdown": -32942.75,
+    "worst_day": -19509.75,
+    "extra_vs_B3": {
+     "mean": 186.02955607476633,
+     "ci90": [
+      58.64318341121492,
+      297.66709112149533
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4": {
+     "mean": -31.321923676012453,
+     "ci90": [
+      -110.45275311526483,
+      47.40881035825541
+     ],
+     "reading": "includes zero"
+    },
+    "vs_B4_after_added_brokerage": {
+     "mean": -31.321923676012453,
+     "ci90": [
+      -110.45275311526483,
+      47.40881035825541
+     ],
+     "reading": "includes zero"
+    },
+    "added_brokerage_per_day": 0.0
+   },
+   "T-W2": {
+    "per_day": 2007.9750000000001,
+    "max_drawdown": -27314.0,
+    "worst_day": -17049.8,
+    "extra_vs_B3": {
+     "mean": 122.666238317757,
+     "ci90": [
+      13.233650700934573,
+      228.50403037383174
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4": {
+     "mean": -94.68524143302179,
+     "ci90": [
+      -170.2240011682243,
+      -17.177589563862927
+     ],
+     "reading": "below zero"
+    },
+    "vs_B4_after_added_brokerage": {
+     "mean": -94.68524143302179,
+     "ci90": [
+      -170.2240011682243,
+      -17.177589563862927
+     ],
+     "reading": "below zero"
+    },
+    "added_brokerage_per_day": 0.0
+   },
+   "T-W+": {
+    "per_day": 1973.314836448598,
+    "max_drawdown": -30867.0,
+    "worst_day": -19025.5,
+    "extra_vs_B3": {
+     "mean": 88.00607476635516,
+     "ci90": [
+      -23.369386682243004,
+      198.67248831775703
+     ],
+     "reading": "includes zero"
+    },
+    "vs_B4": {
+     "mean": -129.34540498442365,
+     "ci90": [
+      -233.9372332554517,
+      -19.622015186915878
+     ],
+     "reading": "below zero"
+    },
+    "vs_B4_after_added_brokerage": {
+     "mean": -185.47811526479742,
+     "ci90": [
+      -290.7446281152647,
+      -75.59184190031152
+     ],
+     "reading": "below zero"
+    },
+    "added_brokerage_per_day": 56.13271028037382
+   },
+   "T-D2": {
+    "per_day": 2200.2432242990653,
+    "max_drawdown": -33690.40000000001,
+    "worst_day": -17598.4,
+    "extra_vs_B3": {
+     "mean": 314.93446261682243,
+     "ci90": [
+      168.48004672897196,
+      455.9309345794393
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4": {
+     "mean": 97.58298286604362,
+     "ci90": [
+      -19.85354556074767,
+      214.6703738317757
+     ],
+     "reading": "includes zero"
+    },
+    "vs_B4_after_added_brokerage": {
+     "mean": 86.88578660436137,
+     "ci90": [
+      -31.517418224299085,
+      204.80872663551398
+     ],
+     "reading": "includes zero"
+    },
+    "added_brokerage_per_day": 10.697196261682242,
+    "vs_B4_without_top_5": {
+     "mean": 33.36162332545312,
+     "ci90": [
+      -84.36390661938542,
+      145.65624704491722
+     ],
+     "reading": "includes zero",
+     "share_of_excess": 0.6621143997979193
+    },
+    "vs_B4_without_top_10": {
+     "mean": -20.308971291866026,
+     "ci90": [
+      -135.14866626794262,
+      91.49225079744815
+     ],
+     "reading": "includes zero",
+     "share_of_excess": 1.203257392162833
+    }
+   }
+  },
+  "last_year": {
+   "days": 244,
+   "expiry_days": 104,
+   "B3": {
+    "per_day": 2100.2524590163935,
+    "max_drawdown": -23300.25,
+    "worst_day": -13809.25
+   },
+   "B4": {
+    "per_day": 2362.7698087431695,
+    "max_drawdown": -27903.333333333314,
+    "worst_day": -18412.333333333332
+   },
+   "T-W1": {
+    "per_day": 2304.8686475409836,
+    "max_drawdown": -29000.75,
+    "worst_day": -19509.75,
+    "extra_vs_B3": {
+     "mean": 204.61618852459017,
+     "ci90": [
+      52.07465163934425,
+      345.3188934426229
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4": {
+     "mean": -57.90116120218578,
+     "ci90": [
+      -159.13591188524592,
+      41.46725751366121
+     ],
+     "reading": "includes zero"
+    },
+    "vs_B4_after_added_brokerage": {
+     "mean": -57.90116120218578,
+     "ci90": [
+      -159.13591188524592,
+      41.46725751366121
+     ],
+     "reading": "includes zero"
+    },
+    "added_brokerage_per_day": 0.0
+   },
+   "T-W2": {
+    "per_day": 2258.2430327868856,
+    "max_drawdown": -27314.0,
+    "worst_day": -16883.75,
+    "extra_vs_B3": {
+     "mean": 157.99057377049178,
+     "ci90": [
+      32.48288934426229,
+      284.9712090163934
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4": {
+     "mean": -104.52677595628415,
+     "ci90": [
+      -194.62797814207656,
+      -18.10865778688525
+     ],
+     "reading": "below zero"
+    },
+    "vs_B4_after_added_brokerage": {
+     "mean": -104.52677595628415,
+     "ci90": [
+      -194.62797814207656,
+      -18.10865778688525
+     ],
+     "reading": "below zero"
+    },
+    "added_brokerage_per_day": 0.0
+   },
+   "T-W+": {
+    "per_day": 2168.581762295082,
+    "max_drawdown": -30867.0,
+    "worst_day": -19025.5,
+    "extra_vs_B3": {
+     "mean": 68.32930327868853,
+     "ci90": [
+      -81.80026639344261,
+      213.73499999999999
+     ],
+     "reading": "includes zero"
+    },
+    "vs_B4": {
+     "mean": -194.18804644808742,
+     "ci90": [
+      -318.0157377049181,
+      -73.15106898907105
+     ],
+     "reading": "below zero"
+    },
+    "vs_B4_after_added_brokerage": {
+     "mean": -250.09296448087423,
+     "ci90": [
+      -373.50838456284146,
+      -128.9389446721311
+     ],
+     "reading": "below zero"
+    },
+    "added_brokerage_per_day": 55.904918032786874
+   },
+   "T-D2": {
+    "per_day": 2512.848155737705,
+    "max_drawdown": -24810.75,
+    "worst_day": -13734.5,
+    "extra_vs_B3": {
+     "mean": 412.5956967213115,
+     "ci90": [
+      246.34018442622948,
+      569.5589549180328
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4": {
+     "mean": 150.07834699453554,
+     "ci90": [
+      26.57185109289612,
+      270.2710826502732
+     ],
+     "reading": "above zero"
+    },
+    "vs_B4_after_added_brokerage": {
+     "mean": 140.986543715847,
+     "ci90": [
+      16.880474726775965,
+      261.75413251366126
+     ],
+     "reading": "above zero"
+    },
+    "added_brokerage_per_day": 9.091803278688523,
+    "vs_B4_without_top_5": {
+     "mean": 48.413179916318,
+     "ci90": [
+      -66.55288005578801,
+      162.0460355648535
+     ],
+     "reading": "includes zero",
+     "share_of_excess": 0.6840243279125156
+    },
+    "vs_B4_without_top_10": {
+     "mean": -21.707977207977194,
+     "ci90": [
+      -140.66201923076923,
+      88.01717236467233
+     ],
+     "reading": "includes zero",
+     "share_of_excess": 1.138716253395881
+    }
+   }
+  }
+ },
+ "note": "gross per one-lot results x lots; 3 lots on expiry days in every arm"
+}
