@@ -1,6 +1,6 @@
 # Options: rotation ranking (DRB and lists A / B / C / REF)
 
-**Status:** Tested · **Last updated:** 2026-10-16
+**Status:** Tested · **Last updated:** 2026-10-18
 
 ## What it is
 
@@ -47,6 +47,7 @@ per lot-day is above zero and its drawdown per lot is no worse.
 | BL-100 | Pools restricted to the BL-099 families, on P3 | **Planned, not run** | [BL-100][bl100] |
 | BL-106 | The lists over a first-year-selected candidate pool (New-536, registered; New-556 with NIFTY ITM sets, exploratory) vs the 298, test year 2025-10-09 → 2026-10-09, gross | **No list won** on New-536: every interval straddles zero (about ±₹200 a day). Adaptive ₹393 on Core-298 vs ₹292 on New-536 and ₹324 on New-556; New-556's drawdown was shallower (−8.6k vs −10.1k) in one path, descriptive only. The lists were fitted inside the test year, which favours Core-298 | [BL-106][bl106] |
 | BL-109 | Days to expiry counted in weekdays (Sat and Sun skipped) instead of calendar days | Adopted as **no worse**, not better: over 238 days (2025-10-16 → 2026-10-15) Adaptive +₹406 → +₹430 per lot-day, newer minus older +₹25 [-₹6, +₹63]; Steady +₹395 → +₹406, +₹11 [-₹16, +₹46]; Adaptive drawdown 6% deeper (limit 20%); in-sample, lists fitted on calendar labels | [BL-109][bl109] |
+| BL-129 | Order inside Adaptive's picks: Widesl rank 1 (higher composite) vs rank 2; rank 1 at two lots instead of both | **Not positive**: rank 1 earned less than rank 2 over 2025-01 → 2026-10 (Core-298 −₹183 [−339, −36], T1 −₹200 [−388, −1] per lot-day); rank 2 is usually the Widesl the minimum swapped in, so this says the forced-in Widesl earned at least as much as the one picked on merit. The doubled book is not better (intervals include zero) even after ~₹100/day saved brokerage | [BL-129][bl129] |
 
 ## What we know
 
@@ -92,3 +93,4 @@ per lot-day is above zero and its drawdown per lot is no worse.
 [bl109]: ../../../backlog/BL-109-rotation-weekday-dte.md
 [bl100]: ../../../backlog/BL-100-restricted-rotation-lists-p3.md
 [bl106]: ../../../backlog/BL-106-pool-picker-poc.md
+[bl129]: ../../../backlog/BL-129-widesl-rank-one-doubled.md
