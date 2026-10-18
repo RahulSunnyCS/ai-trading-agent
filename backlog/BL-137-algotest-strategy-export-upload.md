@@ -239,3 +239,4 @@ entry, so the strategies must already be in AlgoTest the evening before.
   files export. Not yet known: how AlgoTest encodes a range on the index (`source: underlying`) or
   side low, so both are refused.
 - 2026-10-19 — Q2 reopened after reading AlgoTest's terms (BL-138). Phases 2–4 wait for support's reply.
+- 2026-10-19 — AlgoTest support said by phone that the automation is fine (BL-138 Log); Q2's route is being settled with the owner.

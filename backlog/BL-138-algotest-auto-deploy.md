@@ -205,3 +205,4 @@ Claude.
   HTTP (reverse-engineering clause). Next: ask AlgoTest support in writing whether automating
   deploys of one's own saved strategies is allowed, and the current Signals price.
 - 2026-10-19 — the owner emailed AlgoTest support (automation allowed? Signals price and payload). The route is chosen on the reply.
+- 2026-10-19 — AlgoTest support, by phone to the owner: automating his own account this way is fine. Verbal, not in writing; which route (website or internal requests) it covers is being confirmed with the owner.
