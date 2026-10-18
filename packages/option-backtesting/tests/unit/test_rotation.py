@@ -237,7 +237,7 @@ def test_a_late_entry_is_flagged_not_forward_and_a_past_day_is_refused(seeded):
         target += timedelta(days=1)
     late = record(target, root, vix_open=14.2, now_fn=_at(target, 9, 40))
     assert late.entry["before_first_entry"] is False
-    assert "NOT forward" in late.text
+    assert late.text.startswith("⚠️ LATE · not a forward entry")
     with pytest.raises(PickError, match="not today"):
         record(target + timedelta(days=1), root, vix_open=14.2, now_fn=_at(target, 9, 16))
     # a dry run may name any day

@@ -83,13 +83,20 @@ class Notification:
     # Which switch on the dashboard's Notifications page controls this message (a key of
     # NOTIFICATION_TYPES in packages/notify/src/prefs.ts). None means always sent.
     type: str | None = None
+    # True: send title + body exactly as written, without the severity icon and the
+    # "source, time" line. For a message whose layout is its own (the rotation's picks and result).
+    # Redaction, the preferences switch and truncation still apply.
+    plain: bool = False
 
 
 def render(n: Notification, now: datetime | None = None) -> str:
-    stamp = (now or datetime.now(IST)).astimezone(IST).strftime("%d %b, %H:%M")
-    lines = [f"{SEVERITY_ICON[n.severity]} {n.title}", f"{n.source}, {stamp} IST"]
-    if n.body:
-        lines += ["", n.body]
+    if n.plain:
+        lines = [part for part in (n.title, n.body) if part]
+    else:
+        stamp = (now or datetime.now(IST)).astimezone(IST).strftime("%d %b, %H:%M")
+        lines = [f"{SEVERITY_ICON[n.severity]} {n.title}", f"{n.source}, {stamp} IST"]
+        if n.body:
+            lines += ["", n.body]
     text = redact("\n".join(lines))
     if len(text) > TELEGRAM_LIMIT:
         text = text[: TELEGRAM_LIMIT - 20] + "\n… (truncated)"

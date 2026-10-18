@@ -8,8 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from option_backtesting import notify
-from option_backtesting.rotation import journal, pick
-from option_backtesting.rotation import result as rotation_result
+from option_backtesting.rotation import journal, messages, pick
 from option_backtesting.rotation.cli import rotation_app
 
 
@@ -114,71 +113,75 @@ def test_message_uses_strategy_names_and_keeps_recording_witness(on_time):
         "before_first_entry": on_time,
     }
     text = pick.render(entry)
-    assert "Adaptive: N_ditm1_0932, N_wide_1117 + Buy N_buy_1147" in text
+    assert "🎯 ADAPTIVE · Tue 13 Oct" in text
+    assert "1️⃣ 09:32  N_dir_ITM1" in text and "2️⃣ 11:17  N_widesl_OTM1" in text
+    assert "➕ Buy\n   11:47  N_buy_p50" in text
     assert "Steady" not in text and "Calendar" not in text
     assert "VIX" not in text and "DTE" not in text
     assert "Baseline" not in text and "REF:" not in text
     assert "REF" in entry["lists"]
-    assert "chain f1a772478960" in text and "recorded 09:16:25 IST" in text
-    assert ("LATE:" in text) is not on_time
+    assert text.endswith("🔒 f1a77247 · 09:16")
+    assert (text.splitlines()[0] == "⚠️ LATE · not a forward entry") is not on_time
     assert entry["vix_open"] == 15.25 and entry["dte"]["NIFTY"] == 0
 
 
-def test_result_goes_to_private_chat_and_group(telegram, monkeypatch):
-    calculated = rotation_result.DailyResult(
-        day=date(2026, 10, 13),
-        weekday="Tue",
-        gains={"A": 1200, "B": -450, "C": 0},
-        entry_hash="abc123def456",
-        strategies={
-            "A": [("a", 1400), ("b", -200)],
-            "B": [("c", -450)],
-            "C": [("d", 0)],
-        },
+@pytest.fixture
+def evening_store(tmp_path, monkeypatch):
+    """A day with Adaptive picked and scored, in a tmp store the CLI reads through the env."""
+    from option_backtesting.rotation import store, tomorrow
+
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(tmp_path))
+    core = ["N_ditm1_0917", "N_wide_1117", "N_p100_1202"]
+    journal.append(
+        store.journal_path(tmp_path),
+        {"day": "2026-10-13", "weekday": "Tue", "lists": {"C": {"core": core, "buy": []}}},
     )
-    monkeypatch.setattr(rotation_result, "calculate", lambda _day: calculated)
-    monkeypatch.setattr(rotation_result, "was_sent", lambda _result: False)
-    marked = []
-    monkeypatch.setattr(rotation_result, "mark_sent", lambda completed: marked.append(completed))
+    for name in core:
+        store.append_result(name, {"day": "2026-10-13", "net": 100.0, "gross": 101.0}, tmp_path)
+    monkeypatch.setattr(
+        tomorrow,
+        "next_session_picks",
+        lambda today, root=None, track=None: tomorrow.NextPicks(
+            date(2026, 10, 14), "Wed", core, [], None, None
+        ),
+    )
+    return tmp_path
+
+
+def test_result_goes_to_private_chat_and_group(telegram, evening_store):
     response = CliRunner().invoke(rotation_app, ["result", "--day", "2026-10-13"])
     assert response.exit_code == 0
-    assert marked == [calculated]
     assert [request["chat_id"] for request in telegram] == ["123", "-456"]
     for request in telegram:
-        assert "Adaptive: ₹0" in request["text"]
-        assert "Steady" not in request["text"] and "Calendar" not in request["text"]
-        assert "• d: ₹0" in request["text"]
-        assert "• a:" not in request["text"]
-        assert "Baseline" not in request["text"]
+        text = request["text"]
+        assert text.startswith("📊 Tue 13 Oct · result\n1 lot per strategy, after costs")
+        assert "🎯 Adaptive   +₹300" in text
+        assert "➡️ Wed 14 Oct" in text
+        assert "Steady" not in text and "Calendar" not in text and "Baseline" not in text
+        assert "parse_mode" not in request
+    # the owner's message says T1 was not recorded; the group's has no T1 at all
+    assert "🧪 T1 · not recorded today" in telegram[0]["text"]
+    assert "🧪" not in telegram[1]["text"]
 
 
-def test_result_is_not_sent_twice(telegram, monkeypatch):
-    calculated = rotation_result.DailyResult(
-        day=date(2026, 10, 13),
-        weekday="Tue",
-        gains={"A": 1, "B": 2, "C": 3},
-        entry_hash="abc123",
-    )
-    monkeypatch.setattr(rotation_result, "calculate", lambda _day: calculated)
-    monkeypatch.setattr(rotation_result, "was_sent", lambda _result: True)
-    response = CliRunner().invoke(rotation_app, ["result", "--day", "2026-10-13"])
+def test_result_is_not_sent_twice(telegram, evening_store):
+    runner = CliRunner()
+    assert runner.invoke(rotation_app, ["result", "--day", "2026-10-13"]).exit_code == 0
+    sent = len(telegram)
+    response = runner.invoke(rotation_app, ["result", "--day", "2026-10-13"])
     assert response.exit_code == 0
     assert "already sent" in response.output
-    assert telegram == []
+    assert len(telegram) == sent
 
 
-def test_result_not_ready_sends_nothing(telegram, monkeypatch):
-    def unavailable(_day):
-        raise rotation_result.ResultUnavailable("results are incomplete")
-
-    monkeypatch.setattr(rotation_result, "calculate", unavailable)
-    response = CliRunner().invoke(rotation_app, ["result", "--day", "2026-10-13"])
+def test_result_not_ready_sends_nothing(telegram, evening_store):
+    response = CliRunner().invoke(rotation_app, ["result", "--day", "2026-10-14"])
     assert response.exit_code == 2
     assert "result not ready" in response.output
     assert telegram == []
 
 
-def test_the_picks_message_names_the_next_best_widesl_and_dir_on_its_own_line():
+def test_the_optional_line_names_the_next_best_widesl_and_dir():
     entry = {
         "day": "2026-10-16",
         "weekday": "Fri",
@@ -189,10 +192,17 @@ def test_the_picks_message_names_the_next_best_widesl_and_dir_on_its_own_line():
     }
     options = {"C": {"wide": "N_p100_1117", "dir": "N_ditm1_0932"}}
     lines = pick.render(entry, options).splitlines()
-    assert lines[1] == "Adaptive: N_wide_1117, N_ditm1_1002"
-    assert lines[2] == "Next best, optional: Widesl N_p100_1117; Dir N_ditm1_0932"
-    assert "Next best" not in pick.render(entry)
-    assert pick.next_best_line({"wide": "N_p100_1117", "dir": None}) == (
-        "Next best, optional: Widesl N_p100_1117"
+    assert "➕ Optional: Widesl 11:17 N_widesl_p100 · Dir 09:32 N_dir_ITM1" in lines
+    assert "Optional" not in pick.render(entry)
+    assert messages.optional_line({"wide": "N_p100_1117", "dir": None}) == (
+        "➕ Optional: Widesl 11:17 N_widesl_p100"
     )
-    assert pick.next_best_line({"wide": None, "dir": None}) == ""
+    assert messages.optional_line({"wide": None, "dir": None}) == ""
+
+
+def test_plain_notifications_carry_exactly_the_text_they_are_given():
+    assert notify.render(
+        notify.Notification("s", "info", "", "line one\nline two", plain=True)
+    ) == ("line one\nline two")
+    framed = notify.render(notify.Notification("s", "info", "Title", "body"))
+    assert framed.startswith("ℹ️ Title\ns, ")

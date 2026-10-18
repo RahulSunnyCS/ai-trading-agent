@@ -956,3 +956,142 @@ def test_the_stop_rate_denominator_is_the_strategy_days_it_has_results_for(tmp_p
     write_days(tmp_path)
     c = cell(run(tmp_path, view="family_slot", period="P2"), "N:wide", "0917")
     assert c["n"] == 12 and c["m"]["stop_rate"] == pytest.approx(0.25)
+
+
+# --- the T1 universe (BL-113's extra settings beside Core-298) ---------------------------------
+
+T1_NAMES = [
+    "N_ditm1-t1s36_0917", "N_ditm1-t1s36_0932", "N_dir-t1s29_0917", "S_p285-t1s22_0917",
+    "N_p150-t1s11_0917",
+]  # fmt: skip
+
+
+@pytest.fixture
+def t1_root(root: Path) -> Path:
+    for n in T1_NAMES:
+        write(root, n)  # store.result_path routes these to rotation/track_t1/results/
+    assert (store.track_dir("t1", root) / "results" / f"{T1_NAMES[0]}.csv").exists()
+    return root
+
+
+def test_the_core_universe_never_sees_the_t1_settings(t1_root):
+    cube = m._read_cube(t1_root)
+    assert cube.universe == "core" and set(cube.names) == set(NAMES)
+    resp = m.compute(cube, m.load_journal(t1_root), view="family_slot", period="P2")
+    assert all("-t1" not in r["key"] for r in resp["rows"]) and m.T1_NOTE not in resp["notes"]
+
+
+def test_the_t1_universe_adds_its_settings_as_rows_after_their_core_kind(t1_root):
+    cube = m._read_cube(t1_root, "t1")
+    assert set(cube.names) == {*NAMES, *T1_NAMES}
+    resp = m.compute(cube, m.load_journal(t1_root), view="family_slot", period="P2")
+    keys = [r["key"] for r in resp["rows"]]
+    assert keys == [
+        "N:wide", "N:p150-t1s11", "N:dir", "N:dir-t1s29", "N:ditm1-t1s36", "N:buy",
+        "S:wide", "S:p250", "S:p285-t1s22", "S:dir",
+    ]  # fmt: skip
+    label = {r["key"]: r["label"] for r in resp["rows"]}
+    assert label["N:ditm1-t1s36"] == "NIFTY Dir ITM1 · T1 #36, SL 20%"
+    assert label["S:p285-t1s22"] == "SENSEX Widesl p285 · T1 #22, SL 40%"
+    assert resp["universe"] == "t1" and m.T1_NOTE in resp["notes"]
+    # a T1 row is its own files' mean, like any other row
+    lo, hi = date(2025, 1, 10), date(2025, 8, 29)
+    keep = [i for i, d in enumerate(DAYS) if lo <= d <= hi]
+    expect = np.mean([gross_of("N_ditm1-t1s36_0917", i) for i in keep])
+    assert cell(resp, "N:ditm1-t1s36", "0917")["v"] == pytest.approx(round(float(expect), 2))
+    # Core rows are unchanged by the extra settings
+    core = m.compute(
+        m._read_cube(t1_root), m.load_journal(t1_root), view="family_slot", period="P2"
+    )
+    assert cell(resp, "N:wide", "0917") == cell(core, "N:wide", "0917")
+
+
+def test_an_alias_takes_the_t1_settings_of_its_kinds_and_a_tag_only_itself(t1_root):
+    cube = m._read_cube(t1_root, "t1")
+    jr = m.load_journal(t1_root)
+    dirs = m.compute(
+        cube, jr, view="family_slot", period="P2", filters=m.parse_filters(family="dirs")
+    )
+    assert [r["key"] for r in dirs["rows"]] == ["N:dir", "N:dir-t1s29", "N:ditm1-t1s36", "S:dir"]
+    one = m.compute(
+        cube, jr, view="family_slot", period="P2", filters=m.parse_filters(family="ditm1-t1s36")
+    )
+    assert [r["key"] for r in one["rows"]] == ["N:ditm1-t1s36"]
+    with pytest.raises(m.MatrixError, match="unknown family"):
+        m.parse_filters(family="ditm1_t1s36")
+
+
+def test_the_routes_take_a_universe_and_refuse_an_unknown_one(t1_root, monkeypatch):
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(t1_root))
+    client = TestClient(create_app(t1_root / "cache"))
+    core = client.get("/legwise/rotation/matrix", params={"period": "P2"}).json()
+    t1 = client.get("/legwise/rotation/matrix", params={"period": "P2", "universe": "t1"}).json()
+    assert core["universe"] == "core" and len(t1["rows"]) == len(core["rows"]) + 4
+    assert t1["meta"]["universe"] == "t1" and t1["meta"]["store"]["variants"] == 15
+    drawer = client.get(
+        "/legwise/rotation/matrix/cell",
+        params={"row": "N:ditm1-t1s36", "col": "0917", "period": "P2", "universe": "t1"},
+    ).json()
+    assert drawer["stats"]["sessions"] == 56
+    assert drawer["variants"][0]["settings"]["leg_stop_percent"] == 20.0
+    bad = client.get("/legwise/rotation/matrix", params={"universe": "t2"})
+    assert bad.status_code == 422 and "universe" in bad.json()["error"]
+
+
+def test_widesl_takes_every_closest_premium_level_of_the_track_too(t1_root):
+    cube = m._read_cube(t1_root, "t1")
+    wide = m.compute(
+        cube, m.load_journal(t1_root), view="family_slot", period="P2",
+        filters=m.parse_filters(family="widesl"),
+    )  # fmt: skip
+    assert [r["key"] for r in wide["rows"]] == [
+        "N:wide",
+        "N:p150-t1s11",
+        "S:wide",
+        "S:p250",
+        "S:p285-t1s22",
+    ]
+
+
+def test_a_t1_tag_asked_of_core_says_why_instead_of_an_empty_grid(t1_root):
+    with pytest.raises(m.MatrixError, match="T1 setting"):
+        m.compute(
+            m._read_cube(t1_root), m.load_journal(t1_root), view="family_slot", period="P2",
+            filters=m.parse_filters(family="ditm1-t1s36"),
+        )  # fmt: skip
+
+
+def test_selection_treats_t1_rows_as_not_applicable_and_keeps_core_summaries(journaled):
+    for n in T1_NAMES:
+        write(journaled, n)
+    jr = m.load_journal(journaled)
+    kw = dict(view="family_slot", metric="selection", list_id="A", period="forward")
+    core = m.compute(m._read_cube(journaled), jr, **kw)
+    t1 = m.compute(m._read_cube(journaled, "t1"), jr, **kw)
+    c = cell(t1, "N:ditm1-t1s36", "0917")
+    assert c["st"] == "na" and "never picks a T1 setting" in c["reason"]
+    assert cell(t1, "N:wide", "0917") == cell(core, "N:wide", "0917")
+    col = [x["key"] for x in core["cols"]].index("0917")
+    col_t1 = [x["key"] for x in t1["cols"]].index("0917")
+    assert t1["matrices"][0]["col_summary"][col_t1] == core["matrices"][0]["col_summary"][col]
+
+
+def test_a_period_inside_the_t1_selection_window_is_named_in_the_notes(t1_root):
+    out = m.compute(
+        m._read_cube(t1_root, "t1"), m.load_journal(t1_root), view="family_slot", period="P2"
+    )
+    assert any(n.startswith("P2 lies entirely inside the window") for n in out["notes"])
+    core = m.compute(
+        m._read_cube(t1_root), m.load_journal(t1_root), view="family_slot", period="P2"
+    )
+    assert core["notes"] == m.NOTES
+
+
+def test_the_t1_cube_lays_core_onto_a_wider_day_axis(t1_root):
+    extra = date(2025, 4, 7)  # a Monday after the Core days end
+    write(t1_root, "N_ditm1-t1s36_0947", days=[*DAYS, extra])
+    core, t1 = m._read_cube(t1_root), m._read_cube(t1_root, "t1")
+    assert extra not in core.days and t1.days[-1] == extra
+    v, w = core.names.index("N_wide_0917"), t1.names.index("N_wide_0917")
+    assert np.array_equal(core.G[v], t1.G[w][: len(core.days)])
+    assert np.isnan(t1.G[w][-1])  # no Core result that day: missing, never zero

@@ -17,6 +17,7 @@ import type {
   MatrixResponse,
   MatrixScale,
   MatrixUnit,
+  MatrixUniverse,
   MatrixView,
 } from '../types/rotationMatrix';
 import { formatInr, formatNumber, formatPct, formatPp } from './format';
@@ -114,7 +115,15 @@ export interface MatrixFilters {
   minN: number;
   list: MatrixListId | typeof ANY;
   basis: MatrixBasis;
+  /** Which strategies the grid covers: Core-298, or Core-298 plus the T1 track's settings. */
+  universe: MatrixUniverse;
 }
+
+/** The bar's switch: Core-298 (the live Adaptive's strategies), or Core plus the T1 track's settings. */
+export const UNIVERSE_OPTIONS: { value: MatrixUniverse; label: string }[] = [
+  { value: 'core', label: 'Core 298' },
+  { value: 't1', label: 'T1' },
+];
 
 export const DEFAULT_FILTERS: MatrixFilters = {
   view: 'family_slot',
@@ -133,6 +142,7 @@ export const DEFAULT_FILTERS: MatrixFilters = {
   minN: DEFAULT_MIN_N,
   list: ANY,
   basis: 'all',
+  universe: 'core',
 };
 
 /** Views whose rows and columns do not allow two periods side by side. */
@@ -153,6 +163,7 @@ function put(params: Record<string, string>, key: string, value: string | undefi
 function filterParams(f: MatrixFilters): Record<string, string> {
   const p: Record<string, string> = {};
   p.view = f.view;
+  if (f.universe !== 'core') p.universe = f.universe;
   if (needsStrategy(f.view)) {
     const [idx, fam] = f.strategy.split(':');
     if (idx) p.index = idx === 'S' ? 'SENSEX' : 'NIFTY';

@@ -107,8 +107,8 @@ lists. A forward track is a separate proposal, only after a positive Stage C.
   | ₹350 | 100 % | +94 | -15,076 | 21 of 25 | |
   | ₹350 | 115 % | +92 | -14,250 | 21 of 25 | |
 
-  All three winners are at SL 60 %, the lowest value on the grid, with no tie; the mean falls almost steadily as the stop
-  widens at ₹240 and ₹350 (at ₹300 it dips at 90-100 % and recovers at 115 %). The 60 % cells have 68 % (₹240), 77 % (₹300)
+  All three winners are at SL 60 %, the lowest value on the grid, with no tie; the mean falls steadily as the stop widens at
+  ₹240; at ₹300 it dips at 90-100 % and recovers at 115 %, and at ₹350 it bottoms at 90 % (+76) before +94 / +92. The 60 % cells have 68 % (₹240), 77 % (₹300)
   and 78 % (₹350) of the 115 % cell's drawdown. Unlike BL-127's NIFTY grid (peak at 70-80 %, every cell positive at all 25
   slots), the SENSEX cells are positive at 18 to 25 slots. Because the optimum sits on the edge of the grid, a still
   tighter stop might do better; it was not run (registered: no other SL values).
@@ -128,7 +128,7 @@ lists. A forward track is a separate proposal, only after a positive Stage C.
   third. Stage B replays ran on a temporary root holding only rows on or before 2025-10-08 (asserted in code on the
   files, the days table and the reconstruction).
 
-  **Stage C — test year, read once** (2025-10-09 -> 2026-10-16, 244 weekdays; Adaptive list C over Core-298 + the 50 kept
+  **Stage C — test year, read once** (2025-10-09 -> 2026-10-16, 244 days: SENSEX has 247 scored days, but the replay skips Sunday 2026-02-01 and `days.csv` has no rows for 2026-09-16 and 2026-09-17, so both sides drop them equally; Adaptive list C over Core-298 + the 50 kept
   variants against Core-298; 5-day circular blocks, 2,000 resamples, seed 20261020, two-sided 90 %):
 
   | Added to the universe | Core-298 | With additions | Difference | 90 % interval | Max drawdown (Core / with) | Days a new variant was picked | New picks | Reading |
@@ -140,8 +140,9 @@ lists. A forward track is a separate proposal, only after a positive Stage C.
   With both added, the new variants were picked most at 1002 (37) and 0947 (27), then 1047 (13), 1317 (12), 1302 (11),
   1017 and 1102 (10 each), 0917 and 0932 (9 each); the picks changed on 124 days (more than the 101 on which a
   new variant was picked, because the family-band criterion pools every Widesl in a band). On the 101 days a new variant
-  was picked, the day's gross was +313 with the additions against +268 without; the other 143 days therefore lost about
-  34 each on average (derived from the totals), which is where the +4,500 gained on the picked days went.
+  was picked, the day's gross was +313 with the additions against +268 without (+4,477 in all). Of the other 143 days, 120
+  have identical picks (difference exactly 0); the whole −4,880 falls on 23 days where the picks changed but no new
+  variant was picked (family-band pooling displaced Core picks), about −212 a day (corrected after review).
 
   **Read under the registered rule.** Not positive: the Stage C interval includes zero for all three arms, and with both
   kept winners the drawdown is deeper than Core-298's. The two single-addition arms (descriptive) have a shallower
@@ -149,7 +150,7 @@ lists. A forward track is a separate proposal, only after a positive Stage C.
   forward track is proposed; the item's Phase 1 "done when" is met.
 
   **What the result says, and its weaknesses.** As for NIFTY in BL-127, the selected stops are clearly better standalone in
-  the selection year (+153 to +160 per lot-day against +86 to +103 at 115 %, a quarter to a third less drawdown), and in
+  the selection year (+153 to +160 per lot-day against +86 to +103 at 115 %, 22–32 % less drawdown), and in
   Stage B the ₹300 gain even had an interval above zero (+79 [+15, +149]). None of that carried into the next year: the
   test-year difference is -2 with both added, +20 / +25 alone, all within noise. The Stage B ranking separated little
   (one of three intervals above zero, the order the point difference of one 184-day replay) and Stage B's lead for ₹300 did
@@ -166,3 +167,9 @@ lists. A forward track is a separate proposal, only after a positive Stage C.
   `TRADING_DATA_ROOT` plus the catalog's size; it does not walk the Parquet lake. Code paths that touch the real root
   only read it (`load_day`, `excluded_map`, the stored Core results, `days.csv`); the replays use temporary roots under
   `research/bl128/results/` (filtered copies for Stages A and B, symlinks for Stage C).
+- 2026-10-18 — Review notes (Opus, PR #248; no number changes, the reading stands). The test-year day count is now
+  explained (SENSEX's missing `days.csv` dates differ from BL-127's NIFTY ones; the live `days.csv` lacks four weekdays
+  in all, 2026-09-16, 09-17, 09-23 and 09-24, each with results for one index only: worth a separate look). The Stage C
+  mechanism and the drawdown wording were corrected; the branch was brought up to date with BL-127's corrected
+  findings page. The `other_ids()` clash check covers Core, T1 and BL-127 names only, not BL-126 (no BL-126 id starts
+  with `S_`, so no clash was possible).

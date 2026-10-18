@@ -144,6 +144,12 @@ describe('the request', () => {
     expect(toQuery(matrixParams(f()))).toBe('?view=family_slot&period=P1&metric=avg');
   });
 
+  it('sends the T1 universe to both endpoints and leaves Core as the default', () => {
+    expect(matrixParams(f()).universe).toBeUndefined();
+    expect(matrixParams(f({ universe: 't1' })).universe).toBe('t1');
+    expect(cellParams(f({ universe: 't1' }), 'N:ditm1-t1s36', '0917', 'P1').universe).toBe('t1');
+  });
+
   it('turns the compare switch into P1,P2 and drops the single period', () => {
     const p = matrixParams(f({ compare: true, period: 'P2' }));
     expect(p.compare).toBe('P1,P2');
