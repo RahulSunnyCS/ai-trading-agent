@@ -240,3 +240,17 @@ entry, so the strategies must already be in AlgoTest the evening before.
   side low, so both are refused.
 - 2026-10-19 — Q2 reopened after reading AlgoTest's terms (BL-138). Phases 2–4 wait for support's reply.
 - 2026-10-19 — AlgoTest support said by phone that the automation is fine (BL-138 Log); Q2's route is being settled with the owner.
+- 2026-10-19 — Phase 2, website route (owner's choice after AlgoTest's verbal OK), done by Claude in the
+  owner's signed-in browser:
+  - **Import:** `/backtest` has a hidden `<input type=file accept=".algtst,.json">` behind "Import .algtst";
+    setting a file on it (Playwright `setInputFiles`) fills the builder in the page. Nothing is saved yet, and
+    the strategy's name comes from the file's `name`. `T1 · TEST · N_p150-t1s11_1317` imported with every
+    setting as exported (entry 13:17, exit 15:28, closest premium 150, SL 60%, trail 15/10, MTM ₹4,000).
+  - **Save:** the bottom bar's "Save Strategy" opens "Save New Strategy" with the name filled in; "Done"
+    sends `api.algotest.in/strategy` and shows "Strategy Saved"; the bar then offers Update / Save As New.
+    The `·` in names is accepted. In a window narrower than about 500 px the page switches to a mobile
+    layout without the Save button (what the owner saw while recording): the uploader uses 1440 x 900.
+  - **List:** Backtest's left sidebar, Saved Strategies › MY STRATEGIES; each row's ⋮ has Add to folder and
+    Delete.
+  - Not yet seen: the delete request (Delete is the owner's click; Claude does not delete).
+

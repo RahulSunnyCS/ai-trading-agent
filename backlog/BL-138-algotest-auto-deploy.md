@@ -206,3 +206,10 @@ Claude.
   deploys of one's own saved strategies is allowed, and the current Signals price.
 - 2026-10-19 — the owner emailed AlgoTest support (automation allowed? Signals price and payload). The route is chosen on the reply.
 - 2026-10-19 — AlgoTest support, by phone to the owner: automating his own account this way is fine. Verbal, not in writing; which route (website or internal requests) it covers is being confirmed with the owner.
+- 2026-10-19 — Phase 1, first look (no activation): Forward Test is `/forward-test`. Its "Activation" table
+  lists every saved strategy with Status ("Setup Pending"), Instances ("0 Deployed") and Execution On
+  (M T W Th F Sa Su); a row offers "Select Setup" and "Activate". The page header shows "No Slots Available",
+  "Manage Plan", "Auto Activation" and "Auto restart paused executions". **An activation repeats on the
+  chosen weekdays until stopped, not once**: a dropped pick must be deactivated, not merely left out.
+  Activating needs a slot, i.e. credits (197 on the account); stopped there for the owner's go.
+
