@@ -16,7 +16,8 @@
     "fyers-token": "tsx src/fyers.ts",
     "fyers-login": "tsx src/fyers.ts --store",
     "dispatch": "tsx src/dispatch.ts",
-    "test": "tsx --test src/*.test.ts"
+    "test": "tsx --test src/*.test.ts",
+    "record-strategies": "tsx scripts/record-strategies.ts"
   },
   "dependencies": {
     "@trading/broker-identity": "workspace:*",
