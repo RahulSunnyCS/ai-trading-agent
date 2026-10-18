@@ -104,6 +104,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-111](BL-111-range-regime-strategy-mix.md) | Lots by rank (2-2-1-1) and by range regime: more Dir when expanding, more Widesl when quiet; 3 lots / 6 lots; H3 expiring-index-only: positive but fragile; H3b at most one non-expiring: Core only, fragile | P2 | Planned | research | options |
 | [BL-121](BL-121-moved-expiry-days.md) | Holiday-shifted expiry days: does the rotation earn less on them? | P2 | Done: inconclusive, 11 days; NIFTY Buy reads worse (borderline) | research | options |
 | [BL-113](BL-113-t1-parallel-track.md) | T1 parallel track: Adaptive over Core-298 + 223 time-generic variants, own journal, private Telegram, 60-day read-out vs the live Adaptive (supersedes BL-112) | P1 | In progress | feature + research | options |
+| [BL-129](BL-129-widesl-rank-one-doubled.md) | Adaptive: first-ranked Widesl vs second, and the book with the first at two lots (Core-298 and T1) | P3 | In progress | research | options |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
