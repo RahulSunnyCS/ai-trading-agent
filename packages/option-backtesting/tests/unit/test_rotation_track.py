@@ -234,3 +234,23 @@ def test_soft_fail_needs_a_track():
 
     r = CliRunner().invoke(rotation_app, ["update", "--soft-fail"])
     assert r.exit_code == 2 and "need --track" in r.output
+
+
+def test_verify_checks_the_track_journal_on_request(track_seeded, monkeypatch):
+    from typer.testing import CliRunner
+
+    from option_backtesting.rotation.cli import rotation_app
+
+    root, target = track_seeded
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(root))
+    record(target, root, vix_open=14.2, now_fn=_at(target, 9, 16), track="t1")
+    runner = CliRunner()
+    ok = runner.invoke(rotation_app, ["verify", "--track", "t1"])
+    assert ok.exit_code == 0 and "journal intact: 1 entries" in ok.output
+    # the live journal is a different file: it has no entry yet
+    assert "journal intact: 0 entries" in runner.invoke(rotation_app, ["verify"]).output
+    path = store.journal_path(root, "t1")
+    path.write_text(path.read_text().replace('"vix_open": 14.2', '"vix_open": 99.0'))
+    broken = runner.invoke(rotation_app, ["verify", "--track", "t1"])
+    assert broken.exit_code == 1 and "PROBLEM" in broken.output
+    assert runner.invoke(rotation_app, ["verify", "--track", "t9"]).exit_code == 2
