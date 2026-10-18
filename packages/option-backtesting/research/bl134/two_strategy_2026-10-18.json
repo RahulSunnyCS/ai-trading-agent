@@ -1,0 +1,249 @@
+{
+ "core_298": {
+  "skipped_days": 0,
+  "two_years": {
+   "days": 428,
+   "expiry_days": 181,
+   "three_wide_days": 78,
+   "P": {
+    "gross_per_day": 1241.3619158878505,
+    "net_per_day": 1015.397429906542,
+    "brokerage_per_day": 225.96448598130843,
+    "max_drawdown_net": -70215.55,
+    "worst_day_net": -14838.0
+   },
+   "R": {
+    "gross_per_day": 1493.580023364486,
+    "net_per_day": 1167.1501168224297,
+    "brokerage_per_day": 326.4299065420561,
+    "max_drawdown_net": -41978.450000000004,
+    "worst_day_net": -13381.650000000001
+   },
+   "B3": {
+    "gross_per_day": 1216.452219626168,
+    "net_per_day": 902.7045560747663,
+    "brokerage_per_day": 313.7476635514018,
+    "max_drawdown_net": -42325.94999999998,
+    "worst_day_net": -10862.4
+   },
+   "P_minus_R_net": {
+    "mean": -151.7526869158878,
+    "ci90": [
+     -392.01033878504677,
+     61.99136682242985
+    ],
+    "reading": "includes zero"
+   },
+   "P_minus_R_net_without_top_5": {
+    "mean": -233.74633569739956,
+    "ci90": [
+     -440.17758274231693,
+     -35.69583924349884
+    ],
+    "reading": "below zero",
+    "share": -0.5223167306003144
+   },
+   "P_minus_R_net_without_top_10": {
+    "mean": -301.2332535885168,
+    "ci90": [
+     -502.5392284688995,
+     -109.38140550239245
+    ],
+    "reading": "below zero",
+    "share": -0.9386483326058526
+   },
+   "P_minus_B3_net": {
+    "mean": 112.69287383177571,
+    "ci90": [
+     -200.34129088785048,
+     396.6965946261681
+    ],
+    "reading": "includes zero"
+   }
+  },
+  "last_year": {
+   "days": 244,
+   "expiry_days": 104,
+   "three_wide_days": 35,
+   "P": {
+    "gross_per_day": 1774.7934426229508,
+    "net_per_day": 1549.0459016393443,
+    "brokerage_per_day": 225.74754098360654,
+    "max_drawdown_net": -39085.59999999992,
+    "worst_day_net": -14838.0
+   },
+   "R": {
+    "gross_per_day": 1744.1954918032784,
+    "net_per_day": 1421.3397540983606,
+    "brokerage_per_day": 322.855737704918,
+    "max_drawdown_net": -37676.350000000035,
+    "worst_day_net": -12316.4
+   },
+   "B3": {
+    "gross_per_day": 1392.764139344262,
+    "net_per_day": 1078.8067622950819,
+    "brokerage_per_day": 313.95737704918025,
+    "max_drawdown_net": -35928.999999999956,
+    "worst_day_net": -10249.4
+   },
+   "P_minus_R_net": {
+    "mean": 127.70614754098355,
+    "ci90": [
+     -86.98654713114763,
+     337.3268545081966
+    ],
+    "reading": "includes zero"
+   },
+   "P_minus_R_net_without_top_5": {
+    "mean": -6.723849372385021,
+    "ci90": [
+     -185.9512970711298,
+     181.435460251046
+    ],
+    "reading": "includes zero",
+    "share": 1.0515720323616915
+   },
+   "P_minus_R_net_without_top_10": {
+    "mean": -96.7476495726496,
+    "ci90": [
+     -283.47242521367525,
+     71.42480769230764
+    ],
+    "reading": "includes zero",
+    "share": 1.7265318369848823
+   },
+   "P_minus_B3_net": {
+    "mean": 470.2391393442622,
+    "ci90": [
+     176.3067725409836,
+     747.8006454918033
+    ],
+    "reading": "above zero"
+   }
+  }
+ },
+ "t1": {
+  "skipped_days": 0,
+  "two_years": {
+   "days": 428,
+   "expiry_days": 181,
+   "three_wide_days": 68,
+   "P": {
+    "gross_per_day": 1842.1203271028037,
+    "net_per_day": 1579.7633177570092,
+    "brokerage_per_day": 262.3570093457944,
+    "max_drawdown_net": -43879.4,
+    "worst_day_net": -17706.0
+   },
+   "R": {
+    "gross_per_day": 2200.2432242990653,
+    "net_per_day": 1833.4507009345791,
+    "brokerage_per_day": 366.79252336448593,
+    "max_drawdown_net": -36144.799999999996,
+    "worst_day_net": -17928.800000000003
+   },
+   "B3": {
+    "gross_per_day": 1885.3087616822434,
+    "net_per_day": 1529.2134345794395,
+    "brokerage_per_day": 356.0953271028037,
+    "max_drawdown_net": -25887.04999999999,
+    "worst_day_net": -14092.45
+   },
+   "P_minus_R_net": {
+    "mean": -253.6873831775701,
+    "ci90": [
+     -486.0443691588785,
+     -29.601016355140185
+    ],
+    "reading": "below zero"
+   },
+   "P_minus_R_net_without_top_5": {
+    "mean": -343.9381796690308,
+    "ci90": [
+     -578.7790661938534,
+     -129.6791962174941
+    ],
+    "reading": "below zero",
+    "share": -0.3399176814498675
+   },
+   "P_minus_R_net_without_top_10": {
+    "mean": -420.31052631578945,
+    "ci90": [
+     -647.3758791866029,
+     -217.5539533492823
+    ],
+    "reading": "below zero",
+    "share": -0.6180946083099553
+   },
+   "P_minus_B3_net": {
+    "mean": 50.54988317757008,
+    "ci90": [
+     -239.87594042056077,
+     330.94045560747645
+    ],
+    "reading": "includes zero"
+   }
+  },
+  "last_year": {
+   "days": 244,
+   "expiry_days": 104,
+   "three_wide_days": 37,
+   "P": {
+    "gross_per_day": 2077.9401639344264,
+    "net_per_day": 1819.3073770491803,
+    "brokerage_per_day": 258.63278688524593,
+    "max_drawdown_net": -32333.099999999977,
+    "worst_day_net": -16451.8
+   },
+   "R": {
+    "gross_per_day": 2512.848155737705,
+    "net_per_day": 2149.562909836066,
+    "brokerage_per_day": 363.2852459016393,
+    "max_drawdown_net": -30477.15000000008,
+    "worst_day_net": -14159.3
+   },
+   "B3": {
+    "gross_per_day": 2100.2524590163935,
+    "net_per_day": 1746.0590163934428,
+    "brokerage_per_day": 354.1934426229508,
+    "max_drawdown_net": -25672.40000000014,
+    "worst_day_net": -14092.45
+   },
+   "P_minus_R_net": {
+    "mean": -330.25553278688534,
+    "ci90": [
+     -620.9999282786886,
+     -54.74084016393438
+    ],
+    "reading": "below zero"
+   },
+   "P_minus_R_net_without_top_5": {
+    "mean": -467.6859832635983,
+    "ci90": [
+     -756.3950000000002,
+     -214.601589958159
+    ],
+    "reading": "below zero",
+    "share": -0.3871145480368839
+   },
+   "P_minus_R_net_without_top_10": {
+    "mean": -573.4134615384615,
+    "ci90": [
+     -856.6525534188034,
+     -339.9407905982906
+    ],
+    "reading": "below zero",
+    "share": -0.6651133902151027
+   },
+   "P_minus_B3_net": {
+    "mean": 73.2483606557377,
+    "ci90": [
+     -283.99988729508203,
+     397.055963114754
+    ],
+    "reading": "includes zero"
+   }
+  }
+ },
+ "note": "gross per one-lot result x lots, brokerage once per strategy placed; Buy add-on left out of every book"
+}
