@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P3 — owner's idea, the SENSEX twin of BL-127 |
-| **Status** | In progress |
+| **Status** | Done — informative, not adopted: Stage C not positive (the two selected stops add nothing to Adaptive on the test year) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -64,3 +64,105 @@ lists. A forward track is a separate proposal, only after a positive Stage C.
 ## Log
 
 - 2026-10-18 — Created; Phase 0 registered before any run (owner chose the premiums; the rest is BL-127's design).
+- 2026-10-18 — **Run (Phase 0 followed exactly; no rule changed).** Code and a small JSON summary:
+  `packages/option-backtesting/research/bl128/` (`bl128_selection_2026-10-18.json`; generated variants and results are
+  git-ignored). The folder is BL-127's code copied (no import across item folders) with SENSEX in place of NIFTY. **All
+  figures are gross per lot-day** (the strategy files carry no per-order cost, so the engine's net equals gross; they
+  cannot be read beside after-charges figures such as BL-098's).
+
+  **What was run.** `gen_variants.py` first confirmed that all 25 Core `S_p320_<HHMM>` files equal `S_p250_<HHMM>` apart
+  from id and premium (parsed comparison; it does), then wrote 450 files (18 cells x 25 slots) from Core's
+  `S_p250_<HHMM>` text: only the strategy id, both legs' closest premium and both legs' stop percent differ (Core's call
+  114 % / put 115 % become one value on both legs), checked by a parsed comparison and a changed-line count (5 lines, 4
+  at SL 115 % where the put already has 115). Ids are `S_p<premium><SL>_<HHMM>` (`S_p24060_0917`, `S_p300115_0917`);
+  every one parses as a Widesl (`is_wide`) on SENSEX (`underlying_of`), is not a track, and clashes with no Core-298, T1
+  or BL-127 name. Simulated with BL-126's path (`load_day` + `simulate_day`, the code `obt rotation update` uses) over the
+  495 days Core's `S_p250` results exist (2024-10-09 to 2026-10-16), written only under `research/bl128/results/`.
+
+  **Parity (before trusting the path).** Core `S_p250_0917` and `S_p320_0917` simulated through this path against the
+  stored live results: gross and net equal on 495 of 495 days for each.
+
+  **Stage A — a stop per premium** (selection year 2024-10-09 -> 2025-10-08, 248 days; mean over the 25 slots of gross per
+  lot-day; drawdown is the largest fall of the cumulative slot-averaged series, per lot; the winner is the highest mean,
+  a tie within ₹5 going to the shallower drawdown; no tie arose):
+
+  | Premium | SL | Mean per lot-day | Max drawdown | Slots positive | |
+  |---|---:|---:|---:|---:|---|
+  | ₹240 | 60 % | +153 | -9,013 | 25 of 25 | **winner** |
+  | ₹240 | 70 % | +142 | -9,616 | 24 of 25 | |
+  | ₹240 | 80 % | +127 | -9,132 | 23 of 25 | |
+  | ₹240 | 90 % | +102 | -10,535 | 25 of 25 | |
+  | ₹240 | 100 % | +94 | -11,954 | 21 of 25 | |
+  | ₹240 | 115 % | +86 | -13,350 | 21 of 25 | |
+  | ₹300 | 60 % | +160 | -10,121 | 24 of 25 | **winner** |
+  | ₹300 | 70 % | +143 | -10,678 | 22 of 25 | |
+  | ₹300 | 80 % | +112 | -9,255 | 20 of 25 | |
+  | ₹300 | 90 % | +90 | -13,888 | 22 of 25 | |
+  | ₹300 | 100 % | +91 | -13,453 | 20 of 25 | |
+  | ₹300 | 115 % | +103 | -13,095 | 20 of 25 | |
+  | ₹350 | 60 % | +155 | -11,164 | 22 of 25 | **winner** |
+  | ₹350 | 70 % | +115 | -10,370 | 21 of 25 | |
+  | ₹350 | 80 % | +90 | -12,509 | 21 of 25 | |
+  | ₹350 | 90 % | +76 | -14,919 | 18 of 25 | |
+  | ₹350 | 100 % | +94 | -15,076 | 21 of 25 | |
+  | ₹350 | 115 % | +92 | -14,250 | 21 of 25 | |
+
+  All three winners are at SL 60 %, the lowest value on the grid, with no tie; the mean falls almost steadily as the stop
+  widens at ₹240 and ₹350 (at ₹300 it dips at 90-100 % and recovers at 115 %). The 60 % cells have 68 % (₹240), 77 % (₹300)
+  and 78 % (₹350) of the 115 % cell's drawdown. Unlike BL-127's NIFTY grid (peak at 70-80 %, every cell positive at all 25
+  slots), the SENSEX cells are positive at 18 to 25 slots. Because the optimum sits on the edge of the grid, a still
+  tighter stop might do better; it was not run (registered: no other SL values).
+
+  **Stage B — the best two** (Adaptive list C, no expiry rule, over Core-298 + the winner's 25 variants against Core-298
+  alone, 2025-01-10 -> 2025-10-08, 184 days; Core-298 alone +301 per lot-day, drawdown -11,819, the same figure as
+  BL-127's Stage B; 90 % interval from the registered bootstrap, shown for information, the rule ranks the point
+  difference):
+
+  | Rank | Added | With additions | Difference | 90 % interval | Max drawdown (with) | Days a new variant was picked | New picks |
+  |---:|---|---:|---:|---|---:|---:|---:|
+  | 1 | ₹300, SL 60 % | +380 | **+79** | [+15, +149] | -11,416 | 50 of 184 | 68 |
+  | 2 | ₹240, SL 60 % | +362 | **+62** | [-4, +131] | -11,457 | 41 of 184 | 57 |
+  | 3 | ₹350, SL 60 % | +350 | +49 | [-21, +123] | -10,242 | 61 of 184 | 79 |
+
+  Kept (largest differences above zero): **₹300 at SL 60 %** and **₹240 at SL 60 %**; ₹350 at SL 60 % was dropped as
+  third. Stage B replays ran on a temporary root holding only rows on or before 2025-10-08 (asserted in code on the
+  files, the days table and the reconstruction).
+
+  **Stage C — test year, read once** (2025-10-09 -> 2026-10-16, 244 weekdays; Adaptive list C over Core-298 + the 50 kept
+  variants against Core-298; 5-day circular blocks, 2,000 resamples, seed 20261020, two-sided 90 %):
+
+  | Added to the universe | Core-298 | With additions | Difference | 90 % interval | Max drawdown (Core / with) | Days a new variant was picked | New picks | Reading |
+  |---|---:|---:|---:|---|---|---:|---:|---|
+  | ₹300 SL 60 % + ₹240 SL 60 % (348) | +448 | +447 | -2 | [-88, +79] | -10,688 / -12,307 | 101 of 244 | 180 (₹300: 118, ₹240: 62) | **not positive** (interval includes zero; drawdown deeper) |
+  | ₹300 SL 60 % alone (323) | +448 | +468 | +20 | [-56, +92] | -10,688 / -8,997 | 96 of 244 | 156 | not positive (interval includes zero; drawdown shallower) |
+  | ₹240 SL 60 % alone (323) | +448 | +474 | +25 | [-42, +95] | -10,688 / -9,970 | 83 of 244 | 134 | not positive (interval includes zero; drawdown shallower) |
+
+  With both added, the new variants were picked most at 1002 (37) and 0947 (27), then 1047 (13), 1317 (12), 1302 (11),
+  1017 and 1102 (10 each), 0917 and 0932 (9 each); the picks changed on 124 days (more than the 101 on which a
+  new variant was picked, because the family-band criterion pools every Widesl in a band). On the 101 days a new variant
+  was picked, the day's gross was +313 with the additions against +268 without; the other 143 days therefore lost about
+  34 each on average (derived from the totals), which is where the +4,500 gained on the picked days went.
+
+  **Read under the registered rule.** Not positive: the Stage C interval includes zero for all three arms, and with both
+  kept winners the drawdown is deeper than Core-298's. The two single-addition arms (descriptive) have a shallower
+  drawdown and a point difference of +20 and +25, intervals from -56 to +92 and -42 to +95. Nothing is adopted and no
+  forward track is proposed; the item's Phase 1 "done when" is met.
+
+  **What the result says, and its weaknesses.** As for NIFTY in BL-127, the selected stops are clearly better standalone in
+  the selection year (+153 to +160 per lot-day against +86 to +103 at 115 %, a quarter to a third less drawdown), and in
+  Stage B the ₹300 gain even had an interval above zero (+79 [+15, +149]). None of that carried into the next year: the
+  test-year difference is -2 with both added, +20 / +25 alone, all within noise. The Stage B ranking separated little
+  (one of three intervals above zero, the order the point difference of one 184-day replay) and Stage B's lead for ₹300 did
+  not repeat in Stage C (alone +20, below ₹240's +25). Weaknesses as registered and added: the test year is the same one
+  BL-127, BL-126, BL-098, BL-104 and BL-115 read; the owner chose the premiums after seeing BL-127's result; the 25 slots
+  overlap in time, so Stage A means are not independent; all three winners are at the grid's lowest stop, so the "best
+  stop" is an edge value, not a peak; at ₹350 and ₹300 the winner is positive at 22 and 24 of 25 slots, not all; SENSEX
+  has 18 to 25 positive slots per cell where NIFTY had 25; gross only, so charges (the same four orders a day for every
+  cell) are in no figure. Stage C was read once; no other stop, premium or selection rule was run after it.
+
+  **Live store unchanged.** The fingerprint was taken before any simulation (before `simulate.py`, including the parity
+  run) and again after Stage C: equal. It covers the rotation store (journal md5, the 298 result files, file count, total
+  bytes, newest file and its modification time) and the modification times of the top-level entries of
+  `TRADING_DATA_ROOT` plus the catalog's size; it does not walk the Parquet lake. Code paths that touch the real root
+  only read it (`load_day`, `excluded_map`, the stored Core results, `days.csv`); the replays use temporary roots under
+  `research/bl128/results/` (filtered copies for Stages A and B, symlinks for Stage C).

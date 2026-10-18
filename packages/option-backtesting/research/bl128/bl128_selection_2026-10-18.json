@@ -1,0 +1,608 @@
+{
+ "item": "BL-128",
+ "status": "selection on 2024-10-09..2025-10-08, test 2025-10-09..2026-10-16; gross (no per-order cost in these files)",
+ "variants": "S_p<premium><SL>_<HHMM>: Core S_p250 text with only both legs' closest premium and stop-loss percent changed (the same SL on both legs); 18 cells x 25 slots = 450 files; none is a Core file",
+ "parity": {
+  "S_p250_0917": {
+   "days": 495,
+   "equal_days": 495
+  },
+  "S_p320_0917": {
+   "days": 495,
+   "equal_days": 495
+  }
+ },
+ "stage_a": {
+  "window": [
+   "2024-10-09",
+   "2025-10-08"
+  ],
+  "days": 248,
+  "first_day": "2024-10-09",
+  "last_day": "2025-10-08",
+  "tie_rule_inr": 5.0,
+  "table": {
+   "240": [
+    {
+     "premium": 240,
+     "sl": 60,
+     "core_file": false,
+     "mean": 153.02058064516132,
+     "max_drawdown": -9013.248000000003,
+     "slots_positive": 25,
+     "winner": true
+    },
+    {
+     "premium": 240,
+     "sl": 70,
+     "core_file": false,
+     "mean": 142.10590322580646,
+     "max_drawdown": -9615.696,
+     "slots_positive": 24
+    },
+    {
+     "premium": 240,
+     "sl": 80,
+     "core_file": false,
+     "mean": 126.97403225806451,
+     "max_drawdown": -9132.407999999994,
+     "slots_positive": 23
+    },
+    {
+     "premium": 240,
+     "sl": 90,
+     "core_file": false,
+     "mean": 101.96554838709675,
+     "max_drawdown": -10535.119999999999,
+     "slots_positive": 25
+    },
+    {
+     "premium": 240,
+     "sl": 100,
+     "core_file": false,
+     "mean": 93.47177419354838,
+     "max_drawdown": -11954.448,
+     "slots_positive": 21
+    },
+    {
+     "premium": 240,
+     "sl": 115,
+     "core_file": false,
+     "mean": 85.70945161290322,
+     "max_drawdown": -13350.359999999997,
+     "slots_positive": 21
+    }
+   ],
+   "300": [
+    {
+     "premium": 300,
+     "sl": 60,
+     "core_file": false,
+     "mean": 159.98661290322585,
+     "max_drawdown": -10120.992000000002,
+     "slots_positive": 24,
+     "winner": true
+    },
+    {
+     "premium": 300,
+     "sl": 70,
+     "core_file": false,
+     "mean": 142.62774193548387,
+     "max_drawdown": -10678.271999999999,
+     "slots_positive": 22
+    },
+    {
+     "premium": 300,
+     "sl": 80,
+     "core_file": false,
+     "mean": 111.61990322580647,
+     "max_drawdown": -9254.776000000002,
+     "slots_positive": 20
+    },
+    {
+     "premium": 300,
+     "sl": 90,
+     "core_file": false,
+     "mean": 89.96551612903224,
+     "max_drawdown": -13887.687999999998,
+     "slots_positive": 22
+    },
+    {
+     "premium": 300,
+     "sl": 100,
+     "core_file": false,
+     "mean": 91.14690322580645,
+     "max_drawdown": -13453.376,
+     "slots_positive": 20
+    },
+    {
+     "premium": 300,
+     "sl": 115,
+     "core_file": false,
+     "mean": 102.89900000000002,
+     "max_drawdown": -13095.384,
+     "slots_positive": 20
+    }
+   ],
+   "350": [
+    {
+     "premium": 350,
+     "sl": 60,
+     "core_file": false,
+     "mean": 154.5636129032258,
+     "max_drawdown": -11164.288000000004,
+     "slots_positive": 22,
+     "winner": true
+    },
+    {
+     "premium": 350,
+     "sl": 70,
+     "core_file": false,
+     "mean": 114.83741935483874,
+     "max_drawdown": -10370.416000000001,
+     "slots_positive": 21
+    },
+    {
+     "premium": 350,
+     "sl": 80,
+     "core_file": false,
+     "mean": 90.20870967741936,
+     "max_drawdown": -12509.400000000001,
+     "slots_positive": 21
+    },
+    {
+     "premium": 350,
+     "sl": 90,
+     "core_file": false,
+     "mean": 76.18990322580643,
+     "max_drawdown": -14918.680000000002,
+     "slots_positive": 18
+    },
+    {
+     "premium": 350,
+     "sl": 100,
+     "core_file": false,
+     "mean": 94.02467741935482,
+     "max_drawdown": -15076.359999999999,
+     "slots_positive": 21
+    },
+    {
+     "premium": 350,
+     "sl": 115,
+     "core_file": false,
+     "mean": 92.29303225806451,
+     "max_drawdown": -14249.568,
+     "slots_positive": 21
+    }
+   ]
+  },
+  "winners": {
+   "240": {
+    "sl": 60,
+    "core_file": false,
+    "tie_candidates": [
+     60
+    ]
+   },
+   "300": {
+    "sl": 60,
+    "core_file": false,
+    "tie_candidates": [
+     60
+    ]
+   },
+   "350": {
+    "sl": 60,
+    "core_file": false,
+    "tie_candidates": [
+     60
+    ]
+   }
+  }
+ },
+ "stage_b": {
+  "window": [
+   "2025-01-10",
+   "2025-10-08"
+  ],
+  "rule": "list C, registered weights and lookbacks, no expiry rule; core + Buy picks",
+  "candidates": {
+   "240": {
+    "sl": 60,
+    "family": "p24060"
+   },
+   "300": {
+    "sl": 60,
+    "family": "p30060"
+   },
+   "350": {
+    "sl": 60,
+    "family": "p35060"
+   }
+  },
+  "core_file_winners_not_tested": {},
+  "results": {
+   "240": {
+    "universe_added": 25,
+    "days": 184,
+    "first_day": "2025-01-10",
+    "last_day": "2025-10-08",
+    "core_per_lot_day": 300.75638586956524,
+    "with_additions_per_lot_day": 362.30437047101447,
+    "diff_mean": 61.54798460144927,
+    "ci90": [
+     -3.8036990489130496,
+     130.75636548913045
+    ],
+    "core_max_drawdown": -11818.95,
+    "with_additions_max_drawdown": -11457.316666666662,
+    "drawdown_no_deeper": true,
+    "interval_above_zero": false,
+    "reading": "not positive",
+    "days_with_a_new_variant_picked": 41,
+    "days_with_changed_picks": 50,
+    "new_variant_picks": 57,
+    "new_picks_by_family": {
+     "p24060": 57
+    },
+    "new_picks_by_slot": {
+     "0917": 14,
+     "0932": 10,
+     "0947": 7,
+     "1002": 2,
+     "1017": 11,
+     "1032": 2,
+     "1047": 1,
+     "1102": 1,
+     "1117": 2,
+     "1132": 1,
+     "1232": 2,
+     "1247": 1,
+     "1302": 1,
+     "1317": 1,
+     "1417": 1
+    },
+    "on_days_new_picked": {
+     "n": 41,
+     "with_additions_mean": 165.12926829268295,
+     "core_mean": -144.77693089430892
+    },
+    "premium": 240,
+    "sl": 60
+   },
+   "300": {
+    "universe_added": 25,
+    "days": 184,
+    "first_day": "2025-01-10",
+    "last_day": "2025-10-08",
+    "core_per_lot_day": 300.75638586956524,
+    "with_additions_per_lot_day": 379.8449501811594,
+    "diff_mean": 79.0885643115942,
+    "ci90": [
+     15.234286684782614,
+     149.05557291666668
+    ],
+    "core_max_drawdown": -11818.95,
+    "with_additions_max_drawdown": -11415.666666666664,
+    "drawdown_no_deeper": true,
+    "interval_above_zero": true,
+    "reading": "positive",
+    "days_with_a_new_variant_picked": 50,
+    "days_with_changed_picks": 54,
+    "new_variant_picks": 68,
+    "new_picks_by_family": {
+     "p30060": 68
+    },
+    "new_picks_by_slot": {
+     "0917": 23,
+     "0932": 9,
+     "0947": 7,
+     "1002": 1,
+     "1017": 2,
+     "1032": 4,
+     "1047": 1,
+     "1102": 8,
+     "1117": 2,
+     "1132": 1,
+     "1147": 1,
+     "1217": 3,
+     "1232": 1,
+     "1247": 2,
+     "1302": 2,
+     "1317": 1
+    },
+    "on_days_new_picked": {
+     "n": 50,
+     "with_additions_mean": 128.44825,
+     "core_mean": -168.9875
+    },
+    "premium": 300,
+    "sl": 60
+   },
+   "350": {
+    "universe_added": 25,
+    "days": 184,
+    "first_day": "2025-01-10",
+    "last_day": "2025-10-08",
+    "core_per_lot_day": 300.75638586956524,
+    "with_additions_per_lot_day": 349.9110280797102,
+    "diff_mean": 49.154642210144914,
+    "ci90": [
+     -21.199759963768127,
+     122.81060009057967
+    ],
+    "core_max_drawdown": -11818.95,
+    "with_additions_max_drawdown": -10241.616666666669,
+    "drawdown_no_deeper": true,
+    "interval_above_zero": false,
+    "reading": "not positive",
+    "days_with_a_new_variant_picked": 61,
+    "days_with_changed_picks": 68,
+    "new_variant_picks": 79,
+    "new_picks_by_family": {
+     "p35060": 79
+    },
+    "new_picks_by_slot": {
+     "0917": 32,
+     "0932": 5,
+     "0947": 5,
+     "1002": 2,
+     "1017": 2,
+     "1032": 7,
+     "1047": 2,
+     "1102": 5,
+     "1132": 3,
+     "1217": 2,
+     "1232": 3,
+     "1247": 1,
+     "1302": 3,
+     "1317": 2,
+     "1417": 4,
+     "1432": 1
+    },
+    "on_days_new_picked": {
+     "n": 61,
+     "with_additions_mean": 216.66045081967212,
+     "core_mean": 63.42322404371584
+    },
+    "premium": 350,
+    "sl": 60
+   }
+  },
+  "ranking": [
+   {
+    "premium": 300,
+    "sl": 60,
+    "diff_mean": 79.0885643115942
+   },
+   {
+    "premium": 240,
+    "sl": 60,
+    "diff_mean": 61.54798460144927
+   },
+   {
+    "premium": 350,
+    "sl": 60,
+    "diff_mean": 49.154642210144914
+   }
+  ],
+  "kept": [
+   {
+    "premium": 300,
+    "sl": 60
+   },
+   {
+    "premium": 240,
+    "sl": 60
+   }
+  ],
+  "stage_c_runs": true
+ },
+ "stage_c": {
+  "window_start": "2025-10-09",
+  "rule": "list C, registered weights and lookbacks, no expiry rule; core + Buy picks",
+  "kept": [
+   {
+    "premium": 300,
+    "sl": 60,
+    "family": "p30060"
+   },
+   {
+    "premium": 240,
+    "sl": 60,
+    "family": "p24060"
+   }
+  ],
+  "universe_core": 298,
+  "together": {
+   "universe_added": 50,
+   "days": 244,
+   "first_day": "2025-10-09",
+   "last_day": "2026-10-16",
+   "core_per_lot_day": 448.3877903005465,
+   "with_additions_per_lot_day": 446.73741461748637,
+   "diff_mean": -1.6503756830601128,
+   "ci90": [
+    -88.3224342554645,
+    79.03310109289616
+   ],
+   "core_max_drawdown": -10688.375000000007,
+   "with_additions_max_drawdown": -12306.583333333336,
+   "drawdown_no_deeper": false,
+   "interval_above_zero": false,
+   "reading": "not positive",
+   "days_with_a_new_variant_picked": 101,
+   "days_with_changed_picks": 124,
+   "new_variant_picks": 180,
+   "new_picks_by_family": {
+    "p30060": 118,
+    "p24060": 62
+   },
+   "new_picks_by_slot": {
+    "0917": 9,
+    "0932": 9,
+    "0947": 27,
+    "1002": 37,
+    "1017": 10,
+    "1032": 6,
+    "1047": 13,
+    "1102": 10,
+    "1117": 6,
+    "1132": 4,
+    "1147": 1,
+    "1202": 1,
+    "1217": 3,
+    "1232": 5,
+    "1247": 2,
+    "1302": 11,
+    "1317": 12,
+    "1332": 3,
+    "1347": 2,
+    "1402": 5,
+    "1417": 1,
+    "1432": 1,
+    "1447": 2
+   },
+   "on_days_new_picked": {
+    "n": 101,
+    "with_additions_mean": 312.5974422442244,
+    "core_mean": 268.27211221122116
+   },
+   "universe": 348
+  },
+  "alone_300@60": {
+   "universe_added": 25,
+   "days": 244,
+   "first_day": "2025-10-09",
+   "last_day": "2026-10-16",
+   "core_per_lot_day": 448.3877903005465,
+   "with_additions_per_lot_day": 468.06919398907104,
+   "diff_mean": 19.681403688524586,
+   "ci90": [
+    -56.006311475409824,
+    91.65605959699452
+   ],
+   "core_max_drawdown": -10688.375000000007,
+   "with_additions_max_drawdown": -8996.999999999993,
+   "drawdown_no_deeper": true,
+   "interval_above_zero": false,
+   "reading": "not positive",
+   "days_with_a_new_variant_picked": 96,
+   "days_with_changed_picks": 107,
+   "new_variant_picks": 156,
+   "new_picks_by_family": {
+    "p30060": 156
+   },
+   "new_picks_by_slot": {
+    "0917": 9,
+    "0932": 5,
+    "0947": 23,
+    "1002": 21,
+    "1017": 13,
+    "1032": 8,
+    "1047": 15,
+    "1102": 9,
+    "1117": 9,
+    "1132": 4,
+    "1147": 1,
+    "1217": 2,
+    "1232": 6,
+    "1247": 4,
+    "1302": 9,
+    "1317": 3,
+    "1332": 4,
+    "1347": 3,
+    "1402": 5,
+    "1417": 1,
+    "1432": 1,
+    "1447": 1
+   },
+   "on_days_new_picked": {
+    "n": 96,
+    "with_additions_mean": 309.77239583333335,
+    "core_mean": 244.58454861111113
+   },
+   "universe": 323
+  },
+  "alone_240@60": {
+   "universe_added": 25,
+   "days": 244,
+   "first_day": "2025-10-09",
+   "last_day": "2026-10-16",
+   "core_per_lot_day": 448.3877903005465,
+   "with_additions_per_lot_day": 473.5892076502731,
+   "diff_mean": 25.20141734972677,
+   "ci90": [
+    -42.42357838114756,
+    94.92905823087428
+   ],
+   "core_max_drawdown": -10688.375000000007,
+   "with_additions_max_drawdown": -9969.500000000007,
+   "drawdown_no_deeper": true,
+   "interval_above_zero": false,
+   "reading": "not positive",
+   "days_with_a_new_variant_picked": 83,
+   "days_with_changed_picks": 101,
+   "new_variant_picks": 134,
+   "new_picks_by_family": {
+    "p24060": 134
+   },
+   "new_picks_by_slot": {
+    "0917": 4,
+    "0932": 8,
+    "0947": 15,
+    "1002": 28,
+    "1017": 4,
+    "1032": 10,
+    "1047": 9,
+    "1102": 5,
+    "1117": 4,
+    "1147": 1,
+    "1217": 4,
+    "1232": 2,
+    "1247": 3,
+    "1302": 12,
+    "1317": 16,
+    "1332": 3,
+    "1402": 2,
+    "1417": 2,
+    "1447": 1,
+    "1502": 1
+   },
+   "on_days_new_picked": {
+    "n": 83,
+    "with_additions_mean": 346.6077309236947,
+    "core_mean": 232.99427710843375
+   },
+   "universe": 323
+  },
+  "selection_year_base_check": {
+   "days": 184,
+   "note": "Core replay days in 2025-01-10..2025-10-08 under the full-history root"
+  }
+ },
+ "fingerprint_before_equals_after": true,
+ "fingerprint_before": {
+  "journal_md5": "da0c3f6d7dd88e3b64526195d9833e41",
+  "results_files": 298,
+  "all_files": 534,
+  "total_bytes": 11125591,
+  "newest_file": ".store.lock",
+  "newest_mtime_ns": 1792172712893256539,
+  "root_entries_mtime_ns": {
+   "backups": 1791817955740015524,
+   "catalog.duckdb": 1792170865343264365,
+   "catalog.pre-bl052-merge.duckdb": 1791469561758955505,
+   "heatmap": 1792146286013978572,
+   "lake": 1791914748119237677,
+   "quality": 1792146266065043335,
+   "raw": 1791914726281784344,
+   "research-archive": 1792063999619596992,
+   "results": 1791915135040476406,
+   "rotation": 1792173153183077686,
+   "ruletest": 1792304217582835097
+  },
+  "catalog_bytes": 178270208
+ },
+ "fingerprint_covers": "rotation/ (journal md5, 298 result files, file count, bytes, newest file and mtime) and the mtimes of the top-level entries of TRADING_DATA_ROOT plus the catalog size; not the Parquet lake contents"
+}
