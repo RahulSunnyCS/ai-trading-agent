@@ -98,6 +98,10 @@ def test_a_late_entry_says_so_first():
     assert "🧪 T1 · TESTING PHASE · not traded\n   ⚠️ LATE · not a forward entry\n" in private
     assert private.splitlines()[0] == "🎯 ADAPTIVE · Tue 20 Oct"
     assert "LATE" not in group
+    # a late T1 message of its own says so once, as its first line
+    own = messages.render_entry(t1)
+    assert own.splitlines()[0] == "⚠️ LATE · not a forward entry"
+    assert own.count("LATE") == 1
 
 
 def test_when_t1_was_not_recorded_the_message_says_so_and_adaptive_is_unchanged():
