@@ -94,10 +94,13 @@ describe('job registry', () => {
     expect(evening?.steps.filter((step) => step.includes('--soft-fail'))).toHaveLength(2);
   });
 
-  it('runs the 21:00 result step even when its T1 update fails', () => {
+  it('sends what is owed at 21:00 before a strict T1 update that fails (and retries) the job', () => {
     const t1 = JOBS.find((job) => job.id === 'options-rotation-t1-update');
-    // the update alerts and exits 0, so the steps never stop before the result
-    expect(t1?.steps[0]?.includes('--soft-fail')).toBe(true);
+    // a soft result first, so a T1 failure never costs the Adaptive result
+    expect(t1?.steps[0]?.includes('result') && t1?.steps[0]?.includes('--soft-fail')).toBe(true);
+    // the update itself is strict: a failure fails the job, so its 22:00 / 23:00 retries run
+    expect(t1?.steps[1]?.includes('--soft-fail')).toBe(false);
+    expect(t1?.retries).toBeGreaterThan(0);
     expect(t1?.steps.at(-1)?.includes('--soft-fail')).toBe(false); // a failed result still alerts
   });
 
@@ -145,7 +148,8 @@ describe('T1 parallel track', () => {
     expect(t1?.schedule.at).toBe('21:00');
     const options = ['uv', 'run', '--directory', 'packages/option-backtesting', 'obt'];
     expect(t1?.steps).toEqual([
-      [...options, 'rotation', 'update', '--track', 't1', '--soft-fail'],
+      [...options, 'rotation', 'result', '--soft-fail'],
+      [...options, 'rotation', 'update', '--track', 't1'],
       [...options, 'rotation', 'result'],
     ]);
   });

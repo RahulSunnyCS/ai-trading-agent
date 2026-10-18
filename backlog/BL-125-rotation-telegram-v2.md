@@ -97,7 +97,8 @@ Lists A / B / REF, the journal, scoring, the dashboard's rotation pages, per-tra
   missing (`follows in a separate message` when slow or being caught up, `not recorded today` when it
   failed); the combined T1 block carries the `⚡ Expiry day` line too; `options-evening` ends with
   `obt rotation result --not-before 16:00 --soft-fail`, so a run that only succeeds at 17:15 still sends
-  that evening (a failed 16:00 slot is never caught up); the 21:00 job's T1 update is `--soft-fail`, so its
-  result step always runs; in `send_result` the owner goes first, a failing group copy is retried on its
+  that evening (a failed 16:00 slot is never caught up); the 21:00 job sends anything owed with a soft
+  `result` first, then runs a strict T1 update (a failure fails the job, so its 22:00 / 23:00 retries
+  try again; review of #249) and a last `result`; in `send_result` the owner goes first, a failing group copy is retried on its
   own and never holds back the owner's T1 follow-up, and a T1 that cannot be read alerts the owner;
   `obt rotation verify --track t1` checks the T1 journal.

@@ -593,7 +593,7 @@ def test_result_soft_fail_alerts_and_exits_zero(monkeypatch):
     monkeypatch.setattr(deliver, "send_alert", lambda title, body: alerts.append(title))
     soft = CliRunner().invoke(rotation_app, ["result", "--day", "2026-10-20", "--soft-fail"])
     assert soft.exit_code == 0 and alerts == [
-        "Rotation result for 2026-10-20 not sent by the evening run"
+        "Rotation result for 2026-10-20: not everything was sent (exit 2)"
     ]
     hard = CliRunner().invoke(rotation_app, ["result", "--day", "2026-10-20"])
     assert hard.exit_code == 2 and len(alerts) == 1

@@ -229,8 +229,9 @@ def result(
     if code and soft_fail:
         if telegram:
             send_alert(
-                f"Rotation result for {d} not sent by the evening run",
-                f"exit {code}; the 21:00 job runs `obt rotation result` again (or run it by hand).",
+                f"Rotation result for {d}: not everything was sent (exit {code})",
+                "Already-sent parts are never sent again; what is missing is retried by the 16:00 "
+                "result job's retries and the 21:00 job, or run `obt rotation result` by hand.",
             )
         typer.echo(f"result not sent (exit {code}); alerted, exiting 0 (--soft-fail)")
         return

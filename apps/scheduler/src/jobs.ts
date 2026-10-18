@@ -246,8 +246,8 @@ const BASE_JOBS: Job[] = [
     id: 'options-rotation-result',
     description:
       "Telegram the day's rotation result at 16:00 (BL-125): Adaptive's and the T1 track's one-lot net paper gain and tomorrow's strategies in full (`obt rotation result`). Retried every 5 minutes while the evening run's results are incomplete; sends what exists at 16:25, and the T1 part later if it was missing",
-    // The evening run (15:45) takes about 10 minutes and its last step (the T1 update) takes
-    // seconds, so 16:00 is normally enough. Not in the catalog group: it only reads the rotation
+    // The evening run (15:45) takes about 10 minutes and its T1 update takes seconds, so 16:00
+    // is normally enough. Not in the catalog group: it only reads the rotation
     // journal and result files. An attempt that finds Adaptive (or, before 16:25, T1) incomplete
     // exits 2 and is retried; when the retries run out the owner gets the scheduler's failure
     // alert instead of silence. Sent markers make every retry safe (no double send).
@@ -264,7 +264,7 @@ const BASE_JOBS: Job[] = [
     // --not-before 16:00`) sends the message, and the 21:00 job's result step is the net under it.
     catchUpHours: 6,
     fixHint:
-      'uv run --directory packages/option-backtesting obt rotation result  (the evening run must have stored the results first; add --force to resend)',
+      'If the evening run only finished on a later retry, its last step sends the result itself; otherwise: uv run --directory packages/option-backtesting obt rotation result  (the evening run must have stored the results first; add --force to resend)',
   },
   {
     id: 'options-rotation-t1-update',
@@ -272,24 +272,15 @@ const BASE_JOBS: Job[] = [
       "Catch-up for the T1 parallel track (`obt rotation update --track t1`): stores any day the evening run did not (its 223 extra variants only, in their own folder; the live results are never touched), then `obt rotation result` sends the T1 part of the day's result if it was not ready at 16:00",
     // The evening run does this at about 15:55 now (BL-125); this is the net under it, after the
     // last retry (20:15). Idempotent: it scores every Core-298 day the track lacks, and the result
-    // step is a no-op once everything has been sent (or sends the main message late if nothing
-    // else could). The update is `--soft-fail` (alerts, exits 0) so the result step always runs:
-    // a T1 problem must never cost the day's Adaptive result. The 09:16 job repeats the update as
-    // a catch-up before the track pick.
+    // step is a no-op once everything has been sent. Steps: first `result --soft-fail` sends
+    // anything still owed (a T1 problem must never cost the day's Adaptive result, and it never
+    // fails the job), then the update is strict, so a T1 failure fails the job and its 22:00 /
+    // 23:00 retries try again, and the last `result` sends the T1 part once it is in. The 09:16
+    // job repeats the update as a catch-up before the track pick.
     schedule: { at: '21:00', on: tradingDays, label: 'trading days 21:00' },
     steps: [
-      [
-        'uv',
-        'run',
-        '--directory',
-        OPTIONS,
-        'obt',
-        'rotation',
-        'update',
-        '--track',
-        't1',
-        '--soft-fail',
-      ],
+      ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'result', '--soft-fail'],
+      ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'update', '--track', 't1'],
       ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'result'],
     ],
     cwd: '.',
