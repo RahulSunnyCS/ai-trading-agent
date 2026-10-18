@@ -69,7 +69,7 @@ def interval(x: np.ndarray) -> dict:
     return {
         "mean": m,
         "ci90": [lo, hi],
-        "reading": "positive" if lo > 0 else "negative" if hi < 0 else "inconclusive",
+        "interval_reading": "above zero" if lo > 0 else "below zero" if hi < 0 else "includes zero",
     }
 
 
@@ -100,7 +100,12 @@ def run(root: Path, names: list[str]) -> dict:
         ):
             gross = sum(k * got[n][0] for n, k in lots.items())
             brokerage = sum(2 * got[n][1] * BROKERAGE for n in lots)
-            row[book] = {"gross": gross, "net": gross - brokerage, "entries": len(lots)}
+            row[book] = {
+                "gross": gross,
+                "net": gross - brokerage,
+                "entries": len(lots),
+                "lots": list(lots.values()),
+            }
         rows.append(row)
 
     out = {}
@@ -115,6 +120,7 @@ def run(root: Path, names: list[str]) -> dict:
                 "net_max_drawdown": max_drawdown(a_net),
                 "net_worst_day": float(a_net.min()),
                 "gross_max_drawdown": max_drawdown(a_gross),
+                "gross_worst_day": float(a_gross.min()),
             },
         }
         for book in ("M1", "M2"):
@@ -129,7 +135,16 @@ def run(root: Path, names: list[str]) -> dict:
                 "net_max_drawdown": max_drawdown(m_net),
                 "net_worst_day": float(m_net.min()),
                 "gross_max_drawdown": max_drawdown(m_gross),
+                "gross_worst_day": float(m_gross.min()),
+                "three_lot_days": int(sum(max(r[book]["lots"]) == 3 for r in sub)),
             }
+            m = w[book]
+            m["reading"] = (
+                "positive"
+                if m["m_minus_a_net"]["ci90"][0] > 0
+                and m["net_max_drawdown"] >= w["A"]["net_max_drawdown"]
+                else "not positive"
+            )
         out[wname] = w
     return out
 
@@ -154,7 +169,7 @@ def main() -> None:
                 d = m["m_minus_a_net"]
                 print(
                     f"   {book}: merged on {m['days_merged']} days | net {m['net_per_day']:+.0f}/day "
-                    f"| M-A net {d['mean']:+.0f} [{d['ci90'][0]:+.0f},{d['ci90'][1]:+.0f}] {d['reading']} "
+                    f"| M-A net {d['mean']:+.0f} [{d['ci90'][0]:+.0f},{d['ci90'][1]:+.0f}] {d['interval_reading']} -> {m['reading']} (3-lot days {m['three_lot_days']}) "
                     f"(gross {m['m_minus_a_gross_per_day']:+.0f}, brokerage saved {m['brokerage_saved_per_day']:.0f}) "
                     f"| DD {m['net_max_drawdown']:,.0f} worst {m['net_worst_day']:,.0f}"
                 )

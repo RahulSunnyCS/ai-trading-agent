@@ -78,3 +78,22 @@ saves. Nothing live changes.
   the earlier) were tested; turnover charges approximated as equal; one-lot framing (the live book trades two lots a
   strategy, which doubles the gross part but not the brokerage saving). Nothing adopted; a forward-only check on the
   T1 track would be the next step if wanted.
+- 2026-10-18 — **Review notes (Opus, PR #251; no number changes, the reading stands).**
+  - The JSON's per-cell "reading" now applies both registered conditions (interval and drawdown); the interval alone
+    is `interval_reading`. Regenerated with identical numbers; only T1 two-years M1 reads positive.
+  - **Three lots at one time:** the anchor rule lets a third pick join the same anchor. M1: 2 Core days and 4 T1 days;
+    M2: 46 Core days and 43 T1 days in two years (about 10 %), part of M2's deeper drawdown.
+  - **The T1 gain sits partly in T1's selection year** (split of the two-year window at 2025-10-09; the part before is
+    inside 2024-10-09 → 2025-10-08):
+
+    | T1 | before 2025-10-09 (184 days) | from 2025-10-09 (244 days) |
+    |---|---|---|
+    | M1, M − A net per day | +130 [+45, +217] | +90 [−27, +223] |
+    | M2, M − A net per day | +387 [+132, +650] | +217 [+50, +403] |
+    | Earlier minus later pick, gross per pair (M1) | +446 (43 pairs) | +209 (70 pairs) |
+
+    On Core-298 the same per-pair figure is −189 before and +11 after; 90 of the 109 T1 M1 merges are T1's own
+    variants. So the effect belongs to the T1 variants and roughly halves outside their selection year, where M1 is
+    inconclusive: treat it as at least partly an artefact of that selection.
+  - From 2026-10-19 the T1 track applies the BL-122 expiry rule, so a forward check would test a slightly different
+    picker from this replay.
