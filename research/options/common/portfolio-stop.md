@@ -1,6 +1,6 @@
 # Options: portfolio stop
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-10-18
 
 ## What it is
 
@@ -30,6 +30,7 @@ most 10% lower than with no stop.
 | BL-066 | best-case fill exactly at −X | same | No level reaches the 25% bar; ₹6k closest (drawdown −15.7%, total +1.3%) | [BL-066][bl066] |
 | BL-066 | trailing ₹12k / ₹16k / ₹20k, and trailing only after +₹5k | same | **No level passes**; ₹12k trail best-case drawdown −20.5% | [BL-066][bl066] |
 | BL-095 | ₹10,000 on lists A / B / C / REF (a feature, not a test) | reconstructed list-days, gross, in-sample | First looks only (below) | [BL-095][bl095] |
+| BL-131 | ₹6k, 7k, 8k, 9k, 10k, 12k on each 3-lot book: Core-298 and T1 Adaptive (one lot per pick) | 2025-01-10 → 2026-10-16 (428 days) and the last year, gross, minute replay | **No level clearly changes the result** (24 cells, one interval above zero, chance-level; Core point estimates ≥ 0, T1 at ₹6k–7k < 0); ₹9k+ never binds on Core; trims the worst day (T1 −13.8k → ~−9k), maximum drawdown mostly unchanged | [BL-131][bl131] |
 
 ## What we know
 
@@ -64,3 +65,4 @@ most 10% lower than with no stop.
 [bl066]: ../../../backlog/BL-066-drb-6w3l2-daily-stop.md
 [bl070]: ../../../backlog/BL-070-drb-without-per-strategy-stops.md
 [bl095]: ../../../backlog/BL-095-portfolio-mtm-stop-in-rotation.md
+[bl131]: ../../../backlog/BL-131-book-daily-stop.md
