@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner trades both books with real money (3 lots each) |
-| **Status** | Done — informative: levels set on the first period were hit far less often in the calmer test year; ₹8–8.5k is the "about 95 % of days" level for both books |
+| **Status** | Done — informative: levels set on the first period were hit 2–10 points less often in the calmer test year; whole-period (in-sample) P95 under the rule ≈ ₹8,500 for both books |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -79,8 +79,8 @@ worst day. Nothing live changes.
   | Core | 90 | ₹8,000 | 8.2 % / 2.9 % (10 %) | +13 [−3, +30] | −30,858 | −8,843 |
   | Core | 93, 95 | ₹8,500 | 4.9 % / 2.5 % (7 %, 5 %) | +4 [−9, +16] | −31,324 | −8,993 |
   | T1 | 85 | ₹6,500 | 12.5 % / 10.7 % (15 %) | −122 [−287, +17] | −28,275 | −8,752 |
-  | T1 | 90 | ₹8,000 | 10.3 % / 4.5 % (10 %) | +18 [−47, +80] | −21,049 | −8,990 |
-  | T1 | 93 | ₹8,500 | 7.1 % / 2.9 % (7 %) | +36 [−8, +84] | −21,741 | −9,487 |
+  | T1 | 90 | ₹8,500 (corrected; was ₹8,000) | 7.1 % / 2.9 % (10 %) | +36 [−8, +84] | −21,741 | −9,487 |
+  | T1 | 93 | ₹9,000 (corrected; was ₹8,500) | 6.0 % / 2.9 % (7 %) | +20 [−19, +61] | −21,741 | −9,919 |
   | T1 | 95 | ₹9,500 | 3.3 % / 1.6 % (5 %) | +12 [+0, +30] | −23,300 | −13,809 |
 
   **Read under the rule.** No level "holds": the test year was calmer (its day lows ₹1–2k shallower at every
@@ -89,6 +89,23 @@ worst day. Nothing live changes.
   the same cell BL-131 flagged as chance-level); Core P90–95 and T1 P90–93 are protective (shallower drawdown and worst
   day) with intervals including zero; T1 P85 (₹6,500) tends to cost; T1 P95 (₹9,500) barely fires. **What it says:** a
   fixed rupee stop is not a fixed percentage of days; how often it is hit moves with the market's mood (the calmer
-  year halved the hit rates). Over the whole 21 months, "not hit on about 95 % of days" is about ₹8,000 for Core and
-  ₹8,400 for T1, and "about 90 %" about ₹6,800 / ₹6,600. Weaknesses: in-sample overall; gross; fills at the stop
+  year halved the hit rates). Over the whole 21 months (in-sample, see the corrections below), "not hit on about 95 % of days" is about ₹8,500 for
+  both books and "about 90 %" about ₹7,000. Weaknesses: in-sample overall; gross; fills at the stop
   minute's close; T1's calibration lies in its selection year.
+- 2026-10-18 — **Review corrections (Opus, PR #253).**
+  - **Level rule fixed and re-run:** `level()` used `np.percentile`'s linear interpolation, which let T1 P90 (₹8,000,
+    hit on 10.3 % of calibration days) and T1 P93 (₹8,500, 7.07 %) break the registered "not reached on at least p %"
+    rule. It now uses an observed day low (`method="higher"`) before rounding up; T1 P90 becomes ₹8,500 and P93 ₹9,000
+    (rows above corrected); the six other cells are unchanged. No level holds; every interval except Core P85 includes
+    zero.
+  - **The test year was not unseen:** 2025-10-09 → 2026-10-16 is BL-131's `last_year` window, whose ₹6k–9k results
+    were read before this item's percentiles and split were chosen; Core P85 = ₹7,000 is BL-131's cell again. The
+    "read once" in Phase 0 is therefore not true of these days.
+  - **The whole-period guidance is in-sample and descriptive** (it includes the test year). Under the registered rule
+    (observed low, rounded up to ₹500) it is P90 ₹7,000 for both books and P95 ₹8,500 for both books; the unrounded
+    interpolated values are ₹6,771 / ₹6,613 (P90) and ₹8,018 / ₹8,358 (P95).
+  - Wording: the test year's day lows were ₹0.6–2k shallower (T1 P85 only ₹639), and hit rates fell to between a half
+    and a third for Core but barely moved for T1 P85. T1 P95 fires on 4 test days yet the worst day stays −13,809:
+    the book jumped past −₹9,500 within one minute, filled at that minute's close (the no-slippage caveat).
+  - The script reads BL-131's git-ignored path cache across item folders (it cannot run before BL-131 has); moving
+    the cache and `picks_by_day` to `research/common/` is left for the next item that needs them.

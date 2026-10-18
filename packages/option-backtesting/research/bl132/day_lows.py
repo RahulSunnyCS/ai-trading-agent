@@ -41,7 +41,8 @@ def picks_by_day(root: Path, names: list[str]) -> dict[date, list[str]]:
 
 def level(lows: np.ndarray, p: int) -> float:
     """The p-th percentile day low, rounded up to the next ₹500."""
-    return float(math.ceil(np.percentile(lows, p) / 500.0) * 500)
+    # "higher": an observed day low, so the level is reached on at most (100 - p) % of days (registered rule)
+    return float(math.ceil(np.percentile(lows, p, method="higher") / 500.0) * 500)
 
 
 def main() -> None:

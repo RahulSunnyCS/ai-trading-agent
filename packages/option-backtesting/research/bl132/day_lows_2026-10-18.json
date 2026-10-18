@@ -154,27 +154,10 @@
    "protective": false
   },
   "90": {
-   "level": 8000.0,
-   "calibrate_hit_rate": 0.10326086956521739,
-   "test_hit_rate": 0.045081967213114756,
-   "target_hit_rate": 0.1,
-   "holds": false,
-   "per_day": 2118.0034836065574,
-   "diff_per_day": 17.751024590163922,
-   "ci90": [
-    -46.620543032786905,
-    79.65998975409832
-   ],
-   "positive": false,
-   "max_drawdown": -21049.0,
-   "worst_day": -8989.5,
-   "protective": true
-  },
-  "93": {
    "level": 8500.0,
    "calibrate_hit_rate": 0.07065217391304347,
    "test_hit_rate": 0.028688524590163935,
-   "target_hit_rate": 0.07,
+   "target_hit_rate": 0.1,
    "holds": false,
    "per_day": 2136.676639344262,
    "diff_per_day": 36.424180327868854,
@@ -185,6 +168,23 @@
    "positive": false,
    "max_drawdown": -21740.75,
    "worst_day": -9486.75,
+   "protective": true
+  },
+  "93": {
+   "level": 9000.0,
+   "calibrate_hit_rate": 0.059782608695652176,
+   "test_hit_rate": 0.028688524590163935,
+   "target_hit_rate": 0.07,
+   "holds": false,
+   "per_day": 2120.2883196721314,
+   "diff_per_day": 20.03586065573772,
+   "ci90": [
+    -18.847336065573742,
+    60.92310450819674
+   ],
+   "positive": false,
+   "max_drawdown": -21740.75,
+   "worst_day": -9919.0,
    "protective": true
   },
   "95": {

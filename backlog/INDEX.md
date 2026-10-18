@@ -115,7 +115,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
-| [BL-132](BL-132-mtm-stop-from-day-lows.md) | Book MTM stop sized not to be hit on 85–95 % of days | Informative: levels set on the first period were hit 2–10 points less often in the calmer test year; whole-period "about 95 % of days" ≈ ₹8,000 (Core) / ₹8,400 (T1); protective, no clear money effect | 2026-10-18 |
+| [BL-132](BL-132-mtm-stop-from-day-lows.md) | Book MTM stop sized not to be hit on 85–95 % of days | Informative: levels set on the first period were hit 2–10 points less often in the calmer test year; whole-period (in-sample) P95 ≈ ₹8,500 and P90 ≈ ₹7,000 for both books; protective, no clear money effect | 2026-10-18 |
 | [BL-131](BL-131-book-daily-stop.md) | Daily ₹6k–₹12k stop on each 3-lot book (Core-298 and T1) | Informative: no level clearly changes the result (one chance-level interval of 24); it trims the worst day (T1 −13.8k → ~−9k at ₹6k–9k); ₹9k+ never binds on Core (per-pick stops already cap it) | 2026-10-18 |
 | [BL-130](BL-130-merge-close-widesl-picks.md) | Adaptive: merge two Widesl picks within 30 minutes into one two-lot entry | Informative, not adopted: Core-298 no effect beyond ~₹25–70/day brokerage (noise); T1 gained from keeping the earlier entry (+107 identical, +290 any Widesl per one-lot day, two years), one cell passes, partly in T1's selection year | 2026-10-18 |
 | [BL-129](BL-129-widesl-rank-one-doubled.md) | Adaptive: Widesl rank 1 vs rank 2, and rank 1 at two lots | Informative, not adopted: rank 1 earned no more than rank 2, which is usually the Widesl the minimum swapped in; the doubled book is not better (intervals include zero) | 2026-10-18 |
