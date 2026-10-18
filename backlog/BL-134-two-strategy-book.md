@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner trades both books with real money |
-| **Status** | Done — informative, not adopted: dropping the second Widesl costs T1 clearly and Core's drawdown; the brokerage saved (~₹100 a day) does not pay for it |
+| **Status** | Done — informative, not adopted: dropping the second Widesl is clearly worse in T1; in Core one early stretch decides it; the ~₹100 a day of brokerage saved does not pay for the dropped Widesl |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -85,8 +85,21 @@ lots as picked, in result, drawdown, worst day and brokerage. Nothing live chang
   T1 +51 / +73.
 
   **Read under the rule.** P is **worse** than R in T1 (both windows) and inconclusive in Core, where over 21 months
-  its drawdown is far deeper (−70k vs −42k) and its last-year lead rests on its best days. Dropping the second Widesl
+  its drawdown is far deeper (−70k vs −42k; see the corrections below: one early stretch) and its last-year lead rests
+  on its best days. Dropping the second Widesl
   saves about ₹100 a day of brokerage but gives up that Widesl's result, which (BL-129) is at least as good as the top
   one's; doubling the top Widesl concentrates risk on one entry. The two-strategy book is barely better than 3 lots as
   picked despite carrying 4 lots on normal days. Weaknesses: in-sample, turnover charges taken as equal for equal
   lots, T1 overlaps its selection year.
+- 2026-10-18 — **Review corrections (Opus, PR #255; no number changes).**
+  - **Core's −70k drawdown is one early stretch:** 2025-01-16 → 2025-05-23 (84 trading days, when the ranking had
+    only 3–7 months of history). Over it P lost −70.2k while R gained +11.8k (the doubled top Widesl −43.9k, e.g.
+    `S_wide_0917` top on 16 of those days; Dir lots −7.4k; brokerage −19k). P − R over the stretch is −82.0k, more than
+    the whole 21-month deficit (−65.0k); **outside it P is +17.1k ahead of R**. On the last year the drawdowns are
+    about equal (P −39.1k, R −37.7k). So for Core the deficit and the drawdown are the same event, not two strikes;
+    "not adopted" rests on T1, where both intervals are below zero.
+  - **Top days removed, all cells:** Core two years −234 [−440, −36] (w/o top 5), −301 [−503, −109] (top 10); Core
+    last year −7 / −97 (above); every T1 interval without its top days is below zero. (The JSON's "share" is not
+    meaningful when the total difference is negative.)
+  - **P vs B3:** "barely better" was wrong for Core's last year: P − B3 is +470 [+176, +748] there. That comparison is
+    not like-for-like (P carries 4 lots on normal days against 3, with turnover charges left out).

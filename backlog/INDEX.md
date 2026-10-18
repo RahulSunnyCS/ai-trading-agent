@@ -115,7 +115,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
-| [BL-134](BL-134-two-strategy-book.md) | Two-strategy book: top Widesl + Dir only | Informative, not adopted: worse than three picks with the Dir doubled in T1 (−254 / −330 a day net) and inconclusive in Core with a far deeper drawdown; ~₹100/day brokerage saved does not pay for the dropped Widesl | 2026-10-18 |
+| [BL-134](BL-134-two-strategy-book.md) | Two-strategy book: top Widesl + Dir only | Informative, not adopted: worse than three picks with the Dir doubled in T1 (−254 / −330 a day net) and inconclusive in Core (one early stretch decides it); ~₹100/day brokerage saved does not pay for the dropped Widesl | 2026-10-18 |
 | [BL-133](BL-133-fourth-lot-on-normal-days.md) | A fourth lot on non-expiry days: Widesl (T1) or Dir (Core) | Informative: the Dir at two lots is the best fourth-lot home in both books (Core +149 / +230 a day over an even spread after brokerage; T1 +87 / +141, the last year only above zero) but the edge rests on a few days; no T1 Widesl placement beat the even spread; in-sample | 2026-10-18 |
 | [BL-132](BL-132-mtm-stop-from-day-lows.md) | Book MTM stop sized not to be hit on 85–95 % of days | Informative: levels set on the first period were hit 2–10 points less often in the calmer test year; whole-period (in-sample) P95 ≈ ₹8,500 and P90 ≈ ₹7,000 for both books; protective, no clear money effect | 2026-10-18 |
 | [BL-131](BL-131-book-daily-stop.md) | Daily ₹6k–₹12k stop on each 3-lot book (Core-298 and T1) | Informative: no level clearly changes the result (one chance-level interval of 24); it trims the worst day (T1 −13.8k → ~−9k at ₹6k–9k); ₹9k+ never binds on Core (per-pick stops already cap it) | 2026-10-18 |
