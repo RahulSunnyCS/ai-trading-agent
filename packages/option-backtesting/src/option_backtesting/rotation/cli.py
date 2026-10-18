@@ -187,24 +187,54 @@ def result(
         "exit 2 (the scheduler retries); after it, send without T1 and deliver T1 later. "
         "Default: no waiting.",
     ),
+    not_before: str = typer.Option(
+        None,
+        "--not-before",
+        help="HH:MM IST. Earlier than this, send nothing and exit 0 (the scheduled result job "
+        "sends). The evening run's last step, so a late retry still sends that evening.",
+    ),
+    soft_fail: bool = typer.Option(
+        False,
+        "--soft-fail",
+        help="Never exit non-zero: report and alert instead, so a scheduled chain is not failed "
+        "and retried for it (the evening run; the 21:00 job runs the result again).",
+    ),
 ) -> None:
     """Send the completed day's net paper gain for Adaptive and the T1 track, and tomorrow's
     strategies. Idempotent: markers stop a retry sending twice, and a T1 result that was not
     ready follows on its own the next time this runs."""
     from datetime import time
 
-    from .deliver import send_result
+    from .deliver import send_alert, send_result
 
     until = time.fromisoformat(wait_until) if wait_until else None
-    code = send_result(
-        _day(day),
-        telegram=telegram,
-        force=force,
-        with_tomorrow=tomorrow,
-        wait_until=until,
-        echo=typer.echo,
-        err=lambda message: typer.echo(message, err=True),
-    )
+    earliest = time.fromisoformat(not_before) if not_before else None
+    d = _day(day)
+    try:
+        code = send_result(
+            d,
+            telegram=telegram,
+            force=force,
+            with_tomorrow=tomorrow,
+            wait_until=until,
+            not_before=earliest,
+            echo=typer.echo,
+            err=lambda message: typer.echo(message, err=True),
+        )
+    except Exception as error:  # noqa: BLE001 - reported below
+        if not soft_fail:
+            raise
+        typer.echo(f"result failed: {type(error).__name__}: {error}", err=True)
+        code = 1
+    if code and soft_fail:
+        if telegram:
+            send_alert(
+                f"Rotation result for {d}: not everything was sent (exit {code})",
+                "Already-sent parts are never sent again; what is missing is retried by the 16:00 "
+                "result job's retries and the 21:00 job, or run `obt rotation result` by hand.",
+            )
+        typer.echo(f"result not sent (exit {code}); alerted, exiting 0 (--soft-fail)")
+        return
     if code:
         raise typer.Exit(code)
 
@@ -288,11 +318,17 @@ def readout(
 
 
 @rotation_app.command()
-def verify() -> None:
-    """Re-compute the hash chain; exit 1 on any problem."""
+def verify(
+    track: str = typer.Option(None, "--track", help="A parallel track's journal (t1)."),
+) -> None:
+    """Re-compute the hash chain (the live journal, or a track's); exit 1 on any problem."""
     from . import journal, store
+    from .variants import TRACK_DIRS
 
-    path = store.journal_path()
+    if track and track not in TRACK_DIRS:
+        typer.echo(f"unknown track {track!r} (known: {', '.join(TRACK_DIRS)})", err=True)
+        raise typer.Exit(2)
+    path = store.journal_path(None, track)
     problems = journal.verify(path)
     n = len(journal.read(path))
     if problems:

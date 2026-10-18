@@ -70,6 +70,12 @@ def test_the_expiry_rule_has_one_line_and_the_optional_line_names_the_next_best(
         "",
     ]
     assert private.count("Expiry day") == 1
+    # BL-122 restricts T1 too, so the combined T1 block carries the line as well
+    t1 = _entry(core=T1_CORE, track="t1", expiry_only="NIFTY")
+    both, group = messages.render_morning(live, options, t1)
+    assert both.count("⚡ Expiry day · NIFTY only") == 2
+    assert "🧪 T1 · TESTING PHASE · not traded\n⚡ Expiry day · NIFTY only\n" in both
+    assert group.count("Expiry day") == 1
     assert "➕ Optional: Widesl 13:17 N_widesl_OTM1 · Dir 09:47 N_dir_ITM1" in group
     # no rule, no line; no options, no optional line
     plain, _ = messages.render_morning(_entry(), None, None)

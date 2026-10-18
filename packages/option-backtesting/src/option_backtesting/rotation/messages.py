@@ -22,6 +22,9 @@ NUMBERS = ("1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7�
 SEPARATOR = "━━━━━━━━━━━━━━━"
 T1_HEAD = "🧪 T1 · TESTING PHASE · not traded"
 T1_NOT_RECORDED = "🧪 T1 · TESTING PHASE · not recorded today"
+#: the morning note when T1 is still being recorded (slow, or its results being caught up): it
+#: follows as a message of its own, or an alert says it failed
+T1_FOLLOWS = "🧪 T1 · TESTING PHASE · follows in a separate message"
 #: the evening message's T1 notes
 T1_RESULT_NOT_READY = "🧪 T1 · result not ready"
 T1_RESULT_NOT_RECORDED = "🧪 T1 · not recorded today"
@@ -122,7 +125,7 @@ def _t1_block(
 ) -> list[str]:
     head = f"{T1_HEAD} · {day_text(entry['day'])}" if dated else T1_HEAD
     lines = [head]
-    if dated and entry.get("expiry_only"):
+    if entry.get("expiry_only"):  # BL-122 restricts T1 as well, so its block says so too
         lines.append(expiry_day_line(entry["expiry_only"]))
     # inside the combined message; a T1 message of its own carries LATE as its first line instead
     if not dated and not entry.get("before_first_entry", True):
@@ -149,17 +152,15 @@ def render_morning(
     live_options: dict[str, dict[str, str | None]] | None,
     t1: dict | None,
     t1_options: dict[str, dict[str, str | None]] | None = None,
+    t1_note: str = T1_NOT_RECORDED,
 ) -> tuple[str, str]:
-    """(the owner's message, the group's copy). The owner sees Adaptive, then the T1 track (or the
-    line saying it was not recorded); the group sees Adaptive alone. Both end with the Adaptive
-    entry's chain hash."""
+    """(the owner's message, the group's copy). The owner sees Adaptive, then the T1 track (or,
+    with no T1 entry, `t1_note`: not recorded, or follows separately); the group sees Adaptive
+    alone. Both end with the Adaptive entry's chain hash."""
     adaptive = _adaptive_block(live, (live_options or {}).get(ADAPTIVE_KEY))
     prefix = _late_prefix(live)
     group = "\n".join([*prefix, *adaptive, "", footer(live)])
-    if t1 is None:
-        t1_lines = [T1_NOT_RECORDED]
-    else:
-        t1_lines = _t1_block(t1, (t1_options or {}).get(ADAPTIVE_KEY))
+    t1_lines = [t1_note] if t1 is None else _t1_block(t1, (t1_options or {}).get(ADAPTIVE_KEY))
     private = "\n".join([*prefix, *adaptive, "", SEPARATOR, *t1_lines, "", footer(live)])
     return private, group
 

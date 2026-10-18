@@ -40,7 +40,7 @@ hash, `inputs_sha` or journal field, no pick, no score, not the BL-122 rule.
    `⚠️ LATE · not a forward entry` first. The friends' group gets Adaptive alone (T1 stays private).
 3. **T1 never delays or loses Adaptive.** `obt rotation pick --with-t1` records Adaptive, then T1 in the same
    process (reusing the live VIX read, recorded with its true source), and sends one message. If T1 fails,
-   is not ready by 09:16:50 IST (or 20 s after Adaptive's entry on a later run), Adaptive goes out alone with `🧪 T1 · TESTING PHASE · not recorded today`,
+   is not ready by 09:16:50 IST (or 20 s after Adaptive's entry on a later run), Adaptive goes out alone with `🧪 T1 · TESTING PHASE · follows in a separate message` (slow, or its results being caught up) or `… · not recorded today` (failed),
    the friends' group copy never waits for T1 at all; the failure still alerts the owner as before and the job exits 2 (retry); missing T1 results are stored
    in-process after Adaptive is sent, and T1 then follows as its own message in the T1 layout.
 4. **Evening: one short message** for both lists: each list's total and per-strategy result (real minus sign),
@@ -51,10 +51,11 @@ hash, `inputs_sha` or journal field, no pick, no score, not the BL-122 rule.
    double-sends; a failed group copy is retried alone; a late T1 result follows as its own message. Design
    chosen: wait for T1 until 16:25 (the job retries every 5 minutes), then send what exists.
 6. **Schedule.** `options-evening` (15:45) collects, updates, rebuilds derived tables, then stores the T1
-   results (last step) and no longer sends. New `options-rotation-result` at 16:00 runs
+   results with `--soft-fail`, and ends with `obt rotation result --not-before 16:00 --soft-fail` (a no-op on a normal
+   day; it sends at once when the run only succeeds on a late retry, since a failed 16:00 slot is never caught up). New `options-rotation-result` at 16:00 runs
    `obt rotation result --wait-until 16:25`, retried every 5 minutes to 16:35; if Adaptive's results never
    complete the job fails and the scheduler alerts the owner. `options-rotation-t1-update` (21:00) stays as the
-   catch-up and its second step sends the T1 part if it was missing. The scheduler reads `jobs.ts` at start: restart it after merge.
+   catch-up (its update `--soft-fail`, so its result step always runs) and its second step sends whatever is still owed. The scheduler reads `jobs.ts` at start: restart it after merge.
 
 ## Out of scope
 
@@ -76,8 +77,8 @@ Lists A / B / REF, the journal, scoring, the dashboard's rotation pages, per-tra
 ## Risks
 
 - The 16:00 message needs `options-evening` to finish by about 16:00; it is retried to 16:25, then sent without T1.
-- T1 is last in the evening chain on purpose: a persistent T1 problem fails and alerts that job but never
-  keeps the live update or the derived tables from being built first.
+- The T1 step comes after the live update and the derived tables, and is `--soft-fail`: a T1 problem alerts but never
+  fails the evening run (whose retries would resend the `obt daily` summary).
 - Telegram is proportional-font: right-aligned amounts are approximate.
 
 ## Log
@@ -92,3 +93,12 @@ Lists A / B / REF, the journal, scoring, the dashboard's rotation pages, per-tra
   `flock` around the evening's decide-send-mark; `--dry-run` never runs the T1 catch-up; the evening
   run's T1 step is `--soft-fail` (alerts, exits 0, so `obt daily` is never re-run for it); a pre-BL-125
   `.sent` marker still covers owner + group.
+- 2026-10-18 — second round (coordinator's list on the review): the morning note is honest about why T1 is
+  missing (`follows in a separate message` when slow or being caught up, `not recorded today` when it
+  failed); the combined T1 block carries the `⚡ Expiry day` line too; `options-evening` ends with
+  `obt rotation result --not-before 16:00 --soft-fail`, so a run that only succeeds at 17:15 still sends
+  that evening (a failed 16:00 slot is never caught up); the 21:00 job sends anything owed with a soft
+  `result` first, then runs a strict T1 update (a failure fails the job, so its 22:00 / 23:00 retries
+  try again; review of #249) and a last `result`; in `send_result` the owner goes first, a failing group copy is retried on its
+  own and never holds back the owner's T1 follow-up, and a T1 that cannot be read alerts the owner;
+  `obt rotation verify --track t1` checks the T1 journal.
