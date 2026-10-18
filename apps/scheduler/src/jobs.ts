@@ -340,6 +340,83 @@ const BASE_JOBS: Job[] = [
       'cd packages/option-backtesting && uv run obt rotation pick --with-t1  (a late entry is flagged, not forward)',
   },
   {
+    id: 'algotest-evening',
+    description:
+      "Put tomorrow's expected T1 picks into AlgoTest as saved strategies (BL-137): export them (`obt rotation algotest-export --book t1 --next`), then delete the strategies the tool uploaded that tomorrow drops and upload the missing ones. Never deploys. Does nothing until ALGOTEST_UPLOAD=on",
+    // After the 16:00 result message (its retries end 16:35). The export exits 2 while the day's
+    // results are incomplete (a late Fyers login), so the retries carry it to 20:40. Deleting
+    // needs --allow-delete, left out until a supervised run has seen AlgoTest's delete dialog; until
+    // then dropped strategies stay and the message lists them.
+    schedule: { at: '16:40', on: tradingDays, label: 'trading days 16:40' },
+    steps: [
+      [
+        'uv',
+        'run',
+        '--directory',
+        '../option-backtesting',
+        'obt',
+        'rotation',
+        'algotest-export',
+        '--book',
+        't1',
+        '--next',
+      ],
+      [
+        'node_modules/.bin/tsx',
+        'src/strategy-upload.ts',
+        '--latest',
+        't1',
+        '--mode',
+        'evening',
+        '--apply',
+      ],
+    ],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 15,
+    retries: 4,
+    retryDelayMinutes: 60,
+    catchUpHours: 4,
+    fixHint:
+      'cd packages/option-backtesting && uv run obt rotation algotest-export --book t1 --next; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --latest t1 --mode evening (add --apply once the plan looks right)',
+  },
+  {
+    id: 'algotest-topup',
+    description:
+      "After the 09:16 pick, upload any recorded T1 pick that last night's upload does not have (BL-137); deletes nothing and names the strategies that are not today's. Does nothing until ALGOTEST_UPLOAD=on",
+    // The pick is recorded at about 09:16:20; a changed 09:17 pick cannot be deployed in time
+    // anyway, so 09:18 costs nothing. Not caught up after a long sleep: the picks would be stale.
+    schedule: { at: '09:18', on: tradingDays, label: 'trading days 09:18' },
+    steps: [
+      [
+        'uv',
+        'run',
+        '--directory',
+        '../option-backtesting',
+        'obt',
+        'rotation',
+        'algotest-export',
+        '--book',
+        't1',
+      ],
+      [
+        'node_modules/.bin/tsx',
+        'src/strategy-upload.ts',
+        '--latest',
+        't1',
+        '--mode',
+        'topup',
+        '--apply',
+      ],
+    ],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 10,
+    retries: 2,
+    retryDelayMinutes: 2,
+    catchUpHours: 0.5,
+    fixHint:
+      'cd packages/option-backtesting && uv run obt rotation algotest-export --book t1; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --latest t1 --mode topup --apply',
+  },
+  {
     id: 'backup',
     description: 'Copy the research database (TRADING_DATA_ROOT) to the external SSD',
     schedule: { at: '10:00', on: firstWeekdayOfMonth(0), label: '1st Sunday of the month 10:00' },

@@ -107,6 +107,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-121](BL-121-moved-expiry-days.md) | Holiday-shifted expiry days: does the rotation earn less on them? | P2 | Done: inconclusive, 11 days; NIFTY Buy reads worse (borderline) | research | options |
 | [BL-113](BL-113-t1-parallel-track.md) | T1 parallel track: Adaptive over Core-298 + 223 time-generic variants, own journal, private Telegram, 60-day read-out vs the live Adaptive (supersedes BL-112) | P1 | In progress | feature + research | options |
 | [BL-137](BL-137-algotest-strategy-export-upload.md) | Rotation picks to AlgoTest: export the day's Core and T1 picks to `.algtst` and upload them (read back, never deployed) | P1 | In progress | feature | options + broker-login |
+| [BL-138](BL-138-algotest-auto-deploy.md) | Deploy the rotation picks in AlgoTest automatically: built ready but off by default (the owner may not use it); only the recorded 09:16 picks on /live, deactivate everything at 15:30, 08:00–15:40 window, 6-strategy limit | P2 | In progress | feature | broker-login + options |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
@@ -118,7 +119,6 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
-| [BL-138](BL-138-algotest-auto-deploy.md) | Deploy the rotation picks in AlgoTest automatically | Dropped by the owner: deploying stays a manual click; findings kept (the /live table, 6-strategy limit, 08:00–15:40 deploy window, activations repeat on weekdays) | 2026-10-19 |
 | [BL-134](BL-134-two-strategy-book.md) | Two-strategy book: top Widesl + Dir only | Informative, not adopted: worse than three picks with the Dir doubled in T1 (−254 / −330 a day net) and inconclusive in Core (one early stretch decides it); ~₹100/day brokerage saved does not pay for the dropped Widesl | 2026-10-18 |
 | [BL-133](BL-133-fourth-lot-on-normal-days.md) | A fourth lot on non-expiry days: Widesl (T1) or Dir (Core) | Informative: the Dir at two lots is the best fourth-lot home in both books (Core +149 / +230 a day over an even spread after brokerage; T1 +87 / +141, the last year only above zero) but the edge rests on a few days; no T1 Widesl placement beat the even spread; in-sample | 2026-10-18 |
 | [BL-132](BL-132-mtm-stop-from-day-lows.md) | Book MTM stop sized not to be hit on 85–95 % of days | Informative: levels set on the first period were hit 2–10 points less often in the calmer test year; whole-period (in-sample) P95 ≈ ₹8,500 and P90 ≈ ₹7,000 for both books; protective, no clear money effect | 2026-10-18 |

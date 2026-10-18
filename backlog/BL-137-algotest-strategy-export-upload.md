@@ -254,3 +254,13 @@ entry, so the strategies must already be in AlgoTest the evening before.
     Delete.
   - Not yet seen: the delete request (Delete is the owner's click; Claude does not delete).
 - 2026-10-19 — Q2 settled: the website route (Playwright), after AlgoTest support's verbal OK. BL-138 (auto-deploy) dropped by the owner, so this item stops at saved strategies; the owner deploys. Phase 3 begun.
+- 2026-10-19 — Phase 3 built: `packages/broker-login/src/strategy-plan.ts` (pure: keep / upload / delete /
+  conflicts / deployed-kept / not-today, ledger of its own uploads, read-back comparison; 10 tests) and
+  `src/strategy-upload.ts` (Playwright: log in, read the saved list from AlgoTest's own `/strategies` response,
+  read `/live`'s "n Deployed" before deleting, import + save + export-back per strategy, ledger
+  `TRADING_DATA_ROOT/rotation/algotest/ledger.jsonl`, one Telegram message). `--apply` needs
+  `ALGOTEST_UPLOAD=on`; deleting also needs `--allow-delete` until the delete dialog has been seen. The evening
+  run refuses anything but a preview for a later day, the top-up anything but today's recorded picks. The export
+  gained `--next` and writes `latest-<book>.json` for the uploader. Phase 4: jobs `algotest-evening` (16:40,
+  retried hourly to 20:40) and `algotest-topup` (09:18) registered. Not yet run against AlgoTest.
+

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades the T1 picks with real money and asked for the deploy to be automatic (2026-10-19); a wrong or duplicate deploy costs money, so it is planned with its own gates |
-| **Status** | Dropped (owner, 2026-10-19): deploying stays a manual click; the plan is kept for a later revival |
+| **Status** | In progress: built ready but switched off; the owner decides later whether to use it |
 | **Type** | feature |
 | **Area** | broker-login (AlgoTest automation), options (picks), infra (scheduler) |
 | **Created** | 2026-10-19 |
@@ -231,3 +231,4 @@ Claude.
   showed it). Phase 2: deactivate everything at 15:30–15:39 each day and activate only the recorded picks
   after 09:16; the Setup Execution dialog is recorded after 08:00.
 - 2026-10-19 — **Dropped by the owner**: "stop deploying, do all other things as discussed". Deploying stays the owner's click in AlgoTest's `/live`; BL-137 (export, evening delete-and-upload, 09:16 top-up) continues. The findings above (the `/live` table, the 6-strategy limit, the 08:00–15:40 window, activations repeating on weekdays) are kept for a revival.
+- 2026-10-19 — **Reopened by the owner** the same night: build the deploy function so it is ready, off by default; it may never be used. The Setup Execution discovery happens at 08:06 (the owner clicks it on /live; Claude reads the screen and records the fields).

@@ -196,6 +196,9 @@ def algotest_export(
     preview: bool = typer.Option(
         False, "--preview", help="The expected picks for that session, not the recorded ones."
     ),
+    next_session: bool = typer.Option(
+        False, "--next", help="The session after --day (default today): its expected picks."
+    ),
     variants: str | None = typer.Option(
         None, "--variants", help="Comma-separated variant ids instead of the day's picks."
     ),
@@ -213,6 +216,10 @@ def algotest_export(
     if book not in ax.BOOKS:
         raise typer.BadParameter(f"--book must be one of {', '.join(ax.BOOKS)}")
     d = _day(day)
+    if next_session:
+        from .tomorrow import next_session as following
+
+        d, preview = following(d), True
     if variants:
         names = [v.strip() for v in variants.split(",") if v.strip()]
         picks = ax.DayPicks(d, book, "given", names, [])
@@ -232,7 +239,10 @@ def algotest_export(
         typer.echo(f"not exported: {error}")
         raise typer.Exit(1) from error
     folder = Path(out) if out else store.rotation_dir() / "algotest" / d.isoformat() / book
-    typer.echo(ax.render(picks, exports, ax.write(picks, exports, folder)))
+    zip_path = ax.write(picks, exports, folder)
+    if not out:  # the uploader (BL-137) reads the newest default export through this pointer
+        ax.write_latest(store.rotation_dir() / "algotest", picks, folder)
+    typer.echo(ax.render(picks, exports, zip_path))
 
 
 @rotation_app.command()

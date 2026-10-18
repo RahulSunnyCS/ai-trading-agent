@@ -117,6 +117,16 @@ def write(picks: DayPicks, exports: list[tuple[str, Export]], out: Path) -> Path
     return zip_path
 
 
+def write_latest(base: Path, picks: DayPicks, folder: Path) -> Path:
+    """`latest-<book>.json` in `base`: the newest default export's folder, day and source, for
+    `packages/broker-login`'s uploader (`--latest <book>`)."""
+    base.mkdir(parents=True, exist_ok=True)
+    path = base / f"latest-{picks.book}.json"
+    record = {"dir": str(folder), "day": picks.day.isoformat(), "source": picks.source}
+    path.write_text(json.dumps(record, indent=2) + "\n")
+    return path
+
+
 def _leg_settings(doc: dict) -> tuple[str, str, str, str]:
     leg = doc["strategy"]["ListOfLegConfigs"][0]
     strike = leg["StrikeParameter"]
