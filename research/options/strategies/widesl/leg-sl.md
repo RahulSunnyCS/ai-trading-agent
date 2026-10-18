@@ -43,7 +43,7 @@ Leg-stop rows in the post-charge top four (holdout, mean over the band's start-t
 - Tighter stops are not uniform: the NIFTY afternoon list has a 150% row, and NIFTY OTM1 midday at 80%
   still has a drawdown of −₹28.6k on a ₹15k net.
 - One holdout year, one factor at a time, ranked after viewing the holdout. Nothing is adopted.
-- NIFTY closest-premium Widesl, gross, selection year 2024-10 → 2025-10 (BL-127): the stop chosen per premium (₹80 SL 80 %, ₹100 SL 70 %, ₹120 SL 70 %) beat 115 % on the mean (+₹23 to +₹48 per lot-day; not every 70–80 % cell did: ₹120 at 80 % equals 115 %) and cut the drawdown to roughly 35–60 % of it, positive at all 25 slots. That did not carry into Adaptive on the next year (adding the two chosen stops: −₹10, interval includes zero, deeper drawdown). Standalone benefit, no Adaptive benefit; the test year had already been seen by BL-098 and BL-126.
+- NIFTY closest-premium Widesl, gross, selection year 2024-10 → 2025-10 (BL-127): the stop chosen per premium (₹80 SL 80 %, ₹100 SL 70 %, ₹120 SL 70 %) beat 115 % on the mean (+₹23 to +₹51 per lot-day; not every 70–80 % cell did: ₹120 at 80 % equals 115 %) and cut the drawdown to roughly 35–60 % of it, positive at all 25 slots. That did not carry into Adaptive on the next year (adding the two chosen stops: −₹10, interval includes zero, deeper drawdown). Standalone benefit, no Adaptive benefit; the test year had already been seen by BL-098 and BL-126.
 
 ## Not yet tested
 
