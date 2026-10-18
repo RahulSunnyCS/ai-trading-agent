@@ -15,10 +15,10 @@ from zoneinfo import ZoneInfo
 import numpy as np
 
 from ..fyers.daily import data_dir
-from . import expiry, journal, store
+from . import expiry, journal, messages, store
 from .attrs import last_collected_before
 from .dte import DTE_BASIS
-from .lists import DISPLAY_NAMES, LISTS, LOTS_PER, PUBLIC_KEYS, WARMUP
+from .lists import LISTS, LOTS_PER, PUBLIC_KEYS, WARMUP
 from .live import listed_dte_labels, vix_open_with_source
 from .score import composite, dte_matrix, family_index, runners_up, select, vix_band
 from .variants import track_names, variant_names
@@ -35,6 +35,8 @@ class PickError(RuntimeError):
 class PickResult:
     entry: dict
     text: str
+    #: {list: {wide, dir}}: the optional next best of the public lists (message text only)
+    options: dict | None = None
 
 
 def previous_data_day(root: Path, day: date) -> date:
@@ -237,10 +239,13 @@ def record(
     now_fn: Callable[[], datetime] = lambda: datetime.now(IST),
     dry_run: bool = False,
     track: str | None = None,
+    vix_source: str | None = None,
 ) -> PickResult:
     """Score and append today's entry. `track` (e.g. "t1") records a parallel track instead:
     Core-298 plus its extra variants, only its own lists, in its own journal; the live journal is
-    never touched by a track run."""
+    never touched by a track run. `vix_open` given (the live entry's own read, handed to the track
+    so the two never poll twice) is recorded as read from `vix_source` when that is also given,
+    else as "given"."""
     root = root or data_dir()
     if not dry_run and day != now_fn().astimezone(IST).date():
         raise PickError(f"{day} is not today (IST): an entry can only be recorded on its own day")
@@ -274,7 +279,7 @@ def record(
                 f"(first {', '.join(d.isoformat() for d in missing[:3])}): "
                 f"run `obt rotation update --track {track}`"
             )
-    source = "given"
+    source = vix_source or "given"
     if vix_open is None:
         vix_open, source = vix_open_with_source(day)
     if vix_open is None:
@@ -314,39 +319,10 @@ def record(
     options = next_best(hist, day, vix_open, dte, expiry_only=rule)
     if track:
         options = {k: v for k, v in options.items() if k in TRACK_LISTS[track]}
-    return PickResult(entry, render(entry, options))
-
-
-def next_best_line(options: dict[str, str | None] | None) -> str:
-    """The separate line naming the next best optional Widesl and Dir, or ''."""
-    parts = [
-        f"{label} {options[kind]}"
-        for kind, label in (("wide", "Widesl"), ("dir", "Dir"))
-        if options and options.get(kind)
-    ]
-    return "Next best, optional: " + "; ".join(parts) if parts else ""
-
-
-def expiry_rule_line(index: str) -> str:
-    """The one line a rule day's message adds (BL-122); the unfiltered picks stay in the journal."""
-    return f"Expiry rule ({index}): only {index} strategies"
+    return PickResult(entry, render(entry, options), options)
 
 
 def render(entry: dict, options: dict[str, dict[str, str | None]] | None = None) -> str:
-    track = entry.get("track")
-    title = f"{track.upper()} TRACK picks (not traded)" if track else "Rotation picks"
-    lines = [f"{title} {entry['day']} ({entry['weekday']})"]
-    if entry.get("expiry_only"):
-        lines.append(expiry_rule_line(entry["expiry_only"]))
-    for key, p in entry["lists"].items():
-        if key not in PUBLIC_KEYS:  # Steady and Adaptive only; the entry still records every list
-            continue
-        picked = ", ".join(p["core"]) + (f" + Buy {', '.join(p['buy'])}" if p["buy"] else "")
-        lines.append(f"{DISPLAY_NAMES.get(key, key)}: {picked}")
-        extra = next_best_line((options or {}).get(key))
-        if extra:
-            lines.append(extra)
-    lines.append(f"chain {entry['hash'][:12]}  recorded {entry['recorded_at'][11:19]} IST")
-    if not entry["before_first_entry"]:
-        lines.append("LATE: recorded after 09:17 IST, this entry is NOT forward")
-    return "\n".join(lines)
+    """The message for one entry: Adaptive's layout, or the T1 layout for a track entry
+    (`messages.render_entry`; BL-125)."""
+    return messages.render_entry(entry, options)

@@ -105,3 +105,28 @@ def update_day(
         f"{len(out['errors'])} errors"
     )
     return out
+
+
+def update_track(
+    track: str,
+    day: date | None = None,
+    root: Path | None = None,
+    log: Callable[[str], None] = print,
+    err: Callable[[str], None] = print,
+) -> tuple[int, int]:
+    """Store a parallel track's extra variants (never the live results or days.csv): `day`, or
+    every day Core-298 has stored that the track lacks, so a missed evening is filled the next
+    time and never silently dropped. Returns (days tried, days that failed); (0, 0) when every
+    Core-298 day is already stored. Shared by `obt rotation update --track` and the morning
+    pick's catch-up."""
+    from .variants import track_names
+
+    names = track_names(track)
+    days = [day] if day else backfill_days(names, root)
+    failed = 0
+    for d in days:
+        r = update_day(d, root=root, names=names, log=log, write_days=False)
+        if r["skipped"] or r["errors"]:
+            failed += 1
+            err(f"{track} {d}: {r['skipped'] or r['errors'][:3]}")
+    return len(days), failed

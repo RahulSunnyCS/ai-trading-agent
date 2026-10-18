@@ -4,7 +4,6 @@ track-readout (the T1 parallel track)."""
 
 from __future__ import annotations
 
-import os
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
@@ -14,18 +13,6 @@ rotation_app = typer.Typer(
     no_args_is_help=True, help="The options rotation's forward paper journal (BL-058)."
 )
 IST = ZoneInfo("Asia/Kolkata")
-
-
-def _send_private_and_group(notification) -> bool:
-    """Send a rotation message to the owner and, when configured, the friends' group."""
-    from ..notify import send
-
-    private_ok, _ = send(notification)
-    group = os.environ.get("TELEGRAM_ROTATION_CHAT_ID", "").strip()
-    if group and group != os.environ.get("TELEGRAM_CHAT_ID", "").strip():
-        group_ok, _ = send(notification, chat_id=group)
-        return private_ok and group_ok
-    return private_ok
 
 
 def _day(text: str | None) -> date:
@@ -45,8 +32,8 @@ def update(
     ),
 ) -> None:
     """Run all 298 variants over one collected day and store the results (idempotent)."""
-    from .update import backfill_days, default_day, update_day
-    from .variants import TRACK_DIRS, track_names
+    from .update import default_day, update_day, update_track
+    from .variants import TRACK_DIRS
 
     if backfill and not track:
         typer.echo("--backfill needs --track", err=True)
@@ -58,17 +45,12 @@ def update(
         # A parallel track's extra variants only: every day Core-298 has stored that the track
         # lacks (so a missed evening is filled the next time, never silently dropped), no base or
         # trigger scoring, never the live results or days.csv.
-        names = track_names(track)
-        days = [_day(day)] if day else backfill_days(names)
-        if not days:
+        tried, failed = update_track(
+            track, _day(day) if day else None, log=typer.echo, err=lambda m: typer.echo(m, err=True)
+        )
+        if not tried:
             typer.echo(f"{track}: nothing to update (every Core-298 day is stored)")
             return
-        failed = 0
-        for d in days:
-            r = update_day(d, names=names, log=typer.echo, write_days=False)
-            if r["skipped"] or r["errors"]:
-                failed += 1
-                typer.echo(f"{track} {d}: {r['skipped'] or r['errors'][:3]}", err=True)
         if failed:
             raise typer.Exit(2)
         return
@@ -118,55 +100,35 @@ def pick(
     track: str = typer.Option(
         None, "--track", help="A parallel track (t1): its own journal, private Telegram only."
     ),
+    with_t1: bool = typer.Option(
+        False,
+        "--with-t1",
+        help="Also record the T1 track and send ONE message with both (the 09:16 job). "
+        "Adaptive is never held back by T1.",
+    ),
 ) -> None:
     """Record today's picks for every list (before 09:17), hash-chained, and Telegram them."""
-    from ..notify import Notification, send
-    from .journal import AlreadyRecorded
-    from .pick import PickError, record
-
-    d = _day(day)
-
+    from .deliver import pick_and_send
     from .variants import TRACK_DIRS
 
     if track and track not in TRACK_DIRS:
         typer.echo(f"unknown track {track!r} (known: {', '.join(TRACK_DIRS)})", err=True)
         raise typer.Exit(2)
-    tag = f"{track.upper()} TRACK " if track else ""
-
-    def alert(title: str, body: str) -> None:
-        if telegram and not dry_run:
-            send(
-                Notification(
-                    source="options-rotation", severity="error", title=tag + title, body=body
-                )
-            )
-
-    try:
-        r = record(d, vix_open=vix_open, dry_run=dry_run, track=track)
-    except AlreadyRecorded as error:  # a retry after a success: the day has its entry
-        typer.echo(f"already recorded: {error}")
-        return
-    except (PickError, ValueError) as error:
-        typer.echo(f"not recorded: {error}", err=True)
-        alert(f"Rotation pick NOT recorded for {d}", str(error))
-        raise typer.Exit(2) from error
-    except Exception as error:  # noqa: BLE001 - an unexpected failure must still alert and retry
-        typer.echo(f"not recorded: {type(error).__name__}: {error}", err=True)
-        alert(f"Rotation pick FAILED for {d}", f"{type(error).__name__}: {str(error)[:300]}")
-        raise typer.Exit(2) from error
-    typer.echo(r.text)
-    if telegram and not dry_run:
-        severity = "info" if r.entry["before_first_entry"] else "warn"
-        notification = Notification(
-            source="options-rotation",
-            severity=severity,
-            title=f"{tag}Rotation picks {d}",
-            body=r.text,
-        )
-        if track:
-            send(notification)  # a track is private: never the friends' group
-        else:
-            _send_private_and_group(notification)
+    if track and with_t1:
+        typer.echo("--with-t1 and --track are different modes: use one", err=True)
+        raise typer.Exit(2)
+    code = pick_and_send(
+        _day(day),
+        vix_open=vix_open,
+        dry_run=dry_run,
+        telegram=telegram,
+        track=track,
+        with_t1=with_t1,
+        echo=typer.echo,
+        err=lambda message: typer.echo(message, err=True),
+    )
+    if code:
+        raise typer.Exit(code)
 
 
 @rotation_app.command("track-readout")
@@ -185,46 +147,34 @@ def result(
     telegram: bool = typer.Option(True, "--telegram/--no-telegram"),
     force: bool = typer.Option(False, "--force", help="Resend even if this result was sent."),
     tomorrow: bool = typer.Option(
-        True, "--tomorrow/--no-tomorrow", help="Add how days like the next session have gone."
+        True, "--tomorrow/--no-tomorrow", help="Add tomorrow's strategies in full."
+    ),
+    wait_until: str = typer.Option(
+        None,
+        "--wait-until",
+        help="HH:MM IST. While T1's results are incomplete before this time, send nothing and "
+        "exit 2 (the scheduler retries); after it, send without T1 and deliver T1 later. "
+        "Default: no waiting.",
     ),
 ) -> None:
-    """Send the completed day's net paper gain for Steady and Adaptive."""
-    from ..notify import Notification
-    from .result import ResultUnavailable, calculate, mark_sent, render, was_sent
+    """Send the completed day's net paper gain for Adaptive and the T1 track, and tomorrow's
+    strategies. Idempotent: markers stop a retry sending twice, and a T1 result that was not
+    ready follows on its own the next time this runs."""
+    from datetime import time
 
-    d = _day(day)
-    try:
-        completed = calculate(d)
-        text = render(completed)
-    except ResultUnavailable as error:
-        typer.echo(f"result not ready: {error}", err=True)
-        raise typer.Exit(2) from error
-    already_sent = telegram and not force and was_sent(completed)
-    if tomorrow and not already_sent:
-        # never let the extra section stop the result going out
-        try:
-            from . import tomorrow as tomorrow_mod
+    from .deliver import send_result
 
-            text += "\n\n" + tomorrow_mod.render(tomorrow_mod.for_next_session(d))
-        except Exception as error:  # noqa: BLE001
-            typer.echo(f"tomorrow section skipped: {type(error).__name__}: {error}", err=True)
-    typer.echo(text)
-    if telegram:
-        if not force and was_sent(completed):
-            typer.echo("already sent to Telegram")
-            return
-        delivered = _send_private_and_group(
-            Notification(
-                source="options-rotation",
-                severity="info",
-                title=f"Option results {d}",
-                body=text,
-            )
-        )
-        if not delivered:
-            typer.echo("Telegram delivery was incomplete; result not marked sent", err=True)
-            raise typer.Exit(2)
-        mark_sent(completed)
+    until = time.fromisoformat(wait_until) if wait_until else None
+    code = send_result(
+        _day(day),
+        telegram=telegram,
+        force=force,
+        with_tomorrow=tomorrow,
+        wait_until=until,
+        echo=typer.echo,
+    )
+    if code:
+        raise typer.Exit(code)
 
 
 @rotation_app.command()

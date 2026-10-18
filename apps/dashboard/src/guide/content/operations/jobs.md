@@ -28,9 +28,10 @@ Click a job to read the last 200 lines of its latest log.
 |---|---|
 | `broker-login` (08:00) | Logs the broker accounts into [AlgoTest](glossary:algotest). |
 | `morning-summary` (09:00) | One Telegram message: did the logins work, is the data current. |
-| `options-evening` (15:45) | The [evening run](glossary:evening-run), in three steps: collects the day from Fyers when you are logged in (otherwise from Angel One, and says which in its Telegram message), stores the rotation results, then builds any missing 5-minute snapshots and IV tables. |
-| `options-rotation-pick` (09:16) | Records the day's rotation picks before the first entry and sends them on Telegram, then fills any missing T1 parallel-track results and records the track's Adaptive pick in its own journal (sent to you only, marked T1 TRACK, never traded). |
-| `options-rotation-t1-update` (21:00) | Stores the T1 parallel track's results for the day, in its own folder; the live rotation results are never touched. |
+| `options-evening` (15:45) | The [evening run](glossary:evening-run), in four steps: collects the day from Fyers when you are logged in (otherwise from Angel One, and says which in its Telegram message), stores the rotation results, builds any missing 5-minute snapshots and IV tables, then stores the T1 parallel track's results. It no longer sends the rotation result. |
+| `options-rotation-result` (16:00) | One Telegram message: the day's net paper gain for Adaptive and the T1 track (one lot per strategy, after costs) and tomorrow's strategies in full. If the evening run has not finished it tries again every 5 minutes; at 16:25 it sends what exists (T1 follows on its own if it was missing). If Adaptive's result never completes, the job fails and you are alerted. |
+| `options-rotation-pick` (09:16) | Records the day's rotation picks before the first entry, then the T1 track's Adaptive pick in its own journal, and sends one Telegram message: Adaptive, then T1 marked as a testing phase and not traded. Adaptive is never held back by T1; the friends' group gets Adaptive alone. |
+| `options-rotation-t1-update` (21:00) | Catch-up: stores any T1 day the evening run missed, then sends the T1 part of the day's result if it was not ready at 16:00. The live rotation results are never touched. |
 | `momentum-preview` (Fri 14:40) | The momentum preview on live prices. |
 | `momentum-final` (Fri 16:45) | The momentum final signal. |
 | `momentum-stock-ingest` (Fri 19:30) | Refreshes NSE stock data, then the stock-based finals. |

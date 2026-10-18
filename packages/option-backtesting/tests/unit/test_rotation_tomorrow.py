@@ -1,4 +1,4 @@
-"""The "tomorrow" section of the evening result: base rates from stored history, read-only."""
+"""The "tomorrow" part of the evening result: expected picks and the stored-history helpers."""
 
 from datetime import date
 
@@ -76,15 +76,6 @@ def test_conditions_with_too_few_days_are_dropped():
     assert t.rows == []  # 8 sessions < MIN_DAYS for every condition
 
 
-def test_render_flags_thin_samples_and_says_it_is_not_a_forecast():
-    t = tomorrow.build(date(2026, 3, 1), _history(), "Thu", "3", "0")
-    text = tomorrow.render(t)
-    assert "Tomorrow 2026-03-01 (Thu)" in text
-    assert "NIFTY 3 / SENSEX 0 weekdays to expiry (12d, thin)" in text
-    assert "not a forecast" in text
-    assert "Adaptive" in text and "Steady" not in text and "Calendar" not in text
-
-
 def _picks(a_core, c_core):
     return {"A": (a_core, []), "C": (c_core, [])}
 
@@ -107,33 +98,12 @@ def test_expected_picks_carry_probabilities_and_probable_changes():
     assert labels["more volatile open"].changes["C"] == (["s7"], ["s3"])
 
 
-def test_render_shows_the_picks_with_probabilities_and_no_vix_wording():
-    order = ["low", "mid", "high"]
-    base = _picks(["s1", "s2", "s3"], ["s1", "s2", "s4"])
-    by_band = {"low": _picks(["s1", "s2", "s3"], ["s9", "s2", "s4"]), "mid": base, "high": base}
-    e = tomorrow.build_expected(
-        base, by_band, order, "mid", {"low": 0.25, "mid": 0.5, "high": 0.25}
-    )
-    t = tomorrow.Tomorrow(date(2026, 10, 15), "Thu", "4", "0", [], {}, 10, 0, 0, e)
-    text = tomorrow.render(t)
-    assert "Expected picks if the conditions at the close stay the same:" in text
-    assert "Adaptive: s1 (75%), s2 (100%), s4 (100%)" in text
-    assert "calmer open (~25%): Adaptive +s9 -s1" in text
-    assert "Steady" not in text
-    assert "VIX" not in text and "Calendar" not in text
-    assert "The final picks are recorded at 09:16." in text
-
-
 def test_history_says_how_many_days_were_recorded_forward_and_how_many_re_scored():
     rows = _history()
     rows[-1] = {**rows[-1], "source": "recorded"}
     rows[-2] = {**rows[-2], "source": "recorded"}
     t = tomorrow.build(date(2026, 3, 2), rows, "Thu", "3", "0")
     assert (t.sessions, t.forward) == (60, 2)
-    text = tomorrow.render(t)
-    assert (
-        "60 sessions, of which 2 recorded forward and 58 re-scored from history (in-sample)" in text
-    )
 
 
 def test_a_late_recording_and_a_day_missing_a_list_are_not_used():
@@ -154,22 +124,8 @@ def test_the_fixed_base_is_shown_next_to_the_lists_over_the_same_days():
     by_label = {label: stats for label, _, stats in t.rows}
     assert by_label["all days"]["base"] == (1.0, 50.0)
     assert t.base_days == 60
-    assert "Base 100% +50" in tomorrow.render(t)
     without = tomorrow.build(date(2026, 3, 2), rows, "Thu", "3", "0")
     assert all("base" not in stats for _, _, stats in without.rows)
-
-
-def test_an_unlikely_scenario_is_not_listed():
-    order = ["low", "mid", "high"]
-    base = _picks(["s1", "s2", "s3"], ["s1", "s2", "s3"])
-    by_band = {"low": _picks(["s9", "s2", "s3"], ["s9", "s2", "s3"]), "mid": base, "high": base}
-    e = tomorrow.build_expected(
-        base, by_band, order, "mid", {"low": 0.01, "mid": 0.9, "high": 0.09}
-    )
-    text = tomorrow.render(
-        tomorrow.Tomorrow(date(2026, 10, 15), "Thu", "4", "0", [], {}, 0, 0, 0, e)
-    )
-    assert "calmer open" not in text
 
 
 def test_runners_up_are_the_best_unpicked_widesl_and_dir():
@@ -187,12 +143,25 @@ def test_runners_up_are_the_best_unpicked_widesl_and_dir():
     }
 
 
-def test_the_tomorrow_section_names_the_next_best_options_on_a_separate_line():
-    base = _picks(["s1", "s2", "s3"], ["s1", "s2", "s3"])
-    e = tomorrow.Expected(
-        base, {"C": {"s1": 1.0, "s2": 1.0, "s3": 1.0}}, 1.0, [], {"C": {"wide": "w9", "dir": "d9"}}
-    )
-    t = tomorrow.Tomorrow(date(2026, 10, 16), "Fri", "3", "6", [], {}, 0, 0, 0, e)
-    lines = tomorrow.render(t).splitlines()
-    assert lines[2].startswith("  Adaptive: s1")
-    assert lines[3] == "  Next best, optional: Widesl w9; Dir d9"
+def test_the_expected_picks_rank_core_alone_or_with_a_tracks_variants(monkeypatch):
+    """`expected_picks` ranks Core-298 alone, or Core-298 plus a track's variants, on one code
+    path (the T1 universe is the only difference)."""
+    import contextlib
+
+    from option_backtesting.rotation import attrs as attrs_mod
+    from option_backtesting.rotation import pick
+
+    seen = []
+
+    def fake_load_history(day, root, names):
+        seen.append(list(names))
+        raise RuntimeError("stop once the universe is chosen")
+
+    monkeypatch.setattr(pick, "load_history", fake_load_history)
+    monkeypatch.setattr(attrs_mod, "vix_close_from_lake", lambda r, d: 14.0)
+    for track in (None, "t1"):
+        with contextlib.suppress(RuntimeError):
+            tomorrow.expected_picks(date(2026, 10, 19), None, "0", "2", date(2026, 10, 16), track)
+    core, with_t1 = seen
+    assert len(core) == 298 and len(with_t1) == 298 + 223
+    assert set(core) < set(with_t1)

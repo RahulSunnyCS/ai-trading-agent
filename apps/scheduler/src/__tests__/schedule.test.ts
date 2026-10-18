@@ -60,30 +60,25 @@ describe('job registry', () => {
     }
   });
 
-  it('sends rotation results only after the evening calculations finish', () => {
+  it('stores the day, then the T1 results, in the evening run and sends no message from it', () => {
     const evening = JOBS.find((job) => job.id === 'options-evening');
     expect(evening?.schedule.at).toBe('15:45');
-    expect(evening?.steps.at(-1)).toEqual([
-      'uv',
-      'run',
-      '--directory',
-      'packages/option-backtesting',
-      'obt',
-      'rotation',
-      'result',
-    ]);
+    const options = ['uv', 'run', '--directory', 'packages/option-backtesting', 'obt'];
+    expect(evening?.steps).toContainEqual([...options, 'rotation', 'update']);
+    const lastStep = evening?.steps.at(-1);
+    expect(lastStep).toEqual([...options, 'rotation', 'update', '--track', 't1']);
+    expect(evening?.steps.some((step) => step.includes('result'))).toBe(false);
+    // the live update runs before the track's, which ranks over the same days
+    const steps = evening?.steps.map((step) => step.join(' ')) ?? [];
+    expect(steps.indexOf(`${options.join(' ')} rotation update`)).toBeLessThan(
+      steps.indexOf(`${options.join(' ')} rotation update --track t1`),
+    );
   });
-});
 
-describe('T1 parallel track', () => {
-  it('records the live pick before the track pick, and updates the track after the evening run', () => {
-    const pick = JOBS.find((job) => job.id === 'options-rotation-pick');
-    expect(pick?.steps[0]).toEqual(['uv', 'run', 'obt', 'rotation', 'pick']);
-    expect(pick?.steps[1]).toEqual(['uv', 'run', 'obt', 'rotation', 'update', '--track', 't1']);
-    expect(pick?.steps[2]).toEqual(['uv', 'run', 'obt', 'rotation', 'pick', '--track', 't1']);
-    const t1 = JOBS.find((job) => job.id === 'options-rotation-t1-update');
-    expect(t1?.schedule.at).toBe('21:00');
-    expect(t1?.steps).toEqual([
+  it('sends the rotation result at 16:00, retrying every 5 minutes until 16:35', () => {
+    const result = JOBS.find((job) => job.id === 'options-rotation-result');
+    expect(result?.schedule.at).toBe('16:00');
+    expect(result?.steps).toEqual([
       [
         'uv',
         'run',
@@ -91,10 +86,41 @@ describe('T1 parallel track', () => {
         'packages/option-backtesting',
         'obt',
         'rotation',
-        'update',
-        '--track',
-        't1',
+        'result',
+        '--wait-until',
+        '16:25',
       ],
+    ]);
+    // 16:00 + 7 retries x 5 min = 16:35; the message goes at 16:25 at the latest, the rest is spare
+    expect(result?.retries).toBe(7);
+    expect(result?.retryDelayMinutes).toBe(5);
+    expect(result?.catchUpHours).toBeGreaterThan(0);
+    expect(result?.group).toBeUndefined(); // it only reads journal and result files
+    expect(result?.alertsItself).toBeFalsy(); // a result that never completes alerts the owner
+  });
+
+  it('runs on trading days only', () => {
+    const result = JOBS.find((job) => job.id === 'options-rotation-result');
+    expect(result?.schedule.on('2026-10-17')).toBe(false); // Saturday
+    expect(result?.schedule.on('2026-10-19')).toBe(true); // Monday
+  });
+});
+
+describe('T1 parallel track', () => {
+  it('records the live and the track pick in one step, so one message can carry both', () => {
+    const pick = JOBS.find((job) => job.id === 'options-rotation-pick');
+    expect(pick?.steps).toEqual([['uv', 'run', 'obt', 'rotation', 'pick', '--with-t1']]);
+    expect(pick?.alertsItself).toBe(true);
+    expect(pick?.catchUpHours).toBe(0);
+  });
+
+  it('keeps a 21:00 catch-up that stores missing T1 days and delivers a late T1 result', () => {
+    const t1 = JOBS.find((job) => job.id === 'options-rotation-t1-update');
+    expect(t1?.schedule.at).toBe('21:00');
+    const options = ['uv', 'run', '--directory', 'packages/option-backtesting', 'obt'];
+    expect(t1?.steps).toEqual([
+      [...options, 'rotation', 'update', '--track', 't1'],
+      [...options, 'rotation', 'result'],
     ]);
   });
 });
