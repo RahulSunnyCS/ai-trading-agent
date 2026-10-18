@@ -106,7 +106,7 @@ def run(root: Path, names: list[str], book: str) -> dict:
             if book == "t1":
                 arms = {
                     "T-W1": add(wide[0], False),
-                    "T-W2": add(wide[1], False),
+                    "T-W2": add(wide[-1], False),
                     "T-W+": add(ru.get("wide"), True),
                 }
             else:

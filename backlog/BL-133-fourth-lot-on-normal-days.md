@@ -72,11 +72,11 @@ lots spread evenly; nothing live changes.
   | | C-D+ add a Dir | +1,672 | −34,439 | −12,096 | +279 [+129, +425] | +167 [+2, +333] | +98 [−68, +265] |
   | T1, two years | B3 / B4 | +1,885 / +2,103 | −23,300 / −30,526 | −13,809 / −18,412 | | | |
   | | T-W1 top Widesl ×2 | +2,071 | −32,943 | −19,510 | +186 [+59, +298] | −31 [−110, +47] | −31 [−110, +47] |
-  | | T-W2 2nd Widesl ×2 | +2,047 | −28,334 | −18,844 | +162 [+54, +265] | −56 [−130, +14] | −56 [−130, +14] |
+  | | T-W2 lowest Widesl ×2 (corrected) | +2,008 | −27,314 | −17,050 | +123 [+13, +229] | **−95 [−170, −17]** | −95 [−170, −17] |
   | | T-W+ add a Widesl | +1,973 | −30,867 | −19,026 | +88 [−23, +199] | **−129 [−234, −20]** | −185 [−291, −76] |
   | T1, last year | B3 / B4 | +2,100 / +2,363 | −23,300 / −27,903 | −13,809 / −18,412 | | | |
   | | T-W1 | +2,305 | −29,001 | −19,510 | +205 [+52, +345] | −58 [−159, +41] | −58 [−159, +41] |
-  | | T-W2 | +2,333 | −28,334 | −18,844 | +233 [+110, +360] | −30 [−113, +52] | −30 [−113, +52] |
+  | | T-W2 (corrected) | +2,258 | −27,314 | −16,884 | +158 [+32, +285] | **−105 [−195, −18]** | −105 [−195, −18] |
   | | T-W+ | +2,169 | −30,867 | −19,026 | +68 [−82, +214] | **−194 [−318, −73]** | −250 [−374, −129] |
 
   **Read under the rule.** Core C-D2 (the Dir at two lots) **earns its lot** in both windows (vs B4 above zero, also
@@ -86,3 +86,19 @@ lots spread evenly; nothing live changes.
   and others; T1 overlaps its selection year), gross, turnover charges taken as equal across arms. Consistent with
   BL-129's per-pick means (Core: Dir +580 vs Widesl +227 / +409 per lot-day; T1: other pick +745 vs Widesl +470 /
   +670), which also suggests T1's Dir as a candidate for the fourth lot; that placement was not registered here.
+- 2026-10-18 — **Review corrections (Opus, PR #254).**
+  - **T-W2 fixed and re-run:** the code doubled the middle Widesl (`wide[1]`) instead of the registered lowest-ranked
+    one, which differs on three-Widesl days (33 non-expiry T1 days). With `wide[-1]` (rows above corrected) T-W2
+    **costs** against the even spread in both windows; the T1 reading is stronger: no Widesl placement beats it.
+  - **Core C-D2 rests on a few days:** the top 5 non-expiry days carry 37 % of the two-year excess over B4, the top 10
+    68 %. Without the top 5: +101 [−29, +225] (two years), +148 [+12, +289] (last year); without the top 10 both
+    include zero. The last year sits inside the two-year window, so the two are not independent confirmations. By Dir
+    family: Dir ITM1 picked on 155 days (mean excess +219), plain Dir on 46 (+606); removing either leaves the two-year
+    interval including zero. Read C-D2 as a lead, not a finding.
+  - Execution: doubling a one-lot result assumes the pick's overall stop doubles too (₹3,000 → ₹6,000 for Dir ITM1 at
+    two lots); with the stop unchanged the live result would differ.
+  - Wording: the "after brokerage" figures are +149 [+14, +279] and +230 [+90, +379]; C-D+ on the last year is above
+    zero against B4 but not after brokerage (+98 [−68, +265]). "B4" = the 3-lot result × 4/3 on non-expiry days, a
+    yardstick that cannot be traded (it equals placing the fourth lot on a random pick). "Two years" is 21 months.
+    C-D2 − B4 is the Dir minus the mean pick each day, the comparison BL-129 already made on these days, so the
+    agreement with BL-129 restates it rather than confirming it.
