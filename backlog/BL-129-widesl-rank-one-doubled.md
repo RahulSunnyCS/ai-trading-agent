@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P3 — owner's question; a cheaper book if it holds |
-| **Status** | In progress |
+| **Status** | Done — informative, not adopted: Widesl rank 1 earned less than rank 2; doubling it lowers the book |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -52,3 +52,19 @@ Say, descriptively, whether Widesl rank 1 earns more than Widesl rank 2 among Ad
 ## Log
 
 - 2026-10-18 — Created; Phase 0 registered before any run (owner's question; the windows and rules are Claude's).
+- 2026-10-18 — **Run as registered** (`research/bl129/rank_double.py`; `rank_double_2026-10-18.json`). Gross per lot
+  from the stored results; net B − A adds only the brokerage B saves (₹94–103 a day). Descriptive, in-sample.
+
+  | Universe, window | Days (3-Widesl) | W1 / W2 / X mean | W1 − W2 (90 %) | W1 better | Book A / B per day | B − A net (90 %) | Max drawdown A / B |
+  |---|---|---|---|---|---|---|---|
+  | Core-298, 2025-01-10 → 2026-10-16 | 428 (78) | +227 / +409 / +580 | −183 [−339, −36] negative | 50 % | +1,216 / +1,034 | −89 [−245, +58] | −35,457 / −42,928 |
+  | Core-298, last year | 244 (35) | +404 / +413 / +576 | −9 [−189, +177] | 50 % | +1,393 / +1,384 | +85 [−94, +271] | −31,486 / −32,987 |
+  | T1, 2025-01-10 → 2026-10-16 | 428 (68) | +470 / +670 / +745 | −200 [−388, −1] negative | 47 % | +1,885 / +1,686 | −97 [−285, +101] | −23,300 / −40,583 |
+  | T1, last year | 244 (37) | +478 / +805 / +817 | −327 [−569, −96] negative | 45 % | +2,100 / +1,773 | −223 [−465, +8] | −23,300 / −40,583 |
+
+  **Read under the registered rule: not positive in any cell.** The first-ranked Widesl (highest composite) did not
+  earn more than the second: on two years it earned less in both universes (interval below zero), and on the last
+  year equal (Core) or less (T1). Doubling it saves about ₹100 a day of brokerage but gives up W2's result and deepens
+  the drawdown (T1: −23k → −41k). The composite separates "picked" from "not picked", not the order inside the picks.
+  Weaknesses: in-sample (these days were read by BL-115 and others); turnover charges assumed equal in both books;
+  Buy add-on left out.
