@@ -90,6 +90,36 @@ export function brokerLoginFailedPart(
   return 'unknown';
 }
 
+interface BrokerLoginRun {
+  conclusion: string;
+  status: string;
+  createdAt: string;
+  url: string;
+  databaseId?: number;
+}
+
+/**
+ * The run that answers "did today's broker login work?". A successful run counts only when its
+ * "Log in brokers" step actually ran: a cron backstop that skipped because an earlier run already
+ * existed also ends in success, and must not hide that earlier run's Quantiply failure. `jobsOf`
+ * returns a run's jobs, or null when GitHub could not say (then the success is taken as real).
+ * Without a real success, a failed run is the answer, else the newest run.
+ */
+export function pickBrokerLoginRun(
+  today: BrokerLoginRun[],
+  jobsOf: (run: BrokerLoginRun) => Array<{ steps?: WorkflowStep[] }> | null,
+): BrokerLoginRun | undefined {
+  const loggedIn = today.find((run) => {
+    if (run.conclusion !== 'success') return false;
+    const jobs = jobsOf(run);
+    if (jobs === null) return true;
+    return jobs
+      .flatMap((job) => job.steps ?? [])
+      .some((step) => step.name === 'Log in brokers' && step.conclusion === 'success');
+  });
+  return loggedIn ?? today.find((run) => run.conclusion === 'failure') ?? today[0];
+}
+
 const FAILED_PART: Record<ReturnType<typeof brokerLoginFailedPart>, string> = {
   algotest: 'AlgoTest login failed',
   quantiply: 'Quantiply login failed (AlgoTest logins OK)',
@@ -119,17 +149,26 @@ function algotestCheck(ctx: BuiltinContext): Check {
     ctx.env,
   );
   try {
-    const runs = JSON.parse(raw) as Array<{
-      conclusion: string;
-      status: string;
-      createdAt: string;
-      url: string;
-      databaseId?: number;
-    }>;
-    // Any successful run today counts: GitHub's late backstop cron can fail hours after
-    // the 08:00 dispatch already logged the brokers in (BROKER_LOGIN_ONLY may limit it to one).
+    const runs = JSON.parse(raw) as BrokerLoginRun[];
+    // A successful run today counts (GitHub's late backstop cron can fail hours after the 08:00
+    // dispatch already logged the brokers in), but only one whose login step ran: a backstop
+    // that skipped also succeeds, and must not hide the 08:00 run's Quantiply failure.
     const today = runs.filter((r) => istDay(new Date(r.createdAt)) === istDay(ctx.now()));
-    const run = today.find((r) => r.conclusion === 'success') ?? today[0];
+    const jobsOf = (r: BrokerLoginRun) => {
+      if (!r.databaseId) return null;
+      try {
+        const view = capture(
+          'gh',
+          ['run', 'view', String(r.databaseId), '--json', 'jobs'],
+          ctx.repoRoot,
+          ctx.env,
+        );
+        return (JSON.parse(view) as { jobs?: Array<{ steps?: WorkflowStep[] }> }).jobs ?? [];
+      } catch {
+        return null;
+      }
+    };
+    const run = pickBrokerLoginRun(today, jobsOf);
     if (!run) {
       return {
         ok: false,

@@ -8,6 +8,8 @@ on:
   # a run's AlgoTest step did (backstop-check below); brokers already logged in are
   # reported SKIPPED. A backstop never logs in to Quantiply once any run happened that
   # day, whatever its result (a wrong Angel One PIN must not be sent again and again).
+  # So if the 08:00 run fails before its login steps (bun install, say), the backstops still
+  # log in to AlgoTest but Quantiply waits for a manual dispatch with quantiply=on that day.
   #
   # 02:45 UTC = 08:15 IST, weekdays only. AlgoTest opens broker logins at 08:15 IST;
   # if the scheduler fires a minute early, main.ts's window guard waits it out. The
