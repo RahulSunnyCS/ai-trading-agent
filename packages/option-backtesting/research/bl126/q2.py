@@ -46,6 +46,7 @@ def build_tmp_root(real: os.PathLike) -> None:
 
 
 def replay(names: list[str]) -> dict[date, dict]:
+    daylog._recon_cache.clear()  # its key does not include the universe
     rec = daylog.reconstruction(TMP, names)
     assert rec.error is None, rec.error
     cache: dict[str, dict] = {}

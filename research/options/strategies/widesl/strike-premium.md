@@ -1,6 +1,6 @@
 # Widesl: strike and premium
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-10-18
 
 ## What it is
 
@@ -25,6 +25,7 @@ file sells the NIFTY strike closest to ₹65 (`nifty_widesl_917_closest_premium.
 | BL-075 | Closest-premium families in vs out, 19 weightings × 3 periods | P1, P2 (Jan–Aug 2025), P3 (NIFTY 2022-04 → 2024-10) | **Kept**: removing them pushed 17 of 19 cells below chance | [BL-075][bl075] |
 | BL-080 | Add NIFTY ₹40 / ₹60, SENSEX ₹120 / ₹200 | P1, P2, P3, before charges | **Harmful**; then leave-one-out: NIFTY ₹80 / ₹100 carry weight, SENSEX ₹250 / ₹320 dead weight, but pruning them was **not adopted** | [BL-080][bl080] |
 | BL-098 | All six rotation families × one-factor stops | holdout 2025-10-09 → 2026-10-09, **after charges** | Descriptive: NIFTY leaders ₹100 / ₹80 (morning, afternoon) and OTM1 (midday); SENSEX ₹250 in every band | [BL-098 report][bl098q] |
+| BL-126 (POC) | NIFTY ₹120 at SL 60 % (and ₹100 at SL 75 %) added beside Core ₹100, all 25 slots | 2024-10-09 → 2026-10-16, gross, in-sample | Not positive standalone or in Adaptive (₹120: +₹23 [−33, +81] per lot-day in Adaptive, shallower drawdown) | [BL-126][bl126] |
 
 Fixed mixes, no portfolio stop, total / max drawdown, OTM1 | ₹80 | ₹100 ([BL-055][bl055], before
 charges): 5 × Widesl ₹8.73L / −₹2.26L | ₹7.02L / −₹1.99L | ₹7.37L / −₹1.76L; 3 Widesl + 2 Dir ₹9.47L /
@@ -72,3 +73,4 @@ charges): 5 × Widesl ₹8.73L / −₹2.26L | ₹7.02L / −₹1.99L | ₹7.37L
 [bl075]: ../../../../backlog/BL-075-drb-final-map-and-structural-switches.md
 [bl080]: ../../../../backlog/BL-080-drb-wider-closest-premium-families.md
 [bl098q]: ../../../../backlog/BL-098-widesl-qualified-list-post-charge.md
+[bl126]: ../../../../backlog/BL-126-nifty-premium-widesl-tight-sl-poc.md

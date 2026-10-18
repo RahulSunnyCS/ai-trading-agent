@@ -103,7 +103,6 @@ Sorted by priority (P0 first), then ID.
 | [BL-111](BL-111-range-regime-strategy-mix.md) | Lots by rank (2-2-1-1) and by range regime: more Dir when expanding, more Widesl when quiet; 3 lots / 6 lots; H3 expiring-index-only: positive but fragile; H3b at most one non-expiring: Core only, fragile | P2 | Planned | research | options |
 | [BL-121](BL-121-moved-expiry-days.md) | Holiday-shifted expiry days: does the rotation earn less on them? | P2 | Done: inconclusive, 11 days; NIFTY Buy reads worse (borderline) | research | options |
 | [BL-113](BL-113-t1-parallel-track.md) | T1 parallel track: Adaptive over Core-298 + 223 time-generic variants, own journal, private Telegram, 60-day read-out vs the live Adaptive (supersedes BL-112) | P1 | In progress | feature + research | options |
-| [BL-126](BL-126-nifty-premium-widesl-tight-sl-poc.md) | POC: NIFTY Widesl ₹100 at SL 75 % and ₹120 at SL 60 % vs Core ₹100 (SL 115 %), standalone and in Adaptive | P3 | In progress | research | options |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
@@ -115,6 +114,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-126](BL-126-nifty-premium-widesl-tight-sl-poc.md) | POC: NIFTY Widesl ₹100 at SL 75 % and ₹120 at SL 60 % vs Core ₹100 (SL 115 %) | Informative, not adopted: standalone +41 / +47 gross per lot-day, intervals include zero, deeper drawdown; in Adaptive −7 / +23, intervals include zero; in-sample, repeats BL-098 Phase 2 | 2026-10-18 |
 | [BL-108](BL-108-overnight-context-gift-nifty-global.md) | Overnight context: GIFT Nifty and global closes for the 09:17 entries | Dropped: the 09:16 pick already reads the 09:15 VIX open and the gap is derivable from the spot bars in the lake; nothing to collect | 2026-10-14 |
 | [BL-101](BL-101-early-long-straddle-hedge.md) | Early long ATM straddle (09:16 to 15:28, no stops) as a hedge for the fixed base | Killed by its pre-registered rule: base ES95 -31% and drawdown -40% worse, both halves, every year; pays only +277 on the base's worst 5% of days against -566/day carry | 2026-10-12 |
 | [BL-029](BL-029-point-in-time-universe-in-ui.md) | Point-in-time universe as a choice on the Broad tab | Done: delivered by BL-036 Phase 1 (the third universe card, the default, the universe on the result and in Saved runs); a default run went from 41.4% to 33.3% | 2026-10-10 |

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P3 — owner's idea, a quick look before anything is planned |
-| **Status** | In progress — POC |
+| **Status** | Done — informative, not adopted: neither setting positive standalone or in Adaptive |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -82,7 +82,7 @@ other premiums, SENSEX, other stops.
   **Parity (before trusting the path).** Core `N_p100_0917`, `N_p100_1202` and `N_p100_1517` simulated through this path
   against the stored live results: gross and net equal on 495 of 495 days for each of the three.
 
-  **Q1, standalone, net per lot-day, mean over the 25 slots, 495 days** (5-day circular blocks, 2,000 resamples, seed
+  **Q1, standalone, gross per lot-day (before charges; see the correction below), mean over the 25 slots, 495 days** (5-day circular blocks, 2,000 resamples, seed
   20261018, two-sided 90 %). Drawdown is the maximum fall of the cumulative slot-averaged series, per lot.
 
   | | Mean per lot-day | Arm minus Core | 90 % interval | Max drawdown | Slots with a positive difference | Reading |
@@ -143,3 +143,19 @@ other premiums, SENSEX, other stops.
   20 of 25 slots) and mixed in Adaptive (X1 -7, X2 +23). Weaknesses as registered: in-sample, no hold-out, the window
   was seen in the BL-104 summaries, and the 25 slots overlap in time so their differences are not independent. Live
   store checked unchanged afterwards (journal checksum, 298 result files, newest modification time).
+- 2026-10-18 — **Review corrections (Opus review on PR #244; no number changes, the reading stands).**
+  - **Q1 is gross, not net.** Phase 0 asked for Q1 net of charges; the strategy files carry no per-order cost, so the
+    engine's net equals gross. Departure from Phase 0 recorded here: the Q1 levels (+184 / +225 / +231) are before
+    charges and cannot be read beside BL-098's after-charges figures. The arm-minus-Core differences hardly move with
+    charges (each arm places the same four orders a day, no re-entry), so the reading is unchanged.
+  - **Prior exposure was understated.** Besides the BL-104 summaries, BL-098 Phase 2 already tried 80 / 90 / 100 % leg
+    stops on these NIFTY ₹100 files over the same window and ranked ₹100 at 80–90 % top in the 09:15–11:00 band
+    (after charges). This POC's largest per-slot gains are in the same morning slots (0947–1102), so it repeats that
+    look rather than confirming it; any forward track built on it must say so.
+  - **"Live store unchanged" covers less than written.** The "before" fingerprint was taken after `simulate.py` and
+    `parity.py` had run, so the pair covers `q2.py` only, and only `rotation/`. The review read every code path that
+    touches the data root (reads only) and found today's fingerprint equal to the committed "after" one.
+  - **Journal reproduction is not a committed check.** The Core replay matching the five journal entries (12–16 Oct)
+    was checked during the run and again by the reviewer's script, not by `q2.py`.
+  - `q2.py` now clears the reconstruction cache before each replay (the cache key did not include the universe; it
+    did not affect this run).
