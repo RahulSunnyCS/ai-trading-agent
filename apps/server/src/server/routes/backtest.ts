@@ -66,11 +66,10 @@
  *                                                 as typed, bad values are refused here.
  *  GET  /api/backtest/legwise/angel/status      — the Broker logins page's Angel One card: which
  *                                                 credentials are set (names only), the last
- *                                                 connection check and collection. requireAccess
- *  POST /api/backtest/legwise/angel/test        — ONE SmartAPI login now (no body; one at a time and
- *                                                 a 60 s cool-down, enforced upstream: 409 / 429).
- *                                                 requireAccess; a longer timeout (a login with
- *                                                 network retries can take ~100 s)
+ *                                                 check and collection, the guard. requireAccess
+ *  POST /api/backtest/legwise/angel/test        — start ONE SmartAPI login (no body): 202 at once,
+ *                                                 the login runs in the background upstream; the
+ *                                                 guard's 409 / 429 pass through. requireAccess
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
  *  GET  /api/backtest/legwise/daily             — that run's state/log. requireAccess
@@ -142,14 +141,10 @@ function assertSafeBacktestHost(url: string): void {
   }
 }
 
-async function proxyFetch(
-  path: string,
-  init?: RequestInit,
-  timeoutMs: number = PROXY_TIMEOUT_MS,
-): Promise<Response> {
+async function proxyFetch(path: string, init?: RequestInit): Promise<Response> {
   return fetch(`${backtestApiUrl()}${path}`, {
     ...init,
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
   });
 }
 
@@ -163,11 +158,10 @@ async function forwardToBacktestApi(
   reply: FastifyReply,
   path: string,
   init?: RequestInit,
-  timeoutMs?: number,
 ): Promise<void> {
   let upstream: Response;
   try {
-    upstream = await proxyFetch(path, init, timeoutMs);
+    upstream = await proxyFetch(path, init);
   } catch {
     await reply.status(503).send({ error: 'backtest_service_unavailable' });
     return;
@@ -1267,10 +1261,10 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
 
   // --- angel one connection (Broker logins) ---
   // The Angel One card (angelone/check.py): a read-only status and ONE SmartAPI login on demand.
-  // The guard (one test at a time, a 60 s cool-down) lives upstream, shared with the 08:00
-  // scheduler job; no client body is forwarded, so nothing from the browser reaches the login.
-  const ANGEL_TEST_TIMEOUT_MS = 150_000;
-
+  // The guard (one login at a time, a 60 s cool-down, a hold after a refused login) lives
+  // upstream, shared with the 08:00 scheduler job and the collector; no client body is
+  // forwarded, so nothing from the browser reaches the login. The POST answers at once (202,
+  // the login runs in the background upstream), so the normal timeout applies.
   fastify.get(
     '/api/backtest/legwise/angel/status',
     { preHandler: requireAccess },
@@ -1283,12 +1277,11 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     '/api/backtest/legwise/angel/test',
     { preHandler: requireAccess, bodyLimit: 1024 },
     async (_request, reply) => {
-      await forwardToBacktestApi(
-        reply,
-        '/legwise/angel/test',
-        { method: 'POST', headers: JSON_HEADERS, body: '{}' },
-        ANGEL_TEST_TIMEOUT_MS,
-      );
+      await forwardToBacktestApi(reply, '/legwise/angel/test', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: '{}',
+      });
     },
   );
   // --- end angel one connection ---

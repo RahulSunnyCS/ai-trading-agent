@@ -43,17 +43,27 @@ its `.env` (API key, client code, PIN and TOTP seed). The card shows whether tha
 | Login works | The last check logged in. The client code is shown masked (`R1•••56`). |
 | Last check failed | The last check did not log in. The line under it says why: **Login refused** (Angel One rejected the client code, PIN or TOTP), **Could not reach Angel One** (network), **Angel One unavailable** (their server error), or **Login error**. |
 
-**Last check** is the newest of the automatic check (the `angel-login-check` job, 08:00 on
-trading days, see [Jobs](app:/jobs)) and your own **Test connection**, with the time and how long
-the login took. **Last collection from Angel One** is the last day the evening run actually
-collected from it.
+**Last check** is the newest Angel One login: the automatic check (the `angel-login-check` job,
+08:00 on trading days, see [Jobs](app:/jobs)), your own **Test connection**, or the evening
+collection's login, with the time and how long it took. **Last collection from Angel One** is the
+last day the evening run actually collected from it.
 
 **Test connection** makes one login now. Nothing is fetched or traded, and the session is thrown
-away at once. Angel One limits logins and locks an account after repeated wrong attempts, so
-only one test runs at a time and there is a one-minute wait after each login (the button counts
-it down). The 08:00 check shares the same limit: if you test just before 08:00, it waits rather
-than fails. A failed 08:00 check sends a Telegram alert; a refused login is not retried
-automatically, so fix the setting and use Test connection.
+away at once. The result appears on the card a few seconds later. Angel One limits logins and
+locks an account after repeated wrong attempts, so every Angel One login here (your test, the
+08:00 check and the evening collection) shares a few rules, and the button says which one applies:
+
+| Button | Why |
+|---|---|
+| Testing… | A test is running (yours, or the 08:00 check). |
+| Collection running | The evening run is collecting from Angel One and is logged in; test when it finishes. |
+| Wait N s | One minute must pass after each login; the button counts it down. |
+| Held until HH:MM | Angel One refused the last login. The same settings are not tried again for 15 minutes; the card says why. |
+
+After a **Login refused**, fix the `ANGELONE_*` settings in the `.env` file. The server reads them
+again on every check, so no restart is needed, and changed settings lift the 15-minute hold at
+once. The 08:00 check follows the same rules: if you test just before 08:00 it waits rather than
+fails. A failed 08:00 check sends a Telegram alert.
 
 ## AlgoTest logins
 

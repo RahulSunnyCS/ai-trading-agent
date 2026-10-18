@@ -1,7 +1,7 @@
 /**
  * The Angel One connection proxy routes (src/server/routes/backtest.ts, the "angel one
  * connection" block): both behind the access gate, the test POST forwards no client body and
- * gets a longer timeout, and the upstream guard's 409 / 429 pass through. `fetch` is mocked: no
+ * keeps the usual timeout (upstream answers 202 at once), and the guard's 409 / 429 pass through. `fetch` is mocked: no
  * network, and no login is ever sent.
  */
 
@@ -70,23 +70,24 @@ describe('angel one connection routes', () => {
     );
   });
 
-  it('POST test forwards an empty body, never the client one, with a long timeout', async () => {
+  it('POST test forwards an empty body, never the client one, and passes the 202 through', async () => {
     const timeout = vi.spyOn(AbortSignal, 'timeout');
     server = await buildTestServer();
-    fetchMock.mockResolvedValueOnce(jsonResponse(200, { result: { ok: true } }));
+    const started = { status: 'started', started_at: '2026-10-18T10:00:00+05:30' };
+    fetchMock.mockResolvedValueOnce(jsonResponse(202, started));
     const res = await server.inject({
       method: 'POST',
       url: '/api/backtest/legwise/angel/test',
       payload: { client: 'X', pin: '1234' },
     });
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ result: { ok: true } });
+    expect(res.statusCode).toBe(202);
+    expect(res.json()).toEqual(started);
     expect(requireAccess).toHaveBeenCalled();
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('http://127.0.0.1:8000/legwise/angel/test');
     expect(init.method).toBe('POST');
     expect(init.body).toBe('{}');
-    expect(timeout).toHaveBeenCalledWith(150_000);
+    expect(timeout).toHaveBeenCalledWith(30_000); // the usual timeout: the POST answers at once
   });
 
   it('refuses before upstream when the access gate refuses', async () => {

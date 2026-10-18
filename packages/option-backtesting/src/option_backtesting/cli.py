@@ -425,17 +425,18 @@ app.add_typer(angel_app, name="angel")
 
 @angel_app.command("status")
 def angel_status() -> None:
-    """Whether the Angel One credentials are present (never prints one)."""
-    from .angelone.auth import AngelCredentialsError, load_credentials
+    """Whether the Angel One credentials are present (never prints one; the client code masked)."""
+    from .angelone.auth import AngelCredentialsError, load_credentials, mask_client
+    from .angelone.check import current_env
     from .fyers.daily import data_dir
 
     typer.echo(f"data dir: {data_dir()}")
     try:
-        creds = load_credentials()
+        creds = load_credentials(current_env())
     except AngelCredentialsError as error:
         typer.echo(f"credentials: not ready - {error}")
         raise typer.Exit(1) from None
-    typer.echo(f"credentials: ok for client {creds.client_code}")
+    typer.echo(f"credentials: ok for client {mask_client(creds.client_code)}")
 
 
 @angel_app.command("test")
@@ -443,21 +444,23 @@ def angel_test(
     scheduled: bool = typer.Option(
         False,
         "--scheduled",
-        help="Run as the 08:00 scheduler job: wait out a check in flight or the cool-down "
-        "instead of refusing, and never repeat a login refused in the last 15 minutes.",
+        help="Run as the 08:00 scheduler job: wait for a check or collection in flight and out "
+        "the cool-down instead of refusing.",
     ),
 ) -> None:
     """ONE Angel One SmartAPI login, to check the fallback data source works (nothing fetched,
     the session dropped). Shares the dashboard's Test connection guard (one at a time, a 60 s
-    cool-down) and records the result it shows. Exit 0 = logged in, 1 = failed or not retried,
-    3 = refused by the guard (manual runs only)."""
+    cool-down, no repeat of a refused login with the same settings for 15 minutes) and records
+    the result it shows. Exit 0 = logged in; 1 = the login failed, or it was held after a refusal;
+    3 = refused by the guard without a login: in the cool-down or another check running (a
+    manual run), or the lock still held after 3 minutes (`--scheduled`)."""
     from .angelone.check import CheckRefused, run_check
 
     try:
         result = run_check("scheduled" if scheduled else "manual", wait=scheduled)
     except CheckRefused as refused:
         typer.echo(f"Angel One login not attempted: {refused}")
-        raise typer.Exit(1 if refused.kind == "rejected_recently" else 3) from None
+        raise typer.Exit(1 if refused.kind == "held" else 3) from None
     except (OSError, RuntimeError) as error:
         typer.echo(f"Angel One login not attempted: {error}")
         raise typer.Exit(1) from None

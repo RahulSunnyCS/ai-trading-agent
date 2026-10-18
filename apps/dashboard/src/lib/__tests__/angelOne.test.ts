@@ -4,8 +4,8 @@ import {
   type AngelCheck,
   type AngelStatus,
   angelCardState,
-  cooldownEndsAt,
   newestCheck,
+  resultOf,
   testButton,
 } from '../angelOne';
 
@@ -28,11 +28,16 @@ const status = (over: Partial<AngelStatus> = {}): AngelStatus => ({
   last_check: null,
   last_collection: null,
   running: false,
+  running_source: null,
   cooldown_s: 60,
   retry_after_s: 0,
+  cooldown_until: null,
+  hold: null,
   warning: null,
   ...over,
 });
+
+const NOW = Date.parse('2026-10-18T10:00:00+05:30');
 
 describe('angelCardState', () => {
   it('reads unknown, not configured, untested, working and failed', () => {
@@ -56,46 +61,84 @@ describe('newestCheck', () => {
   });
 });
 
-describe('testButton', () => {
-  const received = 1_000_000;
+describe('resultOf', () => {
+  const started = '2026-10-18T10:00:00+05:30';
 
-  it('is enabled when nothing is running and the cool-down is over', () => {
-    expect(
-      testButton({
-        configured: true,
-        testing: false,
-        running: false,
-        endsAtMs: cooldownEndsAt(status(), received),
-        nowMs: received,
-      }),
-    ).toEqual({ disabled: false, label: 'Test connection', secondsLeft: 0 });
+  it('waits while the check runs or the status still has an older one', () => {
+    expect(resultOf(null, started)).toBeNull();
+    expect(resultOf(status({ running: true, last_check: check() }), started)).toBeNull();
+    expect(resultOf(status({ last_check: check() }), started)).toBeNull(); // 08:00's
   });
 
-  it('counts the cool-down down from when the status arrived', () => {
-    const endsAt = cooldownEndsAt(status({ retry_after_s: 42 }), received);
-    const base = { configured: true, testing: false, running: false, endsAtMs: endsAt };
-    expect(testButton({ ...base, nowMs: received })).toEqual({
+  it('returns the check that started at or after the click', () => {
+    const mine = check({ checked_at: started, source: 'manual' });
+    expect(resultOf(status({ last_check: mine }), started)).toBe(mine);
+  });
+});
+
+describe('testButton', () => {
+  it('is ready when nothing is running, cooling down or held', () => {
+    expect(testButton({ status: status(), testing: false, nowMs: NOW })).toEqual({
+      kind: 'ready',
+      disabled: false,
+      secondsLeft: 0,
+    });
+  });
+
+  it('counts the cool-down down to an absolute time, so a cached status is not stale', () => {
+    const cooling = status({ cooldown_until: '2026-10-18T10:00:42+05:30' });
+    expect(testButton({ status: cooling, testing: false, nowMs: NOW })).toEqual({
+      kind: 'cooldown',
       disabled: true,
-      label: 'Wait 42 s',
       secondsLeft: 42,
     });
-    expect(testButton({ ...base, nowMs: received + 41_500 }).label).toBe('Wait 1 s');
-    expect(testButton({ ...base, nowMs: received + 42_000 }).disabled).toBe(false);
+    expect(testButton({ status: cooling, testing: false, nowMs: NOW + 41_500 }).secondsLeft).toBe(
+      1,
+    );
+    expect(testButton({ status: cooling, testing: false, nowMs: NOW + 42_000 }).kind).toBe('ready');
+    // an old cached answer whose cool-down is long over
+    expect(testButton({ status: cooling, testing: false, nowMs: NOW + 600_000 }).disabled).toBe(
+      false,
+    );
   });
 
-  it('is disabled while a test runs here or anywhere else', () => {
-    const base = { configured: true, endsAtMs: 0, nowMs: received };
-    expect(testButton({ ...base, testing: true, running: false })).toMatchObject({
-      disabled: true,
-      label: 'Testing…',
+  it('never counts more than the cool-down, whatever the clocks say', () => {
+    const skewed = status({ cooldown_until: '2026-10-18T11:00:00+05:30' });
+    expect(testButton({ status: skewed, testing: false, nowMs: NOW }).secondsLeft).toBe(60);
+  });
+
+  it('is disabled while a test or a collection holds the login', () => {
+    expect(testButton({ status: status(), testing: true, nowMs: NOW }).kind).toBe('testing');
+    expect(
+      testButton({
+        status: status({ running: true, running_source: 'scheduled' }),
+        testing: false,
+        nowMs: NOW,
+      }).kind,
+    ).toBe('testing');
+    expect(
+      testButton({
+        status: status({ running: true, running_source: 'collector' }),
+        testing: false,
+        nowMs: NOW,
+      }).kind,
+    ).toBe('collecting');
+  });
+
+  it('is held after a refused login until the hold ends', () => {
+    const held = status({
+      hold: { until: '2026-10-18T10:10:00+05:30', message: 'Angel One refused the login …' },
     });
-    expect(testButton({ ...base, testing: false, running: true }).disabled).toBe(true);
+    expect(testButton({ status: held, testing: false, nowMs: NOW })).toMatchObject({
+      kind: 'held',
+      disabled: true,
+    });
+    expect(testButton({ status: held, testing: false, nowMs: NOW + 600_000 }).kind).toBe('ready');
   });
 
   it('is disabled when the credentials are not configured', () => {
     expect(
-      testButton({ configured: false, testing: false, running: false, endsAtMs: 0, nowMs: 0 })
-        .disabled,
+      testButton({ status: status({ configured: false }), testing: false, nowMs: NOW }).disabled,
     ).toBe(true);
   });
 });

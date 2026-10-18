@@ -18,9 +18,12 @@ export type AngelCheckReason =
   | 'unavailable'
   | 'error';
 
+export type AngelSource = 'manual' | 'scheduled' | 'collector';
+
 export interface AngelCheck {
+  /** When the attempt started (IST, ISO 8601). */
   checked_at: string;
-  source: 'manual' | 'scheduled';
+  source: AngelSource;
   ok: boolean;
   reason: AngelCheckReason;
   /** Scrubbed upstream: never a token, PIN, TOTP code or key. */
@@ -50,15 +53,21 @@ export interface AngelStatus {
   client: string | null;
   last_check: AngelCheck | null;
   last_collection: AngelCollection | null;
+  /** The guard's lock is held: a test or a collection is logged in right now. */
   running: boolean;
+  running_source: AngelSource | null;
   cooldown_s: number;
-  /** Seconds until another login may be sent, as of the response. */
   retry_after_s: number;
+  /** When another login may be sent (absolute, so a cached response counts down correctly). */
+  cooldown_until: string | null;
+  /** A refused login is not repeated with the same settings until `until`. */
+  hold: { until: string; message: string } | null;
   warning: string | null;
 }
 
-export interface AngelTestResponse {
-  result: AngelCheck;
+export interface AngelTestStarted {
+  status: 'started';
+  started_at: string;
 }
 
 export const REASON_LABEL: Record<AngelCheckReason, string> = {
@@ -70,9 +79,10 @@ export const REASON_LABEL: Record<AngelCheckReason, string> = {
   error: 'Login error',
 };
 
-export const SOURCE_LABEL: Record<AngelCheck['source'], string> = {
+export const SOURCE_LABEL: Record<AngelSource, string> = {
   manual: 'Test connection',
   scheduled: '08:00 check',
+  collector: 'Evening collection',
 };
 
 export type AngelCardState = 'unknown' | 'not_configured' | 'untested' | 'working' | 'failed';
@@ -111,24 +121,43 @@ export function newestCheck(a: AngelCheck | null, b: AngelCheck | null): AngelCh
   return Date.parse(a.checked_at) >= Date.parse(b.checked_at) ? a : b;
 }
 
-/** When the cool-down ends, in epoch ms, from a status received at `receivedAtMs`. */
-export function cooldownEndsAt(status: AngelStatus | null, receivedAtMs: number): number {
-  return receivedAtMs + Math.max(0, status?.retry_after_s ?? 0) * 1000;
+/** The check a test started at `startedAt` produced, once the status carries it. */
+export function resultOf(status: AngelStatus | null, startedAt: string): AngelCheck | null {
+  const check = status?.last_check;
+  if (!status || status.running || !check) return null;
+  return Date.parse(check.checked_at) >= Date.parse(startedAt) ? check : null;
 }
 
-/** The Test connection button: disabled while a test runs and through the cool-down. */
+export type TestButtonKind =
+  | 'ready'
+  | 'not_configured'
+  | 'testing'
+  | 'collecting'
+  | 'cooldown'
+  | 'held';
+
+/** The Test connection button: disabled while a login is in use, through the cool-down and a
+ * hold after a refused login. `secondsLeft` is the cool-down's, for the label. */
 export function testButton(opts: {
-  configured: boolean;
+  status: AngelStatus;
   testing: boolean;
-  running: boolean;
-  endsAtMs: number;
   nowMs: number;
-}): { disabled: boolean; label: string; secondsLeft: number } {
-  const secondsLeft = Math.max(0, Math.ceil((opts.endsAtMs - opts.nowMs) / 1000));
-  if (opts.testing || opts.running) {
-    return { disabled: true, label: 'Testing…', secondsLeft };
-  }
-  if (!opts.configured) return { disabled: true, label: 'Test connection', secondsLeft };
-  if (secondsLeft > 0) return { disabled: true, label: `Wait ${secondsLeft} s`, secondsLeft };
-  return { disabled: false, label: 'Test connection', secondsLeft: 0 };
+}): { kind: TestButtonKind; disabled: boolean; secondsLeft: number } {
+  const { status, testing, nowMs } = opts;
+  const until = status.cooldown_until ? Date.parse(status.cooldown_until) : Number.NaN;
+  const cooldown = Number.isNaN(until) ? 0 : until - nowMs;
+  const secondsLeft = Math.min(status.cooldown_s, Math.max(0, Math.ceil(cooldown / 1000)));
+  const holdUntil = status.hold ? Date.parse(status.hold.until) : Number.NaN;
+  const kind: TestButtonKind = !status.configured
+    ? 'not_configured'
+    : testing || (status.running && status.running_source !== 'collector')
+      ? 'testing'
+      : status.running
+        ? 'collecting'
+        : secondsLeft > 0
+          ? 'cooldown'
+          : !Number.isNaN(holdUntil) && holdUntil > nowMs
+            ? 'held'
+            : 'ready';
+  return { kind, disabled: kind !== 'ready', secondsLeft };
 }

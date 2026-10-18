@@ -78,7 +78,10 @@ const BASE_JOBS: Job[] = [
     // The same guarded check as the Broker logins card's Test connection: it waits out a test in
     // flight or the 60 s cool-down rather than fail, and its retry (5 minutes later, past its
     // own cool-down) is for a network blip; a login Angel One refused is never sent again by the
-    // retry (`--scheduled`), since each wrong attempt counts toward a lockout.
+    // retry (`--scheduled`), since each wrong attempt counts toward a lockout. 08:00 is the
+    // owner's choice (2026-10-18) and does not collide with `broker-login` above: AlgoTest's
+    // Angel One login is off (repository variable BROKER_LOGIN_ONLY=finvasia) and AlgoTest logs
+    // in from 08:15 anyway.
     id: 'angel-login-check',
     description: 'Angel One: one SmartAPI login, to check the fallback data source works',
     schedule: { at: '08:00', on: tradingDays, label: 'trading days 08:00' },

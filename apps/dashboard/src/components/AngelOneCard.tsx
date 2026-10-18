@@ -5,8 +5,9 @@
  * repo .env, so there is nothing to log in to here. The card shows which settings are present
  * (names only), the last connection check (the 08:00 job's or a Test connection's), the last
  * collection that came from Angel One, and a Test connection button that makes ONE login now.
- * The server allows one test at a time and one a minute; the button is disabled while a test
- * runs and through that cool-down.
+ * The server allows one login at a time (a test or the evening collection) and one a minute, and
+ * does not repeat a refused login with the same settings for 15 minutes; the button is disabled
+ * through each of those, and the hold's reason is shown.
  */
 
 import { AlertCircle, CheckCircle2, PlugZap } from 'lucide-react';
@@ -20,12 +21,12 @@ import {
   SOURCE_LABEL,
   STATE_BADGE,
   STATE_DOT,
+  type TestButtonKind,
   angelCardState,
-  cooldownEndsAt,
   newestCheck,
   testButton,
 } from '../lib/angelOne';
-import { formatDay, formatDuration, formatIstDateTimeShort } from '../lib/format';
+import { formatDay, formatDuration, formatIstDateTimeShort, formatIstTime } from '../lib/format';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card, CardHeader } from './ui/Card';
@@ -39,26 +40,33 @@ function Code({ children }: { children: string }) {
   );
 }
 
+function buttonLabel(kind: TestButtonKind, secondsLeft: number, status: AngelStatus): string {
+  switch (kind) {
+    case 'testing':
+      return 'Testing…';
+    case 'collecting':
+      return 'Collection running';
+    case 'cooldown':
+      return `Wait ${secondsLeft} s`;
+    case 'held':
+      return `Held until ${formatIstTime(status.hold?.until)}`;
+    default:
+      return 'Test connection';
+  }
+}
+
 /** The button is a small leaf with its own 1 s clock, so the countdown re-renders only it. */
 function TestButton({
   status,
-  receivedAt,
   testing,
   onTest,
 }: {
   status: AngelStatus;
-  receivedAt: number;
   testing: boolean;
   onTest: () => void;
 }) {
   const now = useNow(1000);
-  const button = testButton({
-    configured: status.configured,
-    testing,
-    running: status.running,
-    endsAtMs: cooldownEndsAt(status, receivedAt),
-    nowMs: now ? now.getTime() : receivedAt,
-  });
+  const button = testButton({ status, testing, nowMs: now ? now.getTime() : Date.now() });
   return (
     <Button
       size="sm"
@@ -67,13 +75,13 @@ function TestButton({
       disabled={button.disabled}
       loading={testing}
       title={
-        button.secondsLeft > 0
-          ? 'Angel One limits logins: one test a minute.'
+        button.kind === 'cooldown'
+          ? 'Angel One limits logins: one a minute.'
           : 'Makes one Angel One login now. Nothing is fetched or traded.'
       }
     >
       {testing ? null : <PlugZap className="h-3.5 w-3.5" />}
-      {button.label}
+      {buttonLabel(button.kind, button.secondsLeft, status)}
     </Button>
   );
 }
@@ -100,8 +108,7 @@ function CheckLine({ check }: { check: AngelCheck }) {
 }
 
 export function AngelOneCard() {
-  const { status, loading, error, receivedAt, testing, testResult, testError, test } =
-    useAngelOneConnection();
+  const { status, loading, error, testing, testResult, testError, test } = useAngelOneConnection();
 
   const check = newestCheck(testResult, status?.last_check ?? null);
   const state = angelCardState(status, check);
@@ -116,12 +123,7 @@ export function AngelOneCard() {
         icon={<StatusDot tone={STATE_DOT[state]} pulse={state === 'working'} />}
         actions={
           status?.configured ? (
-            <TestButton
-              status={status}
-              receivedAt={receivedAt}
-              testing={testing}
-              onTest={() => void test()}
-            />
+            <TestButton status={status} testing={testing} onTest={() => void test()} />
           ) : undefined
         }
       />
@@ -162,6 +164,8 @@ export function AngelOneCard() {
         {check && <CheckLine check={check} />}
 
         {testError && <p className="basis-full text-sm text-negative">{testError}</p>}
+
+        {status?.hold && <p className="basis-full text-sm text-warning">{status.hold.message}</p>}
 
         {status?.last_collection && (
           <p className="basis-full text-sm text-muted">
