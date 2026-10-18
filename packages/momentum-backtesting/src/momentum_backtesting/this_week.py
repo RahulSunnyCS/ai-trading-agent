@@ -412,7 +412,9 @@ def week_view(
     headline = next((c for c in cards if c["headline"]), None)
     shared = set(headline["held"]) if headline else set()
     for card in cards:
-        card["trades"] = sum(1 for r in card["rows"] if r["action"] not in ("", "HOLD"))
+        card["trades"] = sum(
+            1 for r in card["rows"] if r["action"] not in ("", "HOLD") and not _is_skip(r["action"])
+        )
         card["shared_with_headline"] = (
             None if card is headline or not headline else len(shared & set(card["held"]))
         )

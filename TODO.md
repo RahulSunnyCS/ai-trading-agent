@@ -703,7 +703,8 @@ never open a new position in an ETF too far above its NAV; the research decides 
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.29.1 | Phase 1: the live gate (`premium_block_pct` 2% / `premium_block_international_pct` 5% in `live_config.toml`, every ETF favourite): a new buy over the limit becomes `SKIP (premium)` with the premium, its date, the limit and the reason; the next-best name takes the slot; Telegram "NOT BOUGHT" group, journal rows, This week "Not bought" section, Journal page chips; a sleeve's skip never reads as a TRIM in a group | claude | **Built 2026-10-18.** Decision-only: the model portfolio still records the buy (Phase 2 task 3 decides whether the gate enters the engine) |
-| 3.29.2 | Phase 2: rebuild the premium history on matching units (MON100 from 2016, not 2021), run the pre-registered arms A–D, apply the pass / kill rule, findings page, keep or zero the limits | claude | Planned; Phase 0 committed with the item |
+| 3.29.2 | Phase 1b: the same gate on Broad and Custom Index atomics (Nasdaq 100, Hang Seng), on the Broad engine decision and the 14:15 orders; until then the followed Broad headline still buys MON100 at any premium | claude | Planned, next |
+| 3.29.3 | Phase 2: rebuild the premium history on matching units (MON100 from 2016, not 2021), run the pre-registered arms A–D, apply the pass / kill rule, findings page, keep or zero the limits | claude | Planned; Phase 0 committed with the item |
 
 ## Reference — where detail lives
 

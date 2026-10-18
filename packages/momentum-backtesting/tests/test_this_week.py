@@ -342,7 +342,7 @@ def test_a_premium_skip_keeps_its_label_and_reason_on_the_card_and_in_the_journa
     row = card["rows"][0]
     assert row["action"] == "SKIP (premium)" and row["reason"].startswith("MON100")
     assert row["premium"] == 0.1689 and row["premium_limit"] == 0.05 and not row["held"]
-    assert card["trades"] == 3  # the skip counts as something to read, like a trade
+    assert card["trades"] == 2  # a skip is a trade NOT placed: not counted, like the tile
     assert card["edge"]["strongest_not_held"][0]["asset"] == "Nasdaq 100"
     view = api._journal_entry_view(
         {

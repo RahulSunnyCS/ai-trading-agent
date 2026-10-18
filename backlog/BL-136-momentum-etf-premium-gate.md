@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — protects the money the ETF favourites' signal would have put into a premium that can vanish in a day; the live gate is cheap, the research decides whether it stays |
-| **Status** | In progress — Phase 1 (the live gate) built 2026-10-18; Phase 2 (pre-registered research) planned |
+| **Status** | In progress — Phase 1 (the live gate, ETF favourites) built 2026-10-18; Phase 1b (Broad / Custom Index atomics) next; Phase 2 (pre-registered research) planned |
 | **Type** | research (Phase 1 is a feature; Phase 2 is the research that keeps or kills it) |
 | **Area** | momentum |
 | **Created** | 2026-10-18 |
@@ -57,9 +57,14 @@ show in the journal and on This week.
 - Selling or trimming a held name for its premium. Selling into a premium is a gift, not a cost;
   the rule is one-sided by design.
 - Blocking a top-up (ADD) of a held name: it keeps the warning. Open question below.
-- The Rebalance preview and Your orders (Broad only today). The preview still shows the ungated
-  ETF trades; note it on the page if a follower is ever on an ETF favourite.
-- Any change to Broad, Stock or Custom Index (no ETF premium there).
+- The Rebalance preview. It still shows the ungated ETF trades; note it on the page if a
+  follower is ever on an ETF favourite.
+- Stock (no ETF is traded there).
+- **Not yet covered, and it matters: Broad and Custom Index.** Both rank Gold, Silver, **Nasdaq
+  100 and Hang Seng** as atomics (`categories/broad.py` `ATOMIC_NAMES`, `api.ATOMIC_INSTRUMENTS`),
+  bought in real money as MON100 / HNGSNGBEES, and the followed favourites, the headline and Your
+  orders are Broad. So after Phase 1 the motivating case, MON100 at +16.9%, is still a BUY on the
+  strategies the owner follows. Phase 1b below gates them; until it ships the Guide says so.
 
 ## Plan
 
@@ -113,6 +118,19 @@ show in the journal and on This week.
   the name can show as HOLD for a follower who never bought it. Phase 2 decides whether the gate
   enters the engine (task 3); until then the Guide says so.
 
+### Phase 1b — The same gate on Broad and Custom Index atomics (next)
+- **Tasks:** the week's blocked atomics (same `latest_premiums` / `premium_blocked`, same TOML
+  limits) passed as `no_buy` into the Broad engine decision (`api._broad_engine_signal`,
+  `_broad_decide`, the sentinel-week run `_orders_signal` uses at 14:15) and Custom Index's
+  `latest` for the decision week only, with the same `SKIP (premium)` row, reason and the
+  no-sale-week rule (keep the ungated action, attach the note); the Broad Telegram message and
+  the 14:15 orders summary name the skip; `_actionable_rows` leaves it out of the trades.
+  `tests/test_broad_parity.py` stays green: the gate must not reach the full backtest.
+- **Deliverables:** the change, tests on the Broad sentinel path (a blocked atomic in the top
+  picks on a rebalance week; a held atomic untouched), Guide wording updated.
+- **Done when:** a Friday on which MON100 is over 5% records `SKIP (premium)` for Nasdaq 100 on
+  the headline's journal entry and Your orders plans no MON100 buy.
+
 ### Phase 2 — Fix the premium history, run the pre-registered arms
 - **Tasks:**
   1. Rebuild `etf_premium.csv` on matching units: apply the same `split_factors` the price gets to
@@ -162,3 +180,9 @@ show in the journal and on This week.
   premium dated on the signal Friday when a rerun found one (now strictly before it), and the
   paper-start views rebuilt the first week from the ungated weights, showing the refused name
   as a BUY (now the skip row is kept).
+- 2026-10-18 — PR review (Opus) found three more, fixed before merge: a blocked name on a week
+  that buys nothing was still labelled a refused buy with a refill that never happened (now it
+  keeps its own action, WAIT, with the note); a skip-only week was sent as action_required (now
+  "No trades", info); and the out-of-scope line wrongly said Broad and Custom Index have no ETF
+  premium exposure. They rank Nasdaq 100 and Hang Seng as atomics and are what the owner follows,
+  so Phase 1b was added as the next step and the Guide says the gate is ETF-favourite-only today.

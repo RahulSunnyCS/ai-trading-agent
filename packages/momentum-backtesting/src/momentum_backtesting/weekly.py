@@ -434,6 +434,15 @@ def compute_signal(data_dir: Path, settings: LiveSettings) -> dict:
     # engine is the item's Phase 2 question, not something the live path decides on its own.
     no_buy = pd.DataFrame({name: [True] for name in blocked}, index=[week]) if blocked else None
     signal = analysis.latest_signal(result, prices, config, no_buy=no_buy)
+    # What the week would have done without the gate: a blocked name is a real skip only when
+    # it would have been bought. On a week that buys nothing (no sale in buffer mode, no open
+    # slot) it keeps its own action (WAIT, or none) and only carries the note, so the row never
+    # claims a refill that did not happen.
+    ungated = (
+        {r["asset"]: r["action"] for r in analysis.latest_signal(result, prices, config)["rows"]}
+        if blocked
+        else {}
+    )
     previous = result.ranks.iloc[-2] if len(result.ranks) > 1 else pd.Series(dtype=float)
     rows = []
     for row in signal["rows"]:
@@ -454,12 +463,17 @@ def compute_signal(data_dir: Path, settings: LiveSettings) -> dict:
         }
         if action == analysis.NO_BUY_SKIP and name in blocked:
             limit = blocked[name]
-            out["action"] = PREMIUM_SKIP
-            out["premium_limit"] = limit
-            out["reason"] = (
+            over = (
                 f"{out['etf']} trades {premium:+.1%} above NAV ({premium_date}), over the "
-                f"{limit:.0%} limit: not bought, the next-best name takes its slot (BL-136)."
+                f"{pct(limit)} limit"
             )
+            out["premium_limit"] = limit
+            if ungated.get(name, "").startswith("BUY"):
+                out["action"] = PREMIUM_SKIP
+                out["reason"] = f"{over}: not bought, the next-best name takes its slot (BL-136)."
+            else:
+                out["action"] = ungated.get(name, "")
+                out["reason"] = f"{over}: it will not be bought while it stays there (BL-136)."
         rows.append(out)
     weights = result.weights.iloc[-1] if len(result.weights) else pd.Series(dtype=float)
     return {
@@ -475,6 +489,12 @@ def compute_signal(data_dir: Path, settings: LiveSettings) -> dict:
             "lookbacks": list(config.lookbacks),
         },
     }
+
+
+def pct(fraction: float) -> str:
+    """A limit as people write it: 5% and 2.5%, never "2%" for 0.025."""
+    text = f"{fraction * 100:.2f}".rstrip("0").rstrip(".")
+    return f"{text}%"
 
 
 def latest_premiums(premiums: pd.DataFrame, week: pd.Timestamp) -> dict[str, tuple[float, str]]:
@@ -548,7 +568,11 @@ def format_message(
         if r["premium"] is not None:
             text += f" · premium {_pct(r['premium'])}"
             if r["action"] == PREMIUM_SKIP:
-                text += f" · over the {r.get('premium_limit', 0):.0%} limit, next-best name instead"
+                text += (
+                    f" · over the {pct(r.get('premium_limit', 0))} limit, next-best name instead"
+                )
+            elif r.get("premium_limit") is not None and r["premium"] > r["premium_limit"]:
+                text += f" · over the {pct(r['premium_limit'])} limit, not bought while there"
             elif r["action"].startswith(("BUY", "ADD")) and r["premium"] > limit:
                 text += " ⚠️ buying above NAV"
         return text
@@ -566,7 +590,9 @@ def format_message(
         f"Model portfolio · top {cfg['top_n']}, sell when rank > {cfg['exit_rank']} · "
         f"P&L on {'ETFs' if cfg['track'] == 'etf' else 'index'}",
     ]
-    trades = [r for r in rows if r["action"] and r["action"] not in ("HOLD", "AT CAP", "WAIT")]
+    # A premium skip is a trade NOT placed: a skip-only week is "No trades" and informational.
+    quiet = ("HOLD", "AT CAP", "WAIT", PREMIUM_SKIP)
+    trades = [r for r in rows if r["action"] and r["action"] not in quiet]
     if not trades:
         lines.append("No trades this week.")
     for title, match in groups:
