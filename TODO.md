@@ -694,6 +694,16 @@ Steady / Calendar / Adaptive lists, favourites, a leg-grid builder. Features fol
 | 3.28.3 | Phase 1c: Builder design A (token strip, leg grid, backtest settings popover) | claude | **Built 2026-10-15.** On `main`: `bars` / `include_excluded` on `POST /legwise/backtest`, the grid helpers and components. The Builder page uses them (PR #227) with period, bar size and include-excluded in the Run panel |
 | 3.28.4 | Phase 2–3: Analytics page pattern on Today, Builder result, Runs, Heatmap, Correlation, Regimes; declutter | claude | **In progress.** Today is one page (list cards, What happened, Is the rule still working?, Experiments) with no mode switch; the evening run bar is on Today and Daily results is retired with a redirect (2026-10-15); Regimes and the YAML engine sit under Advanced (2026-10-15); Heatmap has chips and a settings drawer; correlation / regimes run-bar and drawer controls are not done |
 
+### 3.29 Rule agents — [BL-119](backlog/BL-119-rule-agents-paper-and-retrospection.md)
+
+Owner (2026-10-18): agents that follow rules he gives, trade them as paper trades, retrospect each evening, and
+are replaced by better ones. First rule: a break of a rolling 60-bar NIFTY range after a consolidation.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.29.1 | Phase 0 and Amendment 1 (rolling rule, long and short-premium arms, 2019-2021 confirmation period) pre-registered before any run | claude | **Done 2026-10-18.** Nothing run |
+| 3.29.2 | Phase 1: event study on periods A and B (event counts first, then placebo and trades) | claude | **Next** |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |
