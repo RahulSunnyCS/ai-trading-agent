@@ -102,7 +102,7 @@ lots spread evenly; nothing live changes.
     one, which differs on three-Widesl days (33 non-expiry T1 days). With `wide[-1]` (rows above corrected) T-W2
     **costs** against the even spread in both windows; the T1 reading is stronger: no Widesl placement beats it.
   - **Core C-D2 rests on a few days:** the top 5 non-expiry days carry 37 % of the two-year excess over B4, the top 10
-    68 %. Without the top 5: +101 [−29, +225] (two years), +148 [+12, +289] (last year); without the top 10 both
+    68 %. Without the top 5 (reviewer's check, days set to zero): +101 [−29, +225] (two years), +148 [+12, +289] (last year; the registered deletion in Amendment 1 gives +102 [−22, +229] / +151 [+14, +286]); without the top 10 both
     include zero. The last year sits inside the two-year window, so the two are not independent confirmations. By Dir
     family: Dir ITM1 picked on 155 days (mean excess +219), plain Dir on 46 (+606); removing either leaves the two-year
     interval including zero. Read C-D2 as a lead, not a finding.
@@ -127,6 +127,6 @@ lots spread evenly; nothing live changes.
   placement (+315 / +413 a day over 3 lots), is above the even spread on the last year (+150 [+27, +270]) but not
   over the 21 months (+98 [−20, +215]), and its edge over the even spread is carried by a handful of days (the top 5
   give two-thirds of it; without the top 10 it is gone). Its drawdown over 21 months (−33,690) is as deep as T-W1's;
-  on the last year it is near B3's. Core's Dir is the sturdier of the two (without its top 5 days still +102 / +151).
+  on the last year it is near B3's. Core's Dir is the sturdier of the two (without its top 5 days +102 [−22, +229] / +151 [+14, +286]).
   Both say the same thing: the Dir is at least as good a home for the fourth lot as any other pick, and probably
   better, but not by a margin these days can pin down.
