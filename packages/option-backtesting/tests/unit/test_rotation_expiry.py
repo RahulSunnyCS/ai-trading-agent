@@ -15,7 +15,16 @@ import numpy as np
 import pytest
 
 from option_backtesting.rotation import attrs as attrs_mod
-from option_backtesting.rotation import daylog, expiry, journal, pick, rankic, result, store
+from option_backtesting.rotation import (
+    daylog,
+    expiry,
+    journal,
+    messages,
+    pick,
+    rankic,
+    result,
+    store,
+)
 from option_backtesting.rotation import explain as ex
 from option_backtesting.rotation import tomorrow as tomorrow_mod
 from option_backtesting.rotation import variants as variants_mod
@@ -361,15 +370,14 @@ def test_the_rule_day_message_says_so_once_and_its_next_best_is_from_the_index(r
     assert all(underlying_of(n) == index for n in options["C"].values() if n)
     entry = syn.record_entry(root, MONDAY, dte=_labels(index), vix_open=14.01)
     text = pick.render(entry, options)
-    assert text.count(f"Expiry rule ({index}): only {index} strategies") == 1
-    assert text.splitlines()[1] == f"Expiry rule ({index}): only {index} strategies"
+    line = f"⚡ Expiry day · {index} only"
+    assert text.count(line) == 1
+    assert text.splitlines()[1] == line
     other = "SENSEX" if index == "NIFTY" else "NIFTY"
-    picks_line = next(x for x in text.splitlines() if x.startswith("Adaptive"))
-    assert other[0] + "_" not in picks_line.replace("Adaptive: ", "")
-    for name in entry["lists"]["C"]["unfiltered"]["core"]:
-        if underlying_of(name) != index:
-            assert name not in text  # the unfiltered picks stay in the journal, not the message
+    # every strategy line (the numbered picks, the Buy, the optional line) names the expiring index
+    assert f" {other[0]}_" not in text
     assert "Expiry rule" not in pick.render({**entry, "expiry_only": None}, options)
+    assert "Expiry day" not in pick.render({**entry, "expiry_only": None}, options)
 
 
 def test_the_switch_off_records_monday_unfiltered(rule_store, monkeypatch):
@@ -459,8 +467,8 @@ def test_the_t1_track_applies_the_same_rule(tmp_path, monkeypatch):
     assert any(underlying_of(n) != index for n in c["unfiltered"]["core"])
     assert journal.verify(store.journal_path(root, "t1")) == []
     assert not store.journal_path(root).exists()
-    assert r.text.startswith("T1 TRACK picks (not traded)")
-    assert f"Expiry rule ({index})" in r.text
+    assert r.text.startswith("🧪 T1 · TESTING PHASE · not traded")
+    assert f"⚡ Expiry day · {index} only" in r.text
     # the live list, the same morning, gets the same rule from the same code path
     live = pick.record(MONDAY, root, vix_open=14.01, now_fn=lambda: at)
     assert live.entry["expiry_only"] == index
@@ -497,20 +505,20 @@ def test_tomorrow_expects_the_filtered_picks_on_a_rule_day(rule_store, monkeypat
     hist = pick.load_history(MONDAY, root, syn.NAMES)
     ruled = pick.score_history(hist, MONDAY, 14.0, labels, expiry_only=index)["C"]
     assert (core, buy) == (ruled["core"], ruled["buy"])
-    section = tomorrow_mod.Tomorrow(
-        MONDAY, "Mon", labels["dte_n"], labels["dte_s"], [], {}, 0, expected=e
-    )
-    text = tomorrow_mod.render(section)
-    assert text.count(f"Expiry rule ({index}): only {index} strategies") == 1
+    # the evening message lists these picks in full, with the rule on a line of its own
+    monkeypatch.setattr(tomorrow_mod, "next_session", lambda d: MONDAY)
+    monkeypatch.setattr("option_backtesting.rotation.live.calendar_dte_labels", lambda d: labels)
+    nxt = tomorrow_mod.next_session_picks(PRE, root)
+    assert nxt is not None and nxt.expiry_only == index and nxt.day == MONDAY
+    assert (nxt.core, nxt.buy) == (core, buy)
+    text = messages.render_result(PRE, None, None, nxt)
+    assert text.count(f"⚡ {index} only") == 1
 
     # a session that is not a rule day (before the date, same labels) is expected unfiltered
     early = tomorrow_mod.expected_picks(
         PRE, root, labels["dte_n"], labels["dte_s"], PRE - timedelta(days=1)
     )
     assert early is not None and early.expiry_only is None
-    assert "Expiry rule" not in tomorrow_mod.render(
-        tomorrow_mod.Tomorrow(PRE, "Fri", "0", "2", [], {}, 0, expected=early)
-    )
 
 
 def test_reconstructed_history_stays_unfiltered_after_the_effective_date(monkeypatch, tmp_path):

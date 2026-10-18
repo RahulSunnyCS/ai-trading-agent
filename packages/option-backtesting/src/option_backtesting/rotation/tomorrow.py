@@ -1,26 +1,23 @@
-"""The "tomorrow" section of the evening result message: the expected picks for the next session
-and how Adaptive (and the fixed base) have done on days like it, from the stored history.
+"""The "tomorrow" part of the evening message: the strategies the 09:16 job would pick for the
+next session if tonight's conditions stand, listed in full (`NextPicks`, `next_session_picks`).
 Read-only.
 
-It is a historical frequency, not a forecast. The rows are fixed in advance and do not depend on
-any result: all days, the same weekday, and the same (NIFTY, SENSEX) weekdays to expiry. A row is
-never added or dropped because of how it performed. The next session's gap, opening range and
-VIX are not known tonight and none of them separated winning from losing days in the study behind
-this, so they are left out. Every figure is a one-lot gross per-lot-day basket result, over the
-days since `HISTORY_FROM`. Most of those days were re-scored from history, after the rule's
-weights were chosen on them, so they are in-sample; the message says how many were recorded
-forward."""
+`expected_picks` re-runs the 09:16 ranking on the stored results with the market's last close
+standing in for the opening VIX, under the expiring-index rule (BL-122) for that session, for the
+live list or for a parallel track's universe. Since BL-125 the message shows only those picks. The
+chance of each pick, the likely changes, and the win-rate and mean tables (`build`, `Tomorrow`,
+`conditions`: a historical frequency, not a forecast, most of it re-scored in-sample) are no longer
+sent; the helpers are kept, tested, for the dashboard or a later message."""
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 
 from . import daylog
-from .lists import DISPLAY_NAMES, PUBLIC_KEYS
+from .lists import PUBLIC_KEYS
 
 #: the lists shown: the public ones (Steady and Adaptive); the base is a separate column
 LIST_KEYS = PUBLIC_KEYS
@@ -228,13 +225,14 @@ def vix_transitions(root: Path, last_day: date | None = None) -> dict[str, dict[
 
 
 def expected_picks(
-    day: date, root: Path, dte_n: str, dte_s: str, last_day: date
+    day: date, root: Path, dte_n: str, dte_s: str, last_day: date, track: str | None = None
 ) -> Expected | None:
     """Re-run the 09:16 ranking for `day` from the stored results: with the market's last close
-    standing in for tomorrow's opening conditions, and for each band the open could land in."""
+    standing in for tomorrow's opening conditions, and for each band the open could land in.
+    `track` ranks over Core-298 plus that parallel track's variants, as `pick --track` does."""
     from . import attrs as attrs_mod
     from . import expiry, pick, score, store
-    from .variants import variant_names
+    from .variants import track_names, variant_names
 
     dte = {"dte_n": dte_n, "dte_s": dte_s}
     # the rule the 09:16 job will apply to that session (BL-122), so every figure below is for
@@ -246,7 +244,8 @@ def expected_picks(
         vix = float(vix) if vix not in (None, "") else None
     if vix is None:
         return None
-    hist = pick.load_history(day, root, variant_names())
+    names = variant_names() + (track_names(track) if track else [])
+    hist = pick.load_history(day, root, names)
 
     def picks_at(v: float) -> Picks:
         r = pick.score_history(hist, day, v, dte, expiry_only=rule)
@@ -277,91 +276,42 @@ def expected_picks(
     )
 
 
-def for_next_session(today: date, root: Path | None = None) -> Tomorrow:
-    """The section for the session after `today`, from the stored history."""
+@dataclass(frozen=True)
+class NextPicks:
+    """What the 09:16 job would pick for the next session if tonight's conditions stand: the
+    evening message lists these strategies in full (BL-125)."""
+
+    day: date
+    weekday: str
+    core: list[str]
+    buy: list[str]
+    options: dict[str, str | None] | None
+    #: the index Adaptive is restricted to on that session (BL-122), or None
+    expiry_only: str | None
+
+
+def next_session_picks(
+    today: date, root: Path | None = None, track: str | None = None
+) -> NextPicks | None:
+    """Adaptive's expected picks for the session after `today` (`track`: that parallel track's
+    universe), from the stored results; None when they cannot be worked out. The same ranking,
+    VIX stand-in and expiry rule as the 09:16 job, via `expected_picks`."""
     from ..fyers.daily import data_dir
-    from . import base as base_mod
     from .live import calendar_dte_labels
 
     root = root or data_dir()
     nxt = next_session(today)
     labels = calendar_dte_labels(nxt)
-    log = daylog.build_log(root, start=HISTORY_FROM, source="all")
-    try:  # the base is shown next to the lists; without its series the lists still go out
-        base = {d.isoformat(): v for d, v in base_mod.base_per_lot(root, "gross").items()}
-    except Exception:  # noqa: BLE001
-        base = {}
-    section = build(nxt, log["rows"], nxt.strftime("%a"), labels["dte_n"], labels["dte_s"], base)
-    try:
-        expected = expected_picks(nxt, root, labels["dte_n"], labels["dte_s"], today)
-    except Exception as error:  # noqa: BLE001 - the base rates still go out without the picks
-        print(
-            f"tomorrow: expected picks skipped ({type(error).__name__}: {str(error)[:200]})",
-            file=sys.stderr,
-        )
-        expected = None
-    return Tomorrow(**{**section.__dict__, "expected": expected})
-
-
-def render(t: Tomorrow) -> str:
-    from . import pick as pick_mod
-
-    lines = [
-        f"Tomorrow {t.day} ({t.weekday}): NIFTY {t.dte_n} / SENSEX {t.dte_s} weekdays to expiry"
-    ]
-    e = t.expected
-    if e is not None:
-        if e.expiry_only:
-            lines.append(pick_mod.expiry_rule_line(e.expiry_only))
-        lines.append("Expected picks if the conditions at the close stay the same:")
-        for key in LIST_KEYS:
-            core, buy = e.picks[key]
-            names = [f"{n} ({100 * e.likelihood[key].get(n, 0):.0f}%)" for n in [*core, *buy]]
-            lines.append(f"  {DISPLAY_NAMES[key]}: {', '.join(names)}")
-            extra = pick_mod.next_best_line((e.next_best or {}).get(key))
-            if extra:
-                lines.append(f"  {extra}")
-        shown = [sc for sc in e.scenarios if sc.probability >= MIN_SCENARIO][:3]
-        if shown:
-            lines.append("Probable changes if the opening conditions shift:")
-            for sc in shown:
-                grouped: dict[tuple, list[str]] = {}
-                for key in LIST_KEYS:
-                    added, dropped = sc.changes[key]
-                    if added or dropped:
-                        grouped.setdefault((tuple(added), tuple(dropped)), []).append(
-                            DISPLAY_NAMES[key]
-                        )
-                parts = [
-                    " and ".join(who)
-                    + " "
-                    + " ".join([*(f"+{n}" for n in a_), *(f"-{n}" for n in d_)])
-                    for (a_, d_), who in grouped.items()
-                ]
-                if not parts:  # only a list that is not shown would change
-                    continue
-                lines.append(f"  {sc.label} (~{100 * sc.probability:.0f}%): " + "; ".join(parts))
-        lines.append("The final picks are recorded at 09:16.")
-    inside = t.sessions - t.forward
-    lines.append(
-        f"History: {t.sessions} sessions, of which {t.forward} recorded forward and {inside} "
-        "re-scored from history (in-sample). Win rate and average ₹ per lot-day, gross."
+    expected = expected_picks(nxt, root, labels["dte_n"], labels["dte_s"], today, track)
+    if expected is None:
+        return None
+    key = LIST_KEYS[0]
+    core, buy = expected.picks[key]
+    return NextPicks(
+        nxt,
+        nxt.strftime("%a"),
+        list(core),
+        list(buy),
+        (expected.next_best or {}).get(key),
+        expected.expiry_only,
     )
-    for label, n, stats in t.rows:
-        flag = ", thin" if n < THIN_DAYS else ""
-        cells = "  ".join(
-            f"{DISPLAY_NAMES[k]} {100 * stats[k][0]:.0f}% {stats[k][1]:+,.0f}"
-            for k in LIST_KEYS
-            if k in stats
-        )
-        if BASE_KEY in stats:
-            cells += f"  Base {100 * stats[BASE_KEY][0]:.0f}% {stats[BASE_KEY][1]:+,.0f}"
-        lines.append(f"  {label} ({n}d{flag}): {cells}")
-    if t.recent:
-        cells = ", ".join(f"{DISPLAY_NAMES[k]} {100 * w:.0f}%" for k, w in t.recent.items())
-        lines.append(f"  Last {RECENT} sessions' win rate: {cells}")
-    lines.append(
-        "Historical frequency, not a forecast and not evidence of an edge over the base; the "
-        "opening conditions are not known yet."
-    )
-    return "\n".join(lines)

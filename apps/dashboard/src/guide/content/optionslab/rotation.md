@@ -13,6 +13,8 @@ variants)". It mixes five criteria; the numbers are the weights in percent. From
 2026, on a day when exactly one of NIFTY and SENSEX expires, Adaptive takes only that index's
 strategies: the same ranking with the other index left out, and a Buy add-on kept only when it is
 on the expiring index (the expiry rule; the 09:16 message says so in one line).
+The 09:16 Telegram message lists Adaptive's strategies with their settings, then the T1 testing track (not traded);
+the 16:00 message gives the day's result for both and tomorrow's strategies in full.
 
 | Name | Key | Own recent results | Weekday | Days to expiry | VIX | Family band |
 |---|---|---|---|---|---|---|

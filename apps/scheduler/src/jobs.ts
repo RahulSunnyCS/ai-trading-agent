@@ -188,17 +188,31 @@ const BASE_JOBS: Job[] = [
   {
     id: 'options-evening',
     description:
-      "The evening run: collect the day's 1-minute option data and run every leg-wise strategy (`obt daily`), store the rotation results (`obt rotation update`, BL-058), rebuild missing derived tables, then Telegram each strategy's net paper gain",
+      "The evening run: collect the day's 1-minute option data and run every leg-wise strategy (`obt daily`), store the rotation results (`obt rotation update`, BL-058), rebuild missing derived tables, then store the T1 track's results. The Telegram result is the next job's (`options-rotation-result`, 16:00)",
     schedule: { at: '15:45', on: tradingDays, label: 'trading days 15:45' },
     // One job, four steps in order: each needs the day the one before it collected, and the run
     // stops at the first failure. Every step is idempotent (obt daily skips data already
     // collected, a stored rotation variant-day is never rewritten, derived rebuilds only what is
-    // missing), so a retry re-runs the whole chain cheaply.
+    // missing), so a retry re-runs the whole chain cheaply. The T1 update (BL-125) is last, takes
+    // seconds, and is `--soft-fail`: a T1 problem Telegrams its own alert and exits 0, so it never
+    // fails this job (whose retries would re-run `obt daily` and resend its summary). The 16:00
+    // message then says T1 is not ready, and the 21:00 job is the catch-up.
     steps: [
       ['uv', 'run', '--directory', OPTIONS, 'obt', 'daily'],
       ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'update'],
       ['uv', 'run', '--directory', TRADING_DATA, 'tdata', 'derived', 'rebuild'],
-      ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'result'],
+      [
+        'uv',
+        'run',
+        '--directory',
+        OPTIONS,
+        'obt',
+        'rotation',
+        'update',
+        '--track',
+        't1',
+        '--soft-fail',
+      ],
     ],
     cwd: '.',
     timeoutMinutes: 90, // per step
@@ -209,17 +223,45 @@ const BASE_JOBS: Job[] = [
     catchUpHours: 7.25, // until 23:00
     group: 'catalog',
     fixHint:
-      'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt daily && uv run --directory packages/option-backtesting obt rotation update && uv run --directory packages/option-backtesting obt rotation result',
+      'Log in to Fyers, then run: uv run --directory packages/option-backtesting obt daily && uv run --directory packages/option-backtesting obt rotation update && uv run --directory packages/option-backtesting obt rotation update --track t1',
+  },
+  {
+    id: 'options-rotation-result',
+    description:
+      "Telegram the day's rotation result at 16:00 (BL-125): Adaptive's and the T1 track's one-lot net paper gain and tomorrow's strategies in full (`obt rotation result`). Retried every 5 minutes while the evening run's results are incomplete; sends what exists at 16:25, and the T1 part later if it was missing",
+    // The evening run (15:45) takes about 10 minutes and its last step (the T1 update) takes
+    // seconds, so 16:00 is normally enough. Not in the catalog group: it only reads the rotation
+    // journal and result files. An attempt that finds Adaptive (or, before 16:25, T1) incomplete
+    // exits 2 and is retried; when the retries run out the owner gets the scheduler's failure
+    // alert instead of silence. Sent markers make every retry safe (no double send).
+    schedule: { at: '16:00', on: tradingDays, label: 'trading days 16:00' },
+    steps: [
+      ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'result', '--wait-until', '16:25'],
+    ],
+    cwd: '.',
+    timeoutMinutes: 10,
+    retries: 7, // 16:00, 16:05 ... 16:35
+    retryDelayMinutes: 5,
+    // Catch-up covers a 16:00 slot missed while the laptop slept (until 22:00), not a failed run:
+    // when the evening run only succeeds on a late retry, the 21:00 job's `rotation result` step
+    // sends the message.
+    catchUpHours: 6,
+    fixHint:
+      'uv run --directory packages/option-backtesting obt rotation result  (the evening run must have stored the results first; add --force to resend)',
   },
   {
     id: 'options-rotation-t1-update',
     description:
-      "Store the T1 parallel track's results for the day (`obt rotation update --track t1`): its 223 extra variants only, in their own folder; the live results are never touched",
-    // After the evening run's last retry (20:15). Idempotent: it scores the newest collected day the
-    // track has not stored yet (every missing day, so a missed evening is filled the next time);
-    // the 09:16 job repeats it as a catch-up before the track pick.
+      "Catch-up for the T1 parallel track (`obt rotation update --track t1`): stores any day the evening run did not (its 223 extra variants only, in their own folder; the live results are never touched), then `obt rotation result` sends the T1 part of the day's result if it was not ready at 16:00",
+    // The evening run does this at about 15:55 now (BL-125); this is the net under it, after the
+    // last retry (20:15). Idempotent: it scores every Core-298 day the track lacks, and the result
+    // step is a no-op once everything has been sent (or sends the main message late if the 16:00
+    // job could not). The 09:16 job repeats the update as a catch-up before the track pick.
     schedule: { at: '21:00', on: tradingDays, label: 'trading days 21:00' },
-    steps: [['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'update', '--track', 't1']],
+    steps: [
+      ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'update', '--track', 't1'],
+      ['uv', 'run', '--directory', OPTIONS, 'obt', 'rotation', 'result'],
+    ],
     cwd: '.',
     timeoutMinutes: 20,
     retries: 2,
@@ -227,33 +269,29 @@ const BASE_JOBS: Job[] = [
     catchUpHours: 2.5, // until 23:30
     group: 'catalog',
     fixHint:
-      'uv run --directory packages/option-backtesting obt rotation update --track t1  (add --backfill to fill every missing day)',
+      'uv run --directory packages/option-backtesting obt rotation update --track t1  (add --backfill to fill every missing day), then obt rotation result',
   },
   {
     id: 'options-rotation-pick',
     description:
-      "Record the day's rotation picks (lists A, B, C, REF) before 09:17 and Telegram them (BL-058), then the T1 parallel track's Adaptive pick in its own journal (private Telegram, labelled T1 TRACK)",
-    // Needs the 09:15 VIX bar, which Fyers serves from 09:16, and yesterday's results (the nightly
+      "Record the day's rotation picks (lists A, B, C, REF) before 09:17 (BL-058) and the T1 parallel track's Adaptive pick in its own journal, and Telegram ONE message: Adaptive, then T1 labelled testing phase (BL-125). Adaptive is never held back by T1; the friends' group gets Adaptive alone",
+    // Needs the 09:15 VIX bar, which Fyers serves from 09:16, and yesterday's results (the evening
     // job above). A late entry is flagged (before_first_entry: false), never silently accepted,
     // and a missed slot is not caught up: it would not be forward.
     schedule: { at: '09:16', on: tradingDays, label: 'trading days 09:16' },
-    // The live pick first, always: a failed track step retries the job, and the live step then
-    // answers "already recorded" (exit 0) without writing anything.
-    // Then the track: a catch-up update first (fills any day the 21:00 job missed; usually a no-op),
-    // and its pick, which refuses rather than rank on fewer days than the live list.
-    steps: [
-      ['uv', 'run', 'obt', 'rotation', 'pick'],
-      ['uv', 'run', 'obt', 'rotation', 'update', '--track', 't1'],
-      ['uv', 'run', 'obt', 'rotation', 'pick', '--track', 't1'],
-    ],
+    // One step: the live pick first, then the track in the same process, so one message can carry
+    // both. A failed track step still alerts and fails the run (exit 2), and the retry finds the
+    // live entry already recorded and only completes the track (its own message). The command
+    // stores any missing T1 results itself when that is why the track cannot be ranked.
+    steps: [['uv', 'run', 'obt', 'rotation', 'pick', '--with-t1']],
     cwd: OPTIONS,
-    timeoutMinutes: 3,
+    timeoutMinutes: 5,
     retries: 2,
     retryDelayMinutes: 1,
     catchUpHours: 0,
     alertsItself: true,
     fixHint:
-      'cd packages/option-backtesting && uv run obt rotation pick, then uv run obt rotation pick --track t1  (a late entry is flagged, not forward)',
+      'cd packages/option-backtesting && uv run obt rotation pick --with-t1  (a late entry is flagged, not forward)',
   },
   {
     id: 'backup',

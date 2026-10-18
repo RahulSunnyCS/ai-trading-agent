@@ -137,30 +137,30 @@ Otherwise:
   `load_dotenv()` would otherwise pick up the real bot token from the repo `.env`.
   `send(..., chat_id=...)` supports an explicit destination for the rotation pick's group copy;
   its environment configuration lives in the root `technical.md`.
-  Rotation messages use `rotation/list_names.json` (also imported by the dashboard) for
-  display names, add a separate "Next best, optional: Widesl …; Dir …" line under the picks (the best-ranked
-  unpicked variant of each kind; message text only, not stored in the journal entry), and omit Baseline and VIX from the picks and result text (the Tomorrow header shows days to
-  expiry); the journal still stores all of them.
-  `rotation/result.py` reads the completed picked variants' net results (after estimated costs),
-  reports one lot per strategy with every picked strategy's contribution under its section, and
-  sends Adaptive only after the evening pipeline finishes (Steady, Calendar and the baseline are recorded in the journal but not sent; `lists.PUBLIC_KEYS`) (normally around 16:00).
-  A per-entry marker prevents a retry from sending it twice;
-  `obt rotation result --force` explicitly resends it.
+  Rotation messages (BL-125) are plain text (`Notification(plain=True)`: no icon or source line) built by pure functions
+  in `rotation/messages.py`; strategy names come from `rotation/labels.py` (`label(name)` -> head `N_widesl_OTM1` +
+  params `SL115% · TSL15%/10% · REnone · MTMSL2500`, read from the variant's own YAML; an id with no file is shown
+  raw, never an error) and `rotation/list_names.json` (also imported by the dashboard) for list names. `rotation/deliver.py`
+  decides when they go: `pick_and_send` (the 09:16 job: Adaptive recorded first and sent to the friends' group at once,
+  T1 right after reusing its VIX read; the owner's message carries both if T1 is in by `t1_deadline` (09:16:50 IST, or
+  20 s after Adaptive's entry), else Adaptive alone and T1 follows; a dry run writes nothing, not even the T1 catch-up)
+  and `send_result` (the evening message, under `result.sending_lock`, a per-day `flock`; any error reading T1 degrades
+  to `T1 · result not ready` and never stops Adaptive's result). Nothing in them touches a pick, a score, a hash or a journal field.
+  `rotation/result.py` reads the completed picked variants' net results (after estimated costs) for the live list or
+  `track="t1"`, one lot per strategy (`NoEntry` = never picked, `NotScored` = results still coming). Sent markers are per
+  destination and piece (`.sent` owner, `.group.sent`, `.t1.sent`; a pre-BL-125 `.sent`, recognised by its text, still
+  covers owner + group), so a retry never double-sends and a late T1 result still follows as its own message; `obt rotation result --force` resends.
   Days to expiry in the rotation are **weekdays** (Monday to Friday dates after the session up to the expiry;
   holidays are not excluded; BL-109, 2026-10-15): `rotation/dte.py` holds the count, `live.py` builds the live
   labels with it, and the stored `days.csv` and the journal entries recorded before the change keep calendar
   days as written and are converted on read (`store.read_days`, `dte.entry_labels`), so nothing is rewritten.
   New entries carry `dte_basis: weekdays`. The Options Lab anatomy `dte` and the YAML engine's `days_to_expiry`
   stay calendar days.
-  `rotation/tomorrow.py` appends a "Tomorrow" section to that message (`--no-tomorrow` drops it; a failure in
-  it never blocks the result, and it is skipped when the result was already sent): the expected picks for the
-  next session (the 09:16 ranking re-run on the stored results with tonight's VIX close standing in for the
-  open, a chance for each pick across the plausible opening bands, and the likely changes), then the win rate
-  and mean per-lot-day gross of Adaptive and the fixed base on all days, the same weekday and the same
-  NIFTY/SENSEX days to expiry (daylog, since 2025-01-10; late recordings and days missing a list are left
-  out; thin samples flagged). The rows are fixed in advance and never chosen by their results. Most of those
-  days were re-scored from history, so they are in-sample: the message says how many were recorded forward.
-  A historical frequency, not a forecast and not evidence of an edge over the base.
+  `rotation/tomorrow.py` supplies the evening message's "tomorrow" part (`--no-tomorrow` drops it; a failure in it never
+  blocks the result): `next_session_picks(today, root, track=)` is the 09:16 ranking re-run on the stored results with
+  tonight's VIX close standing in for the open, under the BL-122 rule for that session, for Core-298 or Core-298 plus a
+  track's variants; the message lists those strategies in full. The old history tables, probabilities and likely changes
+  are no longer sent (`build`/`Tomorrow` are kept, tested, unused by the message).
 - `api/legwise_routes.py` — `/legwise/*` on `obt-api` for the dashboard's Options Lab: `/day` and `/anatomy` (see above; `/anatomy` also overlays apps/server's T-33 `daily_regime_tags` as `t33` when `DATABASE_URL` is set in this process, with an explicit status), list/
   validate/save strategies (slug-checked name, `yaml.safe_dump` of the validated model — never
   raw client text), ad-hoc backtest over collected days, saved results, data/token status, and

@@ -52,11 +52,9 @@ def test_calculates_net_two_lot_gain_and_omits_baseline(tmp_path):
     assert got.strategies["C"]
     assert got.entry_hash == entry["hash"]
     text = result.render(got)
-    assert "Paper result 2026-10-13 (Tue)" in text
-    assert "Net after estimated costs · 1 lot per strategy" in text
-    assert "Adaptive: +₹20" in text
+    assert text.startswith("📊 Tue 13 Oct · result\n1 lot per strategy, after costs")
+    assert "🎯 Adaptive   +₹20" in text
     assert "Steady" not in text and "Calendar" not in text
-    assert "  • a:" not in text  # Steady's strategies are recorded, not sent
     assert "Baseline" not in text and "REF" not in text
 
 
@@ -64,12 +62,12 @@ def test_waits_until_every_picked_strategy_is_scored(tmp_path):
     _entry(tmp_path)
     _write(tmp_path, {"a": 100, "b": -20, "c": 30, "d": 50})
 
-    with pytest.raises(result.ResultUnavailable, match="1 picked strategies missing"):
+    with pytest.raises(result.NotScored, match="1 picked strategies missing"):
         result.calculate(DAY, tmp_path)
 
 
 def test_requires_a_morning_entry(tmp_path):
-    with pytest.raises(result.ResultUnavailable, match="no rotation picks"):
+    with pytest.raises(result.NoEntry, match="no rotation picks"):
         result.calculate(DAY, tmp_path)
 
 
