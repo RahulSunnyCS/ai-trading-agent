@@ -74,6 +74,24 @@ const BASE_JOBS: Job[] = [
     fixHint: 'Start "Daily broker login" by hand from GitHub Actions',
   },
   {
+    // ONE Angel One SmartAPI login (nothing fetched): is the evening run's fallback source ready?
+    // The same guarded check as the Broker logins card's Test connection: it waits out a test in
+    // flight or the 60 s cool-down rather than fail, and its retry (5 minutes later, past its
+    // own cool-down) is for a network blip; a login Angel One refused is never sent again by the
+    // retry (`--scheduled`), since each wrong attempt counts toward a lockout.
+    id: 'angel-login-check',
+    description: 'Angel One: one SmartAPI login, to check the fallback data source works',
+    schedule: { at: '08:00', on: tradingDays, label: 'trading days 08:00' },
+    steps: [['uv', 'run', 'obt', 'angel', 'test', '--scheduled']],
+    cwd: OPTIONS,
+    timeoutMinutes: 8,
+    retries: 1,
+    retryDelayMinutes: 5,
+    catchUpHours: 70 / 60, // until 09:10
+    fixHint:
+      'Check the ANGELONE_* settings in .env, then Broker logins › Angel One › Test connection (or: cd packages/option-backtesting && uv run obt angel test)',
+  },
+  {
     // BL-051 Phase 3: the headline's orders before the close. With a signal delay of 1 the
     // decision is already fixed by last Friday's ranks, so they can be placed at 14:15.
     id: 'momentum-orders',

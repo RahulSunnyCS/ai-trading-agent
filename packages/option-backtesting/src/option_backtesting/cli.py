@@ -438,6 +438,40 @@ def angel_status() -> None:
     typer.echo(f"credentials: ok for client {creds.client_code}")
 
 
+@angel_app.command("test")
+def angel_test(
+    scheduled: bool = typer.Option(
+        False,
+        "--scheduled",
+        help="Run as the 08:00 scheduler job: wait out a check in flight or the cool-down "
+        "instead of refusing, and never repeat a login refused in the last 15 minutes.",
+    ),
+) -> None:
+    """ONE Angel One SmartAPI login, to check the fallback data source works (nothing fetched,
+    the session dropped). Shares the dashboard's Test connection guard (one at a time, a 60 s
+    cool-down) and records the result it shows. Exit 0 = logged in, 1 = failed or not retried,
+    3 = refused by the guard (manual runs only)."""
+    from .angelone.check import CheckRefused, run_check
+
+    try:
+        result = run_check("scheduled" if scheduled else "manual", wait=scheduled)
+    except CheckRefused as refused:
+        typer.echo(f"Angel One login not attempted: {refused}")
+        raise typer.Exit(1 if refused.kind == "rejected_recently" else 3) from None
+    except (OSError, RuntimeError) as error:
+        typer.echo(f"Angel One login not attempted: {error}")
+        raise typer.Exit(1) from None
+    took = f"{result.duration_ms / 1000:.1f} s"
+    who = f" as {result.client}" if result.client else ""
+    if result.ok:
+        typer.echo(f"Angel One login: ok{who} at {result.checked_at} ({took})")
+        return
+    typer.echo(
+        f"Angel One login failed ({result.reason}){who} at {result.checked_at}: {result.message}"
+    )
+    raise typer.Exit(1)
+
+
 @angel_app.command("fetch")
 def angel_fetch(
     day: str = typer.Option(date.today().isoformat(), "--date", help="Trading day, YYYY-MM-DD."),

@@ -1,7 +1,8 @@
 ## What it is for
 
 The dashboard reads market data from **Fyers**. Fyers requires a fresh login every day; this
-screen shows whether today's login is valid and lets you log in by hand.
+screen shows whether today's login is valid and lets you log in by hand. Below it, the
+**Angel One** card shows whether the fallback data source can log in.
 
 ## Why it expires every day
 
@@ -30,12 +31,37 @@ contract that is still listed.
 **Log in again** opens Fyers' own login page in a new tab. The token is stored encrypted on the
 server; the browser never sees it.
 
+## Angel One connection
+
+Angel One has no login page to visit: the server logs in by itself with the Angel One settings in
+its `.env` (API key, client code, PIN and TOTP seed). The card shows whether that works.
+
+| What you see | Meaning |
+|---|---|
+| Not configured | One or more of the four required settings is missing; the card names which. `ANGELONE_PUBLIC_IP` is optional. Values are never shown, only whether each is set. |
+| Not tested yet | Configured, but no check has been recorded. |
+| Login works | The last check logged in. The client code is shown masked (`R1•••56`). |
+| Last check failed | The last check did not log in. The line under it says why: **Login refused** (Angel One rejected the client code, PIN or TOTP), **Could not reach Angel One** (network), **Angel One unavailable** (their server error), or **Login error**. |
+
+**Last check** is the newest of the automatic check (the `angel-login-check` job, 08:00 on
+trading days, see [Jobs](app:/jobs)) and your own **Test connection**, with the time and how long
+the login took. **Last collection from Angel One** is the last day the evening run actually
+collected from it.
+
+**Test connection** makes one login now. Nothing is fetched or traded, and the session is thrown
+away at once. Angel One limits logins and locks an account after repeated wrong attempts, so
+only one test runs at a time and there is a one-minute wait after each login (the button counts
+it down). The 08:00 check shares the same limit: if you test just before 08:00, it waits rather
+than fails. A failed 08:00 check sends a Telegram alert; a refused login is not retried
+automatically, so fix the setting and use Test connection.
+
 ## AlgoTest logins
 
 The broker accounts (Angel One, Finvasia) are logged into [AlgoTest](glossary:algotest) by the
-08:00 `broker-login` job, not from this screen. See [Jobs](app:/jobs).
+08:00 `broker-login` job, not from this screen. See [Jobs](app:/jobs). The Angel One card above
+checks this tool's own data login, not AlgoTest's.
 
 ## Common questions
 
 **Is Fyers used for trading?** No. This tool uses Fyers for market data only and places no
-orders.
+orders. The same goes for Angel One: its login here only reads 1-minute data.

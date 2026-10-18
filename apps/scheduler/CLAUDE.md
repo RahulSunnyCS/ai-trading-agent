@@ -67,6 +67,14 @@ network or disk so the test needs neither. One group per file keeps parallel PRs
 - `group: 'catalog'` is for anything that writes the DuckDB catalog (`TRADING_DATA_ROOT`).
 - `broker-login` has `retries: 0` on purpose: `dispatch.ts` retries itself and must never
   dispatch the GitHub workflow twice.
+- `angel-login-check` (trading days 08:00) runs `obt angel test --scheduled`: one Angel One
+  SmartAPI login through the same guard as the dashboard's Test connection (one at a time, 60 s
+  cool-down). Its single retry is 5 minutes later, past its own cool-down, and the CLI never
+  re-sends a login Angel One refused in the last 15 minutes, so the retry only helps a network
+  blip. The scheduler sends the failure alert (the job does not alert itself).
+- The scheduler reads `jobs.ts` once at start: a new or changed job needs a restart of the
+  service (`launchctl kickstart -k gui/$(id -u)/com.ai-trading-agent.scheduler`, see
+  `deploy/launchd/README.md`).
 
 ## Commands
 

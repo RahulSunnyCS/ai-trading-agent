@@ -40,6 +40,10 @@ class AngelNetworkError(AngelCredentialsError):
     as a connection problem, not as a login to fix."""
 
 
+class AngelUnavailableError(AngelNetworkError):
+    """Angel One answered with a server error (HTTP 5xx): reached, but not serving logins."""
+
+
 @dataclass(frozen=True)
 class AngelCredentials:
     client_code: str
@@ -148,7 +152,7 @@ def login(
         if status == 0:
             raise AngelNetworkError(f"Angel One could not be reached: {detail}")
         if status >= 500:
-            raise AngelNetworkError(f"Angel One is unavailable (HTTP {status}): {detail}")
+            raise AngelUnavailableError(f"Angel One is unavailable (HTTP {status}): {detail}")
         raise AngelCredentialsError(f"Angel One login failed: {code} {detail}".strip())
     return Session(jwt=jwt, api_key=creds.api_key, public_ip=creds.public_ip)
 
