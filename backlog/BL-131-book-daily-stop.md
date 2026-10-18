@@ -1,9 +1,9 @@
-# BL-131 — A daily stop of ₹10,000 or ₹12,000 on each 3-lot book (Core-298 and T1)
+# BL-131 — A daily stop of ₹6,000 to ₹12,000 on each 3-lot book (Core-298 and T1)
 
 | | |
 |---|---|
 | **Priority** | P2 — the owner trades both books with real money (3 lots each) |
-| **Status** | Done — informative: a book stop trims the worst day but adds no money; tight stops cost T1; ₹9k+ never binds on Core |
+| **Status** | Done — informative: no level clearly changes the result; a book stop trims the worst day; ₹9k+ never binds on Core |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -60,7 +60,7 @@ Say what each stop would have done to each book and to the two together, against
 ### Phase 1 — Run
 
 - **Tasks:** `packages/option-backtesting/research/bl131/book_stop.py`; results JSON committed; Log entry.
-- **Done when:** the Log has the read-out for both books, both windows and both levels.
+- **Done when:** the Log has the read-out for both books, both windows and every registered level.
 
 ## Log
 
@@ -104,3 +104,23 @@ Say what each stop would have done to each book and to the two together, against
   worst day: T1's −13.8k becomes about −9k at ₹6k–9k, and both books' −22.8k becomes −14.8k to −19.8k; the maximum
   drawdown, a run of ordinary losing days, mostly does not improve. Weaknesses: in-sample, gross (a stop can only
   lower charges), T1's window overlaps its selection year, fills at the stop minute's close (no slippage).
+- 2026-10-18 — **Review corrections (Opus, PR #252; no number changes).** The reading above is superseded where it
+  differs:
+  - "Protective" also holds for **Core ₹8k on the last year** (drawdown −30,858 vs −31,486, worst day −8,843 vs
+    −9,919), which the list above left out.
+  - The two directions are read the same way: **no level clearly adds or costs money** in either book. Every Core
+    point estimate at ₹6k–8k is ≥ 0 and T1's at ₹6k–7k are < 0, but every interval except one (Core, last year, ₹7k,
+    chance-level) includes zero, so "tight stops cost T1" is a tendency, not a finding.
+  - Mechanism: Core's per-pick stops are ₹2,000 (48 variants), ₹2,500 (150) and ₹3,000 (100), and one-lot losses
+    overshoot them to about −₹4,700, so three picks cap the book near −₹9k to −₹10.5k; that is why ₹9k+ never changes
+    Core's result.
+  - "Two years" means 2025-01-10 → 2026-10-16 (about 21 months), as registered.
+  - Both books, last year (244 days; no stop +3,493/day, drawdown −44,957, worst day −22,802): ₹6k +3,401 / −40,451 /
+    −14,820; ₹7k +3,494 / −43,753 / −17,248; ₹8k +3,524 / −46,777 / −17,248; ₹9k +3,513 / −48,460 / −19,838; ₹10k
+    +3,497 and ₹12k +3,493 / −44,957 / −22,802.
+- 2026-10-18 — **Owner's combination, descriptive (after the results were read):** Core ₹6k + T1 ₹9k on the 6-lot book.
+  Two years: +3,117/day vs +3,102, change +15 [−69, +101], max drawdown −47,898 vs −44,957, worst five days −17.5k to
+  −16.0k vs −22.8k to −18.4k. Last year: +3,537 vs +3,493, +44 [−27, +118]. Chosen after seeing the table, so this is
+  a description of that choice, not a test of it.
+- Code note: `research/bl131/results/paths.pkl` is keyed by (day, variant) only; delete it before re-running after any
+  change to a strategy file, the data or the engine.

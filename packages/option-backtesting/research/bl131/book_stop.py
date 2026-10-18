@@ -1,4 +1,4 @@
-"""BL-131: a daily ₹10,000 / ₹12,000 stop on each 3-lot book (Core-298 and T1).
+"""BL-131: a daily ₹6,000-₹12,000 stop on each 3-lot book (Core-298 and T1).
 
 As registered in backlog/BL-131 (descriptive, in-sample). Reads the live store only; replayed paths are
 cached under research/bl131/results/ (git-ignored).
@@ -23,7 +23,7 @@ from option_backtesting.rotation.readout import block_bootstrap_mean, max_drawdo
 from option_backtesting.rotation.variants import track_names, variant_names
 
 HERE = Path(__file__).parent
-CACHE = HERE / "results" / "paths.pkl"
+CACHE = HERE / "results" / "paths.pkl"  # keyed (day, variant) only: delete after any strategy/data/engine change
 WINDOWS = {
     "two_years": (date(2025, 1, 10), date(2026, 10, 16)),
     "last_year": (date(2025, 10, 9), date(2026, 10, 16)),
