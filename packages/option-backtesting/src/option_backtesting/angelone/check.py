@@ -225,6 +225,15 @@ def _hold(state: dict, env: Mapping[str, str], now: float) -> tuple[float, str] 
     )
 
 
+def refusal_hold(
+    root: Path | None = None, env: Mapping[str, str] | None = None, now: Clock = time.time
+) -> str | None:
+    """The hold message while a refused login must not be repeated with the current settings,
+    else None. For a caller that logs in outside the lock (the 09:16 VIX fallback): it never
+    waits, it only skips."""
+    return (_hold(_read_state(root or data_dir()), _env(env), now()) or (None, None))[1]
+
+
 # --- the lock -------------------------------------------------------------------------------
 
 
