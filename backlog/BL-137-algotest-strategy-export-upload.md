@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner places 3 Core + 3 T1 picks a day by hand with real money; retyping six strategies before 09:17 is where a wrong SL or strike slips in |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | feature |
 | **Area** | options (exporter), broker-login (uploader) |
 | **Created** | 2026-10-19 |
 | **Depends on** | BL-058 (journal), BL-113 (T1 track), BL-122 (expiry-only rule); none blocking |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | §3.30 |
 
 ## Context
 
@@ -61,21 +61,22 @@ was probably edited after export, so the name is no evidence of the time.
 ### Phase 1 — Exporter (in-repo, no network)
 
 - **Tasks:**
-  - `legwise/algotest.py`: `to_algtst(spec) -> dict`, a pure function. Fields mapped (from the owner's
+  - `legwise/algtst.py` (`legwise/algotest.py` is BL-009's trade-log comparison): `to_algtst(spec) -> dict`, a pure function. Fields mapped (from the owner's
     sample and the 2026-10-19 files):
 
-    | Legwise YAML | `.algtst` |
+    | Legwise YAML | `.algtst` (each read off an AlgoTest export, `tests/fixtures/algtst/`) |
     |---|---|
     | `underlying` | `Ticker` |
     | `entry_time` / `exit_time` | `EntryIndicators` / `ExitIndicators` → `TimeIndicator {Hour, Minute}` |
-    | `square_off: partial / complete` | `SquareOffAllLegs: "False" / "True"` |
-    | leg `position`, `option_type`, `expiry` | `PositionType.Sell/Buy`, `LegType.CE/PE`, `ExpiryType.Weekly/Monthly` |
+    | `square_off: partial` | `SquareOffAllLegs: "False"` |
+    | leg `position`, `option_type`, `expiry: weekly` | `PositionType.Sell/Buy`, `LegType.CE/PE`, `ExpiryType.Weekly` |
     | `strike.strike_type: X` | `EntryType.EntryByStrikeType`, `StrikeParameter: "StrikeType.X"` |
-    | `strike.closest_premium: P` | `EntryType.EntryByPremium`, `StrikeParameter: {Type: PremiumType.ClosestPremium, Value: P}` |
+    | `strike.closest_premium: P` | `EntryType.EntryByPremium`, `StrikeParameter: P` (a bare number) |
     | `stop_loss.percent` | `LegStopLoss {Type: LegTgtSLType.Percentage}` |
-    | `trail_sl.percent: [a, b]` | `LegTrailSL {Type: TrailStopLossType.Percentage, Value: {InstrumentMove: a, StopLossMove: b}}` |
-    | `reentry_on_sl {mode: cost, count: n}` | `LegReentrySL {Type: ReentryType.ReentryCost, Value: {Count: n}}` |
-    | `lots` | `LotConfig {Type: LotType.Quantity, Value: lots}` (unit to confirm, Q4) |
+    | `trail_sl.percent / points: [a, b]` | `LegTrailSL {Type: TrailStopLossType.Percentage / Points, Value: {InstrumentMove: a, StopLossMove: b}}` |
+    | `reentry_on_sl {mode: cost, count: n}` | `LegReentrySL {Type: ReentryType.AtCost, Value: {ReentryCount: n}}` |
+    | `range_breakout {until, side: high, source: instrument}` | `LegMomentum {Type: MomentumType.DelayedBreadthHigh, Time: minutes from entry to until, Value: {Type: None, Value: 0}}` |
+    | `lots` | `LotConfig {Type: LotType.Quantity, Value: lots}` (1 lot entered in the builder exports as 1) |
     | `overall.stop_loss_inr` | `OverallSL {Type: OverallTgtSLType.MTM}` |
 
     The constants are copied from the sample: `version 0.8`, `TakeUnderlyingFromCashOrNot "True"`,
@@ -197,16 +198,17 @@ entry, so the strategies must already be in AlgoTest the evening before.
 
 1. ~~Library or daily?~~ **Answered 2026-10-19:** daily. After the evening message, delete the strategies
    from the evening before and upload the predicted picks. At 09:16, add only the picks that changed.
-2. **Route:** HTTP if the spike finds a plain save call, else Playwright. Any objection to an
-   undocumented AlgoTest endpoint?
-3. **Naming:** variant id alone (`N_p150-t1s11_0917`), or with a prefix or date?
+2. ~~Route?~~ **Answered 2026-10-19:** HTTP if the spike finds a plain save call, Playwright otherwise.
+3. ~~Naming?~~ **Answered 2026-10-19:** a book prefix plus the variant id (`T1 · N_p150-t1s11_0917`, later
+   `Core · N_wide_1117`). If AlgoTest refuses `·` the spike picks the nearest allowed separator.
 4. **`LotConfig` `LotType.Quantity` `Value: 1`:** is that 1 lot or a quantity of 1? (Check in the UI
    during Phase 2.)
 5. **`WeeklyOldRegime: true` and `template: Straddle920`:** keep them as in the sample? What does
    `WeeklyOldRegime` change?
-6. **Buy add-on:** export and upload it on the days it is picked, or leave it out as the lot plans do
-   (BL-135)?
-7. **Core list too, or T1 only** at first?
+6. ~~Buy add-on?~~ **Answered 2026-10-19:** upload it on the days it is picked, labelled as the add-on.
+   The owner decides whether to deploy it.
+7. ~~Core too?~~ **Answered 2026-10-19:** T1 only first; Core once the cycle has run clean (Phase 4's five
+   days). The exporter supports both from Phase 1.
 8. ~~A pick that dropped out at 09:16?~~ **Answered 2026-10-19:** leave it until the evening delete. The
    09:16 message's AlgoTest line names the picks that dropped out, so it is clear which ones not to deploy.
 
@@ -219,3 +221,18 @@ entry, so the strategies must already be in AlgoTest the evening before.
   limited to the ones this tool uploaded (ledger + prefix). The evening step follows the result message,
   not a fixed 16:00, so a late-data evening still uploads. Q8 added.
 - 2026-10-19 — Q8 answered: picks that dropped out stay until the evening delete; the 09:16 line names them.
+- 2026-10-19 — started. Answers: T1 only first, name `T1 · <variant>`, Buy add-on uploaded, HTTP route if
+  possible. Q4 / Q5 (lot unit, `WeeklyOldRegime`) are settled by observation in Phase 2. Claude will not type
+  the AlgoTest password itself: the owner runs the Phase 2 login, and from Phase 3 the owner's scheduled code
+  logs in from `.env` as the 08:00 job does. TODO §3.30 added; Phase 1 begun.
+
+- 2026-10-19 — Phase 1 built: `legwise/algtst.py`, `rotation/algtst_export.py`, `obt rotation
+  algotest-export [--day] [--book t1|core] [--preview] [--variants] [--out]`. The owner built three
+  strategies by hand in AlgoTest and exported them, settling every inferred mapping. Three guesses
+  (also in the 224 files made outside the repo on 2026-10-19, which are therefore wrong) were
+  corrected: a closest premium is a bare number in `StrikeParameter`; re-entry at cost is
+  `ReentryType.AtCost` with `ReentryCount`; a range breakout is AlgoTest's momentum setting
+  `MomentumType.DelayedBreadthHigh` with `Time` in minutes, not a `LegRangeBreakout` key. Buy legs and
+  a trail in points were guessed right. The four exports are the test fixtures; all 521 Core-298 and T1
+  files export. Not yet known: how AlgoTest encodes a range on the index (`source: underlying`) or
+  side low, so both are refused.

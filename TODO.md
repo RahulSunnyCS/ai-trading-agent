@@ -706,6 +706,20 @@ never open a new position in an ETF too far above its NAV; the research decides 
 | 3.29.2 | Phase 1b: the same gate on Broad and Custom Index atomics (Nasdaq 100, Hang Seng), on the Broad engine decision and the 14:15 orders; until then the followed Broad headline still buys MON100 at any premium | claude | Planned, next |
 | 3.29.3 | Phase 2: rebuild the premium history on matching units (MON100 from 2016, not 2021), run the pre-registered arms A–D, apply the pass / kill rule, findings page, keep or zero the limits | claude | Planned; Phase 0 committed with the item |
 
+### 3.30 Rotation picks to AlgoTest — [BL-137](backlog/BL-137-algotest-strategy-export-upload.md)
+
+Owner (2026-10-19): the picks are typed into AlgoTest by hand each morning; export them to `.algtst` and upload
+them. Every evening after the result message, delete what the tool uploaded and upload tomorrow's predicted picks; at
+09:16 add any pick that changed. T1 first. Nothing is ever deployed by the tool.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.30.1 | Phase 1: `legwise/algtst.py` + `obt rotation algotest-export`: YAML → `.algtst`, unmapped settings refused | claude | **Built 2026-10-19.** Every mapping read off four AlgoTest exports (the test fixtures); three earlier guesses corrected; all 521 Core-298 and T1 files export |
+| 3.30.2 | Phase 2: spike with the owner — how AlgoTest saves, lists, reads back and deletes an imported strategy; HTTP or Playwright | owner + claude | Planned; the owner runs the login (its password is never typed by Claude) |
+| 3.30.3 | Phase 3: uploader in `packages/broker-login` (dry run by default, ledger, read-back, delete only its own) | claude | Planned |
+| 3.30.4 | Phase 4: evening replace + 09:16 top-up in the scheduler; one line in the 09:16 message | claude | Planned |
+| 3.30.5 | Phase 5: compare the first week's AlgoTest trades with the files | claude | Planned |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |
