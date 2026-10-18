@@ -31,6 +31,7 @@ most 10% lower than with no stop.
 | BL-066 | trailing ₹12k / ₹16k / ₹20k, and trailing only after +₹5k | same | **No level passes**; ₹12k trail best-case drawdown −20.5% | [BL-066][bl066] |
 | BL-095 | ₹10,000 on lists A / B / C / REF (a feature, not a test) | reconstructed list-days, gross, in-sample | First looks only (below) | [BL-095][bl095] |
 | BL-131 | ₹6k, 7k, 8k, 9k, 10k, 12k on each 3-lot book: Core-298 and T1 Adaptive (one lot per pick) | 2025-01-10 → 2026-10-16 (428 days) and the last year, gross, minute replay | **No level clearly changes the result** (24 cells, one interval above zero, chance-level; Core point estimates ≥ 0, T1 at ₹6k–7k < 0); ₹9k+ never binds on Core; trims the worst day (T1 −13.8k → ~−9k), maximum drawdown mostly unchanged | [BL-131][bl131] |
+| BL-132 | Stop = the 85 / 90 / 93 / 95th percentile of each 3-lot book's day low, set on 2025-01 → 2025-10, checked on the next year | Core-298 and T1 Adaptive, gross, minute replay | Levels ₹6.5k–9.5k; in the calmer test year hit 2–10 points less often than targeted (none "holds"); protective at P90–95, no clear money effect. Whole-period (in-sample) P95 ≈ ₹8,500, P90 ≈ ₹7,000 for both books | [BL-132][bl132] |
 
 ## What we know
 
@@ -66,3 +67,4 @@ most 10% lower than with no stop.
 [bl070]: ../../../backlog/BL-070-drb-without-per-strategy-stops.md
 [bl095]: ../../../backlog/BL-095-portfolio-mtm-stop-in-rotation.md
 [bl131]: ../../../backlog/BL-131-book-daily-stop.md
+[bl132]: ../../../backlog/BL-132-mtm-stop-from-day-lows.md
