@@ -83,6 +83,9 @@ export function RotationMatrixControls({
   periodExtras?: ReactNode;
 }) {
   const tags = Array.from(new Set((meta?.families ?? []).map((x) => x.family)));
+  /** A track's setting ("ditm1-t1s36") has no short name: its API label says what it is. */
+  const tagLabel = (t: string) =>
+    FAMILY_NAME[t] ?? meta?.families.find((x) => x.family === t)?.label ?? t;
   const compareOk = canCompare(f.view);
   const strategySelect = (
     <Field label="Strategy kind">
@@ -205,7 +208,7 @@ export function RotationMatrixControls({
               <option value="dirs">Dir (ATM and ITM1)</option>
               {tags.map((t) => (
                 <option key={t} value={t}>
-                  {FAMILY_NAME[t] ?? t}
+                  {tagLabel(t)}
                 </option>
               ))}
             </Select>

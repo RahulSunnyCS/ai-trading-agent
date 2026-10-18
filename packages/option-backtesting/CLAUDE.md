@@ -243,7 +243,11 @@ Otherwise:
   `pulse`; metrics `avg` / `win_rate` / `stop_rate` / `worst` / `selection`; periods P1, P2, P3 (returned as
   `unavailable`: not in the store), `forward`, `custom`; `compare=P1,P2` returns both grids on one scale plus the
   difference) and `GET /legwise/rotation/matrix/cell` (daily values, running total, pooled variants with their
-  settings). Reads `rotation/results/*.csv`, `days.csv` and the journal and writes nothing. Gross per ONE-lot
+  settings). Reads `rotation/results/*.csv`, `days.csv` and the journal and writes nothing. `universe=t1` (both
+  routes; default `core`) adds the T1 track's extra settings from `rotation/track_t1/results/` as their own rows
+  (after their Core kind, labelled "… · T1 #36, SL 20%", with an in-sample note for their BL-113 selection window);
+  the `widesl` / `dirs` aliases then take them too (`Filters.groups`), the overlay stays the live journal's, and
+  `universe=core` (and the pulse) never read them. One cached cube per universe. Gross per ONE-lot
   strategy-day, pooled as mean / rate / worst, never summed; `n` is distinct sessions, a cell under `min_n`
   (default 20) is flagged `thin`, never hidden; a missing value is `missing` / `excluded` / `na`, never zero.
   The selection overlay is journal entries only (late entries excluded from selection statistics); picks are never
