@@ -47,6 +47,16 @@ Say what each stop would have done to each book and to the two together, against
   order only (the first minute at or below the level).
 - **Will not run:** other levels, trailing or profit locks, a stop on the combined 6-lot book.
 
+### Phase 0 — Amendment 1 (2026-10-18, before any result was read)
+
+- Owner (2026-10-18), while the first run was replaying paths and before any figure had been printed or read: "then
+  lets look from 6k, 7k, 8k, 9k also in T1 and core". Levels become **₹6,000, ₹7,000, ₹8,000, ₹9,000, ₹10,000 and
+  ₹12,000** per book per day; everything else as above. The "Will not run: other levels" line is superseded for these
+  four levels only.
+- **Selection caveat, registered now:** with six levels read on the same days, the best-looking one is partly picked
+  by chance. Every level is reported; none is called "best" from these in-sample figures. A level the owner wants to
+  use is a judgement on the whole table (cost, protection, how often it fires), to be checked forward.
+
 ### Phase 1 — Run
 
 - **Tasks:** `packages/option-backtesting/research/bl131/book_stop.py`; results JSON committed; Log entry.
@@ -55,3 +65,4 @@ Say what each stop would have done to each book and to the two together, against
 ## Log
 
 - 2026-10-18 — Created; Phase 0 registered before any run (owner chose the levels and per-book stops).
+- 2026-10-18 — Amendment 1 committed before any result was read: levels 6k–9k added at the owner's request.
