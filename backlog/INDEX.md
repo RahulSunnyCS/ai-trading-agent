@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-18
+Last updated: 2026-10-19
 
 ## Open
 
@@ -46,6 +46,8 @@ Sorted by priority (P0 first), then ID.
 | [BL-125](BL-125-rotation-telegram-v2.md) | Rotation Telegram messages redone: one morning message (Adaptive, then T1 as testing phase), self-explaining strategy names, a short 16:00 evening message with tomorrow's strategies in full | P1 | In progress | feature | options |
 | [BL-135](BL-135-rotation-lot-plans-forward.md) | Lot plans tracked forward from Mon 2026-10-19: As picked, Dir Boost (BL-133) and Duo (BL-134) for Core and T1, read-out at 60 days, dashboard card | P1 | In progress | feature | options |
 | [BL-136](BL-136-momentum-etf-premium-gate.md) | Momentum: do not buy an ETF trading too far above its NAV (live gate 2% / 5% international, skips in the journal and This week; pre-registered research on whether it stays and enters the engine) | P1 | In progress (Phase 1 built 2026-10-18) | research | momentum |
+| [BL-140](BL-140-automation-settings-page.md) | Automation settings page: per platform + broker (AlgoTest / Quantiply × Shoonya / Angel One) choose the 08:00 login, the list (Classic / Tuned) and uploads; saved in the scheduler's database; every job follows it | P1 | Planned | feature | dashboard + scheduler |
+| [BL-141](BL-141-live-vs-backtest-slippage-discretionary.md) | Live vs backtest: a 15:40 capture of each platform's per-strategy P&L, slippage vs the paper result (signed, in the owner's 16:00 Telegram), discretionary trades tracked apart | P1 | Planned | feature | broker-login + options |
 | [BL-114](BL-114-momentum-correlation-widget.md) | Momentum correlation widget: how alike are the strategies we follow? (saved groups measure as 1.2 independent bets of 11) | P1 | Planned | feature | momentum |
 | [BL-105](BL-105-dir-trade-management-tests.md) | Directional trade management: profit lock / trail on day MTM, roll the decayed leg to the new ATM, restart at a profit limit; a screen on existing machinery first, engine support only for survivors | P2 | Done: no idea passed its rule (lock / trail, restart, roll); engine roll kept | research | options |
 | [BL-096](BL-096-directional-parameter-sweep.md) | Directional stop, re-entry, trailing and exit sweep across NIFTY/SENSEX ATM and ITM1 variants | P2 | In progress | research | options |
