@@ -87,6 +87,7 @@ bun run --filter '*' typecheck     # packages only — NOT the root app
 # Scheduler service (BL-012) — apps/scheduler; see its CLAUDE.md
 bun run --filter @ata/scheduler jobs status    # every job: schedule, last run, next run
 bun run --filter @ata/scheduler jobs run <id>  # run one job now
+bun run --filter @ata/scheduler jobs settings [show | set <file.json>]  # BL-140: the automation settings (versioned in scheduler.db; a set also syncs the workflow's GitHub variables)
 
 # Laptop scheduler (launchd keeps apps/scheduler alive) — see deploy/launchd/README.md
 deploy/launchd/install.sh    # (re)install the scheduler agent; retires the old per-job plists

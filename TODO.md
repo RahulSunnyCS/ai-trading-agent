@@ -751,3 +751,17 @@ Owner (2026-10-19): add the Core Adaptive picks to Quantiply (Angel One) too, on
 | 3.32.3 | Phase 3: uploader over the API (ledger by algo id, read-back, delete only its own finished algos) + jobs `quantiply-evening` 16:45, `quantiply-topup` 09:19 | claude | **Built 2026-10-19** (`src/quantiply-upload.ts`, 12 planner tests), off until `QUANTIPLY_UPLOAD=on`; first dry run and first `--apply` by the owner 2026-10-19: 3 Wednesday algos created, each read back identical; to switch on: merge (after PR #264), restart the scheduler, set `QUANTIPLY_UPLOAD=on` |
 | 3.32.4 | Phase 4: deploy (`enabled`), built but off | claude | Planned |
 
+
+### 3.33 Automation settings page — [BL-140](backlog/BL-140-automation-settings-page.md)
+
+Owner (2026-10-19): one place in the dashboard says what runs, with one row per platform + broker. Each row sets
+the 08:00 login, the list (Adaptive Classic / Tuned) and uploads. Three master switches: logins, uploads,
+deployment. The settings are saved in the scheduler's database, the GitHub variables are synced for the 08:15
+backstop, and the `.env` switches stay as hard safety.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.33.1 | Phase 1: versioned settings store + scheduler API + CLI + GitHub variable sync | claude | **Built 2026-10-19** (`apps/scheduler/src/automation.ts`, `GET`/`PUT /settings/automation`, `jobs settings`, 13 tests). The workflow does not read the new variables until Phase 3 |
+| 3.33.2 | Phase 2: Settings › Automation page + Guide | claude | **Built 2026-10-19** (`components/settings/AutomationSettingsCard.tsx`, `lib/automation.ts`, 8 tests; checked in a preview against a throwaway scheduler API). Apply now waits for Phase 3 |
+| 3.33.3 | Phase 3: the jobs follow the settings (08:00 logins, exports, uploaders); 3b: Quantiply login through Shoonya | claude + owner | Planned (3b needs a capture with the owner) |
+| 3.33.4 | Phase 4: more settings (lots multiplier, add-on, pause, portfolio stop, 09:20 check) | claude | Planned |

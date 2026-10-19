@@ -48,9 +48,21 @@ summary flags anything but `main`).
   `GET /runs/:id/log?tail=200` (refuses paths outside the log dir and
   `packages/momentum-backtesting/data`, symlinks resolved), `POST /jobs/:id/run` (manual run;
   202 + run id, 409 if the job or its group is busy), `GET`/`PUT /notifications` (catalogue +
-  the prefs file from `@trading/notify`, written atomically). The dashboard reaches it through the
+  the prefs file from `@trading/notify`, written atomically), `GET`/`PUT /settings/automation`
+  (BL-140, below). The dashboard reaches it through the
   `SCHEDULER_DIRECT` rewrite `/api/scheduler/*`. Never bind it beyond loopback.
-- `src/cli.ts` — `bun run jobs status | run <id> | serve`.
+- `src/automation.ts` — BL-140's automation settings. Three master switches (logins, uploads, deploy) and one
+  row per platform + broker (`algotest|quantiply` × `finvasia|angelone`: login, list none/core/t1, upload),
+  validated (unknown keys refused).
+  - Every save is a new version in `scheduler.db` (`automation_settings`). Only the `github` outcome column is
+    ever written after the insert.
+  - The current version is written atomically to `automation-settings.json` beside it (also on `serve` start);
+    that file is what jobs read.
+  - A save also sets the repository variables the "Daily broker login" workflow reads (`BROKER_LOGIN_ENABLED`,
+    `ALGOTEST_BROKERS`, `QUANTIPLY_BROKERS`, `BROKER_LOGIN_ONLY`, `QUANTIPLY_LOGIN`) through `gh`, so the 08:15
+    backstop follows too. A failed sync is recorded on the version, never undoes it.
+  - The `.env` switches (`ALGOTEST_UPLOAD`, `QUANTIPLY_UPLOAD`, `ALGOTEST_DEPLOY`) stay as hard safety.
+- `src/cli.ts` — `bun run jobs status | run <id> | serve | settings [show | set <file.json>]`.
 
 ## Adding a check
 
@@ -88,9 +100,10 @@ network or disk so the test needs neither. One group per file keeps parallel PRs
 bun run jobs status          # every job: schedule, last run, next run
 bun run jobs run <job-id>    # run one now (recorded as manual)
 bun run jobs serve           # the long-running scheduler
+bun run jobs settings        # the current automation settings (BL-140); `settings set <file.json>` saves a version
 bun run test                 # bun test
 bun run typecheck
 ```
 
 State: `SCHEDULER_STATE_DIR` (default `~/Library/Application Support/ai-trading-agent`,
-holds `scheduler.db`). Logs: `SCHEDULER_LOG_DIR` (default `~/Library/Logs/ai-trading-agent`).
+holds `scheduler.db` and `automation-settings.json`). Logs: `SCHEDULER_LOG_DIR` (default `~/Library/Logs/ai-trading-agent`).
