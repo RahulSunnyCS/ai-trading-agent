@@ -72,12 +72,14 @@ describe('effective and the GitHub variables', () => {
       list: 'core',
       upload: false,
     });
-    expect(githubVariables(s)).toMatchObject({
+    const vars = githubVariables(s);
+    expect(vars).toMatchObject({
       BROKER_LOGIN_ENABLED: 'off',
       ALGOTEST_BROKERS: '',
-      BROKER_LOGIN_ONLY: 'none',
       QUANTIPLY_LOGIN: 'off',
     });
+    // Until the workflow understands `none` (PR #268) the variable is left as it is.
+    expect('BROKER_LOGIN_ONLY' in vars).toBe(false);
   });
 
   it('one AlgoTest broker becomes BROKER_LOGIN_ONLY', () => {
