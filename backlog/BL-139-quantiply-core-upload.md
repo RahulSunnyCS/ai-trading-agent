@@ -1,4 +1,4 @@
-# BL-139 — Rotation Core picks to Quantiply (Angel One): add them through its algo form, deploy built but off
+# BL-139 — Rotation Core picks to Quantiply (Angel One): add them through its own API, deploy built but off
 
 | | |
 |---|---|
@@ -25,7 +25,8 @@ quantiply.angelone also".
 - **BL-138** deploys them on AlgoTest. It is built, but off until `ALGOTEST_DEPLOY=on`.
 - **Quantiply** (`app.quantiply.angelone.in`) is Angel One's algo platform.
   - The daily 08:00 broker-login run already logs in to it through Angel One's SmartAPI page (`src/quantiply.ts`, `QUANTIPLY_LOGIN=on`).
-  - Its strategies are built in a form. There is no import file (owner, 2026-10-19).
+  - Its strategies are built in a form. There is no import file (owner, 2026-10-19), but saving one
+    calls Quantiply's own API, and the tool can make the same call.
   - BL-118 records that Quantiply paused algo services on 31 March 2026 for SEBI's retail algo framework. The owner uses it now, so they are back for the owner's account.
 - Nothing yet reads or writes Quantiply's algo list or its form.
 
@@ -55,52 +56,87 @@ quantiply.angelone also".
 
 ## Plan
 
-### Phase 1 — Map Quantiply's algo pages (with the owner)
+### Phase 1 — Capture Quantiply's own API calls (with the owner)
+
+Route (owner, 2026-10-19): when a strategy is saved, Quantiply's web app calls its own API. The tool
+captures that call and repeats it with a JSON body built from our YAML, rather than filling the form.
+That is faster, and more reliable than clicking through the form. The form stays the fallback, used
+only if the API cannot be used.
 
 - **Tasks:**
-  1. The owner opens Quantiply logged in, in the browser pane or under a recorder like BL-137's `scripts/record-strategies.ts` (its HAR redacted, output kept in `_rec/`).
-  2. Read the pages, without saving or deploying anything:
-     - the algo list;
-     - the "create algo" form;
-     - an existing algo opened for edit;
-     - the delete confirmation;
-     - the deploy control.
-  3. For each field of the form, note:
-     - its label, its control type and the values it accepts;
-     - its locator;
-     - which YAML field it carries: legs, buy/sell, CE/PE, strike choice (ATM±n, closest premium), expiry, lots, leg SL % and points, trailing, re-entry, entry and exit times, the range-breakout entry, overall MTM SL.
-  4. Check whether the form saves through a JSON call to `api-prod.quantiply.angelone.in`. If it does, a saved algo can be read back field by field, which is a stronger check than the screen.
-  5. Check Angel One's and Quantiply's terms on automating the website, as was done for AlgoTest, and record the owner's decision.
+  1. The owner logs in to Quantiply and builds one Core strategy by hand while the network traffic is
+     recorded. The recorder is the browser pane's network log, or a recorder like BL-137's
+     `scripts/record-strategies.ts`:
+     - it captures request and response bodies to `api-prod.quantiply.angelone.in`;
+     - it redacts the Authorization header, cookies and tokens;
+     - it keeps its output in the git-ignored `_rec/`.
+     Pick a strategy that uses as many features as possible: SL %, trailing, re-entry,
+     closest premium and overall MTM SL.
+  2. Capture, for each call, the method, path, body shape and the response:
+     - **create**: the save of a new algo;
+     - **list**: the algo list, which also serves as the read-back;
+     - **get**: one algo;
+     - **update** and **delete**;
+     - **deploy** and its undeploy, recorded only. They are not replayed until Phase 4 is switched on.
+  3. Find how the API authenticates:
+     - the header or cookie it needs;
+     - where that comes from after the Angel One login (local storage, a cookie, a token response);
+     - how long it lasts, and whether one login in the morning covers the 09:18 and evening runs.
+  4. Map each body field to the YAML: legs, buy/sell, CE/PE, strike choice (ATM±n, closest premium),
+     expiry, lots, leg SL % and points, trailing, re-entry, entry and exit times, range-breakout entry,
+     overall MTM SL. For each field, note its enum values exactly as Quantiply sends them.
+  5. Check Angel One's and Quantiply's terms on calling their API this way, as was done for AlgoTest,
+     and record the owner's decision.
 - **Deliverables:**
-  - a section "Quantiply algos through the website" in `docs/algotest-execution.md` (the page contract);
-  - locators in `selectors.ts` (`quantiplyAlgoPage`), marked PROVISIONAL until a real run confirms them;
-  - the list of Core YAML features the form cannot express.
-- **Done when:** for each of the 12 Core-298 shapes, every field the YAML sets has a form field mapped to it, or is listed as unmappable with the reason.
+  - the API contract, recorded as a section "Quantiply algos through its API" in
+    `docs/algotest-execution.md`. It covers the endpoints, the auth, the body schema and the enums;
+  - the captured bodies, with all secrets removed, as test fixtures;
+  - the list of Core YAML features the API cannot express.
+- **Done when:** for each of the 12 Core-298 shapes, one of these holds:
+  - every field the YAML sets has a body field mapped to it, confirmed by a strategy the owner built by hand;
+  - or it is listed as unmappable, with the reason.
 
-### Phase 2 — Export the Core picks as Quantiply form plans
+### Phase 2 — Export the Core picks as Quantiply create bodies
 
 - **Tasks:**
-  1. `to_quantiply(spec) -> FormPlan`: a neutral description of what to type into each field, built from the same `StrategySpec` as `to_algtst`. It raises `Unmappable` for anything Phase 1 found missing; it never guesses.
-  2. Add `obt rotation quantiply-export [--day] [--preview] [--next]` (Core only). It reuses BL-137's `recorded_picks` / `preview_picks` and the manifest, written under `TRADING_DATA_ROOT/rotation/quantiply/<day>/core` with a `latest-core.json` pointer.
+  1. `to_quantiply(spec) -> Export(name, body)` builds the create body from the same
+     `StrategySpec` as `to_algtst`.
+     - It raises `Unmappable` for anything Phase 1 found missing; it never guesses.
+     - Leg and strategy ids are made the way the web app makes them, or left out if the server assigns them.
+  2. `obt rotation quantiply-export [--day] [--preview] [--next]` (Core only):
+     - it reuses BL-137's `recorded_picks` / `preview_picks` and its manifest;
+     - it writes under `TRADING_DATA_ROOT/rotation/quantiply/<day>/core`, with a
+       `latest-core.json` pointer.
   3. Tests:
      - every Core-298 variant either maps or refuses with a named reason;
-     - fixtures copied from algos the owner built by hand in Phase 1.
-- **Done when:** today's Core picks export, and each plan matches the algo the owner built by hand for the same variant.
+     - the bodies match the fixtures the owner made by hand in Phase 1, compared field by field
+       with ids, timestamps and key order ignored, like `comparable()`.
+- **Done when:** today's Core picks export, and each body equals the body Quantiply saved for the owner's
+  hand-built copy of the same variant.
 
 ### Phase 3 — Add and replace on Quantiply (`quantiply-upload.ts`)
 
 - **Tasks:**
-  1. Log in the way `src/quantiply.ts` does, in its own browser context.
-     - Angel One's TOTP rule holds across processes: two codes are never typed from one 30-second window (`angelTotp`).
-     - Never screenshot a logged-in Quantiply page unless the run is local and the owner asked for it. The repo is public.
+  1. Get a session:
+     - Log in the way `src/quantiply.ts` does, in its own browser context. Take only the
+       auth value Phase 1 found, then close the browser.
+     - The token is held in memory and registered with `registerSecret`. It is never logged,
+       written to disk or sent in Telegram.
+     - If the token lasts, reuse the morning login instead of logging in again.
+     - Angel One's TOTP rule holds across processes: two codes from one 30-second window are never
+       typed (`angelTotp`).
   2. Reuse `strategy-plan.ts`'s `plan()` for the two modes:
      - evening: keep, delete, upload;
      - top-up: upload only, and report changed and not-today picks.
-     It gets its own ledger, `rotation/quantiply/ledger.jsonl`, and the `Core · ` prefix. It deletes only names the ledger says it added, and never a deployed algo.
-  3. Fill the form from the plan, save, then read the algo back (from its JSON if Phase 1 found it, else the edit screen).
-     - A mismatch is recorded and alerted. It is never deployed.
-     - Gate: `--apply` needs `QUANTIPLY_UPLOAD=on`; without it the run is a dry run.
-  4. Scheduler jobs `quantiply-evening` (after AlgoTest's 16:40) and `quantiply-topup` (09:18), each with retries like the AlgoTest jobs. One Telegram message per run (`broker.quantiply`).
+     The list call supplies the existing names. The upload gets its own ledger,
+     `rotation/quantiply/ledger.jsonl`, and the `Core · ` prefix. It deletes only names the ledger
+     says it added, and never a deployed algo.
+  3. POST each create body, then GET the algo back and compare it with what was sent.
+     - A mismatch is recorded and alerted, and that algo is never deployed.
+     - Any response other than 2xx with the expected shape stops the run. Nothing is retried blind.
+     - Gate: `--apply` needs `QUANTIPLY_UPLOAD=on`; without it the run is a dry run that only reads the list.
+  4. Add the scheduler jobs `quantiply-evening` (after AlgoTest's 16:40) and `quantiply-topup` (09:18),
+     with retries like the AlgoTest jobs. Each run sends one Telegram message (`broker.quantiply`).
 - **Done when:**
   - a supervised `--apply` evening run and a top-up run leave exactly the Core picks on Quantiply;
   - each read-back matches;
@@ -121,10 +157,16 @@ quantiply.angelone also".
 
 ## Risks
 
-- **The form is the contract.** A redesign breaks the filler. Every locator lives in `selectors.ts`, and the read-back catches a field that silently kept its old value.
-- **Gaps in Quantiply's form.** Range breakout, closest premium, re-entry at cost or overall MTM SL may be missing. An unmappable pick is reported and left for the owner, never uploaded in a near-enough form.
+- **The API is undocumented.** Quantiply can change it without notice. The read-back catches a field it
+  ignored, and an unexpected response stops the run with an alert. The form is the fallback if the API
+  is ever closed to us.
+- **The token is a live credential to the owner's Angel One algos.** It is kept in memory only and
+  redacted from every log, report and fixture. The repo is public.
+- **Gaps in Quantiply's model.** Range breakout, closest premium, re-entry at cost or overall MTM SL may be missing. An unmappable pick is reported and left for the owner, never uploaded in a near-enough form.
 - **Angel One login rate.** The 08:00, 09:18 and 16:4x runs each log in through Angel's TOTP. If Quantiply keeps its session, reuse a stored session instead of logging in again (Phase 1 checks this).
-- **Speed at 09:16.** A 09:17 pick changed at 09:16 has about a minute. Filling a form is slower than AlgoTest's file import, so the top-up may miss a 09:17 change. It says so in its message rather than racing.
+- **Speed at 09:16.** A 09:17 pick changed at 09:16 has about a minute. One API call takes seconds,
+  but the login does not. A top-up that would miss a 09:17 entry says so in its message rather than
+  racing.
 
 ## Open questions
 
@@ -133,4 +175,6 @@ quantiply.angelone also".
 
 ## Log
 
+- 2026-10-19 — route changed (owner): capture the create call the web app makes and POST it, rather than
+  filling the form. Phases 1–3 rewritten; the form is the fallback.
 - 2026-10-19 — created from the owner's request. Questions answered: built in the form, AlgoTest's schedule, deploy built but off, Core only.
