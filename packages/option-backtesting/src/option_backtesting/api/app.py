@@ -35,8 +35,8 @@ from .rotation_pulse_routes import router as rotation_pulse_router
 from .rotation_regime_routes import router as rotation_regime_router
 from .rotation_routes import router as rotation_router
 from .rotation_shadow_routes import router as rotation_shadow_router
-from .rule_routes import router as rule_router
 from .routes import router
+from .rule_routes import router as rule_router
 
 
 def create_app(cache_dir: Path | None = None) -> FastAPI:
