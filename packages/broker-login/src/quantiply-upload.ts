@@ -138,6 +138,7 @@ async function main(): Promise<number> {
   const label = `Quantiply CORE ${when} for ${manifest.day} (${manifest.weekday})`;
   const lines: string[] = [];
   let failed = false;
+  let printed = 0; // lines already on the console (the plan), so the end prints only the rest
 
   try {
     // The browser is only for the login: the token is taken and the browser closed before any call.
@@ -163,6 +164,7 @@ async function main(): Promise<number> {
     const algos = await api.list();
     const p = planQ(mode, manifest.weekday, istWeekday(), wanted, ledger, algos);
     lines.push(...summaryQ(p, mode));
+    printed = lines.length;
     console.log(`${label}${values.apply ? '' : ' (dry run)'}\n${lines.join('\n')}`);
     if (!values.apply) return 0;
 
@@ -262,7 +264,7 @@ async function main(): Promise<number> {
       () => undefined,
     );
   }
-  console.log(lines.join('\n'));
+  console.log(lines.slice(printed).join('\n'));
   return failed ? 1 : 0;
 }
 

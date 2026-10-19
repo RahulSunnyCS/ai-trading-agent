@@ -175,6 +175,12 @@ only if the API cannot be used.
 
 ## Log
 
+- 2026-10-19 — First real upload, by the owner with `--apply` (at 17:25 IST, ledger in a scratch file):
+  - It created `Core · S_ditm1_1202`, `Core · S_p250_1317` and `Core · S_p250_1302` for Wednesday 21 Oct.
+  - Each was read back `identical`.
+  - Quantiply's Wednesday list shows them disabled, with no broker, at the right times.
+  - The three create rows were copied to `TRADING_DATA_ROOT/rotation/quantiply/ledger.jsonl`, so the scheduled runs own these algos.
+  - The run printed its plan twice; fixed.
 - 2026-10-19 — First dry run (the owner, in a terminal), against Wednesday 21 Oct's preview picks:
   - The run logged in through Angel One, took the token and read the list over the API.
   - Plan: create `Core · S_ditm1_1202`, `Core · S_p250_1317`, `Core · S_p250_1302`. Nothing was changed.
