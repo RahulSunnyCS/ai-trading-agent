@@ -18,7 +18,8 @@
     "dispatch": "tsx src/dispatch.ts",
     "test": "tsx --test src/*.test.ts",
     "record-strategies": "tsx scripts/record-strategies.ts",
-    "strategy-upload": "tsx src/strategy-upload.ts"
+    "strategy-upload": "tsx src/strategy-upload.ts",
+    "quantiply-upload": "tsx src/quantiply-upload.ts"
   },
   "dependencies": {
     "@trading/broker-identity": "workspace:*",

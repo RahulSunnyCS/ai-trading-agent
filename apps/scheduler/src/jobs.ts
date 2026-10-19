@@ -461,6 +461,69 @@ const BASE_JOBS: Job[] = [
     fixHint: 'Open algotest.in/live and untick the execution days of the T1 strategies',
   },
   {
+    id: 'quantiply-evening',
+    description:
+      "Put tomorrow's expected Core picks into Quantiply (Angel One) as algos for tomorrow's weekday (BL-139): export them (`obt rotation quantiply-export --next`), then, through Quantiply's API, delete the finished algos the tool created that tomorrow drops and create the missing ones. Never enables (deploys). Does nothing until QUANTIPLY_UPLOAD=on",
+    // After algotest-evening (16:40), so the two never log in at once. The export exits 2 while
+    // the day's results are incomplete (a late Fyers login), so the retries carry it to 20:45.
+    schedule: { at: '16:45', on: tradingDays, label: 'trading days 16:45' },
+    steps: [
+      [
+        'uv',
+        'run',
+        '--directory',
+        '../option-backtesting',
+        'obt',
+        'rotation',
+        'quantiply-export',
+        '--next',
+      ],
+      [
+        'node_modules/.bin/tsx',
+        'src/quantiply-upload.ts',
+        '--latest',
+        'core',
+        '--mode',
+        'evening',
+        '--apply',
+      ],
+    ],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 10,
+    retries: 4,
+    retryDelayMinutes: 60,
+    catchUpHours: 4,
+    fixHint:
+      'cd packages/option-backtesting && uv run obt rotation quantiply-export --next; then cd ../broker-login && node_modules/.bin/tsx src/quantiply-upload.ts --latest core --mode evening (add --apply once the plan looks right)',
+  },
+  {
+    id: 'quantiply-topup',
+    description:
+      "After the 09:16 pick, create on Quantiply any recorded Core pick that last night's upload does not have (BL-139); deletes nothing and names the algos that are not today's. Does nothing until QUANTIPLY_UPLOAD=on",
+    // 09:19, not 09:18: a minute clear of the pick's own Angel One work, so two logins never type
+    // codes from one TOTP window. A changed 09:17 pick is too late either way. Not caught up.
+    schedule: { at: '09:19', on: tradingDays, label: 'trading days 09:19' },
+    steps: [
+      ['uv', 'run', '--directory', '../option-backtesting', 'obt', 'rotation', 'quantiply-export'],
+      [
+        'node_modules/.bin/tsx',
+        'src/quantiply-upload.ts',
+        '--latest',
+        'core',
+        '--mode',
+        'topup',
+        '--apply',
+      ],
+    ],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 10,
+    retries: 1,
+    retryDelayMinutes: 2,
+    catchUpHours: 0.5,
+    fixHint:
+      'cd packages/option-backtesting && uv run obt rotation quantiply-export; then cd ../broker-login && node_modules/.bin/tsx src/quantiply-upload.ts --latest core --mode topup --apply',
+  },
+  {
     id: 'backup',
     description: 'Copy the research database (TRADING_DATA_ROOT) to the external SSD',
     schedule: { at: '10:00', on: firstWeekdayOfMonth(0), label: '1st Sunday of the month 10:00' },

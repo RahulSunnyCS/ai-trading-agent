@@ -13,6 +13,7 @@ import { join } from 'node:path';
 export const NOTIFICATION_TYPES = {
   'broker.algotest': 'AlgoTest broker login report and failures',
   'broker.fyers': 'Fyers login failures',
+  'broker.quantiply': 'Quantiply: the Core picks created or deleted, and failures (BL-139)',
   'momentum.preview': 'Momentum weekly preview (Fri 14:40)',
   'momentum.final': 'Momentum weekly final signal / rebalance (Fri 16:45)',
   'momentum.orders': 'Momentum: your orders for the headline favourite (Fri 14:15)',

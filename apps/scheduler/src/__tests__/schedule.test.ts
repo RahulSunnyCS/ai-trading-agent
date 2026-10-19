@@ -174,8 +174,8 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('has 27 jobs', () => {
-    expect(JOBS).toHaveLength(27);
+  it('has 29 jobs', () => {
+    expect(JOBS).toHaveLength(29);
   });
 });
 
