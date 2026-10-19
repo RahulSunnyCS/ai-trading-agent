@@ -775,7 +775,7 @@ options margin and are never part of the strategy. Kite access is read-only.
 
 | # | Task | Owner | State |
 |---|---|---|---|
-| 3.34.1 | Phase 1: Kite read-only access (Login button, Friday reminder, holdings + free cash snapshot, LIQUIDBEES / `SGB*` excluded); unattended TOTP login tried | claude | **Built 2026-10-19, not yet run live.** `kite.py`, `/api/kite/*`, migration 013, `mbt kite …`, `kite-login-reminder` Fri 13:30, Broker logins Kite card. Open: the owner's Kite app + `.env` keys, holdings source → Kite, the unattended-login spike, the first real snapshot Fri 23 Oct |
+| 3.34.1 | Phase 1: Kite read-only access (Login button, Friday reminder, holdings + free cash snapshot, LIQUIDBEES / `SGB*` excluded); login stays manual (Zerodha does not allow automating it; owner, 2026-10-19) | claude | **Built 2026-10-19, not yet run live.** `kite.py`, `/api/kite/*`, migration 013, `mbt kite …`, `kite-login-reminder` Fri 13:30, Broker logins Kite card. Open: holdings source → Kite, the first real snapshot Fri 23 Oct |
 | 3.34.2 | Phase 2: the lot ledger (seed from the first Kite snapshot, weekly diff attribution, flags, `mbt lots`) | claude | Planned |
 | 3.34.3 | Phase 3: per-sleeve orders on Friday with free cash | claude | Planned |
 | 3.34.4 | Phase 4: Lots panel, Guide, `business.md` / `technical.md` | claude | Planned |

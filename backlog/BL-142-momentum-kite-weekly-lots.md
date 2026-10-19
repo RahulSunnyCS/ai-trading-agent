@@ -35,8 +35,8 @@ delivery brokerage. The plan for the money:
 - So the lots must be **built by us**: a Kite holdings snapshot every Friday, and the change since
   the previous Friday becomes that week's trades.
 - The access token lasts until about 06:00 IST the next day, like Fyers. The login is Kite's own
-  page (user ID, password, TOTP), then an API-secret exchange. Whether it can run unattended
-  is Phase 1's spike. The Kite Connect Personal plan (orders, holdings, margins; no market data)
+  page (user ID, password, TOTP), then an API-secret exchange. It is always done by hand: Zerodha
+  does not allow automating it (decided 2026-10-19, see Open questions). The Kite Connect Personal plan (orders, holdings, margins; no market data)
   should be enough; confirm at signup.
 
 **What already exists (reuse, do not rebuild):**
@@ -87,19 +87,18 @@ plus free cash.
 
 ### Phase 1 — Kite access, read-only
 - **Tasks:**
-  - Kite Connect app (the owner creates it); `.env` keys `KITE_API_KEY`, `KITE_API_SECRET`,
-    `KITE_USER_ID`, `KITE_PASSWORD`, `KITE_TOTP_SECRET` (the owner adds them).
-  - Spike: can the login run unattended? Try the TOTP login the AlgoTest logins already do
-    (`packages/broker-login`, `@trading/broker-identity`'s `generateTotp`). If Kite shows a human
-    check, as Fyers' page does, drop it.
-  - Fallback either way: a Kite **Login** button on Broker logins (an OAuth callback like
-    Fyers'), and a **Friday 13:30 Telegram reminder** when no valid Kite token exists. The
-    14:15 job then alerts if it still cannot read Kite.
+  - Kite Connect app (the owner creates it); `.env` keys `KITE_API_KEY` and `KITE_API_SECRET`
+    only (the owner adds them). No password or TOTP secret is stored: the login is manual.
+  - ~~Spike: can the login run unattended?~~ Dropped 2026-10-19: Zerodha does not allow
+    automating the login (exchange regulations), so it is not tried.
+  - A Kite **Login** button on Broker logins (an OAuth callback like Fyers'), and a **Friday
+    13:30 Telegram reminder** when no valid Kite token exists. The 14:15 job then alerts if it
+    still cannot read Kite.
   - `kite.holdings()` (holdings + T1 quantity + today's CNC positions) and `kite.margins()` (free
     equity cash), read-only; store the snapshot with source `kite`; `holdings_source = kite`.
   - Exclude rules for LIQUIDBEES and every SGB symbol, preferably a pattern (`SGB*`) so a new
     tranche needs no hand rule.
-- **Deliverables:** Kite client + tests on recorded responses; login (automatic or button);
+- **Deliverables:** Kite client + tests on recorded responses; the Login button;
   reminder job; snapshot stored on the real account.
 - **Done when:** on Fri 2026-10-23 a Kite snapshot is stored for the owner's account, it holds
   this week's buy, and LIQUIDBEES and SGBs are not in it.
@@ -147,8 +146,8 @@ plus free cash.
   flagged, never guessed.
 - **Corporate actions** change quantity with no trade. The flag catches them. The existing
   split classifier (`blocked` in `orders.plan`) holds such a name until it is classified.
-- **Automated Kite login** may break on a page change or fall outside Zerodha's terms. The
-  button + reminder fallback works without it.
+- **A missed Friday login** means no Kite read at 14:15. The 13:30 reminder and the 14:15 alert
+  cover it; a login any time from 06:00 that Friday is enough.
 - **Free cash meant for something else** would be swept into a rebalance. The cash used is
   shown in every order message and can be capped in settings.
 - **T+1:** a Thursday buy shows as T1 quantity, not holdings. The snapshot must count both.
@@ -158,10 +157,15 @@ plus free cash.
 Answered by the owner on 2026-10-19 (the item was started):
 
 1. **Strategy and K:** chosen once this is built; nothing assumes a cadence.
-2. **Kite login:** a Login button and a Friday 13:30 reminder first, then a test of the
-   unattended TOTP login from `.env`, kept only if Kite allows it with no human check.
-3. **Free cash:** all of Kite's free equity cash (the margins endpoint's `net`) goes to the due
-   sleeve. LIQUIDBEES and SGBs are untouched, so options margin stays. Every message shows the
+2. **Kite login:** a Login button and a Friday 13:30 reminder. **Manual only (owner,
+   2026-10-19):** the planned test of an unattended TOTP login is dropped. A Zerodha
+   representative states on the Kite developer forum that automating the login is not allowed
+   under exchange regulations (https://kite.trade/forum/discussion/comment/19966/), and it would
+   mean keeping the Kite password and TOTP secret in `.env`. The account ID Kite returns at login
+   is kept with the day's token and shown on the card; it is not used to log in.
+3. **Free cash:** all of Kite's free equity cash goes to the due sleeve. The amount is the
+   margins endpoint's `net` minus `available.collateral`, never below 0: the margin pledged
+   holdings give is not cash (the PR #270 review). LIQUIDBEES and SGBs are untouched, so options margin stays. Every message shows the
    cash used.
 4. **After ₹2 lakh:** new money is just free cash for the next due sleeve. No new lots after
    the ramp.
@@ -198,8 +202,13 @@ Kite facts checked on 2026-10-19 ([portfolio](https://kite.trade/docs/connect/v3
   - Broker logins Kite card, the Kite option in Your orders settings, Guide pages, docs.
 
   Still open in Phase 1:
-  - the unattended TOTP login spike, which waits for the owner's `KITE_USER_ID` /
-    `KITE_PASSWORD` / `KITE_TOTP_SECRET`;
   - switching the owner's holdings source to `kite`;
   - the first real snapshot, due Fri 2026-10-23.
+- 2026-10-19 — The owner chose to drop the unattended Kite login: Zerodha does not allow
+  automating it. The Login button and the Friday 13:30 reminder stay, and no Kite password or
+  TOTP secret goes in `.env`. Review fixes on PR #270:
+  - free cash leaves out pledged collateral;
+  - LIQUIDBEES / `SGB*` are always excluded;
+  - Kite timeouts are handled;
+  - the callback never fails after a good login.
 
