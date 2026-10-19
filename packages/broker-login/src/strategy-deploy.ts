@@ -21,6 +21,7 @@ import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { redact, registerSecret } from './secrets.js';
 import { livePage } from './selectors.js';
 import { type Manifest, istToday } from './strategy-plan.js';
+import { visibleWithin } from './wait.js';
 
 /**
  * BL-138: deploy the day's recorded rotation picks on AlgoTest's /live, through the website. Built
@@ -92,7 +93,7 @@ async function deployOne(page: Page, pick: Pick): Promise<string> {
 
   // Anything that pops up now (a broker choice, a confirmation) has never been seen: stop.
   const popup = livePage.popup(page).first();
-  if (await popup.isVisible({ timeout: 4_000 }).catch(() => false)) {
+  if (await visibleWithin(popup, 4_000)) {
     const text = (await popup.innerText()).replace(/\s+/g, ' ').slice(0, 200);
     throw new Error(`Activate opened something not yet seen, not confirmed: ${text}`);
   }

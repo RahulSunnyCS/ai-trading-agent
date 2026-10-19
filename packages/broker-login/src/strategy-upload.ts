@@ -26,6 +26,7 @@ import {
   sha256,
   summary,
 } from './strategy-plan.js';
+import { visibleWithin } from './wait.js';
 
 /**
  * BL-137 Phase 3: put the day's rotation picks into AlgoTest as saved strategies, through the
@@ -84,7 +85,7 @@ async function deployedNames(page: Page, candidates: string[]): Promise<Set<stri
 async function freshBuilder(page: Page): Promise<void> {
   await page.goto(`${BASE_URL}/backtest`, { waitUntil: 'domcontentloaded' });
   const importButton = strategyPage.importButton(page);
-  if (!(await importButton.isVisible({ timeout: 10_000 }).catch(() => false))) {
+  if (!(await visibleWithin(importButton, 10_000))) {
     await strategyPage.newStrategy(page).click();
     await importButton.waitFor({ timeout: 15_000 });
   }
@@ -132,7 +133,7 @@ async function deleteOne(page: Page, name: string): Promise<void> {
   );
   await item.click();
   const confirm = strategyPage.deleteConfirm(page).last();
-  if (await confirm.isVisible({ timeout: 3_000 }).catch(() => false)) await confirm.click();
+  if (await visibleWithin(confirm, 3_000)) await confirm.click();
   const response = await deleted;
   if (!response.ok()) throw new Error(`delete answered ${response.status()}`);
 }

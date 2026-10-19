@@ -18,6 +18,7 @@ import {
 import { fyersLogin } from './selectors.js';
 import { storeFyersToken } from './store-token.js';
 import { freshTotp, waitForNextWindow } from './totp.js';
+import { visibleWithin } from './wait.js';
 
 /**
  * Mints a Fyers access token headlessly, for the weekly momentum job's market-data
@@ -98,7 +99,7 @@ async function loginOnce(context: BrowserContext, config: FyersConfig): Promise<
 
   await step(page, 'fyers-client-id', async () => {
     const toggle = fyersLogin.useClientId(page);
-    if (await toggle.isVisible({ timeout: 5_000 }).catch(() => false)) await toggle.click();
+    if (await visibleWithin(toggle, 5_000)) await toggle.click();
     const input = fyersLogin.clientId(page);
     await input.waitFor({ state: 'visible', timeout: 20_000 });
     await input.fill(config.clientId);
