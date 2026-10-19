@@ -152,7 +152,7 @@ export function effective(settings: AutomationSettings, key: RowKey): Row {
  * BL-140 Phase 3 (PR #268); until then `none` would fail the 08:00 run, so the variable is left as
  * it is and the sync outcome says so.
  */
-export const WORKFLOW_KNOWS_NONE = false;
+export const WORKFLOW_KNOWS_NONE = true;
 
 export function githubVariables(settings: AutomationSettings): Record<string, string> {
   const on = (p: Platform) => BROKERS.filter((b) => effective(settings, `${p}.${b}`).login);

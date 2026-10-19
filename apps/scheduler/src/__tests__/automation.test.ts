@@ -78,8 +78,8 @@ describe('effective and the GitHub variables', () => {
       ALGOTEST_BROKERS: '',
       QUANTIPLY_LOGIN: 'off',
     });
-    // Until the workflow understands `none` (PR #268) the variable is left as it is.
-    expect('BROKER_LOGIN_ONLY' in vars).toBe(false);
+    // The workflow understands `none` (config.ts, BL-140 Phase 3): no AlgoTest login.
+    expect(vars.BROKER_LOGIN_ONLY).toBe('none');
   });
 
   it('one AlgoTest broker becomes BROKER_LOGIN_ONLY', () => {
