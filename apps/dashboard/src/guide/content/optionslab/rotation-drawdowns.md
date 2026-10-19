@@ -14,8 +14,8 @@ rupees per lot. The peak starts at zero, as in the read-out. The dashed line is 
 the same days, drawn from its own peak of zero; it breaks where the base has no result. Shaded and
 numbered stretches are the falls of at least the chosen size.
 
-With a **portfolio stop** applied (the button at the top of the page), the same days are also
-replayed through it and drawn as a second line. Three figures sit above the chart: the worst fall
+With a **portfolio stop** applied (the Adaptive Classic card's stop button, ₹8,000 by default), the
+same days are also replayed through it, at 1 lot a strategy, and drawn as a second line. Three figures sit above the chart: the worst fall
 without the stop, the worst fall with it, and on how many days the stop closed the book. The
 episode table and the drivers stay on the registered figures; only the chart, those three figures
 and the reading line below it show the stopped series.
@@ -35,7 +35,7 @@ and the reading line below it show the stopped series.
 | Peak | The last day the list was at its running peak before the fall. "start" means it began the window underwater. |
 | Trough | The deepest day of the fall. |
 | Back | The first day the list was back at the peak, or **open** when it never got back. |
-| Depth / lot, Basket | The fall at the trough, per lot and for the lots the list held (2 per strategy). |
+| Depth / lot, Basket | The fall at the trough, per lot and for the page's lots (1 a strategy). |
 | Length | Sessions from the peak to the trough, and from the trough to the way back. |
 | Base, same days | The fixed base's per-lot P&L over the same peak-to-trough days. A day the base has no result for is counted, not treated as zero. |
 | Stops | Strategies stopped out on those days. |
@@ -49,8 +49,9 @@ The bars add up to the episode's depth.
 
 ## Things to know
 
-- **Per lot-day.** A list holds 6 lots, or 8 with the Buy add-on, so rupee totals would reward
-  holding more. Per lot is the unit the lists and the base are compared in.
+- **Per lot-day.** The page counts 1 lot a strategy (3 lots a day, or 4 with the Buy add-on; the journal
+  records 2), so the Basket column is in those lots. Rupee totals would still reward holding more, so per
+  lot is the unit the lists and the base are compared in.
 - **Recorded and re-scored are counted apart.** Days before the journal began are what the rule
   would have picked, scored with the same code as the 09:16 job. The weights were chosen on that
   history, so those falls are a description, not a test.

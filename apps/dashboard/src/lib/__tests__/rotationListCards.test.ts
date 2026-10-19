@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { RotationSummary } from '../../types/rotation';
-import { CARD_KEYS, listCards } from '../rotationListCards';
+import { CARD_KEYS, listCards, tunedCard } from '../rotationListCards';
 
 // vs the base is the list's per-lot-day minus the base's (100), so a stop carries through.
 const stats = (total: number, dd: number, vs: number) =>
@@ -34,11 +34,11 @@ function summary(over: Partial<RotationSummary> = {}): RotationSummary {
 }
 
 describe('listCards', () => {
-  it('has one card, Adaptive, never Steady, Calendar or Baseline', () => {
+  it('has one card, Adaptive Classic, never Steady, Calendar or Baseline', () => {
     const cards = listCards(summary());
     expect(CARD_KEYS).toEqual(['C']);
     expect(cards.map((c) => c.key)).toEqual(['C']);
-    expect(cards.map((c) => c.name)).toEqual(['Adaptive']);
+    expect(cards.map((c) => c.name)).toEqual(['Adaptive Classic']);
   });
 
   it("reads the list's latest day, total, drawdown and gap to the base", () => {
@@ -82,5 +82,30 @@ describe('listCards', () => {
         expect([c.latest, c.total, c.maxDrawdown, c.vsBase]).toEqual([null, null, null, null]);
       }
     }
+  });
+});
+
+describe('tunedCard', () => {
+  it("is Adaptive Tuned, list C of the T1 track's read-out", () => {
+    const t1 = summary({ lists: { C: stats(4000, -1200, 250) } as never });
+    const card = tunedCard(t1);
+    expect(card).toMatchObject({ key: 'C', id: 'T1', name: 'Adaptive Tuned' });
+    expect(card.note).toMatch(/T1 track/);
+    expect(card.total).toBe(4000);
+    expect(card.maxDrawdown).toBe(-1200);
+    expect(card.vsBase).toBe(250);
+    expect(card.latest).toEqual({ day: '2026-10-14', total: -250 });
+    expect(listCards(t1)[0]?.id).toBe('C'); // the two cards never share an id
+  });
+
+  it('gives dashes before the track has a scored day', () => {
+    const card = tunedCard(summary({ n_days: 0, days: [] }));
+    expect([card.latest, card.total, card.maxDrawdown, card.vsBase]).toEqual([
+      null,
+      null,
+      null,
+      null,
+    ]);
+    expect(tunedCard(null).name).toBe('Adaptive Tuned');
   });
 });

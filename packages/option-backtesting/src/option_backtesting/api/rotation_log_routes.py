@@ -5,6 +5,8 @@ decision-to-result record) and the owner's placement record.
                                                    with no entry (`not_recorded`), plus counters
     GET  /legwise/rotation/day/{day}               one day in full: the four baskets, each pick's
                                                    outcome, the chain hash and the placement rows
+                                                   (both take `lots=1..10`: each list at that many
+                                                   lots a strategy, display only)
     GET  /legwise/rotation/placement?from=&to=     the placement record: current state and history
     POST /legwise/rotation/placement               one new row: placed | changed | not_placed
     GET  /legwise/rotation/forensics?variant=&day= one rotation variant's day re-simulated for the
@@ -38,6 +40,7 @@ from ..legwise.schema import load_legwise
 from ..rotation import daylog, journal, placements
 from ..rotation.lists import LISTS, SIZING_DATE
 from ..rotation.variants import strategy_path, variant_names
+from .rotation_routes import track_and_lots
 
 router = APIRouter(prefix="/legwise/rotation")
 
@@ -72,6 +75,7 @@ def log(
     from_: str | None = Query(default=None, alias="from"),
     to: str | None = None,
     source: str = "recorded",
+    lots: str | None = None,
 ) -> Any:
     window = _window(from_, to)
     if isinstance(window, JSONResponse):
@@ -79,20 +83,28 @@ def log(
     if source not in daylog.SOURCES:
         return _error(422, f"source must be one of {', '.join(daylog.SOURCES)}")
     try:
-        return daylog.build_log(start=window[0], end=window[1], source=source)
+        _, lots_ = track_and_lots(None, lots)
+    except ValueError as error:
+        return _error(422, str(error))
+    try:
+        return daylog.build_log(start=window[0], end=window[1], source=source, lots_per=lots_)
     except journal.JournalCorrupt as error:
         return _error(500, f"the journal cannot be read: {error}")
 
 
 @router.get("/day/{day}")
-def day_detail(day: str) -> Any:
+def day_detail(day: str, lots: str | None = None) -> Any:
     parsed = _day(day, "day")
     if isinstance(parsed, JSONResponse):
         return parsed
     if parsed is None:
         return _error(422, "day must be YYYY-MM-DD")
     try:
-        body = daylog.build_day(parsed)
+        _, lots_ = track_and_lots(None, lots)
+    except ValueError as error:
+        return _error(422, str(error))
+    try:
+        body = daylog.build_day(parsed, lots_per=lots_)
     except journal.JournalCorrupt as error:
         return _error(500, f"the journal cannot be read: {error}")
     if body is None:

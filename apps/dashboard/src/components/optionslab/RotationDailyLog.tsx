@@ -7,7 +7,7 @@
  * foot say how often the structural things happened (a Buy qualified, the Widesl minimum applied,
  * the lists agreed, a stop fired).
  *
- * Gross basis; ₹ per lot-day is the unit lists are compared in (they hold 6 lots, or 8 with the
+ * Gross basis, 1 lot a strategy; ₹ per lot-day is the unit lists are compared in (3 strategies, or 4 with the
  * Buy add-on) and they are alternative baskets, never added together. A day with no figure shows
  * its reason. The filters are for browsing: a set selected by its outcome is biased, so no
  * total is shown for a filtered set.
@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { usePortfolioStop } from '../../hooks/usePortfolioStop';
+import { ROTATION_PAGE_LOTS } from '../../hooks/useRotation';
 import { useRotationLog } from '../../hooks/useRotationDailyLog';
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { cn } from '../../lib/cn';
@@ -100,8 +101,9 @@ function EmptyJournal({ log, onBrowseHistory }: { log: RotationLog; onBrowseHist
           ))}
       </ul>
       <p className="mt-3 text-xs text-faint">
-        Each holds {log.registered.lots_per_strategy} lots in each of 3 strategies, plus a Buy
-        add-on when one ranks in the overall top 10.
+        Each is recorded at {log.registered.lots_per_strategy} lots in each of 3 strategies, plus a
+        Buy add-on when one ranks in the overall top 10; this page shows {ROTATION_PAGE_LOTS} lot a
+        strategy.
       </p>
       {can ? (
         <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -159,7 +161,7 @@ export function RotationDailyLog({
 
   // The stopped figures (BL-095). Only an answer to THIS source and setting is laid over the log;
   // until it lands the log's own figures stay, and the note below says so.
-  const book = useRotationPortfolioDays(source, range, setting);
+  const book = useRotationPortfolioDays(source, range, setting, { lots: ROTATION_PAGE_LOTS });
   const bookNow =
     book.data !== null &&
     book.data.source === (source === 'reconstructed' ? 'reconstructed' : 'recorded') &&
