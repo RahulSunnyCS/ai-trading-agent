@@ -725,7 +725,7 @@ backstop, and the `.env` switches stay as hard safety.
 
 | # | Task | Owner | State |
 |---|---|---|---|
-| 3.33.1 | Phase 1: versioned settings store + scheduler API + CLI + GitHub variable sync | claude | In progress |
+| 3.33.1 | Phase 1: versioned settings store + scheduler API + CLI + GitHub variable sync | claude | **Built 2026-10-19** (`apps/scheduler/src/automation.ts`, `GET`/`PUT /settings/automation`, `jobs settings`, 13 tests). The workflow does not read the new variables until Phase 3 |
 | 3.33.2 | Phase 2: Settings › Automation page + Guide | claude | Planned |
 | 3.33.3 | Phase 3: the jobs follow the settings (08:00 logins, exports, uploaders); 3b: Quantiply login through Shoonya | claude + owner | Planned (3b needs a capture with the owner) |
 | 3.33.4 | Phase 4: more settings (lots multiplier, add-on, pause, portfolio stop, 09:20 check) | claude | Planned |

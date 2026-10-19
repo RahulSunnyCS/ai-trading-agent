@@ -129,6 +129,10 @@ Today all of this is fixed in code and in switches:
 
 ## Log
 
+- 2026-10-19 — Phase 1 built:
+  - `apps/scheduler/src/automation.ts`: validation, master gating, the versioned store in `scheduler.db`, and the `automation-settings.json` snapshot for jobs.
+  - `GET`/`PUT /settings/automation`, which syncs the GitHub variables on save, and `jobs settings show|set`. 13 tests.
+  - Nothing reads the settings yet: the workflow and the jobs follow them from Phase 3.
 - 2026-10-19 — Started ("Start BL-140"). Answers:
   - three master switches (logins, uploads, deployment);
   - Save also sets the GitHub variables, so the 08:15 backstop follows the page;
