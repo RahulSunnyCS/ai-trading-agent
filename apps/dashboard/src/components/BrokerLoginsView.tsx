@@ -1,5 +1,6 @@
 import { AngelOneCard } from './AngelOneCard';
 import { FyersAuthCard } from './FyersAuthCard';
+import { KiteCard } from './KiteCard';
 import { CardHeader } from './ui/Card';
 
 /**
@@ -27,6 +28,13 @@ export function BrokerLoginsView() {
           Angel One
         </h2>
         <AngelOneCard />
+      </section>
+
+      <section aria-labelledby="kite-heading" className="space-y-3">
+        <h2 id="kite-heading" className="text-sm font-semibold text-foreground">
+          Kite (Zerodha)
+        </h2>
+        <KiteCard />
       </section>
     </div>
   );

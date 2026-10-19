@@ -26,6 +26,12 @@ SETTINGS_DEFAULTS = {
     "updated_at": None,
 }
 SETTING_FIELDS = ("min_trade_rs", "extra_cash_rs", "holdings_source", "paper_capital_rs")
+HOLDINGS_SOURCES = ("paper", "fyers", "kite")
+#: Held for options margin, never part of the strategy (owner, BL-142): LIQUIDBEES and every
+#: sovereign gold bond (symbols starting SGB). Always excluded: no holding rule overrides it, so
+#: an old "count LIQUIDBEES as cash" rule can never spend the options margin.
+MARGIN_SYMBOLS = frozenset({"LIQUIDBEES"})
+MARGIN_PREFIXES = ("SGB",)
 
 
 def owner() -> str:
@@ -62,8 +68,8 @@ def save_settings(con: duckdb.DuckDBPyConnection, who: str, **changes: Any) -> d
     if unknown:
         raise ValueError(f"Unknown settings: {', '.join(sorted(unknown))}")
     merged = {**current, **{k: v for k, v in changes.items() if v is not None}}
-    if merged["holdings_source"] not in ("paper", "fyers"):
-        raise ValueError("holdings_source must be 'paper' or 'fyers'.")
+    if merged["holdings_source"] not in HOLDINGS_SOURCES:
+        raise ValueError("holdings_source must be 'paper', 'fyers' or 'kite'.")
     for key in ("min_trade_rs", "extra_cash_rs", "paper_capital_rs"):
         if float(merged[key]) < 0:
             raise ValueError(f"{key} cannot be negative.")
@@ -84,9 +90,14 @@ def save_settings(con: duckdb.DuckDBPyConnection, who: str, **changes: Any) -> d
 
 
 def save_holdings(
-    con: duckdb.DuckDBPyConnection, who: str, source: str, rows: list[dict[str, Any]]
+    con: duckdb.DuckDBPyConnection,
+    who: str,
+    source: str,
+    rows: list[dict[str, Any]],
+    cash: float | None = None,
 ) -> str:
-    """Store one complete snapshot; returns its `synced_at`."""
+    """Store one complete snapshot, with the free cash read alongside it when there is one
+    (Kite, BL-142); returns its `synced_at`."""
     synced_at = _now()
     con.execute("BEGIN")
     try:
@@ -109,6 +120,11 @@ def save_holdings(
                 "avg_price) VALUES (?, ?, ?, '', 0, NULL)",
                 [who, synced_at, source],
             )
+        if cash is not None:
+            con.execute(
+                "INSERT INTO momentum_cash (owner, synced_at, source, cash_rs) VALUES (?, ?, ?, ?)",
+                [who, synced_at, source, float(cash)],
+            )
         con.execute("COMMIT")
     except Exception:
         con.execute("ROLLBACK")
@@ -116,23 +132,39 @@ def save_holdings(
     return synced_at
 
 
-def latest_holdings(con: duckdb.DuckDBPyConnection, who: str) -> dict[str, Any] | None:
+#: The snapshot sources each holdings source reads: its own broker, or a pasted list.
+SNAPSHOT_SOURCES = {"fyers": ("fyers", "paste"), "kite": ("kite", "paste")}
+
+
+def latest_holdings(
+    con: duckdb.DuckDBPyConnection, who: str, sources: tuple[str, ...] | None = None
+) -> dict[str, Any] | None:
+    """The newest snapshot, of any source or only of `sources`."""
+    where, params = "owner = ?", [who]
+    if sources:
+        where += f" AND source IN ({', '.join('?' for _ in sources)})"
+        params += list(sources)
     head = con.execute(
-        "SELECT synced_at, source FROM momentum_holdings WHERE owner = ? "
+        f"SELECT synced_at, source FROM momentum_holdings WHERE {where} "
         "ORDER BY synced_at DESC LIMIT 1",
-        [who],
+        params,
     ).fetchone()
     if head is None:
         return None
     rows = con.execute(
         "SELECT symbol, quantity, avg_price FROM momentum_holdings "
-        "WHERE owner = ? AND synced_at = ? AND symbol <> '' ORDER BY symbol",
-        [who, head[0]],
+        "WHERE owner = ? AND synced_at = ? AND source = ? AND symbol <> '' ORDER BY symbol",
+        [who, head[0], head[1]],
     ).fetchall()
+    cash = con.execute(
+        "SELECT cash_rs FROM momentum_cash WHERE owner = ? AND synced_at = ? AND source = ?",
+        [who, head[0], head[1]],
+    ).fetchone()
     return {
         "synced_at": head[0],
         "source": head[1],
         "rows": [{"symbol": s, "quantity": q, "avg_price": p} for s, q, p in rows],
+        "cash": cash[0] if cash else None,
     }
 
 
@@ -142,6 +174,18 @@ def rules(con: duckdb.DuckDBPyConnection, who: str) -> dict[str, str]:
             "SELECT symbol, treatment FROM momentum_holding_rules WHERE owner = ?", [who]
         ).fetchall()
     )
+
+
+def is_margin_symbol(symbol: str) -> bool:
+    return symbol in MARGIN_SYMBOLS or symbol.startswith(MARGIN_PREFIXES)
+
+
+def treatment(symbol: str, rules: dict[str, str]) -> str | None:
+    """How Your orders treats a holding: `exclude` for the options-margin holdings (LIQUIDBEES,
+    SGBs) whatever the rules say, else the owner's rule, else None (part of the strategy)."""
+    if is_margin_symbol(symbol):
+        return "exclude"
+    return rules.get(symbol)
 
 
 def set_rule(con: duckdb.DuckDBPyConnection, who: str, symbol: str, treatment: str | None) -> None:

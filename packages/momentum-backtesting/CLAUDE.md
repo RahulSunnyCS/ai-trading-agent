@@ -498,6 +498,20 @@ contract, not a shared service).
   NEXT week on a flat stand-in row. `tests/test_broad_parity.py` pins that the week-ahead decision
   buys and fully sells exactly what the full backtest did; trims and top-ups read the week's own
   prices and are not pinned. Broad only for now; delay-0 strategies get no orders before 19:30.
+- `kite.py` + `holdings_sync.py` (BL-142 Phase 1) — Zerodha Kite, read-only: the Momentum money
+  is on Kite. `kite.py` calls only `/session/token`, `/portfolio/holdings` (quantity + T1),
+  `/user/margins/equity` (`net` = free cash) and `/user/profile`; no order endpoint. The token
+  (06:00 IST expiry, `fyers.token_expiry`) is cached 0600 in `data/.kite_token.json`. Login:
+  `POST /api/kite/login` returns Kite's login URL (state in `redirect_params`, in memory like
+  the Fyers states), Kite redirects to `GET /api/kite/callback` (the Kite app's registered
+  redirect URL `http://127.0.0.1:8765/api/kite/callback`), which stores the token and, when the
+  holdings source is `kite`, reads a snapshot. `holdings_sync.sync('kite'|'fyers')` stores a
+  snapshot (Kite with its free cash in `momentum_cash`, trading-data migration 013) for
+  `mbt orders run`, `mbt kite sync`, the callback and `POST /api/holdings/sync`.
+  `holdings_store.treatment` always leaves LIQUIDBEES and `SGB*` out as options margin (no rule
+  overrides it); Your orders counts a Kite snapshot's free cash, which is `net` minus pledged
+  collateral, never below 0. `mbt kite remind --send` is the Fri
+  13:30 `kite-login-reminder` job. The lot ledger and per-sleeve orders are BL-142 Phases 2–3.
 - `alerts.py` (BL-051 Phase 5) — `GET /api/alerts`: what needs a person, for the dashboard's bell
   and once-a-day pop-up. One pure function per kind over the data its Telegram job already reads:
   `split` (`stock_actions.review_snapshot`), `data` (`/weekly/status` readiness, for the

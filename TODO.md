@@ -766,3 +766,16 @@ backstop, and the `.env` switches stay as hard safety.
 | 3.33.2 | Phase 2: Settings › Automation page + Guide | claude | **Built 2026-10-19** (`components/settings/AutomationSettingsCard.tsx`, `lib/automation.ts`, 8 tests; checked in a preview against a throwaway scheduler API). Apply now waits for Phase 3 |
 | 3.33.3 | Phase 3: the jobs follow the settings (08:00 logins, exports, uploaders); 3b: Quantiply login through Shoonya | claude | **Built 2026-10-19** (stand-in tested, not yet run live): `--from-settings` exports and uploaders, Quantiply per broker (`--broker`, own ledger), Shoonya login (`quantiply-shoonya.ts`), dispatch and the 08:15 backstop follow the logins switch, `ONLY=none`, Quantiply · Shoonya at 08:00 (own line, never the exit code), deploy gated by the deploy switch, Apply now |
 | 3.33.4 | Phase 4: more settings (lots multiplier, add-on, pause, portfolio stop, 09:20 check) | claude | Planned |
+
+### 3.34 Momentum on Zerodha Kite, weekly lots — [BL-142](backlog/BL-142-momentum-kite-weekly-lots.md)
+
+Owner (2026-10-19): the Momentum money is on Kite, bought on Mondays at ₹50k a week up to ₹2 lakh.
+Each week's buy is a lot, rebalanced every K weeks with Kite's free cash. LIQUIDBEES and SGBs are
+options margin and are never part of the strategy. Kite access is read-only.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.34.1 | Phase 1: Kite read-only access (Login button, Friday reminder, holdings + free cash snapshot, LIQUIDBEES / `SGB*` excluded); login stays manual (Zerodha does not allow automating it; owner, 2026-10-19) | claude | **Built 2026-10-19, not yet run live.** `kite.py`, `/api/kite/*`, migration 013, `mbt kite …`, `kite-login-reminder` Fri 13:30, Broker logins Kite card. Open: holdings source → Kite, the first real snapshot Fri 23 Oct |
+| 3.34.2 | Phase 2: the lot ledger (seed from the first Kite snapshot, weekly diff attribution, flags, `mbt lots`) | claude | Planned |
+| 3.34.3 | Phase 3: per-sleeve orders on Friday with free cash | claude | Planned |
+| 3.34.4 | Phase 4: Lots panel, Guide, `business.md` / `technical.md` | claude | Planned |

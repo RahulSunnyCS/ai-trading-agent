@@ -104,6 +104,22 @@ const BASE_JOBS: Job[] = [
       'Check the ANGELONE_* settings in .env, then Broker logins › Angel One › Test connection (or: cd packages/option-backtesting && uv run obt angel test)',
   },
   {
+    // BL-142: the 14:15 orders read the Kite holdings and free cash, and a Kite token dies at
+    // 06:00. When Kite is the holdings source and today has no valid login, Telegram the owner
+    // to log in (Broker logins › Kite). Says nothing when the login is fine or Kite is not used.
+    id: 'kite-login-reminder',
+    description: 'Kite: remind to log in before the 14:15 orders',
+    schedule: { at: '13:30', on: FRIDAY, label: 'Fri 13:30' },
+    steps: [['uv', 'run', 'mbt', 'kite', 'remind', '--send']],
+    cwd: MOMENTUM,
+    timeoutMinutes: 5,
+    retries: 0,
+    retryDelayMinutes: 0,
+    catchUpHours: 0.5, // after ~14:00 a reminder comes too late for 14:15
+    group: 'catalog',
+    fixHint: 'cd packages/momentum-backtesting && uv run mbt kite login',
+  },
+  {
     // BL-051 Phase 3: the headline's orders before the close. With a signal delay of 1 the
     // decision is already fixed by last Friday's ranks, so they can be placed at 14:15.
     id: 'momentum-orders',
