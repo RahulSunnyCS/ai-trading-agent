@@ -232,3 +232,15 @@ Claude.
   after 09:16; the Setup Execution dialog is recorded after 08:00.
 - 2026-10-19 — **Dropped by the owner**: "stop deploying, do all other things as discussed". Deploying stays the owner's click in AlgoTest's `/live`; BL-137 (export, evening delete-and-upload, 09:16 top-up) continues. The findings above (the `/live` table, the 6-strategy limit, the 08:00–15:40 window, activations repeating on weekdays) are kept for a revival.
 - 2026-10-19 — **Reopened by the owner** the same night: build the deploy function so it is ready, off by default; it may never be used. The Setup Execution discovery happens at 08:06 (the owner clicks it on /live; Claude reads the screen and records the fields).
+- 2026-10-19 09:18 — first live deploy seen (the owner deployed `T1 · N_p150-t1s11_0917` by hand), read from
+  /live without clicking:
+  - **Deployed Strategies** card: "Deployed on 19 OCT 26 · Intraday · <name> · NIFTY · Open Pos: 2 · RUNNING ·
+    ₹ 81.25 · Finvasia - Shiny" with "Switch to manual", "Square Off", "View Trades"; the section header has
+    "Switch all to manual" and "Square off all".
+  - **Activation** row after setup: status "Ready to deploy", "1 Deployed", the button "Edit Execution" in place
+    of "Setup Execution", and the weekday columns still "-": the owner's deploy did **not** set repeating
+    days. So an activation can be for the day only, which corrects the earlier reading that activations always
+    repeat. The 15:30 deactivate-all stays as a safety net.
+  - The Setup Execution dialog itself is still to be read (the owner will pause on it for the 09:47 deploy).
+  - The 09:16 T1 entry matched the evening preview exactly (3 of 3), so the morning top-up had nothing to add.
+
