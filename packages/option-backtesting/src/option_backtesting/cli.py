@@ -36,6 +36,10 @@ from .heatmap.cli import heatmap_app  # noqa: E402  (BL-094: the straddle heatma
 
 app.add_typer(heatmap_app, name="heatmap")
 
+from .ruletest.cli import rule_app  # noqa: E402  (BL-120: rule strategies and the tester)
+
+app.add_typer(rule_app, name="rule")
+
 
 @app.callback()
 def _load_env() -> None:

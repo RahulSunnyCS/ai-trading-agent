@@ -1281,6 +1281,10 @@ def run_broad_backtest(
     # that week (higher feature = better; a name without a value gets the week's middle rank),
     # re-ranked. None (default) changes nothing.
     feature_tilt: tuple[pd.DataFrame, float] | None = None,
+    # BL-116 Phase 2: a buy week's money goes to picks from the best-placed sector held that week
+    # (its category is first in `held_by_week`) at this many times the share of the others.
+    # 1.0 (default) changes nothing; category mode only.
+    top_sector_weight: float = 1.0,
 ) -> BroadBacktestResult:
     """Step 2 (if `ranking` isn't already supplied -- e.g. by a caller's own cache, see
     `api.py`'s `get_categories_universe` for the equivalent Custom Index pattern) plus either
@@ -1470,10 +1474,23 @@ def run_broad_backtest(
             str(prices.index[0].date()),
             str(prices.index[-1].date()),
         )
+    buy_weights = None
+    if top_sector_weight != 1.0:
+        if category_mode != "on" or held_by_week is None or effective.groups is None:
+            raise ValueError("top_sector_weight needs category_mode='on'")
+        picked_through = effective.groups.reindex(prices.index)
+        top = pd.Series(
+            [(held_by_week.get(w) or [None])[0] for w in picked_through.index],
+            index=picked_through.index,
+            dtype=object,
+        )
+        buy_weights = pd.DataFrame(1.0, index=picked_through.index, columns=picked_through.columns)
+        buy_weights = buy_weights.mask(picked_through.eq(top, axis=0), float(top_sector_weight))
     result = engine.run_backtest(
         prices,
         includes,
         config,
+        buy_weights=buy_weights,
         external_ranks=(ranks_full, scores_full),
         mass_exit_weeks=mass_exit_weeks if mass_exit_response == "throttle" else None,
         groups=(

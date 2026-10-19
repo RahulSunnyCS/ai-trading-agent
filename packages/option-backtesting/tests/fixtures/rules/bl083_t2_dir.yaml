@@ -1,0 +1,33 @@
+# BL-083 T2 VIX turn, said in the BL-120 rule grammar. Acceptance fixture: the tester must find the same
+# firings as research/bl083/triggers.py and the same event-minus-placebo as its event study.
+rule:
+  id: bl083_t2_dir
+  name: BL-083 T2 to Dir
+  underlying: NIFTY
+  window: { from: "10:30", to: "14:00" }
+  when:
+    all:
+      - ge: [{ sub: [{ div: [vix, vix_open] }, 1] }, 0.02]
+      - le: [{ pct_change: { x: vix, n: 30 } }, -0.01]
+  template:
+    exit_time: "15:28"
+    square_off: partial
+    legs:
+      - id: ce
+        lots: 1
+        position: sell
+        option_type: CE
+        expiry: weekly
+        strike: { strike_type: ATM }
+        stop_loss: { percent: 21 }
+        reentry_on_sl: { mode: cost, count: 1 }
+      - id: pe
+        lots: 1
+        position: sell
+        option_type: PE
+        expiry: weekly
+        strike: { strike_type: ATM }
+        stop_loss: { percent: 21 }
+        reentry_on_sl: { mode: cost, count: 1 }
+    overall:
+      stop_loss_inr: 3000

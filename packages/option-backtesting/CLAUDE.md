@@ -164,6 +164,41 @@ Otherwise:
   dashboard's `POST /legwise/daily` job; add a step here, never in one caller), `store.py` (strategies, versions and
   results in the trading-data catalog — a version is a hash of the validated spec). Separate from `engine/` on purpose — see `DECISIONS.md`.
   Also `anatomy.py` (per-day, per-segment index shape — QUIET/CHOP/TREND from spot + India VIX, descriptive only: lag it a day before using it for anything actionable; `DTE_RELIABLE_FROM` guards a wrong pre-Sep-2025 expiry calendar) and `forensics.py` (one saved day re-simulated for the dashboard; `DayResult.mtm` is the per-minute curve, never persisted). `fyers/history.py` backfills index + VIX history (`obt fyers history`).
+- `live/session.py` + `api/live_routes.py` — the Live page's data (BL-117 Phase 3; `GET /legwise/live/days` and
+  `/session?underlying=NIFTY|SENSEX&day=`, proxied at `/api/backtest/legwise/live/*`), read-only. One day on the
+  375-minute grid, trimmed to the last real index bar: spot, India VIX, the ATM strike of each minute, the **rolling**
+  ATM straddle (CE + PE at each minute's own ATM, so it re-strikes) and the straddle **held** from the strike that was
+  ATM at the 09:15 open, both on the nearest weekly expiry; a minute with no bar of its own is `None`, never carried
+  (`market.load_day` forward-fills for the engine, so `_load` blanks those minutes again from the files' bar
+  minutes, for spot, VIX and every leg); days to expiry are
+  weekdays (`rotation/dte.py`); the median full-session range of the last 20 sessions is context only. Today the
+  source is always a collected lake day (`source.kind: replay`, `live.available: false` with the reason); a live reader
+  over `TRADING_DATA_ROOT/live/<day>/` (BL-117 Phase 2) is meant to return the same shape. Replays are cached
+  (`lru_cache`); nothing is written.
+- `ruletest/` + `api/rule_routes.py` — rule strategies and the tester (BL-120 Phase 1; `obt rule validate|test|reveal|ledger`,
+  `/legwise/rules/*`). A rule is WHEN (a condition on the index's bars, `expr.py`'s small grammar over (sessions x 375)
+  arrays; every operator reads only stamps <= j and earlier sessions, held by a causality test) → WHAT (a legwise
+  template's legs, each `on: up|down|both`, entered at the firing stamp + 1) → how it is managed (the template's stops
+  and exit). `spec.py` validates and hashes it (`spec_hash` ignores id / name / notes; `template_hash` ignores the
+  condition, so the simulation cache is shared by rules with one template) and reads it back in plain words;
+  `frame.py` loads index + VIX sessions from 2020-09 and the cached ATM-straddle feature; `sim.py` runs the template
+  with the legwise engine and keeps gross + turnover per (template, day, entry, side, slippage) in
+  `TRADING_DATA_ROOT/ruletest/simcache/` (charges are applied on read by `charges.py`, the BL-063 model);
+  `study.py` is BL-083's event study generalised: events (first firing in the window, one per session), the placebo
+  (same template and side at the same minute on the 20 nearest no-event days), the random-time control (a 5-minute entry
+  grid, 200 draws, seeded from the spec hash), slippage 0.5% / 1% on the events, by half-year / weekday / expiry day.
+  `store.py` keeps specs, results, the **ledger** (`tests.jsonl`, every test, a sweep of K counts K) and the **reveals**
+  (`reveals.jsonl`) as files, not the catalog. The learning period (2024-10-09 to 2026-10-08) is always open; the
+  confirmation period (NIFTY 2022-01 to 2024-10-08) is locked until `obt rule reveal <hash>` (once per spec hash, logged)
+  or an exploratory run (`--open-all`), which is itself logged as the spec's reveal (`note: exploratory test <id>`); a
+  test that includes it lists every earlier test of the spec that already saw it (`confirmation_seen_before`, in the
+  result and its ledger line); sessions after 2026-10-08 are forward only and never tested.
+  `{straddle: {at: T}}` is NaN before `T` (its strike is chosen at `T`'s close); the straddle feature file saves only
+  built rows and days whose option file lacks the strike, never a day without a file or a failed read (retried next
+  run); the simulation cache skips and counts a torn row and starts every append on a fresh line. A result is labelled
+  "a screen, not a finding". `scripts/ruletest-acceptance.py` must print ACCEPTANCE OK: the four BL-083 triggers, said in
+  the grammar (`tests/fixtures/rules/`), fire on the same days and stamps as `research/bl083/`, and T1 and T4 with the Dir
+  template reproduce its event-study rows to the rupee. A leg with its own `range_breakout` is not supported yet.
 - `notify.py` — Telegram sender (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID), a deliberate copy of
   `momentum-backtesting`'s notify.py mirroring `@trading/notify`'s contract (never `parse_mode`,
   redacts known secrets, never raises; prints when unconfigured). Tests must stub `send` —

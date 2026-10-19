@@ -30,6 +30,7 @@ import momentumReadSignal from './content/momentum/walkthrough-weekly-signal.md?
 import opsBrokerLogins from './content/operations/broker-logins.md?raw';
 import opsCoverage from './content/operations/coverage.md?raw';
 import opsJobs from './content/operations/jobs.md?raw';
+import opsLive from './content/operations/live.md?raw';
 import opsOverview from './content/operations/overview.md?raw';
 import opsSettings from './content/operations/settings.md?raw';
 import optionsBuilderForm from './content/optionslab/builder-form.md?raw';
@@ -433,6 +434,16 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     kind: 'Screen',
     body: opsBrokerLogins,
     screen: { tab: 'brokerLogins' },
+  },
+  {
+    chapter: 'operations',
+    slug: 'live',
+    title: 'Live',
+    summary:
+      'Spot, India VIX and two straddles for NIFTY or SENSEX, minute by minute; a replay until live capture exists.',
+    kind: 'Screen',
+    body: opsLive,
+    screen: { tab: 'live' },
   },
   {
     chapter: 'operations',

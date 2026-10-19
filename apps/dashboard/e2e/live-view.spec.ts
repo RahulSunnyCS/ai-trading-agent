@@ -1,380 +1,228 @@
 /**
- * E2E tests for the Live view (/live).
+ * E2E tests for the Live page (/live, BL-117 Phase 3).
  *
- * These tests verify:
- *  - The index card's feed-status badge renders in its various states (Connecting…, Not
- *    connected, Simulation) and is never absent
- *  - A simulated feed is labelled as such — the Simulation banner and badge — never as real
- *    or live straddle data
- *  - The ATM straddle card shows a graceful notice, with no numeric value, until the first
- *    straddle snapshot arrives
- *  - Incoming tick frames are parsed and rendered as numbers
- *  - Leaving the Live view (sidebar link to Trades) and coming back neither crashes nor
- *    loses the session's ticks (useLiveTicks keeps them at module level)
+ * Until live capture exists the page replays a day the evening run collected, read from
+ * `/api/backtest/legwise/live/days` and `/live/session` (live/session.py). These tests verify:
+ *  - The page loads a replay: the Replay badge and banner, the controls (index, day, playback)
+ *    and the charts, with the headline figures from the session
+ *  - Switching the index never shows the previous index's figures while the next one loads
+ *    (the fetch hook keeps the last response; the page shows only one that matches its controls)
+ *  - Picking a day keeps the day control on the chosen day while that day loads
+ *  - A session that cannot be loaded shows an error, not a blank page
  *
- * Every view has its own URL: the tests open /live directly and switch views through the
- * sidebar's Primary navigation links.
- *
- * The live feed is the /ws/ticks WebSocket — the straddle no longer comes from an HTTP poll.
- * It is mocked with page.routeWebSocket(), so no Fastify server is needed: the mock sends
- * tick / straddle frames, closes the socket to simulate an unreachable server, or holds it
- * in the connecting state. /api/meta and /api/auth/fyers/status are intercepted with
- * page.route(); only the Next dev server (http://localhost:5173) must be up.
+ * Both routes are mocked with page.route(), so no research API is needed; only the Next dev
+ * server (http://localhost:5173) must be up.
  *
  * Required env vars: none — all data is mocked via route interception.
  */
 
-import { type Page, type WebSocketRoute, expect, test } from '@playwright/test';
+import { type Page, type Route, expect, test } from '@playwright/test';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** /api/meta for a server running its random-walk simulator. */
-const SIMULATED_META = { simulate: true, broker: 'sim', authDegraded: false };
-
-/** A NIFTY 50 index tick frame, stamped now so the feed reads as fresh. */
-function indexTick(ltp: number, timestamp: number = Date.now()): string {
-  return JSON.stringify({ type: 'tick', symbol: 'NSE:NIFTY50-INDEX', ltp, timestamp });
+/** Epoch seconds of 09:15 IST on a YYYY-MM-DD day, then one minute apart. */
+function minutes(day: string, n: number): number[] {
+  const open = Date.parse(`${day}T03:45:00Z`) / 1000;
+  return Array.from({ length: n }, (_, i) => open + i * 60);
 }
 
+/** A four-minute session; `spot` is the index level it starts from. */
+function session(underlying: 'NIFTY' | 'SENSEX', day: string, spot: number) {
+  const closes = [spot, spot + 20, spot + 60, spot + 80];
+  const step = underlying === 'NIFTY' ? 50 : 100;
+  return {
+    underlying,
+    day,
+    source: { kind: 'replay', note: 'A collected session, played back from the lake.' },
+    live: {
+      available: false,
+      reason: 'No live feed is running, so the page replays a session the evening run collected.',
+    },
+    expiry: '2026-10-20',
+    dte_weekdays: 2,
+    strike_step: step,
+    last_minute: 3,
+    minutes: minutes(day, 4),
+    spot: {
+      open: spot,
+      close: closes,
+      high: closes.map((c) => c + 2),
+      low: closes.map((c) => c - 2),
+    },
+    vix: [14, 14.1, 14.2, 14.3],
+    atm: closes.map((c) => Math.round(c / step) * step),
+    rolling: { ce: [100, 101, null, 98], pe: [90, 89, null, 95], straddle: [190, 190, null, 193] },
+    fixed: {
+      strike: Math.round(spot / step) * step,
+      ce: [100, 101, 102, 103],
+      pe: [90, 89, 88, 87],
+      straddle: [190, 190, 190, 190],
+      open_value: 190,
+    },
+    range: { median_sessions: 20, median_full_session: 200, full_session: 84 },
+    notes: [],
+  };
+}
+
+const DAYS = ['2026-10-16', '2026-10-15'];
+const SPOT = { NIFTY: 25000, SENSEX: 82000 } as const;
+
 /**
- * Mock the backend the Live view talks to, then open /live.
- *
- * `onSocket` runs for every /ws/ticks connection the page opens (one per mount of the view).
- * When it returns without closing the socket, Playwright opens it as a mock server; while it
- * is still pending, the page's socket stays in the connecting state.
+ * Mock the two Live routes and open /live. `hold(url)` may return a promise to delay one
+ * session response (to look at the page while it loads); `failSession` answers every session
+ * request with an error.
  */
-async function openLiveView(
+async function openLive(
   page: Page,
   {
-    meta = SIMULATED_META,
-    onSocket = () => {},
-  }: {
-    meta?: unknown;
-    onSocket?: (ws: WebSocketRoute) => void | Promise<void>;
-  } = {},
+    hold = () => null,
+    failSession = false,
+  }: { hold?: (url: URL) => Promise<void> | null; failSession?: boolean } = {},
 ) {
-  await page.routeWebSocket((url) => url.pathname === '/ws/ticks', onSocket);
-
   await page.route(
-    (url) => url.pathname === '/api/meta',
-    (route) =>
-      route.fulfill({
+    (url) => url.pathname === '/api/backtest/legwise/live/days',
+    (route) => {
+      const underlying = new URL(route.request().url()).searchParams.get('underlying');
+      void route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(meta),
-      }),
+        body: JSON.stringify({ underlying, days: DAYS }),
+      });
+    },
   );
   await page.route(
-    (url) => url.pathname === '/api/auth/fyers/status',
-    (route) =>
-      route.fulfill({
+    (url) => url.pathname === '/api/backtest/legwise/live/session',
+    async (route: Route) => {
+      const url = new URL(route.request().url());
+      if (failSession) {
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'no collected NIFTY days' }),
+        });
+        return;
+      }
+      await hold(url);
+      const underlying = url.searchParams.get('underlying') === 'SENSEX' ? 'SENSEX' : 'NIFTY';
+      const day = url.searchParams.get('day') ?? DAYS[0];
+      await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ configured: false }),
-      }),
+        body: JSON.stringify(session(underlying, day, SPOT[underlying])),
+      });
+    },
   );
-
   await page.goto('/live');
 }
 
-/** The NIFTY 50 index card. */
-function indexCard(page: Page) {
-  return page.getByRole('main').locator('div.rounded-xl').filter({ hasText: 'NIFTY 50 index' });
-}
-
-/** The ATM straddle card. */
-function straddleCard(page: Page) {
-  return page
-    .getByRole('main')
-    .locator('div.rounded-xl')
-    .filter({ has: page.getByRole('heading', { name: 'ATM straddle' }) });
-}
-
-/** Every label the index card's feed badge can show (lib/live.ts LIVE_FEED_VIEW). */
-const FEED_LABELS = [
-  'Live',
-  'Simulation',
-  'Stale',
-  'Waiting for ticks',
-  'Idle',
-  'Connecting…',
-  'Not connected',
-];
-
-/** Mock /api/trades and switch to the Trades view through the sidebar — unmounts LiveView. */
-async function switchToTrades(page: Page) {
-  await page.route(
-    (url) => url.pathname === '/api/trades',
-    (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: [], message: 'no trades' }),
-      }),
-  );
-  await page
-    .getByRole('navigation', { name: 'Primary' })
-    .getByRole('link', { name: 'Trades', exact: true })
-    .click();
-  await expect(page).toHaveURL(/\/trades$/);
-  await expect(page.getByRole('heading', { name: 'Paper Trades' })).toBeVisible();
+function main(page: Page) {
+  return page.getByRole('main');
 }
 
 // ---------------------------------------------------------------------------
-// 1. Synthetic feed label — @critical
+// 1. The replay loads with its controls and charts — @critical
 // ---------------------------------------------------------------------------
 
-test('A simulated tick feed is labelled Simulation — not live or real straddle data @critical', async ({
+test('The Live page replays a collected day with its controls and charts @critical', async ({
   page,
 }) => {
-  await openLiveView(page, {
-    onSocket: (ws) => {
-      ws.send(JSON.stringify({ type: 'connected' }));
-      // VIX and option-leg ticks share the socket; only the index belongs on the index card.
-      ws.send(JSON.stringify({ type: 'tick', symbol: 'NSE:INDIAVIX-INDEX', ltp: 13.42 }));
-      ws.send(indexTick(22456.75));
-    },
-  });
+  const pageErrors: string[] = [];
+  page.on('pageerror', (err) => pageErrors.push(err.message));
+  await openLive(page);
 
-  // The incoming index tick is parsed and rendered as a formatted number.
-  const card = indexCard(page);
-  await expect(card.getByText('22,456.75')).toBeVisible();
-  await expect(card.getByText('13.42')).toHaveCount(0);
+  // It says plainly that this is a replay, not a live feed.
+  await expect(main(page).getByText('Replay', { exact: true })).toBeVisible();
+  await expect(main(page).getByText('Replay of Fri 16 Oct 2026.')).toBeVisible();
+  await expect(main(page)).toContainText('No live feed is running');
 
-  // The simulation banner says plainly that these are not real prices.
-  const banner = page.getByRole('status').filter({ hasText: 'Simulation' });
-  await expect(banner).toContainText('not real market prices');
+  // Controls: index, day, playback.
+  const index = page.getByRole('radiogroup', { name: 'Index' });
+  await expect(index.getByRole('radio', { name: 'NIFTY' })).toBeChecked();
+  await expect(page.getByRole('combobox', { name: 'Day to replay' })).toHaveValue('2026-10-16');
+  await expect(page.getByRole('button', { name: 'Play the day from here' })).toBeVisible();
+  await expect(page.getByRole('slider', { name: 'Minute of the day shown' })).toBeVisible();
 
-  // The feed badge on fresh simulated ticks reads "Simulation" — never "Live".
-  await expect(card.getByText('Simulation', { exact: true })).toBeVisible();
-  await expect(card.getByText('Live', { exact: true })).toHaveCount(0);
+  // Headline figures come from the session (the day opens at its end: minute 3).
+  await expect(main(page).getByText('NIFTY spot')).toBeVisible();
+  await expect(main(page).getByText('25,080.00')).toBeVisible();
 
-  // The straddle is a separate card, and has no value while no snapshot has arrived.
-  await expect(straddleCard(page)).toContainText('Waiting for the first straddle snapshot');
+  // The three charts render.
+  await expect(page.getByRole('img', { name: /NIFTY spot minute by minute/ })).toBeVisible();
+  await expect(
+    page.getByRole('img', { name: /Call plus put premium minute by minute/ }),
+  ).toBeVisible();
+  await expect(page.getByRole('img', { name: /India VIX minute by minute/ })).toBeVisible();
 
-  // Nothing presents the index tick (or anything else) as real or live straddle data.
-  const bodyText = (await page.locator('body').innerText()).toLowerCase();
-  for (const phrase of ['live straddle', 'real price', 'real straddle']) {
-    expect(bodyText).not.toContain(phrase);
-  }
+  expect(pageErrors).toHaveLength(0);
 });
 
 // ---------------------------------------------------------------------------
-// 2. No straddle snapshot → graceful notice — @critical
+// 2. A new index never shows the previous index's figures — @critical
 // ---------------------------------------------------------------------------
 
-test('Before any straddle snapshot arrives the straddle card shows a graceful notice with no numeric value @critical', async ({
+test('Switching the index shows no figures of the previous index while the next one loads @critical', async ({
   page,
 }) => {
-  // Connected, index ticks flowing, but the straddle calculator has sent nothing.
-  await openLiveView(page, {
-    onSocket: (ws) => {
-      ws.send(indexTick(22456.75));
-    },
-  });
-  await expect(indexCard(page).getByText('22,456.75')).toBeVisible();
-
-  const card = straddleCard(page);
-  await expect(card).toBeVisible();
-
-  // The notice is human-readable.
-  await expect(card).toContainText('Waiting for the first straddle snapshot');
-
-  // No feed badge for a straddle that has never arrived.
-  for (const label of FEED_LABELS) {
-    await expect(card.getByText(label, { exact: true })).toHaveCount(0);
-  }
-
-  // No numeric straddle value: a formatted one looks like "245.60" or "1,245.60".
-  expect(await card.innerText()).not.toMatch(/\d[\d,]*\.\d{2}/);
-});
-
-// ---------------------------------------------------------------------------
-// 3. Feed-status badge — Connecting state — @critical
-// ---------------------------------------------------------------------------
-
-test('The index card shows a Connecting… badge while the WebSocket has not opened @critical', async ({
-  page,
-}) => {
-  // Hold the mock socket in the connecting state until the test releases it.
   let release = () => {};
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await openLiveView(page, {
-    onSocket: async (ws) => {
-      await held;
-      ws.send(indexTick(22456.75));
-    },
+  await openLive(page, {
+    hold: (url) => (url.searchParams.get('underlying') === 'SENSEX' ? held : null),
   });
+  await expect(main(page).getByText('25,080.00')).toBeVisible();
 
-  const card = indexCard(page);
-  await expect(card.getByText('Connecting…', { exact: true })).toBeVisible();
-  await expect(card).toContainText('Connecting to the tick feed…');
-  // No value is invented while connecting.
-  await expect(card).toContainText('––');
-
-  // Once the socket opens and a tick arrives, the badge moves on from Connecting….
-  release();
-  await expect(card.getByText('22,456.75')).toBeVisible();
-  await expect(card.getByText('Connecting…', { exact: true })).toHaveCount(0);
-  await expect(card.getByText('Simulation', { exact: true })).toBeVisible();
-});
-
-// ---------------------------------------------------------------------------
-// 4. Feed-status badge — Not connected when the socket closes — @critical
-// ---------------------------------------------------------------------------
-
-test('The feed badge turns to Not connected when the WebSocket cannot connect @critical', async ({
-  page,
-}) => {
-  // The server refuses every connection: close the socket as soon as it is routed.
-  await openLiveView(page, {
-    onSocket: (ws) => {
-      void ws.close({ code: 1011, reason: 'unreachable' });
-    },
-  });
-
-  const card = indexCard(page);
-  await expect(card.getByText('Not connected', { exact: true })).toBeVisible();
-  await expect(card).toContainText('Tick feed unreachable · retrying');
-
-  // The straddle card says why it is empty rather than waiting forever.
-  await expect(straddleCard(page)).toContainText('Tick feed not connected');
-});
-
-// ---------------------------------------------------------------------------
-// 5. Unmounting LiveView closes the WebSocket — @critical (partial E2E component)
-// ---------------------------------------------------------------------------
-
-test('Switching away from LiveView to another view closes its socket and leaves no stale console errors @critical', async ({
-  page,
-}) => {
-  // Collect any console errors during the test.
-  const consoleErrors: string[] = [];
-  page.on('console', (msg) => {
-    if (msg.type() === 'error') {
-      consoleErrors.push(msg.text());
-    }
-  });
-
-  // Collect any unhandled page errors.
-  const pageErrors: string[] = [];
-  page.on('pageerror', (err) => {
-    pageErrors.push(err.message);
-  });
-
-  // Track which sockets the page still holds open (dev StrictMode opens and closes one extra).
-  const openSockets = new Set<WebSocketRoute>();
-  let connections = 0;
-  await openLiveView(page, {
-    onSocket: (ws) => {
-      connections += 1;
-      openSockets.add(ws);
-      ws.onClose(() => {
-        openSockets.delete(ws);
-      });
-      ws.send(indexTick(22456.75));
-    },
-  });
-  await expect(indexCard(page).getByText('22,456.75')).toBeVisible();
-  await expect.poll(() => openSockets.size).toBe(1);
-
-  // Switch to Trades through the sidebar — this unmounts LiveView.
-  await switchToTrades(page);
-
-  // Unmounting closes the socket...
-  await expect.poll(() => openSockets.size).toBe(0);
-  const connectionsAtUnmount = connections;
-
-  // Wait out the first reconnect backoff (3 s + up to 20% jitter, hooks/useLiveTicks.ts) so
-  // any post-unmount effect — a reconnect included — would have fired.
-  await page.waitForTimeout(4_000);
-
-  // ...and does not arm a reconnect: no new socket after the view is gone.
-  expect(connections).toBe(connectionsAtUnmount);
-
-  // No unhandled page errors should have occurred.
-  expect(pageErrors).toHaveLength(0);
-
-  // No React "state update on unmounted component" warnings.
-  const reactUnmountWarnings = consoleErrors.filter(
-    (e) => e.includes('unmounted component') || e.includes("Can't perform a React state update"),
-  );
-  expect(reactUnmountWarnings).toHaveLength(0);
-});
-
-// ---------------------------------------------------------------------------
-// 6. Ticks are retained across a view switch and return — @non-blocker
-// ---------------------------------------------------------------------------
-
-test('Switching away from LiveView and back keeps the session ticks and does not crash @non-blocker', async ({
-  page,
-}) => {
-  // Collect unhandled errors.
-  const pageErrors: string[] = [];
-  page.on('pageerror', (err) => {
-    pageErrors.push(err.message);
-  });
-
-  // Ticks are sent only before the switch: anything shown after the return must have been
-  // kept from before it, not re-sent.
-  let sendTicks = true;
-  let connections = 0;
-  await openLiveView(page, {
-    onSocket: (ws) => {
-      connections += 1;
-      if (!sendTicks) return;
-      const now = Date.now();
-      ws.send(indexTick(22450.5, now - 2_000));
-      ws.send(indexTick(22456.75, now - 1_000));
-    },
-  });
-  const chart = page.getByRole('img', { name: /NIFTY 50 index over the last 2 ticks/ });
-  await expect(indexCard(page).getByText('22,456.75')).toBeVisible();
-  await expect(chart).toBeVisible();
-
-  sendTicks = false;
-  const connectionsBeforeSwitch = connections;
-  await switchToTrades(page);
-
-  // Switch back to Live through the sidebar.
   await page
-    .getByRole('navigation', { name: 'Primary' })
-    .getByRole('link', { name: 'Live', exact: true })
+    .getByRole('radiogroup', { name: 'Index' })
+    .getByRole('radio', { name: 'SENSEX' })
     .click();
-  await expect(page).toHaveURL(/\/live$/);
+  await expect(page).toHaveURL(/ix=SENSEX/);
+  // SENSEX has not answered yet: NIFTY's figures are gone, not shown under the SENSEX control.
+  await expect(main(page).getByText('25,080.00')).toHaveCount(0);
+  await expect(main(page).getByText('NIFTY spot')).toHaveCount(0);
 
-  // LiveView remounts cleanly with a fresh socket, showing the ticks from before the switch.
-  await expect.poll(() => connections).toBeGreaterThan(connectionsBeforeSwitch);
-  await expect(indexCard(page).getByText('22,456.75')).toBeVisible();
-  await expect(chart).toBeVisible();
-
-  // The straddle card still shows its notice.
-  await expect(straddleCard(page)).toContainText('Waiting for the first straddle snapshot');
-
-  // No JS errors during the round-trip.
-  expect(pageErrors).toHaveLength(0);
+  release();
+  await expect(main(page).getByText('SENSEX spot')).toBeVisible();
+  await expect(main(page).getByText('82,080.00')).toBeVisible();
 });
 
 // ---------------------------------------------------------------------------
-// 7. Feed badge is visible and readable — @non-blocker (visual)
+// 3. The day control keeps the chosen day while it loads — @non-blocker
 // ---------------------------------------------------------------------------
 
-test('The index feed badge is visible and names the current status in text @non-blocker', async ({
+test('Picking a day keeps the day control on that day while it loads @non-blocker', async ({
   page,
 }) => {
-  await openLiveView(page, {
-    onSocket: (ws) => {
-      ws.send(indexTick(22456.75));
-    },
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
   });
+  await openLive(page, {
+    hold: (url) => (url.searchParams.get('day') === '2026-10-15' ? held : null),
+  });
+  const day = page.getByRole('combobox', { name: 'Day to replay' });
+  await expect(day).toHaveValue('2026-10-16');
 
-  // The badge's status dot is decorative (aria-hidden); the status is the badge's own text,
-  // so it reaches screen readers without an aria-label.
-  const badge = indexCard(page).getByText('Simulation', { exact: true });
-  await expect(badge).toBeVisible();
-  await expect(badge.locator('[aria-hidden="true"]')).toHaveCount(1);
+  await day.selectOption('2026-10-15');
+  await expect(page).toHaveURL(/d=2026-10-15/);
+  // Still loading: the control stays on the chosen day, and the old day's banner is gone.
+  await expect(day).toHaveValue('2026-10-15');
+  await expect(main(page).getByText('Replay of Fri 16 Oct 2026.')).toHaveCount(0);
+
+  release();
+  await expect(main(page).getByText('Replay of Thu 15 Oct 2026.')).toBeVisible();
+  await expect(day).toHaveValue('2026-10-15');
+});
+
+// ---------------------------------------------------------------------------
+// 4. A session that cannot be loaded is an error, not a blank page — @critical
+// ---------------------------------------------------------------------------
+
+test('A session that cannot be loaded shows an error @critical', async ({ page }) => {
+  await openLive(page, { failSession: true });
+  const alert = main(page).getByRole('alert');
+  await expect(alert).toContainText('The session could not be loaded');
+  await expect(page.getByRole('radiogroup', { name: 'Index' })).toBeVisible();
 });

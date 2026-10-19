@@ -1,0 +1,38 @@
+# BL-083 T4 RSI exhaustion, said in the BL-120 rule grammar. Acceptance fixture: the tester must find the same
+# firings as research/bl083/triggers.py and the same event-minus-placebo as its event study.
+rule:
+  id: bl083_t4_dir
+  name: BL-083 T4 to Dir
+  underlying: NIFTY
+  window: { from: "10:30", to: "14:00" }
+  define:
+    rsi5: { rsi: { n: 14, minutes: 5 } }
+    prev: { lag: { x: rsi5, n: 5 } }
+  when:
+    all:
+      - bar_close: 5
+      - any:
+          - all: [{ ge: [prev, 70] }, { lt: [rsi5, 70] }]
+          - all: [{ le: [prev, 30] }, { gt: [rsi5, 30] }]
+  template:
+    exit_time: "15:28"
+    square_off: partial
+    legs:
+      - id: ce
+        lots: 1
+        position: sell
+        option_type: CE
+        expiry: weekly
+        strike: { strike_type: ATM }
+        stop_loss: { percent: 21 }
+        reentry_on_sl: { mode: cost, count: 1 }
+      - id: pe
+        lots: 1
+        position: sell
+        option_type: PE
+        expiry: weekly
+        strike: { strike_type: ATM }
+        stop_loss: { percent: 21 }
+        reentry_on_sl: { mode: cost, count: 1 }
+    overall:
+      stop_loss_inr: 3000

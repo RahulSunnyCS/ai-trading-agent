@@ -309,14 +309,22 @@ export function formatIstDateTimeShort(
   return date ? `${_istDate.format(date)}, ${formatIstTime(date, options)}` : EMPTY;
 }
 
+const _utcWeekday = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short' });
+
 /**
  * A calendar day that carries no time zone ("2026-10-05", a trading day or signal week):
- * "05 Oct 2026". Unlike formatIstDate it never shifts the day.
+ * "05 Oct 2026", or "Mon 05 Oct 2026" with `weekday`. Unlike formatIstDate it never shifts
+ * the day.
  */
-export function formatDay(day: string | null | undefined): string {
+export function formatDay(
+  day: string | null | undefined,
+  options: { weekday?: boolean } = {},
+): string {
   if (!day) return EMPTY;
   const date = new Date(`${day.slice(0, 10)}T00:00:00Z`);
-  return Number.isNaN(date.getTime()) ? EMPTY : _utcDate.format(date);
+  if (Number.isNaN(date.getTime())) return EMPTY;
+  const text = _utcDate.format(date);
+  return options.weekday ? `${_utcWeekday.format(date)} ${text}` : text;
 }
 
 /** How long ago an instant was: "just now", "42s ago", "5 min ago", "3 h ago", "2 d ago". */

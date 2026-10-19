@@ -112,7 +112,7 @@ describe('guide routing helpers', () => {
     expect(guidePageForScreen('optionslab', ['builder', 'yaml'])?.slug).toBe('builder-yaml');
     expect(guidePageForScreen('momentum', ['journal'])?.slug).toBe('journal');
     expect(guidePageForScreen('jobs')?.slug).toBe('jobs');
-    expect(guidePageForScreen('live')).toBeUndefined();
+    expect(guidePageForScreen('trades')).toBeUndefined();
   });
 
   it('gives every Momentum and Options Lab sub-screen a page', () => {
