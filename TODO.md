@@ -738,3 +738,16 @@ Owner (2026-10-19): build the deploy function ready, off by default; it may neve
 | `.claude/project/overview.md` | What is **built** (Implementation Phases). This file holds what is **left** |
 | `docs/epics.md` | Permanent delivery record. Never deleted, never a TODO |
 | `docs/architecture.md`, `product.md`, `setup.md`, `testing.md` | Reference specs. No status, no tasks |
+
+### 3.32 Rotation Core picks to Quantiply — [BL-139](backlog/BL-139-quantiply-core-upload.md)
+
+Owner (2026-10-19): add the Core Adaptive picks to Quantiply (Angel One) too, on AlgoTest's schedule: evening replace,
+09:16 top-up. Through Quantiply's own API (the call its web app makes), not the form. Deploy built but off.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.32.1 | Phase 1: capture the web app's calls (create, list, read, delete, auth) with the owner | owner + claude | **Done 2026-10-19** (`docs/algotest-execution.md`, `tests/fixtures/quantiply/`); the enable (deploy) call is not sent |
+| 3.32.2 | Phase 2: `legwise/quantiply.py` + `obt rotation quantiply-export`: YAML → `POST /algos` body, the owner's execution settings, unmapped settings refused | claude | **Built 2026-10-19** (25 tests); all of Core-298 maps; Buy shapes' trail in points is unconfirmed, so they cannot be uploaded yet |
+| 3.32.3 | Phase 3: uploader over the API (ledger, read-back, delete only its own) + scheduler jobs | claude | Planned |
+| 3.32.4 | Phase 4: deploy (`enabled`), built but off | claude | Planned |
+

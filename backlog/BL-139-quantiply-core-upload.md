@@ -8,7 +8,7 @@
 | **Area** | options + broker-login |
 | **Created** | 2026-10-19 |
 | **Depends on** | BL-137 (rotation export, picks, the evening/top-up planner and its ledger), BL-138 (deploy, built but off), the Quantiply login (#261, #262) |
-| **TODO.md row** | — (filled in when Phase 1 starts) |
+| **TODO.md row** | §3.32 |
 
 ## Context
 
@@ -175,6 +175,12 @@ only if the API cannot be used.
 
 ## Log
 
+- 2026-10-19 — Phase 2 built:
+  - `legwise/quantiply.py` (`to_quantiply`, `comparable` for the read-back) and `rotation/quantiply_export.py` + `obt rotation quantiply-export` (Core only).
+  - Execution settings are copied from the owner's `N_ITM1_SL21_3000` (owner's choice): limit orders with buffer 3, product D, SL limit 1, exit delay 3 s.
+  - All 298 Core variants map. Only `N_buy` / `S_buy` use a trail in points, which is never yet seen saved, so they are marked unconfirmed.
+  - 25 tests against the captured fixtures.
+  - The exit time is the YAML's (15:28:00); the owner's own algo uses 15:28:50.
 - 2026-10-19 — Phase 1 captured with the owner in the browser pane:
   - The calls: create (`POST /algos`, one algo per weekday, not enabled), list (`/algos/day-wise`), read (`GET /algos/:id`) and delete (`DELETE /algos/:id`).
   - Auth: a 9-hour JWT kept in the app's local storage.
