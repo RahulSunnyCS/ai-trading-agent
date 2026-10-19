@@ -6,8 +6,12 @@
  *    page says so at the top. There is no live capture yet (BL-117 Phase 2); when it exists the
  *    same URL answers with the day so far, and this page needs no change.
  *  - Two straddles on the nearest weekly expiry: the rolling ATM (re-strikes as the index moves)
- *    and the strike that was ATM at the 09:15 open, held all day. A minute whose leg had not
- *    traded is a gap in the line, never a carried value.
+ *    and the strike that was ATM at the 09:15 open, held all day. A minute with no bar of its own
+ *    (a leg that had not traded, or did not trade in that minute) is a gap in the line, never a
+ *    carried value.
+ *  - A response is shown only when it is the index and day the controls ask for
+ *    (`isCurrentSession`): while the next one loads the page shows a skeleton, never the last
+ *    one's figures.
  *  - Changes are measured since 09:15 and are never coloured as profit or loss: spot, VIX and a
  *    straddle moving is not the reader's P&L.
  *  - Index and day live in the URL query (`ix`, `d`), so a copied link shows the same session.
@@ -21,13 +25,13 @@ import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react
 
 import { useLiveDays, useLiveSession } from '../hooks/useLiveSession';
 import { useQueryState } from '../hooks/useQueryState';
-import { formatDay, formatInt, formatNumber } from '../lib/format';
+import { formatDay, formatInt, formatNumber, formatPct } from '../lib/format';
 import {
   type Change,
   type LiveFrame,
   type SpeedId,
-  dayLabel,
   frameAt,
+  isCurrentSession,
   pointsUpTo,
 } from '../lib/liveSession';
 import type { LiveUnderlying } from '../types/liveSession';
@@ -53,8 +57,14 @@ const INDEXES: ReadonlyArray<{ value: LiveUnderlying; label: string }> = [
 function changeText(change: Change | null, unit = ''): string {
   if (change === null) return '–';
   const abs = formatNumber(change.abs, 2, { sign: true });
-  const pct = change.pct === null ? '' : ` (${formatNumber(change.pct, 2, { sign: true })}%)`;
+  const pct =
+    change.pct === null ? '' : ` (${formatPct(change.pct, 2, { unit: 'percent', sign: true })})`;
   return `${abs}${unit}${pct}`;
+}
+
+/** "Fri 16 Oct 2026": a replay is picked by date, so the weekday is shown with it. */
+function dayLabel(day: string): string {
+  return formatDay(day, { weekday: true });
 }
 
 function value(n: number | null, dp = 2): string {
@@ -126,7 +136,7 @@ function Headline({
         note={
           frame.straddlePctOfSpot === null
             ? 'Re-strikes with the index'
-            : `${formatNumber(frame.straddlePctOfSpot, 2)}% of spot`
+            : `${formatPct(frame.straddlePctOfSpot, 2, { unit: 'percent' })} of spot`
         }
       />
       <StatCard
@@ -206,7 +216,11 @@ export function LiveView() {
 
   const days = useLiveDays(underlying);
   const sessionState = useLiveSession(underlying, dayParam);
-  const session = sessionState.data;
+  // The hook keeps the previous response while the next one loads: show a response only when it
+  // is the index and day the controls ask for, never the last one's figures under new controls.
+  const session = isCurrentSession(sessionState.data, underlying, dayParam)
+    ? sessionState.data
+    : null;
 
   // null = the end of the day (the whole session drawn); a number = the minute replayed to.
   const [minute, setMinute] = useState<number | null>(null);
@@ -265,9 +279,11 @@ export function LiveView() {
 
   const onMinute = useCallback((next: number) => setMinute(next), []);
   const dayOptions = useMemo(() => {
-    const list = days.data?.days ?? [];
-    return session && !list.includes(session.day) ? [session.day, ...list] : list;
-  }, [days.data, session]);
+    // the same rule for the day list: another index's days are not offered under this one
+    const list = days.data?.underlying === underlying ? days.data.days : [];
+    const chosen = dayParam || session?.day;
+    return chosen && !list.includes(chosen) ? [chosen, ...list] : list;
+  }, [days.data, underlying, dayParam, session]);
 
   const replay = session ? !session.live.available : true;
 
@@ -289,7 +305,7 @@ export function LiveView() {
             <Badge tone="info">Replay</Badge>
             <Select
               aria-label="Day to replay"
-              value={session?.day ?? dayParam ?? ''}
+              value={dayParam || session?.day || ''}
               onChange={(event) => setDay(event.target.value)}
               disabled={dayOptions.length === 0}
               className="w-auto"
@@ -327,7 +343,7 @@ export function LiveView() {
         />
       ) : null}
 
-      {sessionState.loading && !session ? (
+      {!session && !sessionState.error ? (
         <div className="space-y-3">
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-72 w-full" />

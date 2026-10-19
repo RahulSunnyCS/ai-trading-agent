@@ -105,6 +105,8 @@ describe('dates', () => {
   it('formatDay never shifts a calendar day', () => {
     expect(formatDay('2026-10-05')).toBe('05 Oct 2026');
     expect(formatDay('2026-10-05T00:00:00')).toBe('05 Oct 2026');
+    expect(formatDay('2026-10-16', { weekday: true })).toBe('Fri 16 Oct 2026');
+    expect(formatDay('nope', { weekday: true })).toBe(EMPTY);
   });
 
   it('renders missing or malformed dates as the empty marker', () => {

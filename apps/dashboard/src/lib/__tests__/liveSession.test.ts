@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { LiveSessionResponse } from '../../types/liveSession';
-import { clampMinute, dayLabel, frameAt, pointsUpTo, rangeSoFar } from '../liveSession';
+import { clampMinute, frameAt, isCurrentSession, pointsUpTo, rangeSoFar } from '../liveSession';
 
 /** Four minutes of a day: spot 100 -> 130, a rolling straddle with a gap, a fixed one without. */
 function session(over: Partial<LiveSessionResponse> = {}): LiveSessionResponse {
@@ -96,14 +96,30 @@ describe('frameAt', () => {
 });
 
 describe('pointsUpTo', () => {
-  it('draws the minutes up to the cursor and leaves gaps out', () => {
+  it('draws the minutes up to the cursor and breaks the line at a gap', () => {
     const s = session();
+    // the gap at 1120 is a whitespace item: Lightweight Charts would otherwise join 1060 to 1180
     expect(pointsUpTo(s.minutes, s.rolling.straddle, 3)).toEqual([
       { time: 1000, value: 20 },
       { time: 1060, value: 20 },
+      { time: 1120 },
       { time: 1180, value: 25 },
     ]);
     expect(pointsUpTo(s.minutes, s.rolling.straddle, 0)).toEqual([{ time: 1000, value: 20 }]);
+  });
+
+  it('leaves a leading or trailing gap out', () => {
+    expect(pointsUpTo([1, 2, 3, 4, 5], [null, 7, null, 8, null], 4)).toEqual([
+      { time: 2, value: 7 },
+      { time: 3 },
+      { time: 4, value: 8 },
+    ]);
+    // replayed only to the gap: nothing after the last value
+    expect(pointsUpTo([1, 2, 3], [6, 7, null], 2)).toEqual([
+      { time: 1, value: 6 },
+      { time: 2, value: 7 },
+    ]);
+    expect(pointsUpTo([1, 2], [null, null], 1)).toEqual([]);
   });
 
   it('is empty for a missing series and never reads past the data', () => {
@@ -123,10 +139,19 @@ describe('rangeSoFar', () => {
   });
 });
 
-describe('dayLabel', () => {
-  it('writes a day with its weekday, and leaves a malformed one as it is', () => {
-    expect(dayLabel('2026-10-16')).toMatch(/Fri/);
-    expect(dayLabel('2026-10-16')).toMatch(/2026/);
-    expect(dayLabel('not a day')).toBe('not a day');
+describe('isCurrentSession', () => {
+  const nifty = { underlying: 'NIFTY', day: '2026-10-16' } as const;
+
+  it('accepts only the index the control shows', () => {
+    expect(isCurrentSession(nifty, 'NIFTY', null)).toBe(true);
+    // switched to SENSEX while NIFTY's response is still the latest: not shown
+    expect(isCurrentSession(nifty, 'SENSEX', null)).toBe(false);
+    expect(isCurrentSession(null, 'NIFTY', null)).toBe(false);
+  });
+
+  it('accepts only the chosen day, or any day when none is chosen', () => {
+    expect(isCurrentSession(nifty, 'NIFTY', '2026-10-16')).toBe(true);
+    expect(isCurrentSession(nifty, 'NIFTY', '2026-10-15')).toBe(false);
+    expect(isCurrentSession(nifty, 'NIFTY', '')).toBe(true);
   });
 });

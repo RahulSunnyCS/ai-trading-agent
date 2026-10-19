@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from types import SimpleNamespace
 
 import pytest
 
@@ -64,6 +65,31 @@ def test_confirmation_is_locked_until_revealed(tmp_path):
         study.check_allowed(tmp_path, changed, "confirmation", "locked")
 
 
+def test_an_exploratory_look_at_the_confirmation_period_is_recorded(tmp_path, monkeypatch):
+    """`--open-all` over the confirmation period, then a locked test: the exploratory run is
+    logged as the spec's reveal, and the locked result says the period was already seen."""
+    monkeypatch.setattr(study.F, "load_frame", lambda *a, **k: None)
+    monkeypatch.setattr(
+        study, "analyse_period", lambda root, rule, frame, period, options: {"period": period}
+    )
+    rule = from_dict(BASE)
+    both = ("learning", "confirmation")
+    first = study.run_test(tmp_path, rule, "text", study.Options(periods=both, mode="exploratory"))
+    assert first["confirmation_seen_before"] == []
+    assert store.is_revealed(tmp_path, rule.spec_hash)
+    assert store.reveals(tmp_path)[0]["note"] == f"exploratory test {first['id']}"
+
+    learning = study.run_test(tmp_path, rule, "text", study.Options(periods=("learning",)))
+    assert learning["confirmation_seen_before"] == []  # it did not look at the period
+
+    locked = study.run_test(tmp_path, rule, "text", study.Options(periods=both, mode="locked"))
+    assert locked["mode"] == "locked"
+    assert locked["confirmation_seen_before"] == [first["id"]]
+    assert store.ledger(tmp_path)[-1]["confirmation_seen_before"] == [first["id"]]
+    assert len(store.ledger(tmp_path)) == 3  # every test still counted
+    assert len(store.reveals(tmp_path)) == 1
+
+
 def test_sensex_has_no_confirmation_period(tmp_path):
     rule = from_dict({**BASE, "underlying": "SENSEX"})
     with pytest.raises(store.RuleTestError, match="NIFTY data only"):
@@ -96,3 +122,64 @@ def test_cache_skips_error_rows_so_they_are_retried(tmp_path):
     path.write_text("\n".join([header, good, bad]) + "\n")
     got = sim.read_cache(tmp_path, "tpl")
     assert list(got) == [("2026-01-05", "11:01", "both", 0.0)]
+
+
+GOOD_ROW = "2026-01-05,11:01,both,0.0,100,-5,120,,2,9000,11000,2,2026-01-08,23000,23010,"
+
+
+def test_cache_skips_and_counts_torn_lines(tmp_path):
+    path = sim.cache_path(tmp_path, "tpl")
+    path.parent.mkdir(parents=True)
+    header = ",".join(sim.COLUMNS)
+    # a row cut short at a digit boundary (sell_value "11" of "11000", the rest missing), and a
+    # full row glued onto a cut one (too many fields, a merged number)
+    cut = "2026-01-06,11:01,both,0.0,100,-5,120,,2,9000,11"
+    glued = "2026-01-07,11:01,both,0.0,1" + GOOD_ROW.replace("2026-01-05", "2026-01-09")
+    path.write_text("\n".join([header, GOOD_ROW, cut, glued]) + "\n")
+    got, skipped = sim.read_cache_counted(tmp_path, "tpl")
+    assert list(got) == [("2026-01-05", "11:01", "both", 0.0)]
+    assert skipped == 2
+
+
+def test_an_append_after_a_torn_line_starts_a_line_of_its_own(tmp_path, monkeypatch):
+    """A killed run leaves the file ending part-way through a row: the next run simulates that
+    key again and its rows land on their own lines, not glued onto the cut one."""
+    path = sim.cache_path(tmp_path, "tpl")
+    path.parent.mkdir(parents=True)
+    header = ",".join(sim.COLUMNS)
+    path.write_text("\r\n".join([header, GOOD_ROW]) + "\r\n" + "2026-01-06,11:01,both,0.0,12")
+
+    def fake_work(task):
+        _root, _spec, day, items = task
+        return [
+            {"day": day, "entry": e, "side": s, "slip": p, "gross": 250.5, "worst_mtm": -1,
+             "best_mtm": 300, "stopped_by": "", "orders": 2, "buy_value": 900.0,
+             "sell_value": 1234.5, "n_trades": 2, "weekly_expiry": "2026-01-08",
+             "spot_entry": 23000, "spot_exit": 23005, "error": ""}
+            for e, s, p in items
+        ]  # fmt: skip
+
+    class InlinePool:
+        def __init__(self, _workers):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def map(self, fn, tasks, chunksize=1):
+            return map(fn, tasks)
+
+    monkeypatch.setattr(sim, "_work", fake_work)
+    monkeypatch.setattr(sim, "ProcessPoolExecutor", InlinePool)
+    rule = SimpleNamespace(template_hash="tpl", spec=SimpleNamespace(model_dump=lambda **_: {}))
+    wanted = {("2026-01-05", "11:01", "both", 0.0), ("2026-01-06", "11:01", "both", 0.0)}
+    got = sim.ensure(tmp_path, rule, wanted, workers=1)
+    assert float(got[("2026-01-06", "11:01", "both", 0.0)]["sell_value"]) == 1234.5
+    again, skipped = sim.read_cache_counted(tmp_path, "tpl")
+    assert set(again) == wanted
+    assert float(again[("2026-01-06", "11:01", "both", 0.0)]["sell_value"]) == 1234.5
+    assert float(again[("2026-01-05", "11:01", "both", 0.0)]["gross"]) == 100.0
+    assert skipped == 1  # the cut line stays in the file, never trusted

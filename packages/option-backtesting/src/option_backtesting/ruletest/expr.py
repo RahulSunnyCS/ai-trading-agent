@@ -18,7 +18,8 @@ Leaves
     minute                         the stamp index (0 = 09:15)
     {clock: "10:30"}               the stamp index of a clock time
     {straddle: {at: "09:20"}}      CE + PE close of the strike that was ATM at that bar's spot
-                                   close, nearest expiry (NaN where option bars are missing)
+                                   close, nearest expiry; NaN before that bar (its strike is not
+                                   known yet) and where option bars are missing
     {rsi: {n: 14, minutes: 5}}     Wilder RSI of the closes of `minutes`-minute bars, continuous
                                    across sessions, held until the next bar completes
     {bar_close: 5}                 true only at the stamps where a 5-minute bar completes
@@ -429,7 +430,12 @@ def _evaluate(node: Node, frame: Frame, memo: dict[int, np.ndarray]) -> np.ndarr
     if op == "straddle":
         if frame.straddle_loader is None:
             return _full(frame)
-        return np.asarray(frame.straddle_loader(node.params["at"]), dtype=float)
+        at = node.params["at"]
+        out = np.array(frame.straddle_loader(at), dtype=float)  # a copy: the mask below is ours
+        # The strike is the one ATM at the close of the `at` bar, so it is not known before that
+        # bar: every earlier stamp is unavailable, and a window opening before `at` cannot see it.
+        out[:, :at] = np.nan
+        return out
     if op == "bar_close":
         m = node.params["minutes"]
         out = np.zeros((frame.n, N_BARS), dtype=bool)

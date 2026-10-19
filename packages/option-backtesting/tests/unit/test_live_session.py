@@ -9,8 +9,10 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 
+import pyarrow as pa
 import pytest
 from fastapi.testclient import TestClient
+from trading_data import lake
 
 from option_backtesting.api.app import create_app
 from option_backtesting.legwise.market import N_MINUTES, DayData, Series
@@ -121,6 +123,46 @@ def test_a_day_without_data_and_a_bad_underlying_are_refused(patched, tmp_path):
         session.build_session(tmp_path, "NIFTY", date(2026, 10, 15), Ref())
     with pytest.raises(session.LiveSessionError, match="underlying must be"):
         session.build_session(tmp_path, "BANKNIFTY", DAY, Ref())
+
+
+def _write_bars(root, asset: str, name: str, rows: list[dict]) -> None:
+    schema = lake.OPT_SCHEMA if asset == "option" else lake.BAR_SCHEMA
+    table = pa.Table.from_pylist(rows, schema=schema)
+    lake.write_parquet(table, lake.bars_1m_path(root, asset, name, DAY))
+
+
+def _bar(minute: int, price: float, **extra) -> dict:
+    ts = datetime(2026, 10, 16, 9, 15, tzinfo=IST) + timedelta(minutes=minute)
+    return {"ts": ts, "open": price, "high": price, "low": price, "close": price, **extra}
+
+
+def test_a_minute_without_a_bar_is_a_gap_in_a_lake_day(tmp_path):
+    """Over real lake files (no patched loader): `market.load_day` forward-fills each leg, but a
+    minute that leg did not trade in is drawn as a gap, never the last price carried on."""
+    _write_bars(tmp_path, "index", "NIFTY", [_bar(m, 22000.0) for m in range(5)])
+    _write_bars(tmp_path, "index", "INDIAVIX", [_bar(m, 14.0 + m) for m in (0, 2, 3, 4)])
+    leg = {"expiry": EXPIRY, "strike": 22000.0}
+    _write_bars(
+        tmp_path,
+        "option",
+        "NIFTY",
+        [_bar(m, 100.0, option_type="CE", **leg) for m in range(5)]
+        + [_bar(m, 90.0, option_type="PE", **leg) for m in (0, 1, 3)],
+    )
+    session._load.cache_clear()
+    try:
+        s = session.build_session(tmp_path, "NIFTY", DAY, Ref())
+    finally:
+        session._load.cache_clear()
+    assert s["last_minute"] == 4
+    assert s["fixed"]["strike"] == 22000.0
+    assert s["fixed"]["ce"] == [100.0] * 5
+    # the put has no bar at 09:17 and none after 09:18: gaps, not 90 carried on
+    assert s["fixed"]["pe"] == [90.0, 90.0, None, 90.0, None]
+    assert s["fixed"]["straddle"] == [190.0, 190.0, None, 190.0, None]
+    assert s["rolling"]["straddle"] == [190.0, 190.0, None, 190.0, None]
+    assert s["vix"] == [14.0, None, 16.0, 17.0, 18.0]
+    assert s["spot"]["close"] == [22000.0] * 5
 
 
 @pytest.fixture

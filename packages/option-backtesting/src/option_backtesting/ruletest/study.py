@@ -342,6 +342,11 @@ def run_test(root: Path, rule: CompiledRule, text: str, options: Options) -> dic
     test_id = store.new_test_id()
     stamp = store.now().isoformat(timespec="seconds")
     count_after = store.counts([*prior, {"at": stamp, "tries": options.tries}], store.now())
+    # every earlier test of this spec that already showed the confirmation period, whatever its
+    # mode: a later look at it is not a first look, and the result says so
+    seen_before = (
+        store.confirmation_tests(prior, rule.spec_hash) if "confirmation" in options.periods else []
+    )
     result = {
         "id": test_id,
         "at": stamp,
@@ -355,6 +360,7 @@ def run_test(root: Path, rule: CompiledRule, text: str, options: Options) -> dic
         "tries": options.tries,
         "counts": count_after,
         "luck": store.lucky_sentence(count_after["month"]),
+        "confirmation_seen_before": seen_before,
         "periods": periods,
     }
     row = {
@@ -377,5 +383,11 @@ def run_test(root: Path, rule: CompiledRule, text: str, options: Options) -> dic
             for p, v in periods.items()
         },
     }
+    if seen_before:
+        row["confirmation_seen_before"] = seen_before
     store.record_test(root, row, result)
+    if options.mode == "exploratory" and "confirmation" in options.periods:
+        # an exploratory look at the confirmation period spends it: logged as the spec's reveal
+        # (a no-op when it was already revealed), so the record shows it was seen and when
+        store.reveal(root, rule.spec_hash, f"exploratory test {test_id}")
     return result

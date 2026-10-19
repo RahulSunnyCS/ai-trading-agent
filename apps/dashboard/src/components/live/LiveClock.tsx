@@ -1,10 +1,9 @@
 /**
- * The Live page's once-a-second clock, kept in these two leaves so only they re-render every
- * second — not the whole page with its charts.
+ * The Live page's once-a-second clock, kept in this leaf so only it re-renders every second —
+ * not the whole page with its charts.
  */
 
 import { useNow } from '../../hooks/useNow';
-import { formatRelative } from '../../lib/format';
 import { type MarketState, describeMarketSession, marketSession } from '../../lib/market';
 import { Badge, type Tone } from '../ui/Badge';
 import { StatusDot } from '../ui/StatusDot';
@@ -33,10 +32,4 @@ export function MarketSessionBadge() {
       {describeMarketSession(now)} IST
     </Badge>
   );
-}
-
-/** "4s ago" for an instant, kept current; "…" until mounted. */
-export function UpdatedAgo({ at }: { at: number }) {
-  const now = useNow(TICK_MS);
-  return <>{now ? formatRelative(at, now) : '…'}</>;
 }

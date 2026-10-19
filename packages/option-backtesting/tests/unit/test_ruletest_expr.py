@@ -173,12 +173,23 @@ CAUSAL_RULES = [
     {"gt": [{"div": [{"sub": ["close", "session_open"]}, "atr14"]}, 0.3]},
     {"gt": [{"sub": [{"div": ["vix", "vix_open"]}, 1]}, 0.001]},
     {"crosses_up": ["close", "r1"]},
+    # the straddle's strike is chosen at the `at` bar's close: 12:00 is after the cut below, so a
+    # stamp before it must not see the strike (09:20 is before the cut, so it is known there)
+    {"gt": [{"straddle": {"at": "12:00"}}, "close"]},
+    {"gt": [{"straddle": {"at": "09:20"}}, "close"]},
 ]
+
+
+def with_straddle(fr: E.Frame) -> E.Frame:
+    """A stand-in for frame.StraddleLoader: like it, the whole session's series depends on the
+    spot close at the `at` stamp (the real one picks the strike from it)."""
+    fr.straddle_loader = lambda at: np.repeat(fr.C[:, at][:, None], E.N_BARS, axis=1)
+    return fr
 
 
 @pytest.mark.parametrize("when", CAUSAL_RULES, ids=[str(i) for i in range(len(CAUSAL_RULES))])
 def test_value_at_a_stamp_ignores_the_future(when):
-    base = frame(40, seed=3)
+    base = with_straddle(frame(40, seed=3))
     root, _ = E.parse_rule(when)
     full = E.evaluate(root, base)
     rng = np.random.default_rng(9)
@@ -200,7 +211,7 @@ def test_value_at_a_stamp_ignores_the_future(when):
         arr[session + 1 :] = rng.normal(
             20000 if arr is not cut.vix_close else 14, 50, size=arr[session + 1 :].shape
         )
-    scrambled = E.evaluate(root, cut)
+    scrambled = E.evaluate(root, with_straddle(cut))
     same_until = full[: session + 1, : stamp + 1]
     other = scrambled[: session + 1, : stamp + 1]
     # earlier sessions entirely, and this session up to and including `stamp`

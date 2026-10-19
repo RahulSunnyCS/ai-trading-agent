@@ -89,6 +89,13 @@ def render(result: dict) -> str:
         f"test {result['counts']['week']} this week, {result['counts']['month']} this month. "
         f"{result['luck']}",
     ]
+    seen = result.get("confirmation_seen_before") or []
+    if seen:
+        lines.append(
+            f"The confirmation period was already seen by {len(seen)} earlier test"
+            f"{'' if len(seen) == 1 else 's'} of this rule ({', '.join(seen)}): "
+            "this is not a first look at it."
+        )
     for period, p in result["periods"].items():
         lines.append("")
         lines.append(f"{period}  {p['from']} to {p['to']}")

@@ -155,7 +155,9 @@ Otherwise:
   `/session?underlying=NIFTY|SENSEX&day=`, proxied at `/api/backtest/legwise/live/*`), read-only. One day on the
   375-minute grid, trimmed to the last real index bar: spot, India VIX, the ATM strike of each minute, the **rolling**
   ATM straddle (CE + PE at each minute's own ATM, so it re-strikes) and the straddle **held** from the strike that was
-  ATM at the 09:15 open, both on the nearest weekly expiry; a missing leg is `None`, never carried; days to expiry are
+  ATM at the 09:15 open, both on the nearest weekly expiry; a minute with no bar of its own is `None`, never carried
+  (`market.load_day` forward-fills for the engine, so `_load` blanks those minutes again from the files' bar
+  minutes, for spot, VIX and every leg); days to expiry are
   weekdays (`rotation/dte.py`); the median full-session range of the last 20 sessions is context only. Today the
   source is always a collected lake day (`source.kind: replay`, `live.available: false` with the reason); a live reader
   over `TRADING_DATA_ROOT/live/<day>/` (BL-117 Phase 2) is meant to return the same shape. Replays are cached
@@ -175,7 +177,12 @@ Otherwise:
   `store.py` keeps specs, results, the **ledger** (`tests.jsonl`, every test, a sweep of K counts K) and the **reveals**
   (`reveals.jsonl`) as files, not the catalog. The learning period (2024-10-09 to 2026-10-08) is always open; the
   confirmation period (NIFTY 2022-01 to 2024-10-08) is locked until `obt rule reveal <hash>` (once per spec hash, logged)
-  or an exploratory run (`--open-all`); sessions after 2026-10-08 are forward only and never tested. A result is labelled
+  or an exploratory run (`--open-all`), which is itself logged as the spec's reveal (`note: exploratory test <id>`); a
+  test that includes it lists every earlier test of the spec that already saw it (`confirmation_seen_before`, in the
+  result and its ledger line); sessions after 2026-10-08 are forward only and never tested.
+  `{straddle: {at: T}}` is NaN before `T` (its strike is chosen at `T`'s close); the straddle feature file saves only
+  built rows and days whose option file lacks the strike, never a day without a file or a failed read (retried next
+  run); the simulation cache skips and counts a torn row and starts every append on a fresh line. A result is labelled
   "a screen, not a finding". `scripts/ruletest-acceptance.py` must print ACCEPTANCE OK: the four BL-083 triggers, said in
   the grammar (`tests/fixtures/rules/`), fire on the same days and stamps as `research/bl083/`, and T1 and T4 with the Dir
   template reproduce its event-study rows to the rupee. A leg with its own `range_breakout` is not supported yet.

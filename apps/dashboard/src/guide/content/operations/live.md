@@ -18,7 +18,7 @@ The change shown under each figure is against the straddle at the 09:15 open. It
 
 - **Headline strip**: spot and VIX with their change since 09:15, the ATM strike with the expiry and how many weekdays away it is, and the two straddles. The straddle note also gives it as a percent of spot, which is roughly the move the market is pricing in until expiry.
 - **Charts**: spot, the two straddles, and VIX, all on the same time axis from 09:15 to 15:30 IST. While a day is part-way through its replay the axis still runs to the close, so you can see how far along it is.
-- **A gap in a line** means that leg had not traded yet, or that strike was not collected. The page never fills it with an earlier price.
+- **A gap in a line** means there was no bar for that minute: the leg had not traded yet, did not trade in that minute, or that strike was not collected (the same holds for spot and VIX). The page never fills it with an earlier price, so a held strike that stops trading shows a gap, not its last price.
 - **The legs at this minute**: strike, call, put and their sum for each straddle, at the minute you are viewing.
 - **Range so far** is the high minus the low since the open, compared with the median full-session range of the last 20 sessions. It is a description of the day, not a signal.
 

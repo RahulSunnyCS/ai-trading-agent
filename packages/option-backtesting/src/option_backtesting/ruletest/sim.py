@@ -46,17 +46,66 @@ def cache_path(root: Path, template_hash: str) -> Path:
     return store.simcache_dir(root) / f"{template_hash}.csv"
 
 
-def read_cache(root: Path, template_hash: str) -> dict[Key, dict[str, Any]]:
+#: the fields a cached row must carry, parsed, before it is trusted
+_FLOATS = ("slip", "gross", "worst_mtm", "best_mtm", "buy_value", "sell_value")
+_INTS = ("orders", "n_trades")
+
+
+def _complete(row: dict[Any, Any]) -> bool:
+    """Every column present and none extra. A line cut short by a killed process, or one glued
+    onto such a line, fails this."""
+    return None not in row and all(row.get(c) is not None for c in COLUMNS)
+
+
+def _parses(row: dict[str, Any]) -> bool:
+    """The day and the numbers parse (a complete row can still hold a cut or merged number)."""
+    try:
+        date.fromisoformat(row["day"])
+        for c in _FLOATS:
+            float(row[c])
+        for c in _INTS:
+            int(row[c])
+    except ValueError:
+        return False
+    return True
+
+
+def read_cache_counted(root: Path, template_hash: str) -> tuple[dict[Key, dict[str, Any]], int]:
+    """(the trusted rows, how many lines were skipped as torn or unreadable)."""
     path = cache_path(root, template_hash)
     out: dict[Key, dict[str, Any]] = {}
+    skipped = 0
     if not path.exists():
-        return out
+        return out, skipped
     with path.open(newline="") as handle:
         for row in csv.DictReader(handle):
-            if row.get("error"):
+            if not _complete(row):
+                skipped += 1  # torn: simulated again, never trusted
+                continue
+            if row["error"]:
                 continue  # an error row is retried, never trusted
+            if not _parses(row):
+                skipped += 1
+                continue
             out[(row["day"], row["entry"], row["side"], float(row["slip"]))] = row
-    return out
+    return out, skipped
+
+
+def read_cache(root: Path, template_hash: str) -> dict[Key, dict[str, Any]]:
+    return read_cache_counted(root, template_hash)[0]
+
+
+def _end_line(path: Path) -> None:
+    """Make sure the next append starts on a line of its own (a killed writer can leave the file
+    ending part-way through a row)."""
+    if not path.exists() or path.stat().st_size == 0:
+        return
+    with path.open("rb") as handle:
+        handle.seek(-1, 2)
+        last = handle.read(1)
+    if last != b"\n":
+        with path.open("a", newline="") as handle:
+            handle.write("\r\n")
 
 
 def _early_reference():
@@ -151,7 +200,9 @@ def ensure(
 ) -> dict[Key, dict[str, Any]]:
     """Every wanted simulation, from the cache or run now (and appended to the cache). A day with no
     data, or a simulation that errors, is simply absent from the answer."""
-    cache = read_cache(root, rule.template_hash)
+    cache, torn = read_cache_counted(root, rule.template_hash)
+    if torn and progress:
+        progress(f"skipped {torn} torn simulation-cache rows; they are simulated again")
     missing = sorted(k for k in wanted if k not in cache)
     if missing:
         by_day: dict[str, list[tuple[str, str, float]]] = {}
@@ -168,7 +219,8 @@ def ensure(
             )
         path = cache_path(root, rule.template_hash)
         path.parent.mkdir(parents=True, exist_ok=True)
-        new = not path.exists()
+        new = not path.exists() or path.stat().st_size == 0
+        _end_line(path)
         with path.open("a", newline="") as handle, ProcessPoolExecutor(workers) as pool:
             writer = csv.DictWriter(handle, fieldnames=COLUMNS, restval="")
             if new:
@@ -178,10 +230,9 @@ def ensure(
                     writer.writerow({c: row.get(c, "") for c in COLUMNS})
                     if not row.get("error"):
                         cache[(row["day"], row["entry"], row["side"], float(row["slip"]))] = row
-                if k % 25 == 0:
-                    handle.flush()
-                    if progress:
-                        progress(f"  {k}/{len(tasks)} days")
+                handle.flush()  # one day at a time, so a kill loses at most a part-written row
+                if k % 25 == 0 and progress:
+                    progress(f"  {k}/{len(tasks)} days")
     return {k: cache[k] for k in wanted if k in cache}
 
 

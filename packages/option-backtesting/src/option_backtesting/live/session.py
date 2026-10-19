@@ -12,8 +12,10 @@ Two straddles, both on the nearest listed weekly expiry, both CE close + PE clos
 - **fixed**: the strike that was ATM at the 09:15 open, held all day (what a seller of the
   morning straddle holds).
 
-A minute whose strike was not collected, or whose leg has not traded yet, is `None` (a gap in
-the line), never a carried or invented value. Days to expiry count weekdays (BL-109).
+A minute with no bar of its own is `None` (a gap in the line), never a carried or invented value:
+a strike that was not collected, a leg that has not traded yet or did not trade in that minute,
+and likewise for spot and India VIX. (`market.load_day` forward-fills each series for the
+legwise engine; `_load` blanks those minutes again.) Days to expiry count weekdays (BL-109).
 """
 
 from __future__ import annotations
@@ -122,15 +124,53 @@ def _check_underlying(underlying: str) -> None:
 
 @lru_cache(maxsize=8)
 def _load(root: Path, underlying: str, day: date) -> DayData:
-    # A collected day never changes once the evening run has written it, so replays are cached.
-    return market.load_day(root, underlying, day)
+    """The day as collected: a minute with no bar is None in every series.
+
+    `market.load_day` forward-fills each series after its first bar (what the legwise engine
+    wants), so the minutes that had no bar of their own are blanked again here. A collected day
+    never changes once the evening run has written it, so replays are cached."""
+    data = market.load_day(root, underlying, day)
+    _blank_unbarred(data.spot, _bar_minutes(lake.bars_1m_path(root, "index", underlying, day)))
+    if data.vix is not None:
+        vix_path = lake.bars_1m_path(root, "index", "INDIAVIX", day)
+        _blank_unbarred(data.vix, _bar_minutes(vix_path))
+    legs = _leg_minutes(lake.bars_1m_path(root, "option", underlying, day))
+    for key, series in data.chain.items():
+        _blank_unbarred(series, legs.get(key, set()))
+    return data
+
+
+def _bar_minutes(path: Path) -> set[int]:
+    """The grid minutes a 1-minute file has a bar for."""
+    table = pq.read_table(path, columns=["ts"])
+    return {m for m in market._minutes(table) if 0 <= m < N_MINUTES}
+
+
+def _leg_minutes(path: Path) -> dict[tuple[date, float, str], set[int]]:
+    """The grid minutes each contract of an option file has a bar for."""
+    table = pq.read_table(path, columns=["ts", "expiry", "strike", "option_type"])
+    keys = zip(
+        table.column("expiry").to_pylist(),
+        table.column("strike").to_pylist(),
+        table.column("option_type").to_pylist(),
+        strict=True,
+    )
+    out: dict[tuple[date, float, str], set[int]] = {}
+    for key, m in zip(keys, market._minutes(table), strict=True):
+        if 0 <= m < N_MINUTES:
+            out.setdefault(key, set()).add(m)
+    return out
+
+
+def _blank_unbarred(series: Series, minutes: set[int]) -> None:
+    for m in range(N_MINUTES):
+        if m not in minutes:
+            series.open[m] = series.high[m] = series.low[m] = series.close[m] = None
 
 
 def _last_minute(root: Path, underlying: str, day: date) -> int:
-    """The last grid minute with a real index bar. `Series` forward-fills to the end of the grid,
-    so a short session cannot be told from the fill by looking at the series."""
-    table = pq.read_table(lake.bars_1m_path(root, "index", underlying, day), columns=["ts"])
-    minutes = [m for m in market._minutes(table) if 0 <= m < N_MINUTES]
+    """The last grid minute with a real index bar."""
+    minutes = _bar_minutes(lake.bars_1m_path(root, "index", underlying, day))
     if not minutes:
         raise LiveSessionError(f"the {underlying} index file for {day.isoformat()} has no bars")
     return max(minutes)

@@ -4,7 +4,8 @@
  * half-played day shows how far along it is. Several charts stacked on the page share those
  * minutes and the same price-axis width, so their time axes line up.
  * Colours come from lib/chartTheme.ts and follow the theme; time reads in IST whatever the browser's
- * zone. A gap in a series is a gap in the line (the points are simply not there).
+ * zone. A gap in a series is a gap in the line: `pointsUpTo` sends a whitespace item (`{ time }`)
+ * for it, since leaving the point out would only join its neighbours with a straight segment.
  */
 
 import { createChart } from 'lightweight-charts';
@@ -148,7 +149,14 @@ export function LiveSessionChart({
         });
         seriesRef.current.set(line.id, series);
       }
-      series.setData(line.points.map((p) => ({ time: p.time as UTCTimestamp, value: p.value })));
+      // A point without a value is a whitespace item, so the line breaks across a gap.
+      series.setData(
+        line.points.map((p) =>
+          p.value === undefined
+            ? { time: p.time as UTCTimestamp }
+            : { time: p.time as UTCTimestamp, value: p.value },
+        ),
+      );
     }
     gridRef.current?.setData(minutes.map((time) => ({ time: time as UTCTimestamp, value: 0 })));
     chart.timeScale().fitContent();

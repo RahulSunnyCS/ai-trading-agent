@@ -3,6 +3,7 @@ cached on disk (its first build reads every day's option bars)."""
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from datetime import date, timedelta
 from pathlib import Path
@@ -13,6 +14,8 @@ from ..rotation import triggers as T
 from . import expr as E
 from . import store
 
+log = logging.getLogger(__name__)
+
 #: sessions are loaded from here so the longest look-back in the grammar (252 prior sessions for a
 #: median, the RSI chain, 14 for the ATR) is seeded before the first tested day (BL-083's start)
 HISTORY_START = date(2020, 9, 1)
@@ -20,6 +23,8 @@ HISTORY_START = date(2020, 9, 1)
 OPTIONS_FROM = date(2022, 1, 3)
 #: the straddle feature is saved this often while it is built, so an interrupted build resumes
 CHECKPOINT_DAYS = 100
+#: the straddle file's format; 2 = a day with no option file or a failed read is never saved
+FEATURE_VERSION = 2
 
 
 def session_days(root: Path, symbol: str, start: date, end: date) -> list[date]:
@@ -81,11 +86,23 @@ class StraddleLoader:
         self.root, self.underlying, self.frame = root, underlying, frame
 
     def __call__(self, at_stamp: int, progress: Callable[[str], None] | None = None) -> np.ndarray:
+        from trading_data import lake
+
         path = store.features_dir(self.root) / f"straddle_{self.underlying}_{at_stamp}.npz"
         known: dict[str, np.ndarray] = {}
+        legacy = False
         if path.exists():
             with np.load(path, allow_pickle=False) as z:
                 known = dict(zip(z["days"].tolist(), z["data"], strict=True))
+                legacy = "version" not in z.files
+            if legacy:
+                # Before version 2 a day with no option file, or a failed read, was saved as a
+                # blank row for good; drop those so they are built once more.
+                known = {
+                    d: row
+                    for d, row in known.items()
+                    if date.fromisoformat(d) < OPTIONS_FROM or not np.isnan(row).all()
+                }
         frame = self.frame
         added = 0
         out = np.full((frame.n, E.N_BARS), np.nan)
@@ -96,14 +113,21 @@ class StraddleLoader:
             day = date.fromisoformat(d)
             row = np.full(E.N_BARS, np.nan)
             if day >= OPTIONS_FROM:
+                if not lake.bars_1m_path(self.root, "option", self.underlying, day).exists():
+                    continue  # not collected (yet): blank this run, looked for again next time
                 try:
                     built = T.straddle_series(
                         self.root, self.underlying, day, float(frame.C[i, at_stamp])
                     )
-                except Exception:  # noqa: BLE001 - a day without usable option bars has no straddle
-                    built = None
+                except Exception as error:  # noqa: BLE001 - one bad day never stops a test
+                    # blank for this run only, never saved: a transient failure is retried
+                    log.warning("straddle %s %s not built: %s", self.underlying, d, error)
+                    if progress:
+                        progress(f"straddle {self.underlying} {d}: not built ({error})")
+                    continue
                 if built is not None:
                     row = built[0]
+            # saved: a built row, a session before options, or a file without the strike's bars
             known[d] = row
             out[i] = row
             added += 1
@@ -111,7 +135,7 @@ class StraddleLoader:
                 self._save(path, known)
                 if progress:
                     progress(f"straddle {self.underlying}: {added} days built, at {d}")
-        if added:
+        if added or legacy:
             self._save(path, known)
         return out
 
@@ -120,5 +144,10 @@ class StraddleLoader:
         days = sorted(known)
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".tmp.npz")
-        np.savez_compressed(tmp, days=np.array(days), data=np.array([known[d] for d in days]))
+        np.savez_compressed(
+            tmp,
+            days=np.array(days),
+            data=np.array([known[d] for d in days]),
+            version=np.array(FEATURE_VERSION),
+        )
         tmp.replace(path)

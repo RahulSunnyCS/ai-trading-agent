@@ -3,16 +3,21 @@
  * chart draws up to that minute. No React, no fetching. The series come from live/session.py; this
  * only reads them (a change since 09:15, the range so far, which points are drawn).
  *
- * A gap in the data (a leg that had not traded, a strike that was not collected) stays a gap: it
+ * A gap in the data (a minute with no bar: a leg that had not traded or did not trade in that
+ * minute, a strike that was not collected) stays a gap: live/session.py sends it as null, and it
  * is never carried forward or filled, in a figure or in a chart.
  */
 
 import type { LiveSessionResponse, StraddleSide } from '../types/liveSession';
 
+/**
+ * One item of a chart line. Without `value` it is a Lightweight Charts whitespace item: the line
+ * breaks there instead of joining the points either side.
+ */
 export interface ChartPoint {
   /** Epoch seconds (UTC), what Lightweight Charts takes. */
   time: number;
-  value: number;
+  value?: number;
 }
 
 export interface Change {
@@ -64,6 +69,21 @@ function firstNumber(values: ReadonlyArray<number | null> | null | undefined): n
   if (!values) return null;
   for (const v of values) if (v !== null) return v;
   return null;
+}
+
+/**
+ * Whether a response is the session the controls ask for: the same index and, when a day is
+ * chosen, that day (no day = the newest collected one, whichever the server answered). The
+ * fetch hook keeps the previous response while the next loads, so the page shows a response only
+ * when this holds, never the last index's or day's figures under the new controls.
+ */
+export function isCurrentSession(
+  session: Pick<LiveSessionResponse, 'underlying' | 'day'> | null | undefined,
+  underlying: string,
+  day: string | null,
+): boolean {
+  if (!session || session.underlying !== underlying) return false;
+  return day === null || day === '' || session.day === day;
 }
 
 /** The minute to show, kept inside the day. */
@@ -131,7 +151,11 @@ export function frameAt(session: LiveSessionResponse, rawMinute: number): LiveFr
   };
 }
 
-/** The points of a series up to and including `minute`, gaps left out (the line breaks there). */
+/**
+ * The items of a series up to and including `minute`. A gap between two values is a whitespace
+ * item (`{ time }`), because Lightweight Charts joins consecutive values with a straight segment
+ * however far apart they are; a leading or trailing gap is simply left out.
+ */
 export function pointsUpTo(
   minutes: readonly number[],
   values: ReadonlyArray<number | null> | null | undefined,
@@ -139,13 +163,20 @@ export function pointsUpTo(
 ): ChartPoint[] {
   if (!values) return [];
   const out: ChartPoint[] = [];
+  let lastValue = -1; // index in `out` of the last item with a value
   const end = Math.min(minute, minutes.length - 1, values.length - 1);
   for (let i = 0; i <= end; i++) {
     const value = values[i];
     const time = minutes[i];
-    if (value !== null && value !== undefined && time !== undefined) out.push({ time, value });
+    if (time === undefined) continue;
+    if (value !== null && value !== undefined) {
+      out.push({ time, value });
+      lastValue = out.length - 1;
+    } else if (lastValue >= 0) {
+      out.push({ time });
+    }
   }
-  return out;
+  return out.slice(0, lastValue + 1);
 }
 
 /** Which straddle series a chart line is, in the order the legend and colours use. */
@@ -153,19 +184,6 @@ export type StraddleKind = 'rolling' | 'fixed';
 
 export function straddleSeries(session: LiveSessionResponse, kind: StraddleKind): StraddleSide {
   return kind === 'rolling' ? session.rolling : session.fixed;
-}
-
-/** "Fri 16 Oct 2026" for a YYYY-MM-DD day, with the weekday (a replay is picked by date). */
-export function dayLabel(day: string): string {
-  const date = new Date(`${day}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return day;
-  return new Intl.DateTimeFormat('en-IN', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(date);
 }
 
 /** How a playback speed is named on the control. */

@@ -126,6 +126,15 @@ def ledger(root: Path) -> list[dict[str, Any]]:
     return _read_lines(ruletest_dir(root) / "tests.jsonl")
 
 
+def confirmation_tests(rows: list[dict[str, Any]], spec_hash: str) -> list[str]:
+    """The ids of the ledger's tests of this spec that ran the confirmation period, in any mode."""
+    return [
+        str(r["id"])
+        for r in rows
+        if r.get("spec_hash") == spec_hash and "confirmation" in (r.get("periods") or [])
+    ]
+
+
 def new_test_id() -> str:
     return datetime.now(IST).strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:4]
 
