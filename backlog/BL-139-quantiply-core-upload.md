@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades the Core picks with real money every day and sets them up on Quantiply by hand |
-| **Status** | Ready — questions answered 2026-10-19; Phase 1 needs the owner to open Quantiply's algo form |
+| **Status** | In progress — Phase 1 captured 2026-10-19 (the API contract and fixtures); Phase 2 next |
 | **Type** | feature |
 | **Area** | options + broker-login |
 | **Created** | 2026-10-19 |
@@ -175,6 +175,16 @@ only if the API cannot be used.
 
 ## Log
 
+- 2026-10-19 — Phase 1 captured with the owner in the browser pane:
+  - The calls: create (`POST /algos`, one algo per weekday, not enabled), list (`/algos/day-wise`), read (`GET /algos/:id`) and delete (`DELETE /algos/:id`).
+  - Auth: a 9-hour JWT kept in the app's local storage.
+  - Every Core feature maps: strike, closest premium, SL %, trailing %, re-entry at cost, range breakout and MTM SL. Trailing in points is unconfirmed.
+  - The contract is in `docs/algotest-execution.md`, and the fixtures are in `tests/fixtures/quantiply/`.
+  - Only one DELETE was seen (the Tue copy); the Mon copy's delete is unconfirmed.
+  - Still open:
+    - market or limit orders;
+    - one login per run or a reused token;
+    - the enable (deploy) call, not sent.
 - 2026-10-19 — route changed (owner): capture the create call the web app makes and POST it, rather than
   filling the form. Phases 1–3 rewritten; the form is the fallback.
 - 2026-10-19 — created from the owner's request. Questions answered: built in the form, AlgoTest's schedule, deploy built but off, Core only.

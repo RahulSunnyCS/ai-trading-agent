@@ -398,3 +398,54 @@ change. Getting there needed two container fixes in the workflow — `unzip` for
 
 Tracked in [`/TODO.md`](../TODO.md) → Priority 1.
 
+
+## Quantiply algos through its API (BL-139, captured 2026-10-19)
+
+Captured from the web app in a browser while the owner saved, opened and deleted algos by hand. The
+recorder kept header names only, never values. Fixtures, with the user and broker ids removed:
+`packages/option-backtesting/tests/fixtures/quantiply/`.
+
+**Host and auth.** `https://api-prod.quantiply.angelone.in`. Every call sends an `authorization`
+header with a JWT. The web app keeps the JWT in `localStorage["quantiply-dashboard-local"].token`
+after the Angel One login (`src/quantiply.ts`). The JWT seen was valid for 9 hours from login
+(claims `_id, name, clientId, familyContext, iat, exp`). The JWT is a live credential to the owner's
+algos: never log it, store it in a file or put it in a fixture.
+
+**Calls seen**
+
+| Call | What it does |
+|---|---|
+| `GET /algos/config` | days, expiry tags per underlying and weekday, lot sizes (NIFTY 65, SENSEX 20 on 2026-10-19) |
+| `GET /algos/day-wise` | the list: one entry per weekday (`MON`…`SUN`, `ELSE`) with `active` and `algos` (summaries: `_id`, `name`, `day`, `enabled`, `status` such as `NOT_RUNNING` or `TRADE_CLOSED`; no configuration) |
+| `GET /algos/:id` | one algo, full `configurations` (the read-back) |
+| `POST /algos` | create: body `{code, name, day: [..], configurations}`. Answers 201 with `data`: **one algo per weekday in `day`**, each `enabled: false`, with the server defaults filled in |
+| `DELETE /algos/:id` | delete one algo (one weekday's copy): `{"message":"Deleted successfully"}` |
+
+In the app's code but not yet seen: `/algos/bulk/action/{enable,disable,delete,clone,edit,mtm-edit,
+TERMINATE,SQ_OFF_TERMINATE}`, `/algos/clone`, `/algos/types`. An algo is deployed for its weekday
+when `enabled` is true; the enable call is BL-139 Phase 4's and has not been sent.
+
+**Body: `code: "OPTIONS_SPREADS_LEGS"`, `configurations`**
+
+| YAML (legwise) | Quantiply |
+|---|---|
+| `entry_time` / `exit_time` | `startTime` / `endTime` `"HH:MM:SS"` |
+| `square_off: partial` | `legsAction: "SQ_OFF_LEG"` |
+| `overall.stop_loss_inr: N` | `stoploss: {type: "TOTAL_AMOUNT", value: -N, action: "SQ_OFF_ALL"}` |
+| leg `position: sell / buy` | `transactionType: "S" / "B"` |
+| leg `option_type` | `side: "CE" / "PE"` |
+| leg `expiry: weekly` | `expiryTag: "CURRENT_WEEK"` |
+| leg `lots: n` | `quantity: n` (lots), `multiplier: 1` |
+| `strike_type: ATM / ITMn / OTMn` | `selectionType: "STRIKE"`, `strike: "ATM" / "ITM_n" / "OTM_n"` |
+| `closest_premium: P` | `selectionType: "PREMIUM"`, `premium: {type: "PREMIUM_CLOSE_TO", value: P, specificStrikeSelection: false}` |
+| `stop_loss: {percent: p}` | `stoploss: {type: "PER_POSITION_PERCENT", value: -p}` |
+| `stop_loss: {points: p}` | `stoploss: {type: "PER_POSITION_POINT", value: -p}` |
+| `trail_sl: {percent: [x, y]}` | `trailingStoploss: {type: "PER_POSITION_PERCENT", moveBy: x, trailBy: y}` |
+| `trail_sl: {points: [x, y]}` | `trailingStoploss: {type: "PER_POSITION_POINT", …}`: the type exists in the app, **unconfirmed** for trailing |
+| `reentry_on_sl: {mode: cost, count: n}` | `isReEntryEnabled: true`, leg `reEntry: {type: "RE_ENTRY_COST", repeat: n}` |
+| `range_breakout: {until: T, side: high/low, source: instrument}` | `isORBEnabled: true`, `orbEndTime: T`, leg `orb: {type: "ORB_INSTRUMENT", entryAt: "HIGH"/"LOW"}`; the range starts at `startTime` |
+
+Execution settings with no YAML counterpart, as on the owner's own algos (N_ITM1_SL21_3000):
+`product: "D"`, limit orders (`entryOrderType: "L"`, buffer `FIXED_VALUE` 3, timeouts 5 / 4 s),
+SL limit buffer 1, `stoplossOrderPlacement: "LATER"`, exit delay 3 s, `errorAutoSquareOff: true`.
+The algo the owner built for the capture used market orders (`"M"`) instead.
