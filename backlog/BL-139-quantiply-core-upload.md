@@ -175,6 +175,11 @@ only if the API cannot be used.
 
 ## Log
 
+- 2026-10-19 — First dry run (the owner, in a terminal), against Wednesday 21 Oct's preview picks:
+  - The run logged in through Angel One, took the token and read the list over the API.
+  - Plan: create `Core · S_ditm1_1202`, `Core · S_p250_1317`, `Core · S_p250_1302`. Nothing was changed.
+  - The owner's own browser session stayed logged in, so a scripted login does not sign it out.
+  - Algos created without a broker show "Select Client ID / Broker" and are disabled. The owner's enabled algos carry their Angel One account (the create call's optional `broker`). Uploads leave the broker unset, and the owner picks it when deploying; Phase 4 must set it before enabling.
 - 2026-10-19 — Owner: Quantiply can also delete in a batch. Its web app sends `DELETE /algos/bulk/action/delete` with `{algoIds: [...]}`; the call was read from the app's code, but its request was never captured.
   - The uploader keeps the captured one-by-one `DELETE /algos/:id`. An evening deletes only a few algos, and each delete gets its own ledger row and result.
   - Switch to the batch call only if the evening grows (for example when T1 joins) or Quantiply limits request rates. Capture one batch delete first.
