@@ -476,12 +476,16 @@ def recorded_row(
     }
 
 
-def reconstructed_row(day: date, rec: _Recon, results: _Results) -> dict | None:
+def reconstructed_row(
+    day: date, rec: _Recon, results: _Results, lots_per: int | None = None
+) -> dict | None:
+    """A research-history day re-scored, at `lots_per` lots a strategy (display only; default the
+    registered LOTS_PER), like a recorded row."""
     picked = rec.picks(day)
     if picked is None:
         return None
     a = rec.attrs[day]
-    lists = {key: list_block(day, p, results) for key, p in picked.items()}
+    lists = {key: list_block(day, p, results, lots_per or LOTS_PER) for key, p in picked.items()}
     row = _row_common(day, lists)
     lacking = sorted({n for b in lists.values() for n in b["missing"]})
     scored = row["scored"]
@@ -572,12 +576,8 @@ def counters(rows: list[dict]) -> dict:
 # --- the log ----------------------------------------------------------------------------------
 
 
-#: The lists a parallel track records (BL-113: Adaptive only).
-TRACK_LISTS = ("C",)
-
-
 def _registered(track: str | None = None) -> dict:
-    keys = TRACK_LISTS if track else tuple(LISTS)
+    keys = pick.TRACK_LISTS[track] if track else tuple(LISTS)
     return {
         "first_day": REGISTERED_FIRST_DAY.isoformat(),
         "record_time": RECORD_TIME,
@@ -695,7 +695,7 @@ def build_log(
         )
         for d in available:
             if within(d, recon_start):
-                row = reconstructed_row(d, rec, results)
+                row = reconstructed_row(d, rec, results, lots_per)
                 if row is not None:
                     rows.append(row)
 
@@ -814,7 +814,7 @@ def build_day(
     if row is None and not track:
         first = min((date.fromisoformat(e["day"]) for e in entries), default=REGISTERED_FIRST_DAY)
         if day < min(first, REGISTERED_FIRST_DAY):
-            row = reconstructed_row(day, reconstruction(root, names), results)
+            row = reconstructed_row(day, reconstruction(root, names), results, lots_per)
     if row is None:
         return None
     lists_info = {

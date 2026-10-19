@@ -26,6 +26,7 @@ from ..fyers.daily import data_dir
 from . import base as base_mod
 from . import journal, store
 from .lists import LISTS, LOTS_PER, MIN_WIDE_N
+from .pick import TRACK_LISTS
 from .variants import is_buy, is_wide, track_names, variant_names
 
 N_RUNS = 1000  # random same-shape baskets, as research/bl057/rotate.py
@@ -36,8 +37,6 @@ BOOT_SEED = 20261012
 BOOT_LEVEL = 0.90
 MIN_DAYS_FOR_INTERVAL = 10  # below this the interval is shown but flagged as too short to read
 READOUT_DAYS = 60  # the registered read-out point (BL-058 Phase 0b)
-#: The lists a parallel track records (BL-113: Adaptive only).
-TRACK_LISTS = ("C",)
 
 
 def max_drawdown(daily: np.ndarray) -> float:
@@ -176,7 +175,7 @@ def build(
     if first_n is not None:
         scored = scored[:first_n]
 
-    keys = list(TRACK_LISTS if track else LISTS)
+    keys = list(TRACK_LISTS[track] if track else LISTS)
     days = [s["day"] for s in scored]
     out: dict = {
         "settings": {

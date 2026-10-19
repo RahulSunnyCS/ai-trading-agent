@@ -931,3 +931,21 @@ def test_an_entry_recorded_on_calendar_days_is_checked_on_those_days(world):
     assert got["checked"] and got["same_inputs"] and got["same_picks"]
     declared = daylog._rescore({**entry, "dte_basis": "weekdays"}, root, syn.NAMES)
     assert declared["same_inputs"] is False  # the same entry read on the other basis differs
+
+
+def test_reconstructed_days_follow_the_lots_override(world):
+    """Review of PR #265: a re-scored (reconstructed) day is booked at `lots_per` like a recorded
+    one, so its rupees and its stop replay are at the Rotation page's 1 lot."""
+    root, _ = world
+    two = daylog.build_log(root, source="reconstructed", now=NOW)
+    one = daylog.build_log(root, source="reconstructed", now=NOW, lots_per=1)
+    rows2 = {r["day"]: r for r in two["rows"]}
+    rows1 = {r["day"]: r for r in one["rows"]}
+    assert rows1 and rows1.keys() == rows2.keys()
+    for day, r1 in rows1.items():
+        for key, b1 in r1["lists"].items():
+            b2 = rows2[day]["lists"][key]
+            n = len(b1["picks"])
+            assert b1["lots"] == n and b2["lots"] == 2 * n
+            if b1["gross"] is not None and b2["gross"] is not None:
+                assert b1["gross"] == pytest.approx(b2["gross"] / 2)

@@ -71,6 +71,13 @@ class Day:
     stops: int = 0
 
 
+def _at_lots(d: Day, lots_per: int | None) -> float:
+    """The day's basket gross at `lots_per` lots a strategy (None: as recorded)."""
+    if not lots_per or not d.lots or not d.picks:
+        return d.gross
+    return d.gross * lots_per * len(d.picks) / d.lots
+
+
 def episodes_of(daily: np.ndarray, min_depth: float) -> list[dict]:
     """Drawdown episodes of a per-day series, in order. Indexes refer to `daily`:
 
@@ -323,8 +330,9 @@ def build(
             if not have_base or missing == len(seg_base)
             else round(sum(v for v in seg_base if v is not None), 2)
         )
-        # the rupees the list's lots lost over the same days (6 lots, or 8 on a Buy day)
-        basket = sum(d.gross for d in window_days[lo : hi + 1])
+        # the rupees the list's lots lost over the same days: at the recorded lots (6, or 8 on a Buy
+        # day), or at `lots_per` a strategy when the page asks for it (the 1-lot Rotation page)
+        basket = sum(_at_lots(d, lots_per) for d in window_days[lo : hi + 1])
         episodes.append(
             {
                 "n": n,

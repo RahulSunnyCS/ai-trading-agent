@@ -25,6 +25,7 @@ same in every mode: everything closes at the close of the first minute at or bel
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import math
@@ -365,18 +366,25 @@ def _lookup(key: tuple) -> tuple[float, ...] | None:
     return hit
 
 
+@functools.lru_cache(maxsize=1)
+def _known_names() -> frozenset[str]:
+    """Every name a replay may run, matched against the enumerated files, never a path: Core-298,
+    every parallel track's own variants (a T1 book replays its `-t1s` picks from
+    strategies/rotation_t1/) and the fixed base's Dir leg (its Widesl leg is the Core variant
+    N_wide_0917). Read once per process: the strategy folders only change with a deploy."""
+    from . import base
+    from .variants import TRACK_DIRS, track_names, variant_names
+
+    return frozenset(variant_names()).union(*(track_names(t) for t in TRACK_DIRS), {base.DIR_NAME})
+
+
 def one_lot_path(root: Path, day: date, name: str, loaded: dict | None = None) -> tuple[float, ...]:
     """One variant's one-lot path on `day`, replayed exactly as the nightly update did (same
     strategy file, same lot-sizing date), and cached. `loaded` shares a day's loaded index data
     across picks of one call. Raises PortfolioStopError for a day or variant it cannot run."""
     from . import base
-    from .variants import TRACK_DIRS, track_names, variant_names
 
-    # Matched against the enumerated files, never a path: Core-298, every parallel track's own
-    # variants (a T1 book replays its `-t1s` picks from strategies/rotation_t1/) and the fixed
-    # base's Dir leg (its Widesl leg is the Core variant N_wide_0917).
-    known = set(variant_names()).union(*(track_names(t) for t in TRACK_DIRS), {base.DIR_NAME})
-    if name not in known:
+    if name not in _known_names():
         raise PortfolioStopError(f"{name!r} is not one of the rotation variants")
     if name == base.DIR_NAME and base.file_sha256(strategy_file(name)) != base.BASE_YAML_SHA256:
         # the nightly scoring refuses a changed base file; so does the replay
