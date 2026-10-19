@@ -27,7 +27,7 @@ const LATE_BUTTON = `<body><script>
     const b = document.createElement('button');
     b.textContent = 'Import .algtst';
     document.body.append(b);
-  }, 400);
+  }, 1500);
 </script></body>`;
 
 describe('visibleWithin', () => {
@@ -39,6 +39,18 @@ describe('visibleWithin', () => {
     const button = page.getByText('Import .algtst');
     assert.equal(await button.isVisible(), false); // the old check: answers at once
     assert.equal(await visibleWithin(button, 3_000), true);
+    await page.context().close();
+  });
+
+  it('throws, rather than answering false, when the locator matches two elements', async (t) => {
+    if (skip) return t.skip(skip);
+    assert.ok(browser);
+    const page = await (await browser.newContext()).newPage();
+    await page.setContent(
+      '<body><button>Import .algtst</button><button>Import .algtst</button></body>',
+    );
+    await assert.rejects(visibleWithin(page.getByText('Import .algtst'), 1_000), /strict mode/);
+    assert.equal(await visibleWithin(page.getByText('Import .algtst').first(), 1_000), true);
     await page.context().close();
   });
 

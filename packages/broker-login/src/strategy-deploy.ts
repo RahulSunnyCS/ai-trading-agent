@@ -57,6 +57,9 @@ async function readLive(page: Page): Promise<LiveState> {
   return parseLive(await page.evaluate(() => document.body.innerText));
 }
 
+/** Too close to a pick's entry minute to activate it: that pick only; later picks still deploy. */
+class TooLate extends Error {}
+
 async function deployOne(page: Page, pick: Pick): Promise<string> {
   const { name } = pick;
   await livePage.row(page, name).click();
@@ -87,15 +90,27 @@ async function deployOne(page: Page, pick: Pick): Promise<string> {
   // The plan checked the time at login; setting up may have taken a while, so check again.
   const left = secondsUntil(pick.entry);
   if (left < ACTIVATE_LEAD_SECONDS)
-    throw new Error(`TOO LATE: ${left} s to its entry minute, not activated`);
+    throw new TooLate(`TOO LATE: ${left} s to its entry minute, not activated`);
   await livePage.row(page, name).click();
   await livePage.activate(page).click();
 
   // Anything that pops up now (a broker choice, a confirmation) has never been seen: stop.
   const popup = livePage.popup(page).first();
   if (await visibleWithin(popup, 4_000)) {
-    const text = (await popup.innerText()).replace(/\s+/g, ' ').slice(0, 200);
-    throw new Error(`Activate opened something not yet seen, not confirmed: ${text}`);
+    // the popup may already be gone again: never wait the page default for its text
+    const raw = await popup.innerText({ timeout: 1_000 }).catch(() => '(text not readable)');
+    const text = raw.replace(/\s+/g, ' ').slice(0, 200);
+    // Activate may already have deployed it: say what /live shows, so nobody deploys it twice
+    const now = await readLive(page)
+      .then((s) => s.rows.find((r) => r.name === name)?.deployed)
+      .catch(() => undefined);
+    const state =
+      now === undefined
+        ? '/live could not be read: check it before deploying this by hand, it may be live already'
+        : now > before
+          ? `/live shows ${now} Deployed (was ${before}): it IS deployed, do not deploy it again by hand`
+          : `/live shows ${now} Deployed (was ${before}): not deployed`;
+    throw new Error(`Activate opened something not yet seen, not confirmed: ${text}. ${state}`);
   }
   const after = (await readLive(page)).rows.find((r) => r.name === name)?.deployed ?? 0;
   if (after <= before) throw new Error('not shown as deployed after Activate');
@@ -212,7 +227,9 @@ async function main(): Promise<number> {
               ledger,
               `${JSON.stringify({ at: new Date().toISOString(), name: pick.name, ok: false, error: describe(error) })}\n`,
             );
-            break; // one surprise stops the run: nothing else is deployed blind
+            // too late for this pick only: the later ones still have time. Any other surprise
+            // stops the run, so nothing else is deployed blind.
+            if (!(error instanceof TooLate)) break;
           }
         }
       }
