@@ -59,16 +59,19 @@ def list_day(
     trail: Trail | None,
     source: str = "all",
     root: Path | None = None,
+    track: str | None = None,
+    lots_per: int | None = None,
 ) -> dict:
     """One list's basket on one day: the combined and each pick's path, the stop level and where it
     fired. `source` (`recorded`, `reconstructed` or `all`) is a filter: a day that exists only as
     the other kind is a 404, never silently shown under the wrong label. `LogBookError` carries
-    the HTTP status for a day or list that cannot be shown."""
+    the HTTP status for a day or list that cannot be shown. `track` reads a parallel track's
+    journal and `lots_per` books every pick at that many lots (as `daylog.build_day`)."""
     if list_key not in LISTS:
         raise LogBookError(422, f"list must be one of {', '.join(LISTS)}")
     if source not in daylog.SOURCES:
         raise LogBookError(422, f"source must be one of {', '.join(daylog.SOURCES)}")
-    body = daylog.build_day(day, root)
+    body = daylog.build_day(day, root, track=track, lots_per=lots_per)
     if body is None:
         raise LogBookError(404, f"{day} is not a recorded or reconstructable day")
     if source != "all" and body.get("source") != source:
@@ -94,6 +97,7 @@ def list_day(
     return {
         "day": day.isoformat(),
         "list": list_key,
+        "track": track,
         "basis": "gross",
         "setting": _setting(stop_inr, trail),
         "book": _book_row(block, book),
@@ -123,12 +127,16 @@ def days(
     trail: Trail | None,
     source: str = "recorded",
     root: Path | None = None,
+    track: str | None = None,
+    lots_per: int | None = None,
 ) -> dict:
-    """Every scored list-day in the window, with and without the portfolio stop."""
+    """Every scored list-day in the window, with and without the portfolio stop. `track` reads a
+    parallel track's journal (list C only), `lots_per` books every pick at that many lots (the
+    Rotation page asks for 1; default the entry's recorded lots)."""
     from ..fyers.daily import data_dir
 
     root = root or data_dir()
-    log = daylog.build_log(root, start, end, source)
+    log = daylog.build_log(root, start, end, source, track=track, lots_per=lots_per)
     rows: list[dict] = []
     errors: list[dict] = []
     totals = {k: {"n": 0, "without": 0.0, "with": 0.0, "fired": 0} for k in LISTS}
@@ -157,6 +165,8 @@ def days(
     return {
         "basis": "gross",
         "source": source,
+        "track": track,
+        "lots_per_strategy": lots_per,
         "setting": _setting(stop_inr, trail),
         "rows": rows,
         "errors": errors,

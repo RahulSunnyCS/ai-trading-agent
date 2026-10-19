@@ -12,8 +12,57 @@
 import type { RotationDayRow, RotationSummary } from '../types/rotation';
 import type { RotationListKey, RotationRow } from '../types/rotationDailyLog';
 import type { PortfolioDays } from '../types/rotationPortfolio';
+import {
+  type PortfolioStopSetting,
+  amountOf,
+  buttonLabel,
+  isOn,
+  sameTrail,
+  trailParam,
+} from './portfolioStop';
 import { LIST_KEYS } from './rotationDailyLogView';
 import { listName } from './rotationListNames';
+
+/** The replay only when it answers this setting (a stale answer for an earlier one is null). */
+export function bookFor(
+  data: PortfolioDays | null,
+  setting: PortfolioStopSetting,
+): PortfolioDays | null {
+  return data !== null &&
+    data.setting?.amount === amountOf(setting) &&
+    sameTrail(data.setting?.trail, trailParam(setting)) &&
+    Array.isArray(data.rows)
+    ? data
+    : null;
+}
+
+/**
+ * The line under a card's portfolio stop: what the replay changed, that it is still replaying, or
+ * why it could not; null when the setting is off or nothing is scored yet.
+ */
+export function stopNote(opts: {
+  setting: PortfolioStopSetting;
+  scoredDays: number;
+  /** The read-out now carries the stopped figures. */
+  stopped: boolean;
+  error: string | null;
+  /** List-days that no longer replay to their logged figure (`unmatched`). */
+  skipped: number;
+}): string | null {
+  const { setting, scoredDays, stopped, error, skipped } = opts;
+  if (!isOn(setting) || scoredDays <= 0) return null;
+  if (stopped) {
+    const level = buttonLabel(setting).replace('Portfolio stop ', '');
+    const left =
+      skipped > 0
+        ? ` ${skipped} list-day${skipped === 1 ? '' : 's'} no longer replay to their logged figure (bars repaired since the nightly update) and keep the registered one.`
+        : '';
+    return `With the ${level} portfolio stop replayed over these sessions: cumulative gross, ₹ per lot-day, the drawdowns and the curves. Beats random baskets, the verdict and the read-out stay on the registered basis, without a stop.${left}`;
+  }
+  return error
+    ? `The portfolio stop could not be replayed (${error}); the registered figures are shown.`
+    : 'Replaying the sessions under the portfolio stop; the registered figures are shown meanwhile.';
+}
 
 export function overlayBook(
   rows: readonly RotationRow[],

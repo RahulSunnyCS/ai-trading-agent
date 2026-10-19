@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CORE_STOP_KEYS,
   DEFAULT_SETTING,
+  DEFAULT_T1_SETTING,
   type PortfolioStopSetting,
+  T1_STOP_KEYS,
   amountOf,
   buttonLabel,
   fromQuery,
@@ -22,9 +25,19 @@ const make = (over: Partial<PortfolioStopSetting>): PortfolioStopSetting => ({
 });
 
 describe('the stop amount', () => {
-  it('defaults to 10,000', () => {
-    expect(amountOf(DEFAULT_SETTING)).toBe(10000);
-    expect(queryOf(DEFAULT_SETTING)).toEqual({ stop: '10000', trail: null });
+  it('defaults to 8,000 for Adaptive Classic and 9,000 for Adaptive Tuned', () => {
+    expect(amountOf(DEFAULT_SETTING)).toBe(8000);
+    expect(queryOf(DEFAULT_SETTING)).toEqual({ stop: '8000', trail: null });
+    expect(amountOf(DEFAULT_T1_SETTING)).toBe(9000);
+    expect(DEFAULT_T1_SETTING).toEqual({ ...DEFAULT_SETTING, stop: '9000' });
+  });
+
+  it('keeps each card in its own URL keys and storage, and Core moved to a new storage key', () => {
+    expect(CORE_STOP_KEYS).toMatchObject({ stopParam: 'pfstop', trailParam: 'pftrail' });
+    expect(T1_STOP_KEYS).toMatchObject({ stopParam: 'pfstop_t1', trailParam: 'pftrail_t1' });
+    expect(CORE_STOP_KEYS.storageKey).not.toBe('ata.rotation.portfolioStop.v1');
+    expect(CORE_STOP_KEYS.storageKey).not.toBe(T1_STOP_KEYS.storageKey);
+    expect(T1_STOP_KEYS.defaults).toBe(DEFAULT_T1_SETTING);
   });
 
   it.each(['', '  ', '0', '-5', '0.0'])('%j means no stop', (stop) => {
@@ -75,9 +88,9 @@ describe('trailing', () => {
 
 describe('the words', () => {
   it('says what each setting does', () => {
-    expect(summary(DEFAULT_SETTING)).toBe('No trailing: the stop stays at -₹10,000.');
+    expect(summary(DEFAULT_SETTING)).toBe('No trailing: the stop stays at -₹8,000.');
     expect(summary(make({ stop: '' }))).toMatch(/No portfolio stop/);
-    expect(summary(make({ mode: 'sl', x: '1000', y: '500' }))).toBe(
+    expect(summary(make({ stop: '10000', mode: 'sl', x: '1000', y: '500' }))).toBe(
       'Starts at -₹10,000; after +₹1,000 it is -₹9,500, after +₹2,000 it is -₹9,000. It never moves down.',
     );
     expect(summary(make({ mode: 'lock', a: '2000', b: '500' }))).toMatch(
@@ -89,9 +102,10 @@ describe('the words', () => {
   });
 
   it('labels the button', () => {
-    expect(buttonLabel(DEFAULT_SETTING)).toBe('Portfolio stop ₹10,000');
+    expect(buttonLabel(DEFAULT_SETTING)).toBe('Portfolio stop ₹8,000');
+    expect(buttonLabel(DEFAULT_T1_SETTING)).toBe('Portfolio stop ₹9,000');
     expect(buttonLabel(make({ stop: '' }))).toBe('Portfolio stop off');
-    expect(buttonLabel(make({ mode: 'sl', x: '1000', y: '500' }))).toBe(
+    expect(buttonLabel(make({ stop: '10000', mode: 'sl', x: '1000', y: '500' }))).toBe(
       'Portfolio stop ₹10,000 · trail 1,000 → 500',
     );
     expect(buttonLabel(make({ stop: '0', mode: 'lock', a: '2000', b: '500' }))).toBe(
@@ -106,7 +120,10 @@ describe('what was stored', () => {
     expect(parseStored(JSON.parse(JSON.stringify(s)))).toEqual(s);
     expect(parseStored(null)).toEqual(DEFAULT_SETTING);
     expect(parseStored({ mode: 'evil' })).toEqual(DEFAULT_SETTING);
-    expect(parseStored({ mode: 'sl', stop: 'x'.repeat(50) }).stop).toBe('10000');
+    expect(parseStored({ mode: 'sl', stop: 'x'.repeat(50) }).stop).toBe('8000');
+    // Adaptive Tuned falls back on its own default
+    expect(parseStored(null, DEFAULT_T1_SETTING)).toEqual(DEFAULT_T1_SETTING);
+    expect(parseStored({ mode: 'sl', stop: 'x'.repeat(50) }, DEFAULT_T1_SETTING).stop).toBe('9000');
   });
 });
 
@@ -115,7 +132,7 @@ describe('the URL form', () => {
     expect(toQuery(DEFAULT_SETTING)).toEqual({ pfstop: null, pftrail: null });
     expect(fromQuery(null, null)).toBeNull();
     const cases = [
-      make({ stop: '8000' }),
+      make({ stop: '7000' }),
       make({ stop: '' }),
       make({ mode: 'sl', x: '1000', y: '500' }),
       make({ stop: '', mode: 'lock', a: '2000', b: '500' }),
@@ -125,6 +142,21 @@ describe('the URL form', () => {
       const q = toQuery(s);
       expect(fromQuery(q.pfstop, q.pftrail)).toEqual(s);
     }
+  });
+
+  it("measures Adaptive Tuned's setting against its own default", () => {
+    expect(toQuery(DEFAULT_T1_SETTING, DEFAULT_T1_SETTING)).toEqual({
+      pfstop: null,
+      pftrail: null,
+    });
+    // Classic's default is not Tuned's: it has to be written to the URL
+    expect(toQuery(DEFAULT_SETTING, DEFAULT_T1_SETTING)).toEqual({ pfstop: '8000', pftrail: null });
+    expect(fromQuery(null, 'sl:1000,500', DEFAULT_T1_SETTING)).toEqual({
+      ...DEFAULT_T1_SETTING,
+      mode: 'sl',
+      x: '1000',
+      y: '500',
+    });
   });
 
   it('turns an unreadable URL into the default, never an error', () => {

@@ -68,7 +68,9 @@ One 32 px line a day, newest first.
 | Status | Scored, Waiting, Late or Not recorded |
 
 > [!NOTE]
-> The figure is per lot-day because the list holds 6 lots, or 8 when the Buy add-on was taken.
+> The figure is per lot-day because the list holds 3 strategies, or 4 when the Buy add-on was
+> taken. Rupee totals are at 1 lot per strategy, as traded (the journal records 2 lots a strategy;
+> the per-lot figure is the same either way).
 
 ### Status
 
@@ -81,14 +83,14 @@ One 32 px line a day, newest first.
 
 ## The portfolio stop
 
-The **Portfolio stop** button in the run bar shows the stop that is applied and opens its pop-up.
+The **Portfolio stop** button on the Adaptive Classic card shows the stop this log follows and opens its pop-up.
 It is the stop you trade the list under: one level on the *combined* P&L of the basket, on top of
 each strategy's own stop. The first minute the basket's mark-to-market reaches the level, every
 pick closes at that minute's close and nothing that has not entered yet enters that day.
 
 | Field | What it does |
 |---|---|
-| Stop loss | Rupees for the whole basket. **10,000 by default.** Empty, 0 or below means no portfolio stop |
+| Stop loss | Rupees for the whole basket at 1 lot per strategy. **8,000 by default** (Adaptive Classic's stop on the Rotation page; Adaptive Tuned's card has its own, 9,000). Empty, 0 or below means no portfolio stop |
 | Trail SL | Every ₹X of profit the basket makes, the stop moves up ₹Y. It never moves down. Needs a stop loss |
 | Lock profit | Once profit reaches ₹A, lock ₹B: the basket closes if it falls back to ₹B. Works with no stop loss |
 | Lock and trail | Lock ₹B once profit reaches ₹A, then every further ₹X of profit raises the level ₹Y |

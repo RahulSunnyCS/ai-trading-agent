@@ -1,5 +1,5 @@
 /**
- * The hero chart: cumulative gross of the shown lists (VISIBLE_LIST_KEYS), 2 lots per strategy,
+ * The hero chart: cumulative gross of the shown lists (VISIBLE_LIST_KEYS), 1 lot per strategy,
  * the fixed base and, behind them, the band of 1,000 random
  * same-shape baskets for the focus list. Hand-drawn SVG, like the
  * Correlation tab's heatmap, so nothing here pulls in a chart library.

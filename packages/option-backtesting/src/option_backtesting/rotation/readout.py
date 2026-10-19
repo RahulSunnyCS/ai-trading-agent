@@ -26,7 +26,7 @@ from ..fyers.daily import data_dir
 from . import base as base_mod
 from . import journal, store
 from .lists import LISTS, LOTS_PER, MIN_WIDE_N
-from .variants import is_buy, is_wide, variant_names
+from .variants import is_buy, is_wide, track_names, variant_names
 
 N_RUNS = 1000  # random same-shape baskets, as research/bl057/rotate.py
 RANDOM_SEED = 57  # the research comparator's seed; combined with the day, see random_day
@@ -36,6 +36,8 @@ BOOT_SEED = 20261012
 BOOT_LEVEL = 0.90
 MIN_DAYS_FOR_INTERVAL = 10  # below this the interval is shown but flagged as too short to read
 READOUT_DAYS = 60  # the registered read-out point (BL-058 Phase 0b)
+#: The lists a parallel track records (BL-113: Adaptive only).
+TRACK_LISTS = ("C",)
 
 
 def max_drawdown(daily: np.ndarray) -> float:
@@ -103,7 +105,8 @@ def random_day(
 
 
 def _grosses(names: list[str], root: Path) -> dict[str, dict[date, float]]:
-    return {n: base_mod.read_column(n, "gross", root) for n in names}
+    # store.result_path: a parallel track's variants live in its own folder
+    return {n: base_mod.read_column(store.result_path(n, root), "gross") for n in names}
 
 
 def build(
@@ -112,14 +115,27 @@ def build(
     end: date | None = None,
     runs: int = N_RUNS,
     first_n: int | None = None,
+    track: str | None = None,
+    lots_per: int | None = None,
 ) -> dict:
     """The read-out over the forward entries (never a late one), as a plain dict.
 
     `first_n` keeps only the first N scored sessions: `first_n=60` is the registered read-out even
-    when more days exist. Without it every scored session counts and `past_readout` says so."""
+    when more days exist. Without it every scored session counts and `past_readout` says so.
+
+    `lots_per` (display only, default the registered LOTS_PER) sets the lots a strategy behind every
+    rupee total: a list's and the base's cumulative gross and drawdown, the daily `*_total`s and the
+    random baskets' rupee band. Every per-lot figure, the random-basket percentile (both sides
+    scale alike), the intervals and the pass rule are the same at any lots.
+
+    `track` ("t1") reads that parallel track's journal (list C only) over Core-298 plus the track's
+    variants. Its random baskets draw from that universe; its list is compared with the fixed base
+    as the live lists are, and `vs_ref` is None (the track records no REF list; its registered
+    comparison with the live Adaptive is `track.build`)."""
     root = root or data_dir()
-    names = variant_names()
-    path = store.journal_path(root)
+    lots_per = lots_per or LOTS_PER
+    names = variant_names() + (track_names(track) if track else [])
+    path = store.journal_path(root, track)
     all_entries = journal.read(path)
     chain_problems = journal.verify(path)
     entries = [
@@ -160,11 +176,12 @@ def build(
     if first_n is not None:
         scored = scored[:first_n]
 
-    keys = list(LISTS)
+    keys = list(TRACK_LISTS if track else LISTS)
     days = [s["day"] for s in scored]
     out: dict = {
         "settings": {
-            "lots_per_strategy": LOTS_PER,
+            "lots_per_strategy": lots_per,
+            "registered_lots_per_strategy": LOTS_PER,
             "random_runs": runs,
             "random_seed": RANDOM_SEED,
             "bootstrap_resamples": BOOT_RESAMPLES,
@@ -185,6 +202,7 @@ def build(
         "short": len(days) < MIN_DAYS_FOR_INTERVAL,
         "lists": {},
         "base": None,
+        "track": track,
     }
     if not days:
         return out
@@ -202,21 +220,24 @@ def build(
             ps = s["picks"][k]
             g = sum(gross[n][s["day"]] for n in ps)
             pl.append(g / len(ps))
-            tt.append(LOTS_PER * g)
-            ll.append(LOTS_PER * len(ps))
+            tt.append(lots_per * g)
+            ll.append(lots_per * len(ps))
         per_lot[k], total[k], lots[k] = np.array(pl), np.array(tt), np.array(ll, dtype=float)
 
     base_series = np.array([base_pl[d] for d in days])
     base_dd = max_drawdown(base_series)
     out["base"] = {
-        "definition": "2 x NIFTY Widesl OTM1 09:17 + 1 x NIFTY Dir ATM 09:24, 2 lots each",
+        "definition": (
+            "2 x NIFTY Widesl OTM1 09:17 + 1 x NIFTY Dir ATM 09:24, "
+            f"{lots_per} lot{'' if lots_per == 1 else 's'} each"
+        ),
         "per_lot_day": float(base_series.mean()),
         "cumulative_per_lot": float(base_series.sum()),
         "max_drawdown_per_lot": base_dd,
-        "lots_per_day": LOTS_PER * base_mod.BASE_LOTS,
-        # the base at the same 2 lots per strategy, so its cumulative is comparable to a list's
-        "total": float(LOTS_PER * base_mod.BASE_LOTS * base_series.sum()),
-        "max_drawdown": max_drawdown(LOTS_PER * base_mod.BASE_LOTS * base_series),
+        "lots_per_day": lots_per * base_mod.BASE_LOTS,
+        # the base at the same lots per strategy, so its cumulative is comparable to a list's
+        "total": float(lots_per * base_mod.BASE_LOTS * base_series.sum()),
+        "max_drawdown": max_drawdown(lots_per * base_mod.BASE_LOTS * base_series),
     }
 
     # random same-shape baskets, one set of core draws per day shared by every list
@@ -233,17 +254,17 @@ def build(
         core, buy = random_day(day, pool[ok], wide_mask[pool_ix][ok], bpool, runs=runs)
         for k in keys:
             has_buy = bool(s["entry"]["lists"][k]["buy"])
-            r = LOTS_PER * (core + (buy if has_buy else 0.0))
+            r = lots_per * (core + (buy if has_buy else 0.0))
             rand_total[k] += r
             rand_cum[k][j] = rand_total[k]
             rand_day_pct[k].append(float((r < total[k][j]).mean()))
 
-    ref = per_lot["REF"]
+    ref = per_lot.get("REF")  # a track records no REF list
     for k in keys:
         t = float(total[k].sum())
         r = rand_total[k]
         vs_base = block_bootstrap_mean(per_lot[k] - base_series)
-        vs_ref = block_bootstrap_mean(per_lot[k] - ref) if k != "REF" else None
+        vs_ref = block_bootstrap_mean(per_lot[k] - ref) if k != "REF" and ref is not None else None
         dd_lot = max_drawdown(per_lot[k])
         out["lists"][k] = {
             "total": t,
@@ -282,7 +303,7 @@ def build(
         {
             "day": d.isoformat(),
             "base": float(base_series[j]),
-            "base_total": float(LOTS_PER * base_mod.BASE_LOTS * base_series[j]),
+            "base_total": float(lots_per * base_mod.BASE_LOTS * base_series[j]),
             **{k: float(per_lot[k][j]) for k in keys},
             **{f"{k}_total": float(total[k][j]) for k in keys},
             **{f"{k}_random_pct": rand_day_pct[k][j] * 100 for k in keys},

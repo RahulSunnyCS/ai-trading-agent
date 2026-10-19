@@ -73,11 +73,16 @@ export function PortfolioStopDialog({
   onOpenChange,
   setting,
   onApply,
+  defaults = DEFAULT_SETTING,
+  title = 'Portfolio stop',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   setting: PortfolioStopSetting;
   onApply: (next: PortfolioStopSetting) => void;
+  /** What "Reset to default" goes back to: each card has its own default level. */
+  defaults?: PortfolioStopSetting;
+  title?: string;
 }) {
   const [draft, setDraft] = useState<PortfolioStopSetting>(setting);
   const [tried, setTried] = useState(false);
@@ -105,11 +110,11 @@ export function PortfolioStopDialog({
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title="Portfolio stop"
+      title={title}
       description="Closes every pick in the basket when the combined P&L reaches the level. Leave it empty, or 0, for no portfolio stop."
       footer={
         <>
-          <Button size="sm" variant="ghost" onClick={() => setDraft(DEFAULT_SETTING)}>
+          <Button size="sm" variant="ghost" onClick={() => setDraft(defaults)}>
             Reset to default
           </Button>
           <Button size="sm" variant="primary" onClick={apply}>

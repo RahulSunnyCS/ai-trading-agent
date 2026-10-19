@@ -1,12 +1,18 @@
 /**
- * The "Portfolio stop" button of the Rotation page's run bar (BL-095): shows the setting that is
- * applied and opens its pop-up.
+ * The "Portfolio stop" button (BL-095): shows the setting that is applied and opens its pop-up.
+ * On the Rotation page each list card has its own (Adaptive Classic, Adaptive Tuned), each with
+ * its own default level.
  */
 
 import { ShieldHalf } from 'lucide-react';
 import { useState } from 'react';
 
-import { type PortfolioStopSetting, buttonLabel, isOn } from '../../lib/portfolioStop';
+import {
+  DEFAULT_SETTING,
+  type PortfolioStopSetting,
+  buttonLabel,
+  isOn,
+} from '../../lib/portfolioStop';
 import { SEVERAL_LISTS_VISIBLE } from '../../lib/rotationListNames';
 import { Button } from '../ui/Button';
 import { PortfolioStopDialog } from './PortfolioStopDialog';
@@ -14,9 +20,15 @@ import { PortfolioStopDialog } from './PortfolioStopDialog';
 export function PortfolioStopButton({
   setting,
   onChange,
+  defaults = DEFAULT_SETTING,
+  dialogTitle,
 }: {
   setting: PortfolioStopSetting;
   onChange: (next: PortfolioStopSetting) => void;
+  /** This button's default ("Reset to default" in the pop-up). */
+  defaults?: PortfolioStopSetting;
+  /** The pop-up's title, e.g. "Portfolio stop · Adaptive Tuned". */
+  dialogTitle?: string;
 }) {
   const [open, setOpen] = useState(false);
   const on = isOn(setting);
@@ -37,6 +49,8 @@ export function PortfolioStopButton({
         onOpenChange={setOpen}
         setting={setting}
         onApply={onChange}
+        defaults={defaults}
+        {...(dialogTitle ? { title: dialogTitle } : {})}
       />
     </>
   );

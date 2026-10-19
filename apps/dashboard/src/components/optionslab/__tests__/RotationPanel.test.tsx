@@ -6,32 +6,40 @@ const mocks = vi.hoisted(() => ({
   overview: null as unknown,
   summary: null as unknown,
   mounted: [] as string[],
+  summaryArgs: [] as unknown[],
+  portfolioArgs: [] as unknown[],
+  stopKeys: [] as unknown[],
 }));
 
 vi.mock('../../../hooks/useRotation', () => ({
+  ROTATION_PAGE_LOTS: 1,
   useRotationOverview: () => ({
     data: mocks.overview,
     loading: false,
     error: null,
     refetch: () => undefined,
   }),
-  useRotationSummary: () => ({
-    data: mocks.summary,
-    loading: false,
-    error: null,
-    refetch: () => undefined,
-  }),
+  useRotationSummary: (opts: unknown) => {
+    mocks.summaryArgs.push(opts);
+    return {
+      data: mocks.summary,
+      loading: false,
+      error: null,
+      refetch: () => undefined,
+    };
+  },
 }));
 vi.mock('../../../hooks/useRotationPortfolio', () => ({
-  useRotationPortfolioDays: () => ({
-    data: null,
-    loading: false,
-    error: null,
-    refetch: () => undefined,
-  }),
+  useRotationPortfolioDays: (...args: unknown[]) => {
+    mocks.portfolioArgs.push(args[3]);
+    return { data: null, loading: false, error: null, refetch: () => undefined };
+  },
 }));
 vi.mock('../../../hooks/usePortfolioStop', () => ({
-  usePortfolioStop: () => [{ stop: '', mode: 'none', a: '', b: '', x: '', y: '' }, () => undefined],
+  usePortfolioStop: (keys: unknown) => {
+    mocks.stopKeys.push(keys);
+    return [{ stop: '', mode: 'none', a: '', b: '', x: '', y: '' }, () => undefined];
+  },
 }));
 
 // Each widget is replaced by a stub that records that it mounted, so the test can say which
@@ -77,6 +85,9 @@ const stats = {
 
 beforeEach(() => {
   mocks.mounted = [];
+  mocks.summaryArgs = [];
+  mocks.portfolioArgs = [];
+  mocks.stopKeys = [];
   mocks.overview = {
     health: { as_of: '2026-10-14T20:00:00+05:30', checks: [] },
     readout_days: 60,
@@ -121,14 +132,29 @@ describe('RotationPanel as one page', () => {
     expect(screen.getByTestId('EveningRun')).toBeTruthy();
   });
 
-  it('opens on the Adaptive card, then the day-by-day log', () => {
+  it('opens on the Adaptive Classic and Adaptive Tuned cards, then the day-by-day log', () => {
     render(<RotationPanel />);
-    expect(screen.getByRole('region', { name: 'Adaptive list' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Adaptive Classic list' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Adaptive Tuned list' })).toBeTruthy();
     for (const name of ['Steady', 'Calendar', 'Baseline']) {
       expect(screen.queryByRole('region', { name: `${name} list` })).toBeNull();
     }
     expect(screen.getByRole('heading', { name: 'What happened' })).toBeTruthy();
     expect(screen.getByTestId('DailyLog')).toBeTruthy();
+  });
+
+  it('reads both books at 1 lot, Tuned from the T1 track, each with its own stop', () => {
+    render(<RotationPanel />);
+    expect(screen.getByText('Forward · gross · 1 lot per strategy')).toBeTruthy();
+    expect(mocks.summaryArgs).toContainEqual({ lots: 1 });
+    expect(mocks.summaryArgs).toContainEqual({ lots: 1, track: 't1' });
+    expect(mocks.portfolioArgs).toContainEqual({ lots: 1 });
+    expect(mocks.portfolioArgs).toContainEqual({ lots: 1, track: 't1' });
+    // Classic on the default keys, Tuned on its own
+    expect(mocks.stopKeys).toContain(undefined);
+    expect(mocks.stopKeys).toContainEqual(
+      expect.objectContaining({ stopParam: 'pfstop_t1', trailParam: 'pftrail_t1' }),
+    );
   });
 
   it('names the list and its universe instead of a one-option focus control', () => {

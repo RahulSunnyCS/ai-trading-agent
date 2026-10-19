@@ -27,7 +27,10 @@ export interface PortfolioStopSetting {
   y: string;
 }
 
-export const DEFAULT_STOP = '10000';
+/** Adaptive Classic's (Core) stop, the owner's level for one lot a strategy (2026-10-19). */
+export const DEFAULT_STOP = '8000';
+/** Adaptive Tuned's (the T1 track) stop (owner, 2026-10-19). */
+export const DEFAULT_T1_STOP = '9000';
 
 export const DEFAULT_SETTING: PortfolioStopSetting = {
   stop: DEFAULT_STOP,
@@ -36,6 +39,36 @@ export const DEFAULT_SETTING: PortfolioStopSetting = {
   b: '',
   x: '',
   y: '',
+};
+
+export const DEFAULT_T1_SETTING: PortfolioStopSetting = {
+  ...DEFAULT_SETTING,
+  stop: DEFAULT_T1_STOP,
+};
+
+/** Where one card's setting is kept: its URL query keys, its browser storage key, its default. */
+export interface PortfolioStopKeys {
+  stopParam: string;
+  trailParam: string;
+  storageKey: string;
+  defaults: PortfolioStopSetting;
+}
+
+/** Adaptive Classic (Core) and every page widget that follows it. The storage key's version went
+ * to v2 with the ₹8,000 default, so a ₹10,000 kept from before does not override it. */
+export const CORE_STOP_KEYS: PortfolioStopKeys = {
+  stopParam: 'pfstop',
+  trailParam: 'pftrail',
+  storageKey: 'ata.rotation.portfolioStop.v2',
+  defaults: DEFAULT_SETTING,
+};
+
+/** Adaptive Tuned (the T1 track's card). */
+export const T1_STOP_KEYS: PortfolioStopKeys = {
+  stopParam: 'pfstop_t1',
+  trailParam: 'pftrail_t1',
+  storageKey: 'ata.rotation.portfolioStop.t1.v1',
+  defaults: DEFAULT_T1_SETTING,
 };
 
 export const MODE_LABEL: Record<TrailMode, string> = {
@@ -157,16 +190,19 @@ export function buttonLabel(s: PortfolioStopSetting): string {
 }
 
 /** What was kept in the browser, made safe: anything unreadable is the default. */
-export function parseStored(raw: unknown): PortfolioStopSetting {
-  if (typeof raw !== 'object' || raw === null) return DEFAULT_SETTING;
+export function parseStored(
+  raw: unknown,
+  defaults: PortfolioStopSetting = DEFAULT_SETTING,
+): PortfolioStopSetting {
+  if (typeof raw !== 'object' || raw === null) return defaults;
   const r = raw as Record<string, unknown>;
   const text = (v: unknown) => (typeof v === 'string' && v.length <= 12 ? v : '');
   const mode = r.mode;
   if (mode !== 'none' && mode !== 'sl' && mode !== 'lock' && mode !== 'locktrail') {
-    return DEFAULT_SETTING;
+    return defaults;
   }
   return {
-    stop: typeof r.stop === 'string' && r.stop.length <= 12 ? r.stop : DEFAULT_STOP,
+    stop: typeof r.stop === 'string' && r.stop.length <= 12 ? r.stop : defaults.stop,
     mode,
     a: text(r.a),
     b: text(r.b),
@@ -187,9 +223,9 @@ export function sameTrail(a: string | null | undefined, b: string | null | undef
   return left.length === right.length && left.every((v, i) => v === right[i]);
 }
 
-function isDefault(s: PortfolioStopSetting): boolean {
+function isDefault(s: PortfolioStopSetting, defaults: PortfolioStopSetting): boolean {
   return (
-    s.stop === DEFAULT_SETTING.stop &&
+    s.stop === defaults.stop &&
     s.mode === 'none' &&
     s.a === '' &&
     s.b === '' &&
@@ -198,12 +234,16 @@ function isDefault(s: PortfolioStopSetting): boolean {
   );
 }
 
-/** The setting as URL query values (`pfstop`, `pftrail`), or nulls when it is the default. */
-export function toQuery(s: PortfolioStopSetting): {
+/** The setting as URL query values (`pfstop`, `pftrail`; a card with other keys maps these to
+ * its own), or nulls when it is that card's default. */
+export function toQuery(
+  s: PortfolioStopSetting,
+  defaults: PortfolioStopSetting = DEFAULT_SETTING,
+): {
   pfstop: string | null;
   pftrail: string | null;
 } {
-  if (isDefault(s)) return { pfstop: null, pftrail: null };
+  if (isDefault(s, defaults)) return { pfstop: null, pftrail: null };
   const fields = MODE_FIELDS[s.mode].map((f) => s[f].trim()).join(',');
   return {
     pfstop: s.stop.trim() === '' ? 'off' : s.stop.trim(),
@@ -216,11 +256,12 @@ export function toQuery(s: PortfolioStopSetting): {
 export function fromQuery(
   pfstop: string | null,
   pftrail: string | null,
+  defaults: PortfolioStopSetting = DEFAULT_SETTING,
 ): PortfolioStopSetting | null {
   if (pfstop === null && pftrail === null) return null;
   const safe = (v: string) => (v.length <= 12 && /^[0-9.,]*$/.test(v) ? v : '');
-  const stop = pfstop === null ? DEFAULT_STOP : pfstop === 'off' ? '' : safe(pfstop);
-  const setting: PortfolioStopSetting = { ...DEFAULT_SETTING, stop };
+  const stop = pfstop === null ? defaults.stop : pfstop === 'off' ? '' : safe(pfstop);
+  const setting: PortfolioStopSetting = { ...defaults, mode: 'none', stop };
   if (pftrail !== null) {
     const [mode = '', rest = ''] = pftrail.split(':');
     if (mode === 'sl' || mode === 'lock' || mode === 'locktrail') {

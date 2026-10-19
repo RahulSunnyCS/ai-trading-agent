@@ -133,6 +133,14 @@ Otherwise:
   the 298 universe; its Dir results in `rotation/base/`) and the read-out (per list ₹ per lot-day, drawdown,
   random same-shape percentile, list minus REF and minus base by a circular 5-day block bootstrap, 2,000
   resamples, seed 20261012). Read-only over the journal; `obt rotation readout | base`.
+  Display overrides for the Rotation page (owner, 2026-10-19), every default unchanged:
+  `lots_per` (`readout.build`, `daylog.build_log|build_day`, `portfolio_log.days|list_day`,
+  `drawdowns.build`'s stop replay) books every pick at that many lots, so rupee totals scale and
+  per-lot figures, the random-basket percentile and the pass rule do not, and no entry's recorded
+  `lots_per_strategy` is rewritten; `track="t1"` (`readout.build`, `daylog`, `portfolio_log`,
+  `overview.baskets`) reads the T1 journal (list C only, Core-298 + the track's variants via
+  `store.result_path`; no reconstruction, placements or re-score; missing days counted from the
+  track's own first entry; `vs_ref` None, the gap to the fixed base kept).
 - `rotation/expiry.py` — the expiring-index rule (BL-122, owner 2026-10-18): from `EXPIRY_ONLY_FROM` (Mon
   2026-10-19), on a day when exactly one index expires (weekday label `0`; both, neither or an unknown label =
   no rule), Adaptive (list C, live and T1) is a FILTER of the unrestricted ranking: `filter_picks` runs

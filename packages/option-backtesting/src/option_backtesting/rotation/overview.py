@@ -251,13 +251,14 @@ def health(root: Path | None = None, now: datetime | None = None) -> dict:
     return {"checks": checks, "state": worst, "as_of": now.isoformat(timespec="seconds")}
 
 
-def baskets(root: Path | None = None, day: date | None = None) -> dict:
+def baskets(root: Path | None = None, day: date | None = None, track: str | None = None) -> dict:
     """The picks of one journal entry (default the latest), per list, with each pick's composite,
-    how many lists hold it, and what changed since the entry before."""
+    how many lists hold it, and what changed since the entry before. `track` reads a parallel
+    track's own journal."""
     root = root or data_dir()
     out: dict = {"entry": None, "lists": {}, "changed": {}, "readout_days": READOUT_DAYS}
     try:
-        entries = journal.read(store.journal_path(root))
+        entries = journal.read(store.journal_path(root, track))
     except journal.JournalCorrupt as error:
         out["error"] = str(error)
         return out

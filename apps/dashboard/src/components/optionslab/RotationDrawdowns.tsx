@@ -2,7 +2,7 @@
  * Rotation page → "Drawdown episodes": each time the focus list fell, how deep, for how long, how
  * fast it came back, what the fixed base did over the same days, and what the list was holding.
  *
- * Gross, per lot-day (a list holds 6 lots, or 8 with the Buy add-on). The series is the stored
+ * Gross, per lot-day (a list holds 3 strategies, or 4 with the Buy add-on). The series is the stored
  * results of the days the journal recorded and, for days before it began, the picks the rule
  * would have made; the two are counted apart. Read through `GET /legwise/rotation/drawdowns`
  * (`rotation/drawdowns.py` does every figure). A description of what was held, never a cause.
