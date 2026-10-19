@@ -14,7 +14,8 @@ import { type Mode, NAME_PREFIXES } from './strategy-plan.js';
  *   not create is a conflict: alerted, never touched.
  * - Evening: owned algos that are listed and not wanted are deleted, on any weekday, but only
  *   when Quantiply shows them finished (`NOT_RUNNING` / `TRADE_CLOSED`) and either not enabled or
- *   enabled for today's weekday (whose session is over). An owned algo that may be running, or is
+ *   enabled for today's weekday once today's session is over (`sessionOver`, 15:30 IST: before
+ *   that, an enabled `NOT_RUNNING` algo may still be waiting for its entry). An owned algo that may be running, or is
  *   enabled for another day (it would trade then), is kept and alerted. Wanted algos missing on
  *   the weekday are created; an owned one with different content is replaced on the same rules.
  * - Morning (`topup`): only missing picks are created. Nothing is deleted; owned algos on today's
@@ -89,6 +90,22 @@ export const FINISHED = new Set(['NOT_RUNNING', 'TRADE_CLOSED']);
 
 export const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const;
 
+/** From this IST minute an enabled algo for today can no longer be waiting for its entry. */
+export const SESSION_OVER_MINUTES = 15 * 60 + 30;
+
+/** Is today's session over (IST), so an enabled algo for today is done for the day? */
+export function sessionOver(now: Date = new Date()): boolean {
+  const ist = new Date(now.getTime() + 330 * 60_000);
+  return ist.getUTCHours() * 60 + ist.getUTCMinutes() >= SESSION_OVER_MINUTES;
+}
+
+/** The weekday of a `YYYY-MM-DD` date, as Quantiply writes it (`WED`). */
+export function weekdayOf(isoDay: string): string {
+  const d = new Date(`${isoDay}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) throw new Error(`not a date: ${isoDay}`);
+  return WEEKDAYS[d.getUTCDay()] ?? 'SUN';
+}
+
 /** The IST weekday of `now`, as Quantiply writes it (`MON`). */
 export function istWeekday(now: Date = new Date()): string {
   return WEEKDAYS[new Date(now.getTime() + 330 * 60_000).getUTCDay()] ?? 'SUN';
@@ -140,14 +157,21 @@ export function parseDayWise(json: unknown): QAlgo[] {
   return out;
 }
 
-function deletable(a: QAlgo, today: string): boolean {
-  return FINISHED.has(a.status) && (!a.enabled || a.day === today);
+/** When an evening plan may delete an owned algo: today, and whether today's session is over. */
+export interface Today {
+  weekday: string;
+  sessionOver: boolean;
+}
+
+function deletable(a: QAlgo, today: Today): boolean {
+  if (!FINISHED.has(a.status)) return false;
+  return !a.enabled || (a.day === today.weekday && today.sessionOver);
 }
 
 export function planQ(
   mode: Mode,
   weekday: string,
-  today: string,
+  today: Today,
   wanted: QWanted[],
   ledger: QLedgerRow[],
   algos: QAlgo[],

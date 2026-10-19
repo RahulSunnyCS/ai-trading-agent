@@ -17,7 +17,9 @@ import {
   parseQLedger,
   planQ,
   readBackDiffs,
+  sessionOver,
   summaryQ,
+  weekdayOf,
 } from './quantiply-plan.js';
 import { quantiplyLogin } from './quantiply.js';
 import { redact, registerSecret } from './secrets.js';
@@ -38,6 +40,8 @@ import { type Mode, istToday, sha256 } from './strategy-plan.js';
  * only algos in it are ever deleted. Each created algo is read back (`GET /algos/:id`) and compared
  * with what was sent; a difference is recorded and alerted.
  */
+
+const READ_BACK_OK = 'read back: identical';
 
 async function readJson<T>(path: string): Promise<T> {
   return JSON.parse(await readFile(path, 'utf8')) as T;
@@ -103,6 +107,10 @@ async function main(): Promise<number> {
     );
     return 1;
   }
+  if (weekdayOf(manifest.day) !== manifest.weekday) {
+    console.error(`manifest: ${manifest.day} is not a ${manifest.weekday}; refusing`);
+    return 1;
+  }
   const bodies = new Map<string, Record<string, unknown>>();
   const wanted: QWanted[] = [];
   for (const s of manifest.strategies) {
@@ -162,13 +170,23 @@ async function main(): Promise<number> {
     const api = new QuantiplyApi(token);
 
     const algos = await api.list();
-    const p = planQ(mode, manifest.weekday, istWeekday(), wanted, ledger, algos);
+    const p = planQ(
+      mode,
+      manifest.weekday,
+      { weekday: istWeekday(), sessionOver: sessionOver() },
+      wanted,
+      ledger,
+      algos,
+    );
     lines.push(...summaryQ(p, mode));
     printed = lines.length;
     console.log(`${label}${values.apply ? '' : ' (dry run)'}\n${lines.join('\n')}`);
     if (!values.apply) return 0;
 
+    // The ledger is what makes an algo the tool's: check it can be written before changing
+    // anything (an unmounted TRADING_DATA_ROOT would otherwise leave created algos unowned).
     await mkdir(dirname(ledgerPath), { recursive: true });
+    await appendFile(ledgerPath, '', 'utf8');
     const record = async (row: Omit<QLedgerRow, 'at' | 'day' | 'weekday' | 'mode'>) => {
       const full: QLedgerRow = {
         at: new Date().toISOString(),
@@ -177,20 +195,59 @@ async function main(): Promise<number> {
         mode,
         ...row,
       };
-      await appendFile(ledgerPath, `${JSON.stringify(full)}\n`, 'utf8');
+      const line = `${JSON.stringify(full)}\n`;
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          await appendFile(ledgerPath, line, 'utf8');
+          return;
+        } catch (error) {
+          if (attempt >= 3) {
+            // Stop here: anything changed after this would be unowned too. The row has no secret.
+            throw new Error(
+              `the ledger could not be written (${describe(error)}); add this row to ${ledgerPath} by hand: ${line.trim()}`,
+            );
+          }
+          await new Promise((r) => setTimeout(r, 1_000));
+        }
+      }
     };
+    /** Read an algo back and compare it with what was sent, its weekday included. */
+    const check = async (body: Record<string, unknown>, id: string): Promise<string> => {
+      try {
+        const saved = await api.get(id);
+        const diffs = readBackDiffs(body, saved);
+        if (saved.day !== manifest.weekday) diffs.unshift(`day ${String(saved.day)}`);
+        return diffs.length ? `READ-BACK DIFFERS: ${diffs.slice(0, 5).join(', ')}` : READ_BACK_OK;
+      } catch (error) {
+        return `READ-BACK FAILED: ${describe(error)}`;
+      }
+    };
+    const owned = async (w: QWanted, id: string, verdict: string, note = '') => {
+      const ok = verdict === READ_BACK_OK;
+      // Created but not as sent: owned (so it can be replaced), under a sha no export will match.
+      await record({
+        action: 'create',
+        id,
+        name: w.name,
+        sha: ok ? w.sha : `mismatch:${w.sha}`,
+        ok: true,
+        detail: `${note}${verdict}`,
+      });
+      if (!ok) failed = true;
+      lines.push(`${ok ? '✅' : '❌'} created ${w.name} (${note}${verdict})`);
+    };
+    const listedBefore = new Set(algos.map((a) => a.id));
 
-    // A replaced algo is deleted first; if that fails, creating it again would leave two algos
-    // with one name on the day, so the create is skipped too.
+    // A replaced algo is deleted first; if that delete fails, creating it again would leave two
+    // algos with one name on the day, so the create is skipped too. Keyed by algo id: a failed
+    // delete of the same name on another weekday must not block this day's create.
     const notDeleted = new Set<string>();
     for (const a of p.delete) {
       try {
         await api.remove(a.id);
-        await record({ action: 'delete', id: a.id, name: a.name, sha: '', ok: true });
-        lines.push(`deleted ${a.name} (${a.day})`);
       } catch (error) {
         failed = true;
-        notDeleted.add(a.name);
+        notDeleted.add(a.id);
         await record({
           action: 'delete',
           id: a.id,
@@ -200,22 +257,43 @@ async function main(): Promise<number> {
           detail: describe(error),
         });
         lines.push(`❌ delete failed: ${a.name} (${a.day}) — ${describe(error)}`);
+        continue;
       }
+      await record({ action: 'delete', id: a.id, name: a.name, sha: '', ok: true });
+      lines.push(`deleted ${a.name} (${a.day})`);
     }
     for (const w of p.create) {
-      if (
-        notDeleted.has(w.name) &&
-        p.delete.some((a) => a.name === w.name && a.day === manifest.weekday)
-      ) {
+      const stuck = p.delete.some(
+        (a) => a.name === w.name && a.day === manifest.weekday && notDeleted.has(a.id),
+      );
+      if (stuck) {
         failed = true;
         lines.push(`NOT created again, the old copy is still there: ${w.name}`);
         continue;
       }
       const body = bodies.get(w.name) ?? {};
-      let saved: { id: string }[] = [];
+      let saved: { id: string }[];
       try {
         saved = await api.create(body);
       } catch (error) {
+        // The create may have happened on Quantiply even though this side saw an error (a
+        // timeout, a dropped connection): take over a new algo of that name on the day, if any,
+        // so it is not left unowned and reported as made by hand on the next run.
+        let adopted: { id: string }[] = [];
+        try {
+          adopted = (await api.list()).filter(
+            (a) => a.name === w.name && a.day === manifest.weekday && !listedBefore.has(a.id),
+          );
+        } catch {
+          // the list failed too: reported as a failed create below
+        }
+        if (adopted.length) {
+          for (const a of adopted) {
+            await owned(w, a.id, await check(body, a.id), `adopted after "${describe(error)}": `);
+          }
+          failed = true; // the owner should know the API errored
+          continue;
+        }
         failed = true;
         await record({
           action: 'create',
@@ -228,29 +306,7 @@ async function main(): Promise<number> {
         lines.push(`❌ create failed: ${w.name} — ${describe(error)}`);
         continue;
       }
-      for (const s of saved) {
-        let verdict: string;
-        try {
-          const diffs = readBackDiffs(body, await api.get(s.id));
-          verdict = diffs.length
-            ? `READ-BACK DIFFERS: ${diffs.slice(0, 5).join(', ')}`
-            : 'read back: identical';
-        } catch (error) {
-          verdict = `READ-BACK FAILED: ${describe(error)}`;
-        }
-        const ok = verdict === 'read back: identical';
-        // Created but not as sent: owned (so it can be replaced), under a sha no export will match.
-        await record({
-          action: 'create',
-          id: s.id,
-          name: w.name,
-          sha: ok ? w.sha : `mismatch:${w.sha}`,
-          ok: true,
-          detail: verdict,
-        });
-        if (!ok) failed = true;
-        lines.push(`${ok ? '✅' : '❌'} created ${w.name} (${verdict})`);
-      }
+      for (const s of saved) await owned(w, s.id, await check(body, s.id));
     }
     if (needsAttentionQ(p)) failed = true;
   } catch (error) {

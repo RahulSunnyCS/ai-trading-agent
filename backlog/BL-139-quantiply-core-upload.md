@@ -175,6 +175,14 @@ only if the API cannot be used.
 
 ## Log
 
+- 2026-10-19 — Code review on PR #266 (10 findings). Findings 1–5 fixed:
+  1. An enabled algo for today is deleted only after 15:30 IST.
+  2. A create that errors adopts a new same-name algo found by a re-list.
+  3. The ledger is checked writable first; a failed row write stops the run with the row to add by hand.
+  4. Failed deletes are keyed by algo id.
+  5. The read-back checks the algo's weekday, and the manifest's weekday must match its date.
+
+  Findings 6–10 (login reuse, duplicated helpers, dead unconfirmed plumbing) are left as they are.
 - 2026-10-19 — First real upload, by the owner with `--apply` (at 17:25 IST, ledger in a scratch file):
   - It created `Core · S_ditm1_1202`, `Core · S_p250_1317` and `Core · S_p250_1302` for Wednesday 21 Oct.
   - Each was read back `identical`.

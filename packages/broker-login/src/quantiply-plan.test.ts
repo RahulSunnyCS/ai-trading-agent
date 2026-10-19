@@ -11,10 +11,13 @@ import {
   parseQLedger,
   planQ,
   readBackDiffs,
+  sessionOver,
   summaryQ,
+  weekdayOf,
 } from './quantiply-plan.js';
 
 const P = 'Core · ';
+const MON_AFTER_CLOSE = { weekday: 'MON', sessionOver: true };
 const row = (action: 'create' | 'delete', id: string, name: string, sha = 'a', ok = true) =>
   ({
     at: '2026-10-19T16:45:00+05:30',
@@ -57,7 +60,7 @@ test('ownedIds follows the last successful action per id and ignores other names
 test('evening: keeps the unchanged, deletes the dropped, creates the missing', () => {
   const ledger = [row('create', '1', `${P}A`), row('create', '2', `${P}B`)];
   const algos = [algo('1', `${P}A`, 'WED'), algo('2', `${P}B`, 'MON', { status: 'TRADE_CLOSED' })];
-  const p = planQ('evening', 'WED', 'MON', [want(`${P}A`), want(`${P}C`)], ledger, algos);
+  const p = planQ('evening', 'WED', MON_AFTER_CLOSE, [want(`${P}A`), want(`${P}C`)], ledger, algos);
   assert.deepEqual(p.keep, [`${P}A`]);
   assert.deepEqual(
     p.delete.map((a) => a.id),
@@ -82,7 +85,7 @@ test("evening never touches the owner's algos, a running one or one enabled for 
     algo('9', `${P}X`, 'WED'),
     algo('8', 'N_ITM1_SL21_3000', 'MON', { status: 'TRADE_CLOSED' }),
   ];
-  const p = planQ('evening', 'WED', 'MON', [want(`${P}X`)], ledger, algos);
+  const p = planQ('evening', 'WED', MON_AFTER_CLOSE, [want(`${P}X`)], ledger, algos);
   assert.deepEqual(
     p.heldBack.map((a) => a.id),
     ['1', '2'],
@@ -95,10 +98,39 @@ test("evening never touches the owner's algos, a running one or one enabled for 
   assert.deepEqual(p.create, []);
 });
 
+test("before today's session is over, an enabled algo for today is never deleted", () => {
+  const ledger = [row('create', '1', `${P}A`), row('create', '2', `${P}B`)];
+  const algos = [
+    algo('1', `${P}A`, 'MON', { enabled: true }), // waiting for its 12:02 entry
+    algo('2', `${P}B`, 'MON'), // not enabled: safe at any time
+  ];
+  const before = planQ('evening', 'WED', { weekday: 'MON', sessionOver: false }, [], ledger, algos);
+  assert.deepEqual(
+    before.heldBack.map((a) => a.id),
+    ['1'],
+  );
+  assert.deepEqual(
+    before.delete.map((a) => a.id),
+    ['2'],
+  );
+  const after = planQ('evening', 'WED', MON_AFTER_CLOSE, [], ledger, algos);
+  assert.deepEqual(
+    after.delete.map((a) => a.id),
+    ['1', '2'],
+  );
+});
+
+test('sessionOver and weekdayOf read IST and the calendar', () => {
+  assert.equal(sessionOver(new Date('2026-10-19T09:59:00Z')), false); // 15:29 IST
+  assert.equal(sessionOver(new Date('2026-10-19T10:00:00Z')), true); // 15:30 IST
+  assert.equal(weekdayOf('2026-10-21'), 'WED');
+  assert.throws(() => weekdayOf('2026-13-40'), /not a date/);
+});
+
 test('the same name on another weekday is not a match for the wanted day', () => {
   const ledger = [row('create', '1', `${P}A`)];
   const algos = [algo('1', `${P}A`, 'MON', { status: 'TRADE_CLOSED' })];
-  const p = planQ('evening', 'WED', 'MON', [want(`${P}A`)], ledger, algos);
+  const p = planQ('evening', 'WED', MON_AFTER_CLOSE, [want(`${P}A`)], ledger, algos);
   assert.deepEqual(
     p.create.map((w) => w.name),
     [`${P}A`],
@@ -119,7 +151,7 @@ test('evening replaces an owned algo whose content changed, and a duplicate', ()
   const p = planQ(
     'evening',
     'WED',
-    'MON',
+    MON_AFTER_CLOSE,
     [want(`${P}A`, 'new'), want(`${P}B`, 'b')],
     ledger,
     algos,
@@ -145,7 +177,7 @@ test('top-up creates only what is missing on the day, deletes nothing, reports t
   const p = planQ(
     'topup',
     'WED',
-    'WED',
+    { weekday: 'WED', sessionOver: false },
     [want(`${P}A`), want(`${P}C`, 'new'), want(`${P}D`)],
     ledger,
     algos,
@@ -164,7 +196,7 @@ test('a pick with an unconfirmed setting is never created, and is reported', () 
   const p = planQ(
     'evening',
     'WED',
-    'MON',
+    MON_AFTER_CLOSE,
     [want(`${P}N_buy_0932`, 'a', ['trail in points'])],
     [],
     [],

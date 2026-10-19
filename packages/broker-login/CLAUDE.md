@@ -103,8 +103,12 @@ npm run typecheck
     and never logged.
   - Quantiply keeps one algo per weekday, so the ledger (`TRADING_DATA_ROOT/rotation/quantiply/ledger.jsonl`) is
     keyed by algo id. Only ids in it are ever deleted, and only when Quantiply shows them finished and not enabled
-    for a later day.
-  - Every created algo is read back (`GET /algos/:id`) and compared field by field (`readBackDiffs`).
+    (an algo enabled for today only after 15:30 IST, when its session is over).
+  - Every created algo is read back (`GET /algos/:id`) and compared field by field (`readBackDiffs`), its
+    weekday included; the manifest's weekday must match its date.
+  - A create that errors on this side is checked against a fresh list: a new algo of that name on the day is
+    taken over (owned, read back) rather than left unowned. The ledger is checked writable before any change;
+    if a row cannot be written, the run stops and the message carries the row to add by hand.
   - `--apply` needs `QUANTIPLY_UPLOAD=on`; Telegram type `broker.quantiply`. It never enables (deploys) an algo.
   - It reads `latest-core.json`, written by `obt rotation quantiply-export`.
 
