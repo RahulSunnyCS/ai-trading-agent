@@ -7,6 +7,7 @@
 import { type PortfolioStopSetting, queryOf } from '../lib/portfolioStop';
 import type { RotationListKey } from '../types/rotation';
 import type { DrawdownWindowId, RotationDrawdownsResponse } from '../types/rotationDrawdowns';
+import { ROTATION_PAGE_LOTS } from './useRotation';
 import { useWarmingResource } from './useWarmingResource';
 
 const BASE = '/api/backtest/legwise';
@@ -27,6 +28,8 @@ export function useRotationDrawdowns(p: {
     const { stop, trail } = queryOf(p.portfolio);
     if (stop) q.set('stop', stop);
     if (trail) q.set('trail', trail);
+    // the stop is set for the page's lots a strategy, so the replay books each pick at them
+    if (stop || trail) q.set('lots', String(ROTATION_PAGE_LOTS));
   }
   return useWarmingResource<RotationDrawdownsResponse>(
     `${BASE}/rotation/drawdowns?${q.toString()}`,

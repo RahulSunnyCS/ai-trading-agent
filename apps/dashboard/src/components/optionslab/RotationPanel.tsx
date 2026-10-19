@@ -11,23 +11,50 @@
  * the day log loads alongside it.
  *
  * Gross only: the stored costs are zero. Lists are alternative baskets and are never added up.
- * Nothing on this page changes a list, a weight or the journal.
+ * Rupee totals are at 1 lot a strategy (`lots=1`, display only: the per-lot figures, the verdict
+ * and the journal's recorded 2 lots do not change). Three cards: Adaptive Classic (the live
+ * journal, Core-298) with its portfolio stop, which every widget below follows; Adaptive Tuned (the
+ * T1 track's journal) and the Fixed base, each with its own. Under each stop, what it changed
+ * ("Without the portfolio stop"). Nothing on this page changes a list, a weight or the journal.
  */
 
 import { useMemo, useState } from 'react';
 
 import { usePortfolioStop } from '../../hooks/usePortfolioStop';
-import { useRotationOverview, useRotationSummary } from '../../hooks/useRotation';
+import {
+  ROTATION_PAGE_LOTS,
+  type RotationReadOptions,
+  useRotationOverview,
+  useRotationSummary,
+} from '../../hooks/useRotation';
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { formatDay, formatIstTime, istToday } from '../../lib/format';
-import { amountOf, buttonLabel, isOn, sameTrail, trailParam } from '../../lib/portfolioStop';
 import {
+  BASE_STOP_KEYS,
+  DEFAULT_BASE_SETTING,
+  DEFAULT_SETTING,
+  DEFAULT_T1_SETTING,
+  type PortfolioStopSetting,
+  T1_STOP_KEYS,
+} from '../../lib/portfolioStop';
+import { baseCard, tunedCard } from '../../lib/rotationListCards';
+import {
+  ADAPTIVE_CARD,
+  BASE_CARD,
   DEFAULT_LIST,
   SEVERAL_LISTS_VISIBLE,
   listName,
   listWithUniverse,
 } from '../../lib/rotationListNames';
-import { overlaySummary, unmatched } from '../../lib/rotationPortfolioView';
+import {
+  type StopEffect,
+  bookFor,
+  overlayBase,
+  overlaySummary,
+  stopEffect,
+  stopNote,
+  unmatched,
+} from '../../lib/rotationPortfolioView';
 import {
   BENCHMARKS,
   BENCHMARK_LABEL,
@@ -37,6 +64,7 @@ import {
   verdict as buildVerdict,
   headline,
   heroSeries,
+  lotsWord,
 } from '../../lib/rotationView';
 import type { RotationListKey } from '../../types/rotation';
 import { Accordion } from '../ui/Accordion';
@@ -63,21 +91,68 @@ import { RotationHero } from './rotation/RotationHero';
 import { RotationListCards } from './rotation/RotationListCards';
 import { RotationReadoutBanner } from './rotation/RotationReadout';
 import { RotationVerdict } from './rotation/RotationVerdict';
+import { StopEffectBlock } from './rotation/StopEffect';
 
 const BENCHMARK_OPTIONS: SegmentedOption<RotationBenchmark>[] = BENCHMARKS.map((value) => ({
   value,
   label: BENCHMARK_LABEL[value],
 }));
 
+/** The owner trades one lot a pick (2026-10-19): every rupee total on the page is at 1 lot. */
+const ONE_LOT: RotationReadOptions = { lots: ROTATION_PAGE_LOTS };
+/** Adaptive Tuned: the T1 track's journal, at 1 lot. */
+const TUNED: RotationReadOptions = { lots: ROTATION_PAGE_LOTS, track: 't1' };
+/** The Fixed base as a book under its own stop, at 1 lot a strategy (2 Widesl + 1 Dir). */
+const BASE_BOOK = { lots: ROTATION_PAGE_LOTS, book: 'base' } as const;
+
+/** A card's portfolio stop: its button and the line saying what the replay did. */
+function CardStop({
+  setting,
+  onChange,
+  defaults,
+  title,
+  note,
+  effect,
+}: {
+  setting: PortfolioStopSetting;
+  onChange: (next: PortfolioStopSetting) => void;
+  defaults: PortfolioStopSetting;
+  title: string;
+  note: string | null;
+  /** What the stop changed, once its replay is in. */
+  effect: StopEffect | null;
+}) {
+  return (
+    <>
+      <PortfolioStopButton
+        setting={setting}
+        onChange={onChange}
+        defaults={defaults}
+        dialogTitle={`Portfolio stop · ${title}`}
+      />
+      {note ? (
+        <p className="text-[11px] text-muted" aria-live="polite">
+          {note}
+        </p>
+      ) : null}
+      {effect ? <StopEffectBlock effect={effect} /> : null}
+    </>
+  );
+}
+
 export function RotationPanel() {
   const overview = useRotationOverview();
-  const summary = useRotationSummary();
+  const summary = useRotationSummary(ONE_LOT);
+  const tuned = useRotationSummary(TUNED);
   const [focus, setFocus] = useState<RotationListKey>(DEFAULT_LIST);
   const [benchmark, setBenchmark] = useState<RotationBenchmark>('base');
   const [shown, setShown] = useState<ReadonlySet<RotationListKey>>(new Set([DEFAULT_LIST]));
   const [showBase, setShowBase] = useState(true);
-  // BL-095: one portfolio stop for every widget below that shows stopped figures.
+  // BL-095: Adaptive Classic's portfolio stop, which every widget below that shows stopped
+  // figures follows; Adaptive Tuned has its own (own URL keys, own storage, ₹9,000 default).
   const [portfolio, setPortfolio] = usePortfolioStop();
+  const [tunedStop, setTunedStop] = usePortfolioStop(T1_STOP_KEYS);
+  const [baseStop, setBaseStop] = usePortfolioStop(BASE_STOP_KEYS);
 
   const readoutDays = overview.data?.readout_days ?? 60;
   const s = summary.data;
@@ -85,17 +160,46 @@ export function RotationPanel() {
   // BL-095: the forward sessions replayed under the portfolio stop. Only an answer for this
   // setting is laid over the read-out; the verdict, the intervals and the random baskets always
   // stay on the registered basis (the pre-registered test does not move with a typed level).
-  const book = useRotationPortfolioDays('recorded', {}, portfolio);
-  const bookNow =
-    book.data !== null &&
-    book.data.setting?.amount === amountOf(portfolio) &&
-    sameTrail(book.data.setting?.trail, trailParam(portfolio)) &&
-    Array.isArray(book.data.rows)
-      ? book.data
-      : null;
+  const book = useRotationPortfolioDays('recorded', {}, portfolio, ONE_LOT);
+  const bookNow = bookFor(book.data, portfolio);
   const shown_s = useMemo(() => (s ? overlaySummary(s, bookNow) : s), [s, bookNow]);
   const stopped = shown_s !== s;
   const skipped = unmatched(bookNow);
+
+  // Adaptive Tuned (the T1 track): its own read-out and its own stop, on its card only.
+  const t = tuned.data;
+  const tunedBook = useRotationPortfolioDays('recorded', {}, tunedStop, TUNED);
+  const tunedBookNow = bookFor(tunedBook.data, tunedStop);
+  const tunedShown = useMemo(() => (t ? overlaySummary(t, tunedBookNow) : t), [t, tunedBookNow]);
+  const tunedNote = stopNote({
+    setting: tunedStop,
+    scoredDays: t?.n_days ?? 0,
+    stopped: tunedShown !== t,
+    error: tunedBook.error,
+    skipped: unmatched(tunedBookNow),
+  });
+
+  // The Fixed base: the read-out's own base over Classic's sessions, under its own stop (card only;
+  // the headline's base benchmark stays unstopped).
+  const baseBook = useRotationPortfolioDays('recorded', {}, baseStop, BASE_BOOK);
+  const baseBookNow = bookFor(baseBook.data, baseStop);
+  const baseShown = useMemo(() => (s ? overlayBase(s, baseBookNow) : s), [s, baseBookNow]);
+
+  // "Without the portfolio stop": each card's replay over that card's own scored days.
+  const classicDays = useMemo(() => (s?.days ?? []).map((d) => d.day), [s]);
+  const tunedDays = useMemo(() => (t?.days ?? []).map((d) => d.day), [t]);
+  const classicEffect = useMemo(
+    () => stopEffect(bookNow, 'C', classicDays),
+    [bookNow, classicDays],
+  );
+  const tunedEffect = useMemo(
+    () => stopEffect(tunedBookNow, 'C', tunedDays),
+    [tunedBookNow, tunedDays],
+  );
+  const baseEffect = useMemo(
+    () => stopEffect(baseBookNow, 'BASE', classicDays),
+    [baseBookNow, classicDays],
+  );
 
   const visible = useMemo(() => new Set<RotationListKey>([...shown, focus]), [shown, focus]);
   const figures = useMemo(
@@ -109,6 +213,7 @@ export function RotationPanel() {
   const reload = () => {
     overview.refetch();
     summary.refetch();
+    tuned.refetch();
   };
   const toggle = (k: RotationListKey) =>
     setShown((prev) => {
@@ -140,9 +245,8 @@ export function RotationPanel() {
           />
         </div>
         <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted">
-          Forward · gross · 2 lots per strategy
+          Forward · gross · 1 lot per strategy
         </span>
-        <PortfolioStopButton setting={portfolio} onChange={setPortfolio} />
         <span className="flex-1" />
         <RefreshButton
           onClick={reload}
@@ -200,15 +304,6 @@ export function RotationPanel() {
         <SkeletonRows rows={5} />
       ) : (
         <>
-          {isOn(portfolio) && s.n_days > 0 ? (
-            <p className="text-xs text-muted" aria-live="polite">
-              {stopped
-                ? `With the ${buttonLabel(portfolio).replace('Portfolio stop ', '')} portfolio stop replayed over these sessions: cumulative gross, ₹ per lot-day, the drawdowns and the curves. Beats random baskets, the verdict and the read-out stay on the registered basis, without a stop.${skipped > 0 ? ` ${skipped} list-day${skipped === 1 ? '' : 's'} no longer replay to their logged figure (bars repaired since the nightly update) and keep the registered one.` : ''}`
-                : book.error
-                  ? `The portfolio stop could not be replayed (${book.error}); the registered figures are shown.`
-                  : 'Replaying the sessions under the portfolio stop; the registered figures are shown meanwhile.'}
-            </p>
-          ) : null}
           {s.n_days === 0 ? (
             <>
               {overview.data ? (
@@ -264,6 +359,72 @@ export function RotationPanel() {
                 today={istToday()}
                 focus={focus}
                 onFocus={setFocus}
+                action={
+                  <CardStop
+                    setting={portfolio}
+                    onChange={setPortfolio}
+                    defaults={DEFAULT_SETTING}
+                    title={ADAPTIVE_CARD.classic.name}
+                    note={stopNote({
+                      setting: portfolio,
+                      scoredDays: s.n_days,
+                      stopped,
+                      error: book.error,
+                      skipped,
+                    })}
+                    effect={classicEffect}
+                  />
+                }
+                extra={[
+                  {
+                    card: tunedCard(tunedShown),
+                    basket: t?.baskets?.lists.C,
+                    entryDay: t?.baskets?.entry?.day ?? null,
+                    action: (
+                      <>
+                        <CardStop
+                          setting={tunedStop}
+                          onChange={setTunedStop}
+                          defaults={DEFAULT_T1_SETTING}
+                          title={ADAPTIVE_CARD.tuned.name}
+                          note={tunedNote}
+                          effect={tunedEffect}
+                        />
+                        {tuned.error ? (
+                          <p className="text-[11px] text-negative">
+                            The T1 read-out could not be read: {tuned.error}
+                          </p>
+                        ) : t && t.n_days === 0 ? (
+                          <p className="text-[11px] text-muted">
+                            {Object.values(t.pending_reasons)[0] ??
+                              'No scored forward session yet: the first T1 entry is scored after the evening update.'}
+                          </p>
+                        ) : null}
+                      </>
+                    ),
+                  },
+                  {
+                    card: baseCard(baseShown),
+                    basket: undefined,
+                    entryDay: null,
+                    action: (
+                      <CardStop
+                        setting={baseStop}
+                        onChange={setBaseStop}
+                        defaults={DEFAULT_BASE_SETTING}
+                        title={BASE_CARD.name}
+                        note={stopNote({
+                          setting: baseStop,
+                          scoredDays: s.n_days,
+                          stopped: baseShown !== s,
+                          error: baseBook.error,
+                          skipped: unmatched(baseBookNow, ['BASE']),
+                        })}
+                        effect={baseEffect}
+                      />
+                    ),
+                  },
+                ]}
               />
               <RotationHeadline figures={figures} benchmarkLabel={bench?.label ?? ''} />
               {verdictFor ? <RotationVerdict verdict={verdictFor} /> : null}
@@ -274,7 +435,7 @@ export function RotationPanel() {
                       ? 'Cumulative gross by list'
                       : `Cumulative gross, ${listName(focus)} and the fixed base`
                   }
-                  description={`${s.n_days} scored forward sessions, 2 lots per strategy.${stopped ? ' With the portfolio stop applied.' : ''} Late entries and unscored days are left out.`}
+                  description={`${s.n_days} scored forward sessions, ${lotsWord(s.settings?.lots_per_strategy)} per strategy.${stopped ? ' With the portfolio stop applied.' : ''} Late entries and unscored days are left out.`}
                 />
                 <RotationHero
                   points={points}

@@ -16,6 +16,9 @@ import type {
   RotationLogSource,
 } from '../types/rotationDailyLog';
 import { usePolledResource } from './usePolledResource';
+import { ROTATION_PAGE_LOTS } from './useRotation';
+
+const LOTS = String(ROTATION_PAGE_LOTS);
 
 const BASE = '/api/backtest/legwise/rotation';
 
@@ -35,14 +38,17 @@ export function useRotationLog(
   range: { from?: string | undefined; to?: string | undefined } = {},
 ) {
   return usePolledResource<RotationLog>(
-    `${BASE}/log${query({ source, from: range.from, to: range.to })}`,
+    `${BASE}/log${query({ source, from: range.from, to: range.to, lots: LOTS })}`,
     { intervalMs: LOG_POLL_MS },
   );
 }
 
-/** One day in full. Always fetches: mount the component that calls it only once a day is picked. */
+/** One day in full. Always fetches: mount the component that calls it only once a day is picked.
+ * Both it and the log show each list at the page's lots a strategy (ROTATION_PAGE_LOTS). */
 export function useRotationDay(day: string) {
-  return usePolledResource<RotationDay>(`${BASE}/day/${encodeURIComponent(day)}`);
+  return usePolledResource<RotationDay>(
+    `${BASE}/day/${encodeURIComponent(day)}${query({ lots: LOTS })}`,
+  );
 }
 
 export interface PlacementInput {

@@ -15,7 +15,7 @@ function book(day: string, lots: number): PortfolioDays {
   return {
     basis: 'gross',
     source: 'recorded',
-    setting: { amount: 10000, trail: null },
+    setting: { amount: 8000, trail: null },
     rows: [
       {
         day,
@@ -71,7 +71,7 @@ describe('the daily log with a portfolio stop', () => {
     render(<RotationDailyLog focus="C" portfolio={DEFAULT_SETTING} />);
     await screen.findByRole('table');
     await waitFor(() => expect(screen.getByText('PF stop 11:14')).toBeTruthy());
-    expect(calls.some((c) => /portfolio\/days\?.*stop=10000/.test(c))).toBe(true);
+    expect(calls.some((c) => /portfolio\/days\?.*stop=8000/.test(c))).toBe(true);
     const row = screen.getByText('PF stop 11:14').closest('tr');
     expect(row).not.toBeNull();
     // the stopped figure per lot-day, with the log's own figure struck through beside it

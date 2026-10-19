@@ -103,7 +103,7 @@ export interface RotationBase {
   max_drawdown: number;
 }
 
-/** One scored day: ₹ per lot for each list (`A`…), 2-lot totals (`A_total`…), the base. */
+/** One scored day: ₹ per lot for each list (`A`…), totals at the asked lots (`A_total`…), the base. */
 export type RotationDayRow = {
   day: string;
   base: number;
@@ -113,6 +113,8 @@ export type RotationDayRow = {
 export interface RotationSummary {
   settings: {
     lots_per_strategy: number;
+    /** The registered lots a strategy (2), whatever `lots` the page asked for. */
+    registered_lots_per_strategy?: number;
     random_runs: number;
     random_seed: number;
     bootstrap_resamples: number;
@@ -131,4 +133,8 @@ export interface RotationSummary {
   lists: Partial<Record<RotationListKey, RotationListStats>>;
   base: RotationBase | null;
   days?: RotationDayRow[];
+  /** The parallel track read (`t1`), or null for the live journal. */
+  track?: string | null;
+  /** A track's latest entry (`?track=t1` only): the page has no other source for its picks. */
+  baskets?: RotationBaskets;
 }

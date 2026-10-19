@@ -4,6 +4,9 @@ nothing here computes a figure. Read-only: no route writes to the journal or the
 
     GET /legwise/rotation/overview   data-health checks, the latest entry's baskets, the lists
     GET /legwise/rotation/summary    the read-out: lists against REF, the base and random baskets
+                                     (`lots=1..10` sets the lots a strategy behind the rupee totals,
+                                     display only; `track=t1` reads the T1 journal, list C only,
+                                     and adds that journal's latest `baskets`)
 
 Errors come back as `{"error": ...}` (what the dashboard's api.ts reads).
 """
@@ -23,6 +26,8 @@ from ..rotation.journal import JournalCorrupt
 router = APIRouter(prefix="/legwise/rotation")
 
 MAX_CACHED = 16
+TRACKS = ("t1",)
+MAX_LOTS = 10
 CACHE_SECONDS = 30.0  # results are written nightly; a page refresh should not re-run 1,000 baskets
 _cache: dict[tuple, tuple[float, Any]] = {}
 
@@ -38,6 +43,20 @@ def _day(raw: str | None, label: str) -> date | None | JSONResponse:
         return date.fromisoformat(raw)
     except ValueError:
         return _error(422, f"{label} must be YYYY-MM-DD")
+
+
+def track_and_lots(track: str | None, lots: str | None) -> tuple[str | None, int | None]:
+    """The optional `track` and `lots` query values, checked: `track` one of TRACKS, `lots` a whole
+    number 1..MAX_LOTS. Empty is absent. Raises ValueError with the message for a 422."""
+    if track in (None, ""):
+        track = None
+    elif track not in TRACKS:
+        raise ValueError(f"track must be one of {', '.join(TRACKS)}")
+    if lots in (None, ""):
+        return track, None
+    if not (lots.isascii() and lots.isdigit()) or not 1 <= int(lots) <= MAX_LOTS:
+        raise ValueError(f"lots must be a whole number from 1 to {MAX_LOTS}")
+    return track, int(lots)
 
 
 def _cached(key: tuple, build):
@@ -76,6 +95,8 @@ def get_overview(day: str | None = Query(default=None)):
 def get_summary(
     from_: str | None = Query(default=None, alias="from"),
     to: str | None = Query(default=None),
+    track: str | None = Query(default=None),
+    lots: str | None = Query(default=None),
 ):
     start = _day(from_, "from")
     if isinstance(start, JSONResponse):
@@ -83,10 +104,21 @@ def get_summary(
     end = _day(to, "to")
     if isinstance(end, JSONResponse):
         return end
+    try:
+        track_, lots_ = track_and_lots(track, lots)
+    except ValueError as error:
+        return _error(422, str(error))
     from ..fyers.daily import data_dir
 
     root = data_dir()
+
+    def build() -> dict:
+        out = readout.build(root, start, end, track=track_, lots_per=lots_)
+        if track_:  # the page has no other source for a track's picks
+            out["baskets"] = overview.baskets(root, None, track_)
+        return out
+
     try:
-        return _cached(("summary", root, start, end), lambda: readout.build(root, start, end))
+        return _cached(("summary", root, start, end, track_, lots_), build)
     except JournalCorrupt as error:
         return _error(409, f"the journal cannot be read: {error}")

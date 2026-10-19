@@ -109,6 +109,28 @@ export function renameListsIn(text: string): string {
   return text.replace(/\b[Ll]ist (A|B|C|REF)\b/g, (_m, k: string) => `${listName(k)} list`);
 }
 
+/**
+ * The Rotation page's two Adaptive cards (owner, 2026-10-19), on the dashboard's cards only: the
+ * shared `list_names.json`, every other screen and the Telegram messages keep "Adaptive".
+ * `classic` is list C of the live journal (Core-298), `tuned` list C of the T1 track's journal.
+ */
+export const ADAPTIVE_CARD = {
+  classic: {
+    name: 'Adaptive Classic',
+    note: 'The 298 tested variants; gives its own recent results the most say.',
+  },
+  tuned: {
+    name: 'Adaptive Tuned',
+    note: 'The same picker with 223 tuned-settings variants added (T1 track).',
+  },
+} as const satisfies Record<string, { name: string; note: string }>;
+
+/** The Rotation page's third card (owner, 2026-10-19): the registered fixed base, unranked. */
+export const BASE_CARD = {
+  name: 'Fixed base',
+  note: '2 × NIFTY Widesl OTM1 09:17 + 1 × NIFTY Dir ATM 09:24, every day, no ranking.',
+} as const;
+
 /** "Adaptive · Core (298 variants)": a list named with the pool it ranks. */
 export function listWithUniverse(key: string): string {
   return `${listName(key)} · ${UNIVERSE_LABEL}`;
