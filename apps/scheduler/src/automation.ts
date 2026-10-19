@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { promisify } from 'node:util';
+import { jobPath } from './env.js';
 
 /**
  * The automation settings (BL-140): what the daily jobs do, set from the dashboard's
@@ -172,8 +173,16 @@ export function githubVariables(settings: AutomationSettings): Record<string, st
 export type GhRunner = (args: string[]) => Promise<void>;
 
 const execFileP = promisify(execFile);
+/**
+ * `gh` with the PATH the jobs get (env.ts): launchd starts the scheduler with a bare PATH, and gh
+ * lives in /opt/homebrew/bin. Runs in the scheduler's working directory, the repo, so gh knows
+ * which repository's variables to set.
+ */
 export const realGh: GhRunner = async (args) => {
-  await execFileP('gh', args, { timeout: 60_000 });
+  await execFileP('gh', args, {
+    timeout: 60_000,
+    env: { ...process.env, PATH: jobPath(process.env.PATH) },
+  });
 };
 
 /**
