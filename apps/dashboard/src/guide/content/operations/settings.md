@@ -48,7 +48,12 @@ A warning badge on a block means its master switch holds it back.
 **The `.env` switches still have the last word.** `ALGOTEST_UPLOAD`, `QUANTIPLY_UPLOAD` and `ALGOTEST_DEPLOY` must also be on for the tool to change a platform.
 
 > [!NOTE]
-> Built in stages. For now the page stores the settings and updates GitHub. The jobs start following them in a later stage: until then they run as before.
+> Built in stages. A save already changes the **08:00 login** from the next morning: it updates the
+> GitHub variables the login run reads (which brokers log in, and whether Quantiply does). Two
+> things wait for a later stage:
+>
+> - switching all AlgoTest logins off, or logins off altogether (the page says "partly updated" in red);
+> - the uploads, which keep their fixed lists until then.
 
 ## Common questions
 

@@ -53,13 +53,17 @@ describe('validate', () => {
 });
 
 describe('effective and the GitHub variables', () => {
-  it("today's setup logs both brokers into AlgoTest and Angel One into Quantiply", () => {
+  it("today's live setup: AlgoTest logs Shoonya in, Quantiply logs in through Angel One", () => {
+    // gh variable list on 2026-10-19: BROKER_LOGIN_ONLY=finvasia, QUANTIPLY_LOGIN=on.
     expect(githubVariables(DEFAULT_SETTINGS)).toEqual({
-      BROKER_LOGIN_ENABLED: 'on',
-      ALGOTEST_BROKERS: 'finvasia,angelone',
-      QUANTIPLY_BROKERS: 'angelone',
-      BROKER_LOGIN_ONLY: '',
-      QUANTIPLY_LOGIN: 'on',
+      vars: {
+        BROKER_LOGIN_ENABLED: 'on',
+        ALGOTEST_BROKERS: 'finvasia',
+        QUANTIPLY_BROKERS: 'angelone',
+        BROKER_LOGIN_ONLY: 'finvasia',
+        QUANTIPLY_LOGIN: 'on',
+      },
+      withheld: [],
     });
   });
 
@@ -72,34 +76,68 @@ describe('effective and the GitHub variables', () => {
       list: 'core',
       upload: false,
     });
-    const vars = githubVariables(s);
+    const { vars, withheld } = githubVariables(s);
     expect(vars).toMatchObject({
       BROKER_LOGIN_ENABLED: 'off',
       ALGOTEST_BROKERS: '',
       QUANTIPLY_LOGIN: 'off',
     });
-    // Until the workflow understands `none` (PR #268) the variable is left as it is.
+    // Until the workflow understands `none` and BROKER_LOGIN_ENABLED, that is said, not hidden.
     expect('BROKER_LOGIN_ONLY' in vars).toBe(false);
+    expect(withheld.join(' ')).toContain('cannot skip AlgoTest yet');
   });
 
-  it('one AlgoTest broker becomes BROKER_LOGIN_ONLY', () => {
+  it('both AlgoTest brokers leave BROKER_LOGIN_ONLY empty; one names it', () => {
     const s = clone(DEFAULT_SETTINGS);
-    s.rows['algotest.angelone'].login = false;
-    expect(githubVariables(s).BROKER_LOGIN_ONLY).toBe('finvasia');
+    s.rows['algotest.angelone'].login = true;
+    expect(githubVariables(s).vars.BROKER_LOGIN_ONLY).toBe('');
+    s.rows['algotest.finvasia'].login = false;
+    expect(githubVariables(s).vars.BROKER_LOGIN_ONLY).toBe('angelone');
+  });
+
+  it('QUANTIPLY_LOGIN is the Angel One route only', () => {
+    const s = clone(DEFAULT_SETTINGS);
+    s.rows['quantiply.angelone'].login = false;
+    s.rows['quantiply.finvasia'].login = true;
+    expect(githubVariables(s).vars).toMatchObject({
+      QUANTIPLY_LOGIN: 'off',
+      QUANTIPLY_BROKERS: 'finvasia',
+    });
   });
 
   it('syncGithub sets each variable, deletes empty ones, and reports a failure', async () => {
+    const both = clone(DEFAULT_SETTINGS);
+    both.rows['algotest.angelone'].login = true;
     const calls: string[][] = [];
-    const ok = await syncGithub(DEFAULT_SETTINGS, async (args) => {
+    const ok = await syncGithub(both, async (args) => {
       calls.push(args);
     });
     expect(ok).toStartWith('ok: ');
     expect(calls).toContainEqual(['variable', 'delete', 'BROKER_LOGIN_ONLY']);
     expect(calls).toContainEqual(['variable', 'set', 'QUANTIPLY_LOGIN', '--body', 'on']);
-    const bad = await syncGithub(DEFAULT_SETTINGS, async (args) => {
+    const bad = await syncGithub(both, async (args) => {
       if (args[2] === 'QUANTIPLY_LOGIN') throw new Error('HTTP 403\nmore');
     });
     expect(bad).toBe('FAILED 1/5: QUANTIPLY_LOGIN: HTTP 403');
+  });
+
+  it('deleting a missing variable is fine; any other failed delete is reported', async () => {
+    const both = clone(DEFAULT_SETTINGS);
+    both.rows['algotest.angelone'].login = true;
+    const missing = await syncGithub(both, async (args) => {
+      if (args[1] === 'delete') throw new Error('HTTP 404: Not Found');
+    });
+    expect(missing).toStartWith('ok: ');
+    const denied = await syncGithub(both, async (args) => {
+      if (args[1] === 'delete') throw new Error('HTTP 403: Resource not accessible');
+    });
+    expect(denied).toBe('FAILED 1/5: BROKER_LOGIN_ONLY: HTTP 403: Resource not accessible');
+  });
+
+  it('a save the workflow cannot carry out yet is PARTIAL, never ok', async () => {
+    const s = clone(DEFAULT_SETTINGS);
+    s.masters.logins = false;
+    expect(await syncGithub(s, async () => {})).toStartWith('PARTIAL: ');
   });
 });
 
@@ -188,7 +226,7 @@ describe('API /settings/automation', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as View;
     expect(body.current.version).toBe(1);
-    expect(body.current.github).toStartWith('ok: BROKER_LOGIN_ENABLED=off');
+    expect(body.current.github).toStartWith('PARTIAL: '); // logins off: not yet in the workflow
     expect(calls).toContainEqual(['variable', 'set', 'BROKER_LOGIN_ENABLED', '--body', 'off']);
 
     const bad = await handle(

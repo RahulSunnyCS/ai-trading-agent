@@ -19,7 +19,7 @@ const SETTINGS: AutomationSettings = {
   masters: { logins: true, uploads: true, deploy: false },
   rows: {
     'algotest.finvasia': { login: true, list: 't1', upload: true },
-    'algotest.angelone': { login: true, list: 'none', upload: false },
+    'algotest.angelone': { login: false, list: 'none', upload: false },
     'quantiply.angelone': { login: true, list: 'core', upload: true },
     'quantiply.finvasia': { login: false, list: 'none', upload: false },
   },
@@ -84,6 +84,10 @@ describe('automation helpers', () => {
     expect(githubOutcome(null)).toBeNull();
     expect(githubOutcome('ok: X=on')).toEqual({ text: 'GitHub backstop updated', failed: false });
     expect(githubOutcome('FAILED 1/5: QUANTIPLY_LOGIN: HTTP 403')?.failed).toBe(true);
+    expect(githubOutcome('PARTIAL: logins off: not yet')).toEqual({
+      text: 'GitHub backstop partly updated: logins off: not yet',
+      failed: true,
+    });
   });
 });
 

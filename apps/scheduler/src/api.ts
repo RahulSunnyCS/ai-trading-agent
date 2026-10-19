@@ -187,7 +187,7 @@ export function createApi({
     return json({
       current,
       effective: Object.fromEntries(ROW_KEYS.map((k) => [k, effective(current.settings, k)])),
-      github: githubVariables(current.settings),
+      github: githubVariables(current.settings).vars,
       history: settings.history(20),
     });
   }
@@ -236,7 +236,14 @@ export function createApi({
 
 /** Bind the API to loopback only. */
 export function startApi(options: ApiOptions, port: number = apiPort()) {
-  const server = Bun.serve({ hostname: '127.0.0.1', port, fetch: createApi(options) });
+  // A settings save waits for its GitHub sync (up to five `gh` calls); Bun's default 10 s idle
+  // timeout would drop that response although the version was saved. 255 s is Bun's maximum.
+  const server = Bun.serve({
+    hostname: '127.0.0.1',
+    port,
+    idleTimeout: 255,
+    fetch: createApi(options),
+  });
   console.log(`scheduler API on http://127.0.0.1:${server.port}`);
   return server;
 }
