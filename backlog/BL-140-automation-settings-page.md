@@ -143,6 +143,13 @@ Shoonya's own hosts:
 
 ## Log
 
+- 2026-10-19 — Phase 2 built: the Automation card in Settings (`AutomationSettingsCard.tsx`, `lib/automation.ts`).
+  - Three master switches and four blocks (login, list, upload). Choosing no list turns upload off.
+  - Edits stay a draft until Save, with the changes listed in plain words and a Discard button.
+  - The version line shows the GitHub sync outcome (failures in red). History lists each version's changes.
+  - The Guide's Settings page has a new Automation section.
+  - Checked in the browser against a throwaway scheduler API with a fake `gh`: two saves, history, the master-switch warnings.
+  - "Apply now" is left for Phase 3, when the jobs follow the settings.
 - 2026-10-19 — Quantiply · Shoonya captured (the owner logged in in the pane). It is the same app, token and API paths, on `quantiply.shoonya.com` / `api-prod.quantiply.shoonya.com`. The broker page is the Shoonya OAuth form AlgoTest already fills (`finvasiaForm`). Phase 3b is now mostly host parameters.
 - 2026-10-19 — Phase 1 built:
   - `apps/scheduler/src/automation.ts`: validation, master gating, the versioned store in `scheduler.db`, and the `automation-settings.json` snapshot for jobs.
