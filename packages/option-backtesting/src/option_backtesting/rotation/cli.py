@@ -190,10 +190,81 @@ def lot_plans_cmd(
     typer.echo(json.dumps(r, indent=2, default=str) if as_json else render(r, last))
 
 
+def _resolve_picks(day, book, preview, next_session, variants, wait):
+    """The day's picks for one book, the way both exports resolve them: --variants, --next /
+    --preview (the evening's expected picks) or the recorded 09:16 entry (waiting up to `wait`
+    seconds). Exits 2 when there is nothing to export yet."""
+    import time
+
+    from . import algtst_export as ax
+
+    d = _day(day)
+    if next_session:
+        from .tomorrow import next_session as following
+
+        d, preview = following(d), True
+    if variants:
+        names = [v.strip() for v in variants.split(",") if v.strip()]
+        return ax.DayPicks(d, book, "given", names, [])
+    if preview:
+        picks = ax.preview_picks(d, book)
+        if picks is None:
+            typer.echo(f"no expected picks for {d}: results do not reach the session before it")
+            raise typer.Exit(2)
+        return picks
+    picks = ax.recorded_picks(d, book)
+    deadline = time.monotonic() + wait
+    while picks is None and time.monotonic() < deadline:
+        time.sleep(2)
+        picks = ax.recorded_picks(d, book)
+    if picks is None:
+        typer.echo(f"no recorded {book} entry for {d} (09:16); --preview: the expected picks")
+        raise typer.Exit(2)
+    return picks
+
+
+def _picks_or_skip(day, book, preview, next_session, variants, wait, from_settings):
+    """`_resolve_picks`, except that under --from-settings a list with nothing to export yet (a
+    late T1 day) is skipped, so the other list still exports; `None` when skipped."""
+    try:
+        return _resolve_picks(day, book, preview, next_session, variants, wait)
+    except typer.Exit as stop:
+        if not from_settings or stop.exit_code != 2:
+            raise
+        typer.echo(f"{book}: not exported yet; the other lists go ahead")
+        return None
+
+
+def _end_missing(missing: list[str], books: list[str]) -> None:
+    """Exit 2 (the scheduler retries) only when no list could be exported. With some exported,
+    exit 0 so the uploads run; the uploader refuses a list whose export is stale and says so."""
+    if missing and len(missing) == len(books):
+        raise typer.Exit(2)
+    if missing:
+        typer.echo(f"not exported yet: {', '.join(missing)}")
+
+
+def _settings_books(platform: str) -> list[str]:
+    """BL-140: the lists the dashboard's Settings › Automation gives `platform` (empty: none)."""
+    from . import automation_settings
+
+    settings, source = automation_settings.read()
+    books = automation_settings.upload_books(settings, platform)
+    typer.echo(f"{platform}: {', '.join(books) or 'nothing to upload'} ({source})")
+    return books
+
+
+_FROM_SETTINGS_HELP = (
+    "Export every list the dashboard's Settings › Automation uploads to this platform "
+    "(BL-140), instead of --book; nothing when it uploads none."
+)
+
+
 @rotation_app.command("algotest-export")
 def algotest_export(
     day: str | None = typer.Option(None, "--day", help="The session; default: today (IST)."),
     book: str = typer.Option("t1", "--book", help="t1 (the T1 track) or core (live Adaptive)."),
+    from_settings: bool = typer.Option(False, "--from-settings", help=_FROM_SETTINGS_HELP),
     preview: bool = typer.Option(
         False, "--preview", help="The expected picks for that session, not the recorded ones."
     ),
@@ -217,51 +288,40 @@ def algotest_export(
     from . import algtst_export as ax
     from . import store
 
-    if book not in ax.BOOKS:
-        raise typer.BadParameter(f"--book must be one of {', '.join(ax.BOOKS)}")
-    d = _day(day)
-    if next_session:
-        from .tomorrow import next_session as following
-
-        d, preview = following(d), True
-    if variants:
-        names = [v.strip() for v in variants.split(",") if v.strip()]
-        picks = ax.DayPicks(d, book, "given", names, [])
-    elif preview:
-        picks = ax.preview_picks(d, book)
+    books = _settings_books("algotest") if from_settings else [book]
+    for b in books:
+        if b not in ax.BOOKS:
+            raise typer.BadParameter(f"--book must be one of {', '.join(ax.BOOKS)}")
+    if from_settings and out and len(books) > 1:
+        raise typer.BadParameter("--out takes one list; the settings give several")
+    missing = []
+    for b in books:
+        picks = _picks_or_skip(day, b, preview, next_session, variants, wait, from_settings)
         if picks is None:
-            typer.echo(f"no expected picks for {d}: results do not reach the session before it")
-            raise typer.Exit(2)
-    else:
-        import time
-
-        picks = ax.recorded_picks(d, book)
-        deadline = time.monotonic() + wait
-        while picks is None and time.monotonic() < deadline:
-            time.sleep(2)
-            picks = ax.recorded_picks(d, book)
-        if picks is None:
-            typer.echo(f"no recorded {book} entry for {d} (09:16); --preview: the expected picks")
-            raise typer.Exit(2)
-    try:
-        exports = ax.build(picks)
-    except (Unmappable, FileNotFoundError) as error:
-        typer.echo(f"not exported: {error}")
-        raise typer.Exit(1) from error
-    folder = Path(out) if out else store.rotation_dir() / "algotest" / d.isoformat() / book
-    try:
-        zip_path = ax.write(picks, exports, folder)
-    except FileExistsError as error:
-        typer.echo(f"not exported: {error}")
-        raise typer.Exit(1) from error
-    if not out:  # the uploader (BL-137) reads the newest default export through this pointer
-        ax.write_latest(store.rotation_dir() / "algotest", picks, folder)
-    typer.echo(ax.render(picks, exports, zip_path))
+            missing.append(b)
+            continue
+        try:
+            exports = ax.build(picks)
+        except (Unmappable, FileNotFoundError) as error:
+            typer.echo(f"not exported: {error}")
+            raise typer.Exit(1) from error
+        folder = Path(out) if out else store.rotation_dir() / "algotest" / picks.day.isoformat() / b
+        try:
+            zip_path = ax.write(picks, exports, folder)
+        except FileExistsError as error:
+            typer.echo(f"not exported: {error}")
+            raise typer.Exit(1) from error
+        if not out:  # the uploader (BL-137) reads the newest default export through this pointer
+            ax.write_latest(store.rotation_dir() / "algotest", picks, folder)
+        typer.echo(ax.render(picks, exports, zip_path))
+    _end_missing(missing, books)
 
 
 @rotation_app.command("quantiply-export")
 def quantiply_export(
     day: str | None = typer.Option(None, "--day", help="The session; default: today (IST)."),
+    book: str = typer.Option("core", "--book", help="core (live Adaptive) or t1 (the T1 track)."),
+    from_settings: bool = typer.Option(False, "--from-settings", help=_FROM_SETTINGS_HELP),
     preview: bool = typer.Option(
         False, "--preview", help="The expected picks for that session, not the recorded ones."
     ),
@@ -272,57 +332,48 @@ def quantiply_export(
         None, "--variants", help="Comma-separated variant ids instead of the day's picks."
     ),
     out: str | None = typer.Option(
-        None, "--out", help="Folder; default TRADING_DATA_ROOT/rotation/quantiply/<day>/core."
+        None, "--out", help="Folder; default TRADING_DATA_ROOT/rotation/quantiply/<day>/<book>."
     ),
     wait: int = typer.Option(
         0, "--wait", help="Seconds to wait for the day's recorded entry (the 09:16 job)."
     ),
 ) -> None:
-    """The day's Core Adaptive picks as Quantiply create bodies (BL-139; uploads nothing)."""
-    import time
+    """The day's Adaptive picks as Quantiply create bodies (BL-139; uploads nothing)."""
     from pathlib import Path
 
     from ..legwise.quantiply import Unmappable
-    from . import algtst_export as ax
     from . import quantiply_export as qx
     from . import store
 
-    d = _day(day)
-    if next_session:
-        from .tomorrow import next_session as following
-
-        d, preview = following(d), True
-    if variants:
-        names = [v.strip() for v in variants.split(",") if v.strip()]
-        picks = ax.DayPicks(d, qx.BOOK, "given", names, [])
-    elif preview:
-        picks = ax.preview_picks(d, qx.BOOK)
+    books = _settings_books("quantiply") if from_settings else [book]
+    for b in books:
+        if b not in qx.BOOKS:
+            raise typer.BadParameter(f"--book must be one of {', '.join(qx.BOOKS)}")
+    if from_settings and out and len(books) > 1:
+        raise typer.BadParameter("--out takes one list; the settings give several")
+    missing = []
+    for b in books:
+        picks = _picks_or_skip(day, b, preview, next_session, variants, wait, from_settings)
         if picks is None:
-            typer.echo(f"no expected picks for {d}: results do not reach the session before it")
-            raise typer.Exit(2)
-    else:
-        picks = ax.recorded_picks(d, qx.BOOK)
-        deadline = time.monotonic() + wait
-        while picks is None and time.monotonic() < deadline:
-            time.sleep(2)
-            picks = ax.recorded_picks(d, qx.BOOK)
-        if picks is None:
-            typer.echo(f"no recorded core entry for {d} (09:16); --preview: the expected picks")
-            raise typer.Exit(2)
-    try:
-        built = qx.build(picks)
-    except (Unmappable, FileNotFoundError) as error:
-        typer.echo(f"not exported: {error}")
-        raise typer.Exit(1) from error
-    folder = Path(out) if out else store.rotation_dir() / "quantiply" / d.isoformat() / qx.BOOK
-    try:
-        manifest = qx.write(picks, built, folder)
-    except FileExistsError as error:
-        typer.echo(f"not exported: {error}")
-        raise typer.Exit(1) from error
-    if not out:  # the uploader (BL-139 Phase 3) reads the newest default export through this
-        qx.write_latest(store.rotation_dir() / "quantiply", picks, folder)
-    typer.echo(qx.render(picks, built, manifest))
+            missing.append(b)
+            continue
+        try:
+            built = qx.build(picks)
+        except (Unmappable, FileNotFoundError) as error:
+            typer.echo(f"not exported: {error}")
+            raise typer.Exit(1) from error
+        folder = (
+            Path(out) if out else store.rotation_dir() / "quantiply" / picks.day.isoformat() / b
+        )
+        try:
+            manifest = qx.write(picks, built, folder)
+        except FileExistsError as error:
+            typer.echo(f"not exported: {error}")
+            raise typer.Exit(1) from error
+        if not out:  # the uploader reads the newest default export through this pointer
+            qx.write_latest(store.rotation_dir() / "quantiply", picks, folder)
+        typer.echo(qx.render(picks, built, manifest))
+    _end_missing(missing, books)
 
 
 @rotation_app.command()

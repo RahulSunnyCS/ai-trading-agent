@@ -143,6 +143,20 @@ Shoonya's own hosts:
 
 ## Log
 
+- 2026-10-19 — Phases 3 and 3b built while the owner was out ("do it as per your thinking"). Code and stand-in tests only: nothing was logged in, uploaded or set on GitHub.
+  - **Readers:** `packages/broker-login/src/automation-settings.ts` and `rotation/automation_settings.py`. With no file yet they use today's setup, so nothing changes until a save.
+  - **Exports and uploaders:** `--from-settings` on `algotest-export`, `quantiply-export` (now accepts T1), `strategy-upload.ts` (several lists in one plan) and `quantiply-upload.ts` (`--broker angelone|finvasia`; own login, API host and ledger `ledger-finvasia.jsonl`). A block with upload off is left untouched.
+  - **Shoonya login:** `src/quantiply-shoonya.ts` (`finvasiaForm`, the Authorize consent, one attempt). 5 stand-in tests.
+  - **The 08:00 run:**
+    - `dispatch.ts` does not dispatch with logins off.
+    - The workflow's backstop skips on `BROKER_LOGIN_ENABLED=off`.
+    - `ONLY=none` skips the AlgoTest brokers.
+    - `QUANTIPLY_BROKERS` listing finvasia logs Quantiply · Shoonya in after AlgoTest, on its own report line, never the exit code. A backstop never repeats it.
+  - **Deploy:** `strategy-deploy.ts --apply` also needs the deploy master switch on.
+  - **Jobs:** `algotest-*` and `quantiply-*` use `--from-settings`; `quantiply-*` run one upload step per account.
+  - **Page:** Apply now buttons start `algotest-evening` / `quantiply-evening`.
+  - **Not done:** the owner asked for the `.env` switches to be on by default. That edit was refused by the permission check as a security weakening, so they still need `=on`; left for the owner to decide.
+  - Review finding 7 of PR #266 (duplicated pick resolution) is fixed by the shared `_resolve_picks`.
 - 2026-10-19 — Phase 2 built: the Automation card in Settings (`AutomationSettingsCard.tsx`, `lib/automation.ts`).
   - Three master switches and four blocks (login, list, upload). Choosing no list turns upload off.
   - Edits stay a draft until Save, with the changes listed in plain words and a Discard button.

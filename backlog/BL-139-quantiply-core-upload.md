@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades the Core picks with real money every day and sets them up on Quantiply by hand |
-| **Status** | In progress — Phase 1 captured 2026-10-19 (the API contract and fixtures); Phase 2 next |
+| **Status** | In progress: Phases 1–3 merged (#266), and the live upload is tested. It waits for `QUANTIPLY_UPLOAD=on`. Phase 4 (deploy) is built but off. Follow-ups from the #266 review are in #268 |
 | **Type** | feature |
 | **Area** | options + broker-login |
 | **Created** | 2026-10-19 |
@@ -175,6 +175,12 @@ only if the API cannot be used.
 
 ## Log
 
+- 2026-10-19 — A second review of #266 (by the merging session) found three bugs. They are fixed in #268:
+  1. A refused login is never retried: exit 3 is in `noRetryExitCodes`, and a hold blocks logins until the `.env` credentials change.
+  2. Persistent problems (a conflict, a held-back delete, a read-back that differs) exit 3, so they are not re-run hourly.
+  3. The top-up flags an ENABLED algo that 09:16 dropped ("it WILL TRADE").
+
+  Still open from that review: the terms and compliance decision (Phase 1 task 5) is not recorded yet; it is the owner's call.
 - 2026-10-19 — Code review on PR #266 (10 findings). Findings 1–5 fixed:
   1. An enabled algo for today is deleted only after 15:30 IST.
   2. A create that errors adopts a new same-name algo found by a re-list.

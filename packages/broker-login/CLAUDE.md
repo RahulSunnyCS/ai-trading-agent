@@ -93,10 +93,31 @@ npm run typecheck
 - `src/run-plan.ts` — main.ts's pure decisions: whether Quantiply runs first, last or not at all (`quantiplyOrder`), and the exit code (`exitCode`)
 - `src/quantiply-rules.ts` — the browser-free half: URLs, the logged-in/Angel-page URL predicates, error classification, the retry rule (wrong PIN: never; TOTP refused: once, next window; anything else: once only if the credentials were not sent yet), `QUANTIPLY_LOGIN` parsing
 
+## Automation settings (BL-140)
+
+`src/automation-settings.ts` reads the dashboard's Settings › Automation, which the scheduler writes to
+`automation-settings.json` (`SCHEDULER_STATE_DIR`). With no file yet it uses today's setup. What follows it:
+
+- **Uploads:** `strategy-upload.ts --from-settings` (every list AlgoTest's blocks choose) and
+  `quantiply-upload.ts --broker <b> --from-settings` (that Quantiply account's list). A block with upload off is
+  left untouched.
+- **Logins:**
+  - `dispatch.ts` does not dispatch with logins off.
+  - The workflow's 08:15 backstop skips on `BROKER_LOGIN_ENABLED=off`.
+  - `ONLY=none` skips the AlgoTest brokers.
+  - `QUANTIPLY_BROKERS` listing `finvasia` logs Quantiply · Shoonya in after the AlgoTest logins
+    (`runQuantiplyShoonyaIsolated`, one attempt, its own report line, never the exit code).
+- **Deploy:** `strategy-deploy.ts --apply` also needs the deploy master switch on.
+
+The scheduler sets the repository variables on every save. `.env` switches (`ALGOTEST_UPLOAD`, `QUANTIPLY_UPLOAD`,
+`ALGOTEST_DEPLOY`) still need `on`.
+
 ## Quantiply algos: upload (BL-139)
 
-- `src/quantiply-upload.ts` (+ pure `src/quantiply-plan.ts`, API client `src/quantiply-api.ts`) puts the day's Core
-  rotation picks into Quantiply as algos through Quantiply's own API, the calls its web app makes
+- `src/quantiply-upload.ts` (+ pure `src/quantiply-plan.ts`, API client `src/quantiply-api.ts`) puts the day's
+  rotation picks into a Quantiply account as algos (`--broker angelone` = app.quantiply.angelone.in, ledger
+  `ledger.jsonl`; `--broker finvasia` = quantiply.shoonya.com, logged in by `src/quantiply-shoonya.ts`, ledger
+  `ledger-finvasia.jsonl`; hosts in `QUANTIPLY_SITES`) through Quantiply's own API, the calls its web app makes
   (`docs/algotest-execution.md`, "Quantiply algos through its API").
   - It logs in with `quantiplyLogin` (Angel One, TOTP) in a browser, reads the web app's JWT from local storage,
     closes the browser, and calls the API with `authorization: Bearer <JWT>`. The token is registered as a secret

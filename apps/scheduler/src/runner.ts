@@ -60,12 +60,22 @@ function runStep(
   const exe = resolveExecutable(cmd, cwd, env.PATH ?? '');
   if (!exe) return Promise.resolve({ code: NOT_FOUND, error: `${cmd}: not found on PATH` });
   return new Promise((resolve) => {
-    const child = spawn(exe, args, { cwd, env, stdio: ['ignore', logFd, logFd] });
+    // Its own process group, so a timeout ends everything the step started (a `sh -c` step's
+    // commands, a browser), not just the first process: a retry must never overlap a survivor.
+    const child = spawn(exe, args, { cwd, env, stdio: ['ignore', logFd, logFd], detached: true });
+    const killAll = (signal: NodeJS.Signals) => {
+      try {
+        if (child.pid) process.kill(-child.pid, signal);
+        else child.kill(signal);
+      } catch {
+        child.kill(signal);
+      }
+    };
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      child.kill('SIGTERM');
-      setTimeout(() => child.kill('SIGKILL'), 10_000).unref();
+      killAll('SIGTERM');
+      setTimeout(() => killAll('SIGKILL'), 10_000).unref();
     }, timeoutMs);
     child.on('error', (error) => {
       clearTimeout(timer);
@@ -178,6 +188,8 @@ export function runJob(
         }
         writeSync(logFd, `=== exit ${result.code}\n`);
         if (result.code === 0 || attempts > job.retries) break;
+        // A failure a retry cannot fix (a refused login, a conflict the owner must look at).
+        if (job.noRetryExitCodes?.includes(result.code)) break;
         await sleep(job.retryDelayMinutes * 60_000);
       }
     } catch (error) {

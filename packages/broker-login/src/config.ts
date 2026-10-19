@@ -27,6 +27,14 @@ export interface Config {
    * AlgoTest logins.
    */
   quantiplyProblem: string | null;
+  /**
+   * BL-140: also log in to Quantiply · Shoonya (quantiply.shoonya.com) with the SHOONYA_* secrets.
+   * On when the repository variable QUANTIPLY_BROKERS (set by the dashboard's Settings ›
+   * Automation) lists finvasia. Reported on its own line; never changes the run's exit code.
+   */
+  quantiplyShoonya: boolean;
+  /** Why Quantiply · Shoonya can't run (its SHOONYA_* secrets are missing), else null. */
+  quantiplyShoonyaProblem: string | null;
   runUrl: string | null;
 }
 
@@ -109,16 +117,24 @@ export function loadConfig(): Config {
   if (existsSync('.env')) process.loadEnvFile('.env');
 
   const only = process.env.ONLY?.trim() || null;
-  if (only && !(only in BROKER_SECRET_KEYS)) {
-    throw new Error(`ONLY=${only} matched no broker (expected: angelone, finvasia)`);
+  // `none` (BL-140: no AlgoTest block logs in, set from the dashboard) skips the AlgoTest logins.
+  if (only && only !== 'none' && !(only in BROKER_SECRET_KEYS)) {
+    throw new Error(`ONLY=${only} matched no broker (expected: angelone, finvasia, none)`);
   }
 
   // A broker's secrets are only required while it's actually going to run, so an
   // ONLY=angelone run works even with Finvasia's TOTP secret still blank - the point
   // of ONLY existing at all is to bring brokers online one at a time.
-  const activeBrokers = only
-    ? [only as keyof typeof BROKER_SECRET_KEYS]
-    : (Object.keys(BROKER_SECRET_KEYS) as (keyof typeof BROKER_SECRET_KEYS)[]);
+  const activeBrokers =
+    only === 'none'
+      ? []
+      : only
+        ? [only as keyof typeof BROKER_SECRET_KEYS]
+        : (Object.keys(BROKER_SECRET_KEYS) as (keyof typeof BROKER_SECRET_KEYS)[]);
+  const quantiplyShoonya = (process.env.QUANTIPLY_BROKERS ?? '')
+    .split(',')
+    .map((b) => b.trim().toLowerCase())
+    .includes('finvasia');
 
   const required: readonly SecretKey[] = [
     ...ALWAYS_REQUIRED,
@@ -149,8 +165,15 @@ export function loadConfig(): Config {
   // A skipped broker never reaches broker.login() - main.ts filters by `only`
   // before that - so an empty placeholder here is inert, not a silent credential gap.
   // Angel One's are read for Quantiply too.
+  const shoonyaMissing = BROKER_SECRET_KEYS.finvasia.filter((key) => !process.env[key]?.trim());
+  const quantiplyShoonyaProblem =
+    quantiplyShoonya && shoonyaMissing.length
+      ? `not run - missing ${shoonyaMissing.join(', ')}`
+      : null;
+  const needsShoonya =
+    activeBrokers.includes('finvasia') || (quantiplyShoonya && !quantiplyShoonyaProblem);
   const readOrBlank = (broker: keyof typeof BROKER_SECRET_KEYS, key: SecretKey): string =>
-    (broker === 'angelone' ? needsAngel : activeBrokers.includes(broker)) ? read(key) : '';
+    (broker === 'angelone' ? needsAngel : needsShoonya) ? read(key) : '';
 
   return {
     algotest: {
@@ -174,6 +197,8 @@ export function loadConfig(): Config {
     only,
     quantiply,
     quantiplyProblem,
+    quantiplyShoonya,
+    quantiplyShoonyaProblem,
     runUrl: runUrl(),
   };
 }

@@ -132,3 +132,13 @@ export function githubOutcome(github: string | null): { text: string; failed: bo
   }
   return { text: `GitHub backstop NOT updated: ${github.replace(/^FAILED\s*/, '')}`, failed: true };
 }
+
+/**
+ * Apply now runs a platform's evening upload, which replaces today's strategies with tomorrow's:
+ * only once today's session is over (15:30 IST), when none of today's picks can still trade. The
+ * uploaders refuse earlier anyway; the page says so instead of starting a run that fails.
+ */
+export function applyNowOpen(now: Date = new Date()): boolean {
+  const ist = new Date(now.getTime() + 330 * 60_000);
+  return ist.getUTCHours() * 60 + ist.getUTCMinutes() >= 15 * 60 + 30;
+}

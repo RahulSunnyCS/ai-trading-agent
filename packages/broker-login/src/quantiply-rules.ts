@@ -16,6 +16,45 @@ export const QUANTIPLY_APP_HOST = 'app.quantiply.angelone.in';
 /** Angel One's SmartAPI publisher login, where the client code, PIN and TOTP go in. */
 export const ANGEL_LOGIN_HOST = 'smartapi.angelone.in';
 
+/** Quantiply runs one copy of its web app per broker (BL-140, captured 2026-10-19). */
+export type QuantiplyBroker = 'angelone' | 'finvasia';
+
+export interface QuantiplySite {
+  broker: QuantiplyBroker;
+  /** Display name in reports and Telegram. */
+  name: string;
+  appHost: string;
+  /** Origin of its API (`api-prod.quantiply.<broker host>`): the same paths on both. */
+  apiOrigin: string;
+  loginUrl: string;
+}
+
+export const QUANTIPLY_SITES: Record<QuantiplyBroker, QuantiplySite> = {
+  angelone: {
+    broker: 'angelone',
+    name: 'Quantiply · Angel One',
+    appHost: QUANTIPLY_APP_HOST,
+    apiOrigin: 'https://api-prod.quantiply.angelone.in',
+    loginUrl: QUANTIPLY_LOGIN_URL,
+  },
+  finvasia: {
+    broker: 'finvasia',
+    name: 'Quantiply · Shoonya',
+    appHost: 'quantiply.shoonya.com',
+    apiOrigin: 'https://api-prod.quantiply.shoonya.com',
+    loginUrl: 'https://quantiply.shoonya.com/auth?resume=/algos',
+  },
+};
+
+export function parseQuantiplyBroker(raw: string | undefined): QuantiplyBroker {
+  const value = raw?.trim().toLowerCase() || 'angelone';
+  if (value === 'angelone' || value === 'finvasia') return value;
+  throw new Error(`Quantiply broker ${raw} is not angelone or finvasia`);
+}
+
+/** Shoonya's OAuth login page, where Quantiply · Shoonya sends the user (`route_to=QUANTIPLY`). */
+export const SHOONYA_LOGIN_HOST = 'api.shoonya.com';
+
 function parse(url: string): URL | null {
   try {
     return new URL(url);
@@ -28,10 +67,13 @@ function parse(url: string): URL | null {
  * Logged in = back on Quantiply's web app and outside its /auth screens (normally on /algos).
  * The API host's /auth/angel/redirect leg and Angel's own page never count.
  */
-export function isQuantiplyLoggedInUrl(url: string | URL): boolean {
+export function isQuantiplyLoggedInUrl(
+  url: string | URL,
+  appHost: string = QUANTIPLY_APP_HOST,
+): boolean {
   const u = typeof url === 'string' ? parse(url) : url;
   if (!u || u.protocol !== 'https:') return false;
-  if (u.hostname !== QUANTIPLY_APP_HOST) return false;
+  if (u.hostname !== appHost) return false;
   return !/^\/auth(\/|$)/i.test(u.pathname);
 }
 
@@ -104,4 +146,10 @@ export function parseQuantiplyFlag(raw: string | undefined): boolean {
   }
   if (value === 'on' || value === 'true' || value === '1' || value === 'yes') return true;
   throw new Error(`QUANTIPLY_LOGIN=${raw?.trim()} is not on or off`);
+}
+
+/** On Shoonya's OAuth login page (the form AlgoTest's Shoonya login fills, `finvasiaForm`). */
+export function isShoonyaLoginUrl(url: string | URL): boolean {
+  const u = typeof url === 'string' ? parse(url) : url;
+  return u !== null && u.hostname === SHOONYA_LOGIN_HOST && /^\/OAuthlogin\//i.test(u.pathname);
 }

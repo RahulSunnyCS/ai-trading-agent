@@ -82,9 +82,9 @@ describe('effective and the GitHub variables', () => {
       ALGOTEST_BROKERS: '',
       QUANTIPLY_LOGIN: 'off',
     });
-    // Until the workflow understands `none` and BROKER_LOGIN_ENABLED, that is said, not hidden.
-    expect('BROKER_LOGIN_ONLY' in vars).toBe(false);
-    expect(withheld.join(' ')).toContain('cannot skip AlgoTest yet');
+    // The workflow understands `none` and BROKER_LOGIN_ENABLED (BL-140 Phase 3): nothing held back.
+    expect(vars.BROKER_LOGIN_ONLY).toBe('none');
+    expect(withheld).toEqual([]);
   });
 
   it('both AlgoTest brokers leave BROKER_LOGIN_ONLY empty; one names it', () => {
@@ -134,10 +134,10 @@ describe('effective and the GitHub variables', () => {
     expect(denied).toBe('FAILED 1/5: BROKER_LOGIN_ONLY: HTTP 403: Resource not accessible');
   });
 
-  it('a save the workflow cannot carry out yet is PARTIAL, never ok', async () => {
+  it('logins off is carried out in full now that the workflow reads it', async () => {
     const s = clone(DEFAULT_SETTINGS);
     s.masters.logins = false;
-    expect(await syncGithub(s, async () => {})).toStartWith('PARTIAL: ');
+    expect(await syncGithub(s, async () => {})).toStartWith('ok: BROKER_LOGIN_ENABLED=off');
   });
 });
 
@@ -226,7 +226,7 @@ describe('API /settings/automation', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as View;
     expect(body.current.version).toBe(1);
-    expect(body.current.github).toStartWith('PARTIAL: '); // logins off: not yet in the workflow
+    expect(body.current.github).toStartWith('ok: BROKER_LOGIN_ENABLED=off');
     expect(calls).toContainEqual(['variable', 'set', 'BROKER_LOGIN_ENABLED', '--body', 'off']);
 
     const bad = await handle(

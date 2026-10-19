@@ -79,6 +79,11 @@ export interface QPlan {
   conflicts: string[];
   /** owned algos on today's weekday that are not today's picks (morning only) */
   notToday: string[];
+  /**
+   * The same, but ENABLED: the owner deployed last night's preview pick that 09:16 dropped, so it
+   * will trade real money today unless they disable it. Always needs the owner (morning only).
+   */
+  enabledNotToday: string[];
   /** a wanted name the tool owns with different content (morning only: alerted, left alone) */
   changed: string[];
   /** picks with a mapping not yet seen saved: never created */
@@ -184,6 +189,7 @@ export function planQ(
     heldBack: [],
     conflicts: [],
     notToday: [],
+    enabledNotToday: [],
     changed: [],
     unconfirmed: [],
   };
@@ -230,7 +236,10 @@ export function planQ(
     const a = listed.get(id);
     if (!a || handled.has(id)) continue;
     if (mode === 'topup') {
-      if (a.day === weekday && !wantedNames.has(a.name)) out.notToday.push(a.name);
+      if (a.day === weekday && !wantedNames.has(a.name)) {
+        if (a.enabled) out.enabledNotToday.push(a.name);
+        else out.notToday.push(a.name);
+      }
       continue;
     }
     if (deletable(a, today)) out.delete.push(a);
@@ -257,6 +266,11 @@ export function summaryQ(p: QPlan, mode: Mode): string[] {
         .map((w) => `${w.name} (${w.unconfirmed.join('; ')})`)
         .join(', ')}`,
     );
+  if (p.enabledNotToday.length) {
+    lines.push(
+      `⚠️ ENABLED but no longer today's pick, it WILL TRADE unless you disable it: ${p.enabledNotToday.join(', ')}`,
+    );
+  }
   if (mode === 'topup' && p.notToday.length) lines.push(`not today: ${p.notToday.join(', ')}`);
   if (!lines.length) lines.push('nothing to do');
   return lines;
@@ -264,7 +278,14 @@ export function summaryQ(p: QPlan, mode: Mode): string[] {
 
 /** Anything kept, skipped or changed against the plan's intent: the owner should look. */
 export function needsAttentionQ(p: QPlan): boolean {
-  return p.heldBack.length + p.conflicts.length + p.changed.length + p.unconfirmed.length > 0;
+  return (
+    p.heldBack.length +
+      p.conflicts.length +
+      p.changed.length +
+      p.unconfirmed.length +
+      p.enabledNotToday.length >
+    0
+  );
 }
 
 /** Keys Quantiply adds or rewrites on save; ignored at the top level of a read-back. */
