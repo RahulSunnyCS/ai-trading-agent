@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { usePolledResource } from '../../hooks/usePolledResource';
-import { apiPut } from '../../lib/api';
+import { apiPost, apiPut } from '../../lib/api';
 import {
   type AutomationSettings,
   type AutomationView,
@@ -18,7 +18,7 @@ import {
   withRow,
 } from '../../lib/automation';
 import { formatIstDateTime } from '../../lib/format';
-import { SCHEDULER_API } from '../../lib/scheduler';
+import { SCHEDULER_API, runNowError } from '../../lib/scheduler';
 import { Accordion } from '../ui/Accordion';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -56,6 +56,7 @@ export function AutomationSettingsCard() {
   const [view, setView] = useState<AutomationView | null>(null);
   const [draft, setDraft] = useState<AutomationSettings | null>(null);
   const [saving, setSaving] = useState(false);
+  const [applying, setApplying] = useState<string | null>(null);
 
   useEffect(() => {
     if (!data) return;
@@ -84,6 +85,22 @@ export function AutomationSettingsCard() {
     toast(
       `Saved as version ${result.data.current.version}.${sync ? ` ${sync.text}.` : ''}`,
       sync?.failed ? 'error' : 'success',
+    );
+  }
+
+  /** Run a platform's evening upload now, so a saved change reaches tomorrow's picks today. */
+  async function applyNow(job: string, platform: string) {
+    if (applying) return;
+    setApplying(job);
+    const result = await apiPost<{ runId: number | null }>(`${SCHEDULER_API}/jobs/${job}/run`, {});
+    setApplying(null);
+    if (!result.ok) {
+      toast(runNowError(result.status, result.error), 'error');
+      return;
+    }
+    toast(
+      `${platform}: tomorrow's upload started. Its result comes on Telegram and in Jobs.`,
+      'success',
     );
   }
 
@@ -208,6 +225,37 @@ export function AutomationSettingsCard() {
                 Discard changes
               </Button>
             </div>
+          </section>
+
+          <section className="space-y-2 border-t border-border pt-4" aria-label="Apply now">
+            <p className="text-sm font-medium text-foreground">Apply now</p>
+            <p className="text-xs text-muted">
+              Runs a platform's evening upload straight away with the saved settings: tomorrow's
+              picks replace what the tool put there. Use it after a change saved later than the
+              evening run.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ['algotest-evening', 'AlgoTest'],
+                  ['quantiply-evening', 'Quantiply'],
+                ] as const
+              ).map(([job, platform]) => (
+                <Button
+                  key={job}
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void applyNow(job, platform)}
+                  loading={applying === job}
+                  disabled={changes.length > 0 || applying !== null}
+                >
+                  Apply now: {platform}
+                </Button>
+              ))}
+            </div>
+            {changes.length > 0 ? (
+              <p className="text-xs text-muted">Save or discard your changes first.</p>
+            ) : null}
           </section>
 
           {view.history.length > 1 ? (

@@ -7,6 +7,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { istTimestamp, sendText } from '@trading/notify';
+import { describeSource, effectiveRow, readAutomation } from './automation-settings.js';
 import { readTelegramConfig } from './config.js';
 import { describe } from './diagnose.js';
 import { type WorkflowRun, findRunSince, istClock, shouldDispatch } from './dispatch-rules.js';
@@ -60,6 +61,18 @@ async function main(): Promise<number> {
   if (!shouldDispatch(istClock(new Date()))) {
     console.log('outside weekday 07:45-15:35 IST (a late wake?) - not dispatching');
     if (!dryRun) return 0;
+  }
+
+  // BL-140: the dashboard's "Automated logins" switch, or no block logging in at all, means no
+  // dispatch. The workflow's own 08:15 backstop reads the same choice from the repository
+  // variables the scheduler sets on every save (BROKER_LOGIN_ENABLED).
+  const automation = readAutomation();
+  const anyLogin = (['algotest', 'quantiply'] as const).some((p) =>
+    (['finvasia', 'angelone'] as const).some((b) => effectiveRow(automation, p, b).login),
+  );
+  if (!anyLogin) {
+    console.log(`automated logins are off (${describeSource(automation)}) - not dispatching`);
+    return 0;
   }
 
   if (dryRun) {

@@ -20,6 +20,7 @@ const KEYS = [
   'SHOONYA_TOTP_SECRET',
   'ONLY',
   'QUANTIPLY_LOGIN',
+  'QUANTIPLY_BROKERS',
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_CHAT_ID',
 ];
@@ -96,5 +97,34 @@ describe('QUANTIPLY_LOGIN in loadConfig', () => {
     const config = loadConfig();
     assert.equal(config.quantiply, true);
     assert.equal(config.quantiplyProblem, 'not run - QUANTIPLY_LOGIN=maybe is not on or off');
+  });
+});
+
+describe('BL-140 settings in loadConfig', () => {
+  beforeEach(() => env({}));
+
+  it('ONLY=none needs no broker secrets and logs no AlgoTest broker in', () => {
+    env({ ...ALGOTEST, ONLY: 'none' });
+    const config = loadConfig();
+    assert.equal(config.only, 'none');
+    assert.equal(config.finvasia.clientId, '');
+    assert.equal(config.angelone.clientCode, '');
+  });
+
+  it('still refuses an unknown ONLY', () => {
+    env({ ...ALGOTEST, ...ANGEL, ...FINVASIA, ONLY: 'zerodha' });
+    assert.throws(() => loadConfig(), /expected: angelone, finvasia, none/);
+  });
+
+  it('QUANTIPLY_BROKERS listing finvasia turns Quantiply · Shoonya on and reads its secrets', () => {
+    env({ ...ALGOTEST, ...FINVASIA, ONLY: 'none', QUANTIPLY_BROKERS: 'angelone, finvasia' });
+    const config = loadConfig();
+    assert.equal(config.quantiplyShoonya, true);
+    assert.equal(config.finvasia.clientId, 'FA0000');
+  });
+
+  it('Quantiply · Shoonya is off without it', () => {
+    env({ ...ALGOTEST, ...ANGEL, ...FINVASIA, QUANTIPLY_BROKERS: 'angelone' });
+    assert.equal(loadConfig().quantiplyShoonya, false);
   });
 });

@@ -1,10 +1,11 @@
-"""A day's Core Adaptive picks as Quantiply create bodies (BL-139 Phase 2;
+"""A day's Adaptive picks as Quantiply create bodies (BL-139 Phase 2;
 `obt rotation quantiply-export`).
 
 The picks are the same as BL-137's AlgoTest export (`algtst_export`): list C's core plus the Buy
 add-on, recorded at 09:16 or, with `preview`, the evening's expected picks for that session. Core
-only: T1 stays on AlgoTest (owner, 2026-10-19). The name is BL-137's (`Core · <variant>`, the
-add-on marked `· add-on`), so one name means one strategy on both platforms.
+was the first list on Quantiply; since BL-140 the dashboard's settings may give it T1 too. The
+name is BL-137's (`Core · <variant>` / `T1 · <variant>`, the add-on marked `· add-on`), so one
+name means one strategy on both platforms.
 
 Quantiply keeps one algo per weekday, so each body is for the session's weekday only. Each body is
 `<variant>.json`, the exact `POST /algos` payload; `manifest.json` records the day, its weekday,
@@ -22,7 +23,8 @@ from ..legwise.schema import load_legwise
 from .algtst_export import DayPicks, strategy_name
 from .variants import strategy_path
 
-BOOK = "core"
+#: the lists Quantiply can take (BL-140: the dashboard settings choose; core was the first)
+BOOKS = ("core", "t1")
 MANIFEST = "manifest.json"
 
 
@@ -39,13 +41,13 @@ def weekday(picks: DayPicks) -> str:
 
 def build(picks: DayPicks) -> list[Built]:
     """One body per pick, core first; raises `Unmappable` on a setting with no known form."""
-    if picks.book != BOOK:
-        raise ValueError(f"Quantiply takes the core book only, not {picks.book!r}")
+    if picks.book not in BOOKS:
+        raise ValueError(f"Quantiply takes {' or '.join(BOOKS)}, not {picks.book!r}")
     day = weekday(picks)
     out = []
     for variant, addon in [(v, False) for v in picks.core] + [(v, True) for v in picks.buy]:
         spec = load_legwise(strategy_path(variant))
-        name = strategy_name(BOOK, variant, addon)
+        name = strategy_name(picks.book, variant, addon)
         out.append(Built(variant, addon, to_quantiply(spec, name, [day])))
     return out
 
@@ -68,7 +70,7 @@ def write(picks: DayPicks, built: list[Built], out: Path) -> Path:
     manifest = {
         "day": picks.day.isoformat(),
         "weekday": weekday(picks),
-        "book": BOOK,
+        "book": picks.book,
         "source": picks.source,
         "strategies": [
             {
@@ -89,7 +91,7 @@ def write_latest(base: Path, picks: DayPicks, folder: Path) -> Path:
     """`latest-core.json` in `base`: the newest default export's folder, day and source, for the
     uploader (`--latest core`)."""
     base.mkdir(parents=True, exist_ok=True)
-    path = base / f"latest-{BOOK}.json"
+    path = base / f"latest-{picks.book}.json"
     record = {"dir": str(folder), "day": picks.day.isoformat(), "source": picks.source}
     path.write_text(json.dumps(record, indent=2) + "\n")
     return path
@@ -123,7 +125,8 @@ def _legs(cfg: dict) -> tuple[str, str, str, str]:
 def render(picks: DayPicks, built: list[Built], manifest: Path) -> str:
     """A table to check by eye before uploading."""
     lines = [
-        f"CORE picks for {picks.day.isoformat()} ({weekday(picks)}, {picks.source}): "
+        f"{picks.book.upper()} picks for {picks.day.isoformat()} "
+        f"({weekday(picks)}, {picks.source}): "
         f"{len(built)} body(ies) in {manifest.parent}",
         "",
         f"{'name':<36} {'entry':>5} {'exit':>5}  {'legs':<18} {'SL':>5}  {'trail':<9} "

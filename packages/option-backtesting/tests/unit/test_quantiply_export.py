@@ -247,9 +247,36 @@ def test_day_export_writes_bodies_and_manifest(tmp_path):
     assert "Core · N_ditm1_0917" in text
 
 
-def test_build_refuses_the_t1_book():
-    with pytest.raises(ValueError, match="core book only"):
-        qx.build(ax.DayPicks(date(2026, 10, 20), "t1", "given", ["N_wide_0917"], []))
+def test_build_takes_t1_and_refuses_an_unknown_book():
+    """BL-140: the dashboard settings may give Quantiply the T1 list too."""
+    built = qx.build(ax.DayPicks(date(2026, 10, 21), "t1", "given", ["N_wide_0917"], []))
+    assert built[0].export.name == "T1 · N_wide_0917"
+    with pytest.raises(ValueError, match="core or t1"):
+        qx.build(ax.DayPicks(date(2026, 10, 21), "momentum", "given", ["N_wide_0917"], []))
+
+
+def test_automation_settings_choose_the_books(tmp_path, monkeypatch):
+    from option_backtesting.rotation import automation_settings as auto
+
+    monkeypatch.setenv("SCHEDULER_STATE_DIR", str(tmp_path))
+    settings, source = auto.read()
+    assert source.startswith("settings: defaults")
+    assert auto.upload_books(settings, "quantiply") == ["core"]
+    assert auto.upload_books(settings, "algotest") == ["t1"]
+    saved = json.loads(json.dumps(auto.DEFAULT))
+    saved["version"] = 3
+    saved["rows"]["quantiply.finvasia"] = {"login": True, "list": "t1", "upload": True}
+    (tmp_path / "automation-settings.json").write_text(json.dumps(saved))
+    settings, source = auto.read()
+    assert source == "settings v3"
+    assert auto.upload_books(settings, "quantiply") == ["core", "t1"]
+    assert auto.upload_books(settings, "quantiply", "finvasia") == ["t1"]
+    saved["masters"]["uploads"] = False
+    (tmp_path / "automation-settings.json").write_text(json.dumps(saved))
+    assert auto.upload_books(auto.read()[0], "quantiply") == []
+    (tmp_path / "automation-settings.json").write_text("{}")
+    with pytest.raises(ValueError, match="not automation settings"):
+        auto.read()
 
 
 def test_write_never_deletes_files_it_did_not_write(tmp_path):

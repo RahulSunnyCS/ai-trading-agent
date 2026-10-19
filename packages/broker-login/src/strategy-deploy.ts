@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 import { sendText } from '@trading/notify';
 import { type Page, chromium } from 'playwright';
 import { BASE_URL, algotestLogin } from './algotest.js';
+import { describeSource, readAutomation } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
 import {
   ACTIVATE_LEAD_SECONDS,
@@ -117,6 +118,14 @@ async function main(): Promise<number> {
   ) {
     console.log('ALGOTEST_DEPLOY is not "on": nothing deployed (dry run without --apply)');
     return 0;
+  }
+  // BL-140: the dashboard's "Automated deployment" master switch must be on as well.
+  if (values.apply) {
+    const automation = readAutomation();
+    if (!automation.masters.deploy) {
+      console.log(`Automated deployment is off (${describeSource(automation)}): nothing deployed`);
+      return 0;
+    }
   }
   let dir = values.dir;
   if (!dir && values.latest) {

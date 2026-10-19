@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
 import { type QAlgo, parseDayWise } from './quantiply-plan.js';
-import { QUANTIPLY_APP_HOST } from './quantiply-rules.js';
+import { QUANTIPLY_SITES, type QuantiplySite } from './quantiply-rules.js';
 
 /**
  * Quantiply's own API, as its web app calls it (BL-139; `docs/algotest-execution.md`, "Quantiply
@@ -9,15 +9,19 @@ import { QUANTIPLY_APP_HOST } from './quantiply-rules.js';
  * logs it or puts it in an error.
  */
 
-export const QUANTIPLY_API = 'https://api-prod.quantiply.angelone.in';
-const APP_ORIGIN = `https://${QUANTIPLY_APP_HOST}`;
+/** Angel One's site; `QuantiplyApi` and `readToken` take the site of the row they serve. */
+export const QUANTIPLY_API = QUANTIPLY_SITES.angelone.apiOrigin;
 /** Where the web app keeps its session, in local storage on the app's origin. */
 export const STORAGE_KEY = 'quantiply-dashboard-local';
 
 /** The JWT from a logged-in browser context (any page on the app's origin will do). */
-export async function readToken(page: Page): Promise<string> {
-  if (new URL(page.url()).origin !== APP_ORIGIN) {
-    await page.goto(`${APP_ORIGIN}/algos`, { waitUntil: 'domcontentloaded' });
+export async function readToken(
+  page: Page,
+  site: QuantiplySite = QUANTIPLY_SITES.angelone,
+): Promise<string> {
+  const appOrigin = `https://${site.appHost}`;
+  if (new URL(page.url()).origin !== appOrigin) {
+    await page.goto(`${appOrigin}/algos`, { waitUntil: 'domcontentloaded' });
   }
   const token = await page.evaluate((key) => {
     try {
@@ -41,16 +45,18 @@ export class QuantiplyApi {
   constructor(
     private readonly token: string,
     private readonly fetchImpl: typeof fetch = fetch,
+    private readonly site: QuantiplySite = QUANTIPLY_SITES.angelone,
   ) {}
 
   private async call(method: string, path: string, body?: unknown): Promise<unknown> {
-    const response = await this.fetchImpl(`${QUANTIPLY_API}${path}`, {
+    const appOrigin = `https://${this.site.appHost}`;
+    const response = await this.fetchImpl(`${this.site.apiOrigin}${path}`, {
       method,
       headers: {
         Accept: 'application/json, text/plain, */*',
         authorization: `Bearer ${this.token}`,
-        Origin: APP_ORIGIN,
-        Referer: `${APP_ORIGIN}/`,
+        Origin: appOrigin,
+        Referer: `${appOrigin}/`,
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
       },
       body: body === undefined ? undefined : JSON.stringify(body),

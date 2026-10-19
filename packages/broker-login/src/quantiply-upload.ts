@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { sendText } from '@trading/notify';
 import { chromium } from 'playwright';
+import { describeSource, readAutomation, uploadBooks } from './automation-settings.js';
 import { readTelegramConfig } from './config.js';
 import { describe } from './diagnose.js';
 import { installOverlayHandlers } from './overlays.js';
@@ -21,15 +22,24 @@ import {
   summaryQ,
   weekdayOf,
 } from './quantiply-plan.js';
+import { QUANTIPLY_SITES, parseQuantiplyBroker } from './quantiply-rules.js';
+import { quantiplyShoonyaLogin } from './quantiply-shoonya.js';
 import { quantiplyLogin } from './quantiply.js';
 import { redact, registerSecret } from './secrets.js';
 import { type Mode, istToday, sha256 } from './strategy-plan.js';
 
 /**
- * BL-139 Phase 3: put the day's Core rotation picks into Quantiply (Angel One) as algos, through
- * Quantiply's own API (the calls its web app makes). Never enables (deploys) anything.
+ * BL-139 Phase 3: put the day's rotation picks into Quantiply as algos, through Quantiply's own
+ * API (the calls its web app makes). Never enables (deploys) anything.
  *
- *   tsx src/quantiply-upload.ts --latest core | --dir <export folder> --mode evening|topup [--apply]
+ *   tsx src/quantiply-upload.ts [--broker angelone|finvasia] --from-settings | --latest <book> |
+ *     --dir <export folder>  --mode evening|topup [--apply]
+ *
+ * BL-140: Quantiply has one account per broker (`--broker`, default angelone: Angel One's
+ * app.quantiply.angelone.in; finvasia: Shoonya's quantiply.shoonya.com), each with its own login,
+ * API host and ledger. `--from-settings` uploads the list the dashboard's Settings › Automation
+ * gives that row (`automation-settings.json`); a row with no upload, or uploads switched off, is
+ * left untouched: the run says so and changes nothing.
  *
  * `--dir` is a folder written by `obt rotation quantiply-export` (manifest.json + one `POST /algos`
  * body per pick, for the session's weekday). The run logs in through Angel One in a browser (the
@@ -54,12 +64,16 @@ async function main(): Promise<number> {
       latest: { type: 'string' },
       mode: { type: 'string' },
       ledger: { type: 'string' },
+      broker: { type: 'string' },
+      'from-settings': { type: 'boolean', default: false },
       apply: { type: 'boolean', default: false },
       headed: { type: 'boolean', default: false },
     },
   });
   if (values.mode !== 'evening' && values.mode !== 'topup') {
-    console.error('usage: --dir <export folder> | --latest core, --mode evening|topup [--apply]');
+    console.error(
+      'usage: [--broker angelone|finvasia] --from-settings | --latest <book> | --dir <folder>, --mode evening|topup [--apply]',
+    );
     return 64;
   }
   if (existsSync('.env')) process.loadEnvFile('.env');
@@ -69,16 +83,30 @@ async function main(): Promise<number> {
     );
     return 0;
   }
+  const broker = parseQuantiplyBroker(values.broker);
+  const site = QUANTIPLY_SITES[broker];
   const dataRoot = process.env.TRADING_DATA_ROOT?.trim();
   let exportDir = values.dir;
-  if (!exportDir && values.latest) {
+  let latest = values.latest;
+  let decidedBy = '';
+  if (values['from-settings']) {
+    const automation = readAutomation();
+    decidedBy = describeSource(automation);
+    const books = uploadBooks(automation, 'quantiply', broker);
+    if (!books.length) {
+      console.log(`${site.name}: nothing to upload (${decidedBy}); nothing changed`);
+      return 0;
+    }
+    latest = books[0];
+  }
+  if (!exportDir && latest) {
     if (!dataRoot) {
       console.error('--latest needs TRADING_DATA_ROOT');
       return 1;
     }
     exportDir = (
       await readJson<{ dir: string }>(
-        join(dataRoot, 'rotation', 'quantiply', `latest-${values.latest}.json`),
+        join(dataRoot, 'rotation', 'quantiply', `latest-${latest}.json`),
       )
     ).dir;
   }
@@ -94,7 +122,13 @@ async function main(): Promise<number> {
   const dir = resolve(exportDir);
   const ledgerPath = values.ledger
     ? resolve(values.ledger)
-    : join(dataRoot ?? '', 'rotation', 'quantiply', 'ledger.jsonl');
+    : join(
+        dataRoot ?? '',
+        'rotation',
+        'quantiply',
+        // Angel One's keeps its original name; each other account has its own ledger.
+        broker === 'angelone' ? 'ledger.jsonl' : `ledger-${broker}.jsonl`,
+      );
   const manifest = await readJson<QManifest>(join(dir, 'manifest.json'));
   const today = istToday();
   const fits =
@@ -132,18 +166,20 @@ async function main(): Promise<number> {
   }
   const ledger = existsSync(ledgerPath) ? parseQLedger(await readFile(ledgerPath, 'utf8')) : [];
 
-  const clientCode = process.env.ANGELONE_CLIENT_CODE?.trim();
-  const mpin = process.env.ANGELONE_MPIN?.trim();
-  const totpSecret = process.env.ANGELONE_TOTP_SECRET?.trim();
-  if (!clientCode || !mpin || !totpSecret) {
-    console.error('ANGELONE_CLIENT_CODE / ANGELONE_MPIN / ANGELONE_TOTP_SECRET missing from .env');
+  const names =
+    broker === 'angelone'
+      ? ['ANGELONE_CLIENT_CODE', 'ANGELONE_MPIN', 'ANGELONE_TOTP_SECRET']
+      : ['SHOONYA_CLIENT_ID', 'SHOONYA_PASSWORD', 'SHOONYA_TOTP_SECRET'];
+  const [user, secret, totpSecret] = names.map((n) => process.env[n]?.trim() ?? '');
+  if (!user || !secret || !totpSecret) {
+    console.error(`${names.join(' / ')} missing from .env`);
     return 1;
   }
-  registerSecret(mpin);
+  registerSecret(secret);
   registerSecret(totpSecret);
   const telegram = readTelegramConfig();
   const when = mode === 'evening' ? 'evening' : '09:16 top-up';
-  const label = `Quantiply CORE ${when} for ${manifest.day} (${manifest.weekday})`;
+  const label = `${site.name} ${manifest.book.toUpperCase()} ${when} for ${manifest.day} (${manifest.weekday})${decidedBy ? `, ${decidedBy}` : ''}`;
   const lines: string[] = [];
   let failed = false;
   let printed = 0; // lines already on the console (the plan), so the end prints only the rest
@@ -161,13 +197,21 @@ async function main(): Promise<number> {
       installOverlayHandlers(context);
       const page = await context.newPage();
       page.setDefaultTimeout(15_000);
-      await quantiplyLogin(page, { clientCode, mpin, totpSecret }, { submitted: false });
-      token = await readToken(await context.newPage());
+      if (broker === 'angelone') {
+        await quantiplyLogin(
+          page,
+          { clientCode: user, mpin: secret, totpSecret },
+          { submitted: false },
+        );
+      } else {
+        await quantiplyShoonyaLogin(page, { userId: user, password: secret, totpSecret });
+      }
+      token = await readToken(await context.newPage(), site);
     } finally {
       await browser.close().catch(() => undefined);
     }
     registerSecret(token);
-    const api = new QuantiplyApi(token);
+    const api = new QuantiplyApi(token, fetch, site);
 
     const algos = await api.list();
     const p = planQ(

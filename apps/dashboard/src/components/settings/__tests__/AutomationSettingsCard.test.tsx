@@ -126,6 +126,20 @@ describe('AutomationSettingsCard', () => {
     expect(screen.queryByText('Automated deployment: off → on')).toBeNull();
   });
 
+  it("Apply now starts that platform's evening upload", async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
+      init?.method === 'POST'
+        ? ok({ runId: 7, job: 'quantiply-evening' }, 202)
+        : ok(view(SETTINGS)),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    render(<AutomationSettingsCard />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Apply now: Quantiply' }));
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST');
+    expect(post?.[0]).toBe('/api/scheduler/jobs/quantiply-evening/run');
+  });
+
   it('says so when the scheduler is not reachable', async () => {
     vi.stubGlobal(
       'fetch',

@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 import { sendText } from '@trading/notify';
 import { type Page, type Response, chromium } from 'playwright';
 import { BASE_URL, algotestLogin } from './algotest.js';
+import { describeSource, readAutomation, uploadBooks } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
 import { parseCards, parseLive, stillDeployed } from './deploy-plan.js';
 import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
@@ -142,6 +143,7 @@ async function main(): Promise<number> {
       latest: { type: 'string' },
       mode: { type: 'string' },
       ledger: { type: 'string' },
+      'from-settings': { type: 'boolean', default: false },
       apply: { type: 'boolean', default: false },
       'allow-delete': { type: 'boolean', default: false },
       headed: { type: 'boolean', default: false },
@@ -149,7 +151,7 @@ async function main(): Promise<number> {
   });
   if (values.mode !== 'evening' && values.mode !== 'topup') {
     console.error(
-      'usage: --dir <export folder> | --latest <book>, --mode evening|topup [--apply] [--allow-delete]',
+      'usage: --from-settings | --latest <book> | --dir <export folder>, --mode evening|topup [--apply] [--allow-delete]',
     );
     return 64;
   }
@@ -160,26 +162,36 @@ async function main(): Promise<number> {
     );
     return 0;
   }
-  let exportDir = values.dir;
-  if (!exportDir && values.latest) {
-    const root = process.env.TRADING_DATA_ROOT?.trim();
-    if (!root) {
-      console.error('--latest needs TRADING_DATA_ROOT');
+  const dataRoot = process.env.TRADING_DATA_ROOT?.trim();
+  // BL-140: --from-settings uploads every list the dashboard's Settings › Automation gives
+  // AlgoTest (one account; its brokers matter only when deploying). None: hands off.
+  let decidedBy = '';
+  let books: string[] = values.latest ? [values.latest] : [];
+  if (values['from-settings']) {
+    const automation = readAutomation();
+    decidedBy = describeSource(automation);
+    books = uploadBooks(automation, 'algotest');
+    if (!books.length) {
+      console.log(`AlgoTest: nothing to upload (${decidedBy}); nothing changed`);
+      return 0;
+    }
+  }
+  const exportDirs: string[] = values.dir ? [values.dir] : [];
+  if (!exportDirs.length && books.length) {
+    if (!dataRoot) {
+      console.error('--latest / --from-settings need TRADING_DATA_ROOT');
       return 1;
     }
-    exportDir = (
-      await readJson<{ dir: string }>(
-        join(root, 'rotation', 'algotest', `latest-${values.latest}.json`),
-      )
-    ).dir;
+    for (const book of books) {
+      const pointer = join(dataRoot, 'rotation', 'algotest', `latest-${book}.json`);
+      exportDirs.push((await readJson<{ dir: string }>(pointer)).dir);
+    }
   }
-  if (!exportDir) {
-    console.error('give --dir or --latest');
+  if (!exportDirs.length) {
+    console.error('give --from-settings, --latest or --dir');
     return 64;
   }
   const mode = values.mode as Mode;
-  const dir = resolve(exportDir);
-  const dataRoot = process.env.TRADING_DATA_ROOT?.trim();
   if (!values.ledger && !dataRoot) {
     console.error('the ledger lives under TRADING_DATA_ROOT: set it, or pass --ledger');
     return 1;
@@ -187,26 +199,44 @@ async function main(): Promise<number> {
   const ledgerPath = values.ledger
     ? resolve(values.ledger)
     : join(dataRoot ?? '', 'rotation', 'algotest', 'ledger.jsonl');
-  const manifest = await readJson<Manifest>(join(dir, 'manifest.json'));
   const today = istToday();
-  const fits =
-    mode === 'evening'
-      ? manifest.source === 'preview' && manifest.day > today
-      : manifest.source === 'recorded' && manifest.day === today;
-  if (!fits) {
-    console.error(
-      `${mode}: the export is ${manifest.source} for ${manifest.day} (today ${today}); refusing`,
-    );
-    return 1;
-  }
   const docs = new Map<string, unknown>();
+  const bookOf = new Map<string, string>();
   const wanted: Wanted[] = [];
-  for (const s of manifest.strategies) {
-    const file = join(dir, s.file);
-    const text = await readFile(file, 'utf8');
-    docs.set(s.name, JSON.parse(text));
-    wanted.push({ name: s.name, variant: s.variant, file, sha: sha256(text) });
+  const manifests: Manifest[] = [];
+  for (const exportDir of exportDirs) {
+    const dir = resolve(exportDir);
+    const m = await readJson<Manifest>(join(dir, 'manifest.json'));
+    const fits =
+      mode === 'evening'
+        ? m.source === 'preview' && m.day > today
+        : m.source === 'recorded' && m.day === today;
+    if (!fits) {
+      console.error(
+        `${mode}: the ${m.book} export is ${m.source} for ${m.day} (today ${today}); refusing`,
+      );
+      return 1;
+    }
+    if (manifests.length && manifests[0]?.day !== m.day) {
+      console.error(
+        `the exports are for different days (${manifests[0]?.day}, ${m.day}); refusing`,
+      );
+      return 1;
+    }
+    manifests.push(m);
+    for (const s of m.strategies) {
+      const file = join(dir, s.file);
+      const text = await readFile(file, 'utf8');
+      docs.set(s.name, JSON.parse(text));
+      bookOf.set(s.name, m.book);
+      wanted.push({ name: s.name, variant: s.variant, file, sha: sha256(text) });
+    }
   }
+  // Several lists upload as one plan: names never collide (`Core · ` / `T1 · `).
+  const manifest = {
+    day: manifests[0]?.day ?? today,
+    book: manifests.map((m) => m.book).join('+'),
+  };
   const ledger = existsSync(ledgerPath) ? parseLedger(await readFile(ledgerPath, 'utf8')) : [];
 
   const phone = process.env.ALGOTEST_PHONE?.trim();
@@ -217,7 +247,7 @@ async function main(): Promise<number> {
   }
   registerSecret(password);
   const telegram = readTelegramConfig();
-  const label = `AlgoTest ${manifest.book.toUpperCase()} ${mode === 'evening' ? 'evening' : '09:16 top-up'} for ${manifest.day}`;
+  const label = `AlgoTest ${manifest.book.toUpperCase()} ${mode === 'evening' ? 'evening' : '09:16 top-up'} for ${manifest.day}${decidedBy ? `, ${decidedBy}` : ''}`;
 
   const browser = await chromium.launch({ headless: !values.headed });
   const context = await browser.newContext({
@@ -253,7 +283,7 @@ async function main(): Promise<number> {
       const row: LedgerRow = {
         at: new Date().toISOString(),
         day: manifest.day,
-        book: manifest.book,
+        book: bookOf.get(name) ?? manifest.book,
         mode,
         action,
         name,

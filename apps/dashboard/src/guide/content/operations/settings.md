@@ -45,10 +45,18 @@ A warning badge on a block means its master switch holds it back.
 
 **When a change takes effect.** From each job's next run. The evening uploads run at 16:40 (AlgoTest) and 16:45 (Quantiply), so a change saved later than that reaches tomorrow's picks only at the next evening run.
 
-**The `.env` switches still have the last word.** `ALGOTEST_UPLOAD`, `QUANTIPLY_UPLOAD` and `ALGOTEST_DEPLOY` must also be on for the tool to change a platform.
+**Apply now.** **Apply now: AlgoTest** and **Apply now: Quantiply** run that platform's evening upload straight away, with the saved settings. Use them after a change saved later than the evening run. They are disabled while there are unsaved changes.
 
-> [!NOTE]
-> Built in stages. For now the page stores the settings and updates GitHub. The jobs start following them in a later stage: until then they run as before.
+**What follows these settings:**
+
+- **The 08:00 login:**
+  - With logins off, or no block logging in, the laptop does not start the login run, and the 08:15 GitHub backstop does nothing.
+  - With neither AlgoTest block on, the run skips the AlgoTest brokers.
+  - Quantiply · Shoonya logs in after the AlgoTest logins, when its block is on.
+- **The evening and 09:16 uploads:** AlgoTest gets every list its blocks choose. Each Quantiply account (Angel One, Shoonya) gets its own block's list. A block with upload off is left untouched.
+- **Deploying:** it also needs Automated deployment on.
+
+**The `.env` switches still have the last word.** `ALGOTEST_UPLOAD`, `QUANTIPLY_UPLOAD` and `ALGOTEST_DEPLOY` must also be on for the tool to change a platform.
 
 ## Common questions
 

@@ -77,10 +77,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
+          # BL-140: the dashboard's "Automated logins" switch, synced here by the laptop's scheduler.
+          ENABLED: ${{ vars.BROKER_LOGIN_ENABLED }}
         run: |
           skip=false
           quantiply_off=false
-          if [ "${{ github.event_name }}" = "schedule" ]; then
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "${ENABLED}" = "off" ]; then
+            skip=true
+            echo "Automated logins are off in the dashboard's settings; the backstop does nothing."
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
             today=$(date -u +%Y-%m-%d)
             runs=$(gh api "repos/${REPO}/actions/workflows/daily-broker-login.yml/runs?created=>=${today}&per_page=50" \
               --jq "[.workflow_runs[] | select(.id != ${RUN_ID}) | {id, conclusion}]")
@@ -160,8 +165,9 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           # A dispatch's own input wins; otherwise the repository variable BROKER_LOGIN_ONLY (set in
           # Settings > Secrets and variables > Actions > Variables) decides for the 08:00 dispatch and
-          # the cron backstop alike. Unset or empty = both brokers. A value other than angelone or
-          # finvasia fails the run loudly (config.ts), with the usual Telegram alert.
+          # the cron backstop alike. Unset or empty = both brokers; `none` = no AlgoTest login (BL-140,
+          # set from the dashboard's settings). Any other value fails the run loudly (config.ts),
+          # with the usual Telegram alert.
           ONLY: ${{ inputs.only || vars.BROKER_LOGIN_ONLY }}
           # Also log in to Quantiply (Angel One's algo platform) with the ANGELONE_* secrets above:
           # before AlgoTest's 08:15 window when there is time, else after the AlgoTest logins. Off
@@ -170,6 +176,10 @@ jobs:
           # it off once any run happened today (backstop-check). Any value other than on/off is
           # reported as a Quantiply failure; the AlgoTest logins still run.
           QUANTIPLY_LOGIN: ${{ needs.backstop-check.outputs.quantiply_off == 'true' && 'off' || ((inputs.quantiply && inputs.quantiply != 'default') && inputs.quantiply || vars.QUANTIPLY_LOGIN) }}
+          # BL-140: Quantiply · Shoonya too when this lists finvasia (the dashboard's settings set it).
+          # Logged in after the AlgoTest logins, one attempt, its own report line, never the exit
+          # code; like Angel One's Quantiply, a backstop never repeats it once a run happened today.
+          QUANTIPLY_BROKERS: ${{ needs.backstop-check.outputs.quantiply_off != 'true' && vars.QUANTIPLY_BROKERS || '' }}
           TRACE: ${{ inputs.trace && '1' || '' }}
           SKIP_WINDOW_GUARD: ${{ inputs.skip_window_guard && '1' || '' }}
         run: bun run login

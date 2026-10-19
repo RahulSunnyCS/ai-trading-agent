@@ -22,6 +22,8 @@ import { type Config, loadConfig, readTelegramConfig } from './config.js';
 import { ARTIFACTS_DIR, describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { formatReport } from './notify.js';
 import { installOverlayHandlers } from './overlays.js';
+import { QUANTIPLY_SITES } from './quantiply-rules.js';
+import { runQuantiplyShoonyaIsolated } from './quantiply-shoonya.js';
 import { QUANTIPLY_NAME, runQuantiplyIsolated } from './quantiply.js';
 import {
   WINDOW_CLOSES_MINUTES,
@@ -235,6 +237,7 @@ async function main(): Promise<number> {
   let quantiply: BrokerResult | null = config.quantiplyProblem
     ? { name: QUANTIPLY_NAME, status: 'FAIL', detail: config.quantiplyProblem }
     : null;
+  let quantiplyShoonya: BrokerResult | null = null;
   let fatal: string | null = null;
   let algotestStarted = false;
   let browser: Browser | undefined;
@@ -254,7 +257,8 @@ async function main(): Promise<number> {
         browser = await launch();
       }
       algotestStarted = true;
-      results = await runAlgotest(browser, config, tracing);
+      // ONLY=none: no AlgoTest block logs in (BL-140, from the dashboard's settings).
+      results = config.only === 'none' ? [] : await runAlgotest(browser, config, tracing);
     } catch (error) {
       fatal = describe(error);
       console.error(`\nfatal: ${fatal}`);
@@ -268,6 +272,25 @@ async function main(): Promise<number> {
         quantiply = { name: QUANTIPLY_NAME, status: 'FAIL', detail: describe(error) };
       }
     }
+    // BL-140: Quantiply · Shoonya, always after the AlgoTest logins so it can never delay them.
+    // Its own line; it never changes the exit code (a Shoonya failure must not make the backstop
+    // log the AlgoTest brokers in again), and the backstop never repeats it (workflow).
+    if (config.quantiplyShoonya) {
+      try {
+        browser ??= await launch();
+        quantiplyShoonya = await runQuantiplyShoonyaIsolated(browser, {
+          userId: config.finvasia.clientId,
+          password: config.finvasia.password,
+          totpSecret: config.finvasia.totpSecret,
+        });
+      } catch (error) {
+        quantiplyShoonya = {
+          name: QUANTIPLY_SITES.finvasia.name,
+          status: 'FAIL',
+          detail: describe(error),
+        };
+      }
+    }
   } finally {
     if (browser) await browser.close().catch(() => undefined);
   }
@@ -277,7 +300,10 @@ async function main(): Promise<number> {
     quantiply = { name: QUANTIPLY_NAME, status: 'FAIL', detail: 'did not run' };
   }
 
-  const body = formatReport(results, config.runUrl, quantiply);
+  const shoonyaLine = quantiplyShoonya
+    ? `\n${quantiplyShoonya.status === 'OK' || quantiplyShoonya.status === 'SKIPPED' ? '✅' : '❌'} ${quantiplyShoonya.name}: ${quantiplyShoonya.detail}`
+    : '';
+  const body = formatReport(results, config.runUrl, quantiply) + shoonyaLine;
   const fatalLabel = quantiply && algotestStarted ? 'fatal (AlgoTest)' : 'fatal';
   const report = fatal ? `${body}\n${fatalLabel}: ${fatal}` : body;
 
