@@ -183,3 +183,23 @@ Kite facts checked on 2026-10-19 ([portfolio](https://kite.trade/docs/connect/v3
   credentials go in `.env`, and the login is automated if possible, otherwise a Friday
   notification and a manual login; the owner buys on Mondays; the strategy is chosen once this is built.
 - 2026-10-19 — started; the owner answered the open questions (recorded above). Phase 1 begun.
+- 2026-10-19 — Phase 1 built (not yet run against the real account). Kite client `kite.py` (read-only:
+  session, holdings + T1, equity margins `net`, profile), token cached 0600, 06:00 IST expiry;
+  Momentum API `/api/kite/status | login | start | callback`. The redirect URL given to the owner
+  for the Kite app is `http://127.0.0.1:8765/api/kite/callback`. Other pieces:
+  - trading-data migration 013: `kite` as a snapshot and holdings source, `momentum_cash`; the
+    holdings key gains `source`.
+  - `holdings_sync.sync`, shared by the orders job, `mbt kite sync`, the callback and the page's
+    Sync button.
+  - LIQUIDBEES and `SGB*` excluded by default (`holdings_store.treatment`, an owner rule still wins).
+  - Your orders counts a Kite snapshot's free cash and reads only its own source's snapshots.
+    The tests found that two sources syncing in the same second mixed their rows; now fixed.
+  - `mbt kite status | login | sync | remind`; scheduler job `kite-login-reminder`, Fri 13:30.
+  - Broker logins Kite card, the Kite option in Your orders settings, Guide pages, docs.
+
+  Still open in Phase 1:
+  - the unattended TOTP login spike, which waits for the owner's `KITE_USER_ID` /
+    `KITE_PASSWORD` / `KITE_TOTP_SECRET`;
+  - switching the owner's holdings source to `kite`;
+  - the first real snapshot, due Fri 2026-10-23.
+

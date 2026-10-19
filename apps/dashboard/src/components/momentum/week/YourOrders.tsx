@@ -147,7 +147,7 @@ export function YourOrders() {
           <Badge tone={settings.holdings_source === 'paper' ? 'info' : 'positive'}>
             {settings.holdings_source === 'paper'
               ? `Paper portfolio ${formatInr(settings.paper_capital_rs)}`
-              : 'Holdings from Fyers'}
+              : `Holdings from ${brokerName(settings.holdings_source)}`}
           </Badge>
         ) : null}
         {latest && latest.kind !== 'unavailable' ? (
@@ -240,7 +240,9 @@ export function YourOrders() {
             always go through. Made {formatIstDateTime(latest.created_at)} (
             {latest.trigger === 'scheduled' ? 'the 14:15 job' : 'by hand'}).
             {plan.missing_prices.length ? ` No price for ${plan.missing_prices.join(', ')}.` : ''}
-            {latest.holdings?.source === 'fyers' && latest.holdings.outside?.length
+            {latest.holdings &&
+            latest.holdings.source !== 'paper' &&
+            latest.holdings.outside?.length
               ? ` Left alone, not part of this strategy: ${latest.holdings.outside.join(', ')}.`
               : ''}
           </p>
@@ -269,6 +271,8 @@ function OrdersSettingsDrawer({
 }) {
   const settings = view?.settings ?? null;
   const [draft, setDraft] = useState<Partial<MomentumOrderSettings>>({});
+  // The paper source keeps the Fyers button, as before Kite existed.
+  const broker = settings?.holdings_source === 'kite' ? 'Kite' : 'Fyers';
   const [paste, setPaste] = useState('');
   const [busy, setBusy] = useState(false);
   const value = <K extends keyof MomentumOrderSettings>(
@@ -293,8 +297,8 @@ function OrdersSettingsDrawer({
     setBusy(true);
     const response = await apiPost('/api/momentum/holdings/sync', {});
     setBusy(false);
-    if (!response.ok) toast(`Could not read Fyers: ${response.error}`, 'error');
-    else toast('Holdings read from Fyers');
+    if (!response.ok) toast(`Could not read ${broker}: ${response.error}`, 'error');
+    else toast(`Holdings read from ${broker}`);
     onChanged();
   }
 
@@ -349,16 +353,19 @@ function OrdersSettingsDrawer({
             options={[
               { value: 'paper', label: 'Paper portfolio' },
               { value: 'fyers', label: 'Holdings from Fyers' },
+              { value: 'kite', label: 'Holdings from Kite' },
             ]}
           />
           <p className="text-xs text-muted">
-            Paper: the model portfolio at your paper capital, until money goes in. Fyers: what your
-            account holds, read-only, at 14:15 and when you press Sync.
+            Paper: the model portfolio at your paper capital, until money goes in. Fyers or Kite:
+            what your account holds, read-only, at 14:15 and when you press Sync. Kite also reads
+            the account&apos;s free cash, which the orders use. LIQUIDBEES and gold bonds (SGB) are
+            options margin and always left out.
           </p>
         </div>
         {number('paper_capital_rs', 'Paper capital (₹)')}
         {number('min_trade_rs', 'Skip top-ups and trims smaller than (₹)')}
-        {number('extra_cash_rs', 'Cash for the strategy held outside Fyers (₹)')}
+        {number('extra_cash_rs', 'Cash for the strategy held outside the broker (₹)')}
         <Button
           variant="primary"
           onClick={() => void save()}
@@ -372,23 +379,28 @@ function OrdersSettingsDrawer({
             <h3 className="text-sm font-semibold text-foreground">Holdings</h3>
             <span className="text-xs text-muted">
               {view?.holdings
-                ? `${view.holdings.source === 'fyers' ? 'from Fyers' : 'pasted'} · ${formatIstDateTime(view.holdings.synced_at)}`
+                ? `${view.holdings.source === 'paste' ? 'pasted' : `from ${brokerName(view.holdings.source)}`} · ${formatIstDateTime(view.holdings.synced_at)}`
                 : 'none saved yet'}
+              {view?.holdings?.cash != null ? ` · free cash ${formatInr(view.holdings.cash)}` : ''}
             </span>
             <Button size="sm" className="ml-auto" onClick={() => void sync()} disabled={busy}>
-              Sync from Fyers
+              Sync from {broker}
             </Button>
           </div>
           {view?.holdings?.rows.length ? (
             <ul className="mt-2 divide-y divide-border rounded-lg border border-border">
               {view.holdings.rows.map((row) => {
-                const rule = view.rules[row.symbol] ?? null;
+                const margin = isMarginSymbol(row.symbol, view.margin);
+                const rule = view.rules[row.symbol] ?? (margin ? 'exclude' : null);
                 return (
                   <li key={row.symbol} className="flex items-center gap-2 px-3 py-1.5 text-sm">
                     <span className="w-28 truncate font-semibold text-foreground">
                       {row.symbol}
                     </span>
                     <span className="metric text-xs text-muted">{formatInt(row.quantity)} sh</span>
+                    {margin && !view.rules[row.symbol] ? (
+                      <span className="text-xs text-faint">options margin</span>
+                    ) : null}
                     <span className="ml-auto">
                       <SegmentedControl
                         ariaLabel={`How ${row.symbol} counts`}
@@ -408,7 +420,7 @@ function OrdersSettingsDrawer({
             </ul>
           ) : null}
           <label className="mt-3 block text-xs text-muted">
-            Or paste <span className="font-mono">SYMBOL quantity</span>, one per line (when Fyers
+            Or paste <span className="font-mono">SYMBOL quantity</span>, one per line (when {broker}{' '}
             cannot be read)
             <textarea
               value={paste}
@@ -430,4 +442,14 @@ function OrdersSettingsDrawer({
       </div>
     </Drawer>
   );
+}
+
+function brokerName(source: 'fyers' | 'kite'): string {
+  return source === 'kite' ? 'Kite' : 'Fyers';
+}
+
+/** LIQUIDBEES and sovereign gold bonds are options margin, left out with no rule (BL-142). */
+function isMarginSymbol(symbol: string, margin: MomentumOrdersView['margin']): boolean {
+  if (!margin) return false;
+  return margin.symbols.includes(symbol) || margin.prefixes.some((p) => symbol.startsWith(p));
 }

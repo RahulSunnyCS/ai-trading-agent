@@ -35,10 +35,11 @@ def test_fresh_catalog_migrates_once_and_loads_reference(root):
             ("010_ref_rates",),
             ("011_momentum_result_changes",),
             ("012_momentum_orders",),
+            ("013_momentum_kite",),
         ]
         assert con.execute("SELECT count(*) FROM ref_lot_sizes").fetchone()[0] > 0
     with connect(root) as con:  # second open: nothing re-applied, nothing duplicated
-        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 12
+        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 13
 
 
 # The orders tables as the first draft of BL-051 Phase 3 created them, applied to the owner's live
@@ -134,6 +135,47 @@ def test_012_applies_over_catalog_with_old_011_ledger(root):
         )
     with connect(root, views=()) as con:  # and the next open applies nothing
         assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == ledger_rows
+
+
+def test_013_keeps_every_orders_row_and_accepts_kite(root):
+    """BL-142: 013 rebuilds momentum_holdings and momentum_owner_settings to widen their CHECKs.
+    A catalog at 012 with rows in both keeps every row, and then takes Kite snapshots, a 'kite'
+    holdings source and a Kite and a Fyers snapshot in the same second."""
+    old_ddl = dict(_migrations())["012_momentum_orders"]
+    with connect(root, views=()) as con:  # a current catalog, rewound to 012's tables
+        for table in ("momentum_cash", "momentum_holdings", "momentum_owner_settings"):
+            con.execute(f"DROP TABLE {table}")
+        con.execute("DROP TABLE momentum_holding_rules")
+        con.execute("DROP TABLE momentum_orders")
+        con.execute(old_ddl)
+        con.execute("DELETE FROM schema_migrations WHERE version = '013_momentum_kite'")
+        con.execute(
+            "INSERT INTO momentum_owner_settings (owner, min_trade_rs, holdings_source, "
+            "paper_capital_rs) VALUES ('rahul', 7000, 'fyers', 50000)"
+        )
+        con.execute(
+            "INSERT INTO momentum_holdings VALUES ('rahul', '2026-10-16T14:15:00+05:30', 'fyers', "
+            "'SBIN', 10, 800.5)"
+        )
+        with pytest.raises(Exception, match="CHECK"):
+            con.execute("UPDATE momentum_owner_settings SET holdings_source = 'kite'")
+    with connect(root, views=()) as con:
+        assert con.execute(
+            "SELECT owner, min_trade_rs, holdings_source, paper_capital_rs "
+            "FROM momentum_owner_settings"
+        ).fetchall() == [("rahul", 7000.0, "fyers", 50000.0)]
+        assert con.execute("SELECT source, symbol, quantity FROM momentum_holdings").fetchall() == [
+            ("fyers", "SBIN", 10.0)
+        ]
+        con.execute("UPDATE momentum_owner_settings SET holdings_source = 'kite'")
+        at = "2026-10-23T14:15:00+05:30"
+        con.execute(f"INSERT INTO momentum_holdings VALUES ('rahul', '{at}', 'kite', 'SBIN', 5, 1)")
+        con.execute(
+            f"INSERT INTO momentum_holdings VALUES ('rahul', '{at}', 'fyers', 'SBIN', 3, 1)"
+        )
+        con.execute(f"INSERT INTO momentum_cash VALUES ('rahul', '{at}', 'kite', 25000)")
+        with pytest.raises(Exception, match="CHECK"):
+            con.execute("UPDATE momentum_owner_settings SET holdings_source = 'broker'")
 
 
 def test_004_moves_stock_benchmark_tris_out_of_momentum_prices(root):

@@ -2,7 +2,8 @@
 
 The dashboard reads market data from **Fyers**. Fyers requires a fresh login every day; this
 screen shows whether today's login is valid and lets you log in by hand. Below it, the
-**Angel One** card shows whether the fallback data source can log in.
+**Angel One** card shows whether the fallback data source can log in, and the **Kite** card
+connects the Zerodha account that holds the Momentum money.
 
 ## Why it expires every day
 
@@ -65,6 +66,29 @@ again on every check, so no restart is needed, and changed settings lift the 15-
 once. The 08:00 check follows the same rules: if you test just before 08:00 it waits rather than
 fails. A failed 08:00 check sends a Telegram alert.
 
+## Kite connection
+
+Kite (Zerodha) holds the Momentum money. This tool reads two things from it, never trading:
+your holdings and your free cash, for Momentum's [Your orders](app:/momentum/week). It is set up
+with `KITE_API_KEY` and `KITE_API_SECRET` in the `.env` file. The Kite app's redirect URL is
+`http://127.0.0.1:8765/api/kite/callback`.
+
+| What you see | Meaning |
+|---|---|
+| Not configured | The two settings are missing from `.env`. |
+| Connected | Today's login is valid, until 06:00 IST tomorrow. The account ID is shown. |
+| Not logged in today | Log in before Friday's 14:15 orders. |
+
+**Login with Kite** opens Kite's own login page in a new tab. After you log in, Kite sends the
+browser back to the Momentum service on the laptop, which keeps the token (in a private file,
+never shown) and, when Kite is the holdings source, reads your holdings straight away. Because
+the way back is to the laptop, log in from the laptop, not from your phone.
+
+The card's last line shows the last read: how many holdings, the free cash, and what was left
+out as options margin (LIQUIDBEES and gold bonds). A **13:30 Friday** job (`kite-login-reminder`,
+see [Jobs](app:/jobs)) sends a Telegram reminder when Kite is the holdings source and you have
+not logged in that day; it says nothing otherwise.
+
 ## AlgoTest logins
 
 The broker accounts (Angel One, Finvasia) are logged into [AlgoTest](glossary:algotest) by the
@@ -77,4 +101,5 @@ same Angel One account. Its result is a line of its own in the job's Telegram re
 ## Common questions
 
 **Is Fyers used for trading?** No. This tool uses Fyers for market data only and places no
-orders. The same goes for Angel One: its login here only reads 1-minute data.
+orders. The same goes for Angel One: its login here only reads 1-minute data. And for Kite: it
+reads holdings and free cash, never an order.

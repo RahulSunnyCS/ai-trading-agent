@@ -817,15 +817,17 @@ export interface MomentumOrderSettings {
   owner: string;
   min_trade_rs: number;
   extra_cash_rs: number;
-  holdings_source: 'paper' | 'fyers';
+  holdings_source: 'paper' | 'fyers' | 'kite';
   paper_capital_rs: number;
   updated_at: string | null;
 }
 
 export interface MomentumHoldingsSnapshot {
   synced_at: string;
-  source: 'fyers' | 'paste';
+  source: 'fyers' | 'kite' | 'paste';
   rows: Array<{ symbol: string; quantity: number; avg_price: number | null }>;
+  /** Free cash read with a Kite snapshot (BL-142); null for other sources. */
+  cash?: number | null;
 }
 
 export interface MomentumOrderRow {
@@ -860,7 +862,7 @@ export interface MomentumOrders {
   created_at: string;
   trigger: 'scheduled' | 'manual';
   favourite_id: string;
-  holdings_source: 'paper' | 'fyers';
+  holdings_source: 'paper' | 'fyers' | 'kite';
   week: string;
   headline: { id: string; name: string };
   /** exact: decided before the close by last Friday's ranks; final: from the week's own data. */
@@ -869,9 +871,11 @@ export interface MomentumOrders {
   holdings?:
     | { source: 'paper'; capital: number }
     | {
-        source: 'fyers';
+        source: 'fyers' | 'kite';
         synced_at: string | null;
         excluded: string[];
+        /** Free cash in Kite counted in the plan (BL-142). */
+        broker_cash?: number | null;
         /** Holdings that are not something this strategy holds or could buy: left alone. */
         outside?: string[];
       };
@@ -886,6 +890,8 @@ export interface MomentumOrdersView {
   settings: MomentumOrderSettings;
   holdings: MomentumHoldingsSnapshot | null;
   rules: Record<string, 'exclude' | 'cash'>;
+  /** Held for options margin, excluded with no rule (BL-142): LIQUIDBEES, and SGB* by prefix. */
+  margin?: { symbols: string[]; prefixes: string[] };
   orders: MomentumOrders[];
   job: MomentumLiveRules['job'];
 }

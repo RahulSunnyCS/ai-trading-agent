@@ -24,28 +24,33 @@ Open this page to read the week, to run something by hand, or to classify a poss
 | Since the 14:40 preview | ETF favourites: what the final changed against the preview, so you know whether a trade made on the preview still stands. |
 | Names at the edge | The weakest names held and the strongest not held, by rank: next rebalance's likely trades. For a group, in the sleeve that trades next. |
 | Telegram message | The headline's message for the week, word for word, and whether it was sent. **Re-send…** opens Run by hand, where a final run can be sent again after you confirm. |
-| Your orders | The headline's trades in whole shares, against your paper portfolio (until money goes in) or your holdings read from Fyers. See below. |
+| Your orders | The headline's trades in whole shares, against your paper portfolio (until money goes in) or your holdings read from Kite or Fyers. See below. |
 
 ## Your orders
 
 At **14:15** on Friday a job works out the headline's orders and sends a short summary to
 Telegram, so they can be placed before the 15:30 close; **Make orders now** does the same at any
-time. Nothing here places an order: you place them in Fyers yourself.
+time. Nothing here places an order: you place them in your broker yourself.
 
 - **Exact before the close.** A strategy with a one-week signal delay (the Phase 6 sleeves)
   decides this Friday's trades from last Friday's ranks, which are already stored at 14:15. Which
   names are bought and sold is therefore exact; only the share counts and a few checks that read
   Friday's own prices (the price ceiling, circuit limits, cap trims) use the latest prices.
 - **Paper portfolio** (the default until money goes in): the model's portfolio at your paper
-  capital (₹1,00,000, changeable in **Settings**). **Holdings from Fyers**: what your account
-  holds, read-only, at 14:15 or when you press **Sync from Fyers**; any holding can be left out
-  or counted as cash, and holdings can be pasted when Fyers cannot be read.
+  capital (₹1,00,000, changeable in **Settings**). **Holdings from Kite** or **from Fyers**: what
+  your account holds, read-only, at 14:15 or when you press **Sync**; any holding can be left out
+  or counted as cash, and holdings can be pasted when the broker cannot be read.
+- **Kite** (where the Momentum money is, from 19 Oct 2026) is read with its **free cash**, and
+  the orders use all of it. **LIQUIDBEES** and every **sovereign gold bond** (symbols starting
+  `SGB`) are options margin: they are always left out, marked *options margin*, with no rule to
+  set. Kite needs a login each day it is read: log in on [Broker logins](app:/brokerLogins)
+  before 14:15 on Friday; a Telegram reminder comes at 13:30 when you have not.
 - **What is traded.** A name the model drops is sold in full and a new name is bought, whatever
   the amount. Top-ups and trims smaller than the **minimum trade** (₹10,000 by default) are shown
   as SKIP with what they would have cost. Whole shares, rounded down; sells first. A name with a
   possible split still to classify is held, never traded.
 - **Charges** are estimated with the backtest's rates: STT, stamp duty, exchange fees and the DP
-  charge per sale. Fyers charges no brokerage on delivery.
+  charge per sale. Neither Kite nor Fyers charges brokerage on delivery.
 
 ## Reading a group
 

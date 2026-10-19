@@ -1,11 +1,13 @@
 """Private Momentum API consumed by the shared dashboard."""
 
 import contextlib
+import html
 import inspect
 import json
 import logging
 import math
 import os
+import secrets
 import threading
 import urllib.parse
 from collections import OrderedDict
@@ -29,8 +31,10 @@ from . import (
     angelone,
     db_read,
     fyers,
+    kite,
     levers,
     metrics,
+    notify,
     rebalance,
     reference_benchmarks,
     runs_store,
@@ -108,6 +112,8 @@ _CATEGORY_LABEL_INFO = {
 
 _LOCAL_OAUTH_STATES: dict[str, datetime] = {}
 _LOCAL_OAUTH_LOCK = threading.Lock()
+# BL-142: Kite logins started here and not yet back (state -> expiry), like the Fyers ones.
+_KITE_LOGIN_STATES: dict[str, datetime] = {}
 
 
 class _Data:
@@ -809,7 +815,7 @@ class OrderSettingsBody(BaseModel):
 
     min_trade_rs: float | None = Field(None, ge=0, le=10_000_000)
     extra_cash_rs: float | None = Field(None, ge=0, le=1_000_000_000)
-    holdings_source: Literal["paper", "fyers"] | None = None
+    holdings_source: Literal["paper", "fyers", "kite"] | None = None
     paper_capital_rs: float | None = Field(None, ge=1_000, le=1_000_000_000)
 
 
@@ -3378,7 +3384,9 @@ def _compute_orders(
             favourites = runs_store.list_favorites(con, include_groups=True)
             groups = {g["id"]: g for g in runs_store.list_groups(con)}
             settings = holdings_store.settings(con, who)
-            synced = holdings_store.latest_holdings(con, who)
+            synced = holdings_store.latest_holdings(
+                con, who, holdings_store.SNAPSHOT_SOURCES.get(settings["holdings_source"])
+            )
             rules = holdings_store.rules(con, who)
             review = stock_actions.review_snapshot(con)
     except FileNotFoundError:  # no catalog yet: no favourites either
@@ -3432,12 +3440,16 @@ def _compute_orders(
             payload["holdings"]["fresh"] = True
     else:
         rows = (synced or {}).get("rows", [])
-        cash = float(settings["extra_cash_rs"])
+        # Kite snapshots carry the account's free cash (BL-142: all of it is the strategy's).
+        broker_cash = float((synced or {}).get("cash") or 0.0)
+        cash = float(settings["extra_cash_rs"]) + broker_cash
         holdings: dict[str, float] = {}
         outside = []
+        excluded = []
         for row in rows:
-            treatment = rules.get(row["symbol"])
+            treatment = holdings_store.treatment(row["symbol"], rules)
             if treatment == "exclude":
+                excluded.append(row["symbol"])
                 continue
             if treatment == "cash":
                 cash += float(row["quantity"]) * float(row.get("avg_price") or 0)
@@ -3450,10 +3462,11 @@ def _compute_orders(
             holdings[name] = holdings.get(name, 0.0) + float(row["quantity"])
         prices, source = _order_prices(stored, symbols, set(holdings) | set(target))
         payload["holdings"] = {
-            "source": "fyers",
+            "source": settings["holdings_source"],
             "synced_at": (synced or {}).get("synced_at"),
-            "excluded": sorted(s for s, t in rules.items() if t == "exclude"),
+            "excluded": sorted(set(excluded) | {s for s, t in rules.items() if t == "exclude"}),
             "outside": sorted(outside),
+            "broker_cash": (synced or {}).get("cash"),
         }
     blocked_names = {n for n in set(holdings) | set(target) if base_of.get(n, n) in blocked}
     plan = orders.plan(
@@ -3502,7 +3515,7 @@ def _orders_message(payload: dict) -> Notification:
     where = (
         f"paper portfolio of ₹{holdings['capital']:,.0f}"
         if holdings["source"] == "paper"
-        else "your Fyers holdings"
+        else f"your {'Kite' if holdings['source'] == 'kite' else 'Fyers'} holdings"
     )
     how = (
         "Exact (decided by last Friday's ranks)"
@@ -3510,6 +3523,8 @@ def _orders_message(payload: dict) -> Notification:
         else "From the final data"
     )
     lines = [f"{how} · against your {where} · prices: {payload['prices']}"]
+    if holdings.get("broker_cash") is not None:
+        lines.append(f"Free cash in Kite: ₹{holdings['broker_cash']:,.0f} (counted)")
     trades = [r for r in plan["rows"] if r["quantity"]]
     for row in trades:
         lines.append(
@@ -4582,6 +4597,113 @@ def create_app() -> FastAPI:
             headers={"Cache-Control": "no-store"},
         )
 
+    # BL-142: Kite, read-only. The Kite app's redirect URL is this service's /api/kite/callback
+    # (http://127.0.0.1:8765/api/kite/callback), so a login finishes on the owner's laptop.
+    def _kite_start() -> str:
+        load_repo_env()
+        try:
+            state = secrets.token_urlsafe(16)
+            url = kite.login_url(state)
+        except kite.KiteCredentialsError as error:
+            raise HTTPException(503, str(error)) from None
+        now = datetime.now(IST)
+        with _LOCAL_OAUTH_LOCK:
+            for old_state, expiry in list(_KITE_LOGIN_STATES.items()):
+                if expiry <= now:
+                    del _KITE_LOGIN_STATES[old_state]
+            _KITE_LOGIN_STATES[state] = now + timedelta(minutes=10)
+        return url
+
+    @app.get("/api/kite/status")
+    def kite_status() -> dict:
+        from . import holdings_store
+
+        load_repo_env()
+        creds = kite.cached_credentials() if kite.configured() else None
+        alive = None
+        if creds is not None:
+            try:
+                alive = kite.probe(creds)
+            except RuntimeError:
+                alive = None  # Kite unreachable: the token may still be good
+        snapshot = None
+        source = "paper"
+        try:
+            with read_catalog() as con:
+                who = holdings_store.owner()
+                source = holdings_store.settings(con, who)["holdings_source"]
+                snapshot = holdings_store.latest_holdings(con, who, ("kite",))
+        except (FileNotFoundError, duckdb.CatalogException):
+            pass
+        connected = creds is not None and alive is not False
+        return {
+            "configured": kite.configured(),
+            "connected": connected,
+            "expiresAt": creds.expires_at.isoformat() if creds and connected else None,
+            "userId": creds.user_id if creds else None,
+            "holdingsSource": source,
+            "lastSnapshot": (
+                {
+                    "syncedAt": snapshot["synced_at"],
+                    "cash": snapshot["cash"],
+                    "symbols": len(snapshot["rows"]),
+                    "excluded": sorted(
+                        r["symbol"]
+                        for r in snapshot["rows"]
+                        if holdings_store.is_margin_symbol(r["symbol"])
+                    ),
+                }
+                if snapshot
+                else None
+            ),
+        }
+
+    @app.post("/api/kite/login")
+    def kite_login() -> dict:
+        """The Kite login page to send the browser to (the dashboard card's button)."""
+        return {"url": _kite_start()}
+
+    @app.get("/api/kite/start")
+    def kite_start() -> RedirectResponse:
+        """The same, as a redirect (`mbt kite login` opens this)."""
+        return RedirectResponse(
+            _kite_start(), status_code=302, headers={"Cache-Control": "no-store"}
+        )
+
+    @app.get("/api/kite/callback")
+    def kite_callback(state: str = "", request_token: str = "", status: str = "") -> HTMLResponse:
+        from . import holdings_store, holdings_sync
+
+        now = datetime.now(IST)
+        with _LOCAL_OAUTH_LOCK:
+            expiry = _KITE_LOGIN_STATES.pop(state, None)
+        if not state or expiry is None or expiry <= now:
+            raise HTTPException(400, "Kite login state is missing, expired or already used.")
+        if status != "success" or not request_token:
+            raise HTTPException(400, "Kite did not complete the login.")
+        load_repo_env()
+        try:
+            creds = kite.exchange_request_token(request_token)
+        except (kite.KiteCredentialsError, RuntimeError) as error:
+            raise HTTPException(502, str(error)) from None
+        kite.save_token(creds)
+        # Read the holdings at once when Kite is the holdings source, so the page has them.
+        note = "Kite connected."
+        try:
+            with open_catalog() as con:
+                source = holdings_store.settings(con, holdings_store.owner())["holdings_source"]
+            if source == "kite":
+                snapshot = holdings_sync.sync("kite")
+                note += f" Holdings read: {len(snapshot.get('rows', []))} names."
+        except (*holdings_sync.LOGIN_ERRORS, RuntimeError) as error:
+            note += f" Holdings not read: {notify.redact(str(error))}"
+        return HTMLResponse(
+            "<!doctype html><title>Kite connected</title>"
+            f"<p>{html.escape(note)} You can return to the dashboard.</p>"
+            "<script>setTimeout(() => window.close(), 1500)</script>",
+            headers={"Cache-Control": "no-store"},
+        )
+
     @app.get("/api/meta")
     def meta(dataset: Literal["etf", "stock", "custom_index", "broad"] = "etf") -> dict:
         if dataset == "stock":
@@ -5049,6 +5171,7 @@ def create_app() -> FastAPI:
 
         who = holdings_store.owner()
         target = week or week_ending_on_or_before(datetime.now(IST).date() + timedelta(days=6))
+        # BL-142: holdings held for options margin (LIQUIDBEES, SGBs) count as excluded with no rule.
         empty = {
             "week": target.isoformat(),
             "settings": {"owner": who, **holdings_store.SETTINGS_DEFAULTS},
@@ -5059,11 +5182,18 @@ def create_app() -> FastAPI:
         }
         try:
             with read_catalog() as con:
+                settings = holdings_store.settings(con, who)
                 return {
                     **empty,
-                    "settings": holdings_store.settings(con, who),
-                    "holdings": holdings_store.latest_holdings(con, who),
+                    "settings": settings,
+                    "holdings": holdings_store.latest_holdings(
+                        con, who, holdings_store.SNAPSHOT_SOURCES.get(settings["holdings_source"])
+                    ),
                     "rules": holdings_store.rules(con, who),
+                    "margin": {
+                        "symbols": sorted(holdings_store.MARGIN_SYMBOLS),
+                        "prefixes": list(holdings_store.MARGIN_PREFIXES),
+                    },
                     "orders": holdings_store.orders_for(con, who, target.isoformat()),
                 }
         except (FileNotFoundError, duckdb.CatalogException):  # no catalog / tables yet
@@ -5088,19 +5218,20 @@ def create_app() -> FastAPI:
 
     @app.post("/api/holdings/sync")
     def holdings_sync() -> dict:
-        """Read the owner's Fyers holdings (read-only) and keep them as a new snapshot."""
-        from . import holdings_store
+        """Read the owner's holdings (read-only) from the broker their holdings source names —
+        Kite (with its free cash) or Fyers — and keep them as a new snapshot."""
+        from . import holdings_store, holdings_sync
 
+        load_repo_env()
+        with open_catalog() as con:
+            source = holdings_store.settings(con, holdings_store.owner())["holdings_source"]
+        broker = holdings_sync.broker_source(source)
         try:
-            rows = fyers.holdings(fyers.resolve_credentials())
-        except fyers.FyersCredentialsError as error:
-            raise HTTPException(409, f"No valid Fyers login: {error}") from error
+            return holdings_sync.sync(broker)
+        except holdings_sync.LOGIN_ERRORS as error:
+            raise HTTPException(409, f"No valid {broker.title()} login: {error}") from error
         except RuntimeError as error:
             raise HTTPException(502, str(error)) from error
-        with open_catalog() as con:
-            who = holdings_store.owner()
-            holdings_store.save_holdings(con, who, "fyers", rows)
-            return holdings_store.latest_holdings(con, who) or {}
 
     @app.post("/api/holdings/paste")
     def holdings_paste(body: PastedHoldingsBody) -> dict:
