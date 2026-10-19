@@ -124,6 +124,12 @@ export function heldByMaster(settings: AutomationSettings, key: RowKey): string 
 export function githubOutcome(github: string | null): { text: string; failed: boolean } | null {
   if (!github) return null;
   if (github.startsWith('ok')) return { text: 'GitHub backstop updated', failed: false };
+  if (github.startsWith('PARTIAL')) {
+    return {
+      text: `GitHub backstop partly updated: ${github.replace(/^PARTIAL:\s*/, '')}`,
+      failed: true,
+    };
+  }
   return { text: `GitHub backstop NOT updated: ${github.replace(/^FAILED\s*/, '')}`, failed: true };
 }
 

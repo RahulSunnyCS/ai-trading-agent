@@ -63,12 +63,16 @@ export const ROW_KEYS: RowKey[] = PLATFORMS.flatMap((p) =>
   BROKERS.map((b) => `${p}.${b}` as RowKey),
 );
 
-/** The owner's setup on 2026-10-19: the first version when nothing is saved yet. */
+/**
+ * The owner's live setup on 2026-10-19, the first version when nothing is saved yet: the repository
+ * variables then were BROKER_LOGIN_ONLY=finvasia (AlgoTest logs Shoonya in, not Angel One) and
+ * QUANTIPLY_LOGIN=on, so a first Save that changes nothing else leaves the 08:00 logins as they are.
+ */
 export const DEFAULT_SETTINGS: AutomationSettings = {
   masters: { logins: true, uploads: true, deploy: false },
   rows: {
     'algotest.finvasia': { login: true, list: 't1', upload: true },
-    'algotest.angelone': { login: true, list: 'none', upload: false },
+    'algotest.angelone': { login: false, list: 'none', upload: false },
     'quantiply.angelone': { login: true, list: 'core', upload: true },
     'quantiply.finvasia': { login: false, list: 'none', upload: false },
   },
@@ -146,7 +150,9 @@ export function effective(settings: AutomationSettings, key: RowKey): Row {
  * - `BROKER_LOGIN_ENABLED`: the logins master switch.
  * - `ALGOTEST_BROKERS` / `QUANTIPLY_BROKERS`: comma-separated brokers to log in on each.
  * - `BROKER_LOGIN_ONLY` / `QUANTIPLY_LOGIN`: what the workflow reads today. `ONLY` empty
- *   means both AlgoTest brokers, `none` means neither; Quantiply is on if any of its rows is.
+ *   means both AlgoTest brokers, `none` means neither. `QUANTIPLY_LOGIN` is the Angel One route
+ *   (the workflow logs Quantiply in with the ANGELONE_* secrets), so only Quantiply · Angel One's
+ *   row turns it on.
  */
 /**
  * Whether the workflow understands `BROKER_LOGIN_ONLY=none` (no AlgoTest login). It does from
@@ -155,18 +161,38 @@ export function effective(settings: AutomationSettings, key: RowKey): Row {
  */
 export const WORKFLOW_KNOWS_NONE = true;
 
-export function githubVariables(settings: AutomationSettings): Record<string, string> {
+export interface GithubPlan {
+  vars: Record<string, string>;
+  /** what the page asked for that the workflow cannot do yet: reported, never claimed as done */
+  withheld: string[];
+}
+
+export function githubVariables(settings: AutomationSettings): GithubPlan {
   const on = (p: Platform) => BROKERS.filter((b) => effective(settings, `${p}.${b}`).login);
   const algotest = on('algotest');
   const quantiply = on('quantiply');
   const only =
     algotest.length === BROKERS.length ? '' : algotest.length === 1 ? (algotest[0] ?? '') : 'none';
+  const withheld: string[] = [];
+  if (only === 'none' && !WORKFLOW_KNOWS_NONE) {
+    withheld.push(
+      'no AlgoTest login: the workflow cannot skip AlgoTest yet (BL-140 Phase 3), BROKER_LOGIN_ONLY left as it was',
+    );
+  }
+  if (!WORKFLOW_KNOWS_NONE && !settings.masters.logins) {
+    withheld.push(
+      'logins off: the workflow does not read BROKER_LOGIN_ENABLED yet (BL-140 Phase 3)',
+    );
+  }
   return {
-    BROKER_LOGIN_ENABLED: settings.masters.logins ? 'on' : 'off',
-    ALGOTEST_BROKERS: algotest.join(','),
-    QUANTIPLY_BROKERS: quantiply.join(','),
-    ...(only === 'none' && !WORKFLOW_KNOWS_NONE ? {} : { BROKER_LOGIN_ONLY: only }),
-    QUANTIPLY_LOGIN: quantiply.length ? 'on' : 'off',
+    vars: {
+      BROKER_LOGIN_ENABLED: settings.masters.logins ? 'on' : 'off',
+      ALGOTEST_BROKERS: algotest.join(','),
+      QUANTIPLY_BROKERS: quantiply.join(','),
+      ...(only === 'none' && !WORKFLOW_KNOWS_NONE ? {} : { BROKER_LOGIN_ONLY: only }),
+      QUANTIPLY_LOGIN: quantiply.includes('angelone') ? 'on' : 'off',
+    },
+    withheld,
   };
 }
 
@@ -180,7 +206,8 @@ const execFileP = promisify(execFile);
  */
 export const realGh: GhRunner = async (args) => {
   await execFileP('gh', args, {
-    timeout: 60_000,
+    // Five calls per save must finish inside the API's idle timeout (api.ts, 255 s).
+    timeout: 40_000,
     env: { ...process.env, PATH: jobPath(process.env.PATH) },
   });
 };
@@ -193,23 +220,32 @@ export async function syncGithub(
   settings: AutomationSettings,
   gh: GhRunner = realGh,
 ): Promise<string> {
-  const vars = githubVariables(settings);
+  const { vars, withheld } = githubVariables(settings);
   const failed: string[] = [];
+  const message = (error: unknown) =>
+    error instanceof Error ? (error.message.split('\n')[0] ?? '') : String(error);
   for (const [name, value] of Object.entries(vars)) {
     try {
-      if (value === '') await gh(['variable', 'delete', name]).catch(() => undefined);
-      else await gh(['variable', 'set', name, '--body', value]);
+      if (value === '') {
+        // Deleting a variable that is not there is fine (it reads as empty); anything else is not.
+        await gh(['variable', 'delete', name]).catch((error: unknown) => {
+          const text =
+            error instanceof Error
+              ? `${error.message} ${String((error as { stderr?: unknown }).stderr ?? '')}`
+              : String(error);
+          if (!/not found|404/i.test(text)) throw error;
+        });
+      } else await gh(['variable', 'set', name, '--body', value]);
     } catch (error) {
-      failed.push(
-        `${name}: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`,
-      );
+      failed.push(`${name}: ${message(error)}`);
     }
   }
-  return failed.length
-    ? `FAILED ${failed.length}/${Object.keys(vars).length}: ${failed.join('; ')}`
-    : `ok: ${Object.entries(vars)
-        .map(([k, v]) => `${k}=${v || '(unset)'}`)
-        .join(' ')}`;
+  if (failed.length)
+    return `FAILED ${failed.length}/${Object.keys(vars).length}: ${failed.join('; ')}`;
+  if (withheld.length) return `PARTIAL: ${withheld.join('; ')}`;
+  return `ok: ${Object.entries(vars)
+    .map(([k, v]) => `${k}=${v || '(unset)'}`)
+    .join(' ')}`;
 }
 
 /** The versioned store, in the scheduler's SQLite file (its own connection; WAL). */
