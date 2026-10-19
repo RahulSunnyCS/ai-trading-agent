@@ -93,6 +93,21 @@ npm run typecheck
 - `src/run-plan.ts` — main.ts's pure decisions: whether Quantiply runs first, last or not at all (`quantiplyOrder`), and the exit code (`exitCode`)
 - `src/quantiply-rules.ts` — the browser-free half: URLs, the logged-in/Angel-page URL predicates, error classification, the retry rule (wrong PIN: never; TOTP refused: once, next window; anything else: once only if the credentials were not sent yet), `QUANTIPLY_LOGIN` parsing
 
+## Quantiply algos: upload (BL-139)
+
+- `src/quantiply-upload.ts` (+ pure `src/quantiply-plan.ts`, API client `src/quantiply-api.ts`) puts the day's Core
+  rotation picks into Quantiply as algos through Quantiply's own API, the calls its web app makes
+  (`docs/algotest-execution.md`, "Quantiply algos through its API").
+  - It logs in with `quantiplyLogin` (Angel One, TOTP) in a browser, reads the web app's JWT from local storage,
+    closes the browser, and calls the API with `authorization: Bearer <JWT>`. The token is registered as a secret
+    and never logged.
+  - Quantiply keeps one algo per weekday, so the ledger (`TRADING_DATA_ROOT/rotation/quantiply/ledger.jsonl`) is
+    keyed by algo id. Only ids in it are ever deleted, and only when Quantiply shows them finished and not enabled
+    for a later day.
+  - Every created algo is read back (`GET /algos/:id`) and compared field by field (`readBackDiffs`).
+  - `--apply` needs `QUANTIPLY_UPLOAD=on`; Telegram type `broker.quantiply`. It never enables (deploys) an algo.
+  - It reads `latest-core.json`, written by `obt rotation quantiply-export`.
+
 ## AlgoTest strategies: upload (BL-137) and deploy (BL-138)
 
 - `src/strategy-upload.ts` (+ pure `src/strategy-plan.ts`) puts the day's rotation picks into AlgoTest as saved

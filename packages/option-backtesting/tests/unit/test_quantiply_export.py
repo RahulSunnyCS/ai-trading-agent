@@ -15,7 +15,6 @@ import pytest
 
 from option_backtesting.legwise.quantiply import (
     EXECUTION,
-    TRAIL_POINTS,
     Unmappable,
     comparable,
     leg_uid,
@@ -151,14 +150,14 @@ def test_re_entry_at_cost_is_quantiplys_recost():
     assert leg["reEntry"] == sample == {"repeat": 2, "type": "RE_ENTRY_COST"}
 
 
-def test_trail_in_points_is_marked_unconfirmed():
-    e = to_quantiply(_spec(leg={"trail_sl": {"points": [15, 10]}}), days=["MON"])
-    assert e.body["configurations"]["legs"][0]["trailingStoploss"] == {
-        "type": "PER_POSITION_POINT",
-        "moveBy": 15,
-        "trailBy": 10,
-    }
-    assert e.unconfirmed == [TRAIL_POINTS]
+def test_trail_in_points_is_quantiplys_point_trail():
+    """The owner's test1 (2026-10-19): a percent stop with a trail in points, saved as sent."""
+    fix = _fixture("trail_points")
+    assert fix["request_leg"]["trailingStoploss"] == fix["saved_leg"]["trailingStoploss"]
+    e = to_quantiply(_spec(leg={"trail_sl": {"points": [10, 5]}}), days=["MON"])
+    leg = e.body["configurations"]["legs"][0]
+    assert leg["trailingStoploss"] == fix["saved_leg"]["trailingStoploss"]
+    assert e.unconfirmed == []
 
 
 def test_leg_ids_are_stable_and_distinct():
@@ -201,16 +200,11 @@ def test_days_must_be_weekdays():
 
 
 def test_every_core_variant_maps():
-    """Core-298 uses only mapped settings; a new setting fails here. Trail in points is the one
-    mapping not yet seen saved, so those variants export but are marked unconfirmed."""
+    """Core-298 uses only mapped settings, all seen saved; a new setting fails here."""
     files = sorted(STRATEGIES_DIR.glob("*.yaml"))
     assert len(files) == 298
-    unconfirmed = set()
     for path in files:
-        e = to_quantiply(load_legwise(path), path.stem, ["MON"])
-        if e.unconfirmed:
-            unconfirmed.add(path.stem.rsplit("_", 1)[0])
-    assert unconfirmed == {"N_buy", "S_buy"}
+        assert to_quantiply(load_legwise(path), path.stem, ["MON"]).unconfirmed == []
 
 
 def test_read_back_ignores_server_defaults_but_not_changed_fields():

@@ -747,7 +747,7 @@ Owner (2026-10-19): add the Core Adaptive picks to Quantiply (Angel One) too, on
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.32.1 | Phase 1: capture the web app's calls (create, list, read, delete, auth) with the owner | owner + claude | **Done 2026-10-19** (`docs/algotest-execution.md`, `tests/fixtures/quantiply/`); the enable (deploy) call is not sent |
-| 3.32.2 | Phase 2: `legwise/quantiply.py` + `obt rotation quantiply-export`: YAML → `POST /algos` body, the owner's execution settings, unmapped settings refused | claude | **Built 2026-10-19** (25 tests); all of Core-298 maps; Buy shapes' trail in points is unconfirmed, so they cannot be uploaded yet |
-| 3.32.3 | Phase 3: uploader over the API (ledger, read-back, delete only its own) + scheduler jobs | claude | Planned |
+| 3.32.2 | Phase 2: `legwise/quantiply.py` + `obt rotation quantiply-export`: YAML → `POST /algos` body, the owner's execution settings, unmapped settings refused | claude | **Built 2026-10-19** (25 tests); all of Core-298 maps, trail in points confirmed by the owner's `test1` |
+| 3.32.3 | Phase 3: uploader over the API (ledger by algo id, read-back, delete only its own finished algos) + jobs `quantiply-evening` 16:45, `quantiply-topup` 09:19 | claude | **Built 2026-10-19** (`src/quantiply-upload.ts`, 12 planner tests), off until `QUANTIPLY_UPLOAD=on`; never run against Quantiply yet: the owner's first dry run, then a supervised `--apply`; restart the scheduler after merge |
 | 3.32.4 | Phase 4: deploy (`enabled`), built but off | claude | Planned |
 

@@ -12,9 +12,11 @@ made on 2026-10-19 (`tests/fixtures/quantiply/`, contract in `docs/algotest-exec
 - the owner's own `N_ITM1_SL21_3000`, whose execution settings every export copies (owner,
   2026-10-19): limit orders with a buffer of 3, product D, SL limit buffer 1, a 3 s exit delay.
 
-A trail in points (`PER_POSITION_POINT`) is in the web app's code and is Quantiply's form for a
-points stop, but no trailing stop in points was seen saved: such an export lists it in
-`Export.unconfirmed`, and the uploader refuses an export with anything unconfirmed.
+- the owner's `test1` (2026-10-19), saved to confirm a trail in points: `trailingStoploss` with
+  `type: "PER_POSITION_POINT"` beside a percent stop, as the Buy shapes need.
+
+A mapping taken from the web app's code but never seen saved would go in `Export.unconfirmed`,
+which the uploader refuses; none is left.
 
 Anything else that is set (a target, re-entry asap or on target, roll, a range breakout on the
 index or with a gap or valid-until, next-weekly or monthly expiry, complete square-off,
@@ -51,8 +53,6 @@ EXECUTION: dict = {
     "errorAutoSquareOff": True,
 }
 PRODUCT = "D"
-
-TRAIL_POINTS = "trail in points (PER_POSITION_POINT trailing never seen saved)"
 
 _ID_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
@@ -147,8 +147,6 @@ def _leg(spec: LegwiseStrategy, leg: Leg, unconfirmed: list[str]) -> dict:
             kind, (x, y) = "PER_POSITION_PERCENT", leg.trail_sl.percent
         else:
             kind, (x, y) = "PER_POSITION_POINT", leg.trail_sl.points
-            if TRAIL_POINTS not in unconfirmed:
-                unconfirmed.append(TRAIL_POINTS)
         out["trailingStoploss"] = {"type": kind, "moveBy": _num(x), "trailBy": _num(y)}
 
     if leg.reentry_on_sl is not None:

@@ -198,8 +198,8 @@ Otherwise:
   leg `reEntry: RE_ENTRY_COST`. A range breakout is a leg `orb: ORB_INSTRUMENT` with `orbEndTime`. Every body copies
   the execution settings of the owner's own `N_ITM1_SL21_3000` (`EXECUTION`: limit orders with buffer 3, product D,
   SL limit 1, a 3 s exit delay). One algo per weekday, so a body carries the session's weekday only. A trail in points
-  is listed in `Export.unconfirmed` (never seen saved; only the Buy shapes use it) and the uploader must refuse it.
-  Anything else that is set raises `Unmappable`.
+  is `PER_POSITION_POINT` (confirmed by the owner's `test1`). `Export.unconfirmed` lists any mapping never seen
+  saved, which the uploader refuses; none is left. Anything else that is set raises `Unmappable`.
 - `api/legwise_routes.py` — `/legwise/*` on `obt-api` for the dashboard's Options Lab: `/day` and `/anatomy` (see above; `/anatomy` also overlays apps/server's T-33 `daily_regime_tags` as `t33` when `DATABASE_URL` is set in this process, with an explicit status), list/
   validate/save strategies (slug-checked name, `yaml.safe_dump` of the validated model — never
   raw client text), ad-hoc backtest over collected days, saved results, data/token status, and

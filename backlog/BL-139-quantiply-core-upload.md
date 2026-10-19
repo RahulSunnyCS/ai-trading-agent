@@ -175,6 +175,18 @@ only if the API cannot be used.
 
 ## Log
 
+- 2026-10-19 — Phase 3 built:
+  - The trail in points is confirmed. The owner's `test1` saved `PER_POSITION_POINT` trailing beside a percent stop (fixture `trail_points.json`). No mapping is left unconfirmed.
+  - `src/quantiply-upload.ts`, `quantiply-plan.ts` and `quantiply-api.ts` in `packages/broker-login`:
+    - logs in through Angel One in a browser, takes the web app's JWT (`authorization: Bearer`) and closes the browser;
+    - lists, creates, reads back and deletes over the API;
+    - the ledger is keyed by algo id;
+    - evening deletes only the tool's algos that are finished and not enabled for a later day.
+  - Jobs: `quantiply-evening` 16:45 and `quantiply-topup` 09:19 (a minute clear of the pick's Angel One work). Off until `QUANTIPLY_UPLOAD=on`.
+  - Not yet run against Quantiply. Still to do:
+    - the owner's dry run;
+    - whether a scripted login signs out the owner's own browser session.
+  - The owner's two test algos (`test` Tue, `test1` Mon) are still in Quantiply, for the owner to delete.
 - 2026-10-19 — Phase 2 built:
   - `legwise/quantiply.py` (`to_quantiply`, `comparable` for the read-back) and `rotation/quantiply_export.py` + `obt rotation quantiply-export` (Core only).
   - Execution settings are copied from the owner's `N_ITM1_SL21_3000` (owner's choice): limit orders with buffer 3, product D, SL limit 1, exit delay 3 s.
