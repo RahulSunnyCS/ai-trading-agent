@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner changes which list runs on which platform by asking for code changes; the daily jobs should follow a setting instead |
-| **Status** | Planned — layout and storage answered 2026-10-19 |
+| **Status** | In progress — started 2026-10-19; Phase 1 |
 | **Type** | feature |
 | **Area** | dashboard + scheduler + broker-login + options |
 | **Created** | 2026-10-19 |
 | **Depends on** | BL-137 (AlgoTest upload), BL-139 (Quantiply upload), BL-012 (scheduler and its API) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | §3.33 |
 
 ## Context
 
@@ -33,9 +33,14 @@ Today all of this is fixed in code and in switches:
 |---|---|
 | Layout | **One row per platform + broker**: AlgoTest · Shoonya, AlgoTest · Angel One, Quantiply · Angel One, Quantiply · Shoonya. Each row has its own on/off and its own list |
 | Storage | **The scheduler's database** (its SQLite), through its loopback API, which the dashboard's Jobs page already uses. Every job reads the settings when it runs |
+| Master switches (asked at the start) | **Three, independent of the rows:** "Automated logins" (the 08:00 run and its GitHub backstop), "Automated uploads" (evening and 09:16 top-up uploads) and "Automated deployment" (BL-138 / BL-139 Phase 4). With a master switch off, no row can turn that kind of automation on |
+| The 08:15 GitHub backstop | **Save also sets the repository variables** the workflow reads (`BROKER_LOGIN_ONLY`, `QUANTIPLY_LOGIN`, plus a new on/off for logins), through `gh variable set` on the laptop, so the backstop obeys the page too |
+| The `.env` switches | **Kept as hard safety:** `ALGOTEST_UPLOAD`, `QUANTIPLY_UPLOAD` and `ALGOTEST_DEPLOY`. The page decides what runs, but nothing changes a platform unless its `.env` switch is also on |
+| Quantiply · Shoonya | **Build its login in this item.** Quantiply logs in only through Angel One today; the Shoonya route needs a capture of that login with the owner |
 
 ## Goal
 
+- Three master switches on the page: automated logins, automated uploads, automated deployment.
 - A dashboard page, Settings › Automation, where the owner sets, for each platform + broker row:
   - log in at 08:00 (on/off);
   - list: none, Adaptive Classic (Core) or Adaptive Tuned (T1);
@@ -61,7 +66,14 @@ Today all of this is fixed in code and in switches:
     - one list per row;
     - Quantiply · Shoonya allowed: Quantiply supports Shoonya as a paid plan (BL-118).
   - Add `GET /settings/automation` (current version plus history) and `PUT /settings/automation`, which validates and writes a new version, on the scheduler API.
+  - The master switches `logins`, `uploads` and `deploy` are stored in the same versioned object.
   - Add a CLI, `jobs settings show|set`.
+  - **On Save:** sync the GitHub repository variables the 08:15 backstop reads. Variables:
+    - `BROKER_LOGIN_ONLY` (finvasia / angelone / empty);
+    - `QUANTIPLY_LOGIN` (on / off);
+    - a new `BROKER_LOGIN_ENABLED` (on / off), which the workflow checks before logging in at all.
+
+    The sync is done with `gh variable set` on the laptop. A failed sync is shown on the page and alerted; the saved version stands.
   - The first version is seeded from today's setup: Quantiply · Angel One = Core, upload on; AlgoTest · Shoonya = T1, upload on; AlgoTest · Angel One login on, no list; Quantiply · Shoonya off.
 - **Done when:** the API round-trips and refuses bad input (tests), and the history is append-only.
 
@@ -88,6 +100,13 @@ Today all of this is fixed in code and in switches:
   - **Records:** each ledger row and Telegram message records the settings version used.
 - **Done when:** switching Quantiply · Angel One from Core to T1 in the page makes the next evening run replace Core's algos with T1's. Checked in a dry run.
 
+### Phase 3b — Quantiply login through Shoonya (owner, 2026-10-19)
+- **Tasks:**
+  - Capture Quantiply's Shoonya (Finvasia) login flow with the owner. This needs the Shoonya plan on Quantiply to be active.
+  - Add `quantiplyLogin` for Finvasia beside the Angel One one: its own selectors, TOTP from the `SHOONYA_*` secrets, and the same rules (never screenshot logged-in pages).
+  - The 08:00 run logs in Quantiply · Shoonya when its row is on.
+- **Done when:** a supervised 08:00 run logs Quantiply in through Shoonya.
+
 ### Phase 4 — More settings that help the automation (the owner asked what else; proposed)
 - **Lots multiplier per row:** written into each strategy's quantity, or Quantiply's `multiplier`. Today it is 1 and the owner changes it by hand when deploying.
 - **Buy add-on per row:** on/off. Today it is always included.
@@ -110,4 +129,11 @@ Today all of this is fixed in code and in switches:
 
 ## Log
 
+- 2026-10-19 — Started ("Start BL-140"). Answers:
+  - three master switches (logins, uploads, deployment);
+  - Save also sets the GitHub variables, so the 08:15 backstop follows the page;
+  - the `.env` switches stay as hard safety;
+  - Quantiply · Shoonya's login is built here (Phase 3b).
+
+  Phase 1 begins.
 - 2026-10-19 — Created from the owner's request. Layout and storage answered: one row per platform + broker, in the scheduler's database. Phase 4 lists the extra settings proposed when the owner asked what else would help.
