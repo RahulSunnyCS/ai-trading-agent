@@ -464,7 +464,7 @@ const BASE_JOBS: Job[] = [
     retryDelayMinutes: 0,
     catchUpHours: 0,
     fixHint:
-      'Deploy the picks by hand on algotest.in/live; then: cd packages/broker-login && node_modules/.bin/tsx src/strategy-deploy.ts --latest t1  (dry run)',
+      "First read each pick's Deployed count on algotest.in/live (the alert says what it showed): a pick that is already deployed must not be deployed again. Deploy only the rest by hand; then: cd packages/broker-login && node_modules/.bin/tsx src/strategy-deploy.ts --latest t1  (dry run)",
   },
   {
     id: 'algotest-deploy-check',

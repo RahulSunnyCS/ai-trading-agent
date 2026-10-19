@@ -247,7 +247,7 @@ export const fyersLogin = {
  */
 export const strategyPage = {
   importInput: (page: Page): Locator => page.locator('input[type=file][accept*=".algtst"]'),
-  importButton: (page: Page): Locator => page.getByText('Import .algtst'),
+  importButton: (page: Page): Locator => page.getByText('Import .algtst').first(),
   newStrategy: (page: Page): Locator => page.getByText('New Strategy').first(),
   title: (page: Page, name: string): Locator => page.getByText(name, { exact: true }).first(),
   saveButton: (page: Page): Locator => page.getByRole('button', { name: /Save Strategy/ }),
