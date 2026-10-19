@@ -6,8 +6,10 @@ import { sendText } from '@trading/notify';
 import { type Page, type Response, chromium } from 'playwright';
 import { BASE_URL, algotestLogin } from './algotest.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
+import { parseCards, parseLive, stillDeployed } from './deploy-plan.js';
 import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { redact, registerSecret } from './secrets.js';
+import { livePage, strategyPage } from './selectors.js';
 import {
   type LedgerRow,
   type Manifest,
@@ -32,9 +34,9 @@ import {
  * `--dir` is a folder written by `obt rotation algotest-export` (manifest.json + one .algtst per
  * pick). Without `--apply` it logs in, reads what AlgoTest has and prints the plan, changing
  * nothing. Deleting also needs `--allow-delete` until the delete dialog has been seen in a
- * supervised run. `ALGOTEST_UPLOAD=off` stops it before login. The ledger (`--ledger`, default
- * `<dir>/../../ledger.jsonl`, i.e. TRADING_DATA_ROOT/rotation/algotest/ledger.jsonl) records every
- * upload and delete; only strategies in it are ever deleted.
+ * supervised run. `--apply` needs `ALGOTEST_UPLOAD=on`. The ledger (`--ledger`, default
+ * TRADING_DATA_ROOT/rotation/algotest/ledger.jsonl) records every upload and delete; only
+ * strategies in it are ever deleted. Locators: `strategyPage` / `livePage` in selectors.ts.
  *
  * Website steps, as seen on 2026-10-19 (BL-137 Log): /backtest at desktop width has a hidden file
  * input (accept ".algtst,.json") behind "Import .algtst"; "Save Strategy" opens "Save New
@@ -58,33 +60,30 @@ async function existingNames(page: Page): Promise<Set<string>> {
   return namesIn(await (await listed).json());
 }
 
-/** Names AlgoTest shows as deployed on /live. A row that cannot be read counts as deployed. */
+/**
+ * Names AlgoTest shows as still deployed on /live: "n Deployed" above zero AND a card that could be
+ * it is not squared off (the count may include finished instances). Unreadable counts as deployed.
+ */
 async function deployedNames(page: Page, candidates: string[]): Promise<Set<string>> {
   const out = new Set<string>();
   if (!candidates.length) return out;
   await page.goto(`${BASE_URL}/live`, { waitUntil: 'domcontentloaded' });
-  await page
-    .getByText('Activation', { exact: true })
+  await livePage
+    .anyRowCount(page)
     .waitFor({ timeout: 30_000 })
     .catch(() => undefined);
-  for (const name of candidates) {
-    const row = page
-      .locator('div')
-      .filter({ hasText: name })
-      .filter({ hasText: /\d+ Deployed/ })
-      .last();
-    const text = await row.innerText({ timeout: 5_000 }).catch(() => '');
-    const n = /(\d+) Deployed/.exec(text);
-    if (!n || Number(n[1]) > 0) out.add(name);
-  }
+  const text = await page.evaluate(() => document.body.innerText);
+  const live = parseLive(text);
+  const cards = parseCards(text);
+  for (const name of candidates) if (stillDeployed(name, live, cards)) out.add(name);
   return out;
 }
 
 async function freshBuilder(page: Page): Promise<void> {
   await page.goto(`${BASE_URL}/backtest`, { waitUntil: 'domcontentloaded' });
-  const importButton = page.getByText('Import .algtst');
+  const importButton = strategyPage.importButton(page);
   if (!(await importButton.isVisible({ timeout: 10_000 }).catch(() => false))) {
-    await page.getByText('New Strategy').first().click();
+    await strategyPage.newStrategy(page).click();
     await importButton.waitFor({ timeout: 15_000 });
   }
 }
@@ -92,42 +91,45 @@ async function freshBuilder(page: Page): Promise<void> {
 /** Import, save under `w.name`, then export it back and compare. Returns the read-back verdict. */
 async function uploadOne(page: Page, w: Wanted, sent: unknown): Promise<string> {
   await freshBuilder(page);
-  await page.locator('input[type=file][accept*=".algtst"]').setInputFiles(w.file);
-  await page.getByText(w.name, { exact: true }).first().waitFor({ timeout: 15_000 });
+  await strategyPage.importInput(page).setInputFiles(w.file);
+  await strategyPage.title(page, w.name).waitFor({ timeout: 15_000 });
 
-  await page.getByRole('button', { name: /Save Strategy/ }).click();
-  await page.getByText('Save New Strategy').waitFor({ timeout: 10_000 });
-  const field = page.getByText('Strategy Name:').locator('xpath=following::input[1]');
-  await field.fill(w.name);
+  await strategyPage.saveButton(page).click();
+  await strategyPage.saveDialog(page).waitFor({ timeout: 10_000 });
+  await strategyPage.saveName(page).fill(w.name);
   const saved = page.waitForResponse(
     (r: Response) =>
       /api\.algotest\.in\/strategy(\?|$)/.test(r.url()) && r.request().method() !== 'GET',
     { timeout: 20_000 },
   );
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await strategyPage.saveDone(page).click();
   const response = await saved;
   if (!response.ok()) throw new Error(`save answered ${response.status()}`);
-  await page.getByText('Strategy Saved').waitFor({ timeout: 10_000 });
+  await strategyPage.savedToast(page).waitFor({ timeout: 10_000 });
 
   const download = page.waitForEvent('download', { timeout: 20_000 });
-  await page.getByText('Export .algtst').click();
+  await strategyPage.exportButton(page).click();
   const path = await (await download).path();
   const back = JSON.parse(await readFile(path, 'utf8'));
-  return comparable(back) === comparable(sent) ? 'read back: identical' : 'READ-BACK DIFFERS';
+  return comparable(back) === comparable(sent) ? READ_BACK_OK : 'READ-BACK DIFFERS';
 }
 
+const READ_BACK_OK = 'read back: identical';
+
+/** PROVISIONAL (the delete dialog has not been seen): behind --allow-delete. */
 async function deleteOne(page: Page, name: string): Promise<void> {
   await page.goto(`${BASE_URL}/backtest`, { waitUntil: 'domcontentloaded' });
-  await page.getByPlaceholder('Search Strategies').fill(name);
-  const row = page.locator('div').filter({ hasText: name }).last();
-  await row.locator('svg, button').last().click();
+  await strategyPage.search(page).fill(name);
+  await strategyPage.rowMenu(page, name).click();
+  const item = strategyPage.rowMenuDelete(page);
+  await item.waitFor({ timeout: 5_000 }); // the right menu opened: "Add to folder" beside "Delete"
   const deleted = page.waitForResponse(
     (r: Response) =>
       /api\.algotest\.in\/strateg/.test(r.url()) && r.request().method() === 'DELETE',
     { timeout: 20_000 },
   );
-  await page.getByText('Delete', { exact: true }).last().click();
-  const confirm = page.getByRole('button', { name: /^(Delete|Yes|Confirm)/ }).last();
+  await item.click();
+  const confirm = strategyPage.deleteConfirm(page).last();
   if (await confirm.isVisible({ timeout: 3_000 }).catch(() => false)) await confirm.click();
   const response = await deleted;
   if (!response.ok()) throw new Error(`delete answered ${response.status()}`);
@@ -177,7 +179,14 @@ async function main(): Promise<number> {
   }
   const mode = values.mode as Mode;
   const dir = resolve(exportDir);
-  const ledgerPath = values.ledger ? resolve(values.ledger) : join(dir, '..', '..', 'ledger.jsonl');
+  const dataRoot = process.env.TRADING_DATA_ROOT?.trim();
+  if (!values.ledger && !dataRoot) {
+    console.error('the ledger lives under TRADING_DATA_ROOT: set it, or pass --ledger');
+    return 1;
+  }
+  const ledgerPath = values.ledger
+    ? resolve(values.ledger)
+    : join(dataRoot ?? '', 'rotation', 'algotest', 'ledger.jsonl');
   const manifest = await readJson<Manifest>(join(dir, 'manifest.json'));
   const today = istToday();
   const fits =
@@ -255,8 +264,12 @@ async function main(): Promise<number> {
       await appendFile(ledgerPath, `${JSON.stringify(row)}\n`, 'utf8');
     };
 
+    // A changed strategy is deleted and uploaded again; if its delete does not happen, uploading
+    // would leave two strategies with one name, so the upload is skipped too.
+    const notDeleted = new Set<string>();
     for (const name of p.delete) {
       if (!values['allow-delete']) {
+        notDeleted.add(name);
         lines.push(`skipped delete (no --allow-delete): ${name}`);
         continue;
       }
@@ -266,6 +279,7 @@ async function main(): Promise<number> {
         lines.push(`deleted ${name}`);
       } catch (error) {
         failed = true;
+        notDeleted.add(name);
         await record('delete', name, '', false, describe(error));
         await safeScreenshot(page, 'delete-failed');
         await dumpHtml(page, 'delete-failed');
@@ -273,10 +287,16 @@ async function main(): Promise<number> {
       }
     }
     for (const w of p.upload) {
+      if (notDeleted.has(w.name)) {
+        failed = true;
+        lines.push(`NOT re-uploaded, the old copy is still there: ${w.name}`);
+        continue;
+      }
       try {
         const verdict = await uploadOne(page, w, docs.get(w.name));
-        const ok = verdict.endsWith('identical');
-        await record('upload', w.name, w.sha, true, verdict);
+        const ok = verdict === READ_BACK_OK;
+        // Saved but not as sent: owned (so it can be replaced), under a sha no export will match.
+        await record('upload', w.name, ok ? w.sha : `mismatch:${w.sha}`, true, verdict);
         if (!ok) failed = true;
         lines.push(`${ok ? '✅' : '❌'} uploaded ${w.name} (${verdict})`);
       } catch (error) {

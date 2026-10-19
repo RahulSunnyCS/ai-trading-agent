@@ -191,7 +191,6 @@ def test_day_export_writes_files_manifest_and_zip(tmp_path):
         ["N_buy-t1s47_0917"],
     )
     exports = ax.build(picks)
-    (tmp_path / "stale.algtst").write_text("{}")
     zip_path = ax.write(picks, exports, tmp_path)
 
     assert sorted(p.name for p in tmp_path.glob("*.algtst")) == sorted(
@@ -227,3 +226,22 @@ def test_recorded_picks_read_the_tracks_journal(tmp_path, monkeypatch):
     assert picks.core == ["N_wide_0917"] and picks.source == "recorded"
     assert seen["path"] == tmp_path / "rotation" / "track_t1" / "journal.jsonl"
     assert ax.recorded_picks(date(2026, 10, 20), "t1", tmp_path) is None
+
+
+def test_write_never_deletes_files_it_did_not_write(tmp_path):
+    """BL-137 review: `--out ~/Downloads` must not delete the owner's other exports."""
+    picks = ax.DayPicks(date(2026, 10, 19), "t1", "given", ["N_p150-t1s11_0917"], [])
+    exports = ax.build(picks)
+    mine = tmp_path / "owners_own.algtst"
+    mine.write_text("{}")
+    with pytest.raises(FileExistsError):
+        ax.write(picks, exports, tmp_path)
+    assert mine.exists()
+
+    folder = tmp_path / "export"
+    ax.write(picks, exports, folder)
+    (folder / "kept.algtst").write_text("{}")  # dropped in later by hand
+    later = ax.DayPicks(date(2026, 10, 19), "t1", "given", ["N_ditm1-t1s36_0947"], [])
+    ax.write(later, ax.build(later), folder)
+    names = sorted(p.name for p in folder.glob("*.algtst"))
+    assert names == ["N_ditm1-t1s36_0947.algtst", "kept.algtst"]

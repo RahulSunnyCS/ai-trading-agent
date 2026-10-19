@@ -101,7 +101,8 @@ npm run typecheck
   (`TRADING_DATA_ROOT/rotation/algotest/ledger.jsonl`) says it uploaded, and never one deployed on /live.
 - `src/strategy-deploy.ts` (+ pure `src/deploy-plan.ts`) deploys the day's recorded picks on /live. `--apply`
   and `--check` need `ALGOTEST_DEPLOY=on`. It stops at anything "Activate" opens that it has not seen.
-- Both read `latest-<book>.json`, written by `obt rotation algotest-export`. The page contract is in
+- Their locators are `strategyPage` and `livePage` in `src/selectors.ts`, like every other. Both read
+  `latest-<book>.json`, written by `obt rotation algotest-export`. The page contract is in
   `docs/algotest-execution.md` §7. Use a desktop viewport (1440 x 900): below about 500 px AlgoTest hides "Save
   Strategy".
 

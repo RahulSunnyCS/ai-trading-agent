@@ -54,6 +54,16 @@ export function istMinutes(now: Date = new Date()): number {
   return ist.getUTCHours() * 60 + ist.getUTCMinutes();
 }
 
+/** Seconds from `now` until the start of the `entry` minute (IST); negative once it has come. */
+export function secondsUntil(entry: number, now: Date = new Date()): number {
+  const ist = new Date(now.getTime() + 330 * 60_000);
+  const secs = ist.getUTCHours() * 3600 + ist.getUTCMinutes() * 60 + ist.getUTCSeconds();
+  return entry * 60 - secs;
+}
+
+/** The last moment a pick may still be activated: 30 s before its entry minute. */
+export const ACTIVATE_LEAD_SECONDS = 30;
+
 export function planDeploy(picks: Pick[], live: LiveState, now: number): DeployPlan {
   const out: DeployPlan = {
     refused: null,
@@ -96,8 +106,47 @@ export function repeating(live: LiveState): string[] {
     .map((r) => r.name);
 }
 
+// The ticker line ("NIFTY") is sometimes absent (seen at night), so it is optional.
 const ROW =
-  /([^\n]+)\n+[A-Z]+\n+•\n+INTRADAY\n+([^\n]+)\n+(\d+) Deployed\n+((?:[^\n]+\n+){6}[^\n]+)/g;
+  /([^\n]+)\n+(?:[A-Z]+\n+)?•\n+INTRADAY\n+([^\n]+)\n+(\d+) Deployed\n+((?:[^\n]+\n+){6}[^\n]+)/g;
+
+export interface DeployedCard {
+  /** as shown: long names are cut and end in "..." */
+  name: string;
+  state: string;
+}
+
+const CARD = /\n([^\n]+)\n+(?:[A-Z]+\n+)?•\n+Open Pos: \d+\n+([A-Z][A-Z ]*[A-Z])\n/g;
+
+/** The Deployed Strategies cards (above the Activation table) as name and state. */
+export function parseCards(text: string): DeployedCard[] {
+  const start = text.indexOf('Deployed Strategies');
+  const end = text.indexOf('\nActivation\n');
+  if (start < 0) return [];
+  const body = text.slice(start, end > start ? end : undefined);
+  return [...body.matchAll(CARD)].map((m) => ({
+    name: (m[1] ?? '').trim(),
+    state: (m[2] ?? '').trim(),
+  }));
+}
+
+/** A card shows `name` if its text is the name, or the name's start cut with "...". */
+export function cardShows(card: DeployedCard, name: string): boolean {
+  const cut = card.name.replace(/(\.\.\.|…)$/, '');
+  return card.name === name || (cut !== card.name && name.startsWith(cut));
+}
+
+/**
+ * Is `name` deployed and not finished? "n Deployed" alone may still count instances squared off
+ * earlier in the day, so a strategy counts only if a card that could be it is not "SQD OFF". A
+ * cut card name that fits several strategies counts for all of them (never deletes a live one).
+ */
+export function stillDeployed(name: string, live: LiveState, cards: DeployedCard[]): boolean {
+  const row = live.rows.find((r) => r.name === name);
+  if (!row) return true; // unreadable: assume deployed
+  if (row.deployed === 0) return false;
+  return cards.some((c) => cardShows(c, name) && c.state !== 'SQD OFF');
+}
 
 /** The /live page's text (document.body.innerText) as counts and Activation rows. */
 export function parseLive(text: string): LiveState {

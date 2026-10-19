@@ -263,4 +263,9 @@ entry, so the strategies must already be in AlgoTest the evening before.
   run refuses anything but a preview for a later day, the top-up anything but today's recorded picks. The export
   gained `--next` and writes `latest-<book>.json` for the uploader. Phase 4: jobs `algotest-evening` (16:40,
   retried hourly to 20:40) and `algotest-topup` (09:18) registered. Not yet run against AlgoTest.
-
+- 2026-10-19 — code review of PR #264 (10 findings) fixed: a changed strategy is not re-uploaded unless its old copy
+  was deleted (no two strategies with one name); a read-back mismatch is recorded under a `mismatch:` sha so the
+  next evening replaces it; "still deployed" needs a /live card that is not SQD OFF (the "n Deployed" count may
+  include finished instances); the ledger defaults to TRADING_DATA_ROOT, not beside `--dir`; the delete path waits
+  for the ⋮ menu's "Add to folder" before clicking Delete; `algotest-export --out` never deletes files it did not
+  write (it refuses a folder holding other `.algtst` files); every locator moved to `src/selectors.ts`.

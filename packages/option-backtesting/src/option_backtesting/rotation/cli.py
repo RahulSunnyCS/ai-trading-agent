@@ -248,7 +248,11 @@ def algotest_export(
         typer.echo(f"not exported: {error}")
         raise typer.Exit(1) from error
     folder = Path(out) if out else store.rotation_dir() / "algotest" / d.isoformat() / book
-    zip_path = ax.write(picks, exports, folder)
+    try:
+        zip_path = ax.write(picks, exports, folder)
+    except FileExistsError as error:
+        typer.echo(f"not exported: {error}")
+        raise typer.Exit(1) from error
     if not out:  # the uploader (BL-137) reads the newest default export through this pointer
         ax.write_latest(store.rotation_dir() / "algotest", picks, folder)
     typer.echo(ax.render(picks, exports, zip_path))

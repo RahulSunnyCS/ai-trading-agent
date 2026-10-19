@@ -86,10 +86,20 @@ def build(picks: DayPicks) -> list[tuple[str, Export]]:
 
 def write(picks: DayPicks, exports: list[tuple[str, Export]], out: Path) -> Path:
     """Write `<variant>.algtst` per pick, `manifest.json` and `<day>-<book>.zip` into `out`;
-    returns the zip's path. Files from an earlier run in `out` are replaced, never merged."""
+    returns the zip's path. Files from an earlier export in `out` (the ones its `manifest.json`
+    lists) are replaced; any other `.algtst` there is left alone, and a folder holding `.algtst`
+    files with no manifest is refused (`FileExistsError`) rather than overwritten or merged."""
     out.mkdir(parents=True, exist_ok=True)
-    for old in out.glob("*.algtst"):
-        old.unlink()
+    old_manifest = out / "manifest.json"
+    if old_manifest.exists():
+        for entry in json.loads(old_manifest.read_text()).get("strategies", []):
+            (out / Path(entry["file"]).name).unlink(missing_ok=True)
+        for old_zip in out.glob("*-*.zip"):
+            old_zip.unlink()
+    elif any(out.glob("*.algtst")):
+        raise FileExistsError(
+            f"{out} already holds .algtst files that no export wrote; choose an empty folder"
+        )
     files = []
     for variant, export in exports:
         path = out / f"{variant}.algtst"

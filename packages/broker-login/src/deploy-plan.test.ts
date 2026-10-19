@@ -2,11 +2,15 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   type LiveState,
+  cardShows,
   istMinutes,
   minutesOf,
+  parseCards,
   parseLive,
   planDeploy,
   repeating,
+  secondsUntil,
+  stillDeployed,
 } from './deploy-plan.js';
 
 // /live's innerText on 2026-10-19 09:18 IST (trimmed), one strategy deployed by hand.
@@ -208,4 +212,86 @@ test('repeating lists tool strategies with a ticked day', () => {
 
 test('istMinutes is IST whatever the host zone', () => {
   assert.equal(istMinutes(new Date('2026-10-19T03:46:00Z')), minutesOf('09:16'));
+});
+
+test('parseLive reads rows that have no ticker line (as /live showed at night)', () => {
+  const night = PAGE.replace(/\nNIFTY\n\n•\nINTRADAY/g, '\n\n•\nINTRADAY');
+  assert.deepEqual(
+    parseLive(night).rows.map((r) => r.name),
+    parseLive(PAGE).rows.map((r) => r.name),
+  );
+});
+
+// The Deployed Strategies section at 10:09 IST (trimmed): two copies of one strategy, one
+// squared off, and a cut name shared by two strategies.
+const CARDS = `Deployed Strategies
+Switch all to manual
+
+Deployed on 19 OCT 26
+
+Intraday
+
+T1 · N_p150-t1s11_091...
+
+NIFTY
+•
+Open Pos: 1
+RUNNING
+₹ -1,426.75
+Finvasia - Shiny
+Intraday
+
+T1 · N_ditm1-t1s36_09...
+
+NIFTY
+•
+Open Pos: 1
+RUNNING
+₹ 939.25
+Intraday
+
+T1 · N_p150-t1s11_131...
+
+NIFTY
+•
+Open Pos: 0
+SQD OFF
+₹ -4,095
+
+Activation
+`;
+
+test('parseCards reads each card and its state', () => {
+  assert.deepEqual(parseCards(CARDS), [
+    { name: 'T1 · N_p150-t1s11_091...', state: 'RUNNING' },
+    { name: 'T1 · N_ditm1-t1s36_09...', state: 'RUNNING' },
+    { name: 'T1 · N_p150-t1s11_131...', state: 'SQD OFF' },
+  ]);
+});
+
+test('cardShows matches a cut name by its start only', () => {
+  const card = { name: 'T1 · N_ditm1-t1s36_09...', state: 'RUNNING' };
+  assert.equal(cardShows(card, 'T1 · N_ditm1-t1s36_0947'), true);
+  assert.equal(cardShows(card, 'T1 · N_ditm1-t1s36_0932'), true);
+  assert.equal(cardShows(card, 'T1 · N_ditm1-t1s36_1047'), false);
+});
+
+test('stillDeployed: a squared-off instance does not count, a running one does', () => {
+  const live = parseLive(
+    PAGE.replace(
+      'T1 · N_p150-t1s11_1317\n\nNIFTY\n\n•\nINTRADAY\n\nSetup Pending\n\n0 Deployed',
+      'T1 · N_p150-t1s11_1317\n\nNIFTY\n\n•\nINTRADAY\n\nReady to deploy\n\n1 Deployed',
+    ),
+  );
+  const cards = parseCards(CARDS);
+  assert.equal(stillDeployed('T1 · N_p150-t1s11_1317', live, cards), false);
+  assert.equal(stillDeployed('T1 · N_p150-t1s11_0917', live, cards), true);
+  assert.equal(stillDeployed('T1 · N_ditm1-t1s36_0947', live, cards), false); // 0 Deployed
+  assert.equal(stillDeployed('T1 · not on the page', live, cards), true);
+});
+
+test('secondsUntil counts to the start of the entry minute in IST', () => {
+  // 09:16:40 IST = 03:46:40 UTC
+  assert.equal(secondsUntil(minutesOf('09:17'), new Date('2026-10-19T03:46:40Z')), 20);
+  assert.ok(secondsUntil(minutesOf('09:17'), new Date('2026-10-19T03:47:05Z')) < 0);
 });

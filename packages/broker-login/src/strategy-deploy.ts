@@ -7,15 +7,18 @@ import { type Page, chromium } from 'playwright';
 import { BASE_URL, algotestLogin } from './algotest.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
 import {
+  ACTIVATE_LEAD_SECONDS,
   type LiveState,
   type Pick,
   istMinutes,
   parseLive,
   planDeploy,
   repeating,
+  secondsUntil,
 } from './deploy-plan.js';
 import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { redact, registerSecret } from './secrets.js';
+import { livePage } from './selectors.js';
 import { type Manifest, istToday } from './strategy-plan.js';
 
 /**
@@ -47,54 +50,49 @@ function entryOf(doc: unknown): number {
 
 async function readLive(page: Page): Promise<LiveState> {
   await page.goto(`${BASE_URL}/live`, { waitUntil: 'domcontentloaded' });
-  await page.getByText('Strategy Deployed').first().waitFor({ timeout: 30_000 });
-  await page
-    .getByText(/\d+ Deployed$/)
-    .first()
-    .waitFor({ timeout: 30_000 });
+  await livePage.header(page).waitFor({ timeout: 30_000 });
+  await livePage.anyRowCount(page).waitFor({ timeout: 30_000 });
   return parseLive(await page.evaluate(() => document.body.innerText));
 }
 
-async function deployOne(page: Page, name: string): Promise<string> {
-  await page.getByText(name, { exact: true }).first().click();
-  await page
-    .getByRole('button', { name: /^(Setup|Edit) Execution$/ })
-    .first()
-    .click();
-  const sheet = page.getByText(`Edit execution for ${name}`);
+async function deployOne(page: Page, pick: Pick): Promise<string> {
+  const { name } = pick;
+  await livePage.row(page, name).click();
+  await livePage.setupExecution(page).click();
+  const sheet = livePage.sheet(page, name);
   await sheet.waitFor({ timeout: 15_000 });
 
-  // AlgoTest's defaults, checked rather than changed: 1 lot, NRML on every leg, no repeat day.
-  const multiplier = await page.locator('input[type=number]').first().inputValue();
+  // AlgoTest's defaults, checked inside the sheet rather than changed: 1 lot, NRML on every leg,
+  // no execution day ticked (so the deploy is for today only).
+  const multiplier = await sheet.locator('input[type=number]').first().inputValue();
   if (multiplier !== '1') throw new Error(`quantity multiplier is ${multiplier}, not 1`);
-  const products = await page
+  const products = await sheet
     .locator('select')
     .evaluateAll((els) =>
       els.map((e) => (e as HTMLSelectElement).value).filter((v) => v.startsWith('ProductType.')),
     );
   if (!products.length || products.some((v) => v !== 'ProductType.NRML'))
     throw new Error(`leg product types ${products.join(', ')}, expected NRML`);
-  const ticked = await page
+  const ticked = await sheet
     .locator('input[type=checkbox]')
     .evaluateAll((els) => els.filter((e) => (e as HTMLInputElement).checked).length);
   if (ticked > 0) throw new Error(`${ticked} box(es) ticked in the sheet; expected none`);
 
-  await page.getByRole('button', { name: 'Setup Execution Settings' }).click();
+  await livePage.sheetSave(sheet).click();
   await sheet.waitFor({ state: 'hidden', timeout: 15_000 });
 
   const before = (await readLive(page)).rows.find((r) => r.name === name)?.deployed ?? 0;
-  await page.getByText(name, { exact: true }).first().click();
-  await page.getByRole('button', { name: 'Activate', exact: true }).first().click();
+  // The plan checked the time at login; setting up may have taken a while, so check again.
+  const left = secondsUntil(pick.entry);
+  if (left < ACTIVATE_LEAD_SECONDS)
+    throw new Error(`TOO LATE: ${left} s to its entry minute, not activated`);
+  await livePage.row(page, name).click();
+  await livePage.activate(page).click();
 
   // Anything that pops up now (a broker choice, a confirmation) has never been seen: stop.
-  const popup = page.locator('[role=dialog], [class*="fixed bottom-0"]').filter({ hasText: /\w/ });
-  if (
-    await popup
-      .first()
-      .isVisible({ timeout: 4_000 })
-      .catch(() => false)
-  ) {
-    const text = (await popup.first().innerText()).replace(/\s+/g, ' ').slice(0, 200);
+  const popup = livePage.popup(page).first();
+  if (await popup.isVisible({ timeout: 4_000 }).catch(() => false)) {
+    const text = (await popup.innerText()).replace(/\s+/g, ' ').slice(0, 200);
     throw new Error(`Activate opened something not yet seen, not confirmed: ${text}`);
   }
   const after = (await readLive(page)).rows.find((r) => r.name === name)?.deployed ?? 0;
@@ -189,7 +187,7 @@ async function main(): Promise<number> {
         const ledger = join(resolve(dir), '..', '..', 'deploy-ledger.jsonl');
         for (const pick of p.deploy) {
           try {
-            const verdict = await deployOne(page, pick.name);
+            const verdict = await deployOne(page, pick);
             lines.push(`✅ ${pick.name}: ${verdict}`);
             await appendFile(
               ledger,

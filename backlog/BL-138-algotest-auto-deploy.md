@@ -254,4 +254,7 @@ Claude.
   tool strategy has a day ticked. Jobs `algotest-deploy` (09:16, waits up to 120 s for the entry, no retries)
   and `algotest-deploy-check` (15:35) registered, both doing nothing until `ALGOTEST_DEPLOY=on`. Not run against
   AlgoTest; the first `--apply` must be watched by the owner.
-
+- 2026-10-19 — code review fixes: the sheet's default checks (multiplier, NRML, no day ticked) read only inside the
+  "Edit execution for" sheet, not the whole page (page toggles like "Auto restart paused executions" no longer
+  count); `parseLive` accepts rows without the ticker line; the entry time is checked again, to the second, just
+  before each Activate (at least 30 s left, else TOO LATE); locators in `src/selectors.ts` (`livePage`).
