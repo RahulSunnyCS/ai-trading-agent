@@ -147,6 +147,13 @@ export function effective(settings: AutomationSettings, key: RowKey): Row {
  * - `BROKER_LOGIN_ONLY` / `QUANTIPLY_LOGIN`: what the workflow reads today. `ONLY` empty
  *   means both AlgoTest brokers, `none` means neither; Quantiply is on if any of its rows is.
  */
+/**
+ * Whether the workflow understands `BROKER_LOGIN_ONLY=none` (no AlgoTest login). It does from
+ * BL-140 Phase 3 (PR #268); until then `none` would fail the 08:00 run, so the variable is left as
+ * it is and the sync outcome says so.
+ */
+export const WORKFLOW_KNOWS_NONE = false;
+
 export function githubVariables(settings: AutomationSettings): Record<string, string> {
   const on = (p: Platform) => BROKERS.filter((b) => effective(settings, `${p}.${b}`).login);
   const algotest = on('algotest');
@@ -157,7 +164,7 @@ export function githubVariables(settings: AutomationSettings): Record<string, st
     BROKER_LOGIN_ENABLED: settings.masters.logins ? 'on' : 'off',
     ALGOTEST_BROKERS: algotest.join(','),
     QUANTIPLY_BROKERS: quantiply.join(','),
-    BROKER_LOGIN_ONLY: only,
+    ...(only === 'none' && !WORKFLOW_KNOWS_NONE ? {} : { BROKER_LOGIN_ONLY: only }),
     QUANTIPLY_LOGIN: quantiply.length ? 'on' : 'off',
   };
 }
