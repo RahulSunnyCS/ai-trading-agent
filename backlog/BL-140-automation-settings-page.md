@@ -101,9 +101,23 @@ Today all of this is fixed in code and in switches:
 - **Done when:** switching Quantiply · Angel One from Core to T1 in the page makes the next evening run replace Core's algos with T1's. Checked in a dry run.
 
 ### Phase 3b — Quantiply login through Shoonya (owner, 2026-10-19)
+
+Captured 2026-10-19 with the owner in the browser pane. Quantiply on Shoonya is the same web app as on Angel One, on
+Shoonya's own hosts:
+
+| | Angel One | Shoonya (Finvasia) |
+|---|---|---|
+| App | `app.quantiply.angelone.in` | `quantiply.shoonya.com` |
+| Login start | `/auth?resume=/algos` → "Login / Sign Up" | the same |
+| Broker page | `smartapi.angelone.in/publisher-login` (`angelOneForm`) | `api.shoonya.com/OAuthlogin/investor-entry-level/login?…&route_to=QUANTIPLY`: `#lgnusrid`, `#lgnpwd`, `#lgnotp`, `button.lgnBtnClss`, i.e. **exactly `finvasiaForm`** (AlgoTest's Shoonya login) |
+| Lands on | `/algos` | `/algos` |
+| Token | `localStorage["quantiply-dashboard-local"].token`, a JWT valid 9 h | the same key and claims, 9 h |
+| API | `api-prod.quantiply.angelone.in` | `api-prod.quantiply.shoonya.com` (the same paths: `/algos/day-wise`, `/algos/config`, `/brokers`, …) |
+
 - **Tasks:**
-  - Capture Quantiply's Shoonya (Finvasia) login flow with the owner. This needs the Shoonya plan on Quantiply to be active.
-  - Add `quantiplyLogin` for Finvasia beside the Angel One one: its own selectors, TOTP from the `SHOONYA_*` secrets, and the same rules (never screenshot logged-in pages).
+  - Make `quantiply-rules.ts` per broker: the app host, the API host, and the broker login page's URL predicate.
+  - Add `quantiplyLogin` for Finvasia, reusing `finvasiaForm` and the `SHOONYA_*` secrets (TOTP), including its "Authorize" consent screen. The same rules apply: never screenshot logged-in pages.
+  - `QuantiplyApi` takes the API host from the row, so the BL-139 uploader can serve Quantiply · Shoonya with no other change.
   - The 08:00 run logs in Quantiply · Shoonya when its row is on.
 - **Done when:** a supervised 08:00 run logs Quantiply in through Shoonya.
 
@@ -129,6 +143,7 @@ Today all of this is fixed in code and in switches:
 
 ## Log
 
+- 2026-10-19 — Quantiply · Shoonya captured (the owner logged in in the pane). It is the same app, token and API paths, on `quantiply.shoonya.com` / `api-prod.quantiply.shoonya.com`. The broker page is the Shoonya OAuth form AlgoTest already fills (`finvasiaForm`). Phase 3b is now mostly host parameters.
 - 2026-10-19 — Phase 1 built:
   - `apps/scheduler/src/automation.ts`: validation, master gating, the versioned store in `scheduler.db`, and the `automation-settings.json` snapshot for jobs.
   - `GET`/`PUT /settings/automation`, which syncs the GitHub variables on save, and `jobs settings show|set`. 13 tests.
