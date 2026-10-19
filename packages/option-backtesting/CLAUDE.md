@@ -185,6 +185,12 @@ Otherwise:
   tonight's VIX close standing in for the open, under the BL-122 rule for that session, for Core-298 or Core-298 plus a
   track's variants; the message lists those strategies in full. The old history tables, probabilities and likely changes
   are no longer sent (`build`/`Tomorrow` are kept, tested, unused by the message).
+- `legwise/algtst.py` + `rotation/algtst_export.py` — BL-137: a leg-wise strategy as an AlgoTest `.algtst` (import
+  format, one strategy per file) and a day's picks as files + zip (`obt rotation algotest-export`). Every mapping was read
+  off an AlgoTest export in `tests/fixtures/algtst/` (a closest premium is a bare number; re-entry at cost is
+  `ReentryType.AtCost` / `ReentryCount`; a range breakout is `LegMomentum` `MomentumType.DelayedBreadthHigh` with `Time` in
+  minutes after entry); anything else that is set raises `Unmappable`. Not `legwise/algotest.py`, which is BL-009's
+  trade-log comparison.
 - `api/legwise_routes.py` — `/legwise/*` on `obt-api` for the dashboard's Options Lab: `/day` and `/anatomy` (see above; `/anatomy` also overlays apps/server's T-33 `daily_regime_tags` as `t33` when `DATABASE_URL` is set in this process, with an explicit status), list/
   validate/save strategies (slug-checked name, `yaml.safe_dump` of the validated model — never
   raw client text), ad-hoc backtest over collected days, saved results, data/token status, and

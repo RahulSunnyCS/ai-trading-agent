@@ -1,6 +1,6 @@
 """`obt rotation …`: update | pick | verify | show | readout | base (BL-058); triggers,
 triggers-show (BL-083); corr, corr-list, corr-pick (BL-090); update / pick --track t1 and
-track-readout (the T1 parallel track); lot-plans (BL-135)."""
+track-readout (the T1 parallel track); lot-plans (BL-135); algotest-export (BL-137)."""
 
 from __future__ import annotations
 
@@ -187,6 +187,75 @@ def lot_plans_cmd(
         raise typer.BadParameter(f"--book must be one of {', '.join(BOOKS)}")
     r = build(book)
     typer.echo(json.dumps(r, indent=2, default=str) if as_json else render(r, last))
+
+
+@rotation_app.command("algotest-export")
+def algotest_export(
+    day: str | None = typer.Option(None, "--day", help="The session; default: today (IST)."),
+    book: str = typer.Option("t1", "--book", help="t1 (the T1 track) or core (live Adaptive)."),
+    preview: bool = typer.Option(
+        False, "--preview", help="The expected picks for that session, not the recorded ones."
+    ),
+    next_session: bool = typer.Option(
+        False, "--next", help="The session after --day (default today): its expected picks."
+    ),
+    variants: str | None = typer.Option(
+        None, "--variants", help="Comma-separated variant ids instead of the day's picks."
+    ),
+    out: str | None = typer.Option(
+        None, "--out", help="Folder; default TRADING_DATA_ROOT/rotation/algotest/<day>/<book>."
+    ),
+    wait: int = typer.Option(
+        0, "--wait", help="Seconds to wait for the day's recorded entry (the 09:16 jobs)."
+    ),
+) -> None:
+    """The day's Adaptive picks as AlgoTest .algtst files plus a zip (BL-137; uploads nothing)."""
+    from pathlib import Path
+
+    from ..legwise.algtst import Unmappable
+    from . import algtst_export as ax
+    from . import store
+
+    if book not in ax.BOOKS:
+        raise typer.BadParameter(f"--book must be one of {', '.join(ax.BOOKS)}")
+    d = _day(day)
+    if next_session:
+        from .tomorrow import next_session as following
+
+        d, preview = following(d), True
+    if variants:
+        names = [v.strip() for v in variants.split(",") if v.strip()]
+        picks = ax.DayPicks(d, book, "given", names, [])
+    elif preview:
+        picks = ax.preview_picks(d, book)
+        if picks is None:
+            typer.echo(f"no expected picks for {d}: results do not reach the session before it")
+            raise typer.Exit(2)
+    else:
+        import time
+
+        picks = ax.recorded_picks(d, book)
+        deadline = time.monotonic() + wait
+        while picks is None and time.monotonic() < deadline:
+            time.sleep(2)
+            picks = ax.recorded_picks(d, book)
+        if picks is None:
+            typer.echo(f"no recorded {book} entry for {d} (09:16); --preview: the expected picks")
+            raise typer.Exit(2)
+    try:
+        exports = ax.build(picks)
+    except (Unmappable, FileNotFoundError) as error:
+        typer.echo(f"not exported: {error}")
+        raise typer.Exit(1) from error
+    folder = Path(out) if out else store.rotation_dir() / "algotest" / d.isoformat() / book
+    try:
+        zip_path = ax.write(picks, exports, folder)
+    except FileExistsError as error:
+        typer.echo(f"not exported: {error}")
+        raise typer.Exit(1) from error
+    if not out:  # the uploader (BL-137) reads the newest default export through this pointer
+        ax.write_latest(store.rotation_dir() / "algotest", picks, folder)
+    typer.echo(ax.render(picks, exports, zip_path))
 
 
 @rotation_app.command()

@@ -706,6 +706,29 @@ never open a new position in an ETF too far above its NAV; the research decides 
 | 3.29.2 | Phase 1b: the same gate on Broad and Custom Index atomics (Nasdaq 100, Hang Seng), on the Broad engine decision and the 14:15 orders; until then the followed Broad headline still buys MON100 at any premium | claude | Planned, next |
 | 3.29.3 | Phase 2: rebuild the premium history on matching units (MON100 from 2016, not 2021), run the pre-registered arms A–D, apply the pass / kill rule, findings page, keep or zero the limits | claude | Planned; Phase 0 committed with the item |
 
+### 3.30 Rotation picks to AlgoTest — [BL-137](backlog/BL-137-algotest-strategy-export-upload.md)
+
+Owner (2026-10-19): the picks are typed into AlgoTest by hand each morning; export them to `.algtst` and upload
+them. Every evening after the result message, delete what the tool uploaded and upload tomorrow's predicted picks; at
+09:16 add any pick that changed. T1 first. Nothing is ever deployed by the tool.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.30.1 | Phase 1: `legwise/algtst.py` + `obt rotation algotest-export`: YAML → `.algtst`, unmapped settings refused | claude | **Built 2026-10-19.** Every mapping read off four AlgoTest exports (the test fixtures); three earlier guesses corrected; all 521 Core-298 and T1 files export |
+| 3.30.2 | Phase 2: how AlgoTest imports, saves, lists and deletes a strategy | owner + claude | **Mostly done 2026-10-19:** website route (Playwright, AlgoTest's verbal OK); import, save and list seen; the delete dialog still to be seen |
+| 3.30.3 | Phase 3: uploader in `packages/broker-login` (dry run by default, ledger, read-back, delete only its own) | claude | **Built 2026-10-19** (`src/strategy-upload.ts`, `src/strategy-plan.ts`); first supervised `--apply` and the delete dialog still to be seen |
+| 3.30.4 | Phase 4: evening replace + 09:16 top-up in the scheduler | claude | **Registered 2026-10-19** (`algotest-evening` 16:40, `algotest-topup` 09:18), off until `ALGOTEST_UPLOAD=on`; restart the scheduler after merge. The top-up sends its own Telegram line, not one inside the 09:16 message |
+| 3.30.5 | Phase 5: compare the first week's AlgoTest trades with the files | claude | Planned |
+
+### 3.31 Deploy the rotation picks in AlgoTest — [BL-138](backlog/BL-138-algotest-auto-deploy.md)
+
+Owner (2026-10-19): build the deploy function ready, off by default; it may never be used.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.31.1 | The /live page and the Setup Execution sheet, read from the screen | claude | **Done 2026-10-19** (`docs/algotest-execution.md` §7); what Activate asks is still unseen |
+| 3.31.2 | Deployer `packages/broker-login/src/strategy-deploy.ts` + `deploy-plan.ts` (8 tests), jobs `algotest-deploy` 09:16 and `algotest-deploy-check` 15:35 | claude | **Built 2026-10-19**, off until `ALGOTEST_DEPLOY=on`; the first `--apply` must be watched by the owner |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |
