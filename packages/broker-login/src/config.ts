@@ -33,6 +33,8 @@ export interface Config {
    * Automation) lists finvasia. Reported on its own line; never changes the run's exit code.
    */
   quantiplyShoonya: boolean;
+  /** Why Quantiply · Shoonya can't run (its SHOONYA_* secrets are missing), else null. */
+  quantiplyShoonyaProblem: string | null;
   runUrl: string | null;
 }
 
@@ -163,9 +165,13 @@ export function loadConfig(): Config {
   // A skipped broker never reaches broker.login() - main.ts filters by `only`
   // before that - so an empty placeholder here is inert, not a silent credential gap.
   // Angel One's are read for Quantiply too.
+  const shoonyaMissing = BROKER_SECRET_KEYS.finvasia.filter((key) => !process.env[key]?.trim());
+  const quantiplyShoonyaProblem =
+    quantiplyShoonya && shoonyaMissing.length
+      ? `not run - missing ${shoonyaMissing.join(', ')}`
+      : null;
   const needsShoonya =
-    activeBrokers.includes('finvasia') ||
-    (quantiplyShoonya && BROKER_SECRET_KEYS.finvasia.every((key) => process.env[key]?.trim()));
+    activeBrokers.includes('finvasia') || (quantiplyShoonya && !quantiplyShoonyaProblem);
   const readOrBlank = (broker: keyof typeof BROKER_SECRET_KEYS, key: SecretKey): string =>
     (broker === 'angelone' ? needsAngel : needsShoonya) ? read(key) : '';
 
@@ -192,6 +198,7 @@ export function loadConfig(): Config {
     quantiply,
     quantiplyProblem,
     quantiplyShoonya,
+    quantiplyShoonyaProblem,
     runUrl: runUrl(),
   };
 }

@@ -11,6 +11,7 @@ import {
   type List,
   MASTER_LABEL,
   ROWS,
+  applyNowOpen,
   describeChanges,
   githubOutcome,
   heldByMaster,
@@ -247,7 +248,7 @@ export function AutomationSettingsCard() {
                   size="sm"
                   onClick={() => void applyNow(job, platform)}
                   loading={applying === job}
-                  disabled={changes.length > 0 || applying !== null}
+                  disabled={changes.length > 0 || applying !== null || !applyNowOpen()}
                 >
                   Apply now: {platform}
                 </Button>
@@ -255,6 +256,10 @@ export function AutomationSettingsCard() {
             </div>
             {changes.length > 0 ? (
               <p className="text-xs text-muted">Save or discard your changes first.</p>
+            ) : !applyNowOpen() ? (
+              <p className="text-xs text-muted">
+                Available after 15:30 IST, when none of today's picks can still trade.
+              </p>
             ) : null}
           </section>
 

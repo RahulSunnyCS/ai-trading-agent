@@ -194,6 +194,13 @@ jobs:
           echo "::error::Quantiply login failed - the Telegram report and the Log in brokers step say why"
           exit 1
 
+      # BL-140: Quantiply · Shoonya the same way (its result is also a line in the Telegram report).
+      - name: Quantiply Shoonya login
+        if: always() && steps.login.outputs.quantiply_shoonya == 'FAIL'
+        run: |
+          echo "::error::Quantiply · Shoonya login failed - the Telegram report says why"
+          exit 1
+
       - name: Upload diagnostics
         if: failure()
         uses: actions/upload-artifact@v4

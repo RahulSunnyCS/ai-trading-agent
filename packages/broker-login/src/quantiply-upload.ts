@@ -83,6 +83,12 @@ async function main(): Promise<number> {
     );
     return 0;
   }
+  // Evening mode replaces today's algos with tomorrow's: before 15:30 IST today's later picks may
+  // still be waiting to be enabled, so it never runs then (Apply now, a manual run, a catch-up).
+  if (values.mode === 'evening' && !sessionOver()) {
+    console.error("evening mode runs only after 15:30 IST: today's picks may still trade");
+    return 1;
+  }
   const broker = parseQuantiplyBroker(values.broker);
   const site = QUANTIPLY_SITES[broker];
   const dataRoot = process.env.TRADING_DATA_ROOT?.trim();

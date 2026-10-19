@@ -64,7 +64,11 @@ export function readAutomation(path: string = settingsPath()): Automation {
   if (!raw.masters || !raw.rows) throw new Error(`${path}: not automation settings`);
   for (const p of ['algotest', 'quantiply'] as const) {
     for (const b of BROKERS) {
-      if (!raw.rows[`${p}.${b}`]) throw new Error(`${path}: row ${p}.${b} missing`);
+      const row = raw.rows[`${p}.${b}`];
+      if (!row) throw new Error(`${path}: row ${p}.${b} missing`);
+      if (!['none', 'core', 't1'].includes(row.list)) {
+        throw new Error(`${path}: row ${p}.${b} has list ${JSON.stringify(row.list)}`);
+      }
     }
   }
   return {

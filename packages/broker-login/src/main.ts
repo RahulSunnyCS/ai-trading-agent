@@ -275,7 +275,13 @@ async function main(): Promise<number> {
     // BL-140: Quantiply · Shoonya, always after the AlgoTest logins so it can never delay them.
     // Its own line; it never changes the exit code (a Shoonya failure must not make the backstop
     // log the AlgoTest brokers in again), and the backstop never repeats it (workflow).
-    if (config.quantiplyShoonya) {
+    if (config.quantiplyShoonya && config.quantiplyShoonyaProblem) {
+      quantiplyShoonya = {
+        name: QUANTIPLY_SITES.finvasia.name,
+        status: 'FAIL',
+        detail: config.quantiplyShoonyaProblem,
+      };
+    } else if (config.quantiplyShoonya) {
       try {
         browser ??= await launch();
         quantiplyShoonya = await runQuantiplyShoonyaIsolated(browser, {
@@ -314,9 +320,10 @@ async function main(): Promise<number> {
   // the job; this step's conclusion stays AlgoTest's alone (run-plan.ts exitCode).
   const githubOutput = process.env.GITHUB_OUTPUT;
   if (githubOutput) {
-    await appendFile(githubOutput, `quantiply=${quantiply?.status ?? 'OFF'}\n`).catch((error) =>
-      console.error(`could not write the step output: ${describe(error)}`),
-    );
+    await appendFile(
+      githubOutput,
+      `quantiply=${quantiply?.status ?? 'OFF'}\nquantiply_shoonya=${quantiplyShoonya?.status ?? 'OFF'}\n`,
+    ).catch((error) => console.error(`could not write the step output: ${describe(error)}`));
   }
   return exitCode(results, quantiply, fatal, Boolean(githubOutput));
 }

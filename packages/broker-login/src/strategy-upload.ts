@@ -9,6 +9,7 @@ import { describeSource, readAutomation, uploadBooks } from './automation-settin
 import { normalizePhone, readTelegramConfig } from './config.js';
 import { parseCards, parseLive, stillDeployed } from './deploy-plan.js';
 import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
+import { sessionOver } from './quantiply-plan.js';
 import { redact, registerSecret } from './secrets.js';
 import { livePage, strategyPage } from './selectors.js';
 import {
@@ -161,6 +162,12 @@ async function main(): Promise<number> {
       'ALGOTEST_UPLOAD is not "on": nothing uploaded or deleted (dry run without --apply)',
     );
     return 0;
+  }
+  // Evening mode deletes today's strategies that tomorrow drops: before 15:30 IST one of them may
+  // still be waiting to be deployed, so it never runs then (Apply now, a manual run, a catch-up).
+  if (values.mode === 'evening' && !sessionOver()) {
+    console.error("evening mode runs only after 15:30 IST: today's picks may still trade");
+    return 1;
   }
   const dataRoot = process.env.TRADING_DATA_ROOT?.trim();
   // BL-140: --from-settings uploads every list the dashboard's Settings › Automation gives

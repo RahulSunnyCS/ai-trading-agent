@@ -6,6 +6,7 @@ import { clearPolledResourceCache } from '../../../hooks/usePolledResource';
 import {
   type AutomationSettings,
   type AutomationView,
+  applyNowOpen,
   describeChanges,
   githubOutcome,
   heldByMaster,
@@ -126,7 +127,13 @@ describe('AutomationSettingsCard', () => {
     expect(screen.queryByText('Automated deployment: off → on')).toBeNull();
   });
 
+  it('Apply now opens only after 15:30 IST', () => {
+    expect(applyNowOpen(new Date('2026-10-19T09:59:00Z'))).toBe(false); // 15:29 IST
+    expect(applyNowOpen(new Date('2026-10-19T10:00:00Z'))).toBe(true);
+  });
+
   it("Apply now starts that platform's evening upload", async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-19T11:00:00Z') }); // 16:30 IST
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
       init?.method === 'POST'
         ? ok({ runId: 7, job: 'quantiply-evening' }, 202)
@@ -138,6 +145,7 @@ describe('AutomationSettingsCard', () => {
     await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
     const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST');
     expect(post?.[0]).toBe('/api/scheduler/jobs/quantiply-evening/run');
+    vi.useRealTimers();
   });
 
   it('says so when the scheduler is not reachable', async () => {

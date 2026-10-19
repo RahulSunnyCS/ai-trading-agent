@@ -277,6 +277,10 @@ def test_automation_settings_choose_the_books(tmp_path, monkeypatch):
     (tmp_path / "automation-settings.json").write_text("{}")
     with pytest.raises(ValueError, match="not automation settings"):
         auto.read()
+    saved["rows"]["algotest.finvasia"]["list"] = "classic"
+    (tmp_path / "automation-settings.json").write_text(json.dumps(saved))
+    with pytest.raises(ValueError, match="has list 'classic'"):
+        auto.read()
 
 
 def test_write_never_deletes_files_it_did_not_write(tmp_path):

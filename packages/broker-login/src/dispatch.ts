@@ -66,11 +66,21 @@ async function main(): Promise<number> {
   // BL-140: the dashboard's "Automated logins" switch, or no block logging in at all, means no
   // dispatch. The workflow's own 08:15 backstop reads the same choice from the repository
   // variables the scheduler sets on every save (BROKER_LOGIN_ENABLED).
-  const automation = readAutomation();
-  const anyLogin = (['algotest', 'quantiply'] as const).some((p) =>
-    (['finvasia', 'angelone'] as const).some((b) => effectiveRow(automation, p, b).login),
-  );
-  if (!anyLogin) {
+  // A settings file that cannot be read never stops the login: dispatch as before, and say so.
+  let automation: ReturnType<typeof readAutomation> | null = null;
+  try {
+    automation = readAutomation();
+  } catch (error) {
+    const warning = `⚠️ Automation settings unreadable (${describe(error)}); dispatching the broker login anyway. Re-save Settings › Automation.`;
+    console.warn(warning);
+    await sendText(readTelegramConfig(), warning, 'broker.algotest').catch(() => undefined);
+  }
+  const anyLogin =
+    automation === null ||
+    (['algotest', 'quantiply'] as const).some((p) =>
+      (['finvasia', 'angelone'] as const).some((b) => effectiveRow(automation, p, b).login),
+    );
+  if (!anyLogin && automation) {
     console.log(`automated logins are off (${describeSource(automation)}) - not dispatching`);
     return 0;
   }

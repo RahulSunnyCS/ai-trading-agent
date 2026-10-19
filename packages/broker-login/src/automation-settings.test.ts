@@ -55,6 +55,12 @@ describe('automation settings for the jobs (BL-140)', () => {
   it('refuses a file that is not settings, rather than guess', () => {
     write({ masters: {} });
     assert.throws(() => readAutomation(file), /not automation settings/);
+    write(
+      saved((s) => {
+        (s.rows['algotest.finvasia'] as { list: string }).list = 'classic';
+      }),
+    );
+    assert.throws(() => readAutomation(file), /algotest\.finvasia has list "classic"/);
   });
 
   it('lives beside the scheduler database', () => {

@@ -475,26 +475,8 @@ const BASE_JOBS: Job[] = [
         '--from-settings',
         '--next',
       ],
-      [
-        'node_modules/.bin/tsx',
-        'src/quantiply-upload.ts',
-        '--broker',
-        'angelone',
-        '--from-settings',
-        '--mode',
-        'evening',
-        '--apply',
-      ],
-      [
-        'node_modules/.bin/tsx',
-        'src/quantiply-upload.ts',
-        '--broker',
-        'finvasia',
-        '--from-settings',
-        '--mode',
-        'evening',
-        '--apply',
-      ],
+      // Both accounts always run (a failed step would stop the next); the job fails if either did.
+      ['/bin/sh', '-c', quantiplyUploads('evening')],
     ],
     cwd: BROKER_LOGIN,
     timeoutMinutes: 10,
@@ -522,26 +504,8 @@ const BASE_JOBS: Job[] = [
         'quantiply-export',
         '--from-settings',
       ],
-      [
-        'node_modules/.bin/tsx',
-        'src/quantiply-upload.ts',
-        '--broker',
-        'angelone',
-        '--from-settings',
-        '--mode',
-        'topup',
-        '--apply',
-      ],
-      [
-        'node_modules/.bin/tsx',
-        'src/quantiply-upload.ts',
-        '--broker',
-        'finvasia',
-        '--from-settings',
-        '--mode',
-        'topup',
-        '--apply',
-      ],
+      // Both accounts always run (a failed step would stop the next); the job fails if either did.
+      ['/bin/sh', '-c', quantiplyUploads('topup')],
     ],
     cwd: BROKER_LOGIN,
     timeoutMinutes: 10,
@@ -582,6 +546,13 @@ const BASE_JOBS: Job[] = [
 ];
 
 /** Every job: the ones above plus each check group's (src/checks/). */
+/** BL-140: one Quantiply upload per account, each told by the settings whether it has work. */
+function quantiplyUploads(mode: 'evening' | 'topup'): string {
+  const run = (broker: string) =>
+    `node_modules/.bin/tsx src/quantiply-upload.ts --broker ${broker} --from-settings --mode ${mode} --apply`;
+  return `${run('angelone')}; a=$?; ${run('finvasia')}; b=$?; [ "$a" -eq 0 ] && [ "$b" -eq 0 ]`;
+}
+
 export const JOBS: Job[] = [...BASE_JOBS, ...CHECK_JOBS];
 
 export function findJob(id: string): Job | undefined {

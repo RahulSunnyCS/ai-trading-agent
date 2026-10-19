@@ -45,8 +45,11 @@ def read(path: Path | None = None) -> tuple[dict, str]:
         raise ValueError(f"{path}: not automation settings")
     for p in PLATFORMS:
         for b in BROKERS:
-            if f"{p}.{b}" not in data["rows"]:
+            row = data["rows"].get(f"{p}.{b}")
+            if row is None:
                 raise ValueError(f"{path}: row {p}.{b} missing")
+            if row.get("list") not in ("none", "core", "t1"):
+                raise ValueError(f"{path}: row {p}.{b} has list {row.get('list')!r}")
     return data, f"settings v{data.get('version', 0)}"
 
 

@@ -123,6 +123,14 @@ describe('BL-140 settings in loadConfig', () => {
     assert.equal(config.finvasia.clientId, 'FA0000');
   });
 
+  it('Quantiply · Shoonya with missing secrets is a problem line, never a blank login', () => {
+    env({ ...ALGOTEST, ...ANGEL, ONLY: 'angelone', QUANTIPLY_BROKERS: 'finvasia' });
+    const config = loadConfig();
+    assert.equal(config.quantiplyShoonya, true);
+    assert.match(config.quantiplyShoonyaProblem ?? '', /missing SHOONYA_CLIENT_ID/);
+    assert.equal(config.finvasia.clientId, '');
+  });
+
   it('Quantiply · Shoonya is off without it', () => {
     env({ ...ALGOTEST, ...ANGEL, ...FINVASIA, QUANTIPLY_BROKERS: 'angelone' });
     assert.equal(loadConfig().quantiplyShoonya, false);
