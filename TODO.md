@@ -706,6 +706,29 @@ never open a new position in an ETF too far above its NAV; the research decides 
 | 3.29.2 | Phase 1b: the same gate on Broad and Custom Index atomics (Nasdaq 100, Hang Seng), on the Broad engine decision and the 14:15 orders; until then the followed Broad headline still buys MON100 at any premium | claude | Planned, next |
 | 3.29.3 | Phase 2: rebuild the premium history on matching units (MON100 from 2016, not 2021), run the pre-registered arms A–D, apply the pass / kill rule, findings page, keep or zero the limits | claude | Planned; Phase 0 committed with the item |
 
+### 3.30 Rotation picks to AlgoTest — [BL-137](backlog/BL-137-algotest-strategy-export-upload.md)
+
+Owner (2026-10-19): the picks are typed into AlgoTest by hand each morning; export them to `.algtst` and upload
+them. Every evening after the result message, delete what the tool uploaded and upload tomorrow's predicted picks; at
+09:16 add any pick that changed. T1 first. Nothing is ever deployed by the tool.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.30.1 | Phase 1: `legwise/algtst.py` + `obt rotation algotest-export`: YAML → `.algtst`, unmapped settings refused | claude | **Built 2026-10-19.** Every mapping read off four AlgoTest exports (the test fixtures); three earlier guesses corrected; all 521 Core-298 and T1 files export |
+| 3.30.2 | Phase 2: how AlgoTest imports, saves, lists and deletes a strategy | owner + claude | **Mostly done 2026-10-19:** website route (Playwright, AlgoTest's verbal OK); import, save and list seen; the delete dialog still to be seen |
+| 3.30.3 | Phase 3: uploader in `packages/broker-login` (dry run by default, ledger, read-back, delete only its own) | claude | **Built 2026-10-19** (`src/strategy-upload.ts`, `src/strategy-plan.ts`); first supervised `--apply` and the delete dialog still to be seen |
+| 3.30.4 | Phase 4: evening replace + 09:16 top-up in the scheduler | claude | **Registered 2026-10-19** (`algotest-evening` 16:40, `algotest-topup` 09:18), off until `ALGOTEST_UPLOAD=on`; restart the scheduler after merge. The top-up sends its own Telegram line, not one inside the 09:16 message |
+| 3.30.5 | Phase 5: compare the first week's AlgoTest trades with the files | claude | Planned |
+
+### 3.31 Deploy the rotation picks in AlgoTest — [BL-138](backlog/BL-138-algotest-auto-deploy.md)
+
+Owner (2026-10-19): build the deploy function ready, off by default; it may never be used.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.31.1 | The /live page and the Setup Execution sheet, read from the screen | claude | **Done 2026-10-19** (`docs/algotest-execution.md` §7); what Activate asks is still unseen |
+| 3.31.2 | Deployer `packages/broker-login/src/strategy-deploy.ts` + `deploy-plan.ts` (8 tests), jobs `algotest-deploy` 09:16 and `algotest-deploy-check` 15:35 | claude | **Built 2026-10-19**, off until `ALGOTEST_DEPLOY=on`; the first `--apply` must be watched by the owner |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |
@@ -715,6 +738,18 @@ never open a new position in an ETF too far above its NAV; the research decides 
 | `.claude/project/overview.md` | What is **built** (Implementation Phases). This file holds what is **left** |
 | `docs/epics.md` | Permanent delivery record. Never deleted, never a TODO |
 | `docs/architecture.md`, `product.md`, `setup.md`, `testing.md` | Reference specs. No status, no tasks |
+
+### 3.32 Rotation Core picks to Quantiply — [BL-139](backlog/BL-139-quantiply-core-upload.md)
+
+Owner (2026-10-19): add the Core Adaptive picks to Quantiply (Angel One) too, on AlgoTest's schedule: evening replace,
+09:16 top-up. Through Quantiply's own API (the call its web app makes), not the form. Deploy built but off.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.32.1 | Phase 1: capture the web app's calls (create, list, read, delete, auth) with the owner | owner + claude | **Done 2026-10-19** (`docs/algotest-execution.md`, `tests/fixtures/quantiply/`); the enable (deploy) call is not sent |
+| 3.32.2 | Phase 2: `legwise/quantiply.py` + `obt rotation quantiply-export`: YAML → `POST /algos` body, the owner's execution settings, unmapped settings refused | claude | **Built 2026-10-19** (25 tests); all of Core-298 maps, trail in points confirmed by the owner's `test1` |
+| 3.32.3 | Phase 3: uploader over the API (ledger by algo id, read-back, delete only its own finished algos) + jobs `quantiply-evening` 16:45, `quantiply-topup` 09:19 | claude | **Built 2026-10-19** (`src/quantiply-upload.ts`, 12 planner tests), off until `QUANTIPLY_UPLOAD=on`; first dry run and first `--apply` by the owner 2026-10-19: 3 Wednesday algos created, each read back identical; to switch on: merge (after PR #264), restart the scheduler, set `QUANTIPLY_UPLOAD=on` |
+| 3.32.4 | Phase 4: deploy (`enabled`), built but off | claude | Planned |
 
 ### 3.33 Automation settings page — [BL-140](backlog/BL-140-automation-settings-page.md)
 

@@ -1,0 +1,169 @@
+{
+  "version": "0.8",
+  "name": "N_buy-t1s47_0917",
+  "strategy": {
+    "Ticker": "NIFTY",
+    "TakeUnderlyingFromCashOrNot": "True",
+    "TrailSLtoBreakeven": "False",
+    "SquareOffAllLegs": "False",
+    "EntryIndicators": {
+      "Type": "IndicatorTreeNodeType.OperandNode",
+      "OperandType": "OperandType.And",
+      "Value": [
+        {
+          "Type": "IndicatorTreeNodeType.DataNode",
+          "Value": {
+            "IndicatorName": "IndicatorType.TimeIndicator",
+            "Parameters": {
+              "Hour": 9,
+              "Minute": 17
+            }
+          }
+        }
+      ]
+    },
+    "ExitIndicators": {
+      "Type": "IndicatorTreeNodeType.OperandNode",
+      "OperandType": "OperandType.And",
+      "Value": [
+        {
+          "Type": "IndicatorTreeNodeType.DataNode",
+          "Value": {
+            "IndicatorName": "IndicatorType.TimeIndicator",
+            "Parameters": {
+              "Hour": 15,
+              "Minute": 28
+            }
+          }
+        }
+      ]
+    },
+    "StrategyType": "StrategyType.IntradaySameDay",
+    "MaxPositionInADay": 1,
+    "ReentryTimeRestriction": "None",
+    "SkipInitialCandles": 0,
+    "StopMonitoringTime": "None",
+    "ListOfLegConfigs": [
+      {
+        "EntryType": "EntryType.EntryByPremium",
+        "ExpiryKind": "ExpiryType.Weekly",
+        "InstrumentKind": "LegType.CE",
+        "LegMomentum": {
+          "Type": "MomentumType.DelayedBreadthHigh",
+          "Time": 10,
+          "Value": {
+            "Type": "None",
+            "Value": 0
+          }
+        },
+        "LegReentrySL": {
+          "Type": "None",
+          "Value": {}
+        },
+        "LegReentryTP": {
+          "Type": "None",
+          "Value": {}
+        },
+        "LegStopLoss": {
+          "Type": "LegTgtSLType.Percentage",
+          "Value": 20
+        },
+        "LegTarget": {
+          "Type": "None",
+          "Value": 0
+        },
+        "LegTrailSL": {
+          "Type": "TrailStopLossType.Points",
+          "Value": {
+            "InstrumentMove": 1,
+            "StopLossMove": 1
+          }
+        },
+        "LotConfig": {
+          "Type": "LotType.Quantity",
+          "Value": 1
+        },
+        "PositionType": "PositionType.Buy",
+        "StrikeParameter": 75,
+        "id": "ld1busad"
+      },
+      {
+        "EntryType": "EntryType.EntryByPremium",
+        "ExpiryKind": "ExpiryType.Weekly",
+        "InstrumentKind": "LegType.PE",
+        "LegMomentum": {
+          "Type": "MomentumType.DelayedBreadthHigh",
+          "Time": 10,
+          "Value": {
+            "Type": "None",
+            "Value": 0
+          }
+        },
+        "LegReentrySL": {
+          "Type": "None",
+          "Value": {}
+        },
+        "LegReentryTP": {
+          "Type": "None",
+          "Value": {}
+        },
+        "LegStopLoss": {
+          "Type": "LegTgtSLType.Percentage",
+          "Value": 20
+        },
+        "LegTarget": {
+          "Type": "None",
+          "Value": 0
+        },
+        "LegTrailSL": {
+          "Type": "TrailStopLossType.Points",
+          "Value": {
+            "InstrumentMove": 1,
+            "StopLossMove": 1
+          }
+        },
+        "LotConfig": {
+          "Type": "LotType.Quantity",
+          "Value": 1
+        },
+        "PositionType": "PositionType.Buy",
+        "StrikeParameter": 75,
+        "id": "66nzex9x"
+      }
+    ],
+    "IdleLegConfigs": {},
+    "OverallSL": {
+      "Type": "OverallTgtSLType.MTM",
+      "Value": 2000
+    },
+    "OverallTgt": {
+      "Type": "None",
+      "Value": 0
+    },
+    "OverallTrailSL": {
+      "Type": "None",
+      "Value": {}
+    },
+    "LockAndTrail": {
+      "Type": "None",
+      "Value": {}
+    },
+    "OverallReentrySL": {
+      "Type": "None",
+      "Value": {}
+    },
+    "OverallReentryTgt": {
+      "Type": "None",
+      "Value": {}
+    },
+    "OverallMomentum": {
+      "Type": "None",
+      "Value": 0
+    },
+    "WeeklyOldRegime": true
+  },
+  "attributes": {
+    "template": "Straddle920",
+    "positional": "False"
+  }
+}

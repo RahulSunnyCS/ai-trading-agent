@@ -1,0 +1,126 @@
+{
+  "_id": "6ad59770892783f88a7e4ca7",
+  "algoType": {
+    "code": "OPTIONS_SPREADS_LEGS",
+    "description": "Choose ATM, OTM or ITM strikes to create a spread",
+    "name": "Options Spreads: Legs",
+    "order": 1,
+    "shortName": "Legs"
+  },
+  "code": "OPTIONS_SPREADS_LEGS",
+  "configurations": {
+    "calcBaseSlTgt": "AVG_PRICE",
+    "calculationBase": "AVG_PRICE",
+    "calculationBaseExitPrice": "AVG_PRICE",
+    "endDay": 0,
+    "endTime": "15:28:50",
+    "entryOrderDelayType": null,
+    "entryOrderLimitPrice": {
+      "type": "FIXED_VALUE",
+      "value": 3
+    },
+    "entryOrderTimeoutSeconds": 5,
+    "entryOrderType": "L",
+    "errorAutoSquareOff": true,
+    "exitOrderDelay": 3,
+    "exitOrderDelayType": "B",
+    "handleCancelled": true,
+    "isORBEnabled": false,
+    "isReEntryEnabled": true,
+    "isWaitAndTradeEnabled": false,
+    "jOrderPlacement": "LATER",
+    "legs": [
+      {
+        "base": "NIFTY",
+        "expiryTag": "CURRENT_WEEK",
+        "id": "dppPexX5CPgwVh2fu3",
+        "mp": false,
+        "product": "D",
+        "quantity": 1,
+        "reEntry": {
+          "repeat": 1,
+          "type": "RE_ENTRY_COST"
+        },
+        "segment": "SEGMENT_OPTIONS",
+        "selectionType": "STRIKE",
+        "side": "CE",
+        "specificStrikeSelection": false,
+        "stoploss": {
+          "type": "PER_POSITION_PERCENT",
+          "value": -21
+        },
+        "strike": "ITM_1",
+        "transactionType": "S"
+      },
+      {
+        "base": "NIFTY",
+        "expiryTag": "CURRENT_WEEK",
+        "id": "NxuSZPZHD1PwSoZUsK",
+        "mp": false,
+        "product": "D",
+        "quantity": 1,
+        "reEntry": {
+          "repeat": 1,
+          "type": "RE_ENTRY_COST"
+        },
+        "segment": "SEGMENT_OPTIONS",
+        "selectionType": "STRIKE",
+        "side": "PE",
+        "specificStrikeSelection": false,
+        "stoploss": {
+          "type": "PER_POSITION_PERCENT",
+          "value": -21
+        },
+        "strike": "ITM_1",
+        "transactionType": "S"
+      }
+    ],
+    "legsAction": "SQ_OFF_LEG",
+    "limitOrderTimeoutSeconds": 4,
+    "mDayInitEntry": true,
+    "matching": [
+      {
+        "active": true,
+        "mode": "NO_MATCHING"
+      }
+    ],
+    "moveStoplossToCost": false,
+    "mtmReEntryRepeatMode": "RE_ENTRY_REPEAT_SEPARATE",
+    "mtmStoplossSquareOffDelay": 0,
+    "multiplier": 1,
+    "positionReEntryRepeatMode": "RE_ENTRY_REPEAT_SEPARATE",
+    "reEntryAsapOrderDelay": 0,
+    "reEntryOrderPlacement": "LATER",
+    "startTime": "09:17:00",
+    "stoploss": {
+      "action": "SQ_OFF_ALL",
+      "type": "TOTAL_AMOUNT",
+      "value": -3000
+    },
+    "stoplossLimitPrice": {
+      "type": "FIXED_VALUE",
+      "value": 1
+    },
+    "stoplossOrderPlacement": "LATER",
+    "stoplossSquareOffBy": "SL",
+    "stoplossSquareOffDelay": 3,
+    "tradeOnlyFirstEntry": false,
+    "tradingType": "INTRADAY",
+    "trailingInterval": {
+      "frequency": "M",
+      "value": 1
+    },
+    "underlying": "UNDERLYING_INDEX"
+  },
+  "createdAt": "2026-10-19T04:07:12.493Z",
+  "day": "TUE",
+  "enabled": false,
+  "entryErrorCount": 0,
+  "exitErrorCount": 0,
+  "hasError": false,
+  "hasWaiting": false,
+  "hasWaitingWT": false,
+  "name": "N_ITM1_SL21_3000",
+  "status": "NOT_RUNNING",
+  "updatedAt": "2026-10-19T04:07:12.493Z"
+}

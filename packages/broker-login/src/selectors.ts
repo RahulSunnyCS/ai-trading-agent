@@ -236,3 +236,73 @@ export const fyersLogin = {
       .locator('visible=true')
       .first(),
 };
+
+/**
+ * BL-137: the strategy builder (/backtest) at desktop width (1440 x 900; below about 500 px AlgoTest
+ * switches to a phone layout without "Save Strategy"). VERIFIED 2026-10-19 by importing and saving
+ * four strategies in the owner's session: the hidden file input, "Strategy imported successfully",
+ * "Save Strategy" → "Save New Strategy" (name pre-filled) → "Done" → "Strategy Saved", "Export .algtst".
+ * The delete path (sidebar ⋮ → "Add to folder" / "Delete") is PROVISIONAL: the menu was seen, a
+ * delete was not.
+ */
+export const strategyPage = {
+  importInput: (page: Page): Locator => page.locator('input[type=file][accept*=".algtst"]'),
+  importButton: (page: Page): Locator => page.getByText('Import .algtst'),
+  newStrategy: (page: Page): Locator => page.getByText('New Strategy').first(),
+  title: (page: Page, name: string): Locator => page.getByText(name, { exact: true }).first(),
+  saveButton: (page: Page): Locator => page.getByRole('button', { name: /Save Strategy/ }),
+  saveDialog: (page: Page): Locator => page.getByText('Save New Strategy'),
+  saveName: (page: Page): Locator =>
+    page.getByText('Strategy Name:').locator('xpath=following::input[1]'),
+  saveDone: (page: Page): Locator => page.getByRole('button', { name: 'Done', exact: true }),
+  savedToast: (page: Page): Locator => page.getByText('Strategy Saved'),
+  exportButton: (page: Page): Locator => page.getByText('Export .algtst'),
+  search: (page: Page): Locator => page.getByPlaceholder('Search Strategies'),
+  /** PROVISIONAL: the ⋮ next to a saved strategy is the nearest icon around its name. */
+  rowMenu: (page: Page, name: string): Locator =>
+    page
+      .getByText(name, { exact: true })
+      .first()
+      .locator('xpath=ancestor::*[.//*[local-name()="svg"]][1]')
+      .locator('svg')
+      .last(),
+  /** The open ⋮ menu: the visible element holding both of its items. */
+  rowMenuDelete: (page: Page): Locator =>
+    page
+      .getByText('Add to folder', { exact: true })
+      .filter({ visible: true })
+      .locator('xpath=..')
+      .getByText('Delete', { exact: true }),
+  deleteConfirm: (page: Page): Locator =>
+    page.getByRole('button', { name: /^(Delete|Yes|Confirm)$/ }).filter({ visible: true }),
+};
+
+/**
+ * BL-138: Algo Trade (/live). VERIFIED 2026-10-19 from the owner's session: the Activation rows
+ * (select a row by its name, then "Setup Execution" / "Edit Execution" and "Activate"), and the
+ * "Edit execution for <name>" sheet (Quantity Multiplier, per-leg NRML/MIS selects, Weekdays/DTE
+ * day boxes, "Setup Execution Settings"). What "Activate" opens is NOT yet seen.
+ */
+export const livePage = {
+  header: (page: Page): Locator => page.getByText('Strategy Deployed').first(),
+  anyRowCount: (page: Page): Locator => page.getByText(/^\d+ Deployed$/).first(),
+  row: (page: Page, name: string): Locator => page.getByText(name, { exact: true }).first(),
+  setupExecution: (page: Page): Locator =>
+    page.getByRole('button', { name: /^(Setup|Edit) Execution$/ }).first(),
+  activate: (page: Page): Locator =>
+    page.getByRole('button', { name: 'Activate', exact: true }).filter({ visible: true }).first(),
+  /** The sheet: the innermost element holding its title and its save button. */
+  sheet: (page: Page, name: string): Locator =>
+    page
+      .locator('div')
+      .filter({ has: page.getByText(`Edit execution for ${name}`) })
+      .filter({ has: page.getByRole('button', { name: 'Setup Execution Settings' }) })
+      .last(),
+  sheetSave: (sheet: Locator): Locator =>
+    sheet.getByRole('button', { name: 'Setup Execution Settings' }),
+  /** Anything that may open after "Activate": a dialog or a bottom sheet. */
+  popup: (page: Page): Locator =>
+    page
+      .locator('[role=dialog], [role=alertdialog], [class*="fixed bottom-0"][class*="flex-col"]')
+      .filter({ visible: true }),
+};

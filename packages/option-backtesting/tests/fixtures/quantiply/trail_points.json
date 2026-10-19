@@ -1,0 +1,47 @@
+{
+  "note": "The owner's test1, saved 2026-10-19 11:47 UTC to confirm a trail in points: its one leg as sent (POST /algos) and as Quantiply saved it.",
+  "request_leg": {
+    "base": "NIFTY",
+    "expiryTag": "CURRENT_WEEK",
+    "id": "pg3MYAvgEMT9SMIycW",
+    "mp": false,
+    "product": "I",
+    "quantity": 1,
+    "segment": "SEGMENT_OPTIONS",
+    "side": "CE",
+    "stoploss": {
+      "type": "PER_POSITION_PERCENT",
+      "value": -66
+    },
+    "strike": "ATM",
+    "trailingStoploss": {
+      "moveBy": 10,
+      "trailBy": 5,
+      "type": "PER_POSITION_POINT"
+    },
+    "transactionType": "B"
+  },
+  "saved_leg": {
+    "base": "NIFTY",
+    "expiryTag": "CURRENT_WEEK",
+    "id": "pg3MYAvgEMT9SMIycW",
+    "mp": false,
+    "product": "I",
+    "quantity": 1,
+    "segment": "SEGMENT_OPTIONS",
+    "selectionType": "STRIKE",
+    "side": "CE",
+    "specificStrikeSelection": false,
+    "stoploss": {
+      "type": "PER_POSITION_PERCENT",
+      "value": -66
+    },
+    "strike": "ATM",
+    "trailingStoploss": {
+      "moveBy": 10,
+      "trailBy": 5,
+      "type": "PER_POSITION_POINT"
+    },
+    "transactionType": "B"
+  }
+}
