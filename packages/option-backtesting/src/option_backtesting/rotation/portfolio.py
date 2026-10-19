@@ -356,9 +356,12 @@ def one_lot_path(root: Path, day: date, name: str, loaded: dict | None = None) -
     """One variant's one-lot path on `day`, replayed exactly as the nightly update did (same
     strategy file, same lot-sizing date), and cached. `loaded` shares a day's loaded index data
     across picks of one call. Raises PortfolioStopError for a day or variant it cannot run."""
-    from .variants import variant_names
+    from .variants import TRACK_DIRS, track_names, variant_names
 
-    if name not in set(variant_names()):  # matched against the enumerated files, never a path
+    # Matched against the enumerated files, never a path: Core-298 and every parallel track's own
+    # variants (a T1 book replays its `-t1s` picks from strategies/rotation_t1/).
+    known = set(variant_names()).union(*(track_names(t) for t in TRACK_DIRS))
+    if name not in known:
         raise PortfolioStopError(f"{name!r} is not one of the rotation variants")
     key = (str(root), day, name, _stamp(root, day, name))
     hit = _lookup(key)

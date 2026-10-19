@@ -245,3 +245,15 @@ def test_a_track_readout_reads_list_c_from_the_t1_journal_against_the_base(tmp_p
     # the live read-out is unchanged by the track's journal
     live = readout.build(tmp_path, runs=100)
     assert set(live["lists"]) == {"A", "B", "C", "REF"} and live["track"] is None
+
+
+def test_replay_accepts_t1_variants_and_still_refuses_unknown_names(tmp_path):
+    """The real `one_lot_path` (not the stub the other tests use): a T1 pick passes the name check
+    (and fails later only for want of bars), an unknown name or a path never does."""
+    day = date(2026, 10, 19)
+    with pytest.raises(pf.PortfolioStopError) as t1:
+        pf.one_lot_path(tmp_path, day, track_names("t1")[0])
+    assert "is not one of the rotation variants" not in str(t1.value)
+    for bad in ("N_nothing_0917", "../strategies/rotation/N_wide_0917"):
+        with pytest.raises(pf.PortfolioStopError, match="is not one of the rotation variants"):
+            pf.one_lot_path(tmp_path, day, bad)
