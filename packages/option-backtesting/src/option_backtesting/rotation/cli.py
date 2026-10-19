@@ -223,6 +223,27 @@ def _resolve_picks(day, book, preview, next_session, variants, wait):
     return picks
 
 
+def _picks_or_skip(day, book, preview, next_session, variants, wait, from_settings):
+    """`_resolve_picks`, except that under --from-settings a list with nothing to export yet (a
+    late T1 day) is skipped, so the other list still exports; `None` when skipped."""
+    try:
+        return _resolve_picks(day, book, preview, next_session, variants, wait)
+    except typer.Exit as stop:
+        if not from_settings or stop.exit_code != 2:
+            raise
+        typer.echo(f"{book}: not exported yet; the other lists go ahead")
+        return None
+
+
+def _end_missing(missing: list[str], books: list[str]) -> None:
+    """Exit 2 (the scheduler retries) only when no list could be exported. With some exported,
+    exit 0 so the uploads run; the uploader refuses a list whose export is stale and says so."""
+    if missing and len(missing) == len(books):
+        raise typer.Exit(2)
+    if missing:
+        typer.echo(f"not exported yet: {', '.join(missing)}")
+
+
 def _settings_books(platform: str) -> list[str]:
     """BL-140: the lists the dashboard's Settings › Automation gives `platform` (empty: none)."""
     from . import automation_settings
@@ -273,8 +294,12 @@ def algotest_export(
             raise typer.BadParameter(f"--book must be one of {', '.join(ax.BOOKS)}")
     if from_settings and out and len(books) > 1:
         raise typer.BadParameter("--out takes one list; the settings give several")
+    missing = []
     for b in books:
-        picks = _resolve_picks(day, b, preview, next_session, variants, wait)
+        picks = _picks_or_skip(day, b, preview, next_session, variants, wait, from_settings)
+        if picks is None:
+            missing.append(b)
+            continue
         try:
             exports = ax.build(picks)
         except (Unmappable, FileNotFoundError) as error:
@@ -289,6 +314,7 @@ def algotest_export(
         if not out:  # the uploader (BL-137) reads the newest default export through this pointer
             ax.write_latest(store.rotation_dir() / "algotest", picks, folder)
         typer.echo(ax.render(picks, exports, zip_path))
+    _end_missing(missing, books)
 
 
 @rotation_app.command("quantiply-export")
@@ -325,8 +351,12 @@ def quantiply_export(
             raise typer.BadParameter(f"--book must be one of {', '.join(qx.BOOKS)}")
     if from_settings and out and len(books) > 1:
         raise typer.BadParameter("--out takes one list; the settings give several")
+    missing = []
     for b in books:
-        picks = _resolve_picks(day, b, preview, next_session, variants, wait)
+        picks = _picks_or_skip(day, b, preview, next_session, variants, wait, from_settings)
+        if picks is None:
+            missing.append(b)
+            continue
         try:
             built = qx.build(picks)
         except (Unmappable, FileNotFoundError) as error:
@@ -343,6 +373,7 @@ def quantiply_export(
         if not out:  # the uploader reads the newest default export through this pointer
             qx.write_latest(store.rotation_dir() / "quantiply", picks, folder)
         typer.echo(qx.render(picks, built, manifest))
+    _end_missing(missing, books)
 
 
 @rotation_app.command()

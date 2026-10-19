@@ -211,6 +211,8 @@ async function main(): Promise<number> {
   const bookOf = new Map<string, string>();
   const wanted: Wanted[] = [];
   const manifests: Manifest[] = [];
+  /** lists whose export is not today's yet (a late T1 day): skipped, and the job retries */
+  const notReady: string[] = [];
   for (const exportDir of exportDirs) {
     const dir = resolve(exportDir);
     const m = await readJson<Manifest>(join(dir, 'manifest.json'));
@@ -219,6 +221,12 @@ async function main(): Promise<number> {
         ? m.source === 'preview' && m.day > today
         : m.source === 'recorded' && m.day === today;
     if (!fits) {
+      // With several lists from the settings, one not ready yet must not hold the others back.
+      if (values['from-settings'] && exportDirs.length > 1) {
+        notReady.push(m.book);
+        console.error(`${mode}: the ${m.book} export is ${m.source} for ${m.day}; skipped for now`);
+        continue;
+      }
       console.error(
         `${mode}: the ${m.book} export is ${m.source} for ${m.day} (today ${today}); refusing`,
       );
@@ -238,6 +246,10 @@ async function main(): Promise<number> {
       bookOf.set(s.name, m.book);
       wanted.push({ name: s.name, variant: s.variant, file, sha: sha256(text) });
     }
+  }
+  if (!manifests.length) {
+    console.error(`${mode}: no list is ready (${notReady.join(', ')}); the job retries`);
+    return 1;
   }
   // Several lists upload as one plan: names never collide (`Core · ` / `T1 · `).
   const manifest = {
@@ -265,8 +277,12 @@ async function main(): Promise<number> {
   });
   const page = await context.newPage();
   page.setDefaultTimeout(20_000);
-  const lines: string[] = [];
+  const lines: string[] = notReady.length
+    ? [`not ready yet, retried later: ${notReady.join(', ')}`]
+    : [];
   let failed = false;
+  /** a failure a later attempt may fix; anything else that failed needs the owner (exit 3) */
+  let retryable = notReady.length > 0;
 
   try {
     await algotestLogin(page, { phone: normalizePhone(phone), password });
@@ -275,6 +291,12 @@ async function main(): Promise<number> {
     const deployed =
       mode === 'evening' ? await deployedNames(page, ownedPresent) : new Set<string>();
     const p = plan(mode, wanted, ledger, existing, deployed);
+    // A list whose export is not ready keeps its strategies until it is (no delete without a
+    // replacement on the way).
+    const PREFIX: Record<string, string> = { core: 'Core · ', t1: 'T1 · ' };
+    if (notReady.length) {
+      p.delete = p.delete.filter((n) => !notReady.some((b) => n.startsWith(PREFIX[b] ?? '\0')));
+    }
     lines.push(...summary(p, mode));
     console.log(`${label}${values.apply ? '' : ' (dry run)'}\n${lines.join('\n')}`);
     if (!values.apply) return 0;
@@ -316,6 +338,7 @@ async function main(): Promise<number> {
         lines.push(`deleted ${name}`);
       } catch (error) {
         failed = true;
+        retryable = true;
         notDeleted.add(name);
         await record('delete', name, '', false, describe(error));
         await safeScreenshot(page, 'delete-failed');
@@ -326,6 +349,7 @@ async function main(): Promise<number> {
     for (const w of p.upload) {
       if (notDeleted.has(w.name)) {
         failed = true;
+        retryable = true;
         lines.push(`NOT re-uploaded, the old copy is still there: ${w.name}`);
         continue;
       }
@@ -334,10 +358,11 @@ async function main(): Promise<number> {
         const ok = verdict === READ_BACK_OK;
         // Saved but not as sent: owned (so it can be replaced), under a sha no export will match.
         await record('upload', w.name, ok ? w.sha : `mismatch:${w.sha}`, true, verdict);
-        if (!ok) failed = true;
+        if (!ok) failed = true; // a read-back that differs needs the owner, not a retry
         lines.push(`${ok ? '✅' : '❌'} uploaded ${w.name} (${verdict})`);
       } catch (error) {
         failed = true;
+        retryable = true;
         await record('upload', w.name, w.sha, false, describe(error));
         await safeScreenshot(page, 'upload-failed');
         await dumpHtml(page, 'upload-failed');
@@ -347,6 +372,7 @@ async function main(): Promise<number> {
     if (needsAttention(p)) failed = true;
   } catch (error) {
     failed = true;
+    retryable = true;
     lines.push(`❌ ${describe(error)}`);
     await safeScreenshot(page, 'strategy-upload-fatal');
   } finally {
@@ -360,7 +386,10 @@ async function main(): Promise<number> {
     );
   }
   console.log(lines.join('\n'));
-  return failed ? 1 : 0;
+  // 1: the scheduler retries; 3 (noRetryExitCodes): a conflict, a deployed strategy kept, a
+  // read-back that differs - a retry would only repeat it.
+  if (retryable) return 1;
+  return failed ? 3 : 0;
 }
 
 main().then((code) => process.exit(code));

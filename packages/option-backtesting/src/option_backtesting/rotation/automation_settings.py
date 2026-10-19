@@ -20,7 +20,7 @@ DEFAULT = {
     "masters": {"logins": True, "uploads": True, "deploy": False},
     "rows": {
         "algotest.finvasia": {"login": True, "list": "t1", "upload": True},
-        "algotest.angelone": {"login": True, "list": "none", "upload": False},
+        "algotest.angelone": {"login": False, "list": "none", "upload": False},
         "quantiply.angelone": {"login": True, "list": "core", "upload": True},
         "quantiply.finvasia": {"login": False, "list": "none", "upload": False},
     },

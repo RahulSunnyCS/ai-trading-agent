@@ -26,7 +26,23 @@ export async function angelTotp(secret: string): Promise<string> {
   return code;
 }
 
+/** The window of the last Shoonya (Finvasia) code this process typed, or null before the first. */
+let lastShoonyaWindow: number | null = null;
+
+/**
+ * The same rule for Shoonya (BL-140): the 08:00 run logs AlgoTest's Shoonya broker in and then
+ * Quantiply · Shoonya with the same seed, seconds apart; the second waits for the next window
+ * rather than type a code Shoonya may refuse as already used.
+ */
+export async function shoonyaTotp(secret: string): Promise<string> {
+  if (lastShoonyaWindow !== null && totpWindow() <= lastShoonyaWindow) await waitForNextWindow();
+  const code = await freshTotp(secret);
+  lastShoonyaWindow = totpWindow();
+  return code;
+}
+
 /** Tests only: forget the last window, so back-to-back scenarios don't wait 30 s each. */
 export function resetAngelTotpWindow(): void {
   lastAngelWindow = null;
+  lastShoonyaWindow = null;
 }

@@ -257,8 +257,12 @@ async function main(): Promise<number> {
         browser = await launch();
       }
       algotestStarted = true;
-      // ONLY=none: no AlgoTest block logs in (BL-140, from the dashboard's settings).
-      results = config.only === 'none' ? [] : await runAlgotest(browser, config, tracing);
+      // ONLY=none: no AlgoTest block logs in (BL-140, from the dashboard's settings). One SKIPPED
+      // line, never an empty list, which the report would read as "never reached the broker list".
+      results =
+        config.only === 'none'
+          ? [{ name: 'brokers', status: 'SKIPPED', detail: 'no AlgoTest login in the settings' }]
+          : await runAlgotest(browser, config, tracing);
     } catch (error) {
       fatal = describe(error);
       console.error(`\nfatal: ${fatal}`);

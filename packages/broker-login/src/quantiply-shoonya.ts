@@ -5,7 +5,7 @@ import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { dismissOverlays, waitVisibleDismissing } from './overlays.js';
 import { QUANTIPLY_SITES, isQuantiplyLoggedInUrl, isShoonyaLoginUrl } from './quantiply-rules.js';
 import { finvasiaForm, quantiplyPage } from './selectors.js';
-import { freshTotp } from './totp.js';
+import { shoonyaTotp } from './totp.js';
 
 /**
  * The Quantiply login through Shoonya (BL-140, captured 2026-10-19): quantiply.shoonya.com/auth →
@@ -102,7 +102,7 @@ export async function quantiplyShoonyaLogin(
     await finvasiaForm.userId(target).fill(creds.userId);
     await finvasiaForm.password(target).fill(creds.password);
     // Generated last so as little of the 30-second window as possible is spent.
-    await finvasiaForm.totp(target).fill(await freshTotp(creds.totpSecret));
+    await finvasiaForm.totp(target).fill(await shoonyaTotp(creds.totpSecret));
     await finvasiaForm.submit(target).click();
   }
 

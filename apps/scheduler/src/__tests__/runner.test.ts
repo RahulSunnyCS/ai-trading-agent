@@ -51,6 +51,33 @@ describe('runJob', () => {
     expect(ctx.history.last('bad')?.attempts).toBe(2);
   });
 
+  it('never retries an exit code the job marks as unfixable by a retry', async () => {
+    const counter = join(ctx.repoRoot, 'tries');
+    const j = job('refused', `echo x >> ${counter}; exit 3`, {
+      retries: 3,
+      noRetryExitCodes: [3],
+    });
+    const result = await runJob(j, ctx, 'manual');
+    expect(result.exitCode).toBe(3);
+    expect(readFileSync(counter, 'utf8').trim().split('\n')).toHaveLength(1);
+  });
+
+  it('a timeout ends everything the step started, not just its shell', async () => {
+    const pidFile = join(ctx.repoRoot, 'child.pid');
+    const j = job('slow', `sleep 30 & echo $! > ${pidFile}; wait`, { timeoutMinutes: 0.005 });
+    const result = await runJob(j, ctx, 'manual');
+    expect(result.exitCode).toBe(124);
+    const pid = Number(readFileSync(pidFile, 'utf8'));
+    await new Promise((r) => setTimeout(r, 200));
+    let alive = true;
+    try {
+      process.kill(pid, 0);
+    } catch {
+      alive = false;
+    }
+    expect(alive).toBe(false);
+  });
+
   it('stops at the first failing step', async () => {
     const steps = [
       ['/bin/sh', '-c', 'exit 1'],

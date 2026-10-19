@@ -70,3 +70,13 @@ describe('formatReport', () => {
     );
   });
 });
+
+it('ONLY=none (BL-140): one SKIPPED line reads as ready, never as a broken run', () => {
+  const report = formatReport(
+    [{ name: 'brokers', status: 'SKIPPED', detail: 'no AlgoTest login in the settings' }],
+    null,
+    { name: 'Quantiply · Angel One', status: 'OK', detail: 'logged in (12s)' },
+  );
+  assert.match(report, /^✅ All logins ready \(2\/2\)/);
+  assert.doesNotMatch(report, /never reached/);
+});

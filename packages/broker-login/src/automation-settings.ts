@@ -36,7 +36,7 @@ export const DEFAULT_AUTOMATION: Automation = {
   masters: { logins: true, uploads: true, deploy: false },
   rows: {
     'algotest.finvasia': { login: true, list: 't1', upload: true },
-    'algotest.angelone': { login: true, list: 'none', upload: false },
+    'algotest.angelone': { login: false, list: 'none', upload: false },
     'quantiply.angelone': { login: true, list: 'core', upload: true },
     'quantiply.finvasia': { login: false, list: 'none', upload: false },
   },

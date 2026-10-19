@@ -6,6 +6,7 @@ import {
   type QLedgerRow,
   type QWanted,
   istWeekday,
+  needsAttentionQ,
   ownedIds,
   parseDayWise,
   parseQLedger,
@@ -190,6 +191,16 @@ test('top-up creates only what is missing on the day, deletes nothing, reports t
   assert.deepEqual(p.notToday, [`${P}B`]);
   assert.deepEqual(p.changed, [`${P}C`]);
   assert.deepEqual(p.keep, [`${P}A`]);
+});
+
+test('top-up flags an enabled algo that 09:16 dropped: it would trade real money', () => {
+  const ledger = [row('create', '1', `${P}A`), row('create', '2', `${P}B`)];
+  const algos = [algo('1', `${P}A`, 'WED', { enabled: true }), algo('2', `${P}B`, 'WED')];
+  const p = planQ('topup', 'WED', { weekday: 'WED', sessionOver: false }, [], ledger, algos);
+  assert.deepEqual(p.enabledNotToday, [`${P}A`]);
+  assert.deepEqual(p.notToday, [`${P}B`]);
+  assert.equal(needsAttentionQ(p), true);
+  assert.match(summaryQ(p, 'topup').join('\n'), /ENABLED but no longer today's pick.*WILL TRADE/);
 });
 
 test('a pick with an unconfirmed setting is never created, and is reported', () => {

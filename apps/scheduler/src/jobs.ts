@@ -18,6 +18,11 @@ export interface Job {
   timeoutMinutes: number;
   /** Extra attempts after a failure, `retryDelayMinutes` apart. */
   retries: number;
+  /**
+   * Exit codes that are never retried: the step says a retry cannot help (a refused password,
+   * a conflict the owner must look at). Retrying those would only repeat them.
+   */
+  noRetryExitCodes?: number[];
   retryDelayMinutes: number;
   /**
    * After a missed slot (laptop asleep or off), run it if no more than this
@@ -372,6 +377,7 @@ const BASE_JOBS: Job[] = [
     cwd: BROKER_LOGIN,
     timeoutMinutes: 15,
     retries: 4,
+    noRetryExitCodes: [3], // a conflict or a read-back that differs: retrying only repeats it
     retryDelayMinutes: 60,
     catchUpHours: 4,
     fixHint:
@@ -407,6 +413,7 @@ const BASE_JOBS: Job[] = [
     cwd: BROKER_LOGIN,
     timeoutMinutes: 10,
     retries: 2,
+    noRetryExitCodes: [3], // a conflict or a read-back that differs: retrying only repeats it
     retryDelayMinutes: 2,
     catchUpHours: 0.5,
     fixHint:
@@ -481,6 +488,7 @@ const BASE_JOBS: Job[] = [
     cwd: BROKER_LOGIN,
     timeoutMinutes: 10,
     retries: 4,
+    noRetryExitCodes: [3], // a refused login or a conflict: retrying only repeats it
     retryDelayMinutes: 60,
     catchUpHours: 4,
     fixHint:
@@ -510,6 +518,7 @@ const BASE_JOBS: Job[] = [
     cwd: BROKER_LOGIN,
     timeoutMinutes: 10,
     retries: 1,
+    noRetryExitCodes: [3], // a refused login or a conflict: retrying only repeats it
     retryDelayMinutes: 2,
     catchUpHours: 0.5,
     fixHint:
@@ -550,7 +559,9 @@ const BASE_JOBS: Job[] = [
 function quantiplyUploads(mode: 'evening' | 'topup'): string {
   const run = (broker: string) =>
     `node_modules/.bin/tsx src/quantiply-upload.ts --broker ${broker} --from-settings --mode ${mode} --apply`;
-  return `${run('angelone')}; a=$?; ${run('finvasia')}; b=$?; [ "$a" -eq 0 ] && [ "$b" -eq 0 ]`;
+  // Both always run. The job's exit: 1 if either may succeed on a retry, else 3 (never retried:
+  // a refused login or something the owner must look at) if either needs that, else 0.
+  return `${run('angelone')}; a=$?; ${run('finvasia')}; b=$?; if [ "$a" -eq 1 ] || [ "$b" -eq 1 ]; then exit 1; elif [ "$a" -ne 0 ]; then exit "$a"; else exit "$b"; fi`;
 }
 
 export const JOBS: Job[] = [...BASE_JOBS, ...CHECK_JOBS];
