@@ -3,7 +3,7 @@ import { BASE_URL, classifyError, visibleErrorText } from '../algotest.js';
 import type { Config } from '../config.js';
 import { safeScreenshot, step } from '../diagnose.js';
 import { angelOneForm, brokerNames, brokerPage, dataBrokerKeys } from '../selectors.js';
-import { freshTotp } from '../totp.js';
+import { angelTotp } from '../totp.js';
 import { type Broker, BrokerLoginError } from './types.js';
 
 const ANGEL_HOST = /angel(one|broking)/i;
@@ -51,8 +51,9 @@ export const angelone: Broker = {
       await clientCode.waitFor({ state: 'visible', timeout: 10_000 });
       await clientCode.fill(config.angelone.clientCode);
       await angelOneForm.mpin(target).fill(config.angelone.mpin);
-      // Generated last so as little of the 30-second window as possible is spent.
-      await angelOneForm.totp(target).fill(await freshTotp(config.angelone.totpSecret));
+      // Generated last so as little of the 30-second window as possible is spent, and never
+      // from the window Quantiply's login (src/quantiply.ts) already used in this run.
+      await angelOneForm.totp(target).fill(await angelTotp(config.angelone.totpSecret));
     });
 
     await step(target, 'angelone-submit', async () => {

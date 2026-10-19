@@ -1,0 +1,100 @@
+import type { Page } from 'playwright';
+import { type QAlgo, parseDayWise } from './quantiply-plan.js';
+import { QUANTIPLY_APP_HOST } from './quantiply-rules.js';
+
+/**
+ * Quantiply's own API, as its web app calls it (BL-139; `docs/algotest-execution.md`, "Quantiply
+ * algos through its API"). The token is the JWT the web app keeps after the Angel One login; it
+ * is a live credential to the owner's algos: callers register it as a secret, and nothing here
+ * logs it or puts it in an error.
+ */
+
+export const QUANTIPLY_API = 'https://api-prod.quantiply.angelone.in';
+const APP_ORIGIN = `https://${QUANTIPLY_APP_HOST}`;
+/** Where the web app keeps its session, in local storage on the app's origin. */
+export const STORAGE_KEY = 'quantiply-dashboard-local';
+
+/** The JWT from a logged-in browser context (any page on the app's origin will do). */
+export async function readToken(page: Page): Promise<string> {
+  if (new URL(page.url()).origin !== APP_ORIGIN) {
+    await page.goto(`${APP_ORIGIN}/algos`, { waitUntil: 'domcontentloaded' });
+  }
+  const token = await page.evaluate((key) => {
+    try {
+      const value = JSON.parse(localStorage.getItem(key) ?? '{}') as { token?: unknown };
+      return typeof value.token === 'string' ? value.token : '';
+    } catch {
+      return '';
+    }
+  }, STORAGE_KEY);
+  if (!token) throw new Error(`no Quantiply token in local storage (${STORAGE_KEY})`);
+  return token;
+}
+
+export interface Saved {
+  id: string;
+  day: string;
+  name: string;
+}
+
+export class QuantiplyApi {
+  constructor(
+    private readonly token: string,
+    private readonly fetchImpl: typeof fetch = fetch,
+  ) {}
+
+  private async call(method: string, path: string, body?: unknown): Promise<unknown> {
+    const response = await this.fetchImpl(`${QUANTIPLY_API}${path}`, {
+      method,
+      headers: {
+        Accept: 'application/json, text/plain, */*',
+        authorization: `Bearer ${this.token}`,
+        Origin: APP_ORIGIN,
+        Referer: `${APP_ORIGIN}/`,
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const text = await response.text();
+    let json: { status?: unknown; message?: unknown } | null = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      // not JSON: reported below with the status
+    }
+    const message = typeof json?.message === 'string' ? json.message.slice(0, 200) : '';
+    if (!response.ok) throw new Error(`${method} ${path} answered ${response.status} ${message}`);
+    if (json?.status !== 'success') {
+      throw new Error(`${method} ${path}: unexpected answer (${message || text.slice(0, 80)})`);
+    }
+    return json;
+  }
+
+  async list(): Promise<QAlgo[]> {
+    return parseDayWise(await this.call('GET', '/algos/day-wise'));
+  }
+
+  /** `POST /algos`: Quantiply makes one algo per weekday in `body.day`. */
+  async create(body: unknown): Promise<Saved[]> {
+    const json = (await this.call('POST', '/algos', body)) as { data?: unknown };
+    if (!Array.isArray(json.data) || !json.data.length) throw new Error('create: no algo returned');
+    return (json.data as Record<string, unknown>[]).map((a) => {
+      if (typeof a._id !== 'string') throw new Error('create: an algo without _id');
+      return { id: a._id, day: String(a.day), name: String(a.name) };
+    });
+  }
+
+  /** `GET /algos/:id`: the saved algo, configuration included (the read-back). */
+  async get(id: string): Promise<Record<string, unknown>> {
+    const json = (await this.call('GET', `/algos/${encodeURIComponent(id)}`)) as { data?: unknown };
+    const data = Array.isArray(json.data) ? json.data[0] : json.data;
+    if (!data || typeof data !== 'object') throw new Error(`get ${id}: no algo returned`);
+    return data as Record<string, unknown>;
+  }
+
+  /** `DELETE /algos/:id`: one weekday's algo. */
+  async remove(id: string): Promise<void> {
+    await this.call('DELETE', `/algos/${encodeURIComponent(id)}`);
+  }
+}

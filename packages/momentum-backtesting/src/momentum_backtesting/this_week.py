@@ -159,22 +159,30 @@ def _rows(signal: dict[str, Any], previous: dict[str, Any] | None) -> list[dict[
         asset = row.get("asset")
         if asset is None or asset in groups_mod.IDLE_NAMES:
             continue
-        action = str(row.get("action") or "").upper()
+        raw_action = str(row.get("action") or "")
+        action = raw_action.upper()
         held = bool(row.get("held"))
         if not action and not held and asset not in target:
             continue
         rank = row.get("rank")
+        if action.startswith("SKIP"):
+            # A gate label ("SKIP (premium)", BL-136) keeps its case: a sentence, not a verb.
+            shown = raw_action
+        elif action in groups_mod.QUIET_ACTIONS:
+            shown = "HOLD" if held or asset in target else action
+        else:
+            shown = action
         out.append(
             {
                 "asset": asset,
-                "action": action
-                if action not in groups_mod.QUIET_ACTIONS
-                else ("HOLD" if held or asset in target else action),
+                "action": shown,
                 "rank": None if rank is None or pd.isna(rank) else rank,
                 "rank_prev": row.get("previous_rank", before.get(asset)),
                 "held": held,
                 "after": target.get(asset),
                 "sleeves": None,
+                # Why a name was not bought (a gate's row), and the ETF's premium to NAV.
+                **{k: row[k] for k in ("reason", "premium", "premium_limit") if k in row},
             }
         )
     return out
@@ -263,24 +271,46 @@ def _renumber_sleeves(card: dict[str, Any], week: str, start: str) -> None:
         edge["sleeve"] = names[edge["sleeve"]]
 
 
+def _is_skip(action: Any) -> bool:
+    return str(action or "").upper().startswith("SKIP")
+
+
 def first_week_actions(signal: dict[str, Any]) -> list[dict[str, Any]]:
     """The paper start Friday as a journal entry shows it: a buy for every name the signal holds
-    afterwards, best rank first (nothing is held going into the first week)."""
+    afterwards, best rank first (nothing is held going into the first week), then any name a gate
+    kept out that week (BL-136's "SKIP (premium)") exactly as recorded: the model's weights are
+    ungated, so without this the name the signal refused would read as a BUY."""
     weights = signal.get("target_weights") or signal.get("weights") or {}
-    ranks = {r.get("asset"): r.get("rank") for r in signal.get("rows", [])}
-    held = [a for a, w in weights.items() if w and a not in groups_mod.IDLE_NAMES]
+    rows = signal.get("rows", [])
+    ranks = {r.get("asset"): r.get("rank") for r in rows}
+    skipped = {r.get("asset"): r for r in rows if _is_skip(r.get("action"))}
+    held = [
+        a for a, w in weights.items() if w and a not in groups_mod.IDLE_NAMES and a not in skipped
+    ]
     held.sort(key=lambda a: (ranks.get(a) is None, ranks.get(a) or 0, a))
-    return [{"asset": a, "action": "BUY", "rank": ranks.get(a)} for a in held]
+    buys = [{"asset": a, "action": "BUY", "rank": ranks.get(a)} for a in held]
+    skips = [
+        {
+            "asset": r.get("asset"),
+            "action": r.get("action"),
+            "rank": r.get("rank"),
+            **{k: r[k] for k in ("reason", "premium", "premium_limit") if k in r},
+        }
+        for r in skipped.values()
+    ]
+    return buys + skips
 
 
 def _start_from_cash(card: dict[str, Any]) -> None:
     """The first week of a portfolio: nothing is held, so every name the strategy holds after
-    the week is a buy and nothing is sold (the rows' `after` weights are unchanged)."""
+    the week is a buy and nothing is sold (the rows' `after` weights are unchanged). A gate's
+    skip row is kept as it is: the strategy wanted the name and did not buy it."""
     rows = []
     for row in card["rows"]:
-        if not (row.get("after") or 0) > 0:
-            continue
-        rows.append({**row, "action": "BUY", "held": False, "before": 0.0, "rank_prev": None})
+        if _is_skip(row.get("action")):
+            rows.append({**row, "held": False, "before": 0.0, "rank_prev": None})
+        elif (row.get("after") or 0) > 0:
+            rows.append({**row, "action": "BUY", "held": False, "before": 0.0, "rank_prev": None})
     card["rows"] = rows
     card["first_week"] = True
 
@@ -382,7 +412,9 @@ def week_view(
     headline = next((c for c in cards if c["headline"]), None)
     shared = set(headline["held"]) if headline else set()
     for card in cards:
-        card["trades"] = sum(1 for r in card["rows"] if r["action"] not in ("", "HOLD"))
+        card["trades"] = sum(
+            1 for r in card["rows"] if r["action"] not in ("", "HOLD") and not _is_skip(r["action"])
+        )
         card["shared_with_headline"] = (
             None if card is headline or not headline else len(shared & set(card["held"]))
         )

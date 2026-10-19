@@ -133,6 +133,19 @@ Otherwise:
   the 298 universe; its Dir results in `rotation/base/`) and the read-out (per list ₹ per lot-day, drawdown,
   random same-shape percentile, list minus REF and minus base by a circular 5-day block bootstrap, 2,000
   resamples, seed 20261012). Read-only over the journal; `obt rotation readout | base`.
+  Display overrides for the Rotation page (owner, 2026-10-19), every default unchanged:
+  `lots_per` (`readout.build`, `daylog.build_log|build_day`, `portfolio_log.days|list_day`,
+  `drawdowns.build`'s stop replay) books every pick at that many lots, so rupee totals scale and
+  per-lot figures, the random-basket percentile and the pass rule do not, and no entry's recorded
+  `lots_per_strategy` is rewritten; `track="t1"` (`readout.build`, `daylog`, `portfolio_log`,
+  `overview.baskets`) reads the T1 journal (list C only, Core-298 + the track's variants via
+  `store.result_path`; no reconstruction, placements or re-score; missing days counted from the
+  track's own first entry; `vs_ref` None, the gap to the fixed base kept). The fixed base can be
+  booked under a portfolio stop (`portfolio_log.base_days|base_day`, `book=base`): picks
+  [(`N_wide_0917`, 2 x lots), (`N_dir_atm_0924`, 1 x lots)], weekdays both legs are stored, from
+  the registered first day; `portfolio.one_lot_path` accepts the Dir leg by its enumerated name
+  (`portfolio.strategy_file` resolves it to `strategies/rotation_base/`, refused if its sha256 is
+  not `base.BASE_YAML_SHA256`) and replays it with `base.score_days`' own call and sizing date.
 - `rotation/expiry.py` — the expiring-index rule (BL-122, owner 2026-10-18): from `EXPIRY_ONLY_FROM` (Mon
   2026-10-19), on a day when exactly one index expires (weekday label `0`; both, neither or an unknown label =
   no rule), Adaptive (list C, live and T1) is a FILTER of the unrestricted ranking: `filter_picks` runs
@@ -220,6 +233,21 @@ Otherwise:
   tonight's VIX close standing in for the open, under the BL-122 rule for that session, for Core-298 or Core-298 plus a
   track's variants; the message lists those strategies in full. The old history tables, probabilities and likely changes
   are no longer sent (`build`/`Tomorrow` are kept, tested, unused by the message).
+- `legwise/algtst.py` + `rotation/algtst_export.py` — BL-137: a leg-wise strategy as an AlgoTest `.algtst` (import
+  format, one strategy per file) and a day's picks as files + zip (`obt rotation algotest-export`). Every mapping was read
+  off an AlgoTest export in `tests/fixtures/algtst/` (a closest premium is a bare number; re-entry at cost is
+  `ReentryType.AtCost` / `ReentryCount`; a range breakout is `LegMomentum` `MomentumType.DelayedBreadthHigh` with `Time` in
+  minutes after entry); anything else that is set raises `Unmappable`. Not `legwise/algotest.py`, which is BL-009's
+  trade-log comparison.
+- `legwise/quantiply.py` + `rotation/quantiply_export.py` — BL-139: a leg-wise strategy as the body of Quantiply's create
+  call (`POST /algos` on `api-prod.quantiply.angelone.in`) and a day's Core picks as one `<variant>.json` body each plus
+  `manifest.json` (`obt rotation quantiply-export`). The mappings were read off calls the web app made, in
+  `tests/fixtures/quantiply/`. A closest premium is `selectionType: PREMIUM` + `PREMIUM_CLOSE_TO`. Re-entry at cost is a
+  leg `reEntry: RE_ENTRY_COST`. A range breakout is a leg `orb: ORB_INSTRUMENT` with `orbEndTime`. Every body copies
+  the execution settings of the owner's own `N_ITM1_SL21_3000` (`EXECUTION`: limit orders with buffer 3, product D,
+  SL limit 1, a 3 s exit delay). One algo per weekday, so a body carries the session's weekday only. A trail in points
+  is `PER_POSITION_POINT` (confirmed by the owner's `test1`). `Export.unconfirmed` lists any mapping never seen
+  saved, which the uploader refuses; none is left. Anything else that is set raises `Unmappable`.
 - `api/legwise_routes.py` — `/legwise/*` on `obt-api` for the dashboard's Options Lab: `/day` and `/anatomy` (see above; `/anatomy` also overlays apps/server's T-33 `daily_regime_tags` as `t33` when `DATABASE_URL` is set in this process, with an explicit status), list/
   validate/save strategies (slug-checked name, `yaml.safe_dump` of the validated model — never
   raw client text), ad-hoc backtest over collected days, saved results, data/token status, and

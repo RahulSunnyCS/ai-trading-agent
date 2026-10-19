@@ -66,9 +66,73 @@ function capture(cmd: string, args: string[], cwd: string, env: Record<string, s
   return `${out.stdout ?? ''}${out.stderr ?? ''}`.trim();
 }
 
-/** Did today's AlgoTest login workflow (dispatched at 08:00) succeed? */
+interface WorkflowStep {
+  name?: string;
+  conclusion?: string | null;
+}
+
+/**
+ * Which part of a failed "Daily broker login" run failed, from its steps: "Log in brokers" is the
+ * AlgoTest logins, "Quantiply login" fails only when Quantiply did (QUANTIPLY_LOGIN on). Unknown
+ * when neither step tells (a setup step failed, or GitHub's answer was unreadable).
+ */
+export function brokerLoginFailedPart(
+  jobs: Array<{ steps?: WorkflowStep[] }>,
+): 'algotest' | 'quantiply' | 'both' | 'unknown' {
+  const steps = jobs.flatMap((job) => job.steps ?? []);
+  const failed = (name: string) =>
+    steps.some((step) => step.name === name && step.conclusion === 'failure');
+  const algotest = failed('Log in brokers');
+  const quantiply = failed('Quantiply login');
+  if (algotest && quantiply) return 'both';
+  if (algotest) return 'algotest';
+  if (quantiply) return 'quantiply';
+  return 'unknown';
+}
+
+interface BrokerLoginRun {
+  conclusion: string;
+  status: string;
+  createdAt: string;
+  url: string;
+  databaseId?: number;
+}
+
+/**
+ * The run that answers "did today's broker login work?". A successful run counts only when its
+ * "Log in brokers" step actually ran: a cron backstop that skipped because an earlier run already
+ * existed also ends in success, and must not hide that earlier run's Quantiply failure. `jobsOf`
+ * returns a run's jobs, or null when GitHub could not say (then the success is taken as real).
+ * Without a real success, a failed run is the answer, else the newest run.
+ */
+export function pickBrokerLoginRun(
+  today: BrokerLoginRun[],
+  jobsOf: (run: BrokerLoginRun) => Array<{ steps?: WorkflowStep[] }> | null,
+): BrokerLoginRun | undefined {
+  const loggedIn = today.find((run) => {
+    if (run.conclusion !== 'success') return false;
+    const jobs = jobsOf(run);
+    if (jobs === null) return true;
+    return jobs
+      .flatMap((job) => job.steps ?? [])
+      .some((step) => step.name === 'Log in brokers' && step.conclusion === 'success');
+  });
+  return loggedIn ?? today.find((run) => run.conclusion === 'failure') ?? today[0];
+}
+
+const FAILED_PART: Record<ReturnType<typeof brokerLoginFailedPart>, string> = {
+  algotest: 'AlgoTest login failed',
+  quantiply: 'Quantiply login failed (AlgoTest logins OK)',
+  both: 'AlgoTest and Quantiply logins failed',
+  unknown: 'failure',
+};
+
+/**
+ * Did today's broker login workflow (dispatched at 08:00) succeed? It logs the brokers in to
+ * AlgoTest and, with QUANTIPLY_LOGIN on, logs in to Quantiply too; a failure says which part.
+ */
 function algotestCheck(ctx: BuiltinContext): Check {
-  const label = 'AlgoTest login';
+  const label = 'Broker login';
   const raw = capture(
     'gh',
     [
@@ -79,22 +143,32 @@ function algotestCheck(ctx: BuiltinContext): Check {
       '--limit',
       '10',
       '--json',
-      'conclusion,status,createdAt,url',
+      'conclusion,status,createdAt,url,databaseId',
     ],
     ctx.repoRoot,
     ctx.env,
   );
   try {
-    const runs = JSON.parse(raw) as Array<{
-      conclusion: string;
-      status: string;
-      createdAt: string;
-      url: string;
-    }>;
-    // Any successful run today counts: GitHub's late backstop cron can fail hours after
-    // the 08:00 dispatch already logged the brokers in (BROKER_LOGIN_ONLY may limit it to one).
+    const runs = JSON.parse(raw) as BrokerLoginRun[];
+    // A successful run today counts (GitHub's late backstop cron can fail hours after the 08:00
+    // dispatch already logged the brokers in), but only one whose login step ran: a backstop
+    // that skipped also succeeds, and must not hide the 08:00 run's Quantiply failure.
     const today = runs.filter((r) => istDay(new Date(r.createdAt)) === istDay(ctx.now()));
-    const run = today.find((r) => r.conclusion === 'success') ?? today[0];
+    const jobsOf = (r: BrokerLoginRun) => {
+      if (!r.databaseId) return null;
+      try {
+        const view = capture(
+          'gh',
+          ['run', 'view', String(r.databaseId), '--json', 'jobs'],
+          ctx.repoRoot,
+          ctx.env,
+        );
+        return (JSON.parse(view) as { jobs?: Array<{ steps?: WorkflowStep[] }> }).jobs ?? [];
+      } catch {
+        return null;
+      }
+    };
+    const run = pickBrokerLoginRun(today, jobsOf);
     if (!run) {
       return {
         ok: false,
@@ -103,9 +177,22 @@ function algotestCheck(ctx: BuiltinContext): Check {
       };
     }
     if (run.status !== 'completed') return { ok: true, label, detail: `still ${run.status}` };
-    return run.conclusion === 'success'
-      ? { ok: true, label, detail: 'broker login succeeded' }
-      : { ok: false, label, detail: `${run.conclusion} → ${run.url}` };
+    if (run.conclusion === 'success') return { ok: true, label, detail: 'broker login succeeded' };
+    let what = run.conclusion;
+    if (run.conclusion === 'failure' && run.databaseId) {
+      try {
+        const view = capture(
+          'gh',
+          ['run', 'view', String(run.databaseId), '--json', 'jobs'],
+          ctx.repoRoot,
+          ctx.env,
+        );
+        what = FAILED_PART[brokerLoginFailedPart((JSON.parse(view) as { jobs?: [] }).jobs ?? [])];
+      } catch {
+        // Keep the plain conclusion: the run link still says everything.
+      }
+    }
+    return { ok: false, label, detail: `${what} → ${run.url}` };
   } catch {
     return {
       ok: false,

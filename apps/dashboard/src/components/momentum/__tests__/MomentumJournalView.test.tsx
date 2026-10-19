@@ -51,6 +51,14 @@ const journal: MomentumJournal = {
         { asset: 'Nifty IT', action: 'BUY', rank: 1 },
         { asset: 'Gold', action: 'SELL', rank: 14 },
         { asset: 'Nifty Realty', action: 'HOLD', rank: 2 },
+        {
+          asset: 'Nasdaq 100',
+          action: 'SKIP (premium)',
+          rank: 3,
+          reason: 'MON100 trades +16.9% above NAV (2026-10-08), over the 5% limit.',
+          premium: 0.1689,
+          premium_limit: 0.05,
+        },
       ],
       first_week: false,
       level: null,
@@ -148,6 +156,8 @@ describe('MomentumJournalView', () => {
     expect(screen.getByText('BUY Nifty IT')).toBeTruthy();
     expect(screen.getByText('SELL Gold')).toBeTruthy();
     expect(screen.queryByText('HOLD Nifty Realty')).toBeNull();
+    // A gate's skip (BL-136) is part of the record: shown with the trades.
+    expect(screen.getByText('SKIP (premium) Nasdaq 100')).toBeTruthy();
     expect(screen.getByText('Nifty Realty 60%, Gold 40%')).toBeTruthy();
   });
 
@@ -157,6 +167,7 @@ describe('MomentumJournalView', () => {
     fireEvent.click(screen.getByText('ETF Weekly Core', { selector: 'span' }));
     expect(screen.getByText('Actions in this signal')).toBeTruthy();
     expect(screen.getByText('HOLD')).toBeTruthy();
+    expect(screen.getByText(/over the 5% limit/)).toBeTruthy();
     expect(screen.getByText('uncommitted changes')).toBeTruthy();
     expect(screen.getByText('weekly_closes:sha256:ff')).toBeTruthy();
   });

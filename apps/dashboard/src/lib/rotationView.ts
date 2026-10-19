@@ -3,7 +3,9 @@
  * set against, the hero chart's series, and the read-out banner. No React, so it is unit-tested.
  *
  * Everything is gross, in ₹. Lists are alternative baskets, never added together. Per lot-day is
- * the unit that compares lists, because a list holds 6 lots, or 8 on a day its Buy add-on fires.
+ * the unit that compares lists, because a list holds 3 strategies, or 4 on a day its Buy add-on
+ * fires. The page asks for rupee totals at 1 lot a strategy (`lots=1`); the per-lot figures are
+ * the same at any lots.
  */
 
 import type {
@@ -116,6 +118,13 @@ function toneOf(gap: number | null): HeadlineTone {
 
 const lots = (v: number | null): string => (v === null ? '' : `${Math.round(v * 10) / 10}`);
 
+/** "1 lot", "2 lots": the lots a strategy behind the read-out's rupee totals (the page asks for
+ * 1; the registered read-out holds 2). Unknown is the registered 2. */
+export function lotsWord(n: number | null | undefined): string {
+  const v = typeof n === 'number' && n > 0 ? n : 2;
+  return `${v} lot${v === 1 ? '' : 's'}`;
+}
+
 /**
  * The numbers that say whether the focus list is good, each against the benchmark. Lists hold 6
  * lots, or 8 on a Buy day, and the base 6, so a total or a drawdown in rupees is not comparable:
@@ -145,7 +154,7 @@ export function headline(
       benchmark: b.perLotDay,
       gap: gap(f.per_lot_day, b.perLotDay),
       tone: toneOf(gap(f.per_lot_day, b.perLotDay)),
-      hint: 'Average gross per lot per day: the fair way to compare a 6-lot and an 8-lot day, and the unit the registered rule uses.',
+      hint: 'Average gross per lot per day: the fair way to compare a 3-strategy day with a 4-strategy Buy day, and the unit the registered rule uses.',
     },
     {
       id: 'drawdownLot',
@@ -166,7 +175,7 @@ export function headline(
       benchmark: b.total,
       gap: null,
       tone: 'default',
-      hint: `Total over the scored sessions at 2 lots per strategy (max drawdown ${Math.round(f.max_drawdown)} ₹ in rupees). Totals depend on how many lots a list held, so they are shown, not compared.`,
+      hint: `Total over the scored sessions at ${lotsWord(summary.settings?.lots_per_strategy)} per strategy (max drawdown ${Math.round(f.max_drawdown)} ₹ in rupees). Totals depend on how many lots a list held, so they are shown, not compared.`,
       ...(totalCaption ? { caption: totalCaption } : {}),
     },
     {

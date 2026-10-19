@@ -3115,7 +3115,13 @@ def _journal_entry_view(row: dict, start: str | None = None) -> dict:
         **{key: row[key] for key in row if key not in ("signal", "holdings_before", "settings")},
         "holdings_before": json.loads(row["holdings_before"]),
         "actions": [
-            {"asset": r.get("asset"), "action": r.get("action"), "rank": r.get("rank")}
+            {
+                "asset": r.get("asset"),
+                "action": r.get("action"),
+                "rank": r.get("rank"),
+                # BL-136: why a gate did not buy the name, and the premium that decided.
+                **{k: r[k] for k in ("reason", "premium", "premium_limit") if k in r},
+            }
             for r in signal.get("rows", [])
             if r.get("action")
         ],

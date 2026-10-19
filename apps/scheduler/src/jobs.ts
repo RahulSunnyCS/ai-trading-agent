@@ -79,9 +79,13 @@ const BASE_JOBS: Job[] = [
     // flight or the 60 s cool-down rather than fail, and its retry (5 minutes later, past its
     // own cool-down) is for a network blip; a login Angel One refused is never sent again by the
     // retry (`--scheduled`), since each wrong attempt counts toward a lockout. 08:00 is the
-    // owner's choice (2026-10-18) and does not collide with `broker-login` above: AlgoTest's
-    // Angel One login is off (repository variable BROKER_LOGIN_ONLY=finvasia) and AlgoTest logs
-    // in from 08:15 anyway.
+    // owner's choice (2026-10-18). `broker-login` above also logs in to Angel One with the same
+    // account, from GitHub, where this job's refusal hold can't see it: AlgoTest's Angel One login
+    // (off while BROKER_LOGIN_ONLY=finvasia; from 08:15) and, with QUANTIPLY_LOGIN on, Quantiply's
+    // at about 08:02. A wrong PIN is therefore refused once here and once or twice there per day
+    // (that workflow never resends a refused PIN, and its backstops skip Quantiply once a run
+    // happened). They seldom share a 30-second TOTP window; when they do and Angel refuses the
+    // reused code, the GitHub side retries with the next window's code.
     id: 'angel-login-check',
     description: 'Angel One: one SmartAPI login, to check the fallback data source works',
     schedule: { at: '08:00', on: tradingDays, label: 'trading days 08:00' },
@@ -334,6 +338,190 @@ const BASE_JOBS: Job[] = [
     alertsItself: true,
     fixHint:
       'cd packages/option-backtesting && uv run obt rotation pick --with-t1  (a late entry is flagged, not forward)',
+  },
+  {
+    id: 'algotest-evening',
+    description:
+      "Put tomorrow's expected T1 picks into AlgoTest as saved strategies (BL-137): export them (`obt rotation algotest-export --book t1 --next`), then delete the strategies the tool uploaded that tomorrow drops and upload the missing ones. Never deploys. Does nothing until ALGOTEST_UPLOAD=on",
+    // After the 16:00 result message (its retries end 16:35). The export exits 2 while the day's
+    // results are incomplete (a late Fyers login), so the retries carry it to 20:40. Deleting
+    // needs --allow-delete, left out until a supervised run has seen AlgoTest's delete dialog; until
+    // then dropped strategies stay and the message lists them.
+    schedule: { at: '16:40', on: tradingDays, label: 'trading days 16:40' },
+    steps: [
+      [
+        'uv',
+        'run',
+        '--directory',
+        '../option-backtesting',
+        'obt',
+        'rotation',
+        'algotest-export',
+        '--book',
+        't1',
+        '--next',
+      ],
+      [
+        'node_modules/.bin/tsx',
+        'src/strategy-upload.ts',
+        '--latest',
+        't1',
+        '--mode',
+        'evening',
+        '--apply',
+      ],
+    ],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 15,
+    retries: 4,
+    retryDelayMinutes: 60,
+    catchUpHours: 4,
+    fixHint:
+      'cd packages/option-backtesting && uv run obt rotation algotest-export --book t1 --next; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --latest t1 --mode evening (add --apply once the plan looks right)',
+  },
+  {
+    id: 'algotest-topup',
+    description:
+      "After the 09:16 pick, upload any recorded T1 pick that last night's upload does not have (BL-137); deletes nothing and names the strategies that are not today's. Does nothing until ALGOTEST_UPLOAD=on",
+    // The pick is recorded at about 09:16:20; a changed 09:17 pick cannot be deployed in time
+    // anyway, so 09:18 costs nothing. Not caught up after a long sleep: the picks would be stale.
+    schedule: { at: '09:18', on: tradingDays, label: 'trading days 09:18' },
+    steps: [
+      [
+        'uv',
+        'run',
+        '--directory',
+        '../option-backtesting',
+        'obt',
+        'rotation',
+        'algotest-export',
+        '--book',
+        't1',
+      ],
+      [
+        'node_modules/.bin/tsx',
+        'src/strategy-upload.ts',
+        '--latest',
+        't1',
+        '--mode',
+        'topup',
+        '--apply',
+      ],
+    ],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 10,
+    retries: 2,
+    retryDelayMinutes: 2,
+    catchUpHours: 0.5,
+    fixHint:
+      'cd packages/option-backtesting && uv run obt rotation algotest-export --book t1; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --latest t1 --mode topup --apply',
+  },
+  {
+    id: 'algotest-deploy',
+    description:
+      "Deploy the day's recorded T1 picks on AlgoTest's /live (BL-138), right after the 09:16 pick: 1 lot each, today only, never a pick whose entry minute has come. Built ready but OFF: does nothing until ALGOTEST_DEPLOY=on",
+    // Starts with the pick and waits (up to 120 s) for its journal entry. A 09:17 pick may still be
+    // too late through the website; it is then reported, never deployed late. Not caught up.
+    schedule: { at: '09:16', on: tradingDays, label: 'trading days 09:16' },
+    steps: [
+      [
+        'uv',
+        'run',
+        '--directory',
+        '../option-backtesting',
+        'obt',
+        'rotation',
+        'algotest-export',
+        '--book',
+        't1',
+        '--wait',
+        '120',
+      ],
+      ['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--latest', 't1', '--apply'],
+    ],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 10,
+    retries: 0, // a second attempt could deploy what the first already did; the run alerts instead
+    retryDelayMinutes: 0,
+    catchUpHours: 0,
+    fixHint:
+      'Deploy the picks by hand on algotest.in/live; then: cd packages/broker-login && node_modules/.bin/tsx src/strategy-deploy.ts --latest t1  (dry run)',
+  },
+  {
+    id: 'algotest-deploy-check',
+    description:
+      'At 15:35, alert if any strategy the tool deploys on AlgoTest has an execution day ticked (it would trade again on its own). Does nothing until ALGOTEST_DEPLOY=on',
+    schedule: { at: '15:35', on: tradingDays, label: 'trading days 15:35' },
+    steps: [['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--latest', 't1', '--check']],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 5,
+    retries: 1,
+    retryDelayMinutes: 2,
+    catchUpHours: 0,
+    fixHint: 'Open algotest.in/live and untick the execution days of the T1 strategies',
+  },
+  {
+    id: 'quantiply-evening',
+    description:
+      "Put tomorrow's expected Core picks into Quantiply (Angel One) as algos for tomorrow's weekday (BL-139): export them (`obt rotation quantiply-export --next`), then, through Quantiply's API, delete the finished algos the tool created that tomorrow drops and create the missing ones. Never enables (deploys). Does nothing until QUANTIPLY_UPLOAD=on",
+    // After algotest-evening (16:40), so the two never log in at once. The export exits 2 while
+    // the day's results are incomplete (a late Fyers login), so the retries carry it to 20:45.
+    schedule: { at: '16:45', on: tradingDays, label: 'trading days 16:45' },
+    steps: [
+      [
+        'uv',
+        'run',
+        '--directory',
+        '../option-backtesting',
+        'obt',
+        'rotation',
+        'quantiply-export',
+        '--next',
+      ],
+      [
+        'node_modules/.bin/tsx',
+        'src/quantiply-upload.ts',
+        '--latest',
+        'core',
+        '--mode',
+        'evening',
+        '--apply',
+      ],
+    ],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 10,
+    retries: 4,
+    retryDelayMinutes: 60,
+    catchUpHours: 4,
+    fixHint:
+      'cd packages/option-backtesting && uv run obt rotation quantiply-export --next; then cd ../broker-login && node_modules/.bin/tsx src/quantiply-upload.ts --latest core --mode evening (add --apply once the plan looks right)',
+  },
+  {
+    id: 'quantiply-topup',
+    description:
+      "After the 09:16 pick, create on Quantiply any recorded Core pick that last night's upload does not have (BL-139); deletes nothing and names the algos that are not today's. Does nothing until QUANTIPLY_UPLOAD=on",
+    // 09:19, not 09:18: a minute clear of the pick's own Angel One work, so two logins never type
+    // codes from one TOTP window. A changed 09:17 pick is too late either way. Not caught up.
+    schedule: { at: '09:19', on: tradingDays, label: 'trading days 09:19' },
+    steps: [
+      ['uv', 'run', '--directory', '../option-backtesting', 'obt', 'rotation', 'quantiply-export'],
+      [
+        'node_modules/.bin/tsx',
+        'src/quantiply-upload.ts',
+        '--latest',
+        'core',
+        '--mode',
+        'topup',
+        '--apply',
+      ],
+    ],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 10,
+    retries: 1,
+    retryDelayMinutes: 2,
+    catchUpHours: 0.5,
+    fixHint:
+      'cd packages/option-backtesting && uv run obt rotation quantiply-export; then cd ../broker-login && node_modules/.bin/tsx src/quantiply-upload.ts --latest core --mode topup --apply',
   },
   {
     id: 'backup',

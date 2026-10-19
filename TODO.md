@@ -446,6 +446,7 @@ collector is forward-only".
 | 3.10.31 | Rotation Telegram messages redone — [BL-125](backlog/BL-125-rotation-telegram-v2.md) | claude | **Built 2026-10-18 (owner request).** 09:16: one message, Adaptive then T1 labelled testing phase, strategies shown as self-explaining labels with their settings; T1 never delays Adaptive. Evening: a short message at 16:00 (new job `options-rotation-result`) with both results and tomorrow's strategies in full; the T1 update moved into the 15:45 evening chain. Picks, scoring and journal unchanged. Open: restart the scheduler after merge (it reads `jobs.ts` at start); read the first days' messages. |
 | 3.10.32 | Lot plans tracked forward — [BL-135](backlog/BL-135-rotation-lot-plans-forward.md) | claude | **In progress 2026-10-18 (owner request).** Phase 0 registered before the 2026-10-19 09:16 entry: As picked, Dir Boost and Duo per book (Core, T1) from the journals and stored one-lot results, brokerage included; read-out at 60 forward scored days. Read-only; changes no pick. |
 | 3.10.33 | Desk screens and strategy tester — [BL-120](backlog/BL-120-desk-screens-and-strategy-tester.md) | claude | **In progress 2026-10-18.** Phase 0 answers recorded (Live tab + Options Lab placement, confirmation locked by default, chat route before the page text box, frozen Live-group tabs hidden in Phase 3). Phase 1 built 2026-10-18 (rule spec and grammar, event detection, simulation cache, placebo / random-time / charges, store and ledger, `obt rule`, `/legwise/rules/*`): reproduces BL-083's four triggers' firings and T1 / T4 → Dir event rows to the rupee; a two-year test runs in under a minute. Next: Phase 2 (MCP tool). |
+| 3.10.34 | Rotation page at 1 lot, Core ₹8,000 / T1 ₹9,000 / base ₹8,000 stops, T1 and Fixed base cards, "Without the portfolio stop" — owner requests 2026-10-19 | claude | **Built 2026-10-19.** Every rupee figure on the page (cards, headline, chart, Daily log, Drawdown episodes' stopped line, replays) at 1 lot a strategy via a display-only `lots` query (`/summary`, `/log`, `/day/{day}`, `/portfolio/day\|days`, `/drawdowns`); per-lot figures, the verdict and the journal's recorded 2 lots unchanged. Cards titled Adaptive Classic (Core, stop ₹8,000, `pfstop`/`pftrail`, storage key bumped to v2) and Adaptive Tuned (T1 journal via `track=t1`, stop ₹9,000, `pfstop_t1`/`pftrail_t1`); dashboard-only names, Telegram and `list_names.json` unchanged. Tuned's REF comparison is omitted (the track records no REF); its gap to the fixed base is shown. Third card **Fixed base** (the registered base, unchanged, over Classic's sessions at 1 lot = 3 lots a day; no gap-to-base line), its own stop ₹8,000 (`pfstop_base`/`pftrail_base`) replayed through `/portfolio/days\|day?book=base` (the base's Dir leg accepted by name, its registered file sha-checked; the replay reproduces the stored base results, `matches_log`). Under each card's stop, "Without the portfolio stop": latest day with vs without (or "stop not reached"), total and max drawdown with vs without, days fired and their net effect. |
 
 ### 3.11 Local research database (`packages/trading-data`)
 
@@ -696,6 +697,40 @@ Steady / Calendar / Adaptive lists, favourites, a leg-grid builder. Features fol
 | 3.28.3 | Phase 1c: Builder design A (token strip, leg grid, backtest settings popover) | claude | **Built 2026-10-15.** On `main`: `bars` / `include_excluded` on `POST /legwise/backtest`, the grid helpers and components. The Builder page uses them (PR #227) with period, bar size and include-excluded in the Run panel |
 | 3.28.4 | Phase 2–3: Analytics page pattern on Today, Builder result, Runs, Heatmap, Correlation, Regimes; declutter | claude | **In progress.** Today is one page (list cards, What happened, Is the rule still working?, Experiments) with no mode switch; the evening run bar is on Today and Daily results is retired with a redirect (2026-10-15); Regimes and the YAML engine sit under Advanced (2026-10-15); Heatmap has chips and a settings drawer; correlation / regimes run-bar and drawer controls are not done |
 
+### 3.29 Momentum ETF premium gate — [BL-136](backlog/BL-136-momentum-etf-premium-gate.md)
+
+Owner (2026-10-18), after MON100 read +16.89% above NAV on a Friday the ranking put Nasdaq 100 first:
+never open a new position in an ETF too far above its NAV; the research decides whether the rule stays.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.29.1 | Phase 1: the live gate (`premium_block_pct` 2% / `premium_block_international_pct` 5% in `live_config.toml`, every ETF favourite): a new buy over the limit becomes `SKIP (premium)` with the premium, its date, the limit and the reason; the next-best name takes the slot; Telegram "NOT BOUGHT" group, journal rows, This week "Not bought" section, Journal page chips; a sleeve's skip never reads as a TRIM in a group | claude | **Built 2026-10-18.** Decision-only: the model portfolio still records the buy (Phase 2 task 3 decides whether the gate enters the engine) |
+| 3.29.2 | Phase 1b: the same gate on Broad and Custom Index atomics (Nasdaq 100, Hang Seng), on the Broad engine decision and the 14:15 orders; until then the followed Broad headline still buys MON100 at any premium | claude | Planned, next |
+| 3.29.3 | Phase 2: rebuild the premium history on matching units (MON100 from 2016, not 2021), run the pre-registered arms A–D, apply the pass / kill rule, findings page, keep or zero the limits | claude | Planned; Phase 0 committed with the item |
+
+### 3.30 Rotation picks to AlgoTest — [BL-137](backlog/BL-137-algotest-strategy-export-upload.md)
+
+Owner (2026-10-19): the picks are typed into AlgoTest by hand each morning; export them to `.algtst` and upload
+them. Every evening after the result message, delete what the tool uploaded and upload tomorrow's predicted picks; at
+09:16 add any pick that changed. T1 first. Nothing is ever deployed by the tool.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.30.1 | Phase 1: `legwise/algtst.py` + `obt rotation algotest-export`: YAML → `.algtst`, unmapped settings refused | claude | **Built 2026-10-19.** Every mapping read off four AlgoTest exports (the test fixtures); three earlier guesses corrected; all 521 Core-298 and T1 files export |
+| 3.30.2 | Phase 2: how AlgoTest imports, saves, lists and deletes a strategy | owner + claude | **Mostly done 2026-10-19:** website route (Playwright, AlgoTest's verbal OK); import, save and list seen; the delete dialog still to be seen |
+| 3.30.3 | Phase 3: uploader in `packages/broker-login` (dry run by default, ledger, read-back, delete only its own) | claude | **Built 2026-10-19** (`src/strategy-upload.ts`, `src/strategy-plan.ts`); first supervised `--apply` and the delete dialog still to be seen |
+| 3.30.4 | Phase 4: evening replace + 09:16 top-up in the scheduler | claude | **Registered 2026-10-19** (`algotest-evening` 16:40, `algotest-topup` 09:18), off until `ALGOTEST_UPLOAD=on`; restart the scheduler after merge. The top-up sends its own Telegram line, not one inside the 09:16 message |
+| 3.30.5 | Phase 5: compare the first week's AlgoTest trades with the files | claude | Planned |
+
+### 3.31 Deploy the rotation picks in AlgoTest — [BL-138](backlog/BL-138-algotest-auto-deploy.md)
+
+Owner (2026-10-19): build the deploy function ready, off by default; it may never be used.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.31.1 | The /live page and the Setup Execution sheet, read from the screen | claude | **Done 2026-10-19** (`docs/algotest-execution.md` §7); what Activate asks is still unseen |
+| 3.31.2 | Deployer `packages/broker-login/src/strategy-deploy.ts` + `deploy-plan.ts` (8 tests), jobs `algotest-deploy` 09:16 and `algotest-deploy-check` 15:35 | claude | **Built 2026-10-19**, off until `ALGOTEST_DEPLOY=on`; the first `--apply` must be watched by the owner |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |
@@ -705,3 +740,29 @@ Steady / Calendar / Adaptive lists, favourites, a leg-grid builder. Features fol
 | `.claude/project/overview.md` | What is **built** (Implementation Phases). This file holds what is **left** |
 | `docs/epics.md` | Permanent delivery record. Never deleted, never a TODO |
 | `docs/architecture.md`, `product.md`, `setup.md`, `testing.md` | Reference specs. No status, no tasks |
+
+### 3.32 Rotation Core picks to Quantiply — [BL-139](backlog/BL-139-quantiply-core-upload.md)
+
+Owner (2026-10-19): add the Core Adaptive picks to Quantiply (Angel One) too, on AlgoTest's schedule: evening replace,
+09:16 top-up. Through Quantiply's own API (the call its web app makes), not the form. Deploy built but off.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.32.1 | Phase 1: capture the web app's calls (create, list, read, delete, auth) with the owner | owner + claude | **Done 2026-10-19** (`docs/algotest-execution.md`, `tests/fixtures/quantiply/`); the enable (deploy) call is not sent |
+| 3.32.2 | Phase 2: `legwise/quantiply.py` + `obt rotation quantiply-export`: YAML → `POST /algos` body, the owner's execution settings, unmapped settings refused | claude | **Built 2026-10-19** (25 tests); all of Core-298 maps, trail in points confirmed by the owner's `test1` |
+| 3.32.3 | Phase 3: uploader over the API (ledger by algo id, read-back, delete only its own finished algos) + jobs `quantiply-evening` 16:45, `quantiply-topup` 09:19 | claude | **Built 2026-10-19** (`src/quantiply-upload.ts`, 12 planner tests), off until `QUANTIPLY_UPLOAD=on`; first dry run and first `--apply` by the owner 2026-10-19: 3 Wednesday algos created, each read back identical; to switch on: merge (after PR #264), restart the scheduler, set `QUANTIPLY_UPLOAD=on` |
+| 3.32.4 | Phase 4: deploy (`enabled`), built but off | claude | Planned |
+
+### 3.33 Automation settings page — [BL-140](backlog/BL-140-automation-settings-page.md)
+
+Owner (2026-10-19): one place in the dashboard says what runs, with one row per platform + broker. Each row sets
+the 08:00 login, the list (Adaptive Classic / Tuned) and uploads. Three master switches: logins, uploads,
+deployment. The settings are saved in the scheduler's database, the GitHub variables are synced for the 08:15
+backstop, and the `.env` switches stay as hard safety.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.33.1 | Phase 1: versioned settings store + scheduler API + CLI + GitHub variable sync | claude | **Built 2026-10-19** (`apps/scheduler/src/automation.ts`, `GET`/`PUT /settings/automation`, `jobs settings`, 13 tests). The workflow does not read the new variables until Phase 3 |
+| 3.33.2 | Phase 2: Settings › Automation page + Guide | claude | **Built 2026-10-19** (`components/settings/AutomationSettingsCard.tsx`, `lib/automation.ts`, 8 tests; checked in a preview against a throwaway scheduler API). Apply now waits for Phase 3 |
+| 3.33.3 | Phase 3: the jobs follow the settings (08:00 logins, exports, uploaders); 3b: Quantiply login through Shoonya | claude + owner | Planned (3b needs a capture with the owner) |
+| 3.33.4 | Phase 4: more settings (lots multiplier, add-on, pause, portfolio stop, 09:20 check) | claude | Planned |

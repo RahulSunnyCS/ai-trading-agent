@@ -1,6 +1,16 @@
 import { mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, sep } from 'node:path';
 import { NOTIFICATION_TYPES, disabledTypes, prefsPath } from '@trading/notify';
+import {
+  type GhRunner,
+  ROW_KEYS,
+  type SettingsStore,
+  effective,
+  githubVariables,
+  realGh,
+  syncGithub,
+  validate,
+} from './automation.js';
 import { JOBS, type Job } from './jobs.js';
 import { type RunContext, runJob } from './runner.js';
 import { nextDue } from './schedule.js';
@@ -26,6 +36,10 @@ export interface ApiOptions {
   prefsFile?: string;
   /** Extra directories a run log may live in, besides `ctx.logDir`. */
   logRoots?: string[];
+  /** The automation settings (BL-140); without it the settings routes answer 503. */
+  settings?: SettingsStore;
+  /** How the GitHub variables are set on Save; tests pass a fake. */
+  gh?: GhRunner;
 }
 
 const json = (body: unknown, status = 200): Response => Response.json(body, { status });
@@ -67,7 +81,14 @@ function writePrefs(path: string, disabled: string[]): void {
   renameSync(tmp, path);
 }
 
-export function createApi({ ctx, jobs = JOBS, prefsFile, logRoots = [] }: ApiOptions) {
+export function createApi({
+  ctx,
+  jobs = JOBS,
+  prefsFile,
+  logRoots = [],
+  settings,
+  gh = realGh,
+}: ApiOptions) {
   const now = () => (ctx.now ?? (() => new Date()))();
   const roots = [ctx.logDir, ...logRoots];
   const inFlight = new Set<string>();
@@ -160,6 +181,35 @@ export function createApi({ ctx, jobs = JOBS, prefsFile, logRoots = [] }: ApiOpt
     return listNotifications();
   }
 
+  function automationView(): Response {
+    if (!settings) return fail(503, 'automation settings are not available');
+    const current = settings.current();
+    return json({
+      current,
+      effective: Object.fromEntries(ROW_KEYS.map((k) => [k, effective(current.settings, k)])),
+      github: githubVariables(current.settings).vars,
+      history: settings.history(20),
+    });
+  }
+
+  async function putAutomation(req: Request): Promise<Response> {
+    if (!settings) return fail(503, 'automation settings are not available');
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return fail(400, 'body must be JSON');
+    }
+    const checked = validate(body);
+    if ('errors' in checked)
+      return json({ error: 'invalid settings', errors: checked.errors }, 400);
+    const saved = settings.save(checked.settings, now());
+    // The 08:15 GitHub backstop reads repository variables, not this database: set them now.
+    // A failed sync does not undo the save; the page shows the outcome.
+    settings.noteGithub(saved.version, await syncGithub(checked.settings, gh));
+    return automationView();
+  }
+
   return async function handle(req: Request): Promise<Response> {
     const url = new URL(req.url);
     const path = url.pathname.replace(/\/+$/, '') || '/';
@@ -173,7 +223,10 @@ export function createApi({ ctx, jobs = JOBS, prefsFile, logRoots = [] }: ApiOpt
       if (run && method === 'POST') return await startRun(decodeURIComponent(run[1] ?? ''));
       if (path === '/notifications' && method === 'GET') return listNotifications();
       if (path === '/notifications' && method === 'PUT') return await putNotifications(req);
-      const known = ['/jobs', '/runs', '/notifications'].includes(path) || log || run;
+      if (path === '/settings/automation' && method === 'GET') return automationView();
+      if (path === '/settings/automation' && method === 'PUT') return await putAutomation(req);
+      const known =
+        ['/jobs', '/runs', '/notifications', '/settings/automation'].includes(path) || log || run;
       return known ? fail(405, 'method not allowed') : fail(404, 'not found');
     } catch (error) {
       return fail(500, error instanceof Error ? error.message : String(error));
@@ -183,7 +236,14 @@ export function createApi({ ctx, jobs = JOBS, prefsFile, logRoots = [] }: ApiOpt
 
 /** Bind the API to loopback only. */
 export function startApi(options: ApiOptions, port: number = apiPort()) {
-  const server = Bun.serve({ hostname: '127.0.0.1', port, fetch: createApi(options) });
+  // A settings save waits for its GitHub sync (up to five `gh` calls); Bun's default 10 s idle
+  // timeout would drop that response although the version was saved. 255 s is Bun's maximum.
+  const server = Bun.serve({
+    hostname: '127.0.0.1',
+    port,
+    idleTimeout: 255,
+    fetch: createApi(options),
+  });
   console.log(`scheduler API on http://127.0.0.1:${server.port}`);
   return server;
 }

@@ -194,6 +194,48 @@ browser inside a GitHub Action — the trigger is an RPC either way.
 
 ---
 
+### 7. Saved strategies and live deploys through the website (BL-137 / BL-138, 2026-10-19)
+
+AlgoTest support confirmed by phone (2026-10-19) that automating one's own account through the website is
+fine. Everything below was read off the site at desktop width (1440 x 900); below about 500 px the site switches
+to a phone layout with no "Save Strategy" button.
+
+**Import and save (`/backtest`).** "Import .algtst" is a hidden `<input type=file accept=".algtst,.json">`;
+setting a file fills the builder ("Strategy imported successfully") and nothing is saved. The name comes from
+the file's `name`. "Save Strategy" (bottom bar) opens "Save New Strategy" with that name filled in; "Done"
+saves it through `api.algotest.in/strategy` ("Strategy Saved"), and the bar then shows Update / Save As New.
+"Export .algtst" downloads the saved strategy. The saved list is Saved Strategies › MY STRATEGIES (its ⋮ menu:
+Add to folder, Delete); the page itself reads it from `GET api.algotest.in/strategies`.
+
+**Live (`/live`, "Algo Trade").** Header: "Broker Login n/m", "n/6 Strategy Deployed" (6 at once on the
+owner's plan), Auto Activation, Auto restart paused executions. Deploys are allowed only **08:00–15:40 IST**
+("Strategies can only be deployed during 08:00 IST to 15:40 IST"). Two sections:
+
+- **Activation:** one row per saved strategy: status ("Setup Pending" → "Ready to deploy"), "n Deployed", the
+  execution days (M–Su, "-" when none), and the buttons "Setup Execution" (then "Edit Execution") and
+  "Activate".
+- **Deployed Strategies:** one card per deploy: "Deployed on 19 OCT 26 · Intraday · <name> · NIFTY ·
+  Open Pos: n · RUNNING · ₹ MTM · <broker - account>", with Switch to manual / Square Off / View Trades; the
+  section has "Switch all to manual" and "Square off all". Filters: Running, Paused, Sq Off, Error, Manual.
+
+**Setup Execution** opens a sheet "Edit execution for <name>":
+
+| Field | Seen (default) |
+|---|---|
+| Notice | limit and SL-limit orders are watched for 50 s; still open → cancelled and the strategy marked Error |
+| Notice | for MIS orders the exit time must be strictly before 15:24; the rotation exits at 15:28, so NRML |
+| Quantity Multiplier | 1 |
+| Auto Sq Off on Margin Error | on |
+| Trade monitoring | on LTP / **on Candle Close** |
+| Strategy execution time | the strategy's entry time (11:37:00 for the owner's Widesl file) |
+| Per leg (Leg 1, Leg 2, "Copy To Legs") | NRML/MIS **NRML**; Tgt/SL ref price Traded/**Trigger**; delay entry 0 s; entry and exit order type **Limit**/MPP; buffer type **Points**/%; trigger buffer 0; limit buffer 3; monitoring **Continuous**/Delayed, frequency 5 s |
+| Execution days | Weekdays / DTE; M T W Th F Sa Su, **none ticked** |
+| Buttons | Cancel · "Setup Execution Settings" |
+
+The owner's first live deploy (2026-10-19, `T1 · N_p150-t1s11_0917` on Finvasia) left the days unticked, and the
+row shows "-" for every day: **a deploy with no days ticked runs that day only**. Not yet seen: what "Activate"
+asks (broker or account choice, a confirmation), and what stopping a deploy before its entry looks like.
+
 <a id="pending"></a>
 
 ## Pending actions → moved
@@ -356,3 +398,60 @@ change. Getting there needed two container fixes in the workflow — `unzip` for
 
 Tracked in [`/TODO.md`](../TODO.md) → Priority 1.
 
+
+## Quantiply algos through its API (BL-139, captured 2026-10-19)
+
+Captured from the web app in a browser while the owner saved, opened and deleted algos by hand. The
+recorder kept header names only, never values. Fixtures, with the user and broker ids removed:
+`packages/option-backtesting/tests/fixtures/quantiply/`.
+
+**Host and auth.** `https://api-prod.quantiply.angelone.in`. Every call sends an `authorization`
+header with a JWT. The web app keeps the JWT in `localStorage["quantiply-dashboard-local"].token`
+after the Angel One login (`src/quantiply.ts`). The JWT seen was valid for 9 hours from login
+(claims `_id, name, clientId, familyContext, iat, exp`). The JWT is a live credential to the owner's
+algos: never log it, store it in a file or put it in a fixture.
+
+**Calls seen**
+
+| Call | What it does |
+|---|---|
+| `GET /algos/config` | days, expiry tags per underlying and weekday, lot sizes (NIFTY 65, SENSEX 20 on 2026-10-19) |
+| `GET /algos/day-wise` | the list: one entry per weekday (`MON`…`SUN`, `ELSE`) with `active` and `algos` (summaries: `_id`, `name`, `day`, `enabled`, `status` such as `NOT_RUNNING` or `TRADE_CLOSED`; no configuration) |
+| `GET /algos/:id` | one algo, full `configurations` (the read-back) |
+| `POST /algos` | create: body `{code, name, day: [..], configurations}`. Answers 201 with `data`: **one algo per weekday in `day`**, each `enabled: false`, with the server defaults filled in |
+| `DELETE /algos/:id` | delete one algo (one weekday's copy): `{"message":"Deleted successfully"}` |
+
+The header is `authorization: Bearer <JWT>` (the web app's API client sets it so). In the app's
+code but not yet seen: `PUT /algos/bulk/action/enable` and `.../disable` with `{algoIds: [...]}`,
+`DELETE /algos/bulk/action/delete` with `{algoIds}`, `/algos/bulk/action/{clone,edit,mtm-edit,
+TERMINATE,SQ_OFF_TERMINATE}`, `/algos/clone`, `/algos/types`. An algo is deployed for its weekday
+when `enabled` is true; the enable call is BL-139 Phase 4's and has not been sent.
+
+The uploader (`packages/broker-login/src/quantiply-upload.ts`) logs in through Angel One in a
+browser, takes this token, closes the browser and uses `GET /algos/day-wise`, `POST /algos`,
+`GET /algos/:id` (the read-back) and `DELETE /algos/:id`.
+
+**Body: `code: "OPTIONS_SPREADS_LEGS"`, `configurations`**
+
+| YAML (legwise) | Quantiply |
+|---|---|
+| `entry_time` / `exit_time` | `startTime` / `endTime` `"HH:MM:SS"` |
+| `square_off: partial` | `legsAction: "SQ_OFF_LEG"` |
+| `overall.stop_loss_inr: N` | `stoploss: {type: "TOTAL_AMOUNT", value: -N, action: "SQ_OFF_ALL"}` |
+| leg `position: sell / buy` | `transactionType: "S" / "B"` |
+| leg `option_type` | `side: "CE" / "PE"` |
+| leg `expiry: weekly` | `expiryTag: "CURRENT_WEEK"` |
+| leg `lots: n` | `quantity: n` (lots), `multiplier: 1` |
+| `strike_type: ATM / ITMn / OTMn` | `selectionType: "STRIKE"`, `strike: "ATM" / "ITM_n" / "OTM_n"` |
+| `closest_premium: P` | `selectionType: "PREMIUM"`, `premium: {type: "PREMIUM_CLOSE_TO", value: P, specificStrikeSelection: false}` |
+| `stop_loss: {percent: p}` | `stoploss: {type: "PER_POSITION_PERCENT", value: -p}` |
+| `stop_loss: {points: p}` | `stoploss: {type: "PER_POSITION_POINT", value: -p}` |
+| `trail_sl: {percent: [x, y]}` | `trailingStoploss: {type: "PER_POSITION_PERCENT", moveBy: x, trailBy: y}` |
+| `trail_sl: {points: [x, y]}` | `trailingStoploss: {type: "PER_POSITION_POINT", moveBy: x, trailBy: y}`, beside a percent stop (the owner's `test1`, saved 2026-10-19) |
+| `reentry_on_sl: {mode: cost, count: n}` | `isReEntryEnabled: true`, leg `reEntry: {type: "RE_ENTRY_COST", repeat: n}` |
+| `range_breakout: {until: T, side: high/low, source: instrument}` | `isORBEnabled: true`, `orbEndTime: T`, leg `orb: {type: "ORB_INSTRUMENT", entryAt: "HIGH"/"LOW"}`; the range starts at `startTime` |
+
+Execution settings with no YAML counterpart, as on the owner's own algos (N_ITM1_SL21_3000):
+`product: "D"`, limit orders (`entryOrderType: "L"`, buffer `FIXED_VALUE` 3, timeouts 5 / 4 s),
+SL limit buffer 1, `stoplossOrderPlacement: "LATER"`, exit delay 3 s, `errorAutoSquareOff: true`.
+The algo the owner built for the capture used market orders (`"M"`) instead.

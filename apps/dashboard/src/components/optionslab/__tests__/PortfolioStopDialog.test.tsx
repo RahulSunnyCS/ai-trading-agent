@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_SETTING } from '../../../lib/portfolioStop';
+import { DEFAULT_SETTING, DEFAULT_T1_SETTING } from '../../../lib/portfolioStop';
 import { PortfolioStopButton } from '../PortfolioStopButton';
 
 afterEach(cleanup);
@@ -17,16 +17,16 @@ function open(setting = DEFAULT_SETTING) {
 describe('PortfolioStopButton and its pop-up', () => {
   it('shows the applied setting on the button', () => {
     render(<PortfolioStopButton setting={DEFAULT_SETTING} onChange={() => {}} />);
-    expect(screen.getByRole('button').textContent).toBe('Portfolio stop ₹10,000');
+    expect(screen.getByRole('button').textContent).toBe('Portfolio stop ₹8,000');
     cleanup();
     render(<PortfolioStopButton setting={{ ...DEFAULT_SETTING, stop: '' }} onChange={() => {}} />);
     expect(screen.getByRole('button').textContent).toBe('Portfolio stop off');
   });
 
-  it('opens with 10,000 and no trailing, and applies a cleared stop as none', () => {
+  it('opens with 8,000 and no trailing, and applies a cleared stop as none', () => {
     const onChange = open();
-    expect((screen.getByLabelText(/Stop loss/) as HTMLInputElement).value).toBe('10000');
-    expect(screen.getByText(/No trailing: the stop stays at -₹10,000/)).toBeTruthy();
+    expect((screen.getByLabelText(/Stop loss/) as HTMLInputElement).value).toBe('8000');
+    expect(screen.getByText(/No trailing: the stop stays at -₹8,000/)).toBeTruthy();
     fireEvent.change(screen.getByLabelText(/Stop loss/), { target: { value: '' } });
     expect(screen.getByText(/No portfolio stop/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
@@ -38,7 +38,7 @@ describe('PortfolioStopButton and its pop-up', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Trail SL' }));
     fireEvent.change(screen.getByLabelText(/Every profit of/), { target: { value: '1000' } });
     fireEvent.change(screen.getByLabelText(/Move the stop/), { target: { value: '500' } });
-    expect(screen.getByText(/after \+₹1,000 it is -₹9,500/)).toBeTruthy();
+    expect(screen.getByText(/after \+₹1,000 it is -₹7,500/)).toBeTruthy();
     expect(screen.queryByLabelText(/When profit reaches/)).toBeNull();
     fireEvent.click(screen.getByRole('radio', { name: 'Lock and trail' }));
     expect(screen.getByLabelText(/When profit reaches/)).toBeTruthy();
@@ -71,9 +71,24 @@ describe('PortfolioStopButton and its pop-up', () => {
   });
 
   it('resets the draft to the default', () => {
-    open({ ...DEFAULT_SETTING, stop: '8000', mode: 'sl', x: '1000', y: '500' });
+    open({ ...DEFAULT_SETTING, stop: '7000', mode: 'sl', x: '1000', y: '500' });
     fireEvent.click(screen.getByRole('button', { name: 'Reset to default' }));
-    expect((screen.getByLabelText(/Stop loss/) as HTMLInputElement).value).toBe('10000');
+    expect((screen.getByLabelText(/Stop loss/) as HTMLInputElement).value).toBe('8000');
     expect(screen.getByText(/No trailing/)).toBeTruthy();
+  });
+
+  it("resets Adaptive Tuned's pop-up to its own default and names the card", () => {
+    render(
+      <PortfolioStopButton
+        setting={{ ...DEFAULT_T1_SETTING, stop: '7000' }}
+        onChange={() => {}}
+        defaults={DEFAULT_T1_SETTING}
+        dialogTitle="Portfolio stop · Adaptive Tuned"
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Portfolio stop/ }));
+    expect(screen.getByRole('dialog').textContent).toMatch(/Portfolio stop · Adaptive Tuned/);
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to default' }));
+    expect((screen.getByLabelText(/Stop loss/) as HTMLInputElement).value).toBe('9000');
   });
 });

@@ -322,3 +322,90 @@ def test_the_first_week_of_an_ungrouped_favourite_is_all_buys_from_its_own_targe
     assert {r["action"] for r in first["rows"]} == {"BUY"}
     # Exactly the names the card holds after the week, each at its target weight.
     assert {r["asset"]: r["after"] for r in first["rows"]} == ETF_FINAL["weights"]
+
+
+def test_a_premium_skip_keeps_its_label_and_reason_on_the_card_and_in_the_journal_view():
+    """BL-136: the gate's row reaches This week and the Journal page with why it was not bought."""
+    skip = {
+        "asset": "Nasdaq 100",
+        "action": "SKIP (premium)",
+        "rank": 1,
+        "previous_rank": 4,
+        "held": False,
+        "premium": 0.1689,
+        "premium_limit": 0.05,
+        "reason": "MON100 trades +16.9% above NAV (2026-10-15), over the 5% limit.",
+    }
+    signal = {**ETF_FINAL, "rows": [skip, *ETF_FINAL["rows"]]}
+    etf = _favourite("e1", "ETF Core", "paper", exit_rank=5, active=True)
+    (card,) = this_week.week_view("2026-12-04", [_entry(1, "e1", "final", signal)], [], [etf], [])
+    row = card["rows"][0]
+    assert row["action"] == "SKIP (premium)" and row["reason"].startswith("MON100")
+    assert row["premium"] == 0.1689 and row["premium_limit"] == 0.05 and not row["held"]
+    assert card["trades"] == 2  # a skip is a trade NOT placed: not counted, like the tile
+    assert card["edge"]["strongest_not_held"][0]["asset"] == "Nasdaq 100"
+    view = api._journal_entry_view(
+        {
+            "week": "2026-12-04",
+            "source": "favourite",
+            "config_name": "ETF Core",
+            "signal": json.dumps(signal),
+            "holdings_before": json.dumps({"IT": 0.5, "Bank": 0.5}),
+            "settings": "{}",
+        }
+    )
+    first = view["actions"][0]
+    assert first["action"] == "SKIP (premium)" and first["reason"].startswith("MON100")
+    assert first["premium"] == 0.1689
+    assert "reason" not in view["actions"][1]  # ordinary actions carry no reason
+
+
+def test_the_paper_start_week_keeps_a_premium_skip_instead_of_reading_it_as_a_buy():
+    """BL-136: the model's weights are ungated, so on the start Friday the name the gate refused
+    is in `target_weights`; the first-week views must show the recorded skip, not a BUY."""
+    skip = {
+        "asset": "Nasdaq 100",
+        "action": "SKIP (premium)",
+        "rank": 1,
+        "held": False,
+        "premium": 0.1689,
+        "premium_limit": 0.05,
+        "reason": "MON100 trades +16.9% above NAV (2026-10-15), over the 5% limit.",
+    }
+    signal = {
+        "week": "2026-12-04",
+        "rows": [skip, {"asset": "Gold", "action": "BUY", "rank": 2, "held": False}],
+        "weights": {},
+        "target_weights": {"Nasdaq 100": 0.5, "Gold": 0.5},
+    }
+    actions = this_week.first_week_actions(signal)
+    assert [(a["asset"], a["action"]) for a in actions] == [
+        ("Gold", "BUY"),
+        ("Nasdaq 100", "SKIP (premium)"),
+    ]
+    assert actions[1]["reason"].startswith("MON100") and actions[1]["premium"] == 0.1689
+    view = api._journal_entry_view(
+        {
+            "week": "2026-12-04",
+            "source": "favourite",
+            "config_name": "ETF Core",
+            "signal": json.dumps(signal),
+            "holdings_before": json.dumps({}),
+            "settings": "{}",
+        },
+        "2026-12-04",
+    )
+    assert view["first_week"] and [a["action"] for a in view["actions"]] == [
+        "BUY",
+        "SKIP (premium)",
+    ]
+    etf = _favourite("e1", "ETF Core", "paper", exit_rank=5, active=True)
+    (card,) = this_week.week_view(
+        "2026-12-04", [_entry(1, "e1", "final", signal)], [], [etf], [], start_week="2026-12-04"
+    )
+    assert card["first_week"]
+    by_asset = {r["asset"]: r for r in card["rows"]}
+    assert by_asset["Gold"]["action"] == "BUY"
+    assert by_asset["Nasdaq 100"]["action"] == "SKIP (premium)"
+    assert by_asset["Nasdaq 100"]["reason"].startswith("MON100")
+    assert not by_asset["Nasdaq 100"]["held"]

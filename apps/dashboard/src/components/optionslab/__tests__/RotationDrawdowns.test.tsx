@@ -147,7 +147,7 @@ describe('RotationDrawdowns', () => {
 
 describe('RotationDrawdowns with a portfolio stop', () => {
   const withStop = {
-    setting: { amount: 10000, trail: null },
+    setting: { amount: 8000, trail: null },
     max_dd: -900,
     total_per_lot: 1200,
     total_per_lot_without: 800,
@@ -171,12 +171,12 @@ describe('RotationDrawdowns with a portfolio stop', () => {
     expect(screen.getByText(/2 of 6/)).toBeTruthy();
     expect(screen.getByText(/1 not replayed/)).toBeTruthy();
     expect(screen.getByText(/with the portfolio stop/)).toBeTruthy();
-    expect(screen.getByText(/With the ₹10,000 stop replayed/)).toBeTruthy();
+    expect(screen.getByText(/With the ₹8,000 stop replayed/)).toBeTruthy();
   });
 
   it('does not draw an answer made for another setting under this one', () => {
     hook.state.data = response({
-      with_stop: { ...withStop, setting: { amount: 8000, trail: null } },
+      with_stop: { ...withStop, setting: { amount: 7000, trail: null } },
     });
     render(<RotationDrawdowns list="A" portfolio={DEFAULT_SETTING} />);
     expect(screen.queryByText('Worst fall per lot, registered')).toBeNull();

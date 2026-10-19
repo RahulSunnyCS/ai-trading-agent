@@ -39,7 +39,8 @@ summary flags anything but `main`).
   they timed out or could not start), on a missed slot, and on recovery. Successes stay
   quiet.
 - `src/summary.ts` — the 09:00 trading-day morning summary (builtin job): today's job slots,
-  the AlgoTest workflow result (`gh run list`), Fyers token (`mbt token-status`), whether
+  the broker login workflow result (`gh run list`; label "Broker login", and a failure names
+  AlgoTest or Quantiply from the run's steps via `gh run view`), Fyers token (`mbt token-status`), whether
   the last trading day's options data is in the lake, disk space, and failures in the last
   24 h.
 - `src/api.ts` — loopback HTTP API (`127.0.0.1:8790`, `SCHEDULER_API_PORT`) started by
@@ -47,9 +48,21 @@ summary flags anything but `main`).
   `GET /runs/:id/log?tail=200` (refuses paths outside the log dir and
   `packages/momentum-backtesting/data`, symlinks resolved), `POST /jobs/:id/run` (manual run;
   202 + run id, 409 if the job or its group is busy), `GET`/`PUT /notifications` (catalogue +
-  the prefs file from `@trading/notify`, written atomically). The dashboard reaches it through the
+  the prefs file from `@trading/notify`, written atomically), `GET`/`PUT /settings/automation`
+  (BL-140, below). The dashboard reaches it through the
   `SCHEDULER_DIRECT` rewrite `/api/scheduler/*`. Never bind it beyond loopback.
-- `src/cli.ts` — `bun run jobs status | run <id> | serve`.
+- `src/automation.ts` — BL-140's automation settings. Three master switches (logins, uploads, deploy) and one
+  row per platform + broker (`algotest|quantiply` × `finvasia|angelone`: login, list none/core/t1, upload),
+  validated (unknown keys refused).
+  - Every save is a new version in `scheduler.db` (`automation_settings`). Only the `github` outcome column is
+    ever written after the insert.
+  - The current version is written atomically to `automation-settings.json` beside it (also on `serve` start);
+    that file is what jobs read.
+  - A save also sets the repository variables the "Daily broker login" workflow reads (`BROKER_LOGIN_ENABLED`,
+    `ALGOTEST_BROKERS`, `QUANTIPLY_BROKERS`, `BROKER_LOGIN_ONLY`, `QUANTIPLY_LOGIN`) through `gh`, so the 08:15
+    backstop follows too. A failed sync is recorded on the version, never undoes it.
+  - The `.env` switches (`ALGOTEST_UPLOAD`, `QUANTIPLY_UPLOAD`, `ALGOTEST_DEPLOY`) stay as hard safety.
+- `src/cli.ts` — `bun run jobs status | run <id> | serve | settings [show | set <file.json>]`.
 
 ## Adding a check
 
@@ -73,8 +86,10 @@ network or disk so the test needs neither. One group per file keeps parallel PRs
   cool-down, and a login Angel One refused is not re-sent for 15 minutes with the same settings,
   so the retry only helps a network blip. The check re-reads the `ANGELONE_*` keys from `.env`
   itself, so the scheduler's start-time snapshot of `.env` does not matter for it. The scheduler
-  sends the failure alert (the job does not alert itself). 08:00 does not collide with
-  `broker-login` (AlgoTest's Angel One login is off and AlgoTest logs in from 08:15).
+  sends the failure alert (the job does not alert itself). `broker-login`'s GitHub run logs in
+  to Angel One too (AlgoTest's Angel One login from 08:15 unless BROKER_LOGIN_ONLY=finvasia, and
+  Quantiply's at about 08:02 when QUANTIPLY_LOGIN is on), where this job's hold can't see it;
+  see the comment on the job in `jobs.ts`.
 - The scheduler reads `jobs.ts` once at start: a new or changed job needs a restart of the
   service (`launchctl kickstart -k gui/$(id -u)/com.ai-trading-agent.scheduler`, see
   `deploy/launchd/README.md`).
@@ -85,9 +100,10 @@ network or disk so the test needs neither. One group per file keeps parallel PRs
 bun run jobs status          # every job: schedule, last run, next run
 bun run jobs run <job-id>    # run one now (recorded as manual)
 bun run jobs serve           # the long-running scheduler
+bun run jobs settings        # the current automation settings (BL-140); `settings set <file.json>` saves a version
 bun run test                 # bun test
 bun run typecheck
 ```
 
 State: `SCHEDULER_STATE_DIR` (default `~/Library/Application Support/ai-trading-agent`,
-holds `scheduler.db`). Logs: `SCHEDULER_LOG_DIR` (default `~/Library/Logs/ai-trading-agent`).
+holds `scheduler.db` and `automation-settings.json`). Logs: `SCHEDULER_LOG_DIR` (default `~/Library/Logs/ai-trading-agent`).

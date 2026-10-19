@@ -14,8 +14,32 @@ export function useRotationOverview() {
   return usePolledResource<RotationOverview>(`${BASE}/overview`, { intervalMs: HALF_MINUTE });
 }
 
-export function useRotationSummary() {
-  return usePolledResource<RotationSummary>(`${BASE}/summary`, { intervalMs: HALF_MINUTE * 4 });
+/** The owner trades one lot a pick (2026-10-19): the Rotation page shows every rupee figure at
+ * this many lots a strategy (display only; the journal records 2 and the per-lot figures and the
+ * verdict do not depend on it). The page's log, day view, replays and drawdowns all ask for it. */
+export const ROTATION_PAGE_LOTS = 1;
+
+/** Which journal and how many lots: `lots` sets the lots a strategy behind the rupee totals
+ * (display only; the per-lot figures and the verdict do not move), `track` reads a parallel
+ * track's journal (`t1`: Adaptive Tuned, list C only). Absent = the registered read-out. */
+export interface RotationReadOptions {
+  lots?: number;
+  track?: 't1';
+}
+
+/** "?lots=1&track=t1", or "" for the defaults. */
+export function readQuery(opts: RotationReadOptions = {}): string {
+  const q = new URLSearchParams();
+  if (opts.lots !== undefined) q.set('lots', String(opts.lots));
+  if (opts.track) q.set('track', opts.track);
+  const text = q.toString();
+  return text ? `?${text}` : '';
+}
+
+export function useRotationSummary(opts: RotationReadOptions = {}) {
+  return usePolledResource<RotationSummary>(`${BASE}/summary${readQuery(opts)}`, {
+    intervalMs: HALF_MINUTE * 4,
+  });
 }
 
 export const ROTATION_API = BASE;
