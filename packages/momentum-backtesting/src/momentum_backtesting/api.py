@@ -5171,7 +5171,6 @@ def create_app() -> FastAPI:
 
         who = holdings_store.owner()
         target = week or week_ending_on_or_before(datetime.now(IST).date() + timedelta(days=6))
-        # BL-142: holdings held for options margin (LIQUIDBEES, SGBs) count as excluded with no rule.
         empty = {
             "week": target.isoformat(),
             "settings": {"owner": who, **holdings_store.SETTINGS_DEFAULTS},
@@ -5190,6 +5189,7 @@ def create_app() -> FastAPI:
                         con, who, holdings_store.SNAPSHOT_SOURCES.get(settings["holdings_source"])
                     ),
                     "rules": holdings_store.rules(con, who),
+                    # BL-142: options-margin holdings, excluded with no rule
                     "margin": {
                         "symbols": sorted(holdings_store.MARGIN_SYMBOLS),
                         "prefixes": list(holdings_store.MARGIN_PREFIXES),
