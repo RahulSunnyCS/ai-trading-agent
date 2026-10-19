@@ -175,6 +175,9 @@ only if the API cannot be used.
 
 ## Log
 
+- 2026-10-19 — Owner: Quantiply can also delete in a batch. Its web app sends `DELETE /algos/bulk/action/delete` with `{algoIds: [...]}`; the call was read from the app's code, but its request was never captured.
+  - The uploader keeps the captured one-by-one `DELETE /algos/:id`. An evening deletes only a few algos, and each delete gets its own ledger row and result.
+  - Switch to the batch call only if the evening grows (for example when T1 joins) or Quantiply limits request rates. Capture one batch delete first.
 - 2026-10-19 — Phase 3 built:
   - The trail in points is confirmed. The owner's `test1` saved `PER_POSITION_POINT` trailing beside a percent stop (fixture `trail_points.json`). No mapping is left unconfirmed.
   - `src/quantiply-upload.ts`, `quantiply-plan.ts` and `quantiply-api.ts` in `packages/broker-login`:
