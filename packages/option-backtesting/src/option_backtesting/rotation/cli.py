@@ -205,6 +205,9 @@ def algotest_export(
     out: str | None = typer.Option(
         None, "--out", help="Folder; default TRADING_DATA_ROOT/rotation/algotest/<day>/<book>."
     ),
+    wait: int = typer.Option(
+        0, "--wait", help="Seconds to wait for the day's recorded entry (the 09:16 jobs)."
+    ),
 ) -> None:
     """The day's Adaptive picks as AlgoTest .algtst files plus a zip (BL-137; uploads nothing)."""
     from pathlib import Path
@@ -229,7 +232,13 @@ def algotest_export(
             typer.echo(f"no expected picks for {d}: results do not reach the session before it")
             raise typer.Exit(2)
     else:
+        import time
+
         picks = ax.recorded_picks(d, book)
+        deadline = time.monotonic() + wait
+        while picks is None and time.monotonic() < deadline:
+            time.sleep(2)
+            picks = ax.recorded_picks(d, book)
         if picks is None:
             typer.echo(f"no recorded {book} entry for {d} (09:16); --preview: the expected picks")
             raise typer.Exit(2)

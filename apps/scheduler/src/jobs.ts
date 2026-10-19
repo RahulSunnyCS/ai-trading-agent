@@ -417,6 +417,50 @@ const BASE_JOBS: Job[] = [
       'cd packages/option-backtesting && uv run obt rotation algotest-export --book t1; then cd ../broker-login && node_modules/.bin/tsx src/strategy-upload.ts --latest t1 --mode topup --apply',
   },
   {
+    id: 'algotest-deploy',
+    description:
+      "Deploy the day's recorded T1 picks on AlgoTest's /live (BL-138), right after the 09:16 pick: 1 lot each, today only, never a pick whose entry minute has come. Built ready but OFF: does nothing until ALGOTEST_DEPLOY=on",
+    // Starts with the pick and waits (up to 120 s) for its journal entry. A 09:17 pick may still be
+    // too late through the website; it is then reported, never deployed late. Not caught up.
+    schedule: { at: '09:16', on: tradingDays, label: 'trading days 09:16' },
+    steps: [
+      [
+        'uv',
+        'run',
+        '--directory',
+        '../option-backtesting',
+        'obt',
+        'rotation',
+        'algotest-export',
+        '--book',
+        't1',
+        '--wait',
+        '120',
+      ],
+      ['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--latest', 't1', '--apply'],
+    ],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 10,
+    retries: 0, // a second attempt could deploy what the first already did; the run alerts instead
+    retryDelayMinutes: 0,
+    catchUpHours: 0,
+    fixHint:
+      'Deploy the picks by hand on algotest.in/live; then: cd packages/broker-login && node_modules/.bin/tsx src/strategy-deploy.ts --latest t1  (dry run)',
+  },
+  {
+    id: 'algotest-deploy-check',
+    description:
+      'At 15:35, alert if any strategy the tool deploys on AlgoTest has an execution day ticked (it would trade again on its own). Does nothing until ALGOTEST_DEPLOY=on',
+    schedule: { at: '15:35', on: tradingDays, label: 'trading days 15:35' },
+    steps: [['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--latest', 't1', '--check']],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 5,
+    retries: 1,
+    retryDelayMinutes: 2,
+    catchUpHours: 0,
+    fixHint: 'Open algotest.in/live and untick the execution days of the T1 strategies',
+  },
+  {
     id: 'backup',
     description: 'Copy the research database (TRADING_DATA_ROOT) to the external SSD',
     schedule: { at: '10:00', on: firstWeekdayOfMonth(0), label: '1st Sunday of the month 10:00' },

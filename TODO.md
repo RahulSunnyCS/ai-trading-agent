@@ -720,6 +720,15 @@ them. Every evening after the result message, delete what the tool uploaded and 
 | 3.30.4 | Phase 4: evening replace + 09:16 top-up in the scheduler | claude | **Registered 2026-10-19** (`algotest-evening` 16:40, `algotest-topup` 09:18), off until `ALGOTEST_UPLOAD=on`; restart the scheduler after merge. The top-up sends its own Telegram line, not one inside the 09:16 message |
 | 3.30.5 | Phase 5: compare the first week's AlgoTest trades with the files | claude | Planned |
 
+### 3.31 Deploy the rotation picks in AlgoTest — [BL-138](backlog/BL-138-algotest-auto-deploy.md)
+
+Owner (2026-10-19): build the deploy function ready, off by default; it may never be used.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.31.1 | The /live page and the Setup Execution sheet, read from the screen | claude | **Done 2026-10-19** (`docs/algotest-execution.md` §7); what Activate asks is still unseen |
+| 3.31.2 | Deployer `packages/broker-login/src/strategy-deploy.ts` + `deploy-plan.ts` (8 tests), jobs `algotest-deploy` 09:16 and `algotest-deploy-check` 15:35 | claude | **Built 2026-10-19**, off until `ALGOTEST_DEPLOY=on`; the first `--apply` must be watched by the owner |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

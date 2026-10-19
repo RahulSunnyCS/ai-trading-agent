@@ -8,7 +8,7 @@
 | **Area** | broker-login (AlgoTest automation), options (picks), infra (scheduler) |
 | **Created** | 2026-10-19 |
 | **Depends on** | BL-137 (export, upload, ledger, the AlgoTest discovery); BL-058 / BL-113 (the 09:16 journal) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | §3.31 |
 
 ## Context
 
@@ -243,4 +243,15 @@ Claude.
     repeat. The 15:30 deactivate-all stays as a safety net.
   - The Setup Execution dialog itself is still to be read (the owner will pause on it for the 09:47 deploy).
   - The 09:16 T1 entry matched the evening preview exactly (3 of 3), so the morning top-up had nothing to add.
+- 2026-10-19 ~09:30 — Setup Execution sheet read (owner opened it on `Nifty_Widesl_917_OTM1`, then cancelled):
+  fields in `docs/algotest-execution.md` §7 (multiplier 1, NRML legs, MIS needs exit before 15:24, Candle Close
+  monitoring, limit orders watched 50 s, no execution day ticked by default). Deployer built:
+  `src/deploy-plan.ts` (pure: 08:00–15:40 window, at least one broker logged in, strategy limit, entry still
+  ahead, only `T1 · ` / `Core · ` names; parses /live's text; 8 tests on the page captured at 09:18) and
+  `src/strategy-deploy.ts` (checks the sheet's defaults rather than changing them, "Setup Execution Settings",
+  then "Activate"; stops at any pop-up it has not seen; a ledger `deploy-ledger.jsonl`; one Telegram message).
+  Because a deploy with no day ticked runs that day only, the 15:30 deactivate-all became a 15:35 check that no
+  tool strategy has a day ticked. Jobs `algotest-deploy` (09:16, waits up to 120 s for the entry, no retries)
+  and `algotest-deploy-check` (15:35) registered, both doing nothing until `ALGOTEST_DEPLOY=on`. Not run against
+  AlgoTest; the first `--apply` must be watched by the owner.
 

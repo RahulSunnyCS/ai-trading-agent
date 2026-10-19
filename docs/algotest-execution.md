@@ -194,6 +194,48 @@ browser inside a GitHub Action — the trigger is an RPC either way.
 
 ---
 
+### 7. Saved strategies and live deploys through the website (BL-137 / BL-138, 2026-10-19)
+
+AlgoTest support confirmed by phone (2026-10-19) that automating one's own account through the website is
+fine. Everything below was read off the site at desktop width (1440 x 900); below about 500 px the site switches
+to a phone layout with no "Save Strategy" button.
+
+**Import and save (`/backtest`).** "Import .algtst" is a hidden `<input type=file accept=".algtst,.json">`;
+setting a file fills the builder ("Strategy imported successfully") and nothing is saved. The name comes from
+the file's `name`. "Save Strategy" (bottom bar) opens "Save New Strategy" with that name filled in; "Done"
+saves it through `api.algotest.in/strategy` ("Strategy Saved"), and the bar then shows Update / Save As New.
+"Export .algtst" downloads the saved strategy. The saved list is Saved Strategies › MY STRATEGIES (its ⋮ menu:
+Add to folder, Delete); the page itself reads it from `GET api.algotest.in/strategies`.
+
+**Live (`/live`, "Algo Trade").** Header: "Broker Login n/m", "n/6 Strategy Deployed" (6 at once on the
+owner's plan), Auto Activation, Auto restart paused executions. Deploys are allowed only **08:00–15:40 IST**
+("Strategies can only be deployed during 08:00 IST to 15:40 IST"). Two sections:
+
+- **Activation:** one row per saved strategy: status ("Setup Pending" → "Ready to deploy"), "n Deployed", the
+  execution days (M–Su, "-" when none), and the buttons "Setup Execution" (then "Edit Execution") and
+  "Activate".
+- **Deployed Strategies:** one card per deploy: "Deployed on 19 OCT 26 · Intraday · <name> · NIFTY ·
+  Open Pos: n · RUNNING · ₹ MTM · <broker - account>", with Switch to manual / Square Off / View Trades; the
+  section has "Switch all to manual" and "Square off all". Filters: Running, Paused, Sq Off, Error, Manual.
+
+**Setup Execution** opens a sheet "Edit execution for <name>":
+
+| Field | Seen (default) |
+|---|---|
+| Notice | limit and SL-limit orders are watched for 50 s; still open → cancelled and the strategy marked Error |
+| Notice | for MIS orders the exit time must be strictly before 15:24; the rotation exits at 15:28, so NRML |
+| Quantity Multiplier | 1 |
+| Auto Sq Off on Margin Error | on |
+| Trade monitoring | on LTP / **on Candle Close** |
+| Strategy execution time | the strategy's entry time (11:37:00 for the owner's Widesl file) |
+| Per leg (Leg 1, Leg 2, "Copy To Legs") | NRML/MIS **NRML**; Tgt/SL ref price Traded/**Trigger**; delay entry 0 s; entry and exit order type **Limit**/MPP; buffer type **Points**/%; trigger buffer 0; limit buffer 3; monitoring **Continuous**/Delayed, frequency 5 s |
+| Execution days | Weekdays / DTE; M T W Th F Sa Su, **none ticked** |
+| Buttons | Cancel · "Setup Execution Settings" |
+
+The owner's first live deploy (2026-10-19, `T1 · N_p150-t1s11_0917` on Finvasia) left the days unticked, and the
+row shows "-" for every day: **a deploy with no days ticked runs that day only**. Not yet seen: what "Activate"
+asks (broker or account choice, a confirmation), and what stopping a deploy before its entry looks like.
+
 <a id="pending"></a>
 
 ## Pending actions → moved
