@@ -508,8 +508,9 @@ contract, not a shared service).
   holdings source is `kite`, reads a snapshot. `holdings_sync.sync('kite'|'fyers')` stores a
   snapshot (Kite with its free cash in `momentum_cash`, trading-data migration 013) for
   `mbt orders run`, `mbt kite sync`, the callback and `POST /api/holdings/sync`.
-  `holdings_store.treatment` leaves LIQUIDBEES and `SGB*` out as options margin unless the owner
-  set a rule; Your orders counts a Kite snapshot's free cash. `mbt kite remind --send` is the Fri
+  `holdings_store.treatment` always leaves LIQUIDBEES and `SGB*` out as options margin (no rule
+  overrides it); Your orders counts a Kite snapshot's free cash, which is `net` minus pledged
+  collateral, never below 0. `mbt kite remind --send` is the Fri
   13:30 `kite-login-reminder` job. The lot ledger and per-sleeve orders are BL-142 Phases 2–3.
 - `alerts.py` (BL-051 Phase 5) — `GET /api/alerts`: what needs a person, for the dashboard's bell
   and once-a-day pop-up. One pure function per kind over the data its Telegram job already reads:

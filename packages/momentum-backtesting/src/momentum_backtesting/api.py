@@ -3441,7 +3441,7 @@ def _compute_orders(
     else:
         rows = (synced or {}).get("rows", [])
         # Kite snapshots carry the account's free cash (BL-142: all of it is the strategy's).
-        broker_cash = float((synced or {}).get("cash") or 0.0)
+        broker_cash = max(0.0, float((synced or {}).get("cash") or 0.0))
         cash = float(settings["extra_cash_rs"]) + broker_cash
         holdings: dict[str, float] = {}
         outside = []
@@ -3524,7 +3524,11 @@ def _orders_message(payload: dict) -> Notification:
     )
     lines = [f"{how} · against your {where} · prices: {payload['prices']}"]
     if holdings.get("broker_cash") is not None:
-        lines.append(f"Free cash in Kite: ₹{holdings['broker_cash']:,.0f} (counted)")
+        lines.append(
+            f"Free cash in Kite: ₹{holdings['broker_cash']:,.0f} (counted; pledged margin left out)"
+        )
+    elif holdings["source"] == "kite":
+        lines.append("Free cash in Kite: not read (pasted holdings), so none is counted")
     trades = [r for r in plan["rows"] if r["quantity"]]
     for row in trades:
         lines.append(
@@ -4695,7 +4699,7 @@ def create_app() -> FastAPI:
             if source == "kite":
                 snapshot = holdings_sync.sync("kite")
                 note += f" Holdings read: {len(snapshot.get('rows', []))} names."
-        except (*holdings_sync.LOGIN_ERRORS, RuntimeError) as error:
+        except Exception as error:  # noqa: BLE001 - the login worked; the read is best effort
             note += f" Holdings not read: {notify.redact(str(error))}"
         return HTMLResponse(
             "<!doctype html><title>Kite connected</title>"

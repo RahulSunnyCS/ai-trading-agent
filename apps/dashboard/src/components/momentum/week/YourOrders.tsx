@@ -391,29 +391,35 @@ function OrdersSettingsDrawer({
             <ul className="mt-2 divide-y divide-border rounded-lg border border-border">
               {view.holdings.rows.map((row) => {
                 const margin = isMarginSymbol(row.symbol, view.margin);
-                const rule = view.rules[row.symbol] ?? (margin ? 'exclude' : null);
+                const rule = view.rules[row.symbol] ?? null;
                 return (
                   <li key={row.symbol} className="flex items-center gap-2 px-3 py-1.5 text-sm">
                     <span className="w-28 truncate font-semibold text-foreground">
                       {row.symbol}
                     </span>
                     <span className="metric text-xs text-muted">{formatInt(row.quantity)} sh</span>
-                    {margin && !view.rules[row.symbol] ? (
-                      <span className="text-xs text-faint">options margin</span>
-                    ) : null}
-                    <span className="ml-auto">
-                      <SegmentedControl
-                        ariaLabel={`How ${row.symbol} counts`}
-                        size="sm"
-                        value={rule ?? 'use'}
-                        onChange={(next) => void setRule(row.symbol, next === 'use' ? null : next)}
-                        options={[
-                          { value: 'use', label: 'Use' },
-                          { value: 'exclude', label: 'Exclude' },
-                          { value: 'cash', label: 'As cash' },
-                        ]}
-                      />
-                    </span>
+                    {margin ? (
+                      // Options margin is always left out (BL-142): no rule can change it.
+                      <span className="ml-auto text-xs text-faint">
+                        Options margin · always left out
+                      </span>
+                    ) : (
+                      <span className="ml-auto">
+                        <SegmentedControl
+                          ariaLabel={`How ${row.symbol} counts`}
+                          size="sm"
+                          value={rule ?? 'use'}
+                          onChange={(next) =>
+                            void setRule(row.symbol, next === 'use' ? null : next)
+                          }
+                          options={[
+                            { value: 'use', label: 'Use' },
+                            { value: 'exclude', label: 'Exclude' },
+                            { value: 'cash', label: 'As cash' },
+                          ]}
+                        />
+                      </span>
+                    )}
                   </li>
                 );
               })}

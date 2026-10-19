@@ -28,7 +28,8 @@ SETTINGS_DEFAULTS = {
 SETTING_FIELDS = ("min_trade_rs", "extra_cash_rs", "holdings_source", "paper_capital_rs")
 HOLDINGS_SOURCES = ("paper", "fyers", "kite")
 #: Held for options margin, never part of the strategy (owner, BL-142): LIQUIDBEES and every
-#: sovereign gold bond (symbols starting SGB). An explicit holding rule still overrides this.
+#: sovereign gold bond (symbols starting SGB). Always excluded: no holding rule overrides it, so
+#: an old "count LIQUIDBEES as cash" rule can never spend the options margin.
 MARGIN_SYMBOLS = frozenset({"LIQUIDBEES"})
 MARGIN_PREFIXES = ("SGB",)
 
@@ -180,11 +181,11 @@ def is_margin_symbol(symbol: str) -> bool:
 
 
 def treatment(symbol: str, rules: dict[str, str]) -> str | None:
-    """How Your orders treats a holding: the owner's rule, else `exclude` for the options-margin
-    holdings (LIQUIDBEES, SGBs), else None (part of the strategy)."""
-    if symbol in rules:
-        return rules[symbol]
-    return "exclude" if is_margin_symbol(symbol) else None
+    """How Your orders treats a holding: `exclude` for the options-margin holdings (LIQUIDBEES,
+    SGBs) whatever the rules say, else the owner's rule, else None (part of the strategy)."""
+    if is_margin_symbol(symbol):
+        return "exclude"
+    return rules.get(symbol)
 
 
 def set_rule(con: duckdb.DuckDBPyConnection, who: str, symbol: str, treatment: str | None) -> None:

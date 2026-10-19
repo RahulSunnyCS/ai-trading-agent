@@ -98,6 +98,9 @@ def _request(path: str, *, token: str | None = None, data: dict | None = None) -
         raise RuntimeError(f"Kite {path}: {message}") from None
     except urllib.error.URLError as error:
         raise RuntimeError(f"Kite {path}: {error.reason}") from None
+    except (TimeoutError, OSError, ValueError) as error:
+        # A read timeout (not wrapped in URLError) or a body that is not JSON.
+        raise RuntimeError(f"Kite {path}: {type(error).__name__}") from None
     if payload.get("status") != "success":
         raise RuntimeError(f"Kite {path}: {payload.get('message') or 'no data'}")
     return payload.get("data") or {}
@@ -198,9 +201,16 @@ def holdings(creds: Credentials) -> list[dict]:
 
 
 def free_cash(creds: Credentials) -> float:
-    """Free equity cash: the equity margins' `net` ("net cash balance available for trading")."""
+    """Cash that can pay for delivery buys: the equity margins' `net` minus `available.collateral`.
+
+    `net` includes the margin from pledged holdings (LIQUIDBEES and the gold bonds, kept as
+    options margin), which cannot fund a delivery buy, and is already reduced by the margin open
+    positions use. Taking the collateral out leaves the cash; never below 0, so open options can
+    never make the plan trim Momentum holdings."""
     data = _request("/user/margins/equity", token=_auth(creds))
-    return float(data.get("net") or 0.0)
+    net = float(data.get("net") or 0.0)
+    collateral = float((data.get("available") or {}).get("collateral") or 0.0)
+    return max(0.0, net - collateral)
 
 
 def probe(creds: Credentials) -> bool:

@@ -62,7 +62,12 @@ HOLDINGS = [
 
 
 def test_holdings_count_t1_drop_the_series_and_never_touch_an_order_endpoint(monkeypatch):
-    fake = FakeKite({"/portfolio/holdings": HOLDINGS, "/user/margins/equity": {"net": 12345.5}})
+    fake = FakeKite(
+        {
+            "/portfolio/holdings": HOLDINGS,
+            "/user/margins/equity": {"net": 12345.5, "available": {"collateral": 0}},
+        }
+    )
     monkeypatch.setattr(kite.urllib.request, "urlopen", fake)
     got = {h["symbol"]: h for h in kite.holdings(_creds())}
     assert set(got) == {"SBIN", "NAVINFLUOR", "LIQUIDBEES", "SGBJUN31I-GB"}
@@ -127,7 +132,7 @@ def test_a_login_comes_back_once_stores_the_token_and_reads_holdings_and_cash(cl
         {
             "/session/token": {"access_token": "fresh", "user_id": "BZ0001"},
             "/portfolio/holdings": HOLDINGS,
-            "/user/margins/equity": {"net": 50_000.0},
+            "/user/margins/equity": {"net": 350_000.0, "available": {"collateral": 300_000.0}},
             "/user/profile": {"user_id": "BZ0001"},
         }
     )
@@ -183,14 +188,38 @@ def test_kite_orders_count_free_cash_and_leave_out_the_options_margin(client, mo
     assert payload["plan"]["cash"] == 25_000.0
     assert "BBB" not in rows and rows["AAA"][1] == 30
     note = api._orders_message(payload)
-    assert "your Kite holdings" in note.body and "Free cash in Kite: ₹25,000" in note.body
+    assert "your Kite holdings" in note.body and "Free cash in Kite: ₹25,000 (counted" in note.body
 
 
-def test_an_owner_rule_still_overrides_the_margin_default():
+def test_the_options_margin_is_always_left_out_whatever_the_rules_say():
     assert holdings_store.treatment("LIQUIDBEES", {}) == "exclude"
     assert holdings_store.treatment("SGBDEC30-GB", {}) == "exclude"
-    assert holdings_store.treatment("LIQUIDBEES", {"LIQUIDBEES": "cash"}) == "cash"
+    # an old "count LIQUIDBEES as cash" rule must never spend the options margin
+    assert holdings_store.treatment("LIQUIDBEES", {"LIQUIDBEES": "cash"}) == "exclude"
+    assert holdings_store.treatment("SBIN", {"SBIN": "cash"}) == "cash"
     assert holdings_store.treatment("SBIN", {}) is None
+
+
+def test_free_cash_leaves_out_pledged_collateral_and_never_goes_below_zero(monkeypatch):
+    margins = {"net": 320_000.0, "available": {"cash": 20_000.0, "collateral": 300_000.0}}
+    monkeypatch.setattr(kite.urllib.request, "urlopen", FakeKite({"/user/margins/equity": margins}))
+    assert kite.free_cash(_creds()) == 20_000.0
+    margins.update(net=250_000.0)  # open options use more than the cash
+    assert kite.free_cash(_creds()) == 0.0
+
+
+def test_a_slow_or_garbled_kite_answer_is_a_runtime_error(monkeypatch):
+    def slow(request, timeout=None):
+        raise TimeoutError("read timed out")
+
+    monkeypatch.setattr(kite.urllib.request, "urlopen", slow)
+    with pytest.raises(RuntimeError, match="TimeoutError"):
+        kite.holdings(_creds())
+    monkeypatch.setattr(
+        kite.urllib.request, "urlopen", lambda request, timeout=None: io.BytesIO(b"<html>")
+    )
+    with pytest.raises(RuntimeError):
+        kite.free_cash(_creds())
 
 
 def test_the_friday_reminder_speaks_only_when_kite_is_used_and_not_logged_in(monkeypatch):

@@ -42,8 +42,9 @@ time. Nothing here places an order: you place them in your broker yourself.
   or counted as cash, and holdings can be pasted when the broker cannot be read.
 - **Kite** (where the Momentum money is, from 19 Oct 2026) is read with its **free cash**, and
   the orders use all of it. **LIQUIDBEES** and every **sovereign gold bond** (symbols starting
-  `SGB`) are options margin: they are always left out, marked *options margin*, with no rule to
-  set. Kite needs a login each day it is read: log in on [Broker logins](app:/brokerLogins)
+  `SGB`) are options margin: they are always left out, marked *options margin*, and no rule
+  changes that. Free cash is Kite's cash after margins, without the margin your pledged holdings
+  give, so the orders never spend the options margin. Kite needs a login each day it is read: log in on [Broker logins](app:/brokerLogins)
   before 14:15 on Friday; a Telegram reminder comes at 13:30 when you have not.
 - **What is traded.** A name the model drops is sold in full and a new name is bought, whatever
   the amount. Top-ups and trims smaller than the **minimum trade** (₹10,000 by default) are shown
