@@ -125,6 +125,12 @@ export const ADAPTIVE_CARD = {
   },
 } as const satisfies Record<string, { name: string; note: string }>;
 
+/** The Rotation page's third card (owner, 2026-10-19): the registered fixed base, unranked. */
+export const BASE_CARD = {
+  name: 'Fixed base',
+  note: '2 × NIFTY Widesl OTM1 09:17 + 1 × NIFTY Dir ATM 09:24, every day, no ranking.',
+} as const;
+
 /** "Adaptive · Core (298 variants)": a list named with the pool it ranks. */
 export function listWithUniverse(key: string): string {
   return `${listName(key)} · ${UNIVERSE_LABEL}`;

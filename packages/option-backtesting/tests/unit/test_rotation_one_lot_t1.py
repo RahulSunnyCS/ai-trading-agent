@@ -257,3 +257,128 @@ def test_replay_accepts_t1_variants_and_still_refuses_unknown_names(tmp_path):
     for bad in ("N_nothing_0917", "../strategies/rotation/N_wide_0917"):
         with pytest.raises(pf.PortfolioStopError, match="is not one of the rotation variants"):
             pf.one_lot_path(tmp_path, day, bad)
+
+
+# --- the fixed base as a book (owner, 2026-10-19) -----------------------------------------------
+
+
+def test_the_base_dir_leg_passes_the_name_check_and_runs_its_registered_file(tmp_path):
+    """The real `one_lot_path`: the base's Dir leg is accepted by its enumerated name (and fails
+    later only for want of bars); its file is `strategies/rotation_base/`, never a typed path."""
+    day = date(2026, 10, 19)
+    with pytest.raises(pf.PortfolioStopError) as dirn:
+        pf.one_lot_path(tmp_path, day, base.DIR_NAME)
+    assert "is not one of the rotation variants" not in str(dirn.value)
+    assert pf.strategy_file(base.DIR_NAME) == base.BASE_DIR / f"{base.DIR_NAME}.yaml"
+    assert pf.strategy_file(base.WIDE_NAME).parent.name == "rotation"
+    with pytest.raises(pf.PortfolioStopError, match="is not one of the rotation variants"):
+        pf.one_lot_path(tmp_path, day, "../rotation_base/N_dir_atm_0924")
+
+
+def test_a_changed_base_file_is_refused_by_the_replay_as_by_the_scoring(tmp_path, monkeypatch):
+    monkeypatch.setattr(base, "BASE_YAML_SHA256", "0" * 64)
+    with pytest.raises(pf.PortfolioStopError, match="not the registered one"):
+        pf.one_lot_path(tmp_path, date(2026, 10, 19), base.DIR_NAME)
+
+
+def test_the_real_base_replay_reproduces_the_stored_base_results(tmp_path, monkeypatch):
+    """No stub: the Widesl leg stored by the nightly update's own call, the Dir leg by
+    `base.score_days`, then the portfolio replay of the base book with no stop must equal the
+    stored base gross (`matches_log`), at 1 and at 2 lots a strategy."""
+    from option_backtesting.legwise import market
+    from option_backtesting.rotation import portfolio_log, update
+
+    from .test_legwise_engine import DAY, bars
+    from .test_legwise_engine import day as day_data
+
+    # OTM1 for the Widesl leg, ATM (spot 22,010) for the Dir leg: both legs trade
+    data = day_data(
+        {
+            (22050.0, "CE"): bars(100, {"09:16": (100, 101, 99, 100), "15:27": (82, 83, 81, 82)}),
+            (21950.0, "PE"): bars(90, {"09:16": (90, 91, 89, 90), "15:27": (95, 96, 94, 95)}),
+            (22000.0, "CE"): bars(150, {"15:27": (140, 141, 139, 140)}),
+            (22000.0, "PE"): bars(140, {"15:27": (128, 129, 127, 128)}),
+        }
+    )
+    monkeypatch.setenv("ATA_PORTFOLIO_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setattr(update, "load_day", lambda r, u, d: data)
+    monkeypatch.setattr(base, "load_day", lambda r, u, d: data)
+    monkeypatch.setattr(market, "load_day", lambda r, u, d: data)
+    pf.clear_cache()
+    out = update.update_day(
+        DAY, tmp_path, log=lambda _m: None, names=[base.WIDE_NAME], write_days=False
+    )
+    assert out["written"] == 1 and not out["errors"]
+    assert base.score_days([DAY], tmp_path, log=lambda _m: None)["written"] == 1
+    wide = base.read_column(base.WIDE_NAME, "gross", tmp_path)[DAY]
+    dirn = base.read_column(base.base_dir(tmp_path) / f"{base.DIR_NAME}.csv", "gross")[DAY]
+    assert wide != 0 and dirn != 0  # both legs traded: the check is not 0 == 0
+    for lots in (1, 2):
+        r = portfolio_log.base_days(DAY, DAY, None, None, tmp_path, lots_per=lots)
+        assert r["errors"] == [] and len(r["rows"]) == 1
+        row = r["rows"][0]["lists"]["BASE"]
+        assert row["lots"] == 3 * lots
+        assert row["gross_log"] == pytest.approx(lots * (2 * wide + dirn), abs=0.01)
+        assert row["matches_log"] is True and row["gross_with"] == row["gross_without"]
+    day = portfolio_log.base_day(DAY, None, None, tmp_path, lots_per=1)
+    assert [(p["name"], p["lots"]) for p in day["picks"]] == [
+        (base.WIDE_NAME, 2),
+        (base.DIR_NAME, 1),
+    ]
+    assert day["book"]["matches_log"] is True
+    pf.clear_cache()
+
+
+def _base_results(root: Path, days: list[date]) -> None:
+    for i, d in enumerate(days):
+        base.append_dir_result(
+            {"day": d.isoformat(), "net": -300.0 + 50 * i, "gross": -300.0 + 50 * i}, root
+        )
+
+
+@pytest.fixture
+def base_paths(monkeypatch):
+    """Every leg dives -4,000 an hour in, then recovers to its stored gross (base legs included)."""
+
+    def fake(root, day, name, loaded=None):
+        if name == base.DIR_NAME:
+            gross = base.read_column(base.base_dir(root) / f"{name}.csv", "gross").get(day, 0.0)
+        else:
+            row = daylog._Results(root).row(name, day)
+            gross = 0.0 if row is None else float(row["gross"])
+        return crafted_path(gross)
+
+    monkeypatch.setattr(pf, "one_lot_path", fake)
+
+
+def test_the_base_book_route_rows_like_a_list_and_its_422s(world, base_paths):
+    root, sc = world
+    forward = [d for d in sc["forward"] if sc["events"][d] != "waiting"]
+    _base_results(root, forward)
+    c = TestClient(create_app())
+    off = c.get("/legwise/rotation/portfolio/days?book=base&lots=1&stop=0").json()
+    on = c.get("/legwise/rotation/portfolio/days?book=base&lots=1&stop=8000").json()
+    assert off["book"] == "base" and [r["day"] for r in off["rows"]] == [
+        d.isoformat() for d in forward
+    ]
+    for r in off["rows"]:
+        b = r["lists"]["BASE"]
+        assert b["lots"] == 3 and b["matches_log"] is True and b["gross_with"] == b["gross_without"]
+    # 3 lots each diving 4,000: -12,000 combined, so the ₹8,000 stop fires every day
+    assert on["totals"]["BASE"]["fired"] == len(forward)
+    assert all(r["lists"]["BASE"]["gross_with"] <= -8000 for r in on["rows"])
+    two = c.get("/legwise/rotation/portfolio/days?book=base&stop=0").json()
+    assert two["rows"][0]["lists"]["BASE"]["gross_without"] == pytest.approx(
+        2 * off["rows"][0]["lists"]["BASE"]["gross_without"], abs=0.02
+    )
+    day = c.get(f"/legwise/rotation/portfolio/day?day={forward[0]}&book=base&lots=1&stop=8000")
+    assert day.status_code == 200, day.text
+    assert day.json()["list"] == "BASE" and day.json()["book"]["stop_minute"] is not None
+    assert c.get("/legwise/rotation/portfolio/day?day=2020-01-06&book=base").status_code == 404
+    for q in ("book=nope", "book=base&track=t1"):
+        for url in (
+            f"/legwise/rotation/portfolio/days?{q}",
+            f"/legwise/rotation/portfolio/day?day={forward[0]}&{q}",
+        ):
+            r = c.get(url)
+            assert r.status_code == 422 and "error" in r.json(), url

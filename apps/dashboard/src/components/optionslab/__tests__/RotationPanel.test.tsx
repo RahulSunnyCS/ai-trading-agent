@@ -132,10 +132,12 @@ describe('RotationPanel as one page', () => {
     expect(screen.getByTestId('EveningRun')).toBeTruthy();
   });
 
-  it('opens on the Adaptive Classic and Adaptive Tuned cards, then the day-by-day log', () => {
+  it('opens on the Adaptive Classic, Adaptive Tuned and Fixed base cards, then the log', () => {
     render(<RotationPanel />);
     expect(screen.getByRole('region', { name: 'Adaptive Classic list' })).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Adaptive Tuned list' })).toBeTruthy();
+    const base = screen.getByRole('region', { name: 'Fixed base list' });
+    expect(base.textContent).not.toMatch(/Against the fixed base/);
     for (const name of ['Steady', 'Calendar', 'Baseline']) {
       expect(screen.queryByRole('region', { name: `${name} list` })).toBeNull();
     }
@@ -154,6 +156,11 @@ describe('RotationPanel as one page', () => {
     expect(mocks.stopKeys).toContain(undefined);
     expect(mocks.stopKeys).toContainEqual(
       expect.objectContaining({ stopParam: 'pfstop_t1', trailParam: 'pftrail_t1' }),
+    );
+    // the Fixed base: its own book at 1 lot and its own stop keys
+    expect(mocks.portfolioArgs).toContainEqual({ lots: 1, book: 'base' });
+    expect(mocks.stopKeys).toContainEqual(
+      expect.objectContaining({ stopParam: 'pfstop_base', trailParam: 'pftrail_base' }),
     );
   });
 

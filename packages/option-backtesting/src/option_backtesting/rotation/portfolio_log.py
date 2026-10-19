@@ -176,3 +176,141 @@ def days(
             if v["n"]
         },
     }
+
+
+# --- the fixed base as a book (owner, 2026-10-19) -----------------------------------------------
+
+BASE_KEY = "BASE"
+BOOKS = ("base",)
+
+
+def _base_block(day: date, lots_per: int, root: Path) -> dict | None:
+    """The base's day as a log block: its picks and stored gross at `lots_per` lots a strategy
+    (2 x Widesl + 1 x Dir), from the one-lot results the nightly update stored. None when either
+    leg has no result that day (never zero)."""
+    from . import base
+
+    wide = base.read_column(base.WIDE_NAME, "gross", root).get(day)
+    dirn = base.read_column(base.base_dir(root) / f"{base.DIR_NAME}.csv", "gross").get(day)
+    if wide is None or dirn is None:
+        return None
+    picks = [(base.WIDE_NAME, base.N_WIDE * lots_per), (base.DIR_NAME, base.N_DIR * lots_per)]
+    return {
+        "picks": picks,
+        "lots": base.BASE_LOTS * lots_per,
+        "gross": round(lots_per * (base.N_WIDE * wide + base.N_DIR * dirn), 2),
+    }
+
+
+def base_days(
+    start: date | None,
+    end: date | None,
+    stop_inr: float | None,
+    trail: Trail | None,
+    root: Path | None = None,
+    lots_per: int | None = None,
+) -> dict:
+    """The fixed base (BL-058 amendment 2026-10-10: 2 x `N_wide_0917` + 1 x the Dir ATM 09:24 leg,
+    unchanged) as a book under the portfolio stop, one row a weekday both legs are stored, keyed
+    `BASE` like a list. `start` defaults to the journal's registered first day (the base's forward
+    window; its backfilled history is not replayed by default). `lots_per` defaults to the
+    registered 2; `matches_log` compares the replay with no stop to the stored results."""
+    from ..fyers.daily import data_dir
+    from . import base
+    from .lists import LOTS_PER
+
+    root = root or data_dir()
+    lots_per = lots_per or LOTS_PER
+    start = start or daylog.REGISTERED_FIRST_DAY
+    window = [d for d in base.base_days(root) if d >= start and (end is None or d <= end)]
+    if len(window) > MAX_DAYS:
+        raise LogBookError(422, f"at most {MAX_DAYS} days at a time; narrow from / to")
+    rows: list[dict] = []
+    errors: list[dict] = []
+    total = {"n": 0, "without": 0.0, "with": 0.0, "fired": 0}
+    for day in window:
+        block = _base_block(day, lots_per, root)
+        if block is None:
+            continue
+        try:
+            book = pf.book_day(root, day, block["picks"], stop_inr, trail, {})
+        except PortfolioStopError as error:
+            errors.append({"day": day.isoformat(), "list": BASE_KEY, "error": str(error)})
+            continue
+        rows.append({"day": day.isoformat(), "lists": {BASE_KEY: _book_row(block, book)}})
+        total["n"] += 1
+        total["without"] += book.gross_without
+        total["with"] += book.gross_with
+        total["fired"] += book.stop_minute is not None
+    totals = (
+        {
+            BASE_KEY: {
+                **total,
+                "without": round(total["without"], 2),
+                "with": round(total["with"], 2),
+            }
+        }
+        if total["n"]
+        else {}
+    )
+    return {
+        "basis": "gross",
+        "source": "recorded",
+        "book": "base",
+        "track": None,
+        "lots_per_strategy": lots_per,
+        "setting": _setting(stop_inr, trail),
+        "rows": rows,
+        "errors": errors,
+        "totals": totals,
+    }
+
+
+def base_day(
+    day: date,
+    stop_inr: float | None,
+    trail: Trail | None,
+    root: Path | None = None,
+    lots_per: int | None = None,
+) -> dict:
+    """The fixed base's book on one day, in `list_day`'s shape (list `BASE`)."""
+    from ..fyers.daily import data_dir
+    from .lists import LOTS_PER
+
+    root = root or data_dir()
+    lots_per = lots_per or LOTS_PER
+    block = _base_block(day, lots_per, root)
+    if block is None:
+        raise LogBookError(404, f"the fixed base has no stored result for both legs on {day}")
+    try:
+        loaded: dict = {}
+        book = pf.book_day(root, day, block["picks"], stop_inr, trail, loaded)
+        paths = {n: pf.one_lot_path(root, day, n, loaded) for n, _ in block["picks"]}
+    except PortfolioStopError as error:
+        raise LogBookError(404, str(error)) from error
+    lots = dict(block["picks"])
+    by_name = {m["name"]: m for m in book.members}
+    return {
+        "day": day.isoformat(),
+        "list": BASE_KEY,
+        "track": None,
+        "basis": "gross",
+        "setting": _setting(stop_inr, trail),
+        "book": _book_row(block, book),
+        "minutes": N_MINUTES,
+        "first_minute_label": minute_label(0),
+        "combined": [round(v, 2) for v in book.combined],
+        "stopped": [round(v, 2) for v in book.stopped],
+        "level": [None if v is None else round(v, 2) for v in book.level],
+        "picks": [
+            {
+                "name": n,
+                "lots": lots[n],
+                "role": "base",
+                "gross": by_name[n]["gross_without"],
+                "at_stop": by_name[n]["at_stop"],
+                "path": [round(lots[n] * v, 2) for v in paths[n]],
+            }
+            for n in lots
+        ],
+    }

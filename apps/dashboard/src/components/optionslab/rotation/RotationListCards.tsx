@@ -104,13 +104,15 @@ function ListCardView({
           hint="Gross, one lot a strategy, over the scored forward days."
         />
         <Figure label="Max drawdown" value={formatInr(card.maxDrawdown)} />
-        <Figure
-          label="Against the fixed base"
-          value={
-            card.vsBase === null ? EMPTY : `${formatInr(card.vsBase, { sign: true })} / lot-day`
-          }
-          hint="The mean daily gap per lot, the list minus the fixed base. A description of the days so far, not a verdict: the registered read-out is at 60 sessions."
-        />
+        {card.isBase ? null : (
+          <Figure
+            label="Against the fixed base"
+            value={
+              card.vsBase === null ? EMPTY : `${formatInr(card.vsBase, { sign: true })} / lot-day`
+            }
+            hint="The mean daily gap per lot, the list minus the fixed base. A description of the days so far, not a verdict: the registered read-out is at 60 sessions."
+          />
+        )}
       </dl>
 
       {action ? <div className="space-y-1.5 border-t border-border pt-2">{action}</div> : null}
@@ -173,18 +175,21 @@ export function RotationListCards({
         count > 2 ? 'lg:grid-cols-3' : count === 2 ? 'max-w-4xl md:grid-cols-2' : 'max-w-md',
       )}
     >
-      {cards.map((card) => (
-        <ListCardView
-          key={card.id}
-          card={card}
-          focused={card.key === focus}
-          focusable={SEVERAL_LISTS_VISIBLE}
-          basket={baskets?.[card.key]}
-          picksTitle={picksTitleFor(entryDay, today)}
-          onFocus={() => onFocus(card.key)}
-          action={card.key === focus ? action : undefined}
-        />
-      ))}
+      {cards.map((card) => {
+        const key = card.key;
+        return (
+          <ListCardView
+            key={card.id}
+            card={card}
+            focused={key === focus}
+            focusable={SEVERAL_LISTS_VISIBLE}
+            basket={key ? baskets?.[key] : undefined}
+            picksTitle={picksTitleFor(entryDay, today)}
+            onFocus={() => (key ? onFocus(key) : undefined)}
+            action={key === focus ? action : undefined}
+          />
+        );
+      })}
       {extra.map((x) => (
         <ListCardView
           key={x.card.id}

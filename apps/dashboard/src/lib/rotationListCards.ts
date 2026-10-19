@@ -1,15 +1,22 @@
 /**
  * The Today page's list cards (BL-102): one per shown list (`VISIBLE_LIST_KEYS`), each with its
  * latest scored day, its total and drawdown since the forward test began, and how it stands
- * against the fixed base; and Adaptive Tuned, the T1 track's Adaptive, from its own read-out
- * (`tunedCard`). Pure, so it is unit-tested; the figures are the read-out's, nothing is recomputed.
+ * against the fixed base; Adaptive Tuned, the T1 track's Adaptive, from its own read-out
+ * (`tunedCard`); and the Fixed base itself over the same sessions (`baseCard`). Pure, so it is
+ * unit-tested; the figures are the read-out's, nothing is recomputed.
  *
  * Gross, at the lots the page asked the read-out for (1 a strategy). A day not yet scored is
  * absent, never a zero. Baseline (REF) is a comparator in the page's settings, not a card.
  */
 
 import type { RotationListKey, RotationSummary } from '../types/rotation';
-import { ADAPTIVE_CARD, LIST_INFO, type ListKey, VISIBLE_LIST_KEYS } from './rotationListNames';
+import {
+  ADAPTIVE_CARD,
+  BASE_CARD,
+  LIST_INFO,
+  type ListKey,
+  VISIBLE_LIST_KEYS,
+} from './rotationListNames';
 
 export type CardKey = Exclude<ListKey, 'REF'>;
 
@@ -19,10 +26,13 @@ export const CARD_KEYS: readonly CardKey[] = (VISIBLE_LIST_KEYS as readonly List
 );
 
 export interface ListCard {
-  /** The list key in its journal (`C` for both Adaptive cards); `id` tells the cards apart. */
-  key: CardKey;
-  /** `A` / `B` / `C`, or `T1` for Adaptive Tuned. */
+  /** The list key in its journal (`C` for both Adaptive cards, null for the Fixed base);
+   * `id` tells the cards apart. */
+  key: CardKey | null;
+  /** `A` / `B` / `C`, `T1` for Adaptive Tuned, `BASE` for the Fixed base. */
   id: string;
+  /** The Fixed base's own card: it has no gap to itself, so that line is left out. */
+  isBase: boolean;
   name: string;
   note: string;
   /** The latest scored day and the list's gross that day, if any. */
@@ -59,6 +69,7 @@ function cardOf(
   return {
     key,
     id,
+    isBase: false,
     name: label.name,
     note: label.note,
     latest: summary && scored ? latestOf(summary, key) : null,
@@ -79,4 +90,30 @@ export function listCards(summary: RotationSummary | null): ListCard[] {
 /** Adaptive Tuned: list C of the T1 track's read-out (`?track=t1`). */
 export function tunedCard(summary: RotationSummary | null): ListCard {
   return cardOf(summary, 'C', 'T1', ADAPTIVE_CARD.tuned);
+}
+
+/**
+ * The Fixed base: the read-out's own base (2 x Widesl OTM1 09:17 + 1 x Dir ATM 09:24, unchanged)
+ * over the same scored forward sessions as Adaptive Classic, at the lots the read-out was asked
+ * for (`base_total` per day, `base.total`, `base.max_drawdown`). No gap to the base.
+ */
+export function baseCard(summary: RotationSummary | null): ListCard {
+  const scored = (summary?.n_days ?? 0) > 0 && summary?.base != null;
+  let latest: ListCard['latest'] = null;
+  const rows = summary?.days ?? [];
+  const last = rows[rows.length - 1];
+  if (scored && last && typeof last.base_total === 'number') {
+    latest = { day: last.day, total: last.base_total };
+  }
+  return {
+    key: null,
+    id: 'BASE',
+    isBase: true,
+    name: BASE_CARD.name,
+    note: BASE_CARD.note,
+    latest,
+    total: scored && summary?.base ? summary.base.total : null,
+    maxDrawdown: scored && summary?.base ? summary.base.max_drawdown : null,
+    vsBase: null,
+  };
 }

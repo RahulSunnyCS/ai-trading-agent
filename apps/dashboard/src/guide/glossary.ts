@@ -119,7 +119,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     group: 'Options',
     short:
       'One stop on the combined P&L of a whole basket: the first minute it reaches the level, every pick closes and nothing else enters that day. Separate from each strategy’s own stop.',
-    long: 'On the Rotation page each Adaptive card has its own level in rupees at 1 lot a strategy (8,000 for Adaptive Classic, 9,000 for Adaptive Tuned by default; empty or 0 means none) and can add AlgoTest’s trailing modes: Trail SL (every X of profit moves the stop Y), Lock profit (once profit reaches A, lock B) and Lock and trail. The figures are replayed from the strategy files at the minute close, gross and in-sample; the recorded entries, the stored results and the registered 60-day read-out are not changed.',
+    long: 'On the Rotation page each Adaptive card has its own level in rupees at 1 lot a strategy (8,000 for Adaptive Classic, 9,000 for Adaptive Tuned and 8,000 for the Fixed base by default; empty or 0 means none; each card also says what its stop changed) and can add AlgoTest’s trailing modes: Trail SL (every X of profit moves the stop Y), Lock profit (once profit reaches A, lock B) and Lock and trail. The figures are replayed from the strategy files at the minute close, gross and in-sample; the recorded entries, the stored results and the registered 60-day read-out are not changed.',
     seeAlso: ['stop-loss', 'trailing-sl'],
   },
   {

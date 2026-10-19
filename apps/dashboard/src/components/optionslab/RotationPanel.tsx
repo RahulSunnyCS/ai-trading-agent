@@ -12,9 +12,10 @@
  *
  * Gross only: the stored costs are zero. Lists are alternative baskets and are never added up.
  * Rupee totals are at 1 lot a strategy (`lots=1`, display only: the per-lot figures, the verdict
- * and the journal's recorded 2 lots do not change). Two cards: Adaptive Classic (the live journal,
- * Core-298) with its portfolio stop, which every widget below follows, and Adaptive Tuned (the T1
- * track's journal) with its own. Nothing on this page changes a list, a weight or the journal.
+ * and the journal's recorded 2 lots do not change). Three cards: Adaptive Classic (the live
+ * journal, Core-298) with its portfolio stop, which every widget below follows; Adaptive Tuned (the
+ * T1 track's journal) and the Fixed base, each with its own. Under each stop, what it changed
+ * ("Without the portfolio stop"). Nothing on this page changes a list, a weight or the journal.
  */
 
 import { useMemo, useState } from 'react';
@@ -29,20 +30,31 @@ import {
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { formatDay, formatIstTime, istToday } from '../../lib/format';
 import {
+  BASE_STOP_KEYS,
+  DEFAULT_BASE_SETTING,
   DEFAULT_SETTING,
   DEFAULT_T1_SETTING,
   type PortfolioStopSetting,
   T1_STOP_KEYS,
 } from '../../lib/portfolioStop';
-import { tunedCard } from '../../lib/rotationListCards';
+import { baseCard, tunedCard } from '../../lib/rotationListCards';
 import {
   ADAPTIVE_CARD,
+  BASE_CARD,
   DEFAULT_LIST,
   SEVERAL_LISTS_VISIBLE,
   listName,
   listWithUniverse,
 } from '../../lib/rotationListNames';
-import { bookFor, overlaySummary, stopNote, unmatched } from '../../lib/rotationPortfolioView';
+import {
+  type StopEffect,
+  bookFor,
+  overlayBase,
+  overlaySummary,
+  stopEffect,
+  stopNote,
+  unmatched,
+} from '../../lib/rotationPortfolioView';
 import {
   BENCHMARKS,
   BENCHMARK_LABEL,
@@ -79,6 +91,7 @@ import { RotationHero } from './rotation/RotationHero';
 import { RotationListCards } from './rotation/RotationListCards';
 import { RotationReadoutBanner } from './rotation/RotationReadout';
 import { RotationVerdict } from './rotation/RotationVerdict';
+import { StopEffectBlock } from './rotation/StopEffect';
 
 const BENCHMARK_OPTIONS: SegmentedOption<RotationBenchmark>[] = BENCHMARKS.map((value) => ({
   value,
@@ -89,6 +102,8 @@ const BENCHMARK_OPTIONS: SegmentedOption<RotationBenchmark>[] = BENCHMARKS.map((
 const ONE_LOT: RotationReadOptions = { lots: ROTATION_PAGE_LOTS };
 /** Adaptive Tuned: the T1 track's journal, at 1 lot. */
 const TUNED: RotationReadOptions = { lots: ROTATION_PAGE_LOTS, track: 't1' };
+/** The Fixed base as a book under its own stop, at 1 lot a strategy (2 Widesl + 1 Dir). */
+const BASE_BOOK = { lots: ROTATION_PAGE_LOTS, book: 'base' } as const;
 
 /** A card's portfolio stop: its button and the line saying what the replay did. */
 function CardStop({
@@ -97,12 +112,15 @@ function CardStop({
   defaults,
   title,
   note,
+  effect,
 }: {
   setting: PortfolioStopSetting;
   onChange: (next: PortfolioStopSetting) => void;
   defaults: PortfolioStopSetting;
   title: string;
   note: string | null;
+  /** What the stop changed, once its replay is in. */
+  effect: StopEffect | null;
 }) {
   return (
     <>
@@ -117,6 +135,7 @@ function CardStop({
           {note}
         </p>
       ) : null}
+      {effect ? <StopEffectBlock effect={effect} /> : null}
     </>
   );
 }
@@ -133,6 +152,7 @@ export function RotationPanel() {
   // figures follows; Adaptive Tuned has its own (own URL keys, own storage, ₹9,000 default).
   const [portfolio, setPortfolio] = usePortfolioStop();
   const [tunedStop, setTunedStop] = usePortfolioStop(T1_STOP_KEYS);
+  const [baseStop, setBaseStop] = usePortfolioStop(BASE_STOP_KEYS);
 
   const readoutDays = overview.data?.readout_days ?? 60;
   const s = summary.data;
@@ -158,6 +178,28 @@ export function RotationPanel() {
     error: tunedBook.error,
     skipped: unmatched(tunedBookNow),
   });
+
+  // The Fixed base: the read-out's own base over Classic's sessions, under its own stop (card only;
+  // the headline's base benchmark stays unstopped).
+  const baseBook = useRotationPortfolioDays('recorded', {}, baseStop, BASE_BOOK);
+  const baseBookNow = bookFor(baseBook.data, baseStop);
+  const baseShown = useMemo(() => (s ? overlayBase(s, baseBookNow) : s), [s, baseBookNow]);
+
+  // "Without the portfolio stop": each card's replay over that card's own scored days.
+  const classicDays = useMemo(() => (s?.days ?? []).map((d) => d.day), [s]);
+  const tunedDays = useMemo(() => (t?.days ?? []).map((d) => d.day), [t]);
+  const classicEffect = useMemo(
+    () => stopEffect(bookNow, 'C', classicDays),
+    [bookNow, classicDays],
+  );
+  const tunedEffect = useMemo(
+    () => stopEffect(tunedBookNow, 'C', tunedDays),
+    [tunedBookNow, tunedDays],
+  );
+  const baseEffect = useMemo(
+    () => stopEffect(baseBookNow, 'BASE', classicDays),
+    [baseBookNow, classicDays],
+  );
 
   const visible = useMemo(() => new Set<RotationListKey>([...shown, focus]), [shown, focus]);
   const figures = useMemo(
@@ -330,6 +372,7 @@ export function RotationPanel() {
                       error: book.error,
                       skipped,
                     })}
+                    effect={classicEffect}
                   />
                 }
                 extra={[
@@ -345,6 +388,7 @@ export function RotationPanel() {
                           defaults={DEFAULT_T1_SETTING}
                           title={ADAPTIVE_CARD.tuned.name}
                           note={tunedNote}
+                          effect={tunedEffect}
                         />
                         {tuned.error ? (
                           <p className="text-[11px] text-negative">
@@ -357,6 +401,27 @@ export function RotationPanel() {
                           </p>
                         ) : null}
                       </>
+                    ),
+                  },
+                  {
+                    card: baseCard(baseShown),
+                    basket: undefined,
+                    entryDay: null,
+                    action: (
+                      <CardStop
+                        setting={baseStop}
+                        onChange={setBaseStop}
+                        defaults={DEFAULT_BASE_SETTING}
+                        title={BASE_CARD.name}
+                        note={stopNote({
+                          setting: baseStop,
+                          scoredDays: s.n_days,
+                          stopped: baseShown !== s,
+                          error: baseBook.error,
+                          skipped: unmatched(baseBookNow, ['BASE']),
+                        })}
+                        effect={baseEffect}
+                      />
                     ),
                   },
                 ]}

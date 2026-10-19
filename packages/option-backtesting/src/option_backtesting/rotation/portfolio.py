@@ -264,6 +264,18 @@ def _mtime(path: Path) -> int:
     return stat.st_mtime_ns ^ (stat.st_size << 1)
 
 
+def strategy_file(name: str) -> Path:
+    """The strategy file a replayable name runs: the fixed base's Dir ATM 09:24 leg from
+    `strategies/rotation_base/` (BL-058 amendment 2026-10-10), else the variant's own file. Only
+    called after `one_lot_path`'s name check, which enumerates every accepted name."""
+    from . import base
+    from .variants import strategy_path
+
+    if name == base.DIR_NAME:
+        return base.BASE_DIR / f"{base.DIR_NAME}.yaml"
+    return strategy_path(name)
+
+
 def _stamp(root: Path, day: date, name: str) -> tuple:
     """Everything the replay of `name` on `day` depends on: the cache version, the lot-sizing
     date, the strategy file, the reference CSVs (lot sizes, strike steps, expiries, holidays), and
@@ -273,15 +285,16 @@ def _stamp(root: Path, day: date, name: str) -> tuple:
     from trading_data import lake
 
     from ..data.reference.loader import REFERENCE_DIR
+    from . import base
     from .lists import SIZING_DATE
-    from .variants import strategy_path, underlying_of
+    from .variants import underlying_of
 
-    underlying = underlying_of(name)
+    underlying = base.UNDERLYING if name == base.DIR_NAME else underlying_of(name)
     parts: list = [CACHE_VERSION, SIZING_DATE]
     for kind, symbol in (("option", underlying), ("index", underlying), ("index", "INDIAVIX")):
         parts.append(_mtime(lake.bars_1m_path(root, kind, symbol, day)))
     parts.append(_mtime(lake.symbol_master_path(root, "fyers", day)))
-    parts.append(_mtime(strategy_path(name)))
+    parts.append(_mtime(strategy_file(name)))
     parts.extend(_mtime(p) for p in sorted(REFERENCE_DIR.glob("*.csv")))
     return tuple(parts)
 
@@ -356,13 +369,18 @@ def one_lot_path(root: Path, day: date, name: str, loaded: dict | None = None) -
     """One variant's one-lot path on `day`, replayed exactly as the nightly update did (same
     strategy file, same lot-sizing date), and cached. `loaded` shares a day's loaded index data
     across picks of one call. Raises PortfolioStopError for a day or variant it cannot run."""
+    from . import base
     from .variants import TRACK_DIRS, track_names, variant_names
 
-    # Matched against the enumerated files, never a path: Core-298 and every parallel track's own
-    # variants (a T1 book replays its `-t1s` picks from strategies/rotation_t1/).
-    known = set(variant_names()).union(*(track_names(t) for t in TRACK_DIRS))
+    # Matched against the enumerated files, never a path: Core-298, every parallel track's own
+    # variants (a T1 book replays its `-t1s` picks from strategies/rotation_t1/) and the fixed
+    # base's Dir leg (its Widesl leg is the Core variant N_wide_0917).
+    known = set(variant_names()).union(*(track_names(t) for t in TRACK_DIRS), {base.DIR_NAME})
     if name not in known:
         raise PortfolioStopError(f"{name!r} is not one of the rotation variants")
+    if name == base.DIR_NAME and base.file_sha256(strategy_file(name)) != base.BASE_YAML_SHA256:
+        # the nightly scoring refuses a changed base file; so does the replay
+        raise PortfolioStopError(f"{name}: the base file is not the registered one")
     key = (str(root), day, name, _stamp(root, day, name))
     hit = _lookup(key)
     if hit is not None:
@@ -391,15 +409,16 @@ def _replay(root: Path, day: date, name: str, loaded: dict) -> tuple[float, ...]
     from ..legwise.engine import simulate_day
     from ..legwise.market import load_day
     from ..legwise.schema import load_legwise
+    from . import base
     from .lists import SIZING_DATE
-    from .variants import strategy_path, underlying_of
+    from .variants import underlying_of
 
-    underlying = underlying_of(name)
+    underlying = base.UNDERLYING if name == base.DIR_NAME else underlying_of(name)
     try:
         if underlying not in loaded:
             loaded[underlying] = load_day(root, underlying, day)
         result = simulate_day(
-            load_legwise(strategy_path(name)),
+            load_legwise(strategy_file(name)),
             loaded[underlying],
             default_reference_data(),
             date.fromisoformat(SIZING_DATE),

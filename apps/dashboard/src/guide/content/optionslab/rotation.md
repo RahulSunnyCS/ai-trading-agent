@@ -38,8 +38,8 @@ The screen is one page, in the order you read it:
   One when it is not), when the run last finished, a *Run* button, and under *Options & log*
   the Day field, *Collect data first* and *Send summary to Telegram*. The run is also scheduled at
   15:45 on trading days; this bar is for running it by hand or seeing how the last one went.
-- **The list and the headline** — forward-test status, the two Adaptive cards (Classic and
-  Tuned), the headline numbers, the verdict, the cumulative chart and today's basket. Before the first scored day it shows the
+- **The list and the headline** — forward-test status, the three cards (Adaptive Classic,
+  Adaptive Tuned and the Fixed base), the headline numbers, the verdict, the cumulative chart and today's basket. Before the first scored day it shows the
   next entry instead of reserving a large empty chart area.
 - **What happened** — the recorded or reconstructed day log. Below it, *Drawdowns and selection
   drift* opens the risk review for the list.
@@ -65,14 +65,19 @@ and whether the journal's hash chain is intact. A problem names its fix undernea
 fact; ₹ per lot-day, beats random baskets, the verdict and the 60-day read-out are the same at any
 number of lots, so none of them moves.
 
-**The two Adaptive cards.** They come first on the page, side by side:
+**The three cards.** They come first on the page, side by side:
 
 - **Adaptive Classic** — Adaptive as the journal records it: the 298 tested variants (Core), list C
   of the live journal.
 - **Adaptive Tuned** — the same picker with the 223 tuned-settings variants of the T1 track added,
   read from the T1 track's own journal (recorded at 09:16 like the live list, from 19 Oct 2026).
+- **Fixed base** — the registered base, unchanged: 2 × NIFTY Widesl OTM1 09:17 + 1 × NIFTY Dir ATM
+  09:24 every day, no ranking, over the same scored sessions as Adaptive Classic, at 1 lot per
+  strategy (3 lots a day). It has no "Against the fixed base" line: it is the base. Its own stop
+  changes only its card; the headline's comparison with the base always uses the base without a
+  stop.
 
-These two names are the cards' only: the 09:16 and 16:00 Telegram messages and the rest of the page
+The Adaptive names are the cards' only: the 09:16 and 16:00 Telegram messages and the rest of the page
 still say Adaptive and T1. Each card shows the gross on the latest scored day, the total since the
 first forward day, the largest drawdown and the mean daily gap to the fixed base per lot (on the
 same basis as the headline, so it follows that card's portfolio stop). Forward days only: a late
@@ -122,10 +127,11 @@ Lock and trail):
 |---|---|---|
 | Adaptive Classic | **8,000 rupees** | `pfstop`, `pftrail` |
 | Adaptive Tuned | **9,000 rupees** | `pfstop_t1`, `pftrail_t1` |
+| Fixed base | **8,000 rupees** | `pfstop_base`, `pftrail_base` |
 
 Adaptive Classic's stop also drives the **Daily log**, **Drawdown episodes** and, once there are
-forward sessions, the **headline figures and the cumulative chart**; Adaptive Tuned's changes only
-its own card. The basket is replayed minute by minute and closed the first minute the stop is
+forward sessions, the **headline figures and the cumulative chart**; Adaptive Tuned's and the Fixed
+base's change only their own card. The basket is replayed minute by minute and closed the first minute the stop is
 reached. See the [Daily log](guide:optionslab/rotation-daily-log) page for how the stop works. Your
 last setting is kept in this browser for each card separately (a stop kept from before 19 Oct 2026,
 when the default was 10,000 at 2 lots, is not carried over).
@@ -134,6 +140,20 @@ The registered read-out does not move with it. **Beats random baskets**, the **v
 intervals always stay on the registered basis, without a portfolio stop, because the pre-registered
 test must not change after the fact. A line under each card's button says when its figures are the
 stopped ones.
+
+**Without the portfolio stop.** Under each card's stop (once its replay is in) a short block says
+what the stop changed, over that card's own scored days:
+
+| Line | What it says |
+|---|---|
+| Latest day | The latest scored day's gross with the stop and without it |
+| That day | "stop reached at 11:14" and what that changed in rupees, or "stop not reached" |
+| Since the first day | The total with the stop, without it, and the difference |
+| Max drawdown | The largest fall of the running total, with and without the stop |
+| Stop fired | On how many of the days the stop closed the basket, and its net effect on those days (with minus without) |
+| Not counted | Days whose replay no longer matches the stored result (bars repaired since), left out |
+
+Some traders call this stop an MTM SL; it is the same thing.
 
 ## How to read it
 

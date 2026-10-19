@@ -71,6 +71,17 @@ export const T1_STOP_KEYS: PortfolioStopKeys = {
   defaults: DEFAULT_T1_SETTING,
 };
 
+/** The Fixed base card's stop (owner, 2026-10-19): ₹8,000, on 3 lots (2 Widesl + 1 Dir). */
+export const DEFAULT_BASE_SETTING: PortfolioStopSetting = { ...DEFAULT_SETTING, stop: '8000' };
+
+/** The Fixed base card. */
+export const BASE_STOP_KEYS: PortfolioStopKeys = {
+  stopParam: 'pfstop_base',
+  trailParam: 'pftrail_base',
+  storageKey: 'ata.rotation.portfolioStop.base.v1',
+  defaults: DEFAULT_BASE_SETTING,
+};
+
 export const MODE_LABEL: Record<TrailMode, string> = {
   none: 'None',
   sl: 'Trail SL',

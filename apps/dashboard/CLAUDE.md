@@ -140,7 +140,7 @@ needs to be shared with the server, it is currently hand-duplicated in
   resource that only exists under some setting.
 - The portfolio stop (BL-095): `lib/portfolioStop.ts` is the setting (drafts stay strings; empty,
   0 or below is none; Trail SL / Lock profit / Lock and trail), `hooks/usePortfolioStop.ts` keeps it
-  in the URL query (`pfstop`, `pftrail`; a copied link shows the same figures; one key set per card: `CORE_STOP_KEYS` for Adaptive Classic, ₹8,000, which the other widgets follow, and `T1_STOP_KEYS` for Adaptive Tuned, ₹9,000, `pfstop_t1` / `pftrail_t1`) with this browser's last choice
+  in the URL query (`pfstop`, `pftrail`; a copied link shows the same figures; one key set per card: `CORE_STOP_KEYS` for Adaptive Classic, ₹8,000, which the other widgets follow, and `T1_STOP_KEYS` for Adaptive Tuned, ₹9,000, `pfstop_t1` / `pftrail_t1`, and `BASE_STOP_KEYS` for the Fixed base card, ₹8,000, `pfstop_base` / `pftrail_base`, replayed through `book=base` and laid over its card only by `overlayBase`; each card's "Without the portfolio stop" block is `stopEffect` / `stopEffectRows` in `lib/rotationPortfolioView.ts`) with this browser's last choice
   (localStorage, read after mount) as the fallback, `hooks/useRotationPortfolio.ts` reads `/rotation/portfolio/days|day` through `hooks/useWarmingResource.ts`
   (a cold replay answers 202 "warming" or `with_stop_pending`; the hook asks again every few seconds), and
   `lib/rotationPortfolioView.ts::overlayBook` lays the stopped figures over the log rows so the

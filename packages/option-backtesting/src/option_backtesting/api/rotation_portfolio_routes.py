@@ -4,8 +4,10 @@
     GET /legwise/rotation/portfolio/days?from=&to=&source=recorded|reconstructed&stop=&trail=
 
 Both also take `track=t1` (the T1 journal; list C only, no reconstructed days) and `lots=1..10`
-(every pick booked at that many lots, display only; default the entry's recorded lots). Anything
-else in either is a 422.
+(every pick booked at that many lots, display only; default the entry's recorded lots), and
+`book=base`: the fixed base (2 x `N_wide_0917` + 1 x `N_dir_atm_0924`, unchanged) as a book keyed
+`BASE`, from the registered first day, `matches_log` against its stored results; `list`, `source`
+and `track` do not apply to it. Anything else in any of them is a 422.
 
 `/day` filters by `source` (`recorded`, `reconstructed` or the default `all`): a day that exists
 only as the other kind is a 404. `/days` answers `202 {"status": "warming"}` while a cold replay
@@ -36,6 +38,17 @@ def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": message})
 
 
+def _book(book: str | None, track: str | None) -> str | None:
+    """The optional `book`: absent, or `base` (then no `track`). Raises ValueError for a 422."""
+    if book in (None, ""):
+        return None
+    if book not in portfolio_log.BOOKS:
+        raise ValueError(f"book must be one of {', '.join(portfolio_log.BOOKS)}")
+    if track:
+        raise ValueError("book=base takes no track")
+    return book
+
+
 def _day(raw: str | None, label: str) -> date | None:
     if raw is None or raw == "":
         return None
@@ -54,11 +67,13 @@ def get_day(
     source: str = "all",
     track: str | None = None,
     lots: str | None = None,
+    book: str | None = None,
 ) -> Any:
     if source not in daylog.SOURCES:
         return _error(422, f"source must be one of {', '.join(daylog.SOURCES)}")
     try:
         track_, lots_ = track_and_lots(track, lots)
+        book_ = _book(book, track_)
     except ValueError as error:
         return _error(422, str(error))
     try:
@@ -66,6 +81,8 @@ def get_day(
         amount, trailing = settings_from_query(stop, trail)
         if parsed is None:
             raise PortfolioStopError("day is required, YYYY-MM-DD")
+        if book_ == "base":
+            return portfolio_log.base_day(parsed, amount, trailing, lots_per=lots_)
         return portfolio_log.list_day(
             parsed, list_, amount, trailing, source, track=track_, lots_per=lots_
         )
@@ -86,11 +103,13 @@ def get_days(
     trail: str | None = None,
     track: str | None = None,
     lots: str | None = None,
+    book: str | None = None,
 ) -> Any:
     if source not in daylog.SOURCES:
         return _error(422, f"source must be one of {', '.join(daylog.SOURCES)}")
     try:
         track_, lots_ = track_and_lots(track, lots)
+        book_ = _book(book, track_)
     except ValueError as error:
         return _error(422, str(error))
     try:
@@ -100,12 +119,18 @@ def get_days(
             raise PortfolioStopError("from must not be after to")
         # A cold replay of the whole history outlasts the proxy's 30 s: answer 202 within the
         # wait and let the page ask again (rotation/warm.py); the work fills the path cache.
-        done, value = warm.run_within(
-            ("days", start, end, amount, trailing, source, track_, lots_),
-            lambda: portfolio_log.days(
-                start, end, amount, trailing, source, track=track_, lots_per=lots_
-            ),
-        )
+        if book_ == "base":
+            done, value = warm.run_within(
+                ("base_days", start, end, amount, trailing, lots_),
+                lambda: portfolio_log.base_days(start, end, amount, trailing, lots_per=lots_),
+            )
+        else:
+            done, value = warm.run_within(
+                ("days", start, end, amount, trailing, source, track_, lots_),
+                lambda: portfolio_log.days(
+                    start, end, amount, trailing, source, track=track_, lots_per=lots_
+                ),
+            )
         if not done:
             return JSONResponse(status_code=202, content={"status": "warming"})
         return value

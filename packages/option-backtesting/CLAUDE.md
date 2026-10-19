@@ -140,7 +140,12 @@ Otherwise:
   `lots_per_strategy` is rewritten; `track="t1"` (`readout.build`, `daylog`, `portfolio_log`,
   `overview.baskets`) reads the T1 journal (list C only, Core-298 + the track's variants via
   `store.result_path`; no reconstruction, placements or re-score; missing days counted from the
-  track's own first entry; `vs_ref` None, the gap to the fixed base kept).
+  track's own first entry; `vs_ref` None, the gap to the fixed base kept). The fixed base can be
+  booked under a portfolio stop (`portfolio_log.base_days|base_day`, `book=base`): picks
+  [(`N_wide_0917`, 2 x lots), (`N_dir_atm_0924`, 1 x lots)], weekdays both legs are stored, from
+  the registered first day; `portfolio.one_lot_path` accepts the Dir leg by its enumerated name
+  (`portfolio.strategy_file` resolves it to `strategies/rotation_base/`, refused if its sha256 is
+  not `base.BASE_YAML_SHA256`) and replays it with `base.score_days`' own call and sizing date.
 - `rotation/expiry.py` — the expiring-index rule (BL-122, owner 2026-10-18): from `EXPIRY_ONLY_FROM` (Mon
   2026-10-19), on a day when exactly one index expires (weekday label `0`; both, neither or an unknown label =
   no rule), Adaptive (list C, live and T1) is a FILTER of the unrestricted ranking: `filter_picks` runs

@@ -30,14 +30,19 @@ export interface PortfolioBookRow {
   matches_log: boolean;
 }
 
+/** A list, or `BASE`: the fixed base booked like a list (`book=base`). */
+export type PortfolioBookKey = RotationListKey | 'BASE';
+
 export interface PortfolioDays {
+  /** `base` for the fixed base's book. */
+  book?: 'base';
   basis: 'gross';
   source: string;
   setting: PortfolioSettingEcho;
-  rows: { day: string; lists: Partial<Record<RotationListKey, PortfolioBookRow>> }[];
+  rows: { day: string; lists: Partial<Record<PortfolioBookKey, PortfolioBookRow>> }[];
   errors: { day: string; list: string; error: string }[];
   totals: Partial<
-    Record<RotationListKey, { n: number; without: number; with: number; fired: number }>
+    Record<PortfolioBookKey, { n: number; without: number; with: number; fired: number }>
   >;
 }
 
