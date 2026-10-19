@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P0 — real money is already in (first ₹50k bought Mon 2026-10-19); the month's goal is Momentum the owner trusts with money (`overview.md`) |
-| **Status** | Planned |
+| **Status** | In progress — Phase 1 |
 | **Type** | feature |
 | **Area** | momentum / broker / dashboard / scheduler |
 | **Created** | 2026-10-19 |
 | **Depends on** | BL-051 Phase 3 (holdings snapshots, holding rules, orders engine, the Fri 14:15 `momentum-orders` job), BL-087 (sleeves, one per Friday) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.34 |
 
 ## Context
 
@@ -155,12 +155,26 @@ plus free cash.
 
 ## Open questions
 
-Put to the owner when started:
+Answered by the owner on 2026-10-19 (the item was started):
 
-1. Which strategy, and so which K? (Owner: decided once this is built.)
-2. Is all free equity cash in Kite fair game for the due sleeve, or should a reserve stay?
-3. After ₹2 lakh, does new money go to the due sleeve or to a new lot?
-4. The full list of SGB / margin symbols to exclude, if a pattern is not enough.
+1. **Strategy and K:** chosen once this is built; nothing assumes a cadence.
+2. **Kite login:** a Login button and a Friday 13:30 reminder first, then a test of the
+   unattended TOTP login from `.env`, kept only if Kite allows it with no human check.
+3. **Free cash:** all of Kite's free equity cash (the margins endpoint's `net`) goes to the due
+   sleeve. LIQUIDBEES and SGBs are untouched, so options margin stays. Every message shows the
+   cash used.
+4. **After ₹2 lakh:** new money is just free cash for the next due sleeve. No new lots after
+   the ramp.
+5. **Exclusions:** LIQUIDBEES and every symbol starting with `SGB` are excluded automatically.
+   Others can still be added with the existing exclude rule.
+
+Kite facts checked on 2026-10-19 ([portfolio](https://kite.trade/docs/connect/v3/portfolio/),
+[user](https://kite.trade/docs/connect/v3/user/)):
+- Holdings give `quantity` (T+2), `t1_quantity`, `average_price` and `isin`, with no dates.
+- The access token ends at 06:00 the next day.
+- Login is `kite.zerodha.com/connect/login?v=3&api_key=…` → `request_token` on the registered
+  redirect URL → `POST /session/token` with `sha256(api_key + request_token + api_secret)`.
+- The free Personal plan (since March 2025) covers holdings and funds, not market data.
 
 ## Log
 
@@ -168,3 +182,4 @@ Put to the owner when started:
   on the strategy's cadence (K weeks after their buy) and may use free Kite cash; Kite
   credentials go in `.env`, and the login is automated if possible, otherwise a Friday
   notification and a manual login; the owner buys on Mondays; the strategy is chosen once this is built.
+- 2026-10-19 — started; the owner answered the open questions (recorded above). Phase 1 begun.
