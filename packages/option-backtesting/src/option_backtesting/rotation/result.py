@@ -152,13 +152,15 @@ def render(
     t1: DailyResult | str | None = None,
     tomorrow=None,
     tomorrow_t1=None,
+    live: list[str] | None = None,
 ) -> str:
     """The evening message (BL-125): Adaptive's result, T1's (or the note saying why it is not
-    there), then tomorrow's strategies in full. `tomorrow` / `tomorrow_t1` are
-    `tomorrow.NextPicks` (or a note for T1); without `tomorrow` there is no section."""
+    there), BL-141's live-vs-paper lines (`live`, the owner's copy only), then tomorrow's
+    strategies in full. `tomorrow` / `tomorrow_t1` are `tomorrow.NextPicks` (or a note for T1);
+    without `tomorrow` there is no section."""
     t1_part = _total_and_rows(t1) if isinstance(t1, DailyResult) else t1
     return messages.render_result(
-        result.day, _total_and_rows(result), t1_part, tomorrow, tomorrow_t1
+        result.day, _total_and_rows(result), t1_part, tomorrow, tomorrow_t1, live=live
     )
 
 

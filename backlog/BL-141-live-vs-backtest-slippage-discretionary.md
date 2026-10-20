@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — real money runs on these picks every day; how far live results drift from the backtest decides whether the backtest can be trusted |
-| **Status** | Planned — capture timing answered 2026-10-19 |
+| **Status** | In progress — Phases 1–3 built 2026-10-20 (the Rotation page card still to do) |
 | **Type** | feature (Phase 4 is research) |
 | **Area** | broker-login + options + dashboard |
 | **Created** | 2026-10-19 |
 | **Depends on** | BL-137 / BL-139 (the tool's strategies and their ledgers), BL-140 (which list runs where), BL-093 / BL-026 (contract notes, the realised record) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.36 |
 
 ## Context
 
@@ -62,7 +62,7 @@ Today nothing reads the live results. Each evening the uploaders delete the day'
     - live ₹, and fills where known;
     - `source: tool | discretionary`.
   - Re-running the job for a day replaces that day's file; nothing else is ever changed.
-  - The tool's evening jobs check that the capture for today exists before deleting. If it does not, they delete nothing and alert.
+  - ~~The tool's evening jobs check that the capture for today exists before deleting.~~ Dropped 2026-10-20 (see the Log): both platforms keep a day's results after the deletes, so a missed day is back-filled instead, and the uploads never wait.
 - **Done when:** a day's file lists every strategy that ran, tool and discretionary, with live P&L that matches the platform's screen.
 
 ### Phase 3 — Compare and show
@@ -106,5 +106,62 @@ Today nothing reads the live results. Each evening the uploaders delete the day'
 
 ## Log
 
+- 2026-10-20 — Started (owner: "start", item 3 of the monitoring list). Built, not yet run by the scheduler:
+  - **Phase 1.** The calls, from both web apps' public JavaScript and then a few GETs after a real login (one per
+    platform per minute, Angel One through the TOTP stamp; nothing but GET; a holiday, so Monday 19 Oct was read):
+    AlgoTest `/execution/v2/executions` (today's cards), `/execution/v2/exited-executions` (a minute range in IST),
+    `/execution/v2/execution-info/<id>` (the multiplier); Quantiply `/pnl-chart/algo?graphLevel=account`, whose
+    `metaData.lastValues` is each algo's closing MTM for the day. Recorded in `docs/algotest-execution.md`
+    ("Live results"), fixtures in `packages/option-backtesting/tests/fixtures/live/`. Quantiply has no GET for
+    fills after the day (the order book and trade report are POSTs, never sent); on the day they may be in
+    `GET /algos/:id`'s `state.positions`, not seen yet. AlgoTest P&L is the web app's own sum over the legs.
+  - **Phase 2.** `live-capture` 15:40 (`packages/broker-login/src/live-capture.ts`), group `quantiply` ahead of
+    `quantiply-disable`, catch-up 6 h. `rotation/live/<day>.jsonl`: a section line per platform + broker read, a
+    strategy line per strategy (tool by the ledgers' ids, else discretionary). A re-run replaces only the sections
+    it read. (The first version also held the evening deletes until the capture had read a platform; removed after
+    the review, below.)
+  - **Phase 3.** `obt rotation live-compare` and the owner's 16:00 lines (`rotation/live_compare.py`): per
+    platform + broker + list, live per lot (copies and multipliers added up) minus paper per lot after the same
+    costs, signed, and % of the entry premium where fills are known; a copy whose first fill is away from its entry
+    minute is off-slot and left out; discretionary summed on its own line, never compared (the open question's
+    proposal, taken until the owner says otherwise). "Live · not captured" when the day has no file. The group's
+    copy never has it; nothing changes in the message before the capture's first run.
+  - **Check, 19 Oct (captured by hand into a scratch file, nothing written to the data root):** AlgoTest · Shoonya,
+    T1: 09:47 live +₹2,795 vs paper +₹2,714 (+₹81), 09:17 −₹4,095 vs −₹4,261 (+₹166), 13:17 +₹910 vs +₹790
+    (+₹120): slip +₹367 on the list, +0.6% of the entry premium. A second 09:17 copy deployed at 09:45 (+₹5,207)
+    is off-slot. Quantiply · Angel One: six of the owner's own algos, −₹3,676 in all, matching the chart's total.
+    Not yet reconciled with the contract notes.
+  - Left: the Rotation page card (each day, the running chart, slippage by platform, list and shape); Quantiply
+    fills once a traded day shows their shape; Quantiply · Shoonya not read yet (its row is off).
+- 2026-10-20 — Review of PR #277 (coordinator's decision on findings 8 / 1 / 9: **no delete gate**; missing a
+  real-money pick is worse than missing a P&L record). Changed:
+  - The gate that held the 16:40 / 16:45 deletes is gone (`live-capture-gate.ts` deleted; the uploaders are as on
+    main). Instead a missed day is back-filled: checked read-only that both platforms keep a day's results after
+    its strategies are deleted (Quantiply's chart for 13 and 14 Oct still gave every run of algos no longer listed,
+    adding up to its total; AlgoTest's exited list keeps past deploys), so `live-capture.ts --day D` reads any day
+    and each 15:40 run back-fills the last 5 trading days that miss a section.
+  - Two jobs: `live-capture` 15:40, one attempt, 8-minute limit (the disable starts by 15:48), `--soft-fail`; and
+    `live-capture-retry` 15:55, retried twice to about 16:30, which reads only the sections not yet read (no second
+    login to an account already read) and alerts once if the day is still missing. Missing credentials, a held or
+    refused login exit 3 (no retry). A failed exited-list read counts as not read, also on the day.
+  - Quantiply: every run of an algo is added up (15 Oct had one algo run twice); a sum that does not match the
+    chart's total beyond ₹1 fails the section. Fill times are read as UTC and shown in IST.
+  - A copy that did not trade (deployed, nothing filled; or, today on Quantiply, enabled with no run) has no P&L
+    and is listed apart, on both platforms; one with open legs (or a partial exit) is flagged in the 16:00 lines
+    and left out of the slippage; Core and T1 copies of one variant are separate rows.
+  - Nits: tool prefixes are an append-only list (`TOOL_PREFIXES`), ownership by ledger id whatever the name;
+    "a lot" on the list lines, "in all" on the off-slot and discretionary ones; leg P&L uses the exited quantity;
+    the premium % counts the first entry only; money sums in integer paise (TypeScript) and `Decimal` (Python).
+  - Checked by hand again (scratch files only): 15 Oct (Quantiply 5 algos, one with 2 runs, summed to the chart's
+    total) and 14 Oct (3 Quantiply algos deleted since, still read; 3 AlgoTest deploys that did not trade).
+- 2026-10-20 — Re-review of PR #277: AlgoTest P&L counts only the legs that entered on the day read (a deploy
+  with days ticked spans days; test: +₹3,250 on 19 Oct and −₹650 on 20 Oct read for the 20th gives −₹650);
+  a Quantiply position with no exit is an open leg; did-not-trade on Quantiply comes from the deploy ledger (what
+  the tool switched on for the session), so the 15:40 and 15:55 runs agree; a refused Quantiply login during the
+  capture writes the capture's own hold, never the shared one, so `quantiply-disable` always decides for itself
+  (the capture stays before the disable: it adds at most 8 minutes, and the deploy-ledger rule no longer needs the
+  `enabled` read); a tool line whose name cannot be read gets its own ❓ line, never Discretionary; a multiplier
+  the platform did not show is recorded `multiplier_assumed` and said in the 16:00 lines. The capture's Quantiply
+  login already went through the TOTP-window stamp; the `obt angel` SmartAPI lock is separate (noted).
 - 2026-10-19 — Owner: report the slippage every day, signed (positive or negative), on Telegram at 16:00 with the day's summary, to the owner only.
 - 2026-10-19 — Created from the owner's request. Capture timing answered: a separate 15:40 job, before the evening deletes.

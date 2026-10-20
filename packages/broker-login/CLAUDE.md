@@ -199,6 +199,39 @@ week, until disabled.
   `docs/algotest-execution.md` §7. Use a desktop viewport (1440 x 900): below about 500 px AlgoTest hides "Save
   Strategy".
 
+## Live results capture (BL-141)
+
+- `src/live-capture.ts` (+ pure `src/live-capture-plan.ts`) is the 15:40 `live-capture` job: for each platform +
+  broker row the automation settings have on (login or upload), it reads every strategy that ran on the day and
+  writes `TRADING_DATA_ROOT/rotation/live/<day>.jsonl` (a `section` line per platform + broker read, a `strategy`
+  line per strategy). GET calls only (`docs/algotest-execution.md`, "Live results"): AlgoTest's site login, then
+  the live and exited executions and each one's `execution-info` (the multiplier); Quantiply through
+  `quantiply-session.ts` (the TOTP window stamp), then the account P&L chart (`metaData.lastValues`, each algo's
+  closing MTM) named from `/algos/day-wise`. Tool or discretionary: AlgoTest by the saved strategy id in the upload
+  ledger (by name for uploads before ids were kept), Quantiply by the algo id in its ledger.
+- A run reads only the sections a day's file does not have as read (`--force`: all), with one login per platform
+  for every day it reads, and keeps the earlier lines of a section it could not read. Without `--day` it reads
+  today (after 15:30 IST) and back-fills the last 5 trading days that miss a section (`backfillDays`, from the
+  capture's first file on); both platforms keep a day's results after its strategies are deleted (checked
+  2026-10-20), so the evening uploads never wait for it. `--out` (with `--day`) writes elsewhere. Exit 0 all read,
+  1 a retry may help, 3 a retry cannot (missing credentials, a held or refused login); `--soft-fail` exits 0 (the
+  15:40 attempt; `live-capture-retry` at 15:55 reads the rest and alerts once).
+- Quantiply P&L is every run of an algo that day added up (`quantiplyRuns`, keyed by run id); a sum that does not
+  match the chart's `totalMTM` beyond ₹1 fails the section. A position with no exit in the fills is an open leg.
+  AlgoTest P&L counts only the legs that entered on the day read (a deploy with days ticked spans days).
+- Did not trade (`traded: false`, no P&L): an AlgoTest deploy with no fills on the day; a Quantiply algo the tool
+  switched on for the session (its deploy ledger, `toolEnabledFor`, the 15:40 safety-net disable left out) with no
+  run, so the 15:40 run and the 15:55 retry agree. A multiplier the platform did not show (an algo gone from the
+  list on a back-filled day) is 1x with `multiplier_assumed: true`. Quantiply's UTC times become IST. Money sums are
+  integer paise.
+- Its Quantiply login goes through `quantiply-session.ts` like the uploader's and the deployer's (it waits out the
+  TOTP window the account last typed a code in), but a refusal writes the capture's OWN hold
+  (`rotation/live/login-hold-quantiply-<broker>.json`, `openQuantiply`'s `holdFile`), never the shared one, so it
+  can never stop `quantiply-disable` from logging in. The capture checks both holds. The `obt angel` SmartAPI guard
+  is a separate lock: nothing spaces a capture login and an evening-run SmartAPI login (not seen to clash).
+- `TOOL_PREFIXES` is append-only (a rename adds its prefixes beside the old ones); ownership is by ledger id
+  wherever the ledger has one.
+
 ## The stop button (BL-143 Phase 4)
 
 The owner's Telegram "stop everything": switch off AND square off, only after a second confirm tap (owner,

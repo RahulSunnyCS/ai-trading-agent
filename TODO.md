@@ -788,3 +788,15 @@ second confirm tap.
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.35.4 | Phase 4: stop button (`apps/scheduler/src/stop-button.ts` listener, `packages/broker-login/src/stop-button.ts` runner, a hold that lasts until Resume, held jobs) | claude | **Built 2026-10-20** (review fixes in), stand-in tested, never sent live; off until `STOP_BUTTON=on` + scheduler restart. Done when the owner has pressed it once on a day of their choice |
+
+### 3.36 Live vs paper: slippage and discretionary trades — [BL-141](backlog/BL-141-live-vs-backtest-slippage-discretionary.md)
+
+Owner (2026-10-19): before the evening deletes, read what AlgoTest and Quantiply show for the day, compare it with
+the backtest, report the slippage signed at 16:00 (owner only), and track the trades added by hand apart.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.36.1 | Phase 1: the read-only calls behind each platform's per-strategy P&L and fills (`docs/algotest-execution.md`, "Live results") | claude | **Found 2026-10-20** from the public bundles, confirmed with GETs after a real login (a holiday, reading 19 Oct). Quantiply fills not seen yet: needs a traded day's `GET /algos/:id` state |
+| 3.36.2 | Phase 2: `live-capture` 15:40 + `live-capture-retry` 15:55 (`src/live-capture.ts`), the day file, back-fill of missed days (no delete gate: both platforms keep the results) | claude | **Built 2026-10-20**, run by hand for 14, 15 and 19 Oct into scratch files; needs the scheduler restart (new jobs) |
+| 3.36.3 | Phase 3: `obt rotation live-compare` and the lines in the owner's 16:00 message | claude | **Built 2026-10-20**; the Rotation page card (live, paper, gap, discretionary, running chart) is still to do. Reconciling a week against the contract notes is the owner's |
+| 3.36.4 | Phase 4: slippage per shape into the backtests (research, pre-register first) | — | After 20 forward days |

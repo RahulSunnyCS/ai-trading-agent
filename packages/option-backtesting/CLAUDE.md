@@ -248,6 +248,12 @@ Otherwise:
   SL limit 1, a 3 s exit delay). One algo per weekday, so a body carries the session's weekday only. A trail in points
   is `PER_POSITION_POINT` (confirmed by the owner's `test1`). `Export.unconfirmed` lists any mapping never seen
   saved, which the uploader refuses; none is left. Anything else that is set raises `Unmappable`.
+- `rotation/live_compare.py` — BL-141: the 15:40 capture's day file (`rotation/live/<day>.jsonl`, written by
+  `packages/broker-login/src/live-capture.ts`) beside the stored paper results (`store.result_path`, so T1 variants
+  too): per variant, list and platform + broker, live per lot (copies' multipliers added up) minus paper per lot
+  after the same costs, signed, summed in `Decimal`; copies that did not trade, have open legs or are off-slot, and
+  discretionary lines, apart. `owner_lines` is what `deliver.send_result`
+  adds to the owner's 16:00 message only, and returns None (no block) until `rotation/live/` exists.
 - `api/legwise_routes.py` — `/legwise/*` on `obt-api` for the dashboard's Options Lab: `/day` and `/anatomy` (see above; `/anatomy` also overlays apps/server's T-33 `daily_regime_tags` as `t33` when `DATABASE_URL` is set in this process, with an explicit status), list/
   validate/save strategies (slug-checked name, `yaml.safe_dump` of the validated model — never
   raw client text), ad-hoc backtest over collected days, saved results, data/token status, and

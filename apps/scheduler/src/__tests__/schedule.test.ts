@@ -174,8 +174,54 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('has 33 jobs', () => {
-    expect(JOBS).toHaveLength(33);
+  it('has 35 jobs', () => {
+    expect(JOBS).toHaveLength(35);
+  });
+});
+
+describe('live capture (BL-141)', () => {
+  const job = (id: string) => JOBS.find((j) => j.id === id);
+  const minutes = (at = '') => {
+    const [h = 0, m = 0] = at.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  it('one attempt at 15:40 that never holds the Quantiply group past 15:50 or alerts itself', () => {
+    const capture = job('live-capture');
+    expect(minutes(capture?.schedule.at)).toBeGreaterThan(15 * 60 + 28); // the last exit
+    expect(capture?.retries).toBe(0);
+    expect(minutes(capture?.schedule.at) + (capture?.timeoutMinutes ?? 99)).toBeLessThanOrEqual(
+      15 * 60 + 50,
+    );
+    expect(capture?.steps).toEqual([
+      ['node_modules/.bin/tsx', 'src/live-capture.ts', '--soft-fail'],
+    ]);
+    expect(capture?.schedule.on('2026-10-20')).toBe(false); // a market holiday
+    const ids = JOBS.map((j) => j.id);
+    expect(ids.indexOf('live-capture')).toBeLessThan(ids.indexOf('quantiply-disable'));
+  });
+
+  it('its retries come after the disable and end before the 16:45 Quantiply upload', () => {
+    const retry = job('live-capture-retry');
+    const start = minutes(retry?.schedule.at);
+    expect(start).toBeGreaterThan(minutes(job('quantiply-disable')?.schedule.at));
+    const tries = (retry?.retries ?? 0) + 1;
+    const end =
+      start +
+      tries * (retry?.timeoutMinutes ?? 0) +
+      (retry?.retries ?? 0) * (retry?.retryDelayMinutes ?? 0);
+    expect(end).toBeLessThanOrEqual(16 * 60 + 30);
+    expect(end).toBeLessThan(minutes(job('quantiply-evening')?.schedule.at));
+    expect(retry?.steps).toEqual([
+      ['node_modules/.bin/tsx', 'src/live-capture.ts', '--no-backfill'],
+    ]);
+    expect(retry?.noRetryExitCodes).toEqual([3]);
+  });
+
+  it('both in the Quantiply group, so their logins never overlap another Quantiply job', () => {
+    for (const id of ['live-capture', 'live-capture-retry']) {
+      expect(job(id)?.group).toBe('quantiply');
+    }
   });
 });
 
