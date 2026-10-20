@@ -17,7 +17,9 @@ export function telegramSink(env: Record<string, string>, type?: string): AlertS
   const chatId = env.TELEGRAM_CHAT_ID?.trim();
   if (botToken) registerSecret(botToken);
   const config: TelegramConfig | null = botToken && chatId ? { botToken, chatId } : null;
-  return (text) => sendText(config, text, type);
+  return async (text) => {
+    await sendText(config, text, type);
+  };
 }
 
 /** Exit codes the runner itself produces: the job never got to report anything. */

@@ -10,6 +10,7 @@
  * See docs/architecture.md for why the boundary is the contract, not a service.
  */
 export { send, sendText, istTimestamp } from './telegram.js';
+export type { SendOutcome } from './telegram.js';
 export { registerSecret, redact } from './secrets.js';
 export { NOTIFICATION_TYPES, disabledTypes, isEnabled, prefsPath } from './prefs.js';
 export type { NotificationType } from './prefs.js';

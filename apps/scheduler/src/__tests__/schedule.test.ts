@@ -174,8 +174,8 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('has 35 jobs', () => {
-    expect(JOBS).toHaveLength(35); // BL-143: + fyers-token-reminder, trade-monitor
+  it('has 34 jobs', () => {
+    expect(JOBS).toHaveLength(34); // BL-143: + trade-monitor
   });
 });
 

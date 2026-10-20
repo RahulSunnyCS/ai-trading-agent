@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { sendText } from '@trading/notify';
 import { type Page, chromium } from 'playwright';
-import { BASE_URL, algotestLogin } from './algotest.js';
+import { BASE_URL } from './algotest.js';
 import { describeSource, readAutomation } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
 import {
@@ -18,6 +18,7 @@ import {
   secondsUntil,
 } from './deploy-plan.js';
 import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
+import { algotestLoginLocked } from './login-lock.js';
 import { redact, registerSecret } from './secrets.js';
 import { livePage } from './selectors.js';
 import { type Manifest, istToday } from './strategy-plan.js';
@@ -190,7 +191,7 @@ async function main(): Promise<number> {
   let failed = false;
 
   try {
-    await algotestLogin(page, { phone: normalizePhone(phone), password });
+    await algotestLoginLocked(page, { phone: normalizePhone(phone), password }, 'strategy-deploy');
     const live = await readLive(page);
     if (values.check) {
       const again = repeating(live);

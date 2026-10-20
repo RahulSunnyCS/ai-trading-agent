@@ -252,7 +252,9 @@ the first two:
 
 /live's "Total MTM" (and each broker's) is **computed in the page** from the executions and live prices (its
 bundle, chunk `2331-*.js`, `overallMTM`), not answered by an API, so the monitor reads the figure off the open
-page. The header also shows "Available Margin" and "Margin Blocked (approx)".
+page: the card `[data-testid="broker-mtm"]` whose first line is "Total MTM" (one per broker beside it, labelled
+with the broker's alias), its figure a `p.tabular-nums` coloured `text-green-500` when >= 0 and `text-red-500`
+when < 0 (a loading-dots element while it computes). Read live 2026-10-20 16:13 IST: `₹ 0`, green. The header also shows "Available Margin" and "Margin Blocked (approx)".
 
 The owner's first live deploy (2026-10-19, `T1 · N_p150-t1s11_0917` on Finvasia) left the days unticked, and the
 row shows "-" for every day: **a deploy with no days ticked runs that day only**. Not yet seen: what "Activate"

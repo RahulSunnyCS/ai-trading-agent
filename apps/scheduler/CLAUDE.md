@@ -40,7 +40,7 @@ summary flags anything but `main`).
   quiet.
 - `src/summary.ts` — the 09:00 trading-day morning summary (builtin job): today's job slots,
   the broker login workflow result (`gh run list`; label "Broker login", and a failure names
-  AlgoTest or Quantiply from the run's steps via `gh run view`), Fyers token (`mbt token-status`), whether
+  AlgoTest or Quantiply from the run's steps via `gh run view`), Fyers token (`mbt token-status --probe`: the one Fyers check of the morning, which also asks Fyers, so a stale `.env` token fails), whether
   the last trading day's options data is in the lake, disk space, the previous trading day's jobs that
   ran as catch-ups after sleep ("Ran late after sleep", `History.catchUpsBetween`, BL-143), and failures
   in the last 24 h.
@@ -69,8 +69,7 @@ summary flags anything but `main`).
 ## Adding a check
 
 A check looks for a slow-burning problem and **never changes data** (alert only). Put it in
-its group's file under `src/checks/` (`drift`, `calendar`, `stock`, `credentials`, `digest`, `fyers`
-(BL-143's 09:00 `fyers-token-reminder`, on by default)):
+its group's file under `src/checks/` (`drift`, `calendar`, `stock`, `credentials`, `digest`):
 export `jobs` (use `checkJob({...})` from `checks/types.ts` for the shared defaults) and
 `builtins` (wrap the function in `checkBuiltin(...)`). A problem makes the job exit 1 with the
 detail as its error, so the normal failure alert goes out with the job's `fixHint`; the job runs
@@ -102,9 +101,13 @@ network or disk so the test needs neither. One group per file keeps parallel PRs
   see the comment on the job in `jobs.ts`.
 - `trade-monitor` (BL-143, trading days 09:04, `packages/broker-login/src/trade-monitor.ts`) runs all
   session long under `caffeinate -i`, so it is not in the `quantiply` group (it would hold the 09:19 /
-  09:21 top-ups all day); its Quantiply login waits out the same TOTP window stamp. It alerts itself
-  (`alertsItself`), including when it crashes; its state file stops a retry repeating a message; exit 3
-  (a held Quantiply login) is not retried. Each part waits for its `.env` switch.
+  09:21 top-ups all day). It makes no login and holds no session 09:10-09:25; every platform login
+  (its own, the uploaders', the deployers') takes the cross-process login lock. It alerts itself
+  (`alertsItself`), including every failure exit and a crash; its state file stops a retry repeating
+  a message; exit 3 (a refused or held Quantiply login, or another monitor running) is not retried.
+  `restartIfInterruptedUntil: '15:25'` (a `Job` field, read by `loop.decide`): a run cut off by a
+  scheduler or laptop restart (reaped as interrupted, exit -2) is started again while the session
+  lasts; every other job treats an interrupted slot as served. Each part waits for its `.env` switch.
 - The scheduler reads `jobs.ts` once at start: a new or changed job needs a restart of the
   service (`launchctl kickstart -k gui/$(id -u)/com.ai-trading-agent.scheduler`, see
   `deploy/launchd/README.md`).

@@ -2,10 +2,12 @@ import { type AlertSink, alertMissed, alertResult } from './alerts.js';
 import type { History } from './history.js';
 import type { Job } from './jobs.js';
 import { type RunContext, runJob } from './runner.js';
-import { formatIst, istDay, previousDue } from './schedule.js';
+import { formatIst, istAt, istDay, previousDue } from './schedule.js';
 
 /** A slot started within this long of its time counts as on time, not a catch-up. */
 const ON_TIME_MS = 5 * 60_000;
+/** The exit code `History.reapDead` records for a run the scheduler's stop cut off. */
+export const INTERRUPTED = -2;
 
 export type Decision =
   | { kind: 'idle' }
@@ -21,7 +23,20 @@ export type Decision =
 export function decide(job: Job, now: Date, history: History, since: Date): Decision {
   const slot = previousDue(job.schedule, now);
   if (!slot || slot.getTime() < since.getTime()) return { kind: 'idle' };
-  if (history.forSlot(job.id, slot)) return { kind: 'idle' };
+  const served = history.forSlot(job.id, slot);
+  if (served) {
+    // BL-143: a job that runs all session (the trade monitor) and was cut off by a scheduler
+    // or laptop restart (the run row reaped as interrupted) starts again while its day lasts.
+    if (
+      job.restartIfInterruptedUntil &&
+      served.ended_at !== null &&
+      served.exit_code === INTERRUPTED &&
+      now.getTime() < istAt(istDay(slot), job.restartIfInterruptedUntil).getTime()
+    ) {
+      return { kind: 'run', slot, trigger: 'catch-up' };
+    }
+    return { kind: 'idle' };
+  }
   const late = now.getTime() - slot.getTime();
   if (late <= ON_TIME_MS) return { kind: 'run', slot, trigger: 'schedule' };
   if (late <= job.catchUpHours * 3_600_000) return { kind: 'run', slot, trigger: 'catch-up' };

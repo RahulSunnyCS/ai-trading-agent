@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { waitForNextWindow } from '@trading/broker-identity';
 import { type Browser, type Page, chromium } from 'playwright';
@@ -103,13 +103,29 @@ export async function waitOutTotpWindow(stateDir: string, broker: QuantiplyBroke
   for (let n = 0; last !== null && totpWindow() <= last && n < 2; n += 1) await waitForNextWindow();
 }
 
-/** Record the window a login typed its code in (written after the attempt, success or not). */
-async function stampTotpWindow(stateDir: string, broker: QuantiplyBroker): Promise<void> {
+/**
+ * Claim a window (BL-143): written BEFORE the code is typed, and again after the attempt, under the
+ * login lock, so no other process reads an old stamp while this one types. A code may come from the
+ * next window when this one is about to end (`freshTotp`), so near the boundary the claim is the
+ * next window.
+ */
+export function claimedWindow(atMs: number = Date.now()): number {
+  const w = totpWindow(atMs);
+  return atMs % 30_000 > 25_000 ? w + 1 : w;
+}
+
+async function stampTotpWindow(
+  stateDir: string,
+  broker: QuantiplyBroker,
+  window: number = totpWindow(),
+): Promise<void> {
   await mkdir(stateDir, { recursive: true }).catch(() => undefined);
-  await writeFile(
-    windowPath(stateDir, broker),
-    `${JSON.stringify({ window: totpWindow() })}\n`,
-  ).catch(() => undefined);
+  const path = windowPath(stateDir, broker);
+  type Stamp = { window?: number };
+  const old = await readJson<Stamp>(path).catch((): Stamp => ({}));
+  // never move the stamp back (the claim may already be a window ahead)
+  const at = typeof old.window === 'number' ? Math.max(old.window, window) : window;
+  await writeFile(path, `${JSON.stringify({ window: at })}\n`).catch(() => undefined);
 }
 
 /**
@@ -140,29 +156,109 @@ export interface QuantiplyApp {
 export async function openQuantiplyApp(
   c: QCredentials,
   stateDir: string,
-  opts: { headed?: boolean; retryTotpOnce?: boolean; onPage?: (page: Page) => void } = {},
+  opts: LoginOptions = {},
 ): Promise<QuantiplyApp> {
   const app = await openWithRetry(c, stateDir, { ...opts, keep: true });
   if (!app.browser || !app.page) throw new Error('internal: the app was not kept open');
   return { api: app.api, browser: app.browser, page: app.page };
 }
 
+export interface LoginOptions {
+  headed?: boolean;
+  retryTotpOnce?: boolean;
+  onPage?: (page: Page) => void;
+  /**
+   * Called before each code is typed (BL-143: the monitor counts codes against its daily cap and
+   * may refuse by throwing). A retry in the next window is a second call.
+   */
+  beforeAttempt?: () => Promise<void>;
+}
+
 async function openWithRetry(
   c: QCredentials,
   stateDir: string,
-  opts: { headed?: boolean; retryTotpOnce?: boolean; keep: boolean; onPage?: (page: Page) => void },
+  opts: LoginOptions & { keep: boolean },
 ): Promise<{ api: QuantiplyApi; browser?: Browser; page?: Page }> {
-  for (let attempt = 1; ; attempt += 1) {
-    await waitOutTotpWindow(stateDir, c.broker);
-    try {
-      return await loginOnce(c, stateDir, opts);
-    } catch (error) {
-      const totp = error instanceof BrokerLoginError && error.kind === 'TOTP_REJECTED';
-      if (!totp || !opts.retryTotpOnce || attempt >= 2) throw error;
-      console.log('  TOTP code refused: one more login in the next window');
-    } finally {
-      await stampTotpWindow(stateDir, c.broker);
+  // One Quantiply login per account at a time across processes (the uploader, the deployer, the
+  // monitor, the stop button): the window stamp below is read and claimed under this lock.
+  const release = await takeLoginLock(stateDir, c.broker);
+  try {
+    for (let attempt = 1; ; attempt += 1) {
+      await opts.beforeAttempt?.();
+      await waitOutTotpWindow(stateDir, c.broker);
+      await stampTotpWindow(stateDir, c.broker, claimedWindow());
+      try {
+        return await loginOnce(c, stateDir, opts);
+      } catch (error) {
+        const totp = error instanceof BrokerLoginError && error.kind === 'TOTP_REJECTED';
+        if (!totp || !opts.retryTotpOnce || attempt >= 2) throw error;
+        console.log('  TOTP code refused: one more login in the next window');
+      } finally {
+        await stampTotpWindow(stateDir, c.broker);
+      }
     }
+  } finally {
+    await release();
+  }
+}
+
+// The lock below is the same file, format and rules as PR #275's (the stop button), so the two
+// branches share one lock: `login-lock-<broker>` beside the ledger, {pid, at}, taken over when its
+// process is gone or it is 6 minutes old.
+const lockPath = (stateDir: string, broker: QuantiplyBroker) =>
+  join(stateDir, `login-lock-${broker}`);
+
+/** A lock older than this is a crashed run's: taken over. */
+const LOCK_STALE_MS = 6 * 60_000;
+
+/**
+ * Across processes: one Quantiply login per account at a time (the uploader, the deployer, the
+ * 15:40 disable, the monitor, the stop button). Waits up to `waitMs` for another run's login;
+ * after that it goes ahead anyway, because a stuck lock must never be what keeps the stop button
+ * from logging in.
+ */
+export async function takeLoginLock(
+  stateDir: string,
+  broker: QuantiplyBroker,
+  opts: { waitMs?: number; pollMs?: number } = {},
+): Promise<() => Promise<void>> {
+  const path = lockPath(stateDir, broker);
+  const deadline = Date.now() + (opts.waitMs ?? 150_000);
+  await mkdir(stateDir, { recursive: true }).catch(() => undefined);
+  for (;;) {
+    try {
+      await writeFile(path, `${JSON.stringify({ pid: process.pid, at: Date.now() })}\n`, {
+        flag: 'wx',
+      });
+      return () => rm(path, { force: true }).catch(() => undefined);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') return async () => undefined;
+    }
+    type Lock = { pid?: number; at?: number };
+    // unreadable: just created and not yet written, or torn: judged by its age alone
+    const held = await readJson<Lock>(path).catch(
+      async (): Promise<Lock> => ({ at: (await stat(path).catch(() => null))?.mtimeMs ?? 0 }),
+    );
+    const alive = typeof held.pid === 'number' ? pidAlive(held.pid) : true;
+    const fresh = typeof held.at === 'number' && Date.now() - held.at < LOCK_STALE_MS;
+    if (!alive || !fresh) {
+      await rm(path, { force: true }).catch(() => undefined);
+      continue;
+    }
+    if (Date.now() >= deadline) {
+      console.log(`  another Quantiply login (pid ${held.pid}) still holds ${path}: going ahead`);
+      return async () => undefined;
+    }
+    await new Promise((r) => setTimeout(r, opts.pollMs ?? 1_000));
+  }
+}
+
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
   }
 }
 
@@ -181,7 +277,7 @@ async function loginOnce(
       locale: 'en-IN',
       timezoneId: 'Asia/Kolkata',
     });
-    installOverlayHandlers(context);
+    const detachOverlays = installOverlayHandlers(context);
     const page = await context.newPage();
     page.setDefaultTimeout(15_000);
     try {
@@ -209,6 +305,8 @@ async function loginOnce(
       }
       throw error;
     }
+    // The kept page gets no overlay handler: nothing on it is ever clicked.
+    if (opts.keep) detachOverlays();
     const tokenPage = await context.newPage();
     // The listener goes on before the app loads, so the socket it opens is seen from the start.
     if (opts.keep && opts.onPage) opts.onPage(tokenPage);

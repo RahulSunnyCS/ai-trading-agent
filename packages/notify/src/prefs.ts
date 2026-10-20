@@ -25,7 +25,7 @@ export const NOTIFICATION_TYPES = {
   'monitor.margin': 'Trade monitor: the 09:05 margin check per broker account (BL-143)',
   'monitor.deploy': 'Trade monitor: the 09:25 deploy check of AlgoTest and Quantiply (BL-143)',
   'monitor.loss':
-    'Trade monitor: the -₹5,000 loss warning and an unreadable platform (the -₹8,000 alert is always sent)',
+    'Trade monitor: the -₹5,000 loss warning (the -₹8,000 alert and "cannot read" are always sent)',
   'options.daily': 'Options evening collection and leg-wise P&L summary',
   'options.problem': 'Options evening collection could not run',
   'scheduler.morning': 'Scheduler morning summary (09:00 on trading days)',

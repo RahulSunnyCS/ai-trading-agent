@@ -2,14 +2,17 @@ import { describe, expect, it } from 'bun:test';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fyersTokenCheck } from '../checks/fyers.js';
 import { History } from '../history.js';
 import { JOBS, findJob } from '../jobs.js';
-import { catchUpCheck } from '../summary.js';
+import { decide } from '../loop.js';
+import { istAt } from '../schedule.js';
+import { catchUpCheck, catchUpWindow, fyersLine } from '../summary.js';
+
+const tmpHistory = () => new History(join(mkdtempSync(join(tmpdir(), 'bl143-')), 'scheduler.db'));
 
 describe('BL-143: catch-ups after sleep in the morning summary', () => {
   it("lists the previous day's catch-up runs, due and ran, as one problem line", () => {
-    const history = new History(join(mkdtempSync(join(tmpdir(), 'bl143-')), 'scheduler.db'));
+    const history = tmpHistory();
     const slot = new Date('2026-10-19T11:10:00Z'); // 16:40 IST
     const late = history.start(
       'algotest-evening',
@@ -27,10 +30,8 @@ describe('BL-143: catch-ups after sleep in the morning summary', () => {
       new Date('2026-10-19T11:15:00Z'),
     );
     history.finish(onTime, 0, 1, new Date('2026-10-19T11:16:00Z'));
-    const rows = history.catchUpsBetween(
-      new Date('2026-10-18T18:30:00Z'),
-      new Date('2026-10-19T18:30:00Z'),
-    );
+    const { since, until } = catchUpWindow('2026-10-20');
+    const rows = history.catchUpsBetween(since, until);
     expect(rows.map((r) => r.job)).toEqual(['algotest-evening']);
     const check = catchUpCheck(rows);
     expect(check?.ok).toBe(false);
@@ -39,34 +40,35 @@ describe('BL-143: catch-ups after sleep in the morning summary', () => {
     expect(catchUpCheck([])).toBeNull();
     history.close();
   });
+
+  it("on Monday, Friday's day only: a weekend job caught up is not flagged", () => {
+    // Mon 2026-10-26: the previous trading day is Fri 2026-10-23
+    const { since, until } = catchUpWindow('2026-10-26');
+    expect(since.toISOString()).toBe(istAt('2026-10-23', '00:00').toISOString());
+    expect(until.toISOString()).toBe(istAt('2026-10-24', '00:00').toISOString());
+  });
 });
 
-describe('BL-143: the 09:00 Fyers token reminder', () => {
-  const runner = (code: number, output: string) => () => ({ code, output });
-
-  it('is quiet with a valid token', () => {
-    const r = fyersTokenCheck(
-      runner(0, 'ok: token from dashboard, expires 2026-10-21 06:00 IST'),
-      '/m',
+describe("BL-143: the morning summary's one Fyers check", () => {
+  it('passes a token Fyers accepts', () => {
+    const c = fyersLine(
+      'ok: token from broker_tokens, expires 2026-10-21 06:00 IST (Fyers accepts it)',
     );
-    expect(r.ok).toBe(true);
+    expect(c.ok).toBe(true);
   });
 
-  it('alerts when the token is missing or expired, with the reason', () => {
-    const r = fyersTokenCheck(runner(1, 'not ready: no Fyers token found'), '/m');
-    expect(r).toEqual({
-      ok: false,
-      detail: 'No valid Fyers token for today: no Fyers token found',
-    });
-    const crash = fyersTokenCheck(runner(127, 'spawnSync uv ENOENT'), '/m');
-    expect(crash.ok).toBe(false);
-    expect(crash.detail).toContain('ENOENT');
+  it('fails a rejected or unconfirmable token, with what to do', () => {
+    const c = fyersLine(
+      'not ready: the token from env has no known expiry and Fyers could not be asked',
+    );
+    expect(c.ok).toBe(false);
+    expect(c.detail).toContain('no known expiry');
+    expect(c.detail).toContain('Broker logins');
+    expect(fyersLine('').ok).toBe(false);
   });
 
-  it('runs at 09:00 on trading days, on by default', () => {
-    const job = findJob('fyers-token-reminder');
-    expect(job?.schedule.at).toBe('09:00');
-    expect(job?.builtin).toBe('fyers-token-reminder');
+  it('is a summary line, not a second 09:00 job', () => {
+    expect(findJob('fyers-token-reminder')).toBeUndefined();
   });
 });
 
@@ -79,8 +81,40 @@ describe('BL-143: the trade monitor job', () => {
     expect(job?.steps).toEqual([
       ['/usr/bin/caffeinate', '-i', 'node_modules/.bin/tsx', 'src/trade-monitor.ts'],
     ]);
-    // 09:04 + the timeout covers the session's end (15:30)
     expect((job?.timeoutMinutes ?? 0) >= 15 * 60 + 30 - (9 * 60 + 4)).toBe(true);
     expect(JOBS.filter((j) => j.id === 'trade-monitor')).toHaveLength(1);
+  });
+
+  it('starts again after a restart cut it off, while the session lasts', () => {
+    const job = findJob('trade-monitor');
+    if (!job) throw new Error('no trade-monitor job');
+    const history = tmpHistory();
+    const slot = istAt('2026-10-21', '09:04');
+    const since = istAt('2026-10-01', '00:00');
+    const id = history.start('trade-monitor', 'schedule', slot, '/x', slot);
+    // the scheduler stopped mid-session: reaped as interrupted
+    history.finish(id, -2, 0, istAt('2026-10-21', '11:00'), 'interrupted');
+    const d = decide(job, istAt('2026-10-21', '11:05'), history, since);
+    expect(d).toEqual({ kind: 'run', slot, trigger: 'catch-up' });
+    // after 15:25 it stays down
+    expect(decide(job, istAt('2026-10-21', '15:26'), history, since).kind).toBe('idle');
+    // a run that ended normally is served
+    const ok = history.start('trade-monitor', 'catch-up', slot, '/x', istAt('2026-10-21', '11:05'));
+    history.finish(ok, 0, 1, istAt('2026-10-21', '15:30'));
+    expect(decide(job, istAt('2026-10-21', '15:20'), history, since).kind).toBe('idle');
+    history.close();
+  });
+
+  it('other jobs treat an interrupted slot as served', () => {
+    const job = findJob('options-evening');
+    if (!job) throw new Error('no options-evening job');
+    const history = tmpHistory();
+    const slot = istAt('2026-10-21', '15:45');
+    const id = history.start('options-evening', 'schedule', slot, '/x', slot);
+    history.finish(id, -2, 0, istAt('2026-10-21', '16:00'), 'interrupted');
+    expect(
+      decide(job, istAt('2026-10-21', '16:05'), history, istAt('2026-10-01', '00:00')).kind,
+    ).toBe('idle');
+    history.close();
   });
 });

@@ -203,22 +203,38 @@ function algotestCheck(ctx: BuiltinContext): Check {
   }
 }
 
-/** Is there a usable Fyers token (the evening collection needs one)? */
-function fyersCheck(ctx: BuiltinContext): Check {
-  const out = capture(
-    'uv',
-    ['run', 'mbt', 'token-status'],
-    join(ctx.repoRoot, 'packages/momentum-backtesting'),
-    ctx.env,
-  );
+/**
+ * BL-143 item 7: is there a Fyers token Fyers accepts today (the 09:16 pick and the evening run
+ * need one)? `mbt token-status --probe` also asks Fyers (a read-only profile call), so a stale
+ * `.env` token with no known expiry is not passed as "ok". The one Fyers check of the morning:
+ * its line in this summary is the reminder, with what to do.
+ */
+export function fyersLine(output: string): Check {
   const line =
-    out.split('\n').find((l) => l.startsWith('ok:') || l.startsWith('not ready:')) ??
-    out.slice(0, 160);
+    output
+      .split('\n')
+      .map((l) => l.trim())
+      .find((l) => l.startsWith('ok:') || l.startsWith('not ready:')) ?? '';
+  if (line.startsWith('ok:')) {
+    return { ok: true, label: 'Fyers token', detail: line.replace(/^ok:\s*/, '') };
+  }
+  const why = line.replace(/^not ready:\s*/, '') || output.trim().slice(0, 160) || 'no answer';
   return {
-    ok: line.startsWith('ok:'),
+    ok: false,
     label: 'Fyers token',
-    detail: line.replace(/^(ok|not ready):\s*/, ''),
+    detail: `${why} → log in today: Dashboard › Broker logins › Fyers (before the 09:16 pick)`,
   };
+}
+
+function fyersCheck(ctx: BuiltinContext): Check {
+  return fyersLine(
+    capture(
+      'uv',
+      ['run', 'mbt', 'token-status', '--probe'],
+      join(ctx.repoRoot, 'packages/momentum-backtesting'),
+      ctx.env,
+    ),
+  );
 }
 
 /** Was the last trading day's options data collected? Expired contracts can't be fetched later. */
@@ -317,11 +333,15 @@ export function catchUpCheck(rows: RunRow[]): Check | null {
   };
 }
 
+/** The previous trading day only, [00:00, next day 00:00): a weekend job caught up is not flagged. */
+export function catchUpWindow(today: string): { since: Date; until: Date } {
+  const prev = previousTradingDay(today);
+  return { since: istAt(prev, '00:00'), until: istAt(addDays(prev, 1), '00:00') };
+}
+
 function catchUps(ctx: BuiltinContext): Check[] {
-  const today = istDay(ctx.now());
-  const check = catchUpCheck(
-    ctx.history.catchUpsBetween(istAt(previousTradingDay(today), '00:00'), istAt(today, '00:00')),
-  );
+  const { since, until } = catchUpWindow(istDay(ctx.now()));
+  const check = catchUpCheck(ctx.history.catchUpsBetween(since, until));
   return check ? [check] : [];
 }
 

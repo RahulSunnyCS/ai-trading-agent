@@ -59,7 +59,14 @@ def login() -> None:
 
 
 @app.command()
-def token_status() -> None:
+def token_status(
+    probe: bool = typer.Option(
+        False,
+        "--probe",
+        help="Also ask Fyers (read-only profile call) whether it accepts the token now; a token "
+        "with no known expiry (FYERS_ACCESS_TOKEN in .env) that cannot be confirmed is not ready.",
+    ),
+) -> None:
     """Show where the Fyers token would come from and when it expires (never prints it)."""
     try:
         creds = fyers.resolve_credentials()
@@ -67,7 +74,29 @@ def token_status() -> None:
         typer.echo(f"not ready: {error}")
         raise typer.Exit(1) from None
     expiry = f", expires {creds.expires_at:%Y-%m-%d %H:%M %Z}" if creds.expires_at else ""
+    if probe:
+        verdict = token_verdict(
+            creds.source, creds.expires_at is not None, fyers.probe_token(creds)
+        )
+        if verdict:
+            typer.echo(f"not ready: {verdict}")
+            raise typer.Exit(1)
+        typer.echo(f"ok: token from {creds.source}{expiry} (Fyers accepts it)")
+        return
     typer.echo(f"ok: token from {creds.source}{expiry}")
+
+
+def token_verdict(source: str, has_expiry: bool, probe: str) -> str | None:
+    """BL-143: why a token is not ready after the profile probe, or None when it is usable.
+    Rejected = not ready; not reachable = usable only when its expiry is known (a `.env`
+    token carries none, so yesterday's would otherwise pass)."""
+    if probe == "valid":
+        return None
+    if probe == "rejected":
+        return f"Fyers rejects the token from {source}: log in again"
+    if not has_expiry:
+        return f"the token from {source} has no known expiry and Fyers could not be asked"
+    return None
 
 
 @app.command()
