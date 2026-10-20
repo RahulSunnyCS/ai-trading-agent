@@ -275,3 +275,9 @@ entry, so the strategies must already be in AlgoTest the evening before.
   showed the call (`DELETE /strategy/<_id>`, cookies + `X-CSRF-TOKEN-ACCESS` from `csrf_access_token`).
   `src/strategy-delete.ts` makes it for a name with exactly one `_id`, lists again and stops the run if any other
   strategy vanished. The `algotest-evening` job now passes `--allow-delete`. The click selectors were removed.
+- 2026-10-20 — Review of #272 fixed before the first live delete: the ledger records each upload's `_id` and a delete
+  goes only to that id (never a same-named strategy the owner saved); a STOP (another strategy vanished) exits 3
+  with a 🛑 alert, never retried; a 2xx delete is recorded at once, then checked through the API listing; a name
+  with no id, repeated, or listed under another id is the owner's (exit 3); a strategy with a weekday ticked on
+  /live is never deleted. `--record-ids` added the ids of earlier uploads once. The owner's hand delete of
+  `T1 · N_p150-t1s11_0917` removed it from `GET /strategies` (10 -> 9, nothing else changed).

@@ -1,14 +1,36 @@
-import type { APIRequestContext } from 'playwright';
-
-/** AlgoTest's API host (the web app's axios client: cookies plus the CSRF header below). */
-export const ALGOTEST_API = 'https://api.algotest.in';
+import type { APIRequestContext, BrowserContext } from 'playwright';
 
 /**
- * Delete one saved strategy by its id, the call AlgoTest's own web app makes (its bundle:
- * `SP.delete("/strategy/" + id)`, an axios client with `withCredentials` and
- * `xsrfCookieName: "csrf_access_token"`, `xsrfHeaderName: "X-CSRF-TOKEN-ACCESS"`; read 2026-10-20).
- * `request` must carry the logged-in session's cookies (a Playwright page's `page.request`).
+ * AlgoTest's API host. Its web app calls it with the session cookies and the CSRF header below
+ * (`docs/algotest-execution.md` §7); a call without the header answers 401 "Missing CSRF token".
  */
+export const ALGOTEST_API = 'https://api.algotest.in';
+
+/** The logged-in session's `csrf_access_token` cookie, the value the CSRF header carries. */
+export async function csrfToken(context: BrowserContext): Promise<string> {
+  const csrf = (await context.cookies(ALGOTEST_API)).find(
+    (c) => c.name === 'csrf_access_token',
+  )?.value;
+  if (!csrf) throw new Error('no csrf_access_token cookie for the API: not logged in');
+  return csrf;
+}
+
+/** `GET /strategies` straight from the API: the saved strategies, `{_id, name, ...}` each. */
+export async function listViaApi(
+  request: APIRequestContext,
+  csrf: string,
+  apiUrl: string = ALGOTEST_API,
+): Promise<unknown> {
+  const response = await request.get(`${apiUrl}/strategies`, {
+    headers: { 'X-CSRF-TOKEN-ACCESS': csrf },
+    failOnStatusCode: false,
+    timeout: 20_000,
+  });
+  if (!response.ok()) throw new Error(`listing answered ${response.status()}`);
+  return response.json();
+}
+
+/** `DELETE /strategy/<id>`, the web app's own call; `request` must carry the session's cookies. */
 export async function deleteStrategyById(
   request: APIRequestContext,
   id: string,
@@ -22,10 +44,4 @@ export async function deleteStrategyById(
     timeout: 20_000,
   });
   if (!response.ok()) throw new Error(`delete answered ${response.status()}`);
-}
-
-/** The ids a listing held, minus `gone`, that are missing afterwards: each must still be there. */
-export function vanished(before: string[], after: string[], gone: string): string[] {
-  const now = new Set(after);
-  return before.filter((id) => id !== gone && !now.has(id));
 }

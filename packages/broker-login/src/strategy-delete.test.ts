@@ -3,7 +3,7 @@ import { type Server, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, before, describe, it } from 'node:test';
 import { type APIRequestContext, request } from 'playwright';
-import { deleteStrategyById, vanished } from './strategy-delete.js';
+import { deleteStrategyById, listViaApi } from './strategy-delete.js';
 
 /**
  * The delete call against a local stand-in for api.algotest.in: what it sends (method, path, CSRF
@@ -62,9 +62,13 @@ describe('deleteStrategyById', () => {
   });
 });
 
-describe('vanished', () => {
-  it('names every other id that is missing after a delete', () => {
-    assert.deepEqual(vanished(['a', 'b', 'c'], ['a', 'c'], 'b'), []);
-    assert.deepEqual(vanished(['a', 'b', 'c'], ['c'], 'b'), ['a']);
+describe('listViaApi', () => {
+  it('sends the CSRF header and returns the JSON; a 401 is an error', async () => {
+    seen.length = 0;
+    status = 200;
+    assert.deepEqual(await listViaApi(client, 'csrf-2', api), { msg: 'Strategy deleted' });
+    assert.deepEqual(seen, [{ method: 'GET', url: '/strategies', csrf: 'csrf-2' }]);
+    status = 401;
+    await assert.rejects(listViaApi(client, 'csrf-2', api), /listing answered 401/);
   });
 });

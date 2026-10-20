@@ -242,8 +242,7 @@ export const fyersLogin = {
  * switches to a phone layout without "Save Strategy"). VERIFIED 2026-10-19 by importing and saving
  * four strategies in the owner's session: the hidden file input, "Strategy imported successfully",
  * "Save Strategy" → "Save New Strategy" (name pre-filled) → "Done" → "Strategy Saved", "Export .algtst".
- * Deleting does not click: `strategy-delete.ts` calls AlgoTest's API by the strategy's id (saved
- * strategies outside a folder are not listed in the sidebar at all, 2026-10-20).
+ * Deleting does not click (`strategy-delete.ts`).
  */
 export const strategyPage = {
   importInput: (page: Page): Locator => page.locator('input[type=file][accept*=".algtst"]'),

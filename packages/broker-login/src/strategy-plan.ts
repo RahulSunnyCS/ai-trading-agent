@@ -42,6 +42,8 @@ export interface LedgerRow {
   sha: string;
   ok: boolean;
   detail?: string;
+  /** AlgoTest's `_id` of the saved strategy (uploads since 2026-10-20); a delete needs it */
+  id?: string;
 }
 
 export interface Wanted {
@@ -93,6 +95,36 @@ export function owned(ledger: LedgerRow[]): Map<string, string> {
     else out.delete(row.name);
   }
   return out;
+}
+
+/** The `_id` the tool recorded for each name it owns (the latest ok upload that has one). */
+export function ownedIds(ledger: LedgerRow[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const row of ledger) {
+    if (!row.ok || !NAME_PREFIXES.some((p) => row.name.startsWith(p))) continue;
+    if (row.action === 'upload') {
+      if (row.id) out.set(row.name, row.id);
+      else out.delete(row.name);
+    } else out.delete(row.name);
+  }
+  return out;
+}
+
+/**
+ * What a fresh listing says after deleting `id`: still there, and which other strategies (as
+ * "name (id)") were there before and are missing now. Any missing other one stops everything.
+ */
+export function afterDelete(
+  before: Map<string, string[]>,
+  after: Map<string, string[]>,
+  id: string,
+): { stillListed: boolean; vanished: string[] } {
+  const now = new Set([...after.values()].flat());
+  const vanished: string[] = [];
+  for (const [name, ids] of before)
+    for (const other of ids)
+      if (other !== id && !now.has(other)) vanished.push(`${name} (${other})`);
+  return { stillListed: now.has(id), vanished };
 }
 
 export function plan(
