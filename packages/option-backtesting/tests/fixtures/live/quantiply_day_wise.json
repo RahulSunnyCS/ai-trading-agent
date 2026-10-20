@@ -1,0 +1,251 @@
+{
+ "message": "Ok",
+ "status": "success",
+ "data": [
+  {
+   "day": "MON",
+   "dayName": "Monday",
+   "active": false,
+   "algos": [
+    {
+     "_id": "000000000000000000000001",
+     "code": "OPTIONS_SPREADS_LEGS",
+     "name": "test1",
+     "configurations": {
+      "isWaitAndTradeEnabled": false
+     },
+     "day": "MON",
+     "enabled": false,
+     "startTime": "09:15:00",
+     "endTime": "15:15:00",
+     "tradingType": "INTRADAY",
+     "multiplier": 1,
+     "underlyings": [
+      "NIFTY"
+     ],
+     "transactionTypes": [
+      "B"
+     ],
+     "status": "NOT_RUNNING",
+     "entryErrorCount": 0,
+     "exitErrorCount": 0
+    },
+    {
+     "_id": "000000000000000000000002",
+     "code": "OPTIONS_SPREADS_LEGS",
+     "name": "N_OTM1_SL115_TSL15%10%_9_17",
+     "configurations": {
+      "isWaitAndTradeEnabled": false
+     },
+     "day": "MON",
+     "enabled": false,
+     "startTime": "09:17:00",
+     "endTime": "15:28:00",
+     "tradingType": "INTRADAY",
+     "multiplier": 1,
+     "underlyings": [
+      "NIFTY"
+     ],
+     "transactionTypes": [
+      "S"
+     ],
+     "status": "NOT_RUNNING",
+     "entryErrorCount": 0,
+     "exitErrorCount": 0
+    },
+    {
+     "_id": "000000000000000000000003",
+     "code": "OPTIONS_SPREADS_LEGS",
+     "name": "N_OTM1_SL115",
+     "configurations": {
+      "isWaitAndTradeEnabled": false
+     },
+     "day": "MON",
+     "enabled": true,
+     "startTime": "11:17:00",
+     "endTime": "15:27:50",
+     "tradingType": "INTRADAY",
+     "multiplier": 1,
+     "underlyings": [
+      "NIFTY"
+     ],
+     "transactionTypes": [
+      "S"
+     ],
+     "brokerDisplayName": "<redacted>",
+     "brokerClientId": "<redacted>",
+     "status": "NOT_RUNNING",
+     "entryErrorCount": 0,
+     "exitErrorCount": 0
+    },
+    {
+     "_id": "000000000000000000000004",
+     "code": "OPTIONS_SPREADS_LEGS",
+     "name": "N_OTM1_SL115",
+     "configurations": {
+      "isWaitAndTradeEnabled": false
+     },
+     "day": "MON",
+     "enabled": true,
+     "startTime": "11:17:00",
+     "endTime": "15:27:50",
+     "tradingType": "INTRADAY",
+     "multiplier": 1,
+     "underlyings": [
+      "NIFTY"
+     ],
+     "transactionTypes": [
+      "S"
+     ],
+     "brokerDisplayName": "<redacted>",
+     "brokerClientId": "<redacted>",
+     "status": "NOT_RUNNING",
+     "entryErrorCount": 0,
+     "exitErrorCount": 0
+    },
+    {
+     "_id": "000000000000000000000005",
+     "code": "OPTIONS_SPREADS_LEGS",
+     "name": "N_ITM1_SL21_3000",
+     "configurations": {
+      "isWaitAndTradeEnabled": false
+     },
+     "day": "MON",
+     "enabled": true,
+     "startTime": "09:17:00",
+     "endTime": "15:28:50",
+     "tradingType": "INTRADAY",
+     "multiplier": 1,
+     "underlyings": [
+      "NIFTY"
+     ],
+     "transactionTypes": [
+      "S"
+     ],
+     "brokerDisplayName": "<redacted>",
+     "brokerClientId": "<redacted>",
+     "status": "NOT_RUNNING",
+     "entryErrorCount": 0,
+     "exitErrorCount": 0
+    },
+    {
+     "_id": "000000000000000000000006",
+     "code": "OPTIONS_SPREADS_LEGS",
+     "name": "N_OTM1_SL115",
+     "configurations": {
+      "isWaitAndTradeEnabled": false
+     },
+     "day": "MON",
+     "enabled": true,
+     "startTime": "11:17:00",
+     "endTime": "15:27:50",
+     "tradingType": "INTRADAY",
+     "multiplier": 1,
+     "underlyings": [
+      "NIFTY"
+     ],
+     "transactionTypes": [
+      "S"
+     ],
+     "brokerDisplayName": "<redacted>",
+     "brokerClientId": "<redacted>",
+     "status": "NOT_RUNNING",
+     "entryErrorCount": 0,
+     "exitErrorCount": 0
+    },
+    {
+     "_id": "000000000000000000000007",
+     "code": "OPTIONS_SPREADS_LEGS",
+     "configurations": {
+      "isWaitAndTradeEnabled": false
+     },
+     "day": "MON",
+     "enabled": true,
+     "name": "N_p100_SL115",
+     "startTime": "12:02:00",
+     "endTime": "15:28:50",
+     "tradingType": "INTRADAY",
+     "multiplier": 1,
+     "underlyings": [
+      "NIFTY"
+     ],
+     "transactionTypes": [
+      "S"
+     ],
+     "brokerDisplayName": "<redacted>",
+     "brokerClientId": "<redacted>",
+     "status": "NOT_RUNNING",
+     "entryErrorCount": 0,
+     "exitErrorCount": 0
+    },
+    {
+     "_id": "000000000000000000000008",
+     "code": "OPTIONS_SPREADS_LEGS",
+     "configurations": {
+      "isWaitAndTradeEnabled": false
+     },
+     "day": "MON",
+     "enabled": true,
+     "name": "N_ITM1_SL21_3000",
+     "startTime": "09:17:00",
+     "endTime": "15:28:50",
+     "tradingType": "INTRADAY",
+     "multiplier": 1,
+     "underlyings": [
+      "NIFTY"
+     ],
+     "transactionTypes": [
+      "S"
+     ],
+     "brokerDisplayName": "<redacted>",
+     "brokerClientId": "<redacted>",
+     "status": "NOT_RUNNING",
+     "entryErrorCount": 0,
+     "exitErrorCount": 0
+    }
+   ]
+  },
+  {
+   "day": "TUE",
+   "dayName": "Tuesday",
+   "active": true,
+   "algos": []
+  },
+  {
+   "day": "WED",
+   "dayName": "Wednesday",
+   "active": false,
+   "algos": []
+  },
+  {
+   "day": "THU",
+   "dayName": "Thursday",
+   "active": false,
+   "algos": []
+  },
+  {
+   "day": "FRI",
+   "dayName": "Friday",
+   "active": false,
+   "algos": []
+  },
+  {
+   "day": "SAT",
+   "dayName": "Saturday",
+   "active": false,
+   "algos": []
+  },
+  {
+   "day": "SUN",
+   "dayName": "Sunday",
+   "active": false,
+   "algos": []
+  },
+  {
+   "day": "ELSE",
+   "dayName": "--",
+   "active": false,
+   "algos": []
+  }
+ ]
+}

@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — real money runs on these picks every day; how far live results drift from the backtest decides whether the backtest can be trusted |
-| **Status** | Planned — capture timing answered 2026-10-19 |
+| **Status** | In progress — Phases 1–3 built 2026-10-20 (the Rotation page card still to do) |
 | **Type** | feature (Phase 4 is research) |
 | **Area** | broker-login + options + dashboard |
 | **Created** | 2026-10-19 |
 | **Depends on** | BL-137 / BL-139 (the tool's strategies and their ledgers), BL-140 (which list runs where), BL-093 / BL-026 (contract notes, the realised record) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.36 |
 
 ## Context
 
@@ -106,5 +106,32 @@ Today nothing reads the live results. Each evening the uploaders delete the day'
 
 ## Log
 
+- 2026-10-20 — Started (owner: "start", item 3 of the monitoring list). Built, not yet run by the scheduler:
+  - **Phase 1.** The calls, from both web apps' public JavaScript and then a few GETs after a real login (one per
+    platform per minute, Angel One through the TOTP stamp; nothing but GET; a holiday, so Monday 19 Oct was read):
+    AlgoTest `/execution/v2/executions` (today's cards), `/execution/v2/exited-executions` (a minute range in IST),
+    `/execution/v2/execution-info/<id>` (the multiplier); Quantiply `/pnl-chart/algo?graphLevel=account`, whose
+    `metaData.lastValues` is each algo's closing MTM for the day. Recorded in `docs/algotest-execution.md`
+    ("Live results"), fixtures in `packages/option-backtesting/tests/fixtures/live/`. Quantiply has no GET for
+    fills after the day (the order book and trade report are POSTs, never sent); on the day they may be in
+    `GET /algos/:id`'s `state.positions`, not seen yet. AlgoTest P&L is the web app's own sum over the legs.
+  - **Phase 2.** `live-capture` 15:40 (`packages/broker-login/src/live-capture.ts`), group `quantiply` ahead of
+    `quantiply-disable`, retried to about 16:30, catch-up 6 h. `rotation/live/<day>.jsonl`: a section line per
+    platform + broker read, a strategy line per strategy (tool by the ledgers' ids, else discretionary). A re-run
+    replaces only the sections it read. Once `rotation/live/` exists, the 16:40 / 16:45 uploads hold their deletes
+    (and same-name replacements) on a platform the day's capture has not read, say so and exit 3.
+  - **Phase 3.** `obt rotation live-compare` and the owner's 16:00 lines (`rotation/live_compare.py`): per
+    platform + broker + list, live per lot (copies and multipliers added up) minus paper per lot after the same
+    costs, signed, and % of the entry premium where fills are known; a copy whose first fill is away from its entry
+    minute is off-slot and left out; discretionary summed on its own line, never compared (the open question's
+    proposal, taken until the owner says otherwise). "Live · not captured" when the day has no file. The group's
+    copy never has it; nothing changes in the message before the capture's first run.
+  - **Check, 19 Oct (captured by hand into a scratch file, nothing written to the data root):** AlgoTest · Shoonya,
+    T1: 09:47 live +₹2,795 vs paper +₹2,714 (+₹81), 09:17 −₹4,095 vs −₹4,261 (+₹166), 13:17 +₹910 vs +₹790
+    (+₹120): slip +₹367 on the list, +0.6% of the entry premium. A second 09:17 copy deployed at 09:45 (+₹5,207)
+    is off-slot. Quantiply · Angel One: six of the owner's own algos, −₹3,676 in all, matching the chart's total.
+    Not yet reconciled with the contract notes.
+  - Left: the Rotation page card (each day, the running chart, slippage by platform, list and shape); Quantiply
+    fills once a traded day shows their shape; Quantiply · Shoonya not read yet (its row is off).
 - 2026-10-19 — Owner: report the slippage every day, signed (positive or negative), on Telegram at 16:00 with the day's summary, to the owner only.
 - 2026-10-19 — Created from the owner's request. Capture timing answered: a separate 15:40 job, before the evening deletes.

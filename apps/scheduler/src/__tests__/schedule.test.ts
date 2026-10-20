@@ -174,8 +174,34 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('has 33 jobs', () => {
-    expect(JOBS).toHaveLength(33);
+  it('has 34 jobs', () => {
+    expect(JOBS).toHaveLength(34);
+  });
+});
+
+describe('live capture (BL-141)', () => {
+  const job = (id: string) => JOBS.find((j) => j.id === id);
+  const minutes = (at = '') => {
+    const [h = 0, m = 0] = at.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  it('reads after the last exit and, retries included, before the evening uploads delete', () => {
+    const capture = job('live-capture');
+    const start = minutes(capture?.schedule.at);
+    expect(start).toBeGreaterThan(15 * 60 + 28);
+    const lastTry = start + (capture?.retries ?? 0) * ((capture?.retryDelayMinutes ?? 0) + 2);
+    expect(lastTry).toBeLessThan(minutes(job('algotest-evening')?.schedule.at));
+    expect(lastTry).toBeLessThan(minutes(job('quantiply-evening')?.schedule.at));
+    expect(capture?.schedule.on('2026-10-20')).toBe(false); // a market holiday
+    expect(capture?.steps).toEqual([['node_modules/.bin/tsx', 'src/live-capture.ts']]);
+    expect(capture?.noRetryExitCodes).toEqual([3]);
+  });
+
+  it('is in the Quantiply group, ahead of the 15:40 disable, so their logins never overlap', () => {
+    expect(job('live-capture')?.group).toBe('quantiply');
+    const ids = JOBS.map((j) => j.id);
+    expect(ids.indexOf('live-capture')).toBeLessThan(ids.indexOf('quantiply-disable'));
   });
 });
 

@@ -196,3 +196,20 @@ week, until disabled.
   `docs/algotest-execution.md` §7. Use a desktop viewport (1440 x 900): below about 500 px AlgoTest hides "Save
   Strategy".
 
+## Live results capture (BL-141)
+
+- `src/live-capture.ts` (+ pure `src/live-capture-plan.ts`) is the 15:40 `live-capture` job: for each platform +
+  broker row the automation settings have on (login or upload), it reads every strategy that ran on the day and
+  writes `TRADING_DATA_ROOT/rotation/live/<day>.jsonl` (a `section` line per platform + broker read, a `strategy`
+  line per strategy). GET calls only (`docs/algotest-execution.md`, "Live results"): AlgoTest's site login, then
+  the live and exited executions and each one's `execution-info` (the multiplier); Quantiply through
+  `quantiply-session.ts` (the TOTP window stamp), then the account P&L chart (`metaData.lastValues`, each algo's
+  closing MTM) named from `/algos/day-wise`. Tool or discretionary: AlgoTest by the saved strategy id in the upload
+  ledger (by name for uploads before ids were kept), Quantiply by the algo id in its ledger.
+- A re-run replaces only the sections it read; a section it could not read keeps the earlier lines. Before 15:30
+  IST on the day it only prints. `--out` writes elsewhere (a check by hand). Exit 1 retried, 3 a held or refused
+  Quantiply login.
+- `src/live-capture-gate.ts`: once `rotation/live/` exists, the evening uploads (`strategy-upload.ts`,
+  `quantiply-upload.ts`) delete nothing on a platform today's capture has not read, and drop the same-name
+  replacements with them; the run's Telegram message says so and it exits 3 (the scheduler alerts).
+

@@ -9,6 +9,7 @@ import { describeSource, readAutomation, uploadBooks } from './automation-settin
 import { normalizePhone, readTelegramConfig } from './config.js';
 import { parseCards, parseLive, stillDeployed } from './deploy-plan.js';
 import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
+import { captureGate, heldLine, holdDeletes } from './live-capture-gate.js';
 import { sessionOver } from './quantiply-plan.js';
 import { redact, registerSecret } from './secrets.js';
 import { livePage, strategyPage } from './selectors.js';
@@ -399,7 +400,25 @@ async function main(): Promise<number> {
     if (notReady.length) {
       p.delete = p.delete.filter((n) => !notReady.some((b) => n.startsWith(PREFIX[b] ?? '\0')));
     }
+    // BL-141: nothing is deleted before today's live capture has read AlgoTest.
+    const gate = captureGate(dataRoot ?? '', today, 'algotest');
+    let heldMessage = '';
+    if (gate.hold && p.delete.length) {
+      const h = holdDeletes(
+        p.delete,
+        p.upload,
+        (n) => n,
+        (w) => w.name,
+      );
+      p.delete = h.deletes;
+      p.upload = h.uploads;
+      heldMessage = heldLine(gate.why, h.held, h.heldUploads);
+    }
     lines.push(...summary(p, mode));
+    if (heldMessage) {
+      lines.push(heldMessage);
+      failed = true; // the owner is told (exit 3: a retry before the capture exists would repeat it)
+    }
     console.log(`${label}${values.apply ? '' : ' (dry run)'}\n${lines.join('\n')}`);
     if (!values.apply) return 0;
 

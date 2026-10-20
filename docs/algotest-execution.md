@@ -479,3 +479,53 @@ Execution settings with no YAML counterpart, as on the owner's own algos (N_ITM1
 `product: "D"`, limit orders (`entryOrderType: "L"`, buffer `FIXED_VALUE` 3, timeouts 5 / 4 s),
 SL limit buffer 1, `stoplossOrderPlacement: "LATER"`, exit delay 3 s, `errorAutoSquareOff: true`.
 The algo the owner built for the capture used market orders (`"M"`) instead.
+
+<a id="live-results"></a>
+
+## Live results: per-strategy P&L and fills (BL-141, read 2026-10-20)
+
+Found in both web apps' public JavaScript (fetched with curl, no login), then confirmed with a few
+GET calls after a real login (2026-10-20, a market holiday, reading Monday 2026-10-19). Nothing
+but GET was sent. Fixtures, every id replaced: `packages/option-backtesting/tests/fixtures/live/`.
+`packages/broker-login/src/live-capture.ts` (the 15:40 `live-capture` job) makes these calls;
+`live-capture-plan.ts` parses them.
+
+**AlgoTest** (`api.algotest.in`; the site login, session cookies + `X-CSRF-TOKEN-ACCESS` from
+`csrf_access_token`, as for §7). The app's API client (`SP`, `withCredentials`, the CSRF header) has
+a second base for orders, `orders.algotest.in` (`fw`), and a third for prices.
+
+| Call | What it answers |
+|---|---|
+| `GET /execution/v2/executions?environment=live&is_signal=false` | the /live "Deployed Strategies" cards: an array of executions (today's, until the day is over; `[]` on the holiday) |
+| `GET /execution/v2/exited-executions?start_date=YYYY-MM-DDT00:00&end_date=YYYY-MM-DDT23:59&environment=live&is_signal=false` | past trades for the range (the page sends the day's minute 0 and 1439, IST; its UI allows only days before today and 7 days back). The same execution shape |
+| `GET /execution/v2/execution-info/<execution _id>` | one execution with its settings: `config.ExecutionConfig.LotMultiplier` (the Quantity Multiplier), `LegsConfig` (order types, buffers, product), plus `trades`, `ongoing_trade`, `notifications` |
+| `GET /execution/v2/execution-strategy/<execution _id>` | the strategy as deployed (legs, entry and exit indicators) |
+| `GET orders.algotest.in/today-orders`, `/data/monitored-orders-and-trades`, `/data/orders-and-trades?user_tags=…` | the order book (`[]` on the holiday); `manual-trades` rows. Not used |
+
+An execution: `_id`, `name` = the saved strategy's name plus ` (n)` (the n-th deploy of it),
+`strategy_id` = the saved strategy's `_id` (what the uploader's ledger records), `broker_type`
+(`Broker.Finvasia`, `Broker.AngelOne`), `status` (`StrategyStatus.SquaredOff`, `Stopped`, …),
+`creation_ts` / `last_activation_ts` / `entry_time` / `exit_time` (IST, no zone), and `legs`: one
+per leg and re-entry, `{id, symbol, strike, option, lot_size, quantity, position:
+PositionType.Sell|Buy, status (2 = exited), entry_trade, exit_trade, last_saw_price}`, each trade
+`{price, quantity, exchange_timestamp, traded_timestamp, trigger_price, underlying_at_trade}`,
+quantity in units (65 = one NIFTY lot). A leg that never entered has `entry_trade: null`. There is
+no P&L field: the app sums it from the legs (its `XT`), sell = (entry − exit) × quantity, buy the
+other way, and that is what the capture records (the 2026-10-19 read is in the BL-141 Log).
+
+**Quantiply** (`api-prod.quantiply.angelone.in`, the uploader's JWT; the same paths on
+`api-prod.quantiply.shoonya.com`, not read yet).
+
+| Call | What it answers |
+|---|---|
+| `GET /pnl-chart/algo?graphLevel=account&from=D&to=D[&after=…]` | the P&L chart: `data` = minute candles `"epoch ms,open,high,low,close"` of the account's MTM; `metaData.totalMTM`, `minMTM`/`maxMTM` (+`At`), and **`lastValues`: one entry per algo run of the period, `{algo: <algo id>, state: <run id>, t, o, h, l, c}`, `c` its closing MTM**. `paging.after` pages. On 2026-10-19 the six `c` added up to `totalMTM` to the paisa |
+| `GET /pnl-chart/algo?graphLevel=algo&from=&to=&algoIds[]=…` | the same per algo; answered an error for the ids tried, so not used |
+| `GET /pnl-chart/algo?graphLevel=broker&broker=…` and `/pnl-chart/underlying?underlyingName=…` | per client id, per underlying. Not used |
+| `GET /algos/day-wise` | names, `multiplier`, `status`, `broker`, `brokerDisplayName`, `brokerClientId` per algo (no `pnl` field once the day's state is reset) |
+| `GET /algos/:id` | the algo; `state` is `null` after the overnight reset. While the day's state is there, the web app reads the positions from `state.positions` (a socket.io message `position_updates`, its reducer), shape not seen yet |
+
+The order book is `POST algos/order-book {brokers}` and the trade report `POST
+/reports/download/trade-report` (a blob): both are POSTs, so the capture does not call them. Fills on
+Quantiply are therefore read only from `GET /algos/:id`'s `state.positions` on the day, and only
+when its fields are plain (`transactionType`, `quantity`, `entryPrice`, `exitPrice`); otherwise
+`fills: null`. Slippage % needs fills, so it is AlgoTest-only until a traded day shows that shape.

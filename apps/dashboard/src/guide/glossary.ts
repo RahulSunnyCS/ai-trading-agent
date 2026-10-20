@@ -179,6 +179,16 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     group: 'Options',
     short:
       'The gap between the price a backtest assumes and the price you would really get. Options Lab takes it as a % of premium; Momentum in basis points (5 bps = 0.05%).',
+    long: 'The 16:00 result message measures it on the real trades too: for each of the tool’s strategies that ran on AlgoTest or Quantiply, live ₹ per lot minus the paper result for the same strategy and day, after the same costs. A plus means live did better than paper. The % is that gap as a share of the premium at entry, where the platform shows the fills. A copy deployed at another time than the strategy’s entry is listed as off-slot and left out.',
+    seeAlso: ['discretionary-trade'],
+  },
+  {
+    id: 'discretionary-trade',
+    term: 'Discretionary trade',
+    group: 'Options',
+    short:
+      'A strategy you run by hand on AlgoTest or Quantiply beside the tool’s picks. The tool never touches it; the 16:00 message shows its P&L on its own line, never as slippage.',
+    seeAlso: ['slippage'],
   },
   {
     id: 'day-type',

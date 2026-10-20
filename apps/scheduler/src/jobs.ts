@@ -486,6 +486,27 @@ const BASE_JOBS: Job[] = [
     fixHint: 'Open algotest.in/live and untick the execution days of the T1 strategies',
   },
   {
+    id: 'live-capture',
+    description:
+      "Record the day's live results before the evening deletes anything (BL-141): for each platform + broker the dashboard's Settings › Automation has on, every strategy that ran today, the tool's (in the uploaders' ledgers) or the owner's own (discretionary), with its live ₹, multiplier and fills where the platform gives them, to TRADING_DATA_ROOT/rotation/live/<day>.jsonl. Read-only on AlgoTest and Quantiply (GET calls only); the 16:00 result message puts it beside paper (owner only), and the 16:40 / 16:45 uploads delete nothing on a platform the capture has not read",
+    // 15:40: every pick has exited (15:28). In the Quantiply group, ahead of quantiply-disable at
+    // the same minute, so its Angel One login never overlaps another Quantiply job's; the TOTP
+    // window stamp in quantiply-session.ts spaces the logins. Retries until about 16:30, before
+    // the 16:40 / 16:45 uploads. A re-run replaces only the sections it read. A later catch-up is
+    // still worth it: both platforms keep the day's P&L after the strategies are deleted.
+    schedule: { at: '15:40', on: tradingDays, label: 'trading days 15:40' },
+    steps: [['node_modules/.bin/tsx', 'src/live-capture.ts']],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 10,
+    retries: 4, // 15:40, then about every 12 minutes to 16:30
+    noRetryExitCodes: [3], // a Quantiply login held or refused: never sent again
+    retryDelayMinutes: 10,
+    catchUpHours: 6,
+    group: 'quantiply',
+    fixHint:
+      'cd packages/broker-login && node_modules/.bin/tsx src/live-capture.ts  (re-reads the day; --dry-run prints only). Until a capture reads a platform, the evening upload holds its deletes',
+  },
+  {
     id: 'quantiply-disable',
     description:
       "After the session, switch off on each Quantiply account the algos the uploader made for today that are still enabled, and any of an earlier session (BL-139 Phase 4): an enabled Quantiply algo runs again on its weekday next week. Only the tool's algos (its ledger), only finished ones, confirmed by reading the list again. The safety net: always runs, whatever QUANTIPLY_DEPLOY and Automated deployment say",

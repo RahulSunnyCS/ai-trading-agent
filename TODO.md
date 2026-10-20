@@ -779,3 +779,15 @@ options margin and are never part of the strategy. Kite access is read-only.
 | 3.34.2 | Phase 2: the lot ledger (seed from the first Kite snapshot, weekly diff attribution, flags, `mbt lots`) | claude | Planned |
 | 3.34.3 | Phase 3: per-sleeve orders on Friday with free cash | claude | Planned |
 | 3.34.4 | Phase 4: Lots panel, Guide, `business.md` / `technical.md` | claude | Planned |
+
+### 3.36 Live vs paper: slippage and discretionary trades — [BL-141](backlog/BL-141-live-vs-backtest-slippage-discretionary.md)
+
+Owner (2026-10-19): before the evening deletes, read what AlgoTest and Quantiply show for the day, compare it with
+the backtest, report the slippage signed at 16:00 (owner only), and track the trades added by hand apart.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.36.1 | Phase 1: the read-only calls behind each platform's per-strategy P&L and fills (`docs/algotest-execution.md`, "Live results") | claude | **Found 2026-10-20** from the public bundles, confirmed with GETs after a real login (a holiday, reading 19 Oct). Quantiply fills not seen yet: needs a traded day's `GET /algos/:id` state |
+| 3.36.2 | Phase 2: `live-capture` job 15:40 (`src/live-capture.ts`), the day file, the evening uploads hold deletes until it has read the platform | claude | **Built 2026-10-20**, run by hand for 19 Oct into a scratch file; needs the scheduler restart (new job) |
+| 3.36.3 | Phase 3: `obt rotation live-compare` and the lines in the owner's 16:00 message | claude | **Built 2026-10-20**; the Rotation page card (live, paper, gap, discretionary, running chart) is still to do. Reconciling a week against the contract notes is the owner's |
+| 3.36.4 | Phase 4: slippage per shape into the backtests (research, pre-register first) | — | After 20 forward days |

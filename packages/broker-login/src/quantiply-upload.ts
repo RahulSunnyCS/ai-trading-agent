@@ -6,6 +6,7 @@ import { sendText } from '@trading/notify';
 import { describeSource, readAutomation, uploadBooks } from './automation-settings.js';
 import { readTelegramConfig } from './config.js';
 import { describe } from './diagnose.js';
+import { captureGate, heldLine, holdDeletes } from './live-capture-gate.js';
 import {
   type QLedgerRow,
   type QManifest,
@@ -238,7 +239,26 @@ async function main(): Promise<number> {
       ledger,
       algos,
     );
+    // BL-141: nothing is deleted before today's live capture has read this account.
+    const gate = captureGate(dataRoot ?? '', today, 'quantiply', broker);
+    let heldMessage = '';
+    if (gate.hold && p.delete.length) {
+      const h = holdDeletes(
+        p.delete,
+        p.create,
+        (a) => a.name,
+        (w) => w.name,
+      );
+      p.delete = h.deletes;
+      p.create = h.uploads;
+      heldMessage = heldLine(gate.why, h.held, h.heldUploads);
+    }
     lines.push(...summaryQ(p, mode));
+    if (heldMessage) {
+      lines.push(heldMessage);
+      failed = true; // the owner is told; no done marker, so a later run can still delete
+      attention = true;
+    }
     printed = lines.length;
     console.log(`${label}${values.apply ? '' : ' (dry run)'}\n${lines.join('\n')}`);
     if (!values.apply) return 0;
