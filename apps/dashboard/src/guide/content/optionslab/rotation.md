@@ -18,8 +18,9 @@ the 16:00 message gives the day's result for both and tomorrow's strategies in f
 friends' group) also says how the real trades did against paper, per platform and list, per lot: "AlgoTest ·
 Shoonya T1  +₹910 vs +₹790 · slip +₹120 (+0.6%)" means live made ₹120 a lot more than paper, 0.6% of the
 premium at entry ([slippage](glossary:slippage)). A copy deployed at another time than its entry minute is listed
-as off-slot, and strategies you added by hand as [discretionary](glossary:discretionary-trade). "Live · not
-captured" means the 15:40 read did not happen; that evening's uploads then delete nothing.
+as off-slot, and strategies you added by hand as [discretionary](glossary:discretionary-trade). A copy that did not trade, or whose legs were still open when read, is
+named on its own line and left out. "Live · not captured" means the 15:40 read did not happen; the next evening reads
+that day, and `obt rotation live-compare --day` shows it (the 16:00 message is not sent again).
 
 | Name | Key | Own recent results | Weekday | Days to expiry | VIX | Family band |
 |---|---|---|---|---|---|---|

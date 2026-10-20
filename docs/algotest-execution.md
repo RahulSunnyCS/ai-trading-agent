@@ -524,6 +524,19 @@ other way, and that is what the capture records (the 2026-10-19 read is in the B
 | `GET /algos/day-wise` | names, `multiplier`, `status`, `broker`, `brokerDisplayName`, `brokerClientId` per algo (no `pnl` field once the day's state is reset) |
 | `GET /algos/:id` | the algo; `state` is `null` after the overnight reset. While the day's state is there, the web app reads the positions from `state.positions` (a socket.io message `position_updates`, its reducer), shape not seen yet |
 
+**Back-fill and repeated runs (read 2026-10-20, GET only).** Both platforms keep a day's results
+after its strategies are deleted: Quantiply's account chart for 13 and 14 Oct still gave every
+run of algos that are no longer listed (2 and 3 of them), and they added up to `totalMTM`; AlgoTest's
+exited list keeps past deploys (12 to 19 Oct read). A `lastValues` key is the run id (`state`), and an
+algo can run twice in a day (15 Oct: 6 runs of 5 algos), so the day's P&L is the sum of its runs.
+`exited-executions` for today answers 200 with the day's exited ones (`[]` on the holiday), not an
+error. So the capture never needs to hold the evening deletes: a missed day is read later
+(`live-capture.ts --day D`, or the next evening's back-fill).
+
+**What is not seen.** Only the platform + broker rows the automation settings have on (login or
+upload) are read; a discretionary trade on an account whose row is off is not captured (turn its
+login on, or read it with `--only` after switching it on).
+
 The order book is `POST algos/order-book {brokers}` and the trade report `POST
 /reports/download/trade-report` (a blob): both are POSTs, so the capture does not call them. Fills on
 Quantiply are therefore read only from `GET /algos/:id`'s `state.positions` on the day, and only

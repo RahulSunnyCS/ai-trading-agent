@@ -1,21 +1,35 @@
 import { NAME_PREFIXES } from './strategy-plan.js';
 
 /**
- * BL-141: what the 15:40 live capture records, decided without a network. Pure functions over
- * what AlgoTest's and Quantiply's own APIs answer (`docs/algotest-execution.md`, "Live results"),
- * the uploaders' ledgers, and the day's previous capture file.
+ * BL-141: what the live capture records, decided without a network. Pure functions over what
+ * AlgoTest's and Quantiply's own APIs answer (`docs/algotest-execution.md`, "Live results"), the
+ * uploaders' ledgers, and the day's previous capture file.
  *
  * One file per day, `TRADING_DATA_ROOT/rotation/live/<day>.jsonl`:
- * - a `section` line per platform + broker read (`ok`, or the error), and
+ * - a `section` line per platform + broker read (`ok`, or the error and whether a retry can help),
  * - a `strategy` line per strategy that ran that day on it, the tool's (in its ledger) or the
  *   owner's own (`discretionary`), with its live ₹ (gross, before charges, as the platform shows
- *   it), multiplier, and fills where the platform gives them.
+ *   it), multiplier, and fills where the platform gives them. One that was deployed but never
+ *   filled is a line with `traded: false` and no P&L (did not trade, never a zero).
  * A re-run replaces the sections it read; a section it could not read keeps the earlier lines.
+ * Both platforms keep a day's results after its strategies are deleted, so any day can be read
+ * again later (back-fill).
  */
 
 export type LivePlatform = 'algotest' | 'quantiply';
 export type LiveBroker = 'finvasia' | 'angelone';
 export type Source = 'tool' | 'discretionary';
+
+/**
+ * Every name prefix the uploaders have ever used, with the list it means. APPEND ONLY: a rename
+ * (say `TA · ` / `CA · `) adds its prefixes here beside the old ones, so a day captured before it
+ * still reads. Ownership itself comes from the ledgers' ids wherever they have one; the prefix
+ * only names the variant and its list.
+ */
+export const TOOL_PREFIXES: readonly { prefix: string; book: string }[] = [
+  { prefix: 'T1 · ', book: 't1' },
+  { prefix: 'Core · ', book: 'core' },
+];
 
 export interface Fill {
   leg: string;
@@ -23,8 +37,9 @@ export interface Fill {
   /** S sold first (short), B bought first */
   side: 'S' | 'B';
   qty: number;
+  /** `at` is IST, `YYYY-MM-DD HH:MM:SS` (Quantiply's UTC times are converted) */
   entry: { price: number; at: string } | null;
-  exit: { price: number; at: string } | null;
+  exit: { price: number; qty: number; at: string } | null;
 }
 
 export interface StrategyLine {
@@ -35,17 +50,21 @@ export interface StrategyLine {
   name: string;
   /** the rotation variant when the name is the tool's (`T1 · <variant>`), else null */
   variant: string | null;
-  book: 'core' | 't1' | null;
+  book: string | null;
   addon: boolean;
   source: Source;
   /** the platform's id of the deploy (AlgoTest execution) or algo (Quantiply) */
   platform_id: string;
   multiplier: number | null;
+  /** false: deployed or enabled but nothing filled; `pnl` is then null */
+  traded: boolean;
   /** live P&L in rupees, gross (before brokerage and taxes), for the whole multiplier */
   pnl: number | null;
   status: string | null;
-  /** legs still open when read (their P&L is not in `pnl`) */
+  /** legs still open (or partly exited) when read: their P&L is not in `pnl` */
   open_legs: number;
+  /** Quantiply: runs of the algo that day, added up in `pnl` */
+  runs?: number;
   fills: Fill[] | null;
   /** where `pnl` came from: `legs` (AlgoTest fills) or `pnl-chart` (Quantiply's account chart) */
   pnl_source: 'legs' | 'pnl-chart' | null;
@@ -58,6 +77,8 @@ export interface SectionLine {
   broker: LiveBroker | 'all';
   ok: boolean;
   error: string | null;
+  /** `config`: a retry cannot help (missing credentials, a held or refused login) */
+  error_kind?: 'retry' | 'config' | null;
   strategies: number;
   captured_at: string;
 }
@@ -65,16 +86,23 @@ export interface SectionLine {
 export type LiveLine = StrategyLine | SectionLine;
 
 /** `T1 · N_p150-t1s11_0917` / `Core · S_p250_1317 · add-on` -> the variant, its list, add-on. */
-export function toolName(
-  name: string,
-): { variant: string; book: 'core' | 't1'; addon: boolean } | null {
-  const m = /^(T1|Core) · (\S+?)( · add-on)?$/.exec(name.trim());
-  if (!m?.[2]) return null;
-  return { variant: m[2], book: m[1] === 'T1' ? 't1' : 'core', addon: Boolean(m[3]) };
+export function toolName(name: string): { variant: string; book: string; addon: boolean } | null {
+  const trimmed = name.trim();
+  const p = TOOL_PREFIXES.find((x) => trimmed.startsWith(x.prefix));
+  if (!p) return null;
+  const m = /^(\S+?)( · add-on)?$/.exec(trimmed.slice(p.prefix.length));
+  if (!m?.[1]) return null;
+  return { variant: m[1], book: p.book, addon: Boolean(m[2]) };
 }
+
+const isToolNamed = (name: string) =>
+  TOOL_PREFIXES.some((p) => name.startsWith(p.prefix)) ||
+  NAME_PREFIXES.some((p) => name.startsWith(p));
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+/** Money in integer paise: prices have two decimals, so sums of paise are exact. */
+const paise = (rupees: number) => Math.round(rupees * 100);
 
 // -- AlgoTest --------------------------------------------------------------------------------
 
@@ -113,10 +141,15 @@ export interface AtExecution {
   config?: { ExecutionConfig?: { LotMultiplier?: unknown } } | null;
 }
 
-/** An AlgoTest execution's legs as fills, and its realised P&L (the web app's own sum). */
+/**
+ * An AlgoTest execution's legs as fills, and its realised P&L (the web app's own sum: sell =
+ * (entry − exit) × quantity, buy the other way). A leg exited for less than it entered counts its
+ * exited quantity and is open for the rest; one exited for more is counted at its entry quantity
+ * and flagged open too, so it is never read as a clean result.
+ */
 export function algotestLegs(legs: unknown): { fills: Fill[]; pnl: number; open: number } {
   const fills: Fill[] = [];
-  let pnl = 0;
+  let pnl = 0; // paise
   let open = 0;
   for (const raw of Array.isArray(legs) ? (legs as AtLeg[]) : []) {
     const side = str(raw.position) === 'PositionType.Buy' ? 'B' : 'S';
@@ -127,23 +160,25 @@ export function algotestLegs(legs: unknown): { fills: Fill[]; pnl: number; open:
     const xq = num(exit?.quantity);
     const ep = num(entry.price) ?? 0;
     const xp = num(exit?.price);
-    const exited = raw.status === 2 && xq !== null && xp !== null;
+    const exited = raw.status === 2 && xq !== null && xq > 0 && xp !== null;
     fills.push({
       leg: str(raw.id).replace(/^[0-9a-f]{24}_/i, ''),
       symbol: str(raw.symbol),
       side,
       qty: eq,
       entry: { price: ep, at: str(entry.exchange_timestamp) },
-      exit: exited ? { price: xp, at: str(exit?.exchange_timestamp) } : null,
+      exit: exited ? { price: xp, qty: xq, at: str(exit?.exchange_timestamp) } : null,
     });
     if (!exited) {
       open += 1;
       continue;
     }
+    const closed = Math.min(eq, xq);
+    if (closed !== eq || xq !== eq) open += 1;
     const sign = side === 'S' ? 1 : -1;
-    pnl += sign * (ep * eq - xp * xq);
+    pnl += sign * (paise(ep) - paise(xp)) * closed;
   }
-  return { fills, pnl: Math.round(pnl * 100) / 100, open };
+  return { fills, pnl: pnl / 100, open };
 }
 
 /** Whether an execution traded (or was deployed) on `day` (AlgoTest writes IST, no zone). */
@@ -159,29 +194,23 @@ export interface AlgotestOwnership {
   ids: Set<string>;
   /** names the tool uploaded before ids were recorded (2026-10-20): matched by name */
   namesWithoutId: Set<string>;
-  /** names the tool has an id for: a deploy of that name under another id is the owner's copy */
-  namesWithId: Set<string>;
 }
 
 export function algotestOwnership(
   ledger: { action?: string; ok?: boolean; name?: string; id?: string }[],
 ): AlgotestOwnership {
-  const out: AlgotestOwnership = {
-    ids: new Set(),
-    namesWithoutId: new Set(),
-    namesWithId: new Set(),
-  };
+  const out: AlgotestOwnership = { ids: new Set(), namesWithoutId: new Set() };
+  const namesWithId = new Set<string>();
   for (const row of ledger) {
+    if (row.action !== 'upload' || !row.ok) continue;
     const name = row.name ?? '';
-    if (row.action !== 'upload' || !row.ok || !NAME_PREFIXES.some((p) => name.startsWith(p))) {
-      continue;
-    }
     if (row.id) {
+      // an id is the tool's whatever its name says (a later rename of the prefixes changes nothing)
       out.ids.add(row.id);
-      out.namesWithId.add(name);
-    } else out.namesWithoutId.add(name);
+      namesWithId.add(name);
+    } else if (isToolNamed(name)) out.namesWithoutId.add(name);
   }
-  for (const n of out.namesWithId) out.namesWithoutId.delete(n);
+  for (const n of namesWithId) out.namesWithoutId.delete(n);
   return out;
 }
 
@@ -219,6 +248,7 @@ export function algotestLines(
     const tool = toolName(name);
     const source = algotestSource(e, own);
     const legs = algotestLegs(e.legs);
+    const traded = legs.fills.length > 0;
     const fromConfig = num(e.config?.ExecutionConfig?.LotMultiplier);
     out.push({
       kind: 'strategy',
@@ -232,7 +262,8 @@ export function algotestLines(
       source,
       platform_id: id,
       multiplier: multipliers.get(id) ?? fromConfig ?? null,
-      pnl: legs.fills.length ? legs.pnl : 0,
+      traded,
+      pnl: traded ? legs.pnl : null,
       status: str(e.status).replace(/^StrategyStatus\./, '') || null,
       open_legs: legs.open,
       fills: legs.fills,
@@ -255,10 +286,9 @@ export interface QSummary {
   id: string;
   name: string;
   day: string;
+  enabled: boolean;
   multiplier: number | null;
   status: string;
-  /** the day-wise list's own `pnl`, when it carries one (a running or closed algo) */
-  pnl: number | null;
 }
 
 /** `GET /algos/day-wise` with the fields the capture needs (a superset of `parseDayWise`). */
@@ -276,39 +306,49 @@ export function quantiplySummaries(json: unknown): QSummary[] {
         id: a._id,
         name: a.name,
         day: typeof a.day === 'string' ? a.day : String(day.day),
+        enabled: a.enabled === true,
         multiplier: num(a.multiplier),
         status: typeof a.status === 'string' ? a.status : 'UNKNOWN',
-        pnl: num(a.pnl),
       });
     }
   }
   return out;
 }
 
+export interface QRuns {
+  /** the day's P&L of the algo: every run of it added up */
+  pnl: number;
+  runs: number;
+}
+
 /**
- * The account P&L chart's last value per algo (`GET /pnl-chart/algo?graphLevel=account`,
- * `metaData.lastValues`: one entry per algo run of the period, `{algo, c, t}`, `c` its closing
- * MTM). Several pages (`paging.after`) merge, the later `t` winning.
+ * Each algo's P&L for the period from the account P&L chart (`GET /pnl-chart/algo?
+ * graphLevel=account`): `metaData.lastValues` holds one entry per RUN, keyed by the run's id
+ * (`state`), `{algo, c, t}`, `c` that run's closing MTM. An algo that ran twice in a day (a
+ * re-run, 2026-10-15) has two entries, and the day's P&L is their sum. Pages (`paging.after`)
+ * merge by run id, a later page winning.
  */
-export function quantiplyLastValues(pages: unknown[]): Map<string, { pnl: number; at: string }> {
-  const out = new Map<string, { pnl: number; at: string }>();
+export function quantiplyRuns(pages: unknown[]): Map<string, QRuns> {
+  const byRun = new Map<string, { algo: string; c: number }>();
   for (const page of pages) {
-    const meta = (page as { metaData?: { lastValues?: unknown } })?.metaData;
-    const last = meta?.lastValues;
+    const last = (page as { metaData?: { lastValues?: unknown } })?.metaData?.lastValues;
     if (last === undefined || last === null) continue;
     if (typeof last !== 'object') throw new Error('pnl chart: lastValues is not an object');
-    for (const v of Object.values(
-      last as Record<string, { algo?: unknown; c?: unknown; t?: unknown }>,
+    for (const [key, v] of Object.entries(
+      last as Record<string, { algo?: unknown; c?: unknown; state?: unknown }>,
     )) {
       const algo = str(v?.algo);
       const c = num(v?.c);
       if (!algo || c === null) continue;
-      const at = str(v?.t);
-      const prev = out.get(algo);
-      if (!prev || at >= prev.at) out.set(algo, { pnl: c, at });
+      byRun.set(str(v?.state) || key, { algo, c });
     }
   }
-  return out;
+  const out = new Map<string, { paise: number; runs: number }>();
+  for (const { algo, c } of byRun.values()) {
+    const prev = out.get(algo) ?? { paise: 0, runs: 0 };
+    out.set(algo, { paise: prev.paise + paise(c), runs: prev.runs + 1 });
+  }
+  return new Map([...out].map(([k, v]) => [k, { pnl: v.paise / 100, runs: v.runs }]));
 }
 
 /** The account chart's total for the period (`metaData.totalMTM`), to check the lines' sum. */
@@ -321,26 +361,40 @@ export function quantiplyTotal(pages: unknown[]): number | null {
 }
 
 /**
- * The day's Quantiply lines: every algo the account chart shows a value for on the day, named
- * from the day-wise list (or, if gone from it, from the uploader's ledger). `owned` is every algo
- * id the uploader ever created.
+ * The reason to fail the section when the algos' runs do not add up to the chart's own total
+ * (beyond ₹1 of rounding), else null: a P&L that does not reconcile is not recorded as read.
+ */
+export function quantiplyMismatch(runs: Map<string, QRuns>, total: number | null): string | null {
+  if (total === null) return runs.size ? 'pnl chart: no totalMTM to check the algos against' : null;
+  const sum = [...runs.values()].reduce((s, r) => s + paise(r.pnl), 0) / 100;
+  return Math.abs(sum - total) > 1
+    ? `pnl chart: the algos' runs add up to ${sum.toFixed(2)}, its total is ${total}`
+    : null;
+}
+
+/**
+ * The day's Quantiply lines: every algo the account chart has runs for on the day, named from the
+ * day-wise list (or, if gone from it, the uploader's ledger). `owned` is every algo id the uploader
+ * ever created, whatever its name. With `notTradedOn` (the day's weekday, given only for today,
+ * while the list still says what was enabled), an algo enabled for that weekday with no run is a
+ * `traded: false` line.
  */
 export function quantiplyLines(
   day: string,
   broker: LiveBroker,
   summaries: QSummary[],
-  last: Map<string, { pnl: number; at: string }>,
-  ledgerNames: Map<string, string>,
+  runs: Map<string, QRuns>,
+  owned: Map<string, string>,
   positions: Map<string, unknown> = new Map(),
+  notTradedOn?: string,
 ): StrategyLine[] {
   const byId = new Map(summaries.map((s) => [s.id, s]));
-  const out: StrategyLine[] = [];
-  for (const [id, v] of last) {
+  const line = (id: string, r: QRuns | null): StrategyLine => {
     const s = byId.get(id);
-    const owned = ledgerNames.has(id);
-    const name = s?.name ?? ledgerNames.get(id) ?? `(algo ${id.slice(-6)})`;
-    const tool = owned ? toolName(name) : null;
-    out.push({
+    const mine = owned.has(id);
+    const name = s?.name ?? owned.get(id) ?? `(algo ${id.slice(-6)})`;
+    const tool = mine ? toolName(name) : null;
+    return {
       kind: 'strategy',
       day,
       platform: 'quantiply',
@@ -349,26 +403,42 @@ export function quantiplyLines(
       variant: tool?.variant ?? null,
       book: tool?.book ?? null,
       addon: Boolean(tool?.addon),
-      source: owned ? 'tool' : 'discretionary',
+      source: mine ? 'tool' : 'discretionary',
       platform_id: id,
       multiplier: s?.multiplier ?? null,
-      pnl: v.pnl,
+      traded: r !== null,
+      pnl: r?.pnl ?? null,
       status: s?.status ?? null,
       open_legs: 0,
-      fills: quantiplyFills(positions.get(id)),
-      pnl_source: 'pnl-chart',
-    });
+      runs: r?.runs ?? 0,
+      fills: r ? quantiplyFills(positions.get(id)) : null,
+      pnl_source: r ? 'pnl-chart' : null,
+    };
+  };
+  const out = [...runs].map(([id, r]) => line(id, r));
+  if (notTradedOn) {
+    for (const s of summaries) {
+      if (s.day === notTradedOn && s.enabled && !runs.has(s.id)) out.push(line(s.id, null));
+    }
   }
   return out.sort(
     (a, b) => a.name.localeCompare(b.name) || a.platform_id.localeCompare(b.platform_id),
   );
 }
 
+/** An ISO time with a zone (Quantiply writes UTC, `…Z`) as IST `YYYY-MM-DD HH:MM:SS`; else as is. */
+export function toIst(at: string): string {
+  if (!/[zZ]$|[+-]\d{2}:?\d{2}$/.test(at)) return at;
+  const t = Date.parse(at);
+  if (Number.isNaN(t)) return at;
+  return new Date(t + 330 * 60_000).toISOString().slice(0, 19).replace('T', ' ');
+}
+
 /**
  * Fills from `GET /algos/:id`'s `state.positions`, read while the day's state is still there
  * (Quantiply resets it overnight). The shape is not confirmed on a traded day yet (the
  * 2026-10-20 read was a holiday): only fields whose meaning is plain are taken, and anything else
- * gives null, never a guess.
+ * gives null, never a guess. Times are converted from UTC to IST.
  */
 export function quantiplyFills(algo: unknown): Fill[] | null {
   const data = (algo as { data?: unknown })?.data ?? algo;
@@ -387,8 +457,8 @@ export function quantiplyFills(algo: unknown): Fill[] | null {
       symbol: str(p.symbol) || str(p.tradingSymbol),
       side,
       qty,
-      entry: { price: entry, at: str(p.entryTime) },
-      exit: exit === null ? null : { price: exit, at: str(p.exitTime) },
+      entry: { price: entry, at: toIst(str(p.entryTime)) },
+      exit: exit === null ? null : { price: exit, qty, at: toIst(str(p.exitTime)) },
     });
   }
   return out;
@@ -421,11 +491,53 @@ export function parseLiveFile(text: string): LiveLine[] {
   return out;
 }
 
-const sectionKey = (platform: string, broker: string) => `${platform}.${broker}`;
+export const sectionKey = (platform: string, broker: string) => `${platform}.${broker}`;
 
 /** The section a strategy line belongs to (AlgoTest is one account read once: `all`). */
 export function sectionOf(line: StrategyLine): string {
   return sectionKey(line.platform, line.platform === 'algotest' ? 'all' : String(line.broker));
+}
+
+/** The wanted sections (`algotest.all`, `quantiply.<broker>`) a day's file does not have as ok. */
+export function sectionsToRead(
+  lines: LiveLine[] | null,
+  wanted: string[],
+  force = false,
+): string[] {
+  if (force || !lines) return [...wanted];
+  const ok = new Set(
+    lines
+      .filter((l): l is SectionLine => l.kind === 'section' && l.ok)
+      .map((l) => sectionKey(l.platform, l.broker)),
+  );
+  return wanted.filter((k) => !ok.has(k));
+}
+
+/**
+ * Earlier trading days to read again: the last `maxDays` trading days before `today`, from the
+ * first day the capture ever wrote (`firstDay`) on, that miss a wanted section (no file, or a
+ * section not read). A day the 15:40 run and its retries missed is filled the next evening.
+ */
+export function backfillDays(
+  today: string,
+  firstDay: string | null,
+  files: Map<string, LiveLine[]>,
+  wanted: string[],
+  isTradingDay: (day: string) => boolean,
+  maxDays = 5,
+): string[] {
+  if (!firstDay) return [];
+  const out: string[] = [];
+  let d = new Date(`${today}T00:00:00Z`);
+  for (let seen = 0; seen < maxDays; ) {
+    d = new Date(d.getTime() - 86_400_000);
+    const day = d.toISOString().slice(0, 10);
+    if (day < firstDay) break;
+    if (!isTradingDay(day)) continue;
+    seen += 1;
+    if (sectionsToRead(files.get(day) ?? null, wanted).length) out.push(day);
+  }
+  return out.reverse();
 }
 
 /**
@@ -468,7 +580,7 @@ export function renderLiveFile(lines: LiveLine[]): string {
   return lines.map((l) => JSON.stringify(l)).join('\n') + (lines.length ? '\n' : '');
 }
 
-/** Short lines for the log and the alert. */
+/** Short lines for the log. */
 export function summarizeCapture(lines: LiveLine[]): string[] {
   const out: string[] = [];
   for (const l of lines) {
@@ -479,22 +591,17 @@ export function summarizeCapture(lines: LiveLine[]): string[] {
   }
   const strategies = lines.filter((l): l is StrategyLine => l.kind === 'strategy');
   const tool = strategies.filter((s) => s.source === 'tool').length;
-  out.push(`${tool} tool, ${strategies.length - tool} discretionary`);
+  const idle = strategies.filter((s) => !s.traded).length;
+  out.push(`${tool} tool, ${strategies.length - tool} discretionary, ${idle} did not trade`);
   return out;
 }
 
 /**
- * Whether today's capture covers a platform (BL-141 Phase 2: the evening jobs delete nothing on a
- * platform before its strategies' results are recorded). AlgoTest is one section (`all`);
- * Quantiply one per account.
+ * The run's exit code from the sections it tried to read: 0 all read; 1 a retry may help; 3 none
+ * can (missing credentials, a held or refused login), so the scheduler alerts once, no retry.
  */
-export function captureCovers(
-  lines: LiveLine[],
-  platform: LivePlatform,
-  broker?: LiveBroker,
-): boolean {
-  const want = sectionKey(platform, platform === 'algotest' ? 'all' : (broker ?? ''));
-  return lines.some(
-    (l) => l.kind === 'section' && sectionKey(l.platform, l.broker) === want && l.ok,
-  );
+export function exitCodeFor(tried: SectionLine[]): 0 | 1 | 3 {
+  const failed = tried.filter((s) => !s.ok);
+  if (!failed.length) return 0;
+  return failed.some((s) => s.error_kind !== 'config') ? 1 : 3;
 }

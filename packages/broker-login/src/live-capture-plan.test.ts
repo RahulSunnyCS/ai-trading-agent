@@ -5,24 +5,30 @@ import {
   type LiveLine,
   type SectionLine,
   type StrategyLine,
+  TOOL_PREFIXES,
   algotestBroker,
   algotestLegs,
   algotestLines,
   algotestMultiplier,
   algotestOwnership,
-  captureCovers,
+  backfillDays,
+  exitCodeFor,
   mergeCapture,
   parseLiveFile,
   quantiplyFills,
-  quantiplyLastValues,
   quantiplyLines,
+  quantiplyMismatch,
   quantiplyOwned,
+  quantiplyRuns,
   quantiplySummaries,
   quantiplyTotal,
   renderLiveFile,
   savedName,
+  sectionsToRead,
+  toIst,
   toolName,
 } from './live-capture-plan.js';
+import { NAME_PREFIXES } from './strategy-plan.js';
 
 // What the platforms answered on 2026-10-20 (read-only GETs), ids replaced (tests/fixtures/live/).
 const FIX = new URL('../../option-backtesting/tests/fixtures/live/', import.meta.url);
@@ -48,6 +54,14 @@ test('tool names: list, variant, add-on; anything else is not the tool', () => {
   assert.equal(algotestBroker('Broker.AngelOne'), 'angelone');
 });
 
+test('every prefix the uploaders use is a tool prefix (the list is append-only)', () => {
+  for (const p of NAME_PREFIXES)
+    assert.ok(
+      TOOL_PREFIXES.some((t) => t.prefix === p),
+      p,
+    );
+});
+
 test('AlgoTest: P&L from the legs, as the web app sums it (sell = entry - exit)', () => {
   const [widesl] = fixture('algotest_exited.json') as { legs: unknown }[];
   const legs = algotestLegs(widesl?.legs);
@@ -70,6 +84,35 @@ test('AlgoTest: P&L from the legs, as the web app sums it (sell = entry - exit)'
   assert.equal(buy.open, 1);
 });
 
+test('AlgoTest: a partial exit counts what was exited and stays open; sums are exact', () => {
+  const partial = algotestLegs([
+    {
+      position: 'PositionType.Sell',
+      status: 2,
+      entry_trade: { price: 100.1, quantity: 130 },
+      exit_trade: { price: 80.2, quantity: 65 },
+    },
+  ]);
+  assert.equal(partial.pnl, 1293.5); // 19.9 x 65, not 19.9 x 130
+  assert.equal(partial.open, 1);
+  // 0.1 + 0.2 in floats would not be exact
+  const exact = algotestLegs([
+    {
+      position: 'PositionType.Sell',
+      status: 2,
+      entry_trade: { price: 0.3, quantity: 1 },
+      exit_trade: { price: 0.1, quantity: 1 },
+    },
+    {
+      position: 'PositionType.Sell',
+      status: 2,
+      entry_trade: { price: 0.3, quantity: 1 },
+      exit_trade: { price: 0.2, quantity: 1 },
+    },
+  ]);
+  assert.equal(exact.pnl, 0.3);
+});
+
 test('AlgoTest: a leg that never entered is skipped, not counted at price 0', () => {
   const dir = (fixture('algotest_exited.json') as { legs: unknown }[])[1];
   const legs = algotestLegs(dir?.legs);
@@ -81,20 +124,23 @@ test("AlgoTest: one day's executions only, from either list, each id once", () =
   const exited = fixture('algotest_exited.json') as unknown[];
   const lines = algotestLines('2026-10-12', [exited, exited.slice(0, 1)], NO_LEDGER);
   assert.deepEqual(
-    lines.map((l) => [l.name, l.pnl, l.broker, l.source]),
+    lines.map((l) => [l.name, l.pnl, l.broker, l.source, l.traded]),
     [
-      ['Nifty_Dir_924_ITM1_SL21_RECOST_MTMSL_3000', 4397.25, 'finvasia', 'discretionary'],
-      ['Nifty_Widesl_917_OTM1', 1413.75, 'finvasia', 'discretionary'],
+      ['Nifty_Dir_924_ITM1_SL21_RECOST_MTMSL_3000', 4397.25, 'finvasia', 'discretionary', true],
+      ['Nifty_Widesl_917_OTM1', 1413.75, 'finvasia', 'discretionary', true],
     ],
   );
   assert.equal(algotestLines('2026-10-13', [exited], NO_LEDGER).length, 1);
-  // a deploy that never traded is listed with 0 (it ran, nothing filled)
-  const noLegs = algotestLines('2026-10-14', [exited], NO_LEDGER);
-  assert.deepEqual(
-    noLegs.map((l) => [l.name, l.pnl, l.fills?.length]),
-    [['S_Widesl_917_otm2', 0, 0]],
-  );
   assert.throws(() => algotestLines('2026-10-12', [{}], NO_LEDGER), /not a list/);
+});
+
+test('AlgoTest: a deploy with no fills did not trade: no P&L, never a zero', () => {
+  const exited = fixture('algotest_exited.json') as unknown[];
+  const lines = algotestLines('2026-10-14', [exited], NO_LEDGER);
+  assert.deepEqual(
+    lines.map((l) => [l.name, l.traded, l.pnl, l.fills?.length]),
+    [['S_Widesl_917_otm2', false, null, 0]],
+  );
 });
 
 test('AlgoTest: the multiplier is the execution settings LotMultiplier', () => {
@@ -118,8 +164,10 @@ test("AlgoTest: the tool's by the saved strategy id in its ledger; a same-named 
   const own = algotestOwnership([
     { action: 'upload', ok: true, name, id: id(7) },
     { action: 'upload', ok: false, name: 'T1 · N_failed_0917', id: id(8) },
+    // an id under a name no prefix knows (a later rename) is still the tool's
+    { action: 'upload', ok: true, name: 'XX · N_renamed_0917', id: id(9) },
   ]);
-  const lines = algotestLines('2026-10-21', [[exec(id(7), 1), exec(id(9), 2)]], own);
+  const lines = algotestLines('2026-10-21', [[exec(id(7), 1), exec(id(10), 2)]], own);
   assert.deepEqual(
     lines.map((l) => [l.platform_id, l.source, l.variant, l.book]),
     [
@@ -127,49 +175,58 @@ test("AlgoTest: the tool's by the saved strategy id in its ledger; a same-named 
       [id(102), 'discretionary', null, null],
     ],
   );
+  assert.ok(own.ids.has(id(9)) && !own.ids.has(id(8)));
   // an upload from before ids were recorded is matched by its name
   const old = algotestOwnership([{ action: 'upload', ok: true, name }]);
-  assert.equal(algotestLines('2026-10-21', [[exec(id(9), 1)]], old)[0]?.source, 'tool');
+  assert.equal(algotestLines('2026-10-21', [[exec(id(10), 1)]], old)[0]?.source, 'tool');
 });
 
-test("Quantiply: each algo's closing MTM from the account chart adds up to its total", () => {
+test("Quantiply: each algo's runs from the account chart add up to its total", () => {
   const pages = [fixture('quantiply_pnl_account.json')];
-  const last = quantiplyLastValues(pages);
-  assert.equal(last.size, 6);
-  const sum = [...last.values()].reduce((s, v) => s + v.pnl, 0);
+  const runs = quantiplyRuns(pages);
+  assert.equal(runs.size, 6);
+  const sum = [...runs.values()].reduce((s, v) => s + v.pnl, 0);
   assert.equal(Math.round(sum * 100) / 100, quantiplyTotal(pages));
   assert.equal(quantiplyTotal(pages), -3675.75);
+  assert.equal(quantiplyMismatch(runs, quantiplyTotal(pages)), null);
 });
 
-test('Quantiply: a later page wins for the same algo', () => {
-  const page = (c: number, t: string) => ({
-    metaData: { lastValues: { s: { algo: id(1), c, t } } },
-  });
-  const last = quantiplyLastValues([
-    page(10, '2026-10-19T04:00:00Z'),
-    page(25, '2026-10-19T09:00:00Z'),
-  ]);
-  assert.equal(last.get(id(1))?.pnl, 25);
+test('Quantiply: two runs of one algo in a day are added, not the last one kept', () => {
+  const page = {
+    metaData: {
+      totalMTM: 500,
+      lastValues: {
+        r1: { algo: id(1), state: 'r1', c: 1500, t: '2026-10-15T05:00:00Z' },
+        r2: { algo: id(1), state: 'r2', c: -1000, t: '2026-10-15T09:00:00Z' },
+      },
+    },
+  };
+  // the same run again on a later page replaces, never adds
+  const later = { metaData: { lastValues: { r2: { algo: id(1), state: 'r2', c: -900, t: 'x' } } } };
+  assert.deepEqual(quantiplyRuns([page]).get(id(1)), { pnl: 500, runs: 2 });
+  assert.deepEqual(quantiplyRuns([page, later]).get(id(1)), { pnl: 600, runs: 2 });
+  // not matching the chart's total beyond rounding fails the section
+  assert.match(quantiplyMismatch(quantiplyRuns([page, later]), 500) ?? '', /add up to 600.00/);
+  assert.equal(quantiplyMismatch(quantiplyRuns([page]), 500.4), null);
 });
 
 test('Quantiply: names and multipliers from the day-wise list, the tool by its ledger', () => {
   const summaries = quantiplySummaries(fixture('quantiply_day_wise.json'));
   assert.equal(summaries.filter((s) => s.day === 'MON').length, 8);
-  const last = quantiplyLastValues([fixture('quantiply_pnl_account.json')]);
-  const [first] = [...last.keys()];
+  const runs = quantiplyRuns([fixture('quantiply_pnl_account.json')]);
+  const [first] = [...runs.keys()];
   assert.ok(first);
   // pretend the uploader made the first one, and one more that is gone from the list
   const gone = id(999);
-  last.set(gone, { pnl: -120, at: '2026-10-19T09:50:00Z' });
+  runs.set(gone, { pnl: -120, runs: 1 });
   const owned = quantiplyOwned([
     { action: 'create', ok: true, id: first, name: 'Core · N_p100_1202' },
     { action: 'create', ok: true, id: gone, name: 'Core · N_wide_1117' },
     { action: 'create', ok: false, id: id(998), name: 'Core · x' },
   ]);
-  const lines = quantiplyLines('2026-10-19', 'angelone', summaries, last, owned);
+  const lines = quantiplyLines('2026-10-19', 'angelone', summaries, runs, owned);
   assert.equal(lines.length, 7);
   const mine = lines.filter((l) => l.source === 'tool');
-  // the list's name is shown (the owner may rename); the variant comes from a tool name only
   assert.deepEqual(
     mine.map((l) => [l.platform_id, l.multiplier]).sort(),
     [
@@ -179,10 +236,48 @@ test('Quantiply: names and multipliers from the day-wise list, the tool by its l
   );
   assert.equal(lines.find((l) => l.platform_id === gone)?.variant, 'N_wide_1117');
   assert.ok(lines.filter((l) => l.source === 'discretionary').every((l) => l.variant === null));
-  assert.ok(lines.every((l) => l.pnl_source === 'pnl-chart'));
+  assert.ok(lines.every((l) => l.pnl_source === 'pnl-chart' && l.traded));
 });
 
-test('Quantiply: fills only from a state whose fields are plain, else null', () => {
+test('Quantiply: today, an enabled algo with no run did not trade (the same rule as AlgoTest)', () => {
+  const summaries = [
+    {
+      id: id(1),
+      name: 'Core · N_wide_1117',
+      day: 'WED',
+      enabled: true,
+      multiplier: 1,
+      status: 'ERROR',
+    },
+    { id: id(2), name: 'N_mine', day: 'WED', enabled: false, multiplier: 1, status: 'NOT_RUNNING' },
+    {
+      id: id(3),
+      name: 'N_other_day',
+      day: 'THU',
+      enabled: true,
+      multiplier: 1,
+      status: 'NOT_RUNNING',
+    },
+  ];
+  const owned = new Map([[id(1), 'Core · N_wide_1117']]);
+  const lines = quantiplyLines(
+    '2026-10-21',
+    'angelone',
+    summaries,
+    new Map(),
+    owned,
+    new Map(),
+    'WED',
+  );
+  assert.deepEqual(
+    lines.map((l) => [l.platform_id, l.traded, l.pnl, l.source]),
+    [[id(1), false, null, 'tool']],
+  );
+  // a past day cannot say what was enabled: no such lines
+  assert.equal(quantiplyLines('2026-10-21', 'angelone', summaries, new Map(), owned).length, 0);
+});
+
+test('Quantiply: fills only from a state whose fields are plain, times read as UTC into IST', () => {
   assert.equal(quantiplyFills(fixture('quantiply_day_wise.json')), null);
   assert.equal(quantiplyFills({ data: { state: null } }), null);
   assert.deepEqual(
@@ -196,6 +291,8 @@ test('Quantiply: fills only from a state whose fields are plain, else null', () 
               entryPrice: 100,
               exitPrice: 80,
               symbol: 'NIFTY…CE',
+              entryTime: '2026-10-21T03:46:59.000Z',
+              exitTime: '2026-10-21T09:58:00Z',
             },
           ],
         },
@@ -207,25 +304,30 @@ test('Quantiply: fills only from a state whose fields are plain, else null', () 
         symbol: 'NIFTY…CE',
         side: 'S',
         qty: 65,
-        entry: { price: 100, at: '' },
-        exit: { price: 80, at: '' },
+        entry: { price: 100, at: '2026-10-21 09:16:59' },
+        exit: { price: 80, qty: 65, at: '2026-10-21 15:28:00' },
       },
     ],
   );
   assert.equal(quantiplyFills({ data: { state: { positions: [{ side: 'CE' }] } } }), null);
+  assert.equal(toIst('2026-10-12 13:16:59'), '2026-10-12 13:16:59'); // AlgoTest's: already IST
+  assert.equal(toIst('2026-10-21T03:46:59+00:00'), '2026-10-21 09:16:59');
 });
 
 const sectionLine = (
   platform: 'algotest' | 'quantiply',
   broker: string,
   ok: boolean,
+  kind: 'retry' | 'config' | null = ok ? null : 'retry',
+  day = '2026-10-21',
 ): SectionLine => ({
   kind: 'section',
-  day: '2026-10-21',
+  day,
   platform,
   broker: broker as SectionLine['broker'],
   ok,
   error: ok ? null : 'login failed',
+  error_kind: kind,
   strategies: 0,
   captured_at: '2026-10-21T10:10:00Z',
 });
@@ -245,6 +347,7 @@ const strategyLine = (
   source: 'discretionary',
   platform_id: id(1),
   multiplier: 1,
+  traded: true,
   pnl: 100,
   status: null,
   open_legs: 0,
@@ -268,15 +371,49 @@ test('the day file: a re-run replaces what it read and keeps a section it could 
   ]);
   const names = merged.filter((l): l is StrategyLine => l.kind === 'strategy').map((l) => l.name);
   assert.deepEqual(names, ['new', 'old Quantiply']);
-  assert.ok(captureCovers(merged, 'quantiply', 'angelone')); // the earlier good read stands
-  // with nothing earlier, a failed section is recorded as failed
-  const fresh = mergeCapture(
-    [],
-    [{ section: sectionLine('quantiply', 'angelone', false), strategies: [] }],
-  );
-  assert.equal(captureCovers(fresh, 'quantiply', 'angelone'), false);
-  assert.equal(captureCovers(fresh, 'algotest'), false);
   // the file round-trips, a torn line is skipped
   const text = `${renderLiveFile(merged)}{"kind":"strat`;
   assert.deepEqual(parseLiveFile(text), merged);
+});
+
+test('a retry reads only the sections not read yet (no second login to an account read)', () => {
+  const wanted = ['algotest.all', 'quantiply.angelone'];
+  assert.deepEqual(sectionsToRead(null, wanted), wanted);
+  const lines = [sectionLine('algotest', 'all', false), sectionLine('quantiply', 'angelone', true)];
+  assert.deepEqual(sectionsToRead(lines, wanted), ['algotest.all']);
+  assert.deepEqual(sectionsToRead(lines, wanted, true), wanted);
+});
+
+test('exit: 0 all read, 1 a retry may help, 3 only config problems (one alert, no retry)', () => {
+  assert.equal(exitCodeFor([sectionLine('algotest', 'all', true)]), 0);
+  assert.equal(exitCodeFor([sectionLine('algotest', 'all', false, 'config')]), 3);
+  assert.equal(
+    exitCodeFor([
+      sectionLine('algotest', 'all', false, 'config'),
+      sectionLine('quantiply', 'angelone', false, 'retry'),
+    ]),
+    1,
+  );
+});
+
+test("back-fill: the last 5 trading days that miss a section, from the capture's first day", () => {
+  const wanted = ['algotest.all'];
+  const trading = (d: string) => !['2026-10-20', '2026-10-24', '2026-10-25'].includes(d);
+  const ok = (day: string) => [sectionLine('algotest', 'all', true, null, day)];
+  const files = new Map<string, LiveLine[]>([
+    ['2026-10-19', ok('2026-10-19')],
+    ['2026-10-22', [sectionLine('algotest', 'all', false, 'retry', '2026-10-22')]],
+  ]);
+  // Mon 26: Fri 23 (no file), Thu 22 (failed) miss; Wed 21 had no file either; Mon 19 is fine;
+  // Tue 20 is a holiday; nothing before the first day (19) counts
+  assert.deepEqual(backfillDays('2026-10-26', '2026-10-19', files, wanted, trading), [
+    '2026-10-21',
+    '2026-10-22',
+    '2026-10-23',
+  ]);
+  assert.deepEqual(backfillDays('2026-10-26', null, files, wanted, trading), []);
+  assert.deepEqual(backfillDays('2026-10-26', '2026-10-19', files, wanted, trading, 2), [
+    '2026-10-22',
+    '2026-10-23',
+  ]);
 });

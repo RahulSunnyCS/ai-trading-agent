@@ -206,10 +206,16 @@ week, until disabled.
   `quantiply-session.ts` (the TOTP window stamp), then the account P&L chart (`metaData.lastValues`, each algo's
   closing MTM) named from `/algos/day-wise`. Tool or discretionary: AlgoTest by the saved strategy id in the upload
   ledger (by name for uploads before ids were kept), Quantiply by the algo id in its ledger.
-- A re-run replaces only the sections it read; a section it could not read keeps the earlier lines. Before 15:30
-  IST on the day it only prints. `--out` writes elsewhere (a check by hand). Exit 1 retried, 3 a held or refused
-  Quantiply login.
-- `src/live-capture-gate.ts`: once `rotation/live/` exists, the evening uploads (`strategy-upload.ts`,
-  `quantiply-upload.ts`) delete nothing on a platform today's capture has not read, and drop the same-name
-  replacements with them; the run's Telegram message says so and it exits 3 (the scheduler alerts).
+- A run reads only the sections a day's file does not have as read (`--force`: all), with one login per platform
+  for every day it reads, and keeps the earlier lines of a section it could not read. Without `--day` it reads
+  today (after 15:30 IST) and back-fills the last 5 trading days that miss a section (`backfillDays`, from the
+  capture's first file on); both platforms keep a day's results after its strategies are deleted (checked
+  2026-10-20), so the evening uploads never wait for it. `--out` (with `--day`) writes elsewhere. Exit 0 all read,
+  1 a retry may help, 3 a retry cannot (missing credentials, a held or refused login); `--soft-fail` exits 0 (the
+  15:40 attempt; `live-capture-retry` at 15:55 reads the rest and alerts once).
+- Quantiply P&L is every run of an algo that day added up (`quantiplyRuns`, keyed by run id); a sum that does not
+  match the chart's `totalMTM` beyond ₹1 fails the section. A deploy with no fills, or (today) an enabled algo with
+  no run, is `traded: false` with no P&L. Quantiply's UTC times are converted to IST. Money sums are integer paise.
+- `TOOL_PREFIXES` is append-only (a rename adds its prefixes beside the old ones); ownership is by ledger id
+  wherever the ledger has one.
 

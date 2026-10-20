@@ -31,24 +31,35 @@ def _fill(at, price, qty=65, side="S"):
 
 
 def _line(
-    name, pnl, *, source="tool", platform="algotest", broker="finvasia", mult=1, fills=None, pid="1"
+    name,
+    pnl,
+    *,
+    source="tool",
+    platform="algotest",
+    broker="finvasia",
+    mult=1,
+    fills=None,
+    pid="1",
+    open_legs=0,
+    traded=True,
 ):
-    variant = name.split(" · ")[1] if source == "tool" else None
+    prefix, _, variant = name.partition(" · ")
     return {
         "kind": "strategy",
         "day": DAY.isoformat(),
         "platform": platform,
         "broker": broker,
         "name": name,
-        "variant": variant,
-        "book": "t1" if source == "tool" else None,
+        "variant": variant if source == "tool" else None,
+        "book": {"T1": "t1", "Core": "core"}.get(prefix) if source == "tool" else None,
         "addon": False,
         "source": source,
         "platform_id": pid,
         "multiplier": mult,
-        "pnl": pnl,
+        "traded": traded,
+        "pnl": pnl if traded else None,
         "status": "SquaredOff",
-        "open_legs": 0,
+        "open_legs": open_legs,
         "fills": fills,
         "pnl_source": "legs",
     }
@@ -167,7 +178,7 @@ def test_discretionary_lines_are_summed_apart_and_never_compared(root):
     c = live_compare.compare(DAY, root)
     assert c.compared == [] and c.discretionary_total == pytest.approx(-2119.0)
     lines = live_compare.message_lines(c, messages.rupees)
-    assert lines == ["💹 Live vs paper · per lot", "✋ Discretionary  −₹2,119 (2)"]
+    assert lines == ["💹 Live vs paper", "✋ Discretionary  −₹2,119 in all (2)"]
 
 
 def test_no_capture_a_failed_section_and_a_missing_paper_result_are_said(root):
@@ -190,7 +201,72 @@ def test_no_capture_a_failed_section_and_a_missing_paper_result_are_said(root):
 def test_the_message_line_per_platform_and_list(root):
     _capture(root, [_section("algotest", "all"), _line("T1 · N_p150-t1s11_1317", 910.0)])
     lines = live_compare.message_lines(live_compare.compare(DAY, root), messages.rupees)
-    assert lines[1] == "AlgoTest · Shoonya T1  +₹910 vs +₹790 · slip +₹120"
+    assert lines[1] == "AlgoTest · Shoonya T1  +₹910 vs +₹790 a lot · slip +₹120"
+
+
+def test_core_and_t1_copies_of_one_variant_stay_separate(root):
+    _paper(root, "N_wide_1117", 2000.0)
+    _capture(
+        root,
+        [
+            _section("algotest", "all"),
+            _line("Core · N_wide_1117", 1700.0, pid="a"),
+            _line("T1 · N_wide_1117", 2100.0, pid="b"),
+        ],
+    )
+    c = live_compare.compare(DAY, root)
+    by = {x.book: x for x in c.compared}
+    assert by["core"].slippage == pytest.approx(-300.0) and by["core"].lots == 1
+    assert by["t1"].slippage == pytest.approx(100.0)
+    assert [(g.book, g.slippage) for g in c.groups()] == [("core", -300.0), ("t1", 100.0)]
+
+
+def test_a_copy_that_did_not_trade_or_has_open_legs_is_not_slippage(root):
+    _capture(
+        root,
+        [
+            _section("algotest", "all"),
+            _line("T1 · N_p150-t1s11_1317", 910.0, pid="a"),
+            _line("T1 · N_p150-t1s11_1317", None, pid="b", traded=False, fills=[]),
+            _line("T1 · N_ditm1-t1s36_0947", 300.0, pid="c", open_legs=1),
+        ],
+    )
+    c = live_compare.compare(DAY, root)
+    [x] = c.compared
+    assert (x.variant, x.copies, x.slippage) == (T1[2], 1, pytest.approx(120.25))
+    assert [r["platform_id"] for r in c.not_traded] == ["b"]
+    assert [r["platform_id"] for r in c.open_legs] == ["c"]
+    lines = live_compare.message_lines(c, messages.rupees)
+    assert f"⚠️ Legs still open, left out: {T1[0]}" in lines
+    assert f"⛔ Did not trade: {T1[2]}" in lines
+    # a capture written before `traded` existed: an AlgoTest copy with no fills did not trade
+    old = _line("T1 · N_x_0917", 0, fills=[])
+    del old["traded"]
+    assert live_compare.traded(old) is False
+
+
+def test_quantiply_times_are_utc_and_premium_counts_the_first_entry_only(root):
+    _capture(
+        root,
+        [
+            _section("quantiply", "angelone"),
+            _line(
+                "T1 · N_p150-t1s11_0917",
+                -4095.0,
+                platform="quantiply",
+                broker="angelone",
+                fills=[
+                    _fill("2026-10-19T03:46:59.000Z", 150),  # 09:16:59 IST: on its slot
+                    _fill("2026-10-19T03:46:30Z", 150),
+                    _fill("2026-10-19T05:00:00Z", 999),  # a re-entry at 10:30: not the premium
+                ],
+            ),
+        ],
+    )
+    c = live_compare.compare(DAY, root)
+    assert not c.off_slot
+    [x] = c.compared
+    assert x.premium_per_lot == pytest.approx(300 * 65)
 
 
 # -- in the 16:00 message ------------------------------------------------------------------------
@@ -243,9 +319,7 @@ def test_before_the_capture_ever_ran_the_message_is_unchanged(evening):
 def test_the_owner_gets_the_live_lines_and_the_group_never_does(evening):
     _capture(evening, [_section("algotest", "all"), _line("T1 · N_p150-t1s11_1317", 910.0)])
     owner, group = _send(evening)
-    assert (
-        "💹 Live vs paper · per lot\nAlgoTest · Shoonya T1  +₹910 vs +₹790 · slip +₹120" in owner[0]
-    )
+    assert "💹 Live vs paper\nAlgoTest · Shoonya T1  +₹910 vs +₹790 a lot · slip +₹120" in owner[0]
     assert "💹" not in group[0]
     # after T1's result, before tomorrow
     assert owner[0].index("🧪 T1") < owner[0].index("💹")
