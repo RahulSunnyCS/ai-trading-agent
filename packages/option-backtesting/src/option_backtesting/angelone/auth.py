@@ -120,6 +120,26 @@ def post_json(path: str, body: dict, headers: dict[str, str]) -> tuple[int, dict
     return status, parsed if isinstance(parsed, dict) else {"status": False, "message": "bad body"}
 
 
+Get = Callable[[str, dict[str, str]], tuple[int, dict]]
+
+
+def get_json(path: str, headers: dict[str, str]) -> tuple[int, dict]:
+    """A GET to SmartAPI (read-only calls such as `getRMS`), answered like `post_json`."""
+    request = urllib.request.Request(BASE_URL + path, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            raw, status = response.read(), response.status
+    except urllib.error.HTTPError as error:
+        raw, status = error.read(), error.code
+    except (urllib.error.URLError, TimeoutError) as error:
+        return 0, {"status": False, "message": f"network: {error}"}
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        return status, {"status": False, "message": f"HTTP {status}, not JSON"}
+    return status, parsed if isinstance(parsed, dict) else {"status": False, "message": "bad body"}
+
+
 def login(
     creds: AngelCredentials,
     post: Post = post_json,

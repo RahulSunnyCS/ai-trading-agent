@@ -240,6 +240,20 @@ owner's plan), Auto Activation, Auto restart paused executions. Deploys are allo
 | Execution days | Weekdays / DTE; M T W Th F Sa Su, **none ticked** |
 | Buttons | Cancel · "Setup Execution Settings" |
 
+**Read-only calls the /live and /broker pages make (BL-143, seen 2026-10-20 15:13 IST; GETs only, with the
+session cookies and the CSRF header).** The trade monitor (`packages/broker-login/src/trade-monitor.ts`) uses
+the first two:
+
+| Call | What it answers |
+|---|---|
+| `GET /brokers` | one entry per linked broker: `broker` (`Broker.Finvasia`, `Broker.AngelOne`), `logged_until` and `margin: {available, updated_ts}` (UTC, no zone: `02:47` = the 08:17 IST broker login). The funds are read at AlgoTest's broker login, not live. The entry also carries `app_keys`; the monitor never reads or logs them |
+| `GET /executable-strategies?page=&page_size=&weekday=tuesday` | the Activation rows, each with `multiplier` (the Quantity Multiplier) and `weekdays` |
+| `GET /execution/v2/executions?environment=live` | today's deploys (`[]` with none) |
+
+/live's "Total MTM" (and each broker's) is **computed in the page** from the executions and live prices (its
+bundle, chunk `2331-*.js`, `overallMTM`), not answered by an API, so the monitor reads the figure off the open
+page. The header also shows "Available Margin" and "Margin Blocked (approx)".
+
 The owner's first live deploy (2026-10-19, `T1 · N_p150-t1s11_0917` on Finvasia) left the days unticked, and the
 row shows "-" for every day: **a deploy with no days ticked runs that day only**. Not yet seen: what "Activate"
 asks (broker or account choice, a confirmation), and what stopping a deploy before its entry looks like.
@@ -454,6 +468,14 @@ has been sent yet: the first `--apply` is the owner's.
 The uploader (`packages/broker-login/src/quantiply-upload.ts`) logs in through Angel One in a
 browser, takes this token, closes the browser and uses `GET /algos/day-wise`, `POST /algos`,
 `GET /algos/:id` (the read-back) and `DELETE /algos/:id`.
+
+**Live MTM (BL-143; read from the bundle 2026-10-20).** `GET /algos/day-wise` gives each algo's `multiplier`,
+`status` and broker, but no MTM. The app's MTM column (`pnl`) comes over its socket.io connection
+(`wss-prod.quantiply.angelone.in`): one CSV string per algo update, `<algo id>,,,,<pnl>,<error flags>,,<waiting>,<waitingWT>`
+(the SUBSCRIBE_LITE_POSITION_UPDATES reducer splits it on commas). The trade monitor keeps the app open on
+/algos and reads those frames as they arrive (`pnlFromSocketFrame`); it sends nothing on the socket. Not yet
+seen with an algo running: no algo of the owner's traded on 2026-10-20. The app also has `GET /pnl-chart/algo`
+(`graphLevel=account|broker|algo`, `from`, `to`), not used.
 
 **Body: `code: "OPTIONS_SPREADS_LEGS"`, `configurations`**
 

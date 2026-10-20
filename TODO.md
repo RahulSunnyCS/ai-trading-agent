@@ -779,3 +779,14 @@ options margin and are never part of the strategy. Kite access is read-only.
 | 3.34.2 | Phase 2: the lot ledger (seed from the first Kite snapshot, weekly diff attribution, flags, `mbt lots`) | claude | Planned |
 | 3.34.3 | Phase 3: per-sleeve orders on Friday with free cash | claude | Planned |
 | 3.34.4 | Phase 4: Lots panel, Guide, `business.md` / `technical.md` | claude | Planned |
+
+### 3.35 Trade monitoring and safety — [BL-143](backlog/BL-143-trade-monitoring-and-safety.md)
+
+Owner (2026-10-20): "lets build all 7" (item 3 is BL-141). Read-only checks of the real trades on AlgoTest
+(Finvasia) and Quantiply (Angel One); every new part off until its `.env` switch is `on`, the Fyers reminder on.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.35.1 | Phase 1: wake schedule documented (`deploy/launchd/README.md`); morning summary lists the previous day's catch-ups after sleep | claude + owner | **Built 2026-10-20.** Owner: run the `pmset` line(s) in the README (07:55 recommended over 08:50: the 08:00 jobs); done when a trading day's 16:40 job runs on time |
+| 3.35.2 | Phase 2: `fyers-token-reminder` 09:00 (on); 09:25 deploy check in `trade-monitor` (`DEPLOY_CHECK`) | claude | **Built 2026-10-20**; deploy check read live 2026-10-20 15:28 by hand (`--now --print`: AlgoTest /live, multipliers, Quantiply day-wise all read; nothing deployed that day). To switch on: merge, restart the scheduler, `DEPLOY_CHECK=on`; done when its 09:25 line matches the platforms on a trading day |
+| 3.35.3 | Phase 3: 09:05 margin check (`MARGIN_CHECK`) and loss alerts -₹5,000 / -₹8,000 (`LOSS_ALERTS`) in `trade-monitor` | claude | **Built 2026-10-20.** Margin read live (Angel One SmartAPI `getRMS`; Finvasia from AlgoTest `GET /brokers`, no Shoonya API login). Loss: AlgoTest "Total MTM" read live (₹0, nothing deployed); Quantiply's socket MTM is from its bundle, **not yet seen with an algo running**: check the first `LOSS_ALERTS=on` day's log |

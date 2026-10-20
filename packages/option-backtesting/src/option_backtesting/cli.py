@@ -479,6 +479,35 @@ def angel_test(
     raise typer.Exit(1)
 
 
+@angel_app.command("funds")
+def angel_funds(
+    as_json: bool = typer.Option(False, "--json", help="One JSON line (for the margin check)."),
+) -> None:
+    """BL-143: the Angel One account's free margin, read-only: ONE guarded SmartAPI login (the
+    same guard as Test connection: one at a time, the 60 s cool-down waited out, a refused login
+    held 15 minutes), one `getRMS` read, the session dropped. Never a token or PIN printed.
+    Exit 0 = read; 1 = the login or the read failed, or a refused login holds it."""
+    import json as _json
+
+    from .angelone.auth import AngelCredentialsError
+    from .angelone.check import session
+    from .angelone.funds import read_funds
+
+    try:
+        with session(source="margin") as sess:
+            funds = read_funds(sess)
+    except (AngelCredentialsError, OSError, RuntimeError) as error:
+        if as_json:
+            typer.echo(_json.dumps({"ok": False, "error": str(error)[:200]}))
+        else:
+            typer.echo(f"Angel One funds not read: {error}")
+        raise typer.Exit(1) from None
+    if as_json:
+        typer.echo(_json.dumps({"ok": True, **funds.as_dict()}))
+    else:
+        typer.echo(f"Angel One free margin (net): {funds.net:,.0f}")
+
+
 @angel_app.command("fetch")
 def angel_fetch(
     day: str = typer.Option(date.today().isoformat(), "--date", help="Trading day, YYYY-MM-DD."),

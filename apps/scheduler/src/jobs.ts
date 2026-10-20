@@ -606,6 +606,31 @@ const BASE_JOBS: Job[] = [
       'Read the alert first: an algo it enabled must not be enabled again. Then: cd packages/broker-login && node_modules/.bin/tsx src/quantiply-deploy.ts --broker angelone --mode enable  (dry run; add --apply)',
   },
   {
+    id: 'trade-monitor',
+    description:
+      "Watch the day's real trades, read-only (BL-143): 09:05 free margin per broker account vs the day's picks (MARGIN_CHECK=on), 09:25 AlgoTest /live and Quantiply hold exactly the picks at 1 lot (DEPLOY_CHECK=on), and 09:15-15:30 the combined MTM every minute with a -₹5,000 warning and a -₹8,000 alert, once each (LOSS_ALERTS=on). Logs in to each platform once and keeps the session; never clicks, changes or squares off anything. Does nothing until a switch is on",
+    // ONE process for the three parts, so each platform is logged in to once a day: the Quantiply
+    // JWT is never written to a file, so separate jobs would each need their own TOTP login.
+    // Not in the 'quantiply' group: it would hold the 09:19 / 09:21 top-ups for the whole day;
+    // its Quantiply login waits out the TOTP window stamp like theirs. A crash is retried (the
+    // day's state file under TRADING_DATA_ROOT/monitor/ stops a check or a level being sent
+    // twice); exit 3 = a held Quantiply login, never retried. Caught up after sleep: a late
+    // start skips the margin check after 09:16 and still runs the rest.
+    schedule: { at: '09:04', on: tradingDays, label: 'trading days 09:04' },
+    // caffeinate -i: macOS does not idle-sleep while the monitor runs (a power assertion held only
+    // by this process, gone when it exits; not a system setting). A closed lid on battery still sleeps.
+    steps: [['/usr/bin/caffeinate', '-i', 'node_modules/.bin/tsx', 'src/trade-monitor.ts']],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 400, // 09:04 to 15:44
+    retries: 2,
+    noRetryExitCodes: [3],
+    retryDelayMinutes: 2,
+    catchUpHours: 6,
+    alertsItself: true,
+    fixHint:
+      'cd packages/broker-login && node_modules/.bin/tsx src/trade-monitor.ts --parts deploy --now --print  (a read-only look; nothing sent)',
+  },
+  {
     id: 'backup',
     description: 'Copy the research database (TRADING_DATA_ROOT) to the external SSD',
     schedule: { at: '10:00', on: firstWeekdayOfMonth(0), label: '1st Sunday of the month 10:00' },

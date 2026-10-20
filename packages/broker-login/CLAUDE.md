@@ -72,6 +72,7 @@ npm run fyers-token   # tsx src/fyers.ts — headless Fyers login for the moment
 npm run dispatch      # tsx src/dispatch.ts — triggers the GitHub workflow via `gh` (the scheduler's 08:00 job); DRY_RUN=1 only checks gh auth
 npm run test          # node:test unit tests: browser-free helpers (Fyers auth, dispatch rules, config gating, report, Quantiply rules) + Chromium against local stand-in pages (overlays, the Quantiply flow; no network)
 npm run typecheck
+node_modules/.bin/tsx src/trade-monitor.ts --parts deploy --now --print   # BL-143: a read-only look, nothing sent
 ```
 
 ## Source layout
@@ -196,3 +197,33 @@ week, until disabled.
   `docs/algotest-execution.md` §7. Use a desktop viewport (1440 x 900): below about 500 px AlgoTest hides "Save
   Strategy".
 
+
+## Trade monitor (BL-143): margin, deploy and loss checks, read-only
+
+`src/trade-monitor.ts` (+ pure `src/monitor-plan.ts`) is the scheduler's `trade-monitor` job (trading days
+09:04-15:30, under `caffeinate -i`). One process a day, so each platform is logged in to once and the session kept:
+
+- **Parts and switches** (`.env`, each off until `on`): `MARGIN_CHECK` (09:05, before the 09:16 deploys),
+  `DEPLOY_CHECK` (09:25), `LOSS_ALERTS` (09:15-15:30, every minute). All off = no login at all.
+- **Read-only.** Pages and GET calls only; it never clicks a platform button, never sends a PUT/POST/DELETE to
+  one, never squares off. Its writes: Telegram (`monitor.margin`, `monitor.deploy`, `monitor.loss`; the
+  -₹8,000 alert untagged, so it cannot be muted) and `TRADING_DATA_ROOT/monitor/<day>.json` (what was sent,
+  the logins used, Quantiply's last MTM per algo), so a retry or restart never repeats a message.
+- **Logins.** AlgoTest: the website login (no broker login), at most 3 a day (a logged-out page re-logs in).
+  Quantiply: `openQuantiplyApp` (`quantiply-session.ts`: the refused-login hold, the TOTP window stamp; the app
+  stays open, never screenshotted), at most 2 a day per account. Angel One SmartAPI: `obt angel funds` once
+  (the shared guard). **Shoonya's own API: never** (no document shows an API login leaves the session AlgoTest
+  trades through alone); Finvasia's free margin is AlgoTest's figure.
+- **Margin** (`marginMessage`): need = per sold leg-lot half the underlying's short-straddle figure in
+  option-backtesting's `margin.csv` (NIFTY's when the underlying has none), ₹5,000 per bought leg-lot, every
+  pick at once, no hedge benefit; ok with a 20% cushion. Picks from the exports (`latest-<book>.json`), per
+  broker account across both platforms' rows. Free: Finvasia = AlgoTest `GET /brokers` `margin.available`
+  (as of AlgoTest's broker login; not today's = not read), Angel One = SmartAPI `getRMS` `net`.
+- **Deploy** (`checkAlgoTest`, `checkQuantiply`): each pick deployed once (AlgoTest "1 Deployed", multiplier 1
+  from `GET /executable-strategies`) / enabled once for today's weekday at multiplier 1 with the export's lots
+  (`GET /algos/:id`); a tool strategy (`T1 · ` / `Core · `) live that is not a pick is extra; the owner's own
+  are notes. One headline, `AlgoTest T1 3/3 · Quantiply Core 3/3 ✅`.
+- **Loss** (`lossCrossings`): AlgoTest's /live "Total MTM" (computed in the page; reloaded every 3 minutes)
+  plus Quantiply's per-algo MTM from its web app's socket frames (`pnlFromSocketFrame`, the CSV the app's
+  reducer splits; frames only read). A platform that cannot be read is said once and left out of the total.
+- `--now --print` runs the asked parts once and prints instead of sending (no switch needed, no state written).

@@ -81,6 +81,11 @@ export class QuantiplyApi {
     return parseDayWise(await this.call('GET', '/algos/day-wise'));
   }
 
+  /** `GET /algos/day-wise` as answered (BL-143's checks read `multiplier` from it too). */
+  async dayWise(): Promise<unknown> {
+    return this.call('GET', '/algos/day-wise');
+  }
+
   /** `POST /algos`: Quantiply makes one algo per weekday in `body.day`. */
   async create(body: unknown): Promise<Saved[]> {
     const json = (await this.call('POST', '/algos', body)) as { data?: unknown };

@@ -67,3 +67,41 @@ deploy/launchd/uninstall.sh
   within that job's catch-up window, otherwise it alerts that the run was missed.
 - **Off:** nothing runs. To wake or power on the Mac before 08:00 on weekdays:
   `sudo pmset repeat wakeorpoweron MTWRF 07:55:00`.
+
+## Wake schedule (BL-143)
+
+On 2026-10-19 the 16:40 / 16:45 uploads ran at 20:27, as catch-ups, because the laptop slept.
+The morning summary now lists the previous trading day's jobs that ran late like that ("Ran late
+after sleep"). Keeping the laptop awake is a macOS power setting, so **the owner runs these**; no
+job or script in the repo changes them.
+
+1. **The morning wake.** `pmset repeat` keeps one repeating wake, so pick one time:
+
+   ```bash
+   sudo pmset repeat wakeorpoweron MTWRF 07:55:00   # recommended: the 08:00 jobs run on time
+   sudo pmset repeat wakeorpoweron MTWRF 08:50:00   # BL-143's first suggestion: wake for the 09:00-09:25 jobs only;
+                                                    # the 08:00 broker login and Angel One check then run as catch-ups at ~08:50
+   pmset -g sched                                   # check what is set
+   ```
+
+2. **An optional second wake for the evening jobs** (16:40 AlgoTest upload, 16:45 Quantiply
+   upload, 16:55 Quantiply enable). `pmset repeat` cannot hold a second wake; `pmset schedule`
+   adds one-off ones, so schedule the next four weeks' weekdays in one go (re-run monthly):
+
+   ```bash
+   for d in $(seq 0 27); do
+     day=$(date -v+${d}d +%u)                      # 1-5 = Mon-Fri
+     [ "$day" -le 5 ] && sudo pmset schedule wake "$(date -v+${d}d +%m/%d/%y) 16:35:00"
+   done
+   pmset -g sched
+   ```
+
+3. **Staying awake once woken.** A scheduled wake does not stop the Mac going back to sleep at
+   its idle timer, and a closed lid on battery always sleeps. On the power adapter, System
+   Settings › Battery › Options › "Prevent automatic sleeping on power adapter when the display
+   is off" keeps it awake. The `trade-monitor` job (09:04-15:30) holds `caffeinate -i` while it
+   runs, so the Mac does not idle-sleep during the session; that assertion ends with the job and
+   changes no setting.
+
+**Done when** a trading day's 16:40 job runs at 16:40 (the next morning summary has no "Ran late
+after sleep" line).

@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { isTradingDay } from '@trading/market-reference';
 import { type AlertSink, telegramSink } from './alerts.js';
+import type { RunRow } from './history.js';
 import { JOBS } from './jobs.js';
 import type { Builtin, BuiltinContext } from './runner.js';
 import { addDays, formatIst, istAt, istDay, previousDue } from './schedule.js';
@@ -286,6 +287,44 @@ function recentFailures(ctx: BuiltinContext, today: Check[]): Check[] {
     }));
 }
 
+/** The previous trading day: what "yesterday" means on a Monday too. */
+function previousTradingDay(today: string): string {
+  let day = addDays(today, -1);
+  while (!isTradingDay(day)) day = addDays(day, -1);
+  return day;
+}
+
+/** `HH:MM` IST of an instant. */
+const istClock = (iso: string) =>
+  new Date(new Date(iso).getTime() + 330 * 60_000).toISOString().slice(11, 16);
+
+/**
+ * BL-143: the previous trading day's jobs that ran as catch-ups, late because the laptop was
+ * asleep or off at their time (on 2026-10-19 the 16:40 / 16:45 uploads ran at 20:27). One line,
+ * counted as a problem, so a missing wake schedule (deploy/launchd/README.md) shows each morning
+ * it costs something.
+ */
+export function catchUpCheck(rows: RunRow[]): Check | null {
+  if (!rows.length) return null;
+  const late = rows.map(
+    (r) =>
+      `${r.job} (due ${r.scheduled_for ? istClock(r.scheduled_for) : '?'}, ran ${istClock(r.started_at)})`,
+  );
+  return {
+    ok: false,
+    label: 'Ran late after sleep',
+    detail: `${late.join(', ')} → keep the laptop awake for the jobs: the wake schedule in deploy/launchd/README.md`,
+  };
+}
+
+function catchUps(ctx: BuiltinContext): Check[] {
+  const today = istDay(ctx.now());
+  const check = catchUpCheck(
+    ctx.history.catchUpsBetween(istAt(previousTradingDay(today), '00:00'), istAt(today, '00:00')),
+  );
+  return check ? [check] : [];
+}
+
 /** The checks that look outside the history table: GitHub, Fyers, the lake, git, the disk. */
 export type SystemChecks = (ctx: BuiltinContext) => Check[];
 
@@ -301,7 +340,7 @@ const systemChecks: SystemChecks = (ctx) => [
 export function morningSummary(sink?: AlertSink, system: SystemChecks = systemChecks): Builtin {
   return async (ctx) => {
     const jobs = jobChecks(ctx);
-    const checks = [...jobs, ...system(ctx), ...recentFailures(ctx, jobs)];
+    const checks = [...jobs, ...system(ctx), ...catchUps(ctx), ...recentFailures(ctx, jobs)];
     const { text } = formatSummary(istDay(ctx.now()), checks);
     ctx.log(text);
     await (sink ?? telegramSink(ctx.env, 'scheduler.morning'))(text);

@@ -7,7 +7,9 @@ Callers, by `source`:
   in a background thread once `begin` has the lock, and `obt angel test`);
 - "scheduled": the 08:00 job `angel-login-check` (`obt angel test --scheduled`);
 - "collector": `obt angel fetch` and the `obt daily` fallback (`evening.collect_detailed`), through
-  `session()`, which holds the lock for the whole collection so no test logs in under it.
+  `session()`, which holds the lock for the whole collection so no test logs in under it;
+- "margin": `obt angel funds` (BL-143, the 09:05 margin check), through `session(source="margin")`:
+  one login, one read of the account's funds (`getRMS`), the session dropped.
 
 The guard, shared by all of them:
 - one at a time, across processes: an exclusive `flock` on `TRADING_DATA_ROOT/angelone/check.lock`.
@@ -63,7 +65,7 @@ LOCK_WAIT_S = 180
 MANUAL_LOCK_WAIT_S = 1.0
 OPTIONAL = ("ANGELONE_PUBLIC_IP",)
 KEYS = (*auth.REQUIRED, *OPTIONAL)
-SOURCES = ("manual", "scheduled", "collector")
+SOURCES = ("manual", "scheduled", "collector", "margin")
 #: ok, not_configured (no login sent), rejected (Angel One refused the login), network (not
 #: reached), unavailable (HTTP 5xx), error (anything else, e.g. a TOTP seed that is not base32).
 REASONS = ("ok", "not_configured", "rejected", "network", "unavailable", "error")
@@ -443,6 +445,7 @@ def run_check(
 @contextlib.contextmanager
 def session(
     *,
+    source: str = "collector",
     root: Path | None = None,
     env: Mapping[str, str] | None = None,
     login: Login | None = None,
@@ -454,9 +457,7 @@ def session(
     error (AngelCredentialsError / AngelNetworkError) as before; a guard refusal is an
     AngelCredentialsError (held) or AngelNetworkError (still busy after LOCK_WAIT_S)."""
     try:
-        pending = begin(
-            "collector", wait=True, root=root, env=env, login=login, now=now, sleep=sleep
-        )
+        pending = begin(source, wait=True, root=root, env=env, login=login, now=now, sleep=sleep)
     except CheckRefused as refused:
         if refused.kind == "held":
             raise auth.AngelCredentialsError(str(refused)) from None

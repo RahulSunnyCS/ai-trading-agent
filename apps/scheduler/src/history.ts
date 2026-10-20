@@ -106,6 +106,18 @@ export class History {
       .all(since.toISOString()) as RunRow[];
   }
 
+  /**
+   * Runs started in [since, until) that served a slot as a catch-up (the slot was missed while
+   * the laptop slept or was off, BL-143): the morning summary lists the previous day's.
+   */
+  catchUpsBetween(since: Date, until: Date): RunRow[] {
+    return this.db
+      .query(
+        "SELECT * FROM runs WHERE trigger = 'catch-up' AND started_at >= ? AND started_at < ? ORDER BY started_at",
+      )
+      .all(since.toISOString(), until.toISOString()) as RunRow[];
+  }
+
   /** The run before `id` for the same job, to notice a recovery. */
   previous(job: string, id: number): RunRow | null {
     return (this.db

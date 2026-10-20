@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { waitForNextWindow } from '@trading/broker-identity';
-import { chromium } from 'playwright';
+import { type Browser, type Page, chromium } from 'playwright';
 import { BrokerLoginError } from './brokers/types.js';
 import { describe } from './diagnose.js';
 import { installOverlayHandlers } from './overlays.js';
@@ -122,6 +122,36 @@ export async function openQuantiply(
   stateDir: string,
   opts: { headed?: boolean; retryTotpOnce?: boolean } = {},
 ): Promise<QuantiplyApi> {
+  return (await openWithRetry(c, stateDir, { ...opts, keep: false })).api;
+}
+
+/** A logged-in Quantiply web app kept open (BL-143's monitor reads its live MTM), plus the API. */
+export interface QuantiplyApp {
+  api: QuantiplyApi;
+  browser: Browser;
+  page: Page;
+}
+
+/**
+ * `openQuantiply`, but the browser stays open on the logged-in app (BL-143's loss monitor reads
+ * the MTM the app's socket pushes to it; nothing is clicked). The caller closes `browser`. Never
+ * screenshot or save this page: it is the owner's live account.
+ */
+export async function openQuantiplyApp(
+  c: QCredentials,
+  stateDir: string,
+  opts: { headed?: boolean; retryTotpOnce?: boolean; onPage?: (page: Page) => void } = {},
+): Promise<QuantiplyApp> {
+  const app = await openWithRetry(c, stateDir, { ...opts, keep: true });
+  if (!app.browser || !app.page) throw new Error('internal: the app was not kept open');
+  return { api: app.api, browser: app.browser, page: app.page };
+}
+
+async function openWithRetry(
+  c: QCredentials,
+  stateDir: string,
+  opts: { headed?: boolean; retryTotpOnce?: boolean; keep: boolean; onPage?: (page: Page) => void },
+): Promise<{ api: QuantiplyApi; browser?: Browser; page?: Page }> {
   for (let attempt = 1; ; attempt += 1) {
     await waitOutTotpWindow(stateDir, c.broker);
     try {
@@ -139,11 +169,12 @@ export async function openQuantiply(
 async function loginOnce(
   c: QCredentials,
   stateDir: string,
-  opts: { headed?: boolean },
-): Promise<QuantiplyApi> {
+  opts: { headed?: boolean; keep?: boolean; onPage?: (page: Page) => void },
+): Promise<{ api: QuantiplyApi; browser?: Browser; page?: Page }> {
   const site = QUANTIPLY_SITES[c.broker];
   const browser = await chromium.launch({ headless: !opts.headed });
   let token: string;
+  let kept: Page | undefined;
   try {
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
@@ -178,10 +209,18 @@ async function loginOnce(
       }
       throw error;
     }
-    token = await readToken(await context.newPage(), site);
+    const tokenPage = await context.newPage();
+    // The listener goes on before the app loads, so the socket it opens is seen from the start.
+    if (opts.keep && opts.onPage) opts.onPage(tokenPage);
+    token = await readToken(tokenPage, site);
+    if (opts.keep) {
+      kept = tokenPage;
+      await page.close().catch(() => undefined);
+    }
   } finally {
-    await browser.close().catch(() => undefined);
+    if (!kept) await browser.close().catch(() => undefined);
   }
   registerSecret(token);
-  return new QuantiplyApi(token, fetch, site);
+  const api = new QuantiplyApi(token, fetch, site);
+  return kept ? { api, browser, page: kept } : { api };
 }
