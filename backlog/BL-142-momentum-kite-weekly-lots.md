@@ -211,4 +211,12 @@ Kite facts checked on 2026-10-19 ([portfolio](https://kite.trade/docs/connect/v3
   - LIQUIDBEES / `SGB*` are always excluded;
   - Kite timeouts are handled;
   - the callback never fails after a good login.
+- 2026-10-20 — First live read. The owner logged in on Broker logins (account ID shown on the card)
+  and the callback stored a Kite snapshot at 12:25: five names, all still T1 (bought Mon 19 Oct,
+  so `quantity` 0 and `t1_quantity` counted, as the client does), free cash ₹4,509 with no pledged
+  collateral. Kite lists the five on **BSE** (20MICRONS, CUPID, GRWRHITECH, NAZARA, RATEGAIN):
+  Your orders maps holdings by symbol, so check on Fri 23 Oct that each maps to its strategy
+  name (an unmapped one is left alone and its target name would be bought again). This account
+  holds no LIQUIDBEES or SGB, so the options-margin exclusion was not exercised. The first
+  restart of the research stack lost a login in progress (login states are in memory).
 
