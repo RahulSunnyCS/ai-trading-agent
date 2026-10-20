@@ -190,6 +190,8 @@ export interface EnablePlan {
   enabledLive: string[];
   /** switched on or off already this session (deploy ledger) and now off: left off */
   leftOff: string[];
+  /** this session's enable call failed (deploy ledger) and the algo is off: left off, alerted */
+  enableFailed: string[];
   /** owned algos of the session that are no longer picks and are not enabled: left alone */
   notPicked: string[];
   /** picks with no owned algo for the session on Quantiply */
@@ -216,8 +218,8 @@ export interface EnableInput {
   algos: QAlgo[];
   details: Map<string, AlgoDetail>;
   brokerId: string;
-  /** algo ids the deploy ledger shows switched on or off already for this session */
-  toggled?: Set<string>;
+  /** the deploy ledger's last enable or disable row for this session, by algo id */
+  toggled?: Map<string, DeployLedgerRow>;
 }
 
 /** One row of `deploy-ledger*.jsonl`. */
@@ -237,7 +239,16 @@ export function parseDeployLedger(text: string): DeployLedgerRow[] {
   for (const line of text.split('\n')) {
     if (!line.trim()) continue;
     try {
-      rows.push(JSON.parse(line) as DeployLedgerRow);
+      const row = JSON.parse(line) as DeployLedgerRow | null;
+      // only rows it can read: `null`, a number or a row without id or session is skipped. The
+      // deploy ledger never blocks the disable safety net.
+      if (
+        row &&
+        typeof row === 'object' &&
+        typeof row.id === 'string' &&
+        typeof row.session === 'string'
+      )
+        rows.push(row);
     } catch {
       // a torn last line is skipped
     }
@@ -246,15 +257,35 @@ export function parseDeployLedger(text: string): DeployLedgerRow[] {
 }
 
 /**
- * Ids this tool switched on or off for `session`. A failed call counts too: its state was
- * unknown, so the owner has been told and decides.
+ * Ids this tool switched on or off for `session`, each with its last such row. A failed call
+ * counts too: its state was unknown, so the owner has been told and decides.
  */
-export function toggledIds(rows: DeployLedgerRow[], session: string): Set<string> {
-  return new Set(
-    rows
-      .filter((r) => r.session === session && (r.action === 'enable' || r.action === 'disable'))
-      .map((r) => r.id),
-  );
+export function toggledIds(rows: DeployLedgerRow[], session: string): Map<string, DeployLedgerRow> {
+  const out = new Map<string, DeployLedgerRow>();
+  for (const r of rows) {
+    if (r.session === session && (r.action === 'enable' || r.action === 'disable'))
+      out.set(r.id, r);
+  }
+  return out;
+}
+
+/**
+ * The session each algo was last switched on for (a successful enable row). A kept copy's ledger
+ * `day` is an earlier week's; this says which session it is enabled for now.
+ */
+export function enabledSessions(rows: DeployLedgerRow[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const r of rows) {
+    if (r.action !== 'enable' || !r.ok) continue;
+    if (r.session > (out.get(r.id) ?? '')) out.set(r.id, r.session);
+  }
+  return out;
+}
+
+/** The session an owned algo belongs to: its ledger day, or a later session it was enabled for. */
+function sessionOf(id: string, row: QLedgerRow, enabledFor?: Map<string, string>): string {
+  const later = enabledFor?.get(id);
+  return later && later > row.day ? later : row.day;
 }
 
 /** Why a run for `session` must not change anything (enable), or null. */
@@ -303,6 +334,7 @@ export function planEnable(input: EnableInput): EnablePlan {
     disable: [],
     enabledLive: [],
     leftOff: [],
+    enableFailed: [],
     notPicked: [],
     missing: [],
     duplicates: [],
@@ -313,7 +345,7 @@ export function planEnable(input: EnableInput): EnablePlan {
   };
   if (out.refused) return out;
   const weekday = weekdayOf(input.session);
-  const toggled = input.toggled ?? new Set<string>();
+  const toggled = input.toggled ?? new Map<string, DeployLedgerRow>();
   const listed = new Map(input.algos.map((a) => [a.id, a]));
   const mine = ownedForSession(input.ledger, input.session, input.picks);
   const isOn = (id: string) =>
@@ -363,8 +395,10 @@ export function planEnable(input: EnableInput): EnablePlan {
     const a = listed.get(id) as QAlgo;
     const row = mine.get(id) as QLedgerRow;
     const d = input.details.get(id);
-    if (toggled.has(id) && !isOn(id)) {
-      out.leftOff.push(name);
+    const last = toggled.get(id);
+    if (last && !isOn(id)) {
+      if (last.action === 'enable' && !last.ok) out.enableFailed.push(name);
+      else out.leftOff.push(name);
       continue;
     }
     if (row.sha !== input.picks.get(name)) {
@@ -434,19 +468,21 @@ export function planDisable(
   today: string,
   ledger: QLedgerRow[],
   algos: QAlgo[],
-  opts: { nowSeconds?: number; emergency?: boolean } = {},
+  opts: { nowSeconds?: number; emergency?: boolean; enabledFor?: Map<string, string> } = {},
 ): DisablePlan {
   const out: DisablePlan = { disable: [], live: [], off: [], notYet: [] };
   const listed = new Map(algos.map((a) => [a.id, a]));
   const todayWeekday = weekdayOf(today);
   const over = (opts.nowSeconds ?? 0) >= SESSION_OVER_MINUTES * 60;
   for (const [id, row] of ownedIds(ledger)) {
-    if (row.day !== session && row.day >= today) continue;
+    // a kept copy enabled for a later session belongs to that session, like a fresh copy
+    const day = sessionOf(id, row, opts.enabledFor);
+    if (day !== session && day >= today) continue;
     const a = listed.get(id);
     if (!a) continue;
-    const label = row.day === session ? a.name : `${a.name} (${row.day})`;
+    const label = day === session ? a.name : `${a.name} (${day})`;
     if (!a.enabled) {
-      if (row.day === session) out.off.push(label);
+      if (day === session) out.off.push(label);
       continue;
     }
     if (a.day === todayWeekday && !over && !opts.emergency) out.notYet.push(label);
@@ -466,6 +502,7 @@ export function staleEnabled(
   nowSeconds: number,
   ledger: QLedgerRow[],
   algos: QAlgo[],
+  enabledFor?: Map<string, string>,
 ): string[] {
   const listed = new Map(algos.map((a) => [a.id, a]));
   const over = nowSeconds >= SESSION_OVER_MINUTES * 60;
@@ -473,8 +510,8 @@ export function staleEnabled(
   for (const [id, row] of ownedIds(ledger)) {
     const a = listed.get(id);
     if (!a?.enabled) continue;
-    if (row.day < today || (row.day === today && over))
-      out.push(`${a.name} (${row.day}, ${a.day})`);
+    const day = sessionOf(id, row, enabledFor);
+    if (day < today || (day === today && over)) out.push(`${a.name} (${day}, ${a.day})`);
   }
   return out;
 }
@@ -540,6 +577,10 @@ export function summaryEnable(p: EnablePlan): { lines: string[]; attention: bool
     lines.push(`⚠️ disable, ENABLED and ${bad.map((x) => `${x.why}: ${x.name}`).join('; ')}`);
   if (p.leftOff.length)
     lines.push(`switched off since it was switched on, left off: ${p.leftOff.join(', ')}`);
+  if (p.enableFailed.length)
+    lines.push(
+      `⚠️ ENABLE FAILED earlier this session, left off (enable it by hand if wanted): ${p.enableFailed.join(', ')}`,
+    );
   if (p.notPicked.length) lines.push(`not a pick, left disabled: ${p.notPicked.join(', ')}`);
   if (p.tooLate.length) lines.push(`TOO LATE, not enabled: ${p.tooLate.join(', ')}`);
   if (p.enabledLive.length)
@@ -556,6 +597,7 @@ export function summaryEnable(p: EnablePlan): { lines: string[]; attention: bool
   if (!lines.length) lines.push('nothing to enable');
   const attention =
     bad.length +
+      p.enableFailed.length +
       p.tooLate.length +
       p.enabledLive.length +
       p.missing.length +

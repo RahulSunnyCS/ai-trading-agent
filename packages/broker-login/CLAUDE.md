@@ -164,7 +164,10 @@ week, until disabled.
   the tool's; anything else exits 3 and alerts (a change on the owner's own algos is a note). A failed enable stops
   the run there. A disable whose call failed exits 1 (retried) even when something else needs the owner.
 - Enabling with `--apply` needs `QUANTIPLY_DEPLOY=on` (checked before logging in), Automated deployment and the
-  account's row. Disabling is the safety net and is never gated. An account with nothing of the tool's for the
+  account's row. Disabling is the safety net and is never gated: it reads no automation settings, and an
+  unreadable deploy ledger or line is skipped. A kept copy the deploy ledger shows enabled for a later session
+  belongs to that session for disable and check (`enabledSessions`). An enable that failed earlier in the
+  session is reported ENABLE FAILED and left off. An account with nothing of the tool's for the
   session is not logged in. Every change is a row in `deploy-ledger[-<broker>].jsonl` beside the ledger.
 - Logins go through `quantiply-session.ts`: it waits out the last TOTP window the account typed a code in (a file
   stamp beside the ledger, shared with the uploader), and the deployer retries a refused code once. The ledger

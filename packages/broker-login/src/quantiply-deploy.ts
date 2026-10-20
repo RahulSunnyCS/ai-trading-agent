@@ -19,6 +19,7 @@ import {
   type DeployMode,
   ENABLE_LEAD_SECONDS,
   defaultSession,
+  enabledSessions,
   istSeconds,
   ownedForSession,
   parseBrokers,
@@ -162,15 +163,20 @@ async function main(): Promise<number> {
     console.log(`${site.name}: QUANTIPLY_DEPLOY is not "on": nothing enabled`);
     return 0;
   }
-  let automation: Automation;
-  try {
-    automation = readAutomation();
-  } catch (error) {
-    console.error(`automation settings: ${describe(error)}`);
-    return EXIT_RETRY;
+  // The disable safety net reads nothing it does not use: no automation settings.
+  let gate: ReturnType<typeof quantiplyDeploy> = { ok: false, book: null, why: '' };
+  let decidedBy = 'settings not read (disable never needs them)';
+  if (mode !== 'disable') {
+    let automation: Automation;
+    try {
+      automation = readAutomation();
+    } catch (error) {
+      console.error(`automation settings: ${describe(error)}`);
+      return EXIT_RETRY;
+    }
+    gate = quantiplyDeploy(automation, broker);
+    decidedBy = describeSource(automation);
   }
-  const gate = quantiplyDeploy(automation, broker);
-  const decidedBy = describeSource(automation);
   // Gate 2: enabling also needs the dashboard's switch and the account's row.
   if (values.apply && mode === 'enable' && !gate.ok) {
     console.log(`${site.name}: ${gate.why} (${decidedBy}): nothing enabled`);
@@ -192,9 +198,20 @@ async function main(): Promise<number> {
     broker === 'angelone' ? 'deploy-ledger.jsonl' : `deploy-ledger-${broker}.jsonl`,
   );
   const ledger = existsSync(ledgerPath) ? parseQLedger(await readFile(ledgerPath, 'utf8')) : [];
-  const deployRows = existsSync(deployLedger)
-    ? parseDeployLedger(await readFile(deployLedger, 'utf8'))
-    : [];
+  // Unreadable is empty, with a warning: the deploy ledger must never stop a disable. (For an
+  // enable it only ever holds back: an id it lists is never switched on again.)
+  let deployRows: ReturnType<typeof parseDeployLedger> = [];
+  try {
+    if (existsSync(deployLedger))
+      deployRows = parseDeployLedger(await readFile(deployLedger, 'utf8'));
+  } catch (error) {
+    console.error(`the deploy ledger could not be read, taken as empty: ${describe(error)}`);
+    if (mode === 'enable') {
+      console.error('enable needs it (an algo switched off since must stay off): nothing enabled');
+      return EXIT_RETRY;
+    }
+  }
+  const enabledFor = enabledSessions(deployRows);
 
   const today = istToday();
   const chosen = values.day
@@ -248,7 +265,11 @@ async function main(): Promise<number> {
     mode === 'enable'
       ? ownedForSession(ledger, session, picks?.sha).size
       : mode === 'disable'
-        ? [...owned.values()].filter((r) => r.day === session || r.day < today).length
+        ? [...owned.entries()].filter(([id, r]) => {
+            const later = enabledFor.get(id) ?? '';
+            const at = later > r.day ? later : r.day;
+            return at === session || at < today;
+          }).length
         : owned.size;
   if (!relevant) {
     console.log(
@@ -323,7 +344,7 @@ async function main(): Promise<number> {
     const before = await api.list();
 
     if (mode === 'check') {
-      const stale = staleEnabled(today, istSeconds(), ledger, before);
+      const stale = staleEnabled(today, istSeconds(), ledger, before, enabledFor);
       const mine = ownedForSession(ledger, session);
       const states = before
         .filter((a) => mine.has(a.id))
@@ -337,6 +358,7 @@ async function main(): Promise<number> {
       const plan = planDisable(session, today, ledger, before, {
         nowSeconds: istSeconds(),
         emergency: values.emergency,
+        enabledFor,
       });
       const s = summaryDisable(plan);
       lines.push(...s.lines);

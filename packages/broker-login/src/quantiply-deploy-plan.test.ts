@@ -7,6 +7,7 @@ import {
   type EnableInput,
   UNKNOWN_BROKER,
   defaultSession,
+  enabledSessions,
   istSeconds,
   ownedForSession,
   parseBroker,
@@ -22,7 +23,7 @@ import {
   toggledIds,
   verifyToggles,
 } from './quantiply-deploy-plan.js';
-import type { QAlgo, QLedgerRow } from './quantiply-plan.js';
+import { type QAlgo, type QLedgerRow, parseQLedger } from './quantiply-plan.js';
 
 const P = 'Core · ';
 const WED = '2026-10-21';
@@ -352,7 +353,7 @@ test('never enabled again once this session switched it (the owner turned it off
     ].join('\n'),
   );
   const toggled = toggledIds(rows, WED);
-  assert.deepEqual([...toggled], ['1']);
+  assert.deepEqual([...toggled.keys()], ['1']);
   const p = planEnable(wednesday({ toggled }));
   assert.deepEqual(p.leftOff, [`${P}S_ditm1_1202`]);
   assert.deepEqual(
@@ -484,4 +485,64 @@ test('enabling needs the deploy switch and the account row uploading a list', ()
   assert.equal(quantiplyDeploy(a, 'finvasia').ok, false);
   a.masters.uploads = false;
   assert.equal(quantiplyDeploy(a, 'angelone').ok, false);
+});
+
+const deployRow = (id: string, session: string, action = 'enable', ok = true) =>
+  JSON.stringify({ at: 'x', session, mode: 'enable', action, id, name: id, ok });
+
+test('a kept copy enabled for the next session is that session, for disable and check alike', () => {
+  // Tue 20:00: Wednesday's K (kept from last week) and N (new) were enabled at 16:55
+  const TUE = '2026-10-27';
+  const NEXT_WED = '2026-10-28';
+  const ledger = [created('K', `${P}K`, WED), created('N', `${P}N`, NEXT_WED)];
+  const algos = [algo('K', `${P}K`, { enabled: true }), algo('N', `${P}N`, { enabled: true })];
+  const enabledFor = enabledSessions(
+    parseDeployLedger([deployRow('K', NEXT_WED), deployRow('N', NEXT_WED)].join('\n')),
+  );
+  const evening = { nowSeconds: HM(20, 0), enabledFor };
+  // an evening disable for today touches neither; for Wednesday, both
+  assert.deepEqual(planDisable(TUE, TUE, ledger, algos, evening).disable, []);
+  assert.deepEqual(
+    planDisable(NEXT_WED, TUE, ledger, algos, evening).disable.map((t) => t.id),
+    ['K', 'N'],
+  );
+  assert.deepEqual(staleEnabled(TUE, HM(20, 0), ledger, algos, enabledFor), []);
+  // without the deploy ledger the kept copy would look a week old
+  assert.equal(staleEnabled(TUE, HM(20, 0), ledger, algos).length, 1);
+  // last week's enable of the same copy does not make it this week's
+  const old = enabledSessions(parseDeployLedger(deployRow('K', WED)));
+  assert.equal(staleEnabled(TUE, HM(20, 0), ledger, algos, old).length, 1);
+  // a failed enable does not count
+  const failed = enabledSessions(parseDeployLedger(deployRow('K', NEXT_WED, 'enable', false)));
+  assert.equal(failed.size, 0);
+});
+
+test('unreadable ledger lines are skipped, never a crash', () => {
+  const rows = parseDeployLedger(
+    ['null', '7', '"x"', '{"id":1}', deployRow('1', WED), '{"torn'].join('\n'),
+  );
+  assert.equal(rows.length, 1);
+  assert.deepEqual([...toggledIds(rows, WED).keys()], ['1']);
+  const ledger = parseQLedger(['null', '[]', JSON.stringify(created('1', `${P}A`))].join('\n'));
+  assert.deepEqual(
+    ledger.map((r) => r.id),
+    ['1'],
+  );
+});
+
+test("an enable that failed earlier this session is said so, and alerted, never 'switched off since'", () => {
+  const toggled = toggledIds(parseDeployLedger(deployRow('1', WED, 'enable', false)), WED);
+  const p = planEnable(wednesday({ toggled }));
+  assert.deepEqual(p.enableFailed, [`${P}S_ditm1_1202`]);
+  assert.deepEqual(p.leftOff, []);
+  assert.ok(!p.enable.some((t) => t.id === '1'));
+  const s = summaryEnable(p);
+  assert.equal(s.attention, true);
+  assert.ok(s.lines.some((l) => l.includes('ENABLE FAILED')));
+  // a successful enable the owner switched off since: left off, no alert
+  const off = planEnable(
+    wednesday({ toggled: toggledIds(parseDeployLedger(deployRow('1', WED)), WED) }),
+  );
+  assert.deepEqual(off.leftOff, [`${P}S_ditm1_1202`]);
+  assert.equal(summaryEnable(off).attention, false);
 });

@@ -184,6 +184,11 @@ its weekday every week until it is switched off.
 
 ## Log
 
+- 2026-10-20 — Re-review of #273: three low findings fixed. (A) A kept copy that the deploy ledger shows enabled
+  for a later session belongs to that session, so an evening disable or check treats it like the fresh copies.
+  (B) Disable reads no automation settings and skips an unreadable deploy ledger or line. (D) An enable that
+  failed earlier in the session is reported ENABLE FAILED with an alert, not "switched off since". (C) Accepted:
+  the 15:40 safety net logs in every trading day the tool owns algos.
 - 2026-10-20 — Review of #273, fixed on the branch:
   1. An algo this session already switched on or off (the deploy ledger) is never switched on again: an owner who
      switched it off by hand keeps it off.

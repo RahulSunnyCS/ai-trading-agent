@@ -121,7 +121,15 @@ export function parseQLedger(text: string): QLedgerRow[] {
   for (const line of text.split('\n')) {
     if (!line.trim()) continue;
     try {
-      rows.push(JSON.parse(line) as QLedgerRow);
+      const row = JSON.parse(line) as QLedgerRow | null;
+      // a line that is JSON but not a ledger row (`null`, a number) is skipped like a torn one
+      if (
+        row &&
+        typeof row === 'object' &&
+        typeof row.id === 'string' &&
+        typeof row.name === 'string'
+      )
+        rows.push(row);
     } catch {
       // a torn last line (a crash mid-write) is skipped, never fatal
     }
