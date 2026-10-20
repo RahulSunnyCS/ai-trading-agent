@@ -11,9 +11,10 @@ import {
   syncGithub,
   validate,
 } from './automation.js';
-import { JOBS, type Job } from './jobs.js';
+import { rowAlive } from './history.js';
+import { JOBS, type Job, maxRunMinutes } from './jobs.js';
 import { type RunContext, runJob } from './runner.js';
-import { nextDue } from './schedule.js';
+import { nextDue, previousDue } from './schedule.js';
 import { heldReason } from './stop-hold.js';
 
 /**
@@ -95,18 +96,35 @@ export function createApi({
   const inFlight = new Set<string>();
   const prefs = () => prefsFile ?? prefsPath();
 
+  /** An open row says whether its work still runs (its writer or its step's process group). */
+  const withAlive = <R extends Parameters<typeof rowAlive>[0] & { ended_at: string | null }>(
+    row: R | null,
+  ) => (row && row.ended_at === null ? { ...row, alive: rowAlive(row) } : row);
+
   function listJobs(): Response {
     const at = now();
+    // A row whose process is gone (a scheduler restart, a Ctrl-C'd `jobs run`) is closed first, so
+    // no reader (the trade monitor, BL-143) waits on a run that is not running.
+    ctx.history.reapDead(at);
     return json(
-      jobs.map((job) => ({
-        id: job.id,
-        description: job.description,
-        schedule: job.schedule.label,
-        nextRun: nextDue(job.schedule, at)?.toISOString() ?? null,
-        lastRun: ctx.history.last(job.id),
-        needs: job.needs ?? [],
-        group: job.group ?? null,
-      })),
+      jobs.map((job) => {
+        // BL-143: the latest slot that has come and the row serving it (none yet = still due or
+        // queued behind its group): the trade monitor waits for the morning deploy jobs to end.
+        const slot = previousDue(job.schedule, at);
+        return {
+          id: job.id,
+          description: job.description,
+          schedule: job.schedule.label,
+          nextRun: nextDue(job.schedule, at)?.toISOString() ?? null,
+          lastRun: withAlive(ctx.history.last(job.id)),
+          previousSlot: slot?.toISOString() ?? null,
+          previousSlotRun: withAlive(slot ? ctx.history.forSlot(job.id, slot) : null),
+          maxRunMinutes: maxRunMinutes(job),
+          catchUpHours: job.catchUpHours,
+          needs: job.needs ?? [],
+          group: job.group ?? null,
+        };
+      }),
     );
   }
 

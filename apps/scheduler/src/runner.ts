@@ -56,6 +56,7 @@ function runStep(
   env: Record<string, string>,
   logFd: number,
   timeoutMs: number,
+  onSpawn: (pgid: number) => void = () => undefined,
 ): Promise<{ code: number; error: string | null }> {
   const [cmd = '', ...args] = step;
   const exe = resolveExecutable(cmd, cwd, env.PATH ?? '');
@@ -64,6 +65,15 @@ function runStep(
     // Its own process group, so a timeout ends everything the step started (a `sh -c` step's
     // commands, a browser), not just the first process: a retry must never overlap a survivor.
     const child = spawn(exe, args, { cwd, env, stdio: ['ignore', logFd, logFd], detached: true });
+    // detached: the child leads its own group, whose id is its pid. Recorded on the run row, so a
+    // scheduler that stops mid-step does not make the step look ended while it still runs.
+    if (child.pid) {
+      try {
+        onSpawn(child.pid);
+      } catch {
+        // a bookkeeping failure must not fail the step
+      }
+    }
     const killAll = (signal: NodeJS.Signals) => {
       try {
         if (child.pid) process.kill(-child.pid, signal);
@@ -198,7 +208,9 @@ export function runJob(
         }
         for (const step of job.steps) {
           writeSync(logFd, `$ ${step.join(' ')}\n`);
-          result = await runStep(step, cwd, ctx.env, logFd, job.timeoutMinutes * 60_000);
+          result = await runStep(step, cwd, ctx.env, logFd, job.timeoutMinutes * 60_000, (pgid) =>
+            ctx.history.setChild(runId, pgid),
+          );
           if (result.error) writeSync(logFd, `! ${result.error}\n`);
           if (result.code !== 0) break;
         }

@@ -174,8 +174,8 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('has 35 jobs', () => {
-    expect(JOBS).toHaveLength(35);
+  it('has 36 jobs', () => {
+    expect(JOBS).toHaveLength(36); // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor
   });
 });
 

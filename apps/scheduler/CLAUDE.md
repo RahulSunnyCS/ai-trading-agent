@@ -34,17 +34,29 @@ summary flags anything but `main`).
   (`History.jobFirstSeen`, kept per job in the `meta` table), so a newly added job is
   never reported missed for a slot from before it existed. A new job is seen as of now
   minus its `catchUpHours`, so a slot that only just passed still catches up on the first
-  restart; a manual `jobs run` does not count as history.
+  restart; a manual `jobs run` does not count as history. Before its first tick it closes the
+  rows a previous scheduler left open (`reapDead`, exit -2, interrupted), but only a row whose
+  writer (`pid`) AND whose step's process group (`child_pgid`, recorded by the runner at each
+  spawn: steps run detached and outlive a stopped scheduler) are both gone (`rowAlive`); an orphan
+  still running keeps its row open. Every tick reaps the same way, so an orphan that ends later is
+  closed then (and the trade monitor restarts). An orphan's exit code cannot be read, so even a
+  normal exit is recorded as interrupted (-2).
 - `src/alerts.ts` — immediate Telegram on failure (skipped for `alertsItself` jobs unless
   they timed out or could not start), on a missed slot, and on recovery. Successes stay
   quiet.
 - `src/summary.ts` — the 09:00 trading-day morning summary (builtin job): today's job slots,
   the broker login workflow result (`gh run list`; label "Broker login", and a failure names
-  AlgoTest or Quantiply from the run's steps via `gh run view`), Fyers token (`mbt token-status`), whether
-  the last trading day's options data is in the lake, disk space, and failures in the last
-  24 h.
+  AlgoTest or Quantiply from the run's steps via `gh run view`), Fyers token (`mbt token-status --probe`: the one Fyers check of the morning, which also asks Fyers, so a stale `.env` token fails), whether
+  the last trading day's options data is in the lake, disk space, the previous trading day's jobs that
+  ran as catch-ups after sleep ("Ran late after sleep", `History.catchUpsBetween`, BL-143; a restart of an
+  interrupted run is not one: its slot has an earlier row, the interrupted run, listed as a failure), and failures
+  in the last 24 h.
 - `src/api.ts` — loopback HTTP API (`127.0.0.1:8790`, `SCHEDULER_API_PORT`) started by
-  `serve` in the same process as the loop. `GET /jobs`, `GET /runs?job=&limit=`,
+  `serve` in the same process as the loop. `GET /jobs` (each job's schedule, next and last run, its latest slot
+  that has come with the row serving it, `previousSlot` / `previousSlotRun` (an open row carries `alive`: its
+  writer or its step's process group exists), its longest run `maxRunMinutes` (timeout x steps x attempts, the
+  retry delays, one timeout of group wait) and `catchUpHours`: the trade monitor reads these before every platform
+  login; dead rows are closed first, `reapDead`), `GET /runs?job=&limit=`,
   `GET /runs/:id/log?tail=200` (refuses paths outside the log dir and
   `packages/momentum-backtesting/data`, symlinks resolved), `POST /jobs/:id/run` (manual run;
   202 + run id, 409 if the job or its group is busy), `GET`/`PUT /notifications` (catalogue +
@@ -127,6 +139,17 @@ network or disk so the test needs neither. One group per file keeps parallel PRs
   to Angel One too (AlgoTest's Angel One login from 08:15 unless BROKER_LOGIN_ONLY=finvasia, and
   Quantiply's at about 08:02 when QUANTIPLY_LOGIN is on), where this job's hold can't see it;
   see the comment on the job in `jobs.ts`.
+- `trade-monitor` (BL-143, trading days 09:04, `packages/broker-login/src/trade-monitor.ts`) runs all
+  session long under `caffeinate -i`, so it is not in the `quantiply` group (it would hold the 09:19 /
+  09:21 top-ups all day). It makes no login and holds no session 09:10-09:25, and none on a platform after that
+  while a job that logs in to that platform runs (`GET /jobs` before every login, at any hour; a due one
+  blocks until 10:00 / 17:30); every platform login
+  (its own, the uploaders', the deployers') takes the cross-process login lock. It alerts itself
+  (`alertsItself`), including every failure exit and a crash; its state file stops a retry repeating
+  a message; exit 3 (a refused or held Quantiply login, or another monitor running) is not retried.
+  `restartIfInterruptedUntil: '15:25'` (a `Job` field, read by `loop.decide`): a run cut off by a
+  scheduler or laptop restart (reaped as interrupted, exit -2, by `startLoop` before its first tick) is
+  started again while the session lasts; every other job treats an interrupted slot as served. Each part waits for its `.env` switch.
 - The scheduler reads `jobs.ts` once at start: a new or changed job needs a restart of the
   service (`launchctl kickstart -k gui/$(id -u)/com.ai-trading-agent.scheduler`, see
   `deploy/launchd/README.md`).

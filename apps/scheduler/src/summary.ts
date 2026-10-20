@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { isTradingDay } from '@trading/market-reference';
 import { type AlertSink, telegramSink } from './alerts.js';
+import type { RunRow } from './history.js';
 import { JOBS } from './jobs.js';
 import type { Builtin, BuiltinContext } from './runner.js';
 import { addDays, formatIst, istAt, istDay, previousDue } from './schedule.js';
@@ -202,22 +203,38 @@ function algotestCheck(ctx: BuiltinContext): Check {
   }
 }
 
-/** Is there a usable Fyers token (the evening collection needs one)? */
-function fyersCheck(ctx: BuiltinContext): Check {
-  const out = capture(
-    'uv',
-    ['run', 'mbt', 'token-status'],
-    join(ctx.repoRoot, 'packages/momentum-backtesting'),
-    ctx.env,
-  );
+/**
+ * BL-143 item 7: is there a Fyers token Fyers accepts today (the 09:16 pick and the evening run
+ * need one)? `mbt token-status --probe` also asks Fyers (a read-only profile call), so a stale
+ * `.env` token with no known expiry is not passed as "ok". The one Fyers check of the morning:
+ * its line in this summary is the reminder, with what to do.
+ */
+export function fyersLine(output: string): Check {
   const line =
-    out.split('\n').find((l) => l.startsWith('ok:') || l.startsWith('not ready:')) ??
-    out.slice(0, 160);
+    output
+      .split('\n')
+      .map((l) => l.trim())
+      .find((l) => l.startsWith('ok:') || l.startsWith('not ready:')) ?? '';
+  if (line.startsWith('ok:')) {
+    return { ok: true, label: 'Fyers token', detail: line.replace(/^ok:\s*/, '') };
+  }
+  const why = line.replace(/^not ready:\s*/, '') || output.trim().slice(0, 160) || 'no answer';
   return {
-    ok: line.startsWith('ok:'),
+    ok: false,
     label: 'Fyers token',
-    detail: line.replace(/^(ok|not ready):\s*/, ''),
+    detail: `${why} → log in today: Dashboard › Broker logins › Fyers (before the 09:16 pick)`,
   };
+}
+
+function fyersCheck(ctx: BuiltinContext): Check {
+  return fyersLine(
+    capture(
+      'uv',
+      ['run', 'mbt', 'token-status', '--probe'],
+      join(ctx.repoRoot, 'packages/momentum-backtesting'),
+      ctx.env,
+    ),
+  );
 }
 
 /** Was the last trading day's options data collected? Expired contracts can't be fetched later. */
@@ -286,6 +303,48 @@ function recentFailures(ctx: BuiltinContext, today: Check[]): Check[] {
     }));
 }
 
+/** The previous trading day: what "yesterday" means on a Monday too. */
+function previousTradingDay(today: string): string {
+  let day = addDays(today, -1);
+  while (!isTradingDay(day)) day = addDays(day, -1);
+  return day;
+}
+
+/** `HH:MM` IST of an instant. */
+const istClock = (iso: string) =>
+  new Date(new Date(iso).getTime() + 330 * 60_000).toISOString().slice(11, 16);
+
+/**
+ * BL-143: the previous trading day's jobs that ran as catch-ups, late because the laptop was
+ * asleep or off at their time (on 2026-10-19 the 16:40 / 16:45 uploads ran at 20:27). One line,
+ * counted as a problem, so a missing wake schedule (deploy/launchd/README.md) shows each morning
+ * it costs something.
+ */
+export function catchUpCheck(rows: RunRow[]): Check | null {
+  if (!rows.length) return null;
+  const late = rows.map(
+    (r) =>
+      `${r.job} (due ${r.scheduled_for ? istClock(r.scheduled_for) : '?'}, ran ${istClock(r.started_at)})`,
+  );
+  return {
+    ok: false,
+    label: 'Ran late after sleep',
+    detail: `${late.join(', ')} → keep the laptop awake for the jobs: the wake schedule in deploy/launchd/README.md`,
+  };
+}
+
+/** The previous trading day only, [00:00, next day 00:00): a weekend job caught up is not flagged. */
+export function catchUpWindow(today: string): { since: Date; until: Date } {
+  const prev = previousTradingDay(today);
+  return { since: istAt(prev, '00:00'), until: istAt(addDays(prev, 1), '00:00') };
+}
+
+function catchUps(ctx: BuiltinContext): Check[] {
+  const { since, until } = catchUpWindow(istDay(ctx.now()));
+  const check = catchUpCheck(ctx.history.catchUpsBetween(since, until));
+  return check ? [check] : [];
+}
+
 /** The checks that look outside the history table: GitHub, Fyers, the lake, git, the disk. */
 export type SystemChecks = (ctx: BuiltinContext) => Check[];
 
@@ -301,7 +360,7 @@ const systemChecks: SystemChecks = (ctx) => [
 export function morningSummary(sink?: AlertSink, system: SystemChecks = systemChecks): Builtin {
   return async (ctx) => {
     const jobs = jobChecks(ctx);
-    const checks = [...jobs, ...system(ctx), ...recentFailures(ctx, jobs)];
+    const checks = [...jobs, ...system(ctx), ...catchUps(ctx), ...recentFailures(ctx, jobs)];
     const { text } = formatSummary(istDay(ctx.now()), checks);
     ctx.log(text);
     await (sink ?? telegramSink(ctx.env, 'scheduler.morning'))(text);

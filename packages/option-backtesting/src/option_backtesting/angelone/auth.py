@@ -102,10 +102,8 @@ def request_headers(api_key: str, public_ip: str, jwt: str | None = None) -> dic
     return headers
 
 
-def post_json(path: str, body: dict, headers: dict[str, str]) -> tuple[int, dict]:
-    request = urllib.request.Request(
-        BASE_URL + path, data=json.dumps(body).encode(), headers=headers, method="POST"
-    )
+def _answer(request: urllib.request.Request) -> tuple[int, dict]:
+    """Send one request to SmartAPI: (HTTP status, JSON body); status 0 = not reached."""
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             raw, status = response.read(), response.status
@@ -118,6 +116,22 @@ def post_json(path: str, body: dict, headers: dict[str, str]) -> tuple[int, dict
     except ValueError:
         return status, {"status": False, "message": f"HTTP {status}, not JSON"}
     return status, parsed if isinstance(parsed, dict) else {"status": False, "message": "bad body"}
+
+
+def post_json(path: str, body: dict, headers: dict[str, str]) -> tuple[int, dict]:
+    return _answer(
+        urllib.request.Request(
+            BASE_URL + path, data=json.dumps(body).encode(), headers=headers, method="POST"
+        )
+    )
+
+
+Get = Callable[[str, dict[str, str]], tuple[int, dict]]
+
+
+def get_json(path: str, headers: dict[str, str]) -> tuple[int, dict]:
+    """A GET to SmartAPI (read-only calls such as `getRMS`), answered like `post_json`."""
+    return _answer(urllib.request.Request(BASE_URL + path, headers=headers, method="GET"))
 
 
 def login(

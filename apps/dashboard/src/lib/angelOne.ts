@@ -18,7 +18,7 @@ export type AngelCheckReason =
   | 'unavailable'
   | 'error';
 
-export type AngelSource = 'manual' | 'scheduled' | 'collector';
+export type AngelSource = 'manual' | 'scheduled' | 'collector' | 'margin';
 
 export interface AngelCheck {
   /** When the attempt started (IST, ISO 8601). */
@@ -83,6 +83,7 @@ export const SOURCE_LABEL: Record<AngelSource, string> = {
   manual: 'Test connection',
   scheduled: '08:00 check',
   collector: 'Evening collection',
+  margin: '09:05 margin check',
 };
 
 export type AngelCardState = 'unknown' | 'not_configured' | 'untested' | 'working' | 'failed';

@@ -372,7 +372,7 @@ export function telegramPort(env: Record<string, string>): StopPort {
           ...(body ? { body } : {}),
           ...(buttons ? { actions: buttons } : {}),
         },
-      );
+      ).then(() => undefined);
     },
     answer: (id, text) => answerCallbackQuery(botToken, id, text),
     getUpdates: (offset, timeout) => getUpdates(botToken, offset, timeout),

@@ -4,11 +4,12 @@ import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { sendText } from '@trading/notify';
 import { type Page, type Response, chromium } from 'playwright';
-import { BASE_URL, algotestLogin } from './algotest.js';
+import { BASE_URL } from './algotest.js';
 import { describeSource, readAutomation, uploadBooks } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
 import { parseCards, parseLive, stillDeployed } from './deploy-plan.js';
 import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
+import { algotestLoginLocked } from './login-lock.js';
 import { sessionOver } from './quantiply-plan.js';
 import { redact, registerSecret } from './secrets.js';
 import { livePage, strategyPage } from './selectors.js';
@@ -209,7 +210,7 @@ async function recordIds(ledgerArg: string | undefined): Promise<number> {
   try {
     const page = await (await browser.newContext({ viewport: VIEWPORT })).newPage();
     page.setDefaultTimeout(20_000);
-    await algotestLogin(page, { phone: normalizePhone(phone), password });
+    await algotestLoginLocked(page, { phone: normalizePhone(phone), password }, 'strategy-upload');
     const listing = await listStrategies(page);
     for (const name of missing) {
       const found = listing.ids.get(name) ?? [];
@@ -393,7 +394,7 @@ async function main(): Promise<number> {
   let stopped = false;
 
   try {
-    await algotestLogin(page, { phone: normalizePhone(phone), password });
+    await algotestLoginLocked(page, { phone: normalizePhone(phone), password }, 'strategy-upload');
     let listing = await listStrategies(page);
     const existing = listing.names;
     const ownedPresent = [...existing].filter((n) => /^(T1|Core) · /.test(n));

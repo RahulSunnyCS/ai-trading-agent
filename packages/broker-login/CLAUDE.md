@@ -72,6 +72,7 @@ npm run fyers-token   # tsx src/fyers.ts — headless Fyers login for the moment
 npm run dispatch      # tsx src/dispatch.ts — triggers the GitHub workflow via `gh` (the scheduler's 08:00 job); DRY_RUN=1 only checks gh auth
 npm run test          # node:test unit tests: browser-free helpers (Fyers auth, dispatch rules, config gating, report, Quantiply rules) + Chromium against local stand-in pages (overlays, the Quantiply flow; no network)
 npm run typecheck
+node_modules/.bin/tsx src/trade-monitor.ts --parts deploy --now --print   # BL-143: a read-only look, nothing sent
 npm run stop-button -- --plan             # BL-143: what the Telegram stop would do now (ledgers only, no login)
 npm run stop-button -- --dry-run --fixture fixtures/stop-dry-run.json   # plus each call it would make (none sent)
 npm run stop-button -- --clear-hold       # lift the stop hold (Telegram's Resume does the same)
@@ -199,6 +200,85 @@ week, until disabled.
   `docs/algotest-execution.md` §7. Use a desktop viewport (1440 x 900): below about 500 px AlgoTest hides "Save
   Strategy".
 
+
+## Trade monitor (BL-143): margin, deploy and loss checks, read-only
+
+`src/trade-monitor.ts` (+ pure `src/monitor-plan.ts`) is the scheduler's `trade-monitor` job (trading days
+09:04-15:30, under `caffeinate -i`, restarted after a scheduler or laptop restart until 15:25):
+
+- **Timeline and switches** (`.env`, each off until `on`): `MARGIN_CHECK` 09:05-09:10; then **no login and no
+  open session 09:10-09:25** (the 09:16 deploy and the 09:18-09:21 top-ups log in; neither platform is known to
+  keep two sessions per user), checked at every login (after the lock wait) and every use of an open session;
+  `DEPLOY_CHECK` at 09:25; `LOSS_ALERTS` every minute 09:25-15:30. All off = no login. Before every login, at any
+  hour, it reads the scheduler's `GET /jobs` (`jobsStillToEnd` over `PLATFORM_JOBS`: AlgoTest `algotest-deploy`,
+  `algotest-topup`, `algotest-deploy-check`, `algotest-evening`; Quantiply `quantiply-topup`,
+  `quantiply-deploy-topup`, `quantiply-disable`, `quantiply-evening`, `quantiply-deploy`; both: BL-141's
+  `live-capture` and `live-capture-retry`), and again under the
+  login lock right before the login (`jobsStillToEnd`, then `jobsWait`). A run of one of them in progress today
+  always blocks (a 10:30 wake into a deploy-topup catch-up, a hand `jobs run`, an orphaned step after a scheduler
+  restart) while `GET /jobs` reports it `alive` (its writer or its step's process group exists), however old: a
+  step's timeout pauses while the laptop sleeps. Only a row not alive is ignored once older than the job's longest
+  run (`maxRunMinutes`, + 5 min); the scheduler also closes such rows at start and on every `GET /jobs`. A slot that came with no run yet (due, or
+  queued behind its group), one within 5 minutes, or an API that does not answer blocks only until its window's
+  cap (`WAIT_WINDOWS`: 10:00 for the morning jobs, whose retries end by 09:52 at worst; 17:30 for the evening
+  ones); a due slot still inside its `catchUpHours` blocks past the cap for 30 minutes from when the monitor first
+  saw it. After that it logs in anyway and says so once per window (named from the job's window). Waiting over
+  30 minutes on one job is said once, unmuted. Not scheduled today or ended blocks nothing. The deploy check is
+  tried once per pass (never waited for in place, so the loss readings and alerts go on); still waiting at 15:30
+  it says once "deploy check not done today" with what it waited for; a loss reading skips the waiting platform
+  quietly; a `--now` run waits in place. A monitor that
+  starts after 09:10 says once (`monitor.margin`) that the margin was not checked.
+- **Read-only.** Pages and GET calls only; it never clicks a platform button (the kept Quantiply page has no
+  overlay handler), never sends a PUT/POST/DELETE to one, never squares off. Its writes: Telegram
+  (`monitor.margin`, `monitor.deploy`, `monitor.loss` for the warning; the -₹8,000 alert, "cannot read" and
+  "degraded" are untagged, so they cannot be muted) and `TRADING_DATA_ROOT/monitor/<day>.json` (what was sent,
+  the logins, Quantiply's last MTM per algo with its time). A message is marked sent only when Telegram took it
+  (`sendText` returns `SendOutcome`); a failed one goes again next tick. Every failure exit alerts (it is
+  `alertsItself`). A lock file in `TRADING_DATA_ROOT/locks/` keeps a second monitor from starting (exit 3).
+- **Logins.** AlgoTest's website login goes through the AlgoTest login lock (`withLoginLock` in
+  `src/login-lock.ts`, its checks made again once the lock is held; the uploader and the deployer use
+  `algotestLoginLocked`); Quantiply's through `quantiply-session.ts` (`takeLoginLock`, the per-account lock
+  shared with the stop button, PR #275; the TOTP window is claimed before the code is typed; the refused-login
+  hold). Caps: 3 AlgoTest logins and 2 Quantiply codes a day per account, counting `--print` runs (the state
+  file's logins are merged, higher count and later times, on every read and save: `mergeLogins`); no new login
+  for 10 minutes after a failed one, nor within 10 minutes of the platform ending the session (logged out / 401:
+  someone else's login, the owner's browser or the stop button, most likely ended it), the first replacement
+  included; a replacement also waits while another process logged in to the platform in the last 10 minutes
+  (AlgoTest: `login-algotest.last`, stamped by every login under the lock except one the monitor refused inside
+  it; Quantiply: the TOTP window stamp) and comes at most every 30 minutes, said once as "degraded"
+  (`loginRefusal`). A loss on disk later than the last successful login (`loggedInAt`) still counts as a
+  replacement after a restart (`isReplacing`). No login at all while the stop button runs
+  (`otherStopRunning` in `src/stop-hold.ts`: a `stop-running.json` in either place, `stopRunningPaths`, whose pid
+  lives and is not this process, under 20 minutes old and from today, IST). **Not covered:** the GitHub "Daily broker login" backstop cron (08:15 IST, often hours
+  late) logs in to AlgoTest from GitHub's runners without the local lock or `login-algotest.last`, so the monitor
+  (and the uploader and the deployer) cannot see it. The margin's AlgoTest session is closed before
+  `obt angel funds` runs, and its lock is waited for only until 09:10. A Quantiply account is logged in to only when its
+  Settings › Automation row uploads a list: for `quantiply.finvasia` that is a Shoonya login, so the same caution
+  as below applies before switching that row on. Angel One SmartAPI: `obt angel funds` once (the shared guard).
+  **Shoonya's own API: never** (no document shows an API login leaves the session AlgoTest trades through
+  alone); Finvasia's free margin is AlgoTest's figure.
+- **Margin** (`marginMessage`): need = per sold leg-lot half the underlying's short-straddle figure in
+  option-backtesting's `margin.csv` (NIFTY's when the underlying has none), per bought leg-lot the closest-premium
+  target x the lot size (`lotSize`), and "not estimated" for a leg bought by strike; every pick at once, no hedge
+  benefit; ok with a 20% cushion. Picks from the exports of the rows that upload (`latest-<book>.json`), per
+  broker account across both platforms. Free: Finvasia = AlgoTest `GET /brokers` `margin.available` (as of
+  AlgoTest's broker login; not today's = not read), Angel One = SmartAPI `getRMS` `net`.
+- **Deploy** (`checkAlgoTest`, `checkQuantiply`): per BL-140 row that uploads. AlgoTest: each pick deployed once
+  per row that holds it, on that row's broker where /live's card names it (`parseDeployedOn`), multiplier 1 from
+  `GET /executable-strategies` (no weekday filter; a pick it does not list is said); Quantiply: enabled once for
+  today's weekday at multiplier 1 with the export's lots (`GET /algos/:id`). A tool strategy (`T1 · ` /
+  `Core · `) live that is not a pick is extra; the owner's own are notes. One headline,
+  `AlgoTest T1 3/3 · Quantiply Core 3/3 ✅`, with the time it ran.
+- **Loss** (`lossCrossings`): AlgoTest's "Total MTM" card on /live (`readMtmCardsInPage` + `readTotalMtm`: the card
+  `[data-testid="broker-mtm"]` labelled "Total MTM", its `p.tabular-nums` figure, red = a loss; anything else is
+  unreadable, never a neighbouring figure; fixture `src/fixtures/live-mtm.html`) plus Quantiply's per-algo MTM
+  from its web app's socket frames (`pnlFromSocketFrame`; `quantiplyReading`: a started algo needs a figure under
+  3 minutes old and a closed one any figure, whatever its status is called, else "cannot read", never ₹0).
+  "Cannot read <platform>'s MTM" is said the first time, then "reads again" after 3 readings in a row, which
+  re-arms it for a later loss of the feed; at most 3 a day per platform (`mtmNotice`).
+- `--now --print` runs the asked parts once and prints instead of sending (no switch needed; refuses to log in
+  09:10-09:25; its logins count).
+
 ## Live results capture (BL-141)
 
 - `src/live-capture.ts` (+ pure `src/live-capture-plan.ts`) is the 15:40 `live-capture` job: for each platform +
@@ -299,7 +379,8 @@ The owner's Telegram "stop everything": switch off AND square off, only after a 
   their jobs. `quantiply-deploy.ts --mode disable` is never held.
 - The Quantiply login lock (`takeLoginLock`, `login-lock-<broker>` beside the ledger): exclusive create with a
   token; a dead or 6-minute-old lock is taken over only under a second exclusive marker (`.takeover`) and only if
-  it is still the lock judged stale; a release removes only its own lock. Taken once per login, in `openQuantiply`.
+  it is still the lock judged stale; a release removes only its own lock. Taken once per login, in `openWithRetry`
+  (behind `openQuantiply` and the monitor's `openQuantiplyApp`), around every attempt and its TOTP stamp.
 - `NAME_PREFIXES` (`strategy-plan.ts`) is append-only: a rename adds prefixes and keeps the old ones (a test pins
   them), because ownership, the 15:40 disable and the stop all match on it.
 - Never tested live: the tests use stand-in servers and fixtures only; `--plan` and `--dry-run` never log in or

@@ -17,6 +17,7 @@ export {
   sendTextChecked,
   splitText,
 } from './telegram.js';
+export type { SendOutcome } from './telegram.js';
 export { answerCallbackQuery, getUpdates } from './updates.js';
 export type { TgCallbackQuery, TgMessage, TgUpdate, UpdatesResult } from './updates.js';
 export { registerSecret, redact } from './secrets.js';

@@ -112,7 +112,10 @@ Otherwise:
   longest first, the client code masked, then cut), and the last result, with the client masked
   (`R1•••56`), goes to `angelone/last_check.json`. The status lists the settings by name with a
   yes/no only, and the newest `ingest_runs` row with source `angelone` as the last collection.
-  Tests fake the login; none sends a real one.
+  Tests fake the login; none sends a real one. `funds.py` (BL-143, `obt angel funds [--json]`): one login
+  under the guard with source `margin` (`check.session(source=...)`), one `getRMS` GET, the account's free
+  margin (`net`) for the 09:05 margin check; SmartAPI sessions are per API key and client (Angel's FAQ on
+  AB1010), so this app's login does not replace Quantiply's (Angel's publisher login, its own key).
 - `rotation/` — the options rotation's forward paper journal (BL-058): `lists.py` (the registered lists
   A / B / C / REF, never edited after the first entry), `score.py` (a port of research/bl057/rotate.py's
   ranking, numpy only; `scripts/rotation-parity.py` must print PARITY OK), `update.py` (nightly one-day

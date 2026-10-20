@@ -5,6 +5,21 @@ import { type Schedule, firstWeekdayOfMonth, onWeekdays, tradingDays } from './s
  * Every recurring job, in one place (BL-012). Adding a job means adding an
  * entry here — no plist, no cron line elsewhere.
  */
+/**
+ * The longest a run of `job` can take while the scheduler lives: every step of every attempt to
+ * its timeout (the timeout is per step), the delays between attempts, and (for a grouped job) the
+ * wait for its group, which gives up after one timeout. BL-143's trade monitor ignores a "running"
+ * row older than this, only when the row's processes are gone (`GET /jobs` says `alive`).
+ */
+export function maxRunMinutes(job: Job): number {
+  const attempts = job.retries + 1;
+  return (
+    job.timeoutMinutes * Math.max(1, job.steps.length) * attempts +
+    job.retryDelayMinutes * job.retries +
+    (job.group ? job.timeoutMinutes : 0)
+  );
+}
+
 export interface Job {
   id: string;
   description: string;
@@ -60,6 +75,12 @@ export interface Job {
   logFile?: string;
   /** Run an in-process job (see runner's `builtins`) instead of `steps`. */
   builtin?: string;
+  /**
+   * `HH:MM` IST: a run of today's slot cut off by a scheduler or laptop restart (reaped as
+   * interrupted) is started again until then (BL-143's all-session trade monitor). Without it an
+   * interrupted slot counts as served.
+   */
+  restartIfInterruptedUntil?: string;
 }
 
 const MOMENTUM = 'packages/momentum-backtesting';
@@ -645,6 +666,37 @@ const BASE_JOBS: Job[] = [
     group: 'quantiply',
     fixHint:
       'Read the alert first: an algo it enabled must not be enabled again. Then: cd packages/broker-login && node_modules/.bin/tsx src/quantiply-deploy.ts --broker angelone --mode enable  (dry run; add --apply)',
+  },
+  {
+    id: 'trade-monitor',
+    description:
+      "Watch the day's real trades, read-only (BL-143): 09:05-09:10 free margin per broker account vs the day's picks (MARGIN_CHECK=on); no login and no open session 09:10-09:25 (the deploy and top-up jobs log in then), nor on a platform while a job that logs in to it runs; 09:25 AlgoTest /live and Quantiply hold exactly the picks at 1 lot, per Settings › Automation row (DEPLOY_CHECK=on); 09:25-15:30 the combined MTM every minute with a -₹5,000 warning and a -₹8,000 alert, once each (LOSS_ALERTS=on). Never clicks, changes or squares off anything. Does nothing until a switch is on",
+    // ONE process for the three parts, so each platform is logged in to once a day: the Quantiply
+    // JWT is never written to a file, so separate jobs would each need their own TOTP login.
+    // Not in the 'quantiply' group (it would hold the 09:19 / 09:21 top-ups all day); every
+    // platform login, here and in the uploaders and deployers, takes the cross-process login lock
+    // (packages/broker-login/src/login-lock.ts), and the monitor makes none 09:10-09:25, nor after
+    // while a job that logs in to that platform runs (it reads `GET /jobs` before every login: the
+    // morning top-ups and deploys, the evening uploads, enable, disable; a due one until 10:00 /
+    // 17:30). A
+    // crash is retried, and a run cut off by a scheduler or laptop restart starts again until
+    // 15:25 (`restartIfInterruptedUntil`); the day's state file under TRADING_DATA_ROOT/monitor/ stops a
+    // check or a level being sent twice, and a lock file stops two monitors. Exit 3 = a refused or
+    // held Quantiply login, or another monitor running: never retried.
+    schedule: { at: '09:04', on: tradingDays, label: 'trading days 09:04' },
+    // caffeinate -i: macOS does not idle-sleep while the monitor runs (a power assertion held only
+    // by this process, gone when it exits; not a system setting). A closed lid on battery still sleeps.
+    steps: [['/usr/bin/caffeinate', '-i', 'node_modules/.bin/tsx', 'src/trade-monitor.ts']],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 400, // 09:04 to 15:44
+    retries: 2,
+    noRetryExitCodes: [3],
+    retryDelayMinutes: 2,
+    catchUpHours: 6,
+    restartIfInterruptedUntil: '15:25',
+    alertsItself: true,
+    fixHint:
+      "After 09:25: cd packages/broker-login && node_modules/.bin/tsx src/trade-monitor.ts --parts deploy --now --print  (a read-only look, nothing sent; its login counts toward the day's cap)",
   },
   {
     id: 'backup',

@@ -71,21 +71,27 @@ async function post(
   }
 }
 
+/**
+ * What became of a message: Telegram accepted it, the owner switched its type off, Telegram is
+ * not configured, or the send failed. A caller that must not lose a message (BL-143's loss
+ * alert) marks it sent only when it was `sent` or `muted`, and tries again otherwise.
+ */
+export type SendOutcome = 'sent' | 'muted' | 'unconfigured' | 'failed';
 /** Telegram refuses a message longer than this (characters). */
 export const TELEGRAM_MAX_TEXT = 4096;
 
 /** Structured send. Prefer this — it renders consistently across every caller. */
-export async function send(config: TelegramConfig | null, n: Notification): Promise<void> {
+export async function send(config: TelegramConfig | null, n: Notification): Promise<SendOutcome> {
   const text = redact(render(n));
   if (!isEnabled(n.type)) {
     console.log(`\n[telegram: '${n.type}' is switched off, message below]\n${text}`);
-    return;
+    return 'muted';
   }
   if (!config) {
     console.log(`\n[telegram not configured, message below]\n${text}`);
-    return;
+    return 'unconfigured';
   }
-  await post(config, { text, reply_markup: keyboard(n.actions) });
+  return (await post(config, { text, reply_markup: keyboard(n.actions) })) ? 'sent' : 'failed';
 }
 
 /**
@@ -96,17 +102,17 @@ export async function sendText(
   config: TelegramConfig | null,
   text: string,
   type?: string,
-): Promise<void> {
+): Promise<SendOutcome> {
   const safe = redact(text);
   if (!isEnabled(type)) {
     console.log(`\n[telegram: '${type}' is switched off, message below]\n${safe}`);
-    return;
+    return 'muted';
   }
   if (!config) {
     console.log(`\n[telegram not configured, message below]\n${safe}`);
-    return;
+    return 'unconfigured';
   }
-  await post(config, { text: safe });
+  return (await post(config, { text: safe })) ? 'sent' : 'failed';
 }
 
 /**

@@ -2,10 +2,12 @@ import { type AlertSink, alertMissed, alertResult } from './alerts.js';
 import type { History } from './history.js';
 import type { Job } from './jobs.js';
 import { type RunContext, runJob } from './runner.js';
-import { formatIst, istDay, previousDue } from './schedule.js';
+import { formatIst, istAt, istDay, previousDue } from './schedule.js';
 
 /** A slot started within this long of its time counts as on time, not a catch-up. */
 const ON_TIME_MS = 5 * 60_000;
+/** The exit code `History.reapDead` records for a run the scheduler's stop cut off. */
+export const INTERRUPTED = -2;
 
 export type Decision =
   | { kind: 'idle' }
@@ -21,7 +23,20 @@ export type Decision =
 export function decide(job: Job, now: Date, history: History, since: Date): Decision {
   const slot = previousDue(job.schedule, now);
   if (!slot || slot.getTime() < since.getTime()) return { kind: 'idle' };
-  if (history.forSlot(job.id, slot)) return { kind: 'idle' };
+  const served = history.forSlot(job.id, slot);
+  if (served) {
+    // BL-143: a job that runs all session (the trade monitor) and was cut off by a scheduler
+    // or laptop restart (the run row reaped as interrupted) starts again while its day lasts.
+    if (
+      job.restartIfInterruptedUntil &&
+      served.ended_at !== null &&
+      served.exit_code === INTERRUPTED &&
+      now.getTime() < istAt(istDay(slot), job.restartIfInterruptedUntil).getTime()
+    ) {
+      return { kind: 'run', slot, trigger: 'catch-up' };
+    }
+    return { kind: 'idle' };
+  }
   const late = now.getTime() - slot.getTime();
   if (late <= ON_TIME_MS) return { kind: 'run', slot, trigger: 'schedule' };
   if (late <= job.catchUpHours * 3_600_000) return { kind: 'run', slot, trigger: 'catch-up' };
@@ -53,6 +68,10 @@ export interface LoopOptions {
   jobs: Job[];
   alerts: AlertSink;
   tickMs?: number;
+  /** Whether a run row's pid still lives; tests pass a fake. */
+  pidAlive?: (pid: number) => boolean;
+  /** Whether a run row's step process group still lives; tests pass a fake. */
+  pgidAlive?: (pgid: number) => boolean;
 }
 
 /**
@@ -60,8 +79,20 @@ export interface LoopOptions {
  * due (without waiting for it), report what was missed. A job already in
  * flight in this process is never started twice.
  */
-export function startLoop({ ctx, jobs, alerts, tickMs = 30_000 }: LoopOptions): () => void {
+export function startLoop({
+  ctx,
+  jobs,
+  alerts,
+  tickMs = 30_000,
+  pidAlive,
+  pgidAlive,
+}: LoopOptions): () => void {
   const now = ctx.now ?? (() => new Date());
+  // Rows the previous scheduler left open (it was stopped, crashed, or the laptop restarted) are
+  // closed as interrupted before the first tick: an ungrouped job never reaps them itself, and
+  // `restartIfInterruptedUntil` (the trade monitor) needs that row to start again.
+  const reaped = ctx.history.reapDead(now(), pidAlive, pgidAlive);
+  if (reaped) console.log(`${formatIst(now())} closed ${reaped} run(s) left open by a stop`);
   ctx.history.firstStart(now());
   // Per job, not the scheduler's first start: a job added since then has no slots to miss
   // from before it was added.
@@ -72,6 +103,15 @@ export function startLoop({ ctx, jobs, alerts, tickMs = 30_000 }: LoopOptions): 
   const inFlight = new Set<string>();
 
   const tick = () => {
+    // Every tick too: a step left running as an orphan by a stopped scheduler keeps its row open
+    // until its process group ends; then it is closed as interrupted here, so the trade monitor's
+    // `restartIfInterruptedUntil` still fires. An orphan's exit code cannot be read (it is not
+    // this process's child), so a normal exit is also recorded as interrupted.
+    try {
+      ctx.history.reapDead(now(), pidAlive, pgidAlive);
+    } catch (error) {
+      console.error(`reap: ${String(error)}`);
+    }
     for (const { job, since } of watched) {
       if (inFlight.has(job.id)) continue;
       try {

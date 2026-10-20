@@ -118,7 +118,7 @@ export class QuantiplyApi {
     return parseDayWise(await this.call('GET', '/algos/day-wise'));
   }
 
-  /** `GET /algos/day-wise` as it answers (BL-141's capture reads `multiplier` and `pnl` too). */
+  /** `GET /algos/day-wise` as it answers (BL-141's capture and BL-143's checks read `multiplier`, BL-141 `pnl` too). */
   async dayWise(): Promise<unknown> {
     return this.call('GET', '/algos/day-wise');
   }
