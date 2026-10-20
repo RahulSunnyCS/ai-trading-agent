@@ -227,7 +227,8 @@ export interface DeployLedgerRow {
   at: string;
   session: string;
   mode: string;
-  action: 'enable' | 'disable' | 'broker';
+  /** `sqoff`: the stop button's square-off & terminate (BL-143), `mode: 'stop'` */
+  action: 'enable' | 'disable' | 'broker' | 'sqoff';
   id: string;
   name: string;
   ok: boolean;
@@ -263,7 +264,11 @@ export function parseDeployLedger(text: string): DeployLedgerRow[] {
 export function toggledIds(rows: DeployLedgerRow[], session: string): Map<string, DeployLedgerRow> {
   const out = new Map<string, DeployLedgerRow>();
   for (const r of rows) {
-    if (r.session === session && (r.action === 'enable' || r.action === 'disable'))
+    // a stop's square-off counts too (BL-143): a squared-off algo is never switched back on
+    if (
+      r.session === session &&
+      (r.action === 'enable' || r.action === 'disable' || r.action === 'sqoff')
+    )
       out.set(r.id, r);
   }
   return out;

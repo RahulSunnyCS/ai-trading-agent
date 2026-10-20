@@ -50,10 +50,12 @@ import {
   checkLoginHold,
   openQuantiply,
   quantiplyCredentials,
+  quantiplyDeployLedgerPath,
   quantiplyLedgerPath,
   readJson,
 } from './quantiply-session.js';
 import { redact } from './secrets.js';
+import { stopHeld } from './stop-hold.js';
 import { istToday, sha256 } from './strategy-plan.js';
 
 /**
@@ -163,6 +165,13 @@ async function main(): Promise<number> {
     console.log(`${site.name}: QUANTIPLY_DEPLOY is not "on": nothing enabled`);
     return 0;
   }
+  // BL-143 Phase 4: a confirmed stop holds every enable until the owner resumes (never a
+  // disable: switching off is the safety net).
+  const held = values.apply && mode === 'enable' ? stopHeld() : null;
+  if (held) {
+    console.log(`${site.name} enable ${held}`);
+    return 0;
+  }
   // The disable safety net reads nothing it does not use: no automation settings.
   let gate: ReturnType<typeof quantiplyDeploy> = { ok: false, book: null, why: '' };
   let decidedBy = 'settings not read (disable never needs them)';
@@ -193,10 +202,7 @@ async function main(): Promise<number> {
     ? resolve(values.ledger)
     : quantiplyLedgerPath(dataRoot ?? '', broker);
   const stateDir = dirname(ledgerPath);
-  const deployLedger = join(
-    stateDir,
-    broker === 'angelone' ? 'deploy-ledger.jsonl' : `deploy-ledger-${broker}.jsonl`,
-  );
+  const deployLedger = quantiplyDeployLedgerPath(stateDir, broker);
   const ledger = existsSync(ledgerPath) ? parseQLedger(await readFile(ledgerPath, 'utf8')) : [];
   // Unreadable is empty, with a warning: the deploy ledger must never stop a disable. (For an
   // enable it only ever holds back: an id it lists is never switched on again.)

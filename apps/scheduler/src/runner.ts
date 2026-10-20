@@ -4,6 +4,7 @@ import { dirname, isAbsolute, join } from 'node:path';
 import type { History, Trigger } from './history.js';
 import { JOBS, type Job } from './jobs.js';
 import { formatIst, istDay } from './schedule.js';
+import { heldReason } from './stop-hold.js';
 
 export interface RunContext {
   repoRoot: string;
@@ -164,6 +165,21 @@ export function runJob(
       fd = openSync(logPath, 'a');
       const logFd = fd;
       for (attempts = 1; attempts <= job.retries + 1; attempts++) {
+        // BL-143: the stop button's hold, checked after any wait for the group and before every
+        // attempt, whoever started the run (schedule, catch-up, `jobs run`, Apply now).
+        const held = heldReason(job.id, ctx.env);
+        if (held) {
+          writeSync(logFd, `\n=== ${job.id} · ${trigger} · ${formatIst(now())} IST: ${held}\n`);
+          const tried = attempts - 1;
+          if (tried === 0) {
+            ctx.history.finish(runId, 0, 0, now(), held);
+            return { runId, ok: true, exitCode: 0, attempts: 0, logPath, error: held };
+          }
+          // held before a retry: the earlier attempt's failure stays the run's result
+          const error = `${result.error ?? `exit ${result.code}`}; retry ${held}`;
+          ctx.history.finish(runId, result.code, tried, now(), error);
+          return { runId, ok: false, exitCode: result.code, attempts: tried, logPath, error };
+        }
         writeSync(
           logFd,
           `\n=== ${job.id} · ${trigger} · attempt ${attempts} · ${formatIst(now())} IST\n`,

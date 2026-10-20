@@ -546,3 +546,11 @@ test("an enable that failed earlier this session is said so, and alerted, never 
   assert.deepEqual(off.leftOff, [`${P}S_ditm1_1202`]);
   assert.equal(summaryEnable(off).attention, false);
 });
+
+test("a stop's square-off row keeps the algo off for that session, like a disable (BL-143)", () => {
+  const toggled = toggledIds(parseDeployLedger(deployRow('1', WED, 'sqoff')), WED);
+  assert.deepEqual([...toggled.keys()], ['1']);
+  const p = planEnable(wednesday({ toggled }));
+  assert.deepEqual(p.leftOff, [`${P}S_ditm1_1202`]);
+  assert.ok(!p.enable.some((t) => t.id === '1'));
+});

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it, test } from 'node:test';
 import {
   type LedgerRow,
+  NAME_PREFIXES,
   type Wanted,
   afterDelete,
   comparable,
@@ -34,6 +35,11 @@ const want = (name: string, sha = 'a'): Wanted => ({
 });
 
 const P = 'T1 · ';
+
+test('the name prefixes are append-only: the old ones stay recognised after any rename', () => {
+  // ownership, the 15:40 disable and the stop button all match on these (BL-143 review, item 8)
+  for (const p of ['T1 · ', 'Core · ']) assert.ok(NAME_PREFIXES.includes(p), p);
+});
 
 test('owned follows the last successful action and ignores names without the prefix', () => {
   const ledger = [

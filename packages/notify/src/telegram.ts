@@ -47,9 +47,13 @@ function keyboard(actions: Action[] | undefined) {
  * Every outbound string passes through redact() — this is the last point at
  * which a credential can be stopped from leaving the process.
  */
-async function post(config: TelegramConfig, body: Record<string, unknown>): Promise<void> {
+async function post(
+  config: TelegramConfig,
+  body: Record<string, unknown>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
   try {
-    const response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
+    const response = await fetchImpl(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ chat_id: config.chatId, disable_web_page_preview: true, ...body }),
@@ -57,12 +61,18 @@ async function post(config: TelegramConfig, body: Record<string, unknown>): Prom
     });
     if (!response.ok) {
       console.error(`  telegram returned ${response.status}: ${redact(await response.text())}`);
+      return false;
     }
+    return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`  telegram send failed: ${redact(message)}`);
+    return false;
   }
 }
+
+/** Telegram refuses a message longer than this (characters). */
+export const TELEGRAM_MAX_TEXT = 4096;
 
 /** Structured send. Prefer this — it renders consistently across every caller. */
 export async function send(config: TelegramConfig | null, n: Notification): Promise<void> {
@@ -97,4 +107,51 @@ export async function sendText(
     return;
   }
   await post(config, { text: safe });
+}
+
+/**
+ * For a message whose delivery matters (the stop button's report): never type-gated, cut into
+ * parts of at most `TELEGRAM_MAX_TEXT` characters on line breaks, and true only when Telegram
+ * accepted every part. False when not configured. Still redacted, still never throws.
+ */
+export async function sendTextChecked(
+  config: TelegramConfig | null,
+  text: string,
+  fetchImpl?: typeof fetch,
+): Promise<boolean> {
+  const safe = redact(text);
+  if (!config) {
+    console.log(`\n[telegram not configured, message below]\n${safe}`);
+    return false;
+  }
+  let all = true;
+  for (const part of splitText(safe)) {
+    if (!(await post(config, { text: part }, fetchImpl))) all = false;
+  }
+  return all;
+}
+
+/** Parts of at most `max` characters, cut at line breaks where possible, numbered when several. */
+export function splitText(text: string, max = TELEGRAM_MAX_TEXT - 96): string[] {
+  const parts: string[] = [];
+  let cur = '';
+  for (const line of text.split('\n')) {
+    let piece = line;
+    for (;;) {
+      const room = max - (cur ? cur.length + 1 : 0);
+      if (piece.length <= room) {
+        cur = cur ? `${cur}\n${piece}` : piece;
+        break;
+      }
+      if (cur) {
+        parts.push(cur);
+        cur = '';
+        continue;
+      }
+      parts.push(piece.slice(0, max));
+      piece = piece.slice(max);
+    }
+  }
+  if (cur || !parts.length) parts.push(cur);
+  return parts.length > 1 ? parts.map((p, i) => `(${i + 1}/${parts.length})\n${p}`) : parts;
 }
