@@ -85,6 +85,9 @@ describe('GET /jobs and /runs', () => {
     body = (await (await get('/jobs')).json()) as Array<Record<string, unknown>>;
     expect(body[0]?.previousSlotRun).toMatchObject({ id, ended_at: null });
     expect(body[0]).toMatchObject({ maxRunMinutes: 1, catchUpHours: 0 });
+    // an open row says whether its work still runs (this process wrote it: alive)
+    expect(body[0]?.previousSlotRun).toMatchObject({ alive: true });
+    expect(body[0]?.lastRun).toMatchObject({ alive: true });
   });
 
   it('GET /jobs closes a row whose process is gone before answering (BL-143)', async () => {

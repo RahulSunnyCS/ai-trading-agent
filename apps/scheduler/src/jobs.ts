@@ -6,14 +6,15 @@ import { type Schedule, firstWeekdayOfMonth, onWeekdays, tradingDays } from './s
  * entry here — no plist, no cron line elsewhere.
  */
 /**
- * The longest a run of `job` can take while the scheduler lives: every attempt to its timeout, the
- * delays between them, and (for a grouped job) the wait for its group, which gives up after one
- * timeout. BL-143's trade monitor ignores a "running" row older than this (a row nothing closed).
+ * The longest a run of `job` can take while the scheduler lives: every step of every attempt to
+ * its timeout (the timeout is per step), the delays between attempts, and (for a grouped job) the
+ * wait for its group, which gives up after one timeout. BL-143's trade monitor ignores a "running"
+ * row older than this, only when the row's processes are gone (`GET /jobs` says `alive`).
  */
 export function maxRunMinutes(job: Job): number {
   const attempts = job.retries + 1;
   return (
-    job.timeoutMinutes * attempts +
+    job.timeoutMinutes * Math.max(1, job.steps.length) * attempts +
     job.retryDelayMinutes * job.retries +
     (job.group ? job.timeoutMinutes : 0)
   );

@@ -17,6 +17,7 @@ const row = (
   exit_code: exit,
   attempts: 1,
   pid: 1,
+  child_pgid: null,
   log_path: '',
   error,
 });

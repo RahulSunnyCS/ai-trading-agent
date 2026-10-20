@@ -214,16 +214,18 @@ week, until disabled.
   `algotest-topup`, `algotest-deploy-check`, `algotest-evening`; Quantiply `quantiply-topup`,
   `quantiply-deploy-topup`, `quantiply-disable`, `quantiply-evening`, `quantiply-deploy`), and again under the
   login lock right before the login (`jobsStillToEnd`, then `jobsWait`). A run of one of them in progress today
-  always blocks (a 10:30 wake into a deploy-topup catch-up, a hand `jobs run`), unless its row is older than the
-  job's longest run (`maxRunMinutes` from `GET /jobs`, + 5 min): a row nothing closed is ignored; the scheduler
-  also closes rows of dead processes at start and on every `GET /jobs`. A slot that came with no run yet (due, or
+  always blocks (a 10:30 wake into a deploy-topup catch-up, a hand `jobs run`, an orphaned step after a scheduler
+  restart) while `GET /jobs` reports it `alive` (its writer or its step's process group exists), however old: a
+  step's timeout pauses while the laptop sleeps. Only a row not alive is ignored once older than the job's longest
+  run (`maxRunMinutes`, + 5 min); the scheduler also closes such rows at start and on every `GET /jobs`. A slot that came with no run yet (due, or
   queued behind its group), one within 5 minutes, or an API that does not answer blocks only until its window's
   cap (`WAIT_WINDOWS`: 10:00 for the morning jobs, whose retries end by 09:52 at worst; 17:30 for the evening
   ones); a due slot still inside its `catchUpHours` blocks past the cap for 30 minutes from when the monitor first
   saw it. After that it logs in anyway and says so once per window (named from the job's window). Waiting over
   30 minutes on one job is said once, unmuted. Not scheduled today or ended blocks nothing. The deploy check is
-  tried once per pass (never waited for in place, so the loss readings and alerts go on); a loss reading skips the
-  waiting platform quietly; a `--now` run waits in place. A monitor that
+  tried once per pass (never waited for in place, so the loss readings and alerts go on); still waiting at 15:30
+  it says once "deploy check not done today" with what it waited for; a loss reading skips the waiting platform
+  quietly; a `--now` run waits in place. A monitor that
   starts after 09:10 says once (`monitor.margin`) that the margin was not checked.
 - **Read-only.** Pages and GET calls only; it never clicks a platform button (the kept Quantiply page has no
   overlay handler), never sends a PUT/POST/DELETE to one, never squares off. Its writes: Telegram

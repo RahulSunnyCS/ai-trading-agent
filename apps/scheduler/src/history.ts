@@ -16,7 +16,13 @@ export interface RunRow {
   ended_at: string | null;
   exit_code: number | null;
   attempts: number;
+  /** the scheduler (or `jobs run`) process that wrote the row */
   pid: number | null;
+  /**
+   * The process group of the step running now (the runner spawns each step detached, in its own
+   * group, so it outlives a scheduler that stops): null before the first step or for a builtin.
+   */
+  child_pgid: number | null;
   log_path: string;
   error: string | null;
 }
@@ -42,6 +48,11 @@ export class History {
       log_path TEXT NOT NULL,
       error TEXT
     )`);
+    // BL-143: added later; older files get the column once.
+    const columns = this.db.query('PRAGMA table_info(runs)').all() as Array<{ name: string }>;
+    if (!columns.some((c) => c.name === 'child_pgid')) {
+      this.db.exec('ALTER TABLE runs ADD COLUMN child_pgid INTEGER');
+    }
     this.db.exec('CREATE INDEX IF NOT EXISTS runs_job_started ON runs (job, started_at)');
     this.db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
   }
@@ -186,18 +197,28 @@ export class History {
       .all(beforeId, ...jobs) as RunRow[];
   }
 
+  /** The process group of the step a run is on now (each step is spawned in its own). */
+  setChild(id: number, pgid: number | null): void {
+    this.db.query('UPDATE runs SET child_pgid = ? WHERE id = ?').run(pgid, id);
+  }
+
   /**
-   * Close rows whose process no longer exists (the scheduler was killed or crashed mid-run),
-   * so they stop blocking their group and stop showing as running. Returns how many.
+   * Close rows whose work no longer exists, so they stop blocking their group and stop showing as
+   * running: the process that wrote the row is gone (the scheduler was killed, crashed or
+   * restarted; a `jobs run` was Ctrl-C'd) AND so is the process group of its step, which is
+   * detached and can outlive the writer as an orphan (a deploy still deploying). Returns how many.
    */
-  reapDead(at: Date, alive: (pid: number) => boolean = pidAlive): number {
-    const rows = this.db.query('SELECT id, pid FROM runs WHERE ended_at IS NULL').all() as Array<{
-      id: number;
-      pid: number | null;
-    }>;
+  reapDead(
+    at: Date,
+    alive: (pid: number) => boolean = pidAlive,
+    groupAlive: (pgid: number) => boolean = pgidAlive,
+  ): number {
+    const rows = this.db
+      .query('SELECT id, pid, child_pgid FROM runs WHERE ended_at IS NULL')
+      .all() as Array<Pick<RunRow, 'id' | 'pid' | 'child_pgid'>>;
     let reaped = 0;
     for (const row of rows) {
-      if (row.pid !== null && alive(row.pid)) continue;
+      if (rowAlive(row, alive, groupAlive)) continue;
       this.finish(row.id, -2, 0, at, 'interrupted: the scheduler stopped while this was running');
       reaped++;
     }
@@ -218,6 +239,27 @@ export class History {
 
   close(): void {
     this.db.close();
+  }
+}
+
+/** Is an open run's work still there: its writer, or its step's process group? */
+export function rowAlive(
+  row: Pick<RunRow, 'pid' | 'child_pgid'>,
+  alive: (pid: number) => boolean = pidAlive,
+  groupAlive: (pgid: number) => boolean = pgidAlive,
+): boolean {
+  if (row.pid !== null && alive(row.pid)) return true;
+  return row.child_pgid !== null && row.child_pgid !== undefined && groupAlive(row.child_pgid);
+}
+
+/** Does any process of this group still exist (`kill(-pgid, 0)`: ESRCH = none)? */
+export function pgidAlive(pgid: number): boolean {
+  if (!Number.isInteger(pgid) || pgid <= 1) return false;
+  try {
+    process.kill(-pgid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
   }
 }
 

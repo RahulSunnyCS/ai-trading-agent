@@ -4,8 +4,9 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { History } from '../history.js';
-import { JOBS, findJob, maxRunMinutes } from '../jobs.js';
+import { JOBS, type Job, findJob, maxRunMinutes } from '../jobs.js';
 import { decide, startLoop } from '../loop.js';
+import { runJob } from '../runner.js';
 import { istAt } from '../schedule.js';
 import { catchUpCheck, catchUpWindow, fyersLine } from '../summary.js';
 
@@ -157,15 +158,74 @@ describe('BL-143: the trade monitor job', () => {
     history.close();
   });
 
-  it("each job's longest run: every attempt, the delays and its group's wait", () => {
+  it("each job's longest run: every step of every attempt, the delays and its group's wait", () => {
     const at = (id: string) => {
       const job = findJob(id);
       if (!job) throw new Error(`no ${id}`);
-      return maxRunMinutes(job);
+      return { minutes: maxRunMinutes(job), steps: job.steps.length };
     };
-    expect(at('algotest-topup')).toBe(10 * 3 + 2 * 2);
-    expect(at('quantiply-deploy-topup')).toBe(10 + 10); // one attempt + the group's wait
-    expect(at('quantiply-topup')).toBe(10 * 2 + 2 + 10);
+    // the live deploy: its export (--wait 120) and the deploy, 10 minutes each, one attempt
+    expect(at('algotest-deploy')).toEqual({ minutes: 10 * 2, steps: 2 });
+    expect(at('algotest-topup')).toEqual({ minutes: 10 * 2 * 3 + 2 * 2, steps: 2 });
+    expect(at('quantiply-topup')).toEqual({ minutes: 10 * 2 * 2 + 2 + 10, steps: 2 });
+    // one step, one attempt, plus the group's wait
+    expect(at('quantiply-deploy-topup')).toEqual({ minutes: 10 + 10, steps: 1 });
+  });
+
+  it("a dead writer with its step's process group still running is not reaped (an orphan)", async () => {
+    const history = tmpHistory();
+    const id = history.start('algotest-deploy', 'schedule', null, '', istAt('2026-10-21', '09:16'));
+    // a real detached step, in its own process group, like the runner's
+    const child = Bun.spawn(['/bin/sleep', '30'], { detached: true });
+    try {
+      history.setChild(id, child.pid);
+      const writerDead = () => false;
+      expect(history.reapDead(istAt('2026-10-21', '09:30'), writerDead)).toBe(0);
+      expect(history.get(id)).toMatchObject({ ended_at: null, child_pgid: child.pid });
+    } finally {
+      process.kill(-child.pid, 'SIGKILL');
+      await child.exited;
+    }
+    // the group is gone now too: the row is closed
+    expect(history.reapDead(istAt('2026-10-21', '09:31'), () => false)).toBe(1);
+    expect(history.get(id)).toMatchObject({ exit_code: -2 });
+    // the injected rule, both ways
+    const other = history.start('quantiply-deploy-topup', 'schedule', null, '', new Date());
+    history.setChild(other, 4242);
+    expect(
+      history.reapDead(
+        new Date(),
+        () => false,
+        () => true,
+      ),
+    ).toBe(0);
+    expect(
+      history.reapDead(
+        new Date(),
+        () => false,
+        () => false,
+      ),
+    ).toBe(1);
+    history.close();
+  });
+
+  it("the runner records each step's process group on its row", async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bl143-pgid-'));
+    const history = new History(join(dir, 'scheduler.db'));
+    const job = {
+      ...JOBS[0],
+      id: 'pgid-probe',
+      steps: [['/bin/sh', '-c', 'true']],
+      cwd: '.',
+    } as Job;
+    const result = await runJob(
+      job,
+      { repoRoot: dir, env: { PATH: '/usr/bin:/bin' }, logDir: dir, history },
+      'manual',
+    );
+    expect(result.ok).toBe(true);
+    expect(typeof history.get(result.runId)?.child_pgid).toBe('number');
+    history.close();
   });
 
   it("GET /jobs' reader is never kept waiting by a row whose process is gone", () => {

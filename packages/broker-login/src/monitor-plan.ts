@@ -209,10 +209,11 @@ export const PLATFORM_JOBS: Record<'algotest' | 'quantiply', readonly PlatformJo
 export interface SchedulerJobView {
   id: string;
   nextRun: string | null;
-  lastRun: { started_at: string; ended_at: string | null } | null;
+  /** `alive` (open rows): its writer or its step's process group still exists */
+  lastRun: { started_at: string; ended_at: string | null; alive?: boolean } | null;
   previousSlot?: string | null;
-  previousSlotRun?: { started_at?: string; ended_at: string | null } | null;
-  /** the longest a run can take while the scheduler lives (every attempt, delays, group wait) */
+  previousSlotRun?: { started_at?: string; ended_at: string | null; alive?: boolean } | null;
+  /** the longest a run can take while the scheduler lives (every step, attempt, delay, group wait) */
   maxRunMinutes?: number;
   catchUpHours?: number;
 }
@@ -249,8 +250,9 @@ const istMinuteOf = (d: Date) => Math.floor((d.getTime() / 60_000 + 330) % 1440)
  * What of the scheduler's platform jobs could still log in, from `GET /jobs` (`views`; null = the
  * API did not answer, `apiError` says why). Every item says whether its window's cap has passed;
  * `jobsWait` decides what blocks.
- * - A run that started today and has not ended (or the run serving today's slot), unless it is
- *   older than the job's longest run plus `STALE_RUN_SLACK_MS` (a row nothing closed: ignored).
+ * - A run that started today and has not ended (or the run serving today's slot). One the
+ *   scheduler reports `alive` (its writer or its step's process group exists) always counts; one
+ *   it does not is ignored once older than the job's longest run plus `STALE_RUN_SLACK_MS`.
  * - Today's slot having come with no run yet (due, or queued behind its group); `inCatchUp` while
  *   the scheduler would still start it.
  * - A slot within `JOB_SOON_MS`.
@@ -282,16 +284,20 @@ export function jobsStillToEnd(
     const v = views.find((j) => j.id === id);
     if (!v) continue;
     const capped = minutes >= WAIT_WINDOWS[window].until;
-    const fresh = (startedAt: string | undefined) =>
-      startedAt === undefined ||
+    // A row whose processes still exist always counts, however old: a run's timeout pauses while
+    // the laptop sleeps, so wall-clock age says nothing about it. Only a row the scheduler cannot
+    // see alive (or an older API that does not say) is judged by its age.
+    const fresh = (row: { started_at?: string; alive?: boolean }) =>
+      row.alive === true ||
+      row.started_at === undefined ||
       v.maxRunMinutes === undefined ||
-      now.getTime() - Date.parse(startedAt) <= v.maxRunMinutes * 60_000 + STALE_RUN_SLACK_MS;
+      now.getTime() - Date.parse(row.started_at) <= v.maxRunMinutes * 60_000 + STALE_RUN_SLACK_MS;
     const last = v.lastRun;
     if (
       last &&
       last.ended_at === null &&
       istDayOf(new Date(last.started_at)) === day &&
-      fresh(last.started_at)
+      fresh(last)
     ) {
       const text = `${id} is running (since ${istClock(new Date(last.started_at))})`;
       out.push({ job: id, window, kind: 'running', text, capped });
@@ -301,7 +307,7 @@ export function jobsStillToEnd(
     if (slot && istDayOf(slot) === day && slot.getTime() <= now.getTime()) {
       const run = v.previousSlotRun;
       if (run && run.ended_at === null) {
-        if (fresh(run.started_at)) {
+        if (fresh(run)) {
           const text = `${id} is running (its ${istClock(slot)} run)`;
           out.push({ job: id, window, kind: 'running', text, capped });
         }

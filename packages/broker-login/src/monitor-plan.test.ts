@@ -320,15 +320,32 @@ test('a "running" row older than its longest run is one nothing closed: ignored 
       maxRunMinutes,
     },
   ];
-  // 34 minutes at most (3 attempts of 10 + 2 delays of 2): at 12:00 a 09:30 row is stale
-  assert.deepEqual(decided(open(34), PLATFORM_JOBS.algotest, noon), { blocking: [], pastCap: [] });
+  // 64 minutes at most (3 attempts of 2 steps of 10, + 2 delays of 2): at 12:00 a 09:30 row is stale
+  assert.deepEqual(decided(open(64), PLATFORM_JOBS.algotest, noon), { blocking: [], pastCap: [] });
   // still within its longest run (+5 min slack): it blocks
   assert.equal(
-    decided(open(34), PLATFORM_JOBS.algotest, ist('2026-10-21', '10:05')).blocking.length,
+    decided(open(64), PLATFORM_JOBS.algotest, ist('2026-10-21', '10:05')).blocking.length,
     1,
   );
   // a scheduler that does not say (older API): treated as running
   assert.equal(decided(open(undefined), PLATFORM_JOBS.algotest, noon).blocking.length, 1);
+  // a row the scheduler reports alive always blocks, however old: the lid was closed 09:22-10:30
+  // and the step's timeout paused while it slept (wall-clock age says nothing about it)
+  const alive = open(64).map((v) => ({
+    ...v,
+    lastRun: v.lastRun && { ...v.lastRun, alive: true },
+    previousSlotRun: v.previousSlotRun && { ...v.previousSlotRun, alive: true },
+  }));
+  assert.deepEqual(decided(alive, PLATFORM_JOBS.algotest, noon).blocking, [
+    'algotest-topup is running (since 09:30)',
+  ]);
+  // ... and one it reports not alive is judged by its age
+  const dead = alive.map((v) => ({
+    ...v,
+    lastRun: v.lastRun && { ...v.lastRun, alive: false },
+    previousSlotRun: v.previousSlotRun && { ...v.previousSlotRun, alive: false },
+  }));
+  assert.deepEqual(decided(dead, PLATFORM_JOBS.algotest, noon).blocking, []);
 });
 
 test('a due slot inside its catch-up window blocks past the cap, for 30 minutes at most (nit)', () => {

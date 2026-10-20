@@ -35,8 +35,10 @@ summary flags anything but `main`).
   never reported missed for a slot from before it existed. A new job is seen as of now
   minus its `catchUpHours`, so a slot that only just passed still catches up on the first
   restart; a manual `jobs run` does not count as history. Before its first tick it closes the
-  rows a previous scheduler left open (`reapDead`: the process is gone; exit -2, interrupted).
-  Their step children are detached, so one may still be running as an orphan; nothing tracks it.
+  rows a previous scheduler left open (`reapDead`, exit -2, interrupted), but only a row whose
+  writer (`pid`) AND whose step's process group (`child_pgid`, recorded by the runner at each
+  spawn: steps run detached and outlive a stopped scheduler) are both gone (`rowAlive`); an orphan
+  still running keeps its row open.
 - `src/alerts.ts` — immediate Telegram on failure (skipped for `alertsItself` jobs unless
   they timed out or could not start), on a missed slot, and on recovery. Successes stay
   quiet.
@@ -49,9 +51,10 @@ summary flags anything but `main`).
   in the last 24 h.
 - `src/api.ts` — loopback HTTP API (`127.0.0.1:8790`, `SCHEDULER_API_PORT`) started by
   `serve` in the same process as the loop. `GET /jobs` (each job's schedule, next and last run, its latest slot
-  that has come with the row serving it, `previousSlot` / `previousSlotRun`, its longest run `maxRunMinutes` and
-  `catchUpHours`: the trade monitor reads these before every platform login; rows whose process is gone are
-  closed first, `reapDead`), `GET /runs?job=&limit=`,
+  that has come with the row serving it, `previousSlot` / `previousSlotRun` (an open row carries `alive`: its
+  writer or its step's process group exists), its longest run `maxRunMinutes` (timeout x steps x attempts, the
+  retry delays, one timeout of group wait) and `catchUpHours`: the trade monitor reads these before every platform
+  login; dead rows are closed first, `reapDead`), `GET /runs?job=&limit=`,
   `GET /runs/:id/log?tail=200` (refuses paths outside the log dir and
   `packages/momentum-backtesting/data`, symlinks resolved), `POST /jobs/:id/run` (manual run;
   202 + run id, 409 if the job or its group is busy), `GET`/`PUT /notifications` (catalogue +

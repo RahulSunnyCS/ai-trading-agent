@@ -494,6 +494,17 @@ class Monitor {
     }
   }
 
+  /** The session closed while the deploy check still waited for a job: said once, unmuted. */
+  async deployNotDone(why: string): Promise<void> {
+    const sent = await this.send(
+      `⚠️ Trade monitor ${this.day}: deploy check not done today: at ${hhmm(SESSION_CLOSE)} it was still waiting for ${why}`,
+    );
+    if (sent) {
+      this.state.deploy = { at: new Date().toISOString(), ok: false };
+      await this.save();
+    }
+  }
+
   /** What the deploy check waits for (the platforms it reads), or null: checked once per pass. */
   async deployBlocked(): Promise<string | null> {
     const out: string[] = [];
@@ -1203,7 +1214,13 @@ async function main(): Promise<number> {
       const marginLeft = parts.has('margin') && !m.done.margin && minute < QUIET_FROM;
       const deployLeft = parts.has('deploy') && !m.done.deploy && minute < SESSION_CLOSE;
       const lossLeft = parts.has('loss') && minute < SESSION_CLOSE;
-      if (!marginLeft && !deployLeft && !lossLeft) break;
+      if (!marginLeft && !deployLeft && !lossLeft) {
+        // the deploy check waited all session for a platform's job: say once it did not run
+        if (parts.has('deploy') && !m.done.deploy && deployWaitSaid) {
+          await m.deployNotDone(deployWaitSaid);
+        }
+        break;
+      }
       // margin done and nothing else before 09:25: no session waits through the quiet window
       if (minute < QUIET_FROM && !marginLeft) await m.closeSessions();
       await sleep(TICK_MS);

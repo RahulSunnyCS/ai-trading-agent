@@ -11,6 +11,7 @@ import {
   syncGithub,
   validate,
 } from './automation.js';
+import { rowAlive } from './history.js';
 import { JOBS, type Job, maxRunMinutes } from './jobs.js';
 import { type RunContext, runJob } from './runner.js';
 import { nextDue, previousDue } from './schedule.js';
@@ -95,6 +96,11 @@ export function createApi({
   const inFlight = new Set<string>();
   const prefs = () => prefsFile ?? prefsPath();
 
+  /** An open row says whether its work still runs (its writer or its step's process group). */
+  const withAlive = <R extends Parameters<typeof rowAlive>[0] & { ended_at: string | null }>(
+    row: R | null,
+  ) => (row && row.ended_at === null ? { ...row, alive: rowAlive(row) } : row);
+
   function listJobs(): Response {
     const at = now();
     // A row whose process is gone (a scheduler restart, a Ctrl-C'd `jobs run`) is closed first, so
@@ -110,9 +116,9 @@ export function createApi({
           description: job.description,
           schedule: job.schedule.label,
           nextRun: nextDue(job.schedule, at)?.toISOString() ?? null,
-          lastRun: ctx.history.last(job.id),
+          lastRun: withAlive(ctx.history.last(job.id)),
           previousSlot: slot?.toISOString() ?? null,
-          previousSlotRun: slot ? ctx.history.forSlot(job.id, slot) : null,
+          previousSlotRun: withAlive(slot ? ctx.history.forSlot(job.id, slot) : null),
           maxRunMinutes: maxRunMinutes(job),
           catchUpHours: job.catchUpHours,
           needs: job.needs ?? [],
