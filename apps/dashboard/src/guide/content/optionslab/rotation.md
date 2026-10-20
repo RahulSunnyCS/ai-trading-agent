@@ -14,7 +14,14 @@ variants)". It mixes five criteria; the numbers are the weights in percent. From
 strategies: the same ranking with the other index left out, and a Buy add-on kept only when it is
 on the expiring index (the expiry rule; the 09:16 message says so in one line).
 The 09:16 Telegram message lists Adaptive's strategies with their settings, then the T1 testing track (not traded);
-the 16:00 message gives the day's result for both and tomorrow's strategies in full.
+the 16:00 message gives the day's result for both and tomorrow's strategies in full. Your copy (never the
+friends' group) also says how the real trades did against paper, per platform and list, per lot: "AlgoTest ·
+Shoonya T1  +₹910 vs +₹790 · slip +₹120 (+0.6%)" means live made ₹120 a lot more than paper, 0.6% of the
+premium at entry ([slippage](glossary:slippage)). A copy deployed at another time than its entry minute is listed
+as off-slot, and strategies you added by hand as [discretionary](glossary:discretionary-trade). A copy that did not trade, or whose legs were still open when read, is
+named on its own line and left out, as is a copy of the tool's whose name the capture could not read (❓). "1x
+assumed" means the platform no longer showed its multiplier (a day read late). "Live · not captured" means the 15:40 read did not happen; the next evening reads
+that day, and `obt rotation live-compare --day` shows it (the 16:00 message is not sent again).
 
 | Name | Key | Own recent results | Weekday | Days to expiry | VIX | Family band |
 |---|---|---|---|---|---|---|

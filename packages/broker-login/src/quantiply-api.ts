@@ -118,9 +118,32 @@ export class QuantiplyApi {
     return parseDayWise(await this.call('GET', '/algos/day-wise'));
   }
 
-  /** `GET /algos/day-wise` as answered (BL-143's checks read `multiplier` from it too). */
+  /** `GET /algos/day-wise` as it answers (BL-141's capture and BL-143's checks read `multiplier`, BL-141 `pnl` too). */
   async dayWise(): Promise<unknown> {
     return this.call('GET', '/algos/day-wise');
+  }
+
+  /**
+   * `GET /pnl-chart/algo?graphLevel=account&from=D&to=D`, every page (`paging.after`): the web
+   * app's P&L chart for the account. Its `metaData.lastValues` holds each algo's closing MTM for
+   * the period (BL-141; `docs/algotest-execution.md`, "Live results"). Read-only.
+   */
+  async pnlChartAccount(day: string): Promise<unknown[]> {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error(`not a day: ${day}`);
+    const pages: unknown[] = [];
+    let after: string | null = null;
+    for (let n = 0; n < 20; n += 1) {
+      const query = `?graphLevel=account&from=${day}&to=${day}${after ? `&after=${encodeURIComponent(after)}` : ''}`;
+      const page = (await this.call('GET', `/pnl-chart/algo${query}`)) as {
+        paging?: { after?: unknown };
+      };
+      pages.push(page);
+      const raw = page.paging?.after;
+      const next = typeof raw === 'number' ? String(raw) : raw;
+      if (typeof next !== 'string' || !next || next === after) return pages;
+      after = next;
+    }
+    throw new Error('pnl chart: more than 20 pages');
   }
 
   /** `POST /algos`: Quantiply makes one algo per weekday in `body.day`. */

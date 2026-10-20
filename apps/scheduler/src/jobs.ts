@@ -507,6 +507,47 @@ const BASE_JOBS: Job[] = [
     fixHint: 'Open algotest.in/live and untick the execution days of the T1 strategies',
   },
   {
+    id: 'live-capture',
+    description:
+      "Record the day's live results (BL-141): for each platform + broker the dashboard's Settings › Automation has on, every strategy that ran today, the tool's (in the uploaders' ledgers) or the owner's own (discretionary), with its live ₹, multiplier and fills where the platform gives them, to TRADING_DATA_ROOT/rotation/live/<day>.jsonl; also back-fills the last 5 trading days that miss a section. Read-only on AlgoTest and Quantiply (GET calls only). One attempt; live-capture-retry reads what it missed. The 16:00 result message puts it beside paper (owner only)",
+    // 15:40: every pick has exited (15:28). In the Quantiply group, ahead of quantiply-disable at
+    // the same minute, so its Angel One login never overlaps another Quantiply job's (the TOTP
+    // window stamp in quantiply-session.ts spaces them). One attempt with a short timeout, so the
+    // disable starts by 15:48 at the latest; --soft-fail leaves the alert to the retry job.
+    // The evening uploads do not wait for it: both platforms keep a day's P&L after its
+    // strategies are deleted (checked 2026-10-20), so a missed day is back-filled later.
+    schedule: { at: '15:40', on: tradingDays, label: 'trading days 15:40' },
+    steps: [['node_modules/.bin/tsx', 'src/live-capture.ts', '--soft-fail']],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 8,
+    retries: 0,
+    retryDelayMinutes: 0,
+    catchUpHours: 6,
+    group: 'quantiply',
+    fixHint:
+      'cd packages/broker-login && node_modules/.bin/tsx src/live-capture.ts  (reads what is missing; --day D for one day, --force to read it again, --dry-run prints only)',
+  },
+  {
+    id: 'live-capture-retry',
+    description:
+      "Read again whatever the 15:40 live capture could not (BL-141): only the platform + broker sections the day's file does not have as read, so an account already read is never logged in to again. Alerts once if the day is still not captured by about 16:30; the next evening's capture back-fills it",
+    // After quantiply-disable (15:40, a few minutes), still in the Quantiply group so its logins
+    // never overlap another Quantiply job's; its retries end by about 16:30, before the 16:45
+    // upload. With everything read it logs in nowhere and exits at once, so a catch-up after a
+    // sleep costs nothing.
+    schedule: { at: '15:55', on: tradingDays, label: 'trading days 15:55' },
+    steps: [['node_modules/.bin/tsx', 'src/live-capture.ts', '--no-backfill']],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 6,
+    retries: 2, // 15:55, about 16:09, about 16:23
+    noRetryExitCodes: [3], // missing credentials, a Quantiply login held or refused
+    retryDelayMinutes: 8,
+    catchUpHours: 6,
+    group: 'quantiply',
+    fixHint:
+      'cd packages/broker-login && node_modules/.bin/tsx src/live-capture.ts --day <day>  (the next evening back-fills it by itself; the 16:00 message said "live not captured")',
+  },
+  {
     id: 'quantiply-disable',
     description:
       "After the session, switch off on each Quantiply account the algos the uploader made for today that are still enabled, and any of an earlier session (BL-139 Phase 4): an enabled Quantiply algo runs again on its weekday next week. Only the tool's algos (its ledger), only finished ones, confirmed by reading the list again. The safety net: always runs, whatever QUANTIPLY_DEPLOY and Automated deployment say",

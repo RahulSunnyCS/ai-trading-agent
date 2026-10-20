@@ -1,7 +1,7 @@
 """`obt rotation …`: update | pick | verify | show | readout | base (BL-058); triggers,
 triggers-show (BL-083); corr, corr-list, corr-pick (BL-090); update / pick --track t1 and
 track-readout (the T1 parallel track); lot-plans (BL-135); algotest-export (BL-137);
-quantiply-export (BL-139)."""
+quantiply-export (BL-139); live-compare (BL-141)."""
 
 from __future__ import annotations
 
@@ -441,6 +441,26 @@ def result(
         return
     if code:
         raise typer.Exit(code)
+
+
+@rotation_app.command("live-compare")
+def live_compare_cmd(
+    day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """BL-141: the day's live results (the 15:40 capture, rotation/live/<day>.jsonl) beside the
+    paper results, per lot: slippage = live − paper, signed (+ live did better). Read-only."""
+    import json
+
+    from . import live_compare, messages
+
+    c = live_compare.compare(_day(day))
+    if as_json:
+        typer.echo(json.dumps(live_compare.to_json(c), indent=1, default=str))
+    else:
+        typer.echo(live_compare.render(c, messages.rupees))
+    if not c.captured:
+        raise typer.Exit(2)
 
 
 @rotation_app.command()

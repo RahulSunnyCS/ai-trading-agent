@@ -1,0 +1,65 @@
+{
+ "_id": "000000000000000000000001",
+ "active_on_server": false,
+ "broker_type": "Broker.AngelOne",
+ "check_after_ts": "2026-10-14 09:15:05",
+ "config": {
+  "ExecutionConfig": {
+   "LegsConfig": {
+    "og_leg_1": {
+     "EntryOrder": {
+      "Config": {
+       "Buffer": {
+        "LimitBuffer": 10,
+        "TriggerBuffer": 0,
+        "Type": "BufferType.Percentage"
+       },
+       "MarketOrderAfter": 50,
+       "Type": "OrderType.Limit"
+      },
+      "Delay": 0
+     },
+     "ExitOrder": {
+      "Config": {
+       "Buffer": {
+        "LimitBuffer": 10,
+        "TriggerBuffer": 0,
+        "Type": "BufferType.Percentage"
+       },
+       "MarketOrderAfter": 50,
+       "Type": "OrderType.Limit"
+      },
+      "Delay": 0
+     },
+     "Product": "ProductType.NRML",
+     "Reference": "PriceReferenceType.Trigger"
+    }
+   },
+   "LikeBacktester": true,
+   "LotMultiplier": 2,
+   "MarginAutoSquareOff": true
+  },
+  "StopMonitoringTime": null,
+  "Ticker": "SENSEX"
+ },
+ "creation_ts": "2026-10-14 09:29:48.923000",
+ "entry_time": "2026-10-14 13:46:59",
+ "exit_time": "2026-10-14 15:27:59",
+ "external_start": null,
+ "free_execution": false,
+ "is_ra_algo": false,
+ "is_shared": false,
+ "last_activation_ts": "2026-10-14 09:29:48.923000",
+ "legs": [],
+ "name": "S_Widesl_917_otm2 (1)",
+ "notifications": [],
+ "ongoing_trade": null,
+ "portfolio": null,
+ "reentry_time_restriction": null,
+ "skip_initial_candles": 0,
+ "status": "StrategyStatus.SquaredOff",
+ "stop_monitoring_time": null,
+ "strategy_id": "000000000000000000000002",
+ "ticker": "SENSEX",
+ "trades": []
+}

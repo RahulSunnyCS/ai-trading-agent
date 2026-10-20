@@ -291,6 +291,11 @@ test('the evening jobs (must-fix 1): the 16:55 enable running blocks a hand --no
   assert.ok(PLATFORM_JOBS.algotest.some((j) => j.id === 'algotest-evening'));
   assert.ok(PLATFORM_JOBS.quantiply.some((j) => j.id === 'quantiply-evening'));
   assert.ok(PLATFORM_JOBS.quantiply.some((j) => j.id === 'quantiply-disable'));
+  // BL-141's capture logs in to both platforms
+  for (const id of ['live-capture', 'live-capture-retry']) {
+    assert.ok(PLATFORM_JOBS.algotest.some((j) => j.id === id && j.window === 'evening'));
+    assert.ok(PLATFORM_JOBS.quantiply.some((j) => j.id === id && j.window === 'evening'));
+  }
 });
 
 test('the scheduler API not answering: waits inside a window, says so after its cap, else nothing', () => {

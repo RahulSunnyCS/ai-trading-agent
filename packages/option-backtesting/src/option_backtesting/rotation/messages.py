@@ -201,11 +201,13 @@ def render_result(
     tomorrow_t1=None,
     *,
     heading: str = "result",
+    live: Sequence[str] | None = None,
 ) -> str:
     """The evening message. `adaptive` and `t1` are (total, [(strategy, rupees)]); either may be
     None to leave that list out (the group's copy has no T1; the T1 follow-up has no Adaptive), and
     `t1` may be a note (`🧪 T1 · result not ready`). `tomorrow_adaptive` / `tomorrow_t1` are
-    `tomorrow.NextPicks` (T1's may be a note); with neither there is no tomorrow section."""
+    `tomorrow.NextPicks` (T1's may be a note); with neither there is no tomorrow section. `live` is
+    BL-141's live-vs-paper block (`live_compare.message_lines`), for the owner's copy only."""
     lines = [f"📊 {day_text(day)} · {heading}", "1 lot per strategy, after costs"]
     if adaptive is not None:
         lines += ["", *result_block("🎯", "Adaptive", *adaptive)]
@@ -213,6 +215,8 @@ def render_result(
         lines += ["", t1]
     elif t1 is not None:
         lines += ["", *result_block("🧪", "T1", *t1)]
+    if live:
+        lines += ["", *live]
     first = tomorrow_adaptive or (None if isinstance(tomorrow_t1, str) else tomorrow_t1)
     if first is not None:
         lines += ["", f"➡️ {day_text(first.day)}"]

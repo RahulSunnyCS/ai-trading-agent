@@ -165,7 +165,8 @@ export function mergeLogins<K extends string>(
  * to run; after its end (the cap) only a run that is actually in progress still blocks.
  * Morning: algotest-topup's three attempts (09:18, 10 min each, 2 min apart) end by 09:52 at worst,
  * quantiply-topup's two and the queued quantiply-deploy-topup by 09:51. Evening: the 15:35 / 15:40
- * deploy check and disable, the 16:40 / 16:45 uploads and the 16:55 enable.
+ * deploy check and disable, the 15:40 / 15:55 live-results capture (BL-141), the 16:40 / 16:45
+ * uploads and the 16:55 enable.
  */
 export const WAIT_WINDOWS = {
   morning: { from: 9 * 60 + 10, until: 10 * 60 },
@@ -195,6 +196,9 @@ export const PLATFORM_JOBS: Record<'algotest' | 'quantiply', readonly PlatformJo
     { id: 'algotest-topup', window: 'morning' },
     { id: 'algotest-deploy-check', window: 'evening' },
     { id: 'algotest-evening', window: 'evening' },
+    // BL-141: the 15:40 capture and its 15:55 retry log in to both platforms
+    { id: 'live-capture', window: 'evening' },
+    { id: 'live-capture-retry', window: 'evening' },
   ],
   quantiply: [
     { id: 'quantiply-topup', window: 'morning' },
@@ -202,6 +206,8 @@ export const PLATFORM_JOBS: Record<'algotest' | 'quantiply', readonly PlatformJo
     { id: 'quantiply-disable', window: 'evening' },
     { id: 'quantiply-evening', window: 'evening' },
     { id: 'quantiply-deploy', window: 'evening' },
+    { id: 'live-capture', window: 'evening' },
+    { id: 'live-capture-retry', window: 'evening' },
   ],
 };
 
