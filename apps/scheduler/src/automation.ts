@@ -20,7 +20,7 @@ import { jobPath } from './env.js';
  * ever updated in place, so the page can show the history. The current version is also
  * written to `automation-settings.json` beside the database, which the jobs (TypeScript and
  * Python) read when they start. The `.env` switches (ALGOTEST_UPLOAD, QUANTIPLY_UPLOAD,
- * ALGOTEST_DEPLOY) stay as hard safety: a setting never overrides one that is off.
+ * ALGOTEST_DEPLOY, QUANTIPLY_DEPLOY) stay as hard safety: a setting never overrides one that is off.
  */
 
 export const PLATFORMS = ['algotest', 'quantiply'] as const;

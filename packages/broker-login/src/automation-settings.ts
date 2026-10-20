@@ -104,6 +104,22 @@ export function uploadBooks(a: Automation, platform: Platform, broker?: Broker):
   return [...books].sort();
 }
 
+/**
+ * Whether the tool may ENABLE (deploy) a Quantiply account's algos, and which list they come
+ * from: the deploy master switch, and the account's row uploading a list (an account the tool
+ * puts nothing into has nothing of the tool's to enable). `why` says what held it back.
+ */
+export function quantiplyDeploy(
+  a: Automation,
+  broker: Broker,
+): { ok: boolean; book: Book | null; why: string } {
+  const row = effectiveRow(a, 'quantiply', broker);
+  const book = row.list === 'none' ? null : row.list;
+  if (!a.masters.deploy) return { ok: false, book, why: 'Automated deployment is off' };
+  if (!row.upload) return { ok: false, book, why: `the Quantiply · ${broker} row uploads nothing` };
+  return { ok: true, book, why: '' };
+}
+
 /** One line for logs and Telegram: which version decided, or that none was saved yet. */
 export function describeSource(a: Automation): string {
   return a.source === 'file' ? `settings v${a.version}` : 'settings: defaults (none saved yet)';

@@ -107,10 +107,12 @@ npm run typecheck
   - `ONLY=none` skips the AlgoTest brokers.
   - `QUANTIPLY_BROKERS` listing `finvasia` logs Quantiply · Shoonya in after the AlgoTest logins
     (`runQuantiplyShoonyaIsolated`, one attempt, its own report line, never the exit code).
-- **Deploy:** `strategy-deploy.ts --apply` also needs the deploy master switch on.
+- **Deploy:** `strategy-deploy.ts --apply` also needs the deploy master switch on;
+  `quantiply-deploy.ts --mode enable --apply` needs it and the account's row uploading a list
+  (`quantiplyDeploy`), and takes that row's list as its picks.
 
 The scheduler sets the repository variables on every save. `.env` switches (`ALGOTEST_UPLOAD`, `QUANTIPLY_UPLOAD`,
-`ALGOTEST_DEPLOY`) still need `on`.
+`ALGOTEST_DEPLOY`, `QUANTIPLY_DEPLOY`) still need `on`.
 
 ## Quantiply algos: upload (BL-139)
 
@@ -132,6 +134,44 @@ The scheduler sets the repository variables on every save. `.env` switches (`ALG
     if a row cannot be written, the run stops and the message carries the row to add by hand.
   - `--apply` needs `QUANTIPLY_UPLOAD=on`; Telegram type `broker.quantiply`. It never enables (deploys) an algo.
   - It reads `latest-core.json`, written by `obt rotation quantiply-export`.
+  - The login, the refused-login hold and the token are `src/quantiply-session.ts`, shared with the deployer.
+
+## Quantiply algos: enable and disable (BL-139 Phase 4)
+
+`src/quantiply-deploy.ts --broker angelone|finvasia --mode enable|disable|check [--day D] [--emergency] [--apply]` (+ pure
+`src/quantiply-deploy-plan.ts`) switches the uploader's algos on and off: `PUT /algos/:id/enable|disable`, the web
+app's row switch (`docs/algotest-execution.md`). An enabled algo trades the real account on its weekday, every
+week, until disabled.
+
+- Only algos in that account's uploader ledger for the session are touched (`--day`; default for enable: today
+  before 15:30 IST on a trading day, else the next trading day; for disable and check: today): the create row's
+  `day` is the session, or it is an earlier copy on the session's weekday with the pick's content that the
+  uploader kept (`ownedForSession`).
+- Enable takes the session's picks from the export (`latest-<book>.json`, the account's list); for today it needs
+  the recorded picks. Each algo must be on the session's weekday (Quantiply's and the ledger's), not enabled,
+  finished, with the export's content (the ledger sha, not a `mismatch:` row, and a fresh `readBackDiffs`), and a
+  broker that is unset (then set to the `GET /brokers` account whose `clientId` is the `.env` login, read back) or
+  that account. For today, never within 90 s of its start (TOO LATE, that algo only, checked again before each
+  call, after the broker call and its full read-back). Never one this session's deploy ledger already shows
+  switched on or off: an algo the owner switched off by hand stays off. An owned algo of the session that is
+  ENABLED but no longer a pick (09:16 dropped it) or fails any check is switched off if it has not started,
+  otherwise reported as ENABLED; a failed check is never reported as just "not enabled". A broker that is set in
+  a shape the tool does not know counts as another account: `PUT {broker}` is only ever sent to an unset one.
+- Disable switches off the session's owned algos still enabled, and any of an earlier session; only finished ones.
+  An algo on today's weekday only after 15:30 IST, unless `--emergency` (the emergency stop: today's pending
+  entries too).
+- After the calls the list is read again (`verifyToggles`): exactly the intended ids changed and no other algo of
+  the tool's; anything else exits 3 and alerts (a change on the owner's own algos is a note). A failed enable stops
+  the run there. A disable whose call failed exits 1 (retried) even when something else needs the owner.
+- Enabling with `--apply` needs `QUANTIPLY_DEPLOY=on` (checked before logging in), Automated deployment and the
+  account's row. Disabling is the safety net and is never gated: it reads no automation settings, and an
+  unreadable deploy ledger or line is skipped. A kept copy the deploy ledger shows enabled for a later session
+  belongs to that session for disable and check (`enabledSessions`). An enable that failed earlier in the
+  session is reported ENABLE FAILED and left off. An account with nothing of the tool's for the
+  session is not logged in. Every change is a row in `deploy-ledger[-<broker>].jsonl` beside the ledger.
+- Logins go through `quantiply-session.ts`: it waits out the last TOTP window the account typed a code in (a file
+  stamp beside the ledger, shared with the uploader), and the deployer retries a refused code once. The ledger
+  path (`quantiplyLedgerPath`) is decided there too, for both.
 
 ## AlgoTest strategies: upload (BL-137) and deploy (BL-138)
 

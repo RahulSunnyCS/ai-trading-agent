@@ -55,8 +55,12 @@ A warning badge on a block means its master switch holds it back.
   - Quantiply · Shoonya logs in after the AlgoTest logins, when its block is on.
 - **The evening and 09:16 uploads:** AlgoTest gets every list its blocks choose. Each Quantiply account (Angel One, Shoonya) gets its own block's list. A block with upload off is left untouched.
 - **Deploying:** it also needs Automated deployment on.
+  - AlgoTest deploys the day's T1 picks after 09:16.
+  - Quantiply switches on each account's picks at 16:55 for the next day, and at 09:21 any that changed. It only does this for an account whose block uploads a list.
+  - At 15:40 the tool's Quantiply algos are switched off again; otherwise they would run on the same weekday next week. This always runs, even with Automated deployment or `QUANTIPLY_DEPLOY` off.
+  - Switching an algo off by hand after the tool switched it on is final for that day: the 09:21 run does not switch it back on.
 
-**The `.env` switches still have the last word.** `ALGOTEST_UPLOAD`, `QUANTIPLY_UPLOAD` and `ALGOTEST_DEPLOY` must also be on for the tool to change a platform.
+**The `.env` switches still have the last word.** `ALGOTEST_UPLOAD`, `QUANTIPLY_UPLOAD`, `ALGOTEST_DEPLOY` and `QUANTIPLY_DEPLOY` must also be on for the tool to change a platform. The one exception is switching the tool's Quantiply algos off at 15:40, which always runs.
 
 ## Common questions
 

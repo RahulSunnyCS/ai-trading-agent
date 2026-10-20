@@ -751,7 +751,7 @@ Owner (2026-10-19): add the Core Adaptive picks to Quantiply (Angel One) too, on
 | 3.32.1 | Phase 1: capture the web app's calls (create, list, read, delete, auth) with the owner | owner + claude | **Done 2026-10-19** (`docs/algotest-execution.md`, `tests/fixtures/quantiply/`); the enable (deploy) call is not sent |
 | 3.32.2 | Phase 2: `legwise/quantiply.py` + `obt rotation quantiply-export`: YAML → `POST /algos` body, the owner's execution settings, unmapped settings refused | claude | **Built 2026-10-19** (25 tests); all of Core-298 maps, trail in points confirmed by the owner's `test1` |
 | 3.32.3 | Phase 3: uploader over the API (ledger by algo id, read-back, delete only its own finished algos) + jobs `quantiply-evening` 16:45, `quantiply-topup` 09:19 | claude | **Built 2026-10-19** (`src/quantiply-upload.ts`, 12 planner tests), off until `QUANTIPLY_UPLOAD=on`; first dry run and first `--apply` by the owner 2026-10-19: 3 Wednesday algos created, each read back identical; to switch on: merge (after PR #264), restart the scheduler, set `QUANTIPLY_UPLOAD=on` |
-| 3.32.4 | Phase 4: deploy (`enabled`), built but off | claude | Planned |
+| 3.32.4 | Phase 4: enable / disable over the API (`src/quantiply-deploy.ts`, 16 planner tests) + jobs `quantiply-disable` 15:40, `quantiply-deploy` 16:55, `quantiply-deploy-topup` 09:21 | claude | **Built 2026-10-20**, off until `QUANTIPLY_DEPLOY=on` + Automated deployment; live dry run lists Wednesday's three Core algos; the first `--apply` is the owner's |
 
 ### 3.33 Automation settings page — [BL-140](backlog/BL-140-automation-settings-page.md)
 
