@@ -38,7 +38,9 @@ summary flags anything but `main`).
   rows a previous scheduler left open (`reapDead`, exit -2, interrupted), but only a row whose
   writer (`pid`) AND whose step's process group (`child_pgid`, recorded by the runner at each
   spawn: steps run detached and outlive a stopped scheduler) are both gone (`rowAlive`); an orphan
-  still running keeps its row open.
+  still running keeps its row open. Every tick reaps the same way, so an orphan that ends later is
+  closed then (and the trade monitor restarts). An orphan's exit code cannot be read, so even a
+  normal exit is recorded as interrupted (-2).
 - `src/alerts.ts` — immediate Telegram on failure (skipped for `alertsItself` jobs unless
   they timed out or could not start), on a missed slot, and on recovery. Successes stay
   quiet.

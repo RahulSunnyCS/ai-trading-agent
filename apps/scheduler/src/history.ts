@@ -51,7 +51,12 @@ export class History {
     // BL-143: added later; older files get the column once.
     const columns = this.db.query('PRAGMA table_info(runs)').all() as Array<{ name: string }>;
     if (!columns.some((c) => c.name === 'child_pgid')) {
-      this.db.exec('ALTER TABLE runs ADD COLUMN child_pgid INTEGER');
+      try {
+        this.db.exec('ALTER TABLE runs ADD COLUMN child_pgid INTEGER');
+      } catch (error) {
+        // two processes opened an old file at once: the other one added it first
+        if (!/duplicate column/i.test(String(error))) throw error;
+      }
     }
     this.db.exec('CREATE INDEX IF NOT EXISTS runs_job_started ON runs (job, started_at)');
     this.db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');

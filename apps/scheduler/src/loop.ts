@@ -70,6 +70,8 @@ export interface LoopOptions {
   tickMs?: number;
   /** Whether a run row's pid still lives; tests pass a fake. */
   pidAlive?: (pid: number) => boolean;
+  /** Whether a run row's step process group still lives; tests pass a fake. */
+  pgidAlive?: (pgid: number) => boolean;
 }
 
 /**
@@ -83,12 +85,13 @@ export function startLoop({
   alerts,
   tickMs = 30_000,
   pidAlive,
+  pgidAlive,
 }: LoopOptions): () => void {
   const now = ctx.now ?? (() => new Date());
   // Rows the previous scheduler left open (it was stopped, crashed, or the laptop restarted) are
   // closed as interrupted before the first tick: an ungrouped job never reaps them itself, and
   // `restartIfInterruptedUntil` (the trade monitor) needs that row to start again.
-  const reaped = ctx.history.reapDead(now(), pidAlive);
+  const reaped = ctx.history.reapDead(now(), pidAlive, pgidAlive);
   if (reaped) console.log(`${formatIst(now())} closed ${reaped} run(s) left open by a stop`);
   ctx.history.firstStart(now());
   // Per job, not the scheduler's first start: a job added since then has no slots to miss
@@ -100,6 +103,15 @@ export function startLoop({
   const inFlight = new Set<string>();
 
   const tick = () => {
+    // Every tick too: a step left running as an orphan by a stopped scheduler keeps its row open
+    // until its process group ends; then it is closed as interrupted here, so the trade monitor's
+    // `restartIfInterruptedUntil` still fires. An orphan's exit code cannot be read (it is not
+    // this process's child), so a normal exit is also recorded as interrupted.
+    try {
+      ctx.history.reapDead(now(), pidAlive, pgidAlive);
+    } catch (error) {
+      console.error(`reap: ${String(error)}`);
+    }
     for (const { job, since } of watched) {
       if (inFlight.has(job.id)) continue;
       try {

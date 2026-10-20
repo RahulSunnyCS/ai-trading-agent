@@ -158,6 +158,65 @@ describe('BL-143: the trade monitor job', () => {
     history.close();
   });
 
+  it('an orphaned monitor is not reaped while its group lives; once it ends, the next tick restarts it', async () => {
+    const real = findJob('trade-monitor');
+    if (!real) throw new Error('no trade-monitor job');
+    const job = { ...real, steps: [['/bin/sh', '-c', 'true']], cwd: '.' };
+    const dir = mkdtempSync(join(tmpdir(), 'bl143-orphan-'));
+    const history = new History(join(dir, 'scheduler.db'));
+    history.firstStart(istAt('2026-10-01', '00:00'));
+    history.jobFirstSeen('trade-monitor', istAt('2026-10-01', '00:00'));
+    const slot = istAt('2026-10-21', '09:04');
+    const first = history.start('trade-monitor', 'schedule', slot, '/x', slot);
+    history.setChild(first, 4242);
+    let groupUp = true;
+    const noon = istAt('2026-10-21', '12:00');
+    const stop = startLoop({
+      ctx: { repoRoot: dir, env: { PATH: '/usr/bin:/bin' }, logDir: dir, history, now: () => noon },
+      jobs: [job],
+      alerts: async () => undefined,
+      tickMs: 20,
+      pidAlive: () => false, // the scheduler that wrote the row is gone
+      pgidAlive: () => groupUp, // ... but the monitor it started still runs, orphaned
+    });
+    try {
+      await new Promise((r) => setTimeout(r, 80));
+      expect(history.get(first)).toMatchObject({ ended_at: null });
+      expect(history.forSlot('trade-monitor', slot)?.id).toBe(first);
+      // the orphan ends: a later tick closes its row and starts the monitor again
+      groupUp = false;
+      let again = history.forSlot('trade-monitor', slot);
+      for (let i = 0; i < 100 && (again?.id === first || again?.ended_at === null); i += 1) {
+        await new Promise((r) => setTimeout(r, 20));
+        again = history.forSlot('trade-monitor', slot);
+      }
+      expect(history.get(first)).toMatchObject({ exit_code: -2 });
+      expect(again).toMatchObject({ trigger: 'catch-up', exit_code: 0 });
+    } finally {
+      stop();
+    }
+    history.close();
+  });
+
+  it('an old history file gets child_pgid on open, and opening it again adds nothing', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bl143-alter-'));
+    const path = join(dir, 'scheduler.db');
+    const a = new History(path);
+    // an old file: drop the column the way an older scheduler would have left it
+    a.close();
+    const db = new Database(path);
+    db.exec('ALTER TABLE runs DROP COLUMN child_pgid');
+    db.close();
+    // the first opener adds it, the second finds it (a true race is caught as "duplicate column")
+    const one = new History(path);
+    const two = new History(path);
+    expect(two.get(two.start('x', 'manual', null, '', new Date()))).toMatchObject({
+      child_pgid: null,
+    });
+    one.close();
+    two.close();
+  });
+
   it("each job's longest run: every step of every attempt, the delays and its group's wait", () => {
     const at = (id: string) => {
       const job = findJob(id);
