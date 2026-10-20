@@ -79,10 +79,13 @@ network or disk so the test needs neither. One group per file keeps parallel PRs
 
 - Tests use `bun test`, not vitest, because `bun:sqlite` only exists under Bun.
 - `group: 'catalog'` is for anything that writes the DuckDB catalog (`TRADING_DATA_ROOT`).
-- `group: 'quantiply'` holds the Quantiply jobs (upload, enable, disable): each logs in through an Angel One /
-  Shoonya TOTP, and an enable must run after the upload before it, retries included (`quantiply-deploy` 16:55
-  waits for `quantiply-evening` 16:45; `quantiply-deploy-topup` 09:21 for `quantiply-topup` 09:19). The enables
-  have `retries: 0` like `algotest-deploy`: a second attempt could act on a half-finished first.
+- `group: 'quantiply'` holds the Quantiply jobs (upload, enable, disable), so an enable runs after the upload
+  before it, retries included (`quantiply-deploy` 16:55 waits for `quantiply-evening` 16:45;
+  `quantiply-deploy-topup` 09:21 for `quantiply-topup` 09:19). It does not space their TOTP logins (the next job
+  starts the moment one ends): `packages/broker-login/src/quantiply-session.ts` waits out the last window each
+  account typed a code in (a file stamp), and the deployer retries a refused code once. The enables have
+  `retries: 0` like `algotest-deploy`: a second attempt could act on a half-finished first. `quantiply-disable`
+  is the safety net and runs whatever `QUANTIPLY_DEPLOY` and the deploy switch say.
 - `broker-login` has `retries: 0` on purpose: `dispatch.ts` retries itself and must never
   dispatch the GitHub workflow twice.
 - `angel-login-check` (trading days 08:00) runs `obt angel test --scheduled`: one Angel One

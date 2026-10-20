@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { waitForNextWindow } from '@trading/broker-identity';
 import { chromium } from 'playwright';
 import { BrokerLoginError } from './brokers/types.js';
 import { describe } from './diagnose.js';
@@ -11,12 +12,31 @@ import { quantiplyShoonyaLogin } from './quantiply-shoonya.js';
 import { quantiplyLogin } from './quantiply.js';
 import { registerSecret } from './secrets.js';
 import { sha256 } from './strategy-plan.js';
+import { totpWindow } from './totp.js';
 
 /**
  * One Quantiply API session for the uploader and the deployer (BL-139): the account's `.env`
  * login, the refused-login hold, a browser login only to take the web app's JWT, then the API.
  * The JWT is registered as a secret at once and never logged or written anywhere.
  */
+
+export async function readJson<T>(path: string): Promise<T> {
+  return JSON.parse(await readFile(path, 'utf8')) as T;
+}
+
+/**
+ * Where an account's uploader ledger lives (`TRADING_DATA_ROOT/rotation/quantiply/`): Angel One's
+ * keeps its original name, each other account has its own. The deployer reads the same file, so
+ * this is the one place the name is decided.
+ */
+export function quantiplyLedgerPath(dataRoot: string, broker: QuantiplyBroker): string {
+  return join(
+    dataRoot,
+    'rotation',
+    'quantiply',
+    broker === 'angelone' ? 'ledger.jsonl' : `ledger-${broker}.jsonl`,
+  );
+}
 
 export interface QCredentials {
   broker: QuantiplyBroker;
@@ -67,14 +87,59 @@ export async function checkLoginHold(c: QCredentials, stateDir: string): Promise
   }
 }
 
+const windowPath = (stateDir: string, broker: QuantiplyBroker) =>
+  join(stateDir, `totp-window-${broker}.json`);
+
+/**
+ * Across processes: never type a code from a 30-second TOTP window another Quantiply run (the
+ * uploader, the deployer) already typed one from for this account. `angelTotp` / `shoonyaTotp`
+ * guard this within one process only; this file stamp covers back-to-back jobs.
+ */
+export async function waitOutTotpWindow(stateDir: string, broker: QuantiplyBroker): Promise<void> {
+  type Stamp = { window?: number };
+  const stamp = await readJson<Stamp>(windowPath(stateDir, broker)).catch((): Stamp => ({}));
+  const last = typeof stamp.window === 'number' ? stamp.window : null;
+  // at most two windows: a stamp further ahead is a clock problem, not a reason to stall
+  for (let n = 0; last !== null && totpWindow() <= last && n < 2; n += 1) await waitForNextWindow();
+}
+
+/** Record the window a login typed its code in (written after the attempt, success or not). */
+async function stampTotpWindow(stateDir: string, broker: QuantiplyBroker): Promise<void> {
+  await mkdir(stateDir, { recursive: true }).catch(() => undefined);
+  await writeFile(
+    windowPath(stateDir, broker),
+    `${JSON.stringify({ window: totpWindow() })}\n`,
+  ).catch(() => undefined);
+}
+
 /**
  * Log in in a browser, take the JWT, close the browser: an API client for the account. A refused
- * login writes the hold and throws `LoginRefused`.
+ * login writes the hold and throws `LoginRefused`. With `retryTotpOnce`, a login whose TOTP code
+ * was refused (nothing on Quantiply changed yet) is tried once more, in the next window.
  */
 export async function openQuantiply(
   c: QCredentials,
   stateDir: string,
-  opts: { headed?: boolean } = {},
+  opts: { headed?: boolean; retryTotpOnce?: boolean } = {},
+): Promise<QuantiplyApi> {
+  for (let attempt = 1; ; attempt += 1) {
+    await waitOutTotpWindow(stateDir, c.broker);
+    try {
+      return await loginOnce(c, stateDir, opts);
+    } catch (error) {
+      const totp = error instanceof BrokerLoginError && error.kind === 'TOTP_REJECTED';
+      if (!totp || !opts.retryTotpOnce || attempt >= 2) throw error;
+      console.log('  TOTP code refused: one more login in the next window');
+    } finally {
+      await stampTotpWindow(stateDir, c.broker);
+    }
+  }
+}
+
+async function loginOnce(
+  c: QCredentials,
+  stateDir: string,
+  opts: { headed?: boolean },
 ): Promise<QuantiplyApi> {
   const site = QUANTIPLY_SITES[c.broker];
   const browser = await chromium.launch({ headless: !opts.headed });

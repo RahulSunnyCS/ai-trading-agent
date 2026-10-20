@@ -22,6 +22,7 @@ import {
   istSeconds,
   ownedForSession,
   parseBrokers,
+  parseDeployLedger,
   parseDetail,
   pickBroker,
   planDisable,
@@ -30,6 +31,7 @@ import {
   startSeconds,
   summaryDisable,
   summaryEnable,
+  toggledIds,
   verifyToggles,
 } from './quantiply-deploy-plan.js';
 import {
@@ -47,6 +49,8 @@ import {
   checkLoginHold,
   openQuantiply,
   quantiplyCredentials,
+  quantiplyLedgerPath,
+  readJson,
 } from './quantiply-session.js';
 import { redact } from './secrets.js';
 import { istToday, sha256 } from './strategy-plan.js';
@@ -58,29 +62,33 @@ import { istToday, sha256 } from './strategy-plan.js';
  * weekday, every week, until disabled. Built ready but OFF.
  *
  *   tsx src/quantiply-deploy.ts --broker angelone|finvasia --mode enable|disable|check
- *     [--day YYYY-MM-DD] [--book core|t1 | --dir <export folder>] [--apply]
+ *     [--day YYYY-MM-DD] [--book core|t1 | --dir <export folder>] [--emergency] [--apply]
  *
  * - Only algos in that account's uploader ledger (`rotation/quantiply/ledger[-<broker>].jsonl`)
- *   created for the session (`--day`) are touched; never one the owner made (pure rules in
+ *   for the session (`--day`) are touched; never one the owner made (pure rules in
  *   `quantiply-deploy-plan.ts`).
  * - `--day` defaults, for enable, to today before 15:30 IST on a trading day, else the next
  *   trading day; for disable and check, to today. The run prints which and why.
  * - enable: the session's picks (the export's manifest, `latest-<book>.json`; the book from
  *   Settings › Automation unless `--book`) that the uploader created, each read back against its
- *   export and set to the account's broker if unset, are enabled. For today, never within 90 s of
- *   an algo's start (TOO LATE, that algo only). An owned algo of the session that 09:16 dropped
- *   and that is enabled is disabled again, if it has not started.
- * - disable: after the session, the session's owned algos still enabled (and any of an earlier
- *   session) are disabled, so they do not run again next week. Only finished ones.
+ *   export and set to the account's broker if unset, are enabled; never one this session's deploy
+ *   ledger shows switched on or off already (the owner may have switched it off). For today, never
+ *   within 90 s of an algo's start (TOO LATE, that algo only, checked again just before the
+ *   call). An owned algo of the session that is ENABLED but no longer a pick, or fails a check, is
+ *   switched off if it has not started, else reported as ENABLED.
+ * - disable: the session's owned algos still enabled (and any of an earlier session) are
+ *   disabled, so they do not run again next week. Only finished ones, and today's only after
+ *   15:30 IST unless `--emergency` (the emergency stop: today's pending entries too).
  * - check: read-only: owned algos enabled after their session.
- * - After any change the list is read again: exactly the intended algos must have changed, and
- *   no other algo's `enabled`; anything else stops the run, alerts and exits 3.
+ * - After any change the list is read again: exactly the intended algos must have changed, and no
+ *   other algo of the tool's; anything else stops the run, alerts and exits 3.
  *
- * Gates: without `--apply` it logs in, prints the plan and changes nothing. `--apply` needs
- * `QUANTIPLY_DEPLOY=on` (else it stops before logging in), and to enable also the dashboard's
- * "Automated deployment" switch and the account's row uploading a list. A disable with the switch
- * off changes nothing but alerts when an owned algo is left enabled after its session.
- * Every change is a row in `deploy-ledger[-<broker>].jsonl`. The JWT is never logged.
+ * Gates: without `--apply` it logs in, prints the plan and changes nothing. Enabling with
+ * `--apply` needs `QUANTIPLY_DEPLOY=on` (else it stops before logging in), the dashboard's
+ * "Automated deployment" switch and the account's row uploading a list. Disabling is the safety
+ * net and is never gated: `--mode disable --apply` always runs, whatever `QUANTIPLY_DEPLOY` and the
+ * switch say, because switching off only ever lowers what trades. Every change is a row in
+ * `deploy-ledger[-<broker>].jsonl`. The JWT is never logged.
  */
 
 /** 1: may succeed on a retry, nothing was changed blind. 3: the owner must look; never retried. */
@@ -89,10 +97,6 @@ const EXIT_NO_RETRY = 3;
 
 /** Already in the report's lines; ends the run without another line. */
 class Reported extends Error {}
-
-async function readJson<T>(path: string): Promise<T> {
-  return JSON.parse(await readFile(path, 'utf8')) as T;
-}
 
 interface Picks {
   manifest: QManifest;
@@ -121,6 +125,7 @@ async function main(): Promise<number> {
       book: { type: 'string' },
       dir: { type: 'string' },
       ledger: { type: 'string' },
+      emergency: { type: 'boolean', default: false },
       apply: { type: 'boolean', default: false },
       headed: { type: 'boolean', default: false },
     },
@@ -128,12 +133,16 @@ async function main(): Promise<number> {
   const mode = values.mode as DeployMode;
   if (!['enable', 'disable', 'check'].includes(mode ?? '')) {
     console.error(
-      'usage: --broker angelone|finvasia --mode enable|disable|check [--day YYYY-MM-DD] [--book core|t1 | --dir <folder>] [--apply]',
+      'usage: --broker angelone|finvasia --mode enable|disable|check [--day YYYY-MM-DD] [--book core|t1 | --dir <folder>] [--emergency] [--apply]',
     );
     return 64;
   }
   if (mode === 'check' && values.apply) {
     console.error('check is read-only: no --apply');
+    return 64;
+  }
+  if (values.emergency && mode !== 'disable') {
+    console.error('--emergency is for --mode disable only');
     return 64;
   }
   if (values.day && !/^\d{4}-\d\d-\d\d$/.test(values.day)) {
@@ -144,11 +153,13 @@ async function main(): Promise<number> {
   const broker = parseQuantiplyBroker(values.broker);
   const site = QUANTIPLY_SITES[broker];
 
-  // Gate 1, before any login: the .env switch.
-  if (values.apply && process.env.QUANTIPLY_DEPLOY?.trim().toLowerCase() !== 'on') {
-    console.log(
-      `${site.name}: QUANTIPLY_DEPLOY is not "on": nothing enabled or disabled (dry run without --apply)`,
-    );
+  // Gate 1, before any login, for enable only: the .env switch. Disable is never gated.
+  if (
+    values.apply &&
+    mode === 'enable' &&
+    process.env.QUANTIPLY_DEPLOY?.trim().toLowerCase() !== 'on'
+  ) {
+    console.log(`${site.name}: QUANTIPLY_DEPLOY is not "on": nothing enabled`);
     return 0;
   }
   let automation: Automation;
@@ -165,9 +176,7 @@ async function main(): Promise<number> {
     console.log(`${site.name}: ${gate.why} (${decidedBy}): nothing enabled`);
     return 0;
   }
-  /** a disable that the settings hold back: plan only, alert if something stays enabled */
-  const heldBack = values.apply && mode === 'disable' && !automation.masters.deploy;
-  const apply = values.apply && !heldBack;
+  const apply = values.apply;
 
   const dataRoot = process.env.TRADING_DATA_ROOT?.trim();
   if (!values.ledger && !dataRoot) {
@@ -176,18 +185,16 @@ async function main(): Promise<number> {
   }
   const ledgerPath = values.ledger
     ? resolve(values.ledger)
-    : join(
-        dataRoot ?? '',
-        'rotation',
-        'quantiply',
-        broker === 'angelone' ? 'ledger.jsonl' : `ledger-${broker}.jsonl`,
-      );
+    : quantiplyLedgerPath(dataRoot ?? '', broker);
   const stateDir = dirname(ledgerPath);
   const deployLedger = join(
     stateDir,
     broker === 'angelone' ? 'deploy-ledger.jsonl' : `deploy-ledger-${broker}.jsonl`,
   );
   const ledger = existsSync(ledgerPath) ? parseQLedger(await readFile(ledgerPath, 'utf8')) : [];
+  const deployRows = existsSync(deployLedger)
+    ? parseDeployLedger(await readFile(deployLedger, 'utf8'))
+    : [];
 
   const today = istToday();
   const chosen = values.day
@@ -195,23 +202,8 @@ async function main(): Promise<number> {
     : defaultSession(mode, today, istSeconds(), isTradingDay);
   const session = chosen.day;
   const weekday = weekdayOf(session);
-  const label = `${site.name} ${mode} for ${session} (${weekday})`;
+  const label = `${site.name} ${mode}${values.emergency ? ' (EMERGENCY)' : ''} for ${session} (${weekday})`;
   console.log(`${label}: session from ${chosen.why}; ${decidedBy}`);
-
-  // Nothing of the tool's to look at: no login (every login is an Angel One / Shoonya TOTP).
-  const owned = ownedIds(ledger);
-  const relevant =
-    mode === 'enable'
-      ? ownedForSession(ledger, session).size
-      : mode === 'disable'
-        ? [...owned.values()].filter((r) => r.day === session || r.day < today).length
-        : owned.size;
-  if (!relevant) {
-    console.log(
-      `nothing the uploader created for ${session} on this account: no login, nothing to do`,
-    );
-    return 0;
-  }
 
   let picks: Picks | null = null;
   if (mode === 'enable') {
@@ -250,6 +242,21 @@ async function main(): Promise<number> {
     console.log(`picks (${m.book}, ${m.source}): ${[...picks.sha.keys()].join(', ')}`);
   }
 
+  // Nothing of the tool's to look at: no login (every login is an Angel One / Shoonya TOTP).
+  const owned = ownedIds(ledger);
+  const relevant =
+    mode === 'enable'
+      ? ownedForSession(ledger, session, picks?.sha).size
+      : mode === 'disable'
+        ? [...owned.values()].filter((r) => r.day === session || r.day < today).length
+        : owned.size;
+  if (!relevant) {
+    console.log(
+      `nothing the uploader created for ${session} on this account: no login, nothing to do`,
+    );
+    return 0;
+  }
+
   let creds: QCredentials;
   try {
     creds = quantiplyCredentials(broker);
@@ -280,11 +287,29 @@ async function main(): Promise<number> {
       lines.push(`❌ the deploy ledger could not be written (${describe(error)}): ${line.trim()}`);
     }
   };
+  const ownedSet = new Set(owned.keys());
+  /** Re-read the list; true when exactly the intended changes show. */
+  const verify = async (
+    before: Awaited<ReturnType<QuantiplyApi['list']>>,
+    after: Awaited<ReturnType<QuantiplyApi['list']>>,
+    intended: Map<string, boolean>,
+    uncertain: Set<string>,
+  ): Promise<boolean> => {
+    const v = verifyToggles(before, after, intended, uncertain, ownedSet);
+    for (const n of v.notes) lines.push(`note (not the tool's): ${n}`);
+    if (v.problems.length) {
+      attention = true;
+      lines.push(`❌ VERIFY: ${v.problems.join('; ')}`);
+      return false;
+    }
+    return true;
+  };
 
   try {
     let api: QuantiplyApi;
     try {
-      api = await openQuantiply(creds, stateDir, { headed: values.headed });
+      // A refused TOTP code changes nothing on Quantiply: one more login in the next window.
+      api = await openQuantiply(creds, stateDir, { headed: values.headed, retryTotpOnce: true });
     } catch (error) {
       if (error instanceof LoginRefused) {
         attention = true;
@@ -309,18 +334,15 @@ async function main(): Promise<number> {
         lines.push(`⚠️ ENABLED after its session, would run again next week: ${stale.join(', ')}`);
       } else lines.push('no owned algo is enabled after its session');
     } else if (mode === 'disable') {
-      const plan = planDisable(session, today, ledger, before);
+      const plan = planDisable(session, today, ledger, before, {
+        nowSeconds: istSeconds(),
+        emergency: values.emergency,
+      });
       const s = summaryDisable(plan);
       lines.push(...s.lines);
       if (s.attention) attention = true;
       printed = lines.length;
       console.log(`${label}${apply ? '' : ' (dry run)'}\n${lines.join('\n')}`);
-      if (heldBack && plan.disable.length) {
-        attention = true;
-        lines.push(
-          `NOT disabled, Automated deployment is off (${decidedBy}): disable them in Quantiply by hand, or they run again next ${weekday}`,
-        );
-      }
       if (apply && plan.disable.length) {
         await mkdir(stateDir, { recursive: true });
         const intended = new Map<string, boolean>();
@@ -350,11 +372,7 @@ async function main(): Promise<number> {
           if (a && !a.enabled) intended.set(id, false);
           else retryable = true;
         }
-        const problems = verifyToggles(before, after, intended);
-        if (problems.length) {
-          attention = true;
-          lines.push(`❌ VERIFY: ${problems.join('; ')}`);
-        } else if (intended.size) {
+        if ((await verify(before, after, intended, new Set())) && intended.size) {
           lines.push(
             `✅ disabled and confirmed: ${plan.disable
               .filter((t) => intended.has(t.id))
@@ -366,7 +384,7 @@ async function main(): Promise<number> {
     } else {
       const p = picks as Picks;
       const pb = pickBroker(parseBrokers(await api.brokers()), creds.user);
-      const mine = ownedForSession(ledger, session);
+      const mine = ownedForSession(ledger, session, p.sha);
       const details = new Map<string, AlgoDetail>();
       for (const a of before) {
         if (!mine.has(a.id)) continue;
@@ -387,6 +405,7 @@ async function main(): Promise<number> {
         algos: before,
         details,
         brokerId: 'id' in pb ? pb.id : '',
+        toggled: toggledIds(deployRows, session),
       });
       if ('error' in pb) plan.refused = `the account's broker: ${pb.error}`;
       const s = summaryEnable(plan);
@@ -395,26 +414,20 @@ async function main(): Promise<number> {
       printed = lines.length;
       console.log(`${label}${apply ? '' : ' (dry run)'}\n${lines.join('\n')}`);
 
-      if (apply && !plan.refused && (plan.enable.length || plan.dropped.length)) {
+      if (apply && !plan.refused && (plan.enable.length || plan.disable.length)) {
         await mkdir(stateDir, { recursive: true });
         await appendFile(deployLedger, '', 'utf8');
         const brokerId = 'id' in pb ? pb.id : '';
         const intended = new Map<string, boolean>();
         const uncertain = new Set<string>();
         let stop = false;
-        // Dropped picks first: it only ever lowers what trades.
-        for (const t of plan.dropped) {
+        // Switching off first: it only ever lowers what trades.
+        for (const t of plan.disable) {
           try {
             await api.setEnabled(t.id, false);
             changed = true;
             intended.set(t.id, false);
-            await record({
-              action: 'disable',
-              id: t.id,
-              name: t.name,
-              ok: true,
-              detail: 'no longer a pick',
-            });
+            await record({ action: 'disable', id: t.id, name: t.name, ok: true, detail: t.why });
           } catch (error) {
             uncertain.add(t.id);
             await record({
@@ -430,7 +443,30 @@ async function main(): Promise<number> {
           }
         }
         for (const t of stop ? [] : plan.enable) {
-          // The plan checked the time at login; check again right before the call.
+          const body = p.body.get(t.name) ?? {};
+          try {
+            if (t.setBroker) {
+              await api.setBroker(t.id, brokerId);
+              changed = true;
+              // The broker call rewrites the algo: read it back in full before enabling it.
+              const raw = await api.get(t.id);
+              const back = parseDetail(raw);
+              const diffs = readBackDiffs(body, raw);
+              const ok = back.broker === brokerId && !back.enabled && !diffs.length;
+              await record({ action: 'broker', id: t.id, name: t.name, ok });
+              if (!ok) {
+                throw new Error(
+                  `after setting the broker it reads broker ${back.broker === brokerId ? 'set' : back.broker ? 'another account' : 'unset'}, ${back.enabled ? 'ENABLED' : 'disabled'}${diffs.length ? `, content differs: ${diffs.slice(0, 3).join(', ')}` : ''}`,
+                );
+              }
+            }
+          } catch (error) {
+            attention = true;
+            lines.push(`❌ ${t.name}: broker not set, not enabled — ${describe(error)}`);
+            break;
+          }
+          // The plan checked the time at login and the broker call took a while: check again
+          // right before the call that deploys it.
           if (session === today && t.startTime) {
             const left = startSeconds(t.startTime) - istSeconds();
             if (left < ENABLE_LEAD_SECONDS) {
@@ -440,28 +476,6 @@ async function main(): Promise<number> {
               );
               continue;
             }
-          }
-          try {
-            if (t.setBroker) {
-              await api.setBroker(t.id, brokerId);
-              changed = true;
-              const back = parseDetail(await api.get(t.id));
-              await record({
-                action: 'broker',
-                id: t.id,
-                name: t.name,
-                ok: back.broker === brokerId,
-              });
-              if (back.broker !== brokerId || back.enabled) {
-                throw new Error(
-                  `after setting the broker it reads broker ${back.broker ? 'another account' : 'unset'}, ${back.enabled ? 'ENABLED' : 'disabled'}`,
-                );
-              }
-            }
-          } catch (error) {
-            attention = true;
-            lines.push(`❌ ${t.name}: broker not set, not enabled — ${describe(error)}`);
-            break;
           }
           try {
             await api.setEnabled(t.id, true);
@@ -482,13 +496,9 @@ async function main(): Promise<number> {
           }
         }
         const after = await api.list();
-        const problems = verifyToggles(before, after, intended, uncertain);
-        if (problems.length) {
-          attention = true;
-          lines.push(`❌ VERIFY: ${problems.join('; ')}`);
-        } else {
+        if (await verify(before, after, intended, uncertain)) {
           const on = plan.enable.filter((t) => intended.get(t.id) === true).map((t) => t.name);
-          const off = plan.dropped.filter((t) => intended.get(t.id) === false).map((t) => t.name);
+          const off = plan.disable.filter((t) => intended.get(t.id) === false).map((t) => t.name);
           if (on.length) lines.push(`✅ enabled and confirmed: ${on.join(', ')}`);
           if (off.length) lines.push(`✅ disabled and confirmed: ${off.join(', ')}`);
         }
@@ -506,7 +516,7 @@ async function main(): Promise<number> {
   const failed = retryable || attention;
   // Quiet when nothing happened: the scheduler alerts on a failure, a change always reports.
   // A dry run never messages, except a failed check (it exists to alert).
-  const send = (values.apply && (changed || failed)) || (mode === 'check' && failed);
+  const send = (apply && (changed || failed)) || (mode === 'check' && failed);
   if (send) {
     const head = failed ? `⚠️ ${label}: check Quantiply` : `✅ ${label}`;
     await sendText(
@@ -516,9 +526,24 @@ async function main(): Promise<number> {
     ).catch(() => undefined);
   }
   console.log(lines.slice(printed).join('\n'));
+  // Disable: a retry may still switch off what is left on, so a retryable failure wins (the
+  // 15:40 job's retries run). Enable is never retried: the owner must look first.
+  if (mode === 'disable' && retryable) return EXIT_RETRY;
   if (attention) return EXIT_NO_RETRY;
   if (retryable) return EXIT_RETRY;
   return 0;
 }
 
-main().then((code) => process.exit(code));
+main()
+  .then((code) => process.exit(code))
+  .catch(async (error: unknown) => {
+    // Anything unexpected (a bad export or manifest, a bad --broker): say so, never silently.
+    const text = `⚠️ Quantiply deploy (${process.argv.slice(2).join(' ')}) stopped: ${describe(error)}`;
+    console.error(text);
+    if (process.argv.includes('--apply')) {
+      await Promise.resolve()
+        .then(() => sendText(readTelegramConfig(), redact(text), 'broker.quantiply'))
+        .catch(() => undefined);
+    }
+    process.exit(EXIT_RETRY);
+  });

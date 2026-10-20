@@ -12,18 +12,23 @@ import {
  * network. Enabling a Quantiply algo deploys it on the owner's real account for its weekday, every
  * week, until it is disabled. So:
  *
- * - Only algos the uploader created (its ledger, `ownedIds`) for the session (the ledger row's
- *   `day`) are ever enabled or disabled. Never an algo the owner made.
+ * - Only algos the uploader created (its ledger, `ownedIds`) for the session are ever enabled or
+ *   disabled: the ledger row's `day` is the session, or the uploader kept an earlier copy on the
+ *   session's weekday with the pick's content (`ownedForSession`). Never an algo the owner made.
  * - Enable: an owned algo of the session that is one of the session's picks (the export's
  *   manifest), listed by Quantiply on the session's weekday, not enabled, finished, with the
  *   content the export holds (ledger sha and a fresh read-back), and either no broker (set to the
  *   account's own) or the account's own broker. For today's session, never within
- *   `ENABLE_LEAD_SECONDS` of its start: TOO LATE, for that algo only.
- * - An owned algo of the session that is no longer a pick (09:16 changed it) and is enabled is
- *   disabled again, if it has not started.
- * - Disable: after the session, every owned algo of the session that is enabled and finished,
- *   plus any owned algo of an earlier session still enabled (it would run again next week).
- * - Afterwards the list is read again (`verifyToggles`): exactly the intended ids changed.
+ *   `ENABLE_LEAD_SECONDS` of its start: TOO LATE, for that algo only. Never one this session's
+ *   deploy ledger already shows switched on or off (the owner may have switched it off since).
+ * - An owned algo of the session that is ENABLED but no longer a pick (09:16 changed it), or that
+ *   fails any check above, is switched off again if it has not started; otherwise it is reported
+ *   as ENABLED for the owner. A check never reports an enabled algo as merely "not enabled".
+ * - Disable: every owned algo of the session that is enabled and finished, plus any owned algo of
+ *   an earlier session still enabled (it would run again next week). Today's only once today's
+ *   session is over, unless it is the emergency stop.
+ * - Afterwards the list is read again (`verifyToggles`): exactly the intended ids changed, and no
+ *   other algo of the tool's.
  */
 
 /** Never enable an algo for today this close to its start (seconds). */
@@ -39,10 +44,26 @@ export interface AlgoDetail {
   status: string;
   /** `configurations.startTime`, `HH:MM:SS`; null when missing */
   startTime: string | null;
-  /** the broker account id, '' when none is set */
+  /** the broker account id; '' when none is set; `UNKNOWN_BROKER` when set but not readable */
   broker: string;
   /** read-back differences against the export's body; null when there is no body to compare */
   diffs: string[] | null;
+}
+
+/** A broker that is set but in a shape this tool does not know: never equal to an account id. */
+export const UNKNOWN_BROKER = '(set, unrecognised)';
+
+/** `broker` as `GET /algos/:id` gives it: unset, an id, or set but unrecognised. */
+export function parseBroker(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'object') {
+    const o = value as Record<string, unknown>;
+    const id = o._id ?? o.id;
+    if (typeof id === 'string' && id) return id;
+  }
+  return UNKNOWN_BROKER;
 }
 
 export function parseDetail(raw: Record<string, unknown>): Omit<AlgoDetail, 'diffs'> {
@@ -54,7 +75,7 @@ export function parseDetail(raw: Record<string, unknown>): Omit<AlgoDetail, 'dif
     enabled: raw.enabled === true,
     status: typeof raw.status === 'string' ? raw.status : 'UNKNOWN',
     startTime: typeof start === 'string' && /^\d\d:\d\d(:\d\d)?$/.test(start) ? start : null,
-    broker: typeof raw.broker === 'string' ? raw.broker : '',
+    broker: parseBroker(raw.broker),
   };
 }
 
@@ -77,7 +98,8 @@ export function parseBrokers(json: unknown): QBroker[] {
 
 /**
  * The account's own broker id: the one listed broker whose client code is the account's (the
- * `.env` login). Anything but exactly one enabled match is refused; never a guess.
+ * `.env` login). No match or several matches (disabled accounts counted too) are refused, and so
+ * is a single match that is disabled; never a guess.
  */
 export function pickBroker(
   brokers: QBroker[],
@@ -148,6 +170,12 @@ export interface Target {
   setBroker: boolean;
 }
 
+/** An enabled algo to switch off, and why. `alert`: the owner should hear of it. */
+export interface OffTarget extends Target {
+  why: string;
+  alert: boolean;
+}
+
 export interface EnablePlan {
   /** the whole run is refused (nothing is changed) */
   refused: string | null;
@@ -156,10 +184,12 @@ export interface EnablePlan {
   already: string[];
   /** today's session, too close to its start: not enabled */
   tooLate: string[];
-  /** owned algos of the session that are no longer picks, enabled, not started: disabled */
-  dropped: Target[];
-  /** the same, but maybe started or too close: left for the owner */
-  droppedLive: string[];
+  /** ENABLED owned algos of the session to switch off: no longer a pick, or a check failed */
+  disable: OffTarget[];
+  /** ENABLED and no longer a pick or failing a check, but maybe started: left for the owner */
+  enabledLive: string[];
+  /** switched on or off already this session (deploy ledger) and now off: left off */
+  leftOff: string[];
   /** owned algos of the session that are no longer picks and are not enabled: left alone */
   notPicked: string[];
   /** picks with no owned algo for the session on Quantiply */
@@ -186,6 +216,45 @@ export interface EnableInput {
   algos: QAlgo[];
   details: Map<string, AlgoDetail>;
   brokerId: string;
+  /** algo ids the deploy ledger shows switched on or off already for this session */
+  toggled?: Set<string>;
+}
+
+/** One row of `deploy-ledger*.jsonl`. */
+export interface DeployLedgerRow {
+  at: string;
+  session: string;
+  mode: string;
+  action: 'enable' | 'disable' | 'broker';
+  id: string;
+  name: string;
+  ok: boolean;
+  detail?: string;
+}
+
+export function parseDeployLedger(text: string): DeployLedgerRow[] {
+  const rows: DeployLedgerRow[] = [];
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      rows.push(JSON.parse(line) as DeployLedgerRow);
+    } catch {
+      // a torn last line is skipped
+    }
+  }
+  return rows;
+}
+
+/**
+ * Ids this tool switched on or off for `session`. A failed call counts too: its state was
+ * unknown, so the owner has been told and decides.
+ */
+export function toggledIds(rows: DeployLedgerRow[], session: string): Set<string> {
+  return new Set(
+    rows
+      .filter((r) => r.session === session && (r.action === 'enable' || r.action === 'disable'))
+      .map((r) => r.id),
+  );
 }
 
 /** Why a run for `session` must not change anything (enable), or null. */
@@ -200,10 +269,22 @@ export function refuseEnable(session: string, today: string, nowSeconds: number)
   return null;
 }
 
-/** Owned algos whose ledger create row is for `session`: id -> that row. */
-export function ownedForSession(ledger: QLedgerRow[], session: string): Map<string, QLedgerRow> {
+/**
+ * Owned algos for `session`: id -> the ledger's create row. That row's `day` is the session, or
+ * (with `picks`) it is an earlier copy on the session's weekday with a pick's exact content, which
+ * the uploader's evening kept rather than made again.
+ */
+export function ownedForSession(
+  ledger: QLedgerRow[],
+  session: string,
+  picks?: Map<string, string>,
+): Map<string, QLedgerRow> {
+  const weekday = weekdayOf(session);
   const out = new Map<string, QLedgerRow>();
-  for (const [id, row] of ownedIds(ledger)) if (row.day === session) out.set(id, row);
+  for (const [id, row] of ownedIds(ledger)) {
+    const kept = row.day < session && row.weekday === weekday && picks?.get(row.name) === row.sha;
+    if (row.day === session || kept) out.set(id, row);
+  }
   return out;
 }
 
@@ -219,8 +300,9 @@ export function planEnable(input: EnableInput): EnablePlan {
     enable: [],
     already: [],
     tooLate: [],
-    dropped: [],
-    droppedLive: [],
+    disable: [],
+    enabledLive: [],
+    leftOff: [],
     notPicked: [],
     missing: [],
     duplicates: [],
@@ -231,14 +313,34 @@ export function planEnable(input: EnableInput): EnablePlan {
   };
   if (out.refused) return out;
   const weekday = weekdayOf(input.session);
+  const toggled = input.toggled ?? new Set<string>();
   const listed = new Map(input.algos.map((a) => [a.id, a]));
-  const mine = ownedForSession(input.ledger, input.session);
+  const mine = ownedForSession(input.ledger, input.session, input.picks);
+  const isOn = (id: string) =>
+    listed.get(id)?.enabled === true || input.details.get(id)?.enabled === true;
+
+  /** An enabled algo that must not stay on: off if it has not started, else the owner's. */
+  const switchOff = (id: string, name: string, why: string, alert: boolean) => {
+    const a = listed.get(id) as QAlgo;
+    const start = input.details.get(id)?.startTime ?? null;
+    if (a.status === 'NOT_RUNNING' && !late(start, input)) {
+      out.disable.push({ id, name, startTime: start, setBroker: false, why, alert });
+    } else out.enabledLive.push(`${name} (ENABLED and ${why}, ${a.status})`);
+  };
+  /** A failed check: on an enabled algo it is never just "not enabled". */
+  const reject = (id: string, name: string, why: string, list: string[], label = name) => {
+    if (isOn(id)) switchOff(id, name, why, true);
+    else list.push(label);
+  };
+
+  const seen = new Set<string>(); // names of every owned algo of the session that is listed
   const byName = new Map<string, string[]>();
   for (const [id, row] of mine) {
     const a = listed.get(id);
     if (!a) continue; // deleted on Quantiply since: nothing to enable
+    seen.add(a.name);
     if (a.day !== weekday || row.weekday !== weekday) {
-      out.wrongDay.push(`${a.name} (${a.day})`);
+      reject(id, a.name, `on ${a.day}, not ${weekday}`, out.wrongDay, `${a.name} (${a.day})`);
       continue;
     }
     byName.set(a.name, [...(byName.get(a.name) ?? []), id]);
@@ -247,50 +349,49 @@ export function planEnable(input: EnableInput): EnablePlan {
   for (const [name, ids] of byName) {
     if (!input.picks.has(name)) {
       for (const id of ids) {
-        const a = listed.get(id) as QAlgo;
-        if (!a.enabled) {
-          out.notPicked.push(name);
-          continue;
-        }
-        const d = input.details.get(id);
-        const start = d?.startTime ?? null;
-        if (a.status === 'NOT_RUNNING' && !late(start, input)) {
-          out.dropped.push({ id, name, startTime: start, setBroker: false });
-        } else out.droppedLive.push(name);
+        if (isOn(id)) switchOff(id, name, 'no longer a pick', false);
+        else out.notPicked.push(name);
       }
       continue;
     }
     if (ids.length > 1) {
       out.duplicates.push(name);
+      for (const id of ids) if (isOn(id)) switchOff(id, name, 'one of several copies', true);
       continue;
     }
     const id = ids[0] as string;
     const a = listed.get(id) as QAlgo;
     const row = mine.get(id) as QLedgerRow;
     const d = input.details.get(id);
+    if (toggled.has(id) && !isOn(id)) {
+      out.leftOff.push(name);
+      continue;
+    }
     if (row.sha !== input.picks.get(name)) {
-      out.differs.push(
-        `${name} (${row.sha.startsWith('mismatch:') ? 'its read-back differed at upload' : 'not the export it was made from'})`,
-      );
+      const why = row.sha.startsWith('mismatch:')
+        ? 'its read-back differed at upload'
+        : 'not the export it was made from';
+      reject(id, name, `content differs: ${why}`, out.differs, `${name} (${why})`);
       continue;
     }
     if (!d) {
-      out.unexpected.push(`${name} (not read)`);
+      reject(id, name, 'not read', out.unexpected, `${name} (not read)`);
       continue;
     }
     if (d.diffs === null || d.diffs.length) {
-      out.differs.push(`${name} (now: ${d.diffs?.slice(0, 3).join(', ') || 'no export body'})`);
+      const why = `now: ${d.diffs?.slice(0, 3).join(', ') || 'no export body'}`;
+      reject(id, name, `content differs: ${why}`, out.differs, `${name} (${why})`);
       continue;
     }
     if (d.day !== weekday) {
-      out.wrongDay.push(`${name} (${d.day})`);
+      reject(id, name, `on ${d.day}, not ${weekday}`, out.wrongDay, `${name} (${d.day})`);
       continue;
     }
     if (d.broker && d.broker !== input.brokerId) {
-      out.brokerDiffers.push(name);
+      reject(id, name, 'another broker account', out.brokerDiffers);
       continue;
     }
-    if (a.enabled || d.enabled) {
+    if (isOn(id)) {
       out.already.push(name);
       continue;
     }
@@ -308,7 +409,7 @@ export function planEnable(input: EnableInput): EnablePlan {
     }
     out.enable.push({ id, name, startTime: d.startTime, setBroker: !d.broker });
   }
-  for (const name of input.picks.keys()) if (!byName.has(name)) out.missing.push(name);
+  for (const name of input.picks.keys()) if (!seen.has(name)) out.missing.push(name);
   return out;
 }
 
@@ -318,20 +419,27 @@ export interface DisablePlan {
   live: string[];
   /** owned algos of the session already disabled */
   off: string[];
+  /** enabled on today's weekday while today's session is not over: left on (no `emergency`) */
+  notYet: string[];
 }
 
 /**
  * Disable: owned algos of `session`, and of any earlier session, that Quantiply lists enabled.
- * Only finished ones (`NOT_RUNNING`, `TRADE_CLOSED`); anything else may hold a position.
+ * Only finished ones (`NOT_RUNNING`, `TRADE_CLOSED`); anything else may hold a position. An algo
+ * on today's weekday is left on until today's session is over (15:30 IST), unless `emergency`:
+ * the owner's emergency stop, which switches off pending entries too.
  */
 export function planDisable(
   session: string,
   today: string,
   ledger: QLedgerRow[],
   algos: QAlgo[],
+  opts: { nowSeconds?: number; emergency?: boolean } = {},
 ): DisablePlan {
-  const out: DisablePlan = { disable: [], live: [], off: [] };
+  const out: DisablePlan = { disable: [], live: [], off: [], notYet: [] };
   const listed = new Map(algos.map((a) => [a.id, a]));
+  const todayWeekday = weekdayOf(today);
+  const over = (opts.nowSeconds ?? 0) >= SESSION_OVER_MINUTES * 60;
   for (const [id, row] of ownedIds(ledger)) {
     if (row.day !== session && row.day >= today) continue;
     const a = listed.get(id);
@@ -341,7 +449,8 @@ export function planDisable(
       if (row.day === session) out.off.push(label);
       continue;
     }
-    if (FINISHED.has(a.status))
+    if (a.day === todayWeekday && !over && !opts.emergency) out.notYet.push(label);
+    else if (FINISHED.has(a.status))
       out.disable.push({ id, name: label, startTime: null, setBroker: false });
     else out.live.push(`${label} (${a.status})`);
   }
@@ -372,20 +481,23 @@ export function staleEnabled(
 
 /**
  * After the calls: compare a fresh list with the one before. `intended`: id -> the `enabled` a
- * successful call set. `uncertain`: ids whose call failed (state unknown). Every intended id
- * must show its new state; every other algo must show the state it had; an uncertain one is
- * reported with what it shows. Any line returned means stop and alert.
+ * successful call set. `uncertain`: ids whose call failed (state unknown). `owned`: the tool's
+ * algos. Every intended id must show its new state, every other algo of the tool's the state it
+ * had, and an uncertain one is reported with what it shows: those are `problems` (stop, alert).
+ * A change on an algo the tool does not own is the owner's: a `note` only.
  */
 export function verifyToggles(
   before: QAlgo[],
   after: QAlgo[],
   intended: Map<string, boolean>,
-  uncertain: Set<string> = new Set(),
-): string[] {
+  uncertain: Set<string>,
+  owned: Set<string>,
+): { problems: string[]; notes: string[] } {
   const now = new Map(after.map((a) => [a.id, a]));
   const was = new Map(before.map((a) => [a.id, a]));
   const state = (on: boolean) => (on ? 'ENABLED' : 'disabled');
   const problems: string[] = [];
+  const notes: string[] = [];
   for (const [id, want] of intended) {
     const a = now.get(id);
     const name = a?.name ?? was.get(id)?.name ?? id;
@@ -403,15 +515,14 @@ export function verifyToggles(
   for (const b of before) {
     if (intended.has(b.id) || uncertain.has(b.id)) continue;
     const a = now.get(b.id);
-    if (a && a.enabled !== b.enabled) {
-      problems.push(`${b.name} (${b.day}) changed to ${state(a.enabled)}, not by this run`);
-    }
+    if (!a || a.enabled === b.enabled) continue;
+    const line = `${b.name} (${b.day}) changed to ${state(a.enabled)}, not by this run`;
+    (owned.has(b.id) ? problems : notes).push(line);
   }
   for (const a of after) {
-    if (!was.has(a.id) && a.enabled)
-      problems.push(`${a.name} (${a.day}) appeared ENABLED, not by this run`);
+    if (!was.has(a.id) && a.enabled) notes.push(`${a.name} (${a.day}) appeared ENABLED`);
   }
-  return problems;
+  return { problems, notes };
 }
 
 /** Human lines for an enable plan; `attention` when the owner should look. */
@@ -422,13 +533,17 @@ export function summaryEnable(p: EnablePlan): { lines: string[]; attention: bool
     `${x.name}${x.startTime ? ` (${x.startTime})` : ''}${x.setBroker ? ' + set broker' : ''}`;
   if (p.enable.length) lines.push(`enable: ${p.enable.map(t).join(', ')}`);
   if (p.already.length) lines.push(`already enabled: ${p.already.join(', ')}`);
-  if (p.dropped.length) lines.push(`disable, no longer a pick: ${p.dropped.map(t).join(', ')}`);
+  const routine = p.disable.filter((x) => !x.alert);
+  const bad = p.disable.filter((x) => x.alert);
+  if (routine.length) lines.push(`disable, no longer a pick: ${routine.map(t).join(', ')}`);
+  if (bad.length)
+    lines.push(`⚠️ disable, ENABLED and ${bad.map((x) => `${x.why}: ${x.name}`).join('; ')}`);
+  if (p.leftOff.length)
+    lines.push(`switched off since it was switched on, left off: ${p.leftOff.join(', ')}`);
   if (p.notPicked.length) lines.push(`not a pick, left disabled: ${p.notPicked.join(', ')}`);
   if (p.tooLate.length) lines.push(`TOO LATE, not enabled: ${p.tooLate.join(', ')}`);
-  if (p.droppedLive.length)
-    lines.push(
-      `⚠️ ENABLED, no longer a pick, may have started: check by hand: ${p.droppedLive.join(', ')}`,
-    );
+  if (p.enabledLive.length)
+    lines.push(`⚠️ may have started, NOT switched off, check by hand: ${p.enabledLive.join(', ')}`);
   if (p.missing.length)
     lines.push(`NOT ON QUANTIPLY (not uploaded), not enabled: ${p.missing.join(', ')}`);
   if (p.duplicates.length)
@@ -440,8 +555,9 @@ export function summaryEnable(p: EnablePlan): { lines: string[]; attention: bool
   if (p.unexpected.length) lines.push(`UNEXPECTED, not enabled: ${p.unexpected.join(', ')}`);
   if (!lines.length) lines.push('nothing to enable');
   const attention =
-    p.tooLate.length +
-      p.droppedLive.length +
+    bad.length +
+      p.tooLate.length +
+      p.enabledLive.length +
       p.missing.length +
       p.duplicates.length +
       p.wrongDay.length +
@@ -456,6 +572,11 @@ export function summaryDisable(p: DisablePlan): { lines: string[]; attention: bo
   const lines: string[] = [];
   if (p.disable.length) lines.push(`disable: ${p.disable.map((t) => t.name).join(', ')}`);
   if (p.off.length) lines.push(`already disabled: ${p.off.join(', ')}`);
+  if (p.notYet.length) {
+    lines.push(
+      `today's session is not over, left ENABLED (the emergency stop switches them off): ${p.notYet.join(', ')}`,
+    );
+  }
   if (p.live.length) lines.push(`⚠️ ENABLED and may be running, NOT disabled: ${p.live.join(', ')}`);
   if (!lines.length) lines.push('nothing to disable');
   return { lines, attention: p.live.length > 0 };

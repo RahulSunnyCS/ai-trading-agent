@@ -184,6 +184,23 @@ its weekday every week until it is switched off.
 
 ## Log
 
+- 2026-10-20 — Review of #273, fixed on the branch:
+  1. An algo this session already switched on or off (the deploy ledger) is never switched on again: an owner who
+     switched it off by hand keeps it off.
+  2. An ENABLED algo that fails a check (content, not read, weekday, broker, a duplicate) is switched off if it has
+     not started, otherwise reported as ENABLED; never "not enabled".
+  3. Disable is the safety net: it runs whatever `QUANTIPLY_DEPLOY` and the deploy switch say.
+  4. The scheduler group never kept two logins out of one TOTP window. A file stamp of the last window per account
+     does now, and the deployer retries a refused code once.
+  5. TOO LATE is checked right before the enable call. After the broker call the algo is read back in full.
+  6. A broker in an unknown shape counts as another account; `PUT {broker}` only goes to an unset one.
+  7. Today's algos are switched off only after 15:30, unless `--emergency` (the emergency stop).
+  8. A copy the uploader kept from an earlier week (same content) counts as the session's; an uploaded algo on the
+     wrong weekday is no longer also "not uploaded".
+  9. A retryable disable failure exits 1, so the 15:40 retries run.
+  Nits: one ledger path and `readJson` for uploader and deployer, a crash alerts, the verify ignores the owner's own
+  algos. Open, for the owner: enabling the evening preview at 16:55 (BL-138 deploys only the recorded picks).
+
 - 2026-10-20 — Phase 4 built (owner, 2026-10-20: "Quantiply can already create the day's Core picks as algos, but it
   never enables (deploys) them; the owner enables by hand. Build the deploy step, mirroring AlgoTest's: off by
   default, two switches"):

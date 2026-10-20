@@ -27,6 +27,8 @@ import {
   checkLoginHold,
   openQuantiply,
   quantiplyCredentials,
+  quantiplyLedgerPath,
+  readJson,
 } from './quantiply-session.js';
 import { redact } from './secrets.js';
 import { type Mode, istToday, sha256 } from './strategy-plan.js';
@@ -64,10 +66,6 @@ const READ_BACK_OK = 'read back: identical';
  */
 const EXIT_RETRY = 1;
 const EXIT_NO_RETRY = 3;
-
-async function readJson<T>(path: string): Promise<T> {
-  return JSON.parse(await readFile(path, 'utf8')) as T;
-}
 
 async function main(): Promise<number> {
   const { values } = parseArgs({
@@ -140,13 +138,7 @@ async function main(): Promise<number> {
   const dir = resolve(exportDir);
   const ledgerPath = values.ledger
     ? resolve(values.ledger)
-    : join(
-        dataRoot ?? '',
-        'rotation',
-        'quantiply',
-        // Angel One's keeps its original name; each other account has its own ledger.
-        broker === 'angelone' ? 'ledger.jsonl' : `ledger-${broker}.jsonl`,
-      );
+    : quantiplyLedgerPath(dataRoot ?? '', broker);
   const manifest = await readJson<QManifest>(join(dir, 'manifest.json'));
   const today = istToday();
   const fits =

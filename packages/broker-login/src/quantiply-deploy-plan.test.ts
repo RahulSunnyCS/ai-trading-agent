@@ -5,9 +5,13 @@ import {
   type AlgoDetail,
   ENABLE_LEAD_SECONDS,
   type EnableInput,
+  UNKNOWN_BROKER,
   defaultSession,
   istSeconds,
+  ownedForSession,
+  parseBroker,
   parseBrokers,
+  parseDeployLedger,
   parseDetail,
   pickBroker,
   planDisable,
@@ -15,6 +19,7 @@ import {
   refuseEnable,
   staleEnabled,
   summaryEnable,
+  toggledIds,
   verifyToggles,
 } from './quantiply-deploy-plan.js';
 import type { QAlgo, QLedgerRow } from './quantiply-plan.js';
@@ -88,7 +93,7 @@ test('enable never touches an algo outside the ledger, even with a pick name', (
   input.ledger.push({ ...created('x', `${P}S_p250_1317`), ok: false });
   const p = planEnable(input);
   assert.ok(!p.enable.some((t) => t.id === 'hand' || t.id === 'x'));
-  assert.ok(!p.dropped.some((t) => t.id === 'own'));
+  assert.ok(!p.disable.some((t) => t.id === 'own'));
 });
 
 test("enable only the ledger's session, on the session's weekday", () => {
@@ -103,7 +108,8 @@ test("enable only the ledger's session, on the session's weekday", () => {
   const p = planEnable(input);
   assert.deepEqual(p.enable, []);
   assert.equal(p.wrongDay.length, 2);
-  assert.deepEqual(p.missing, [`${P}S_ditm1_1202`, `${P}S_p250_1317`, `${P}S_p250_1302`]);
+  // uploaded, on the wrong weekday: never "not uploaded"; next week's copy is not this session's
+  assert.deepEqual(p.missing, [`${P}S_p250_1317`]);
   assert.equal(summaryEnable(p).attention, true);
 });
 
@@ -177,18 +183,19 @@ test('09:16 dropped a pick: its enabled algo is disabled, unless it may have sta
   input.details.set('3', detail('3', { startTime: '13:02:00', enabled: true }));
   let p = planEnable(input);
   assert.deepEqual(
-    p.dropped.map((t) => t.id),
-    ['3'],
+    p.disable.map((t) => [t.id, t.alert]),
+    [['3', false]],
   );
   assert.deepEqual(p.missing, [`${P}N_new_0930`]);
 
   input.details.set('3', detail('3', { startTime: '09:20:00', enabled: true }));
   p = planEnable(input);
-  assert.deepEqual(p.dropped, []);
-  assert.deepEqual(p.droppedLive, [`${P}S_p250_1302`]);
+  assert.deepEqual(p.disable, []);
+  assert.match(p.enabledLive[0] ?? '', /S_p250_1302 \(ENABLED and no longer a pick/);
   assert.equal(summaryEnable(p).attention, true);
 
   input.algos[2] = algo('3', `${P}S_p250_1302`); // not enabled: left alone
+  input.details.set('3', detail('3', { startTime: '09:20:00' }));
   p = planEnable(input);
   assert.deepEqual(p.notPicked, [`${P}S_p250_1302`]);
 });
@@ -227,7 +234,8 @@ test('disable: the session and older sessions, enabled and finished only', () =>
     algo('5', `${P}E`, { enabled: true, status: 'TRADE_ACTIVE' }),
     algo('own', 'mine', { enabled: true }),
   ];
-  const p = planDisable(WED, WED, ledger, algos);
+  const close = { nowSeconds: HM(15, 40) };
+  const p = planDisable(WED, WED, ledger, algos, close);
   assert.deepEqual(
     p.disable.map((t) => t.id),
     ['1', '3'],
@@ -236,8 +244,31 @@ test('disable: the session and older sessions, enabled and finished only', () =>
   assert.deepEqual(p.live, [`${P}E (TRADE_ACTIVE)`]);
   // the owner's undo before the session: a future session's algos
   assert.deepEqual(
-    planDisable('2026-10-22', WED, ledger, algos).disable.map((t) => t.id),
+    planDisable('2026-10-22', WED, ledger, algos, close).disable.map((t) => t.id),
     ['3', '4'],
+  );
+});
+
+test("disable leaves today's algos on until 15:30, unless it is the emergency stop", () => {
+  const ledger = [created('1', `${P}A`, WED), created('4', `${P}D`, '2026-10-22')];
+  const algos = [
+    algo('1', `${P}A`, { enabled: true }),
+    algo('4', `${P}D`, { enabled: true, day: 'THU' }),
+  ];
+  const morning = planDisable(WED, WED, ledger, algos, { nowSeconds: HM(11, 0) });
+  assert.deepEqual(morning.disable, []);
+  assert.deepEqual(morning.notYet, [`${P}A`]);
+  const stop = planDisable(WED, WED, ledger, algos, { nowSeconds: HM(11, 0), emergency: true });
+  assert.deepEqual(
+    stop.disable.map((t) => t.id),
+    ['1'],
+  );
+  // tomorrow's (the undo of an evening enable) is not today's: switched off at any time
+  assert.deepEqual(
+    planDisable('2026-10-22', WED, ledger, algos, { nowSeconds: HM(11, 0) }).disable.map(
+      (t) => t.id,
+    ),
+    ['4'],
   );
 });
 
@@ -249,17 +280,20 @@ test('check: owned algos enabled after their session', () => {
   assert.equal(staleEnabled('2026-10-22', HM(9, 0), ledger, algos).length, 1);
 });
 
-test('verify: exactly the intended algos changed, nothing else', () => {
+test('verify: exactly the intended algos changed, nothing else of the tool', () => {
+  const owned = new Set(['1', '2']);
   const before = [algo('1', 'a'), algo('2', 'b'), algo('own', 'mine', { enabled: true })];
   const ok = [
     algo('1', 'a', { enabled: true }),
     algo('2', 'b'),
     algo('own', 'mine', { enabled: true }),
   ];
-  assert.deepEqual(verifyToggles(before, ok, new Map([['1', true]])), []);
+  const v = (after: QAlgo[], intended: Map<string, boolean>, uncertain = new Set<string>()) =>
+    verifyToggles(before, after, intended, uncertain, owned);
+  assert.deepEqual(v(ok, new Map([['1', true]])), { problems: [], notes: [] });
 
   assert.match(
-    verifyToggles(before, before, new Map([['1', true]]))[0] ?? '',
+    v(before, new Map([['1', true]])).problems[0] ?? '',
     /a \(WED\) is disabled, expected ENABLED/,
   );
   const other = [
@@ -268,20 +302,143 @@ test('verify: exactly the intended algos changed, nothing else', () => {
     before[2] as QAlgo,
   ];
   assert.match(
-    verifyToggles(before, other, new Map([['1', true]]))[0] ?? '',
+    v(other, new Map([['1', true]])).problems[0] ?? '',
     /b \(WED\) changed to ENABLED, not by this run/,
   );
-  const appeared = [...ok, algo('9', 'new', { enabled: true })];
-  assert.match(
-    verifyToggles(before, appeared, new Map([['1', true]]))[0] ?? '',
-    /appeared ENABLED/,
+  // the owner switching their own algo meanwhile is theirs: a note, never a stop
+  const owner = [algo('1', 'a', { enabled: true }), algo('2', 'b'), algo('own', 'mine')];
+  const o = v(owner, new Map([['1', true]]));
+  assert.deepEqual(o.problems, []);
+  assert.match(o.notes[0] ?? '', /mine \(WED\) changed to disabled/);
+  const appeared = v([...ok, algo('9', 'new', { enabled: true })], new Map([['1', true]]));
+  assert.deepEqual(appeared.problems, []);
+  assert.match(appeared.notes[0] ?? '', /appeared ENABLED/);
+  const failed = v(ok, new Map(), new Set(['1']));
+  assert.match(failed.problems[0] ?? '', /the call failed; Quantiply now shows it ENABLED/);
+  assert.match(v([algo('2', 'b')], new Map([['1', true]])).problems[0] ?? '', /no longer listed/);
+});
+
+test('never enabled again once this session switched it (the owner turned it off since)', () => {
+  const rows = parseDeployLedger(
+    [
+      JSON.stringify({
+        at: 'x',
+        session: WED,
+        mode: 'enable',
+        action: 'broker',
+        id: '3',
+        name: 'c',
+        ok: true,
+      }),
+      JSON.stringify({
+        at: 'x',
+        session: WED,
+        mode: 'enable',
+        action: 'enable',
+        id: '1',
+        name: 'a',
+        ok: true,
+      }),
+      JSON.stringify({
+        at: 'x',
+        session: '2026-10-14',
+        mode: 'enable',
+        action: 'enable',
+        id: '2',
+        name: 'b',
+        ok: true,
+      }),
+      '{"torn',
+    ].join('\n'),
   );
-  const failed = verifyToggles(before, ok, new Map(), new Set(['1']));
-  assert.match(failed[0] ?? '', /the call failed; Quantiply now shows it ENABLED/);
-  assert.match(
-    verifyToggles(before, [algo('2', 'b')], new Map([['1', true]]))[0] ?? '',
-    /no longer listed/,
+  const toggled = toggledIds(rows, WED);
+  assert.deepEqual([...toggled], ['1']);
+  const p = planEnable(wednesday({ toggled }));
+  assert.deepEqual(p.leftOff, [`${P}S_ditm1_1202`]);
+  assert.deepEqual(
+    p.enable.map((t) => t.id),
+    ['2', '3'],
   );
+  assert.equal(summaryEnable(p).attention, false);
+  // still on: reported as already enabled, never toggled again
+  const on = wednesday({ toggled });
+  on.algos[0] = algo('1', `${P}S_ditm1_1202`, { enabled: true });
+  assert.deepEqual(planEnable(on).already, [`${P}S_ditm1_1202`]);
+});
+
+test('an ENABLED algo that fails a check is switched off (or reported), never "not enabled"', () => {
+  const input = wednesday({ today: WED, nowSeconds: HM(9, 21) });
+  for (const id of ['1', '2', '3']) {
+    input.algos[Number(id) - 1] = { ...(input.algos[Number(id) - 1] as QAlgo), enabled: true };
+  }
+  input.details.set(
+    '1',
+    detail('1', { diffs: ['configurations.legs[0].quantity'], enabled: true }),
+  );
+  input.details.set('2', detail('2', { broker: 'OTHER', startTime: '13:17:00', enabled: true }));
+  input.details.set('3', detail('3', { startTime: '09:22:00', enabled: true })); // fine, enabled
+  input.picks.set(`${P}S_p250_1302`, 'b'); // the recorded export differs from the uploaded copy
+  const p = planEnable(input);
+  assert.deepEqual(p.differs, []);
+  assert.deepEqual(p.brokerDiffers, []);
+  assert.deepEqual(
+    p.disable.map((t) => [t.id, t.alert]),
+    [
+      ['1', true],
+      ['2', true],
+    ],
+  );
+  assert.match(p.disable[0]?.why ?? '', /content differs/);
+  assert.match(p.enabledLive[0] ?? '', /S_p250_1302 \(ENABLED and content differs/); // starts 09:22
+  const s = summaryEnable(p);
+  assert.equal(s.attention, true);
+  assert.ok(!s.lines.some((l) => l.includes('not enabled')));
+});
+
+test('an enabled duplicate or wrong-weekday algo of the session is switched off too', () => {
+  const input = wednesday();
+  input.ledger.push(created('4', `${P}S_p250_1302`));
+  input.algos.push(algo('4', `${P}S_p250_1302`, { enabled: true }));
+  input.details.set('4', detail('4', { enabled: true }));
+  input.algos[0] = algo('1', `${P}S_ditm1_1202`, { day: 'THU', enabled: true });
+  const p = planEnable(input);
+  assert.deepEqual(p.disable.map((t) => t.id).sort(), ['1', '4']);
+  assert.deepEqual(p.duplicates, [`${P}S_p250_1302`]);
+});
+
+test('a broker that is set but not a plain id is never overwritten', () => {
+  assert.equal(parseBroker(null), '');
+  assert.equal(parseBroker('B1'), 'B1');
+  assert.equal(parseBroker(7), '7');
+  assert.equal(parseBroker({ _id: 'B1', clientId: 'R1' }), 'B1');
+  assert.equal(parseBroker({ clientId: 'R1' }), UNKNOWN_BROKER);
+  assert.equal(parseBroker([1]), UNKNOWN_BROKER);
+  const input = wednesday();
+  input.details.set('1', detail('1', { broker: UNKNOWN_BROKER }));
+  input.details.set('2', detail('2', { broker: parseBroker({ _id: 'B1' }) }));
+  const p = planEnable(input);
+  assert.deepEqual(p.brokerDiffers, [`${P}S_ditm1_1202`]);
+  assert.deepEqual(
+    p.enable.map((t) => [t.id, t.setBroker]),
+    [
+      ['2', false],
+      ['3', true],
+    ],
+  );
+});
+
+test("a copy the uploader kept from an earlier week is this session's, with the pick's content", () => {
+  const input = wednesday();
+  input.ledger[1] = created('2', `${P}S_p250_1317`, '2026-10-14'); // last Wednesday's, same sha
+  let p = planEnable(input);
+  assert.deepEqual(
+    p.enable.map((t) => t.id),
+    ['1', '2', '3'],
+  );
+  input.ledger[1] = created('2', `${P}S_p250_1317`, '2026-10-14', 'old'); // other content: not ours
+  p = planEnable(input);
+  assert.deepEqual(p.missing, [`${P}S_p250_1317`]);
+  assert.deepEqual([...ownedForSession(input.ledger, WED).keys()], ['1', '3']);
 });
 
 test('the broker: exactly one enabled account with the login client code', () => {

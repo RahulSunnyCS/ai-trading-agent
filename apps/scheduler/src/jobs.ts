@@ -32,9 +32,10 @@ export interface Job {
   /**
    * Jobs in the same group never run at the same time. `catalog` = anything
    * that writes the DuckDB catalog, which allows one writer process.
-   * `quantiply` = the jobs that log in to Quantiply (each an Angel One / Shoonya TOTP login)
-   * and change its algos: a deploy then always runs after the upload before it, retries
-   * included, and two logins never type codes from one TOTP window.
+   * `quantiply` = the jobs that log in to Quantiply and change its algos: a deploy then always
+   * runs after the upload before it, retries included. (The group does not space their logins:
+   * the next job starts the moment one ends. `quantiply-session.ts` does, with a file stamp of
+   * the last TOTP window each account typed a code from.)
    */
   group?: 'catalog' | 'quantiply';
   /**
@@ -485,11 +486,11 @@ const BASE_JOBS: Job[] = [
   {
     id: 'quantiply-disable',
     description:
-      "After the session, switch off on each Quantiply account the algos the uploader made for today that are still enabled, and any of an earlier session (BL-139 Phase 4): an enabled Quantiply algo runs again on its weekday next week. Only the tool's algos (its ledger), only finished ones, confirmed by reading the list again. Does nothing until QUANTIPLY_DEPLOY=on",
+      "After the session, switch off on each Quantiply account the algos the uploader made for today that are still enabled, and any of an earlier session (BL-139 Phase 4): an enabled Quantiply algo runs again on its weekday next week. Only the tool's algos (its ledger), only finished ones, confirmed by reading the list again. The safety net: always runs, whatever QUANTIPLY_DEPLOY and Automated deployment say",
     // 15:40: every pick has exited (15:28), and the 16:45 upload comes after (same group), so it
-    // can delete them. Not gated by the account's row: whatever the tool enabled must not repeat.
-    // With Automated deployment off it changes nothing but alerts on anything left enabled. An
-    // account with nothing of the tool's for today is not logged in. Safe to retry.
+    // can delete them. Never gated (not by QUANTIPLY_DEPLOY, the deploy switch or the account's
+    // row): switching off only lowers what trades, and whatever was enabled must not repeat. An
+    // account with nothing of the tool's for today or earlier is not logged in. Safe to retry.
     schedule: { at: '15:40', on: tradingDays, label: 'trading days 15:40' },
     steps: [['/bin/sh', '-c', quantiplyBoth((b) => quantiplyDeploy(b, 'disable'))]],
     cwd: BROKER_LOGIN,
