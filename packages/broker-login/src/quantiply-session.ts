@@ -91,6 +91,20 @@ const windowPath = (stateDir: string, broker: QuantiplyBroker) =>
   join(stateDir, `totp-window-${broker}.json`);
 
 /**
+ * When this account last typed a code (any Quantiply run: the stamp below), as the start of that
+ * window in ms; null when no stamp. BL-143's monitor does not replace a lost session while it is
+ * recent (re-review of #276, B).
+ */
+export async function lastTotpLoginAt(
+  stateDir: string,
+  broker: QuantiplyBroker,
+): Promise<number | null> {
+  type Stamp = { window?: number };
+  const stamp = await readJson<Stamp>(windowPath(stateDir, broker)).catch((): Stamp => ({}));
+  return typeof stamp.window === 'number' ? stamp.window * 30_000 : null;
+}
+
+/**
  * Across processes: never type a code from a 30-second TOTP window another Quantiply run (the
  * uploader, the deployer) already typed one from for this account. `angelTotp` / `shoonyaTotp`
  * guard this within one process only; this file stamp covers back-to-back jobs.

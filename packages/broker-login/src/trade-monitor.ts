@@ -1,12 +1,12 @@
 import { execFile } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { type Underlying, isTradingDay, lotSize } from '@trading/market-reference';
 import { sendText } from '@trading/notify';
 import { type Browser, type Page, chromium } from 'playwright';
-import { BASE_URL } from './algotest.js';
+import { BASE_URL, algotestLogin } from './algotest.js';
 import {
   type Automation,
   type Book,
@@ -17,31 +17,45 @@ import {
 import { normalizePhone, readTelegramConfig } from './config.js';
 import { istMinutes, parseLive } from './deploy-plan.js';
 import { describe } from './diagnose.js';
-import { algotestLoginLocked, lockDir, tryLock, unlock } from './login-lock.js';
+import {
+  LockBusy,
+  lastLoginAt,
+  lockDir,
+  pidAlive,
+  tryLock,
+  unlock,
+  withLoginLock,
+} from './login-lock.js';
 import {
   ALGOTEST_BROKER_ID,
   type AccountMargin,
   type AlgoTestRowPicks,
   DEPLOY_CHECK_AT,
+  JOBS_WAIT_UNTIL,
   LOGIN_CAP,
   type LegNeed,
   type LoginLog,
   MARGIN_AT,
+  type MtmNoticeState,
   type MtmPart,
+  PLATFORM_JOBS,
   type PlatformCheck,
   type PnlSeen,
   type QListed,
   QUIET_FROM,
   SESSION_CLOSE,
+  type SchedulerJobView,
   algotestInstant,
   checkAlgoTest,
   checkQuantiply,
+  commitMtmNotice,
   deployMessage,
   inLossWindow,
   inQuietWindow,
   inr,
   istClock,
   istDayOf,
+  jobsStillToEnd,
   legLots,
   legsFromAlgtst,
   legsFromQuantiply,
@@ -49,6 +63,9 @@ import {
   lossCrossings,
   lossMessage,
   marginMessage,
+  mergeLogins,
+  mtmNotice,
+  mtmNoticeText,
   parseAlgotestBrokers,
   parseDayWiseListed,
   parseDeployedOn,
@@ -58,6 +75,7 @@ import {
   quantiplyReading,
   readMtmCardsInPage,
   readTotalMtm,
+  stopButtonRunning,
   switchOn,
 } from './monitor-plan.js';
 import type { QuantiplyApi } from './quantiply-api.js';
@@ -67,6 +85,7 @@ import {
   LoginHeld,
   LoginRefused,
   checkLoginHold,
+  lastTotpLoginAt,
   openQuantiplyApp,
   quantiplyCredentials,
   quantiplyLedgerPath,
@@ -95,15 +114,21 @@ import { istToday } from './strategy-plan.js';
  * lock (`login-lock.ts`): AlgoTest's website login, Quantiply's per account whose Settings ›
  * Automation row uploads a list (`quantiply-session.ts`: the refused-login hold, the TOTP window
  * claimed before the code is typed), Angel One SmartAPI once (`obt angel funds`, its own guard).
- * Each platform: a daily cap of codes typed, no new login for 10 min after a failed one, a lost
- * session (logged out / 401) replaced at most every 30 min, said once as "degraded". Shoonya's own
- * API: never.
+ * Each platform: a daily cap of codes typed, no new login for 10 min after a failed one, none
+ * within 10 min of losing a session (logged out / 401: someone else's login most likely ended it),
+ * a replacement only when no other process logged in to the platform in the last 10 min and at
+ * most every 30 min, said once as "degraded". No login while PR #275's stop button runs
+ * (`TRADING_DATA_ROOT/stop/stop-running.json`). After 09:10, no login on a platform until today's
+ * runs of its morning deploy jobs have ended (`PLATFORM_JOBS`, the scheduler's `GET /jobs`;
+ * 10:00 at most, then it logs in anyway and says so). Shoonya's own API: never.
  *
  *   tsx src/trade-monitor.ts [--parts margin,deploy,loss] [--now] [--print] [--headed]
  *
- * `--now` runs the asked parts at once (one loss reading, then exit; still no login 09:10-09:25);
- * `--print` prints the messages instead of sending them and keeps no once-only flags, but its
- * logins count toward the day's caps. Without `--print` a part also needs its switch.
+ * `--now` runs the asked parts at once (one loss reading, then exit; still no login or open
+ * session 09:10-09:25, checked at each login and each use); `--print` prints the messages instead
+ * of sending them and keeps no once-only flags, but its logins count toward the day's caps (merged
+ * into the state file, never overwriting a running monitor's). Without `--print` a part also needs
+ * its switch.
  */
 
 const VIEWPORT = { width: 1440, height: 900 };
@@ -130,26 +155,37 @@ const ACCOUNT_NAME: Record<Broker, string> = { finvasia: 'Finvasia', angelone: '
 const BOOK_NAME: Record<Book, string> = { core: 'Core', t1: 'T1' };
 
 interface DayState {
-  margin?: { at: string; ok: boolean };
+  /** `skipped`: the monitor started after 09:10, said once */
+  margin?: { at: string; ok: boolean; skipped?: boolean };
   deploy?: { at: string; ok: boolean };
-  loss: {
+  loss: MtmNoticeState & {
     warned: boolean;
     alerted: boolean;
-    /** said once: this platform's MTM cannot be read */
-    unreadable: Record<string, boolean>;
     /** said once: this platform's session ended and monitoring is degraded */
     degraded: Record<string, boolean>;
   };
   /** Quantiply algo id -> its last MTM figure and when it arrived, kept across restarts */
   qpnl: Record<string, PnlSeen>;
   logins: Partial<Record<LoginPlatform, LoginLog>>;
+  /** said once: a platform's deploy jobs were still running at 10:00 and it logged in anyway */
+  jobsWaitCapped?: Record<string, boolean>;
 }
 
 const fresh = (): DayState => ({
-  loss: { warned: false, alerted: false, unreadable: {}, degraded: {} },
+  loss: {
+    warned: false,
+    alerted: false,
+    unreadable: {},
+    readableRun: {},
+    unreadableSaid: {},
+    degraded: {},
+  },
   qpnl: {},
   logins: {},
 });
+
+/** Where PR #275's stop button marks itself running (beside its HOLD.json, `stop-hold.ts`). */
+const stopRunningPath = (root: string) => join(root, 'stop', 'stop-running.json');
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const hhmm = (m: number) =>
@@ -161,6 +197,8 @@ const istSecondsNow = () => {
 
 /** No login now, and why (said in the log). */
 class LoginNotAllowed extends Error {}
+/** A login waits for the morning's deploy jobs to end: said in the log only, not a reading failure. */
+class LoginWaiting extends LoginNotAllowed {}
 /** The platform ended the session: the next use logs in again, within the limits. */
 class SessionLost extends Error {}
 
@@ -191,6 +229,10 @@ class Monitor {
   >();
   /** a platform whose session was lost: its next login is a replacement */
   private readonly lost = new Set<LoginPlatform>();
+  /** platforms whose morning deploy jobs have ended today (or the wait reached 10:00) */
+  private readonly jobsEnded = new Set<'algotest' | 'quantiply'>();
+  /** what a platform's last check found still running (this process waited for it) */
+  private readonly jobsWaitedFor = new Map<'algotest' | 'quantiply', string>();
   private refused = false;
 
   constructor(
@@ -219,19 +261,25 @@ class Monitor {
     }
   }
 
-  /** Writes the state; a `--print` run writes only its logins (they count toward the caps). */
+  private async disk(): Promise<DayState | null> {
+    try {
+      return { ...fresh(), ...JSON.parse(await readFile(this.statePath, 'utf8')) } as DayState;
+    } catch {
+      return null; // nothing on disk yet
+    }
+  }
+
+  /**
+   * Writes the state. The logins are merged with the file's (the higher count, the later times):
+   * a `--print` run beside the scheduled monitor counts toward the caps, and neither overwrites the
+   * other's logins. A `--print` run writes only the logins.
+   */
   private async save(): Promise<void> {
     await mkdir(dirname(this.statePath), { recursive: true });
+    const disk = await this.disk();
+    this.state.logins = mergeLogins(disk?.logins, this.state.logins);
     let out: DayState = this.state;
-    if (this.opts.print) {
-      let disk: DayState = fresh();
-      try {
-        disk = { ...fresh(), ...JSON.parse(await readFile(this.statePath, 'utf8')) };
-      } catch {
-        // nothing on disk yet
-      }
-      out = { ...disk, logins: this.state.logins };
-    }
+    if (this.opts.print) out = { ...(disk ?? fresh()), logins: this.state.logins };
     const tmp = `${this.statePath}.${process.pid}.tmp`;
     await writeFile(tmp, `${JSON.stringify(out, null, 1)}\n`);
     await rename(tmp, this.statePath);
@@ -290,16 +338,57 @@ class Monitor {
     return this.state.logins[platform] as LoginLog;
   }
 
-  /** Count one login (code) now, or refuse it: the quiet window, the cap, the backoffs. */
-  private async allowLogin(platform: LoginPlatform): Promise<void> {
-    const cap = platform === 'algotest' ? LOGIN_CAP.algotest : LOGIN_CAP.quantiply;
-    const why = loginRefusal(
-      this.log(platform),
-      cap,
-      istMinutes(),
-      Date.now(),
-      this.lost.has(platform),
-    );
+  /** Is PR #275's stop button running (its marker beside HOLD.json)? */
+  private stopRunning(): boolean {
+    const path = stopRunningPath(this.root);
+    if (!existsSync(path)) return false;
+    let mtime: number | null = null;
+    try {
+      mtime = statSync(path).mtimeMs;
+    } catch {
+      return false; // removed meanwhile: the stop ended
+    }
+    let marker: { pid?: unknown; at?: unknown } | 'unreadable';
+    try {
+      marker = JSON.parse(readFileSync(path, 'utf8'));
+    } catch {
+      marker = 'unreadable';
+    }
+    return stopButtonRunning(marker, mtime, Date.now(), pidAlive);
+  }
+
+  /** When another process last logged in to this platform (ms), for a replacement's check. */
+  private async otherLoginAt(platform: LoginPlatform): Promise<number | null> {
+    // the monitor's own logins under the lock are not "another" login
+    if (platform === 'algotest') return lastLoginAt('algotest', undefined, process.pid);
+    const broker = platform === 'quantiply-angelone' ? 'angelone' : 'finvasia';
+    return lastTotpLoginAt(dirname(quantiplyLedgerPath(this.root, broker)), broker);
+  }
+
+  /**
+   * Why no login now, or null: the quiet window, the stop button, the cap, the backoffs and, for a
+   * replacement, another recent login. The logins on disk are merged in first, so a `--print`
+   * run's count.
+   */
+  private async refusal(platform: LoginPlatform, firstAttempt: boolean): Promise<string | null> {
+    const disk = await this.disk();
+    this.state.logins = mergeLogins(disk?.logins, this.state.logins);
+    const replacing = this.lost.has(platform);
+    return loginRefusal({
+      log: this.log(platform),
+      cap: platform === 'algotest' ? LOGIN_CAP.algotest : LOGIN_CAP.quantiply,
+      minutes: istMinutes(),
+      nowMs: Date.now(),
+      replacing,
+      // a retried code in the next window sees this login's own stamp: only the first is checked
+      otherLoginAtMs: replacing && firstAttempt ? await this.otherLoginAt(platform) : null,
+      stopRunning: this.stopRunning(),
+    });
+  }
+
+  /** Count one login (code) now, or refuse it. Called under the platform's login lock. */
+  private async allowLogin(platform: LoginPlatform, firstAttempt = true): Promise<void> {
+    const why = await this.refusal(platform, firstAttempt);
     if (why) throw new LoginNotAllowed(`${platform}: ${why}`);
     const entry = this.log(platform);
     entry.count += 1;
@@ -312,29 +401,113 @@ class Monitor {
     await this.save();
   }
 
-  /** The platform ended our session: say once that monitoring is degraded. */
-  private async sessionLost(platform: LoginPlatform, label: string): Promise<void> {
-    this.lost.add(platform);
-    if (this.state.loss.degraded[platform]) return;
+  /**
+   * After 09:10, before a login on `platform`: have today's runs of its morning deploy jobs ended?
+   * Null = yes (or before 09:10, when none has started, or 10:00 has come: then it logs in anyway
+   * and says so once); else what still runs. Read from the scheduler's loopback `GET /jobs`; an
+   * API that does not answer cannot say, so it waits too (until 10:00).
+   */
+  async platformJobs(platform: 'algotest' | 'quantiply'): Promise<string | null> {
+    if (this.jobsEnded.has(platform)) return null;
+    const minutes = istMinutes();
+    if (minutes < QUIET_FROM) return null;
+    const waited = this.jobsWaitedFor.get(platform);
+    if (minutes >= JOBS_WAIT_UNTIL) {
+      this.jobsEnded.add(platform);
+      // said only when this process was waiting (a run started after 10:00 never waits)
+      if (waited) await this.jobsWaitCapped(platform, minutes, waited);
+      return null;
+    }
+    let busy: string[];
+    try {
+      const port = Number(process.env.SCHEDULER_API_PORT) || 8790;
+      const res = await fetch(`http://127.0.0.1:${port}/jobs`, {
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (!res.ok) throw new Error(`answered ${res.status}`);
+      busy = jobsStillToEnd(
+        (await res.json()) as SchedulerJobView[],
+        PLATFORM_JOBS[platform],
+        new Date(),
+      );
+    } catch (error) {
+      busy = [
+        `the scheduler's API does not answer (${describe(error)}): cannot tell whether ${PLATFORM_JOBS[platform].join(' / ')} ended`,
+      ];
+    }
+    if (!busy.length) {
+      this.jobsEnded.add(platform);
+      if (waited) console.log(`${platform}: the morning jobs have ended: logging in`);
+      return null;
+    }
+    const why = busy.join('; ');
+    this.jobsWaitedFor.set(platform, why);
+    return why;
+  }
+
+  /** 10:00 came while a platform's morning jobs still seemed to run: logging in anyway, said once. */
+  private async jobsWaitCapped(
+    platform: 'algotest' | 'quantiply',
+    minutes: number,
+    waited: string,
+  ): Promise<void> {
+    this.state.jobsWaitCapped ??= {};
+    if (this.state.jobsWaitCapped[platform]) return;
+    const name = platform === 'algotest' ? 'AlgoTest' : 'Quantiply';
+    // never muted: logging in now may end that job's session
     const sent = await this.send(
-      `⚠️ Trade monitor ${hhmm(istMinutes())}: ${label}'s session ended (another login may have replaced it). Monitoring is degraded: it logs in again at most every 30 minutes, ${platform === 'algotest' ? LOGIN_CAP.algotest : LOGIN_CAP.quantiply} logins a day (said once today)`,
+      `⚠️ Trade monitor ${hhmm(minutes)}: waited until ${hhmm(JOBS_WAIT_UNTIL)} (${waited}); logging in to ${name} anyway: if that job still runs, this login may end its session, so check it`,
     );
     if (sent) {
-      this.state.loss.degraded[platform] = true;
+      this.state.jobsWaitCapped[platform] = true;
       await this.save();
     }
+  }
+
+  /** Waits (the deploy check) until `platformJobs` says the platform's jobs have ended. */
+  async waitPlatformJobs(platform: 'algotest' | 'quantiply'): Promise<void> {
+    let said = '';
+    for (;;) {
+      const busy = await this.platformJobs(platform);
+      if (!busy) return;
+      if (busy !== said) console.log(`${platform}: waiting before logging in: ${busy}`);
+      said = busy;
+      await sleep(30_000);
+    }
+  }
+
+  /** The platform ended our session: no login for 10 minutes, and say once it is degraded. */
+  private async sessionLost(platform: LoginPlatform, label: string): Promise<void> {
+    this.lost.add(platform);
+    this.log(platform).lostAt = new Date().toISOString();
+    if (!this.state.loss.degraded[platform]) {
+      const sent = await this.send(
+        `⚠️ Trade monitor ${hhmm(istMinutes())}: ${label}'s session ended (another login may have replaced it). Monitoring is degraded: it logs in again no sooner than 10 minutes from now, while no other login to it is recent, at most every 30 minutes and ${platform === 'algotest' ? LOGIN_CAP.algotest : LOGIN_CAP.quantiply} logins a day (said once today)`,
+      );
+      if (sent) this.state.loss.degraded[platform] = true;
+    }
+    await this.save();
   }
 
   // --- AlgoTest -----------------------------------------------------------------------------
 
   private async algotestPage(): Promise<Page> {
-    if (this.algotest) return this.algotest.page;
+    if (this.algotest) {
+      // an open session is never used in the deploy window (a `--now` run that started before it)
+      if (!inQuietWindow(istMinutes())) return this.algotest.page;
+      await this.dropAlgotest();
+      throw new LoginNotAllowed('algotest: no open session between 09:10 and 09:25');
+    }
     const phone = process.env.ALGOTEST_PHONE?.trim();
     const password = process.env.ALGOTEST_PASSWORD?.trim();
     if (!phone || !password)
       throw new Error('ALGOTEST_PHONE / ALGOTEST_PASSWORD missing from .env');
     registerSecret(password);
-    await this.allowLogin('algotest');
+    const busy = await this.platformJobs('algotest');
+    if (busy) throw new LoginWaiting(`algotest: ${busy}`);
+    // the cheap refusals before a browser starts; all of them again under the lock
+    const early = await this.refusal('algotest', true);
+    if (early) throw new LoginNotAllowed(`algotest: ${early}`);
     const browser = await chromium.launch({ headless: !this.opts.headed });
     try {
       const context = await browser.newContext({
@@ -344,7 +517,18 @@ class Monitor {
       });
       const page = await context.newPage();
       page.setDefaultTimeout(30_000);
-      await algotestLoginLocked(page, { phone: normalizePhone(phone), password }, 'trade-monitor');
+      // Before 09:10 the lock is waited for only until 09:10; the quiet window, the cap and the
+      // backoffs are checked again once it is held (re-review of #276, D), right before the login.
+      const untilQuiet = (QUIET_FROM * 60 - istSecondsNow()) * 1000;
+      await withLoginLock(
+        'algotest',
+        'trade-monitor',
+        async () => {
+          await this.allowLogin('algotest');
+          await algotestLogin(page, { phone: normalizePhone(phone), password });
+        },
+        istMinutes() < QUIET_FROM ? { waitMs: Math.max(0, untilQuiet) } : {},
+      );
       await page.goto(`${BASE_URL}/live`, { waitUntil: 'domcontentloaded' });
       await livePage.header(page).waitFor({ timeout: 30_000 });
       this.algotest = { browser, page, reloadedAt: Date.now() };
@@ -352,7 +536,10 @@ class Monitor {
       return page;
     } catch (error) {
       await browser.close().catch(() => undefined);
-      await this.loginFailed('algotest');
+      // a refusal or a busy lock is not a failed login
+      if (!(error instanceof LoginNotAllowed) && !(error instanceof LockBusy)) {
+        await this.loginFailed('algotest');
+      }
       throw error;
     }
   }
@@ -435,9 +622,15 @@ class Monitor {
   // --- Quantiply ----------------------------------------------------------------------------
 
   private async quantiplyApp(broker: QuantiplyBroker) {
-    const open = this.quantiply.get(broker);
-    if (open) return open;
     const platform: LoginPlatform = `quantiply-${broker}`;
+    const open = this.quantiply.get(broker);
+    if (open) {
+      // an open session is never used in the deploy window (a `--now` run that started before it)
+      if (!inQuietWindow(istMinutes())) return open;
+      await open.browser.close().catch(() => undefined);
+      this.quantiply.delete(broker);
+      throw new LoginNotAllowed(`${platform}: no open session between 09:10 and 09:25`);
+    }
     const creds = quantiplyCredentials(broker);
     const stateDir = dirname(quantiplyLedgerPath(this.root, broker));
     try {
@@ -446,13 +639,23 @@ class Monitor {
       if (error instanceof LoginHeld) this.refused = true;
       throw error;
     }
+    // Waited out before the login lock is taken, so the stop button is never held up by it.
+    const busy = await this.platformJobs('quantiply');
+    if (busy) throw new LoginWaiting(`${platform}: ${busy}`);
+    const early = await this.refusal(platform, true);
+    if (early) throw new LoginNotAllowed(`${platform}: ${early}`);
+    let attempt = 0;
     let app: Awaited<ReturnType<typeof openQuantiplyApp>>;
     try {
       app = await openQuantiplyApp(creds, stateDir, {
         headed: this.opts.headed,
         retryTotpOnce: true,
-        // every code typed counts toward the cap, and each is refused in the quiet window
-        beforeAttempt: () => this.allowLogin(platform),
+        // under the account's login lock: every code typed counts toward the cap, and each is
+        // checked again (the quiet window, the stop button, the backoffs) right before it is typed
+        beforeAttempt: () => {
+          attempt += 1;
+          return this.allowLogin(platform, attempt === 1);
+        },
         onPage: (page) => {
           page.on('websocket', (ws) => {
             ws.on('framereceived', (frame) => {
@@ -573,6 +776,10 @@ class Monitor {
             account.source = `free margin as AlgoTest read it at its broker login (${istClock(at)} IST); Shoonya's own API is never logged in to`;
           }
         } else {
+          // The AlgoTest session (Finvasia's read above) is not kept open while SmartAPI answers:
+          // that can take until after 09:10 (re-review of #276, D). Margin is the only part
+          // before 09:10, so nothing else needs it.
+          await this.dropAlgotest();
           const out = await runCommand(
             'uv',
             ['run', '--directory', '../option-backtesting', 'obt', 'angel', 'funds', '--json'],
@@ -612,11 +819,25 @@ class Monitor {
     }
   }
 
+  /** Started after 09:10 (a late start, a restart): say once that the margin was not checked. */
+  async marginSkipped(minute: number): Promise<void> {
+    const sent = await this.send(
+      `ℹ️ Trade monitor ${hhmm(minute)}: started after 09:10, so the margin check did not run today (it logs in only 09:05-09:10)`,
+      'monitor.margin',
+    );
+    if (sent) {
+      this.state.margin = { at: new Date().toISOString(), ok: false, skipped: true };
+      await this.save();
+    }
+  }
+
   async deploy(): Promise<void> {
     const checks: PlatformCheck[] = [];
     const algotestRows = this.rowBooks('algotest');
     if (algotestRows.length) {
       const label = `AlgoTest ${[...new Set(algotestRows.map((r) => BOOK_NAME[r.book]))].join('+')}`;
+      // picks still being deployed or topped up are not problems: wait for those jobs to end
+      await this.waitPlatformJobs('algotest');
       try {
         const rows: AlgoTestRowPicks[] = [];
         const notes: string[] = [];
@@ -660,6 +881,7 @@ class Monitor {
         });
       }
     }
+    if (this.rowBooks('quantiply').length) await this.waitPlatformJobs('quantiply');
     for (const { broker, book } of this.rowBooks('quantiply')) {
       const label = `Quantiply ${BOOK_NAME[book]}${broker === 'finvasia' ? ' (Shoonya)' : ''}`;
       try {
@@ -718,6 +940,8 @@ class Monitor {
   /** One reading of the day's combined MTM; sends a level the first time it is reached. */
   async lossTick(): Promise<string> {
     const parts: MtmPart[] = [];
+    // waiting for the morning's deploy jobs to end: no "cannot read" notice for that
+    const waiting = new Set<string>();
     if (this.rowBooks('algotest').length) {
       let value: number | null = null;
       try {
@@ -731,6 +955,7 @@ class Monitor {
           console.log(`AlgoTest MTM: ${read.error}`);
         }
       } catch (error) {
+        if (error instanceof LoginWaiting) waiting.add('AlgoTest');
         console.log(`AlgoTest MTM not read: ${describe(error)}`);
       }
       parts.push({ label: 'AlgoTest', inr: value });
@@ -750,18 +975,19 @@ class Monitor {
         if (r.inr === null) console.log(`${label}: no fresh MTM for ${r.unread.join(', ')}`);
         value = r.inr;
       } catch (error) {
+        if (error instanceof LoginWaiting) waiting.add(label);
         console.log(`${label} MTM not read: ${describe(error)}`);
       }
       parts.push({ label, inr: value });
     }
     const at = hhmm(istMinutes());
     for (const p of parts) {
-      if (p.inr === null && !this.state.loss.unreadable[p.label]) {
-        // never muted: it says the loss alert is blind for this platform
-        const sent = await this.send(
-          `⚠️ Loss monitor ${at}: cannot read ${p.label}'s MTM; the loss levels count the other platform only until it can (said once today)`,
-        );
-        if (sent) this.state.loss.unreadable[p.label] = true;
+      if (waiting.has(p.label)) continue;
+      const notice = mtmNotice(this.state.loss, p.label, p.inr !== null);
+      if (!notice) continue;
+      // never muted: it says the loss alert is blind (or no longer blind) for this platform
+      if (await this.send(mtmNoticeText(this.state.loss, p.label, notice, at))) {
+        commitMtmNotice(this.state.loss, p.label, notice);
       }
     }
     const total = parts.reduce((s, p) => s + (p.inr ?? 0), 0);
@@ -904,6 +1130,7 @@ async function main(): Promise<number> {
           if (istMinutes() >= QUIET_FROM - 1) await m.closeSessions();
         } else {
           console.log(`margin: ${hhmm(minute)} is past 09:10: not checked today`);
+          await m.marginSkipped(minute);
           parts.delete('margin');
         }
       }

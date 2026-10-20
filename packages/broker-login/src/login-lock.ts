@@ -123,8 +123,38 @@ export async function withLoginLock<T>(
   try {
     return await fn();
   } finally {
+    // When this platform was last logged in to, by whom (re-review of #276, B): the monitor does
+    // not replace a lost session while another process's login is this recent.
+    try {
+      writeFileSync(
+        lastLoginPath(dir, platform),
+        `${JSON.stringify({ pid: process.pid, at: new Date().toISOString(), who })}\n`,
+      );
+    } catch {
+      // a missing stamp only means the monitor cannot see this login
+    }
     unlock(path);
   }
+}
+
+function lastLoginPath(dir: string, platform: LoginPlatform): string {
+  return join(dir, `login-${platform}.last`);
+}
+
+/**
+ * When the last login under this platform's lock ended, ms; null when unknown or when it was
+ * `exceptPid`'s (the asking process's own).
+ */
+export function lastLoginAt(
+  platform: LoginPlatform,
+  dir: string = lockDir(),
+  exceptPid?: number,
+): number | null {
+  const last = readHolder(lastLoginPath(dir, platform));
+  if (exceptPid !== undefined && last?.pid === exceptPid) return null;
+  const at = last?.at;
+  const ms = at ? Date.parse(at) : Number.NaN;
+  return Number.isFinite(ms) ? ms : null;
 }
 
 /** The AlgoTest website login under the lock (the uploader, the deployer, the monitor). */

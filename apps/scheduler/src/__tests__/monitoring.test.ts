@@ -41,6 +41,24 @@ describe('BL-143: catch-ups after sleep in the morning summary', () => {
     history.close();
   });
 
+  it('a restart of an interrupted run is not "ran late after sleep" (its slot has an earlier row)', () => {
+    const history = tmpHistory();
+    const slot = new Date('2026-10-19T03:34:00Z'); // 09:04 IST
+    const first = history.start('trade-monitor', 'schedule', slot, '/x', slot);
+    history.finish(first, -2, 0, new Date('2026-10-19T06:00:00Z'), 'interrupted');
+    const again = history.start(
+      'trade-monitor',
+      'catch-up',
+      slot,
+      '/x',
+      new Date('2026-10-19T06:05:00Z'),
+    );
+    history.finish(again, 0, 1, new Date('2026-10-19T10:00:00Z'));
+    const { since, until } = catchUpWindow('2026-10-20');
+    expect(history.catchUpsBetween(since, until)).toEqual([]);
+    history.close();
+  });
+
   it("on Monday, Friday's day only: a weekend job caught up is not flagged", () => {
     // Mon 2026-10-26: the previous trading day is Fri 2026-10-23
     const { since, until } = catchUpWindow('2026-10-26');

@@ -108,12 +108,16 @@ export class History {
 
   /**
    * Runs started in [since, until) that served a slot as a catch-up (the slot was missed while
-   * the laptop slept or was off, BL-143): the morning summary lists the previous day's.
+   * the laptop slept or was off, BL-143): the morning summary lists the previous day's. A restart
+   * of a run the scheduler's stop cut off (`restartIfInterruptedUntil`) is not one: its slot
+   * already has an earlier row, the interrupted run, which the summary lists as a failure.
    */
   catchUpsBetween(since: Date, until: Date): RunRow[] {
     return this.db
       .query(
-        "SELECT * FROM runs WHERE trigger = 'catch-up' AND started_at >= ? AND started_at < ? ORDER BY started_at",
+        `SELECT * FROM runs r WHERE r.trigger = 'catch-up' AND r.started_at >= ? AND r.started_at < ?
+           AND NOT EXISTS (SELECT 1 FROM runs p WHERE p.job = r.job AND p.scheduled_for = r.scheduled_for AND p.id < r.id)
+         ORDER BY r.started_at`,
       )
       .all(since.toISOString(), until.toISOString()) as RunRow[];
   }

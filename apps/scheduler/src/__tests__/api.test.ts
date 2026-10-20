@@ -75,6 +75,16 @@ describe('GET /jobs and /runs', () => {
     expect(body[2]).toMatchObject({ needs: ['home'], group: 'catalog' });
   });
 
+  it("gives each job's latest slot that has come and the row serving it (BL-143)", async () => {
+    ctx.now = () => new Date('2026-10-20T04:00:00Z'); // 09:30 IST, after the 08:00 slot
+    const slot = new Date('2026-10-20T02:30:00Z'); // 08:00 IST
+    let body = (await (await get('/jobs')).json()) as Array<Record<string, unknown>>;
+    expect(body[0]).toMatchObject({ previousSlot: slot.toISOString(), previousSlotRun: null });
+    const id = ctx.history.start('fast', 'schedule', slot, '', new Date('2026-10-20T02:30:10Z'));
+    body = (await (await get('/jobs')).json()) as Array<Record<string, unknown>>;
+    expect(body[0]?.previousSlotRun).toMatchObject({ id, ended_at: null });
+  });
+
   it('filters runs by job and 404s an unknown job', async () => {
     ctx.history.start('fast', 'manual', null, '', new Date());
     ctx.history.start('slow', 'manual', null, '', new Date());

@@ -4,19 +4,29 @@ import { after, before, test } from 'node:test';
 import { type Browser, chromium } from 'playwright';
 import { parseLive } from './deploy-plan.js';
 import {
+  JOBS_WAIT_UNTIL,
   LOSS_ALERT_INR,
   LOSS_WARNING_INR,
+  type LoginContext,
+  type LoginLog,
   type MtmCard,
+  type MtmNoticeState,
+  PLATFORM_JOBS,
   PNL_STALE_MS,
   type QListed,
+  READABLE_AGAIN_AFTER,
+  type SchedulerJobView,
+  UNREADABLE_NOTICES_A_DAY,
   algotestInstant,
   checkAlgoTest,
   checkQuantiply,
+  commitMtmNotice,
   deployMessage,
   inLossWindow,
   inQuietWindow,
   inr,
   istDayOf,
+  jobsStillToEnd,
   legLots,
   legsFromAlgtst,
   legsFromQuantiply,
@@ -25,6 +35,9 @@ import {
   lossMessage,
   marginMessage,
   marginVerdict,
+  mergeLogins,
+  mtmNotice,
+  mtmNoticeText,
   parseAlgotestBrokers,
   parseDayWiseListed,
   parseDeployedOn,
@@ -35,6 +48,7 @@ import {
   quantiplyReading,
   readMtmCardsInPage,
   readTotalMtm,
+  stopButtonRunning,
   switchOn,
 } from './monitor-plan.js';
 
@@ -67,19 +81,170 @@ test('logins: never in the quiet window, a cap, a backoff after a failure, a 30-
   const now = Date.parse('2026-10-21T05:00:00Z'); // 10:30 IST
   const at = (ms: number) => new Date(now - ms).toISOString();
   const m = 10 * 60 + 30;
-  assert.match(loginRefusal({ count: 0 }, 3, 9 * 60 + 16, now, false) ?? '', /09:10 and 09:25/);
-  assert.equal(loginRefusal({ count: 2 }, 3, m, now, false), null);
-  assert.match(loginRefusal({ count: 3 }, 3, m, now, false) ?? '', /3 logins today/);
+  const r = (log: LoginLog, replacing = false, extra: Partial<LoginContext> = {}) =>
+    loginRefusal({ log, cap: 3, minutes: m, nowMs: now, replacing, ...extra });
+  assert.match(r({ count: 0 }, false, { minutes: 9 * 60 + 16 }) ?? '', /09:10 and 09:25/);
+  assert.equal(r({ count: 2 }), null);
+  assert.match(r({ count: 3 }) ?? '', /3 logins today/);
+  assert.match(r({ count: 1, failedAt: at(5 * 60_000) }) ?? '', /failed/);
+  assert.equal(r({ count: 1, failedAt: at(11 * 60_000) }), null);
+  assert.match(r({ count: 1, reloginAt: at(20 * 60_000) }, true) ?? '', /30 minutes/);
+  assert.equal(r({ count: 1, reloginAt: at(31 * 60_000) }, true), null);
+});
+
+test('logins (B): even the first replacement waits 10 minutes after the loss, and for other logins', () => {
+  const now = Date.parse('2026-10-21T07:30:00Z'); // 13:00 IST
+  const at = (ms: number) => new Date(now - ms).toISOString();
+  const r = (log: LoginLog, replacing: boolean, extra: Partial<LoginContext> = {}) =>
+    loginRefusal({ log, cap: 3, minutes: 13 * 60, nowMs: now, replacing, ...extra });
+  // the first replacement has no reloginAt: the loss itself starts the wait
+  assert.match(r({ count: 1, lostAt: at(3 * 60_000) }, true) ?? '', /ended less than 10 minutes/);
+  assert.equal(r({ count: 1, lostAt: at(11 * 60_000) }, true), null);
+  // a restarted monitor (not "replacing" in memory) still honours the loss on disk
+  assert.match(r({ count: 1, lostAt: at(3 * 60_000) }, false) ?? '', /ended less than 10/);
+  // another process logged in recently (the owner's tool run, the stop button): no replacement
+  const lost = { count: 1, lostAt: at(15 * 60_000) };
   assert.match(
-    loginRefusal({ count: 1, failedAt: at(5 * 60_000) }, 3, m, now, false) ?? '',
-    /failed/,
+    r(lost, true, { otherLoginAtMs: now - 4 * 60_000 }) ?? '',
+    /another login to this platform/,
   );
-  assert.equal(loginRefusal({ count: 1, failedAt: at(11 * 60_000) }, 3, m, now, false), null);
+  assert.equal(r(lost, true, { otherLoginAtMs: now - 12 * 60_000 }), null);
+  // ... but a first login of the day is not held by the morning jobs' logins (A covers those)
+  assert.equal(r({ count: 0 }, false, { otherLoginAtMs: now - 60_000 }), null);
+  // the stop button running: no login of any kind
+  assert.match(r({ count: 0 }, false, { stopRunning: true }) ?? '', /stop button/);
+});
+
+test('logins (E): a --print run and the monitor merge their counts, never overwrite', () => {
+  const merged = mergeLogins<string>(
+    { algotest: { count: 3, failedAt: '2026-10-21T05:00:00.000Z' } },
+    {
+      algotest: { count: 2, failedAt: '2026-10-21T04:00:00.000Z', lostAt: '2026-10-21T06:00:00Z' },
+      'quantiply-angelone': { count: 1 },
+    },
+  );
+  assert.deepEqual(merged, {
+    algotest: { count: 3, failedAt: '2026-10-21T05:00:00.000Z', lostAt: '2026-10-21T06:00:00Z' },
+    'quantiply-angelone': { count: 1 },
+  });
+  assert.deepEqual(mergeLogins(undefined, undefined), {});
+});
+
+test("waiting for the morning's deploy jobs (A): running, due, queued, done, not today", () => {
+  const now = new Date('2026-10-21T03:55:00Z'); // 09:25 IST
+  const slot = (hhmm: string) => new Date(`2026-10-21T${hhmm}:00+05:30`).toISOString();
+  const tomorrow = (hhmm: string) => new Date(`2026-10-22T${hhmm}:00+05:30`).toISOString();
+  const done = { started_at: slot('09:18'), ended_at: slot('09:20') };
+  const views: SchedulerJobView[] = [
+    // the top-up's retry is still running
+    {
+      id: 'algotest-topup',
+      nextRun: tomorrow('09:18'),
+      lastRun: { started_at: slot('09:18'), ended_at: null },
+      previousSlot: slot('09:18'),
+      previousSlotRun: { ended_at: null },
+    },
+    // ended
+    {
+      id: 'algotest-deploy',
+      nextRun: tomorrow('09:16'),
+      lastRun: done,
+      previousSlot: slot('09:16'),
+      previousSlotRun: { ended_at: slot('09:17') },
+    },
+    // queued behind quantiply-topup in its group: its slot came, no row yet
+    {
+      id: 'quantiply-deploy-topup',
+      nextRun: tomorrow('09:21'),
+      lastRun: { started_at: '2026-10-20T03:51:00Z', ended_at: '2026-10-20T03:52:00Z' },
+      previousSlot: slot('09:21'),
+      previousSlotRun: null,
+    },
+  ];
+  assert.deepEqual(jobsStillToEnd(views, PLATFORM_JOBS.algotest, now), [
+    'algotest-topup is running (since 09:18)',
+  ]);
+  assert.deepEqual(jobsStillToEnd(views, PLATFORM_JOBS.quantiply, now), [
+    'quantiply-deploy-topup is due (its 09:21 run has not started)',
+  ]);
+  // not scheduled today (yesterday's slot, a holiday-like gap) and not listed: nothing blocks
+  const notToday: SchedulerJobView[] = [
+    {
+      id: 'quantiply-topup',
+      nextRun: tomorrow('09:19'),
+      lastRun: { started_at: '2026-10-20T03:49:00Z', ended_at: '2026-10-20T03:50:00Z' },
+      previousSlot: '2026-10-20T03:49:00.000Z',
+      previousSlotRun: { ended_at: '2026-10-20T03:50:00Z' },
+    },
+  ];
+  assert.deepEqual(jobsStillToEnd(notToday, PLATFORM_JOBS.quantiply, now), []);
+  // a slot later today, before the cap, still blocks (a --now run before 09:16)
+  const early = new Date('2026-10-21T03:42:00Z'); // 09:12 IST
+  const later: SchedulerJobView[] = [
+    {
+      id: 'algotest-deploy',
+      nextRun: slot('09:16'),
+      lastRun: null,
+      previousSlot: '2026-10-20T03:46:00.000Z',
+      previousSlotRun: { ended_at: '2026-10-20T03:47:00Z' },
+    },
+  ];
+  assert.deepEqual(jobsStillToEnd(later, PLATFORM_JOBS.algotest, early), [
+    'algotest-deploy runs at 09:16',
+  ]);
+  // ... but not one after the cap
+  assert.deepEqual(jobsStillToEnd(later, PLATFORM_JOBS.algotest, early, 9 * 60 + 15), []);
+  assert.equal(JOBS_WAIT_UNTIL, 10 * 60);
+});
+
+test("the stop button's running marker (B): alive and fresh only; a torn file by its age", () => {
+  const now = Date.parse('2026-10-21T07:30:00Z');
+  const alive = () => true;
+  const dead = () => false;
+  assert.equal(stopButtonRunning(null, null, now, alive), false);
+  assert.equal(
+    stopButtonRunning({ pid: 1, at: new Date(now - 60_000).toISOString() }, null, now, alive),
+    true,
+  );
+  assert.equal(stopButtonRunning({ pid: 1, at: now - 60_000 }, null, now, alive), true);
+  assert.equal(stopButtonRunning({ pid: 1, at: now - 60_000 }, null, now, dead), false);
+  assert.equal(stopButtonRunning({ pid: 1, at: now - 11 * 60_000 }, null, now, alive), false);
+  assert.equal(stopButtonRunning('unreadable', now - 5_000, now, alive), true);
+  assert.equal(stopButtonRunning('unreadable', now - 11 * 60_000, now, alive), false);
+  assert.equal(stopButtonRunning({ at: now - 5_000 }, null, now, dead), true); // no pid: by age
+});
+
+test('"cannot read" (C): said once, re-armed after 3 readings in a row, at most 3 a day', () => {
+  const s: MtmNoticeState = { unreadable: {}, readableRun: {}, unreadableSaid: {} };
+  const step = (readable: boolean, sent = true) => {
+    const n = mtmNotice(s, 'Quantiply Angel One', readable);
+    if (n && sent) commitMtmNotice(s, 'Quantiply Angel One', n);
+    return n;
+  };
+  assert.equal(step(true), null); // readable from the start: nothing to say
+  assert.equal(step(false, false), 'unreadable'); // Telegram did not take it: said again next
+  assert.equal(step(false), 'unreadable');
+  assert.equal(step(false), null); // said once
+  assert.equal(step(true), null);
+  assert.equal(step(false), null); // the run of good readings starts again
+  assert.equal(step(true), null);
+  assert.equal(step(true), null);
+  assert.equal(step(true), 'readable-again');
+  assert.equal(step(true), null);
+  assert.equal(step(false), 'unreadable'); // a later loss of the feed is announced (2nd)
+  for (let i = 0; i < READABLE_AGAIN_AFTER; i += 1) step(true);
   assert.match(
-    loginRefusal({ count: 1, reloginAt: at(20 * 60_000) }, 3, m, now, true) ?? '',
-    /30 minutes/,
+    mtmNoticeText(s, 'Quantiply Angel One', 'unreadable', '13:00'),
+    /said 3 times today: not said again today/,
   );
-  assert.equal(loginRefusal({ count: 1, reloginAt: at(31 * 60_000) }, 3, m, now, true), null);
+  assert.equal(step(false), 'unreadable'); // 3rd
+  for (let i = 0; i < READABLE_AGAIN_AFTER; i += 1) step(true);
+  assert.equal(step(false), null); // the day's notices are used up
+  assert.equal(UNREADABLE_NOTICES_A_DAY, 3);
+  assert.match(
+    mtmNoticeText(s, 'AlgoTest', 'readable-again', '13:05'),
+    /AlgoTest's MTM reads again/,
+  );
 });
 
 test('rupee figures: the whole text must be one amount', () => {

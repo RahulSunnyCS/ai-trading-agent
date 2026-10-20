@@ -49,6 +49,14 @@ export const LOGIN_CAP = { algotest: 3, quantiply: 2 } as const;
 export const LOGIN_BACKOFF_MS = 10 * 60_000;
 /** A session the platform ended (401 / logged out) is replaced at most this often. */
 export const RELOGIN_EVERY_MS = 30 * 60_000;
+/**
+ * No login within this long of losing a session, the first replacement included (re-review of
+ * PR #276, B): the session most likely ended because someone else logged in (the owner's browser,
+ * the stop button), and logging straight back in would end theirs.
+ */
+export const RELOGIN_AFTER_LOSS_MS = 10 * 60_000;
+/** A replacement also waits while another process logged in to the platform this recently. */
+export const OTHER_LOGIN_RECENT_MS = 10 * 60_000;
 
 export interface LoginLog {
   /** codes typed / logins sent today */
@@ -57,29 +65,188 @@ export interface LoginLog {
   failedAt?: string;
   /** ISO time of the last login that replaced a lost session */
   reloginAt?: string;
+  /** ISO time the platform last ended the monitor's session (401 / logged out) */
+  lostAt?: string;
+}
+
+export interface LoginContext {
+  log: LoginLog;
+  cap: number;
+  /** IST minutes */
+  minutes: number;
+  nowMs: number;
+  /** this login replaces a session the platform ended */
+  replacing: boolean;
+  /**
+   * When another process last logged in to this platform (AlgoTest's lock stamp, Quantiply's
+   * TOTP window stamp), ms; null when unknown. Read only for a replacement: the monitor's own
+   * last login is older than its lost session, so a stamp this recent is someone else's.
+   */
+  otherLoginAtMs?: number | null;
+  /** the stop button (PR #275) is running: never log in under it */
+  stopRunning?: boolean;
+}
+
+const ago = (nowMs: number, iso: string | undefined) =>
+  iso === undefined ? Number.POSITIVE_INFINITY : nowMs - Date.parse(iso);
+
+/**
+ * May the monitor log in to a platform now? Never in the quiet window or while the stop button
+ * runs, never past the cap, not within the backoff after a failure, not within 10 min of losing a
+ * session, and a replacement only when no other login to the platform is recent and at most every
+ * 30 min. `why` is said in the log; null means go ahead.
+ */
+export function loginRefusal(c: LoginContext): string | null {
+  const { log, cap, minutes, nowMs, replacing } = c;
+  if (inQuietWindow(minutes)) return 'no login between 09:10 and 09:25 (the deploy window)';
+  if (c.stopRunning) return 'the stop button is running';
+  if (log.count >= cap) return `${cap} logins today already`;
+  if (ago(nowMs, log.failedAt) < LOGIN_BACKOFF_MS) {
+    return 'a login failed less than 10 minutes ago';
+  }
+  if (ago(nowMs, log.lostAt) < RELOGIN_AFTER_LOSS_MS) {
+    return 'the session ended less than 10 minutes ago (another login may be in use)';
+  }
+  if (replacing) {
+    if (typeof c.otherLoginAtMs === 'number' && nowMs - c.otherLoginAtMs < OTHER_LOGIN_RECENT_MS) {
+      return 'another login to this platform was less than 10 minutes ago';
+    }
+    if (ago(nowMs, log.reloginAt) < RELOGIN_EVERY_MS) {
+      return 'the session was already replaced less than 30 minutes ago';
+    }
+  }
+  return null;
+}
+
+const laterIso = (a: string | undefined, b: string | undefined) =>
+  a === undefined ? b : b === undefined ? a : Date.parse(a) >= Date.parse(b) ? a : b;
+
+/**
+ * The day's logins from two copies (the state file on disk and this process's): the higher count
+ * and the later time of each kind, per platform. A `--print` run and the scheduled monitor both
+ * count toward the caps without one overwriting the other's logins (re-review of #276, E).
+ */
+export function mergeLogins<K extends string>(
+  a: Partial<Record<K, LoginLog>> | undefined,
+  b: Partial<Record<K, LoginLog>> | undefined,
+): Partial<Record<K, LoginLog>> {
+  const out: Partial<Record<K, LoginLog>> = {};
+  const keys = new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})]) as Set<K>;
+  for (const k of keys) {
+    const x = a?.[k];
+    const y = b?.[k];
+    const merged: LoginLog = { count: Math.max(x?.count ?? 0, y?.count ?? 0) };
+    for (const f of ['failedAt', 'reloginAt', 'lostAt'] as const) {
+      const v = laterIso(x?.[f], y?.[f]);
+      if (v !== undefined) merged[f] = v;
+    }
+    out[k] = merged;
+  }
+  return out;
+}
+
+// --- waiting for the morning's deploy jobs ---------------------------------------------------
+
+/**
+ * The scheduler jobs that log in to a platform in the morning (re-review of #276, A). The 09:25
+ * end of the quiet window is a clock time, but these can still run then (retries, the `quantiply`
+ * group's queue): before its first login after 09:10 the monitor waits until today's runs have
+ * ended, read from the scheduler's `GET /jobs`.
+ */
+export const PLATFORM_JOBS = {
+  algotest: ['algotest-deploy', 'algotest-topup'],
+  quantiply: ['quantiply-topup', 'quantiply-deploy-topup'],
+} as const;
+/**
+ * The wait ends at 10:00 IST at the latest (then it logs in anyway and says so): algotest-topup's
+ * three attempts (09:18, 10 min each, 2 min apart) end by 09:52 at worst, quantiply-topup's two
+ * and the queued quantiply-deploy-topup by 09:51.
+ */
+export const JOBS_WAIT_UNTIL = 10 * 60;
+
+/** One row of the scheduler's `GET /jobs` (only what the monitor reads). */
+export interface SchedulerJobView {
+  id: string;
+  nextRun: string | null;
+  lastRun: { started_at: string; ended_at: string | null } | null;
+  previousSlot?: string | null;
+  previousSlotRun?: { ended_at: string | null } | null;
 }
 
 /**
- * May the monitor log in to a platform now? Never in the quiet window, never past the cap, not
- * within the backoff after a failure, and a replacement for a lost session at most every 30 min.
- * `why` is said in the log; null means go ahead.
+ * Which of `ids` may still log in today, and why; empty = none, the monitor may log in. A job
+ * blocks while a run of it that started today has not ended, while today's slot has come and no
+ * run serves it yet (still due, or queued behind its group), or while a slot of it later today
+ * comes before `untilMinutes`. A job not scheduled today, or whose run today has ended, does not.
+ * A job the scheduler does not list blocks nothing (it is not scheduled).
  */
-export function loginRefusal(
-  log: LoginLog,
-  cap: number,
-  minutes: number,
+export function jobsStillToEnd(
+  views: SchedulerJobView[],
+  ids: readonly string[],
+  now: Date,
+  untilMinutes: number = JOBS_WAIT_UNTIL,
+): string[] {
+  const day = istDayOf(now);
+  const out: string[] = [];
+  for (const id of ids) {
+    const v = views.find((j) => j.id === id);
+    if (!v) continue;
+    const last = v.lastRun;
+    if (last && last.ended_at === null && istDayOf(new Date(last.started_at)) === day) {
+      out.push(`${id} is running (since ${istClock(new Date(last.started_at))})`);
+      continue;
+    }
+    const slot = v.previousSlot ? new Date(v.previousSlot) : null;
+    if (slot && istDayOf(slot) === day && slot.getTime() <= now.getTime()) {
+      const run = v.previousSlotRun;
+      if (!run) {
+        out.push(`${id} is due (its ${istClock(slot)} run has not started)`);
+        continue;
+      }
+      if (run.ended_at === null) {
+        out.push(`${id} is running (its ${istClock(slot)} run)`);
+        continue;
+      }
+    }
+    const next = v.nextRun ? new Date(v.nextRun) : null;
+    if (next && istDayOf(next) === day) {
+      const m = Math.floor((next.getTime() / 60_000 + 330) % 1440);
+      if (m < untilMinutes) out.push(`${id} runs at ${istClock(next)}`);
+    }
+  }
+  return out;
+}
+
+// --- the stop button (PR #275) -----------------------------------------------------------------
+
+/** A stop-running marker older than this is a crashed stop's. */
+export const STOP_RUNNING_STALE_MS = 10 * 60_000;
+
+/**
+ * Is PR #275's stop button running? It writes `TRADING_DATA_ROOT/stop/stop-running.json`
+ * (`{pid, at}`, beside its HOLD.json) for the whole of a stop and removes it in a `finally`. A
+ * marker counts while its process lives and it is under 10 minutes old; an unreadable one (torn
+ * mid-write) counts by its file time. Never fails open the other way: a marker with no pid counts
+ * by its age alone.
+ */
+export function stopButtonRunning(
+  marker: { pid?: unknown; at?: unknown } | null | 'unreadable',
+  fileMtimeMs: number | null,
   nowMs: number,
-  replacing: boolean,
-): string | null {
-  if (inQuietWindow(minutes)) return 'no login between 09:10 and 09:25 (the deploy window)';
-  if (log.count >= cap) return `${cap} logins today already`;
-  if (log.failedAt && nowMs - Date.parse(log.failedAt) < LOGIN_BACKOFF_MS) {
-    return 'a login failed less than 10 minutes ago';
+  alive: (pid: number) => boolean,
+): boolean {
+  if (marker === null) return false;
+  if (marker === 'unreadable') {
+    return fileMtimeMs !== null && nowMs - fileMtimeMs < STOP_RUNNING_STALE_MS;
   }
-  if (replacing && log.reloginAt && nowMs - Date.parse(log.reloginAt) < RELOGIN_EVERY_MS) {
-    return 'the session was already replaced less than 30 minutes ago';
-  }
-  return null;
+  const at =
+    typeof marker.at === 'number'
+      ? marker.at
+      : typeof marker.at === 'string'
+        ? Date.parse(marker.at)
+        : (fileMtimeMs ?? Number.NaN);
+  if (!Number.isFinite(at) || nowMs - at >= STOP_RUNNING_STALE_MS) return false;
+  return typeof marker.pid === 'number' ? alive(marker.pid) : true;
 }
 
 // --- money ---------------------------------------------------------------------------------
@@ -651,6 +818,66 @@ export function lossCrossings(total: number, state: LossState): Array<'warning' 
   if (total <= LOSS_ALERT_INR && !state.alerted) out.push('alert');
   // past the alert level at the first reading: the alert alone says it
   return out.includes('alert') ? ['alert'] : out;
+}
+
+/** "Readable again" after this many readings in a row (hysteresis against a flapping feed). */
+export const READABLE_AGAIN_AFTER = 3;
+/** At most this many "cannot read" notices per platform a day; the last one says so. */
+export const UNREADABLE_NOTICES_A_DAY = 3;
+
+/** Per platform label: said unreadable (and not yet readable again), the readings in a row since, notices today. */
+export interface MtmNoticeState {
+  unreadable: Record<string, boolean>;
+  readableRun: Record<string, number>;
+  unreadableSaid: Record<string, number>;
+}
+
+export type MtmNotice = 'unreadable' | 'readable-again' | null;
+
+/**
+ * What to say about a platform's MTM after one reading (re-review of #276, C): "cannot read" the
+ * first time it fails, then nothing until it has read `READABLE_AGAIN_AFTER` times in a row, then
+ * "readable again", which re-arms the notice, so a later loss of the feed is announced too (at most
+ * `UNREADABLE_NOTICES_A_DAY`). Updates only the run counter; `commitMtmNotice` records a notice once
+ * Telegram took it.
+ */
+export function mtmNotice(s: MtmNoticeState, label: string, readable: boolean): MtmNotice {
+  if (!readable) {
+    s.readableRun[label] = 0;
+    if (s.unreadable[label]) return null;
+    return (s.unreadableSaid[label] ?? 0) < UNREADABLE_NOTICES_A_DAY ? 'unreadable' : null;
+  }
+  if (!s.unreadable[label]) return null;
+  s.readableRun[label] = (s.readableRun[label] ?? 0) + 1;
+  return (s.readableRun[label] ?? 0) >= READABLE_AGAIN_AFTER ? 'readable-again' : null;
+}
+
+export function commitMtmNotice(s: MtmNoticeState, label: string, notice: MtmNotice): void {
+  if (notice === 'unreadable') {
+    s.unreadable[label] = true;
+    s.unreadableSaid[label] = (s.unreadableSaid[label] ?? 0) + 1;
+  } else if (notice === 'readable-again') {
+    s.unreadable[label] = false;
+    s.readableRun[label] = 0;
+  }
+}
+
+/** The text of a notice. */
+export function mtmNoticeText(
+  s: MtmNoticeState,
+  label: string,
+  notice: 'unreadable' | 'readable-again',
+  at: string,
+): string {
+  if (notice === 'readable-again') {
+    return `✅ Loss monitor ${at}: ${label}'s MTM reads again; the loss levels count it again`;
+  }
+  const n = (s.unreadableSaid[label] ?? 0) + 1;
+  const tail =
+    n >= UNREADABLE_NOTICES_A_DAY
+      ? `said ${n} times today: not said again today`
+      : 'said again only after it has read again';
+  return `⚠️ Loss monitor ${at}: cannot read ${label}'s MTM; the loss levels count the other platform only until it can (${tail})`;
 }
 
 export interface MtmPart {

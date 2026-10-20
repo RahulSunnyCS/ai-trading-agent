@@ -13,7 +13,7 @@ import {
 } from './automation.js';
 import { JOBS, type Job } from './jobs.js';
 import { type RunContext, runJob } from './runner.js';
-import { nextDue } from './schedule.js';
+import { nextDue, previousDue } from './schedule.js';
 
 /**
  * Loopback HTTP API over the scheduler (BL-012 PR 6): what the dashboard's Jobs and
@@ -97,15 +97,22 @@ export function createApi({
   function listJobs(): Response {
     const at = now();
     return json(
-      jobs.map((job) => ({
-        id: job.id,
-        description: job.description,
-        schedule: job.schedule.label,
-        nextRun: nextDue(job.schedule, at)?.toISOString() ?? null,
-        lastRun: ctx.history.last(job.id),
-        needs: job.needs ?? [],
-        group: job.group ?? null,
-      })),
+      jobs.map((job) => {
+        // BL-143: the latest slot that has come and the row serving it (none yet = still due or
+        // queued behind its group): the trade monitor waits for the morning deploy jobs to end.
+        const slot = previousDue(job.schedule, at);
+        return {
+          id: job.id,
+          description: job.description,
+          schedule: job.schedule.label,
+          nextRun: nextDue(job.schedule, at)?.toISOString() ?? null,
+          lastRun: ctx.history.last(job.id),
+          previousSlot: slot?.toISOString() ?? null,
+          previousSlotRun: slot ? ctx.history.forSlot(job.id, slot) : null,
+          needs: job.needs ?? [],
+          group: job.group ?? null,
+        };
+      }),
     );
   }
 

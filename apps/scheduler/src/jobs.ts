@@ -614,14 +614,16 @@ const BASE_JOBS: Job[] = [
   {
     id: 'trade-monitor',
     description:
-      "Watch the day's real trades, read-only (BL-143): 09:05-09:10 free margin per broker account vs the day's picks (MARGIN_CHECK=on); no login and no open session 09:10-09:25 (the deploy and top-up jobs log in then); 09:25 AlgoTest /live and Quantiply hold exactly the picks at 1 lot, per Settings › Automation row (DEPLOY_CHECK=on); 09:25-15:30 the combined MTM every minute with a -₹5,000 warning and a -₹8,000 alert, once each (LOSS_ALERTS=on). Never clicks, changes or squares off anything. Does nothing until a switch is on",
+      "Watch the day's real trades, read-only (BL-143): 09:05-09:10 free margin per broker account vs the day's picks (MARGIN_CHECK=on); no login and no open session 09:10-09:25 (the deploy and top-up jobs log in then), nor on a platform until its deploy and top-up jobs have ended (10:00 at most); 09:25 AlgoTest /live and Quantiply hold exactly the picks at 1 lot, per Settings › Automation row (DEPLOY_CHECK=on); 09:25-15:30 the combined MTM every minute with a -₹5,000 warning and a -₹8,000 alert, once each (LOSS_ALERTS=on). Never clicks, changes or squares off anything. Does nothing until a switch is on",
     // ONE process for the three parts, so each platform is logged in to once a day: the Quantiply
     // JWT is never written to a file, so separate jobs would each need their own TOTP login.
     // Not in the 'quantiply' group (it would hold the 09:19 / 09:21 top-ups all day); every
     // platform login, here and in the uploaders and deployers, takes the cross-process login lock
-    // (packages/broker-login/src/login-lock.ts), and the monitor makes none 09:10-09:25. A crash
-    // is retried, and a run cut off by a scheduler or laptop restart starts again until 15:30
-    // (`restartIfInterruptedUntil`); the day's state file under TRADING_DATA_ROOT/monitor/ stops a
+    // (packages/broker-login/src/login-lock.ts), and the monitor makes none 09:10-09:25, nor after
+    // it until today's algotest-deploy / algotest-topup (AlgoTest) and quantiply-topup /
+    // quantiply-deploy-topup (Quantiply) runs have ended (it reads `GET /jobs`; 10:00 at most). A
+    // crash is retried, and a run cut off by a scheduler or laptop restart starts again until
+    // 15:25 (`restartIfInterruptedUntil`); the day's state file under TRADING_DATA_ROOT/monitor/ stops a
     // check or a level being sent twice, and a lock file stops two monitors. Exit 3 = a refused or
     // held Quantiply login, or another monitor running: never retried.
     schedule: { at: '09:04', on: tradingDays, label: 'trading days 09:04' },

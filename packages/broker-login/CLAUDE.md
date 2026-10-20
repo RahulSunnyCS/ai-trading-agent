@@ -205,7 +205,14 @@ week, until disabled.
 
 - **Timeline and switches** (`.env`, each off until `on`): `MARGIN_CHECK` 09:05-09:10; then **no login and no
   open session 09:10-09:25** (the 09:16 deploy and the 09:18-09:21 top-ups log in; neither platform is known to
-  keep two sessions per user); `DEPLOY_CHECK` at 09:25; `LOSS_ALERTS` every minute 09:25-15:30. All off = no login.
+  keep two sessions per user), checked at every login (after the lock wait) and every use of an open session;
+  `DEPLOY_CHECK` at 09:25; `LOSS_ALERTS` every minute 09:25-15:30. All off = no login. After 09:10 a platform is
+  not logged in to until today's runs of its morning jobs have ended (`PLATFORM_JOBS`: `algotest-deploy` /
+  `algotest-topup`, `quantiply-topup` / `quantiply-deploy-topup`; `jobsStillToEnd` over the scheduler's
+  `GET /jobs`: running, due or queued behind the group blocks, not scheduled today or ended does not; an API
+  that does not answer blocks too): the deploy check waits, a loss reading skips the platform quietly. At 10:00
+  (`JOBS_WAIT_UNTIL`; the retries end by 09:52 at worst) it logs in anyway and says so once. A monitor that
+  starts after 09:10 says once (`monitor.margin`) that the margin was not checked.
 - **Read-only.** Pages and GET calls only; it never clicks a platform button (the kept Quantiply page has no
   overlay handler), never sends a PUT/POST/DELETE to one, never squares off. Its writes: Telegram
   (`monitor.margin`, `monitor.deploy`, `monitor.loss` for the warning; the -₹8,000 alert, "cannot read" and
@@ -213,12 +220,20 @@ week, until disabled.
   the logins, Quantiply's last MTM per algo with its time). A message is marked sent only when Telegram took it
   (`sendText` returns `SendOutcome`); a failed one goes again next tick. Every failure exit alerts (it is
   `alertsItself`). A lock file in `TRADING_DATA_ROOT/locks/` keeps a second monitor from starting (exit 3).
-- **Logins.** AlgoTest's website login goes through `algotestLoginLocked` (`src/login-lock.ts`, also used by the
-  uploader and the deployer); Quantiply's through `quantiply-session.ts` (`takeLoginLock`, the per-account lock
+- **Logins.** AlgoTest's website login goes through the AlgoTest login lock (`withLoginLock` in
+  `src/login-lock.ts`, its checks made again once the lock is held; the uploader and the deployer use
+  `algotestLoginLocked`); Quantiply's through `quantiply-session.ts` (`takeLoginLock`, the per-account lock
   shared with the stop button, PR #275; the TOTP window is claimed before the code is typed; the refused-login
-  hold). Caps: 3 AlgoTest logins and 2 Quantiply codes a day per account, counting `--print` runs; no new login
-  for 10 minutes after a failed one; a session the platform ended (logged out / 401) is replaced at most every
-  30 minutes, said once as "degraded" (`loginRefusal`). A Quantiply account is logged in to only when its
+  hold). Caps: 3 AlgoTest logins and 2 Quantiply codes a day per account, counting `--print` runs (the state
+  file's logins are merged, higher count and later times, on every read and save: `mergeLogins`); no new login
+  for 10 minutes after a failed one, nor within 10 minutes of the platform ending the session (logged out / 401:
+  someone else's login, the owner's browser or the stop button, most likely ended it), the first replacement
+  included; a replacement also waits while another process logged in to the platform in the last 10 minutes
+  (AlgoTest: `login-algotest.last`, stamped by every login under the lock; Quantiply: the TOTP window stamp) and
+  comes at most every 30 minutes, said once as "degraded" (`loginRefusal`). No login at all while PR #275's stop
+  button runs (`TRADING_DATA_ROOT/stop/stop-running.json`, `{pid, at}`, beside its HOLD.json: counted while the
+  pid lives and it is under 10 minutes old, `stopButtonRunning`). The margin's AlgoTest session is closed before
+  `obt angel funds` runs, and its lock is waited for only until 09:10. A Quantiply account is logged in to only when its
   Settings › Automation row uploads a list: for `quantiply.finvasia` that is a Shoonya login, so the same caution
   as below applies before switching that row on. Angel One SmartAPI: `obt angel funds` once (the shared guard).
   **Shoonya's own API: never** (no document shows an API login leaves the session AlgoTest trades through
@@ -240,5 +255,7 @@ week, until disabled.
   unreadable, never a neighbouring figure; fixture `src/fixtures/live-mtm.html`) plus Quantiply's per-algo MTM
   from its web app's socket frames (`pnlFromSocketFrame`; `quantiplyReading`: a started algo needs a figure under
   3 minutes old and a closed one any figure, whatever its status is called, else "cannot read", never ₹0).
+  "Cannot read <platform>'s MTM" is said the first time, then "reads again" after 3 readings in a row, which
+  re-arms it for a later loss of the feed; at most 3 a day per platform (`mtmNotice`).
 - `--now --print` runs the asked parts once and prints instead of sending (no switch needed; refuses to log in
   09:10-09:25; its logins count).
