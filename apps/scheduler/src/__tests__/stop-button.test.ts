@@ -245,7 +245,20 @@ describe('stop button: two taps', () => {
     await h.button.handle(h.tap('stop:go:n1'));
     await h.button.idle();
     expect(h.memory.held).toBe(true);
-    expect(h.sent.at(-1)?.text).toContain('did NOTHING: a stop is already running since 09:30');
+    expect(h.sent.at(-1)?.text).toContain('did nothing new: a stop is already running since 09:30');
+  });
+
+  it('another stop already running: the hold this tap set stays on', async () => {
+    const h = harness({
+      applyCode: 2,
+      refused: 'a stop is already running since 2026-10-20 09:30 IST (pid 7)',
+    });
+    await h.button.handle(h.tap('stop:ask:2026-10-20'));
+    await h.button.handle(h.tap('stop:go:n1'));
+    await h.button.idle();
+    expect(h.memory.holds).toBe(1);
+    expect(h.memory.held).toBe(true);
+    expect(h.sent.at(-1)?.text).toContain('The hold stays on');
   });
 
   it('holds in memory at the confirm; a refused runner (exit 2) lifts it again', async () => {

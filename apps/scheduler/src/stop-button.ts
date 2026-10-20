@@ -263,11 +263,15 @@ export class StopButton {
         this.d.log({ event: 'runner_exit', code: r.code });
         // 0 and 3: the runner delivered its own report.
         if (r.code === 2) {
-          // the runner refused before doing anything: lift only the hold this tap set, never an
-          // earlier stop's (only Resume does that)
-          if (heldNow) this.d.memory.clear();
+          // Another stop is running: keep the hold (the owner asked to stop; that stop may be the
+          // one still squaring off). Any other refusal did nothing at all: lift only the hold this
+          // tap set, never an earlier stop's (only Resume does that).
+          const running = r.refused?.includes('already running') ?? false;
+          if (heldNow && !running) this.d.memory.clear();
           await this.d.port.send(
-            `⚠️ The stop did NOTHING: ${r.refused ?? 'the runner refused'}. ${r.refused?.includes('already running') ? 'Its report follows when it ends.' : 'Stop by hand on Quantiply and algotest.in/live, or fix it and send /stop again.'}`,
+            running
+              ? `⚠️ This stop did nothing new: ${r.refused}. The hold stays on.`
+              : `⚠️ The stop did NOTHING: ${r.refused ?? 'the runner refused'}. Stop by hand on Quantiply and algotest.in/live, or fix it and send /stop again.`,
           );
         } else if (r.code === 4) {
           await this.d.port.send(

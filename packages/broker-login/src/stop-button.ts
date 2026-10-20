@@ -32,9 +32,9 @@ import {
   clearHold,
   holdPath,
   markStopRunning,
-  otherStopRunning,
   readHold,
   stateHoldPath,
+  stateSquareOffLogPath,
   stopLogPath,
   writeHold,
 } from './stop-hold.js';
@@ -241,40 +241,68 @@ function deployLedgerRecorder(q: Account, today: string) {
   };
 }
 
+/** The stop-log rows a later stop must know about: square-off calls, and deploys reported gone. */
+export const SQUARE_OFF_STEPS = new Set(['sq_off_terminate', 'square_off', 'gone']);
+
 /**
- * Today's square-offs from the stop log (`stop/<day>.jsonl`), per platform: every id an earlier
- * stop sent (answered) or may have sent (no answer). They are waited on and reported, never sent
- * again. An unreadable log gives none (the platforms still list what is open).
+ * Today's square-offs from the stop log, per platform: every id an earlier stop sent (answered:
+ * `ok`) or may have sent (no answer: `maybe`, unless the same id was also answered). They are
+ * waited on and reported, never sent again. Read from both copies: `stop/<day>.jsonl` and the
+ * scheduler state dir's `stop-squareoffs-<day>.jsonl` (kept when the data volume is unmounted).
+ * A deploy an earlier stop already reported gone from /live (`gone`) is left out: said once.
+ * An unreadable log gives none (the platforms still list what is open).
  */
 export async function priorSquareOffs(
   dataRoot: string | undefined,
   day: string,
+  env: NodeJS.ProcessEnv = process.env,
 ): Promise<Map<string, Sent>> {
   const out = new Map<string, Sent>();
-  if (!dataRoot) return out;
-  let text = '';
-  try {
-    text = await readFile(stopLogPath(dataRoot, day), 'utf8');
-  } catch {
-    return out;
-  }
-  for (const line of text.split('\n')) {
-    let r: Record<string, unknown>;
+  const gone = new Set<string>();
+  const files = [
+    ...(dataRoot ? [stopLogPath(dataRoot, day)] : []),
+    stateSquareOffLogPath(day, env),
+  ];
+  for (const file of files) {
+    let text = '';
     try {
-      r = JSON.parse(line) as Record<string, unknown>;
+      text = await readFile(file, 'utf8');
     } catch {
       continue;
     }
-    if (r.who !== 'runner' || (r.step !== 'sq_off_terminate' && r.step !== 'square_off')) continue;
-    if (r.ok !== true && r.maybe !== true) continue;
-    if (typeof r.id !== 'string' || typeof r.platform !== 'string') continue;
-    const at =
-      typeof r.at === 'string'
-        ? new Date(Date.parse(r.at) + 330 * 60_000).toISOString().slice(11, 16)
-        : '?';
-    const sent = out.get(r.platform) ?? new Map();
-    if (!sent.has(r.id)) sent.set(r.id, { name: String(r.name ?? r.id), at, earlier: true });
-    out.set(r.platform, sent);
+    for (const line of text.split('\n')) {
+      let r: Record<string, unknown>;
+      try {
+        r = JSON.parse(line) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+      if (r.who !== 'runner' || typeof r.step !== 'string' || !SQUARE_OFF_STEPS.has(r.step))
+        continue;
+      if (typeof r.id !== 'string' || typeof r.platform !== 'string') continue;
+      if (r.step === 'gone') {
+        gone.add(`${r.platform}\u0000${r.id}`);
+        continue;
+      }
+      if (r.ok !== true && r.maybe !== true) continue;
+      const at =
+        typeof r.at === 'string'
+          ? new Date(Date.parse(r.at) + 330 * 60_000).toISOString().slice(11, 16)
+          : '?';
+      const sent = out.get(r.platform) ?? new Map();
+      const had = sent.get(r.id);
+      const answered = r.ok === true;
+      if (!had) {
+        sent.set(r.id, { name: String(r.name ?? r.id), at, earlier: true, maybe: !answered });
+      } else if (answered && had.maybe) {
+        sent.set(r.id, { ...had, at, maybe: false }); // answered after all: sent
+      }
+      out.set(r.platform, sent);
+    }
+  }
+  for (const [platform, sent] of out) {
+    for (const id of sent.keys()) if (gone.has(`${platform}\u0000${id}`)) sent.delete(id);
+    if (!sent.size) out.delete(platform);
   }
   return out;
 }
@@ -282,10 +310,19 @@ export async function priorSquareOffs(
 /** Lines naming an earlier stop's square-offs when this run could not even look at them. */
 function earlierLines(prior: Sent | undefined, where: string): string[] {
   if (!prior?.size) return [];
-  const names = capped([...prior.values()].map((s) => `${s.name} (sent ${s.at})`));
-  return [
-    `⏳ an earlier stop today already sent the square-off for: ${names}. Do NOT exit these at the broker: open ${where} first`,
-  ];
+  const all = [...prior.values()];
+  const sent = all.filter((s) => !s.maybe);
+  const maybe = all.filter((s) => s.maybe);
+  const out: string[] = [];
+  if (sent.length)
+    out.push(
+      `⏳ an earlier stop today already sent the square-off for: ${capped(sent.map((s) => `${s.name} (sent ${s.at})`))}. Do NOT exit these at the broker: open ${where} first`,
+    );
+  if (maybe.length)
+    out.push(
+      `⚠️ square-off may have been sent (no answer) by an earlier stop: ${capped(maybe.map((s) => `${s.name} (at ${s.at})`))}. Open ${where} first; exit at the broker only if it shows no pending exit`,
+    );
+  return out;
 }
 
 async function quantiplyAccount(
@@ -539,9 +576,21 @@ async function main(): Promise<number> {
   }
 
   // --apply
+  const stateLog = stateSquareOffLogPath(local.today);
   const log: StopLog = async (row) => {
     if (dataRoot) await appendStopLog(dataRoot, { who: 'runner', ...row });
     else console.log(`stop: ${redact(JSON.stringify(row))}`);
+    // the square-off rows also on the laptop's own disk: a second press must know them
+    if (typeof row.step === 'string' && SQUARE_OFF_STEPS.has(row.step)) {
+      await mkdir(dirname(stateLog), { recursive: true })
+        .then(() =>
+          appendFile(
+            stateLog,
+            `${redact(JSON.stringify({ at: new Date().toISOString(), who: 'runner', ...row }))}\n`,
+          ),
+        )
+        .catch(() => undefined);
+    }
   };
   if (process.env.STOP_BUTTON?.trim().toLowerCase() !== 'on') {
     await log({ step: 'refused', why: 'STOP_BUTTON is not on' });
@@ -549,19 +598,28 @@ async function main(): Promise<number> {
     return EXIT_REFUSED;
   }
   await log({ step: 'start', by: values.by ?? 'manual' });
-  // While the stop runs, other jobs that log in (the loss / deploy monitor) keep off the accounts.
-  // one stop at a time: a second one would send square-offs the first is still waiting on
-  const other = otherStopRunning(dataRoot);
-  if (other) {
-    await log({ step: 'refused', why: 'another stop is running', since: other.at, pid: other.pid });
-    console.error(`REFUSED: a stop is already running since ${other.at} (pid ${other.pid})`);
+  // One stop at a time (a second would send square-offs the first is still waiting on), and the
+  // loss / deploy monitor keeps off the accounts meanwhile: the marker, taken atomically.
+  const mark = await markStopRunning(dataRoot);
+  if (mark.conflict) {
+    const c = mark.conflict;
+    await log({ step: 'refused', why: 'another stop is running', since: c.since, pid: c.pid });
+    console.error(
+      `REFUSED: a stop is already running since ${c.since} IST (pid ${c.pid}). If no report arrives within 15 minutes, delete ${c.path} and send /stop again`,
+    );
     return EXIT_REFUSED;
   }
-  const running = await markStopRunning(dataRoot);
+  // killed (the listener's 15-minute timeout, Ctrl-C): never leave a marker that blocks a stop
+  const onSignal = (code: number) => () => {
+    mark.releaseSync();
+    process.exit(code);
+  };
+  process.once('SIGTERM', onSignal(143));
+  process.once('SIGINT', onSignal(130));
   try {
     return await applyStop(dataRoot, local, log, values);
   } finally {
-    await running();
+    await mark.release();
   }
 }
 

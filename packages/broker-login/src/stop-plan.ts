@@ -289,7 +289,12 @@ export function algotestOutcome(
     const e = now.get(id);
     const sentAt = w.at ? ` (sent ${w.at}${w.earlier ? ' by an earlier stop' : ''})` : '';
     const name = `${w.name}${w.kind === 'sent' || w.kind === 'maybe' ? sentAt : ''}`;
-    if (!e) out.check.push(`${w.name}: no longer listed: check /live`);
+    if (!e)
+      out.check.push(
+        w.earlier
+          ? `${w.name}: squared off by an earlier stop, no longer listed on /live: check it once`
+          : `${w.name}: no longer listed: check /live`,
+      );
     else if (e.status === A_SQUARED_OFF) out.confirmed.push(w.name);
     else if (squaringOff(e.status)) out.closing.push(name);
     else if (e.status === A_STOPPED)

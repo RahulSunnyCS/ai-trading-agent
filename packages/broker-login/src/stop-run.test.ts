@@ -307,6 +307,23 @@ describe('Quantiply stop against a stand-in API', () => {
     assert.equal(q.seen.filter((x) => x.url === '/algos/a/action/SQ_OFF_TERMINATE').length, 1);
   });
 
+  it("an earlier stop's no-answer square-off stays 'may have been sent', never sent again", async () => {
+    closeAfter = Number.POSITIVE_INFINITY;
+    const prior = new Map([['a', { name: 'Core · A', at: '09:20', earlier: true, maybe: true }]]);
+    const r = await stopQuantiply('Quantiply · Angel One', api, ledger, noLog, {
+      dryRun: false,
+      waits: fast,
+      prior,
+    });
+    const text = r.lines.join('\n');
+    assert.equal(q.seen.filter((x) => x.url === '/algos/a/action/SQ_OFF_TERMINATE').length, 0);
+    assert.match(
+      text,
+      /may have been sent \(no answer\): Core · A \(sent 09:20 by an earlier stop\)\. Open Quantiply first; exit at the broker only if it shows no pending exit/,
+    );
+    assert.doesNotMatch(text, /still closing/);
+  });
+
   it("an earlier stop's square-off is never sent again: waited on, reported as sent then", async () => {
     closeAfter = Number.POSITIVE_INFINITY;
     const prior = new Map([['a', { name: 'Core · A', at: '09:20', earlier: true }]]);
@@ -482,6 +499,39 @@ describe('AlgoTest stop against a stand-in API', () => {
     assert.doesNotMatch(text, /nothing of the tool's running/);
   });
 
+  it("an earlier stop's no-answer square-off stays 'may have been sent' on AlgoTest", async () => {
+    const prior = new Map([
+      ['6ad590af06a3aebabc43634d', { name: 'T1 · A', at: '09:20', earlier: true, maybe: true }],
+    ]);
+    const r = await stopAlgoTest(algotestStopApi(fetchHttp), noLog, { ...opts, prior });
+    const text = r.lines.join('\n');
+    assert.equal(a.seen.filter((x) => x.method === 'PUT').length, 0);
+    assert.match(
+      text,
+      /may have been sent \(no answer\): T1 · A \(sent 09:20 by an earlier stop\)\. Open AlgoTest \/live first/,
+    );
+    assert.doesNotMatch(text, /still closing/);
+  });
+
+  it("an earlier stop's deploy gone from /live is said once, then logged gone", async () => {
+    const prior = new Map([
+      ['6ad590af06a3aebabc436399', { name: 'T1 · Old', at: '09:20', earlier: true }],
+    ]);
+    const rows: Record<string, unknown>[] = [];
+    const r = await stopAlgoTest(
+      algotestStopApi(fetchHttp),
+      async (row) => {
+        rows.push(row);
+      },
+      { ...opts, prior },
+    );
+    assert.match(
+      r.lines.join('\n'),
+      /T1 · Old: squared off by an earlier stop, no longer listed on \/live: check it once/,
+    );
+    assert.ok(rows.some((x) => x.step === 'gone' && x.id === '6ad590af06a3aebabc436399'));
+  });
+
   it("an earlier stop's square-off is never sent again", async () => {
     const prior = new Map([
       ['6ad590af06a3aebabc43634d', { name: 'T1 · A', at: '09:20', earlier: true }],
@@ -587,7 +637,7 @@ describe('stop-button.ts --apply while another stop runs', () => {
       // this test process is alive and is not the child: a running stop as far as the child sees
       await writeFile(
         join(root, 'stop', 'stop-running.json'),
-        JSON.stringify({ pid: process.pid, at: '2026-10-20T04:00:00Z' }),
+        JSON.stringify({ pid: process.pid, at: new Date().toISOString() }),
       );
       const out = cli(
         ['--apply'],
@@ -595,7 +645,10 @@ describe('stop-button.ts --apply while another stop runs', () => {
         root,
       );
       assert.equal(out.status, 2, out.stderr);
-      assert.match(out.stderr, /REFUSED: a stop is already running since 09:30/);
+      assert.match(
+        out.stderr,
+        /REFUSED: a stop is already running since \d{4}-\d\d-\d\d \d\d:\d\d IST \(pid \d+\)\. If no report arrives within 15 minutes, delete .*stop-running\.json and send \/stop again/,
+      );
       assert.ok(!readdirSync(join(root, 'stop')).includes('HOLD.json'));
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -644,15 +697,50 @@ describe('the stop log tells a later stop what was already sent', () => {
         join(root, 'stop', '2026-10-20.jsonl'),
         `${rows.map((r) => JSON.stringify(r)).join('\n')}\n{torn`,
       );
-      const prior = await priorSquareOffs(root, '2026-10-20');
+      const env = { SCHEDULER_STATE_DIR: join(root, 'state') };
+      const prior = await priorSquareOffs(root, '2026-10-20', env);
       assert.deepEqual([...(prior.get('AlgoTest')?.keys() ?? [])], ['x1']);
       assert.deepEqual(prior.get('AlgoTest')?.get('x1'), {
         name: 'T1 · A',
         at: '09:20',
         earlier: true,
+        maybe: false,
       });
-      assert.deepEqual([...(prior.get('Quantiply · Angel One')?.keys() ?? [])], ['q1']);
-      assert.equal((await priorSquareOffs(undefined, '2026-10-20')).size, 0);
+      // no answer stays "may have been sent", never "sent"
+      assert.equal(prior.get('Quantiply · Angel One')?.get('q1')?.maybe, true);
+      assert.equal((await priorSquareOffs(undefined, '2026-10-20', env)).size, 0);
+
+      // the laptop's own copy (the data volume gone): an answer there wins over the no-answer;
+      // a deploy already reported gone is left out
+      await mkdir(join(root, 'state'));
+      const more = [
+        {
+          at: '2026-10-20T03:55:00Z',
+          who: 'runner',
+          platform: 'Quantiply · Angel One',
+          step: 'sq_off_terminate',
+          id: 'q1',
+          name: 'Core · B',
+          ok: true,
+        },
+        {
+          at: '2026-10-20T03:56:00Z',
+          who: 'runner',
+          platform: 'AlgoTest',
+          step: 'gone',
+          id: 'x1',
+          name: 'T1 · A',
+        },
+      ];
+      await writeFile(
+        join(root, 'state', 'stop-squareoffs-2026-10-20.jsonl'),
+        `${more.map((r) => JSON.stringify(r)).join('\n')}\n`,
+      );
+      const both = await priorSquareOffs(root, '2026-10-20', env);
+      assert.equal(both.get('Quantiply · Angel One')?.get('q1')?.maybe, false);
+      assert.equal(both.get('AlgoTest'), undefined);
+      const stateOnly = await priorSquareOffs(undefined, '2026-10-20', env);
+      assert.equal(stateOnly.get('Quantiply · Angel One')?.get('q1')?.maybe, false);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

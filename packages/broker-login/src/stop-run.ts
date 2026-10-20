@@ -103,6 +103,8 @@ export interface SentInfo {
   at: string;
   /** sent by an earlier stop today (`stop/<day>.jsonl`): never sent again */
   earlier?: boolean;
+  /** the call got no answer: it may or may not have reached the platform */
+  maybe?: boolean;
 }
 
 export type Sent = Map<string, SentInfo>;
@@ -151,8 +153,9 @@ export async function stopQuantiply(
   const w = opts.waits ?? DEFAULT_WAITS;
   const list = () => listing(() => api.list(), w, log, platform);
   const lines: string[] = [];
-  const sent: Sent = new Map(opts.prior ?? []);
-  const maybe: Sent = new Map();
+  // an earlier stop's no-answer square-off stays "may have been sent", never becomes "sent"
+  const sent: Sent = new Map([...(opts.prior ?? [])].filter(([, x]) => !x.maybe));
+  const maybe: Sent = new Map([...(opts.prior ?? [])].filter(([, x]) => x.maybe));
   let ok = true;
   try {
     const firstList = await list();
@@ -181,7 +184,7 @@ export async function stopQuantiply(
       if (first.notMine.length) lines.push(`not the tool's, left alone: ${capped(first.notMine)}`);
       return { platform, ok: first.byHand.length === 0, lines };
     }
-    const triedSq = new Set<string>(sent.keys());
+    const triedSq = new Set<string>([...sent.keys(), ...maybe.keys()]);
     const triedOff = new Set<string>();
     const off: string[] = [];
     const watched = () => new Set([...sent.keys(), ...maybe.keys()]);
@@ -350,7 +353,8 @@ export async function stopAlgoTest(
   const plan = (xs: Execution[]) => planAlgoTestStop(xs, opts.isTool, opts.today);
   const lines: string[] = [];
   const watched = new Map<string, Watched>();
-  for (const [id, s] of opts.prior ?? []) watched.set(id, { ...s, kind: 'sent' });
+  for (const [id, s] of opts.prior ?? [])
+    watched.set(id, { ...s, kind: s.maybe ? 'maybe' : 'sent' });
   const sentOf = (kind: Watched['kind']): Sent =>
     new Map([...watched].filter(([, x]) => x.kind === kind));
   let ok = true;
@@ -460,6 +464,11 @@ export async function stopAlgoTest(
       )
         ok = false;
       await log({ platform, step: 'done', ...r });
+      // an earlier stop's deploy gone from /live: said this once, not on every later stop
+      const listed = new Set(finalList.map((e) => e.id));
+      for (const [id, x] of watched) {
+        if (x.earlier && !listed.has(id)) await log({ platform, step: 'gone', id, name: x.name });
+      }
     }
     // a watched deploy's outcome is already a line above
     final.squareOff = final.squareOff.filter((e) => !watched.has(e.id));

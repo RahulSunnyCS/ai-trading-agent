@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { appendFile, mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { settingsPath } from './automation-settings.js';
@@ -125,8 +125,11 @@ export async function clearHold(
 /**
  * While a stop runs: `stop-running.json` (`{pid, at}`) beside each hold copy
  * (`TRADING_DATA_ROOT/stop/stop-running.json`, and `<SCHEDULER_STATE_DIR>/stop-running.json`),
- * removed when the stop ends, so other jobs that log in (the loss / deploy monitor, BL-143 #276)
- * keep off the accounts meanwhile. A marker whose pid is dead is a crashed stop's: ignore it.
+ * removed when the stop ends (also on SIGTERM / SIGINT), so other jobs that log in (the loss /
+ * deploy monitor, BL-143 #276) keep off the accounts meanwhile, and a second stop does not start.
+ * A marker is stale, and ignored, when its pid is dead or this process's, when it is older than
+ * `STOP_RUNNING_STALE_MS` (the runner's 15-minute timeout plus a margin) or not from today (IST),
+ * whatever its pid: a pid is soon reused after a crash or a reboot.
  */
 export function stopRunningPaths(
   dataRoot: string | undefined,
@@ -138,6 +141,8 @@ export function stopRunningPaths(
   ];
 }
 
+export const STOP_RUNNING_STALE_MS = 20 * 60_000;
+
 function pidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -147,54 +152,100 @@ function pidAlive(pid: number): boolean {
   }
 }
 
-/** Another stop that is running now (its marker names a live pid, not this one), or null. */
+export interface RunningStop {
+  pid: number;
+  /** IST `YYYY-MM-DD HH:MM` */
+  since: string;
+  path: string;
+}
+
+/** The marker at `path` if it is a live, fresh stop other than this process, else null. */
+function liveMarker(path: string, now: Date): RunningStop | null {
+  if (!existsSync(path)) return null;
+  try {
+    const m = JSON.parse(readFileSync(path, 'utf8')) as { pid?: unknown; at?: unknown };
+    if (typeof m.pid !== 'number' || m.pid === process.pid) return null;
+    const at = typeof m.at === 'string' ? Date.parse(m.at) : Number.NaN;
+    if (Number.isNaN(at)) return null;
+    if (now.getTime() - at > STOP_RUNNING_STALE_MS) return null;
+    if (istToday(new Date(at)) !== istToday(now)) return null;
+    if (!pidAlive(m.pid)) return null;
+    const ist = new Date(at + 330 * 60_000).toISOString();
+    return { pid: m.pid, since: `${ist.slice(0, 10)} ${ist.slice(11, 16)}`, path };
+  } catch {
+    return null; // torn or unreadable: no pid to trust, not a running stop
+  }
+}
+
+/** Another stop that is running now (a live, fresh marker that is not this one), or null. */
 export function otherStopRunning(
   dataRoot: string | undefined,
   env: NodeJS.ProcessEnv = process.env,
-): { pid: number; at: string } | null {
+  now: Date = new Date(),
+): RunningStop | null {
   for (const path of stopRunningPaths(dataRoot, env)) {
-    if (!existsSync(path)) continue;
-    try {
-      const m = JSON.parse(readFileSync(path, 'utf8')) as { pid?: unknown; at?: unknown };
-      if (typeof m.pid !== 'number' || m.pid === process.pid || !pidAlive(m.pid)) continue;
-      const at = typeof m.at === 'string' ? m.at : '?';
-      const clock = Number.isNaN(Date.parse(at))
-        ? at
-        : new Date(Date.parse(at) + 330 * 60_000).toISOString().slice(11, 16);
-      return { pid: m.pid, at: clock };
-    } catch {
-      // torn or unreadable: no pid to trust, not a running stop
-    }
+    const live = liveMarker(path, now);
+    if (live) return live;
   }
   return null;
 }
 
-/** Writes the marker where it can (best effort); the returned function removes those copies. */
+export interface StopMark {
+  /** another stop holds a marker: this one must not run */
+  conflict: RunningStop | null;
+  release: () => Promise<void>;
+  /** for a signal handler: removes this run's markers synchronously */
+  releaseSync: () => void;
+}
+
+/**
+ * Takes the marker in every place it can, each with an exclusive create (`wx`): a stale marker is
+ * replaced; a live one of another stop is a `conflict` (and this run marks nothing).
+ */
 export async function markStopRunning(
   dataRoot: string | undefined,
   env: NodeJS.ProcessEnv = process.env,
   now: Date = new Date(),
-): Promise<() => Promise<void>> {
+): Promise<StopMark> {
   const written: string[] = [];
   const body = `${JSON.stringify({ pid: process.pid, at: now.toISOString() })}\n`;
-  for (const path of stopRunningPaths(dataRoot, env)) {
-    try {
-      await mkdir(dirname(path), { recursive: true });
-      await writeFile(path, body, 'utf8');
-      written.push(path);
-    } catch {
-      // best effort: the hold, not this marker, is what keeps deploys off
-    }
-  }
-  return async () => {
+  const releaseSync = () => {
     for (const path of written) {
       try {
-        if (readFileSync(path, 'utf8') === body) await rm(path, { force: true });
+        if (readFileSync(path, 'utf8') === body) rmSync(path, { force: true });
       } catch {
         // already gone
       }
     }
   };
+  const release = async () => releaseSync();
+  for (const path of stopRunningPaths(dataRoot, env)) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await mkdir(dirname(path), { recursive: true });
+        await writeFile(path, body, { encoding: 'utf8', flag: 'wx' });
+        written.push(path);
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') break; // best effort
+        const live = liveMarker(path, now);
+        if (live) {
+          releaseSync();
+          return { conflict: live, release: async () => undefined, releaseSync: () => undefined };
+        }
+        await rm(path, { force: true }).catch(() => undefined); // stale: replaced
+      }
+    }
+  }
+  return { conflict: null, release, releaseSync };
+}
+
+/**
+ * The second copy of the stop's square-off rows, on the scheduler's state dir: a second press
+ * still knows what the first sent when the data volume is unmounted (`priorSquareOffs`).
+ */
+export function stateSquareOffLogPath(day: string, env: NodeJS.ProcessEnv = process.env): string {
+  return join(dirname(settingsPath(env)), `stop-squareoffs-${day}.jsonl`);
 }
 
 /** For the deployers and uploaders: why an `--apply` run must change nothing, or null. */

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -11,6 +11,7 @@ import {
   clearHold,
   holdPath,
   markStopRunning,
+  otherStopRunning,
   readHold,
   stateHoldPath,
   stopHeld,
@@ -326,17 +327,73 @@ test('stop-running marker: {pid, at} beside each hold copy while a stop runs, go
       join(root, 'stop', 'stop-running.json'),
       join(root, 'state', 'stop-running.json'),
     ]);
-    const done = await markStopRunning(root, env);
+    const mark = await markStopRunning(root, env);
+    assert.equal(mark.conflict, null);
     for (const p of paths) {
       const m = JSON.parse(await readFile(p, 'utf8')) as { pid: number; at: string };
       assert.equal(m.pid, process.pid);
       assert.ok(m.at);
     }
-    await done();
+    await mark.release();
     assert.deepEqual(
       paths.filter((p) => existsSync(p)),
       [],
     );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('otherStopRunning: only a fresh, today, live marker of another process counts', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'stop-run-'));
+  const env = { SCHEDULER_STATE_DIR: join(root, 'state') };
+  const now = new Date('2026-10-20T06:00:00Z'); // 11:30 IST
+  const marker = join(root, 'stop', 'stop-running.json');
+  const put = (pid: number, at: string) => writeFile(marker, JSON.stringify({ pid, at }));
+  try {
+    await mkdir(join(root, 'stop'), { recursive: true });
+    // a week old, pid 1 (always alive: launchd): stale, whatever the pid
+    await put(1, '2026-10-13T04:00:00Z');
+    assert.equal(otherStopRunning(root, env, now), null);
+    // today, 25 minutes old: past the runner's timeout, stale
+    await put(process.ppid, '2026-10-20T05:35:00Z');
+    assert.equal(otherStopRunning(root, env, now), null);
+    // fresh, another live process (this test's parent): running
+    await put(process.ppid, '2026-10-20T05:55:00Z');
+    assert.deepEqual(otherStopRunning(root, env, now), {
+      pid: process.ppid,
+      since: '2026-10-20 11:25',
+      path: marker,
+    });
+    // fresh but this very process: not another stop
+    await put(process.pid, '2026-10-20T05:55:00Z');
+    assert.equal(otherStopRunning(root, env, now), null);
+    // fresh but a dead pid
+    await put(999999, '2026-10-20T05:55:00Z');
+    assert.equal(otherStopRunning(root, env, now), null);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('markStopRunning: a live marker is a conflict (nothing marked); a stale one is replaced', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'stop-run-'));
+  const env = { SCHEDULER_STATE_DIR: join(root, 'state') };
+  const marker = join(root, 'stop', 'stop-running.json');
+  try {
+    await mkdir(join(root, 'stop'), { recursive: true });
+    const now = new Date();
+    await writeFile(marker, JSON.stringify({ pid: process.ppid, at: now.toISOString() }));
+    const busy = await markStopRunning(root, env, now);
+    assert.equal(busy.conflict?.pid, process.ppid);
+    assert.equal(existsSync(join(root, 'state', 'stop-running.json')), false);
+    // stale (a week old): replaced by this run's own
+    await writeFile(marker, JSON.stringify({ pid: 1, at: '2026-10-13T04:00:00Z' }));
+    const mine = await markStopRunning(root, env, now);
+    assert.equal(mine.conflict, null);
+    assert.equal((JSON.parse(await readFile(marker, 'utf8')) as { pid: number }).pid, process.pid);
+    mine.releaseSync();
+    assert.equal(existsSync(marker), false);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

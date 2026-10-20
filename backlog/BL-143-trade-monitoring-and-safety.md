@@ -8,7 +8,7 @@
 | **Area** | broker-login + scheduler + notify |
 | **Created** | 2026-10-20 |
 | **Depends on** | BL-137 / BL-138 (AlgoTest upload, deploy), BL-139 (Quantiply upload, enable), BL-140 (automation settings), BL-012 (scheduler). Item 3 of the owner's list is BL-141 |
-| **TODO.md row** | — (filled in when each part merges) |
+| **TODO.md row** | 3.35 (3.35.4 = Phase 4, the stop button; PR #275) |
 
 ## Context
 
@@ -86,3 +86,26 @@ The seven, as proposed that day (item 3, real fills and slippage per strategy, i
 ## Log
 
 - 2026-10-20 — Created from the owner's "lets build all 7"; answers above. Item 3 is BL-141.
+- 2026-10-20 — Phase 4 built (PR #275). The Telegram stop button is off until `STOP_BUTTON=on` is in the repo-root
+  `.env` and the scheduler has been restarted. The square-off calls were read from the platforms' public JS:
+  Quantiply `PUT /algos/:id/action/SQ_OFF_TERMINATE`; AlgoTest `PUT /execution/v2/square-off/<id>`, plus the list
+  `GET /execution/v2/executions?environment=live` (`docs/algotest-execution.md`). Tested against stand-ins and
+  fixtures only; nothing sent live.
+- 2026-10-20 — Decisions (coordinator), from four review rounds:
+  - the hold lasts until the owner resumes (Resume plus a confirm tap, or `--clear-hold`). It is kept in
+    `TRADING_DATA_ROOT/stop/HOLD.json`, copied to `SCHEDULER_STATE_DIR`, and held in the scheduler's memory;
+  - if the hold cannot be saved, the stop still squares off and says "HOLD NOT SAVED" first;
+  - a square-off that was sent is never "square off by hand": it is "still closing: do NOT exit at the broker";
+  - a call that got no answer may have been sent, and is never treated as not sent;
+  - a square-off is sent once per id per day, across stops, from the stop log (with a copy in the state dir);
+  - one stop runs at a time: `stop-running.json`, created atomically. It is stale after 20 minutes, or when not
+    from today, or when its pid is dead, and is removed on SIGTERM / SIGINT.
+- 2026-10-20 — Decision (Claude): AlgoTest deploys count as the tool's by the uploader's strategy id, a name it
+  saved, or the name prefix (the owner deploys the tool's uploads by hand, and there is no ledger of execution
+  ids). Quantiply algos count by ledger id; a missing ledger fails closed.
+- Open, not yet seen live:
+  - the exact strings of `pending_square_off`, `creation_ts` and any strategy-id field on `/executions`;
+  - Quantiply's status after `SQ_OFF_TERMINATE`;
+  - what a switched-off `READY` algo shows.
+  Each is matched loosely, and anything unexpected is reported "check". Phase 4 is done when the owner has
+  pressed the button once on a day of their choice.
