@@ -137,8 +137,18 @@ The scheduler sets the repository variables on every save. `.env` switches (`ALG
 
 - `src/strategy-upload.ts` (+ pure `src/strategy-plan.ts`) puts the day's rotation picks into AlgoTest as saved
   strategies through the website (AlgoTest support OK'd it by phone, 2026-10-19). `--apply` needs
-  `ALGOTEST_UPLOAD=on`, deleting also `--allow-delete`; it only ever deletes what its ledger
-  (`TRADING_DATA_ROOT/rotation/algotest/ledger.jsonl`) says it uploaded, and never one deployed on /live.
+  `ALGOTEST_UPLOAD=on`, deleting also `--allow-delete` (the `algotest-evening` job passes it since 2026-10-20); it
+  only ever deletes what its ledger (`TRADING_DATA_ROOT/rotation/algotest/ledger.jsonl`) says it uploaded, and never
+  one deployed on /live or set to repeat on a weekday there. A delete never clicks: `src/strategy-delete.ts` makes
+  AlgoTest's own API call (`docs/algotest-execution.md` §7) for the `_id` recorded in the ledger when the strategy
+  was uploaded, only if that id is the one strategy listed under its name; it then lists again (through the API): the
+  id must be gone and every other strategy still there, or the run stops with exit 3 (no retry, a STOP alert).
+  A STOP also writes `STOP` beside the ledger, and every later run holds its deletes until the owner removes it.
+  The id comes from the save answer, else from the one new id a fresh listing shows under the name; an upload
+  whose id cannot be read is flagged at once. A strategy named by the tool stays the tool's even if the owner edits
+  it in place ("Update" keeps its id); rename it to keep it. Uploads before 2026-10-20 had no id: `--record-ids`
+  adds it once from the listing (ledger only); it cannot tell a tool upload from the owner's copy of the same
+  name, so it was run once, supervised.
 - `src/strategy-deploy.ts` (+ pure `src/deploy-plan.ts`) deploys the day's recorded picks on /live. `--apply`
   and `--check` need `ALGOTEST_DEPLOY=on`. It stops at anything "Activate" opens that it has not seen.
 - Their locators are `strategyPage` and `livePage` in `src/selectors.ts`, like every other. Both read

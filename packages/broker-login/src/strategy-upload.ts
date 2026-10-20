@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { appendFile, mkdir, readFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { sendText } from '@trading/notify';
@@ -12,17 +12,24 @@ import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { sessionOver } from './quantiply-plan.js';
 import { redact, registerSecret } from './secrets.js';
 import { livePage, strategyPage } from './selectors.js';
+import { csrfToken, deleteStrategyById, listViaApi } from './strategy-delete.js';
 import {
   type LedgerRow,
   type Manifest,
   type Mode,
   type Wanted,
+  afterDelete,
   comparable,
+  idsByName,
   istToday,
   namesIn,
   needsAttention,
+  newIdFor,
+  owned,
+  ownedIds,
   parseLedger,
   plan,
+  savedId,
   sha256,
   summary,
 } from './strategy-plan.js';
@@ -36,8 +43,8 @@ import { visibleWithin } from './wait.js';
  *
  * `--dir` is a folder written by `obt rotation algotest-export` (manifest.json + one .algtst per
  * pick). Without `--apply` it logs in, reads what AlgoTest has and prints the plan, changing
- * nothing. Deleting also needs `--allow-delete` until the delete dialog has been seen in a
- * supervised run. `--apply` needs `ALGOTEST_UPLOAD=on`. The ledger (`--ledger`, default
+ * nothing. Deleting also needs `--allow-delete` (the evening job passes it; see deleteOne).
+ * `--apply` needs `ALGOTEST_UPLOAD=on`. The ledger (`--ledger`, default
  * TRADING_DATA_ROOT/rotation/algotest/ledger.jsonl) records every upload and delete; only
  * strategies in it are ever deleted. Locators: `strategyPage` / `livePage` in selectors.ts.
  *
@@ -54,18 +61,25 @@ async function readJson<T>(path: string): Promise<T> {
   return JSON.parse(await readFile(path, 'utf8')) as T;
 }
 
-async function existingNames(page: Page): Promise<Set<string>> {
-  const listed = page.waitForResponse(
-    (r: Response) => /api\.algotest\.in\/strategies(\?|$)/.test(r.url()) && r.ok(),
-    { timeout: 30_000 },
-  );
-  await page.goto(`${BASE_URL}/backtest`, { waitUntil: 'domcontentloaded' });
-  return namesIn(await (await listed).json());
+interface Listing {
+  names: Set<string>;
+  /** `_id`s per exact name */
+  ids: Map<string, string[]>;
+}
+
+/**
+ * AlgoTest's saved strategies, `GET /strategies` through the API with the session (the same call
+ * the builder page makes). Every listing in a run, before and after a delete, comes from here.
+ */
+async function listStrategies(page: Page): Promise<Listing> {
+  const json = await listViaApi(page.request, await csrfToken(page.context()));
+  return { names: namesIn(json), ids: idsByName(json) };
 }
 
 /**
  * Names AlgoTest shows as still deployed on /live: "n Deployed" above zero AND a card that could be
- * it is not squared off (the count may include finished instances). Unreadable counts as deployed.
+ * it is not squared off (the count may include finished instances), or an execution day ticked (it
+ * would run again on that weekday). Unreadable counts as deployed. None of them is ever deleted.
  */
 async function deployedNames(page: Page, candidates: string[]): Promise<Set<string>> {
   const out = new Set<string>();
@@ -78,7 +92,10 @@ async function deployedNames(page: Page, candidates: string[]): Promise<Set<stri
   const text = await page.evaluate(() => document.body.innerText);
   const live = parseLive(text);
   const cards = parseCards(text);
-  for (const name of candidates) if (stillDeployed(name, live, cards)) out.add(name);
+  for (const name of candidates) {
+    const repeats = live.rows.find((r) => r.name === name)?.days.some((d) => d !== '-') ?? false;
+    if (repeats || stillDeployed(name, live, cards)) out.add(name);
+  }
   return out;
 }
 
@@ -91,8 +108,15 @@ async function freshBuilder(page: Page): Promise<void> {
   }
 }
 
-/** Import, save under `w.name`, then export it back and compare. Returns the read-back verdict. */
-async function uploadOne(page: Page, w: Wanted, sent: unknown): Promise<string> {
+/**
+ * Import, save under `w.name`, then export it back and compare. Returns the read-back verdict and
+ * the saved strategy's `_id` when the save answer carries one.
+ */
+async function uploadOne(
+  page: Page,
+  w: Wanted,
+  sent: unknown,
+): Promise<{ verdict: string; id?: string }> {
   await freshBuilder(page);
   await strategyPage.importInput(page).setInputFiles(w.file);
   await strategyPage.title(page, w.name).waitFor({ timeout: 15_000 });
@@ -108,34 +132,106 @@ async function uploadOne(page: Page, w: Wanted, sent: unknown): Promise<string> 
   await strategyPage.saveDone(page).click();
   const response = await saved;
   if (!response.ok()) throw new Error(`save answered ${response.status()}`);
+  const id = savedId(await response.json().catch(() => null));
   await strategyPage.savedToast(page).waitFor({ timeout: 10_000 });
 
   const download = page.waitForEvent('download', { timeout: 20_000 });
   await strategyPage.exportButton(page).click();
   const path = await (await download).path();
   const back = JSON.parse(await readFile(path, 'utf8'));
-  return comparable(back) === comparable(sent) ? READ_BACK_OK : 'READ-BACK DIFFERS';
+  return {
+    verdict: comparable(back) === comparable(sent) ? READ_BACK_OK : 'READ-BACK DIFFERS',
+    id,
+  };
 }
 
 const READ_BACK_OK = 'read back: identical';
 
-/** PROVISIONAL (the delete dialog has not been seen): behind --allow-delete. */
-async function deleteOne(page: Page, name: string): Promise<void> {
-  await page.goto(`${BASE_URL}/backtest`, { waitUntil: 'domcontentloaded' });
-  await strategyPage.search(page).fill(name);
-  await strategyPage.rowMenu(page, name).click();
-  const item = strategyPage.rowMenuDelete(page);
-  await item.waitFor({ timeout: 5_000 }); // the right menu opened: "Add to folder" beside "Delete"
-  const deleted = page.waitForResponse(
-    (r: Response) =>
-      /api\.algotest\.in\/strateg/.test(r.url()) && r.request().method() === 'DELETE',
-    { timeout: 20_000 },
-  );
-  await item.click();
-  const confirm = strategyPage.deleteConfirm(page).last();
-  if (await visibleWithin(confirm, 3_000)) await confirm.click();
-  const response = await deleted;
-  if (!response.ok()) throw new Error(`delete answered ${response.status()}`);
+/** Another strategy vanished with a delete: stop everything (no retry), the owner must look. */
+class Unsafe extends Error {}
+/** A delete a retry cannot fix (no recorded id, a repeated or unknown name): the owner must look. */
+class NeedsOwner extends Error {}
+
+/**
+ * Delete `name` through AlgoTest's API by the `_id` the tool recorded when it uploaded it, and only
+ * if that id is the one strategy AlgoTest lists under that name (never by clicking a row, and never
+ * a same-named strategy the owner saved).
+ */
+async function deleteOne(
+  page: Page,
+  name: string,
+  id: string | undefined,
+  listing: Listing,
+  csrf: string,
+): Promise<void> {
+  if (!id) throw new NeedsOwner('no id was recorded when it was uploaded: delete it by hand once');
+  const found = listing.ids.get(name) ?? [];
+  if (found.length !== 1 || found[0] !== id)
+    throw new NeedsOwner(
+      `AlgoTest lists ${found.length} under this name and the recorded id ${id} ` +
+        `${found.includes(id) ? 'is one of them' : 'is not among them'}; deleted none`,
+    );
+  await deleteStrategyById(page.request, id, csrf);
+}
+
+/**
+ * One-time (2026-10-20): uploads before ids were recorded have none, so they could never be
+ * deleted. For each such name the ledger owns, if AlgoTest lists exactly one strategy under it,
+ * append an upload row with that `_id` (same sha). Writes only the local ledger; changes nothing on
+ * AlgoTest. A name listed twice or not at all is left for the owner.
+ */
+async function recordIds(ledgerArg: string | undefined): Promise<number> {
+  if (existsSync('.env')) process.loadEnvFile('.env');
+  const dataRoot = process.env.TRADING_DATA_ROOT?.trim();
+  const ledgerPath = ledgerArg
+    ? resolve(ledgerArg)
+    : join(dataRoot ?? '', 'rotation', 'algotest', 'ledger.jsonl');
+  if (!ledgerArg && !dataRoot) {
+    console.error('the ledger lives under TRADING_DATA_ROOT: set it, or pass --ledger');
+    return 1;
+  }
+  const ledger = existsSync(ledgerPath) ? parseLedger(await readFile(ledgerPath, 'utf8')) : [];
+  const known = ownedIds(ledger);
+  const missing = [...owned(ledger).keys()].filter((name) => !known.has(name));
+  if (!missing.length) {
+    console.log('every strategy the tool owns already has its id recorded');
+    return 0;
+  }
+  const phone = process.env.ALGOTEST_PHONE?.trim();
+  const password = process.env.ALGOTEST_PASSWORD?.trim();
+  if (!phone || !password) {
+    console.error('ALGOTEST_PHONE and ALGOTEST_PASSWORD are needed');
+    return 1;
+  }
+  registerSecret(password);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await (await browser.newContext({ viewport: VIEWPORT })).newPage();
+    page.setDefaultTimeout(20_000);
+    await algotestLogin(page, { phone: normalizePhone(phone), password });
+    const listing = await listStrategies(page);
+    for (const name of missing) {
+      const found = listing.ids.get(name) ?? [];
+      const last = [...ledger]
+        .reverse()
+        .find((r) => r.name === name && r.action === 'upload' && r.ok);
+      if (found.length !== 1 || !last) {
+        console.log(`left for the owner: ${name} (${found.length} listed under this name)`);
+        continue;
+      }
+      const row: LedgerRow = {
+        ...last,
+        at: new Date().toISOString(),
+        id: found[0],
+        detail: 'id recorded from the listing (one-time, 2026-10-20)',
+      };
+      await appendFile(ledgerPath, `${JSON.stringify(row)}\n`, 'utf8');
+      console.log(`recorded ${name} -> ${found[0]}`);
+    }
+    return 0;
+  } finally {
+    await browser.close().catch(() => undefined);
+  }
 }
 
 async function main(): Promise<number> {
@@ -148,9 +244,11 @@ async function main(): Promise<number> {
       'from-settings': { type: 'boolean', default: false },
       apply: { type: 'boolean', default: false },
       'allow-delete': { type: 'boolean', default: false },
+      'record-ids': { type: 'boolean', default: false },
       headed: { type: 'boolean', default: false },
     },
   });
+  if (values['record-ids']) return recordIds(values.ledger);
   if (values.mode !== 'evening' && values.mode !== 'topup') {
     console.error(
       'usage: --from-settings | --latest <book> | --dir <export folder>, --mode evening|topup [--apply] [--allow-delete]',
@@ -284,10 +382,13 @@ async function main(): Promise<number> {
   let failed = false;
   /** a failure a later attempt may fix; anything else that failed needs the owner (exit 3) */
   let retryable = notReady.length > 0;
+  /** a delete removed something else: no retry, the owner must look */
+  let stopped = false;
 
   try {
     await algotestLogin(page, { phone: normalizePhone(phone), password });
-    const existing = await existingNames(page);
+    let listing = await listStrategies(page);
+    const existing = listing.names;
     const ownedPresent = [...existing].filter((n) => /^(T1|Core) · /.test(n));
     const deployed =
       mode === 'evening' ? await deployedNames(page, ownedPresent) : new Set<string>();
@@ -309,6 +410,7 @@ async function main(): Promise<number> {
       sha: string,
       ok: boolean,
       detail?: string,
+      id?: string,
     ) => {
       const row: LedgerRow = {
         at: new Date().toISOString(),
@@ -320,45 +422,101 @@ async function main(): Promise<number> {
         sha,
         ok,
         ...(detail ? { detail } : {}),
+        ...(id ? { id } : {}),
       };
       await appendFile(ledgerPath, `${JSON.stringify(row)}\n`, 'utf8');
     };
 
     // A changed strategy is deleted and uploaded again; if its delete does not happen, uploading
-    // would leave two strategies with one name, so the upload is skipped too.
-    const notDeleted = new Set<string>();
+    // would leave two strategies with one name, so the upload is skipped too. The value says whether
+    // a later attempt can sort it out ('retry') or only the owner can ('owner').
+    const notDeleted = new Map<string, 'retry' | 'owner'>();
+    const ids = ownedIds(ledger);
+    const csrf = p.delete.length && values['allow-delete'] ? await csrfToken(page.context()) : '';
+    // A STOP holds every later run's deletes until the owner has looked and removed this file.
+    const stopFile = join(dirname(ledgerPath), 'STOP');
+    const held = p.delete.length > 0 && values['allow-delete'] && existsSync(stopFile);
+    if (held) {
+      failed = true;
+      lines.push(`deletes held since a STOP: check AlgoTest, then remove ${stopFile}`);
+    }
+    let deletesStopped = held;
     for (const name of p.delete) {
-      if (!values['allow-delete']) {
-        notDeleted.add(name);
-        lines.push(`skipped delete (no --allow-delete): ${name}`);
+      if (!values['allow-delete'] || deletesStopped) {
+        notDeleted.set(name, 'owner');
+        lines.push(
+          deletesStopped
+            ? `not deleted (deletes stopped): ${name}`
+            : `skipped delete (no --allow-delete): ${name}`,
+        );
         continue;
       }
+      const id = ids.get(name);
       try {
-        await deleteOne(page, name);
-        await record('delete', name, '', true);
-        lines.push(`deleted ${name}`);
+        await deleteOne(page, name, id, listing, csrf);
       } catch (error) {
         failed = true;
-        retryable = true;
-        notDeleted.add(name);
-        await record('delete', name, '', false, describe(error));
-        await safeScreenshot(page, 'delete-failed');
-        await dumpHtml(page, 'delete-failed');
+        const owner = error instanceof NeedsOwner;
+        notDeleted.set(name, owner ? 'owner' : 'retry');
+        if (!owner) retryable = true;
+        await record('delete', name, '', false, describe(error), id);
         lines.push(`❌ delete failed: ${name} — ${describe(error)}`);
+        continue;
       }
+      // AlgoTest answered 2xx: no longer the tool's, whatever the check below finds
+      await record('delete', name, '', true, undefined, id);
+      lines.push(`deleted ${name}`);
+      let after: Map<string, string[]>;
+      try {
+        after = idsByName(await listViaApi(page.request, csrf));
+      } catch (error) {
+        failed = true;
+        retryable = true; // the next attempt lists afresh and finds it gone
+        deletesStopped = true;
+        notDeleted.set(name, 'retry'); // unchecked: never upload a second copy beside it
+        lines.push(`❌ could not list AlgoTest after deleting ${name}: ${describe(error)}`);
+        continue;
+      }
+      const check = afterDelete(listing.ids, after, id ?? '');
+      if (check.vanished.length) {
+        const why = `deleting ${name} (${id}) also removed ${check.vanished.join(', ')}`;
+        await writeFile(stopFile, `${new Date().toISOString()} ${why}\n`, 'utf8').catch(
+          () => undefined,
+        );
+        throw new Unsafe(`STOP: ${why}`);
+      }
+      if (check.stillListed) {
+        failed = true;
+        deletesStopped = true;
+        notDeleted.set(name, 'owner'); // two copies under one name would follow: never
+        lines.push(`❌ ${name} was answered as deleted but is still listed (${id})`);
+        continue;
+      }
+      listing = { names: new Set(after.keys()), ids: after };
     }
     for (const w of p.upload) {
-      if (notDeleted.has(w.name)) {
+      const kept = notDeleted.get(w.name);
+      if (kept) {
         failed = true;
-        retryable = true;
+        if (kept === 'retry') retryable = true;
         lines.push(`NOT re-uploaded, the old copy is still there: ${w.name}`);
         continue;
       }
       try {
-        const verdict = await uploadOne(page, w, docs.get(w.name));
+        const before = listing.ids;
+        let { verdict, id } = await uploadOne(page, w, docs.get(w.name));
+        if (!id) {
+          // the save answer had no id: the one new id under this name in a fresh listing
+          listing = await listStrategies(page);
+          id = newIdFor(before, listing.ids, w.name);
+        }
+        if (!id) {
+          failed = true; // never deletable by the tool: the owner must know now, not when dropped
+          lines.push(`⚠️ ${w.name}: saved, but its AlgoTest id could not be read`);
+        }
         const ok = verdict === READ_BACK_OK;
         // Saved but not as sent: owned (so it can be replaced), under a sha no export will match.
-        await record('upload', w.name, ok ? w.sha : `mismatch:${w.sha}`, true, verdict);
+        await record('upload', w.name, ok ? w.sha : `mismatch:${w.sha}`, true, verdict, id);
         if (!ok) failed = true; // a read-back that differs needs the owner, not a retry
         lines.push(`${ok ? '✅' : '❌'} uploaded ${w.name} (${verdict})`);
       } catch (error) {
@@ -373,7 +531,8 @@ async function main(): Promise<number> {
     if (needsAttention(p)) failed = true;
   } catch (error) {
     failed = true;
-    retryable = true;
+    if (error instanceof Unsafe) stopped = true;
+    else retryable = true;
     lines.push(`❌ ${describe(error)}`);
     await safeScreenshot(page, 'strategy-upload-fatal');
   } finally {
@@ -381,14 +540,20 @@ async function main(): Promise<number> {
   }
 
   if (values.apply) {
-    const head = failed ? `⚠️ ${label}: check AlgoTest` : `✅ ${label}`;
+    const head = stopped
+      ? `🛑 ${label}: STOPPED, a delete removed something else. Check AlgoTest now; deletes are held until the STOP file is removed`
+      : failed
+        ? `⚠️ ${label}: check AlgoTest`
+        : `✅ ${label}`;
     await sendText(telegram, redact([head, ...lines].join('\n')), 'broker.algotest').catch(
       () => undefined,
     );
   }
   console.log(lines.join('\n'));
   // 1: the scheduler retries; 3 (noRetryExitCodes): a conflict, a deployed strategy kept, a
-  // read-back that differs - a retry would only repeat it.
+  // read-back that differs, a delete only the owner can sort out - a retry would only repeat it.
+  // A STOP is always 3: a retry would list afresh and could not see what vanished.
+  if (stopped) return 3;
   if (retryable) return 1;
   return failed ? 3 : 0;
 }

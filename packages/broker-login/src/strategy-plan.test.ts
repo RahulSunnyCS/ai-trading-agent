@@ -1,14 +1,19 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, it, test } from 'node:test';
 import {
   type LedgerRow,
   type Wanted,
+  afterDelete,
   comparable,
+  idsByName,
   istToday,
   namesIn,
+  newIdFor,
   owned,
+  ownedIds,
   parseLedger,
   plan,
+  savedId,
 } from './strategy-plan.js';
 
 const row = (action: 'upload' | 'delete', name: string, sha = 'a', ok = true): LedgerRow => ({
@@ -138,4 +143,90 @@ test('comparable ignores leg ids, key order and the name', () => {
 test('istToday rolls over at IST midnight, not UTC', () => {
   assert.equal(istToday(new Date('2026-10-18T18:29:00Z')), '2026-10-18');
   assert.equal(istToday(new Date('2026-10-18T18:31:00Z')), '2026-10-19');
+});
+
+describe('idsByName', () => {
+  it("maps each exact name to its _ids, as AlgoTest's /strategies lists them", () => {
+    const listing = [
+      { _id: '6ad590af06a3aebabc43634d', name: 'T1 · N_p150-t1s11_0917', folder: null },
+      { _id: '6ad590ec4c3b4049e40b9dc6', name: 'T1 · N_ditm1-t1s36_0947', folder: null },
+      { _id: '6ad52d343337ca7cf13d74bb', name: 'T1 · N_ditm1-t1s36_0947', folder: null },
+      { name: 'no id' },
+      'junk',
+    ];
+    const ids = idsByName(listing);
+    assert.deepEqual(ids.get('T1 · N_p150-t1s11_0917'), ['6ad590af06a3aebabc43634d']);
+    assert.equal(ids.get('T1 · N_ditm1-t1s36_0947')?.length, 2); // a repeat: never deleted
+    assert.equal(ids.has('no id'), false);
+    assert.equal(idsByName({ not: 'an array' }).size, 0);
+  });
+});
+
+describe('ownedIds', () => {
+  const row = (action: 'upload' | 'delete', name: string, id?: string, ok = true): LedgerRow => ({
+    at: '2026-10-20T00:00:00Z',
+    day: '2026-10-21',
+    book: 't1',
+    mode: 'evening',
+    action,
+    name,
+    sha: 's',
+    ok,
+    ...(id ? { id } : {}),
+  }); // fmt
+  it('keeps the latest recorded id per owned name; a delete or an id-less upload clears it', () => {
+    const ids = ownedIds([
+      row('upload', 'T1 · A', '6ad590af06a3aebabc43634d'),
+      row('upload', 'T1 · B', '6ad590ec4c3b4049e40b9dc6'),
+      row('delete', 'T1 · B', '6ad590ec4c3b4049e40b9dc6'),
+      row('upload', 'T1 · C'),
+      row('upload', 'T1 · D', '6ad59113fde44b17bba0c76f', false),
+      row('upload', 'Mine', '6ad52d343337ca7cf13d74bb'),
+    ]);
+    assert.deepEqual([...ids], [['T1 · A', '6ad590af06a3aebabc43634d']]);
+  });
+});
+
+describe('afterDelete', () => {
+  const before = new Map([
+    ['T1 · A', ['a1']],
+    ['T1 · B', ['b1']],
+    ['Mine', ['m1']],
+  ]);
+  it('is clean when only the deleted id is gone', () => {
+    const after = new Map([
+      ['T1 · B', ['b1']],
+      ['Mine', ['m1']],
+    ]);
+    assert.deepEqual(afterDelete(before, after, 'a1'), { stillListed: false, vanished: [] });
+  });
+  it('names every other strategy that went with it', () => {
+    const after = new Map([['T1 · B', ['b1']]]);
+    assert.deepEqual(afterDelete(before, after, 'a1'), {
+      stillListed: false,
+      vanished: ['Mine (m1)'],
+    });
+  });
+  it('says when the deleted id is still listed', () => {
+    assert.equal(afterDelete(before, before, 'a1').stillListed, true);
+  });
+});
+
+describe('savedId and newIdFor', () => {
+  it('reads an id from the shapes a save answer may have, and nothing else', () => {
+    const id = '6ad65d64fdd13d8593bbd44f';
+    assert.equal(savedId({ _id: id }), id);
+    assert.equal(savedId({ data: { _id: id } }), id);
+    assert.equal(savedId({ id }), id);
+    assert.equal(savedId({ msg: 'Strategy Saved' }), undefined);
+    assert.equal(savedId({ _id: '../x' }), undefined);
+    assert.equal(savedId(null), undefined);
+  });
+  it('takes the one new id under the name, or none when it is not exactly one', () => {
+    const before = new Map([['T1 · X', ['a']]]);
+    assert.equal(newIdFor(before, new Map([['T1 · X', ['a', 'b']]]), 'T1 · X'), 'b');
+    assert.equal(newIdFor(new Map(), new Map([['T1 · Y', ['c']]]), 'T1 · Y'), 'c');
+    assert.equal(newIdFor(before, new Map([['T1 · X', ['a']]]), 'T1 · X'), undefined);
+    assert.equal(newIdFor(before, new Map([['T1 · X', ['a', 'b', 'c']]]), 'T1 · X'), undefined);
+  });
 });

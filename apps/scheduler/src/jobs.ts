@@ -365,9 +365,10 @@ const BASE_JOBS: Job[] = [
     description:
       "Put tomorrow's expected picks into AlgoTest as saved strategies (BL-137): the lists the dashboard's Settings › Automation gives AlgoTest (BL-140; T1 until changed). Exports them (`obt rotation algotest-export --from-settings --next`), then deletes the strategies the tool uploaded that tomorrow drops and uploads the missing ones. Never deploys. Does nothing until ALGOTEST_UPLOAD=on",
     // After the 16:00 result message (its retries end 16:35). The export exits 2 while the day's
-    // results are incomplete (a late Fyers login), so the retries carry it to 20:40. Deleting
-    // needs --allow-delete, left out until a supervised run has seen AlgoTest's delete dialog; until
-    // then dropped strategies stay and the message lists them.
+    // results are incomplete (a late Fyers login), so the retries carry it to 20:40. It deletes the
+    // strategies it uploaded that tomorrow drops (--allow-delete, owner 2026-10-20): AlgoTest's own
+    // API call by each strategy's id, never one deployed on /live or one it did not upload, and it
+    // stops at once if any other strategy vanishes with a delete.
     schedule: { at: '16:40', on: tradingDays, label: 'trading days 16:40' },
     steps: [
       [
@@ -388,12 +389,13 @@ const BASE_JOBS: Job[] = [
         '--mode',
         'evening',
         '--apply',
+        '--allow-delete',
       ],
     ],
     cwd: BROKER_LOGIN,
     timeoutMinutes: 15,
     retries: 4,
-    noRetryExitCodes: [3], // a conflict or a read-back that differs: retrying only repeats it
+    noRetryExitCodes: [3], // a conflict, a read-back that differs, a delete only the owner can sort out, or a STOP
     retryDelayMinutes: 60,
     catchUpHours: 4,
     fixHint:

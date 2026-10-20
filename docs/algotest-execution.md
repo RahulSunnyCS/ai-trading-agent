@@ -205,7 +205,15 @@ setting a file fills the builder ("Strategy imported successfully") and nothing 
 the file's `name`. "Save Strategy" (bottom bar) opens "Save New Strategy" with that name filled in; "Done"
 saves it through `api.algotest.in/strategy` ("Strategy Saved"), and the bar then shows Update / Save As New.
 "Export .algtst" downloads the saved strategy. The saved list is Saved Strategies › MY STRATEGIES (its ⋮ menu:
-Add to folder, Delete); the page itself reads it from `GET api.algotest.in/strategies`.
+Add to folder, Delete); the page itself reads it from `GET api.algotest.in/strategies`, an array of
+`{_id, name, folder, archived, template}`.
+
+**Delete (2026-10-20).** The web app deletes with `DELETE api.algotest.in/strategy/<_id>` (its bundle:
+`SP.delete("/strategy/" + id)`). Its API client sends the session cookies (`withCredentials`) and the CSRF
+header `X-CSRF-TOKEN-ACCESS`, copied from the `csrf_access_token` cookie. Strategies saved outside a folder
+(`folder: null`, every one the uploader saves) are not listed in the sidebar at all, so the uploader never
+clicks: it makes that call for the `_id` it recorded at upload, then lists again (`strategy-delete.ts`).
+`GET /strategies` without the CSRF header answers 401 "Missing CSRF token".
 
 **Live (`/live`, "Algo Trade").** Header: "Broker Login n/m", "n/6 Strategy Deployed" (6 at once on the
 owner's plan), Auto Activation, Auto restart paused executions. Deploys are allowed only **08:00–15:40 IST**
