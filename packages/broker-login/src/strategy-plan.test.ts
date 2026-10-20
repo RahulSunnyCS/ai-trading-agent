@@ -8,10 +8,12 @@ import {
   idsByName,
   istToday,
   namesIn,
+  newIdFor,
   owned,
   ownedIds,
   parseLedger,
   plan,
+  savedId,
 } from './strategy-plan.js';
 
 const row = (action: 'upload' | 'delete', name: string, sha = 'a', ok = true): LedgerRow => ({
@@ -207,5 +209,24 @@ describe('afterDelete', () => {
   });
   it('says when the deleted id is still listed', () => {
     assert.equal(afterDelete(before, before, 'a1').stillListed, true);
+  });
+});
+
+describe('savedId and newIdFor', () => {
+  it('reads an id from the shapes a save answer may have, and nothing else', () => {
+    const id = '6ad65d64fdd13d8593bbd44f';
+    assert.equal(savedId({ _id: id }), id);
+    assert.equal(savedId({ data: { _id: id } }), id);
+    assert.equal(savedId({ id }), id);
+    assert.equal(savedId({ msg: 'Strategy Saved' }), undefined);
+    assert.equal(savedId({ _id: '../x' }), undefined);
+    assert.equal(savedId(null), undefined);
+  });
+  it('takes the one new id under the name, or none when it is not exactly one', () => {
+    const before = new Map([['T1 · X', ['a']]]);
+    assert.equal(newIdFor(before, new Map([['T1 · X', ['a', 'b']]]), 'T1 · X'), 'b');
+    assert.equal(newIdFor(new Map(), new Map([['T1 · Y', ['c']]]), 'T1 · Y'), 'c');
+    assert.equal(newIdFor(before, new Map([['T1 · X', ['a']]]), 'T1 · X'), undefined);
+    assert.equal(newIdFor(before, new Map([['T1 · X', ['a', 'b', 'c']]]), 'T1 · X'), undefined);
   });
 });

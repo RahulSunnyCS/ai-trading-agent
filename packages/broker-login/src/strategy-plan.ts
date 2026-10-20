@@ -127,6 +127,24 @@ export function afterDelete(
   return { stillListed: now.has(id), vanished };
 }
 
+/** The `_id` in a save answer (`{_id}`, under `data`, or `id`), if it has one. */
+export function savedId(body: unknown): string | undefined {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const id = b._id ?? (b.data as Record<string, unknown> | undefined)?._id ?? b.id;
+  return typeof id === 'string' && /^[0-9a-f]{24}$/i.test(id) ? id : undefined;
+}
+
+/** The one id listed under `name` now that was not before an upload, if exactly one. */
+export function newIdFor(
+  before: Map<string, string[]>,
+  after: Map<string, string[]>,
+  name: string,
+): string | undefined {
+  const old = new Set(before.get(name) ?? []);
+  const added = (after.get(name) ?? []).filter((id) => !old.has(id));
+  return added.length === 1 ? added[0] : undefined;
+}
+
 export function plan(
   mode: Mode,
   wanted: Wanted[],

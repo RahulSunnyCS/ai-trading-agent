@@ -395,7 +395,7 @@ const BASE_JOBS: Job[] = [
     cwd: BROKER_LOGIN,
     timeoutMinutes: 15,
     retries: 4,
-    noRetryExitCodes: [3], // a conflict or a read-back that differs: retrying only repeats it
+    noRetryExitCodes: [3], // a conflict, a read-back that differs, a delete only the owner can sort out, or a STOP
     retryDelayMinutes: 60,
     catchUpHours: 4,
     fixHint:
