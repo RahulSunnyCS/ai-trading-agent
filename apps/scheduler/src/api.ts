@@ -11,7 +11,7 @@ import {
   syncGithub,
   validate,
 } from './automation.js';
-import { JOBS, type Job } from './jobs.js';
+import { JOBS, type Job, maxRunMinutes } from './jobs.js';
 import { type RunContext, runJob } from './runner.js';
 import { nextDue, previousDue } from './schedule.js';
 
@@ -96,6 +96,9 @@ export function createApi({
 
   function listJobs(): Response {
     const at = now();
+    // A row whose process is gone (a scheduler restart, a Ctrl-C'd `jobs run`) is closed first, so
+    // no reader (the trade monitor, BL-143) waits on a run that is not running.
+    ctx.history.reapDead(at);
     return json(
       jobs.map((job) => {
         // BL-143: the latest slot that has come and the row serving it (none yet = still due or
@@ -109,6 +112,8 @@ export function createApi({
           lastRun: ctx.history.last(job.id),
           previousSlot: slot?.toISOString() ?? null,
           previousSlotRun: slot ? ctx.history.forSlot(job.id, slot) : null,
+          maxRunMinutes: maxRunMinutes(job),
+          catchUpHours: job.catchUpHours,
           needs: job.needs ?? [],
           group: job.group ?? null,
         };

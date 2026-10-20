@@ -1,10 +1,11 @@
+import { Database } from 'bun:sqlite';
 import { describe, expect, it } from 'bun:test';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { History } from '../history.js';
-import { JOBS, findJob } from '../jobs.js';
-import { decide } from '../loop.js';
+import { JOBS, findJob, maxRunMinutes } from '../jobs.js';
+import { decide, startLoop } from '../loop.js';
 import { istAt } from '../schedule.js';
 import { catchUpCheck, catchUpWindow, fyersLine } from '../summary.js';
 
@@ -120,6 +121,64 @@ describe('BL-143: the trade monitor job', () => {
     const ok = history.start('trade-monitor', 'catch-up', slot, '/x', istAt('2026-10-21', '11:05'));
     history.finish(ok, 0, 1, istAt('2026-10-21', '15:30'));
     expect(decide(job, istAt('2026-10-21', '15:20'), history, since).kind).toBe('idle');
+    history.close();
+  });
+
+  it("a scheduler restart closes the monitor's open row and startLoop starts it again", async () => {
+    const real = findJob('trade-monitor');
+    if (!real) throw new Error('no trade-monitor job');
+    // the real job's schedule and restart rule, a stand-in step
+    const job = { ...real, steps: [['/bin/sh', '-c', 'true']], cwd: '.' };
+    const dir = mkdtempSync(join(tmpdir(), 'bl143-restart-'));
+    const history = new History(join(dir, 'scheduler.db'));
+    history.firstStart(istAt('2026-10-01', '00:00'));
+    history.jobFirstSeen('trade-monitor', istAt('2026-10-01', '00:00'));
+    const slot = istAt('2026-10-21', '09:04');
+    // the previous scheduler started it at 09:04, then the laptop restarted: the row stays open
+    const first = history.start('trade-monitor', 'schedule', slot, '/x', slot);
+    const noon = istAt('2026-10-21', '12:00');
+    const stop = startLoop({
+      ctx: { repoRoot: dir, env: { PATH: '/usr/bin:/bin' }, logDir: dir, history, now: () => noon },
+      jobs: [job],
+      alerts: async () => undefined,
+      tickMs: 60_000,
+      pidAlive: () => false, // the old scheduler's process is gone
+    });
+    stop();
+    expect(history.get(first)).toMatchObject({ exit_code: -2 });
+    // the first tick started it again as a catch-up of the same slot
+    let again = history.forSlot('trade-monitor', slot);
+    for (let i = 0; i < 100 && (again?.id === first || again?.ended_at === null); i += 1) {
+      await new Promise((r) => setTimeout(r, 20));
+      again = history.forSlot('trade-monitor', slot);
+    }
+    expect(again).toMatchObject({ trigger: 'catch-up', exit_code: 0 });
+    expect(again?.id).not.toBe(first);
+    history.close();
+  });
+
+  it("each job's longest run: every attempt, the delays and its group's wait", () => {
+    const at = (id: string) => {
+      const job = findJob(id);
+      if (!job) throw new Error(`no ${id}`);
+      return maxRunMinutes(job);
+    };
+    expect(at('algotest-topup')).toBe(10 * 3 + 2 * 2);
+    expect(at('quantiply-deploy-topup')).toBe(10 + 10); // one attempt + the group's wait
+    expect(at('quantiply-topup')).toBe(10 * 2 + 2 + 10);
+  });
+
+  it("GET /jobs' reader is never kept waiting by a row whose process is gone", () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bl143-reap-'));
+    const path = join(dir, 'scheduler.db');
+    const history = new History(path);
+    const id = history.start('algotest-topup', 'manual', null, '', istAt('2026-10-21', '09:30'));
+    // a Ctrl-C'd `jobs run`: its pid is gone
+    const db = new Database(path);
+    db.query('UPDATE runs SET pid = ? WHERE id = ?').run(999_999_999, id);
+    db.close();
+    expect(history.reapDead(istAt('2026-10-21', '12:00'))).toBe(1);
+    expect(history.get(id)).toMatchObject({ exit_code: -2 });
     history.close();
   });
 

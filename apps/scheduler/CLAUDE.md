@@ -34,7 +34,9 @@ summary flags anything but `main`).
   (`History.jobFirstSeen`, kept per job in the `meta` table), so a newly added job is
   never reported missed for a slot from before it existed. A new job is seen as of now
   minus its `catchUpHours`, so a slot that only just passed still catches up on the first
-  restart; a manual `jobs run` does not count as history.
+  restart; a manual `jobs run` does not count as history. Before its first tick it closes the
+  rows a previous scheduler left open (`reapDead`: the process is gone; exit -2, interrupted).
+  Their step children are detached, so one may still be running as an orphan; nothing tracks it.
 - `src/alerts.ts` — immediate Telegram on failure (skipped for `alertsItself` jobs unless
   they timed out or could not start), on a missed slot, and on recovery. Successes stay
   quiet.
@@ -46,9 +48,10 @@ summary flags anything but `main`).
   interrupted run is not one: its slot has an earlier row, the interrupted run, listed as a failure), and failures
   in the last 24 h.
 - `src/api.ts` — loopback HTTP API (`127.0.0.1:8790`, `SCHEDULER_API_PORT`) started by
-  `serve` in the same process as the loop. `GET /jobs` (each job's schedule, next and last run, and its latest
-  slot that has come with the row serving it, `previousSlot` / `previousSlotRun`: the trade monitor reads these to
-  wait for the morning deploy jobs), `GET /runs?job=&limit=`,
+  `serve` in the same process as the loop. `GET /jobs` (each job's schedule, next and last run, its latest slot
+  that has come with the row serving it, `previousSlot` / `previousSlotRun`, its longest run `maxRunMinutes` and
+  `catchUpHours`: the trade monitor reads these before every platform login; rows whose process is gone are
+  closed first, `reapDead`), `GET /runs?job=&limit=`,
   `GET /runs/:id/log?tail=200` (refuses paths outside the log dir and
   `packages/momentum-backtesting/data`, symlinks resolved), `POST /jobs/:id/run` (manual run;
   202 + run id, 409 if the job or its group is busy), `GET`/`PUT /notifications` (catalogue +
@@ -111,8 +114,8 @@ network or disk so the test needs neither. One group per file keeps parallel PRs
   (`alertsItself`), including every failure exit and a crash; its state file stops a retry repeating
   a message; exit 3 (a refused or held Quantiply login, or another monitor running) is not retried.
   `restartIfInterruptedUntil: '15:25'` (a `Job` field, read by `loop.decide`): a run cut off by a
-  scheduler or laptop restart (reaped as interrupted, exit -2) is started again while the session
-  lasts; every other job treats an interrupted slot as served. Each part waits for its `.env` switch.
+  scheduler or laptop restart (reaped as interrupted, exit -2, by `startLoop` before its first tick) is
+  started again while the session lasts; every other job treats an interrupted slot as served. Each part waits for its `.env` switch.
 - The scheduler reads `jobs.ts` once at start: a new or changed job needs a restart of the
   service (`launchctl kickstart -k gui/$(id -u)/com.ai-trading-agent.scheduler`, see
   `deploy/launchd/README.md`).

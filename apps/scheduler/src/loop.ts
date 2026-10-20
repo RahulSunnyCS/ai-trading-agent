@@ -68,6 +68,8 @@ export interface LoopOptions {
   jobs: Job[];
   alerts: AlertSink;
   tickMs?: number;
+  /** Whether a run row's pid still lives; tests pass a fake. */
+  pidAlive?: (pid: number) => boolean;
 }
 
 /**
@@ -75,8 +77,19 @@ export interface LoopOptions {
  * due (without waiting for it), report what was missed. A job already in
  * flight in this process is never started twice.
  */
-export function startLoop({ ctx, jobs, alerts, tickMs = 30_000 }: LoopOptions): () => void {
+export function startLoop({
+  ctx,
+  jobs,
+  alerts,
+  tickMs = 30_000,
+  pidAlive,
+}: LoopOptions): () => void {
   const now = ctx.now ?? (() => new Date());
+  // Rows the previous scheduler left open (it was stopped, crashed, or the laptop restarted) are
+  // closed as interrupted before the first tick: an ungrouped job never reaps them itself, and
+  // `restartIfInterruptedUntil` (the trade monitor) needs that row to start again.
+  const reaped = ctx.history.reapDead(now(), pidAlive);
+  if (reaped) console.log(`${formatIst(now())} closed ${reaped} run(s) left open by a stop`);
   ctx.history.firstStart(now());
   // Per job, not the scheduler's first start: a job added since then has no slots to miss
   // from before it was added.

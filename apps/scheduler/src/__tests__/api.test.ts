@@ -1,3 +1,4 @@
+import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   existsSync,
@@ -83,6 +84,20 @@ describe('GET /jobs and /runs', () => {
     const id = ctx.history.start('fast', 'schedule', slot, '', new Date('2026-10-20T02:30:10Z'));
     body = (await (await get('/jobs')).json()) as Array<Record<string, unknown>>;
     expect(body[0]?.previousSlotRun).toMatchObject({ id, ended_at: null });
+    expect(body[0]).toMatchObject({ maxRunMinutes: 1, catchUpHours: 0 });
+  });
+
+  it('GET /jobs closes a row whose process is gone before answering (BL-143)', async () => {
+    const path = join(dir, 'reap.db');
+    ctx.history.close();
+    ctx.history = new History(path);
+    handle = createApi({ ctx, jobs, prefsFile });
+    const id = ctx.history.start('fast', 'manual', null, '', new Date());
+    const db = new Database(path);
+    db.query('UPDATE runs SET pid = ? WHERE id = ?').run(999_999_999, id);
+    db.close();
+    const body = (await (await get('/jobs')).json()) as Array<Record<string, unknown>>;
+    expect(body[0]?.lastRun).toMatchObject({ id, exit_code: -2 });
   });
 
   it('filters runs by job and 404s an unknown job', async () => {

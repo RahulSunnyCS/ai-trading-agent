@@ -31,8 +31,8 @@ import {
   type AccountMargin,
   type AlgoTestRowPicks,
   DEPLOY_CHECK_AT,
-  type JobsWait,
   LOGIN_CAP,
+  LONG_WAIT_MS,
   type LegNeed,
   type LoginLog,
   MARGIN_AT,
@@ -46,6 +46,7 @@ import {
   SESSION_CLOSE,
   type SchedulerJobView,
   WAIT_WINDOWS,
+  type WaitItem,
   type WaitWindow,
   algotestInstant,
   checkAlgoTest,
@@ -59,6 +60,7 @@ import {
   istClock,
   istDayOf,
   jobsStillToEnd,
+  jobsWait,
   legLots,
   legsFromAlgtst,
   legsFromQuantiply,
@@ -80,6 +82,7 @@ import {
   readTotalMtm,
   stopButtonRunning,
   switchOn,
+  waitKey,
 } from './monitor-plan.js';
 import type { QuantiplyApi } from './quantiply-api.js';
 import { istWeekday } from './quantiply-plan.js';
@@ -173,6 +176,8 @@ interface DayState {
   logins: Partial<Record<LoginPlatform, LoginLog>>;
   /** said once: a platform's deploy jobs were still running at 10:00 and it logged in anyway */
   jobsWaitCapped?: Record<string, boolean>;
+  /** said once: the monitor waited over 30 minutes on this job */
+  longWaitSaid?: Record<string, boolean>;
 }
 
 const fresh = (): DayState => ({
@@ -235,6 +240,10 @@ class Monitor {
   private readonly lost = new Set<LoginPlatform>();
   /** what a platform's last check found still running (this process waited for it) */
   private readonly jobsWaitedFor = new Map<'algotest' | 'quantiply', string>();
+  /** per platform: since when each wait item has been seen (ms, by `waitKey`) */
+  private readonly waitFirstSeen: Partial<
+    Record<'algotest' | 'quantiply', Record<string, number>>
+  > = {};
   private refused = false;
 
   constructor(
@@ -392,6 +401,9 @@ class Monitor {
   private async allowLogin(platform: LoginPlatform, firstAttempt = true): Promise<void> {
     const why = await this.refusal(platform, firstAttempt);
     if (why) throw new LoginNotAllowed(`${platform}: ${why}`);
+    // again right before the login, under the lock: a job that started since the first look
+    const busy = await this.platformJobs(platform === 'algotest' ? 'algotest' : 'quantiply');
+    if (busy) throw new LoginWaiting(`${platform}: ${busy}`);
     const entry = this.log(platform);
     entry.count += 1;
     if (isReplacing(entry, this.lost.has(platform))) entry.reloginAt = new Date().toISOString();
@@ -410,15 +422,18 @@ class Monitor {
   }
 
   /**
-   * Before every login on `platform`, at any hour: may the scheduler's jobs that log in to it be
-   * interrupted? Null = go ahead; else what still runs. Read from the scheduler's loopback
-   * `GET /jobs` (`jobsStillToEnd`): a run in progress today always blocks (its own timeout bounds
-   * it); a due or imminent slot, or an API that does not answer, blocks until its window's cap
-   * (10:00 / 17:30), after which it logs in anyway and says so once per window.
+   * Before every login on `platform` (and again under its login lock), at any hour: may the
+   * scheduler's jobs that log in to it be interrupted? Null = go ahead; else what still runs.
+   * Read from the scheduler's loopback `GET /jobs` (`jobsStillToEnd`, `jobsWait`): a run in
+   * progress always blocks (a row older than the job's longest run is ignored, and the scheduler
+   * closes a dead one); a due or imminent slot, or an API that does not answer, blocks until its
+   * window's cap (10:00 / 17:30), a due slot inside its catch-up window a little longer. Past the
+   * cap it logs in anyway and says so once per window; waiting over 30 minutes on one job is said
+   * once, unmuted. Never waits itself: the caller tries again on its next pass.
    */
   async platformJobs(platform: 'algotest' | 'quantiply'): Promise<string | null> {
     const now = new Date();
-    let wait: JobsWait;
+    let items: WaitItem[];
     try {
       const port = Number(process.env.SCHEDULER_API_PORT) || 8790;
       const res = await fetch(`http://127.0.0.1:${port}/jobs`, {
@@ -426,33 +441,53 @@ class Monitor {
       });
       if (!res.ok) throw new Error(`answered ${res.status}`);
       const views = (await res.json()) as SchedulerJobView[];
-      wait = jobsStillToEnd(views, PLATFORM_JOBS[platform], now);
+      items = jobsStillToEnd(views, PLATFORM_JOBS[platform], now);
     } catch (error) {
-      wait = jobsStillToEnd(null, PLATFORM_JOBS[platform], now, describe(error));
+      items = jobsStillToEnd(null, PLATFORM_JOBS[platform], now, describe(error));
+    }
+    // since when each item has been seen (kept per platform; dropped once it is gone)
+    this.waitFirstSeen[platform] ??= {};
+    const seen = this.waitFirstSeen[platform];
+    const keys = new Set(items.map(waitKey));
+    for (const k of Object.keys(seen)) if (!keys.has(k)) delete seen[k];
+    for (const k of keys) seen[k] ??= now.getTime();
+    const wait = jobsWait(items, now.getTime(), seen);
+    for (const i of wait.blocking) {
+      if (now.getTime() - (seen[waitKey(i)] ?? now.getTime()) >= LONG_WAIT_MS) {
+        await this.longWait(platform, i);
+      }
     }
     if (wait.blocking.length) {
-      const why = wait.blocking.join('; ');
+      const why = wait.blocking.map((i) => i.text).join('; ');
       this.jobsWaitedFor.set(platform, why);
       return why;
     }
-    if (wait.pastCap.length) await this.jobsWaitCapped(platform, wait.pastCap.join('; '));
-    else if (this.jobsWaitedFor.delete(platform)) {
+    for (const w of [...new Set(wait.pastCap.map((i) => i.window))]) {
+      const text = wait.pastCap
+        .filter((i) => i.window === w)
+        .map((i) => i.text)
+        .join('; ');
+      await this.jobsWaitCapped(platform, w, text);
+    }
+    if (!wait.pastCap.length && this.jobsWaitedFor.delete(platform)) {
       console.log(`${platform}: its jobs have ended: logging in`);
     }
     return null;
   }
 
-  /** A window's cap came while a platform's job still looked due: logging in anyway, said once. */
-  private async jobsWaitCapped(platform: 'algotest' | 'quantiply', why: string): Promise<void> {
-    const minutes = istMinutes();
-    const window: WaitWindow = minutes < WAIT_WINDOWS.evening.from ? 'morning' : 'evening';
+  /** A window's cap passed while a platform's job still looked due: logging in anyway, said once. */
+  private async jobsWaitCapped(
+    platform: 'algotest' | 'quantiply',
+    window: WaitWindow,
+    why: string,
+  ): Promise<void> {
     const key = `${platform}-${window}`;
     this.state.jobsWaitCapped ??= {};
     if (this.state.jobsWaitCapped[key]) return;
     const name = platform === 'algotest' ? 'AlgoTest' : 'Quantiply';
     // never muted: logging in now may end that job's session
     const sent = await this.send(
-      `⚠️ Trade monitor ${hhmm(minutes)}: past ${hhmm(WAIT_WINDOWS[window].until)} (${why}); logging in to ${name} anyway: if that job starts now, check it`,
+      `⚠️ Trade monitor ${hhmm(istMinutes())}: past ${hhmm(WAIT_WINDOWS[window].until)} (${why}); logging in to ${name} anyway: if that job starts now, check it`,
     );
     if (sent) {
       this.state.jobsWaitCapped[key] = true;
@@ -460,16 +495,29 @@ class Monitor {
     }
   }
 
-  /** Waits (the deploy check) until `platformJobs` says the platform's jobs have ended. */
-  async waitPlatformJobs(platform: 'algotest' | 'quantiply'): Promise<void> {
-    let said = '';
-    for (;;) {
-      const busy = await this.platformJobs(platform);
-      if (!busy) return;
-      if (busy !== said) console.log(`${platform}: waiting before logging in: ${busy}`);
-      said = busy;
-      await sleep(30_000);
+  /** Waiting over 30 minutes on one job: said once a day for that job, unmuted. */
+  private async longWait(platform: 'algotest' | 'quantiply', item: WaitItem): Promise<void> {
+    this.state.longWaitSaid ??= {};
+    if (this.state.longWaitSaid[item.job]) return;
+    const name = platform === 'algotest' ? 'AlgoTest' : 'Quantiply';
+    const sent = await this.send(
+      `⚠️ Trade monitor ${hhmm(istMinutes())}: waiting over 30 minutes for ${item.text}. No ${name} login until it ends: the deploy check and ${name}'s MTM wait for it (the other platform is still read). Check that job (said once today)`,
+    );
+    if (sent) {
+      this.state.longWaitSaid[item.job] = true;
+      await this.save();
     }
+  }
+
+  /** What the deploy check waits for (the platforms it reads), or null: checked once per pass. */
+  async deployBlocked(): Promise<string | null> {
+    const out: string[] = [];
+    for (const platform of ['algotest', 'quantiply'] as const) {
+      if (!this.rowBooks(platform).length) continue;
+      const busy = await this.platformJobs(platform);
+      if (busy) out.push(`${platform}: ${busy}`);
+    }
+    return out.length ? out.join(' · ') : null;
   }
 
   /** The platform ended our session: no login for 10 minutes, and say once it is degraded. */
@@ -840,8 +888,6 @@ class Monitor {
     const algotestRows = this.rowBooks('algotest');
     if (algotestRows.length) {
       const label = `AlgoTest ${[...new Set(algotestRows.map((r) => BOOK_NAME[r.book]))].join('+')}`;
-      // picks still being deployed or topped up are not problems: wait for those jobs to end
-      await this.waitPlatformJobs('algotest');
       try {
         const rows: AlgoTestRowPicks[] = [];
         const notes: string[] = [];
@@ -885,7 +931,6 @@ class Monitor {
         });
       }
     }
-    if (this.rowBooks('quantiply').length) await this.waitPlatformJobs('quantiply');
     for (const { broker, book } of this.rowBooks('quantiply')) {
       const label = `Quantiply ${BOOK_NAME[book]}${broker === 'finvasia' ? ' (Shoonya)' : ''}`;
       try {
@@ -1119,11 +1164,22 @@ async function main(): Promise<number> {
         return 0;
       }
       if (parts.has('margin')) await run('margin', () => m.margin());
-      if (parts.has('deploy')) await run('deploy', () => m.deploy());
+      if (parts.has('deploy')) {
+        // one look by hand: wait here for the platforms' jobs (bounded: a row nothing closed is
+        // ignored, a due one ends at its cap)
+        let said = '';
+        for (let busy = await m.deployBlocked(); busy; busy = await m.deployBlocked()) {
+          if (busy !== said) console.log(`deploy: waiting before logging in: ${busy}`);
+          said = busy;
+          await sleep(30_000);
+        }
+        await run('deploy', () => m.deploy());
+      }
       if (parts.has('loss')) console.log(await m.lossTick());
       return m.hadRefusal ? EXIT_NO_RETRY : 0;
     }
     let lastLossMinute = -1;
+    let deployWaitSaid = '';
     for (;;) {
       const minute = istMinutes();
       if (inQuietWindow(minute)) await m.closeSessions();
@@ -1144,7 +1200,11 @@ async function main(): Promise<number> {
         minute >= DEPLOY_CHECK_AT &&
         minute < SESSION_CLOSE
       ) {
-        await run('deploy', () => m.deploy());
+        // Checked once per pass, never waited for here: the loss readings go on meanwhile.
+        const busy = await m.deployBlocked();
+        if (!busy) await run('deploy', () => m.deploy());
+        else if (busy !== deployWaitSaid) console.log(`deploy: waiting before logging in: ${busy}`);
+        deployWaitSaid = busy ?? '';
       }
       if (parts.has('loss') && inLossWindow(minute) && minute !== lastLossMinute) {
         lastLossMinute = minute;

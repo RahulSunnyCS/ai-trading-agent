@@ -5,6 +5,20 @@ import { type Schedule, firstWeekdayOfMonth, onWeekdays, tradingDays } from './s
  * Every recurring job, in one place (BL-012). Adding a job means adding an
  * entry here — no plist, no cron line elsewhere.
  */
+/**
+ * The longest a run of `job` can take while the scheduler lives: every attempt to its timeout, the
+ * delays between them, and (for a grouped job) the wait for its group, which gives up after one
+ * timeout. BL-143's trade monitor ignores a "running" row older than this (a row nothing closed).
+ */
+export function maxRunMinutes(job: Job): number {
+  const attempts = job.retries + 1;
+  return (
+    job.timeoutMinutes * attempts +
+    job.retryDelayMinutes * job.retries +
+    (job.group ? job.timeoutMinutes : 0)
+  );
+}
+
 export interface Job {
   id: string;
   description: string;

@@ -4,7 +4,9 @@ import { after, before, test } from 'node:test';
 import { type Browser, chromium } from 'playwright';
 import { parseLive } from './deploy-plan.js';
 import {
+  DUE_GRACE_MS,
   JOBS_WAIT_UNTIL,
+  LONG_WAIT_MS,
   LOSS_ALERT_INR,
   LOSS_WARNING_INR,
   type LoginContext,
@@ -13,12 +15,14 @@ import {
   type MtmNoticeState,
   PLATFORM_JOBS,
   PNL_STALE_MS,
+  type PlatformJob,
   type QListed,
   READABLE_AGAIN_AFTER,
   STOP_RUNNING_ALIVE_MS,
   type SchedulerJobView,
   UNREADABLE_NOTICES_A_DAY,
   WAIT_WINDOWS,
+  type WaitItem,
   algotestInstant,
   checkAlgoTest,
   checkQuantiply,
@@ -30,6 +34,7 @@ import {
   isReplacing,
   istDayOf,
   jobsStillToEnd,
+  jobsWait,
   legLots,
   legsFromAlgtst,
   legsFromQuantiply,
@@ -53,6 +58,7 @@ import {
   readTotalMtm,
   stopButtonRunning,
   switchOn,
+  waitKey,
 } from './monitor-plan.js';
 
 const row = (name: string, deployed: number) =>
@@ -134,6 +140,16 @@ test('logins (E): a --print run and the monitor merge their counts, never overwr
 });
 
 const ist = (day: string, hhmm: string) => new Date(`${day}T${hhmm}:00+05:30`);
+/** The texts that block and the ones past their cap, as the monitor decides them (nothing seen before). */
+const decided = (
+  views: SchedulerJobView[] | null,
+  jobs: readonly PlatformJob[],
+  now: Date,
+  apiError?: string,
+) => {
+  const w = jobsWait(jobsStillToEnd(views, jobs, now, apiError), now.getTime(), {});
+  return { blocking: w.blocking.map((i) => i.text), pastCap: w.pastCap.map((i) => i.text) };
+};
 const slot = (hhmm: string) => ist('2026-10-21', hhmm).toISOString();
 const tomorrow = (hhmm: string) => ist('2026-10-22', hhmm).toISOString();
 
@@ -165,11 +181,11 @@ test("waiting for the platforms' jobs (A): running, due, queued, done, not today
       previousSlotRun: null,
     },
   ];
-  assert.deepEqual(jobsStillToEnd(views, PLATFORM_JOBS.algotest, now), {
+  assert.deepEqual(decided(views, PLATFORM_JOBS.algotest, now), {
     blocking: ['algotest-topup is running (since 09:18)'],
     pastCap: [],
   });
-  assert.deepEqual(jobsStillToEnd(views, PLATFORM_JOBS.quantiply, now), {
+  assert.deepEqual(decided(views, PLATFORM_JOBS.quantiply, now), {
     blocking: ['quantiply-deploy-topup is due (its 09:21 run has not started)'],
     pastCap: [],
   });
@@ -183,7 +199,7 @@ test("waiting for the platforms' jobs (A): running, due, queued, done, not today
       previousSlotRun: { ended_at: '2026-10-20T03:50:00Z' },
     },
   ];
-  assert.deepEqual(jobsStillToEnd(notToday, PLATFORM_JOBS.quantiply, now), {
+  assert.deepEqual(decided(notToday, PLATFORM_JOBS.quantiply, now), {
     blocking: [],
     pastCap: [],
   });
@@ -197,15 +213,12 @@ test("waiting for the platforms' jobs (A): running, due, queued, done, not today
       previousSlotRun: { ended_at: '2026-10-20T03:47:00Z' },
     },
   ];
-  assert.deepEqual(jobsStillToEnd(later, PLATFORM_JOBS.algotest, ist('2026-10-21', '09:12')), {
+  assert.deepEqual(decided(later, PLATFORM_JOBS.algotest, ist('2026-10-21', '09:12')), {
     blocking: ['algotest-deploy runs at 09:16'],
     pastCap: [],
   });
   // ... one further ahead does not (the 09:05 margin login, 11 minutes before it)
-  assert.deepEqual(
-    jobsStillToEnd(later, PLATFORM_JOBS.algotest, ist('2026-10-21', '09:05')).blocking,
-    [],
-  );
+  assert.deepEqual(decided(later, PLATFORM_JOBS.algotest, ist('2026-10-21', '09:05')).blocking, []);
   assert.equal(JOBS_WAIT_UNTIL, 10 * 60);
 });
 
@@ -221,7 +234,7 @@ test('after 10:00 (must-fix 1): a run in progress still blocks; a due one is pas
       previousSlotRun: { ended_at: null },
     },
   ];
-  assert.deepEqual(jobsStillToEnd(running, PLATFORM_JOBS.quantiply, now), {
+  assert.deepEqual(decided(running, PLATFORM_JOBS.quantiply, now), {
     blocking: ['quantiply-deploy-topup is running (since 10:30)'],
     pastCap: [],
   });
@@ -236,7 +249,7 @@ test('after 10:00 (must-fix 1): a run in progress still blocks; a due one is pas
     },
   ];
   assert.equal(
-    jobsStillToEnd(manual, PLATFORM_JOBS.algotest, ist('2026-10-21', '13:01')).blocking.length,
+    decided(manual, PLATFORM_JOBS.algotest, ist('2026-10-21', '13:01')).blocking.length,
     1,
   );
   // a slot that came with no run yet, after the cap: the monitor logs in and says so
@@ -249,7 +262,7 @@ test('after 10:00 (must-fix 1): a run in progress still blocks; a due one is pas
       previousSlotRun: null,
     },
   ];
-  assert.deepEqual(jobsStillToEnd(due, PLATFORM_JOBS.quantiply, now), {
+  assert.deepEqual(decided(due, PLATFORM_JOBS.quantiply, now), {
     blocking: [],
     pastCap: ['quantiply-deploy-topup is due (its 09:21 run has not started)'],
   });
@@ -273,10 +286,10 @@ test('the evening jobs (must-fix 1): the 16:55 enable running blocks a hand --no
       previousSlotRun: { ended_at: slot('16:44') },
     },
   ];
-  assert.deepEqual(jobsStillToEnd(views, PLATFORM_JOBS.quantiply, now).blocking, [
+  assert.deepEqual(decided(views, PLATFORM_JOBS.quantiply, now).blocking, [
     'quantiply-deploy is running (since 16:55)',
   ]);
-  assert.deepEqual(jobsStillToEnd(views, PLATFORM_JOBS.algotest, now).blocking, []);
+  assert.deepEqual(decided(views, PLATFORM_JOBS.algotest, now).blocking, []);
   assert.ok(PLATFORM_JOBS.algotest.some((j) => j.id === 'algotest-evening'));
   assert.ok(PLATFORM_JOBS.quantiply.some((j) => j.id === 'quantiply-evening'));
   assert.ok(PLATFORM_JOBS.quantiply.some((j) => j.id === 'quantiply-disable'));
@@ -284,7 +297,7 @@ test('the evening jobs (must-fix 1): the 16:55 enable running blocks a hand --no
 
 test('the scheduler API not answering: waits inside a window, says so after its cap, else nothing', () => {
   const at = (hhmm: string) =>
-    jobsStillToEnd(null, PLATFORM_JOBS.quantiply, ist('2026-10-21', hhmm), 'ECONNREFUSED');
+    decided(null, PLATFORM_JOBS.quantiply, ist('2026-10-21', hhmm), 'ECONNREFUSED');
   assert.equal(at('09:30').blocking.length, 1);
   assert.match(
     at('09:30').blocking[0] ?? '',
@@ -295,6 +308,58 @@ test('the scheduler API not answering: waits inside a window, says so after its 
   assert.equal(at('16:50').blocking.length, 1);
   assert.equal(at('17:40').pastCap.length, 1);
   assert.equal(WAIT_WINDOWS.evening.until, 17 * 60 + 30);
+});
+
+test('a "running" row older than its longest run is one nothing closed: ignored (4th review)', () => {
+  const noon = ist('2026-10-21', '12:00');
+  const open = (maxRunMinutes?: number): SchedulerJobView[] => [
+    {
+      id: 'algotest-topup',
+      nextRun: tomorrow('09:18'),
+      lastRun: { started_at: slot('09:30'), ended_at: null },
+      previousSlot: slot('09:18'),
+      previousSlotRun: { started_at: slot('09:30'), ended_at: null },
+      maxRunMinutes,
+    },
+  ];
+  // 34 minutes at most (3 attempts of 10 + 2 delays of 2): at 12:00 a 09:30 row is stale
+  assert.deepEqual(decided(open(34), PLATFORM_JOBS.algotest, noon), { blocking: [], pastCap: [] });
+  // still within its longest run (+5 min slack): it blocks
+  assert.equal(
+    decided(open(34), PLATFORM_JOBS.algotest, ist('2026-10-21', '10:05')).blocking.length,
+    1,
+  );
+  // a scheduler that does not say (older API): treated as running
+  assert.equal(decided(open(undefined), PLATFORM_JOBS.algotest, noon).blocking.length, 1);
+});
+
+test('a due slot inside its catch-up window blocks past the cap, for 30 minutes at most (nit)', () => {
+  const wake = ist('2026-10-21', '10:30');
+  const due: SchedulerJobView[] = [
+    {
+      id: 'quantiply-deploy-topup',
+      nextRun: tomorrow('09:21'),
+      lastRun: null,
+      previousSlot: slot('09:21'),
+      previousSlotRun: null,
+      catchUpHours: 3,
+    },
+  ];
+  const items = jobsStillToEnd(due, PLATFORM_JOBS.quantiply, wake);
+  assert.equal(items[0]?.inCatchUp, true);
+  const key = waitKey(items[0] as WaitItem);
+  // first seen now: the scheduler's next tick starts it, so the monitor waits
+  assert.equal(jobsWait(items, wake.getTime(), {}).blocking.length, 1);
+  // still due 30 minutes later (never started: the scheduler skipped it): log in, say so
+  const seen = { [key]: wake.getTime() - DUE_GRACE_MS };
+  assert.equal(jobsWait(items, wake.getTime(), seen).pastCap.length, 1);
+  // outside its catch-up window it is past the cap at once
+  const late = jobsStillToEnd(due, PLATFORM_JOBS.quantiply, ist('2026-10-21', '12:30'));
+  assert.equal(late[0]?.inCatchUp, false);
+  assert.equal(jobsWait(late, ist('2026-10-21', '12:30').getTime(), {}).pastCap.length, 1);
+  // each item carries its own window (the cap message names it, not the clock's)
+  assert.equal(items[0]?.window, 'morning');
+  assert.equal(LONG_WAIT_MS, 30 * 60_000);
 });
 
 test("the stop button's running marker (must-fix 2): a live pid for 20 min; no pid by its age", () => {

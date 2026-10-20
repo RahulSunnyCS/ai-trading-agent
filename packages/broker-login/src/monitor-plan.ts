@@ -211,45 +211,69 @@ export interface SchedulerJobView {
   nextRun: string | null;
   lastRun: { started_at: string; ended_at: string | null } | null;
   previousSlot?: string | null;
-  previousSlotRun?: { ended_at: string | null } | null;
+  previousSlotRun?: { started_at?: string; ended_at: string | null } | null;
+  /** the longest a run can take while the scheduler lives (every attempt, delays, group wait) */
+  maxRunMinutes?: number;
+  catchUpHours?: number;
+}
+
+/** A "running" row older than the job's longest run plus this is one nothing closed: ignored. */
+export const STALE_RUN_SLACK_MS = 5 * 60_000;
+/** A due slot inside its catch-up window still blocks after the cap, for this long at most. */
+export const DUE_GRACE_MS = 30 * 60_000;
+/** Waiting this long on one job is said once, unmuted. */
+export const LONG_WAIT_MS = 30 * 60_000;
+
+export interface WaitItem {
+  /** the job id, or `api` when the scheduler's API did not answer */
+  job: string;
+  window: WaitWindow;
+  kind: 'running' | 'due' | 'soon' | 'api';
+  text: string;
+  /** the window's cap has passed */
+  capped: boolean;
+  /** a due slot still inside the job's catch-up window (the scheduler will start it) */
+  inCatchUp?: boolean;
 }
 
 export interface JobsWait {
   /** what blocks a login now; empty = the monitor may log in */
-  blocking: string[];
+  blocking: WaitItem[];
   /** what would block but its window's cap has passed: the monitor logs in anyway and says so */
-  pastCap: string[];
+  pastCap: WaitItem[];
 }
 
 const istMinuteOf = (d: Date) => Math.floor((d.getTime() / 60_000 + 330) % 1440);
 
 /**
- * May the monitor log in to a platform now, given the scheduler's `GET /jobs` (`views`; null = the
- * API did not answer, `apiError` says why)?
- * - A run of a job that started today and has not ended (or the run serving today's slot) blocks,
- *   at any hour: a laptop that wakes at 10:30 into a quantiply-deploy-topup catch-up still waits.
- * - Today's slot having come with no run yet (still due, or queued behind its group), or a slot
- *   within `JOB_SOON_MS`, blocks until the job's window's cap; after that it is `pastCap`.
- * - An API that does not answer blocks inside a window of the platform's jobs, and is `pastCap`
- *   for an hour after its cap; at other hours it blocks nothing (no scheduler, no job runs).
- * A job not scheduled today, whose run today has ended, or that the scheduler does not list,
- * blocks nothing.
+ * What of the scheduler's platform jobs could still log in, from `GET /jobs` (`views`; null = the
+ * API did not answer, `apiError` says why). Every item says whether its window's cap has passed;
+ * `jobsWait` decides what blocks.
+ * - A run that started today and has not ended (or the run serving today's slot), unless it is
+ *   older than the job's longest run plus `STALE_RUN_SLACK_MS` (a row nothing closed: ignored).
+ * - Today's slot having come with no run yet (due, or queued behind its group); `inCatchUp` while
+ *   the scheduler would still start it.
+ * - A slot within `JOB_SOON_MS`.
+ * - An API that does not answer, inside a window of the platform's jobs or for an hour after it.
+ * A job not scheduled today, whose run today has ended, or that the scheduler does not list, is
+ * not an item.
  */
 export function jobsStillToEnd(
   views: SchedulerJobView[] | null,
   jobs: readonly PlatformJob[],
   now: Date,
   apiError = 'no answer',
-): JobsWait {
-  const out: JobsWait = { blocking: [], pastCap: [] };
+): WaitItem[] {
+  const out: WaitItem[] = [];
   const minutes = istMinuteOf(now);
   if (views === null) {
     for (const w of [...new Set(jobs.map((j) => j.window))]) {
       const win = WAIT_WINDOWS[w];
       const ids = jobs.filter((j) => j.window === w).map((j) => j.id);
-      const why = `the scheduler's API does not answer (${apiError}): cannot tell whether ${ids.join(' / ')} ended`;
-      if (minutes >= win.from && minutes < win.until) out.blocking.push(why);
-      else if (minutes >= win.until && minutes < win.until + 60) out.pastCap.push(why);
+      const text = `the scheduler's API does not answer (${apiError}): cannot tell whether ${ids.join(' / ')} ended`;
+      if (minutes >= win.from && minutes < win.until + 60) {
+        out.push({ job: 'api', window: w, kind: 'api', text, capped: minutes >= win.until });
+      }
     }
     return out;
   }
@@ -258,30 +282,72 @@ export function jobsStillToEnd(
     const v = views.find((j) => j.id === id);
     if (!v) continue;
     const capped = minutes >= WAIT_WINDOWS[window].until;
+    const fresh = (startedAt: string | undefined) =>
+      startedAt === undefined ||
+      v.maxRunMinutes === undefined ||
+      now.getTime() - Date.parse(startedAt) <= v.maxRunMinutes * 60_000 + STALE_RUN_SLACK_MS;
     const last = v.lastRun;
-    if (last && last.ended_at === null && istDayOf(new Date(last.started_at)) === day) {
-      out.blocking.push(`${id} is running (since ${istClock(new Date(last.started_at))})`);
+    if (
+      last &&
+      last.ended_at === null &&
+      istDayOf(new Date(last.started_at)) === day &&
+      fresh(last.started_at)
+    ) {
+      const text = `${id} is running (since ${istClock(new Date(last.started_at))})`;
+      out.push({ job: id, window, kind: 'running', text, capped });
       continue;
     }
     const slot = v.previousSlot ? new Date(v.previousSlot) : null;
     if (slot && istDayOf(slot) === day && slot.getTime() <= now.getTime()) {
       const run = v.previousSlotRun;
       if (run && run.ended_at === null) {
-        out.blocking.push(`${id} is running (its ${istClock(slot)} run)`);
+        if (fresh(run.started_at)) {
+          const text = `${id} is running (its ${istClock(slot)} run)`;
+          out.push({ job: id, window, kind: 'running', text, capped });
+        }
         continue;
       }
       if (!run) {
-        (capped ? out.pastCap : out.blocking).push(
-          `${id} is due (its ${istClock(slot)} run has not started)`,
-        );
+        const inCatchUp = now.getTime() - slot.getTime() <= (v.catchUpHours ?? 0) * 3_600_000;
+        const text = `${id} is due (its ${istClock(slot)} run has not started)`;
+        out.push({ job: id, window, kind: 'due', text, capped, inCatchUp });
         continue;
       }
     }
     const next = v.nextRun ? new Date(v.nextRun) : null;
     const ahead = next ? next.getTime() - now.getTime() : Number.POSITIVE_INFINITY;
     if (next && istDayOf(next) === day && ahead > 0 && ahead <= JOB_SOON_MS) {
-      (capped ? out.pastCap : out.blocking).push(`${id} runs at ${istClock(next)}`);
+      out.push({ job: id, window, kind: 'soon', text: `${id} runs at ${istClock(next)}`, capped });
     }
+  }
+  return out;
+}
+
+/** The key `jobsWait`'s `firstSeen` is kept by. */
+export const waitKey = (i: WaitItem) => `${i.kind}:${i.job}`;
+
+/**
+ * What blocks a login now. `firstSeen` (ms per `waitKey`, kept by the caller across checks) says
+ * since when the monitor has seen each item.
+ * - A run in progress: always (its own longest run bounds it; a row nothing closed is not an item).
+ * - Due, about to run, or the API not answering: until the window's cap.
+ * - After the cap, a due slot still inside its catch-up window (the scheduler starts it on its next
+ *   tick, or it is queued behind its group): for `DUE_GRACE_MS` from when the monitor first saw it.
+ * - Anything else past the cap: `pastCap` (log in anyway, and say so).
+ */
+export function jobsWait(
+  items: WaitItem[],
+  nowMs: number,
+  firstSeen: Record<string, number>,
+): JobsWait {
+  const out: JobsWait = { blocking: [], pastCap: [] };
+  for (const i of items) {
+    const seen = firstSeen[waitKey(i)] ?? nowMs;
+    const blocks =
+      i.kind === 'running' ||
+      !i.capped ||
+      (i.kind === 'due' && i.inCatchUp === true && nowMs - seen < DUE_GRACE_MS);
+    (blocks ? out.blocking : out.pastCap).push(i);
   }
   return out;
 }
