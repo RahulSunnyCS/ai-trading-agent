@@ -51,6 +51,47 @@ test("a crashed run's lock is taken over; a stuck one never blocks past the wait
   }
 });
 
+test('a stale lock is taken over by one waiter only; the others wait their turn', async () => {
+  for (let trial = 0; trial < 30; trial += 1) {
+    const dir = await mkdtemp(join(tmpdir(), 'qlock-'));
+    try {
+      await writeFile(
+        join(dir, 'login-lock-angelone'),
+        JSON.stringify({ pid: 999999, at: Date.now() }),
+      );
+      let inside = 0;
+      let most = 0;
+      await Promise.all(
+        [1, 2, 3].map(async () => {
+          const release = await takeLoginLock(dir, 'angelone', { pollMs: 1, waitMs: 5_000 });
+          inside += 1;
+          most = Math.max(most, inside);
+          await new Promise((r) => setTimeout(r, 5));
+          inside -= 1;
+          await release();
+        }),
+      );
+      assert.equal(most, 1, `trial ${trial}: two holders at once`);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test('a release removes only its own lock', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'qlock-'));
+  try {
+    const release = await takeLoginLock(dir, 'angelone');
+    // taken over meanwhile by another run
+    const theirs = JSON.stringify({ pid: process.pid, at: Date.now(), token: 'theirs' });
+    await writeFile(join(dir, 'login-lock-angelone'), theirs);
+    await release();
+    assert.equal(existsSync(join(dir, 'login-lock-angelone')), true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('the deploy ledger name is the one rule for the enabler and the stop', () => {
   assert.equal(quantiplyDeployLedgerPath('/d', 'angelone'), join('/d', 'deploy-ledger.jsonl'));
   assert.equal(

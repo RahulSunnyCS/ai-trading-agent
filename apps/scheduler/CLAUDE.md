@@ -75,13 +75,18 @@ summary flags anything but `main`).
     re-sends the same nonce.
   - Only `stop:go` acts: `stop-button.ts --apply` runs (log in `<logDir>/stop-button/`). Exit 0 / 3: the runner
     reported; 2: "did nothing, STOP_BUTTON is off"; 4: "the report could not be delivered"; else "check by hand".
-  - The hold (`TRADING_DATA_ROOT/stop/HOLD.json`, written by the runner before anything else) lasts until the
-    owner lifts it: `/resume` or the morning message's Resume button, then `stop:rgo:<nonce>` (same rules), runs
+  - The hold (`TRADING_DATA_ROOT/stop/HOLD.json` and `<SCHEDULER_STATE_DIR>/stop-hold.json`, written by the runner
+    before it squares off; either holds; and this process's memory from the confirm tap, the fallback when no file
+    could be written, lifted by a refused runner or a Resume) lasts until the owner lifts it: `/resume` or the morning message's Resume button, then `stop:rgo:<nonce>` (same rules), runs
     `stop-button.ts --clear-hold`. While it is on, the 09:00 message says so every day.
-  - `runJob` refuses every `STOP_HELD_JOBS` run (the uploads, deploys and enables) while the file exists, however
+  - `runJob` refuses every `STOP_HELD_JOBS` run (the uploads, deploys and enables) while the hold is on, however
     it was started (schedule, catch-up, `jobs run`, Apply now, queued behind its group): the run is recorded with
-    exit 0, no attempts and the reason, and is not caught up later; `POST /jobs/:id/run` answers 409.
-    `quantiply-disable` is never held. Every tap is a line in `TRADING_DATA_ROOT/stop/<day>.jsonl`.
+    exit 0, no attempts and the reason, and is not caught up later; held before a retry, the earlier attempt's
+    failure stays the result. `POST /jobs/:id/run` answers 409. The memory hold covers this process only;
+    `jobs run` in another process sees the files. `quantiply-disable` is never held. Every tap is a line in
+    `TRADING_DATA_ROOT/stop/<day>.jsonl`.
+  - While the runner works, `stop-running.json` (`{pid, at}`) sits beside each hold copy; jobs that log in to the
+    brokers (the loss / deploy monitor) skip their logins while it is there and its pid is alive.
 - `src/cli.ts` — `bun run jobs status | run <id> | serve | settings [show | set <file.json>]`.
 
 ## Adding a check

@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -146,13 +147,31 @@ const lockPath = (stateDir: string, broker: QuantiplyBroker) =>
 
 /** A lock older than this is a crashed run's: taken over. */
 const LOCK_STALE_MS = 6 * 60_000;
+/** A takeover marker older than this is a crashed takeover's: removed. */
+const TAKEOVER_STALE_MS = 30_000;
+
+/** The lock file as it is now: its text and its time, or null when there is none. */
+async function lockState(path: string): Promise<{ text: string; mtime: number } | null> {
+  try {
+    const [text, info] = await Promise.all([readFile(path, 'utf8'), stat(path)]);
+    return { text, mtime: info.mtimeMs };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Across processes: one Quantiply login per account at a time (the uploader, the deployer, the
  * 15:40 disable, the stop button). The TOTP stamp alone is read-then-wait, so two runs starting
  * together could both type a code from one window and get the account's login refused (and held).
- * Waits up to `waitMs` for another run's login; after that it goes ahead anyway, because a stuck
- * lock must never be what keeps the stop button from logging in.
+ *
+ * - Taken with an exclusive create (`wx`); the content carries a random token.
+ * - A lock whose process is dead, or older than 6 minutes, is taken over under a second
+ *   exclusive marker (`<lock>.takeover`): only the marker's holder removes it, and only if it is
+ *   still the very lock judged stale, so two waiters never both get in.
+ * - The release removes the lock only while it is still this run's own (same token).
+ * - Waits up to `waitMs` for another run's login; after that it goes ahead anyway, because a
+ *   stuck lock must never be what keeps the stop button from logging in.
  */
 export async function takeLoginLock(
   stateDir: string,
@@ -160,33 +179,57 @@ export async function takeLoginLock(
   opts: { waitMs?: number; pollMs?: number } = {},
 ): Promise<() => Promise<void>> {
   const path = lockPath(stateDir, broker);
+  const marker = `${path}.takeover`;
   const deadline = Date.now() + (opts.waitMs ?? 150_000);
+  const mine = `${JSON.stringify({ pid: process.pid, at: Date.now(), token: randomBytes(8).toString('hex') })}\n`;
+  const pause = () => new Promise((r) => setTimeout(r, opts.pollMs ?? 1_000));
   await mkdir(stateDir, { recursive: true }).catch(() => undefined);
   for (;;) {
     try {
-      await writeFile(path, `${JSON.stringify({ pid: process.pid, at: Date.now() })}\n`, {
-        flag: 'wx',
-      });
-      return () => rm(path, { force: true }).catch(() => undefined);
+      await writeFile(path, mine, { flag: 'wx' });
+      return async () => {
+        if ((await lockState(path))?.text === mine)
+          await rm(path, { force: true }).catch(() => undefined);
+      };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') return async () => undefined;
     }
+    const seen = await lockState(path);
+    if (!seen) continue; // released meanwhile
     type Lock = { pid?: number; at?: number };
-    // unreadable: just created and not yet written, or torn: judged by its age alone
-    const held = await readJson<Lock>(path).catch(
-      async (): Promise<Lock> => ({ at: (await stat(path).catch(() => null))?.mtimeMs ?? 0 }),
-    );
+    let held: Lock;
+    try {
+      held = JSON.parse(seen.text) as Lock;
+    } catch {
+      held = { at: seen.mtime }; // just created and not yet written, or torn: judged by its age
+    }
     const alive = typeof held.pid === 'number' ? pidAlive(held.pid) : true;
     const fresh = typeof held.at === 'number' && Date.now() - held.at < LOCK_STALE_MS;
     if (!alive || !fresh) {
-      await rm(path, { force: true }).catch(() => undefined);
-      continue;
+      try {
+        await writeFile(marker, `${process.pid}\n`, { flag: 'wx' });
+        try {
+          const now = await lockState(path);
+          if (now && now.text === seen.text && now.mtime === seen.mtime)
+            await rm(path, { force: true });
+        } finally {
+          await rm(marker, { force: true }).catch(() => undefined);
+        }
+        continue;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') return async () => undefined;
+        const m = await lockState(marker);
+        if (m && Date.now() - m.mtime > TAKEOVER_STALE_MS)
+          await rm(marker, { force: true }).catch(() => undefined);
+      }
     }
     if (Date.now() >= deadline) {
-      console.log(`  another Quantiply login (pid ${held.pid}) still holds ${path}: going ahead`);
+      console.log(
+        `  another Quantiply login (pid ${held.pid ?? '?'}) still holds ${path}: going ahead`,
+      );
       return async () => undefined;
     }
-    await new Promise((r) => setTimeout(r, opts.pollMs ?? 1_000));
+    await pause();
   }
 }
 

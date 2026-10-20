@@ -205,13 +205,19 @@ The owner's Telegram "stop everything": switch off AND square off, only after a 
 2026-10-20). The listener and the taps are `apps/scheduler/src/stop-button.ts`; this package does the stop.
 
 - `src/stop-button.ts --apply` (started by the listener; refuses unless `STOP_BUTTON=on`, exit 2):
-  1. writes the hold first and reads it back (`src/stop-hold.ts`, `TRADING_DATA_ROOT/stop/HOLD.json`). If it cannot,
-     nothing else is done and the owner is told to stop by hand (fail closed);
+  1. marks the stop as running (`stop-running.json`, `{pid, at}`, beside each hold copy, removed when the stop ends,
+     so the loss / deploy monitor keeps off the accounts meanwhile), then writes the hold and reads it back
+     (`src/stop-hold.ts`: `TRADING_DATA_ROOT/stop/HOLD.json` and `<SCHEDULER_STATE_DIR>/stop-hold.json`; either
+     holds). If it is saved nowhere, the stop still squares off and switches off, and says first, in its own
+     message and at the top of the report, "HOLD NOT SAVED (…): the tool may re-enable or upload after a scheduler
+     restart. Stop the scheduler or fix the volume"; the scheduler holds in memory meanwhile;
   2. runs each platform in its own path, settled on its own (`settle`, `Promise.allSettled`): a browser that will
      not start fails that platform's section only;
   3. sends the report, a section per platform, in parts under Telegram's 4096 characters (`sendTextChecked`). A
-     failed delivery sends one short fallback and exits 4. Otherwise exit 0 = all confirmed, 3 = something needs
-     the owner. Every step is a line in `TRADING_DATA_ROOT/stop/<day>.jsonl`.
+     failed delivery (also of the crash message) sends one short fallback and exits 4. Otherwise exit 0 = all
+     confirmed, 3 = something needs the owner. Every step is a line in `TRADING_DATA_ROOT/stop/<day>.jsonl`.
+  - Every list call rides out a blip (3 tries, backing off). If a platform's stop ends on an error anyway, its
+    report names every square-off already sent: "square-off already sent for: … Do NOT exit these at the broker".
   - Quantiply, each account: its uploader ledger must be readable. A missing one is "could not tell what is the
     tool's: check Quantiply by hand" (never a green line without a login), unless Settings › Automation gives the
     account no list and no uploads ("not used by the tool"; unreadable settings fail closed). Login through
@@ -219,9 +225,11 @@ The owner's Telegram "stop everything": switch off AND square off, only after a 
     login takes). Then in bounded passes: square off &
     terminate the tool's `TRADE_ACTIVE` algos (`squareOffTerminate`, `PUT /algos/:id/action/SQ_OFF_TERMINATE`),
     switch off its enabled ones (`READY`, `NOT_RUNNING`, `TRADE_CLOSED`; any weekday), wait for the squared-off
-    ones to show finished; an algo that entered meanwhile is squared off on the next pass. Each call is a
+    ones to show finished (later passes keep waiting while one still shows open); an algo that entered meanwhile
+    is squared off on the next pass. A sent square-off still `TRADE_ACTIVE` at the end is "square-off sent, still
+    closing … do NOT exit these at the broker" (the exports use limit orders), never "by hand". Each call is a
     `mode: 'stop'` row in the account's deploy ledger (`quantiplyDeployLedgerPath`) under today AND the next
-    session of the algo's weekday, so no enable switches it back on.
+    session of the algo's weekday, so no enable switches it back on (`toggledIds` counts `sqoff` rows too).
   - AlgoTest: log in (website), then `GET /execution/v2/executions?environment=live` and
     `PUT /execution/v2/square-off/<id>` for each Live / Error, active-on-server deploy of the tool's (the web app's
     `canSquareOff`), in passes. The tool's: the strategy id the uploader recorded (when the list carries one), a
@@ -232,10 +240,13 @@ The owner's Telegram "stop everything": switch off AND square off, only after a 
     order is ever placed with a broker directly. The owner's own algos and deploys are named, never touched.
   - Calls and statuses: `docs/algotest-execution.md` (§7 and "Quantiply algos through its API"). Pure rules:
     `src/stop-plan.ts`; the calls against injected clients: `src/stop-run.ts` (tested against stand-in servers).
-- The hold lasts until lifted (`--clear-hold`, or Telegram's Resume with its confirm tap; the file is kept, renamed
-  `HOLD-cleared-<time>.json`). While it exists `strategy-deploy.ts`, `strategy-upload.ts`, `quantiply-upload.ts`
+- The hold lasts until lifted (`--clear-hold`, or Telegram's Resume with its confirm tap; each copy is kept, renamed
+  `…-cleared-<time>.json`). While it exists `strategy-deploy.ts`, `strategy-upload.ts`, `quantiply-upload.ts`
   and `quantiply-deploy.ts --mode enable` change nothing with `--apply` (`stopHeld()`), and the scheduler refuses
   their jobs. `quantiply-deploy.ts --mode disable` is never held.
+- The Quantiply login lock (`takeLoginLock`, `login-lock-<broker>` beside the ledger): exclusive create with a
+  token; a dead or 6-minute-old lock is taken over only under a second exclusive marker (`.takeover`) and only if
+  it is still the lock judged stale; a release removes only its own lock. Taken once per login, in `openQuantiply`.
 - `NAME_PREFIXES` (`strategy-plan.ts`) is append-only: a rename adds prefixes and keeps the old ones (a test pins
   them), because ownership, the 15:40 disable and the stop all match on it.
 - Never tested live: the tests use stand-in servers and fixtures only; `--plan` and `--dry-run` never log in or

@@ -15,7 +15,13 @@ import {
 import type { History } from './history.js';
 import type { Builtin } from './runner.js';
 import { formatIst, istDay } from './schedule.js';
-import { type HoldInfo, STOP_HELD_JOBS, readHold } from './stop-hold.js';
+import {
+  type HoldInfo,
+  STOP_HELD_JOBS,
+  clearMemoryHold,
+  holdInMemory,
+  readHold,
+} from './stop-hold.js';
 
 /**
  * BL-143 Phase 4: the owner's Telegram "stop everything" button. Owner's answer (2026-10-20):
@@ -34,8 +40,9 @@ import { type HoldInfo, STOP_HELD_JOBS, readHold } from './stop-hold.js';
  *   ledgers, no login) and a "Yes, stop and square off" button carrying a nonce
  *   (`stop:go:<nonce>`): valid for 2 minutes, once. A second tap on the offer while it is valid
  *   re-sends the same nonce, so the first confirm still works. A restart forgets every nonce.
- * - Only that second tap acts: the runner writes the hold first (or does nothing and says so),
- *   squares off and switches off, and its per-platform report comes back in Telegram.
+ * - Only that second tap acts: this process holds at once (in memory, the fallback), the runner
+ *   writes the hold files first (if it cannot, it still squares off and says "HOLD NOT SAVED"
+ *   first), squares off and switches off, and its per-platform report comes back in Telegram.
  * - The hold lasts until the owner lifts it: `/resume` or the morning message's Resume button,
  *   then a confirm tap (`stop:rgo:<nonce>`, same rules), runs `stop-button.ts --clear-hold`.
  *   While it is on, the 09:00 message says so every day.
@@ -63,8 +70,10 @@ export interface StopDeps {
   apply: (by: string) => Promise<{ code: number; logPath: string }>;
   /** the runner's `--clear-hold` */
   resume: (by: string) => Promise<{ code: number }>;
-  /** the hold as the file shows it now */
+  /** the hold as the files (and this process's memory) show it now */
   hold: () => HoldInfo | null;
+  /** this process's own hold: on at the confirm, off at a refused stop or a Resume */
+  memory: { hold: (by: string) => void; clear: () => void };
   log: (row: Record<string, unknown>) => void;
   /** held jobs running right now (they may still finish what they started) */
   runningHeldJobs: () => string[];
@@ -233,6 +242,8 @@ export class StopButton {
       return;
     }
     const now = this.d.now();
+    // held in this process from now on, whatever the runner manages to write (the fallback)
+    this.d.memory.hold(`telegram ${fromId}`);
     this.d.log({ event: 'confirmed', from: fromId });
     await this.d.port.answer(callbackId, 'Stopping now');
     const busy = this.d.runningHeldJobs();
@@ -248,6 +259,7 @@ export class StopButton {
         this.d.log({ event: 'runner_exit', code: r.code });
         // 0 and 3: the runner delivered its own report.
         if (r.code === 2) {
+          this.d.memory.clear(); // the runner refused: nothing was stopped, nothing to hold
           await this.d.port.send(
             '⚠️ The stop did NOTHING: STOP_BUTTON is not "on" in the repo-root .env any more. Stop by hand on Quantiply and algotest.in/live, or set it back and restart the scheduler.',
           );
@@ -303,6 +315,7 @@ export class StopButton {
     await this.d.port.answer(callbackId, 'Lifting the hold');
     try {
       const r = await this.d.resume(`telegram ${fromId} ${this.d.now().toISOString()}`);
+      if (r.code === 0) this.d.memory.clear();
       const still = this.d.hold();
       this.d.log({ event: 'resume_exit', code: r.code, held: still !== null });
       await this.d.port.send(
@@ -456,6 +469,7 @@ export function startStopListener(o: ListenerOptions): (() => void) | null {
     now: () => new Date(),
     log,
     hold: () => readHold(o.env()),
+    memory: { hold: (by) => holdInMemory(by), clear: clearMemoryHold },
     runningHeldJobs: () =>
       STOP_HELD_JOBS.filter((id) => {
         const last = o.history.last(id);

@@ -75,7 +75,7 @@ One Telegram button that stops everything the tool trades, and keeps it stopped 
 
 **What the second tap does:**
 
-- **Holds the tool, until you lift it.** From then on the tool uploads, deploys and switches on nothing, on AlgoTest or Quantiply, on any day. The jobs that would do so are refused, including **Apply now** on this page. The 15:40 Quantiply switch-off still runs. If the hold cannot be written, the stop does nothing else and tells you to stop by hand.
+- **Holds the tool, until you lift it.** From then on the tool uploads, deploys and switches on nothing, on AlgoTest or Quantiply, on any day. The jobs that would do so are refused, including **Apply now** on this page. The 15:40 Quantiply switch-off still runs. If the hold cannot be saved (the data disk unplugged, say), the stop still squares off and switches off, but says **HOLD NOT SAVED** first: the tool could then upload or switch on again after the laptop's scheduler restarts, so stop the scheduler or fix the disk.
 - **Quantiply (each account):** the tool's algos with a trade open are squared off and terminated by Quantiply itself. Every enabled algo of the tool's is switched off, whatever its weekday. An algo that enters while this happens is squared off on a second pass.
 - **AlgoTest:** every running deploy of the tool's (a strategy it uploaded, or one named `T1 · …` or `Core · …`) is squared off with AlgoTest's own Square Off, whoever deployed it. A deploy that went live meanwhile is squared off on a second pass.
 - **Reports back** in the same chat, one section per platform, once each platform shows the result. If the report cannot be sent, a short message says so.
@@ -83,7 +83,7 @@ One Telegram button that stops everything the tool trades, and keeps it stopped 
 Your own algos and deploys are never touched; the report names any that are still running.
 
 > [!WARNING]
-> The square-off sends real exit orders through the platforms. If a platform offers no square-off for something (a paused AlgoTest deploy, for example), the report says **square off by hand**: do that in the platform or your broker's app straight away. If it says **AlgoTest is still squaring off**, do **not** exit at the broker: AlgoTest's own exit orders are going out, and a second exit would open a reverse position. Re-check /live instead. A deploy someone switched to manual is reported **check**: its legs may still be open at the broker. The tool never places an order with a broker itself.
+> The square-off sends real exit orders through the platforms. If a platform offers no square-off for something (a paused AlgoTest deploy, for example), the report says **square off by hand**: do that in the platform or your broker's app straight away. If it says **square-off sent, still closing** (Quantiply) or **AlgoTest is still squaring off**, or names a square-off **already sent**, do **not** exit at the broker: the platform's own exit orders are going out, and a second exit would open a reverse position. Open the platform and look first. A deploy someone switched to manual is reported **check**: its legs may still be open at the broker. The tool never places an order with a broker itself.
 
 **While the hold is on.** The 09:00 message says so every day, with a **Resume** button. Send `/resume` at any time for the same.
 

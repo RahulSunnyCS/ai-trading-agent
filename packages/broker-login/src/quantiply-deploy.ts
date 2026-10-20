@@ -165,7 +165,7 @@ async function main(): Promise<number> {
     console.log(`${site.name}: QUANTIPLY_DEPLOY is not "on": nothing enabled`);
     return 0;
   }
-  // BL-143 Phase 4: a confirmed stop holds every enable for the rest of the IST day (never a
+  // BL-143 Phase 4: a confirmed stop holds every enable until the owner resumes (never a
   // disable: switching off is the safety net).
   const held = values.apply && mode === 'enable' ? stopHeld() : null;
   if (held) {

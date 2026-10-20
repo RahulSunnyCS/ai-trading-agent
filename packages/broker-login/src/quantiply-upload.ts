@@ -94,7 +94,7 @@ async function main(): Promise<number> {
     );
     return 0;
   }
-  // BL-143 Phase 4: a confirmed stop holds every upload for the rest of the IST day.
+  // BL-143 Phase 4: a confirmed stop holds every upload until the owner resumes.
   const held = values.apply ? stopHeld() : null;
   if (held) {
     console.log(`Quantiply upload ${held}`);

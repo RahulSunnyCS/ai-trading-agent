@@ -136,7 +136,7 @@ async function main(): Promise<number> {
     console.log('ALGOTEST_DEPLOY is not "on": nothing deployed (dry run without --apply)');
     return 0;
   }
-  // BL-143 Phase 4: a confirmed stop holds every deploy for the rest of the IST day.
+  // BL-143 Phase 4: a confirmed stop holds every deploy until the owner resumes.
   const held = values.apply ? stopHeld() : null;
   if (held) {
     console.log(`AlgoTest deploy ${held}`);

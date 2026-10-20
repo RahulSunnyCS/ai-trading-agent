@@ -27,6 +27,9 @@ import {
  * The CLI under test, through tsx's own entry resolved from this package (CI's bun 1.2 hoists
  * tsx to the repo root, so `node_modules/.bin/tsx` here may not exist).
  */
+// never the real scheduler state dir (the hold's second copy lives there)
+process.env.SCHEDULER_STATE_DIR = join(tmpdir(), `stop-run-test-${process.pid}`);
+
 const TSX_CLI = createRequire(import.meta.url).resolve('tsx/cli');
 const PKG = resolve(dirname(import.meta.filename), '..');
 function cli(args: string[], env: Record<string, string>, cwd: string) {
@@ -114,9 +117,20 @@ describe('Quantiply stop against a stand-in API', () => {
   let failSqOff = false;
   /** ids that enter (go TRADE_ACTIVE) the moment their switch-off lands: the 09:17 race */
   let entersOnDisable = new Set<string>();
+  /** lists a squared-off algo stays TRADE_ACTIVE for (Infinity: its exit never fills) */
+  let closeAfter = 2;
+  /** the next lists answered 503: a blip (or an outage, when large) */
+  let failLists = 0;
+  /** lists answered normally before the blips start */
+  let listsBeforeFail = 0;
   const q = listen((req) => {
     const url = req.url ?? '';
     if (req.method === 'GET' && url === '/algos/day-wise') {
+      if (listsBeforeFail > 0) listsBeforeFail -= 1;
+      else if (failLists > 0) {
+        failLists -= 1;
+        return { status: 503, json: { message: '503 blip' } };
+      }
       // a squared-off algo shows closed only after a couple of lists, like a real exit
       for (const a of algos) {
         if (a.polls === undefined) continue;
@@ -138,7 +152,7 @@ describe('Quantiply stop against a stand-in API', () => {
     if (req.method === 'PUT' && sq) {
       if (failSqOff) return { status: 500, json: { message: 'broker down' } };
       const a = algos.find((x) => x._id === sq[1]);
-      if (a) a.polls = 2;
+      if (a) a.polls = closeAfter;
       // no `status: "success"`: the web app does not read this answer, nor does the tool
       return { status: 200, json: { message: 'Square off initiated' } };
     }
@@ -163,6 +177,9 @@ describe('Quantiply stop against a stand-in API', () => {
     q.seen.length = 0;
     failSqOff = false;
     entersOnDisable = new Set();
+    closeAfter = 2;
+    failLists = 0;
+    listsBeforeFail = 0;
     algos = [
       { _id: 'a', name: 'Core · A', day: 'TUE', enabled: true, status: 'TRADE_ACTIVE' },
       { _id: 'b', name: 'Core · B', day: 'TUE', enabled: true, status: 'READY' },
@@ -216,6 +233,50 @@ describe('Quantiply stop against a stand-in API', () => {
     assert.match(r.lines.join('\n'), /squared off & terminated: Core · A, Core · B/);
   });
 
+  it('a square-off sent but still open is "still closing: do NOT exit at the broker", never by hand', async () => {
+    closeAfter = Number.POSITIVE_INFINITY;
+    const r = await stopQuantiply('Quantiply · Angel One', api, ledger, noLog, {
+      dryRun: false,
+      waits: fast,
+    });
+    const text = r.lines.join('\n');
+    assert.equal(r.ok, false);
+    assert.match(
+      text,
+      /square-off sent, still closing .*Core · A \(sent \d\d:\d\d\).*do NOT exit these at the broker/,
+    );
+    assert.doesNotMatch(text, /Core · A[^\n]*square off by hand/);
+    // sent once only, however many passes waited on it
+    assert.equal(q.seen.filter((x) => x.url === '/algos/a/action/SQ_OFF_TERMINATE').length, 1);
+  });
+
+  it('rides out a list that fails twice, then finishes the stop', async () => {
+    listsBeforeFail = 1; // the first list works; the next two answer 503
+    failLists = 2;
+    const r = await stopQuantiply('Quantiply · Angel One', api, ledger, noLog, {
+      dryRun: false,
+      waits: fast,
+    });
+    assert.equal(r.ok, true, r.lines.join('\n'));
+    assert.match(r.lines.join('\n'), /squared off & terminated: Core · A/);
+  });
+
+  it('a list that stays down after a square-off names it: do NOT exit at the broker', async () => {
+    listsBeforeFail = 1;
+    failLists = 1000;
+    const r = await stopQuantiply('Quantiply · Angel One', api, ledger, noLog, {
+      dryRun: false,
+      waits: fast,
+    });
+    const text = r.lines.join('\n');
+    assert.equal(r.ok, false);
+    assert.match(text, /503 blip/);
+    assert.match(
+      text,
+      /square-off already sent for: Core · A \(sent \d\d:\d\d\)\. Do NOT exit these at the broker/,
+    );
+  });
+
   it('a failed square off is reported for the owner, the rest still switched off', async () => {
     failSqOff = true;
     const r = await stopQuantiply('Quantiply · Angel One', api, ledger, noLog, {
@@ -246,10 +307,17 @@ describe('AlgoTest stop against a stand-in API', () => {
   let pendingLists = 2;
   /** a deploy that appears once the first square-off went out (a deploy job finishing) */
   let lateDeploy: E | null = null;
+  let aListsBeforeFail = 0;
+  let aFailLists = 0;
   const pending = new Map<string, number>();
   const a = listen((req) => {
     const url = req.url ?? '';
     if (req.method === 'GET' && url === '/execution/v2/executions?environment=live') {
+      if (aListsBeforeFail > 0) aListsBeforeFail -= 1;
+      else if (aFailLists > 0) {
+        aFailLists -= 1;
+        return { status: 502, json: { msg: '502 blip' } };
+      }
       for (const [id, n] of pending) {
         const e = execs.find((x) => x._id === id);
         if (!e) continue;
@@ -288,6 +356,8 @@ describe('AlgoTest stop against a stand-in API', () => {
     a.seen.length = 0;
     pendingLists = 2;
     lateDeploy = null;
+    aListsBeforeFail = 0;
+    aFailLists = 0;
     pending.clear();
     execs = [
       {
@@ -327,6 +397,18 @@ describe('AlgoTest stop against a stand-in API', () => {
     assert.match(text, /still squaring off: T1 · A .*Do NOT exit these at the broker/);
     assert.doesNotMatch(text, /T1 · A[^\n]*square off by hand/);
     assert.equal(r.ok, false);
+  });
+
+  it('a list that stays down after a square-off names it: do NOT exit at the broker', async () => {
+    aListsBeforeFail = 1;
+    aFailLists = 1000;
+    const r = await stopAlgoTest(algotestStopApi(fetchHttp), noLog, opts);
+    const text = r.lines.join('\n');
+    assert.match(text, /live list answered 502/);
+    assert.match(
+      text,
+      /square-off already sent for: T1 · A \(sent \d\d:\d\d\)\. Do NOT exit these at the broker/,
+    );
   });
 
   it('a deploy that went live during the stop is squared off on the next pass', async () => {
@@ -415,16 +497,27 @@ describe('stop-button.ts --apply without STOP_BUTTON=on', () => {
   });
 });
 
-describe('stop-button.ts --apply when the hold cannot be written', () => {
-  it('fails closed: nothing else is done, and it says the report was not delivered', async () => {
+describe('stop-button.ts --apply when the hold cannot be saved', () => {
+  it('says HOLD NOT SAVED first and still goes on to the platforms', async () => {
     const root = await mkdtemp(join(tmpdir(), 'stop-cli-'));
     try {
       await writeFile(join(root, 'stop'), 'a file where the stop folder should be');
-      const out = cli(['--apply'], { TRADING_DATA_ROOT: root, STOP_BUTTON: 'on' }, root);
-      // 4: Telegram is not configured in the test, so the "stop by hand" message did not go
+      await writeFile(join(root, 'state'), 'a file where the state folder should be');
+      const out = cli(
+        ['--apply'],
+        { TRADING_DATA_ROOT: root, STOP_BUTTON: 'on', SCHEDULER_STATE_DIR: join(root, 'state') },
+        root,
+      );
+      // 4: Telegram is not configured in the test, so the report did not go
       assert.equal(out.status, 4, out.stderr);
-      assert.match(out.stderr, /Stop NOT done: the hold could not be written/);
-      assert.doesNotMatch(out.stdout, /logged_in|squared off|switched off|✅/);
+      assert.match(
+        out.stderr,
+        /HOLD NOT SAVED \(.*\): the tool may re-enable or upload after a scheduler restart/,
+      );
+      // it went on: each platform has its section (no logins here: no credentials)
+      assert.match(out.stdout, /^❌ HOLD NOT SAVED/m);
+      assert.match(out.stdout, /Quantiply · Angel One/);
+      assert.match(out.stdout, /AlgoTest\n.*ALGOTEST_PHONE \/ ALGOTEST_PASSWORD missing/);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

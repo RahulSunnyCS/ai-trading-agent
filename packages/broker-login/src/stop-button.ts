@@ -27,10 +27,13 @@ import {
 } from './quantiply-session.js';
 import { redact, registerSecret } from './secrets.js';
 import {
+  type HoldWrite,
   appendStopLog,
   clearHold,
   holdPath,
+  markStopRunning,
   readHold,
+  stateHoldPath,
   stopLogPath,
   writeHold,
 } from './stop-hold.js';
@@ -59,9 +62,11 @@ import { type LedgerRow, istToday, owned, parseLedger } from './strategy-plan.js
  *   tsx src/stop-button.ts --clear-hold                 lift the hold (Telegram's Resume does this)
  *
  * `--apply`, in order:
- * 1. Writes the hold (`stop-hold.ts`, `TRADING_DATA_ROOT/stop/HOLD.json`), read back. A hold that
- *    cannot be written stops the run there (fail closed): nothing else is done, and the owner is
- *    told to stop by hand. The hold lasts until the owner lifts it: uploads, deploys and enables
+ * 1. Writes the hold (`stop-hold.ts`: `TRADING_DATA_ROOT/stop/HOLD.json` and a copy in the
+ *    scheduler's state dir), each read back. If it is saved nowhere the stop still squares off
+ *    and switches off (squaring off is the point of the button), and says "HOLD NOT SAVED"
+ *    first, in its own message and at the top of the report; the scheduler keeps the hold in
+ *    memory meanwhile. The hold lasts until the owner lifts it: uploads, deploys and enables
  *    change nothing, and the scheduler refuses their jobs.
  * 2. Each platform in its own path, in parallel (separate accounts, separate TOTP seeds), every
  *    path in its own try and settled on its own, so one failing (a browser that will not start)
@@ -128,13 +133,15 @@ function usedByTool(broker: QuantiplyBroker): boolean {
   }
 }
 
-async function readLocal(dataRoot: string): Promise<Local> {
+async function readLocal(dataRoot: string | undefined): Promise<Local> {
   const today = istToday();
   const quantiply: Account[] = [];
   for (const broker of BROKERS) {
-    const ledgerPath = quantiplyLedgerPath(dataRoot, broker);
+    const ledgerPath = quantiplyLedgerPath(dataRoot ?? '(TRADING_DATA_ROOT not set)', broker);
     const a: Account = { broker, ledgerPath, ledger: [], problem: null, unused: false };
-    if (!existsSync(ledgerPath)) {
+    if (!dataRoot) {
+      a.problem = 'TRADING_DATA_ROOT is not set, so its ledger cannot be read';
+    } else if (!existsSync(ledgerPath)) {
       // Fail closed unless the settings say the tool never puts algos on this account.
       if (usedByTool(broker)) a.problem = `its ledger is missing (${ledgerPath})`;
       else a.unused = true;
@@ -147,11 +154,12 @@ async function readLocal(dataRoot: string): Promise<Local> {
     }
     quantiply.push(a);
   }
-  const algotestPath = join(dataRoot, 'rotation', 'algotest', 'ledger.jsonl');
+  const algotestPath = join(dataRoot ?? '', 'rotation', 'algotest', 'ledger.jsonl');
   let algotest: LedgerRow[] = [];
   let algotestNote: string | null = null;
   try {
-    if (existsSync(algotestPath)) algotest = parseLedger(await readFile(algotestPath, 'utf8'));
+    if (!dataRoot) algotestNote = 'TRADING_DATA_ROOT not set: matched by the name prefixes alone';
+    else if (existsSync(algotestPath)) algotest = parseLedger(await readFile(algotestPath, 'utf8'));
     else algotestNote = 'no uploader ledger: matched by the name prefixes alone';
   } catch (error) {
     algotestNote = `uploader ledger unreadable (${describe(error)}): matched by the name prefixes alone`;
@@ -350,6 +358,15 @@ export async function settle(
   );
 }
 
+/** The report's first line about the hold: loud when it was not saved in both places. */
+export function holdLine(h: HoldWrite): string {
+  if (!h.saved.length)
+    return `❌ HOLD NOT SAVED (${h.failed.join('; ')}): the tool may re-enable or upload after a scheduler restart. Stop the scheduler or fix the volume.`;
+  if (h.failed.length)
+    return `⚠️ Hold saved only in ${h.saved.join(', ')} (${h.failed.join('; ')}): it holds, but fix the data volume.`;
+  return '✅ Hold on: no uploads, enables or deploys until you lift it (Resume)';
+}
+
 export function reportText(hold: string, reports: Report[], logPath: string): string {
   const ok = reports.every((r) => r.ok);
   const head = ok
@@ -390,33 +407,31 @@ async function main(): Promise<number> {
     return 64;
   }
   if (existsSync('.env')) process.loadEnvFile('.env');
-  const dataRoot = process.env.TRADING_DATA_ROOT?.trim();
-  if (!dataRoot) {
+  const dataRoot = process.env.TRADING_DATA_ROOT?.trim() || undefined;
+  // --apply goes on without it (squaring off is the point of the button); nothing else can
+  if (!dataRoot && !values.apply && !values['clear-hold']) {
     console.error(
       'TRADING_DATA_ROOT is not set: the ledgers, the hold and the stop log live there',
     );
-    if (values.apply) {
-      await deliver(
-        '❌ Stop NOT done: TRADING_DATA_ROOT is not set, so the hold cannot be written. Nothing was changed. Stop by hand on Quantiply and algotest.in/live now.',
-        '❌ Stop NOT done: stop by hand now.',
-      );
-      return EXIT_ATTENTION;
-    }
     return 1;
   }
 
   if (values['clear-hold']) {
     const removed = await clearHold(dataRoot);
-    await appendStopLog(dataRoot, {
-      who: 'runner',
-      step: 'clear_hold',
-      removed,
-      by: values.by ?? 'manual',
-    });
+    if (dataRoot)
+      await appendStopLog(dataRoot, {
+        who: 'runner',
+        step: 'clear_hold',
+        removed,
+        by: values.by ?? 'manual',
+      });
     console.log(
-      removed ? `hold lifted (${holdPath(dataRoot)} kept as a record)` : 'there was no hold',
+      removed
+        ? `hold lifted (${[...(dataRoot ? [holdPath(dataRoot)] : []), stateHoldPath()].join(', ')}: kept, renamed, as a record)`
+        : 'there was no hold',
     );
-    return 0;
+    // the listener checks the hold is gone; still there means something could not be renamed
+    return readHold(dataRoot) ? 1 : 0;
   }
 
   const local = await readLocal(dataRoot);
@@ -453,25 +468,45 @@ async function main(): Promise<number> {
   }
 
   // --apply
-  const log: StopLog = (row) => appendStopLog(dataRoot, { who: 'runner', ...row });
+  const log: StopLog = async (row) => {
+    if (dataRoot) await appendStopLog(dataRoot, { who: 'runner', ...row });
+    else console.log(`stop: ${redact(JSON.stringify(row))}`);
+  };
   if (process.env.STOP_BUTTON?.trim().toLowerCase() !== 'on') {
     await log({ step: 'refused', why: 'STOP_BUTTON is not on' });
     console.error('STOP_BUTTON is not "on": nothing done');
     return EXIT_REFUSED;
   }
   await log({ step: 'start', by: values.by ?? 'manual' });
+  // While the stop runs, other jobs that log in (the loss / deploy monitor) keep off the accounts.
+  const running = await markStopRunning(dataRoot);
   try {
-    const path = await writeHold(dataRoot, values.by ?? 'stop-button.ts --apply');
-    await log({ step: 'hold', ok: true, path });
-  } catch (error) {
-    // Fail closed: without the hold, a deploy or enable could undo the stop behind its back.
-    await log({ step: 'hold', ok: false, detail: describe(error) });
-    const text = `❌ Stop NOT done: the hold could not be written (${describe(error)}). Nothing was changed. Stop by hand on Quantiply and algotest.in/live now.`;
-    console.error(text);
-    const sent = await deliver(text, '❌ Stop NOT done: stop by hand now.');
-    return sent ? EXIT_ATTENTION : EXIT_UNREPORTED;
+    return await applyStop(dataRoot, local, log, values);
+  } finally {
+    await running();
   }
-  const hold = '✅ Hold on: no uploads, enables or deploys until you lift it (Resume)';
+}
+
+async function applyStop(
+  dataRoot: string | undefined,
+  local: Local,
+  log: StopLog,
+  values: { by?: string | undefined; headed: boolean },
+): Promise<number> {
+  // The hold first. If it cannot be saved anywhere, the stop still squares off and switches off
+  // (coordinator's decision, 2026-10-20): it says so first, and loudly, and the scheduler keeps
+  // the hold in memory until it restarts.
+  const held = await writeHold(dataRoot, values.by ?? 'stop-button.ts --apply');
+  await log({ step: 'hold', saved: held.saved, failed: held.failed });
+  const hold = holdLine(held);
+  let early = true;
+  if (!held.saved.length || held.failed.length) {
+    console.error(hold);
+    early = await sendTextChecked(
+      readTelegramConfig(),
+      redact(`${hold}\nSquaring off and switching off now; the result follows.`),
+    );
+  }
   const reports = await settle([
     ...local.quantiply.map((q) => ({
       platform: QUANTIPLY_SITES[q.broker].name,
@@ -479,7 +514,9 @@ async function main(): Promise<number> {
     })),
     { platform: 'AlgoTest', run: () => algotest(local, log, values.headed) },
   ]);
-  const logPath = stopLogPath(dataRoot, local.today);
+  const logPath = dataRoot
+    ? stopLogPath(dataRoot, local.today)
+    : '(no stop log: TRADING_DATA_ROOT not set; see the runner log in the scheduler log folder)';
   const text = reportText(hold, reports, logPath);
   console.log(text);
   const ok = reports.every((r) => r.ok);
@@ -487,9 +524,9 @@ async function main(): Promise<number> {
     text,
     `⚠️ The stop finished (${ok ? 'all confirmed' : 'CHECK BY HAND'}), but its full report could not be sent. Read ${logPath} on the laptop.`,
   );
-  await log({ step: 'end', ok, reported: sent });
+  await log({ step: 'end', ok, reported: sent, holdWarned: early });
   if (!sent) return EXIT_UNREPORTED;
-  return ok ? 0 : EXIT_ATTENTION;
+  return ok && held.saved.length && !held.failed.length ? 0 : EXIT_ATTENTION;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename ?? '')) {
@@ -498,11 +535,13 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename
     .catch(async (error: unknown) => {
       const text = `⚠️ Stop button runner stopped: ${describe(error)}. Square off and switch off by hand on Quantiply and algotest.in/live`;
       console.error(text);
+      let delivered = true;
       if (process.argv.includes('--apply')) {
-        await Promise.resolve()
+        delivered = await Promise.resolve()
           .then(() => sendTextChecked(readTelegramConfig(), redact(text)))
-          .catch(() => undefined);
+          .catch(() => false);
       }
-      process.exit(EXIT_ATTENTION);
+      // 4: the listener then says the report did not arrive, rather than nothing at all
+      process.exit(delivered ? EXIT_ATTENTION : EXIT_UNREPORTED);
     });
 }

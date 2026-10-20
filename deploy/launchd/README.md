@@ -75,5 +75,8 @@ deploy/launchd/uninstall.sh
   Square Off). A confirmed stop holds the tool **until it is lifted** (Telegram's Resume, or
   `cd packages/broker-login && node_modules/.bin/tsx src/stop-button.ts --clear-hold`): no
   `algotest-*` upload or deploy and no `quantiply-*` upload or enable runs, however it is
-  started (`jobs status` shows those slots as ok, held). `quantiply-disable` still runs. A slot
+  started (`jobs status` shows those slots as ok, held). The hold is the file
+  `TRADING_DATA_ROOT/stop/HOLD.json` or its copy `stop-hold.json` in the scheduler's state
+  folder; if neither could be written, only the running scheduler holds it, in memory, and
+  a restart lifts it: the stop's report then says HOLD NOT SAVED. `quantiply-disable` still runs. A slot
   the hold refused is not caught up: run it by hand after lifting the hold.

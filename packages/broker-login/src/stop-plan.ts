@@ -61,13 +61,24 @@ export function planQuantiplyStop(ledger: QLedgerRow[], algos: QAlgo[]): Quantip
   return out;
 }
 
-/** After the calls: the tool's algos still open or still enabled, each with what to do by hand. */
-export function quantiplyLeft(ledger: QLedgerRow[], after: QAlgo[]): string[] {
+/**
+ * After the calls: the tool's algos still open or still enabled, each with what to do by hand.
+ * `sent`: algos whose square-off went out; one of them still open is the caller's "still closing,
+ * do NOT exit at the broker" line, never "by hand".
+ */
+export function quantiplyLeft(
+  ledger: QLedgerRow[],
+  after: QAlgo[],
+  sent: Set<string> = new Set(),
+): string[] {
   const owned = ownedIds(ledger);
   const out: string[] = [];
   for (const a of after) {
     if (!owned.has(a.id)) continue;
-    if (a.status === Q_ACTIVE)
+    if (a.status === Q_ACTIVE && sent.has(a.id)) {
+      if (a.enabled)
+        out.push(`${a.name} (${a.day}) still ENABLED: switch it off once it has closed`);
+    } else if (a.status === Q_ACTIVE)
       out.push(`${a.name} (${a.day}) still TRADE_ACTIVE: square off by hand`);
     else if (a.enabled)
       out.push(`${a.name} (${a.day}) still ENABLED (${a.status}): switch off by hand`);
@@ -238,6 +249,7 @@ export interface AlgoTestAfter {
   pending: string[];
   /** switched to manual or gone from the list: legs may be open */
   check: string[];
+  /** squared off (or squaring) but now in another state: look at /live, never exit blind */
   byHand: string[];
 }
 
@@ -252,7 +264,10 @@ export function algotestAfter(targets: Execution[], after: Execution[]): AlgoTes
     else if (squaringOff(e.status) || canSquareOff(e)) out.pending.push(`${t.name} (${e.status})`);
     else if (e.status === A_STOPPED)
       out.check.push(`${t.name}: switched to manual: its legs may be open, check at the broker`);
-    else out.byHand.push(`${t.name}: ${e.status}: square off by hand`);
+    else
+      out.byHand.push(
+        `${t.name}: square-off sent, AlgoTest now shows ${e.status}: open /live first; do NOT exit it at the broker while AlgoTest may still be exiting`,
+      );
   }
   return out;
 }

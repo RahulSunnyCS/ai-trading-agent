@@ -1,16 +1,21 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+
 import type { QAlgo, QLedgerRow } from './quantiply-plan.js';
 import {
   appendStopLog,
   clearHold,
   holdPath,
+  markStopRunning,
   readHold,
+  stateHoldPath,
   stopHeld,
   stopLogPath,
+  stopRunningPaths,
   writeHold,
 } from './stop-hold.js';
 import {
@@ -29,6 +34,9 @@ import {
   toolMatcher,
 } from './stop-plan.js';
 import { type LedgerRow, istToday } from './strategy-plan.js';
+
+// never the real scheduler state dir (the hold's second copy lives there)
+process.env.SCHEDULER_STATE_DIR = join(tmpdir(), `stop-plan-test-${process.pid}`);
 
 const row = (id: string, name: string, action: 'create' | 'delete' = 'create'): QLedgerRow => ({
   at: '2026-10-19T11:55:27Z',
@@ -220,7 +228,12 @@ test('AlgoTest after: squaring off is pending (wait), stopped is a check, never 
   assert.equal(r.check.length, 2);
   assert.match(r.check[0] ?? '', /T1 · B: switched to manual/);
   assert.match(r.check[1] ?? '', /T1 · D: no longer listed/);
-  assert.deepEqual(r.byHand, ['T1 · F: paused: square off by hand']);
+  assert.equal(r.byHand.length, 1);
+  // already squared off: never 'by hand', never exit it at the broker blind
+  assert.match(
+    r.byHand[0] ?? '',
+    /T1 · F: square-off sent, AlgoTest now shows paused: .*do NOT exit/,
+  );
 });
 
 test('stop rows: today and the next session of the algo weekday', () => {
@@ -235,35 +248,79 @@ test('capped names a long list in part', () => {
   assert.equal(capped(['a', 'b', 'c', 'd'], 2), 'a, b and 2 more');
 });
 
-test('hold: persistent until cleared, read back, found by the deployers', async () => {
+test('hold: in both places, persistent until cleared, found by the deployers', async () => {
   const root = await mkdtemp(join(tmpdir(), 'stop-hold-'));
+  // never the real scheduler state dir
+  const env = { TRADING_DATA_ROOT: root, SCHEDULER_STATE_DIR: join(root, 'state') };
   try {
-    assert.equal(readHold(root), null);
-    assert.equal(stopHeld({ TRADING_DATA_ROOT: root }), null);
-    const path = await writeHold(root, 'test', new Date('2026-10-20T04:00:00Z'));
-    assert.equal(path, holdPath(root));
-    assert.equal(path, join(root, 'stop', 'HOLD.json')); // the scheduler reads this path
-    assert.equal(readHold(root)?.by, 'test');
+    assert.equal(readHold(root, env), null);
+    assert.equal(stopHeld(env), null);
+    const w = await writeHold(root, 'test', new Date('2026-10-20T04:00:00Z'), env);
+    assert.deepEqual(w.failed, []);
+    // the scheduler reads these two paths
+    assert.deepEqual(w.saved, [
+      join(root, 'stop', 'HOLD.json'),
+      join(root, 'state', 'stop-hold.json'),
+    ]);
+    assert.equal(holdPath(root), join(root, 'stop', 'HOLD.json'));
+    assert.equal(stateHoldPath(env), join(root, 'state', 'stop-hold.json'));
+    assert.equal(readHold(root, env)?.by, 'test');
     // a second stop keeps the first time
-    await writeHold(root, 'again', new Date('2026-10-22T04:00:00Z'));
-    assert.equal(readHold(root)?.at, '2026-10-20T04:00:00.000Z');
-    assert.match(stopHeld({ TRADING_DATA_ROOT: root }) ?? '', /held by the stop button/);
-    assert.equal(stopHeld({}), null);
-    assert.equal(await clearHold(root), true);
-    assert.equal(readHold(root), null);
-    assert.equal(await clearHold(root), false);
+    await writeHold(root, 'again', new Date('2026-10-22T04:00:00Z'), env);
+    assert.equal(readHold(root, env)?.at, '2026-10-20T04:00:00.000Z');
+    assert.match(stopHeld(env) ?? '', /held by the stop button/);
+    assert.equal(await clearHold(root, new Date(), env), true);
+    assert.equal(readHold(root, env), null);
+    assert.equal(await clearHold(root, new Date(), env), false);
     assert.ok((await readdir(join(root, 'stop'))).some((f) => f.startsWith('HOLD-cleared-')));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
 
-test('hold: an unreadable hold file still holds', async () => {
+test('hold: either copy holds; an unreadable one still holds; nowhere to save is said', async () => {
   const root = await mkdtemp(join(tmpdir(), 'stop-hold-'));
+  const env = { TRADING_DATA_ROOT: root, SCHEDULER_STATE_DIR: join(root, 'state') };
   try {
-    await writeHold(root, 'x');
-    await writeFile(holdPath(root), 'not json');
-    assert.match(stopHeld({ TRADING_DATA_ROOT: root }) ?? '', /held/);
+    // the data volume gone: the state copy alone holds
+    const w = await writeHold(undefined, 'x', new Date(), env);
+    assert.deepEqual(w.saved, [stateHoldPath(env)]);
+    assert.match(w.failed.join(), /TRADING_DATA_ROOT is not set/);
+    assert.match(stopHeld(env) ?? '', /held/);
+    await writeFile(stateHoldPath(env), 'not json');
+    assert.match(stopHeld(env) ?? '', /held/);
+    // neither place writable
+    await writeFile(join(root, 'blocked'), 'a file, not a folder');
+    const none = await writeHold(join(root, 'blocked'), 'x', new Date(), {
+      SCHEDULER_STATE_DIR: join(root, 'blocked', 'state'),
+    });
+    assert.deepEqual(none.saved, []);
+    assert.equal(none.failed.length, 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('stop-running marker: {pid, at} beside each hold copy while a stop runs, gone after', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'stop-run-'));
+  const env = { SCHEDULER_STATE_DIR: join(root, 'state') };
+  try {
+    const paths = stopRunningPaths(root, env);
+    assert.deepEqual(paths, [
+      join(root, 'stop', 'stop-running.json'),
+      join(root, 'state', 'stop-running.json'),
+    ]);
+    const done = await markStopRunning(root, env);
+    for (const p of paths) {
+      const m = JSON.parse(await readFile(p, 'utf8')) as { pid: number; at: string };
+      assert.equal(m.pid, process.pid);
+      assert.ok(m.at);
+    }
+    await done();
+    assert.deepEqual(
+      paths.filter((p) => existsSync(p)),
+      [],
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }

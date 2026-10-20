@@ -170,8 +170,15 @@ export function runJob(
         const held = heldReason(job.id, ctx.env);
         if (held) {
           writeSync(logFd, `\n=== ${job.id} · ${trigger} · ${formatIst(now())} IST: ${held}\n`);
-          ctx.history.finish(runId, 0, attempts - 1, now(), held);
-          return { runId, ok: true, exitCode: 0, attempts: attempts - 1, logPath, error: held };
+          const tried = attempts - 1;
+          if (tried === 0) {
+            ctx.history.finish(runId, 0, 0, now(), held);
+            return { runId, ok: true, exitCode: 0, attempts: 0, logPath, error: held };
+          }
+          // held before a retry: the earlier attempt's failure stays the run's result
+          const error = `${result.error ?? `exit ${result.code}`}; retry ${held}`;
+          ctx.history.finish(runId, result.code, tried, now(), error);
+          return { runId, ok: false, exitCode: result.code, attempts: tried, logPath, error };
         }
         writeSync(
           logFd,

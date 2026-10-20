@@ -14,7 +14,19 @@ import {
   stopButtonProblem,
   withStopOffer,
 } from '../stop-button.js';
-import { type HoldInfo, STOP_HELD_JOBS, heldReason, holdFile, readHold } from '../stop-hold.js';
+import {
+  type HoldInfo,
+  STOP_HELD_JOBS,
+  clearMemoryHold,
+  heldReason,
+  holdFile,
+  holdInMemory,
+  readHold,
+  stateHoldFile,
+} from '../stop-hold.js';
+
+/** Never the real scheduler state dir: the hold's second copy lives there. */
+const SAFE_STATE = join(tmpdir(), `stop-button-test-${process.pid}`);
 
 /**
  * The stop button's taps against a stand-in Telegram port: never the real API, never the real
@@ -41,6 +53,7 @@ function harness(opts: { applyCode?: number; held?: HoldInfo | null } = {}) {
   let n = 0;
   const applies: string[] = [];
   const resumes: string[] = [];
+  const memory = { held: false, holds: 0 };
   const port: StopPort = {
     send: async (text, buttons) => {
       sent.push({ text, buttons });
@@ -69,6 +82,15 @@ function harness(opts: { applyCode?: number; held?: HoldInfo | null } = {}) {
       return { code: 0 };
     },
     hold: () => hold,
+    memory: {
+      hold: () => {
+        memory.held = true;
+        memory.holds += 1;
+      },
+      clear: () => {
+        memory.held = false;
+      },
+    },
     log: (row) => {
       logs.push(row);
     },
@@ -103,6 +125,7 @@ function harness(opts: { applyCode?: number; held?: HoldInfo | null } = {}) {
     logs,
     applies,
     resumes,
+    memory,
     plans: () => plans,
     tap,
     msg,
@@ -204,6 +227,21 @@ describe('stop button: two taps', () => {
     expect(h.answers.at(-1)).toContain('send /stop');
   });
 
+  it('holds in memory at the confirm; a refused runner (exit 2) lifts it again', async () => {
+    const h = harness({ applyCode: 2 });
+    await h.button.handle(h.tap('stop:ask:2026-10-20'));
+    expect(h.memory.held).toBe(false);
+    await h.button.handle(h.tap('stop:go:n1'));
+    await h.button.idle();
+    expect(h.memory.holds).toBe(1); // held at the confirm
+    expect(h.memory.held).toBe(false); // and lifted: the runner refused
+    const ok = harness({ applyCode: 3 });
+    await ok.button.handle(ok.tap('stop:ask:2026-10-20'));
+    await ok.button.handle(ok.tap('stop:go:n1'));
+    await ok.button.idle();
+    expect(ok.memory.held).toBe(true);
+  });
+
   it('says what each runner exit means for the owner', async () => {
     const cases: Array<[number, RegExp | null]> = [
       [0, null],
@@ -277,6 +315,7 @@ describe('stop button: configuration and the morning message', () => {
     TELEGRAM_CHAT_ID: '111',
     TELEGRAM_ROTATION_CHAT_ID: '-1003',
     TRADING_DATA_ROOT: '/x',
+    SCHEDULER_STATE_DIR: SAFE_STATE,
   };
   it('needs the owner’s private chat, never a group or the friends group', () => {
     expect(stopButtonProblem(ok)).toBeNull();
@@ -330,6 +369,7 @@ describe('stop hold: no job that could upload, deploy or enable runs while it is
   afterEach(() => {
     history.close();
     rmSync(root, { recursive: true, force: true });
+    clearMemoryHold();
   });
 
   it('every held job exists, and the disable safety net is never held', () => {
@@ -337,15 +377,30 @@ describe('stop hold: no job that could upload, deploy or enable runs while it is
     expect(STOP_HELD_JOBS).not.toContain('quantiply-disable');
   });
 
-  it('reads the same file broker-login writes, until it is lifted, any day', () => {
+  it('reads the same files broker-login writes, until it is lifted, any day', () => {
     expect(holdFile(root)).toBe(join(root, 'stop', 'HOLD.json'));
-    const env = { TRADING_DATA_ROOT: root };
+    const env = { TRADING_DATA_ROOT: root, SCHEDULER_STATE_DIR: join(root, 'state') };
+    expect(stateHoldFile(env)).toBe(join(root, 'state', 'stop-hold.json'));
     expect(heldReason('algotest-deploy', env)).toBeNull();
     mkdirSync(join(root, 'stop'));
     writeFileSync(holdFile(root), 'not json');
     expect(readHold(env)?.by).toBe('unreadable hold file'); // still holds
     expect(heldReason('algotest-deploy', env)).toContain('held');
     expect(heldReason('quantiply-disable', env)).toBeNull();
+  });
+
+  it('either file holds, and so does this process’s memory when no file could be written', () => {
+    const env = { TRADING_DATA_ROOT: join(root, 'gone'), SCHEDULER_STATE_DIR: join(root, 'state') };
+    expect(heldReason('quantiply-deploy', env)).toBeNull();
+    mkdirSync(join(root, 'state'));
+    writeFileSync(stateHoldFile(env), JSON.stringify({ at: 'x', by: 'y' }));
+    expect(heldReason('quantiply-deploy', env)).toContain('held');
+    rmSync(stateHoldFile(env));
+    holdInMemory('telegram 111');
+    expect(heldReason('quantiply-deploy', env)).toContain('held');
+    expect(heldReason('quantiply-disable', env)).toBeNull();
+    clearMemoryHold();
+    expect(heldReason('quantiply-deploy', env)).toBeNull();
   });
 
   it('runJob records a held job as held, whoever started it, and runs nothing', async () => {
@@ -366,7 +421,11 @@ describe('stop hold: no job that could upload, deploy or enable runs while it is
     };
     const ctx = {
       repoRoot: '/',
-      env: { TRADING_DATA_ROOT: root, PATH: process.env.PATH ?? '' },
+      env: {
+        TRADING_DATA_ROOT: root,
+        SCHEDULER_STATE_DIR: SAFE_STATE,
+        PATH: process.env.PATH ?? '',
+      },
       logDir: root,
       history,
       jobs: [job],
@@ -378,5 +437,41 @@ describe('stop hold: no job that could upload, deploy or enable runs while it is
       expect(r.error).toContain('stop button');
     }
     expect(await Bun.file(marker).exists()).toBe(false);
+  });
+
+  it('a hold that starts before a retry keeps the earlier attempt’s failure as the result', async () => {
+    const env = {
+      TRADING_DATA_ROOT: root,
+      SCHEDULER_STATE_DIR: SAFE_STATE,
+      PATH: process.env.PATH ?? '',
+    };
+    // the first attempt fails, and the stop's hold lands before the retry
+    const job: Job = {
+      id: 'quantiply-evening',
+      description: 'x',
+      schedule: { at: '16:45', on: () => true, label: '' },
+      steps: [
+        [
+          '/bin/sh',
+          '-c',
+          `mkdir -p ${join(root, 'stop')} && echo '{}' > ${holdFile(root)}; exit 1`,
+        ],
+      ],
+      cwd: '.',
+      timeoutMinutes: 1,
+      retries: 2,
+      retryDelayMinutes: 0,
+      catchUpHours: 0,
+      fixHint: '',
+    };
+    const r = await runJob(
+      job,
+      { repoRoot: '/', env, logDir: root, history, jobs: [job] },
+      'schedule',
+    );
+    expect(r.ok).toBe(false);
+    expect(r.exitCode).toBe(1);
+    expect(r.attempts).toBe(1);
+    expect(r.error).toContain('exit 1; retry held');
   });
 });
