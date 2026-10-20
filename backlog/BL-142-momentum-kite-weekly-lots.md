@@ -156,7 +156,9 @@ plus free cash.
 
 Answered by the owner on 2026-10-19 (the item was started):
 
-1. **Strategy and K:** chosen once this is built; nothing assumes a cadence.
+1. **Strategy and K:** **Four Sectors Monthly, No Tilt · all Fridays** (owner, 2026-10-20): K = 4,
+   so its four sleeves (Friday 1 to 4 of 4) are the owner's four weekly ₹50k lots, one sleeve
+   per lot, no pairing logic. Nothing in the build may assume K = 4 (the choice can change).
 2. **Kite login:** a Login button and a Friday 13:30 reminder. **Manual only (owner,
    2026-10-19):** the planned test of an unattended TOTP login is dropped. A Zerodha
    representative states on the Kite developer forum that automating the login is not allowed
@@ -219,4 +221,8 @@ Kite facts checked on 2026-10-19 ([portfolio](https://kite.trade/docs/connect/v3
   name (an unmapped one is left alone and its target name would be bought again). This account
   holds no LIQUIDBEES or SGB, so the options-margin exclusion was not exercised. The first
   restart of the research stack lost a login in progress (login states are in memory).
+- 2026-10-20 — Strategy chosen: Four Sectors Monthly, No Tilt · all Fridays (K = 4, four sleeves = the
+  four weekly lots). The owner says Monday's first ₹50k (the five names bought 19 Oct) is from this
+  strategy. Its status was set to Invested (still the headline) and Trio Fortnightly to Watching.
+  Still to check on Fri 23 Oct: that the five BSE-listed holdings map to this strategy's names.
 
