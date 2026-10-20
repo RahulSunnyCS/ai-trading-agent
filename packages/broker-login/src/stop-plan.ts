@@ -243,30 +243,70 @@ export function planAlgoTestStop(
   return out;
 }
 
-export interface AlgoTestAfter {
-  confirmed: string[];
-  /** still squaring off, or still live, when the wait ended */
-  pending: string[];
-  /** switched to manual or gone from the list: legs may be open */
-  check: string[];
-  /** squared off (or squaring) but now in another state: look at /live, never exit blind */
-  byHand: string[];
+/**
+ * A deploy the stop is answerable for: `sent` (the call was answered 2xx, or an earlier stop
+ * today sent it), `maybe` (the call got no answer: a timeout, a network error, a 5xx; it may have
+ * reached AlgoTest), `refused` (a 4xx, or never sent), `squaring` (AlgoTest showed it squaring off
+ * before this stop did anything).
+ */
+export interface Watched {
+  name: string;
+  /** IST `HH:MM` the call went out ('' for `squaring`) */
+  at: string;
+  earlier?: boolean;
+  kind: 'sent' | 'maybe' | 'refused' | 'squaring';
+  detail?: string;
 }
 
-/** What each target shows now. `confirmed` only when squared off. */
-export function algotestAfter(targets: Execution[], after: Execution[]): AlgoTestAfter {
+export interface AlgoTestOutcome {
+  confirmed: string[];
+  /** a square-off in flight: never exit these at the broker */
+  closing: string[];
+  /** no answer and still live: look at /live before anything at the broker */
+  maybeOpen: string[];
+  /** refused and still live: square off by hand */
+  refusedLive: string[];
+  /** switched to manual or gone from the list: legs may be open */
+  check: string[];
+  other: string[];
+}
+
+/** What each watched deploy shows on a fresh /live list. Only `SquaredOff` is done. */
+export function algotestOutcome(
+  watched: Map<string, Watched>,
+  after: Execution[],
+): AlgoTestOutcome {
   const now = new Map(after.map((e) => [e.id, e]));
-  const out: AlgoTestAfter = { confirmed: [], pending: [], check: [], byHand: [] };
-  for (const t of targets) {
-    const e = now.get(t.id);
-    if (!e) out.check.push(`${t.name}: no longer listed: check /live`);
-    else if (e.status === A_SQUARED_OFF) out.confirmed.push(t.name);
-    else if (squaringOff(e.status) || canSquareOff(e)) out.pending.push(`${t.name} (${e.status})`);
+  const out: AlgoTestOutcome = {
+    confirmed: [],
+    closing: [],
+    maybeOpen: [],
+    refusedLive: [],
+    check: [],
+    other: [],
+  };
+  for (const [id, w] of watched) {
+    const e = now.get(id);
+    const sentAt = w.at ? ` (sent ${w.at}${w.earlier ? ' by an earlier stop' : ''})` : '';
+    const name = `${w.name}${w.kind === 'sent' || w.kind === 'maybe' ? sentAt : ''}`;
+    if (!e) out.check.push(`${w.name}: no longer listed: check /live`);
+    else if (e.status === A_SQUARED_OFF) out.confirmed.push(w.name);
+    else if (squaringOff(e.status)) out.closing.push(name);
     else if (e.status === A_STOPPED)
-      out.check.push(`${t.name}: switched to manual: its legs may be open, check at the broker`);
+      out.check.push(`${w.name}: switched to manual: its legs may be open, check at the broker`);
+    else if (canSquareOff(e)) {
+      if (w.kind === 'sent') out.closing.push(`${name}, AlgoTest still shows it ${e.status}`);
+      else if (w.kind === 'maybe') out.maybeOpen.push(name);
+      else if (w.kind === 'refused')
+        out.refusedLive.push(`${w.name}${w.detail ? ` (${w.detail})` : ''}`);
+      else
+        out.other.push(
+          `${w.name}: AlgoTest showed it squaring off, now ${e.status} again: open /live first`,
+        );
+    } else if (w.kind === 'refused') out.other.push(`${w.name}: ${e.status}: square off by hand`);
     else
-      out.byHand.push(
-        `${t.name}: square-off sent, AlgoTest now shows ${e.status}: open /live first; do NOT exit it at the broker while AlgoTest may still be exiting`,
+      out.other.push(
+        `${w.name}: square-off sent, AlgoTest now shows ${e.status}: open /live first; do NOT exit it at the broker while AlgoTest may still be exiting`,
       );
   }
   return out;

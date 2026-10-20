@@ -138,6 +138,37 @@ export function stopRunningPaths(
   ];
 }
 
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/** Another stop that is running now (its marker names a live pid, not this one), or null. */
+export function otherStopRunning(
+  dataRoot: string | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): { pid: number; at: string } | null {
+  for (const path of stopRunningPaths(dataRoot, env)) {
+    if (!existsSync(path)) continue;
+    try {
+      const m = JSON.parse(readFileSync(path, 'utf8')) as { pid?: unknown; at?: unknown };
+      if (typeof m.pid !== 'number' || m.pid === process.pid || !pidAlive(m.pid)) continue;
+      const at = typeof m.at === 'string' ? m.at : '?';
+      const clock = Number.isNaN(Date.parse(at))
+        ? at
+        : new Date(Date.parse(at) + 330 * 60_000).toISOString().slice(11, 16);
+      return { pid: m.pid, at: clock };
+    } catch {
+      // torn or unreadable: no pid to trust, not a running stop
+    }
+  }
+  return null;
+}
+
 /** Writes the marker where it can (best effort); the returned function removes those copies. */
 export async function markStopRunning(
   dataRoot: string | undefined,

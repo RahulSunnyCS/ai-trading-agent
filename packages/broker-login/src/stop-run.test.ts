@@ -12,7 +12,7 @@ import { request } from 'playwright';
 import { QuantiplyApi } from './quantiply-api.js';
 import type { QLedgerRow } from './quantiply-plan.js';
 import { QUANTIPLY_SITES } from './quantiply-rules.js';
-import { settle } from './stop-button.js';
+import { priorSquareOffs, settle } from './stop-button.js';
 import { toolMatcher } from './stop-plan.js';
 import {
   type Http,
@@ -114,7 +114,8 @@ describe('Quantiply stop against a stand-in API', () => {
     polls?: number;
   };
   let algos: A[] = [];
-  let failSqOff = false;
+  /** the square-off's answer: 0 = 200; else this HTTP status (a 4xx is a refusal) */
+  let sqOffStatus = 0;
   /** ids that enter (go TRADE_ACTIVE) the moment their switch-off lands: the 09:17 race */
   let entersOnDisable = new Set<string>();
   /** lists a squared-off algo stays TRADE_ACTIVE for (Infinity: its exit never fills) */
@@ -150,7 +151,7 @@ describe('Quantiply stop against a stand-in API', () => {
     }
     const sq = /^\/algos\/([^/]+)\/action\/SQ_OFF_TERMINATE$/.exec(url);
     if (req.method === 'PUT' && sq) {
-      if (failSqOff) return { status: 500, json: { message: 'broker down' } };
+      if (sqOffStatus) return { status: sqOffStatus, json: { message: 'broker down' } };
       const a = algos.find((x) => x._id === sq[1]);
       if (a) a.polls = closeAfter;
       // no `status: "success"`: the web app does not read this answer, nor does the tool
@@ -175,7 +176,7 @@ describe('Quantiply stop against a stand-in API', () => {
   after(() => stop(q.server));
   beforeEach(() => {
     q.seen.length = 0;
-    failSqOff = false;
+    sqOffStatus = 0;
     entersOnDisable = new Set();
     closeAfter = 2;
     failLists = 0;
@@ -277,17 +278,49 @@ describe('Quantiply stop against a stand-in API', () => {
     );
   });
 
-  it('a failed square off is reported for the owner, the rest still switched off', async () => {
-    failSqOff = true;
+  it('a square off refused outright (4xx) is "by hand"; the rest still switched off', async () => {
+    sqOffStatus = 400;
     const r = await stopQuantiply('Quantiply · Angel One', api, ledger, noLog, {
       dryRun: false,
       waits: fast,
     });
     assert.equal(r.ok, false);
     const text = r.lines.join('\n');
-    assert.match(text, /square off failed: Core · A/);
+    assert.match(text, /square off refused: Core · A/);
     assert.match(text, /Core · A .*still TRADE_ACTIVE: square off by hand/);
     assert.match(text, /switched off: Core · B/);
+  });
+
+  it('a square off with no answer (5xx) may have been sent: never "by hand", never sent twice', async () => {
+    sqOffStatus = 503;
+    const r = await stopQuantiply('Quantiply · Angel One', api, ledger, noLog, {
+      dryRun: false,
+      waits: fast,
+    });
+    const text = r.lines.join('\n');
+    assert.equal(r.ok, false);
+    assert.match(
+      text,
+      /square-off may have been sent \(no answer\): Core · A \(sent \d\d:\d\d\)\. Open Quantiply first; exit at the broker only if it shows no pending exit/,
+    );
+    assert.doesNotMatch(text, /Core · A[^\n]*square off by hand/);
+    assert.equal(q.seen.filter((x) => x.url === '/algos/a/action/SQ_OFF_TERMINATE').length, 1);
+  });
+
+  it("an earlier stop's square-off is never sent again: waited on, reported as sent then", async () => {
+    closeAfter = Number.POSITIVE_INFINITY;
+    const prior = new Map([['a', { name: 'Core · A', at: '09:20', earlier: true }]]);
+    // that earlier square-off is still working: the algo shows TRADE_ACTIVE
+    const r = await stopQuantiply('Quantiply · Angel One', api, ledger, noLog, {
+      dryRun: false,
+      waits: fast,
+      prior,
+    });
+    assert.equal(q.seen.filter((x) => x.url === '/algos/a/action/SQ_OFF_TERMINATE').length, 0);
+    assert.match(
+      r.lines.join('\n'),
+      /still closing .*Core · A \(sent 09:20 by an earlier stop\).*do NOT exit/,
+    );
   });
 
   it('a dry run sends nothing', async () => {
@@ -309,6 +342,9 @@ describe('AlgoTest stop against a stand-in API', () => {
   let lateDeploy: E | null = null;
   let aListsBeforeFail = 0;
   let aFailLists = 0;
+  /** 0 = 200; else this HTTP status; `takenAnyway`: AlgoTest acted though the answer failed */
+  let aSqStatus = 0;
+  let takenAnyway = false;
   const pending = new Map<string, number>();
   const a = listen((req) => {
     const url = req.url ?? '';
@@ -331,6 +367,10 @@ describe('AlgoTest stop against a stand-in API', () => {
     const sq = /^\/execution\/v2\/square-off\/([0-9a-f]{24})$/.exec(url);
     if (req.method === 'PUT' && sq) {
       const e = execs.find((x) => x._id === sq[1]);
+      if (aSqStatus) {
+        if (e && takenAnyway) e.status = 'pending_square_off';
+        return { status: aSqStatus, json: { msg: 'failed' } };
+      }
       if (e) {
         e.status = 'pending_square_off';
         pending.set(e._id, pendingLists);
@@ -358,6 +398,8 @@ describe('AlgoTest stop against a stand-in API', () => {
     lateDeploy = null;
     aListsBeforeFail = 0;
     aFailLists = 0;
+    aSqStatus = 0;
+    takenAnyway = false;
     pending.clear();
     execs = [
       {
@@ -394,7 +436,7 @@ describe('AlgoTest stop against a stand-in API', () => {
     pendingLists = Number.POSITIVE_INFINITY;
     const r = await stopAlgoTest(algotestStopApi(fetchHttp), noLog, opts);
     const text = r.lines.join('\n');
-    assert.match(text, /still squaring off: T1 · A .*Do NOT exit these at the broker/);
+    assert.match(text, /square-off sent, still closing: T1 · A .*Do NOT exit these at the broker/);
     assert.doesNotMatch(text, /T1 · A[^\n]*square off by hand/);
     assert.equal(r.ok, false);
   });
@@ -409,6 +451,46 @@ describe('AlgoTest stop against a stand-in API', () => {
       text,
       /square-off already sent for: T1 · A \(sent \d\d:\d\d\)\. Do NOT exit these at the broker/,
     );
+  });
+
+  it('every square-off refused (4xx): never "nothing running"; still LIVE, by hand', async () => {
+    aSqStatus = 403;
+    const r = await stopAlgoTest(algotestStopApi(fetchHttp), noLog, opts);
+    const text = r.lines.join('\n');
+    assert.equal(r.ok, false);
+    assert.doesNotMatch(text, /nothing of the tool's running/);
+    assert.match(text, /❌ still LIVE: square off by hand on AlgoTest \/live: T1 · A/);
+  });
+
+  it('a square-off with no answer (5xx) may have been sent; one AlgoTest took anyway is still closing', async () => {
+    aSqStatus = 502;
+    let r = await stopAlgoTest(algotestStopApi(fetchHttp), noLog, opts);
+    let text = r.lines.join('\n');
+    assert.match(
+      text,
+      /square-off may have been sent \(no answer\): T1 · A \(sent \d\d:\d\d\)\. Open AlgoTest \/live first/,
+    );
+    assert.doesNotMatch(text, /T1 · A[^\n]*by hand/);
+    assert.equal(a.seen.filter((x) => x.method === 'PUT').length, 1); // never sent twice
+    // the call failed but AlgoTest is squaring it off after all
+    a.seen.length = 0;
+    execs[0] = { ...(execs[0] as E), status: 'StrategyStatus.Live' };
+    takenAnyway = true;
+    r = await stopAlgoTest(algotestStopApi(fetchHttp), noLog, opts);
+    text = r.lines.join('\n');
+    assert.match(text, /square-off sent, still closing: T1 · A \(sent \d\d:\d\d\)\. Do NOT exit/);
+    assert.doesNotMatch(text, /nothing of the tool's running/);
+  });
+
+  it("an earlier stop's square-off is never sent again", async () => {
+    const prior = new Map([
+      ['6ad590af06a3aebabc43634d', { name: 'T1 · A', at: '09:20', earlier: true }],
+    ]);
+    pendingLists = Number.POSITIVE_INFINITY;
+    execs[0] = { ...(execs[0] as E), status: 'pending_square_off' };
+    const r = await stopAlgoTest(algotestStopApi(fetchHttp), noLog, { ...opts, prior });
+    assert.equal(a.seen.filter((x) => x.method === 'PUT').length, 0);
+    assert.match(r.lines.join('\n'), /still closing: T1 · A \(sent 09:20 by an earlier stop\)/);
   });
 
   it('a deploy that went live during the stop is squared off on the next pass', async () => {
@@ -488,9 +570,89 @@ describe('stop-button.ts --apply without STOP_BUTTON=on', () => {
     try {
       const out = cli(['--apply'], { TRADING_DATA_ROOT: root }, root);
       assert.equal(out.status, 2, out.stderr);
-      assert.match(out.stderr, /STOP_BUTTON is not "on": nothing done/);
+      assert.match(out.stderr, /REFUSED: STOP_BUTTON is not "on"/);
       const files = readdirSync(join(root, 'stop'));
       assert.ok(!files.includes('HOLD.json'), `no hold written: ${files.join(', ')}`);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('stop-button.ts --apply while another stop runs', () => {
+  it('refuses (exit 2) and touches nothing', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'stop-cli-'));
+    try {
+      await mkdir(join(root, 'stop'));
+      // this test process is alive and is not the child: a running stop as far as the child sees
+      await writeFile(
+        join(root, 'stop', 'stop-running.json'),
+        JSON.stringify({ pid: process.pid, at: '2026-10-20T04:00:00Z' }),
+      );
+      const out = cli(
+        ['--apply'],
+        { TRADING_DATA_ROOT: root, STOP_BUTTON: 'on', SCHEDULER_STATE_DIR: join(root, 'state') },
+        root,
+      );
+      assert.equal(out.status, 2, out.stderr);
+      assert.match(out.stderr, /REFUSED: a stop is already running since 09:30/);
+      assert.ok(!readdirSync(join(root, 'stop')).includes('HOLD.json'));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('the stop log tells a later stop what was already sent', () => {
+  it("today's answered and maybe-sent square-offs, per platform", async () => {
+    const root = await mkdtemp(join(tmpdir(), 'stop-prior-'));
+    try {
+      await mkdir(join(root, 'stop'));
+      const rows = [
+        {
+          at: '2026-10-20T03:50:00Z',
+          who: 'runner',
+          platform: 'AlgoTest',
+          step: 'square_off',
+          id: 'x1',
+          name: 'T1 · A',
+          ok: true,
+        },
+        {
+          at: '2026-10-20T03:51:00Z',
+          who: 'runner',
+          platform: 'Quantiply · Angel One',
+          step: 'sq_off_terminate',
+          id: 'q1',
+          name: 'Core · B',
+          ok: false,
+          maybe: true,
+        },
+        {
+          at: '2026-10-20T03:52:00Z',
+          who: 'runner',
+          platform: 'AlgoTest',
+          step: 'square_off',
+          id: 'x2',
+          name: 'T1 · C',
+          ok: false,
+          maybe: false,
+        },
+        { at: '2026-10-20T03:52:00Z', who: 'listener', event: 'confirmed' },
+      ];
+      await writeFile(
+        join(root, 'stop', '2026-10-20.jsonl'),
+        `${rows.map((r) => JSON.stringify(r)).join('\n')}\n{torn`,
+      );
+      const prior = await priorSquareOffs(root, '2026-10-20');
+      assert.deepEqual([...(prior.get('AlgoTest')?.keys() ?? [])], ['x1']);
+      assert.deepEqual(prior.get('AlgoTest')?.get('x1'), {
+        name: 'T1 · A',
+        at: '09:20',
+        earlier: true,
+      });
+      assert.deepEqual([...(prior.get('Quantiply · Angel One')?.keys() ?? [])], ['q1']);
+      assert.equal((await priorSquareOffs(undefined, '2026-10-20')).size, 0);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

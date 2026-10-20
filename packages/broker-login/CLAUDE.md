@@ -204,18 +204,28 @@ week, until disabled.
 The owner's Telegram "stop everything": switch off AND square off, only after a second confirm tap (owner,
 2026-10-20). The listener and the taps are `apps/scheduler/src/stop-button.ts`; this package does the stop.
 
-- `src/stop-button.ts --apply` (started by the listener; refuses unless `STOP_BUTTON=on`, exit 2):
+- `src/stop-button.ts --apply` (started by the listener). It refuses, exit 2 with a `REFUSED: <why>` line the
+  listener passes on, unless `STOP_BUTTON=on`, and while another stop runs (a `stop-running.json` naming a live
+  pid that is not its own). Then:
   1. marks the stop as running (`stop-running.json`, `{pid, at}`, beside each hold copy, removed when the stop ends,
      so the loss / deploy monitor keeps off the accounts meanwhile), then writes the hold and reads it back
      (`src/stop-hold.ts`: `TRADING_DATA_ROOT/stop/HOLD.json` and `<SCHEDULER_STATE_DIR>/stop-hold.json`; either
      holds). If it is saved nowhere, the stop still squares off and switches off, and says first, in its own
      message and at the top of the report, "HOLD NOT SAVED (…): the tool may re-enable or upload after a scheduler
-     restart. Stop the scheduler or fix the volume"; the scheduler holds in memory meanwhile;
+     restart. Stop the scheduler or fix the volume" (sent without holding up the square-offs); the scheduler holds
+     in memory meanwhile;
   2. runs each platform in its own path, settled on its own (`settle`, `Promise.allSettled`): a browser that will
      not start fails that platform's section only;
   3. sends the report, a section per platform, in parts under Telegram's 4096 characters (`sendTextChecked`). A
      failed delivery (also of the crash message) sends one short fallback and exits 4. Otherwise exit 0 = all
      confirmed, 3 = something needs the owner. Every step is a line in `TRADING_DATA_ROOT/stop/<day>.jsonl`.
+  - A square-off is sent once per id per day, across stops: each run starts from today's stop log
+    (`priorSquareOffs`: every `sq_off_terminate` / `square_off` row answered, or with no answer) and never sends
+    those again; they are waited on and reported "sent HH:MM by an earlier stop".
+  - A square-off call refused outright (a 4xx, or never sent) was not sent: "square off by hand". One with no
+    answer (a timeout, a network error, a 5xx) MAY have been sent: "⚠️ square-off may have been sent (no answer):
+    … Open <platform> first; exit at the broker only if it shows no pending exit" (`definitelyRefused`,
+    `quantiply-api.ts`); if the platform then shows it squaring off it is "square-off sent, still closing".
   - Every list call rides out a blip (3 tries, backing off). If a platform's stop ends on an error anyway, its
     report names every square-off already sent: "square-off already sent for: … Do NOT exit these at the broker".
   - Quantiply, each account: its uploader ledger must be readable. A missing one is "could not tell what is the
@@ -232,10 +242,12 @@ The owner's Telegram "stop everything": switch off AND square off, only after a 
     session of the algo's weekday, so no enable switches it back on (`toggledIds` counts `sqoff` rows too).
   - AlgoTest: log in (website), then `GET /execution/v2/executions?environment=live` and
     `PUT /execution/v2/square-off/<id>` for each Live / Error, active-on-server deploy of the tool's (the web app's
-    `canSquareOff`), in passes. The tool's: the strategy id the uploader recorded (when the list carries one), a
+    `canSquareOff`), in passes (later passes keep waiting while one still shows squaring off). The tool's: the strategy id the uploader recorded (when the list carries one), a
     name it ever saved, or a `NAME_PREFIXES` prefix (`toolMatcher`). `pending_square_off` is waited on (up to
-    60 s a pass) and, if still showing, reported "still squaring off: do NOT exit at the broker", never "by hand".
-    Only `StrategyStatus.SquaredOff` is done; `Stopped` (switched to manual) today is "check: legs may be open".
+    60 s a pass) and, if still showing, reported "square-off sent, still closing: do NOT exit at the broker",
+    never "by hand". The report reads /live afresh (`algotestOutcome`): only `StrategyStatus.SquaredOff` is done;
+    `Stopped` (switched to manual) today is "check: legs may be open"; a refused one still live is "❌ still LIVE:
+    square off by hand on AlgoTest /live", and "nothing of the tool's running" only when nothing was tried.
   - What the platform offers no square-off for, or what still shows open, is reported "square off by hand". No
     order is ever placed with a broker directly. The owner's own algos and deploys are named, never touched.
   - Calls and statuses: `docs/algotest-execution.md` (§7 and "Quantiply algos through its API"). Pure rules:

@@ -22,7 +22,8 @@ import {
   A_LIVE,
   A_SQUARED_OFF,
   A_STOPPED,
-  algotestAfter,
+  type Watched,
+  algotestOutcome,
   canSquareOff,
   capped,
   parseExecutions,
@@ -203,35 +204,50 @@ test("AlgoTest: square off the tool's live deploys only, by the web app's own ru
   assert.equal(squaringOff('pending_stop'), false);
 });
 
-test('AlgoTest after: squaring off is pending (wait), stopped is a check, never a confirm', () => {
-  const targets = parseExecutions([
-    exec('1', 'T1 · A', A_LIVE),
-    exec('2', 'T1 · B', A_LIVE),
-    exec('3', 'T1 · C', A_LIVE),
-    exec('4', 'T1 · D', A_LIVE),
-    exec('5', 'T1 · E', A_LIVE),
-    exec('6', 'T1 · F', A_LIVE),
+test('AlgoTest outcome: only squared off is done; a square-off in flight is never "by hand"', () => {
+  const w = (name: string, kind: Watched['kind'], at = '09:20'): Watched => ({
+    name,
+    at,
+    kind,
+    detail: kind === 'refused' ? 'answered 400' : undefined,
+  });
+  const watched = new Map<string, Watched>([
+    ['1', w('T1 · A', 'sent')],
+    ['2', w('T1 · B', 'sent')],
+    ['3', w('T1 · C', 'sent')],
+    ['4', w('T1 · D', 'sent')],
+    ['5', w('T1 · E', 'maybe')],
+    ['6', w('T1 · F', 'sent')],
+    ['7', w('T1 · G', 'maybe')],
+    ['8', w('T1 · H', 'refused')],
+    ['9', w('T1 · I', 'sent', '09:01')],
   ]);
-  const r = algotestAfter(
-    targets,
+  (watched.get('9') as Watched).earlier = true;
+  const r = algotestOutcome(
+    watched,
     parseExecutions([
       exec('1', 'T1 · A', A_SQUARED_OFF),
       exec('2', 'T1 · B', A_STOPPED),
       exec('3', 'T1 · C', A_LIVE),
-      exec('5', 'T1 · E', 'pending_square_off'),
+      exec('5', 'T1 · E', 'pending_square_off'), // no answer, yet AlgoTest is squaring it off
       exec('6', 'T1 · F', 'paused'),
+      exec('7', 'T1 · G', A_LIVE),
+      exec('8', 'T1 · H', A_LIVE),
+      exec('9', 'T1 · I', 'pending_square_off'),
     ]),
   );
   assert.deepEqual(r.confirmed, ['T1 · A']);
-  assert.equal(r.pending.length, 2);
-  assert.match(r.pending.join(), /T1 · E/);
-  assert.equal(r.check.length, 2);
+  assert.deepEqual(r.closing, [
+    'T1 · C (sent 09:20), AlgoTest still shows it StrategyStatus.Live',
+    'T1 · E (sent 09:20)',
+    'T1 · I (sent 09:01 by an earlier stop)',
+  ]);
+  assert.deepEqual(r.maybeOpen, ['T1 · G (sent 09:20)']);
+  assert.deepEqual(r.refusedLive, ['T1 · H (answered 400)']);
   assert.match(r.check[0] ?? '', /T1 · B: switched to manual/);
   assert.match(r.check[1] ?? '', /T1 · D: no longer listed/);
-  assert.equal(r.byHand.length, 1);
-  // already squared off: never 'by hand', never exit it at the broker blind
   assert.match(
-    r.byHand[0] ?? '',
+    r.other[0] ?? '',
     /T1 · F: square-off sent, AlgoTest now shows paused: .*do NOT exit/,
   );
 });

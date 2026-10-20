@@ -74,10 +74,12 @@ summary flags anything but `main`).
     `stop:go:<nonce>` / `stop:no:<nonce>`: in memory, 2 minutes, once; a second tap on the offer while it is valid
     re-sends the same nonce.
   - Only `stop:go` acts: `stop-button.ts --apply` runs (log in `<logDir>/stop-button/`). Exit 0 / 3: the runner
-    reported; 2: "did nothing, STOP_BUTTON is off"; 4: "the report could not be delivered"; else "check by hand".
+    reported; 2: "did NOTHING: <the runner's REFUSED line>" (STOP_BUTTON off, or another stop running); 4: "the
+    report could not be delivered"; anything else (killed, timed out): "square-offs may already be in flight:
+    open AlgoTest /live and Quantiply before acting at the broker".
   - The hold (`TRADING_DATA_ROOT/stop/HOLD.json` and `<SCHEDULER_STATE_DIR>/stop-hold.json`, written by the runner
     before it squares off; either holds; and this process's memory from the confirm tap, the fallback when no file
-    could be written, lifted by a refused runner or a Resume) lasts until the owner lifts it: `/resume` or the morning message's Resume button, then `stop:rgo:<nonce>` (same rules), runs
+    could be written, lifted by a Resume, or by a refused runner only when that same tap set it) lasts until the owner lifts it: `/resume` or the morning message's Resume button, then `stop:rgo:<nonce>` (same rules), runs
     `stop-button.ts --clear-hold`. While it is on, the 09:00 message says so every day.
   - `runJob` refuses every `STOP_HELD_JOBS` run (the uploads, deploys and enables) while the hold is on, however
     it was started (schedule, catch-up, `jobs run`, Apply now, queued behind its group): the run is recorded with

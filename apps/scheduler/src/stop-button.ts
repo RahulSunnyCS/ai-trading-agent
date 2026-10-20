@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   type Action,
@@ -50,6 +50,10 @@ import {
  */
 
 export const CONFIRM_TTL_MS = 2 * 60_000;
+
+/** After a stop that ended badly: what may already be happening on the platforms. */
+const IN_FLIGHT =
+  'Square-offs may already be in flight: open AlgoTest /live and Quantiply before acting at the broker, then square off by hand only what they show still open.';
 const STOP_COMMAND = /^\/stop(@[A-Za-z0-9_]+)?\s*$/;
 const RESUME_COMMAND = /^\/resume(@[A-Za-z0-9_]+)?\s*$/;
 
@@ -67,13 +71,13 @@ export interface StopDeps {
   /** the runner's `--plan` text */
   plan: () => Promise<string>;
   /** the runner's `--apply`; resolves with its exit code */
-  apply: (by: string) => Promise<{ code: number; logPath: string }>;
+  apply: (by: string) => Promise<{ code: number; logPath: string; refused?: string }>;
   /** the runner's `--clear-hold` */
   resume: (by: string) => Promise<{ code: number }>;
   /** the hold as the files (and this process's memory) show it now */
   hold: () => HoldInfo | null;
   /** this process's own hold: on at the confirm, off at a refused stop or a Resume */
-  memory: { hold: (by: string) => void; clear: () => void };
+  memory: { hold: (by: string) => boolean; clear: () => void };
   log: (row: Record<string, unknown>) => void;
   /** held jobs running right now (they may still finish what they started) */
   runningHeldJobs: () => string[];
@@ -243,7 +247,7 @@ export class StopButton {
     }
     const now = this.d.now();
     // held in this process from now on, whatever the runner manages to write (the fallback)
-    this.d.memory.hold(`telegram ${fromId}`);
+    const heldNow = this.d.memory.hold(`telegram ${fromId}`);
     this.d.log({ event: 'confirmed', from: fromId });
     await this.d.port.answer(callbackId, 'Stopping now');
     const busy = this.d.runningHeldJobs();
@@ -259,23 +263,25 @@ export class StopButton {
         this.d.log({ event: 'runner_exit', code: r.code });
         // 0 and 3: the runner delivered its own report.
         if (r.code === 2) {
-          this.d.memory.clear(); // the runner refused: nothing was stopped, nothing to hold
+          // the runner refused before doing anything: lift only the hold this tap set, never an
+          // earlier stop's (only Resume does that)
+          if (heldNow) this.d.memory.clear();
           await this.d.port.send(
-            '⚠️ The stop did NOTHING: STOP_BUTTON is not "on" in the repo-root .env any more. Stop by hand on Quantiply and algotest.in/live, or set it back and restart the scheduler.',
+            `⚠️ The stop did NOTHING: ${r.refused ?? 'the runner refused'}. ${r.refused?.includes('already running') ? 'Its report follows when it ends.' : 'Stop by hand on Quantiply and algotest.in/live, or fix it and send /stop again.'}`,
           );
         } else if (r.code === 4) {
           await this.d.port.send(
-            `⚠️ The stop ran, but its report could not be delivered. Check Quantiply and algotest.in/live, and the log: ${r.logPath}`,
+            `⚠️ The stop ran, but its report could not be delivered. ${IN_FLIGHT} Log: ${r.logPath}`,
           );
         } else if (r.code !== 0 && r.code !== 3) {
           await this.d.port.send(
-            `⚠️ The stop runner ended with exit ${r.code}: check Quantiply and algotest.in/live BY HAND now. Log: ${r.logPath}`,
+            `⚠️ The stop runner ended with exit ${r.code} (stopped or timed out). ${IN_FLIGHT} Log: ${r.logPath}`,
           );
         }
       } catch (error) {
         this.d.log({ event: 'runner_error', detail: redact(String(error)) });
         await this.d.port.send(
-          `⚠️ The stop runner could not run (${redact(String(error))}): square off and switch off BY HAND on Quantiply and algotest.in/live`,
+          `⚠️ The stop runner could not run (${redact(String(error))}). ${IN_FLIGHT}`,
         );
       } finally {
         this.running = null;
@@ -389,6 +395,20 @@ function stopLog(env: Record<string, string>) {
 
 const BROKER_LOGIN = 'packages/broker-login';
 
+/** The runner's `REFUSED: <why>` line, read back from its log. */
+function refusalIn(logPath: string): { refused?: string } {
+  try {
+    const lines = readFileSync(logPath, 'utf8').split('\n');
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+      const m = /^REFUSED: (.*)$/.exec(lines[i] ?? '');
+      if (m?.[1]) return { refused: redact(m[1]) };
+    }
+  } catch {
+    // no log: no reason to give
+  }
+  return {};
+}
+
 /** tsx for broker-login: its own copy, else the hoisted one at the repo root (bun 1.2). */
 function tsxPath(repoRoot: string): string {
   const own = join(repoRoot, BROKER_LOGIN, 'node_modules/.bin/tsx');
@@ -489,7 +509,7 @@ export function startStopListener(o: ListenerOptions): (() => void) | null {
         `${istDay(now)}-${clock.replace(/:/g, '')}.log`,
       );
       const r = await runner(o.repoRoot, o.env, ['--apply', '--by', by], 15 * 60_000, logPath);
-      return { code: r.code, logPath };
+      return { code: r.code, logPath, ...refusalIn(logPath) };
     },
     resume: async (by) => {
       const r = await runner(o.repoRoot, o.env, ['--clear-hold', '--by', by], 60_000);

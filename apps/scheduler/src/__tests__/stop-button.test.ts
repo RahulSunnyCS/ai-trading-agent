@@ -43,7 +43,9 @@ interface Sent {
   buttons?: Action[] | undefined;
 }
 
-function harness(opts: { applyCode?: number; held?: HoldInfo | null } = {}) {
+function harness(
+  opts: { applyCode?: number; held?: HoldInfo | null; refused?: string; memoryOn?: boolean } = {},
+) {
   let now = at;
   let hold: HoldInfo | null = opts.held ?? null;
   const sent: Sent[] = [];
@@ -53,7 +55,7 @@ function harness(opts: { applyCode?: number; held?: HoldInfo | null } = {}) {
   let n = 0;
   const applies: string[] = [];
   const resumes: string[] = [];
-  const memory = { held: false, holds: 0 };
+  const memory = { held: opts.memoryOn ?? false, holds: 0 };
   const port: StopPort = {
     send: async (text, buttons) => {
       sent.push({ text, buttons });
@@ -74,7 +76,11 @@ function harness(opts: { applyCode?: number; held?: HoldInfo | null } = {}) {
     apply: async (by) => {
       applies.push(by);
       hold = { at: now.toISOString(), by };
-      return { code: opts.applyCode ?? 0, logPath: '/tmp/x.log' };
+      return {
+        code: opts.applyCode ?? 0,
+        logPath: '/tmp/x.log',
+        ...(opts.refused ? { refused: opts.refused } : {}),
+      };
     },
     resume: async (by) => {
       resumes.push(by);
@@ -84,8 +90,10 @@ function harness(opts: { applyCode?: number; held?: HoldInfo | null } = {}) {
     hold: () => hold,
     memory: {
       hold: () => {
-        memory.held = true;
         memory.holds += 1;
+        if (memory.held) return false;
+        memory.held = true;
+        return true;
       },
       clear: () => {
         memory.held = false;
@@ -227,6 +235,19 @@ describe('stop button: two taps', () => {
     expect(h.answers.at(-1)).toContain('send /stop');
   });
 
+  it("a refused stop never lifts an earlier stop's memory hold; it says why", async () => {
+    const h = harness({
+      applyCode: 2,
+      memoryOn: true,
+      refused: 'a stop is already running since 09:30 (pid 7)',
+    });
+    await h.button.handle(h.tap('stop:ask:2026-10-20'));
+    await h.button.handle(h.tap('stop:go:n1'));
+    await h.button.idle();
+    expect(h.memory.held).toBe(true);
+    expect(h.sent.at(-1)?.text).toContain('did NOTHING: a stop is already running since 09:30');
+  });
+
   it('holds in memory at the confirm; a refused runner (exit 2) lifts it again', async () => {
     const h = harness({ applyCode: 2 });
     await h.button.handle(h.tap('stop:ask:2026-10-20'));
@@ -246,9 +267,9 @@ describe('stop button: two taps', () => {
     const cases: Array<[number, RegExp | null]> = [
       [0, null],
       [3, null], // the runner sent its own report
-      [2, /did NOTHING: STOP_BUTTON is not "on" in the repo-root .env/],
-      [4, /report could not be delivered/],
-      [1, /BY HAND/],
+      [2, /did NOTHING: the runner refused/],
+      [4, /report could not be delivered\. Square-offs may already be in flight: open AlgoTest/],
+      [1, /exit 1 \(stopped or timed out\)\. Square-offs may already be in flight/],
     ];
     for (const [code, want] of cases) {
       const h = harness({ applyCode: code });
@@ -396,7 +417,8 @@ describe('stop hold: no job that could upload, deploy or enable runs while it is
     writeFileSync(stateHoldFile(env), JSON.stringify({ at: 'x', by: 'y' }));
     expect(heldReason('quantiply-deploy', env)).toContain('held');
     rmSync(stateHoldFile(env));
-    holdInMemory('telegram 111');
+    expect(holdInMemory('telegram 111')).toBe(true);
+    expect(holdInMemory('telegram 111 again')).toBe(false); // the first one stands
     expect(heldReason('quantiply-deploy', env)).toContain('held');
     expect(heldReason('quantiply-disable', env)).toBeNull();
     clearMemoryHold();

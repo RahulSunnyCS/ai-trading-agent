@@ -47,9 +47,14 @@ export interface HoldInfo {
 
 let memory: HoldInfo | null = null;
 
-/** A stop was confirmed in this process: hold, whatever the files say, until Resume. */
-export function holdInMemory(by: string, at: Date = new Date()): void {
-  memory ??= { at: at.toISOString(), by: `${by} (in memory only until a file holds)` };
+/**
+ * A stop was confirmed in this process: hold, whatever the files say, until Resume. True when
+ * this call set it (false: an earlier stop's memory hold was already on).
+ */
+export function holdInMemory(by: string, at: Date = new Date()): boolean {
+  if (memory) return false;
+  memory = { at: at.toISOString(), by: `${by} (in memory only until a file holds)` };
+  return true;
 }
 
 export function clearMemoryHold(): void {

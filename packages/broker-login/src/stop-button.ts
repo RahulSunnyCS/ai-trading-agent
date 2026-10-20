@@ -32,14 +32,16 @@ import {
   clearHold,
   holdPath,
   markStopRunning,
+  otherStopRunning,
   readHold,
   stateHoldPath,
   stopLogPath,
   writeHold,
 } from './stop-hold.js';
-import { stopSessions, toolMatcher } from './stop-plan.js';
+import { capped, stopSessions, toolMatcher } from './stop-plan.js';
 import {
   type Report,
+  type Sent,
   type StopLog,
   algotestStopApi,
   fixtureApis,
@@ -239,11 +241,59 @@ function deployLedgerRecorder(q: Account, today: string) {
   };
 }
 
+/**
+ * Today's square-offs from the stop log (`stop/<day>.jsonl`), per platform: every id an earlier
+ * stop sent (answered) or may have sent (no answer). They are waited on and reported, never sent
+ * again. An unreadable log gives none (the platforms still list what is open).
+ */
+export async function priorSquareOffs(
+  dataRoot: string | undefined,
+  day: string,
+): Promise<Map<string, Sent>> {
+  const out = new Map<string, Sent>();
+  if (!dataRoot) return out;
+  let text = '';
+  try {
+    text = await readFile(stopLogPath(dataRoot, day), 'utf8');
+  } catch {
+    return out;
+  }
+  for (const line of text.split('\n')) {
+    let r: Record<string, unknown>;
+    try {
+      r = JSON.parse(line) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    if (r.who !== 'runner' || (r.step !== 'sq_off_terminate' && r.step !== 'square_off')) continue;
+    if (r.ok !== true && r.maybe !== true) continue;
+    if (typeof r.id !== 'string' || typeof r.platform !== 'string') continue;
+    const at =
+      typeof r.at === 'string'
+        ? new Date(Date.parse(r.at) + 330 * 60_000).toISOString().slice(11, 16)
+        : '?';
+    const sent = out.get(r.platform) ?? new Map();
+    if (!sent.has(r.id)) sent.set(r.id, { name: String(r.name ?? r.id), at, earlier: true });
+    out.set(r.platform, sent);
+  }
+  return out;
+}
+
+/** Lines naming an earlier stop's square-offs when this run could not even look at them. */
+function earlierLines(prior: Sent | undefined, where: string): string[] {
+  if (!prior?.size) return [];
+  const names = capped([...prior.values()].map((s) => `${s.name} (sent ${s.at})`));
+  return [
+    `⏳ an earlier stop today already sent the square-off for: ${names}. Do NOT exit these at the broker: open ${where} first`,
+  ];
+}
+
 async function quantiplyAccount(
   q: Account,
   today: string,
   log: StopLog,
   headed: boolean,
+  prior?: Sent,
 ): Promise<Report> {
   const site = QUANTIPLY_SITES[q.broker];
   if (q.problem) {
@@ -273,6 +323,7 @@ async function quantiplyAccount(
     const record = deployLedgerRecorder(q, today);
     return await stopQuantiply(site.name, api, q.ledger, log, {
       dryRun: false,
+      ...(prior ? { prior } : {}),
       record: (row, algo) =>
         record(row, algo).catch((error) =>
           log({ platform: site.name, step: 'ledger_row_failed', detail: describe(error) }),
@@ -289,13 +340,21 @@ async function quantiplyAccount(
       ok: false,
       lines: [
         `❌ ${why}`,
-        '⚠️ nothing was changed here: square off and switch off by hand in Quantiply',
+        ...earlierLines(prior, 'Quantiply'),
+        prior?.size
+          ? '⚠️ this run changed nothing here: check Quantiply by hand'
+          : '⚠️ nothing was changed here: square off and switch off by hand in Quantiply',
       ],
     };
   }
 }
 
-async function algotest(local: Local, log: StopLog, headed: boolean): Promise<Report> {
+async function algotest(
+  local: Local,
+  log: StopLog,
+  headed: boolean,
+  prior?: Sent,
+): Promise<Report> {
   const phone = process.env.ALGOTEST_PHONE?.trim();
   const password = process.env.ALGOTEST_PASSWORD?.trim();
   if (!phone || !password) {
@@ -304,6 +363,7 @@ async function algotest(local: Local, log: StopLog, headed: boolean): Promise<Re
       ok: false,
       lines: [
         '❌ ALGOTEST_PHONE / ALGOTEST_PASSWORD missing from .env: square off by hand on algotest.in/live',
+        ...earlierLines(prior, 'algotest.in/live'),
       ],
     };
   }
@@ -326,7 +386,12 @@ async function algotest(local: Local, log: StopLog, headed: boolean): Promise<Re
     const report = await stopAlgoTest(
       algotestStopApi(playwrightHttp(context.request, csrf, ALGOTEST_API)),
       log,
-      { dryRun: false, isTool: toolMatcher(local.algotest), today: local.today },
+      {
+        dryRun: false,
+        isTool: toolMatcher(local.algotest),
+        today: local.today,
+        ...(prior ? { prior } : {}),
+      },
     );
     if (local.algotestNote) report.lines.push(`(${local.algotestNote})`);
     return report;
@@ -335,7 +400,13 @@ async function algotest(local: Local, log: StopLog, headed: boolean): Promise<Re
     return {
       platform: 'AlgoTest',
       ok: false,
-      lines: [`❌ ${describe(error)}`, '⚠️ square off by hand on algotest.in/live'],
+      lines: [
+        `❌ ${describe(error)}`,
+        ...earlierLines(prior, 'algotest.in/live'),
+        prior?.size
+          ? '⚠️ this run changed nothing on AlgoTest: check algotest.in/live by hand'
+          : '⚠️ square off by hand on algotest.in/live',
+      ],
     };
   } finally {
     await browser?.close().catch(() => undefined);
@@ -474,11 +545,18 @@ async function main(): Promise<number> {
   };
   if (process.env.STOP_BUTTON?.trim().toLowerCase() !== 'on') {
     await log({ step: 'refused', why: 'STOP_BUTTON is not on' });
-    console.error('STOP_BUTTON is not "on": nothing done');
+    console.error('REFUSED: STOP_BUTTON is not "on" in the repo-root .env');
     return EXIT_REFUSED;
   }
   await log({ step: 'start', by: values.by ?? 'manual' });
   // While the stop runs, other jobs that log in (the loss / deploy monitor) keep off the accounts.
+  // one stop at a time: a second one would send square-offs the first is still waiting on
+  const other = otherStopRunning(dataRoot);
+  if (other) {
+    await log({ step: 'refused', why: 'another stop is running', since: other.at, pid: other.pid });
+    console.error(`REFUSED: a stop is already running since ${other.at} (pid ${other.pid})`);
+    return EXIT_REFUSED;
+  }
   const running = await markStopRunning(dataRoot);
   try {
     return await applyStop(dataRoot, local, log, values);
@@ -499,20 +577,33 @@ async function applyStop(
   const held = await writeHold(dataRoot, values.by ?? 'stop-button.ts --apply');
   await log({ step: 'hold', saved: held.saved, failed: held.failed });
   const hold = holdLine(held);
-  let early = true;
+  // said at once, but never waited on before the square-offs start
+  let early: Promise<boolean> = Promise.resolve(true);
   if (!held.saved.length || held.failed.length) {
     console.error(hold);
-    early = await sendTextChecked(
+    early = sendTextChecked(
       readTelegramConfig(),
       redact(`${hold}\nSquaring off and switching off now; the result follows.`),
-    );
+    ).catch(() => false);
   }
+  const prior = await priorSquareOffs(dataRoot, local.today);
+  if (prior.size) await log({ step: 'prior', platforms: [...prior.keys()] });
   const reports = await settle([
     ...local.quantiply.map((q) => ({
       platform: QUANTIPLY_SITES[q.broker].name,
-      run: () => quantiplyAccount(q, local.today, log, values.headed),
+      run: () =>
+        quantiplyAccount(
+          q,
+          local.today,
+          log,
+          values.headed,
+          prior.get(QUANTIPLY_SITES[q.broker].name),
+        ),
     })),
-    { platform: 'AlgoTest', run: () => algotest(local, log, values.headed) },
+    {
+      platform: 'AlgoTest',
+      run: () => algotest(local, log, values.headed, prior.get('AlgoTest')),
+    },
   ]);
   const logPath = dataRoot
     ? stopLogPath(dataRoot, local.today)
@@ -524,7 +615,7 @@ async function applyStop(
     text,
     `⚠️ The stop finished (${ok ? 'all confirmed' : 'CHECK BY HAND'}), but its full report could not be sent. Read ${logPath} on the laptop.`,
   );
-  await log({ step: 'end', ok, reported: sent, holdWarned: early });
+  await log({ step: 'end', ok, reported: sent, holdWarned: await early });
   if (!sent) return EXIT_UNREPORTED;
   return ok && held.saved.length && !held.failed.length ? 0 : EXIT_ATTENTION;
 }

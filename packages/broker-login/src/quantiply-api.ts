@@ -9,6 +9,29 @@ import { QUANTIPLY_SITES, type QuantiplySite } from './quantiply-rules.js';
  * logs it or puts it in an error.
  */
 
+/**
+ * A call the server answered with an HTTP error status. A 4xx is a definite refusal (nothing was
+ * done); a 5xx, a timeout or a network error may have reached the server with only the answer
+ * lost (BL-143: a square-off that "may have been sent").
+ */
+export class HttpStatusError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+/** A call refused before it was sent (a bad id): nothing reached the platform. */
+export class NotSentError extends Error {}
+
+/** True only for a definite refusal (a 4xx, or never sent): the call did nothing. */
+export function definitelyRefused(error: unknown): boolean {
+  if (error instanceof NotSentError) return true;
+  return error instanceof HttpStatusError && error.status >= 400 && error.status < 500;
+}
+
 /** Angel One's site; `QuantiplyApi` and `readToken` take the site of the row they serve. */
 export const QUANTIPLY_API = QUANTIPLY_SITES.angelone.apiOrigin;
 /** Where the web app keeps its session, in local storage on the app's origin. */
@@ -79,7 +102,11 @@ export class QuantiplyApi {
       // not JSON: reported below with the status
     }
     const message = typeof json?.message === 'string' ? json.message.slice(0, 200) : '';
-    if (!response.ok) throw new Error(`${method} ${path} answered ${response.status} ${message}`);
+    if (!response.ok)
+      throw new HttpStatusError(
+        response.status,
+        `${method} ${path} answered ${response.status} ${message}`,
+      );
     if (opts.lenient) return json;
     if (json?.status !== 'success') {
       throw new Error(`${method} ${path}: unexpected answer (${message || text.slice(0, 80)})`);
