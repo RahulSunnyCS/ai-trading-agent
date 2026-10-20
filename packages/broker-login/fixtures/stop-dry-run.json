@@ -1,0 +1,49 @@
+{
+  "_about": "BL-143 Phase 4: lists for `tsx src/stop-button.ts --dry-run --fixture fixtures/stop-dry-run.json`. Made up (no real ids or accounts). Quantiply: GET /algos/day-wise, flattened; AlgoTest: GET /execution/v2/executions?environment=live. The ids only count as the tool's if the account's uploader ledger under TRADING_DATA_ROOT lists them.",
+  "quantiply": {
+    "angelone": [
+      {
+        "id": "q-active-1",
+        "name": "Core · N_ITM1_SL21_0917",
+        "day": "TUE",
+        "enabled": true,
+        "status": "TRADE_ACTIVE"
+      },
+      {
+        "id": "q-ready-1",
+        "name": "Core · N_wide_1202",
+        "day": "TUE",
+        "enabled": true,
+        "status": "READY"
+      },
+      {
+        "id": "q-own-1",
+        "name": "my own algo",
+        "day": "TUE",
+        "enabled": true,
+        "status": "TRADE_ACTIVE"
+      }
+    ],
+    "finvasia": []
+  },
+  "algotest": [
+    {
+      "_id": "6ad590af06a3aebabc43634d",
+      "name": "T1 · N_p150-t1s11_0917",
+      "status": "StrategyStatus.Live",
+      "active_on_server": true
+    },
+    {
+      "_id": "6ad590af06a3aebabc43634e",
+      "name": "T1 · S_wide_1117",
+      "status": "paused",
+      "active_on_server": true
+    },
+    {
+      "_id": "6ad590af06a3aebabc43634f",
+      "name": "my own strategy",
+      "status": "StrategyStatus.Live",
+      "active_on_server": true
+    }
+  ]
+}

@@ -54,6 +54,7 @@ import {
   readJson,
 } from './quantiply-session.js';
 import { redact } from './secrets.js';
+import { stopHeld } from './stop-hold.js';
 import { istToday, sha256 } from './strategy-plan.js';
 
 /**
@@ -161,6 +162,13 @@ async function main(): Promise<number> {
     process.env.QUANTIPLY_DEPLOY?.trim().toLowerCase() !== 'on'
   ) {
     console.log(`${site.name}: QUANTIPLY_DEPLOY is not "on": nothing enabled`);
+    return 0;
+  }
+  // BL-143 Phase 4: a confirmed stop holds every enable for the rest of the IST day (never a
+  // disable: switching off is the safety net).
+  const held = values.apply && mode === 'enable' ? stopHeld() : null;
+  if (held) {
+    console.log(`${site.name} enable ${held}`);
     return 0;
   }
   // The disable safety net reads nothing it does not use: no automation settings.

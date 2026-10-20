@@ -48,7 +48,16 @@ export class QuantiplyApi {
     private readonly site: QuantiplySite = QUANTIPLY_SITES.angelone,
   ) {}
 
-  private async call(method: string, path: string, body?: unknown): Promise<unknown> {
+  /**
+   * `lenient`: any 2xx counts as sent, whatever the JSON says. Only for a call whose answer the
+   * web app itself does not read (the square-off): the caller confirms by listing again.
+   */
+  private async call(
+    method: string,
+    path: string,
+    body?: unknown,
+    opts: { lenient?: boolean } = {},
+  ): Promise<unknown> {
     const appOrigin = `https://${this.site.appHost}`;
     const response = await this.fetchImpl(`${this.site.apiOrigin}${path}`, {
       method,
@@ -71,6 +80,7 @@ export class QuantiplyApi {
     }
     const message = typeof json?.message === 'string' ? json.message.slice(0, 200) : '';
     if (!response.ok) throw new Error(`${method} ${path} answered ${response.status} ${message}`);
+    if (opts.lenient) return json;
     if (json?.status !== 'success') {
       throw new Error(`${method} ${path}: unexpected answer (${message || text.slice(0, 80)})`);
     }
@@ -121,5 +131,18 @@ export class QuantiplyApi {
   /** `PUT /algos/:id` with `{broker}`: the web app's "Select Client ID / Broker" (`updateBroker`). */
   async setBroker(id: string, broker: string): Promise<void> {
     await this.call('PUT', `/algos/${encodeURIComponent(id)}`, { broker });
+  }
+
+  /**
+   * `PUT /algos/:id/action/SQ_OFF_TERMINATE`, no body: the web app's "Square off all positions &
+   * Terminate algo" (`sqOffAll`, read from its bundle 2026-10-20; shown only for `TRADE_ACTIVE`).
+   * Quantiply closes the algo's open positions itself and stops managing it. REAL ORDERS: only the
+   * stop button (`stop-button.ts --apply`) calls it. The app does not read the answer; neither does
+   * this (any 2xx): the caller lists again to confirm.
+   */
+  async squareOffTerminate(id: string): Promise<void> {
+    await this.call('PUT', `/algos/${encodeURIComponent(id)}/action/SQ_OFF_TERMINATE`, undefined, {
+      lenient: true,
+    });
   }
 }

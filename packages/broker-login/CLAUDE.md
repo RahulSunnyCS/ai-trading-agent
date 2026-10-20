@@ -72,6 +72,9 @@ npm run fyers-token   # tsx src/fyers.ts — headless Fyers login for the moment
 npm run dispatch      # tsx src/dispatch.ts — triggers the GitHub workflow via `gh` (the scheduler's 08:00 job); DRY_RUN=1 only checks gh auth
 npm run test          # node:test unit tests: browser-free helpers (Fyers auth, dispatch rules, config gating, report, Quantiply rules) + Chromium against local stand-in pages (overlays, the Quantiply flow; no network)
 npm run typecheck
+npm run stop-button -- --plan             # BL-143: what the Telegram stop would do now (ledgers only, no login)
+npm run stop-button -- --dry-run --fixture fixtures/stop-dry-run.json   # plus each call it would make (none sent)
+npm run stop-button -- --clear-hold       # lift today's stop hold
 ```
 
 ## Source layout
@@ -196,3 +199,29 @@ week, until disabled.
   `docs/algotest-execution.md` §7. Use a desktop viewport (1440 x 900): below about 500 px AlgoTest hides "Save
   Strategy".
 
+## The stop button (BL-143 Phase 4)
+
+The owner's Telegram "stop everything": switch off AND square off, only after a second confirm tap (owner,
+2026-10-20). The listener and the two taps are `apps/scheduler/src/stop-button.ts`; this package does the stop.
+
+- `src/stop-button.ts --apply` (started by the listener; refuses unless `STOP_BUTTON=on`): writes today's hold
+  first (`src/stop-hold.ts`, `TRADING_DATA_ROOT/stop/hold-<IST day>.json`), then runs the platforms in parallel
+  and sends one Telegram report, a section per platform. Exit 0 = all confirmed, 3 = something needs the owner.
+  Every step is a line in `TRADING_DATA_ROOT/stop/<day>.jsonl`.
+  - Quantiply, each account with algos in its uploader ledger: log in (`quantiply-session.ts`, the usual hold and
+    TOTP stamp), square off & terminate the tool's `TRADE_ACTIVE` algos (`squareOffTerminate`,
+    `PUT /algos/:id/action/SQ_OFF_TERMINATE`), switch off every enabled one of the tool's (`READY`, `NOT_RUNNING`,
+    `TRADE_CLOSED`; any weekday), wait for the squared-off ones to show finished and switch those off, list again.
+    Each call is a `mode: 'stop'` row in the account's deploy ledger, so the enabler leaves those algos off today.
+  - AlgoTest: log in (website), then `GET /execution/v2/executions?environment=live` and
+    `PUT /execution/v2/square-off/<id>` for each Live / Error, active-on-server execution named `T1 · ` /
+    `Core · ` (the web app's `canSquareOff`), then list again; only `StrategyStatus.SquaredOff` counts as done.
+  - What the platform offers no square-off for, or what still shows open, is reported "square off by hand". No
+    order is ever placed with a broker directly. The owner's own algos and deploys are named, never touched.
+  - Calls and statuses: `docs/algotest-execution.md` (§7 and "Quantiply algos through its API"). Pure rules:
+    `src/stop-plan.ts`; the calls against injected clients: `src/stop-run.ts` (tested against stand-in servers).
+- The hold: while today's file exists, `strategy-deploy.ts`, `strategy-upload.ts`, `quantiply-upload.ts` and
+  `quantiply-deploy.ts --mode enable` change nothing with `--apply` (`stopHeld()`), and the scheduler pauses
+  their jobs. `quantiply-deploy.ts --mode disable` is never held. `--clear-hold` lifts it.
+- Never tested live: the tests use stand-in servers and fixtures only; `--plan` and `--dry-run` never log in or
+  send anything.

@@ -227,7 +227,8 @@ export interface DeployLedgerRow {
   at: string;
   session: string;
   mode: string;
-  action: 'enable' | 'disable' | 'broker';
+  /** `sqoff`: the stop button's square-off & terminate (BL-143), `mode: 'stop'` */
+  action: 'enable' | 'disable' | 'broker' | 'sqoff';
   id: string;
   name: string;
   ok: boolean;

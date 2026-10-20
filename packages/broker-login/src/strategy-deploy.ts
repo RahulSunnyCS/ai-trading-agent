@@ -20,6 +20,7 @@ import {
 import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { redact, registerSecret } from './secrets.js';
 import { livePage } from './selectors.js';
+import { stopHeld } from './stop-hold.js';
 import { type Manifest, istToday } from './strategy-plan.js';
 import { visibleWithin } from './wait.js';
 
@@ -133,6 +134,12 @@ async function main(): Promise<number> {
     process.env.ALGOTEST_DEPLOY?.trim().toLowerCase() !== 'on'
   ) {
     console.log('ALGOTEST_DEPLOY is not "on": nothing deployed (dry run without --apply)');
+    return 0;
+  }
+  // BL-143 Phase 4: a confirmed stop holds every deploy for the rest of the IST day.
+  const held = values.apply ? stopHeld() : null;
+  if (held) {
+    console.log(`AlgoTest deploy ${held}`);
     return 0;
   }
   // BL-140: the dashboard's "Automated deployment" master switch must be on as well.

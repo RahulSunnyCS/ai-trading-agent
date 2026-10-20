@@ -67,3 +67,13 @@ deploy/launchd/uninstall.sh
   within that job's catch-up window, otherwise it alerts that the run was missed.
 - **Off:** nothing runs. To wake or power on the Mac before 08:00 on weekdays:
   `sudo pmset repeat wakeorpoweron MTWRF 07:55:00`.
+- **The stop button (BL-143 Phase 4) lives in this process.** With `STOP_BUTTON=on` in `.env`
+  (and a restart: `launchctl kickstart -k gui/$(id -u)/com.ai-trading-agent.scheduler`), the
+  scheduler long-polls the Telegram bot and is its only `getUpdates` consumer: nothing else may
+  poll the bot. While the scheduler is down (laptop asleep or off) the button does not answer;
+  do the stop by hand then (Quantiply's square off & terminate, algotest.in/live's Square Off).
+  A confirmed stop pauses `algotest-*` uploads and deploys and `quantiply-*` uploads and
+  enables for the rest of the IST day (`jobs status` shows the slots as ok, held);
+  `quantiply-disable` still runs. Lift the hold early with
+  `cd packages/broker-login && node_modules/.bin/tsx src/stop-button.ts --clear-hold`, then run
+  any slot it held by hand (`jobs run <job>`): a held slot is not caught up.

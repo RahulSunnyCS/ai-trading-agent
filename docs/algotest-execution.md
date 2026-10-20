@@ -244,6 +244,23 @@ The owner's first live deploy (2026-10-19, `T1 · N_p150-t1s11_0917` on Finvasia
 row shows "-" for every day: **a deploy with no days ticked runs that day only**. Not yet seen: what "Activate"
 asks (broker or account choice, a confirmation), and what stopping a deploy before its entry looks like.
 
+**Square off, stop, list (BL-143 Phase 4; read from the /live page's public JavaScript, 2026-10-20).** The page's
+chunks (`algotest.in/_next/static/chunks/*.js`, fetched with curl, no login) hold the `/execution` client the
+cards' buttons call, on `api.algotest.in` with the same cookies and `X-CSRF-TOKEN-ACCESS` header as the delete:
+
+| Call | In the app | Answer |
+|---|---|---|
+| `GET /execution/v2/executions?environment=live` | the Deployed Strategies list | an array of executions: `_id`, `name` (the strategy's), `status`, `active_on_server`, … |
+| `PUT /execution/v2/square-off/<execution _id>`, no body | a card's **Square Off** ("Are you sure you want to square off this strategy?"); squaring off a selection calls it once per execution | `{msg}`, shown as a toast; the card turns `pending_square_off` |
+| `PUT /execution/v2/stop/<execution _id>`, no body | **Cancel Deployment** (before the entry time) and **Switch to manual** (after it: the legs stay open and unmanaged) | `{msg}` |
+| `PUT /execution/v2/square-off-all`, body `{execution_type: "live", broker_ids, executions?, portfolio?, signal_execution}` | the section's "Square off all" bulk path | `{msg}` |
+
+Statuses: `StrategyStatus.Live`, `StrategyStatus.Error`, `StrategyStatus.SquaredOff`, `StrategyStatus.Stopped`,
+`paused`. The app offers Square Off only when the status is Live or Error **and** `active_on_server` (its
+`canSquareOff`); otherwise it offers Restart. The stop button (`packages/broker-login/src/stop-button.ts`) uses
+only the list and the per-execution square-off, for executions named `T1 · ` / `Core · `; never `stop` (switching
+to manual would leave positions open) and never the bulk call. Not sent yet: the first is the owner's.
+
 <a id="pending"></a>
 
 ## Pending actions → moved
@@ -445,6 +462,21 @@ weekday, **every week**, while `enabled` is true.
 | `PUT /algos/bulk/action/enable`, `.../disable`, body `{algoIds: [..]}` | `bulkActionEnable` / `bulkActionDisable`, the bulk bar | `data` is one entry per id, `{id, success, message}`; `success: false` ones are reported "Error occured in n algos" |
 | `PUT /algos/:id`, body `{broker: <broker account id>}` | `updateBroker`, the "Select Client ID / Broker" menu; read-only once a broker is set | `data` is the updated algo |
 | `GET /brokers` | the menu's options: each account's `id` (the value sent as `broker`), `clientId`, `status` (`"disabled"` greyed) | |
+
+**Square off & terminate (BL-143 Phase 4; same bundles, read 2026-10-20).** Both web apps (Angel One's
+`main.c34824e5.js`, Shoonya's `main.b6ba1293.js`) have the same calls:
+
+| Call | In the app |
+|---|---|
+| `PUT /algos/:id/action/SQ_OFF_TERMINATE`, no body | `sqOffAll(id)`: the row's "Square off all positions & Terminate algo" icon, after a confirm dialog. Shown only while the algo's `status` is `TRADE_ACTIVE`. The app does not read the answer (no error = done) |
+| `PUT /algos/:id/action/TERMINATE`, no body | `terminate(id)`: "Terminate algo" (positions left open), same row |
+| `PUT /algos/bulk/action/SQ_OFF_TERMINATE`, body `{algoIds}` | `bulkActionSquareOffTerminate` |
+| `PUT /algos/broker/:brokerId/action/SQ_OFF_TERMINATE` | `clientWiseSqOffTerminate`: every algo of one broker account, the owner's own included |
+| `PUT /algos/:id/positions/:positions/action/SQ_OFF_POSITION` | `exitSelectedLegs` |
+
+Statuses seen in the app: `NOT_RUNNING`, `READY`, `TRADE_ACTIVE`, `TRADE_CLOSED`. The stop button squares off and
+terminates the tool's `TRADE_ACTIVE` algos one id at a time (never the account-wide call: it would close the
+owner's own algos too) and switches off its enabled ones; it confirms by listing again. Not sent yet.
 
 The deployer (`packages/broker-login/src/quantiply-deploy.ts`) uses the per-algo switch, one id at a
 time, so each answer belongs to one algo, and the broker call for an algo the upload left without

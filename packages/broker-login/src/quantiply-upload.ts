@@ -31,6 +31,7 @@ import {
   readJson,
 } from './quantiply-session.js';
 import { redact } from './secrets.js';
+import { stopHeld } from './stop-hold.js';
 import { type Mode, istToday, sha256 } from './strategy-plan.js';
 
 /**
@@ -91,6 +92,12 @@ async function main(): Promise<number> {
     console.log(
       'QUANTIPLY_UPLOAD is not "on": nothing created or deleted (dry run without --apply)',
     );
+    return 0;
+  }
+  // BL-143 Phase 4: a confirmed stop holds every upload for the rest of the IST day.
+  const held = values.apply ? stopHeld() : null;
+  if (held) {
+    console.log(`Quantiply upload ${held}`);
     return 0;
   }
   // Evening mode replaces today's algos with tomorrow's: before 15:30 IST today's later picks may

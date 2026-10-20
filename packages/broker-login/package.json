@@ -20,7 +20,8 @@
     "record-strategies": "tsx scripts/record-strategies.ts",
     "strategy-upload": "tsx src/strategy-upload.ts",
     "quantiply-upload": "tsx src/quantiply-upload.ts",
-    "quantiply-deploy": "tsx src/quantiply-deploy.ts"
+    "quantiply-deploy": "tsx src/quantiply-deploy.ts",
+    "stop-button": "tsx src/stop-button.ts"
   },
   "dependencies": {
     "@trading/broker-identity": "workspace:*",
