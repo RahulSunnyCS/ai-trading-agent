@@ -14,6 +14,7 @@ import {
 import { JOBS, type Job, maxRunMinutes } from './jobs.js';
 import { type RunContext, runJob } from './runner.js';
 import { nextDue, previousDue } from './schedule.js';
+import { heldReason } from './stop-hold.js';
 
 /**
  * Loopback HTTP API over the scheduler (BL-012 PR 6): what the dashboard's Jobs and
@@ -153,6 +154,9 @@ export function createApi({
     if (!job) return fail(404, `unknown job '${id}'`);
     const busy = busyReason(job);
     if (busy) return fail(409, busy);
+    // BL-143: Apply now and Run now say so at once (runJob would only record it as held)
+    const held = heldReason(job.id, ctx.env);
+    if (held) return fail(409, held);
     const before = ctx.history.last(job.id)?.id ?? 0;
     inFlight.add(job.id);
     void runJob(job, { ...ctx, jobs }, 'manual').finally(() => inFlight.delete(job.id));

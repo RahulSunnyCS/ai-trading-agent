@@ -80,7 +80,6 @@ import {
   quantiplyReading,
   readMtmCardsInPage,
   readTotalMtm,
-  stopButtonRunning,
   switchOn,
   waitKey,
 } from './monitor-plan.js';
@@ -98,6 +97,7 @@ import {
 } from './quantiply-session.js';
 import { redact, registerSecret } from './secrets.js';
 import { livePage } from './selectors.js';
+import { otherStopRunning } from './stop-hold.js';
 import { ALGOTEST_API, csrfToken } from './strategy-delete.js';
 import { istToday } from './strategy-plan.js';
 
@@ -124,7 +124,7 @@ import { istToday } from './strategy-plan.js';
  * within 10 min of losing a session (logged out / 401: someone else's login most likely ended it),
  * a replacement only when no other process logged in to the platform in the last 10 min and at
  * most every 30 min, said once as "degraded". No login while PR #275's stop button runs
- * (`TRADING_DATA_ROOT/stop/stop-running.json`). Before every login, at any hour, the scheduler's
+ * (`stop-running.json`, `stop-hold.ts`'s `otherStopRunning`). Before every login, at any hour, the scheduler's
  * `GET /jobs`: a run in progress of a job that logs in to the platform (`PLATFORM_JOBS`, morning
  * and evening) always blocks; a due or imminent one, or an API that does not answer, blocks until
  * its window's cap (10:00 / 17:30), then it logs in anyway and says so. Shoonya's own API: never.
@@ -192,9 +192,6 @@ const fresh = (): DayState => ({
   qpnl: {},
   logins: {},
 });
-
-/** Where PR #275's stop button marks itself running (beside its HOLD.json, `stop-hold.ts`). */
-const stopRunningPath = (root: string) => join(root, 'stop', 'stop-running.json');
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const hhmm = (m: number) =>
@@ -351,21 +348,9 @@ class Monitor {
 
   /** Is PR #275's stop button running (its marker beside HOLD.json)? */
   private stopRunning(): boolean {
-    const path = stopRunningPath(this.root);
-    if (!existsSync(path)) return false;
-    let mtime: number | null = null;
-    try {
-      mtime = statSync(path).mtimeMs;
-    } catch {
-      return false; // removed meanwhile: the stop ended
-    }
-    let marker: { pid?: unknown; at?: unknown } | 'unreadable';
-    try {
-      marker = JSON.parse(readFileSync(path, 'utf8'));
-    } catch {
-      marker = 'unreadable';
-    }
-    return stopButtonRunning(marker, mtime, Date.now(), pidAlive);
+    // #275's rule (`otherStopRunning`): a marker in either place (`stopRunningPaths`) counts while
+    // its pid lives, is not this process, it is under 20 minutes old and from today (IST)
+    return otherStopRunning(this.root) !== null;
   }
 
   /** When another process last logged in to this platform (ms), for a replacement's check. */

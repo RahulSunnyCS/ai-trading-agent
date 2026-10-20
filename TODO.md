@@ -780,13 +780,15 @@ options margin and are never part of the strategy. Kite access is read-only.
 | 3.34.3 | Phase 3: per-sleeve orders on Friday with free cash | claude | Planned |
 | 3.34.4 | Phase 4: Lots panel, Guide, `business.md` / `technical.md` | claude | Planned |
 
-### 3.35 Trade monitoring and safety — BL-143 (backlog item added in PR #274)
+### 3.35 Trade monitoring and safety — [BL-143](backlog/BL-143-trade-monitoring-and-safety.md)
 
 Owner (2026-10-20): "lets build all 7" (item 3 is BL-141). Read-only checks of the real trades on AlgoTest
 (Finvasia) and Quantiply (Angel One); every new part off until its `.env` switch is `on`, the Fyers reminder on.
+Phase 4 is the Telegram stop button: switch off AND square off, only after a second confirm tap.
 
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.35.1 | Phase 1: wake schedule documented (`deploy/launchd/README.md`); morning summary lists the previous day's catch-ups after sleep | claude + owner | **Built 2026-10-20.** Owner: run the `pmset` line(s) in the README (07:55 recommended over 08:50: the 08:00 jobs); done when a trading day's 16:40 job runs on time |
 | 3.35.2 | Phase 2: the morning summary's Fyers line asks Fyers (`mbt token-status --probe`); 09:25 deploy check in `trade-monitor` (`DEPLOY_CHECK`), per Settings › Automation row and broker | claude | **Built 2026-10-20**, reworked after the #276 review (no login or session 09:10-09:25, login locks, per-row brokers) and its re-review (no login on a platform while one of its scheduler jobs runs, a due one until 10:00 / 17:30; no login within 10 min of a lost session, while another login is recent, or while the stop button runs). Readers checked live by hand 2026-10-20 (`--now --print`; nothing deployed that day). To switch on: merge, restart the scheduler, `DEPLOY_CHECK=on`; done when its 09:25 line matches the platforms on a trading day |
 | 3.35.3 | Phase 3: 09:05-09:10 margin check (`MARGIN_CHECK`) and loss alerts -₹5,000 / -₹8,000 from 09:25 (`LOSS_ALERTS`) in `trade-monitor` | claude | **Built 2026-10-20.** Margin read live (Angel One SmartAPI `getRMS`; Finvasia from AlgoTest `GET /brokers`, no Shoonya API login). AlgoTest's Total MTM read live from its card (₹0, green; a red figure is a loss). Quantiply's socket MTM is from its bundle, **not yet seen with an algo running**: until a fresh figure arrives for a running algo it says "cannot read", never ₹0. Before `LOSS_ALERTS=on`: check by hand whether a second login logs out the first on each platform |
+| 3.35.4 | Phase 4: stop button (`apps/scheduler/src/stop-button.ts` listener, `packages/broker-login/src/stop-button.ts` runner, a hold that lasts until Resume, held jobs) | claude | **Built 2026-10-20** (review fixes in), stand-in tested, never sent live; off until `STOP_BUTTON=on` + scheduler restart. Done when the owner has pressed it once on a day of their choice |

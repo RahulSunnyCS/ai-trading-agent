@@ -18,7 +18,6 @@ import {
   type PlatformJob,
   type QListed,
   READABLE_AGAIN_AFTER,
-  STOP_RUNNING_ALIVE_MS,
   type SchedulerJobView,
   UNREADABLE_NOTICES_A_DAY,
   WAIT_WINDOWS,
@@ -56,7 +55,6 @@ import {
   quantiplyReading,
   readMtmCardsInPage,
   readTotalMtm,
-  stopButtonRunning,
   switchOn,
   waitKey,
 } from './monitor-plan.js';
@@ -360,32 +358,6 @@ test('a due slot inside its catch-up window blocks past the cap, for 30 minutes 
   // each item carries its own window (the cap message names it, not the clock's)
   assert.equal(items[0]?.window, 'morning');
   assert.equal(LONG_WAIT_MS, 30 * 60_000);
-});
-
-test("the stop button's running marker (must-fix 2): a live pid for 20 min; no pid by its age", () => {
-  const now = Date.parse('2026-10-21T07:30:00Z');
-  const alive = () => true;
-  const dead = () => false;
-  const ago = (min: number) => now - min * 60_000;
-  assert.equal(stopButtonRunning(null, null, now, alive), false);
-  assert.equal(
-    stopButtonRunning({ pid: 1, at: new Date(ago(1)).toISOString() }, null, now, alive),
-    true,
-  );
-  // a stop still running after its 10th minute (the apply timeout is 15) still blocks
-  assert.equal(stopButtonRunning({ pid: 1, at: ago(14) }, null, now, alive), true);
-  assert.equal(stopButtonRunning({ pid: 1, at: ago(19) }, null, now, alive), true);
-  assert.equal(stopButtonRunning({ pid: 1, at: ago(21) }, null, now, alive), false);
-  assert.equal(STOP_RUNNING_ALIVE_MS, 20 * 60_000);
-  // a dead pid is a crashed stop, however fresh
-  assert.equal(stopButtonRunning({ pid: 1, at: ago(1) }, null, now, dead), false);
-  // no readable pid: by its age, 10 minutes
-  assert.equal(stopButtonRunning({ at: ago(5) }, null, now, dead), true);
-  assert.equal(stopButtonRunning({ pid: 'x', at: ago(9) }, null, now, dead), true);
-  assert.equal(stopButtonRunning({ at: ago(11) }, null, now, alive), false);
-  assert.equal(stopButtonRunning({}, ago(3), now, alive), true); // no time: the file's
-  assert.equal(stopButtonRunning('unreadable', ago(0.1), now, alive), true);
-  assert.equal(stopButtonRunning('unreadable', ago(11), now, alive), false);
 });
 
 test('a restarted monitor still treats a loss on disk as a replacement (nit)', () => {

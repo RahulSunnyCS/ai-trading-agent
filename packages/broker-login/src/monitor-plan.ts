@@ -352,50 +352,6 @@ export function jobsWait(
   return out;
 }
 
-// --- the stop button (PR #275) -----------------------------------------------------------------
-
-/**
- * A stop-running marker whose process is alive counts this long: above the scheduler's 15-minute
- * timeout for a stop's `--apply` (#275 writes the marker once, at the start, and never refreshes
- * it), so a slow stop still blocks the monitor's logins to its end.
- */
-export const STOP_RUNNING_ALIVE_MS = 20 * 60_000;
-/** A marker with no readable pid (or a torn file) counts by its age alone, this long. */
-export const STOP_RUNNING_STALE_MS = 10 * 60_000;
-
-/**
- * Is PR #275's stop button running? It writes `TRADING_DATA_ROOT/stop/stop-running.json`
- * (`{pid, at}`, beside its HOLD.json) for the whole of a stop and removes it in a `finally`.
- * - A marker with a pid: running while that process lives, up to 20 minutes from `at` (or the
- *   file time); a dead pid is a crashed stop.
- * - A marker with no readable pid, or an unreadable one (torn mid-write): running for 10 minutes
- *   from its time.
- */
-export function stopButtonRunning(
-  marker: { pid?: unknown; at?: unknown } | null | 'unreadable',
-  fileMtimeMs: number | null,
-  nowMs: number,
-  alive: (pid: number) => boolean,
-): boolean {
-  if (marker === null) return false;
-  if (marker === 'unreadable') {
-    return fileMtimeMs !== null && nowMs - fileMtimeMs < STOP_RUNNING_STALE_MS;
-  }
-  const parsed =
-    typeof marker.at === 'number'
-      ? marker.at
-      : typeof marker.at === 'string'
-        ? Date.parse(marker.at)
-        : Number.NaN;
-  const at = Number.isFinite(parsed) ? parsed : (fileMtimeMs ?? Number.NaN);
-  if (!Number.isFinite(at)) return false;
-  const pid = marker.pid;
-  if (typeof pid === 'number' && Number.isInteger(pid) && pid > 0) {
-    return alive(pid) && nowMs - at < STOP_RUNNING_ALIVE_MS;
-  }
-  return nowMs - at < STOP_RUNNING_STALE_MS;
-}
-
 // --- money ---------------------------------------------------------------------------------
 
 /** "₹ -1,23,456.50", "-₹ 1,234", "₹ 0", "− ₹12" -> a number; null when there is no figure. */

@@ -12,6 +12,7 @@ import { JOBS, findJob } from './jobs.js';
 import { skippedToday, startLoop } from './loop.js';
 import { type RunContext, runJob } from './runner.js';
 import { formatIst, nextDue } from './schedule.js';
+import { startStopListener } from './stop-button.js';
 
 /**
  * `bun run jobs status` — every job, its schedule, last run and next run.
@@ -171,6 +172,14 @@ function serve(): void {
     settings,
   });
   startLoop({ ctx, jobs: JOBS, alerts: telegramSink(ctx.env) });
+  // BL-143 Phase 4, only with STOP_BUTTON=on: then this process is the bot's one getUpdates
+  // consumer. (The stop hold itself is checked by runJob, for every way a job starts.)
+  startStopListener({
+    repoRoot: REPO_ROOT,
+    env: () => jobEnv(REPO_ROOT),
+    logDir: logDir(),
+    history: ctx.history,
+  });
 }
 
 if (import.meta.main) {
