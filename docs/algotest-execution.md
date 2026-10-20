@@ -533,6 +533,10 @@ algo can run twice in a day (15 Oct: 6 runs of 5 algos), so the day's P&L is the
 error. So the capture never needs to hold the evening deletes: a missed day is read later
 (`live-capture.ts --day D`, or the next evening's back-fill).
 
+**Deploys that span days.** A /live deploy with execution days ticked keeps one execution across
+days, its `legs` growing day by day; the capture counts only the legs whose `entry_trade` is on the
+day read.
+
 **What is not seen.** Only the platform + broker rows the automation settings have on (login or
 upload) are read; a discretionary trade on an account whose row is off is not captured (turn its
 login on, or read it with `--only` after switching it on).

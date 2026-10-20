@@ -340,3 +340,31 @@ def test_an_unreadable_capture_never_stops_the_message(evening, monkeypatch):
     monkeypatch.setattr(live_compare, "compare", broken)
     owner, group = _send(evening)
     assert "💹 Live · could not be read" in owner[0] and group
+
+
+def test_a_tool_line_with_no_readable_name_is_its_own_line_not_discretionary(root):
+    odd = _line("T1 · N_p150-t1s11_1317", 400.0, pid="x")
+    odd["name"], odd["variant"] = "T1 N_renamed", None  # the tool's (by ledger id), name unreadable
+    _capture(
+        root,
+        [
+            _section("algotest", "all"),
+            odd,
+            _line("N_mine", 100.0, source="discretionary", pid="y"),
+        ],
+    )
+    c = live_compare.compare(DAY, root)
+    assert [r["platform_id"] for r in c.unrecognised] == ["x"]
+    assert c.discretionary_total == pytest.approx(100.0)
+    lines = live_compare.message_lines(c, messages.rupees)
+    assert "❓ Unrecognised tool copy: T1 N_renamed  +₹400 in all" in lines
+
+
+def test_a_multiplier_the_platform_did_not_show_is_said_in_the_line(root):
+    gone = _line("T1 · N_p150-t1s11_1317", 910.0, platform="quantiply", broker="angelone")
+    gone["multiplier_assumed"] = True  # a back-filled day: the algo is no longer listed
+    _capture(root, [_section("quantiply", "angelone"), gone])
+    c = live_compare.compare(DAY, root)
+    assert c.compared[0].multiplier_guessed
+    lines = live_compare.message_lines(c, messages.rupees)
+    assert f"1x assumed (multiplier not shown by the platform): {T1[2]}" in lines

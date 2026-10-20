@@ -154,5 +154,14 @@ Today nothing reads the live results. Each evening the uploaders delete the day'
     the premium % counts the first entry only; money sums in integer paise (TypeScript) and `Decimal` (Python).
   - Checked by hand again (scratch files only): 15 Oct (Quantiply 5 algos, one with 2 runs, summed to the chart's
     total) and 14 Oct (3 Quantiply algos deleted since, still read; 3 AlgoTest deploys that did not trade).
+- 2026-10-20 — Re-review of PR #277: AlgoTest P&L counts only the legs that entered on the day read (a deploy
+  with days ticked spans days; test: +₹3,250 on 19 Oct and −₹650 on 20 Oct read for the 20th gives −₹650);
+  a Quantiply position with no exit is an open leg; did-not-trade on Quantiply comes from the deploy ledger (what
+  the tool switched on for the session), so the 15:40 and 15:55 runs agree; a refused Quantiply login during the
+  capture writes the capture's own hold, never the shared one, so `quantiply-disable` always decides for itself
+  (the capture stays before the disable: it adds at most 8 minutes, and the deploy-ledger rule no longer needs the
+  `enabled` read); a tool line whose name cannot be read gets its own ❓ line, never Discretionary; a multiplier
+  the platform did not show is recorded `multiplier_assumed` and said in the 16:00 lines. The capture's Quantiply
+  login already went through the TOTP-window stamp; the `obt angel` SmartAPI lock is separate (noted).
 - 2026-10-19 — Owner: report the slippage every day, signed (positive or negative), on Telegram at 16:00 with the day's summary, to the owner only.
 - 2026-10-19 — Created from the owner's request. Capture timing answered: a separate 15:40 job, before the evening deletes.

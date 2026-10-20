@@ -56,6 +56,11 @@ export interface StrategyLine {
   /** the platform's id of the deploy (AlgoTest execution) or algo (Quantiply) */
   platform_id: string;
   multiplier: number | null;
+  /**
+   * true: the platform did not say (an algo gone from Quantiply's list on a back-filled day, an
+   * execution without `LotMultiplier`), so `multiplier` is 1x by assumption
+   */
+  multiplier_assumed?: boolean;
   /** false: deployed or enabled but nothing filled; `pnl` is then null */
   traded: boolean;
   /** live P&L in rupees, gross (before brokerage and taxes), for the whole multiplier */
@@ -145,13 +150,20 @@ export interface AtExecution {
  * An AlgoTest execution's legs as fills, and its realised P&L (the web app's own sum: sell =
  * (entry − exit) × quantity, buy the other way). A leg exited for less than it entered counts its
  * exited quantity and is open for the rest; one exited for more is counted at its entry quantity
- * and flagged open too, so it is never read as a clean result.
+ * and flagged open too, so it is never read as a clean result. With `day`, only the legs that
+ * entered on that day (IST) count.
  */
-export function algotestLegs(legs: unknown): { fills: Fill[]; pnl: number; open: number } {
+export function algotestLegs(
+  legs: unknown,
+  day?: string,
+): { fills: Fill[]; pnl: number; open: number } {
   const fills: Fill[] = [];
   let pnl = 0; // paise
   let open = 0;
   for (const raw of Array.isArray(legs) ? (legs as AtLeg[]) : []) {
+    // A deploy with execution days ticked lives across days: only the legs that entered on the
+    // day being read belong to it.
+    if (day && !str(raw.entry_trade?.exchange_timestamp).startsWith(day)) continue;
     const side = str(raw.position) === 'PositionType.Buy' ? 'B' : 'S';
     const entry = raw.entry_trade;
     const exit = raw.exit_trade;
@@ -247,9 +259,9 @@ export function algotestLines(
     const name = savedName(str(e.name));
     const tool = toolName(name);
     const source = algotestSource(e, own);
-    const legs = algotestLegs(e.legs);
+    const legs = algotestLegs(e.legs, day);
     const traded = legs.fills.length > 0;
-    const fromConfig = num(e.config?.ExecutionConfig?.LotMultiplier);
+    const multiplier = multipliers.get(id) ?? num(e.config?.ExecutionConfig?.LotMultiplier) ?? null;
     out.push({
       kind: 'strategy',
       day,
@@ -261,7 +273,8 @@ export function algotestLines(
       addon: source === 'tool' ? Boolean(tool?.addon) : false,
       source,
       platform_id: id,
-      multiplier: multipliers.get(id) ?? fromConfig ?? null,
+      multiplier: multiplier ?? 1,
+      ...(multiplier === null ? { multiplier_assumed: true } : {}),
       traded,
       pnl: traded ? legs.pnl : null,
       status: str(e.status).replace(/^StrategyStatus\./, '') || null,
@@ -373,11 +386,30 @@ export function quantiplyMismatch(runs: Map<string, QRuns>, total: number | null
 }
 
 /**
+ * The tool's Quantiply algos the deployer switched on for `day`'s session (its deploy ledger,
+ * `deploy-ledger[-<broker>].jsonl`): the last enable / disable row per algo before the session,
+ * the 15:40 safety-net disable (`mode: disable`) left out. What did-not-trade is judged against,
+ * so the answer is the same whichever run reads it, before or after the disable.
+ */
+export function toolEnabledFor(
+  deployLedger: { session?: string; mode?: string; action?: string; id?: string; ok?: boolean }[],
+  day: string,
+): Set<string> {
+  const out = new Set<string>();
+  for (const row of deployLedger) {
+    if (row.session !== day || !row.ok || !row.id || row.mode === 'disable') continue;
+    if (row.action === 'enable') out.add(row.id);
+    else if (row.action === 'disable') out.delete(row.id);
+  }
+  return out;
+}
+
+/**
  * The day's Quantiply lines: every algo the account chart has runs for on the day, named from the
  * day-wise list (or, if gone from it, the uploader's ledger). `owned` is every algo id the uploader
- * ever created, whatever its name. With `notTradedOn` (the day's weekday, given only for today,
- * while the list still says what was enabled), an algo enabled for that weekday with no run is a
- * `traded: false` line.
+ * ever created, whatever its name. An algo the tool switched on for the day (`enabledByTool`) with
+ * no run is a `traded: false` line. A copy whose fills show a position with no exit counts it in
+ * `open_legs`. An algo gone from the list has no multiplier: 1x, `multiplier_assumed`.
  */
 export function quantiplyLines(
   day: string,
@@ -386,7 +418,7 @@ export function quantiplyLines(
   runs: Map<string, QRuns>,
   owned: Map<string, string>,
   positions: Map<string, unknown> = new Map(),
-  notTradedOn?: string,
+  enabledByTool: Set<string> = new Set(),
 ): StrategyLine[] {
   const byId = new Map(summaries.map((s) => [s.id, s]));
   const line = (id: string, r: QRuns | null): StrategyLine => {
@@ -394,6 +426,8 @@ export function quantiplyLines(
     const mine = owned.has(id);
     const name = s?.name ?? owned.get(id) ?? `(algo ${id.slice(-6)})`;
     const tool = mine ? toolName(name) : null;
+    const fills = r ? quantiplyFills(positions.get(id)) : null;
+    const multiplier = s?.multiplier ?? null;
     return {
       kind: 'strategy',
       day,
@@ -405,22 +439,19 @@ export function quantiplyLines(
       addon: Boolean(tool?.addon),
       source: mine ? 'tool' : 'discretionary',
       platform_id: id,
-      multiplier: s?.multiplier ?? null,
+      multiplier: multiplier ?? 1,
+      ...(multiplier === null ? { multiplier_assumed: true } : {}),
       traded: r !== null,
       pnl: r?.pnl ?? null,
       status: s?.status ?? null,
-      open_legs: 0,
+      open_legs: fills ? fills.filter((f) => f.exit === null).length : 0,
       runs: r?.runs ?? 0,
-      fills: r ? quantiplyFills(positions.get(id)) : null,
+      fills,
       pnl_source: r ? 'pnl-chart' : null,
     };
   };
   const out = [...runs].map(([id, r]) => line(id, r));
-  if (notTradedOn) {
-    for (const s of summaries) {
-      if (s.day === notTradedOn && s.enabled && !runs.has(s.id)) out.push(line(s.id, null));
-    }
-  }
+  for (const id of enabledByTool) if (!runs.has(id)) out.push(line(id, null));
   return out.sort(
     (a, b) => a.name.localeCompare(b.name) || a.platform_id.localeCompare(b.platform_id),
   );

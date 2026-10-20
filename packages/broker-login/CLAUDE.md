@@ -214,8 +214,18 @@ week, until disabled.
   1 a retry may help, 3 a retry cannot (missing credentials, a held or refused login); `--soft-fail` exits 0 (the
   15:40 attempt; `live-capture-retry` at 15:55 reads the rest and alerts once).
 - Quantiply P&L is every run of an algo that day added up (`quantiplyRuns`, keyed by run id); a sum that does not
-  match the chart's `totalMTM` beyond ₹1 fails the section. A deploy with no fills, or (today) an enabled algo with
-  no run, is `traded: false` with no P&L. Quantiply's UTC times are converted to IST. Money sums are integer paise.
+  match the chart's `totalMTM` beyond ₹1 fails the section. A position with no exit in the fills is an open leg.
+  AlgoTest P&L counts only the legs that entered on the day read (a deploy with days ticked spans days).
+- Did not trade (`traded: false`, no P&L): an AlgoTest deploy with no fills on the day; a Quantiply algo the tool
+  switched on for the session (its deploy ledger, `toolEnabledFor`, the 15:40 safety-net disable left out) with no
+  run, so the 15:40 run and the 15:55 retry agree. A multiplier the platform did not show (an algo gone from the
+  list on a back-filled day) is 1x with `multiplier_assumed: true`. Quantiply's UTC times become IST. Money sums are
+  integer paise.
+- Its Quantiply login goes through `quantiply-session.ts` like the uploader's and the deployer's (it waits out the
+  TOTP window the account last typed a code in), but a refusal writes the capture's OWN hold
+  (`rotation/live/login-hold-quantiply-<broker>.json`, `openQuantiply`'s `holdFile`), never the shared one, so it
+  can never stop `quantiply-disable` from logging in. The capture checks both holds. The `obt angel` SmartAPI guard
+  is a separate lock: nothing spaces a capture login and an evening-run SmartAPI login (not seen to clash).
 - `TOOL_PREFIXES` is append-only (a rename adds its prefixes beside the old ones); ownership is by ledger id
   wherever the ledger has one.
 

@@ -36,7 +36,9 @@ import {
   sectionKey,
   sectionsToRead,
   summarizeCapture,
+  toolEnabledFor,
 } from './live-capture-plan.js';
+import { parseDeployLedger } from './quantiply-deploy-plan.js';
 import { parseQLedger, sessionOver, weekdayOf } from './quantiply-plan.js';
 import {
   LoginHeld,
@@ -202,15 +204,28 @@ async function captureQuantiply(
   const stateDir = dirname(ledgerPath);
   const fail = (error: unknown, kind: 'retry' | 'config') =>
     days.map((d) => sectionLine(d, 'quantiply', broker, [], describe(error), kind));
+  const deployPath = join(
+    stateDir,
+    broker === 'angelone' ? 'deploy-ledger.jsonl' : `deploy-ledger-${broker}.jsonl`,
+  );
+  // The capture's own refused-login hold: a refusal here must never hold the shared account
+  // login, or the 15:40 quantiply-disable (the safety net) would stop without logging in.
+  const ownHold = join(liveDir(dataRoot), `login-hold-quantiply-${broker}.json`);
   let api: Awaited<ReturnType<typeof openQuantiply>>;
   let owned: Map<string, string>;
+  let deployLedger: ReturnType<typeof parseDeployLedger> = [];
   try {
     const creds = quantiplyCredentials(broker);
-    await checkLoginHold(creds, stateDir);
+    await checkLoginHold(creds, stateDir); // the shared hold: someone's login was refused
+    await checkLoginHold(creds, stateDir, ownHold);
     owned = quantiplyOwned(
       existsSync(ledgerPath) ? parseQLedger(await readFile(ledgerPath, 'utf8')) : [],
     );
-    api = await openQuantiply(creds, stateDir);
+    if (existsSync(deployPath)) {
+      deployLedger = parseDeployLedger(await readFile(deployPath, 'utf8'));
+    }
+    // waits out the account's last TOTP window (the stamp the uploader and deployer share)
+    api = await openQuantiply(creds, stateDir, { holdFile: ownHold });
   } catch (error) {
     const config =
       error instanceof LoginHeld ||
@@ -231,7 +246,7 @@ async function captureQuantiply(
       const runs = quantiplyRuns(pages);
       const mismatch = quantiplyMismatch(runs, quantiplyTotal(pages));
       if (mismatch) throw new Error(mismatch);
-      // Fills and "did not trade": only today, while Quantiply still has the day's state.
+      // Fills: only today, while Quantiply still has the day's state.
       const positions = new Map<string, unknown>();
       const weekday = day === today ? weekdayOf(day) : undefined;
       if (weekday) {
@@ -244,7 +259,8 @@ async function captureQuantiply(
           }
         }
       }
-      const lines = quantiplyLines(day, broker, summaries, runs, owned, positions, weekday);
+      const enabled = toolEnabledFor(deployLedger, day);
+      const lines = quantiplyLines(day, broker, summaries, runs, owned, positions, enabled);
       out.push(sectionLine(day, 'quantiply', broker, lines, null));
     } catch (error) {
       out.push(sectionLine(day, 'quantiply', broker, [], describe(error)));

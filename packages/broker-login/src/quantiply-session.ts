@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { waitForNextWindow } from '@trading/broker-identity';
 import { chromium } from 'playwright';
 import { BrokerLoginError } from './brokers/types.js';
@@ -72,9 +72,17 @@ const holdPath = (stateDir: string, broker: QuantiplyBroker) =>
   join(stateDir, `login-hold-${broker}.json`);
 const fingerprintOf = (c: QCredentials) => sha256(`${c.user}\n${c.secret}`);
 
-/** Throws `LoginHeld` while a refused login holds this account with these credentials. */
-export async function checkLoginHold(c: QCredentials, stateDir: string): Promise<void> {
-  const path = holdPath(stateDir, c.broker);
+/**
+ * Throws `LoginHeld` while a refused login holds this account with these credentials. `holdFile`
+ * reads another hold than the shared one (BL-141's capture keeps its own, so its refusal never
+ * stops the uploader's or the disable's login).
+ */
+export async function checkLoginHold(
+  c: QCredentials,
+  stateDir: string,
+  holdFile?: string,
+): Promise<void> {
+  const path = holdFile ?? holdPath(stateDir, c.broker);
   if (!existsSync(path)) return;
   type Hold = { fingerprint?: string; at?: string; detail?: string };
   const hold = await readFile(path, 'utf8')
@@ -114,13 +122,15 @@ async function stampTotpWindow(stateDir: string, broker: QuantiplyBroker): Promi
 
 /**
  * Log in in a browser, take the JWT, close the browser: an API client for the account. A refused
- * login writes the hold and throws `LoginRefused`. With `retryTotpOnce`, a login whose TOTP code
- * was refused (nothing on Quantiply changed yet) is tried once more, in the next window.
+ * login writes the hold and throws `LoginRefused`; `holdFile` writes it there instead of the
+ * shared hold (BL-141's capture, so its refusal never stops the disable's own login). With
+ * `retryTotpOnce`, a login whose TOTP code was refused (nothing on Quantiply changed yet) is
+ * tried once more, in the next window. Every login waits out the account's last TOTP window.
  */
 export async function openQuantiply(
   c: QCredentials,
   stateDir: string,
-  opts: { headed?: boolean; retryTotpOnce?: boolean } = {},
+  opts: { headed?: boolean; retryTotpOnce?: boolean; holdFile?: string } = {},
 ): Promise<QuantiplyApi> {
   for (let attempt = 1; ; attempt += 1) {
     await waitOutTotpWindow(stateDir, c.broker);
@@ -139,7 +149,7 @@ export async function openQuantiply(
 async function loginOnce(
   c: QCredentials,
   stateDir: string,
-  opts: { headed?: boolean },
+  opts: { headed?: boolean; holdFile?: string },
 ): Promise<QuantiplyApi> {
   const site = QUANTIPLY_SITES[c.broker];
   const browser = await chromium.launch({ headless: !opts.headed });
@@ -169,9 +179,10 @@ async function loginOnce(
       }
     } catch (error) {
       if (error instanceof BrokerLoginError && error.kind === 'CREDENTIALS_REJECTED') {
-        await mkdir(stateDir, { recursive: true });
+        const hold = opts.holdFile ?? holdPath(stateDir, c.broker);
+        await mkdir(dirname(hold), { recursive: true });
         await writeFile(
-          holdPath(stateDir, c.broker),
+          hold,
           `${JSON.stringify({ at: new Date().toISOString(), fingerprint: fingerprintOf(c), detail: describe(error) })}\n`,
         ).catch(() => undefined);
         throw new LoginRefused(describe(error));

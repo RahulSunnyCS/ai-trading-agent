@@ -26,6 +26,7 @@ import {
   savedName,
   sectionsToRead,
   toIst,
+  toolEnabledFor,
   toolName,
 } from './live-capture-plan.js';
 import { NAME_PREFIXES } from './strategy-plan.js';
@@ -111,6 +112,32 @@ test('AlgoTest: a partial exit counts what was exited and stays open; sums are e
     },
   ]);
   assert.equal(exact.pnl, 0.3);
+});
+
+test('AlgoTest: a deploy that spans days counts only the legs that entered on the day read', () => {
+  const leg = (at: string, entry: number, exit: number) => ({
+    position: 'PositionType.Sell',
+    status: 2,
+    entry_trade: { price: entry, quantity: 65, exchange_timestamp: at },
+    exit_trade: { price: exit, quantity: 65, exchange_timestamp: at },
+  });
+  const exec = {
+    _id: id(50),
+    name: 'N_mine_daily (1)',
+    broker_type: 'Broker.Finvasia',
+    status: 'StrategyStatus.Running',
+    creation_ts: '2026-10-19 09:10:00.0',
+    // +3,250 on 10-19 (50 points x 65), −650 on 10-20 (−10 points x 65)
+    legs: [leg('2026-10-19 09:16:59', 100, 50), leg('2026-10-20 09:16:59', 100, 110)],
+  };
+  const [d20] = algotestLines('2026-10-20', [[exec]], NO_LEDGER);
+  assert.equal(d20?.pnl, -650);
+  assert.equal(d20?.fills?.length, 1);
+  const [d19] = algotestLines('2026-10-19', [[exec]], NO_LEDGER);
+  assert.equal(d19?.pnl, 3250);
+  assert.equal(algotestLines('2026-10-21', [[exec]], NO_LEDGER).length, 0);
+  // no LotMultiplier anywhere: 1x, said so
+  assert.deepEqual([d20?.multiplier, d20?.multiplier_assumed], [1, true]);
 });
 
 test('AlgoTest: a leg that never entered is skipped, not counted at price 0', () => {
@@ -231,7 +258,7 @@ test('Quantiply: names and multipliers from the day-wise list, the tool by its l
     mine.map((l) => [l.platform_id, l.multiplier]).sort(),
     [
       [first, 1],
-      [gone, null],
+      [gone, 1],
     ].sort(),
   );
   assert.equal(lines.find((l) => l.platform_id === gone)?.variant, 'N_wide_1117');
@@ -239,27 +266,33 @@ test('Quantiply: names and multipliers from the day-wise list, the tool by its l
   assert.ok(lines.every((l) => l.pnl_source === 'pnl-chart' && l.traded));
 });
 
-test('Quantiply: today, an enabled algo with no run did not trade (the same rule as AlgoTest)', () => {
+test('Quantiply: an algo the tool switched on for the day with no run did not trade', () => {
   const summaries = [
     {
       id: id(1),
       name: 'Core · N_wide_1117',
       day: 'WED',
-      enabled: true,
+      enabled: false,
       multiplier: 1,
       status: 'ERROR',
     },
-    { id: id(2), name: 'N_mine', day: 'WED', enabled: false, multiplier: 1, status: 'NOT_RUNNING' },
-    {
-      id: id(3),
-      name: 'N_other_day',
-      day: 'THU',
-      enabled: true,
-      multiplier: 1,
-      status: 'NOT_RUNNING',
-    },
+    { id: id(2), name: 'N_mine', day: 'WED', enabled: true, multiplier: 1, status: 'NOT_RUNNING' },
   ];
   const owned = new Map([[id(1), 'Core · N_wide_1117']]);
+  // the deploy ledger: enabled for the session (then switched off by the 15:40 safety net, which
+  // does not count), one enabled and switched off again before the session, another session
+  const enabled = toolEnabledFor(
+    [
+      { session: '2026-10-21', mode: 'enable', action: 'enable', id: id(1), ok: true },
+      { session: '2026-10-21', mode: 'disable', action: 'disable', id: id(1), ok: true },
+      { session: '2026-10-21', mode: 'enable', action: 'enable', id: id(4), ok: true },
+      { session: '2026-10-21', mode: 'enable', action: 'disable', id: id(4), ok: true },
+      { session: '2026-10-22', mode: 'enable', action: 'enable', id: id(5), ok: true },
+      { session: '2026-10-21', mode: 'enable', action: 'enable', id: id(6), ok: false },
+    ],
+    '2026-10-21',
+  );
+  assert.deepEqual([...enabled], [id(1)]);
   const lines = quantiplyLines(
     '2026-10-21',
     'angelone',
@@ -267,14 +300,47 @@ test('Quantiply: today, an enabled algo with no run did not trade (the same rule
     new Map(),
     owned,
     new Map(),
-    'WED',
+    enabled,
   );
+  // the same answer before or after the disable: `enabled` in the list is not read
   assert.deepEqual(
     lines.map((l) => [l.platform_id, l.traded, l.pnl, l.source]),
     [[id(1), false, null, 'tool']],
   );
-  // a past day cannot say what was enabled: no such lines
-  assert.equal(quantiplyLines('2026-10-21', 'angelone', summaries, new Map(), owned).length, 0);
+});
+
+test('Quantiply: a position with no exit is an open leg; an algo gone from the list is 1x assumed', () => {
+  const runs = new Map([
+    [id(1), { pnl: -900, runs: 1 }],
+    [id(2), { pnl: 100, runs: 1 }],
+  ]);
+  const positions = new Map([
+    [
+      id(1),
+      {
+        data: {
+          state: {
+            positions: [
+              { transactionType: 'S', quantity: 65, entryPrice: 100, exitPrice: 90 },
+              { transactionType: 'S', quantity: 65, entryPrice: 100 },
+            ],
+          },
+        },
+      },
+    ],
+  ]);
+  const summaries = [
+    { id: id(1), name: 'N_x', day: 'WED', enabled: true, multiplier: 2, status: 'TRADE_CLOSED' },
+  ];
+  const lines = quantiplyLines('2026-10-21', 'angelone', summaries, runs, new Map(), positions);
+  const [open, gone] = [
+    lines.find((l) => l.platform_id === id(1)),
+    lines.find((l) => l.platform_id === id(2)),
+  ];
+  assert.equal(open?.open_legs, 1);
+  assert.equal(open?.multiplier, 2);
+  assert.equal(open?.multiplier_assumed, undefined);
+  assert.deepEqual([gone?.multiplier, gone?.multiplier_assumed], [1, true]);
 });
 
 test('Quantiply: fills only from a state whose fields are plain, times read as UTC into IST', () => {

@@ -198,6 +198,8 @@ class DayComparison:
     open_legs: list[dict] = field(default_factory=list)
     #: tool copies deployed or enabled that never filled
     not_traded: list[dict] = field(default_factory=list)
+    #: lines the capture marked the tool's whose name it could not read as `<list> · <variant>`
+    unrecognised: list[dict] = field(default_factory=list)
     discretionary: list[dict] = field(default_factory=list)
 
     @property
@@ -246,9 +248,11 @@ def compare(day: date, root: Path | None = None) -> DayComparison:
     for r in lines:
         if r["kind"] != "strategy":
             continue
-        if r.get("source") != "tool" or not r.get("variant"):
+        if r.get("source") != "tool":
             if traded(r):
                 result.discretionary.append(r)
+        elif not r.get("variant"):
+            result.unrecognised.append(r)  # the tool's money, never in the discretionary total
         elif not traded(r):
             result.not_traded.append(r)
         elif int(r.get("open_legs") or 0):
@@ -286,7 +290,10 @@ def compare(day: date, root: Path | None = None) -> DayComparison:
             slippage=float(slip) if slip is not None else None,
             slippage_pct=float(pct) if pct is not None else None,
             premium_per_lot=float(premium_per_lot) if premium_per_lot else None,
-            multiplier_guessed=any(not isinstance(m, (int, float)) for m in multipliers),
+            multiplier_guessed=any(
+                c.get("multiplier_assumed") or not isinstance(c.get("multiplier"), (int, float))
+                for c in copies
+            ),
         )
         (result.compared if paper else result.no_paper).append(item)
     return result
@@ -338,6 +345,14 @@ def message_lines(c: DayComparison, rupees) -> list[str]:
         out.append(f"⚠️ Legs still open, left out: {_names(c.open_legs)}")
     if c.not_traded:
         out.append(f"⛔ Did not trade: {_names(c.not_traded)}")
+    if c.unrecognised:
+        total = sum((_d(r.get("pnl")) for r in c.unrecognised if traded(r)), Decimal(0))
+        out.append(
+            f"❓ Unrecognised tool copy: {_names(c.unrecognised)}  {rupees(float(total))} in all"
+        )
+    guessed = sorted({x.variant for x in [*c.compared, *c.no_paper] if x.multiplier_guessed})
+    if guessed:
+        out.append(f"1x assumed (multiplier not shown by the platform): {', '.join(guessed)}")
     for o in c.off_slot:
         out.append(f"⏱ Off-slot {o.get('variant')}  {rupees(float(o.get('pnl') or 0))} in all")
     if c.discretionary:
@@ -383,6 +398,7 @@ def to_json(c: DayComparison) -> dict:
         "off_slot": c.off_slot,
         "open_legs": c.open_legs,
         "not_traded": c.not_traded,
+        "unrecognised": c.unrecognised,
         "discretionary": c.discretionary,
         "discretionary_total": c.discretionary_total,
     }
