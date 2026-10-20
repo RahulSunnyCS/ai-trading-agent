@@ -64,30 +64,32 @@ A warning badge on a block means its master switch holds it back.
 
 ## The stop button (Telegram)
 
-One Telegram button that stops everything the tool trades for the rest of the day. It is not on this page: it lives in your private Telegram chat with the bot, so it works from your phone.
+One Telegram button that stops everything the tool trades, and keeps it stopped until you say so. It is not on this page: it lives in your private Telegram chat with the bot, so it works from your phone.
 
 **Where it appears.** Under the 09:00 morning message, and whenever you send `/stop` to the bot.
 
 **Two taps, nothing on the first.**
 
-1. **🛑 Stop everything** only shows what a stop would do now, platform by platform, read from the tool's own records. Nothing changes.
+1. **🛑 Stop everything** only shows what a stop would do now, platform by platform, read from the tool's own records. Nothing changes. Tapping it twice shows the same confirm button again.
 2. **Yes, stop and square off** does it. This button works once, and only for 2 minutes. After that, send `/stop` again.
 
 **What the second tap does:**
 
-- **Holds today.** Until midnight, the tool uploads, deploys and switches on nothing, on AlgoTest or Quantiply. The jobs that would do so are paused. The 15:40 Quantiply switch-off still runs.
-- **Quantiply (each account):** the tool's algos with a trade open are squared off and terminated by Quantiply itself. Every enabled algo of the tool's is switched off, whatever its weekday.
-- **AlgoTest:** every running deploy named `T1 · …` or `Core · …` is squared off with AlgoTest's own Square Off, whoever deployed it.
-- **Reports back** in the same chat, one section per platform, once each platform shows the result.
+- **Holds the tool, until you lift it.** From then on the tool uploads, deploys and switches on nothing, on AlgoTest or Quantiply, on any day. The jobs that would do so are refused, including **Apply now** on this page. The 15:40 Quantiply switch-off still runs. If the hold cannot be written, the stop does nothing else and tells you to stop by hand.
+- **Quantiply (each account):** the tool's algos with a trade open are squared off and terminated by Quantiply itself. Every enabled algo of the tool's is switched off, whatever its weekday. An algo that enters while this happens is squared off on a second pass.
+- **AlgoTest:** every running deploy of the tool's (a strategy it uploaded, or one named `T1 · …` or `Core · …`) is squared off with AlgoTest's own Square Off, whoever deployed it. A deploy that went live meanwhile is squared off on a second pass.
+- **Reports back** in the same chat, one section per platform, once each platform shows the result. If the report cannot be sent, a short message says so.
 
 Your own algos and deploys are never touched; the report names any that are still running.
 
 > [!WARNING]
-> The square-off sends real exit orders through the platforms. If a platform offers no square-off for something (a paused AlgoTest deploy, for example), the report says **square off by hand**. Do that in the platform or your broker's app straight away. The tool never places an order with a broker itself.
+> The square-off sends real exit orders through the platforms. If a platform offers no square-off for something (a paused AlgoTest deploy, for example), the report says **square off by hand**: do that in the platform or your broker's app straight away. If it says **AlgoTest is still squaring off**, do **not** exit at the broker: AlgoTest's own exit orders are going out, and a second exit would open a reverse position. Re-check /live instead. A deploy someone switched to manual is reported **check**: its legs may still be open at the broker. The tool never places an order with a broker itself.
 
-**When it does not answer.** The button is answered by the laptop's scheduler. While the laptop sleeps or is off, nothing happens: stop by hand in Quantiply and on algotest.in/live. It is also off until `STOP_BUTTON=on` is in the laptop's `.env`.
+**While the hold is on.** The 09:00 message says so every day, with a **Resume** button. Send `/resume` at any time for the same.
 
-**After a stop.** The hold ends at midnight. But this evening's uploads and switch-ons were held as well, so tomorrow's picks are not set up the evening before. The 09:18–09:21 jobs add what they can, which is too late for a 09:17 entry. Set up by hand what you want to trade tomorrow. Or lift the hold the same evening on the laptop and run the held jobs by hand: a held job does not run again by itself.
+**Lifting it.** Tap **Resume**, then **Yes, lift the hold** (again once, for 2 minutes). Uploads, enables and deploys run again from each job's next run. A job the hold refused does not run again by itself: run any you need by hand. Algos the stop switched off stay off; switch on by hand any you want back.
+
+**When it does not answer.** The button is answered by the laptop's scheduler. While the laptop sleeps or is off, nothing happens: stop by hand in Quantiply and on algotest.in/live. It is also off until `STOP_BUTTON=on` is in the `.env` at the top of the repository on the laptop.
 
 ## Common questions
 

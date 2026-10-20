@@ -50,6 +50,7 @@ import {
   checkLoginHold,
   openQuantiply,
   quantiplyCredentials,
+  quantiplyDeployLedgerPath,
   quantiplyLedgerPath,
   readJson,
 } from './quantiply-session.js';
@@ -201,10 +202,7 @@ async function main(): Promise<number> {
     ? resolve(values.ledger)
     : quantiplyLedgerPath(dataRoot ?? '', broker);
   const stateDir = dirname(ledgerPath);
-  const deployLedger = join(
-    stateDir,
-    broker === 'angelone' ? 'deploy-ledger.jsonl' : `deploy-ledger-${broker}.jsonl`,
-  );
+  const deployLedger = quantiplyDeployLedgerPath(stateDir, broker);
   const ledger = existsSync(ledgerPath) ? parseQLedger(await readFile(ledgerPath, 'utf8')) : [];
   // Unreadable is empty, with a warning: the deploy ledger must never stop a disable. (For an
   // enable it only ever holds back: an id it lists is never switched on again.)

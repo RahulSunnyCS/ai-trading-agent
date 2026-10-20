@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { readdirSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { type IncomingMessage, type Server, createServer } from 'node:http';
+import { createRequire } from 'node:module';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -10,6 +12,8 @@ import { request } from 'playwright';
 import { QuantiplyApi } from './quantiply-api.js';
 import type { QLedgerRow } from './quantiply-plan.js';
 import { QUANTIPLY_SITES } from './quantiply-rules.js';
+import { settle } from './stop-button.js';
+import { toolMatcher } from './stop-plan.js';
 import {
   type Http,
   type Waits,
@@ -20,6 +24,21 @@ import {
 } from './stop-run.js';
 
 /**
+ * The CLI under test, through tsx's own entry resolved from this package (CI's bun 1.2 hoists
+ * tsx to the repo root, so `node_modules/.bin/tsx` here may not exist).
+ */
+const TSX_CLI = createRequire(import.meta.url).resolve('tsx/cli');
+const PKG = resolve(dirname(import.meta.filename), '..');
+function cli(args: string[], env: Record<string, string>, cwd: string) {
+  return spawnSync(process.execPath, [TSX_CLI, join(PKG, 'src/stop-button.ts'), ...args], {
+    cwd, // no .env here
+    encoding: 'utf8',
+    env: { PATH: process.env.PATH ?? '', HOME: cwd, ...env },
+    timeout: 60_000,
+  });
+}
+
+/**
  * The stop button's calls against local stand-ins for Quantiply's and AlgoTest's APIs: what is
  * sent (method, path, headers), that only the tool's algos and deploys are touched, and that the
  * result is confirmed by listing again. No browser login, no network, no real account.
@@ -28,6 +47,7 @@ import {
 const fast: Waits = {
   waitMs: 200,
   pollMs: 10,
+  passes: 4,
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
 };
 const noLog = async () => undefined;
@@ -92,6 +112,8 @@ describe('Quantiply stop against a stand-in API', () => {
   };
   let algos: A[] = [];
   let failSqOff = false;
+  /** ids that enter (go TRADE_ACTIVE) the moment their switch-off lands: the 09:17 race */
+  let entersOnDisable = new Set<string>();
   const q = listen((req) => {
     const url = req.url ?? '';
     if (req.method === 'GET' && url === '/algos/day-wise') {
@@ -124,8 +146,9 @@ describe('Quantiply stop against a stand-in API', () => {
     if (req.method === 'PUT' && tog) {
       const a = algos.find((x) => x._id === tog[1]);
       if (a) a.enabled = tog[2] === 'enable';
+      if (a && entersOnDisable.has(a._id)) a.status = 'TRADE_ACTIVE';
       // assumed: an algo waiting for its entry stops waiting once off (the tool still checks)
-      if (a && !a.enabled && a.status === 'READY') a.status = 'NOT_RUNNING';
+      else if (a && !a.enabled && a.status === 'READY') a.status = 'NOT_RUNNING';
       return { status: 200, json: { status: 'success' } };
     }
     return { status: 404, json: { message: 'no such route' } };
@@ -139,6 +162,7 @@ describe('Quantiply stop against a stand-in API', () => {
   beforeEach(() => {
     q.seen.length = 0;
     failSqOff = false;
+    entersOnDisable = new Set();
     algos = [
       { _id: 'a', name: 'Core · A', day: 'TUE', enabled: true, status: 'TRADE_ACTIVE' },
       { _id: 'b', name: 'Core · B', day: 'TUE', enabled: true, status: 'READY' },
@@ -153,8 +177,8 @@ describe('Quantiply stop against a stand-in API', () => {
     const r = await stopQuantiply('Quantiply · Angel One', api, ledger, noLog, {
       dryRun: false,
       waits: fast,
-      record: async (row) => {
-        recorded.push(row);
+      record: async (row, algo) => {
+        recorded.push({ ...row, day: algo.day });
       },
     });
     assert.equal(r.ok, true, r.lines.join('\n'));
@@ -173,6 +197,23 @@ describe('Quantiply stop against a stand-in API', () => {
       recorded.map((x) => `${x.action} ${x.id}`),
       ['sqoff a', 'disable b', 'disable a'],
     );
+  });
+
+  it('an algo that enters while it is being switched off is squared off on the next pass', async () => {
+    entersOnDisable = new Set(['b']);
+    const r = await stopQuantiply('Quantiply · Angel One', api, ledger, noLog, {
+      dryRun: false,
+      waits: fast,
+    });
+    const writes = q.seen.filter((s) => s.method !== 'GET').map((s) => `${s.method} ${s.url}`);
+    assert.deepEqual(writes, [
+      'PUT /algos/a/action/SQ_OFF_TERMINATE',
+      'PUT /algos/b/disable',
+      'PUT /algos/b/action/SQ_OFF_TERMINATE',
+      'PUT /algos/a/disable',
+    ]);
+    assert.equal(r.ok, true, r.lines.join('\n'));
+    assert.match(r.lines.join('\n'), /squared off & terminated: Core · A, Core · B/);
   });
 
   it('a failed square off is reported for the owner, the rest still switched off', async () => {
@@ -201,14 +242,35 @@ describe('Quantiply stop against a stand-in API', () => {
 describe('AlgoTest stop against a stand-in API', () => {
   type E = { _id: string; name: string; status: string; active_on_server: boolean };
   let execs: E[] = [];
+  /** lists a squared-off deploy shows `pending_square_off` for; Infinity = it never finishes */
+  let pendingLists = 2;
+  /** a deploy that appears once the first square-off went out (a deploy job finishing) */
+  let lateDeploy: E | null = null;
+  const pending = new Map<string, number>();
   const a = listen((req) => {
     const url = req.url ?? '';
-    if (req.method === 'GET' && url === '/execution/v2/executions?environment=live')
+    if (req.method === 'GET' && url === '/execution/v2/executions?environment=live') {
+      for (const [id, n] of pending) {
+        const e = execs.find((x) => x._id === id);
+        if (!e) continue;
+        if (n <= 0) {
+          e.status = 'StrategyStatus.SquaredOff';
+          pending.delete(id);
+        } else pending.set(id, n - 1);
+      }
       return { status: 200, json: execs };
+    }
     const sq = /^\/execution\/v2\/square-off\/([0-9a-f]{24})$/.exec(url);
     if (req.method === 'PUT' && sq) {
       const e = execs.find((x) => x._id === sq[1]);
-      if (e) e.status = 'StrategyStatus.SquaredOff';
+      if (e) {
+        e.status = 'pending_square_off';
+        pending.set(e._id, pendingLists);
+      }
+      if (lateDeploy) {
+        execs.push(lateDeploy);
+        lateDeploy = null;
+      }
       return { status: 200, json: { msg: 'Square off initiated' } };
     }
     return { status: 404, json: { msg: 'no such route' } };
@@ -224,6 +286,9 @@ describe('AlgoTest stop against a stand-in API', () => {
   after(() => stop(a.server));
   beforeEach(() => {
     a.seen.length = 0;
+    pendingLists = 2;
+    lateDeploy = null;
+    pending.clear();
     execs = [
       {
         _id: '6ad590af06a3aebabc43634d',
@@ -241,8 +306,10 @@ describe('AlgoTest stop against a stand-in API', () => {
     ];
   });
 
-  it("squares off the tool's live deploy only, confirms it, names what needs a hand", async () => {
-    const r = await stopAlgoTest(algotestStopApi(fetchHttp), noLog, { dryRun: false, waits: fast });
+  const opts = { dryRun: false, waits: fast, isTool: toolMatcher([]), today: '2026-10-20' };
+
+  it("squares off the tool's live deploy only, waits out pending_square_off, confirms it", async () => {
+    const r = await stopAlgoTest(algotestStopApi(fetchHttp), noLog, opts);
     const writes = a.seen.filter((s) => s.method !== 'GET').map((s) => `${s.method} ${s.url}`);
     assert.deepEqual(writes, ['PUT /execution/v2/square-off/6ad590af06a3aebabc43634d']);
     const text = r.lines.join('\n');
@@ -250,6 +317,47 @@ describe('AlgoTest stop against a stand-in API', () => {
     assert.match(text, /square off by hand.*T1 · B \(paused\)/);
     assert.match(text, /not the tool's, left running: my own/);
     assert.equal(r.ok, false); // T1 · B needs the owner
+    assert.doesNotMatch(text, /T1 · A.*by hand/);
+  });
+
+  it('a square-off still pending after the wait is never "by hand": do NOT exit at the broker', async () => {
+    pendingLists = Number.POSITIVE_INFINITY;
+    const r = await stopAlgoTest(algotestStopApi(fetchHttp), noLog, opts);
+    const text = r.lines.join('\n');
+    assert.match(text, /still squaring off: T1 · A .*Do NOT exit these at the broker/);
+    assert.doesNotMatch(text, /T1 · A[^\n]*square off by hand/);
+    assert.equal(r.ok, false);
+  });
+
+  it('a deploy that went live during the stop is squared off on the next pass', async () => {
+    lateDeploy = {
+      _id: '6ad590af06a3aebabc436350',
+      name: 'Core · Late',
+      status: 'StrategyStatus.Live',
+      active_on_server: true,
+    };
+    const r = await stopAlgoTest(algotestStopApi(fetchHttp), noLog, opts);
+    const writes = a.seen.filter((s) => s.method !== 'GET').map((s) => s.url);
+    assert.deepEqual(writes, [
+      '/execution/v2/square-off/6ad590af06a3aebabc43634d',
+      '/execution/v2/square-off/6ad590af06a3aebabc436350',
+    ]);
+    assert.match(r.lines.join('\n'), /✅ squared off: T1 · A, Core · Late/);
+  });
+
+  it('a deploy switched to manual is a check (legs may be open), never green', async () => {
+    execs = [
+      {
+        _id: '6ad590af06a3aebabc43634d',
+        name: 'T1 · Manual',
+        status: 'StrategyStatus.Stopped',
+        active_on_server: false,
+      },
+    ];
+    const r = await stopAlgoTest(algotestStopApi(fetchHttp), noLog, opts);
+    assert.equal(r.ok, false);
+    assert.match(r.lines.join('\n'), /switched to manual today, its legs may be open.*T1 · Manual/);
+    assert.equal(a.seen.filter((s) => s.method !== 'GET').length, 0);
   });
 
   it('over Playwright: the session cookies plus the CSRF header the web app sends', async () => {
@@ -270,26 +378,79 @@ describe('AlgoTest stop against a stand-in API', () => {
   });
 });
 
+describe('each platform is settled on its own', () => {
+  it('one platform throwing (a browser that will not start) never hides the others', async () => {
+    const reports = await settle([
+      {
+        platform: 'Quantiply · Angel One',
+        run: async () => ({ platform: 'Q', ok: true, lines: ['done'] }),
+      },
+      {
+        platform: 'AlgoTest',
+        run: async () => {
+          throw new Error('browserType.launch: Executable does not exist');
+        },
+      },
+    ]);
+    assert.equal(reports.length, 2);
+    assert.equal(reports[0]?.ok, true);
+    assert.equal(reports[1]?.platform, 'AlgoTest');
+    assert.equal(reports[1]?.ok, false);
+    assert.match(reports[1]?.lines.join('\n') ?? '', /Executable does not exist/);
+  });
+});
+
 describe('stop-button.ts --apply without STOP_BUTTON=on', () => {
   it('refuses before anything: no hold, no login', async () => {
     const root = await mkdtemp(join(tmpdir(), 'stop-cli-'));
-    const pkg = resolve(dirname(import.meta.filename), '..');
     try {
-      const out = spawnSync(
-        join(pkg, 'node_modules/.bin/tsx'),
-        [join(pkg, 'src/stop-button.ts'), '--apply'],
-        {
-          cwd: root,
-          encoding: 'utf8',
-          env: { PATH: process.env.PATH ?? '', HOME: root, TRADING_DATA_ROOT: root },
-          timeout: 60_000,
-        },
-      );
+      const out = cli(['--apply'], { TRADING_DATA_ROOT: root }, root);
       assert.equal(out.status, 2, out.stderr);
       assert.match(out.stderr, /STOP_BUTTON is not "on": nothing done/);
-      const { readdirSync, existsSync } = await import('node:fs');
-      const files = existsSync(join(root, 'stop')) ? readdirSync(join(root, 'stop')) : [];
-      assert.ok(!files.some((f) => f.startsWith('hold-')), `no hold written: ${files.join(', ')}`);
+      const files = readdirSync(join(root, 'stop'));
+      assert.ok(!files.includes('HOLD.json'), `no hold written: ${files.join(', ')}`);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('stop-button.ts --apply when the hold cannot be written', () => {
+  it('fails closed: nothing else is done, and it says the report was not delivered', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'stop-cli-'));
+    try {
+      await writeFile(join(root, 'stop'), 'a file where the stop folder should be');
+      const out = cli(['--apply'], { TRADING_DATA_ROOT: root, STOP_BUTTON: 'on' }, root);
+      // 4: Telegram is not configured in the test, so the "stop by hand" message did not go
+      assert.equal(out.status, 4, out.stderr);
+      assert.match(out.stderr, /Stop NOT done: the hold could not be written/);
+      assert.doesNotMatch(out.stdout, /logged_in|squared off|switched off|✅/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('stop-button.ts --plan with a missing ledger', () => {
+  it('fails closed for an account with a login but no ledger', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'stop-cli-'));
+    try {
+      const out = cli(
+        ['--plan'],
+        {
+          TRADING_DATA_ROOT: root,
+          ANGELONE_CLIENT_CODE: 'X1',
+          ANGELONE_MPIN: '0000',
+          ANGELONE_TOTP_SECRET: 'JBSWY3DPEHPK3PXP',
+        },
+        root,
+      );
+      assert.equal(out.status, 0, out.stderr);
+      assert.match(
+        out.stdout,
+        /Quantiply · Angel One: ⚠️ its ledger is missing .*could not tell what is the tool's/,
+      );
+      assert.match(out.stdout, /Quantiply · Shoonya: not used by the tool/);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -299,7 +460,6 @@ describe('stop-button.ts --apply without STOP_BUTTON=on', () => {
 describe('stop-button.ts --dry-run --fixture', () => {
   it('prints the plan and each call it would make, sends nothing', async () => {
     const root = await mkdtemp(join(tmpdir(), 'stop-cli-'));
-    const pkg = resolve(dirname(import.meta.filename), '..');
     try {
       const qdir = join(root, 'rotation', 'quantiply');
       await mkdir(qdir, { recursive: true });
@@ -307,36 +467,21 @@ describe('stop-button.ts --dry-run --fixture', () => {
         join(qdir, 'ledger.jsonl'),
         `${[created('q-active-1', 'Core · N_ITM1_SL21_0917'), created('q-ready-1', 'Core · N_wide_1202')].map((r) => JSON.stringify(r)).join('\n')}\n`,
       );
-      const out = spawnSync(
-        join(pkg, 'node_modules/.bin/tsx'),
-        [
-          join(pkg, 'src/stop-button.ts'),
-          '--dry-run',
-          '--fixture',
-          join(pkg, 'fixtures/stop-dry-run.json'),
-        ],
-        {
-          cwd: root, // no .env here
-          encoding: 'utf8',
-          env: {
-            PATH: process.env.PATH ?? '',
-            HOME: root,
-            TRADING_DATA_ROOT: root,
-            STOP_BUTTON: 'on',
-          },
-          timeout: 60_000,
-        },
+      const out = cli(
+        ['--dry-run', '--fixture', join(PKG, 'fixtures/stop-dry-run.json')],
+        { TRADING_DATA_ROOT: root, STOP_BUTTON: 'on' },
+        root,
       );
       assert.equal(out.status, 0, out.stderr);
       const text = out.stdout;
-      assert.match(text, /HOLD for the rest of today/);
-      assert.match(text, /Quantiply · Shoonya: nothing of the tool's in its ledger: not logged in/);
+      assert.match(text, /HOLD until you lift it/);
+      assert.match(text, /Quantiply · Shoonya: not used by the tool/);
       assert.match(text, /would square off & terminate: Core · N_ITM1_SL21_0917/);
       assert.match(text, /would switch off: Core · N_wide_1202/);
       assert.match(text, /not the tool's, left alone: my own algo/);
       assert.match(text, /would square off: T1 · N_p150-t1s11_0917/);
       assert.match(text, /square off by hand.*T1 · S_wide_1117/);
-      assert.match(text, /ANGELONE_CLIENT_CODE .* missing/); // the preview names what the stop lacks
+      assert.match(text, /Quantiply · Angel One: its login is missing/); // the preview names what the stop lacks
     } finally {
       await rm(root, { recursive: true, force: true });
     }

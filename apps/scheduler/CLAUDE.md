@@ -64,20 +64,24 @@ summary flags anything but `main`).
   - The `.env` switches (`ALGOTEST_UPLOAD`, `QUANTIPLY_UPLOAD`, `ALGOTEST_DEPLOY`, `QUANTIPLY_DEPLOY`) stay as hard
     safety.
 - `src/stop-button.ts` + `src/stop-hold.ts` — BL-143 Phase 4, the owner's Telegram "stop everything" button.
-  Started by `serve` only with `STOP_BUTTON=on` (and a valid `TELEGRAM_CHAT_ID`: a private chat, never the
-  friends' group `TELEGRAM_ROTATION_CHAT_ID`; else it says why and stays off).
+  Started by `serve` only with `STOP_BUTTON=on` in the repo-root `.env` (and a valid `TELEGRAM_CHAT_ID`: a private
+  chat, never the friends' group `TELEGRAM_ROTATION_CHAT_ID`; else it says why and stays off).
   - The listener long-polls the bot (`getUpdates`, `@trading/notify`). **This process is the bot's ONE
     `getUpdates` consumer: nothing else may poll this bot** (a second poller gets 409, which is alerted once).
   - Only updates whose chat AND sender are `TELEGRAM_CHAT_ID` count; everything else is ignored and logged.
   - `/stop` and the 09:00 morning summary (`withStopOffer`, `builtins.ts`) offer `stop:ask:<day>` (that day only).
     Its tap runs `packages/broker-login/src/stop-button.ts --plan` (no login) and sends the plan with
-    `stop:go:<nonce>` / `stop:no:<nonce>`: one nonce at a time, in memory, 2 minutes, once.
-  - Only `stop:go` acts: today is held in memory at once, then `stop-button.ts --apply` runs (log in
-    `<logDir>/stop-button/`), and the runner reports per platform. A runner exit other than 0 / 3 gets a
-    "check by hand" message from here. Every tap is a line in `TRADING_DATA_ROOT/stop/<day>.jsonl`.
-  - `StopHold`: while today's `TRADING_DATA_ROOT/stop/hold-<day>.json` exists (or this process confirmed a
-    stop today) the loop records each slot of `STOP_HELD_JOBS` (the uploads, deploys and enables) as held
-    (exit 0, no attempts, never caught up) instead of running it. `quantiply-disable` is never held.
+    `stop:go:<nonce>` / `stop:no:<nonce>`: in memory, 2 minutes, once; a second tap on the offer while it is valid
+    re-sends the same nonce.
+  - Only `stop:go` acts: `stop-button.ts --apply` runs (log in `<logDir>/stop-button/`). Exit 0 / 3: the runner
+    reported; 2: "did nothing, STOP_BUTTON is off"; 4: "the report could not be delivered"; else "check by hand".
+  - The hold (`TRADING_DATA_ROOT/stop/HOLD.json`, written by the runner before anything else) lasts until the
+    owner lifts it: `/resume` or the morning message's Resume button, then `stop:rgo:<nonce>` (same rules), runs
+    `stop-button.ts --clear-hold`. While it is on, the 09:00 message says so every day.
+  - `runJob` refuses every `STOP_HELD_JOBS` run (the uploads, deploys and enables) while the file exists, however
+    it was started (schedule, catch-up, `jobs run`, Apply now, queued behind its group): the run is recorded with
+    exit 0, no attempts and the reason, and is not caught up later; `POST /jobs/:id/run` answers 409.
+    `quantiply-disable` is never held. Every tap is a line in `TRADING_DATA_ROOT/stop/<day>.jsonl`.
 - `src/cli.ts` — `bun run jobs status | run <id> | serve | settings [show | set <file.json>]`.
 
 ## Adding a check

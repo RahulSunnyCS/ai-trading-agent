@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { waitForNextWindow } from '@trading/broker-identity';
 import { chromium } from 'playwright';
@@ -35,6 +35,17 @@ export function quantiplyLedgerPath(dataRoot: string, broker: QuantiplyBroker): 
     'rotation',
     'quantiply',
     broker === 'angelone' ? 'ledger.jsonl' : `ledger-${broker}.jsonl`,
+  );
+}
+
+/**
+ * The deployer's ledger, beside the uploader's (`stateDir` is that ledger's folder). The enabler,
+ * the 15:40 disable and the stop button all read and write it: one name rule for all.
+ */
+export function quantiplyDeployLedgerPath(stateDir: string, broker: QuantiplyBroker): string {
+  return join(
+    stateDir,
+    broker === 'angelone' ? 'deploy-ledger.jsonl' : `deploy-ledger-${broker}.jsonl`,
   );
 }
 
@@ -121,6 +132,77 @@ export async function openQuantiply(
   c: QCredentials,
   stateDir: string,
   opts: { headed?: boolean; retryTotpOnce?: boolean } = {},
+): Promise<QuantiplyApi> {
+  const release = await takeLoginLock(stateDir, c.broker);
+  try {
+    return await openLocked(c, stateDir, opts);
+  } finally {
+    await release();
+  }
+}
+
+const lockPath = (stateDir: string, broker: QuantiplyBroker) =>
+  join(stateDir, `login-lock-${broker}`);
+
+/** A lock older than this is a crashed run's: taken over. */
+const LOCK_STALE_MS = 6 * 60_000;
+
+/**
+ * Across processes: one Quantiply login per account at a time (the uploader, the deployer, the
+ * 15:40 disable, the stop button). The TOTP stamp alone is read-then-wait, so two runs starting
+ * together could both type a code from one window and get the account's login refused (and held).
+ * Waits up to `waitMs` for another run's login; after that it goes ahead anyway, because a stuck
+ * lock must never be what keeps the stop button from logging in.
+ */
+export async function takeLoginLock(
+  stateDir: string,
+  broker: QuantiplyBroker,
+  opts: { waitMs?: number; pollMs?: number } = {},
+): Promise<() => Promise<void>> {
+  const path = lockPath(stateDir, broker);
+  const deadline = Date.now() + (opts.waitMs ?? 150_000);
+  await mkdir(stateDir, { recursive: true }).catch(() => undefined);
+  for (;;) {
+    try {
+      await writeFile(path, `${JSON.stringify({ pid: process.pid, at: Date.now() })}\n`, {
+        flag: 'wx',
+      });
+      return () => rm(path, { force: true }).catch(() => undefined);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') return async () => undefined;
+    }
+    type Lock = { pid?: number; at?: number };
+    // unreadable: just created and not yet written, or torn: judged by its age alone
+    const held = await readJson<Lock>(path).catch(
+      async (): Promise<Lock> => ({ at: (await stat(path).catch(() => null))?.mtimeMs ?? 0 }),
+    );
+    const alive = typeof held.pid === 'number' ? pidAlive(held.pid) : true;
+    const fresh = typeof held.at === 'number' && Date.now() - held.at < LOCK_STALE_MS;
+    if (!alive || !fresh) {
+      await rm(path, { force: true }).catch(() => undefined);
+      continue;
+    }
+    if (Date.now() >= deadline) {
+      console.log(`  another Quantiply login (pid ${held.pid}) still holds ${path}: going ahead`);
+      return async () => undefined;
+    }
+    await new Promise((r) => setTimeout(r, opts.pollMs ?? 1_000));
+  }
+}
+
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+async function openLocked(
+  c: QCredentials,
+  stateDir: string,
+  opts: { headed?: boolean; retryTotpOnce?: boolean },
 ): Promise<QuantiplyApi> {
   for (let attempt = 1; ; attempt += 1) {
     await waitOutTotpWindow(stateDir, c.broker);

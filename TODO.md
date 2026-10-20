@@ -787,4 +787,4 @@ second confirm tap.
 
 | # | Task | Owner | State |
 |---|---|---|---|
-| 3.35.4 | Phase 4: stop button (`apps/scheduler/src/stop-button.ts` listener, `packages/broker-login/src/stop-button.ts` runner, hold marker, paused jobs) | claude | **Built 2026-10-20**, stand-in tested, never sent live; off until `STOP_BUTTON=on` + scheduler restart. Done when the owner has pressed it once on a day of their choice |
+| 3.35.4 | Phase 4: stop button (`apps/scheduler/src/stop-button.ts` listener, `packages/broker-login/src/stop-button.ts` runner, a hold that lasts until Resume, held jobs) | claude | **Built 2026-10-20** (review fixes in), stand-in tested, never sent live; off until `STOP_BUTTON=on` + scheduler restart. Done when the owner has pressed it once on a day of their choice |

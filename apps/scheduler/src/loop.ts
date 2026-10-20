@@ -53,11 +53,6 @@ export interface LoopOptions {
   jobs: Job[];
   alerts: AlertSink;
   tickMs?: number;
-  /**
-   * BL-143: is this job paused by today's stop-button hold (`StopHold.pauses`)? A paused slot is
-   * recorded as held and never run or caught up.
-   */
-  paused?: (job: Job, now: Date) => boolean;
 }
 
 /**
@@ -65,13 +60,7 @@ export interface LoopOptions {
  * due (without waiting for it), report what was missed. A job already in
  * flight in this process is never started twice.
  */
-export function startLoop({
-  ctx,
-  jobs,
-  alerts,
-  tickMs = 30_000,
-  paused = () => false,
-}: LoopOptions): () => void {
+export function startLoop({ ctx, jobs, alerts, tickMs = 30_000 }: LoopOptions): () => void {
   const now = ctx.now ?? (() => new Date());
   ctx.history.firstStart(now());
   // Per job, not the scheduler's first start: a job added since then has no slots to miss
@@ -100,10 +89,6 @@ export function startLoop({
       const reason = `missed: the scheduler was not running at ${formatIst(decision.slot)} IST`;
       ctx.history.recordMissed(job.id, decision.slot, now(), reason);
       void alertMissed(alerts, job, decision.slot);
-    } else if (decision.kind === 'run' && paused(job, now())) {
-      const reason = 'held: the stop button holds this job for the rest of today';
-      ctx.history.recordHeld(job.id, decision.slot, now(), reason);
-      console.log(`${formatIst(now())} ${job.id}: ${reason}`);
     } else if (decision.kind === 'run') {
       inFlight.add(job.id);
       console.log(`${formatIst(now())} start ${job.id} (${decision.trigger})`);

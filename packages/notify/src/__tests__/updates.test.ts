@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { registerSecret } from '../secrets.js';
+import { TELEGRAM_MAX_TEXT, sendTextChecked, splitText } from '../telegram.js';
 import { answerCallbackQuery, getUpdates } from '../updates.js';
 
 /** A stand-in for Telegram's API: never the real one. */
@@ -58,5 +59,30 @@ describe('answerCallbackQuery', () => {
     await answerCallbackQuery('tok', 'cb-1', 'Stopping', stub(200, { ok: true }, seen));
     expect(seen[0]?.url).toBe('https://api.telegram.org/bottok/answerCallbackQuery');
     expect(seen[0]?.body).toEqual({ callback_query_id: 'cb-1', text: 'Stopping' });
+  });
+});
+
+describe('sendTextChecked / splitText', () => {
+  it('splits a long report into numbered parts under the limit, on line breaks', () => {
+    const text = Array.from({ length: 300 }, (_, i) => `line ${i} ${'x'.repeat(40)}`).join('\n');
+    const parts = splitText(text);
+    expect(parts.length).toBeGreaterThan(1);
+    for (const p of parts) expect(p.length).toBeLessThanOrEqual(TELEGRAM_MAX_TEXT);
+    expect(parts[0]?.startsWith(`(1/${parts.length})\n`)).toBe(true);
+    expect(splitText('short')).toEqual(['short']);
+    // one line longer than the limit is cut, not lost
+    expect(
+      splitText('y'.repeat(9000))
+        .join('')
+        .replace(/\(\d\/\d\)\n/g, ''),
+    ).toHaveLength(9000);
+  });
+
+  it('is true only when Telegram took every part', async () => {
+    const seen: Array<{ url: string; body: unknown }> = [];
+    const cfg = { botToken: 'tok', chatId: '1' };
+    expect(await sendTextChecked(cfg, 'hi', stub(200, { ok: true }, seen))).toBe(true);
+    expect(await sendTextChecked(cfg, 'hi', stub(400, { ok: false }, seen))).toBe(false);
+    expect(await sendTextChecked(null, 'hi')).toBe(false);
   });
 });

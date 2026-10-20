@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { appendFile, mkdir, rm, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { redact } from './secrets.js';
 import { istToday } from './strategy-plan.js';
@@ -7,22 +7,24 @@ import { istToday } from './strategy-plan.js';
 /**
  * BL-143 Phase 4: the stop button's hold marker and log, under `TRADING_DATA_ROOT/stop/`.
  *
- * - `hold-<IST day>.json`: written first by a confirmed stop. While today's exists, the AlgoTest
- *   deployer (`strategy-deploy.ts`), both uploaders (`strategy-upload.ts`, `quantiply-upload.ts`)
- *   and the Quantiply enabler (`quantiply-deploy.ts --mode enable`) change nothing with `--apply`,
- *   and the scheduler pauses their jobs (`apps/scheduler/src/stop-hold.ts`, the same path). It holds
- *   for the rest of the IST day only: tomorrow's file name is different. The disable safety net is
- *   never held.
- * - `<IST day>.jsonl`: every step of the day's stop, from the listener (the taps) and the runner
- *   (each call and its answer), one JSON line each. Never a token or a password (redacted).
+ * - `HOLD.json`: written FIRST by a confirmed stop (a stop that cannot write it does nothing else
+ *   and says so). It holds until the owner clears it (owner's decision via the coordinator,
+ *   2026-10-20: persistent across days): `stop-button.ts --clear-hold`, or Telegram's Resume
+ *   button with its confirm tap. While it exists the AlgoTest deployer (`strategy-deploy.ts`),
+ *   both uploaders (`strategy-upload.ts`, `quantiply-upload.ts`) and the Quantiply enabler
+ *   (`quantiply-deploy.ts --mode enable`) change nothing with `--apply`, and the scheduler
+ *   refuses to run their jobs (`apps/scheduler/src/stop-hold.ts`, the same path; both packages'
+ *   tests pin it). The disable safety net is never held.
+ * - `<IST day>.jsonl`: every step of a stop or a resume, from the listener (the taps) and the
+ *   runner (each call and its answer), one JSON line each. Never a token or a password.
  */
 
 export function stopDir(dataRoot: string): string {
   return join(dataRoot, 'stop');
 }
 
-export function holdPath(dataRoot: string, day: string): string {
-  return join(stopDir(dataRoot), `hold-${day}.json`);
+export function holdPath(dataRoot: string): string {
+  return join(stopDir(dataRoot), 'HOLD.json');
 }
 
 export function stopLogPath(dataRoot: string, day: string): string {
@@ -30,55 +32,56 @@ export function stopLogPath(dataRoot: string, day: string): string {
 }
 
 export interface Hold {
-  day: string;
   at: string;
   by: string;
 }
 
-/** Today's hold, or null. An unreadable file still holds (it exists): never fail open. */
-export function readHold(dataRoot: string, day: string = istToday()): Hold | null {
-  const path = holdPath(dataRoot, day);
+/** The hold, or null. An unreadable file still holds (it exists): never fail open. */
+export function readHold(dataRoot: string): Hold | null {
+  const path = holdPath(dataRoot);
   if (!existsSync(path)) return null;
   try {
     const h = JSON.parse(readFileSync(path, 'utf8')) as Partial<Hold>;
-    return { day, at: String(h.at ?? '?'), by: String(h.by ?? '?') };
+    return { at: String(h.at ?? '?'), by: String(h.by ?? '?') };
   } catch {
-    return { day, at: '?', by: 'unreadable hold file' };
+    return { at: '?', by: 'unreadable hold file' };
   }
 }
 
+/** Writes the hold, then reads it back: throws unless it is really there. */
 export async function writeHold(
   dataRoot: string,
   by: string,
   now: Date = new Date(),
 ): Promise<string> {
-  const day = istToday(now);
   await mkdir(stopDir(dataRoot), { recursive: true });
-  const path = holdPath(dataRoot, day);
-  await writeFile(path, `${JSON.stringify({ day, at: now.toISOString(), by })}\n`, 'utf8');
+  const path = holdPath(dataRoot);
+  // an existing hold keeps its first time: the owner sees since when nothing has been deployed
+  const since = readHold(dataRoot)?.at;
+  await writeFile(path, `${JSON.stringify({ at: since ?? now.toISOString(), by })}\n`, 'utf8');
+  if (!readHold(dataRoot)) throw new Error(`${path} is not readable after writing it`);
   return path;
 }
 
-export async function clearHold(dataRoot: string, day: string = istToday()): Promise<boolean> {
-  const path = holdPath(dataRoot, day);
+/** Lifts the hold; the file is kept, renamed, as a record. False when there was none. */
+export async function clearHold(dataRoot: string, now: Date = new Date()): Promise<boolean> {
+  const path = holdPath(dataRoot);
   if (!existsSync(path)) return false;
-  await rm(path);
+  const stamp = now.toISOString().replace(/[:.]/g, '-');
+  await rename(path, join(stopDir(dataRoot), `HOLD-cleared-${stamp}.json`));
   return true;
 }
 
 /**
- * For the deployers and uploaders: why an `--apply` run must change nothing today, or null.
- * Reads `TRADING_DATA_ROOT` from the environment; without it there is no hold to find.
+ * For the deployers and uploaders: why an `--apply` run must change nothing, or null. Reads
+ * `TRADING_DATA_ROOT` from the environment; without it there is no hold to find.
  */
-export function stopHeld(
-  env: NodeJS.ProcessEnv = process.env,
-  now: Date = new Date(),
-): string | null {
+export function stopHeld(env: NodeJS.ProcessEnv = process.env): string | null {
   const root = env.TRADING_DATA_ROOT?.trim();
   if (!root) return null;
-  const hold = readHold(root, istToday(now));
+  const hold = readHold(root);
   if (!hold) return null;
-  return `held by the stop button since ${hold.at} (${holdPath(root, hold.day)}): nothing changed today. Clear it with: tsx src/stop-button.ts --clear-hold`;
+  return `held by the stop button since ${hold.at} (${holdPath(root)}): nothing changed. Lift it with Resume in Telegram, or: cd packages/broker-login && node_modules/.bin/tsx src/stop-button.ts --clear-hold`;
 }
 
 /** One line of the stop log. Never throws: the log must not be what stops a stop. */

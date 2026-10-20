@@ -88,19 +88,6 @@ export class History {
   }
 
   /** Record a slot that was too late to catch up, so it is reported once. */
-  /**
-   * A slot the stop button paused (BL-143): served, so it is neither run nor caught up later, and
-   * not a failure (exit 0, no attempts); `reason` says why.
-   */
-  recordHeld(job: string, scheduledFor: Date, at: Date, reason: string): void {
-    this.db
-      .query(
-        `INSERT INTO runs (job, trigger, scheduled_for, started_at, ended_at, exit_code, attempts, log_path, error)
-         VALUES (?, 'schedule', ?, ?, ?, 0, 0, '', ?)`,
-      )
-      .run(job, scheduledFor.toISOString(), at.toISOString(), at.toISOString(), reason);
-  }
-
   recordMissed(job: string, scheduledFor: Date, at: Date, reason: string): void {
     this.db
       .query(

@@ -5,8 +5,7 @@ import { join } from 'node:path';
 import type { Action, TgUpdate, UpdatesResult } from '@trading/notify';
 import { History } from '../history.js';
 import { JOBS, type Job } from '../jobs.js';
-import { startLoop } from '../loop.js';
-import type { BuiltinContext } from '../runner.js';
+import { type BuiltinContext, runJob } from '../runner.js';
 import { istAt } from '../schedule.js';
 import {
   CONFIRM_TTL_MS,
@@ -15,11 +14,11 @@ import {
   stopButtonProblem,
   withStopOffer,
 } from '../stop-button.js';
-import { STOP_HELD_JOBS, StopHold, holdFile } from '../stop-hold.js';
+import { type HoldInfo, STOP_HELD_JOBS, heldReason, holdFile, readHold } from '../stop-hold.js';
 
 /**
- * The stop button's two taps against a stand-in Telegram port: never the real API, never the
- * real runner (its plan and apply are stubs that only count their calls).
+ * The stop button's taps against a stand-in Telegram port: never the real API, never the real
+ * runner (its plan, apply and resume are stubs that only count their calls).
  */
 
 const OWNER = 111;
@@ -32,14 +31,16 @@ interface Sent {
   buttons?: Action[] | undefined;
 }
 
-function harness(opts: { applyCode?: number } = {}) {
+function harness(opts: { applyCode?: number; held?: HoldInfo | null } = {}) {
   let now = at;
+  let hold: HoldInfo | null = opts.held ?? null;
   const sent: Sent[] = [];
   const answers: string[] = [];
   const logs: Record<string, unknown>[] = [];
-  const marked: string[] = [];
   let plans = 0;
+  let n = 0;
   const applies: string[] = [];
+  const resumes: string[] = [];
   const port: StopPort = {
     send: async (text, buttons) => {
       sent.push({ text, buttons });
@@ -59,14 +60,23 @@ function harness(opts: { applyCode?: number } = {}) {
     },
     apply: async (by) => {
       applies.push(by);
+      hold = { at: now.toISOString(), by };
       return { code: opts.applyCode ?? 0, logPath: '/tmp/x.log' };
     },
+    resume: async (by) => {
+      resumes.push(by);
+      hold = null;
+      return { code: 0 };
+    },
+    hold: () => hold,
     log: (row) => {
       logs.push(row);
     },
-    hold: { mark: (d) => marked.push(d) },
     runningHeldJobs: () => [],
-    nonce: () => 'n1',
+    nonce: () => {
+      n += 1;
+      return `n${n}`;
+    },
   });
   let id = 0;
   const next = () => {
@@ -91,8 +101,8 @@ function harness(opts: { applyCode?: number } = {}) {
     sent,
     answers,
     logs,
-    marked,
     applies,
+    resumes,
     plans: () => plans,
     tap,
     msg,
@@ -120,10 +130,11 @@ describe('stop button: who may press it', () => {
     await h.button.handle(h.tap('stop:ask:2026-10-20', GROUP, OWNER));
     await h.button.handle(h.tap('stop:ask:2026-10-20', OWNER, STRANGER));
     await h.button.handle(h.tap('stop:go:n1', STRANGER, STRANGER));
+    await h.button.handle(h.tap('stop:rgo:n1', STRANGER, STRANGER));
     expect(h.sent).toEqual([]);
     expect(h.answers).toEqual([]);
     expect(h.plans()).toBe(0);
-    expect(h.logs.filter((l) => l.event === 'ignored')).toHaveLength(5);
+    expect(h.logs.filter((l) => l.event === 'ignored')).toHaveLength(6);
   });
 
   it('ignores the owner’s other messages', async () => {
@@ -150,12 +161,22 @@ describe('stop button: two taps', () => {
     await h.button.handle(h.tap('stop:go:n1'));
     await h.button.idle();
     expect(h.applies).toHaveLength(1);
-    expect(h.marked).toEqual(['2026-10-20']);
     // the same nonce again: refused
     await h.button.handle(h.tap('stop:go:n1'));
     await h.button.idle();
     expect(h.applies).toHaveLength(1);
     expect(h.answers.at(-1)).toContain('nothing done');
+  });
+
+  it('a double tap on the offer re-sends the same confirm: the first Yes still works', async () => {
+    const h = harness();
+    await h.button.handle(h.tap('stop:ask:2026-10-20'));
+    await h.button.handle(h.tap('stop:ask:2026-10-20'));
+    const data = h.sent.map((s) => s.buttons?.[0]?.data);
+    expect(data).toEqual(['stop:go:n1', 'stop:go:n1']);
+    await h.button.handle(h.tap('stop:go:n1'));
+    await h.button.idle();
+    expect(h.applies).toHaveLength(1);
   });
 
   it('a confirm older than 2 minutes does nothing', async () => {
@@ -164,7 +185,6 @@ describe('stop button: two taps', () => {
     h.advance(CONFIRM_TTL_MS + 1000);
     await h.button.handle(h.tap('stop:go:n1'));
     expect(h.applies).toEqual([]);
-    expect(h.marked).toEqual([]);
     expect(h.answers.at(-1)).toContain('Expired');
   });
 
@@ -184,16 +204,74 @@ describe('stop button: two taps', () => {
     expect(h.answers.at(-1)).toContain('send /stop');
   });
 
-  it('a runner that ends badly is reported for the owner to act by hand', async () => {
-    const h = harness({ applyCode: 1 });
-    await h.button.handle(h.tap('stop:ask:2026-10-20'));
-    await h.button.handle(h.tap('stop:go:n1'));
-    await h.button.idle();
-    expect(h.sent.at(-1)?.text).toContain('BY HAND');
+  it('says what each runner exit means for the owner', async () => {
+    const cases: Array<[number, RegExp | null]> = [
+      [0, null],
+      [3, null], // the runner sent its own report
+      [2, /did NOTHING: STOP_BUTTON is not "on" in the repo-root .env/],
+      [4, /report could not be delivered/],
+      [1, /BY HAND/],
+    ];
+    for (const [code, want] of cases) {
+      const h = harness({ applyCode: code });
+      await h.button.handle(h.tap('stop:ask:2026-10-20'));
+      await h.button.handle(h.tap('stop:go:n1'));
+      await h.button.idle();
+      const last = h.sent.at(-1)?.text ?? '';
+      if (want) expect(last).toMatch(want);
+      else expect(last).toContain('Stop confirmed');
+    }
   });
 });
 
-describe('stop button: configuration', () => {
+describe('stop button: the hold until the owner lifts it', () => {
+  const held: HoldInfo = { at: '2026-10-19T04:00:00Z', by: 'telegram' };
+
+  it('while held, /stop says so and offers Resume as well', async () => {
+    const h = harness({ held });
+    await h.button.handle(h.msg('/stop'));
+    expect(h.sent[0]?.text).toContain('stop hold is ON');
+    expect(h.sent[0]?.buttons?.map((b) => b.data)).toEqual([
+      'stop:ask:2026-10-20',
+      'stop:resume:2026-10-20',
+    ]);
+  });
+
+  it('Resume needs its own confirm tap, then lifts the hold', async () => {
+    const h = harness({ held });
+    await h.button.handle(h.tap('stop:resume:2026-10-20'));
+    expect(h.resumes).toEqual([]);
+    expect(h.sent.at(-1)?.buttons?.[0]).toEqual({
+      label: 'Yes, lift the hold',
+      data: 'stop:rgo:n1',
+    });
+    // a stop nonce never lifts the hold, nor a resume nonce stop anything
+    await h.button.handle(h.tap('stop:go:n1'));
+    expect(h.applies).toEqual([]);
+    await h.button.handle(h.tap('stop:rgo:n1'));
+    expect(h.resumes).toHaveLength(1);
+    expect(h.sent.at(-1)?.text).toContain('hold is lifted');
+    // used once
+    await h.button.handle(h.tap('stop:rgo:n1'));
+    expect(h.resumes).toHaveLength(1);
+  });
+
+  it('/resume with no hold says there is nothing to lift', async () => {
+    const h = harness();
+    await h.button.handle(h.msg('/resume'));
+    expect(h.sent.at(-1)?.text).toContain('No stop hold is on');
+  });
+
+  it('an expired Resume confirm does nothing', async () => {
+    const h = harness({ held });
+    await h.button.handle(h.msg('/resume'));
+    h.advance(CONFIRM_TTL_MS + 1000);
+    await h.button.handle(h.tap('stop:rgo:n1'));
+    expect(h.resumes).toEqual([]);
+  });
+});
+
+describe('stop button: configuration and the morning message', () => {
   const ok = {
     TELEGRAM_BOT_TOKEN: 't',
     TELEGRAM_CHAT_ID: '111',
@@ -208,26 +286,41 @@ describe('stop button: configuration', () => {
     expect(stopButtonProblem({ ...ok, TRADING_DATA_ROOT: '' })).toContain('TRADING_DATA_ROOT');
   });
 
-  it('the morning summary carries the offer only with STOP_BUTTON=on', async () => {
-    const sent: Sent[] = [];
-    const port = () => ({
-      send: async (text: string, buttons?: Action[]) => {
-        sent.push({ text, buttons });
-      },
-      answer: async () => undefined,
-      getUpdates: async (): Promise<UpdatesResult> => ({ ok: true, updates: [] }),
-    });
-    const summary = async () => ({ code: 0, error: null });
-    const ctx = (env: Record<string, string>) =>
-      ({ env, now: () => at }) as unknown as BuiltinContext;
-    await withStopOffer(summary, port)(ctx(ok));
-    expect(sent).toEqual([]);
-    await withStopOffer(summary, port)(ctx({ ...ok, STOP_BUTTON: 'on' }));
-    expect(sent[0]?.buttons?.[0]?.data).toBe('stop:ask:2026-10-20');
+  it('the morning message: the offer with STOP_BUTTON=on, the hold line every day it is on', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'stop-am-'));
+    try {
+      const sent: Sent[] = [];
+      const port = () => ({
+        send: async (text: string, buttons?: Action[]) => {
+          sent.push({ text, buttons });
+        },
+        answer: async () => undefined,
+        getUpdates: async (): Promise<UpdatesResult> => ({ ok: true, updates: [] }),
+      });
+      const summary = async () => ({ code: 0, error: null });
+      const ctx = (env: Record<string, string>) =>
+        ({ env, now: () => at, log: () => undefined }) as unknown as BuiltinContext;
+      const env = { ...ok, TRADING_DATA_ROOT: root };
+      await withStopOffer(summary, port)(ctx(env));
+      expect(sent).toEqual([]);
+      await withStopOffer(summary, port)(ctx({ ...env, STOP_BUTTON: 'on' }));
+      expect(sent[0]?.buttons?.map((b) => b.data)).toEqual(['stop:ask:2026-10-20']);
+      mkdirSync(join(root, 'stop'));
+      writeFileSync(holdFile(root), JSON.stringify({ at: '2026-10-19T04:00:00Z', by: 'x' }));
+      await withStopOffer(summary, port)(ctx({ ...env, STOP_BUTTON: 'on' }));
+      expect(sent[1]?.text).toContain('stop hold is ON');
+      expect(sent[1]?.buttons?.map((b) => b.data)).toContain('stop:resume:2026-10-20');
+      // the button off: still says the hold is on
+      await withStopOffer(summary, port)(ctx(env));
+      expect(sent[2]?.text).toContain('stop hold is ON');
+      expect(sent[2]?.buttons).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
-describe('stop hold: pauses the jobs that could deploy or enable', () => {
+describe('stop hold: no job that could upload, deploy or enable runs while it is on', () => {
   let root: string;
   let history: History;
   beforeEach(() => {
@@ -239,35 +332,31 @@ describe('stop hold: pauses the jobs that could deploy or enable', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('every paused job exists, and the disable safety net is never paused', () => {
+  it('every held job exists, and the disable safety net is never held', () => {
     for (const id of STOP_HELD_JOBS) expect(JOBS.some((j) => j.id === id)).toBe(true);
     expect(STOP_HELD_JOBS).not.toContain('quantiply-disable');
   });
 
-  it('reads the same file broker-login writes, for today only', () => {
-    expect(holdFile(root, '2026-10-20')).toBe(join(root, 'stop', 'hold-2026-10-20.json'));
-    const hold = new StopHold({ TRADING_DATA_ROOT: root });
-    const deploy = JOBS.find((j) => j.id === 'algotest-deploy') as Job;
-    const disable = JOBS.find((j) => j.id === 'quantiply-disable') as Job;
-    expect(hold.pauses(deploy, at)).toBe(false);
-    mkdirSync(join(root, 'stop'), { recursive: true });
-    writeFileSync(holdFile(root, '2026-10-20'), '{}');
-    expect(hold.pauses(deploy, at)).toBe(true);
-    expect(hold.pauses(disable, at)).toBe(false);
-    expect(hold.pauses(deploy, istAt('2026-10-21', '09:16'))).toBe(false);
-    // a stop confirmed in this process holds even without the file
-    const memory = new StopHold({});
-    memory.mark('2026-10-21');
-    expect(memory.pauses(deploy, istAt('2026-10-21', '09:16'))).toBe(true);
+  it('reads the same file broker-login writes, until it is lifted, any day', () => {
+    expect(holdFile(root)).toBe(join(root, 'stop', 'HOLD.json'));
+    const env = { TRADING_DATA_ROOT: root };
+    expect(heldReason('algotest-deploy', env)).toBeNull();
+    mkdirSync(join(root, 'stop'));
+    writeFileSync(holdFile(root), 'not json');
+    expect(readHold(env)?.by).toBe('unreadable hold file'); // still holds
+    expect(heldReason('algotest-deploy', env)).toContain('held');
+    expect(heldReason('quantiply-disable', env)).toBeNull();
   });
 
-  it('the loop records a paused slot as held and never runs it', () => {
-    history.firstStart(new Date('2026-01-01T00:00:00Z'));
+  it('runJob records a held job as held, whoever started it, and runs nothing', async () => {
+    mkdirSync(join(root, 'stop'));
+    writeFileSync(holdFile(root), JSON.stringify({ at: '2026-10-19T04:00:00Z', by: 'x' }));
+    const marker = join(root, 'ran');
     const job: Job = {
-      id: 'algotest-deploy',
+      id: 'quantiply-evening',
       description: 'x',
-      schedule: { at: '09:16', on: () => true, label: '' },
-      steps: [['/bin/sh', '-c', 'exit 9']],
+      schedule: { at: '16:45', on: () => true, label: '' },
+      steps: [['/bin/sh', '-c', `touch ${marker}`]],
       cwd: '.',
       timeoutMinutes: 1,
       retries: 0,
@@ -275,22 +364,19 @@ describe('stop hold: pauses the jobs that could deploy or enable', () => {
       catchUpHours: 0,
       fixHint: '',
     };
-    const now = istAt('2026-10-20', '09:16');
-    history.jobFirstSeen(job.id, istAt('2026-10-19', '00:00'));
-    const sent: string[] = [];
-    const stop = startLoop({
-      ctx: { repoRoot: '.', env: {}, logDir: tmpdir(), history, now: () => now },
+    const ctx = {
+      repoRoot: '/',
+      env: { TRADING_DATA_ROOT: root, PATH: process.env.PATH ?? '' },
+      logDir: root,
+      history,
       jobs: [job],
-      alerts: async (t) => {
-        sent.push(t);
-      },
-      paused: () => true,
-    });
-    stop();
-    const row = history.forSlot(job.id, istAt('2026-10-20', '09:16'));
-    expect(row?.exit_code).toBe(0);
-    expect(row?.attempts).toBe(0);
-    expect(row?.error).toContain('stop button');
-    expect(sent).toEqual([]);
+    };
+    for (const trigger of ['schedule', 'manual'] as const) {
+      const r = await runJob(job, ctx, trigger);
+      expect(r.ok).toBe(true);
+      expect(r.attempts).toBe(0);
+      expect(r.error).toContain('stop button');
+    }
+    expect(await Bun.file(marker).exists()).toBe(false);
   });
 });

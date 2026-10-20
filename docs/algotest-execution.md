@@ -258,8 +258,10 @@ cards' buttons call, on `api.algotest.in` with the same cookies and `X-CSRF-TOKE
 Statuses: `StrategyStatus.Live`, `StrategyStatus.Error`, `StrategyStatus.SquaredOff`, `StrategyStatus.Stopped`,
 `paused`. The app offers Square Off only when the status is Live or Error **and** `active_on_server` (its
 `canSquareOff`); otherwise it offers Restart. The stop button (`packages/broker-login/src/stop-button.ts`) uses
-only the list and the per-execution square-off, for executions named `T1 · ` / `Core · `; never `stop` (switching
-to manual would leave positions open) and never the bulk call. Not sent yet: the first is the owner's.
+only the list and the per-execution square-off, for the tool's executions (by the uploader's strategy id, a name it
+saved, or the `T1 · ` / `Core · ` prefix); never `stop` (switching to manual would leave positions open) and never
+the bulk call. It waits while a card shows `pending_square_off` and never calls that "square off by hand"; a
+`Stopped` deploy is reported for a check (its legs may be open). Not sent yet: the first is the owner's.
 
 <a id="pending"></a>
 

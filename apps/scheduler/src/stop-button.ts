@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { appendFileSync, closeSync, mkdirSync, openSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   type Action,
@@ -15,32 +15,36 @@ import {
 import type { History } from './history.js';
 import type { Builtin } from './runner.js';
 import { formatIst, istDay } from './schedule.js';
-import { STOP_HELD_JOBS, type StopHold } from './stop-hold.js';
+import { type HoldInfo, STOP_HELD_JOBS, readHold } from './stop-hold.js';
 
 /**
  * BL-143 Phase 4: the owner's Telegram "stop everything" button. Owner's answer (2026-10-20):
  * switch off AND square off, only after a second confirm tap. The stop itself is
  * `packages/broker-login/src/stop-button.ts --apply`, started from here; this file is the
- * listener and the two taps.
+ * listener and the taps.
  *
- * - Off unless `STOP_BUTTON=on` in `.env`; then `jobs serve` long-polls the bot (`getUpdates`).
- *   ONE consumer per bot: nothing else may poll it (Telegram answers 409 to a second poller).
+ * - Off unless `STOP_BUTTON=on` in the repo-root `.env`; then `jobs serve` long-polls the bot
+ *   (`getUpdates`). ONE consumer per bot: nothing else may poll it (a second poller gets 409).
  * - Only the owner's own private chat counts: `TELEGRAM_CHAT_ID`, a user id (positive), which must
  *   be both the chat and the sender, and never the friends' group (`TELEGRAM_ROTATION_CHAT_ID`).
  *   Anything else is ignored and logged.
  * - `/stop`, or the 09:00 morning message, offers a "Stop everything" button (`stop:ask:<day>`,
  *   good for that IST day only; it only shows the plan).
  * - Its tap shows exactly what a stop would do per platform (`stop-button.ts --plan`, the local
- *   ledgers, no login) and a "Yes, stop and square off" button carrying a fresh nonce
- *   (`stop:go:<nonce>`): valid for 2 minutes, once, and only the latest one. A restart forgets
- *   every nonce.
- * - Only that second tap acts: today is held at once (in memory too), the runner starts, and its
- *   per-platform report comes back in Telegram. Every tap is a line in
- *   `TRADING_DATA_ROOT/stop/<day>.jsonl`.
+ *   ledgers, no login) and a "Yes, stop and square off" button carrying a nonce
+ *   (`stop:go:<nonce>`): valid for 2 minutes, once. A second tap on the offer while it is valid
+ *   re-sends the same nonce, so the first confirm still works. A restart forgets every nonce.
+ * - Only that second tap acts: the runner writes the hold first (or does nothing and says so),
+ *   squares off and switches off, and its per-platform report comes back in Telegram.
+ * - The hold lasts until the owner lifts it: `/resume` or the morning message's Resume button,
+ *   then a confirm tap (`stop:rgo:<nonce>`, same rules), runs `stop-button.ts --clear-hold`.
+ *   While it is on, the 09:00 message says so every day.
+ * - Every tap is a line in `TRADING_DATA_ROOT/stop/<day>.jsonl`.
  */
 
 export const CONFIRM_TTL_MS = 2 * 60_000;
-const COMMAND = /^\/stop(@[A-Za-z0-9_]+)?\s*$/;
+const STOP_COMMAND = /^\/stop(@[A-Za-z0-9_]+)?\s*$/;
+const RESUME_COMMAND = /^\/resume(@[A-Za-z0-9_]+)?\s*$/;
 
 export interface StopPort {
   /** to the owner's chat; `buttons` are callback buttons */
@@ -57,8 +61,11 @@ export interface StopDeps {
   plan: () => Promise<string>;
   /** the runner's `--apply`; resolves with its exit code */
   apply: (by: string) => Promise<{ code: number; logPath: string }>;
+  /** the runner's `--clear-hold` */
+  resume: (by: string) => Promise<{ code: number }>;
+  /** the hold as the file shows it now */
+  hold: () => HoldInfo | null;
   log: (row: Record<string, unknown>) => void;
-  hold: Pick<StopHold, 'mark'>;
   /** held jobs running right now (they may still finish what they started) */
   runningHeldJobs: () => string[];
   nonce?: () => string;
@@ -68,11 +75,27 @@ export function offerButton(day: string): Action {
   return { label: '🛑 Stop everything', data: `stop:ask:${day}` };
 }
 
+export function resumeButton(day: string): Action {
+  return { label: '▶️ Resume (lift the hold)', data: `stop:resume:${day}` };
+}
+
 export const OFFER_TEXT =
   '🛑 Stop everything: tap for what it would do. Nothing happens until you confirm.';
 
+export function holdText(h: HoldInfo): string {
+  return `⛔ The stop hold is ON (since ${h.at}): the tool uploads, enables and deploys nothing, on AlgoTest or Quantiply, until you lift it. The 15:40 Quantiply switch-off still runs.`;
+}
+
+/** The offer, with the hold line and Resume when the hold is on. */
+export function offerMessage(day: string, hold: HoldInfo | null): [string, Action[]] {
+  if (!hold) return [OFFER_TEXT, [offerButton(day)]];
+  return [`${holdText(hold)}\n\n${OFFER_TEXT}`, [offerButton(day), resumeButton(day)]];
+}
+
+type Kind = 'stop' | 'resume';
+
 export class StopButton {
-  private pending: { nonce: string; issued: number } | null = null;
+  private pending = new Map<Kind, { nonce: string; issued: number }>();
   private running: Promise<void> | null = null;
 
   constructor(private readonly d: StopDeps) {}
@@ -84,6 +107,26 @@ export class StopButton {
 
   private ownerOnly(chatId: number | undefined, fromId: number | undefined): boolean {
     return chatId === this.d.ownerChatId && fromId === this.d.ownerChatId;
+  }
+
+  /** The kind's nonce while it is still valid, else a fresh one. */
+  private nonceFor(kind: Kind): string {
+    const now = this.d.now().getTime();
+    const p = this.pending.get(kind);
+    if (p && now - p.issued <= CONFIRM_TTL_MS) return p.nonce;
+    const nonce = (this.d.nonce ?? (() => randomBytes(9).toString('base64url')))();
+    this.pending.set(kind, { nonce, issued: now });
+    return nonce;
+  }
+
+  /** Takes the kind's nonce (once only); why not, when it is not the valid one. */
+  private takeNonce(kind: Kind, nonce: string): string | null {
+    const p = this.pending.get(kind);
+    if (!p || p.nonce !== nonce) return 'Expired or already used: nothing done';
+    this.pending.delete(kind); // once only, whatever happens next
+    if (this.d.now().getTime() - p.issued > CONFIRM_TTL_MS)
+      return 'Expired (2 minutes): nothing done';
+    return null;
   }
 
   async handle(u: TgUpdate): Promise<void> {
@@ -99,10 +142,16 @@ export class StopButton {
         });
         return;
       }
-      if (!COMMAND.test(m.text ?? '')) return; // the owner's other messages are not for this
-      this.d.log({ event: 'offer', via: '/stop' });
-      await this.d.port.send(OFFER_TEXT, [offerButton(today)]);
-      return;
+      const text = m.text ?? '';
+      if (STOP_COMMAND.test(text)) {
+        this.d.log({ event: 'offer', via: '/stop' });
+        const [t, b] = offerMessage(today, this.d.hold());
+        await this.d.port.send(t, b);
+      } else if (RESUME_COMMAND.test(text)) {
+        this.d.log({ event: 'resume_offer', via: '/resume' });
+        await this.offerResume(today);
+      }
+      return; // the owner's other messages are not for this
     }
     const q = u.callback_query;
     if (!q) return;
@@ -124,8 +173,17 @@ export class StopButton {
     }
     if (step === 'ask') return this.ask(q.id, arg, today);
     if (step === 'go') return this.go(q.id, arg, q.from.id);
+    if (step === 'resume') {
+      if (arg !== today) {
+        await this.d.port.answer(q.id, `That button was for ${arg}: send /resume`);
+        return;
+      }
+      await this.d.port.answer(q.id, 'Asking to confirm…');
+      return this.offerResume(today);
+    }
+    if (step === 'rgo') return this.resume(q.id, arg, q.from.id);
     if (step === 'no') {
-      if (this.pending?.nonce === arg) this.pending = null;
+      for (const [kind, p] of this.pending) if (p.nonce === arg) this.pending.delete(kind);
       this.d.log({ event: 'cancelled' });
       await this.d.port.answer(q.id, 'Cancelled: nothing done');
       return;
@@ -149,12 +207,11 @@ export class StopButton {
       plan = await this.d.plan();
     } catch (error) {
       // the stop matters more than its preview: still offer it, saying the preview failed
-      plan = `⚠️ The plan could not be read (${redact(String(error))}). Confirming still holds today, squares off and switches off the tool's algos and deploys on Quantiply and AlgoTest.`;
+      plan = `⚠️ The plan could not be read (${redact(String(error))}). Confirming still holds the tool, squares off and switches off its algos and deploys on Quantiply and AlgoTest.`;
     }
-    const nonce = (this.d.nonce ?? (() => randomBytes(9).toString('base64url')))();
-    this.pending = { nonce, issued: this.d.now().getTime() };
+    const nonce = this.nonceFor('stop');
     this.d.log({ event: 'confirm_offered' });
-    const paused = `Jobs paused for the rest of today: ${STOP_HELD_JOBS.join(', ')}.`;
+    const paused = `Jobs refused while the hold is on: ${STOP_HELD_JOBS.join(', ')}.`;
     await this.d.port.send(
       `🛑 Stop everything?\n\n${plan}\n\n${paused}\n\nThe button below works once, for 2 minutes.`,
       [
@@ -165,28 +222,17 @@ export class StopButton {
   }
 
   private async go(callbackId: string, nonce: string, fromId: number): Promise<void> {
-    const p = this.pending;
-    const now = this.d.now();
-    if (!p || p.nonce !== nonce) {
-      this.d.log({ event: 'refused', why: 'unknown or used nonce' });
-      await this.d.port.answer(
-        callbackId,
-        'Expired or already used: nothing done. Send /stop again',
-      );
-      return;
-    }
-    this.pending = null; // once only, whatever happens next
-    if (now.getTime() - p.issued > CONFIRM_TTL_MS) {
-      this.d.log({ event: 'refused', why: 'nonce expired' });
-      await this.d.port.answer(callbackId, 'Expired (2 minutes): nothing done. Send /stop again');
+    const why = this.takeNonce('stop', nonce);
+    if (why) {
+      this.d.log({ event: 'refused', why });
+      await this.d.port.answer(callbackId, `${why}. Send /stop again`);
       return;
     }
     if (this.running) {
       await this.d.port.answer(callbackId, 'A stop is already running');
       return;
     }
-    const day = istDay(now);
-    this.d.hold.mark(day);
+    const now = this.d.now();
     this.d.log({ event: 'confirmed', from: fromId });
     await this.d.port.answer(callbackId, 'Stopping now');
     const busy = this.d.runningHeldJobs();
@@ -194,14 +240,22 @@ export class StopButton {
       ? `\n⚠️ Running right now, may still finish what it started: ${busy.join(', ')}. When it ends, check, and stop again if it deployed or enabled something.`
       : '';
     await this.d.port.send(
-      `🛑 Stop confirmed ${formatIst(now)} IST: holding today, switching off and squaring off now. The result follows, per platform.${warn}`,
+      `🛑 Stop confirmed ${formatIst(now)} IST: holding the tool, switching off and squaring off now. The result follows, per platform.${warn}`,
     );
     this.running = (async () => {
       try {
         const r = await this.d.apply(`telegram ${fromId} ${now.toISOString()}`);
         this.d.log({ event: 'runner_exit', code: r.code });
-        // 0 and 3: the runner sent its own report. Anything else: it may not have.
-        if (r.code !== 0 && r.code !== 3) {
+        // 0 and 3: the runner delivered its own report.
+        if (r.code === 2) {
+          await this.d.port.send(
+            '⚠️ The stop did NOTHING: STOP_BUTTON is not "on" in the repo-root .env any more. Stop by hand on Quantiply and algotest.in/live, or set it back and restart the scheduler.',
+          );
+        } else if (r.code === 4) {
+          await this.d.port.send(
+            `⚠️ The stop ran, but its report could not be delivered. Check Quantiply and algotest.in/live, and the log: ${r.logPath}`,
+          );
+        } else if (r.code !== 0 && r.code !== 3) {
           await this.d.port.send(
             `⚠️ The stop runner ended with exit ${r.code}: check Quantiply and algotest.in/live BY HAND now. Log: ${r.logPath}`,
           );
@@ -215,6 +269,51 @@ export class StopButton {
         this.running = null;
       }
     })();
+  }
+
+  private async offerResume(today: string): Promise<void> {
+    const hold = this.d.hold();
+    if (!hold) {
+      await this.d.port.send('▶️ No stop hold is on: nothing to lift.');
+      return;
+    }
+    const nonce = this.nonceFor('resume');
+    this.d.log({ event: 'resume_confirm_offered', day: today });
+    await this.d.port.send(
+      `▶️ Lift the stop hold (on since ${hold.at})?\n\nUploads, enables and deploys resume from each job's next run. A slot the hold refused does not run by itself: run any you need by hand. Nothing is switched back on that the stop switched off.\n\nThe button below works once, for 2 minutes.`,
+      [
+        { label: 'Yes, lift the hold', data: `stop:rgo:${nonce}` },
+        { label: 'Cancel', data: `stop:no:${nonce}` },
+      ],
+    );
+  }
+
+  private async resume(callbackId: string, nonce: string, fromId: number): Promise<void> {
+    const why = this.takeNonce('resume', nonce);
+    if (why) {
+      this.d.log({ event: 'resume_refused', why });
+      await this.d.port.answer(callbackId, `${why}. Send /resume again`);
+      return;
+    }
+    if (this.running) {
+      await this.d.port.answer(callbackId, 'A stop is running: lift the hold after it reports');
+      return;
+    }
+    this.d.log({ event: 'resume_confirmed', from: fromId });
+    await this.d.port.answer(callbackId, 'Lifting the hold');
+    try {
+      const r = await this.d.resume(`telegram ${fromId} ${this.d.now().toISOString()}`);
+      const still = this.d.hold();
+      this.d.log({ event: 'resume_exit', code: r.code, held: still !== null });
+      await this.d.port.send(
+        r.code === 0 && !still
+          ? "▶️ The stop hold is lifted: uploads, enables and deploys run again from each job's next run."
+          : `⚠️ The hold could NOT be lifted (exit ${r.code}): on the laptop run: cd packages/broker-login && node_modules/.bin/tsx src/stop-button.ts --clear-hold`,
+      );
+    } catch (error) {
+      this.d.log({ event: 'resume_error', detail: redact(String(error)) });
+      await this.d.port.send(`⚠️ The hold could NOT be lifted (${redact(String(error))})`);
+    }
   }
 }
 
@@ -277,7 +376,13 @@ function stopLog(env: Record<string, string>) {
 
 const BROKER_LOGIN = 'packages/broker-login';
 
-/** Runs the broker-login runner; `capture` returns stdout (the plan), else logs to a file. */
+/** tsx for broker-login: its own copy, else the hoisted one at the repo root (bun 1.2). */
+function tsxPath(repoRoot: string): string {
+  const own = join(repoRoot, BROKER_LOGIN, 'node_modules/.bin/tsx');
+  return existsSync(own) ? own : join(repoRoot, 'node_modules/.bin/tsx');
+}
+
+/** Runs the broker-login runner; without `logPath` it returns stdout (the plan). */
 function runner(
   repoRoot: string,
   env: () => Record<string, string>,
@@ -292,7 +397,7 @@ function runner(
       mkdirSync(join(logPath, '..'), { recursive: true });
       fd = openSync(logPath, 'a');
     }
-    const child = spawn(join(cwd, 'node_modules/.bin/tsx'), ['src/stop-button.ts', ...args], {
+    const child = spawn(tsxPath(repoRoot), ['src/stop-button.ts', ...args], {
       cwd,
       env: env(),
       stdio: ['ignore', fd ?? 'pipe', fd ?? 'pipe'],
@@ -321,7 +426,6 @@ export interface ListenerOptions {
   env: () => Record<string, string>;
   logDir: string;
   history: History;
-  hold: StopHold;
   port?: StopPort;
 }
 
@@ -341,7 +445,7 @@ export function startStopListener(o: ListenerOptions): (() => void) | null {
     console.error(`stop button: NOT started: ${problem}`);
     if (env.TELEGRAM_BOT_TOKEN?.trim() && env.TELEGRAM_CHAT_ID?.trim())
       void port.send(
-        `⚠️ Stop button NOT started: ${problem}. Fix .env, then restart the scheduler.`,
+        `⚠️ Stop button NOT started: ${problem}. Fix the repo-root .env, then restart the scheduler.`,
       );
     return null;
   }
@@ -351,7 +455,7 @@ export function startStopListener(o: ListenerOptions): (() => void) | null {
     ownerChatId: Number(env.TELEGRAM_CHAT_ID),
     now: () => new Date(),
     log,
-    hold: o.hold,
+    hold: () => readHold(o.env()),
     runningHeldJobs: () =>
       STOP_HELD_JOBS.filter((id) => {
         const last = o.history.last(id);
@@ -372,6 +476,10 @@ export function startStopListener(o: ListenerOptions): (() => void) | null {
       );
       const r = await runner(o.repoRoot, o.env, ['--apply', '--by', by], 15 * 60_000, logPath);
       return { code: r.code, logPath };
+    },
+    resume: async (by) => {
+      const r = await runner(o.repoRoot, o.env, ['--clear-hold', '--by', by], 60_000);
+      return { code: r.code };
     },
   });
   let stopped = false;
@@ -415,16 +523,31 @@ export function startStopListener(o: ListenerOptions): (() => void) | null {
   };
 }
 
-/** The 09:00 morning summary, followed by the stop button's offer when it is on. */
+/**
+ * The 09:00 morning summary, then: while the stop hold is on, a line saying so (every day, with
+ * Resume when the button is on); with the button on, its offer.
+ */
 export function withStopOffer(
   summary: Builtin,
   port?: (env: Record<string, string>) => StopPort,
 ): Builtin {
   return async (ctx) => {
     const result = await summary(ctx);
-    if (stopButtonOn(ctx.env) && !stopButtonProblem(ctx.env)) {
-      await (port ?? telegramPort)(ctx.env).send(OFFER_TEXT, [offerButton(istDay(ctx.now()))]);
+    const hold = readHold(ctx.env);
+    const usable = stopButtonOn(ctx.env) && !stopButtonProblem(ctx.env);
+    const day = istDay(ctx.now());
+    const configured = Boolean(
+      ctx.env.TELEGRAM_BOT_TOKEN?.trim() && ctx.env.TELEGRAM_CHAT_ID?.trim(),
+    );
+    if (usable) {
+      const [text, buttons] = offerMessage(day, hold);
+      await (port ?? telegramPort)(ctx.env).send(text, buttons);
+    } else if (hold && (configured || port)) {
+      await (port ?? telegramPort)(ctx.env).send(
+        `${holdText(hold)}\n\nLift it on the laptop: cd packages/broker-login && node_modules/.bin/tsx src/stop-button.ts --clear-hold`,
+      );
     }
+    if (hold) ctx.log(holdText(hold));
     return result;
   };
 }

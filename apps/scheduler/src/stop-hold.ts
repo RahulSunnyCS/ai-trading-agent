@@ -1,16 +1,18 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Job } from './jobs.js';
-import { istDay } from './schedule.js';
 
 /**
- * BL-143 Phase 4: while today is held by the stop button, these jobs are paused (each slot is
- * recorded as held, never run): every job that could upload, deploy or enable anything. The
- * Quantiply switch-off (`quantiply-disable`) and the read-only checks still run.
+ * BL-143 Phase 4: while the stop button's hold is on, these jobs never run (every path: the
+ * schedule, a catch-up, `jobs run`, the dashboard's Apply now, a job queued behind its group):
+ * `runJob` records the run as held instead. They are every job that could upload, deploy or
+ * enable anything. The Quantiply switch-off (`quantiply-disable`) and the read-only checks still
+ * run.
  *
- * The hold is a file written by the stop runner, `TRADING_DATA_ROOT/stop/hold-<IST day>.json`:
- * the same path as `packages/broker-login/src/stop-hold.ts` (`holdPath`), whose deployers and
- * uploaders also refuse to change anything while it exists. Both packages' tests pin the path.
+ * The hold is a file the stop runner writes before it does anything else, and it lasts until the
+ * owner lifts it (Telegram's Resume, or `stop-button.ts --clear-hold`):
+ * `TRADING_DATA_ROOT/stop/HOLD.json`, the same path as `packages/broker-login/src/stop-hold.ts`
+ * (`holdPath`), whose deployers and uploaders also refuse to change anything while it exists.
+ * Both packages' tests pin the path. A stop that cannot write it does nothing (fail closed).
  */
 export const STOP_HELD_JOBS: readonly string[] = [
   'algotest-evening',
@@ -22,32 +24,34 @@ export const STOP_HELD_JOBS: readonly string[] = [
   'quantiply-deploy-topup',
 ];
 
-export function holdFile(dataRoot: string, day: string): string {
-  return join(dataRoot, 'stop', `hold-${day}.json`);
+export function holdFile(dataRoot: string): string {
+  return join(dataRoot, 'stop', 'HOLD.json');
 }
 
-/**
- * Is today held? The file, or a stop this process confirmed today (`mark`), so a hold that could
- * not be written (an unmounted data volume) still pauses the jobs until the scheduler restarts.
- */
-export class StopHold {
-  private readonly days = new Set<string>();
+export interface HoldInfo {
+  at: string;
+  by: string;
+}
 
-  constructor(private readonly env: Record<string, string>) {}
-
-  mark(day: string): void {
-    this.days.add(day);
+/** The hold, or null. An unreadable file still holds: never fail open. */
+export function readHold(env: Record<string, string>): HoldInfo | null {
+  const root = env.TRADING_DATA_ROOT?.trim();
+  if (!root) return null;
+  const path = holdFile(root);
+  if (!existsSync(path)) return null;
+  try {
+    const h = JSON.parse(readFileSync(path, 'utf8')) as Partial<HoldInfo>;
+    return { at: String(h.at ?? '?'), by: String(h.by ?? '?') };
+  } catch {
+    return { at: '?', by: 'unreadable hold file' };
   }
+}
 
-  held(now: Date): boolean {
-    const day = istDay(now);
-    if (this.days.has(day)) return true;
-    const root = this.env.TRADING_DATA_ROOT?.trim();
-    return Boolean(root && existsSync(holdFile(root, day)));
-  }
-
-  /** The loop's question: is this job paused right now? */
-  pauses(job: Job, now: Date): boolean {
-    return STOP_HELD_JOBS.includes(job.id) && this.held(now);
-  }
+/** Why this job must not run now, or null. */
+export function heldReason(jobId: string, env: Record<string, string>): string | null {
+  if (!STOP_HELD_JOBS.includes(jobId)) return null;
+  const hold = readHold(env);
+  return hold
+    ? `held: the stop button's hold is on (since ${hold.at}); nothing is uploaded, enabled or deployed until it is lifted (Resume in Telegram)`
+    : null;
 }

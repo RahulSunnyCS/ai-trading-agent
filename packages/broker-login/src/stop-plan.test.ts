@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -19,12 +19,16 @@ import {
   A_STOPPED,
   algotestAfter,
   canSquareOff,
+  capped,
   parseExecutions,
   planAlgoTestStop,
   planQuantiplyStop,
   quantiplyLeft,
+  squaringOff,
+  stopSessions,
+  toolMatcher,
 } from './stop-plan.js';
-import { istToday } from './strategy-plan.js';
+import { type LedgerRow, istToday } from './strategy-plan.js';
 
 const row = (id: string, name: string, action: 'create' | 'delete' = 'create'): QLedgerRow => ({
   at: '2026-10-19T11:55:27Z',
@@ -104,19 +108,64 @@ test('Quantiply: what is left after the calls is named for the owner', () => {
   assert.match(left[1] ?? '', /Core · B .*switch off by hand/);
 });
 
-const exec = (id: string, name: string, status: string, active = true) => ({
+const exec = (
+  id: string,
+  name: string,
+  status: string,
+  active = true,
+  extra: Record<string, unknown> = {},
+) => ({
   _id: id,
   name,
   status,
   active_on_server: active,
+  ...extra,
 });
+const TODAY = '2026-10-20';
+const byPrefix = toolMatcher([]);
 
-test('AlgoTest: parse the live list (an array, or {data})', () => {
-  const list = [exec('6ad590af06a3aebabc43634d', 'T1 · X', A_LIVE)];
-  assert.equal(parseExecutions(list)[0]?.activeOnServer, true);
+test('AlgoTest: parse the live list (an array, or {data}), strategy id and deploy day', () => {
+  const list = [
+    exec('6ad590af06a3aebabc43634d', 'T1 · X', A_LIVE, true, {
+      strategy_id: '6ad590af06a3aebabc436300',
+      creation_ts: 1792469700, // 2026-10-20 09:45 IST, in seconds
+    }),
+  ];
+  const [e] = parseExecutions(list);
+  assert.equal(e?.activeOnServer, true);
+  assert.equal(e?.strategyId, '6ad590af06a3aebabc436300');
+  assert.equal(e?.createdDay, TODAY);
   assert.equal(parseExecutions({ data: list })[0]?.name, 'T1 · X');
+  assert.equal(parseExecutions([exec('a', 'x', A_LIVE)])[0]?.createdDay, null);
   assert.throws(() => parseExecutions({}), /not an array/);
   assert.throws(() => parseExecutions([{ name: 'x' }]), /without _id/);
+});
+
+test("AlgoTest: the tool's deploys by the uploader ledger's id or name, the prefix as fallback", () => {
+  const ledger: LedgerRow[] = [
+    {
+      at: 'x',
+      day: TODAY,
+      book: 't1',
+      mode: 'evening',
+      action: 'upload',
+      name: 'Renamed later',
+      sha: 'a',
+      ok: true,
+      id: '6ad590af06a3aebabc436300',
+    },
+  ];
+  const isTool = toolMatcher(ledger);
+  const [byId, byName, byPfx, mine] = parseExecutions([
+    exec('1', 'anything', A_LIVE, true, { strategy: { _id: '6ad590af06a3aebabc436300' } }),
+    exec('2', 'Renamed later', A_LIVE),
+    exec('3', 'Core · X', A_LIVE),
+    exec('4', 'my own', A_LIVE),
+  ]);
+  assert.deepEqual(
+    [byId, byName, byPfx, mine].map((e) => isTool(e as never)),
+    [true, true, true, false],
+  );
 });
 
 test("AlgoTest: square off the tool's live deploys only, by the web app's own rule", () => {
@@ -128,30 +177,32 @@ test("AlgoTest: square off the tool's live deploys only, by the web app's own ru
     exec('5', 'T1 · Done', A_SQUARED_OFF),
     exec('6', 'my own', A_LIVE),
     exec('7', 'my own done', A_STOPPED),
+    exec('8', 'T1 · Squaring', 'pending_square_off'),
+    exec('9', 'T1 · Manual today', A_STOPPED, true, { creation_ts: '2026-10-20T04:00:00Z' }),
+    exec('10', 'T1 · Manual undated', A_STOPPED),
+    exec('11', 'T1 · Manual last week', A_STOPPED, true, { creation_ts: '2026-10-13T04:00:00Z' }),
   ]);
   assert.equal(canSquareOff(execs[2] as never), false);
-  const p = planAlgoTestStop(execs);
-  assert.deepEqual(
-    p.squareOff.map((e) => e.id),
-    ['1', '2'],
-  );
-  assert.deepEqual(
-    p.byHand.map((e) => e.id),
-    ['3', '4'],
-  );
-  assert.deepEqual(
-    p.notMine.map((e) => e.id),
-    ['6'],
-  );
-  assert.equal(p.done, 1);
+  const p = planAlgoTestStop(execs, byPrefix, TODAY);
+  const ids = (xs: Array<{ id: string }>) => xs.map((e) => e.id);
+  assert.deepEqual(ids(p.squareOff), ['1', '2']);
+  assert.deepEqual(ids(p.squaring), ['8']); // never "by hand": AlgoTest is exiting it
+  assert.deepEqual(ids(p.byHand), ['3', '4']);
+  assert.deepEqual(ids(p.check), ['9', '10']); // switched to manual: legs may be open
+  assert.deepEqual(ids(p.notMine), ['6']);
+  assert.equal(p.done, 2);
+  assert.equal(squaringOff('PENDING_SQUARE_OFF'), true);
+  assert.equal(squaringOff('pending_stop'), false);
 });
 
-test('AlgoTest: only squared off counts as confirmed; stopped means positions may be open', () => {
+test('AlgoTest after: squaring off is pending (wait), stopped is a check, never a confirm', () => {
   const targets = parseExecutions([
     exec('1', 'T1 · A', A_LIVE),
     exec('2', 'T1 · B', A_LIVE),
     exec('3', 'T1 · C', A_LIVE),
     exec('4', 'T1 · D', A_LIVE),
+    exec('5', 'T1 · E', A_LIVE),
+    exec('6', 'T1 · F', A_LIVE),
   ]);
   const r = algotestAfter(
     targets,
@@ -159,33 +210,60 @@ test('AlgoTest: only squared off counts as confirmed; stopped means positions ma
       exec('1', 'T1 · A', A_SQUARED_OFF),
       exec('2', 'T1 · B', A_STOPPED),
       exec('3', 'T1 · C', A_LIVE),
+      exec('5', 'T1 · E', 'pending_square_off'),
+      exec('6', 'T1 · F', 'paused'),
     ]),
   );
   assert.deepEqual(r.confirmed, ['T1 · A']);
-  assert.equal(r.pending.length, 1);
-  assert.equal(r.byHand.length, 2);
-  assert.match(r.byHand[0] ?? '', /STOPPED.*square off by hand/);
-  assert.match(r.byHand[1] ?? '', /no longer listed/);
+  assert.equal(r.pending.length, 2);
+  assert.match(r.pending.join(), /T1 · E/);
+  assert.equal(r.check.length, 2);
+  assert.match(r.check[0] ?? '', /T1 · B: switched to manual/);
+  assert.match(r.check[1] ?? '', /T1 · D: no longer listed/);
+  assert.deepEqual(r.byHand, ['T1 · F: paused: square off by hand']);
 });
 
-test('hold: written for today, read back, found by the deployers, cleared', async () => {
+test('stop rows: today and the next session of the algo weekday', () => {
+  assert.deepEqual(stopSessions('2026-10-20', 'TUE'), ['2026-10-20']);
+  assert.deepEqual(stopSessions('2026-10-20', 'WED'), ['2026-10-20', '2026-10-21']);
+  assert.deepEqual(stopSessions('2026-10-20', 'MON'), ['2026-10-20', '2026-10-26']);
+  assert.deepEqual(stopSessions('2026-10-20', 'ELSE'), ['2026-10-20']);
+});
+
+test('capped names a long list in part', () => {
+  assert.equal(capped(['a', 'b'], 3), 'a, b');
+  assert.equal(capped(['a', 'b', 'c', 'd'], 2), 'a, b and 2 more');
+});
+
+test('hold: persistent until cleared, read back, found by the deployers', async () => {
   const root = await mkdtemp(join(tmpdir(), 'stop-hold-'));
   try {
-    const today = istToday();
-    assert.equal(readHold(root, today), null);
+    assert.equal(readHold(root), null);
     assert.equal(stopHeld({ TRADING_DATA_ROOT: root }), null);
-    const path = await writeHold(root, 'test');
-    assert.equal(path, holdPath(root, today));
-    assert.equal(path, join(root, 'stop', `hold-${today}.json`)); // the scheduler reads this path
-    assert.equal(readHold(root, today)?.by, 'test');
+    const path = await writeHold(root, 'test', new Date('2026-10-20T04:00:00Z'));
+    assert.equal(path, holdPath(root));
+    assert.equal(path, join(root, 'stop', 'HOLD.json')); // the scheduler reads this path
+    assert.equal(readHold(root)?.by, 'test');
+    // a second stop keeps the first time
+    await writeHold(root, 'again', new Date('2026-10-22T04:00:00Z'));
+    assert.equal(readHold(root)?.at, '2026-10-20T04:00:00.000Z');
     assert.match(stopHeld({ TRADING_DATA_ROOT: root }) ?? '', /held by the stop button/);
-    // tomorrow is not held
-    const tomorrow = new Date(Date.now() + 86_400_000);
-    assert.equal(stopHeld({ TRADING_DATA_ROOT: root }, tomorrow), null);
     assert.equal(stopHeld({}), null);
-    assert.equal(await clearHold(root, today), true);
-    assert.equal(readHold(root, today), null);
-    assert.equal(await clearHold(root, today), false);
+    assert.equal(await clearHold(root), true);
+    assert.equal(readHold(root), null);
+    assert.equal(await clearHold(root), false);
+    assert.ok((await readdir(join(root, 'stop'))).some((f) => f.startsWith('HOLD-cleared-')));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('hold: an unreadable hold file still holds', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'stop-hold-'));
+  try {
+    await writeHold(root, 'x');
+    await writeFile(holdPath(root), 'not json');
+    assert.match(stopHeld({ TRADING_DATA_ROOT: root }) ?? '', /held/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

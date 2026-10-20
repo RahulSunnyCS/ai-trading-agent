@@ -3,8 +3,9 @@ import { describe } from './diagnose.js';
 import type { QAlgo, QLedgerRow } from './quantiply-plan.js';
 import {
   type Execution,
+  Q_ACTIVE,
   algotestAfter,
-  names,
+  capped,
   parseExecutions,
   planAlgoTestStop,
   planQuantiplyStop,
@@ -16,6 +17,10 @@ import {
  * run them against stand-in HTTP servers (`stop-run.test.ts`) and a dry run against a fixture.
  * `stop-button.ts` logs in and passes the real clients. Each executor never throws: whatever
  * happens is a line of its platform's report, and every call is a row in the stop log.
+ *
+ * Both work in bounded passes: list, act on what needs it and was not acted on yet, wait for
+ * square-offs to show done, list again. An algo or deploy that entered between a list and a call
+ * (the stop is most likely pressed right at an entry) is squared off on the next pass.
  */
 
 export interface QStopApi {
@@ -39,15 +44,18 @@ export interface Report {
 }
 
 export interface Waits {
-  /** how long to wait for squared-off positions to show closed */
+  /** how long to wait, each pass, for squared-off positions to show closed */
   waitMs: number;
   pollMs: number;
+  /** how many list-and-act passes at most */
+  passes: number;
   sleep: (ms: number) => Promise<void>;
 }
 
 export const DEFAULT_WAITS: Waits = {
-  waitMs: 90_000,
+  waitMs: 60_000,
   pollMs: 5_000,
+  passes: 4,
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
 };
 
@@ -62,10 +70,11 @@ async function until<T>(list: () => Promise<T>, done: (x: T) => boolean, w: Wait
 }
 
 /**
- * One Quantiply account. Order: square off and terminate the tool's open algos, switch off its
- * enabled ones, wait for the squared-off ones to show finished and switch those off too, then list
- * again and report anything of the tool's still open or enabled as "by hand". `record` adds a row
- * to the account's deploy ledger (so the enabler leaves a stopped algo off today); it may fail.
+ * One Quantiply account. Each pass: square off and terminate the tool's open algos not yet sent,
+ * switch off its enabled ones not yet switched, wait for the squared-off ones to show finished. A
+ * squared-off algo that is still enabled is switched off on the next pass. Afterwards anything of
+ * the tool's still open or enabled is reported "by hand". `record` adds rows to the account's
+ * deploy ledger (so the enabler leaves a stopped algo off); it may fail.
  */
 export async function stopQuantiply(
   platform: string,
@@ -75,104 +84,113 @@ export async function stopQuantiply(
   opts: {
     dryRun: boolean;
     waits?: Waits;
-    record?: (row: Record<string, unknown>) => Promise<void>;
+    record?: (row: Record<string, unknown>, algo: QAlgo) => Promise<void>;
   },
 ): Promise<Report> {
   const w = opts.waits ?? DEFAULT_WAITS;
   const lines: string[] = [];
   let ok = true;
   try {
-    const before = await api.list();
-    const plan = planQuantiplyStop(ledger, before);
-    await log({ platform, step: 'plan', sqOff: names(plan.sqOff), disable: names(plan.disable) });
+    const first = planQuantiplyStop(ledger, await api.list());
+    await log({
+      platform,
+      step: 'plan',
+      sqOff: capped(first.sqOff, 50),
+      disable: capped(first.disable, 50),
+    });
     if (opts.dryRun) {
       lines.push(
-        plan.sqOff.length
-          ? `would square off & terminate: ${names(plan.sqOff)}`
+        first.sqOff.length
+          ? `would square off & terminate: ${capped(first.sqOff)}`
           : "nothing of the tool's open",
       );
-      if (plan.disable.length) lines.push(`would switch off: ${names(plan.disable)}`);
-      if (plan.byHand.length)
-        lines.push(`⚠️ by hand (status unknown to the tool): ${names(plan.byHand)}`);
-      if (plan.notMine.length) lines.push(`not the tool's, left alone: ${names(plan.notMine)}`);
-      return { platform, ok: plan.byHand.length === 0, lines };
+      if (first.disable.length) lines.push(`would switch off: ${capped(first.disable)}`);
+      if (first.byHand.length)
+        lines.push(`⚠️ by hand (status unknown to the tool): ${capped(first.byHand)}`);
+      if (first.notMine.length) lines.push(`not the tool's, left alone: ${capped(first.notMine)}`);
+      return { platform, ok: first.byHand.length === 0, lines };
     }
-    const sent: QAlgo[] = [];
-    for (const a of plan.sqOff) {
-      try {
-        await api.squareOffTerminate(a.id);
-        sent.push(a);
-        await log({ platform, step: 'sq_off_terminate', id: a.id, name: a.name, ok: true });
-        await opts.record?.({ action: 'sqoff', id: a.id, name: a.name, ok: true });
-      } catch (error) {
-        ok = false;
-        lines.push(`❌ square off failed: ${a.name}: ${describe(error)}`);
-        await log({
-          platform,
-          step: 'sq_off_terminate',
-          id: a.id,
-          name: a.name,
-          ok: false,
-          detail: describe(error),
-        });
-      }
-    }
-    const switchOff = async (a: QAlgo) => {
-      try {
-        await api.setEnabled(a.id, false);
-        await log({ platform, step: 'disable', id: a.id, name: a.name, ok: true });
-        await opts.record?.({ action: 'disable', id: a.id, name: a.name, ok: true });
-        return true;
-      } catch (error) {
-        ok = false;
-        lines.push(`❌ switch off failed: ${a.name}: ${describe(error)}`);
-        await log({
-          platform,
-          step: 'disable',
-          id: a.id,
-          name: a.name,
-          ok: false,
-          detail: describe(error),
-        });
-        await opts.record?.({
-          action: 'disable',
-          id: a.id,
-          name: a.name,
-          ok: false,
-          detail: describe(error),
-        });
-        return false;
-      }
-    };
+    const triedSq = new Set<string>();
+    const triedOff = new Set<string>();
+    const closed: string[] = [];
     const off: string[] = [];
-    for (const a of plan.disable) if (await switchOff(a)) off.push(a.name);
-
-    // Squared-off algos: wait until Quantiply shows them finished, then switch them off.
-    let after = await api.list();
-    if (sent.length) {
-      const ids = new Set(sent.map((a) => a.id));
-      after = await until(
-        () => api.list(),
-        (xs) => !xs.some((x) => ids.has(x.id) && x.status === 'TRADE_ACTIVE'),
-        w,
-      );
-      for (const a of after) {
-        if (ids.has(a.id) && a.enabled && a.status !== 'TRADE_ACTIVE' && (await switchOff(a)))
-          off.push(a.name);
+    for (let pass = 1; pass <= w.passes; pass += 1) {
+      const plan = pass === 1 ? first : planQuantiplyStop(ledger, await api.list());
+      const sq = plan.sqOff.filter((a) => !triedSq.has(a.id));
+      const toOff = plan.disable.filter((a) => !triedOff.has(a.id));
+      if (!sq.length && !toOff.length) break;
+      const sent: QAlgo[] = [];
+      for (const a of sq) {
+        triedSq.add(a.id);
+        try {
+          await api.squareOffTerminate(a.id);
+          sent.push(a);
+          await log({ platform, pass, step: 'sq_off_terminate', id: a.id, name: a.name, ok: true });
+          await opts.record?.({ action: 'sqoff', id: a.id, name: a.name, ok: true }, a);
+        } catch (error) {
+          ok = false;
+          lines.push(`❌ square off failed: ${a.name}: ${describe(error)}`);
+          await log({
+            platform,
+            pass,
+            step: 'sq_off_terminate',
+            id: a.id,
+            name: a.name,
+            ok: false,
+            detail: describe(error),
+          });
+        }
       }
-      after = await api.list();
+      for (const a of toOff) {
+        triedOff.add(a.id);
+        try {
+          await api.setEnabled(a.id, false);
+          off.push(a.name);
+          await log({ platform, pass, step: 'disable', id: a.id, name: a.name, ok: true });
+          await opts.record?.({ action: 'disable', id: a.id, name: a.name, ok: true }, a);
+        } catch (error) {
+          ok = false;
+          lines.push(`❌ switch off failed: ${a.name}: ${describe(error)}`);
+          await log({
+            platform,
+            pass,
+            step: 'disable',
+            id: a.id,
+            name: a.name,
+            ok: false,
+            detail: describe(error),
+          });
+          await opts.record?.(
+            { action: 'disable', id: a.id, name: a.name, ok: false, detail: describe(error) },
+            a,
+          );
+        }
+      }
+      if (sent.length) {
+        const ids = new Set(sent.map((a) => a.id));
+        const after = await until(
+          () => api.list(),
+          (xs) => !xs.some((x) => ids.has(x.id) && x.status === Q_ACTIVE),
+          w,
+        );
+        for (const a of sent) {
+          if (after.find((x) => x.id === a.id)?.status !== Q_ACTIVE) closed.push(a.name);
+        }
+      }
     }
-    const closed = sent.filter((a) => after.find((x) => x.id === a.id)?.status !== 'TRADE_ACTIVE');
-    if (closed.length) lines.push(`✅ squared off & terminated: ${names(closed)}`);
-    if (off.length) lines.push(`✅ switched off: ${off.join(', ')}`);
+    const after = await api.list();
+    if (closed.length) lines.push(`✅ squared off & terminated: ${capped(closed)}`);
+    if (off.length) lines.push(`✅ switched off: ${capped(off)}`);
     const left = quantiplyLeft(ledger, after);
-    for (const l of left) lines.push(`⚠️ ${l}`);
+    for (const l of left.slice(0, 12)) lines.push(`⚠️ ${l}`);
+    if (left.length > 12) lines.push(`⚠️ and ${left.length - 12} more: check Quantiply`);
     if (left.length) ok = false;
-    if (plan.byHand.length) {
+    const last = planQuantiplyStop(ledger, after);
+    if (last.byHand.length) {
       ok = false;
-      lines.push(`⚠️ by hand (status unknown to the tool): ${names(plan.byHand)}`);
+      lines.push(`⚠️ by hand (status unknown to the tool): ${capped(last.byHand)}`);
     }
-    if (plan.notMine.length) lines.push(`not the tool's, left alone: ${names(plan.notMine)}`);
+    if (last.notMine.length) lines.push(`not the tool's, left alone: ${capped(last.notMine)}`);
     if (!lines.length) lines.push("nothing of the tool's open or enabled");
     await log({ platform, step: 'done', ok, left });
   } catch (error) {
@@ -183,83 +201,112 @@ export async function stopQuantiply(
   return { platform, ok, lines };
 }
 
-/** AlgoTest /live: square off every running deploy of the tool's, then confirm by listing. */
+/**
+ * AlgoTest /live: square off every running deploy of the tool's, in passes, waiting (bounded)
+ * while AlgoTest shows them squaring off; then confirm by listing.
+ */
 export async function stopAlgoTest(
   api: AStopApi,
   log: StopLog,
-  opts: { dryRun: boolean; waits?: Waits },
+  opts: { dryRun: boolean; isTool: (e: Execution) => boolean; today: string; waits?: Waits },
 ): Promise<Report> {
   const platform = 'AlgoTest';
   const w = opts.waits ?? DEFAULT_WAITS;
+  const plan = (xs: Execution[]) => planAlgoTestStop(xs, opts.isTool, opts.today);
   const lines: string[] = [];
+  const tried = new Set<string>();
+  const targetIds = new Set<string>();
   let ok = true;
   try {
-    const before = await api.list();
-    const plan = planAlgoTestStop(before);
+    const first = plan(await api.list());
     await log({
       platform,
       step: 'plan',
-      squareOff: names(plan.squareOff),
-      byHand: names(plan.byHand),
+      squareOff: capped(first.squareOff, 50),
+      squaring: capped(first.squaring, 50),
+      byHand: capped(first.byHand, 50),
+      check: capped(first.check, 50),
     });
     if (opts.dryRun) {
       lines.push(
-        plan.squareOff.length
-          ? `would square off: ${names(plan.squareOff)}`
+        first.squareOff.length
+          ? `would square off: ${capped(first.squareOff)}`
           : "nothing of the tool's running on /live",
       );
+      if (first.squaring.length)
+        lines.push(`AlgoTest already squaring off: ${capped(first.squaring)}`);
     } else {
-      const sent: Execution[] = [];
-      for (const e of plan.squareOff) {
-        try {
-          await api.squareOff(e.id);
-          sent.push(e);
-          await log({ platform, step: 'square_off', id: e.id, name: e.name, ok: true });
-        } catch (error) {
-          ok = false;
-          lines.push(`❌ square off failed: ${e.name}: ${describe(error)}`);
-          await log({
-            platform,
-            step: 'square_off',
-            id: e.id,
-            name: e.name,
-            ok: false,
-            detail: describe(error),
-          });
+      const targets = new Map<string, Execution>(first.squaring.map((e) => [e.id, e]));
+      let latest: Execution[] = [];
+      for (let pass = 1; pass <= w.passes; pass += 1) {
+        const p = pass === 1 ? first : plan(await api.list());
+        const fresh = p.squareOff.filter((e) => !tried.has(e.id));
+        if (!fresh.length && pass > 1) break;
+        for (const e of fresh) {
+          tried.add(e.id);
+          try {
+            await api.squareOff(e.id);
+            targets.set(e.id, e);
+            await log({ platform, pass, step: 'square_off', id: e.id, name: e.name, ok: true });
+          } catch (error) {
+            ok = false;
+            lines.push(`❌ square off failed: ${e.name}: ${describe(error)}`);
+            await log({
+              platform,
+              pass,
+              step: 'square_off',
+              id: e.id,
+              name: e.name,
+              ok: false,
+              detail: describe(error),
+            });
+          }
         }
-      }
-      if (sent.length) {
-        const after = await until(
+        if (!targets.size) break;
+        latest = await until(
           () => api.list(),
-          (xs) => algotestAfter(sent, xs).pending.length === 0,
+          (xs) => algotestAfter([...targets.values()], xs).pending.length === 0,
           w,
         );
-        const r = algotestAfter(sent, after);
-        if (r.confirmed.length) lines.push(`✅ squared off: ${r.confirmed.join(', ')}`);
+      }
+      for (const id of targets.keys()) targetIds.add(id);
+      if (targets.size) {
+        const r = algotestAfter([...targets.values()], latest.length ? latest : await api.list());
+        if (r.confirmed.length) lines.push(`✅ squared off: ${capped(r.confirmed)}`);
         if (r.pending.length) {
           ok = false;
           lines.push(
-            `⚠️ square off sent, not shown done yet (check /live): ${r.pending.join(', ')}`,
+            `⏳ AlgoTest is still squaring off: ${capped(r.pending)}. Do NOT exit these at the broker: re-check /live in a minute`,
           );
         }
+        for (const c of r.check) lines.push(`⚠️ ${c}`);
         for (const b of r.byHand) lines.push(`⚠️ ${b}`);
-        if (r.byHand.length) ok = false;
-        await log({
-          platform,
-          step: 'done',
-          confirmed: r.confirmed,
-          pending: r.pending,
-          byHand: r.byHand,
-        });
-      } else if (!plan.squareOff.length) lines.push("nothing of the tool's running on /live");
+        if (r.check.length || r.byHand.length) ok = false;
+        await log({ platform, step: 'done', ...r });
+      } else lines.push("nothing of the tool's running on /live");
     }
-    if (plan.byHand.length) {
+    const final = opts.dryRun ? first : plan(await api.list());
+    const untouched = opts.dryRun ? [] : final.squareOff.filter((e) => !tried.has(e.id));
+    // a target's own outcome is already a line above
+    final.byHand = final.byHand.filter((e) => !targetIds.has(e.id));
+    final.check = final.check.filter((e) => !targetIds.has(e.id));
+    if (untouched.length) {
+      ok = false;
+      lines.push(`⚠️ still live after the passes, square off on /live: ${capped(untouched)}`);
+    }
+    if (final.byHand.length) {
       ok = false;
       lines.push(
-        `⚠️ square off by hand (AlgoTest offers no square-off for it now): ${plan.byHand.map((e) => `${e.name} (${e.status}${e.activeOnServer ? '' : ', not active on server'})`).join(', ')}`,
+        `⚠️ square off by hand (AlgoTest offers no square-off for it now): ${capped(final.byHand.map((e) => `${e.name} (${e.status}${e.activeOnServer ? '' : ', not active on server'})`))}`,
       );
     }
-    if (plan.notMine.length) lines.push(`not the tool's, left running: ${names(plan.notMine)}`);
+    if (final.check.length) {
+      ok = false;
+      lines.push(
+        `⚠️ switched to manual today, its legs may be open: check at the broker: ${capped(final.check)}`,
+      );
+    }
+    if (final.notMine.length) lines.push(`not the tool's, left running: ${capped(final.notMine)}`);
   } catch (error) {
     ok = false;
     lines.push(`❌ ${describe(error)}: check algotest.in/live by hand`);

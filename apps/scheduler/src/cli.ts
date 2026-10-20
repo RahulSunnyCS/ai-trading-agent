@@ -13,7 +13,6 @@ import { skippedToday, startLoop } from './loop.js';
 import { type RunContext, runJob } from './runner.js';
 import { formatIst, nextDue } from './schedule.js';
 import { startStopListener } from './stop-button.js';
-import { StopHold } from './stop-hold.js';
 
 /**
  * `bun run jobs status` — every job, its schedule, last run and next run.
@@ -172,21 +171,14 @@ function serve(): void {
     logRoots: [join(REPO_ROOT, 'packages/momentum-backtesting/data')],
     settings,
   });
-  // BL-143 Phase 4: the stop button's hold pauses the jobs that could deploy or enable anything.
-  const hold = new StopHold(ctx.env);
-  startLoop({
-    ctx,
-    jobs: JOBS,
-    alerts: telegramSink(ctx.env),
-    paused: (job, now) => hold.pauses(job, now),
-  });
-  // Only with STOP_BUTTON=on: then this process is the bot's one getUpdates consumer.
+  startLoop({ ctx, jobs: JOBS, alerts: telegramSink(ctx.env) });
+  // BL-143 Phase 4, only with STOP_BUTTON=on: then this process is the bot's one getUpdates
+  // consumer. (The stop hold itself is checked by runJob, for every way a job starts.)
   startStopListener({
     repoRoot: REPO_ROOT,
     env: () => jobEnv(REPO_ROOT),
     logDir: logDir(),
     history: ctx.history,
-    hold,
   });
 }
 
