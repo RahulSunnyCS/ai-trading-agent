@@ -137,8 +137,13 @@ The scheduler sets the repository variables on every save. `.env` switches (`ALG
 
 - `src/strategy-upload.ts` (+ pure `src/strategy-plan.ts`) puts the day's rotation picks into AlgoTest as saved
   strategies through the website (AlgoTest support OK'd it by phone, 2026-10-19). `--apply` needs
-  `ALGOTEST_UPLOAD=on`, deleting also `--allow-delete`; it only ever deletes what its ledger
-  (`TRADING_DATA_ROOT/rotation/algotest/ledger.jsonl`) says it uploaded, and never one deployed on /live.
+  `ALGOTEST_UPLOAD=on`, deleting also `--allow-delete` (the `algotest-evening` job passes it since 2026-10-20); it
+  only ever deletes what its ledger (`TRADING_DATA_ROOT/rotation/algotest/ledger.jsonl`) says it uploaded, and never
+  one deployed on /live. A delete does not click: `src/strategy-delete.ts` makes the web app's own call,
+  `DELETE api.algotest.in/strategy/<_id>` with the session cookies and `X-CSRF-TOKEN-ACCESS` (from the
+  `csrf_access_token` cookie), for a name with exactly one `_id` in `GET /strategies`; it then lists again: that id
+  must be gone and every other strategy still there, or the run stops (saved strategies outside a folder are not in
+  the sidebar at all, so there is nothing to click).
 - `src/strategy-deploy.ts` (+ pure `src/deploy-plan.ts`) deploys the day's recorded picks on /live. `--apply`
   and `--check` need `ALGOTEST_DEPLOY=on`. It stops at anything "Activate" opens that it has not seen.
 - Their locators are `strategyPage` and `livePage` in `src/selectors.ts`, like every other. Both read

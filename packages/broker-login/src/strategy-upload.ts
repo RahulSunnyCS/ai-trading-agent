@@ -12,12 +12,14 @@ import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { sessionOver } from './quantiply-plan.js';
 import { redact, registerSecret } from './secrets.js';
 import { livePage, strategyPage } from './selectors.js';
+import { ALGOTEST_API, deleteStrategyById, vanished } from './strategy-delete.js';
 import {
   type LedgerRow,
   type Manifest,
   type Mode,
   type Wanted,
   comparable,
+  idsByName,
   istToday,
   namesIn,
   needsAttention,
@@ -36,8 +38,8 @@ import { visibleWithin } from './wait.js';
  *
  * `--dir` is a folder written by `obt rotation algotest-export` (manifest.json + one .algtst per
  * pick). Without `--apply` it logs in, reads what AlgoTest has and prints the plan, changing
- * nothing. Deleting also needs `--allow-delete` until the delete dialog has been seen in a
- * supervised run. `--apply` needs `ALGOTEST_UPLOAD=on`. The ledger (`--ledger`, default
+ * nothing. Deleting also needs `--allow-delete` (the evening job passes it): a delete is
+ * AlgoTest's own API call by the strategy's one id, checked by listing again. `--apply` needs `ALGOTEST_UPLOAD=on`. The ledger (`--ledger`, default
  * TRADING_DATA_ROOT/rotation/algotest/ledger.jsonl) records every upload and delete; only
  * strategies in it are ever deleted. Locators: `strategyPage` / `livePage` in selectors.ts.
  *
@@ -54,13 +56,21 @@ async function readJson<T>(path: string): Promise<T> {
   return JSON.parse(await readFile(path, 'utf8')) as T;
 }
 
-async function existingNames(page: Page): Promise<Set<string>> {
+interface Listing {
+  names: Set<string>;
+  /** `_id`s per exact name */
+  ids: Map<string, string[]>;
+}
+
+/** AlgoTest's saved strategies, as the builder page itself loads them. */
+async function listStrategies(page: Page): Promise<Listing> {
   const listed = page.waitForResponse(
     (r: Response) => /api\.algotest\.in\/strategies(\?|$)/.test(r.url()) && r.ok(),
     { timeout: 30_000 },
   );
   await page.goto(`${BASE_URL}/backtest`, { waitUntil: 'domcontentloaded' });
-  return namesIn(await (await listed).json());
+  const json = await (await listed).json();
+  return { names: namesIn(json), ids: idsByName(json) };
 }
 
 /**
@@ -119,23 +129,31 @@ async function uploadOne(page: Page, w: Wanted, sent: unknown): Promise<string> 
 
 const READ_BACK_OK = 'read back: identical';
 
-/** PROVISIONAL (the delete dialog has not been seen): behind --allow-delete. */
-async function deleteOne(page: Page, name: string): Promise<void> {
-  await page.goto(`${BASE_URL}/backtest`, { waitUntil: 'domcontentloaded' });
-  await strategyPage.search(page).fill(name);
-  await strategyPage.rowMenu(page, name).click();
-  const item = strategyPage.rowMenuDelete(page);
-  await item.waitFor({ timeout: 5_000 }); // the right menu opened: "Add to folder" beside "Delete"
-  const deleted = page.waitForResponse(
-    (r: Response) =>
-      /api\.algotest\.in\/strateg/.test(r.url()) && r.request().method() === 'DELETE',
-    { timeout: 20_000 },
-  );
-  await item.click();
-  const confirm = strategyPage.deleteConfirm(page).last();
-  if (await visibleWithin(confirm, 3_000)) await confirm.click();
-  const response = await deleted;
-  if (!response.ok()) throw new Error(`delete answered ${response.status()}`);
+/** Another strategy vanished with a delete: stop everything, the owner must look. */
+class Unsafe extends Error {}
+
+/**
+ * Delete `name` through AlgoTest's API by its one `_id` (never by clicking a row, which could open
+ * another strategy's menu), then list again: it must be gone and every other strategy still there.
+ * Returns the fresh listing.
+ */
+async function deleteOne(page: Page, name: string, listing: Listing): Promise<Listing> {
+  const found = listing.ids.get(name) ?? [];
+  const id = found.length === 1 ? found[0] : undefined;
+  if (id === undefined)
+    throw new Error(`${found.length} strategies are named "${name}" on AlgoTest; deleted none`);
+  const csrf = (await page.context().cookies(ALGOTEST_API)).find(
+    (c) => c.name === 'csrf_access_token',
+  )?.value;
+  if (!csrf) throw new Error('no csrf_access_token cookie for the API: not logged in');
+  await deleteStrategyById(page.request, id, csrf);
+  const after = await listStrategies(page);
+  const afterIds = [...after.ids.values()].flat();
+  if (afterIds.includes(id)) throw new Error(`still listed after the delete (${id})`);
+  const lost = vanished([...listing.ids.values()].flat(), afterIds, id);
+  if (lost.length)
+    throw new Unsafe(`STOP: ${lost.length} other strategies vanished after deleting ${name}`);
+  return after;
 }
 
 async function main(): Promise<number> {
@@ -287,7 +305,8 @@ async function main(): Promise<number> {
 
   try {
     await algotestLogin(page, { phone: normalizePhone(phone), password });
-    const existing = await existingNames(page);
+    let listing = await listStrategies(page);
+    const existing = listing.names;
     const ownedPresent = [...existing].filter((n) => /^(T1|Core) · /.test(n));
     const deployed =
       mode === 'evening' ? await deployedNames(page, ownedPresent) : new Set<string>();
@@ -334,10 +353,11 @@ async function main(): Promise<number> {
         continue;
       }
       try {
-        await deleteOne(page, name);
+        listing = await deleteOne(page, name, listing);
         await record('delete', name, '', true);
         lines.push(`deleted ${name}`);
       } catch (error) {
+        if (error instanceof Unsafe) throw error; // nothing more is changed: the owner must look
         failed = true;
         retryable = true;
         notDeleted.add(name);

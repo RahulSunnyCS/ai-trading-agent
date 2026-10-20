@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, it, test } from 'node:test';
 import {
   type LedgerRow,
   type Wanted,
   comparable,
+  idsByName,
   istToday,
   namesIn,
   owned,
@@ -138,4 +139,21 @@ test('comparable ignores leg ids, key order and the name', () => {
 test('istToday rolls over at IST midnight, not UTC', () => {
   assert.equal(istToday(new Date('2026-10-18T18:29:00Z')), '2026-10-18');
   assert.equal(istToday(new Date('2026-10-18T18:31:00Z')), '2026-10-19');
+});
+
+describe('idsByName', () => {
+  it("maps each exact name to its _ids, as AlgoTest's /strategies lists them", () => {
+    const listing = [
+      { _id: '6ad590af06a3aebabc43634d', name: 'T1 · N_p150-t1s11_0917', folder: null },
+      { _id: '6ad590ec4c3b4049e40b9dc6', name: 'T1 · N_ditm1-t1s36_0947', folder: null },
+      { _id: '6ad52d343337ca7cf13d74bb', name: 'T1 · N_ditm1-t1s36_0947', folder: null },
+      { name: 'no id' },
+      'junk',
+    ];
+    const ids = idsByName(listing);
+    assert.deepEqual(ids.get('T1 · N_p150-t1s11_0917'), ['6ad590af06a3aebabc43634d']);
+    assert.equal(ids.get('T1 · N_ditm1-t1s36_0947')?.length, 2); // a repeat: never deleted
+    assert.equal(ids.has('no id'), false);
+    assert.equal(idsByName({ not: 'an array' }).size, 0);
+  });
 });

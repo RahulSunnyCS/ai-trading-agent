@@ -204,3 +204,20 @@ export function comparable(doc: unknown): string {
 export function istToday(now: Date = new Date()): string {
   return new Date(now.getTime() + 330 * 60_000).toISOString().slice(0, 10);
 }
+
+/**
+ * The `_id`s of each exact strategy name in AlgoTest's `GET /strategies` response (an array of
+ * `{ _id, name, folder, archived, template }`, seen 2026-10-20). A name can repeat, so each maps to
+ * every id it has; a delete goes ahead only when its name has exactly one.
+ */
+export function idsByName(json: unknown): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  if (!Array.isArray(json)) return out;
+  for (const item of json) {
+    if (!item || typeof item !== 'object') continue;
+    const { _id, name } = item as Record<string, unknown>;
+    if (typeof _id !== 'string' || typeof name !== 'string') continue;
+    out.set(name, [...(out.get(name) ?? []), _id]);
+  }
+  return out;
+}

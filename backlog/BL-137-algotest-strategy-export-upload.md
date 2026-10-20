@@ -269,3 +269,9 @@ entry, so the strategies must already be in AlgoTest the evening before.
   include finished instances); the ledger defaults to TRADING_DATA_ROOT, not beside `--dir`; the delete path waits
   for the ⋮ menu's "Add to folder" before clicking Delete; `algotest-export --out` never deletes files it did not
   write (it refuses a folder holding other `.algtst` files); every locator moved to `src/selectors.ts`.
+- 2026-10-20 — Deleting turned on (owner: "option 2"). The click path could not work: saved strategies with
+  `folder: null` are not in the sidebar, and its search box exists only inside the Builder folder. Read-only
+  probes found each strategy's `_id` in `GET /strategies`; the owner deleted one by hand; the web app's bundle
+  showed the call (`DELETE /strategy/<_id>`, cookies + `X-CSRF-TOKEN-ACCESS` from `csrf_access_token`).
+  `src/strategy-delete.ts` makes it for a name with exactly one `_id`, lists again and stops the run if any other
+  strategy vanished. The `algotest-evening` job now passes `--allow-delete`. The click selectors were removed.

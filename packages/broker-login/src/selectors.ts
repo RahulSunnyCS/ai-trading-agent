@@ -242,8 +242,8 @@ export const fyersLogin = {
  * switches to a phone layout without "Save Strategy"). VERIFIED 2026-10-19 by importing and saving
  * four strategies in the owner's session: the hidden file input, "Strategy imported successfully",
  * "Save Strategy" → "Save New Strategy" (name pre-filled) → "Done" → "Strategy Saved", "Export .algtst".
- * The delete path (sidebar ⋮ → "Add to folder" / "Delete") is PROVISIONAL: the menu was seen, a
- * delete was not.
+ * Deleting does not click: `strategy-delete.ts` calls AlgoTest's API by the strategy's id (saved
+ * strategies outside a folder are not listed in the sidebar at all, 2026-10-20).
  */
 export const strategyPage = {
   importInput: (page: Page): Locator => page.locator('input[type=file][accept*=".algtst"]'),
@@ -257,24 +257,6 @@ export const strategyPage = {
   saveDone: (page: Page): Locator => page.getByRole('button', { name: 'Done', exact: true }),
   savedToast: (page: Page): Locator => page.getByText('Strategy Saved'),
   exportButton: (page: Page): Locator => page.getByText('Export .algtst'),
-  search: (page: Page): Locator => page.getByPlaceholder('Search Strategies'),
-  /** PROVISIONAL: the ⋮ next to a saved strategy is the nearest icon around its name. */
-  rowMenu: (page: Page, name: string): Locator =>
-    page
-      .getByText(name, { exact: true })
-      .first()
-      .locator('xpath=ancestor::*[.//*[local-name()="svg"]][1]')
-      .locator('svg')
-      .last(),
-  /** The open ⋮ menu: the visible element holding both of its items. */
-  rowMenuDelete: (page: Page): Locator =>
-    page
-      .getByText('Add to folder', { exact: true })
-      .filter({ visible: true })
-      .locator('xpath=..')
-      .getByText('Delete', { exact: true }),
-  deleteConfirm: (page: Page): Locator =>
-    page.getByRole('button', { name: /^(Delete|Yes|Confirm)$/ }).filter({ visible: true }),
 };
 
 /**
