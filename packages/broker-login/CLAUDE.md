@@ -210,8 +210,8 @@ The owner's Telegram "stop everything": switch off AND square off, only after a 
      (`wx`), removed when the stop ends and on SIGTERM / SIGINT, so a second stop does not start and the loss /
      deploy monitor keeps off the accounts meanwhile. A marker is stale (replaced, never blocking) when its pid is
      dead or this run's, when it is older than 20 minutes or not from today (IST), whatever its pid. A live one is
-     refused: "a stop is already running since <date time> IST (pid N). If no report arrives within 15 minutes,
-     delete <path> and send /stop again". Then it writes the hold and reads it back
+     refused: "a stop is already running since <date time> IST (pid N). If no report arrives, wait until <HH:MM>
+     IST (its marker then lapses), or delete <both marker paths>, and send /stop again". Then it writes the hold and reads it back
      (`src/stop-hold.ts`: `TRADING_DATA_ROOT/stop/HOLD.json` and `<SCHEDULER_STATE_DIR>/stop-hold.json`; either
      holds). If it is saved nowhere, the stop still squares off and switches off, and says first, in its own
      message and at the top of the report, "HOLD NOT SAVED (…): the tool may re-enable or upload after a scheduler
@@ -227,7 +227,9 @@ The owner's Telegram "stop everything": switch off AND square off, only after a 
     `stop/<day>.jsonl` and its copy `<SCHEDULER_STATE_DIR>/stop-squareoffs-<day>.jsonl`, kept for an unmounted
     volume) and never sends those again; they are waited on and reported as "sent HH:MM by an earlier stop", and
     one that got no answer keeps its "may have been sent (no answer)" wording. An earlier deploy gone from /live is
-    said once, then logged `gone` and left out.
+    said once, then logged `gone`; it stays in the never-send-again set, and if it is listed again it is "⏳ <name>:
+    square-off sent at HH:MM by an earlier stop, AlgoTest lists it Live again: open /live first; do NOT exit at the
+    broker while its exit is pending".
   - A square-off call refused outright (a 4xx, or never sent) was not sent: "square off by hand". One with no
     answer (a timeout, a network error, a 5xx) MAY have been sent: "⚠️ square-off may have been sent (no answer):
     … Open <platform> first; exit at the broker only if it shows no pending exit" (`definitelyRefused`,

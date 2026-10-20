@@ -363,6 +363,7 @@ test('otherStopRunning: only a fresh, today, live marker of another process coun
     assert.deepEqual(otherStopRunning(root, env, now), {
       pid: process.ppid,
       since: '2026-10-20 11:25',
+      until: '11:45',
       path: marker,
     });
     // fresh but this very process: not another stop

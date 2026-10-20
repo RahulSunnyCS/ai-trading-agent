@@ -254,6 +254,8 @@ export interface Watched {
   /** IST `HH:MM` the call went out ('' for `squaring`) */
   at: string;
   earlier?: boolean;
+  /** an earlier stop already reported it gone from /live */
+  gone?: boolean;
   kind: 'sent' | 'maybe' | 'refused' | 'squaring';
   detail?: string;
 }
@@ -262,6 +264,8 @@ export interface AlgoTestOutcome {
   confirmed: string[];
   /** a square-off in flight: never exit these at the broker */
   closing: string[];
+  /** an earlier stop's square-off, reported gone, now listed again: `<name>: square-off sent at HH:MM` */
+  reappeared: string[];
   /** no answer and still live: look at /live before anything at the broker */
   maybeOpen: string[];
   /** refused and still live: square off by hand */
@@ -280,6 +284,7 @@ export function algotestOutcome(
   const out: AlgoTestOutcome = {
     confirmed: [],
     closing: [],
+    reappeared: [],
     maybeOpen: [],
     refusedLive: [],
     check: [],
@@ -289,12 +294,16 @@ export function algotestOutcome(
     const e = now.get(id);
     const sentAt = w.at ? ` (sent ${w.at}${w.earlier ? ' by an earlier stop' : ''})` : '';
     const name = `${w.name}${w.kind === 'sent' || w.kind === 'maybe' ? sentAt : ''}`;
-    if (!e)
-      out.check.push(
-        w.earlier
-          ? `${w.name}: squared off by an earlier stop, no longer listed on /live: check it once`
-          : `${w.name}: no longer listed: check /live`,
-      );
+    if (!e) {
+      // said once: an earlier stop already reported this one gone
+      if (!w.gone)
+        out.check.push(
+          w.earlier
+            ? `${w.name}: squared off by an earlier stop, no longer listed on /live: check it once`
+            : `${w.name}: no longer listed: check /live`,
+        );
+    } else if (w.gone && w.earlier && e.status !== A_SQUARED_OFF)
+      out.reappeared.push(`${w.name}: square-off sent at ${w.at}`);
     else if (e.status === A_SQUARED_OFF) out.confirmed.push(w.name);
     else if (squaringOff(e.status)) out.closing.push(name);
     else if (e.status === A_STOPPED)

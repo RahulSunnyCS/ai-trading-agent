@@ -513,6 +513,69 @@ describe('AlgoTest stop against a stand-in API', () => {
     assert.doesNotMatch(text, /still closing/);
   });
 
+  it('sent, then reported gone, then listed Live again: never sent again, said so', async () => {
+    // reproduced: a successful square-off, a later stop logged it gone; now it shows Live again
+    const root = await mkdtemp(join(tmpdir(), 'stop-gone-'));
+    try {
+      await mkdir(join(root, 'stop'));
+      const rows = [
+        {
+          at: '2026-10-20T03:50:00Z',
+          who: 'runner',
+          platform: 'AlgoTest',
+          step: 'square_off',
+          id: '6ad590af06a3aebabc43634d',
+          name: 'T1 · A',
+          ok: true,
+        },
+        {
+          at: '2026-10-20T03:58:00Z',
+          who: 'runner',
+          platform: 'AlgoTest',
+          step: 'gone',
+          id: '6ad590af06a3aebabc43634d',
+          name: 'T1 · A',
+        },
+      ];
+      await writeFile(
+        join(root, 'stop', '2026-10-20.jsonl'),
+        `${rows.map((r) => JSON.stringify(r)).join('\n')}\n`,
+      );
+      const prior = (
+        await priorSquareOffs(root, '2026-10-20', { SCHEDULER_STATE_DIR: join(root, 'state') })
+      ).get('AlgoTest');
+      assert.equal(prior?.get('6ad590af06a3aebabc43634d')?.gone, true);
+      const logged: Record<string, unknown>[] = [];
+      const r = await stopAlgoTest(
+        algotestStopApi(fetchHttp),
+        async (row) => {
+          logged.push(row);
+        },
+        { ...opts, ...(prior ? { prior } : {}) },
+      );
+      assert.equal(a.seen.filter((x) => x.method === 'PUT').length, 0); // sends 0
+      assert.match(
+        r.lines.join('\n'),
+        /⏳ T1 · A: square-off sent at 09:20 by an earlier stop, AlgoTest lists it Live again: open \/live first; do NOT exit at the broker while its exit is pending/,
+      );
+      assert.doesNotMatch(r.lines.join('\n'), /still LIVE/);
+      // and while it stays off the list, nothing more is said or logged about it
+      execs = execs.filter((e) => e._id !== '6ad590af06a3aebabc43634d');
+      logged.length = 0;
+      const quiet = await stopAlgoTest(
+        algotestStopApi(fetchHttp),
+        async (row) => {
+          logged.push(row);
+        },
+        { ...opts, ...(prior ? { prior } : {}) },
+      );
+      assert.doesNotMatch(quiet.lines.join('\n'), /T1 · A/);
+      assert.ok(!logged.some((x) => x.step === 'gone'));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("an earlier stop's deploy gone from /live is said once, then logged gone", async () => {
     const prior = new Map([
       ['6ad590af06a3aebabc436399', { name: 'T1 · Old', at: '09:20', earlier: true }],
@@ -647,7 +710,7 @@ describe('stop-button.ts --apply while another stop runs', () => {
       assert.equal(out.status, 2, out.stderr);
       assert.match(
         out.stderr,
-        /REFUSED: a stop is already running since \d{4}-\d\d-\d\d \d\d:\d\d IST \(pid \d+\)\. If no report arrives within 15 minutes, delete .*stop-running\.json and send \/stop again/,
+        /REFUSED: a stop is already running since \d{4}-\d\d-\d\d \d\d:\d\d IST \(pid \d+\)\. If no report arrives, wait until \d\d:\d\d IST \(its marker then lapses\), or delete \S*stop[/]stop-running\.json and \S*state[/]stop-running\.json, and send \/stop again/,
       );
       assert.ok(!readdirSync(join(root, 'stop')).includes('HOLD.json'));
     } finally {
@@ -738,7 +801,8 @@ describe('the stop log tells a later stop what was already sent', () => {
       );
       const both = await priorSquareOffs(root, '2026-10-20', env);
       assert.equal(both.get('Quantiply · Angel One')?.get('q1')?.maybe, false);
-      assert.equal(both.get('AlgoTest'), undefined);
+      // reported gone, yet still never sent again: kept, flagged gone
+      assert.equal(both.get('AlgoTest')?.get('x1')?.gone, true);
       const stateOnly = await priorSquareOffs(undefined, '2026-10-20', env);
       assert.equal(stateOnly.get('Quantiply · Angel One')?.get('q1')?.maybe, false);
     } finally {

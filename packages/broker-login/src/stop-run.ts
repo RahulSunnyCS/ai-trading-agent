@@ -105,6 +105,8 @@ export interface SentInfo {
   earlier?: boolean;
   /** the call got no answer: it may or may not have reached the platform */
   maybe?: boolean;
+  /** an earlier stop already reported it gone from /live: not said again (still never re-sent) */
+  gone?: boolean;
 }
 
 export type Sent = Map<string, SentInfo>;
@@ -451,12 +453,17 @@ export async function stopAlgoTest(
         lines.push(
           `⚠️ square-off may have been sent (no answer): ${capped(r.maybeOpen)}. Open AlgoTest /live first; exit at the broker only if it shows no pending exit`,
         );
+      for (const x of r.reappeared)
+        lines.push(
+          `⏳ ${x} by an earlier stop, AlgoTest lists it Live again: open /live first; do NOT exit at the broker while its exit is pending`,
+        );
       if (r.refusedLive.length)
         lines.push(`❌ still LIVE: square off by hand on AlgoTest /live: ${capped(r.refusedLive)}`);
       for (const c of r.check) lines.push(`⚠️ ${c}`);
       for (const o of r.other) lines.push(`⚠️ ${o}`);
       if (
         r.closing.length +
+        r.reappeared.length +
         r.maybeOpen.length +
         r.refusedLive.length +
         r.check.length +
@@ -467,7 +474,8 @@ export async function stopAlgoTest(
       // an earlier stop's deploy gone from /live: said this once, not on every later stop
       const listed = new Set(finalList.map((e) => e.id));
       for (const [id, x] of watched) {
-        if (x.earlier && !listed.has(id)) await log({ platform, step: 'gone', id, name: x.name });
+        if (x.earlier && !x.gone && !listed.has(id))
+          await log({ platform, step: 'gone', id, name: x.name });
       }
     }
     // a watched deploy's outcome is already a line above

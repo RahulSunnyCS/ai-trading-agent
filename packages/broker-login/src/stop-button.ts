@@ -36,6 +36,7 @@ import {
   stateHoldPath,
   stateSquareOffLogPath,
   stopLogPath,
+  stopRunningPaths,
   writeHold,
 } from './stop-hold.js';
 import { capped, stopSessions, toolMatcher } from './stop-plan.js';
@@ -249,7 +250,8 @@ export const SQUARE_OFF_STEPS = new Set(['sq_off_terminate', 'square_off', 'gone
  * `ok`) or may have sent (no answer: `maybe`, unless the same id was also answered). They are
  * waited on and reported, never sent again. Read from both copies: `stop/<day>.jsonl` and the
  * scheduler state dir's `stop-squareoffs-<day>.jsonl` (kept when the data volume is unmounted).
- * A deploy an earlier stop already reported gone from /live (`gone`) is left out: said once.
+ * A deploy an earlier stop already reported gone from /live keeps its place (never sent again),
+ * flagged `gone` so its "no longer listed" line is not said again.
  * An unreadable log gives none (the platforms still list what is open).
  */
 export async function priorSquareOffs(
@@ -301,8 +303,7 @@ export async function priorSquareOffs(
     }
   }
   for (const [platform, sent] of out) {
-    for (const id of sent.keys()) if (gone.has(`${platform}\u0000${id}`)) sent.delete(id);
-    if (!sent.size) out.delete(platform);
+    for (const [id, info] of sent) if (gone.has(`${platform}\u0000${id}`)) info.gone = true;
   }
   return out;
 }
@@ -605,7 +606,7 @@ async function main(): Promise<number> {
     const c = mark.conflict;
     await log({ step: 'refused', why: 'another stop is running', since: c.since, pid: c.pid });
     console.error(
-      `REFUSED: a stop is already running since ${c.since} IST (pid ${c.pid}). If no report arrives within 15 minutes, delete ${c.path} and send /stop again`,
+      `REFUSED: a stop is already running since ${c.since} IST (pid ${c.pid}). If no report arrives, wait until ${c.until} IST (its marker then lapses), or delete ${stopRunningPaths(dataRoot).join(' and ')}, and send /stop again`,
     );
     return EXIT_REFUSED;
   }

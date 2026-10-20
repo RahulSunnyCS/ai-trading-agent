@@ -156,6 +156,8 @@ export interface RunningStop {
   pid: number;
   /** IST `YYYY-MM-DD HH:MM` */
   since: string;
+  /** IST `HH:MM` the marker lapses (stale) by itself */
+  until: string;
   path: string;
 }
 
@@ -171,7 +173,13 @@ function liveMarker(path: string, now: Date): RunningStop | null {
     if (istToday(new Date(at)) !== istToday(now)) return null;
     if (!pidAlive(m.pid)) return null;
     const ist = new Date(at + 330 * 60_000).toISOString();
-    return { pid: m.pid, since: `${ist.slice(0, 10)} ${ist.slice(11, 16)}`, path };
+    const lapse = new Date(at + STOP_RUNNING_STALE_MS + 330 * 60_000).toISOString();
+    return {
+      pid: m.pid,
+      since: `${ist.slice(0, 10)} ${ist.slice(11, 16)}`,
+      until: lapse.slice(11, 16),
+      path,
+    };
   } catch {
     return null; // torn or unreadable: no pid to trust, not a running stop
   }
