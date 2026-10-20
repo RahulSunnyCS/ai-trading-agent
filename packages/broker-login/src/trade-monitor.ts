@@ -31,7 +31,7 @@ import {
   type AccountMargin,
   type AlgoTestRowPicks,
   DEPLOY_CHECK_AT,
-  JOBS_WAIT_UNTIL,
+  type JobsWait,
   LOGIN_CAP,
   type LegNeed,
   type LoginLog,
@@ -45,6 +45,8 @@ import {
   QUIET_FROM,
   SESSION_CLOSE,
   type SchedulerJobView,
+  WAIT_WINDOWS,
+  type WaitWindow,
   algotestInstant,
   checkAlgoTest,
   checkQuantiply,
@@ -53,6 +55,7 @@ import {
   inLossWindow,
   inQuietWindow,
   inr,
+  isReplacing,
   istClock,
   istDayOf,
   jobsStillToEnd,
@@ -118,9 +121,10 @@ import { istToday } from './strategy-plan.js';
  * within 10 min of losing a session (logged out / 401: someone else's login most likely ended it),
  * a replacement only when no other process logged in to the platform in the last 10 min and at
  * most every 30 min, said once as "degraded". No login while PR #275's stop button runs
- * (`TRADING_DATA_ROOT/stop/stop-running.json`). After 09:10, no login on a platform until today's
- * runs of its morning deploy jobs have ended (`PLATFORM_JOBS`, the scheduler's `GET /jobs`;
- * 10:00 at most, then it logs in anyway and says so). Shoonya's own API: never.
+ * (`TRADING_DATA_ROOT/stop/stop-running.json`). Before every login, at any hour, the scheduler's
+ * `GET /jobs`: a run in progress of a job that logs in to the platform (`PLATFORM_JOBS`, morning
+ * and evening) always blocks; a due or imminent one, or an API that does not answer, blocks until
+ * its window's cap (10:00 / 17:30), then it logs in anyway and says so. Shoonya's own API: never.
  *
  *   tsx src/trade-monitor.ts [--parts margin,deploy,loss] [--now] [--print] [--headed]
  *
@@ -229,8 +233,6 @@ class Monitor {
   >();
   /** a platform whose session was lost: its next login is a replacement */
   private readonly lost = new Set<LoginPlatform>();
-  /** platforms whose morning deploy jobs have ended today (or the wait reached 10:00) */
-  private readonly jobsEnded = new Set<'algotest' | 'quantiply'>();
   /** what a platform's last check found still running (this process waited for it) */
   private readonly jobsWaitedFor = new Map<'algotest' | 'quantiply', string>();
   private refused = false;
@@ -373,7 +375,7 @@ class Monitor {
   private async refusal(platform: LoginPlatform, firstAttempt: boolean): Promise<string | null> {
     const disk = await this.disk();
     this.state.logins = mergeLogins(disk?.logins, this.state.logins);
-    const replacing = this.lost.has(platform);
+    const replacing = isReplacing(this.log(platform), this.lost.has(platform));
     return loginRefusal({
       log: this.log(platform),
       cap: platform === 'algotest' ? LOGIN_CAP.algotest : LOGIN_CAP.quantiply,
@@ -392,7 +394,13 @@ class Monitor {
     if (why) throw new LoginNotAllowed(`${platform}: ${why}`);
     const entry = this.log(platform);
     entry.count += 1;
-    if (this.lost.has(platform)) entry.reloginAt = new Date().toISOString();
+    if (isReplacing(entry, this.lost.has(platform))) entry.reloginAt = new Date().toISOString();
+    await this.save();
+  }
+
+  /** A login worked: a loss before it is no longer a reason to treat the next one as a replacement. */
+  private async loggedIn(platform: LoginPlatform): Promise<void> {
+    this.log(platform).loggedInAt = new Date().toISOString();
     await this.save();
   }
 
@@ -402,64 +410,52 @@ class Monitor {
   }
 
   /**
-   * After 09:10, before a login on `platform`: have today's runs of its morning deploy jobs ended?
-   * Null = yes (or before 09:10, when none has started, or 10:00 has come: then it logs in anyway
-   * and says so once); else what still runs. Read from the scheduler's loopback `GET /jobs`; an
-   * API that does not answer cannot say, so it waits too (until 10:00).
+   * Before every login on `platform`, at any hour: may the scheduler's jobs that log in to it be
+   * interrupted? Null = go ahead; else what still runs. Read from the scheduler's loopback
+   * `GET /jobs` (`jobsStillToEnd`): a run in progress today always blocks (its own timeout bounds
+   * it); a due or imminent slot, or an API that does not answer, blocks until its window's cap
+   * (10:00 / 17:30), after which it logs in anyway and says so once per window.
    */
   async platformJobs(platform: 'algotest' | 'quantiply'): Promise<string | null> {
-    if (this.jobsEnded.has(platform)) return null;
-    const minutes = istMinutes();
-    if (minutes < QUIET_FROM) return null;
-    const waited = this.jobsWaitedFor.get(platform);
-    if (minutes >= JOBS_WAIT_UNTIL) {
-      this.jobsEnded.add(platform);
-      // said only when this process was waiting (a run started after 10:00 never waits)
-      if (waited) await this.jobsWaitCapped(platform, minutes, waited);
-      return null;
-    }
-    let busy: string[];
+    const now = new Date();
+    let wait: JobsWait;
     try {
       const port = Number(process.env.SCHEDULER_API_PORT) || 8790;
       const res = await fetch(`http://127.0.0.1:${port}/jobs`, {
         signal: AbortSignal.timeout(5_000),
       });
       if (!res.ok) throw new Error(`answered ${res.status}`);
-      busy = jobsStillToEnd(
-        (await res.json()) as SchedulerJobView[],
-        PLATFORM_JOBS[platform],
-        new Date(),
-      );
+      const views = (await res.json()) as SchedulerJobView[];
+      wait = jobsStillToEnd(views, PLATFORM_JOBS[platform], now);
     } catch (error) {
-      busy = [
-        `the scheduler's API does not answer (${describe(error)}): cannot tell whether ${PLATFORM_JOBS[platform].join(' / ')} ended`,
-      ];
+      wait = jobsStillToEnd(null, PLATFORM_JOBS[platform], now, describe(error));
     }
-    if (!busy.length) {
-      this.jobsEnded.add(platform);
-      if (waited) console.log(`${platform}: the morning jobs have ended: logging in`);
-      return null;
+    if (wait.blocking.length) {
+      const why = wait.blocking.join('; ');
+      this.jobsWaitedFor.set(platform, why);
+      return why;
     }
-    const why = busy.join('; ');
-    this.jobsWaitedFor.set(platform, why);
-    return why;
+    if (wait.pastCap.length) await this.jobsWaitCapped(platform, wait.pastCap.join('; '));
+    else if (this.jobsWaitedFor.delete(platform)) {
+      console.log(`${platform}: its jobs have ended: logging in`);
+    }
+    return null;
   }
 
-  /** 10:00 came while a platform's morning jobs still seemed to run: logging in anyway, said once. */
-  private async jobsWaitCapped(
-    platform: 'algotest' | 'quantiply',
-    minutes: number,
-    waited: string,
-  ): Promise<void> {
+  /** A window's cap came while a platform's job still looked due: logging in anyway, said once. */
+  private async jobsWaitCapped(platform: 'algotest' | 'quantiply', why: string): Promise<void> {
+    const minutes = istMinutes();
+    const window: WaitWindow = minutes < WAIT_WINDOWS.evening.from ? 'morning' : 'evening';
+    const key = `${platform}-${window}`;
     this.state.jobsWaitCapped ??= {};
-    if (this.state.jobsWaitCapped[platform]) return;
+    if (this.state.jobsWaitCapped[key]) return;
     const name = platform === 'algotest' ? 'AlgoTest' : 'Quantiply';
     // never muted: logging in now may end that job's session
     const sent = await this.send(
-      `⚠️ Trade monitor ${hhmm(minutes)}: waited until ${hhmm(JOBS_WAIT_UNTIL)} (${waited}); logging in to ${name} anyway: if that job still runs, this login may end its session, so check it`,
+      `⚠️ Trade monitor ${hhmm(minutes)}: past ${hhmm(WAIT_WINDOWS[window].until)} (${why}); logging in to ${name} anyway: if that job starts now, check it`,
     );
     if (sent) {
-      this.state.jobsWaitCapped[platform] = true;
+      this.state.jobsWaitCapped[key] = true;
       await this.save();
     }
   }
@@ -520,19 +516,26 @@ class Monitor {
       // Before 09:10 the lock is waited for only until 09:10; the quiet window, the cap and the
       // backoffs are checked again once it is held (re-review of #276, D), right before the login.
       const untilQuiet = (QUIET_FROM * 60 - istSecondsNow()) * 1000;
+      let attempted = false;
       await withLoginLock(
         'algotest',
         'trade-monitor',
         async () => {
           await this.allowLogin('algotest');
+          attempted = true;
           await algotestLogin(page, { phone: normalizePhone(phone), password });
         },
-        istMinutes() < QUIET_FROM ? { waitMs: Math.max(0, untilQuiet) } : {},
+        {
+          // a login refused inside the lock leaves login-algotest.last alone
+          stampIf: () => attempted,
+          ...(istMinutes() < QUIET_FROM ? { waitMs: Math.max(0, untilQuiet) } : {}),
+        },
       );
       await page.goto(`${BASE_URL}/live`, { waitUntil: 'domcontentloaded' });
       await livePage.header(page).waitFor({ timeout: 30_000 });
       this.algotest = { browser, page, reloadedAt: Date.now() };
       this.lost.delete('algotest');
+      await this.loggedIn('algotest');
       return page;
     } catch (error) {
       await browser.close().catch(() => undefined);
@@ -673,6 +676,7 @@ class Monitor {
       throw error;
     }
     this.lost.delete(platform);
+    await this.loggedIn(platform);
     const entry = { api: app.api, browser: app.browser, list: [] as QListed[], listedAt: 0 };
     this.quantiply.set(broker, entry);
     return entry;

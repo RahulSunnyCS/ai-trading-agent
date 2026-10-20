@@ -104,6 +104,14 @@ test("every login under the lock stamps when it ended, failed or not (the monito
   assert.ok(at !== null && at >= before && at <= Date.now());
   // the asking process's own login is not "another" one
   assert.equal(lastLoginAt('algotest', d, process.pid), null);
+  // a login refused inside the lock (it never got as far as logging in) leaves the stamp alone
+  const stamped = lastLoginAt('algotest', d);
+  await new Promise((r) => setTimeout(r, 5));
+  await withLoginLock('algotest', 'trade-monitor', async () => undefined, {
+    dir: d,
+    stampIf: () => false,
+  });
+  assert.equal(lastLoginAt('algotest', d), stamped);
 });
 
 test("Quantiply's last code typed is read from the TOTP window stamp", async () => {

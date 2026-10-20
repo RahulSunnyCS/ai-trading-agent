@@ -206,12 +206,16 @@ week, until disabled.
 - **Timeline and switches** (`.env`, each off until `on`): `MARGIN_CHECK` 09:05-09:10; then **no login and no
   open session 09:10-09:25** (the 09:16 deploy and the 09:18-09:21 top-ups log in; neither platform is known to
   keep two sessions per user), checked at every login (after the lock wait) and every use of an open session;
-  `DEPLOY_CHECK` at 09:25; `LOSS_ALERTS` every minute 09:25-15:30. All off = no login. After 09:10 a platform is
-  not logged in to until today's runs of its morning jobs have ended (`PLATFORM_JOBS`: `algotest-deploy` /
-  `algotest-topup`, `quantiply-topup` / `quantiply-deploy-topup`; `jobsStillToEnd` over the scheduler's
-  `GET /jobs`: running, due or queued behind the group blocks, not scheduled today or ended does not; an API
-  that does not answer blocks too): the deploy check waits, a loss reading skips the platform quietly. At 10:00
-  (`JOBS_WAIT_UNTIL`; the retries end by 09:52 at worst) it logs in anyway and says so once. A monitor that
+  `DEPLOY_CHECK` at 09:25; `LOSS_ALERTS` every minute 09:25-15:30. All off = no login. Before every login, at any
+  hour, it reads the scheduler's `GET /jobs` (`jobsStillToEnd` over `PLATFORM_JOBS`: AlgoTest `algotest-deploy`,
+  `algotest-topup`, `algotest-deploy-check`, `algotest-evening`; Quantiply `quantiply-topup`,
+  `quantiply-deploy-topup`, `quantiply-disable`, `quantiply-evening`, `quantiply-deploy`). A run of one of them in
+  progress today always blocks (a 10:30 wake into a deploy-topup catch-up, a hand `jobs run`; its own timeout
+  bounds it). A slot that came with no run yet (due, or queued behind its group), one within 5 minutes, or an
+  API that does not answer blocks only until its window's cap (`WAIT_WINDOWS`: 10:00 for the morning jobs, whose
+  retries end by 09:52 at worst; 17:30 for the evening ones); after the cap it logs in anyway and says so once
+  per window. Not scheduled today or ended blocks nothing. The deploy check waits; a loss reading skips the
+  platform quietly. A monitor that
   starts after 09:10 says once (`monitor.margin`) that the margin was not checked.
 - **Read-only.** Pages and GET calls only; it never clicks a platform button (the kept Quantiply page has no
   overlay handler), never sends a PUT/POST/DELETE to one, never squares off. Its writes: Telegram
@@ -229,10 +233,15 @@ week, until disabled.
   for 10 minutes after a failed one, nor within 10 minutes of the platform ending the session (logged out / 401:
   someone else's login, the owner's browser or the stop button, most likely ended it), the first replacement
   included; a replacement also waits while another process logged in to the platform in the last 10 minutes
-  (AlgoTest: `login-algotest.last`, stamped by every login under the lock; Quantiply: the TOTP window stamp) and
-  comes at most every 30 minutes, said once as "degraded" (`loginRefusal`). No login at all while PR #275's stop
+  (AlgoTest: `login-algotest.last`, stamped by every login under the lock except one the monitor refused inside
+  it; Quantiply: the TOTP window stamp) and comes at most every 30 minutes, said once as "degraded"
+  (`loginRefusal`). A loss on disk later than the last successful login (`loggedInAt`) still counts as a
+  replacement after a restart (`isReplacing`). No login at all while PR #275's stop
   button runs (`TRADING_DATA_ROOT/stop/stop-running.json`, `{pid, at}`, beside its HOLD.json: counted while the
-  pid lives and it is under 10 minutes old, `stopButtonRunning`). The margin's AlgoTest session is closed before
+  pid lives, up to 20 minutes, above the stop's 15-minute apply timeout; with no readable pid, 10 minutes by its
+  age; `stopButtonRunning`). **Not covered:** the GitHub "Daily broker login" backstop cron (08:15 IST, often hours
+  late) logs in to AlgoTest from GitHub's runners without the local lock or `login-algotest.last`, so the monitor
+  (and the uploader and the deployer) cannot see it. The margin's AlgoTest session is closed before
   `obt angel funds` runs, and its lock is waited for only until 09:10. A Quantiply account is logged in to only when its
   Settings › Automation row uploads a list: for `quantiply.finvasia` that is a Shoonya login, so the same caution
   as below applies before switching that row on. Angel One SmartAPI: `obt angel funds` once (the shared guard).

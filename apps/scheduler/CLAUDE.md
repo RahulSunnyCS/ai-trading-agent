@@ -105,7 +105,8 @@ network or disk so the test needs neither. One group per file keeps parallel PRs
 - `trade-monitor` (BL-143, trading days 09:04, `packages/broker-login/src/trade-monitor.ts`) runs all
   session long under `caffeinate -i`, so it is not in the `quantiply` group (it would hold the 09:19 /
   09:21 top-ups all day). It makes no login and holds no session 09:10-09:25, and none on a platform after that
-  until today's runs of its morning jobs have ended (`GET /jobs`, 10:00 at most); every platform login
+  while a job that logs in to that platform runs (`GET /jobs` before every login, at any hour; a due one
+  blocks until 10:00 / 17:30); every platform login
   (its own, the uploaders', the deployers') takes the cross-process login lock. It alerts itself
   (`alertsItself`), including every failure exit and a crash; its state file stops a retry repeating
   a message; exit 3 (a refused or held Quantiply login, or another monitor running) is not retried.

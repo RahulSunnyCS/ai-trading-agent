@@ -15,8 +15,10 @@ import {
   PNL_STALE_MS,
   type QListed,
   READABLE_AGAIN_AFTER,
+  STOP_RUNNING_ALIVE_MS,
   type SchedulerJobView,
   UNREADABLE_NOTICES_A_DAY,
+  WAIT_WINDOWS,
   algotestInstant,
   checkAlgoTest,
   checkQuantiply,
@@ -25,6 +27,7 @@ import {
   inLossWindow,
   inQuietWindow,
   inr,
+  isReplacing,
   istDayOf,
   jobsStillToEnd,
   legLots,
@@ -130,11 +133,12 @@ test('logins (E): a --print run and the monitor merge their counts, never overwr
   assert.deepEqual(mergeLogins(undefined, undefined), {});
 });
 
-test("waiting for the morning's deploy jobs (A): running, due, queued, done, not today", () => {
-  const now = new Date('2026-10-21T03:55:00Z'); // 09:25 IST
-  const slot = (hhmm: string) => new Date(`2026-10-21T${hhmm}:00+05:30`).toISOString();
-  const tomorrow = (hhmm: string) => new Date(`2026-10-22T${hhmm}:00+05:30`).toISOString();
-  const done = { started_at: slot('09:18'), ended_at: slot('09:20') };
+const ist = (day: string, hhmm: string) => new Date(`${day}T${hhmm}:00+05:30`);
+const slot = (hhmm: string) => ist('2026-10-21', hhmm).toISOString();
+const tomorrow = (hhmm: string) => ist('2026-10-22', hhmm).toISOString();
+
+test("waiting for the platforms' jobs (A): running, due, queued, done, not today", () => {
+  const now = ist('2026-10-21', '09:25');
   const views: SchedulerJobView[] = [
     // the top-up's retry is still running
     {
@@ -148,7 +152,7 @@ test("waiting for the morning's deploy jobs (A): running, due, queued, done, not
     {
       id: 'algotest-deploy',
       nextRun: tomorrow('09:16'),
-      lastRun: done,
+      lastRun: { started_at: slot('09:16'), ended_at: slot('09:17') },
       previousSlot: slot('09:16'),
       previousSlotRun: { ended_at: slot('09:17') },
     },
@@ -161,13 +165,15 @@ test("waiting for the morning's deploy jobs (A): running, due, queued, done, not
       previousSlotRun: null,
     },
   ];
-  assert.deepEqual(jobsStillToEnd(views, PLATFORM_JOBS.algotest, now), [
-    'algotest-topup is running (since 09:18)',
-  ]);
-  assert.deepEqual(jobsStillToEnd(views, PLATFORM_JOBS.quantiply, now), [
-    'quantiply-deploy-topup is due (its 09:21 run has not started)',
-  ]);
-  // not scheduled today (yesterday's slot, a holiday-like gap) and not listed: nothing blocks
+  assert.deepEqual(jobsStillToEnd(views, PLATFORM_JOBS.algotest, now), {
+    blocking: ['algotest-topup is running (since 09:18)'],
+    pastCap: [],
+  });
+  assert.deepEqual(jobsStillToEnd(views, PLATFORM_JOBS.quantiply, now), {
+    blocking: ['quantiply-deploy-topup is due (its 09:21 run has not started)'],
+    pastCap: [],
+  });
+  // not scheduled today (yesterday's slot) and not listed: nothing blocks
   const notToday: SchedulerJobView[] = [
     {
       id: 'quantiply-topup',
@@ -177,9 +183,11 @@ test("waiting for the morning's deploy jobs (A): running, due, queued, done, not
       previousSlotRun: { ended_at: '2026-10-20T03:50:00Z' },
     },
   ];
-  assert.deepEqual(jobsStillToEnd(notToday, PLATFORM_JOBS.quantiply, now), []);
-  // a slot later today, before the cap, still blocks (a --now run before 09:16)
-  const early = new Date('2026-10-21T03:42:00Z'); // 09:12 IST
+  assert.deepEqual(jobsStillToEnd(notToday, PLATFORM_JOBS.quantiply, now), {
+    blocking: [],
+    pastCap: [],
+  });
+  // a slot about to come blocks (a --now run at 09:12, the 09:16 deploy) ...
   const later: SchedulerJobView[] = [
     {
       id: 'algotest-deploy',
@@ -189,29 +197,139 @@ test("waiting for the morning's deploy jobs (A): running, due, queued, done, not
       previousSlotRun: { ended_at: '2026-10-20T03:47:00Z' },
     },
   ];
-  assert.deepEqual(jobsStillToEnd(later, PLATFORM_JOBS.algotest, early), [
-    'algotest-deploy runs at 09:16',
-  ]);
-  // ... but not one after the cap
-  assert.deepEqual(jobsStillToEnd(later, PLATFORM_JOBS.algotest, early, 9 * 60 + 15), []);
+  assert.deepEqual(jobsStillToEnd(later, PLATFORM_JOBS.algotest, ist('2026-10-21', '09:12')), {
+    blocking: ['algotest-deploy runs at 09:16'],
+    pastCap: [],
+  });
+  // ... one further ahead does not (the 09:05 margin login, 11 minutes before it)
+  assert.deepEqual(
+    jobsStillToEnd(later, PLATFORM_JOBS.algotest, ist('2026-10-21', '09:05')).blocking,
+    [],
+  );
   assert.equal(JOBS_WAIT_UNTIL, 10 * 60);
 });
 
-test("the stop button's running marker (B): alive and fresh only; a torn file by its age", () => {
+test('after 10:00 (must-fix 1): a run in progress still blocks; a due one is past its cap', () => {
+  // the laptop woke at 10:30: the catch-ups of the morning jobs started on the same tick
+  const now = ist('2026-10-21', '10:30');
+  const running: SchedulerJobView[] = [
+    {
+      id: 'quantiply-deploy-topup',
+      nextRun: tomorrow('09:21'),
+      lastRun: { started_at: slot('10:30'), ended_at: null },
+      previousSlot: slot('09:21'),
+      previousSlotRun: { ended_at: null },
+    },
+  ];
+  assert.deepEqual(jobsStillToEnd(running, PLATFORM_JOBS.quantiply, now), {
+    blocking: ['quantiply-deploy-topup is running (since 10:30)'],
+    pastCap: [],
+  });
+  // a hand `jobs run` at 13:00 (no slot today's row: a manual run) blocks too
+  const manual: SchedulerJobView[] = [
+    {
+      id: 'algotest-topup',
+      nextRun: tomorrow('09:18'),
+      lastRun: { started_at: slot('13:00'), ended_at: null },
+      previousSlot: slot('09:18'),
+      previousSlotRun: { ended_at: slot('09:20') },
+    },
+  ];
+  assert.equal(
+    jobsStillToEnd(manual, PLATFORM_JOBS.algotest, ist('2026-10-21', '13:01')).blocking.length,
+    1,
+  );
+  // a slot that came with no run yet, after the cap: the monitor logs in and says so
+  const due: SchedulerJobView[] = [
+    {
+      id: 'quantiply-deploy-topup',
+      nextRun: tomorrow('09:21'),
+      lastRun: null,
+      previousSlot: slot('09:21'),
+      previousSlotRun: null,
+    },
+  ];
+  assert.deepEqual(jobsStillToEnd(due, PLATFORM_JOBS.quantiply, now), {
+    blocking: [],
+    pastCap: ['quantiply-deploy-topup is due (its 09:21 run has not started)'],
+  });
+});
+
+test('the evening jobs (must-fix 1): the 16:55 enable running blocks a hand --now run', () => {
+  const now = ist('2026-10-21', '17:02');
+  const views: SchedulerJobView[] = [
+    {
+      id: 'quantiply-deploy',
+      nextRun: tomorrow('16:55'),
+      lastRun: { started_at: slot('16:55'), ended_at: null },
+      previousSlot: slot('16:55'),
+      previousSlotRun: { ended_at: null },
+    },
+    {
+      id: 'algotest-evening',
+      nextRun: tomorrow('16:40'),
+      lastRun: { started_at: slot('16:40'), ended_at: slot('16:44') },
+      previousSlot: slot('16:40'),
+      previousSlotRun: { ended_at: slot('16:44') },
+    },
+  ];
+  assert.deepEqual(jobsStillToEnd(views, PLATFORM_JOBS.quantiply, now).blocking, [
+    'quantiply-deploy is running (since 16:55)',
+  ]);
+  assert.deepEqual(jobsStillToEnd(views, PLATFORM_JOBS.algotest, now).blocking, []);
+  assert.ok(PLATFORM_JOBS.algotest.some((j) => j.id === 'algotest-evening'));
+  assert.ok(PLATFORM_JOBS.quantiply.some((j) => j.id === 'quantiply-evening'));
+  assert.ok(PLATFORM_JOBS.quantiply.some((j) => j.id === 'quantiply-disable'));
+});
+
+test('the scheduler API not answering: waits inside a window, says so after its cap, else nothing', () => {
+  const at = (hhmm: string) =>
+    jobsStillToEnd(null, PLATFORM_JOBS.quantiply, ist('2026-10-21', hhmm), 'ECONNREFUSED');
+  assert.equal(at('09:30').blocking.length, 1);
+  assert.match(
+    at('09:30').blocking[0] ?? '',
+    /ECONNREFUSED.*quantiply-topup \/ quantiply-deploy-topup/,
+  );
+  assert.deepEqual(at('10:05'), { blocking: [], pastCap: [at('09:30').blocking[0] ?? ''] });
+  assert.deepEqual(at('13:00'), { blocking: [], pastCap: [] });
+  assert.equal(at('16:50').blocking.length, 1);
+  assert.equal(at('17:40').pastCap.length, 1);
+  assert.equal(WAIT_WINDOWS.evening.until, 17 * 60 + 30);
+});
+
+test("the stop button's running marker (must-fix 2): a live pid for 20 min; no pid by its age", () => {
   const now = Date.parse('2026-10-21T07:30:00Z');
   const alive = () => true;
   const dead = () => false;
+  const ago = (min: number) => now - min * 60_000;
   assert.equal(stopButtonRunning(null, null, now, alive), false);
   assert.equal(
-    stopButtonRunning({ pid: 1, at: new Date(now - 60_000).toISOString() }, null, now, alive),
+    stopButtonRunning({ pid: 1, at: new Date(ago(1)).toISOString() }, null, now, alive),
     true,
   );
-  assert.equal(stopButtonRunning({ pid: 1, at: now - 60_000 }, null, now, alive), true);
-  assert.equal(stopButtonRunning({ pid: 1, at: now - 60_000 }, null, now, dead), false);
-  assert.equal(stopButtonRunning({ pid: 1, at: now - 11 * 60_000 }, null, now, alive), false);
-  assert.equal(stopButtonRunning('unreadable', now - 5_000, now, alive), true);
-  assert.equal(stopButtonRunning('unreadable', now - 11 * 60_000, now, alive), false);
-  assert.equal(stopButtonRunning({ at: now - 5_000 }, null, now, dead), true); // no pid: by age
+  // a stop still running after its 10th minute (the apply timeout is 15) still blocks
+  assert.equal(stopButtonRunning({ pid: 1, at: ago(14) }, null, now, alive), true);
+  assert.equal(stopButtonRunning({ pid: 1, at: ago(19) }, null, now, alive), true);
+  assert.equal(stopButtonRunning({ pid: 1, at: ago(21) }, null, now, alive), false);
+  assert.equal(STOP_RUNNING_ALIVE_MS, 20 * 60_000);
+  // a dead pid is a crashed stop, however fresh
+  assert.equal(stopButtonRunning({ pid: 1, at: ago(1) }, null, now, dead), false);
+  // no readable pid: by its age, 10 minutes
+  assert.equal(stopButtonRunning({ at: ago(5) }, null, now, dead), true);
+  assert.equal(stopButtonRunning({ pid: 'x', at: ago(9) }, null, now, dead), true);
+  assert.equal(stopButtonRunning({ at: ago(11) }, null, now, alive), false);
+  assert.equal(stopButtonRunning({}, ago(3), now, alive), true); // no time: the file's
+  assert.equal(stopButtonRunning('unreadable', ago(0.1), now, alive), true);
+  assert.equal(stopButtonRunning('unreadable', ago(11), now, alive), false);
+});
+
+test('a restarted monitor still treats a loss on disk as a replacement (nit)', () => {
+  assert.equal(isReplacing({ count: 1 }, false), false);
+  assert.equal(isReplacing({ count: 1 }, true), true);
+  const lost = { count: 1, lostAt: '2026-10-21T07:00:00Z', loggedInAt: '2026-10-21T04:00:00Z' };
+  assert.equal(isReplacing(lost, false), true);
+  assert.equal(isReplacing({ ...lost, loggedInAt: '2026-10-21T07:20:00Z' }, false), false);
+  assert.equal(isReplacing({ count: 1, lostAt: '2026-10-21T07:00:00Z' }, false), true);
 });
 
 test('"cannot read" (C): said once, re-armed after 3 readings in a row, at most 3 a day', () => {

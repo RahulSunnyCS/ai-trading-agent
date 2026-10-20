@@ -67,6 +67,19 @@ export interface LoginLog {
   reloginAt?: string;
   /** ISO time the platform last ended the monitor's session (401 / logged out) */
   lostAt?: string;
+  /** ISO time of the monitor's last successful login */
+  loggedInAt?: string;
+}
+
+/**
+ * Is the next login a replacement for a lost session? In this process (`lostInMemory`), or by the
+ * state file: a loss later than the last successful login, so a restarted monitor still applies
+ * the replacement checks (another recent login, at most every 30 min).
+ */
+export function isReplacing(log: LoginLog, lostInMemory: boolean): boolean {
+  if (lostInMemory) return true;
+  if (!log.lostAt) return false;
+  return !log.loggedInAt || Date.parse(log.lostAt) > Date.parse(log.loggedInAt);
 }
 
 export interface LoginContext {
@@ -136,7 +149,7 @@ export function mergeLogins<K extends string>(
     const x = a?.[k];
     const y = b?.[k];
     const merged: LoginLog = { count: Math.max(x?.count ?? 0, y?.count ?? 0) };
-    for (const f of ['failedAt', 'reloginAt', 'lostAt'] as const) {
+    for (const f of ['failedAt', 'reloginAt', 'lostAt', 'loggedInAt'] as const) {
       const v = laterIso(x?.[f], y?.[f]);
       if (v !== undefined) merged[f] = v;
     }
@@ -145,24 +158,52 @@ export function mergeLogins<K extends string>(
   return out;
 }
 
-// --- waiting for the morning's deploy jobs ---------------------------------------------------
+// --- waiting for the platforms' jobs ---------------------------------------------------------
 
 /**
- * The scheduler jobs that log in to a platform in the morning (re-review of #276, A). The 09:25
- * end of the quiet window is a clock time, but these can still run then (retries, the `quantiply`
- * group's queue): before its first login after 09:10 the monitor waits until today's runs have
- * ended, read from the scheduler's `GET /jobs`.
+ * The two windows the scheduler's platform jobs log in in. Inside one, a job may be "due" or about
+ * to run; after its end (the cap) only a run that is actually in progress still blocks.
+ * Morning: algotest-topup's three attempts (09:18, 10 min each, 2 min apart) end by 09:52 at worst,
+ * quantiply-topup's two and the queued quantiply-deploy-topup by 09:51. Evening: the 15:35 / 15:40
+ * deploy check and disable, the 16:40 / 16:45 uploads and the 16:55 enable.
  */
-export const PLATFORM_JOBS = {
-  algotest: ['algotest-deploy', 'algotest-topup'],
-  quantiply: ['quantiply-topup', 'quantiply-deploy-topup'],
+export const WAIT_WINDOWS = {
+  morning: { from: 9 * 60 + 10, until: 10 * 60 },
+  evening: { from: 15 * 60 + 35, until: 17 * 60 + 30 },
 } as const;
+export type WaitWindow = keyof typeof WAIT_WINDOWS;
+/** The morning cap. */
+export const JOBS_WAIT_UNTIL = WAIT_WINDOWS.morning.until;
+/** A slot this close ahead counts as about to run. */
+export const JOB_SOON_MS = 5 * 60_000;
+
+export interface PlatformJob {
+  id: string;
+  window: WaitWindow;
+}
+
 /**
- * The wait ends at 10:00 IST at the latest (then it logs in anyway and says so): algotest-topup's
- * three attempts (09:18, 10 min each, 2 min apart) end by 09:52 at worst, quantiply-topup's two
- * and the queued quantiply-deploy-topup by 09:51.
+ * The scheduler jobs that log in to each platform (re-reviews of #276: A, and must-fix 1). Before
+ * any login the monitor reads the scheduler's `GET /jobs`, at any hour: a run of one of these in
+ * progress today always blocks (bounded by the job's own timeout, which the scheduler enforces
+ * while its API answers); a slot that has come with no run yet, one about to come, or an API that
+ * does not answer blocks only until the job's window's cap.
  */
-export const JOBS_WAIT_UNTIL = 10 * 60;
+export const PLATFORM_JOBS: Record<'algotest' | 'quantiply', readonly PlatformJob[]> = {
+  algotest: [
+    { id: 'algotest-deploy', window: 'morning' },
+    { id: 'algotest-topup', window: 'morning' },
+    { id: 'algotest-deploy-check', window: 'evening' },
+    { id: 'algotest-evening', window: 'evening' },
+  ],
+  quantiply: [
+    { id: 'quantiply-topup', window: 'morning' },
+    { id: 'quantiply-deploy-topup', window: 'morning' },
+    { id: 'quantiply-disable', window: 'evening' },
+    { id: 'quantiply-evening', window: 'evening' },
+    { id: 'quantiply-deploy', window: 'evening' },
+  ],
+};
 
 /** One row of the scheduler's `GET /jobs` (only what the monitor reads). */
 export interface SchedulerJobView {
@@ -173,45 +214,73 @@ export interface SchedulerJobView {
   previousSlotRun?: { ended_at: string | null } | null;
 }
 
+export interface JobsWait {
+  /** what blocks a login now; empty = the monitor may log in */
+  blocking: string[];
+  /** what would block but its window's cap has passed: the monitor logs in anyway and says so */
+  pastCap: string[];
+}
+
+const istMinuteOf = (d: Date) => Math.floor((d.getTime() / 60_000 + 330) % 1440);
+
 /**
- * Which of `ids` may still log in today, and why; empty = none, the monitor may log in. A job
- * blocks while a run of it that started today has not ended, while today's slot has come and no
- * run serves it yet (still due, or queued behind its group), or while a slot of it later today
- * comes before `untilMinutes`. A job not scheduled today, or whose run today has ended, does not.
- * A job the scheduler does not list blocks nothing (it is not scheduled).
+ * May the monitor log in to a platform now, given the scheduler's `GET /jobs` (`views`; null = the
+ * API did not answer, `apiError` says why)?
+ * - A run of a job that started today and has not ended (or the run serving today's slot) blocks,
+ *   at any hour: a laptop that wakes at 10:30 into a quantiply-deploy-topup catch-up still waits.
+ * - Today's slot having come with no run yet (still due, or queued behind its group), or a slot
+ *   within `JOB_SOON_MS`, blocks until the job's window's cap; after that it is `pastCap`.
+ * - An API that does not answer blocks inside a window of the platform's jobs, and is `pastCap`
+ *   for an hour after its cap; at other hours it blocks nothing (no scheduler, no job runs).
+ * A job not scheduled today, whose run today has ended, or that the scheduler does not list,
+ * blocks nothing.
  */
 export function jobsStillToEnd(
-  views: SchedulerJobView[],
-  ids: readonly string[],
+  views: SchedulerJobView[] | null,
+  jobs: readonly PlatformJob[],
   now: Date,
-  untilMinutes: number = JOBS_WAIT_UNTIL,
-): string[] {
+  apiError = 'no answer',
+): JobsWait {
+  const out: JobsWait = { blocking: [], pastCap: [] };
+  const minutes = istMinuteOf(now);
+  if (views === null) {
+    for (const w of [...new Set(jobs.map((j) => j.window))]) {
+      const win = WAIT_WINDOWS[w];
+      const ids = jobs.filter((j) => j.window === w).map((j) => j.id);
+      const why = `the scheduler's API does not answer (${apiError}): cannot tell whether ${ids.join(' / ')} ended`;
+      if (minutes >= win.from && minutes < win.until) out.blocking.push(why);
+      else if (minutes >= win.until && minutes < win.until + 60) out.pastCap.push(why);
+    }
+    return out;
+  }
   const day = istDayOf(now);
-  const out: string[] = [];
-  for (const id of ids) {
+  for (const { id, window } of jobs) {
     const v = views.find((j) => j.id === id);
     if (!v) continue;
+    const capped = minutes >= WAIT_WINDOWS[window].until;
     const last = v.lastRun;
     if (last && last.ended_at === null && istDayOf(new Date(last.started_at)) === day) {
-      out.push(`${id} is running (since ${istClock(new Date(last.started_at))})`);
+      out.blocking.push(`${id} is running (since ${istClock(new Date(last.started_at))})`);
       continue;
     }
     const slot = v.previousSlot ? new Date(v.previousSlot) : null;
     if (slot && istDayOf(slot) === day && slot.getTime() <= now.getTime()) {
       const run = v.previousSlotRun;
-      if (!run) {
-        out.push(`${id} is due (its ${istClock(slot)} run has not started)`);
+      if (run && run.ended_at === null) {
+        out.blocking.push(`${id} is running (its ${istClock(slot)} run)`);
         continue;
       }
-      if (run.ended_at === null) {
-        out.push(`${id} is running (its ${istClock(slot)} run)`);
+      if (!run) {
+        (capped ? out.pastCap : out.blocking).push(
+          `${id} is due (its ${istClock(slot)} run has not started)`,
+        );
         continue;
       }
     }
     const next = v.nextRun ? new Date(v.nextRun) : null;
-    if (next && istDayOf(next) === day) {
-      const m = Math.floor((next.getTime() / 60_000 + 330) % 1440);
-      if (m < untilMinutes) out.push(`${id} runs at ${istClock(next)}`);
+    const ahead = next ? next.getTime() - now.getTime() : Number.POSITIVE_INFINITY;
+    if (next && istDayOf(next) === day && ahead > 0 && ahead <= JOB_SOON_MS) {
+      (capped ? out.pastCap : out.blocking).push(`${id} runs at ${istClock(next)}`);
     }
   }
   return out;
@@ -219,15 +288,22 @@ export function jobsStillToEnd(
 
 // --- the stop button (PR #275) -----------------------------------------------------------------
 
-/** A stop-running marker older than this is a crashed stop's. */
+/**
+ * A stop-running marker whose process is alive counts this long: above the scheduler's 15-minute
+ * timeout for a stop's `--apply` (#275 writes the marker once, at the start, and never refreshes
+ * it), so a slow stop still blocks the monitor's logins to its end.
+ */
+export const STOP_RUNNING_ALIVE_MS = 20 * 60_000;
+/** A marker with no readable pid (or a torn file) counts by its age alone, this long. */
 export const STOP_RUNNING_STALE_MS = 10 * 60_000;
 
 /**
  * Is PR #275's stop button running? It writes `TRADING_DATA_ROOT/stop/stop-running.json`
- * (`{pid, at}`, beside its HOLD.json) for the whole of a stop and removes it in a `finally`. A
- * marker counts while its process lives and it is under 10 minutes old; an unreadable one (torn
- * mid-write) counts by its file time. Never fails open the other way: a marker with no pid counts
- * by its age alone.
+ * (`{pid, at}`, beside its HOLD.json) for the whole of a stop and removes it in a `finally`.
+ * - A marker with a pid: running while that process lives, up to 20 minutes from `at` (or the
+ *   file time); a dead pid is a crashed stop.
+ * - A marker with no readable pid, or an unreadable one (torn mid-write): running for 10 minutes
+ *   from its time.
  */
 export function stopButtonRunning(
   marker: { pid?: unknown; at?: unknown } | null | 'unreadable',
@@ -239,14 +315,19 @@ export function stopButtonRunning(
   if (marker === 'unreadable') {
     return fileMtimeMs !== null && nowMs - fileMtimeMs < STOP_RUNNING_STALE_MS;
   }
-  const at =
+  const parsed =
     typeof marker.at === 'number'
       ? marker.at
       : typeof marker.at === 'string'
         ? Date.parse(marker.at)
-        : (fileMtimeMs ?? Number.NaN);
-  if (!Number.isFinite(at) || nowMs - at >= STOP_RUNNING_STALE_MS) return false;
-  return typeof marker.pid === 'number' ? alive(marker.pid) : true;
+        : Number.NaN;
+  const at = Number.isFinite(parsed) ? parsed : (fileMtimeMs ?? Number.NaN);
+  if (!Number.isFinite(at)) return false;
+  const pid = marker.pid;
+  if (typeof pid === 'number' && Number.isInteger(pid) && pid > 0) {
+    return alive(pid) && nowMs - at < STOP_RUNNING_ALIVE_MS;
+  }
+  return nowMs - at < STOP_RUNNING_STALE_MS;
 }
 
 // --- money ---------------------------------------------------------------------------------

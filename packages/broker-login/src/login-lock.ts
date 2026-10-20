@@ -104,7 +104,13 @@ export async function withLoginLock<T>(
   platform: LoginPlatform,
   who: string,
   fn: () => Promise<T>,
-  opts: { dir?: string; waitMs?: number; staleMs?: number } = {},
+  opts: {
+    dir?: string;
+    waitMs?: number;
+    staleMs?: number;
+    /** false = `fn` never got as far as a login (it refused inside the lock): no stamp */
+    stampIf?: () => boolean;
+  } = {},
 ): Promise<T> {
   const dir = opts.dir ?? lockDir();
   mkdirSync(dir, { recursive: true });
@@ -124,14 +130,17 @@ export async function withLoginLock<T>(
     return await fn();
   } finally {
     // When this platform was last logged in to, by whom (re-review of #276, B): the monitor does
-    // not replace a lost session while another process's login is this recent.
-    try {
-      writeFileSync(
-        lastLoginPath(dir, platform),
-        `${JSON.stringify({ pid: process.pid, at: new Date().toISOString(), who })}\n`,
-      );
-    } catch {
-      // a missing stamp only means the monitor cannot see this login
+    // not replace a lost session while another process's login is this recent. A caller that
+    // refused inside the lock writes none, so it never hides another process's stamp.
+    if (!opts.stampIf || opts.stampIf()) {
+      try {
+        writeFileSync(
+          lastLoginPath(dir, platform),
+          `${JSON.stringify({ pid: process.pid, at: new Date().toISOString(), who })}\n`,
+        );
+      } catch {
+        // a missing stamp only means the monitor cannot see this login
+      }
     }
     unlock(path);
   }
