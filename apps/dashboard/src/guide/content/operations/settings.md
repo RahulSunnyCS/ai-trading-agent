@@ -62,6 +62,35 @@ A warning badge on a block means its master switch holds it back.
 
 **The `.env` switches still have the last word.** `ALGOTEST_UPLOAD`, `QUANTIPLY_UPLOAD`, `ALGOTEST_DEPLOY` and `QUANTIPLY_DEPLOY` must also be on for the tool to change a platform. The one exception is switching the tool's Quantiply algos off at 15:40, which always runs.
 
+## The stop button (Telegram)
+
+One Telegram button that stops everything the tool trades, and keeps it stopped until you say so. It is not on this page: it lives in your private Telegram chat with the bot, so it works from your phone.
+
+**Where it appears.** Under the 09:00 morning message, and whenever you send `/stop` to the bot.
+
+**Two taps, nothing on the first.**
+
+1. **🛑 Stop everything** only shows what a stop would do now, platform by platform, read from the tool's own records. Nothing changes. Tapping it twice shows the same confirm button again.
+2. **Yes, stop and square off** does it. This button works once, and only for 2 minutes. After that, send `/stop` again.
+
+**What the second tap does:**
+
+- **Holds the tool, until you lift it.** From then on the tool uploads, deploys and switches on nothing, on AlgoTest or Quantiply, on any day. The jobs that would do so are refused, including **Apply now** on this page. The 15:40 Quantiply switch-off still runs. If the hold cannot be saved (the data disk unplugged, say), the stop still squares off and switches off, but says **HOLD NOT SAVED** first: the tool could then upload or switch on again after the laptop's scheduler restarts, so stop the scheduler or fix the disk.
+- **Quantiply (each account):** the tool's algos with a trade open are squared off and terminated by Quantiply itself. Every enabled algo of the tool's is switched off, whatever its weekday. An algo that enters while this happens is squared off on a second pass.
+- **AlgoTest:** every running deploy of the tool's (a strategy it uploaded, or one named `T1 · …` or `Core · …`) is squared off with AlgoTest's own Square Off, whoever deployed it. A deploy that went live meanwhile is squared off on a second pass.
+- **Reports back** in the same chat, one section per platform, once each platform shows the result. If the report cannot be sent, a short message says so.
+
+Your own algos and deploys are never touched; the report names any that are still running.
+
+> [!WARNING]
+> The square-off sends real exit orders through the platforms. If a platform offers no square-off for something (a paused AlgoTest deploy, for example), the report says **square off by hand**: do that in the platform or your broker's app straight away. If it says **square-off sent, still closing**, or names a square-off **already sent**, do **not** exit at the broker: the platform's own exit orders are going out, and a second exit would open a reverse position. Open the platform and look first. **Square-off may have been sent (no answer)** means the platform did not answer the call: it may have acted anyway. Open it first, and exit at the broker only if it shows no exit pending. A second stop never sends a square-off again that an earlier stop that day already sent, and a stop cannot start while another is still running. A deploy someone switched to manual is reported **check**: its legs may still be open at the broker. The tool never places an order with a broker itself.
+
+**While the hold is on.** The 09:00 message says so every day, with a **Resume** button. Send `/resume` at any time for the same.
+
+**Lifting it.** Tap **Resume**, then **Yes, lift the hold** (again once, for 2 minutes). Uploads, enables and deploys run again from each job's next run. A job the hold refused does not run again by itself: run any you need by hand. Algos the stop switched off stay off; switch on by hand any you want back.
+
+**When it does not answer.** The button is answered by the laptop's scheduler. While the laptop sleeps or is off, nothing happens: stop by hand in Quantiply and on algotest.in/live. It is also off until `STOP_BUTTON=on` is in the `.env` at the top of the repository on the laptop.
+
 ## Common questions
 
 **Are these settings shared?** Appearance, defaults and navigation are stored in this browser

@@ -780,6 +780,15 @@ options margin and are never part of the strategy. Kite access is read-only.
 | 3.34.3 | Phase 3: per-sleeve orders on Friday with free cash | claude | Planned |
 | 3.34.4 | Phase 4: Lots panel, Guide, `business.md` / `technical.md` | claude | Planned |
 
+### 3.35 Trade monitoring and safety — [BL-143](backlog/BL-143-trade-monitoring-and-safety.md)
+
+Owner (2026-10-20): "lets build all 7". Phase 4 is the Telegram stop button: switch off AND square off, only after a
+second confirm tap.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.35.4 | Phase 4: stop button (`apps/scheduler/src/stop-button.ts` listener, `packages/broker-login/src/stop-button.ts` runner, a hold that lasts until Resume, held jobs) | claude | **Built 2026-10-20** (review fixes in), stand-in tested, never sent live; off until `STOP_BUTTON=on` + scheduler restart. Done when the owner has pressed it once on a day of their choice |
+
 ### 3.36 Live vs paper: slippage and discretionary trades — [BL-141](backlog/BL-141-live-vs-backtest-slippage-discretionary.md)
 
 Owner (2026-10-19): before the evening deletes, read what AlgoTest and Quantiply show for the day, compare it with

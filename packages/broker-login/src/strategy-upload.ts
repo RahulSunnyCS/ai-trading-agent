@@ -12,6 +12,7 @@ import { describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { sessionOver } from './quantiply-plan.js';
 import { redact, registerSecret } from './secrets.js';
 import { livePage, strategyPage } from './selectors.js';
+import { stopHeld } from './stop-hold.js';
 import { csrfToken, deleteStrategyById, listViaApi } from './strategy-delete.js';
 import {
   type LedgerRow,
@@ -260,6 +261,12 @@ async function main(): Promise<number> {
     console.log(
       'ALGOTEST_UPLOAD is not "on": nothing uploaded or deleted (dry run without --apply)',
     );
+    return 0;
+  }
+  // BL-143 Phase 4: a confirmed stop holds every upload until the owner resumes.
+  const held = values.apply ? stopHeld() : null;
+  if (held) {
+    console.log(`AlgoTest upload ${held}`);
     return 0;
   }
   // Evening mode deletes today's strategies that tomorrow drops: before 15:30 IST one of them may

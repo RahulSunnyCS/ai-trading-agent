@@ -67,7 +67,14 @@ export interface Plan {
   changed: string[];
 }
 
-export const NAME_PREFIXES = ['T1 · ', 'Core · '] as const;
+/**
+ * Every name prefix the tool has ever given its strategies and algos. APPEND-ONLY: a rename (the
+ * planned TA / CA one) adds its new prefixes and keeps the old ones. Ownership (`owned`, Quantiply's
+ * `ownedIds`), the 15:40 disable and the stop button all match on this list, so dropping an old
+ * prefix would silently stop them treating that day's still-live strategies as the tool's.
+ * `strategy-plan.test.ts` pins the old prefixes.
+ */
+export const NAME_PREFIXES: readonly string[] = ['T1 · ', 'Core · '];
 
 export function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex');

@@ -20,6 +20,11 @@ From `src/index.ts`:
   Markdown parser and Telegram then drops the whole message silently).
   Buttons must use `callback_data`, never a URL — Telegram pre-fetches link
   previews, which would fire before anyone taps it.
+- `getUpdates(botToken, offset, timeoutSeconds)` / `answerCallbackQuery(botToken, id, text)` —
+  the inbound half (BL-143 Phase 4), used only by the stop button's listener in
+  `apps/scheduler` (`src/stop-button.ts`). A bot has ONE `getUpdates` consumer: a second
+  poller gets 409 and updates are handed out once, so nothing else may poll this bot while
+  `STOP_BUTTON=on`. Never throw; errors are redacted.
 - `istTimestamp()` — the one IST-formatted timestamp helper for notification
   bodies.
 - `registerSecret(value)` — adds a value to the redaction registry (used for
@@ -35,7 +40,8 @@ From `src/index.ts`:
   on — a bad preferences file must never be what silences a failure alert. The
   Python `notify.py` copies read the same file with the same rules and use the
   same type strings; add a new type to `NOTIFICATION_TYPES` first.
-- Types: `Action`, `Notification`, `NotificationType`, `Severity`, `TelegramConfig`.
+- Types: `Action`, `Notification`, `NotificationType`, `Severity`, `TelegramConfig`,
+  `TgUpdate`, `TgMessage`, `TgCallbackQuery`, `UpdatesResult`.
 
 ## Cross-package links
 
