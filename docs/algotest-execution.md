@@ -422,10 +422,26 @@ algos: never log it, store it in a file or put it in a fixture.
 | `DELETE /algos/:id` | delete one algo (one weekday's copy): `{"message":"Deleted successfully"}` |
 
 The header is `authorization: Bearer <JWT>` (the web app's API client sets it so). In the app's
-code but not yet seen: `PUT /algos/bulk/action/enable` and `.../disable` with `{algoIds: [...]}`,
-`DELETE /algos/bulk/action/delete` with `{algoIds}`, `/algos/bulk/action/{clone,edit,mtm-edit,
-TERMINATE,SQ_OFF_TERMINATE}`, `/algos/clone`, `/algos/types`. An algo is deployed for its weekday
-when `enabled` is true; the enable call is BL-139 Phase 4's and has not been sent.
+code but not yet seen: `DELETE /algos/bulk/action/delete` with `{algoIds}`, `/algos/bulk/action/{clone,
+edit,mtm-edit,TERMINATE,SQ_OFF_TERMINATE}`, `/algos/clone`, `/algos/types`.
+
+**Enable, disable, broker (BL-139 Phase 4; read from the web app's own JavaScript, 2026-10-20).** The
+public bundle (`app.quantiply.angelone.in/static/js/main.c34824e5.js`; Shoonya's
+`quantiply.shoonya.com/static/js/main.b6ba1293.js` has the same calls, against
+`api-prod.quantiply.shoonya.com`) was fetched with curl, no login. An algo is deployed for its
+weekday, **every week**, while `enabled` is true.
+
+| Call | In the app | How the app reads the answer |
+|---|---|---|
+| `PUT /algos/:id/enable`, `PUT /algos/:id/disable`, **no body** | `toggleAlgo(id, "enable"\|"disable")`, the switch on each algo row; no confirmation, no other call around it | done when the JSON's `status` is `"success"`; it then sets that row's `enabled` locally and shows "Algo enabled successfully". An HTTP error's `message` is shown |
+| `PUT /algos/bulk/action/enable`, `.../disable`, body `{algoIds: [..]}` | `bulkActionEnable` / `bulkActionDisable`, the bulk bar | `data` is one entry per id, `{id, success, message}`; `success: false` ones are reported "Error occured in n algos" |
+| `PUT /algos/:id`, body `{broker: <broker account id>}` | `updateBroker`, the "Select Client ID / Broker" menu; read-only once a broker is set | `data` is the updated algo |
+| `GET /brokers` | the menu's options: each account's `id` (the value sent as `broker`), `clientId`, `status` (`"disabled"` greyed) | |
+
+The deployer (`packages/broker-login/src/quantiply-deploy.ts`) uses the per-algo switch, one id at a
+time, so each answer belongs to one algo, and the broker call for an algo the upload left without
+one (its account is the `GET /brokers` entry whose `clientId` is the `.env` login). None of these
+has been sent yet: the first `--apply` is the owner's.
 
 The uploader (`packages/broker-login/src/quantiply-upload.ts`) logs in through Angel One in a
 browser, takes this token, closes the browser and uses `GET /algos/day-wise`, `POST /algos`,

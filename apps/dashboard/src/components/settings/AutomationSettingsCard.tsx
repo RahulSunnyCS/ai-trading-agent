@@ -49,8 +49,8 @@ const LIST_OPTIONS = (['none', 'core', 't1'] as const).map((value) => ({
  * What the daily automation does (BL-140): three master switches and, per platform + broker, the
  * 08:00 login, the list it gets and whether that list is uploaded. Edits are a draft until Save,
  * which stores a new version in the scheduler and updates the GitHub variables its 08:15
- * backstop reads. The .env switches (ALGOTEST_UPLOAD, QUANTIPLY_UPLOAD, ALGOTEST_DEPLOY) still
- * have the last word.
+ * backstop reads. The .env switches (ALGOTEST_UPLOAD, QUANTIPLY_UPLOAD, ALGOTEST_DEPLOY,
+ * QUANTIPLY_DEPLOY) still have the last word.
  */
 export function AutomationSettingsCard() {
   const { data, loading, error, refetch } = usePolledResource<AutomationView>(URL);

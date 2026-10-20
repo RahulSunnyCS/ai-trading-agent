@@ -19,10 +19,12 @@
     "test": "tsx --test src/*.test.ts",
     "record-strategies": "tsx scripts/record-strategies.ts",
     "strategy-upload": "tsx src/strategy-upload.ts",
-    "quantiply-upload": "tsx src/quantiply-upload.ts"
+    "quantiply-upload": "tsx src/quantiply-upload.ts",
+    "quantiply-deploy": "tsx src/quantiply-deploy.ts"
   },
   "dependencies": {
     "@trading/broker-identity": "workspace:*",
+    "@trading/market-reference": "workspace:*",
     "@trading/notify": "workspace:*",
     "pg": "^8.13.0",
     "playwright": "1.63.0"

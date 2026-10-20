@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades the Core picks with real money every day and sets them up on Quantiply by hand |
-| **Status** | In progress: Phases 1–3 merged (#266), and the live upload is tested. It waits for `QUANTIPLY_UPLOAD=on`. Phase 4 (deploy) is built but off. Follow-ups from the #266 review are in #268 |
+| **Status** | In progress: Phases 1–3 merged (#266), and the live upload is tested. It waits for `QUANTIPLY_UPLOAD=on`. Phase 4 (enable / disable over the API) is built but off until `QUANTIPLY_DEPLOY=on`; its first `--apply` is the owner's. Follow-ups from the #266 review are in #268 |
 | **Type** | feature |
 | **Area** | options + broker-login |
 | **Created** | 2026-10-19 |
@@ -144,16 +144,25 @@ only if the API cannot be used.
 
 ### Phase 4 — Deploy (built, off)
 
+Rewritten 2026-10-20 for the API route: deploying a Quantiply algo is switching it on (`enabled`), which trades on
+its weekday every week until it is switched off.
+
 - **Tasks:**
-  1. Write `quantiply-deploy.ts` on BL-138's pattern:
-     - only today's recorded picks, each deployed once;
-     - never once its entry minute has come;
-     - the multiplier and product type are checked, not changed;
-     - it stops on any popup it has not seen before;
-     - it keeps its own deploy ledger.
-  2. Gate it behind `QUANTIPLY_DEPLOY=on` and leave it off.
-  3. Add a 15:35 check that nothing is left set to run on a later day.
-- **Done when:** a dry run against the live page lists the right picks, and the owner has watched one supervised run (only if they choose to turn it on).
+  1. Read the enable / disable call from the web app's own JavaScript (no call sent) and record it in
+     `docs/algotest-execution.md`.
+  2. `quantiply-deploy.ts --broker <b> --mode enable|disable|check [--day] [--apply]` + pure
+     `quantiply-deploy-plan.ts`:
+     - only the uploader's algos (its ledger) for the session, on the session's weekday, each read back against its
+       export, set to the account's own broker if the upload left it unset;
+     - never within 90 s of an algo's start (TOO LATE, that algo only);
+     - after the calls, the list is read again: exactly the intended algos changed, nothing else; otherwise stop,
+       alert, exit 3;
+     - disable after the session, so nothing runs again next week.
+  3. Gate it behind `QUANTIPLY_DEPLOY=on`, the deploy master switch and the account's row, and leave it off.
+  4. Jobs: `quantiply-disable` 15:40, `quantiply-deploy` 16:55 (after the evening upload), `quantiply-deploy-topup`
+     09:21 (after the top-up), one `quantiply` group with the uploads.
+- **Done when:** a dry run against the live account lists the right picks, and the owner has watched one supervised
+  run (only if they choose to turn it on).
 
 ## Risks
 
@@ -174,6 +183,22 @@ only if the API cannot be used.
 - Does Quantiply allow more algos than are deployed at once? The evening upload adds tomorrow's picks while today's may still be listed.
 
 ## Log
+
+- 2026-10-20 — Phase 4 built (owner, 2026-10-20: "Quantiply can already create the day's Core picks as algos, but it
+  never enables (deploys) them; the owner enables by hand. Build the deploy step, mirroring AlgoTest's: off by
+  default, two switches"):
+  - The call, from the web app's bundle (`main.c34824e5.js`, fetched with curl): the row switch sends
+    `PUT /algos/:id/enable` or `/disable` with no body and counts `status: "success"`. The bulk bar sends
+    `PUT /algos/bulk/action/enable|disable` with `{algoIds}` and reads `{id, success}` per id. The broker menu sends
+    `PUT /algos/:id` with `{broker}`, its options from `GET /brokers`. Recorded in `docs/algotest-execution.md`.
+    Nothing was sent.
+  - `src/quantiply-deploy.ts` + `quantiply-deploy-plan.ts` (16 tests); the login moved to `src/quantiply-session.ts`,
+    shared with the uploader. Jobs `quantiply-disable` 15:40, `quantiply-deploy` 16:55, `quantiply-deploy-topup` 09:21.
+  - Dry run on the live account for Wednesday 21 Oct: enable `Core · S_ditm1_1202` (12:02), `Core · S_p250_1317`
+    (13:17) and `Core · S_p250_1302` (13:02), each with its broker to set; the disable plan shows all three disabled.
+  - Two choices made here: the 09:21 run also switches off an enabled algo that 09:16 dropped (if it has not
+    started), and the 15:40 disable with Automated deployment off changes nothing but alerts.
+  - Open: the owner's first `--apply` (test: enable then disable Wednesday's three on the 20th, a holiday).
 
 - 2026-10-19 — A second review of #266 (by the merging session) found three bugs. They are fixed in #268:
   1. A refused login is never retried: exit 3 is in `noRetryExitCodes`, and a hold blocks logins until the `.env` credentials change.

@@ -3,13 +3,9 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { sendText } from '@trading/notify';
-import { chromium } from 'playwright';
 import { describeSource, readAutomation, uploadBooks } from './automation-settings.js';
-import { BrokerLoginError } from './brokers/types.js';
 import { readTelegramConfig } from './config.js';
 import { describe } from './diagnose.js';
-import { installOverlayHandlers } from './overlays.js';
-import { QuantiplyApi, readToken } from './quantiply-api.js';
 import {
   type QLedgerRow,
   type QManifest,
@@ -24,9 +20,15 @@ import {
   weekdayOf,
 } from './quantiply-plan.js';
 import { QUANTIPLY_SITES, parseQuantiplyBroker } from './quantiply-rules.js';
-import { quantiplyShoonyaLogin } from './quantiply-shoonya.js';
-import { quantiplyLogin } from './quantiply.js';
-import { redact, registerSecret } from './secrets.js';
+import {
+  LoginHeld,
+  LoginRefused,
+  type QCredentials,
+  checkLoginHold,
+  openQuantiply,
+  quantiplyCredentials,
+} from './quantiply-session.js';
+import { redact } from './secrets.js';
 import { type Mode, istToday, sha256 } from './strategy-plan.js';
 
 /**
@@ -182,33 +184,24 @@ async function main(): Promise<number> {
   }
   const ledger = existsSync(ledgerPath) ? parseQLedger(await readFile(ledgerPath, 'utf8')) : [];
 
-  const names =
-    broker === 'angelone'
-      ? ['ANGELONE_CLIENT_CODE', 'ANGELONE_MPIN', 'ANGELONE_TOTP_SECRET']
-      : ['SHOONYA_CLIENT_ID', 'SHOONYA_PASSWORD', 'SHOONYA_TOTP_SECRET'];
-  const [user, secret, totpSecret] = names.map((n) => process.env[n]?.trim() ?? '');
-  if (!user || !secret || !totpSecret) {
-    console.error(`${names.join(' / ')} missing from .env`);
+  let creds: QCredentials;
+  try {
+    creds = quantiplyCredentials(broker);
+  } catch (error) {
+    console.error(describe(error));
     return 1;
   }
-  registerSecret(secret);
-  registerSecret(totpSecret);
   const telegram = readTelegramConfig();
 
   // A refused login holds this account until its credentials in .env change: never send a
   // refused password or PIN again (each retry counts towards the broker's lockout).
   const stateDir = dirname(ledgerPath);
-  const holdPath = join(stateDir, `login-hold-${broker}.json`);
-  const fingerprint = sha256(`${user}\n${secret}`);
-  if (existsSync(holdPath)) {
-    type Hold = { fingerprint?: string; at?: string; detail?: string };
-    const hold = await readJson<Hold>(holdPath).catch((): Hold => ({}));
-    if (hold.fingerprint === fingerprint) {
-      console.error(
-        `${site.name}: login held since ${hold.at ?? '?'} after a refused login (${hold.detail ?? ''}); fix ${names[1]} in .env, then it clears by itself`,
-      );
-      return EXIT_NO_RETRY;
-    }
+  try {
+    await checkLoginHold(creds, stateDir);
+  } catch (error) {
+    if (!(error instanceof LoginHeld)) throw error;
+    console.error(error.message);
+    return EXIT_NO_RETRY;
   }
   // An account this mode already finished for the same export is not logged in again (a retry of
   // the job after the other account failed, Apply now pressed twice).
@@ -236,44 +229,13 @@ async function main(): Promise<number> {
 
   try {
     // The browser is only for the login: the token is taken and the browser closed before any call.
-    const browser = await chromium.launch({ headless: !values.headed });
-    let token: string;
+    let api: Awaited<ReturnType<typeof openQuantiply>>;
     try {
-      const context = await browser.newContext({
-        viewport: { width: 1440, height: 900 },
-        locale: 'en-IN',
-        timezoneId: 'Asia/Kolkata',
-      });
-      installOverlayHandlers(context);
-      const page = await context.newPage();
-      page.setDefaultTimeout(15_000);
-      try {
-        if (broker === 'angelone') {
-          await quantiplyLogin(
-            page,
-            { clientCode: user, mpin: secret, totpSecret },
-            { submitted: false },
-          );
-        } else {
-          await quantiplyShoonyaLogin(page, { userId: user, password: secret, totpSecret });
-        }
-      } catch (error) {
-        if (error instanceof BrokerLoginError && error.kind === 'CREDENTIALS_REJECTED') {
-          loginRefused = true;
-          await mkdir(stateDir, { recursive: true });
-          await writeFile(
-            holdPath,
-            `${JSON.stringify({ at: new Date().toISOString(), fingerprint, detail: describe(error) })}\n`,
-          ).catch(() => undefined);
-        }
-        throw error;
-      }
-      token = await readToken(await context.newPage(), site);
-    } finally {
-      await browser.close().catch(() => undefined);
+      api = await openQuantiply(creds, stateDir, { headed: values.headed });
+    } catch (error) {
+      if (error instanceof LoginRefused) loginRefused = true;
+      throw error;
     }
-    registerSecret(token);
-    const api = new QuantiplyApi(token, fetch, site);
 
     const algos = await api.list();
     const p = planQ(
@@ -437,7 +399,7 @@ async function main(): Promise<number> {
     if (!loginRefused) retryable = true;
     lines.push(
       loginRefused
-        ? `❌ login refused - NOT retried; held until ${names[1]} in .env changes: ${describe(error)}`
+        ? `❌ login refused - NOT retried; held until ${creds.names[1]} in .env changes: ${describe(error)}`
         : `❌ ${describe(error)}`,
     );
   }

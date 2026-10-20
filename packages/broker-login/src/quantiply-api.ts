@@ -103,4 +103,23 @@ export class QuantiplyApi {
   async remove(id: string): Promise<void> {
     await this.call('DELETE', `/algos/${encodeURIComponent(id)}`);
   }
+
+  /** `GET /brokers`: the broker accounts linked to this Quantiply login (read-only). */
+  async brokers(): Promise<unknown> {
+    return this.call('GET', '/brokers');
+  }
+
+  /**
+   * `PUT /algos/:id/enable` or `/disable`, no body: the web app's row switch (`toggleAlgo`,
+   * read from its bundle 2026-10-20). Enabled = deployed on the algo's weekday, every week until
+   * disabled. The app counts `status: "success"` as done, as `call` does.
+   */
+  async setEnabled(id: string, enabled: boolean): Promise<void> {
+    await this.call('PUT', `/algos/${encodeURIComponent(id)}/${enabled ? 'enable' : 'disable'}`);
+  }
+
+  /** `PUT /algos/:id` with `{broker}`: the web app's "Select Client ID / Broker" (`updateBroker`). */
+  async setBroker(id: string, broker: string): Promise<void> {
+    await this.call('PUT', `/algos/${encodeURIComponent(id)}`, { broker });
+  }
 }

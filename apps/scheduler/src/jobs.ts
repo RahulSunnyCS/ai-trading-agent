@@ -32,8 +32,11 @@ export interface Job {
   /**
    * Jobs in the same group never run at the same time. `catalog` = anything
    * that writes the DuckDB catalog, which allows one writer process.
+   * `quantiply` = the jobs that log in to Quantiply (each an Angel One / Shoonya TOTP login)
+   * and change its algos: a deploy then always runs after the upload before it, retries
+   * included, and two logins never type codes from one TOTP window.
    */
-  group?: 'catalog';
+  group?: 'catalog' | 'quantiply';
   /**
    * Where it can run: `home` needs a residential IP (NSE, niftyindices),
    * `gui` a desktop session for a headed browser, `postgres` the local DB.
@@ -480,6 +483,26 @@ const BASE_JOBS: Job[] = [
     fixHint: 'Open algotest.in/live and untick the execution days of the T1 strategies',
   },
   {
+    id: 'quantiply-disable',
+    description:
+      "After the session, switch off on each Quantiply account the algos the uploader made for today that are still enabled, and any of an earlier session (BL-139 Phase 4): an enabled Quantiply algo runs again on its weekday next week. Only the tool's algos (its ledger), only finished ones, confirmed by reading the list again. Does nothing until QUANTIPLY_DEPLOY=on",
+    // 15:40: every pick has exited (15:28), and the 16:45 upload comes after (same group), so it
+    // can delete them. Not gated by the account's row: whatever the tool enabled must not repeat.
+    // With Automated deployment off it changes nothing but alerts on anything left enabled. An
+    // account with nothing of the tool's for today is not logged in. Safe to retry.
+    schedule: { at: '15:40', on: tradingDays, label: 'trading days 15:40' },
+    steps: [['/bin/sh', '-c', quantiplyBoth((b) => quantiplyDeploy(b, 'disable'))]],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 10,
+    retries: 2,
+    noRetryExitCodes: [3], // an algo still running, or a change not made by this run: the owner looks
+    retryDelayMinutes: 5,
+    catchUpHours: 8, // before the next session of that weekday, any time this evening will do
+    group: 'quantiply',
+    fixHint:
+      'In Quantiply, switch off every "Core · " / "T1 · " algo that is still enabled; then check with: cd packages/broker-login && node_modules/.bin/tsx src/quantiply-deploy.ts --broker angelone --mode check',
+  },
+  {
     id: 'quantiply-evening',
     description:
       "Put tomorrow's expected picks into Quantiply as algos for tomorrow's weekday (BL-139): for each Quantiply account (Angel One, Shoonya), the list the dashboard's Settings › Automation gives it (BL-140; Core on Angel One until changed). Exports them (`obt rotation quantiply-export --from-settings --next`), then, through Quantiply's API, deletes the finished algos the tool created that tomorrow drops and creates the missing ones; an account the settings leave off is not touched. Never enables (deploys). Does nothing until QUANTIPLY_UPLOAD=on",
@@ -507,6 +530,7 @@ const BASE_JOBS: Job[] = [
     noRetryExitCodes: [3], // a refused login or a conflict: retrying only repeats it
     retryDelayMinutes: 60,
     catchUpHours: 4,
+    group: 'quantiply',
     fixHint:
       'cd packages/option-backtesting && uv run obt rotation quantiply-export --from-settings --next; then cd ../broker-login && node_modules/.bin/tsx src/quantiply-upload.ts --broker angelone|finvasia --from-settings --mode evening (add --apply once the plan looks right)',
   },
@@ -537,8 +561,46 @@ const BASE_JOBS: Job[] = [
     noRetryExitCodes: [3], // a refused login or a conflict: retrying only repeats it
     retryDelayMinutes: 2,
     catchUpHours: 0.5,
+    group: 'quantiply',
     fixHint:
       'cd packages/option-backtesting && uv run obt rotation quantiply-export --from-settings; then cd ../broker-login && node_modules/.bin/tsx src/quantiply-upload.ts --broker angelone|finvasia --from-settings --mode topup --apply',
+  },
+  {
+    id: 'quantiply-deploy',
+    description:
+      "Enable (deploy) on each Quantiply account the next session's picks the evening upload made (BL-139 Phase 4): REAL MONEY on the owner's account. Only the tool's algos for that session and weekday, each read back against its export and set to the account's own broker first; never a second time; confirmed by reading the list again. Needs QUANTIPLY_DEPLOY=on, Automated deployment on and the account's row uploading a list",
+    // After quantiply-evening (16:45; same group, so it waits for the upload and its retries).
+    // After 15:30 the session is the next trading day. Never retried: a second attempt could
+    // act on a half-finished first; the run alerts instead. An account the settings leave off,
+    // or with nothing uploaded for that session, is not logged in.
+    schedule: { at: '16:55', on: tradingDays, label: 'trading days 16:55' },
+    steps: [['/bin/sh', '-c', quantiplyBoth((b) => quantiplyDeploy(b, 'enable'))]],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 10,
+    retries: 0,
+    retryDelayMinutes: 0,
+    catchUpHours: 6,
+    group: 'quantiply',
+    fixHint:
+      'Read the alert first: an algo it enabled must not be enabled again. Then: cd packages/broker-login && node_modules/.bin/tsx src/quantiply-deploy.ts --broker angelone --mode enable  (dry run; add --apply). Undo: --mode disable --day <session> --apply',
+  },
+  {
+    id: 'quantiply-deploy-topup',
+    description:
+      "After the 09:19 top-up, enable on each Quantiply account today's recorded picks that are not enabled yet (a pick 09:16 changed) and switch off an enabled algo 09:16 dropped, if it has not started (BL-139 Phase 4). Never an algo within 90 s of its start (TOO LATE, reported). Same gates as quantiply-deploy",
+    // 09:21: after quantiply-topup (same group). A 09:17 pick that changed is too late either way.
+    // Caught up for 3 hours: later picks (12:02, 13:17) still have time; the 90 s rule protects
+    // each one.
+    schedule: { at: '09:21', on: tradingDays, label: 'trading days 09:21' },
+    steps: [['/bin/sh', '-c', quantiplyBoth((b) => quantiplyDeploy(b, 'enable'))]],
+    cwd: BROKER_LOGIN,
+    timeoutMinutes: 10,
+    retries: 0,
+    retryDelayMinutes: 0,
+    catchUpHours: 3,
+    group: 'quantiply',
+    fixHint:
+      'Read the alert first: an algo it enabled must not be enabled again. Then: cd packages/broker-login && node_modules/.bin/tsx src/quantiply-deploy.ts --broker angelone --mode enable  (dry run; add --apply)',
   },
   {
     id: 'backup',
@@ -573,8 +635,19 @@ const BASE_JOBS: Job[] = [
 /** Every job: the ones above plus each check group's (src/checks/). */
 /** BL-140: one Quantiply upload per account, each told by the settings whether it has work. */
 function quantiplyUploads(mode: 'evening' | 'topup'): string {
-  const run = (broker: string) =>
-    `node_modules/.bin/tsx src/quantiply-upload.ts --broker ${broker} --from-settings --mode ${mode} --apply`;
+  return quantiplyBoth(
+    (broker) =>
+      `node_modules/.bin/tsx src/quantiply-upload.ts --broker ${broker} --from-settings --mode ${mode} --apply`,
+  );
+}
+
+/** BL-139 Phase 4: one account's enable or disable run (it reads the settings itself). */
+function quantiplyDeploy(broker: string, mode: 'enable' | 'disable'): string {
+  return `node_modules/.bin/tsx src/quantiply-deploy.ts --broker ${broker} --mode ${mode} --apply`;
+}
+
+/** Run a command for both Quantiply accounts, Angel One then Shoonya. */
+function quantiplyBoth(run: (broker: string) => string): string {
   // Both always run. The job's exit: 1 if either may succeed on a retry, else 3 (never retried:
   // a refused login or something the owner must look at) if either needs that, else 0.
   return `${run('angelone')}; a=$?; ${run('finvasia')}; b=$?; if [ "$a" -eq 1 ] || [ "$b" -eq 1 ]; then exit 1; elif [ "$a" -ne 0 ]; then exit "$a"; else exit "$b"; fi`;

@@ -61,7 +61,8 @@ summary flags anything but `main`).
   - A save also sets the repository variables the "Daily broker login" workflow reads (`BROKER_LOGIN_ENABLED`,
     `ALGOTEST_BROKERS`, `QUANTIPLY_BROKERS`, `BROKER_LOGIN_ONLY`, `QUANTIPLY_LOGIN`) through `gh`, so the 08:15
     backstop follows too. A failed sync is recorded on the version, never undoes it.
-  - The `.env` switches (`ALGOTEST_UPLOAD`, `QUANTIPLY_UPLOAD`, `ALGOTEST_DEPLOY`) stay as hard safety.
+  - The `.env` switches (`ALGOTEST_UPLOAD`, `QUANTIPLY_UPLOAD`, `ALGOTEST_DEPLOY`, `QUANTIPLY_DEPLOY`) stay as hard
+    safety.
 - `src/cli.ts` — `bun run jobs status | run <id> | serve | settings [show | set <file.json>]`.
 
 ## Adding a check
@@ -78,6 +79,10 @@ network or disk so the test needs neither. One group per file keeps parallel PRs
 
 - Tests use `bun test`, not vitest, because `bun:sqlite` only exists under Bun.
 - `group: 'catalog'` is for anything that writes the DuckDB catalog (`TRADING_DATA_ROOT`).
+- `group: 'quantiply'` holds the Quantiply jobs (upload, enable, disable): each logs in through an Angel One /
+  Shoonya TOTP, and an enable must run after the upload before it, retries included (`quantiply-deploy` 16:55
+  waits for `quantiply-evening` 16:45; `quantiply-deploy-topup` 09:21 for `quantiply-topup` 09:19). The enables
+  have `retries: 0` like `algotest-deploy`: a second attempt could act on a half-finished first.
 - `broker-login` has `retries: 0` on purpose: `dispatch.ts` retries itself and must never
   dispatch the GitHub workflow twice.
 - `angel-login-check` (trading days 08:00) runs `obt angel test --scheduled`: one Angel One
