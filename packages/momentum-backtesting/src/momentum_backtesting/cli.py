@@ -1833,6 +1833,82 @@ def orders_run(
         notify.send(note)
 
 
+lots_app = typer.Typer(
+    help="BL-142: which Kite shares belong to which weekly lot (one lot per sleeve; never trades)."
+)
+app.add_typer(lots_app, name="lots")
+
+
+@lots_app.command("seed")
+def lots_seed_cmd(
+    week: str = typer.Option(
+        "", help="The Friday this lot was decided (default: the paper start)."
+    ),
+    note: str = typer.Option("", help="Why a holding differs from the strategy, kept with it."),
+    replace: bool = typer.Option(False, help="Start the ledger again (lots already exist)."),
+) -> None:
+    """Book the latest Kite snapshot to the lot of that Friday's sleeve, once, at the start."""
+    from . import api
+    from .config import load_repo_env
+
+    load_repo_env()
+    try:
+        got = api.seed_lots(week=week or None, note=note, replace=replace)
+    except ValueError as error:
+        typer.echo(f"lots seed: {error}")
+        raise typer.Exit(1) from None
+    typer.echo(f"{got['group']}: {got['lot']} ({got['sleeve']}, decided {got['week']})")
+    for symbol, shares in got["booked"].items():
+        typer.echo(f"  {symbol:<14} {shares:>8,.0f}")
+    if got["left_out"]:
+        typer.echo(f"left out (not part of this strategy, or margin): {', '.join(got['left_out'])}")
+
+
+@lots_app.command("show")
+def lots_show_cmd() -> None:
+    """Each lot's shares, the lot whose orders were made last, and what no lot has."""
+    from . import api
+    from .config import load_repo_env
+
+    load_repo_env()
+    try:
+        got = api.lots_status()
+    except ValueError as error:
+        typer.echo(f"lots show: {error}")
+        raise typer.Exit(1) from None
+    typer.echo(
+        f"{got['group']} · Kite snapshot {got['snapshot']} · orders last made for {got['pending']}"
+    )
+    for label, lot in got["lots"].items():
+        held = ", ".join(f"{s} {q:,.0f}" for s, q in sorted(lot["holds"].items())) or "nothing yet"
+        typer.echo(f"  {label}: {held}")
+    if got["not_in_a_lot"]:
+        typer.echo("Kite minus the lots (assign with: mbt lots assign SYMBOL --lot N):")
+        for symbol, delta in got["not_in_a_lot"].items():
+            typer.echo(f"  {symbol:<14} {delta:+,.0f}")
+    else:
+        typer.echo("Every strategy holding in Kite is in a lot.")
+
+
+@lots_app.command("assign")
+def lots_assign_cmd(
+    symbol: str = typer.Argument(..., help="The Kite symbol, e.g. CUPID."),
+    lot: str = typer.Option(..., help="Which lot: 2 or 'Lot 2'."),
+    shares: float = typer.Option(0.0, help="Shares (default: all of the difference)."),
+) -> None:
+    """Book a change in Kite the ledger could not explain to a lot."""
+    from . import api
+    from .config import load_repo_env
+
+    load_repo_env()
+    try:
+        got = api.assign_lot(symbol, lot, shares or None)
+    except ValueError as error:
+        typer.echo(f"lots assign: {error}")
+        raise typer.Exit(1) from None
+    typer.echo(f"{got['symbol']} {got['delta']:+,.0f} booked to {got['lot']}")
+
+
 kite_app = typer.Typer(
     help="BL-142: Zerodha Kite, read-only (holdings and free cash for Your orders; never trades)."
 )

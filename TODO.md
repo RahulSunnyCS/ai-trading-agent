@@ -776,8 +776,8 @@ options margin and are never part of the strategy. Kite access is read-only.
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.34.1 | Phase 1: Kite read-only access (Login button, Friday reminder, holdings + free cash snapshot, LIQUIDBEES / `SGB*` excluded); login stays manual (Zerodha does not allow automating it; owner, 2026-10-19) | claude | **Built 2026-10-19, not yet run live.** `kite.py`, `/api/kite/*`, migration 013, `mbt kite …`, `kite-login-reminder` Fri 13:30, Broker logins Kite card. Holdings source is Kite and the first real read is stored (2026-10-20: five BSE-listed names, ₹4,509 cash). Open: Fri 23 Oct 14:15 run: check each holding maps to its strategy name |
-| 3.34.2 | Phase 2: the lot ledger (strategy chosen 2026-10-20: Four Sectors Monthly, No Tilt · all Fridays, K = 4, a lot = one sleeve) (seed from the first Kite snapshot, weekly diff attribution, flags, `mbt lots`) | claude | Planned |
-| 3.34.3 | Phase 3: per-sleeve orders on Friday with free cash | claude | Planned |
+| 3.34.2 | Phase 2: the lot ledger (strategy chosen 2026-10-20: Four Sectors Monthly, No Tilt · all Fridays, K = 4, a lot = one sleeve) (seed from the first Kite snapshot, weekly diff attribution, flags, `mbt lots`) | claude | **Built 2026-10-21** (`lots.py`, migration 014, `mbt lots seed/show/assign`). Seed the live ledger once after the merge |
+| 3.34.3 | Phase 3: per-sleeve orders on Friday with free cash | claude | **Built 2026-10-21**, rehearsed on a copy of the live catalog. Open: the premium rule for Broad atomics (BL-136 Phase 1b) for lots whose model holds Nasdaq 100 |
 | 3.34.4 | Phase 4: Lots panel, Guide, `business.md` / `technical.md` | claude | Planned |
 
 ### 3.35 Trade monitoring and safety — [BL-143](backlog/BL-143-trade-monitoring-and-safety.md)

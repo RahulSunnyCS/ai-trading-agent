@@ -6,8 +6,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { usePolledResource } from '../../../hooks/usePolledResource';
 import { apiPost, apiPut } from '../../../lib/api';
 import { cn } from '../../../lib/cn';
-import { formatInr, formatInt, formatIstDateTime, formatPct, formatPp } from '../../../lib/format';
+import {
+  formatDay,
+  formatInr,
+  formatInt,
+  formatIstDateTime,
+  formatPct,
+  formatPp,
+} from '../../../lib/format';
 import type {
+  MomentumLotOrders,
   MomentumOrderRow,
   MomentumOrderSettings,
   MomentumOrders,
@@ -60,7 +68,10 @@ function OrderRow({ row }: { row: MomentumOrderRow }) {
           <span className="text-faint">—</span>
         )}
       </Td>
-      <Td className="font-semibold text-foreground">{row.symbol}</Td>
+      <Td className="font-semibold text-foreground">
+        {row.symbol}
+        {row.lot ? <span className="ml-1.5 text-xs font-normal text-faint">{row.lot}</span> : null}
+      </Td>
       <Td align="right" numeric>
         {row.held ? formatInt(row.held) : '0'}
       </Td>
@@ -213,6 +224,7 @@ export function YourOrders() {
               sub={`under ${formatInr(settings?.min_trade_rs ?? 10_000)}, or held`}
             />
           </div>
+          {latest.lots ? <LotsPanel orders={latest} /> : null}
           <Table>
             <THead>
               <Th>Order</Th>
@@ -230,7 +242,7 @@ export function YourOrders() {
             </THead>
             <tbody>
               {plan.rows.map((row) => (
-                <OrderRow key={row.symbol} row={row} />
+                <OrderRow key={`${row.lot ?? ''}-${row.symbol}`} row={row} />
               ))}
             </tbody>
           </Table>
@@ -255,6 +267,68 @@ export function YourOrders() {
         onChanged={refetch}
       />
     </Card>
+  );
+}
+
+const LOT_STATUS: Record<MomentumLotOrders['status'], string> = {
+  new: 'New lot: buy',
+  rebalance: 'Rebalance',
+  exit: 'Sell only',
+  'not due': 'Not due',
+};
+
+/** BL-142: the strategy followed lot by lot: what each lot does this Friday, what to add to Kite,
+ * the one order per stock, and any change in Kite no lot could take. */
+function LotsPanel({ orders }: { orders: MomentumOrders }) {
+  const lots = orders.lots ?? [];
+  const net = Object.entries(orders.net ?? {});
+  const unexplained = orders.ledger?.unexplained ?? [];
+  return (
+    <div className="space-y-2 border-b border-border px-4 py-3 text-sm">
+      <ul className="space-y-1">
+        {lots.map((lot) => (
+          <li key={lot.id} className="flex flex-wrap items-baseline gap-x-2">
+            <span className="font-semibold text-foreground">{lot.label}</span>
+            <Badge tone={lot.status === 'not due' ? 'neutral' : 'primary'}>
+              {LOT_STATUS[lot.status]}
+            </Badge>
+            {lot.budget != null && lot.status !== 'not due' ? (
+              <span className="text-muted">{formatInr(lot.budget)}</span>
+            ) : null}
+            {lot.status === 'not due' && lot.next ? (
+              <span className="text-muted">next {formatDay(lot.next)}</span>
+            ) : null}
+            <span className="text-xs text-faint">
+              {Object.entries(lot.holds)
+                .map(([name, shares]) => `${name} ${formatInt(shares)}`)
+                .join(' · ') || 'holds nothing yet'}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {orders.deposit_needed ? (
+        <p className="text-warning">
+          Add <b>{formatInr(orders.deposit_needed)}</b> to Kite before you buy: the new lot needs{' '}
+          {formatInr(orders.lot_size ?? 0)}.
+        </p>
+      ) : null}
+      {net.length ? (
+        <p className="text-muted">
+          One order per stock:{' '}
+          {net
+            .map(([name, q]) => `${q > 0 ? 'BUY' : 'SELL'} ${name} ${formatInt(Math.abs(q))}`)
+            .join(', ')}
+        </p>
+      ) : null}
+      {unexplained.length ? (
+        <p className="text-negative">
+          Not in any lot (run <span className="font-mono">mbt lots assign SYMBOL --lot N</span>):{' '}
+          {unexplained
+            .map((u) => `${u.symbol} ${u.delta > 0 ? '+' : ''}${formatInt(u.delta)}`)
+            .join(', ')}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -321,7 +395,10 @@ function OrdersSettingsDrawer({
     onChanged();
   }
 
-  const number = (key: 'min_trade_rs' | 'paper_capital_rs' | 'extra_cash_rs', label: string) => (
+  const number = (
+    key: 'min_trade_rs' | 'paper_capital_rs' | 'extra_cash_rs' | 'lot_size_rs',
+    label: string,
+  ) => (
     <div className="block text-sm">
       <span className="text-xs text-muted">{label}</span>
       <NumberField
@@ -364,6 +441,7 @@ function OrdersSettingsDrawer({
           </p>
         </div>
         {number('paper_capital_rs', 'Paper capital (₹)')}
+        {number('lot_size_rs', 'A new weekly lot is funded with (₹)')}
         {number('min_trade_rs', 'Skip top-ups and trims smaller than (₹)')}
         {number('extra_cash_rs', 'Cash for the strategy held outside the broker (₹)')}
         <Button

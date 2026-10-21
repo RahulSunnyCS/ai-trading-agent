@@ -817,6 +817,7 @@ class OrderSettingsBody(BaseModel):
     extra_cash_rs: float | None = Field(None, ge=0, le=1_000_000_000)
     holdings_source: Literal["paper", "fyers", "kite"] | None = None
     paper_capital_rs: float | None = Field(None, ge=1_000, le=1_000_000_000)
+    lot_size_rs: float | None = Field(None, ge=1_000, le=1_000_000_000)
 
 
 class PastedHoldingsBody(BaseModel):
@@ -3294,6 +3295,8 @@ def _orders_signal(
     week = journal_week_string(target_week)
     if members:
         combined = groups_mod.combine(headline, signals, week)
+        # Each sleeve's own signal, for the per-lot orders (BL-142 Phase 3); never saved.
+        combined["_sleeves"] = signals
     else:
         only = signals[0]["signal"]
         combined = {
@@ -3423,6 +3426,24 @@ def _compute_orders(
     # A Fyers holding's base symbol -> the strategy's name for it (SBIN, NAVINFLUOR#2, Nasdaq 100).
     name_of = {fyers.nse_symbol(symbol): name for name, symbol in symbols.items()}
     base_of = {name: fyers.nse_symbol(symbol) for name, symbol in symbols.items()}
+    if settings["holdings_source"] == "kite" and members and signal.get("_sleeves"):
+        return _compute_lot_orders(
+            payload,
+            headline=headline,
+            signal=signal,
+            settings=settings,
+            synced=synced,
+            rules=rules,
+            stored=stored,
+            symbols=symbols,
+            name_of=name_of,
+            base_of=base_of,
+            blocked=blocked,
+            trigger=trigger,
+            who=who,
+            target_week=target_week,
+            today=today,
+        )
     if settings["holdings_source"] == "paper":
         before = {
             k: v for k, v in signal.get("weights", {}).items() if v > 0 and k not in cash_names
@@ -3497,6 +3518,455 @@ def _compute_orders(
     return payload
 
 
+def _lot_label(name: str, week: str, start: str | None, rebalance: dict | None) -> str:
+    """ "Lot 2": the sleeve's number counted from the paper start (the sleeve that traded on the
+    start Friday is Lot 1), as the Friday sleeves are numbered on the page."""
+    import re
+
+    label = this_week.sleeve_label(name, week, start, rebalance) if start else None
+    found = re.search(r"Friday (\d+) of \d+$", label or name)
+    return f"Lot {found.group(1)}" if found else name
+
+
+def _compute_lot_orders(
+    payload: dict,
+    *,
+    headline: dict,
+    signal: dict,
+    settings: dict,
+    synced: dict | None,
+    rules: dict,
+    stored: dict,
+    symbols: dict,
+    name_of: dict,
+    base_of: dict,
+    blocked: set,
+    trigger: str,
+    who: str,
+    target_week: pd.Timestamp,
+    today: date,
+) -> dict:
+    """BL-142 Phase 3: orders for a favourite group followed with one lot per sleeve, against the
+    Kite holdings. First the ledger takes in what changed in Kite since the last run (booked to the
+    lot whose orders were made last; anything else is reported, never guessed), then every lot is
+    planned on its own (`lots.plan_lots`): the due lot trades, a new lot is funded with the weekly
+    lot size, the others only sell a name their sleeve dropped."""
+    from . import holdings_store, lots
+
+    group_id = headline["id"]
+    week = payload["week"]
+    start = this_week.paper_start()
+    cash_names = {IDLE, CASH}
+    held: dict[str, float] = {}
+    outside: list[str] = []
+    excluded: list[str] = []
+    kite_symbols = {row["symbol"] for row in (synced or {}).get("rows", [])}
+    broker_cash = max(0.0, float((synced or {}).get("cash") or 0.0))
+    cash = float(settings["extra_cash_rs"]) + broker_cash
+    for row in (synced or {}).get("rows", []):
+        treatment = holdings_store.treatment(row["symbol"], rules)
+        if treatment == "exclude":
+            excluded.append(row["symbol"])
+        elif treatment == "cash":
+            cash += float(row["quantity"]) * float(row.get("avg_price") or 0)
+        elif row["symbol"] not in name_of:
+            outside.append(row["symbol"])  # not something this strategy holds or could buy
+        else:
+            held[row["symbol"]] = held.get(row["symbol"], 0.0) + float(row["quantity"])
+
+    sleeves: dict[str, dict] = {}
+    for item in signal["_sleeves"]:
+        sig = item["signal"]
+        rebalance = sig.get("rebalance") or {}
+        sleeves[item["id"]] = {
+            "name": item["name"],
+            "label": _lot_label(item["name"], week, start, rebalance),
+            "due": bool(rebalance.get("on_cadence")),
+            "next": rebalance.get("next"),
+            "target": {
+                k: float(v)
+                for k, v in sig.get("target_weights", {}).items()
+                if v > 0 and k not in cash_names
+            },
+            # What the sleeve itself says to sell this week (a forced exit off its calendar).
+            "exits": frozenset(
+                str(row["asset"])
+                for row in sig.get("rows", [])
+                if str(row.get("action") or "").upper() == "SELL"
+            ),
+        }
+
+    with open_catalog() as con:
+        ledger = lots.positions(con, who, group_id)
+        if not ledger:
+            payload["reason"] = (
+                "No lots are recorded yet for this strategy. Run: mbt lots seed "
+                "(it books today's Kite holdings to the lot they belong to)."
+            )
+            return payload
+        allowed = {
+            sid: {base_of.get(name, name) for name in info["target"]} | set(ledger.get(sid, {}))
+            for sid, info in sleeves.items()
+        }
+        pending_id, planned_before = lots.pending_state(con, who, group_id)
+        # What Kite still holds that is not a strategy name today (outside, excluded, or a name
+        # that dropped out of the data) is never booked as sold.
+        reconciled = lots.reconcile(
+            held,
+            ledger,
+            pending_id,
+            allowed,
+            planned=planned_before,
+            ignore=kite_symbols - set(held),
+        )
+        at = (synced or {}).get("synced_at") or datetime.now(IST).isoformat(timespec="seconds")
+        if reconciled.events:
+            lots.append(con, who, group_id, reconciled.events, at)
+            ledger = lots.apply(ledger, reconciled.events)
+        has_history = lots.funded(con, who, group_id)
+
+    lot_inputs = [
+        lots.Lot(
+            sid,
+            info["label"],
+            info["name"],
+            info["due"],
+            info["next"],
+            ledger.get(sid, {}),
+            info["target"],
+            info["exits"],
+            sid in has_history,
+        )
+        for sid, info in sleeves.items()
+    ]
+    lot_inputs.sort(key=lambda lot: (len(lot.label), lot.label))
+    names = {n for lot in lot_inputs for n in lot.target} | {
+        name_of[s] for lot in lot_inputs for s in lot.positions if s in name_of
+    }
+    prices, source = _order_prices(stored, symbols, names)
+    blocked_names = {n for n in names if base_of.get(n, n) in blocked}
+    planned = lots.plan_lots(
+        lot_inputs,
+        name_of=name_of,
+        prices=prices,
+        free_cash=cash,
+        lot_size=float(settings["lot_size_rs"]),
+        min_trade_rs=float(settings["min_trade_rs"]),
+        blocked=blocked_names,
+    )
+    # The next change in Kite belongs to the lots these orders name, and the rest to the lot due
+    # this Friday. Only a run on the Friday itself moves that, and only on a snapshot read today:
+    # a run on an old snapshot has not seen the Monday trades yet.
+    synced_at = (synced or {}).get("synced_at") or ""
+    fresh = synced_at[:10] == today.isoformat()
+    due_ids = [sid for sid, info in sleeves.items() if info["due"]]
+    if today == target_week.date() and due_ids and fresh:
+        planned_now: dict[str, dict[str, float]] = {}
+        for lot in planned["lots"]:
+            for row in (lot["plan"] or {}).get("rows", []):
+                if row["quantity"] and row["symbol"] in base_of:
+                    sign = -1 if row["action"] in ("SELL", "TRIM") else 1
+                    by_symbol = planned_now.setdefault(lot["id"], {})
+                    base = base_of[row["symbol"]]
+                    by_symbol[base] = by_symbol.get(base, 0.0) + sign * row["quantity"]
+        with open_catalog() as con:
+            lots.set_pending(con, who, group_id, due_ids[0], at, planned_now)
+    payload.update(
+        {
+            "prices": source,
+            "sleeves": signal.get("sleeves", []),
+            "plan": planned["plan"],
+            "lots": planned["lots"],
+            "free_cash": round(cash, 2),
+            "deposit_needed": planned["deposit_needed"],
+            "lot_size": float(settings["lot_size_rs"]),
+            "net": lots.net_by_symbol(planned["plan"]),
+            "ledger": {
+                "booked": reconciled.events,
+                "unexplained": reconciled.unexplained,
+                "excluded_from_lots": sorted(outside),
+                "stale": not fresh,
+            },
+            "holdings": {
+                "source": "kite",
+                "synced_at": (synced or {}).get("synced_at"),
+                "excluded": sorted(set(excluded) | {s for s, t in rules.items() if t == "exclude"}),
+                "outside": sorted(outside),
+                "broker_cash": (synced or {}).get("cash"),
+            },
+        }
+    )
+    with open_catalog() as con:
+        payload["created_at"] = holdings_store.save_orders(
+            con,
+            who,
+            week=payload["week"],
+            trigger=trigger,
+            favourite_id=headline["id"],
+            holdings_source=settings["holdings_source"],
+            payload=payload,
+        )
+    return payload
+
+
+def _lot_orders_message(payload: dict, title: str) -> Notification:
+    """The 14:15 Telegram message for a group followed lot by lot."""
+    holdings = payload["holdings"]
+    how = (
+        "Exact (decided by last Friday's ranks)"
+        if payload["kind"] == "exact"
+        else "From the final data"
+    )
+    lines = [f"{how} · prices: {payload['prices']}"]
+    traded = False
+    for lot in payload["lots"]:
+        plan = lot["plan"]
+        status = {
+            "new": "NEW lot",
+            "rebalance": "rebalance",
+            "exit": "exit only",
+            "not due": "not due",
+        }[lot["status"]]
+        head = f"{lot['label']} · {status}"
+        if lot["status"] in ("new", "rebalance") and lot["budget"] is not None:
+            head += f" · ₹{lot['budget']:,.0f}"
+        if lot["status"] == "not due" and lot["next"]:
+            head += f" · next {pd.Timestamp(lot['next']):%a %d %b}"
+        lines.append(head)
+        for row in (plan or {}).get("rows", []):
+            if row["quantity"]:
+                traded = True
+                lines.append(
+                    f"  • {row['action']} {row['symbol']} {row['quantity']} sh "
+                    f"(₹{row['order_value']:,.0f})"
+                )
+            elif row["action"] in ("SKIP", "HOLD"):
+                lines.append(f"  · not traded: {row['symbol']} ({row['note'] or row['action']})")
+    if payload["deposit_needed"] > 0:
+        lines.append(
+            f"Add ₹{payload['deposit_needed']:,.0f} to Kite before you buy "
+            f"(free cash ₹{payload.get('free_cash', 0):,.0f}, the new lot needs "
+            f"₹{payload['lot_size']:,.0f})."
+        )
+    if payload["net"]:
+        net = ", ".join(
+            f"{'BUY' if q > 0 else 'SELL'} {name} {abs(q)}"
+            for name, q in sorted(payload["net"].items())
+        )
+        lines.append(f"One order per stock: {net}")
+    labels = {lot["id"]: lot["label"] for lot in payload["lots"]}
+    booked = payload["ledger"]["booked"]
+    if booked:
+        lines.append(
+            "Booked to lots since the last run: "
+            + ", ".join(
+                f"{labels.get(e['sleeve_id'], '?')} {e['symbol']} {e['delta']:+.0f}"
+                + (" (not in the last orders)" if e.get("note") else "")
+                for e in booked
+            )
+        )
+    if payload["ledger"].get("stale"):
+        lines.append(
+            "Kite was last read "
+            f"{str(holdings.get('synced_at') or 'never')[:16].replace('T', ' ')}: "
+            "log in and press Sync for today's holdings and cash."
+        )
+    unexplained = payload["ledger"]["unexplained"]
+    if unexplained:
+        lines.append(
+            "Not in any lot (tell me which: mbt lots assign): "
+            + ", ".join(f"{u['symbol']} {u['delta']:+.0f}" for u in unexplained)
+        )
+    plan = payload["plan"]
+    lines.append(
+        f"Sells ₹{plan['sells']:,.0f} · buys ₹{plan['buys']:,.0f} · charges "
+        f"₹{plan['charges']:,.0f} · free cash after ₹{plan['cash_after']:,.0f}"
+    )
+    return Notification(
+        "momentum-orders",
+        "action_required" if traded else "info",
+        title,
+        "\n".join(lines),
+        type="momentum.orders",
+    )
+
+
+def _headline_group() -> tuple[dict, list[dict]]:
+    """The headline favourite and its sleeves; raises ValueError when it is not a group."""
+    with read_catalog() as con:
+        favourites = runs_store.list_favorites(con, include_groups=True)
+        groups = {g["id"]: g for g in runs_store.list_groups(con)}
+    headline = next((f for f in favourites if f["active"]), None)
+    members = groups.get(headline["id"], {}).get("members", []) if headline else []
+    if not headline or not members:
+        raise ValueError("The headline favourite is not a group of sleeves.")
+    return headline, members
+
+
+def lot_labels(members: list[dict], week: pd.Timestamp) -> dict[str, str]:
+    """`{sleeve id: "Lot N"}` numbered from the paper start, from each sleeve's cadence around
+    `week` (no stock data needed)."""
+    start = this_week.paper_start()
+    out = {}
+    for member in members:
+        req = BacktestRequest.model_validate(member["config"])
+        out[member["id"]] = _lot_label(
+            member["name"], journal_week_string(week), start, _rebalance_info(req, week)
+        )
+    return out
+
+
+def seed_lots(*, week: str | None = None, note: str = "", replace: bool = False) -> dict:
+    """Book the Kite holdings of the latest snapshot to the lot of `week`'s sleeve (default the
+    paper start Friday: the lot bought the Monday after). Holdings the strategy cannot hold, and
+    margin or excluded ones, are left out and listed. Refuses when lots exist unless `replace`."""
+    from . import holdings_store, lots
+
+    who = holdings_store.owner()
+    week = week or this_week.paper_start()
+    if not week:
+        raise ValueError("No paper start is set: pass the Friday this lot was decided.")
+    friday = pd.Timestamp(week)
+    if friday.weekday() != 4:
+        raise ValueError(f"{week} is not a Friday.")
+    headline, members = _headline_group()
+    due = [
+        m
+        for m in members
+        if _rebalance_info(BacktestRequest.model_validate(m["config"]), friday)["on_cadence"]
+    ]
+    if len(due) != 1:
+        raise ValueError(f"{len(due)} sleeves rebalance on {week}: expected exactly one.")
+    sleeve = due[0]
+    with read_catalog() as con:
+        snapshot = holdings_store.latest_holdings(con, who, ("kite",))
+        rules = holdings_store.rules(con, who)
+        existing = lots.has_ledger(con, who, headline["id"])
+    if snapshot is None:
+        raise ValueError("No Kite snapshot yet: log in to Kite and press Sync first.")
+    if existing and not replace:
+        raise ValueError("Lots already exist for this strategy; pass --replace to start again.")
+    rankings = []
+    for member in members:
+        ranking = _broad_ranking(BacktestRequest.model_validate(member["config"]))
+        if all(ranking is not seen for seen in rankings):
+            rankings.append(ranking)
+    _stored, symbols = _strategy_symbols(rankings, datetime.now(IST).date())
+    name_of = {fyers.nse_symbol(symbol): name for name, symbol in symbols.items()}
+    booked: dict[str, float] = {}
+    left_out: list[str] = []
+    for row in snapshot["rows"]:
+        if (
+            holdings_store.treatment(row["symbol"], rules) is not None
+            or row["symbol"] not in name_of
+        ):
+            left_out.append(row["symbol"])
+        else:
+            booked[row["symbol"]] = booked.get(row["symbol"], 0.0) + float(row["quantity"])
+    label = lot_labels(members, friday)[sleeve["id"]]
+    with open_catalog() as con:
+        if replace:
+            lots.clear(con, who, headline["id"])
+        lots.append(
+            con,
+            who,
+            headline["id"],
+            [
+                {"sleeve_id": sleeve["id"], "symbol": s, "delta": q, "kind": "seed", "note": note}
+                for s, q in sorted(booked.items())
+            ],
+            snapshot["synced_at"],
+        )
+        lots.set_pending(con, who, headline["id"], sleeve["id"], snapshot["synced_at"])
+    return {
+        "group": headline["name"],
+        "lot": label,
+        "sleeve": sleeve["name"],
+        "week": week,
+        "booked": booked,
+        "left_out": sorted(left_out),
+        "snapshot": snapshot["synced_at"],
+    }
+
+
+def lots_status() -> dict:
+    """Each lot's shares, what is pending and how Kite's latest snapshot compares."""
+    from . import holdings_store, lots
+    from .weekly import week_ending_on_or_before
+
+    who = holdings_store.owner()
+    headline, members = _headline_group()
+    friday = pd.Timestamp(week_ending_on_or_before(datetime.now(IST).date() + timedelta(days=6)))
+    labels = lot_labels(members, friday)
+    with read_catalog() as con:
+        ledger = lots.positions(con, who, headline["id"])
+        pending = lots.pending(con, who, headline["id"])
+        snapshot = holdings_store.latest_holdings(con, who, ("kite",))
+        rules = holdings_store.rules(con, who)
+    kite_qty = {
+        r["symbol"]: float(r["quantity"])
+        for r in (snapshot or {}).get("rows", [])
+        if holdings_store.treatment(r["symbol"], rules) is None
+    }
+    booked: dict[str, float] = {}
+    for lot in ledger.values():
+        for symbol, shares in lot.items():
+            booked[symbol] = booked.get(symbol, 0.0) + shares
+    differences = {
+        s: kite_qty.get(s, 0.0) - booked.get(s, 0.0)
+        for s in sorted(set(kite_qty) | set(booked))
+        if abs(kite_qty.get(s, 0.0) - booked.get(s, 0.0)) > 1e-6
+    }
+    return {
+        "group": headline["name"],
+        "lots": {
+            labels[m["id"]]: {"id": m["id"], "holds": ledger.get(m["id"], {})}
+            for m in sorted(members, key=lambda m: (len(labels[m["id"]]), labels[m["id"]]))
+        },
+        "pending": labels.get(pending) if pending else None,
+        "snapshot": (snapshot or {}).get("synced_at"),
+        "not_in_a_lot": differences,
+    }
+
+
+def assign_lot(symbol: str, lot: str, shares: float | None = None) -> dict:
+    """Book a change in Kite the ledger could not explain to a lot (`lot`: "Lot 2" or "2"). By
+    default all of the difference between Kite's latest snapshot and the ledger for `symbol`."""
+    from . import holdings_store, lots
+    from .weekly import week_ending_on_or_before
+
+    who = holdings_store.owner()
+    headline, members = _headline_group()
+    friday = pd.Timestamp(week_ending_on_or_before(datetime.now(IST).date() + timedelta(days=6)))
+    labels = lot_labels(members, friday)
+    wanted = lot if lot.lower().startswith("lot") else f"Lot {lot}"
+    sleeve_id = next(
+        (sid for sid, label in labels.items() if label.lower() == wanted.lower()), None
+    )
+    if sleeve_id is None:
+        raise ValueError(f"No such lot {lot!r}: {', '.join(sorted(labels.values()))}.")
+    symbol = symbol.upper()
+    with read_catalog() as con:
+        ledger = lots.positions(con, who, headline["id"])
+        snapshot = holdings_store.latest_holdings(con, who, ("kite",))
+    held = sum(r["quantity"] for r in (snapshot or {}).get("rows", []) if r["symbol"] == symbol)
+    booked = sum(
+        shares_ for sheet in ledger.values() for s, shares_ in sheet.items() if s == symbol
+    )
+    delta = shares if shares is not None else held - booked
+    if abs(delta) < 1e-6:
+        raise ValueError(f"Nothing to assign: Kite and the ledger agree on {symbol}.")
+    with open_catalog() as con:
+        lots.append(
+            con,
+            who,
+            headline["id"],
+            [{"sleeve_id": sleeve_id, "symbol": symbol, "delta": delta, "kind": "assigned"}],
+            (snapshot or {}).get("synced_at") or datetime.now(IST).isoformat(timespec="seconds"),
+        )
+    return {"lot": labels[sleeve_id], "symbol": symbol, "delta": delta}
+
+
 def _orders_message(payload: dict) -> Notification:
     """The 14:15 Telegram summary of Your orders."""
     plan = payload.get("plan")
@@ -3511,6 +3981,8 @@ def _orders_message(payload: dict) -> Notification:
             payload.get("reason") or payload.get("error") or "",
             type="momentum.problem",
         )
+    if payload.get("lots"):
+        return _lot_orders_message(payload, title)
     holdings = payload["holdings"]
     where = (
         f"paper portfolio of ₹{holdings['capital']:,.0f}"

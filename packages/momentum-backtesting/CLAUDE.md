@@ -512,6 +512,25 @@ contract, not a shared service).
   overrides it); Your orders counts a Kite snapshot's free cash, which is `net` minus pledged
   collateral, never below 0. `mbt kite remind --send` is the Fri
   13:30 `kite-login-reminder` job. The lot ledger and per-sleeve orders are BL-142 Phases 2–3.
+- `lots.py` (BL-142 Phases 2-3) — the lot ledger and per-lot orders for a group followed with one
+  lot per sleeve (BL-087). `momentum_lot_events` (append-only; a lot's shares are the sum of its
+  deltas; trading-data migration 014) books shares to the saved-run id of a sleeve, never to the
+  page's renumbered label. `reconcile` books each difference between Kite's holdings and the ledger
+  first against what each lot was told to trade (`momentum_lot_state.planned`, stored by the last
+  Friday run: a forced exit is booked to the lot told to sell it; the one net order a stock gets
+  is booked as planned), then the rest to the *pending* lot (the lot due on that Friday) when it
+  may hold the name (its target or its current shares; noted "beyond the planned orders"); anything
+  else is returned as unexplained, never guessed (`mbt lots assign`). The pending lot and the plan
+  move only on a run on the Friday itself with a Kite snapshot read that day. Symbols Kite still
+  holds that are not strategy names today are never booked as sold (`ignore`).
+  `plan_lots`: each lot planned alone with `orders.plan`: a due lot with no shares is a *new lot*
+  (funded with `lot_size_rs` or all free cash if more; `deposit_needed` is what to add to Kite),
+  a due lot with shares rebalances with the free cash left, a lot not due sells only names its
+  sleeve's signal marks SELL (never a difference from the model: the owner's real holdings differ
+  on purpose, e.g. a swap for a premium-blocked name). `api._compute_lot_orders` is the Kite +
+  group path of `_compute_orders` (the group's per-sleeve signals ride in `signal["_sleeves"]`,
+  never saved); `api.seed_lots` / `lots_status` / `assign_lot` back `mbt lots`. Tests:
+  `tests/test_lots.py`, `tests/test_lot_orders.py`.
 - `alerts.py` (BL-051 Phase 5) — `GET /api/alerts`: what needs a person, for the dashboard's bell
   and once-a-day pop-up. One pure function per kind over the data its Telegram job already reads:
   `split` (`stock_actions.review_snapshot`), `data` (`/weekly/status` readiness, for the

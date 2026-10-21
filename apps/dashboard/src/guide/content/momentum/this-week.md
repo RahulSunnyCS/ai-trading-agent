@@ -46,6 +46,26 @@ time. Nothing here places an order: you place them in your broker yourself.
   changes that. Free cash is Kite's cash after margins, without the margin your pledged holdings
   give, so the orders never spend the options margin. Kite needs a login each day it is read: log in on [Broker logins](app:/brokerLogins)
   before 14:15 on Friday; a Telegram reminder comes at 13:30 when you have not.
+- **Lot by lot** (a strategy with a sleeve for every Friday, followed with your Kite money: you buy
+  about ₹50,000 a week, one **lot** per sleeve, each rebalanced on its own calendar). Your orders
+  then plans every lot on its own, and the table adds a *Lot* tag to each order. **Lot 1** is the
+  sleeve that traded on your paper start Friday, **Lot 2** the next, and so on. On a Friday:
+  - A lot that is **due** trades. A **new lot** (one that holds nothing yet) is funded with the
+    weekly lot size (Settings, ₹50,000) or all your free Kite cash when that is more, and the page
+    says how much to **add to Kite** before you buy. A lot that **rebalances** uses its own shares
+    plus the free cash.
+  - A lot that is **not due** trades nothing, even if what you hold differs from the model (a swap
+    for a name blocked by the premium rule, whole shares). It sells only a name its sleeve marks
+    SELL that week.
+  - **One order per stock** adds the lots together, so you place a single order per stock.
+  - Shares you buy or sell in Kite between Fridays are booked first to the lots the last orders
+    named, then to the lot whose orders were made last (the message lists what was booked, and
+    marks anything not in the last orders). If Kite was not read that day, the message says so:
+    log in and press Sync. A change no lot can take (a stock that lot does not hold) is shown as *Not in any lot*:
+    book it with `mbt lots assign SYMBOL --lot N`. Stocks outside the strategy (such as a stock you
+    hold for another reason) and LIQUIDBEES / gold bonds are never part of a lot.
+  - `mbt lots show` lists every lot's shares; `mbt lots seed` records the first lot from your Kite
+    holdings once, when you start.
 - **What is traded.** A name the model drops is sold in full and a new name is bought, whatever
   the amount. Top-ups and trims smaller than the **minimum trade** (₹10,000 by default) are shown
   as SKIP with what they would have cost. Whole shares, rounded down; sells first. A name with a
