@@ -555,6 +555,12 @@ contract, not a shared service).
   `uv run python scripts/update-goldens.py --accept-results --reason "..."` and commit the
   changelog entry it writes. A new request field needs a scenario (`test_coverage.py`).
   `test_lookahead.py` re-runs each dataset on data cut off at a date; never weaken it.
+  `test_invariants.py` checks every frozen result is internally consistent (totals, drawdown,
+  calendar years compound, shares in [0,1], the position cap on weekly buffer runs, trades): a check that
+  fails on a baseline is a finding for BL-001's Log, never a reason to loosen it. `test_nightly.py`
+  (`MOMENTUM_GOLDEN_FULL=1`; CI sets it on the schedule trigger) re-runs the scenarios in reverse
+  order and checks that putting each non-default setting back changes the result (`INERT` lists
+  the ones that cannot, with reasons).
 - `patterns/` (`mbt patterns detect|formation|gallery|study|rank|holdout`) — BL-042's chart-pattern
   POC (tight range, flag, cup and handle). Research only: nothing here reaches `api.py`, the
   default ranking or the weekly signal. Rules live in `search_spaces/bl042_criteria.json` (+

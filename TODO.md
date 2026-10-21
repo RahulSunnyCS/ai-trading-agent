@@ -538,9 +538,9 @@ where each phase stands. No momentum CAGR is a "result" until Phases 1–3 pass.
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.14.1 | Phase 1: frozen results on frozen data | claude | **Done 2026-10-05.** `packages/momentum-backtesting/tests/golden/` (16 scenarios, 14.7 MB fixture); accept with `scripts/update-goldens.py --accept-results --reason`; pre-push hook |
-| 3.14.2 | Phase 2: settings coverage and the look-ahead test | claude | **Done 2026-10-05** except the always-true checks and nightly runs. Look-ahead passes at three cut dates on all four datasets |
-| 3.14.3 | Phase 3: code and data stamp on every saved run | claude | Open |
-| 3.14.4 | Phase 4: weekly favourites check | claude | Open — three owner questions in the backlog item |
+| 3.14.2 | Phase 2: settings coverage and the look-ahead test | claude | **Done 2026-10-05**; always-true checks, nightly reverse-order and every-setting-wired runs and the CI flag **built 2026-10-22** (PR open) with five findings F1 to F5 in the BL-001 item (F1: weights omit waiting cash after an off-cadence sale, fix awaits the owner). Look-ahead passes at three cut dates on all four datasets |
+| 3.14.3 | Phase 3: code and data stamp on every saved run | claude | **Mostly delivered by BL-052** (versions on every run); the three catalog columns are still empty. Owner to confirm closing it as superseded |
+| 3.14.4 | Phase 4: weekly favourites check | claude | **Half delivered by BL-052**; the pinned-anchor restated-history check is the missing part. Re-scope proposed in the backlog item, owner to decide |
 | 3.14.5 | Data-dependent test failures — [BL-018](backlog/BL-018-brittle-benchmark-tests.md) | claude | **Done 2026-10-07.** Six tests failed on live data only: two benchmark session-count checks (3,900 hard-coded, now a floor plus NSE's bhavcopy session calendar), two reference-loading tests that read the live `benchmarks_weekly.csv`, the membership check against a current-list snapshot older than the Sep-2026 review, and the stock smoke test looking up a tax class for BSE before the data is rebuilt. Tests only; full suite 1,142 passed on live data |
 | 3.14.6 | Download `data/stocks/raw/nifty50_current.csv` again (niftyindices `ind_nifty50list.csv`) | owner | **Open — before Fri 2026-10-09 19:30.** The 2026-09-27 copy predates BSE replacing WIPRO (2026-09-30), so `mbt stocks fetch`'s membership guard (severity F) fails and `mbt stocks sync` exits 1 |
 

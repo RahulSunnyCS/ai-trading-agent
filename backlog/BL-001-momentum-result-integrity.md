@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — protects the correctness of the numbers favourites and weekly signals are chosen on |
-| **Status** | In progress (Phases 1 and 2 done; 3 and 4 not started) |
+| **Status** | In progress (Phases 1 and 2 done, with five findings below; 3 and 4 mostly delivered by BL-052 and need re-scoping: owner to decide) |
 | **Type** | improvement |
 | **Area** | momentum (+ trading-data for one migration, dashboard for one provenance line) |
 | **Created** | 2026-10-04 |
@@ -340,6 +340,52 @@ Questions 2 to 4 above belong to Phases 3 and 4 and are still open.
 - Not built: the always-true checks, the nightly reverse-order and wiring runs, and the CI
   nightly flag.
 
+## Where it stands (2026-10-22)
+
+**Phase 2's missing pieces are built** (branch `feat/bl001-invariants`): `tests/golden/test_invariants.py`
+(the always-true checks, on the frozen payloads, no extra runs), `tests/golden/test_nightly.py`
+(reverse-order re-run, which passes; every setting wired, 141 variants, 4 minutes) and the CI flag
+`MOMENTUM_GOLDEN_FULL` on the schedule trigger. Findings from building them, in order of weight:
+
+| # | Finding | Effect | Status |
+|---|---|---|---|
+| F1 | **Weights leave the waiting cash out.** After an off-cadence sale (`sell_every_week`, or a stop paid to cash) `engine.py` normalises `weights[week]` over the holdings only, so the rest look bigger and the idle share smaller (a two-name book that sells one shows the other at 100%, not 50%). Equity is right. Hits the Rotation rows, `max_position_share`, `idle_share`, the holdings share of blended sleeves. | Display and KPIs of runs that use those two switches. The live strategy uses neither. | Reproduced by `tests/test_weights_after_off_cadence_sell.py` (strict xfail). **Fix not applied: it moves frozen results, so it needs your yes.** One line in `engine.py` plus `--accept-results`. |
+| F2 | **`max_position` is not a hard cap off the weekly cadence.** The trim is inside `if is_buy_week`, so with `rebalance_every` above 1 or monthly rebalancing a holding can sit above cap + band until the next trade week (a 35% cap reached 54% in a fortnightly scenario, a 50% cap 59% four-weekly). The slots rule has no cap. | The invariant is asserted only for weekly buffer runs. Worth knowing for the 4-weekly sleeves you follow (25% cap). | Documented in the test; a design fact, not changed. |
+| F3 | **No scenario makes a circuit lock block a trade** (`blocked_entries` and `blocked_exits` are 0 in all of them), so a break in `broad_respect_circuits` would pass the goldens. | The fixture cannot prove circuit-lock fills are wired. | Open: needs a fixture window with a blocked fill. |
+| F4 | **No scenario makes `max_category` bind**, so a broken group cap would pass. | Same kind of hole. | Open. |
+| F5 | The payload has nulls in the newest week (`holdings_count`, often `idle_share`; the engine never trades its newest week) and in weeks before the first trade that hold nothing. | Charts must treat null as a gap. | Allowed explicitly in the test; nothing else may be null. |
+
+`tax` on a Broad request is accepted and ignored (documented in `api.py` and `IGNORED_FIELDS`);
+the wiring test lists it as inert with that reason.
+
+**Phases 3 and 4 against what BL-052 built.** BL-052's `saved_identity` already stores, for every
+run, the data version (catalog tables, lake files, input files) and the code commit, and labels a
+moved result `data_revised`, `intended` (a same-dataset accepted golden change lies between the
+commits), `check` or `not_reproducible`; a favourite that is `not_reproducible` sends a Telegram, and
+`check` shows in the alerts bell. That delivers the intent of Phase 3 and half of Phase 4. What it does not do:
+
+- the three catalog columns this item names (`code_version`, `date_from`, `date_to`) are still empty;
+  the stamp lives in the run's summary instead;
+- the data fingerprint is per table, not per instrument, so a restated old price is named only as
+  "a table changed";
+- there is no pinned end date, so every Friday's new week reads as `data_revised`, and a restated
+  history hides in that noise (this was the design point of Phase 4);
+- `data_revised` and `check` send no Telegram.
+
+**Proposal:** close Phase 3 as superseded by BL-052 (fill the three empty columns in one small
+change, or drop them); re-scope Phase 4 to the one thing missing: a weekly check that re-runs each
+favourite with the end pinned to its last accepted anchor and names the instruments whose history changed.
+
+## Open questions for when this resumes (2026-10-22)
+
+1. F1: apply the one-line fix and accept the changed frozen result (which scenarios move is listed
+   by the accept script)? Recommended yes: it only changes runs using `sell_every_week` or a stop.
+2. F3 and F4: add a fixture window and two scenarios so a lock blocks a fill and `max_category`
+   binds? This grows the fixture (budget 15 MB, now 14.7 MB), so something must be trimmed.
+3. Phases 3 and 4: agree with the proposal above?
+4. The original Phase 4 questions 2 to 4 (hold a signal on a "same data, different result" alert,
+   the anchor date, the badge) matter only if Phase 4 is built.
+
 ## Log
 
 - 2026-10-04 — created from the planning conversation. Priority P0 (protects result
@@ -347,3 +393,8 @@ Questions 2 to 4 above belong to Phases 3 and 4 and are still open.
 - 2026-10-05 — started. Phases 1 and 2 built: 16 scenarios frozen, coverage test, look-ahead
   test (passes on all four datasets at three cut dates; fails on a planted `shift(-1)`), accept
   script with a changelog, pre-push hook. A changed cost constant trips five scenarios.
+- 2026-10-22 — Phase 2's missing pieces built and run: always-true checks (all pass on the frozen
+  results once the engine's documented limits are written into them), nightly reverse-order
+  re-run (passes), every-setting-wired (five settings could not be proven and are listed as inert with
+  reasons). Five findings F1 to F5 above. F1 reproduced by a strict-xfail test; the fix waits for the owner.
+  Gap analysis of Phases 3 and 4 against BL-052 written above.
