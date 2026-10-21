@@ -249,7 +249,7 @@ def main() -> None:
         w.writerows(table)
     # behaviour of the picks on premium days
     for key in ("CORE", "T1"):
-        for name, ds in (("vix_p90", groups["vix_p90"]),):
+        for _name, ds in (("vix_p90", groups["vix_p90"]),):
             sh = [
                 by_day[x][f"{key}_wide_share"]
                 for x in ds
