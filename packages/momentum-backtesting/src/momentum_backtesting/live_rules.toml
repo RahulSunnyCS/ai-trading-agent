@@ -21,7 +21,7 @@ source = "the forward-signal journal (BL-024): signals as recorded each Friday, 
 [money_gate]
 # Money goes in only when ALL of these hold, and only after the owner confirms in the BL-025 Log.
 min_paper_weeks = 13
-# Over the paper weeks, the ensemble's journal return must beat this benchmark's.
+# Over the paper weeks, the followed strategy's journal return must beat this benchmark's.
 must_beat = "Nifty200 Momentum 30 TRI"
 # Neither drawdown rule below may have triggered during the paper weeks.
 no_drawdown_rule_hit = true

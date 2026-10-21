@@ -62,6 +62,37 @@ def test_without_a_config_file_the_frozen_ensemble_is_followed():
     assert ids == ["1281e8ed6824", "08c4307d7aa9", "535b17b44ba5", "bad83df3821a"]
 
 
+def test_paper_curves_runs_the_named_sleeves_and_builds_the_universe_once(monkeypatch):
+    from momentum_backtesting import bias, reference_benchmarks, search, tracker
+
+    built, ran = [], []
+
+    class FakeRunner:
+        def __init__(self, *_a, **_k):
+            pass
+
+        def base(self, heavy):
+            built.append(heavy)
+            return "base"
+
+    def fake_run_config(_runner, cfg, base=None):
+        ran.append((cfg["id"], base))
+        return _curve([1.0 + 0.01 * i for i in range(30)], start="2026-03-27")
+
+    monkeypatch.setattr(bias, "Runner", FakeRunner)
+    monkeypatch.setattr(search, "load_space", lambda _p: None)
+    monkeypatch.setattr(tracker, "run_config", fake_run_config)
+    monkeypatch.setattr(
+        reference_benchmarks,
+        "load_references",
+        lambda: {"Nifty200 Momentum 30 TRI": _curve([1.0] * 30, start="2026-03-27")},
+    )
+    followed, _bench = live_rules.paper_curves(echo=lambda _m: None, rules=RULES)
+    assert [i for i, _ in ran] == [f"fbb7ab054238#{k}" for k in range(4)]
+    assert len(built) == 1 and {b for _, b in ran} == {"base"}
+    assert len(followed) > 1
+
+
 # --- drawdown -----------------------------------------------------------------------------------
 
 

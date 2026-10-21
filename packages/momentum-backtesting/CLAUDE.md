@@ -471,7 +471,7 @@ contract, not a shared service).
   `tests/test_live_rules.py` and logs the reason in BL-025. Drawdown and the money gate read the
   followed strategy's model portfolio rebased at `stage.paper_start` (`tracker.run_config`;
   `strategy.config_file` names its sleeves, `search_spaces/bl142_followed.json`: Four Sectors
-  Monthly, No Tilt on four Fridays since 2026-10-22; without that key, the BL-010 frozen ensemble); the
+  Monthly, No Tilt on four Fridays, first lot bought 2026-10-19; without that key, the BL-010 frozen ensemble); the
   trailing rule needs the journal-scored live series (BL-024 Phase 2, not built) and says "not
   measurable" until then; stage `live` is reported as blocked until real fills are recorded
   (BL-024 Phase 3). A breach is sent untagged (never switchable); the routine status is the

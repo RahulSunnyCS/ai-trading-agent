@@ -339,10 +339,13 @@ def paper_curves(echo=print, rules: dict | None = None) -> tuple[pd.Series, pd.S
     runner = bias.Runner(
         search.load_space(SPACE_PATH), universe_kind="turnover_rank", category_tags="curated"
     )
-    curves = {}
+    curves, bases = {}, {}
     for cfg in followed_configs(rules or load()):
         echo(f"{cfg['id']} ...")
-        curves[cfg["id"]] = tracker.run_config(runner, cfg)
+        key = json.dumps(cfg["heavy"], sort_keys=True)
+        if key not in bases:  # the sleeves of one strategy share their heavy settings
+            bases[key] = runner.base(cfg["heavy"])
+        curves[cfg["id"]] = tracker.run_config(runner, cfg, bases[key])
     frame = pd.DataFrame(curves).ffill()
     ensemble = choose.ensemble_curve(frame / frame.iloc[0], list(frame.columns))
     return ensemble, reference_benchmarks.load_references()[MOM30].dropna()
