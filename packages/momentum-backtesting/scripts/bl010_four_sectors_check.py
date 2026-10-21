@@ -182,7 +182,7 @@ def _monday_open(runner, rec: dict, base, locks) -> dict:
         gaps = st.monday_open(bundle, market, reconciled)
         close_curves[offset] = pd.Series(at_close.equity)
         open_curves[offset] = pd.Series(at_open.equity)
-        idle = [at_open.cash[w] / at_open.equity[w] for w in at_open.equity if at_open.equity[w]]
+        idle = [c / at_open.equity[w] for w, c in at_open.cash.items() if at_open.equity.get(w)]
         details.append(
             {
                 "offset": offset,
