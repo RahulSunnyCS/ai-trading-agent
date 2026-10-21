@@ -62,12 +62,37 @@ def test_without_a_config_file_the_frozen_ensemble_is_followed():
     assert ids == ["1281e8ed6824", "08c4307d7aa9", "535b17b44ba5", "bad83df3821a"]
 
 
-def test_paper_curves_runs_the_named_sleeves_and_builds_the_universe_once(monkeypatch):
+def test_lots_are_put_in_one_friday_after_another_on_their_own_sleeves():
+    starts = live_rules.lot_starts("2026-10-16", 4)
+    assert [d.date().isoformat() for d in starts] == [
+        "2026-10-16",
+        "2026-10-23",
+        "2026-10-30",
+        "2026-11-06",
+    ]
+    # the sleeve that trades on each lot's first Friday (calendar-anchored offsets)
+    assert [live_rules.lot_offset(d, 4) for d in starts] == [3, 0, 1, 2]
+
+
+def test_a_new_lot_adds_money_not_return():
+    weeks = pd.date_range("2026-10-16", periods=4, freq="W-FRI")
+    first = pd.Series([1.0, 1.1, 1.1, 1.21], index=weeks)
+    second = pd.Series([1.0, 0.9, 0.99], index=weeks[1:])  # put in a week later, then falls
+    index = live_rules.twr_index([first, second])
+    assert list(index.round(6)) == [1.0, 1.1, round(1.1 * 2.0 / 2.1, 6), round(1.1 * 2.2 / 2.1, 6)]
+    # the second lot's deposit did not lift the peak: the drawdown is only the real fall
+    assert index.iloc[2] / index.iloc[1] - 1 == pytest.approx(2.0 / 2.1 - 1)
+
+
+def test_paper_curves_runs_each_lot_from_cash_on_its_own_friday(monkeypatch):
     from momentum_backtesting import bias, reference_benchmarks, search, tracker
 
     built, ran = [], []
+    weeks = pd.date_range("2026-03-27", "2026-11-13", freq="W-FRI")
 
     class FakeRunner:
+        common = {"outer_prices": pd.DataFrame(index=weeks)}
+
         def __init__(self, *_a, **_k):
             pass
 
@@ -75,22 +100,86 @@ def test_paper_curves_runs_the_named_sleeves_and_builds_the_universe_once(monkey
             built.append(heavy)
             return "base"
 
-    def fake_run_config(_runner, cfg, base=None):
-        ran.append((cfg["id"], base))
-        return _curve([1.0 + 0.01 * i for i in range(30)], start="2026-03-27")
+    def fake_run_config(_runner, cfg, base=None, **window):
+        ran.append((cfg["id"], cfg["rebalance_offset"], base, window["start"]))
+        index = weeks[weeks >= pd.Timestamp(window["start"])]
+        return pd.Series([1.0 + 0.01 * i for i in range(len(index))], index=index)
 
     monkeypatch.setattr(bias, "Runner", FakeRunner)
     monkeypatch.setattr(search, "load_space", lambda _p: None)
     monkeypatch.setattr(tracker, "run_config", fake_run_config)
     monkeypatch.setattr(
-        reference_benchmarks,
-        "load_references",
-        lambda: {"Nifty200 Momentum 30 TRI": _curve([1.0] * 30, start="2026-03-27")},
+        reference_benchmarks, "load_references", lambda: {"Nifty200 Momentum 30 TRI": _flat(30)}
     )
     followed, _bench = live_rules.paper_curves(echo=lambda _m: None, rules=RULES)
-    assert [i for i, _ in ran] == [f"fbb7ab054238#{k}" for k in range(4)]
-    assert len(built) == 1 and {b for _, b in ran} == {"base"}
-    assert len(followed) > 1
+    assert [(i, o, s) for i, o, _b, s in ran] == [
+        ("fbb7ab054238#3", 3, "2026-10-16"),
+        ("fbb7ab054238#0", 0, "2026-10-23"),
+        ("fbb7ab054238#1", 1, "2026-10-30"),
+        ("fbb7ab054238#2", 2, "2026-11-06"),
+    ]
+    assert len(built) == 1 and {b for _, _, b, _ in ran} == {"base"}
+    assert followed.index[0] == pd.Timestamp("2026-10-16") and followed.iloc[0] == 1.0
+
+
+def test_a_lot_put_in_this_week_is_cash_not_a_crash(monkeypatch):
+    from momentum_backtesting import bias, reference_benchmarks, search, tracker
+
+    weeks = pd.date_range("2026-03-27", "2026-10-16", freq="W-FRI")
+
+    class FakeRunner:
+        common = {"outer_prices": pd.DataFrame(index=weeks)}
+
+        def __init__(self, *_a, **_k):
+            pass
+
+        def base(self, _heavy):
+            return "base"
+
+    def too_short(_runner, _cfg, base=None, **_window):
+        raise ValueError("not enough history to run from the chosen start date")
+
+    monkeypatch.setattr(bias, "Runner", FakeRunner)
+    monkeypatch.setattr(search, "load_space", lambda _p: None)
+    monkeypatch.setattr(tracker, "run_config", too_short)
+    monkeypatch.setattr(
+        reference_benchmarks, "load_references", lambda: {"Nifty200 Momentum 30 TRI": _flat(30)}
+    )
+    followed, bench = live_rules.paper_curves(echo=lambda _m: None, rules=RULES)
+    assert list(followed.index) == [pd.Timestamp("2026-10-16")] and followed.iloc[0] == 1.0
+    report = live_rules.evaluate(RULES, followed, bench)
+    assert not report.breached
+
+
+def test_a_lot_not_yet_due_is_left_out(monkeypatch):
+    from momentum_backtesting import bias, reference_benchmarks, search, tracker
+
+    weeks = pd.date_range("2026-03-27", "2026-10-23", freq="W-FRI")
+
+    class FakeRunner:
+        common = {"outer_prices": pd.DataFrame(index=weeks)}
+
+        def __init__(self, *_a, **_k):
+            pass
+
+        def base(self, _heavy):
+            return "base"
+
+    ran = []
+
+    def fake_run_config(_runner, cfg, base=None, **window):
+        ran.append(window["start"])
+        index = weeks[weeks >= pd.Timestamp(window["start"])]
+        return pd.Series(1.0, index=index)
+
+    monkeypatch.setattr(bias, "Runner", FakeRunner)
+    monkeypatch.setattr(search, "load_space", lambda _p: None)
+    monkeypatch.setattr(tracker, "run_config", fake_run_config)
+    monkeypatch.setattr(
+        reference_benchmarks, "load_references", lambda: {"Nifty200 Momentum 30 TRI": _flat(30)}
+    )
+    live_rules.paper_curves(echo=lambda _m: None, rules=RULES)
+    assert ran == ["2026-10-16", "2026-10-23"]  # lots 3 and 4 are not in yet
 
 
 # --- drawdown -----------------------------------------------------------------------------------

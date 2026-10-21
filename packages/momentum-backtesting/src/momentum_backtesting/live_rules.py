@@ -329,26 +329,90 @@ def followed_configs(rules: dict) -> list[dict]:
     return json.loads(path.read_text())["configs"]
 
 
+def lot_starts(paper_start: str, lots: int) -> list[pd.Timestamp]:
+    """The Fridays the lots are put in: the first on `paper_start` (the Friday on or after it),
+    then one a week (BL-142: Friday 1 of 4 on 2026-10-16, Friday 2 on 2026-10-23, ...)."""
+    first = pd.Timestamp(paper_start)
+    first += pd.Timedelta(days=(4 - first.weekday()) % 7)
+    return [first + pd.Timedelta(weeks=k) for k in range(lots)]
+
+
+def lot_offset(start: pd.Timestamp, every: int) -> int:
+    """The `rebalance_offset` of the sleeve whose own Friday is `start` (calendar-anchored,
+    `engine.CADENCE_EPOCH`): the sleeve that trades on a lot's first Friday is that lot's."""
+    from .engine import CADENCE_EPOCH
+
+    return round((start - CADENCE_EPOCH).days / 7) % every
+
+
+def twr_index(lots: list[pd.Series]) -> pd.Series:
+    """Time-weighted index of equal lots put in one after another. `lots[k]` is lot k's value
+    from its own first week (1.0 there; the lot is cash until then). A lot added in a week adds
+    money, not return: that week's return is the lots already in, over what they were worth the
+    week before, so the next lot never lifts the peak the drawdown is measured from."""
+    values = pd.concat(lots, axis=1).sort_index()
+    total = values.sum(axis=1, min_count=1)
+    added = pd.Series(0.0, index=values.index)
+    for lot in lots:
+        added[lot.index[0]] += float(lot.iloc[0])
+    r = ((total - added) / total.shift(1) - 1).fillna(0.0)
+    return (1 + r).cumprod()
+
+
 def paper_curves(echo=print, rules: dict | None = None) -> tuple[pd.Series, pd.Series]:
-    """The followed strategy's weekly equity through the latest week (its configs at equal
-    capital, reset each April), and the Nifty200 Momentum 30 TRI level (BL-010 Phase 6 step 3's
-    model portfolio, not the journal)."""
+    """The followed money's weekly equity through the latest week, and the Nifty200 Momentum 30
+    TRI level (BL-010 Phase 6 step 3's model portfolio, not the journal).
+
+    With `strategy.config_file` the money is the lots the owner actually puts in: lot k starts
+    from cash on `lot_starts()[k]` as the sleeve that trades that Friday (a run `start`ed there,
+    its first buy under the research engine's own fill convention), and the equity is the
+    time-weighted index of the lots (`twr_index`). Without it, the frozen ensemble at equal
+    capital, reset each April, carrying its holdings in at `paper_start`."""
     from . import bias, choose, reference_benchmarks, search, tracker
     from .phase5 import MOM30
 
+    rules = rules or load()
+    configs = followed_configs(rules)
     runner = bias.Runner(
         search.load_space(SPACE_PATH), universe_kind="turnover_rank", category_tags="curated"
     )
-    curves, bases = {}, {}
-    for cfg in followed_configs(rules or load()):
-        echo(f"{cfg['id']} ...")
+    bases = {}
+
+    def base_for(cfg: dict):
         key = json.dumps(cfg["heavy"], sort_keys=True)
         if key not in bases:  # the sleeves of one strategy share their heavy settings
             bases[key] = runner.base(cfg["heavy"])
-        curves[cfg["id"]] = tracker.run_config(runner, cfg, bases[key])
+        return bases[key]
+
+    benchmark = reference_benchmarks.load_references()[MOM30].dropna()
+    if rules["strategy"].get("config_file"):
+        every = configs[0]["rebalance_every"]
+        by_offset = {c["rebalance_offset"]: c for c in configs}
+        last = runner.common["outer_prices"].index[-1]
+        lots = []
+        for start in lot_starts(rules["stage"]["paper_start"], len(configs)):
+            if start > last:
+                break  # this lot is not in yet
+            cfg = by_offset[lot_offset(start, every)]
+            echo(f"lot {len(lots) + 1} from {start.date()}: {cfg['id']} ...")
+            try:
+                curve = tracker.run_config(runner, cfg, base_for(cfg), start=str(start.date()))
+            except ValueError as exc:
+                if "not enough history" not in str(exc):
+                    raise
+                # put in this week (the engine needs two weeks to show a return): still cash
+                curve = pd.Series([1.0], index=[start])
+            lots.append(curve / curve.iloc[0])
+        if not lots:
+            raise RuntimeError("no lot has started yet: the data ends before stage.paper_start")
+        return twr_index(lots), benchmark
+
+    curves = {}
+    for cfg in configs:
+        echo(f"{cfg['id']} ...")
+        curves[cfg["id"]] = tracker.run_config(runner, cfg, base_for(cfg))
     frame = pd.DataFrame(curves).ffill()
-    ensemble = choose.ensemble_curve(frame / frame.iloc[0], list(frame.columns))
-    return ensemble, reference_benchmarks.load_references()[MOM30].dropna()
+    return choose.ensemble_curve(frame / frame.iloc[0], list(frame.columns)), benchmark
 
 
 def simulated_inputs(
