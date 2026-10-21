@@ -6,6 +6,7 @@ import { sendText } from '@trading/notify';
 import { describeSource, readAutomation, uploadBooks } from './automation-settings.js';
 import { readTelegramConfig } from './config.js';
 import { describe } from './diagnose.js';
+import { parseBrokers, parseDetail, pickBroker } from './quantiply-deploy-plan.js';
 import {
   type QLedgerRow,
   type QManifest,
@@ -54,7 +55,10 @@ import { type Mode, istToday, sha256 } from './strategy-plan.js';
  * nothing. `--apply` needs `QUANTIPLY_UPLOAD=on`. The ledger (`--ledger`, default
  * TRADING_DATA_ROOT/rotation/quantiply/ledger.jsonl) records every create and delete by algo id;
  * only algos in it are ever deleted. Each created algo is read back (`GET /algos/:id`) and compared
- * with what was sent; a difference is recorded and alerted.
+ * with what was sent; a difference is recorded and alerted. An algo that reads back identical then
+ * gets the account's own broker (`GET /brokers`, the one whose client code is the `.env` login; the
+ * web app's "Select Client ID / Broker"), so switching it on by hand needs nothing else, and is read
+ * back again (the call rewrites the algo). A broker not set is alerted; the algo stays owned.
  */
 
 const READ_BACK_OK = 'read back: identical';
@@ -289,8 +293,50 @@ async function main(): Promise<number> {
         return `READ-BACK FAILED: ${describe(error)}`;
       }
     };
-    const owned = async (w: QWanted, id: string, verdict: string, note = '') => {
+    // The account's own broker, set on every algo created (a refusal is said on each one).
+    const pb = await api
+      .brokers()
+      .then((json) => pickBroker(parseBrokers(json), creds.user))
+      .catch((error: unknown) => ({ error: `brokers list: ${describe(error)}` }));
+    /**
+     * Set the broker on an algo that read back identical, then read it back again. `verdict` is
+     * the content's (READ_BACK_OK, or what changed); `broker` is '' when set, else why not.
+     */
+    const withBroker = async (
+      body: Record<string, unknown>,
+      id: string,
+    ): Promise<{ verdict: string; broker: string }> => {
+      if ('error' in pb) return { verdict: READ_BACK_OK, broker: pb.error };
+      try {
+        await api.setBroker(id, pb.id);
+      } catch (error) {
+        return { verdict: READ_BACK_OK, broker: describe(error) };
+      }
+      const verdict = await check(body, id);
+      try {
+        const back = parseDetail(await api.get(id));
+        if (back.enabled) return { verdict: `READ-BACK DIFFERS: ENABLED, ${verdict}`, broker: '' };
+        return {
+          verdict,
+          broker: back.broker === pb.id ? '' : 'reads back unset or another account',
+        };
+      } catch (error) {
+        return { verdict, broker: `read back: ${describe(error)}` };
+      }
+    };
+    const owned = async (
+      w: QWanted,
+      body: Record<string, unknown>,
+      id: string,
+      created: string,
+      note = '',
+    ) => {
+      const { verdict, broker } =
+        created === READ_BACK_OK
+          ? await withBroker(body, id)
+          : { verdict: created, broker: 'not set: the read-back differed' };
       const ok = verdict === READ_BACK_OK;
+      const brokerNote = broker ? `; BROKER NOT SET: ${broker}` : '; broker set';
       // Created but not as sent: owned (so it can be replaced), under a sha no export will match.
       await record({
         action: 'create',
@@ -298,14 +344,20 @@ async function main(): Promise<number> {
         name: w.name,
         sha: ok ? w.sha : `mismatch:${w.sha}`,
         ok: true,
-        detail: `${note}${verdict}`,
+        detail: `${note}${verdict}${brokerNote}`,
       });
       if (!ok) {
         failed = true;
         if (verdict.startsWith('READ-BACK FAILED')) retryable = true;
         else attention = true;
+      } else if (broker) {
+        // The content is right; the owner sets the broker by hand (or the deployer does).
+        failed = true;
+        attention = true;
       }
-      lines.push(`${ok ? '✅' : '❌'} created ${w.name} (${note}${verdict})`);
+      lines.push(
+        `${ok && !broker ? '✅' : '❌'} created ${w.name} (${note}${verdict}${brokerNote})`,
+      );
     };
     const listedBefore = new Set(algos.map((a) => a.id));
 
@@ -362,7 +414,13 @@ async function main(): Promise<number> {
         }
         if (adopted.length) {
           for (const a of adopted) {
-            await owned(w, a.id, await check(body, a.id), `adopted after "${describe(error)}": `);
+            await owned(
+              w,
+              body,
+              a.id,
+              await check(body, a.id),
+              `adopted after "${describe(error)}": `,
+            );
           }
           failed = true; // the owner should know the API errored
           attention = true;
@@ -381,7 +439,7 @@ async function main(): Promise<number> {
         lines.push(`❌ create failed: ${w.name} — ${describe(error)}`);
         continue;
       }
-      for (const s of saved) await owned(w, s.id, await check(body, s.id));
+      for (const s of saved) await owned(w, body, s.id, await check(body, s.id));
     }
     if (needsAttentionQ(p)) {
       failed = true;

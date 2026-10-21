@@ -136,6 +136,11 @@ The scheduler sets the repository variables on every save. `.env` switches (`ALG
   - A create that errors on this side is checked against a fresh list: a new algo of that name on the day is
     taken over (owned, read back) rather than left unowned. The ledger is checked writable before any change;
     if a row cannot be written, the run stops and the message carries the row to add by hand.
+  - An algo that reads back identical then gets the account's own broker (`PUT /algos/:id {broker}`, the web
+    app's "Select Client ID / Broker"; the id is `pickBroker` over `GET /brokers`, as the deployer picks it) and is
+    read back again, so the owner's switch-on by hand needs nothing else. A broker not set (no single matching
+    account, a failed call, a read-back without it) is alerted and written in the create row's `detail`; the algo
+    stays owned under its sha. Algos created before 2026-10-22 have none; the deployer still sets an unset one.
   - `--apply` needs `QUANTIPLY_UPLOAD=on`; Telegram type `broker.quantiply`. It never enables (deploys) an algo.
   - It reads `latest-core.json`, written by `obt rotation quantiply-export`.
   - The login, the refused-login hold and the token are `src/quantiply-session.ts`, shared with the deployer.
