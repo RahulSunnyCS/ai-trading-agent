@@ -81,6 +81,7 @@ def blend(
     locks=None,
     every: int | None = None,
     keep: bool = False,
+    window: dict | None = None,
 ):
     """The subject (or a neighbour) as the account follows it: `every` sleeves, one per
     rebalance Friday, equal capital reset each April. Returns (blended Result, locks, sleeves)."""
@@ -100,6 +101,7 @@ def blend(
             rebalance_offset=offset,
             capital=CAPITAL / every,
             tax=TaxRules() if taxed else None,
+            **(window or {}),
         )
         RUNS["count"] += 1
         locks = locks or runner.locks(ranking)
@@ -300,6 +302,50 @@ def stage_variants() -> None:
         )
     )
     print("variants: done", flush=True)
+
+
+def stage_reproduce() -> None:
+    """Addendum 6, A0: explain any gap to the 2026-10-08 ranking row (44.2%, 509 weeks to
+    2026-10-02, the four Fridays averaged without an April reset)."""
+    from momentum_backtesting import choose, tranches
+
+    _, out = _dirs()
+    dest = out / "reproduce.json"
+    if dest.exists():
+        print("reproduce: already done")
+        return
+    rec = _record()
+    runner = _runner("curated")
+    base = runner.base(rec["heavy"])
+    light0 = {k: v for k, v in rec["light"].items() if k != "rebalance_offset"}
+    rows = {}
+    for label, window in (("to_2026-10-02", {"end": "2026-10-02"}), ("to_latest", {})):
+        sleeves = []
+        for offset in range(EVERY):
+            outcome, _ = runner.run(
+                base,
+                rec["heavy"],
+                light0,
+                rebalance_offset=offset,
+                capital=CAPITAL / EVERY,
+                **window,
+            )
+            RUNS["count"] += 1
+            sleeves.append(outcome.result)
+        reset = _curve(tranches.blend_reset(sleeves))
+        mean = pd.concat([_curve(r) for r in sleeves], axis=1).mean(axis=1)
+        rows[label] = {
+            "weeks": int(len(reset)),
+            "blend_with_april_reset_cagr": float(choose.cagr(reset)),
+            "plain_mean_of_sleeves_cagr": float(choose.cagr(mean)),
+        }
+        print(label, rows[label], flush=True)
+    rows["ranking_row_2026-10-08"] = {
+        "weeks": 509,
+        "cagr": 0.442112465641596,
+        "mdd": -0.2697938874508591,
+    }
+    dest.write_text(json.dumps(rows, indent=1))
 
 
 # --- stage 2: G4, the one-step neighbours -----------------------------------------------------
@@ -519,6 +565,16 @@ def stage_report() -> None:
         "share_5_pts_above_mom30": share_above,
         "worst_neighbour": neigh.loc[neigh["cagr"].idxmin()][["label", "cagr"]].to_dict(),
     }
+    live = neigh[(neigh["cagr"] - base_cagr).abs() > 1e-4]  # not a copy of A0 by construction
+    gates["G4_plateau"]["not_registered_without_copies_of_A0"] = {
+        "neighbours": int(len(live)),
+        "median_neighbour_cagr": float(live["cagr"].median()),
+        "median_gap_pts": float((live["cagr"].median() - base_cagr) * 100),
+        "share_5_pts_above_mom30": float(
+            ((live["cagr"] - live["mom30_cagr"]) >= G4_ABOVE_MOM30).mean()
+        ),
+        "lowest": live.nsmallest(3, "cagr")[["label", "cagr", "mdd"]].to_dict("records"),
+    }
 
     cash = runner.common["outer_prices"]["Cash (liquid fund)"]
     factors = choose.factor_regression(a3, cash, bench[N50], bench[SMALL], mom)
@@ -612,6 +668,7 @@ def stage_report() -> None:
         "bootstrap_A3": boot,
         "drawdown_share_of_portfolio_A3": slices,
         "selection_context": _selection_context(),
+        "a0_reproduction": json.loads((out / "reproduce.json").read_text()),
         "comparators_cagr": {n: float(choose.cagr(s)) for n, s in bench.items()},
         "backtests_run": variants["backtests_run"]
         + int(len(neigh)) * EVERY
@@ -631,6 +688,7 @@ def stage_report() -> None:
 
 
 STAGES = {
+    "reproduce": stage_reproduce,
     "variants": stage_variants,
     "neighbours": stage_neighbours,
     "placebo": stage_placebo,
