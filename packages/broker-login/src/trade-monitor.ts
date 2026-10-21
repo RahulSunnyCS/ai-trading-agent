@@ -12,6 +12,7 @@ import {
   type Book,
   type Broker,
   effectiveRow,
+  pausedFor,
   readAutomation,
 } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
@@ -81,6 +82,7 @@ import {
   readMtmCardsInPage,
   readTotalMtm,
   switchOn,
+  uploadCoverage,
   waitKey,
 } from './monitor-plan.js';
 import type { QuantiplyApi } from './quantiply-api.js';
@@ -99,7 +101,7 @@ import { redact, registerSecret } from './secrets.js';
 import { livePage } from './selectors.js';
 import { otherStopRunning } from './stop-hold.js';
 import { ALGOTEST_API, csrfToken } from './strategy-delete.js';
-import { istToday } from './strategy-plan.js';
+import { istToday, namesIn } from './strategy-plan.js';
 
 /**
  * BL-143 Phases 2-3: one process per trading day (the scheduler's `trade-monitor`, 09:04):
@@ -914,6 +916,22 @@ class Monitor {
         );
         c.problems.unshift(...missing);
         c.notes.push(...notes);
+        const paused = pausedFor(this.automation, this.day);
+        if (paused) {
+          c.notes.push(
+            `uploads and deploys are paused until ${paused} (Settings › Automation): missing picks are expected, upload coverage not checked`,
+          );
+        } else {
+          let saved: Set<string> | null = null;
+          try {
+            saved = namesIn(await this.algotestGet('/strategies'));
+          } catch (error) {
+            console.log(`AlgoTest saved strategies not read: ${describe(error)}`);
+          }
+          const coverage = uploadCoverage(names, c.good, saved);
+          c.problems.push(...coverage.problems);
+          c.notes.push(...coverage.notes);
+        }
         checks.push(c);
       } catch (error) {
         checks.push({
@@ -954,6 +972,12 @@ class Monitor {
         const c = checkQuantiply(label, picks, list, weekday, lots);
         c.problems.unshift(...missing);
         c.notes.push(...notes);
+        const paused = pausedFor(this.automation, this.day);
+        if (paused) {
+          c.notes.push(
+            `uploads and deploys are paused until ${paused} (Settings › Automation): missing picks are expected`,
+          );
+        }
         checks.push(c);
       } catch (error) {
         checks.push({

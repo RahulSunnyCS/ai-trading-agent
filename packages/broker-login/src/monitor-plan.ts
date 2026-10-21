@@ -899,6 +899,30 @@ export function checkQuantiply(
   return out;
 }
 
+/**
+ * BL-140 Phase 4: which of the day's picks AlgoTest does not have saved at all (so the 16:40 /
+ * 09:18 upload missed them, a different failure from "saved but not deployed"). `saved` is every
+ * strategy name AlgoTest lists; `null` when the listing could not be read: said in a note, never
+ * guessed. A pick that is already deployed (`good`) is saved by definition and never flagged.
+ * Returns the lines to add to the platform's check.
+ */
+export function uploadCoverage(
+  picks: string[],
+  good: string[],
+  saved: Set<string> | null,
+): { problems: string[]; notes: string[] } {
+  if (saved === null) {
+    return { problems: [], notes: ['saved strategies not read: upload coverage not checked'] };
+  }
+  const missing = [...new Set(picks)].filter((name) => !good.includes(name) && !saved.has(name));
+  return {
+    problems: missing.map(
+      (name) => `${name}: not uploaded to AlgoTest (not among its saved strategies)`,
+    ),
+    notes: [],
+  };
+}
+
 /** The headline: "AlgoTest T1 3/3 · Quantiply Core 3/3 ✅", then what is missing or extra. */
 export function deployMessage(
   day: string,

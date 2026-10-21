@@ -143,6 +143,11 @@ Shoonya's own hosts:
 
 ## Log
 
+- 2026-10-22 — **PR 5 (the morning gap check):** decision (Claude): it is part of the 09:25 `DEPLOY_CHECK`, not a
+  09:20 job (that window forbids a login). Quantiply already said "not in Quantiply for <weekday>" for a pick that was
+  never uploaded; the AlgoTest side now reads `GET /strategies` in the monitor's existing session (`uploadCoverage`)
+  and names a pick that is neither live nor saved ("not uploaded to AlgoTest"). A pause in Settings makes both
+  platforms say so instead of reporting expected gaps. Alert only, no new login, behind `DEPLOY_CHECK`.
 - 2026-10-22 — **PR 3 (Buy add-on):** `obt rotation algotest-export|quantiply-export --from-settings` leaves the Buy
   add-on out of a list's export when no row that uploads that list has it on (`automation_settings.addon_wanted`,
   `cli._without_addon`). The uploaders, deployers and the margin and deploy checks all read the export, so this is the

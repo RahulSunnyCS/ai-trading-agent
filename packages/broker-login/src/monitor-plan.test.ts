@@ -56,6 +56,7 @@ import {
   readMtmCardsInPage,
   readTotalMtm,
   switchOn,
+  uploadCoverage,
   waitKey,
 } from './monitor-plan.js';
 
@@ -851,4 +852,22 @@ test('the day-wise list keeps multiplier and times; leg lots of an algo', () => 
     legLots({ configurations: { legs: [{ quantity: 1 }, { quantity: 2 }] } }),
     [1, 2],
   );
+});
+
+test('upload coverage names a pick AlgoTest has not saved, never one that is already live', () => {
+  const picks = ['T1 · N_a_0917', 'T1 · N_b_1117', 'T1 · N_c_1317', 'T1 · N_a_0917'];
+  const saved = new Set(['T1 · N_b_1117', 'T1 · other']);
+  const c = uploadCoverage(picks, ['T1 · N_c_1317'], saved);
+  assert.deepEqual(c.problems, [
+    'T1 · N_a_0917: not uploaded to AlgoTest (not among its saved strategies)',
+  ]);
+  assert.deepEqual(c.notes, []);
+  // all saved: nothing to say
+  assert.deepEqual(uploadCoverage(picks, [], new Set(picks)), { problems: [], notes: [] });
+  // an unreadable listing is a note, never a guess in either direction
+  const unread = uploadCoverage(picks, [], null);
+  assert.deepEqual(unread.problems, []);
+  assert.match(unread.notes[0] ?? '', /not read/);
+  // no picks (nothing exported): nothing missing
+  assert.deepEqual(uploadCoverage([], [], saved), { problems: [], notes: [] });
 });
