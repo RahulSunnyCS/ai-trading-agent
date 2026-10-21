@@ -103,4 +103,8 @@ None.
   than 15 triggered days in A the verdict is "too few days" and the numbers are shown only. Reported too: the
   share of days that trigger, the best and worst triggered delta, the mean delta by family. No other threshold
   is run (a different threshold needs a dated line here first); the mirror (up 0.6% or more) was not asked for.
+- 2026-10-21 — addendum ran (`research/bl147/conditional.py`, `out/conditional.json`): exit at 14:55 only if the
+  index is down 0.6% or more. From the open: 15.4% of variant-days trigger; picks' mean change per triggered
+  pick-day -153 [-336, +15] (101 pick-days, 54 days), drawdown -33,379 -> -45,260, 4 of 161 variants positive:
+  **not better**. From the previous close: -222 [-341, -108], 0 of 161 positive. Added to the findings page.
 
