@@ -66,6 +66,27 @@ Descriptive; leads, not findings.
 - **It makes no difference whether the trade was winning.** Delta is about −101 (Core) and −140 (T1) both for
   trades in profit and in loss at 14:55.
 
+## Addendum: exit at 14:55 only when the index is down 0.6% or more
+
+Registered before it was computed (BL-147 Log, 2026-10-21): a Dir strategy exits at 14:55 only if its own
+index (Nifty for the N variants, Sensex for the S variants) is down 0.6% or more from the open to 14:55, and
+holds to 15:28 otherwise. Computed from the same 14:55 reruns.
+
+| Down 0.6% or more | From the open | From the previous close |
+|---|---|---|
+| Variant-days that trigger | 15.4% | 20.2% |
+| Picks (T1 + Core): triggered pick-days (days) | 101 (54) | 143 (75) |
+| Mean change per triggered pick-day [90%] | **−153 [−336, +15]** | **−222 [−341, −108]** |
+| Total of the picks, hold → conditional | +₹436,602 → +₹421,178 | → +₹404,791 |
+| Max drawdown, hold → conditional | −₹33,379 → −₹45,260 | → −₹43,590 |
+| Dir variants with a positive mean on triggered days | 2.5% (4 of 161) | 0% |
+| T1 / Core mean change | −233 / −68 | −265 / −177 |
+
+Verdict under the registered rule: **not better.** From the open the interval just reaches zero (+15) but
+the mean is negative, the drawdown is deeper and only 4 of 161 variants gain; from the previous close the
+interval is entirely below zero. Even on days when the index is down 0.6% or more by 14:55, holding to the
+close did better on average: only about a quarter of those triggered trades improved by exiting.
+
 ## Open questions
 
 - Whether a tighter version, such as moving the stop up after 14:55 or taking profit only in recovery-prone
