@@ -36,7 +36,7 @@ Three master switches, then one block per platform and broker.
   - **Adaptive Tuned** is the T1 list.
 - **Upload the list's picks:** the evening job puts tomorrow's picks there, and the 09:16 top-up adds any that changed. It needs a list.
 - **Multiplier:** a whole number from 1 to 10 (1 unless you set it): the platform multiplier the strategies would run at. **Saved only for now:** uploads and deploys do not use it yet.
-- **Include the Buy add-on:** whether the Buy add-on picks go with the list. **Saved only for now:** uploads and deploys do not use it yet.
+- **Include the Buy add-on:** whether the Buy add-on picks go with the list. Off leaves them out of the export, so they are not uploaded, deployed or checked, and an add-on already uploaded counts as no longer picked: the evening run deletes it unless it is deployed on /live (then it is kept and reported). On AlgoTest and Quantiply an export serves every account that uploads that list, so the add-on stays in while any of them has it on.
 
 A warning badge on a block means its master switch holds it back.
 
