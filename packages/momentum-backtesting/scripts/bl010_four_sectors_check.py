@@ -498,7 +498,14 @@ def stage_report() -> None:
     a3 = curves["A3_real_tags_and_tax"]
     runner = _runner()
     span = a3.index
-    bench = {n: _bench(runner, span, n) for n in (MOM30, N50, SMALL, MID, N500)}
+    # The Smallcap 250, Midcap 150 and Nifty 500 TRIs end two weeks before the strategy's data
+    # (2026-10-02 against 2026-10-16: they refresh with `mbt stocks fetch-benchmarks`). Mom30 and
+    # Nifty 50 cover the whole window, so G1 and G3 use all of it; everything that needs a
+    # shorter-lived index (G2, G5, the comparator lines) is judged to the shared last week.
+    cutoff = min(runner.refs[n].dropna().index[-1] for n in (N50, SMALL, MID, N500))
+    short_span = span[span <= cutoff]
+    bench = {MOM30: _bench(runner, span, MOM30)}
+    bench.update({n: _bench(runner, short_span, n) for n in (N50, SMALL, MID, N500)})
     mom = bench[MOM30]
     mom_cagr = float(choose.cagr(mom))
     monday = variants["monday_open"]
@@ -512,8 +519,9 @@ def stage_report() -> None:
         return (a3_stats["cagr"] + change) - mom_cagr >= G1_EXCESS_OVER_MOM30
 
     indices = {SMALL: bench[SMALL], MID: bench[MID]}
-    medium = criteria.basket_passes(a3, indices, "medium")
-    aggressive = criteria.basket_passes(a3, indices, "aggressive")
+    a3_short = a3.loc[:cutoff]
+    medium = criteria.basket_passes(a3_short, indices, "medium")
+    aggressive = criteria.basket_passes(a3_short, indices, "aggressive")
     ceiling = criteria.load()["baskets"]["medium"]["hard_ceiling"]
     gates = {
         "G1_minimum_bar": {
@@ -670,6 +678,11 @@ def stage_report() -> None:
         "selection_context": _selection_context(),
         "a0_reproduction": json.loads((out / "reproduce.json").read_text()),
         "comparators_cagr": {n: float(choose.cagr(s)) for n, s in bench.items()},
+        "comparator_windows_end": {n: str(s.index[-1].date()) for n, s in bench.items()},
+        "a3_cagr_to_benchmark_cutoff": float(
+            choose.cagr(a3.loc[:cutoff] / a3.loc[:cutoff].iloc[0])
+        ),
+        "benchmark_cutoff": str(cutoff.date()),
         "backtests_run": variants["backtests_run"]
         + int(len(neigh)) * EVERY
         + int(len(placebo)) * EVERY,
