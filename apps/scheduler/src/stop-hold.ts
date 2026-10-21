@@ -32,12 +32,17 @@ export function holdFile(dataRoot: string): string {
   return join(dataRoot, 'stop', 'HOLD.json');
 }
 
+/** The scheduler's state dir (`scheduler.db`, `automation-settings.json`, `stop-hold.json`). */
+export function stateDir(env: Record<string, string>): string {
+  return (
+    env.SCHEDULER_STATE_DIR?.trim() ||
+    join(homedir(), 'Library', 'Application Support', 'ai-trading-agent')
+  );
+}
+
 /** Beside `automation-settings.json`, in the scheduler's state dir. */
 export function stateHoldFile(env: Record<string, string>): string {
-  const dir =
-    env.SCHEDULER_STATE_DIR?.trim() ||
-    join(homedir(), 'Library', 'Application Support', 'ai-trading-agent');
-  return join(dir, 'stop-hold.json');
+  return join(stateDir(env), 'stop-hold.json');
 }
 
 export interface HoldInfo {

@@ -163,8 +163,9 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
         errors.push(`${key}.list must be one of ${LISTS.join(', ')}`);
       if (row.upload === true && row.list === 'none')
         errors.push(`${key}: upload is on but no list is chosen`);
+      // A save must say them: a missing field is refused, not defaulted, so an older dashboard tab
+      // cannot quietly reset a multiplier or clear a pause (stored old versions get `withDefaults`).
       if (
-        row.multiplier !== undefined &&
         !(
           typeof row.multiplier === 'number' &&
           Number.isInteger(row.multiplier) &&
@@ -175,25 +176,19 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
         errors.push(
           `${key}.multiplier must be a whole number from ${MULTIPLIER_MIN} to ${MULTIPLIER_MAX}`,
         );
-      if (row.addon !== undefined && typeof row.addon !== 'boolean')
-        errors.push(`${key}.addon must be true or false`);
+      if (typeof row.addon !== 'boolean') errors.push(`${key}.addon must be true or false`);
     }
   }
-  if (value.pause !== undefined) {
-    const pause = value.pause;
-    if (!obj(pause)) errors.push('pause must be an object');
-    else {
-      for (const k of Object.keys(pause))
-        if (k !== 'until') errors.push(`unknown pause field: ${k}`);
-      const until = pause.until;
-      if (until !== null && until !== undefined) {
-        if (!(typeof until === 'string' && isRealDay(until)))
-          errors.push('pause.until must be a day as YYYY-MM-DD, or null');
-      }
-    }
+  const pause = value.pause;
+  if (!obj(pause)) errors.push('pause must be an object');
+  else {
+    for (const k of Object.keys(pause)) if (k !== 'until') errors.push(`unknown pause field: ${k}`);
+    const until = pause.until;
+    if (until !== null && !(typeof until === 'string' && isRealDay(until)))
+      errors.push('pause.until must be a day as YYYY-MM-DD, or null');
   }
   if (errors.length) return { errors };
-  const v = withDefaults(value as unknown as AutomationSettings);
+  const v = value as unknown as AutomationSettings;
   // Rebuild in a fixed key order, so equal settings always serialise the same.
   return {
     settings: {

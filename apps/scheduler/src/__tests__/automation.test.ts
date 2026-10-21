@@ -12,6 +12,7 @@ import {
   pausedFor,
   syncGithub,
   validate,
+  withDefaults,
 } from '../automation.js';
 import { History } from '../history.js';
 import type { RunContext } from '../runner.js';
@@ -203,6 +204,25 @@ describe('API /settings/automation', () => {
     builtins: {},
   });
 
+  it('GET carries the first session an upload would change, for Skip next session', async () => {
+    const handle = createApi({ ctx: ctx(), jobs: [], settings: store, gh: async () => {} });
+    const body = (await (await handle(new Request('http://x/settings/automation'))).json()) as {
+      next_session: string;
+    };
+    expect(body.next_session).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('PUT refuses a body without the multiplier, add-on and pause', async () => {
+    const handle = createApi({ ctx: ctx(), jobs: [], settings: store, gh: async () => {} });
+    const old = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+    old.pause = undefined;
+    const res = await handle(
+      new Request('http://x/settings/automation', { method: 'PUT', body: JSON.stringify(old) }),
+    );
+    expect(res.status).toBe(400);
+    expect(store.current().version).toBe(0);
+  });
+
   it('GET shows the current version, the effective rows and the variables', async () => {
     const handle = createApi({ ctx: ctx(), jobs: [], settings: store, gh: async () => {} });
     const res = await handle(new Request('http://x/settings/automation'));
@@ -255,7 +275,24 @@ describe('API /settings/automation', () => {
 });
 
 describe('multiplier, add-on and pause (BL-140 Phase 4)', () => {
-  it('settings saved before Phase 4 mean 1, yes and no pause, and a first Save keeps them', () => {
+  it('a save without the new fields is refused, so a stale tab cannot clear a pause', () => {
+    const old = clone(DEFAULT_SETTINGS) as unknown as {
+      rows: Record<string, Record<string, unknown>>;
+      pause?: unknown;
+    };
+    old.pause = undefined;
+    const noPause = validate(JSON.parse(JSON.stringify(old)));
+    expect('errors' in noPause && noPause.errors).toContain('pause must be an object');
+    for (const row of Object.values(old.rows)) {
+      row.multiplier = undefined;
+      row.addon = undefined;
+    }
+    old.pause = { until: null };
+    const noRowFields = validate(JSON.parse(JSON.stringify(old)));
+    expect('errors' in noRowFields && noRowFields.errors.join()).toContain('multiplier');
+  });
+
+  it('settings stored before Phase 4 mean 1, yes and no pause (withDefaults)', () => {
     const old = clone(DEFAULT_SETTINGS) as unknown as {
       rows: Record<string, Record<string, unknown>>;
       pause?: unknown;
@@ -265,7 +302,7 @@ describe('multiplier, add-on and pause (BL-140 Phase 4)', () => {
       row.addon = undefined;
     }
     old.pause = undefined;
-    const checked = validate(JSON.parse(JSON.stringify(old)));
+    const checked = validate(withDefaults(JSON.parse(JSON.stringify(old))));
     expect('settings' in checked && checked.settings).toEqual(DEFAULT_SETTINGS);
     expect(DEFAULT_SETTINGS.pause.until).toBeNull();
     expect(Object.values(DEFAULT_SETTINGS.rows).every((r) => r.multiplier === 1 && r.addon)).toBe(

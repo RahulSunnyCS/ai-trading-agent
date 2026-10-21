@@ -1,10 +1,9 @@
 import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { isTradingDay } from '@trading/market-reference';
-import { type AutomationSettings, pausedFor, validate } from './automation.js';
+import { type AutomationSettings, pausedFor, validate, withDefaults } from './automation.js';
 import { addDays, istDay } from './schedule.js';
-import { STOP_HELD_JOBS } from './stop-hold.js';
+import { STOP_HELD_JOBS, stateDir } from './stop-hold.js';
 
 /**
  * BL-140 Phase 4: while the settings' pause covers a job's session, the jobs that upload, enable
@@ -31,10 +30,7 @@ const EVENING_JOBS: readonly string[] = [
 
 /** Beside the scheduler's database; the same file the jobs read. */
 export function settingsFile(env: Record<string, string>): string {
-  const dir =
-    env.SCHEDULER_STATE_DIR?.trim() ||
-    join(homedir(), 'Library', 'Application Support', 'ai-trading-agent');
-  return join(dir, 'automation-settings.json');
+  return join(stateDir(env), 'automation-settings.json');
 }
 
 /** The session a job is for: the next trading day after `today` for an evening job, else today. */
@@ -60,7 +56,9 @@ function readSettings(path: string): AutomationSettings | null | { error: string
       saved_at: _savedAt,
       ...settings
     } = JSON.parse(text) as Record<string, unknown>;
-    const checked = validate(settings);
+    // a snapshot written before Phase 4 has no pause or row fields: withDefaults reads them as
+    // none, 1 and yes (a save is stricter)
+    const checked = validate(withDefaults(settings as unknown as AutomationSettings));
     return 'settings' in checked ? checked.settings : { error: checked.errors.join('; ') };
   } catch (error) {
     return { error: String(error) };
@@ -87,15 +85,18 @@ export function pausedReason(
 }
 
 /**
- * For the 09:00 summary: the pause's last day when it still covers today or later, or null. A
- * pause that cannot be read is said too (never silent).
+ * For the 09:00 summary: the pause's last day when it still covers today or later (`until`), a
+ * reason the settings cannot be read (`error`), or null when there is nothing to say.
  */
-export function pauseNotice(env: Record<string, string>, now: Date = new Date()): string | null {
+export function pauseNotice(
+  env: Record<string, string>,
+  now: Date = new Date(),
+): { until: string } | { error: string } | null {
   const settings = readSettings(settingsFile(env));
   if (settings === null) return null;
-  if ('error' in settings) return `the automation settings cannot be read (${settings.error})`;
+  if ('error' in settings) return { error: settings.error };
   const until = settings.pause.until;
-  return until !== null && until >= istDay(now) ? until : null;
+  return until !== null && until >= istDay(now) ? { until } : null;
 }
 
 /**

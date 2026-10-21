@@ -348,14 +348,16 @@ function catchUps(ctx: BuiltinContext): Check[] {
 
 /** BL-140 Phase 4: a pause is on, so the owner is not surprised by a quiet 09:16. */
 function pauseChecks(ctx: BuiltinContext): Check[] {
-  const until = pauseNotice(ctx.env, ctx.now());
-  if (until === null) return [];
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(until)) return [{ ok: false, label: 'Pause', detail: until }];
+  const notice = pauseNotice(ctx.env, ctx.now());
+  if (notice === null) return [];
+  if ('error' in notice) {
+    return [{ ok: false, label: 'Pause', detail: `settings cannot be read (${notice.error})` }];
+  }
   return [
     {
       ok: true,
       label: 'Paused',
-      detail: `no uploads or deploys until ${until} (Settings › Automation); logins, picks and results go on`,
+      detail: `no uploads or deploys until ${notice.until} (Settings › Automation); logins, picks and results go on`,
     },
   ];
 }

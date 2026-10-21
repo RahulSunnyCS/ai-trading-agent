@@ -121,8 +121,8 @@ describe('pause (BL-140 Phase 4)', () => {
 
   it('the morning notice names a pause that still covers today or later', () => {
     save({ until: '2026-10-26' });
-    expect(pauseNotice(env, ist('2026-10-23', '09:00'))).toBe('2026-10-26');
-    expect(pauseNotice(env, ist('2026-10-26', '09:00'))).toBe('2026-10-26');
+    expect(pauseNotice(env, ist('2026-10-23', '09:00'))).toEqual({ until: '2026-10-26' });
+    expect(pauseNotice(env, ist('2026-10-26', '09:00'))).toEqual({ until: '2026-10-26' });
     expect(pauseNotice(env, ist('2026-10-27', '09:00'))).toBeNull();
   });
 
