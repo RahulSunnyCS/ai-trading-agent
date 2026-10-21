@@ -8,7 +8,12 @@
     "what": "run id fbb7ab054238 from search_spaces/round7_A.toml, heavy and light parameters exactly as stored in data/search/round7_A/results-*.jsonl, run on the point-in-time universe (universe_kind turnover_rank) as the 2026-10-08 ranking was",
     "followed_as": "all Fridays: four sleeves, rebalance_offset 0 to 3 of rebalance_every 4, Rs 2,00,000 in total (Rs 50,000 a sleeve), equal capital restored each April (tranches.blend_reset / choose.ensemble_curve), as BL-087 and BL-142 follow it",
     "window": "first Friday of 2017 (2017-01-06) to the last complete Friday in the data on the run day; the end date and the catalog data version are written into the result",
-    "benchmarks": ["Nifty200 Momentum 30 TRI", "Nifty Smallcap 250 TRI", "Nifty Midcap 150 TRI", "Nifty 500 TRI"],
+    "benchmarks": [
+      "Nifty200 Momentum 30 TRI",
+      "Nifty Smallcap 250 TRI",
+      "Nifty Midcap 150 TRI",
+      "Nifty 500 TRI"
+    ],
     "sealed_data": "The 2012-2016 window was spent by addendum 5's one-shot backcast and is NOT read here. The sealed 2024-01-01 to 2026-09-25 window of the filter research (BL-050, BL-115) is not a hold-out for this config, which was selected on all of 2017-2026, so it is not treated as one."
   },
   "red_team": {

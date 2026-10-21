@@ -1,578 +1,407 @@
 {
- "written": "2026-10-22",
- "criteria": "bl010_criteria_addendum_6.json",
- "subject": "fbb7ab054238",
- "window": [
-  "2017-01-06",
-  "2026-10-16"
- ],
- "weeks": 511,
- "commit": "51ba28525f9afd9f00662faf3b88034f7d6c9432",
- "working_tree_dirty": true,
- "data_version": [
-  [
-   "category_membership",
-   10754,
-   98591892116388555971903
+  "written": "2026-10-22",
+  "criteria": "bl010_criteria_addendum_6.json",
+  "subject": "fbb7ab054238",
+  "window": ["2017-01-06", "2026-10-16"],
+  "weeks": 511,
+  "commit": "51ba28525f9afd9f00662faf3b88034f7d6c9432",
+  "working_tree_dirty": true,
+  "data_version": [
+    ["category_membership", 10754, 98591892116388555971903],
+    ["companies", 95, 885749809421713232574],
+    ["company_symbols", 110, 1040183031097597678258],
+    ["corporate_actions", 1886, 17149478071477760320785],
+    ["data_quality", 135596, 1247269034847537059666112],
+    ["index_membership", 105, 982157288905224367747],
+    ["instrument_aliases", 425320, 3914967589610295558474894],
+    ["instruments", 429622, 3959461860462604710650728],
+    ["momentum_cash", 2, 33705702948685597745],
+    ["momentum_lot_events", 4, 30372560787119214019],
+    ["momentum_lot_state", 1, 10240651221004217612],
+    ["momentum_prices", 140962, 1303801265601233241962436],
+    ["quality_issues", 1, 13782259730769377983],
+    ["ref_expiries", 330, 3130700320867506949173],
+    ["ref_expiry_rules", 3, 19583917854507542062],
+    ["ref_holidays", 48, 481014780835979530979],
+    ["ref_lot_sizes", 22, 196332079829254546933],
+    ["ref_margins", 1, 16531738359777705753],
+    ["ref_rates", 30, 282595287820685227638],
+    ["ref_strike_steps", 7, 50369804970544193076],
+    ["stock_action_candidates", 3199, 29052119667556356534187],
+    ["stock_action_reviews", 70, 634799196353799586737],
+    ["stock_action_scan_state", 1, 8026586735988637686],
+    ["stock_membership_weekly", 76503, 705735581601727515505213],
+    ["stock_weekly_prices", 142458, 1315165899802179685918385],
+    ["stock_weekly_series", 8226, 75457839114278607705268],
+    ["year=2011", 7912116, 1790828248.7093253],
+    ["year=2012", 8301006, 1790828249.134564],
+    ["year=2013", 7812972, 1790828249.4829848],
+    ["year=2014", 8316062, 1790828249.8715155],
+    ["year=2015", 8578160, 1790828250.5826967],
+    ["year=2016", 8942100, 1790828250.8860538],
+    ["year=2017", 9408852, 1790828251.1844535],
+    ["year=2018", 9678238, 1790828251.4826257],
+    ["year=2019", 9578655, 1790828251.8310094],
+    ["year=2020", 10107571, 1790828252.8631976],
+    ["year=2021", 11018301, 1790828253.2355673],
+    ["year=2022", 11723085, 1790828253.6929915],
+    ["year=2023", 12146355, 1790828254.0331426],
+    ["year=2024", 13962893, 1790828254.4246702],
+    ["year=2025", 15041385, 1790828254.8645353],
+    ["year=2026", 12659968, 1792160300.896908]
   ],
-  [
-   "companies",
-   95,
-   885749809421713232574
-  ],
-  [
-   "company_symbols",
-   110,
-   1040183031097597678258
-  ],
-  [
-   "corporate_actions",
-   1886,
-   17149478071477760320785
-  ],
-  [
-   "data_quality",
-   135596,
-   1247269034847537059666112
-  ],
-  [
-   "index_membership",
-   105,
-   982157288905224367747
-  ],
-  [
-   "instrument_aliases",
-   425320,
-   3914967589610295558474894
-  ],
-  [
-   "instruments",
-   429622,
-   3959461860462604710650728
-  ],
-  [
-   "momentum_cash",
-   2,
-   33705702948685597745
-  ],
-  [
-   "momentum_lot_events",
-   4,
-   30372560787119214019
-  ],
-  [
-   "momentum_lot_state",
-   1,
-   10240651221004217612
-  ],
-  [
-   "momentum_prices",
-   140962,
-   1303801265601233241962436
-  ],
-  [
-   "quality_issues",
-   1,
-   13782259730769377983
-  ],
-  [
-   "ref_expiries",
-   330,
-   3130700320867506949173
-  ],
-  [
-   "ref_expiry_rules",
-   3,
-   19583917854507542062
-  ],
-  [
-   "ref_holidays",
-   48,
-   481014780835979530979
-  ],
-  [
-   "ref_lot_sizes",
-   22,
-   196332079829254546933
-  ],
-  [
-   "ref_margins",
-   1,
-   16531738359777705753
-  ],
-  [
-   "ref_rates",
-   30,
-   282595287820685227638
-  ],
-  [
-   "ref_strike_steps",
-   7,
-   50369804970544193076
-  ],
-  [
-   "stock_action_candidates",
-   3199,
-   29052119667556356534187
-  ],
-  [
-   "stock_action_reviews",
-   70,
-   634799196353799586737
-  ],
-  [
-   "stock_action_scan_state",
-   1,
-   8026586735988637686
-  ],
-  [
-   "stock_membership_weekly",
-   76503,
-   705735581601727515505213
-  ],
-  [
-   "stock_weekly_prices",
-   142458,
-   1315165899802179685918385
-  ],
-  [
-   "stock_weekly_series",
-   8226,
-   75457839114278607705268
-  ],
-  [
-   "year=2011",
-   7912116,
-   1790828248.7093253
-  ],
-  [
-   "year=2012",
-   8301006,
-   1790828249.134564
-  ],
-  [
-   "year=2013",
-   7812972,
-   1790828249.4829848
-  ],
-  [
-   "year=2014",
-   8316062,
-   1790828249.8715155
-  ],
-  [
-   "year=2015",
-   8578160,
-   1790828250.5826967
-  ],
-  [
-   "year=2016",
-   8942100,
-   1790828250.8860538
-  ],
-  [
-   "year=2017",
-   9408852,
-   1790828251.1844535
-  ],
-  [
-   "year=2018",
-   9678238,
-   1790828251.4826257
-  ],
-  [
-   "year=2019",
-   9578655,
-   1790828251.8310094
-  ],
-  [
-   "year=2020",
-   10107571,
-   1790828252.8631976
-  ],
-  [
-   "year=2021",
-   11018301,
-   1790828253.2355673
-  ],
-  [
-   "year=2022",
-   11723085,
-   1790828253.6929915
-  ],
-  [
-   "year=2023",
-   12146355,
-   1790828254.0331426
-  ],
-  [
-   "year=2024",
-   13962893,
-   1790828254.4246702
-  ],
-  [
-   "year=2025",
-   15041385,
-   1790828254.8645353
-  ],
-  [
-   "year=2026",
-   12659968,
-   1792160300.896908
-  ]
- ],
- "verdict": "MIXED",
- "verdict_flips_if_monday_change_zero": false,
- "gates": {
-  "G1_minimum_bar": {
-   "pass": true,
-   "e_cagr": 0.2605582070362198,
-   "mom30_cagr": 0.1651298126964933,
-   "excess_pts": 9.542839433972649,
-   "excess_pts_if_monday_change_were_zero": 11.17333842595607
-  },
-  "G2_drawdown_basket": {
-   "pass": false,
-   "a3_passes_medium": false,
-   "a3_passes_aggressive_reported": true,
-   "a3_mdd": -0.3274626637103014,
-   "e_mdd": -0.33199369721128047,
-   "hard_ceiling": -0.4
-  },
-  "G3_no_bad_year": {
-   "pass": false,
-   "worst_fy": 2024,
-   "worst_fy_excess_pts": -22.508295831726045,
-   "fy_table": {
-    "2018": {
-     "A3": 0.23734581259570176,
-     "Nifty200 Momentum 30 TRI": 0.21575462443946192,
-     "Nifty 50 TRI": 0.11758817218774698,
-     "Nifty Smallcap 250 TRI": 0.12865077237416278,
-     "Nifty Midcap 150 TRI": 0.16663957344430713,
-     "Nifty 500 TRI": 0.1286641117716285
+  "verdict": "MIXED",
+  "verdict_flips_if_monday_change_zero": false,
+  "gates": {
+    "G1_minimum_bar": {
+      "pass": true,
+      "e_cagr": 0.2605582070362198,
+      "mom30_cagr": 0.1651298126964933,
+      "excess_pts": 9.542839433972649,
+      "excess_pts_if_monday_change_were_zero": 11.17333842595607
     },
-    "2019": {
-     "A3": -0.06577834481032352,
-     "Nifty200 Momentum 30 TRI": 0.11572399004987788,
-     "Nifty 50 TRI": 0.16447502699131733,
-     "Nifty Smallcap 250 TRI": -0.12442010421685068,
-     "Nifty Midcap 150 TRI": -0.0064831012481045835,
-     "Nifty 500 TRI": 0.09728912579501325
+    "G2_drawdown_basket": {
+      "pass": false,
+      "a3_passes_medium": false,
+      "a3_passes_aggressive_reported": true,
+      "a3_mdd": -0.3274626637103014,
+      "e_mdd": -0.33199369721128047,
+      "hard_ceiling": -0.4
     },
-    "2020": {
-     "A3": -0.03993111514302217,
-     "Nifty200 Momentum 30 TRI": -0.17796746645842598,
-     "Nifty 50 TRI": -0.24479518596120053,
-     "Nifty Smallcap 250 TRI": -0.4071869319592558,
-     "Nifty Midcap 150 TRI": -0.3015724469252945,
-     "Nifty 500 TRI": -0.2655411675515974
+    "G3_no_bad_year": {
+      "pass": false,
+      "worst_fy": 2024,
+      "worst_fy_excess_pts": -22.508295831726045,
+      "fy_table": {
+        "2018": {
+          "A3": 0.23734581259570176,
+          "Nifty200 Momentum 30 TRI": 0.21575462443946192,
+          "Nifty 50 TRI": 0.11758817218774698,
+          "Nifty Smallcap 250 TRI": 0.12865077237416278,
+          "Nifty Midcap 150 TRI": 0.16663957344430713,
+          "Nifty 500 TRI": 0.1286641117716285
+        },
+        "2019": {
+          "A3": -0.06577834481032352,
+          "Nifty200 Momentum 30 TRI": 0.11572399004987788,
+          "Nifty 50 TRI": 0.16447502699131733,
+          "Nifty Smallcap 250 TRI": -0.12442010421685068,
+          "Nifty Midcap 150 TRI": -0.0064831012481045835,
+          "Nifty 500 TRI": 0.09728912579501325
+        },
+        "2020": {
+          "A3": -0.03993111514302217,
+          "Nifty200 Momentum 30 TRI": -0.17796746645842598,
+          "Nifty 50 TRI": -0.24479518596120053,
+          "Nifty Smallcap 250 TRI": -0.4071869319592558,
+          "Nifty Midcap 150 TRI": -0.3015724469252945,
+          "Nifty 500 TRI": -0.2655411675515974
+        },
+        "2021": {
+          "A3": 1.0739553538484565,
+          "Nifty200 Momentum 30 TRI": 0.6149157460414267,
+          "Nifty 50 TRI": 0.6915231079859794,
+          "Nifty Smallcap 250 TRI": 1.1659306907142932,
+          "Nifty Midcap 150 TRI": 0.975738878037204,
+          "Nifty 500 TRI": 0.7502843547989608
+        },
+        "2022": {
+          "A3": 0.33906490821478075,
+          "Nifty200 Momentum 30 TRI": 0.39168835865511786,
+          "Nifty 50 TRI": 0.1960487331636751,
+          "Nifty Smallcap 250 TRI": 0.37575738043057894,
+          "Nifty Midcap 150 TRI": 0.2555036080902533,
+          "Nifty 500 TRI": 0.21921655380066452
+        },
+        "2023": {
+          "A3": 0.1757681001109126,
+          "Nifty200 Momentum 30 TRI": -0.08117012742606411,
+          "Nifty 50 TRI": 0.024184163003228676,
+          "Nifty Smallcap 250 TRI": -0.047112964394572465,
+          "Nifty Midcap 150 TRI": 0.0453047830505755,
+          "Nifty 500 TRI": 0.00424938049300283
+        },
+        "2024": {
+          "A3": 0.47459596447429875,
+          "Nifty200 Momentum 30 TRI": 0.6996789227915592,
+          "Nifty 50 TRI": 0.30084508625404993,
+          "Nifty Smallcap 250 TRI": 0.6414829423928454,
+          "Nifty Midcap 150 TRI": 0.5753854602289528,
+          "Nifty 500 TRI": 0.404860514632319
+        },
+        "2025": {
+          "A3": 0.18962688450656917,
+          "Nifty200 Momentum 30 TRI": -0.0762771861399032,
+          "Nifty 50 TRI": 0.06653587783333137,
+          "Nifty Smallcap 250 TRI": 0.06017671821548887,
+          "Nifty Midcap 150 TRI": 0.08167377681724441,
+          "Nifty 500 TRI": 0.0637311987910556
+        },
+        "2026": {
+          "A3": 0.13339523496653238,
+          "Nifty200 Momentum 30 TRI": -0.0029077986692872537,
+          "Nifty 50 TRI": -0.018912206510625973,
+          "Nifty Smallcap 250 TRI": -0.02418062400293841,
+          "Nifty Midcap 150 TRI": 0.05015611036674472,
+          "Nifty 500 TRI": -0.005574240933645225
+        }
+      }
     },
-    "2021": {
-     "A3": 1.0739553538484565,
-     "Nifty200 Momentum 30 TRI": 0.6149157460414267,
-     "Nifty 50 TRI": 0.6915231079859794,
-     "Nifty Smallcap 250 TRI": 1.1659306907142932,
-     "Nifty Midcap 150 TRI": 0.975738878037204,
-     "Nifty 500 TRI": 0.7502843547989608
+    "G4_plateau": {
+      "pass": true,
+      "neighbours": 22,
+      "median_neighbour_cagr": 0.4447703330588152,
+      "a0_cagr": 0.44857536077313775,
+      "median_gap_pts": -0.3805027714322562,
+      "share_5_pts_above_mom30": 1.0,
+      "worst_neighbour": {
+        "label": "score ranksum",
+        "cagr": 0.3223345605994661
+      },
+      "not_registered_without_copies_of_A0": {
+        "neighbours": 15,
+        "median_neighbour_cagr": 0.4400547987288319,
+        "median_gap_pts": -0.8520562044305846,
+        "share_5_pts_above_mom30": 1.0,
+        "lowest": [
+          {
+            "label": "score ranksum",
+            "cagr": 0.3223345605994661,
+            "mdd": -0.3849786239837517
+          },
+          {
+            "label": "picks_per_category 2",
+            "cagr": 0.3838074695138385,
+            "mdd": -0.25720390308761154
+          },
+          {
+            "label": "pool_top_n 161",
+            "cagr": 0.389684363400282,
+            "mdd": -0.3601446720920367
+          }
+        ]
+      }
     },
-    "2022": {
-     "A3": 0.33906490821478075,
-     "Nifty200 Momentum 30 TRI": 0.39168835865511786,
-     "Nifty 50 TRI": 0.1960487331636751,
-     "Nifty Smallcap 250 TRI": 0.37575738043057894,
-     "Nifty Midcap 150 TRI": 0.2555036080902533,
-     "Nifty 500 TRI": 0.21921655380066452
+    "G5_alpha": {
+      "pass": true,
+      "alpha_pa": 0.12174333721162048,
+      "alpha_t": 2.0278782234397443,
+      "beta_market": 0.8715246006588776,
+      "beta_size": 0.6549416765580415,
+      "beta_momentum": 0.30706419090454673,
+      "r2": 0.48236604507962066,
+      "weeks": 508
     },
-    "2023": {
-     "A3": 0.1757681001109126,
-     "Nifty200 Momentum 30 TRI": -0.08117012742606411,
-     "Nifty 50 TRI": 0.024184163003228676,
-     "Nifty Smallcap 250 TRI": -0.047112964394572465,
-     "Nifty Midcap 150 TRI": 0.0453047830505755,
-     "Nifty 500 TRI": 0.00424938049300283
-    },
-    "2024": {
-     "A3": 0.47459596447429875,
-     "Nifty200 Momentum 30 TRI": 0.6996789227915592,
-     "Nifty 50 TRI": 0.30084508625404993,
-     "Nifty Smallcap 250 TRI": 0.6414829423928454,
-     "Nifty Midcap 150 TRI": 0.5753854602289528,
-     "Nifty 500 TRI": 0.404860514632319
-    },
-    "2025": {
-     "A3": 0.18962688450656917,
-     "Nifty200 Momentum 30 TRI": -0.0762771861399032,
-     "Nifty 50 TRI": 0.06653587783333137,
-     "Nifty Smallcap 250 TRI": 0.06017671821548887,
-     "Nifty Midcap 150 TRI": 0.08167377681724441,
-     "Nifty 500 TRI": 0.0637311987910556
-    },
-    "2026": {
-     "A3": 0.13339523496653238,
-     "Nifty200 Momentum 30 TRI": -0.0029077986692872537,
-     "Nifty 50 TRI": -0.018912206510625973,
-     "Nifty Smallcap 250 TRI": -0.02418062400293841,
-     "Nifty Midcap 150 TRI": 0.05015611036674472,
-     "Nifty 500 TRI": -0.005574240933645225
+    "G6_fair_placebo": {
+      "pass": true,
+      "seeds": 100,
+      "a0_cagr": 0.44857536077313775,
+      "placebo_median": 0.13984579674396425,
+      "placebo_p95": 0.23890451588304273,
+      "margin_over_p95_pts": 20.9670844890095
     }
-   }
   },
-  "G4_plateau": {
-   "pass": true,
-   "neighbours": 22,
-   "median_neighbour_cagr": 0.4447703330588152,
-   "a0_cagr": 0.44857536077313775,
-   "median_gap_pts": -0.3805027714322562,
-   "share_5_pts_above_mom30": 1.0,
-   "worst_neighbour": {
-    "label": "score ranksum",
-    "cagr": 0.3223345605994661
-   },
-   "not_registered_without_copies_of_A0": {
-    "neighbours": 15,
-    "median_neighbour_cagr": 0.4400547987288319,
-    "median_gap_pts": -0.8520562044305846,
-    "share_5_pts_above_mom30": 1.0,
-    "lowest": [
-     {
-      "label": "score ranksum",
-      "cagr": 0.3223345605994661,
-      "mdd": -0.3849786239837517
-     },
-     {
-      "label": "picks_per_category 2",
-      "cagr": 0.3838074695138385,
-      "mdd": -0.25720390308761154
-     },
-     {
-      "label": "pool_top_n 161",
-      "cagr": 0.389684363400282,
-      "mdd": -0.3601446720920367
-     }
+  "variants": {
+    "A0_as_ranked": {
+      "cagr": 0.44857536077313775,
+      "mdd": -0.2700848896447844,
+      "ulcer": 0.09159842027534523
+    },
+    "A1_extended_tags": {
+      "cagr": 0.3573474792856084,
+      "mdd": -0.32436692625246577,
+      "ulcer": 0.1255575333504538
+    },
+    "A2_after_tax": {
+      "cagr": 0.3463546717627668,
+      "mdd": -0.2759755682187608,
+      "ulcer": 0.09920408572785525
+    },
+    "A3_real_tags_and_tax": {
+      "cagr": 0.276863196956054,
+      "mdd": -0.3274626637103014,
+      "ulcer": 0.135722094896626
+    }
+  },
+  "e_expected_case": {
+    "cagr": 0.2605582070362198,
+    "mdd": -0.33199369721128047
+  },
+  "monday_open": {
+    "cagr_at_close": 0.35734747928560817,
+    "cagr_at_open_whole_shares": 0.34104248936577397,
+    "cagr_change": -0.0163049899198342,
+    "mdd_at_close": -0.32436692625246577,
+    "mdd_at_open_whole_shares": -0.3288979597534448,
+    "mdd_change": -0.004531033500979054,
+    "sleeves": [
+      {
+        "offset": 0,
+        "sleeve_cagr_at_close": 0.3914094996737554,
+        "sleeve_cagr_at_open_whole_shares": 0.3539254977459958,
+        "average_gap_on_buys": 0.0028476730589428057,
+        "average_gap_on_sells": -5.658407064737655e-5,
+        "orders_repriced": 619,
+        "orders_with_no_open_that_week": 0,
+        "idle_cash_share_mean": 0.017730308203290916,
+        "replay_problems": []
+      },
+      {
+        "offset": 1,
+        "sleeve_cagr_at_close": 0.3226614567856019,
+        "sleeve_cagr_at_open_whole_shares": 0.3112341909306999,
+        "average_gap_on_buys": 0.0025709523973956915,
+        "average_gap_on_sells": 0.0020850947575308085,
+        "orders_repriced": 614,
+        "orders_with_no_open_that_week": 1,
+        "idle_cash_share_mean": 0.01407651905128236,
+        "replay_problems": []
+      },
+      {
+        "offset": 2,
+        "sleeve_cagr_at_close": 0.3799559765121905,
+        "sleeve_cagr_at_open_whole_shares": 0.38205993752638934,
+        "average_gap_on_buys": 0.0007106412925218044,
+        "average_gap_on_sells": 0.001122464117588635,
+        "orders_repriced": 630,
+        "orders_with_no_open_that_week": 0,
+        "idle_cash_share_mean": 0.011044862839665924,
+        "replay_problems": []
+      },
+      {
+        "offset": 3,
+        "sleeve_cagr_at_close": 0.3196842073529995,
+        "sleeve_cagr_at_open_whole_shares": 0.2994925806173827,
+        "average_gap_on_buys": 0.0030718123433488504,
+        "average_gap_on_sells": 0.0004808733431022674,
+        "orders_repriced": 611,
+        "orders_with_no_open_that_week": 0,
+        "idle_cash_share_mean": 0.01966757003953797,
+        "replay_problems": []
+      }
     ]
-   }
   },
-  "G5_alpha": {
-   "pass": true,
-   "alpha_pa": 0.12174333721162048,
-   "alpha_t": 2.0278782234397443,
-   "beta_market": 0.8715246006588776,
-   "beta_size": 0.6549416765580415,
-   "beta_momentum": 0.30706419090454673,
-   "r2": 0.48236604507962066,
-   "weeks": 508
+  "friday_spread_A0": [
+    {
+      "offset": 0,
+      "cagr": 0.4911822167216129,
+      "mdd": -0.31085147778481126,
+      "ulcer": 0.1038964422603545
+    },
+    {
+      "offset": 1,
+      "cagr": 0.42958673813158654,
+      "mdd": -0.3094097783220031,
+      "ulcer": 0.09589909608933668
+    },
+    {
+      "offset": 2,
+      "cagr": 0.41129897538575055,
+      "mdd": -0.2986786259375639,
+      "ulcer": 0.11595279492385221
+    },
+    {
+      "offset": 3,
+      "cagr": 0.438367812855609,
+      "mdd": -0.31479474215653913,
+      "ulcer": 0.09919164720441936
+    }
+  ],
+  "concentration": {
+    "realised_profit_total_in_capital_units": 35.440618296429136,
+    "top5_share": 0.569022271927292,
+    "top5": {
+      "KIRLOSENG": 0.13916136863727246,
+      "Silver": 0.11783969411016888,
+      "ANANTRAJ": 0.1168526906375627,
+      "Gold": 0.09911559891256985,
+      "WABAG": 0.09605291962971815
+    },
+    "flag_top5_above_50pct": true
   },
-  "G6_fair_placebo": {
-   "pass": true,
-   "seeds": 100,
-   "a0_cagr": 0.44857536077313775,
-   "placebo_median": 0.13984579674396425,
-   "placebo_p95": 0.23890451588304273,
-   "margin_over_p95_pts": 20.9670844890095
-  }
- },
- "variants": {
-  "A0_as_ranked": {
-   "cagr": 0.44857536077313775,
-   "mdd": -0.2700848896447844,
-   "ulcer": 0.09159842027534523
+  "rolling_windows_A3": {
+    "2y": {
+      "worst": -0.08990948577642643,
+      "median": 0.28678253471422677,
+      "best": 0.7615961406989915,
+      "worst_vs_mom30_pts": -15.829801685140744,
+      "share_above_mom30": 0.7741935483870968
+    },
+    "3y": {
+      "worst": 0.035335580315161375,
+      "median": 0.3241345403541782,
+      "best": 0.48356837987944123,
+      "worst_vs_mom30_pts": -4.154622739994096,
+      "share_above_mom30": 0.8888888888888888
+    }
   },
-  "A1_extended_tags": {
-   "cagr": 0.3573474792856084,
-   "mdd": -0.32436692625246577,
-   "ulcer": 0.1255575333504538
+  "bootstrap_A3": {
+    "13w": {
+      "cagr_p5": 0.12190317719314114,
+      "cagr_p50": 0.2767099563562003,
+      "cagr_p95": 0.4564784307300604,
+      "mdd_p5": -0.5012029395699572,
+      "mdd_p50": -0.33370948185555344,
+      "mean_block_weeks": 13
+    },
+    "26w": {
+      "cagr_p5": 0.12218489479436505,
+      "cagr_p50": 0.2769411624756889,
+      "cagr_p95": 0.4520076225211065,
+      "mdd_p5": -0.4812640461661505,
+      "mdd_p50": -0.3274626637103022,
+      "mean_block_weeks": 26
+    }
   },
-  "A2_after_tax": {
-   "cagr": 0.3463546717627668,
-   "mdd": -0.2759755682187608,
-   "ulcer": 0.09920408572785525
+  "drawdown_share_of_portfolio_A3": {
+    "10pct_of_portfolio": -0.03274626637103014,
+    "15pct_of_portfolio": -0.049119399556545214,
+    "20pct_of_portfolio": -0.06549253274206028
   },
-  "A3_real_tags_and_tax": {
-   "cagr": 0.276863196956054,
-   "mdd": -0.3274626637103014,
-   "ulcer": 0.135722094896626
-  }
- },
- "e_expected_case": {
-  "cagr": 0.2605582070362198,
-  "mdd": -0.33199369721128047
- },
- "monday_open": {
-  "cagr_at_close": 0.35734747928560817,
-  "cagr_at_open_whole_shares": 0.34104248936577397,
-  "cagr_change": -0.0163049899198342,
-  "mdd_at_close": -0.32436692625246577,
-  "mdd_at_open_whole_shares": -0.3288979597534448,
-  "mdd_change": -0.004531033500979054,
-  "sleeves": [
-   {
-    "offset": 0,
-    "sleeve_cagr_at_close": 0.3914094996737554,
-    "sleeve_cagr_at_open_whole_shares": 0.3539254977459958,
-    "average_gap_on_buys": 0.0028476730589428057,
-    "average_gap_on_sells": -5.658407064737655e-05,
-    "orders_repriced": 619,
-    "orders_with_no_open_that_week": 0,
-    "idle_cash_share_mean": 0.017730308203290916,
-    "replay_problems": []
-   },
-   {
-    "offset": 1,
-    "sleeve_cagr_at_close": 0.3226614567856019,
-    "sleeve_cagr_at_open_whole_shares": 0.3112341909306999,
-    "average_gap_on_buys": 0.0025709523973956915,
-    "average_gap_on_sells": 0.0020850947575308085,
-    "orders_repriced": 614,
-    "orders_with_no_open_that_week": 1,
-    "idle_cash_share_mean": 0.01407651905128236,
-    "replay_problems": []
-   },
-   {
-    "offset": 2,
-    "sleeve_cagr_at_close": 0.3799559765121905,
-    "sleeve_cagr_at_open_whole_shares": 0.38205993752638934,
-    "average_gap_on_buys": 0.0007106412925218044,
-    "average_gap_on_sells": 0.001122464117588635,
-    "orders_repriced": 630,
-    "orders_with_no_open_that_week": 0,
-    "idle_cash_share_mean": 0.011044862839665924,
-    "replay_problems": []
-   },
-   {
-    "offset": 3,
-    "sleeve_cagr_at_close": 0.3196842073529995,
-    "sleeve_cagr_at_open_whole_shares": 0.2994925806173827,
-    "average_gap_on_buys": 0.0030718123433488504,
-    "average_gap_on_sells": 0.0004808733431022674,
-    "orders_repriced": 611,
-    "orders_with_no_open_that_week": 0,
-    "idle_cash_share_mean": 0.01966757003953797,
-    "replay_problems": []
-   }
-  ]
- },
- "friday_spread_A0": [
-  {
-   "offset": 0,
-   "cagr": 0.4911822167216129,
-   "mdd": -0.31085147778481126,
-   "ulcer": 0.1038964422603545
+  "selection_context": {
+    "configs": 8003,
+    "median_config_cagr": 0.2809576988220215,
+    "subject_cagr_in_search": 0.44211244583129883,
+    "subject_percentile_full": 0.9920029988754218,
+    "subject_percentile_first_half": 0.9831313257528427,
+    "subject_cagr_first_half": 0.3808271884918213,
+    "median_config_cagr_first_half": 0.21688306331634521,
+    "subject_percentile_second_half": 0.9347744595776584,
+    "subject_cagr_second_half": 0.4295862913131714,
+    "median_config_cagr_second_half": 0.2929311990737915
   },
-  {
-   "offset": 1,
-   "cagr": 0.42958673813158654,
-   "mdd": -0.3094097783220031,
-   "ulcer": 0.09589909608933668
+  "a0_reproduction": {
+    "to_2026-10-02": {
+      "weeks": 509,
+      "blend_with_april_reset_cagr": 0.44531616862286105,
+      "plain_mean_of_sleeves_cagr": 0.442112465641596
+    },
+    "to_latest": {
+      "weeks": 511,
+      "blend_with_april_reset_cagr": 0.44857536077313775,
+      "plain_mean_of_sleeves_cagr": 0.44538925223247117
+    },
+    "ranking_row_2026-10-08": {
+      "weeks": 509,
+      "cagr": 0.442112465641596,
+      "mdd": -0.2697938874508591
+    }
   },
-  {
-   "offset": 2,
-   "cagr": 0.41129897538575055,
-   "mdd": -0.2986786259375639,
-   "ulcer": 0.11595279492385221
+  "comparators_cagr": {
+    "Nifty200 Momentum 30 TRI": 0.1651298126964933,
+    "Nifty 50 TRI": 0.12189413845185548,
+    "Nifty Smallcap 250 TRI": 0.1528713989865722,
+    "Nifty Midcap 150 TRI": 0.17513298808608102,
+    "Nifty 500 TRI": 0.1350914210806402
   },
-  {
-   "offset": 3,
-   "cagr": 0.438367812855609,
-   "mdd": -0.31479474215653913,
-   "ulcer": 0.09919164720441936
-  }
- ],
- "concentration": {
-  "realised_profit_total_in_capital_units": 35.440618296429136,
-  "top5_share": 0.569022271927292,
-  "top5": {
-   "KIRLOSENG": 0.13916136863727246,
-   "Silver": 0.11783969411016888,
-   "ANANTRAJ": 0.1168526906375627,
-   "Gold": 0.09911559891256985,
-   "WABAG": 0.09605291962971815
+  "comparator_windows_end": {
+    "Nifty200 Momentum 30 TRI": "2026-10-16",
+    "Nifty 50 TRI": "2026-10-02",
+    "Nifty Smallcap 250 TRI": "2026-10-02",
+    "Nifty Midcap 150 TRI": "2026-10-02",
+    "Nifty 500 TRI": "2026-10-02"
   },
-  "flag_top5_above_50pct": true
- },
- "rolling_windows_A3": {
-  "2y": {
-   "worst": -0.08990948577642643,
-   "median": 0.28678253471422677,
-   "best": 0.7615961406989915,
-   "worst_vs_mom30_pts": -15.829801685140744,
-   "share_above_mom30": 0.7741935483870968
-  },
-  "3y": {
-   "worst": 0.035335580315161375,
-   "median": 0.3241345403541782,
-   "best": 0.48356837987944123,
-   "worst_vs_mom30_pts": -4.154622739994096,
-   "share_above_mom30": 0.8888888888888888
-  }
- },
- "bootstrap_A3": {
-  "13w": {
-   "cagr_p5": 0.12190317719314114,
-   "cagr_p50": 0.2767099563562003,
-   "cagr_p95": 0.4564784307300604,
-   "mdd_p5": -0.5012029395699572,
-   "mdd_p50": -0.33370948185555344,
-   "mean_block_weeks": 13
-  },
-  "26w": {
-   "cagr_p5": 0.12218489479436505,
-   "cagr_p50": 0.2769411624756889,
-   "cagr_p95": 0.4520076225211065,
-   "mdd_p5": -0.4812640461661505,
-   "mdd_p50": -0.3274626637103022,
-   "mean_block_weeks": 26
-  }
- },
- "drawdown_share_of_portfolio_A3": {
-  "10pct_of_portfolio": -0.03274626637103014,
-  "15pct_of_portfolio": -0.049119399556545214,
-  "20pct_of_portfolio": -0.06549253274206028
- },
- "selection_context": {
-  "configs": 8003,
-  "median_config_cagr": 0.2809576988220215,
-  "subject_cagr_in_search": 0.44211244583129883,
-  "subject_percentile_full": 0.9920029988754218,
-  "subject_percentile_first_half": 0.9831313257528427,
-  "subject_cagr_first_half": 0.3808271884918213,
-  "median_config_cagr_first_half": 0.21688306331634521,
-  "subject_percentile_second_half": 0.9347744595776584,
-  "subject_cagr_second_half": 0.4295862913131714,
-  "median_config_cagr_second_half": 0.2929311990737915
- },
- "a0_reproduction": {
-  "to_2026-10-02": {
-   "weeks": 509,
-   "blend_with_april_reset_cagr": 0.44531616862286105,
-   "plain_mean_of_sleeves_cagr": 0.442112465641596
-  },
-  "to_latest": {
-   "weeks": 511,
-   "blend_with_april_reset_cagr": 0.44857536077313775,
-   "plain_mean_of_sleeves_cagr": 0.44538925223247117
-  },
-  "ranking_row_2026-10-08": {
-   "weeks": 509,
-   "cagr": 0.442112465641596,
-   "mdd": -0.2697938874508591
-  }
- },
- "comparators_cagr": {
-  "Nifty200 Momentum 30 TRI": 0.1651298126964933,
-  "Nifty 50 TRI": 0.12189413845185548,
-  "Nifty Smallcap 250 TRI": 0.1528713989865722,
-  "Nifty Midcap 150 TRI": 0.17513298808608102,
-  "Nifty 500 TRI": 0.1350914210806402
- },
- "comparator_windows_end": {
-  "Nifty200 Momentum 30 TRI": "2026-10-16",
-  "Nifty 50 TRI": "2026-10-02",
-  "Nifty Smallcap 250 TRI": "2026-10-02",
-  "Nifty Midcap 150 TRI": "2026-10-02",
-  "Nifty 500 TRI": "2026-10-02"
- },
- "a3_cagr_to_benchmark_cutoff": 0.27955046186662,
- "benchmark_cutoff": "2026-10-02",
- "backtests_run": 512
+  "a3_cagr_to_benchmark_cutoff": 0.27955046186662,
+  "benchmark_cutoff": "2026-10-02",
+  "backtests_run": 512
 }
