@@ -118,4 +118,10 @@ and that Core is a column.
   the share of days with at least one morning wide-stop pick. Counterfactual: T1 against the fixed 3 x Widesl
   09:17 ("all wide, from the open") per lot-day by R7 regime and where R7 and the day's own range are both
   lowest, to see what going all-wide from the morning would have earned when the week was known to be quiet.
+- 2026-10-21 — addendum ran (`research/bl144/morning.py`, `out/morning.json`). In quiet weeks T1's wide-stop
+  picks start at 10:00 on average (68% by 09:47) against 12:09 in volatile weeks; every pick is wide-stop on
+  13.8% of quiet-week days and at least one morning wide-stop pick on 41% (Core 28.8% / 63.8%). All-wide from
+  09:17 (3 x Widesl) in quiet weeks: +119 per lot-day against T1's +554 over 80 days; it wins on the 40 days
+  that stayed quiet (+1,037 vs +809) and loses on the 13 that did not (-1,637 vs +1,225). Written into the
+  findings page.
 

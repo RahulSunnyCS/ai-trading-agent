@@ -63,6 +63,36 @@ Descriptive readings; leads, not findings.
   (about 3 lots; −₹32,438), T1 +₹496,101 (about 3 lots; −₹23,300). A 3-lot strategy is three times the
   one-lot path, so its own ₹2,500 stop scales to ₹7,500 here.
 
+## Addendum: does T1 start its wide strategies from the morning in quiet weeks?
+
+Registered before it was computed (BL-144 Log, 2026-10-21), descriptive only. "Morning" = a start at or before 09:47.
+
+| Quiet weeks (R7 lowest third) vs volatile weeks | T1 quiet / volatile | Core quiet / volatile |
+|---|---|---|
+| Mean start time of the day's picks | 10:29 / 11:29 | 10:36 / 12:00 |
+| Picks that start in the morning | 46% / 23% | 47% / 19% |
+| Wide-stop picks: mean start | 10:00 / 12:09 | 10:28 / 12:24 |
+| Wide-stop picks that start in the morning | 68% / 25% | 54% / 18% |
+| Days when **every** pick is wide-stop | 13.8% / 2.5% | 28.8% / 3.8% |
+| Days with at least one morning wide-stop pick | 41% / 11% | 64% / 23% |
+
+| What all-wide from the open would have earned (₹ per lot-day) | Days | T1 | 3 × Widesl 09:17 | Base |
+|---|---|---|---|---|
+| Quiet week (known at the open) | 80 | +554 | +119 | +240 |
+| Quiet week and the day was quiet | 40 | +809 | +1,037 | +681 |
+| Quiet week but the day was wide | 13 | +1,225 | −1,637 | −595 |
+
+- **T1 does start earlier and wider in quiet weeks, but not all the way.** Its wide-stop picks start
+  around 10:00 instead of 12:09, and two thirds of them are morning starts. Only 14% of quiet-week days
+  have all three picks wide-stop, and 41% have a morning wide-stop pick. Core goes further (29% and 64%).
+- **Going all-wide from 09:17 on every quiet week would have been worse than T1.** The quiet week is known
+  at the open, but the day is not: of the 80 quiet-week days, 40 were quiet (3 × Widesl +1,037 against T1
+  +809) and 13 were wide (3 × Widesl −1,637 against T1 +1,225). Over all 80, 3 × Widesl made +119 per
+  lot-day against T1's +554, and T1 was ahead on 52% of the days.
+- So T1's partial lean is the part of the picker that adds value: it keeps some early wide strategies in
+  quiet weeks and still holds other strategies for the day the market moves. A rule that forces all-wide
+  from the morning in a quiet week was not tested as a rule and would give up the 13 wide-day cases.
+
 ## Open questions
 
 - Whether a longer run of range-bound weeks (this year had 80 such days, in clusters) changes T1's picks.
