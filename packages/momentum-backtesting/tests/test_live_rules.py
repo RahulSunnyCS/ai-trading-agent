@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 import pytest
 from typer.testing import CliRunner
@@ -11,7 +13,7 @@ from momentum_backtesting import cli, live_rules, notify
 RULES = live_rules.load()
 
 
-def _curve(values: list[float], start: str = "2026-10-09") -> pd.Series:
+def _curve(values: list[float], start: str = "2026-10-16") -> pd.Series:
     return pd.Series(values, index=pd.date_range(start, periods=len(values), freq="W-FRI"))
 
 
@@ -41,6 +43,25 @@ def test_rules_file_holds_the_owners_numbers():
     assert RULES["trailing"]["review_action"] and RULES["money_gate"]["confirm_action"]
 
 
+def test_the_followed_money_is_four_sectors_on_the_four_kite_lots():
+    # BL-142: the owner follows Four Sectors Monthly, No Tilt, all Fridays; the check measures
+    # that, one config per sleeve, not the BL-010 Phase 6 ensemble it tracked before.
+    assert RULES["stage"]["paper_start"] == "2026-10-16"
+    configs = live_rules.followed_configs(RULES)
+    assert [c["rebalance_offset"] for c in configs] == [0, 1, 2, 3]
+    assert {c["run_id"] for c in configs} == {"fbb7ab054238"}
+    assert {c["rebalance_every"] for c in configs} == {4}
+    assert len({json.dumps(c["heavy"], sort_keys=True) for c in configs}) == 1
+    assert [c["light"]["rebalance_offset"] for c in configs] == [0, 1, 2, 3]
+    assert len({c["id"] for c in configs}) == 4
+
+
+def test_without_a_config_file_the_frozen_ensemble_is_followed():
+    rules = {"strategy": {}}
+    ids = [c["id"] for c in live_rules.followed_configs(rules)]
+    assert ids == ["1281e8ed6824", "08c4307d7aa9", "535b17b44ba5", "bad83df3821a"]
+
+
 # --- drawdown -----------------------------------------------------------------------------------
 
 
@@ -59,11 +80,11 @@ def test_drawdown_levels_and_the_peak_moves_up():
     f = _find(out, "drawdown")
     assert f.level == "breach" and "exit at 30%" in f.title  # exit outranks cut
     assert f.action == RULES["drawdown"]["exit_action"]
-    assert "First past the line on 2026-11-06" in f.detail  # the week it first fell 30%
+    assert "First past the line on 2026-11-13" in f.detail  # the week it first fell 30%
 
 
 def test_paper_tracking_not_started_before_paper_start():
-    early = _curve([1, 1.01], start="2026-09-25")  # data ends before 2026-10-09
+    early = _curve([1, 1.01], start="2026-10-02")  # data ends 2026-10-09, before 2026-10-16
     report = live_rules.evaluate(RULES, early, _flat(2))
     assert report.weeks == 0 and report.findings[0].level == "pending"
     assert not report.breached
@@ -72,9 +93,9 @@ def test_paper_tracking_not_started_before_paper_start():
 
 
 def test_weeks_are_counted_from_the_paper_start():
-    data = _curve([1, 1, 1, 1, 1, 1], start="2026-10-02")  # starts one week before paper_start
+    data = _curve([1, 1, 1, 1, 1, 1], start="2026-10-09")  # starts one week before paper_start
     report = live_rules.evaluate(RULES, data, _flat(6))
-    assert report.weeks == 4  # 10-09, 10-16, 10-23, 10-30, 11-06 -> 4 weeks after the start week
+    assert report.weeks == 4  # 10-16, 10-23, 10-30, 11-06, 11-13 -> 4 weeks after the start week
 
 
 # --- trailing -----------------------------------------------------------------------------------
@@ -202,11 +223,11 @@ def test_routine_status_is_the_optional_type(sent, monkeypatch):
 
 
 def test_stale_data_fails_loudly(sent, monkeypatch):
-    stale = live_rules.evaluate(RULES, _curve([1, 1.01, 1.02]), _flat(3))  # ends 2026-10-23
+    stale = live_rules.evaluate(RULES, _curve([1, 1.01, 1.02]), _flat(3))  # ends 2026-10-30
     monkeypatch.setattr(live_rules, "run_check", lambda **_: stale)
     monkeypatch.setattr(
         "momentum_backtesting.weekly.week_ending_on_or_before",
-        lambda _day: __import__("datetime").date(2026, 10, 30),
+        lambda _day: __import__("datetime").date(2026, 11, 6),
     )
     result = _invoke("--send")
     assert result.exit_code == 1 and "stale data" in sent[0].title

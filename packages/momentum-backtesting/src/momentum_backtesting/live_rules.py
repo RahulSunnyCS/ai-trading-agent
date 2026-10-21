@@ -6,9 +6,11 @@ rule and quotes the action the owner wrote for it; the owner acts.
 What it measures, and what it cannot yet:
 
 - **Drawdown** (cut half, exit) and the **money gate** use the *followed money's* weekly equity.
-  While the stage is `paper` that is the frozen ensemble's model portfolio rebased at
+  While the stage is `paper` that is the followed strategy's model portfolio rebased at
   `stage.paper_start` (BL-010 Phase 6 step 3's definition: its holdings carry in, as a paper
-  account opened that day would hold them).
+  account opened that day would hold them). Which strategy that is, is `strategy.config_file`
+  in the TOML (BL-142: Four Sectors Monthly, No Tilt, all Fridays; without that key, the
+  frozen ensemble of BL-010 Phase 6).
 - **Trailing** (live return minus the backtest's over the same weeks) needs the *journal-scored*
   live series, which BL-024 Phase 2 has not built. Until a `live` series is supplied the rule
   reports "not measurable" in every weekly message; it never passes silently, and a paper curve
@@ -319,18 +321,26 @@ def summary(report: Report) -> tuple[str, str, str]:
 # --- real inputs ----------------------------------------------------------------------------------
 
 
-def paper_curves(echo=print) -> tuple[pd.Series, pd.Series]:
-    """The frozen ensemble's weekly equity through the latest week, and the Nifty200 Momentum 30
-    TRI level (BL-010 Phase 6 step 3's model portfolio, not the journal)."""
+def followed_configs(rules: dict) -> list[dict]:
+    """The configs whose equal-capital blend is the followed money: the file named by
+    `strategy.config_file` (one config per sleeve), else the frozen ensemble."""
+    named = rules["strategy"].get("config_file")
+    path = PACKAGE / named if named else FROZEN_PATH
+    return json.loads(path.read_text())["configs"]
+
+
+def paper_curves(echo=print, rules: dict | None = None) -> tuple[pd.Series, pd.Series]:
+    """The followed strategy's weekly equity through the latest week (its configs at equal
+    capital, reset each April), and the Nifty200 Momentum 30 TRI level (BL-010 Phase 6 step 3's
+    model portfolio, not the journal)."""
     from . import bias, choose, reference_benchmarks, search, tracker
     from .phase5 import MOM30
 
-    frozen = json.loads(FROZEN_PATH.read_text())
     runner = bias.Runner(
         search.load_space(SPACE_PATH), universe_kind="turnover_rank", category_tags="curated"
     )
     curves = {}
-    for cfg in frozen["configs"]:
+    for cfg in followed_configs(rules or load()):
         echo(f"{cfg['id']} ...")
         curves[cfg["id"]] = tracker.run_config(runner, cfg)
     frame = pd.DataFrame(curves).ffill()
@@ -378,5 +388,5 @@ def run_check(*, simulate: str | None = None, echo=print) -> Report:
         return report
     if rules["stage"]["current"] == "live":
         return evaluate(rules, None, None)  # blocked: no real-money equity exists yet
-    followed, bench = paper_curves(echo=echo)
+    followed, bench = paper_curves(echo=echo, rules=rules)
     return evaluate(rules, followed, bench)

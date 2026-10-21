@@ -100,3 +100,13 @@ A `live_rules` file the owner writes once, and a weekly check that alerts when a
   - **A bug the tests caught:** with the data ending before `paper_start` the check took an
     earlier week as the start and reported all clear. It now reports "paper tracking has not
     started".
+- 2026-10-22 — the weekly check now measures the strategy the money is in: Four Sectors Monthly,
+  No Tilt, all Fridays (BL-142, owner 2026-10-20), as its four sleeves
+  (`search_spaces/bl142_followed.json`, named by `strategy.config_file` in `live_rules.toml`),
+  not the BL-010 Phase 6 frozen ensemble. `stage.paper_start` moves from 2026-10-09 to
+  2026-10-16, Friday 1 of 4 of the Kite lots (first buy Monday 2026-10-19). No rule number
+  changed. Reason: the ensemble was never what the money followed, so its drawdown said nothing
+  about the account. **Owner to confirm** the new start date and that the money gate's
+  `min_paper_weeks = 13` still means what you want now that real money is already in; both are
+  yours. Stage stays `paper`; real-fills equity (BL-024 Phase 3) is still not built, so these
+  numbers are the model portfolio's, not the account's.

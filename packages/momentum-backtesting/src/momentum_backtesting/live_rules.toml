@@ -6,13 +6,16 @@
 [stage]
 # "paper" until the money gate below passes and the owner says go; then "live".
 current = "paper"
-# The Friday paper tracking counts from: the forward journal's first clean Friday (BL-024 decision 5).
-paper_start = "2026-10-09"
+# The Friday the followed money counts from: Friday 1 of 4 of the Kite lots, whose first buy
+# was Monday 2026-10-19 (BL-142; 2026-10-09 was the forward journal's first clean Friday, for the
+# frozen ensemble this file tracked before).
+paper_start = "2026-10-16"
 
 [strategy]
 # What is tracked now, and what the money would follow if the gate passes.
-followed = "BL-010 Phase 6 frozen ensemble (search_spaces/bl010_phase6_frozen.json)"
-compared_with = ["the basket's median config (BL-010 tracker)", "Nifty200 Momentum 30 TRI"]
+followed = "Four Sectors Monthly, No Tilt · all Fridays (run fbb7ab054238, four sleeves; BL-142, chosen by the owner 2026-10-20)"
+config_file = "search_spaces/bl142_followed.json"
+compared_with = ["Nifty200 Momentum 30 TRI"]
 source = "the forward-signal journal (BL-024): signals as recorded each Friday, never rebuilt"
 
 [money_gate]
