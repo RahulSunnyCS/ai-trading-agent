@@ -368,3 +368,115 @@ def test_a_multiplier_the_platform_did_not_show_is_said_in_the_line(root):
     assert c.compared[0].multiplier_guessed
     lines = live_compare.message_lines(c, messages.rupees)
     assert f"1x assumed (multiplier not shown by the platform): {T1[2]}" in lines
+
+
+# --- the range behind the Rotation page's card ---------------------------------------------------
+
+DAY2 = date(2026, 10, 20)
+
+
+def _two_days(root):
+    _paper(root, T1[0], 1000.0, day=DAY2)
+    _capture(
+        root,
+        [
+            _section("algotest", "all"),
+            _line("T1 · N_ditm1-t1s36_0947", 2795.0, fills=[_fill("2026-10-19 09:46:59", 100)]),
+            _line("Core · N_p150-t1s11_1317", 910.0, platform="quantiply", broker="angelone"),
+            _line("Discretionary", 300.0, source="owner"),
+        ],
+    )
+    _capture(
+        root,
+        [
+            _section("algotest", "all"),
+            _line("T1 · N_ditm1-t1s36_0947", 1100.0, fills=[_fill("2026-10-20 09:46:59", 100)]),
+        ],
+        day=DAY2,
+    )
+
+
+def test_captured_days_lists_the_capture_files_oldest_first(root):
+    assert live_compare.captured_days(root) == []
+    _two_days(root)
+    (live_compare.live_dir(root) / "notes.jsonl").write_text("{}")  # not a day: ignored
+    assert live_compare.captured_days(root) == [DAY, DAY2]
+
+
+def test_the_range_runs_totals_per_group_and_filters_by_day(root):
+    _two_days(root)
+    out = live_compare.compare_range(root=root)
+    assert (out["from"], out["to"]) == (DAY.isoformat(), DAY2.isoformat())
+    assert [d["day"] for d in out["days"]] == [DAY.isoformat(), DAY2.isoformat()]
+    [t1] = [r for r in out["running"] if r["platform"] == "algotest"]
+    # +81.25 on the 19th, +100 on the 20th (live 1100 vs paper 1000), added up
+    assert [p["slippage"] for p in t1["points"]] == [pytest.approx(81.25), pytest.approx(181.25)]
+    assert t1["slippage"] == pytest.approx(181.25) and t1["days"] == 2
+    assert out["discretionary"]["total"] == pytest.approx(300.0)
+    one = live_compare.compare_range(DAY2, DAY2, root)
+    assert [d["day"] for d in one["days"]] == [DAY2.isoformat()]
+    assert one["captured_days"] == [DAY.isoformat(), DAY2.isoformat()]
+
+
+def test_slippage_by_shape_groups_sell_and_buy_by_entry_band(root):
+    _two_days(root)
+    shapes = {
+        (s["platform"], s["position"], s["band"]): s
+        for s in live_compare.compare_range(root=root)["shapes"]
+    }
+    sell_morning = shapes[("algotest", "sell", "09:30–12:00")]
+    assert sell_morning["variant_days"] == 2
+    assert sell_morning["slippage"] == pytest.approx(181.25)
+    assert sell_morning["mean_slippage"] == pytest.approx(90.625)
+    # Quantiply has no fills: the figure is there, the percentage is not
+    assert shapes[("quantiply", "sell", "12:00 on")]["slippage_pct"] is None
+    assert live_compare.shape_of("N_wide") == ("sell", "—")
+
+
+def test_an_empty_store_gives_an_empty_range(root):
+    out = live_compare.compare_range(root=root)
+    assert out["days"] == [] and out["running"] == [] and out["from"] is None
+
+
+def test_a_deliberate_multiplier_is_lots_in_the_range_not_slippage(root):
+    _paper(root, "N_wide_1117", 1000.0)
+    _capture(
+        root,
+        [_section("algotest", "all"), _line("T1 · N_wide_1117", 3000.0, mult=3)],
+    )
+    [d] = live_compare.compare_range(root=root)["days"]
+    assert d["compared"][0]["slippage"] == pytest.approx(0.0)
+
+
+# --- the route ---------------------------------------------------------------------------------
+
+
+def test_the_live_route_answers_and_refuses_bad_days(root, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from option_backtesting.api import rotation_live_routes
+    from option_backtesting.api.app import create_app
+
+    _two_days(root)
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(root))
+    rotation_live_routes._cache.clear()
+    c = TestClient(create_app())
+    ok = c.get("/legwise/rotation/live")
+    assert ok.status_code == 200 and len(ok.json()["days"]) == 2
+    window = c.get("/legwise/rotation/live", params={"from": "2026-10-20"})
+    assert [d["day"] for d in window.json()["days"]] == ["2026-10-20"]
+    assert c.get("/legwise/rotation/live", params={"from": "nope"}).status_code == 422
+    backwards = c.get("/legwise/rotation/live", params={"from": "2026-10-21", "to": "2026-10-19"})
+    assert backwards.status_code == 422 and "error" in backwards.json()
+
+
+def test_the_live_route_answers_an_unmounted_root_as_an_error(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from option_backtesting.api import rotation_live_routes
+    from option_backtesting.api.app import create_app
+
+    monkeypatch.setenv("TRADING_DATA_ROOT", "/Volumes/NoSuchVolume-live/TradingData")
+    rotation_live_routes._cache.clear()
+    r = TestClient(create_app()).get("/legwise/rotation/live")
+    assert r.status_code == 503 and "error" in r.json()

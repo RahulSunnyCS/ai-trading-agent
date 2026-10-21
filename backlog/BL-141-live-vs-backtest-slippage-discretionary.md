@@ -106,6 +106,13 @@ Today nothing reads the live results. Each evening the uploaders delete the day'
 
 ## Log
 
+- 2026-10-22 — Phase 3's Rotation page card built (PR "Live vs paper card"; Sonnet overnight run, owner asleep):
+  `GET /legwise/rotation/live?from=&to=` (`live_compare.compare_range`: every captured day compared, running
+  totals per platform + broker + list, slippage by shape = sell/buy × entry band, discretionary summed apart),
+  its Fastify proxy, and a "Live vs paper" band after Lot plans with totals, a cumulative-slippage chart, the daily
+  table with flags and the shape table; Guide page `rotation-live`. Checked read-only against a copy of the real
+  2026-10-21 capture (AlgoTest T1 −₹149 a lot, Quantiply Core −₹34, no % for Quantiply). Still the owner's:
+  reconcile a week of days against the contract notes ("Done when").
 - 2026-10-20 — Started (owner: "start", item 3 of the monitoring list). Built, not yet run by the scheduler:
   - **Phase 1.** The calls, from both web apps' public JavaScript and then a few GETs after a real login (one per
     platform per minute, Angel One through the TOTP stamp; nothing but GET; a holiday, so Monday 19 Oct was read):

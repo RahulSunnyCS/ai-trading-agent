@@ -299,6 +299,171 @@ def compare(day: date, root: Path | None = None) -> DayComparison:
     return result
 
 
+# -- range: the Rotation page's "Live vs paper" card ----------------------------------------------
+
+#: entry-time bands for slippage by shape (minutes from midnight, upper bound exclusive)
+BANDS = (("09:15–09:30", 9 * 60 + 30), ("09:30–12:00", 12 * 60), ("12:00 on", 24 * 60))
+MAX_RANGE_DAYS = 400
+
+
+def captured_days(root: Path | None = None) -> list[date]:
+    """Every day with a capture file, oldest first."""
+    folder = live_dir(root)
+    if not folder.exists():
+        return []
+    out = []
+    for path in folder.glob("*.jsonl"):
+        try:
+            out.append(date.fromisoformat(path.stem))
+        except ValueError:
+            continue
+    return sorted(out)
+
+
+def shape_of(variant: str) -> tuple[str, str]:
+    """(position, entry band) of a variant id: `sell` / `buy` and the band its slot falls in, or
+    `—` when the id carries no slot."""
+    position = "buy" if labels.buy_strategy(variant) else "sell"
+    tag = labels.slot(variant)
+    if not tag:
+        return position, "—"
+    h, m = tag.split(":")
+    minutes = int(h) * 60 + int(m)
+    return position, next(name for name, upper in BANDS if minutes < upper)
+
+
+def _day_json(c: DayComparison) -> dict:
+    return {
+        "day": c.day.isoformat(),
+        "captured": c.captured,
+        "failed_sections": [
+            {"platform": s["platform"], "broker": s["broker"], "error": s.get("error")}
+            for s in c.failed_sections
+        ],
+        "groups": [g.__dict__ for g in c.groups()],
+        "compared": [x.__dict__ for x in c.compared],
+        "no_paper": [x.variant for x in c.no_paper],
+        "off_slot": [str(r.get("variant")) for r in c.off_slot],
+        "open_legs": [str(r.get("variant")) for r in c.open_legs],
+        "not_traded": [str(r.get("variant") or r.get("name")) for r in c.not_traded],
+        "unrecognised": [str(r.get("name")) for r in c.unrecognised],
+        "discretionary_count": len(c.discretionary),
+        "discretionary_total": c.discretionary_total,
+    }
+
+
+def compare_range(
+    start: date | None = None, end: date | None = None, root: Path | None = None
+) -> dict:
+    """Every captured day in [start, end] (default: all), each compared, plus running totals per
+    platform + broker + list and slippage by shape. Read-only; the maths is `compare`'s.
+
+    A group's running line adds up its per-lot live (after costs), paper and slippage day by day,
+    over the days the group traded. Slippage by shape adds a variant's per-lot slippage over every
+    day it was compared, so it counts variant-days: Quantiply has no fills, so no percentage."""
+    days = captured_days(root)
+    if start is not None:
+        days = [d for d in days if d >= start]
+    if end is not None:
+        days = [d for d in days if d <= end]
+    if len(days) > MAX_RANGE_DAYS:
+        days = days[-MAX_RANGE_DAYS:]
+    results = [compare(d, root) for d in days]
+
+    running: dict[tuple[str, str, str], dict] = {}
+    shapes: dict[tuple[str, str, str], dict] = {}
+    discretionary = Decimal(0)
+    discretionary_points = []
+    for c in results:
+        for g in c.groups():
+            key = (g.platform, g.broker, g.book or "")
+            r = running.setdefault(
+                key,
+                {
+                    "platform": g.platform,
+                    "broker": g.broker,
+                    "book": g.book,
+                    "live": Decimal(0),
+                    "paper": Decimal(0),
+                    "slippage": Decimal(0),
+                    "days": 0,
+                    "points": [],
+                },
+            )
+            r["live"] += _d(g.live)
+            r["paper"] += _d(g.paper)
+            r["slippage"] += _d(g.slippage)
+            r["days"] += 1
+            r["points"].append(
+                {
+                    "day": c.day.isoformat(),
+                    "live": float(r["live"]),
+                    "paper": float(r["paper"]),
+                    "slippage": float(r["slippage"]),
+                }
+            )
+        for x in c.compared:
+            if x.slippage is None:
+                continue
+            position, band = shape_of(x.variant)
+            s = shapes.setdefault(
+                (x.platform, position, band),
+                {
+                    "platform": x.platform,
+                    "position": position,
+                    "band": band,
+                    "n": 0,
+                    "slippage": Decimal(0),
+                    "premium": Decimal(0),
+                    "pct_n": 0,
+                },
+            )
+            s["n"] += 1
+            s["slippage"] += _d(x.slippage)
+            if x.slippage_pct is not None and x.premium_per_lot:
+                s["premium"] += _d(x.premium_per_lot)
+                s["pct_n"] += 1
+        if c.captured:
+            discretionary += _d(c.discretionary_total)
+            discretionary_points.append({"day": c.day.isoformat(), "value": float(discretionary)})
+
+    shape_rows = []
+    for key in sorted(shapes):
+        s = shapes[key]
+        pct = None
+        if s["pct_n"] == s["n"] and s["premium"]:
+            pct = float(s["slippage"] / s["premium"] * 100)
+        shape_rows.append(
+            {
+                "platform": s["platform"],
+                "position": s["position"],
+                "band": s["band"],
+                "variant_days": s["n"],
+                "slippage": float(s["slippage"]),
+                "mean_slippage": float(s["slippage"] / s["n"]),
+                "slippage_pct": pct,
+            }
+        )
+    available = captured_days(root)
+    return {
+        "from": days[0].isoformat() if days else None,
+        "to": days[-1].isoformat() if days else None,
+        "captured_days": [d.isoformat() for d in available],
+        "days": [_day_json(c) for c in results],
+        "running": [
+            {
+                **{k: v for k, v in r.items() if k not in ("live", "paper", "slippage")},
+                "live": float(r["live"]),
+                "paper": float(r["paper"]),
+                "slippage": float(r["slippage"]),
+            }
+            for _, r in sorted(running.items())
+        ],
+        "shapes": shape_rows,
+        "discretionary": {"total": float(discretionary), "points": discretionary_points},
+    }
+
+
 # -- text ---------------------------------------------------------------------------------------
 
 

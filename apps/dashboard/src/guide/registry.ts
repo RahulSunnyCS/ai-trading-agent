@@ -43,6 +43,7 @@ import optionsRotationDailyLog from './content/optionslab/rotation-daily-log.md?
 import optionsRotationDrawdowns from './content/optionslab/rotation-drawdowns.md?raw';
 import optionsRotationDrift from './content/optionslab/rotation-drift.md?raw';
 import optionsRotationExplain from './content/optionslab/rotation-explain.md?raw';
+import optionsRotationLive from './content/optionslab/rotation-live.md?raw';
 import optionsRotationLotPlans from './content/optionslab/rotation-lot-plans.md?raw';
 import optionsRotationMatrix from './content/optionslab/rotation-matrix.md?raw';
 import optionsRotationPulse from './content/optionslab/rotation-pulse.md?raw';
@@ -386,6 +387,16 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
       'As picked, Dir Boost and Duo: the same morning picks traded three ways, followed forward for Core and T1.',
     kind: 'Screen',
     body: optionsRotationLotPlans,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-live',
+    title: 'Rotation: live vs paper',
+    summary:
+      'What AlgoTest and Quantiply actually made against the backtest for the same picks: the gap per day, running, and by shape.',
+    kind: 'Screen',
+    body: optionsRotationLive,
     screen: { tab: 'optionslab', rest: ['rotation'] },
   },
   {

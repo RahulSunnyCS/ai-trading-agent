@@ -52,6 +52,9 @@ The screen is one page, in the order you read it:
   drift* opens the risk review for the list.
 - **Lot plans** — the same morning picks traded three ways (As picked, Dir Boost, Duo), followed
   from 19 Oct 2026 for Core and T1. See [Rotation: lot plans](guide:optionslab/rotation-lot-plans).
+- **Live vs paper** — what AlgoTest and Quantiply actually made on each captured day against the
+  backtest for the same picks, the gap running day by day, and by shape. See
+  [Rotation: live vs paper](guide:optionslab/rotation-live).
 - **Is the rule still working?** — optional diagnostics, each closed until you open it: why a pick
   was selected, the family pulse, rank correlation, and what market the forward days tested.
 - **Experiments** — *Ideas being watched*: the unregistered candidates and trigger studies, each
