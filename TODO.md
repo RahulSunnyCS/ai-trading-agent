@@ -731,6 +731,16 @@ Owner (2026-10-19): build the deploy function ready, off by default; it may neve
 | 3.31.1 | The /live page and the Setup Execution sheet, read from the screen | claude | **Done 2026-10-19** (`docs/algotest-execution.md` §7); what Activate asks is still unseen |
 | 3.31.2 | Deployer `packages/broker-login/src/strategy-deploy.ts` + `deploy-plan.ts` (8 tests), jobs `algotest-deploy` 09:16 and `algotest-deploy-check` 15:35 | claude | **Built 2026-10-19**, off until `ALGOTEST_DEPLOY=on`; the first `--apply` must be watched by the owner |
 
+### 3.37 T1 on range-bound days — [BL-144](backlog/BL-144-t1-range-bound-days.md)
+
+Owner (2026-10-21): a year of daily results for 3 x Widesl, the base, Core and T1 with day and 7-day ranges, and a
+study of whether T1 moves to wider stops on range-bound days. Pre-registered 2026-10-21 before any run.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.37.1 | Pre-registration committed | claude | **Done 2026-10-21** |
+| 3.37.2 | The table (CSV) and the study, verdicts against the registered rules, findings page | claude | In progress |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |
