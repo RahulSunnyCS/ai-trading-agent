@@ -136,7 +136,7 @@ def _bench(runner, span: pd.DatetimeIndex, name: str) -> pd.Series:
 # --- stage 1: the variants and the Monday-open replay -----------------------------------------
 
 
-def _monday_open(runner, rec: dict, base, locks) -> dict:
+def _monday_open(runner, rec: dict, base, locks, window: dict | None = None) -> dict:
     """The audit replay of A1's decisions: close in fractional shares against the next open with
     whole shares, per sleeve at Rs 50,000, blended with the April reset."""
     from momentum_backtesting import choose
@@ -156,6 +156,7 @@ def _monday_open(runner, rec: dict, base, locks) -> dict:
             locks=locks,
             rebalance_offset=offset,
             capital=CAPITAL / EVERY,
+            **(window or {}),
         )
         RUNS["count"] += 1
         prices = ranking.prices.ffill()
@@ -700,12 +701,182 @@ def stage_report() -> None:
     )
 
 
+def _falls(curve: pd.Series, small: pd.Series) -> list[dict]:
+    """Every fall of 10% or more: depth, weeks peak to trough, weeks trough back to the old
+    peak (None while it has not recovered), and the Smallcap 250's fall in the same window."""
+    from momentum_backtesting import criteria
+
+    rows = []
+    for ep in criteria.episodes(curve, small, min_depth=0.10):
+        after = curve.loc[ep.trough :]
+        back = after[after >= curve.loc[ep.peak]]
+        rows.append(
+            {
+                "peak": str(ep.peak.date()),
+                "trough": str(ep.trough.date()),
+                "depth": ep.depth,
+                "weeks_peak_to_trough": int(round((ep.trough - ep.peak).days / 7)),
+                "weeks_trough_to_recovery": (
+                    int(round((back.index[0] - ep.trough).days / 7)) if len(back) else None
+                ),
+                "smallcap250_fall_same_window": ep.index_fall,
+            }
+        )
+    return rows
+
+
+def _worst_weeks(index: pd.Series, mine: dict[str, pd.Series]) -> list[dict]:
+    weekly = index.pct_change().dropna().nsmallest(5)
+    return [
+        {
+            "week": str(week.date()),
+            "index_return": float(ret),
+            **{
+                name: float(curve.pct_change().get(week, float("nan")))
+                for name, curve in mine.items()
+            },
+        }
+        for week, ret in weekly.items()
+    ]
+
+
+def stage_supplement() -> None:
+    """Addendum 7: the same variants on signal-delay-0 runs (signal Friday, buy Monday)."""
+    from momentum_backtesting import choose, criteria
+
+    dest = PKG / "search_spaces" / "bl010_four_sectors_supplement.json"
+    if dest.exists():
+        sys.exit(f"{dest.name} exists: the supplement runs once (addendum 7).")
+    if not RESULT.exists():
+        sys.exit("run `report` first: the supplement is read beside the registered result")
+    _, out = _dirs()
+    registered = json.loads(RESULT.read_text())
+    a3 = pd.read_parquet(out / "variant_curves.parquet")["A3_real_tags_and_tax"]
+    rec = _record()
+    runner = _runner()
+    base = runner.base(rec["heavy"])
+    heavy, light = rec["heavy"], rec["light"]
+    window = {"signal_delay": 0}
+    RUNS["count"] = 0
+    curves, stats, locks = {}, {}, None
+    for name, tags, taxed in (
+        ("S0_delay0_curated", "curated", False),
+        ("S1_delay0_extended", "extended", False),
+        ("S3_delay0_extended_tax", "extended", True),
+    ):
+        result, locks, _ = blend(
+            runner, base, heavy, light, tags=tags, taxed=taxed, locks=locks, window=window
+        )
+        curves[name] = _curve(result)
+        stats[name] = _stats(curves[name])
+        print(f"{name}: {stats[name]}", flush=True)
+    monday = _monday_open(runner, rec, base, locks, window)
+    print("monday-open (delay 0):", {k: v for k, v in monday.items() if k != "sleeves"}, flush=True)
+
+    s3 = curves["S3_delay0_extended_tax"]
+    span = s3.index
+    cutoff = min(runner.refs[n].dropna().index[-1] for n in (N50, SMALL, MID, N500))
+    short_span = span[span <= cutoff]
+    bench = {MOM30: _bench(runner, span, MOM30)}
+    bench.update({n: _bench(runner, short_span, n) for n in (N50, SMALL, MID, N500)})
+    mom = bench[MOM30]
+    mom_cagr = float(choose.cagr(mom))
+    s3_stats = stats["S3_delay0_extended_tax"]
+    e0 = {
+        "cagr": s3_stats["cagr"] + monday["cagr_change"],
+        "mdd": s3_stats["mdd"] + monday["mdd_change"],
+    }
+    indices = {SMALL: bench[SMALL], MID: bench[MID]}
+    ceiling = criteria.load()["baskets"]["medium"]["hard_ceiling"]
+    medium = criteria.basket_passes(s3.loc[:cutoff], indices, "medium")
+    fys = choose.complete_fys(span)
+    fy = pd.DataFrame(
+        {
+            "S3": {y: choose.window_returns(s3, *choose.fy_bounds(y)) for y in fys},
+            MOM30: {y: choose.window_returns(mom, *choose.fy_bounds(y)) for y in fys},
+        }
+    )
+    excess = fy["S3"] - fy[MOM30]
+    cash = runner.common["outer_prices"]["Cash (liquid fund)"]
+    factors = choose.factor_regression(s3, cash, bench[N50], bench[SMALL], mom)
+    gates = {
+        "S_G1": {
+            "pass": bool(e0["cagr"] - mom_cagr >= G1_EXCESS_OVER_MOM30),
+            "se_cagr": e0["cagr"],
+            "mom30_cagr": mom_cagr,
+            "excess_pts": (e0["cagr"] - mom_cagr) * 100,
+        },
+        "S_G2": {
+            "pass": bool(medium and e0["mdd"] >= ceiling),
+            "s3_passes_medium": bool(medium),
+            "s3_mdd": s3_stats["mdd"],
+            "se_mdd": e0["mdd"],
+        },
+        "S_G3": {
+            "pass": bool(excess.min() >= G3_WORST_FY_VS_MOM30),
+            "worst_fy": int(excess.idxmin()),
+            "worst_fy_excess_pts": float(excess.min() * 100),
+            "fy_table": {int(y): {k: float(v) for k, v in row.items()} for y, row in fy.iterrows()},
+        },
+        "S_G5": {
+            "pass": bool(factors["alpha_pa"] >= G5_ALPHA and abs(factors["alpha_t"]) >= G5_ABS_T),
+            **factors,
+        },
+        "G4_carried": registered["gates"]["G4_plateau"]["pass"],
+        "G6_carried": registered["gates"]["G6_fair_placebo"]["pass"],
+    }
+    soft_fails = sum(not gates[k] for k in ("G4_carried", "G6_carried")) + (
+        not gates["S_G5"]["pass"]
+    )
+    if not gates["S_G1"]["pass"] or soft_fails >= 2:
+        verdict = "DOES_NOT_HOLD_UP"
+    elif gates["S_G2"]["pass"] and gates["S_G3"]["pass"] and soft_fails <= 1:
+        verdict = "HOLDS_UP"
+    else:
+        verdict = "MIXED"
+    small, mid = bench[SMALL], bench[MID]
+    result = {
+        "written": date.today().isoformat(),
+        "criteria": "bl010_criteria_addendum_7.json",
+        "window": [str(span[0].date()), str(span[-1].date())],
+        "benchmark_cutoff": str(cutoff.date()),
+        "variants": stats,
+        "monday_open_delay0": monday,
+        "se_expected_case": e0,
+        "gates": gates,
+        "supplement_verdict": verdict,
+        "registered_verdict": registered["verdict"],
+        "registered_e_expected_case": registered["e_expected_case"],
+        "falls_10pct_or_more": {
+            "A3_delay1": _falls(a3.loc[:cutoff], small),
+            "S3_delay0": _falls(s3.loc[:cutoff], small),
+        },
+        "worst_weeks": {
+            "smallcap250": _worst_weeks(small, {"A3": a3, "S3": s3}),
+            "midcap150": _worst_weeks(mid, {"A3": a3, "S3": s3}),
+        },
+        "backtests_run": RUNS["count"],
+    }
+    dest.write_text(json.dumps(result, indent=1, default=str) + "\n")
+    print(
+        json.dumps(
+            {
+                "supplement_verdict": verdict,
+                "registered": registered["verdict"],
+                **{k: (v if isinstance(v, bool) else v["pass"]) for k, v in gates.items()},
+            },
+            indent=1,
+        )
+    )
+
+
 STAGES = {
     "reproduce": stage_reproduce,
     "variants": stage_variants,
     "neighbours": stage_neighbours,
     "placebo": stage_placebo,
     "report": stage_report,
+    "supplement": stage_supplement,
 }
 
 if __name__ == "__main__":
