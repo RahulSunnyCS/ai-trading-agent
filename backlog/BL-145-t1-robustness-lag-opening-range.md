@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — follows BL-144; the owner trades T1 with real money and wants to know whether the lead is real |
-| **Status** | In progress |
+| **Status** | Done: T1 broad; no lag seen; opening-range gate works but thin (confirmed on the rule, interval includes zero) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-21 |
@@ -79,3 +79,11 @@ None.
 ## Log
 
 - 2026-10-21 — created and pre-registered before any run. The owner chose Q2 to Q4; Q1 (charges) not run.
+- 2026-10-21 — ran (`research/bl145/run.py`). Q2: **broad**: T1 keeps 69% of its total without its best 10 days
+  (Core 62%; 3 x Widesl -76,337 and Base -6,592 without theirs), 11 of 11 months positive, T1 minus Core +228
+  per lot-day [+81, +376]. Q3: surprise-wide (13 events) T1 +1,225 on the day, +151 [-151, +454] over
+  sessions +1 to +5 against its mean: no lag; calm-down 7 events: too few. Q4 learning: low minus high OR on
+  quiet-week days +1,446 [+426, +2,578] (46 vs 7 days): works. Confirmation, run once with the same cuts:
+  +723 [-92, +1,879] (22 vs 5 days): confirmed by the rule (same sign, >= +250), thin. Findings page
+  `research/options/common/t1-robustness-and-lag.md`.
+

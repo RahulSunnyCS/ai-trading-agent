@@ -748,7 +748,7 @@ Owner (2026-10-21): follow-ups to BL-144 (breadth, lag after a regime change, op
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.38.1 | Pre-registration committed | claude | **Done 2026-10-21** |
-| 3.38.2 | Run Q2-Q4 (Q4 learning, then one confirmation run), findings page | claude | In progress |
+| 3.38.2 | Run Q2-Q4 (Q4 learning, then one confirmation run), findings page | claude | **Done 2026-10-21.** Broad; no lag; gate works but thin; `research/options/common/t1-robustness-and-lag.md` |
 
 ## Reference — where detail lives
 
