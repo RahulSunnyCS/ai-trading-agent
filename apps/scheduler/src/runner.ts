@@ -3,6 +3,7 @@ import { closeSync, mkdirSync, openSync, writeSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 import type { History, Trigger } from './history.js';
 import { JOBS, type Job } from './jobs.js';
+import { pausedReason } from './pause.js';
 import { formatIst, istDay } from './schedule.js';
 import { heldReason } from './stop-hold.js';
 
@@ -175,9 +176,9 @@ export function runJob(
       fd = openSync(logPath, 'a');
       const logFd = fd;
       for (attempts = 1; attempts <= job.retries + 1; attempts++) {
-        // BL-143: the stop button's hold, checked after any wait for the group and before every
-        // attempt, whoever started the run (schedule, catch-up, `jobs run`, Apply now).
-        const held = heldReason(job.id, ctx.env);
+        // BL-143: the stop button's hold (and BL-140's pause), checked after any wait for the group
+        // and before every attempt, whoever started the run (schedule, catch-up, `jobs run`, Apply now).
+        const held = heldReason(job.id, ctx.env) ?? pausedReason(job.id, ctx.env, now());
         if (held) {
           writeSync(logFd, `\n=== ${job.id} · ${trigger} · ${formatIst(now())} IST: ${held}\n`);
           const tried = attempts - 1;

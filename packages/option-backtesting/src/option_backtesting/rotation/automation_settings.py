@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 
+_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 PLATFORMS = ("algotest", "quantiply")
 BROKERS = ("finvasia", "angelone")
 
@@ -19,11 +21,36 @@ DEFAULT = {
     "version": 0,
     "masters": {"logins": True, "uploads": True, "deploy": False},
     "rows": {
-        "algotest.finvasia": {"login": True, "list": "t1", "upload": True},
-        "algotest.angelone": {"login": False, "list": "none", "upload": False},
-        "quantiply.angelone": {"login": True, "list": "core", "upload": True},
-        "quantiply.finvasia": {"login": False, "list": "none", "upload": False},
+        "algotest.finvasia": {
+            "login": True,
+            "list": "t1",
+            "upload": True,
+            "multiplier": 1,
+            "addon": True,
+        },
+        "algotest.angelone": {
+            "login": False,
+            "list": "none",
+            "upload": False,
+            "multiplier": 1,
+            "addon": True,
+        },
+        "quantiply.angelone": {
+            "login": True,
+            "list": "core",
+            "upload": True,
+            "multiplier": 1,
+            "addon": True,
+        },
+        "quantiply.finvasia": {
+            "login": False,
+            "list": "none",
+            "upload": False,
+            "multiplier": 1,
+            "addon": True,
+        },
     },
+    "pause": {"until": None},
 }
 
 
@@ -50,7 +77,32 @@ def read(path: Path | None = None) -> tuple[dict, str]:
                 raise ValueError(f"{path}: row {p}.{b} missing")
             if row.get("list") not in ("none", "core", "t1"):
                 raise ValueError(f"{path}: row {p}.{b} has list {row.get('list')!r}")
+            # A snapshot written before Phase 4 has neither field: 1 and yes, what the jobs did.
+            # A bad value is an error, never a guess: a wrong multiplier changes a real order.
+            multiplier = row.get("multiplier", 1)
+            if (
+                isinstance(multiplier, bool)
+                or not isinstance(multiplier, int)
+                or not 1 <= multiplier <= 10
+            ):
+                raise ValueError(f"{path}: row {p}.{b} has multiplier {row.get('multiplier')!r}")
+            addon = row.get("addon", True)
+            if not isinstance(addon, bool):
+                raise ValueError(f"{path}: row {p}.{b} has addon {row.get('addon')!r}")
+            row["multiplier"], row["addon"] = multiplier, addon
+    pause = data.get("pause") or {}
+    until = pause.get("until") if isinstance(pause, dict) else "?"
+    if until is not None and not (isinstance(until, str) and _DAY.fullmatch(until)):
+        raise ValueError(f"{path}: pause.until is {until!r}")
+    data["pause"] = {"until": until}
     return data, f"settings v{data.get('version', 0)}"
+
+
+def paused_for(settings: dict, session: str) -> str | None:
+    """The pause's last day when a session on `session` (an IST day, YYYY-MM-DD) is paused, else
+    None. Inclusive."""
+    until = (settings.get("pause") or {}).get("until")
+    return until if until is not None and session <= until else None
 
 
 def upload_books(settings: dict, platform: str, broker: str | None = None) -> list[str]:

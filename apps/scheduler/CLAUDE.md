@@ -63,9 +63,15 @@ summary flags anything but `main`).
   the prefs file from `@trading/notify`, written atomically), `GET`/`PUT /settings/automation`
   (BL-140, below). The dashboard reaches it through the
   `SCHEDULER_DIRECT` rewrite `/api/scheduler/*`. Never bind it beyond loopback.
+- `src/pause.ts` — BL-140 Phase 4: while the settings' pause covers a job's session (the evening jobs prepare the
+  next trading session, the morning top-ups and deploys are for today), `PAUSE_JOBS` (= the stop hold's jobs) are
+  held by `runJob` and the API's run routes (`pausedReason`, beside `heldReason`); unreadable settings hold them too.
+  `quantiply-disable` and the read-only jobs are never held. `nextSession` feeds the page's "Skip next session";
+  the 09:00 summary says a pause is on (`pauseNotice`).
 - `src/automation.ts` — BL-140's automation settings. Three master switches (logins, uploads, deploy) and one
-  row per platform + broker (`algotest|quantiply` × `finvasia|angelone`: login, list none/core/t1, upload),
-  validated (unknown keys refused).
+  row per platform + broker (`algotest|quantiply` × `finvasia|angelone`: login, list none/core/t1, upload,
+  `multiplier` 1-10, `addon`) and a `pause.until` day, validated (unknown keys refused). Versions saved before
+  Phase 4 lack the new fields and read as 1, yes and no pause (`withDefaults`).
   - Every save is a new version in `scheduler.db` (`automation_settings`). Only the `github` outcome column is
     ever written after the insert.
   - The current version is written atomically to `automation-settings.json` beside it (also on `serve` start);

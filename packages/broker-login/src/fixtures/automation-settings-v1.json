@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "saved_at": "2026-10-20T09:07:59.258Z",
+  "masters": {
+    "logins": true,
+    "uploads": true,
+    "deploy": true
+  },
+  "rows": {
+    "algotest.finvasia": {
+      "login": true,
+      "list": "t1",
+      "upload": true
+    },
+    "algotest.angelone": {
+      "login": false,
+      "list": "none",
+      "upload": false
+    },
+    "quantiply.finvasia": {
+      "login": false,
+      "list": "none",
+      "upload": false
+    },
+    "quantiply.angelone": {
+      "login": true,
+      "list": "core",
+      "upload": true
+    }
+  }
+}

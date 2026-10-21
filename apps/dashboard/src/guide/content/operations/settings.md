@@ -35,8 +35,17 @@ Three master switches, then one block per platform and broker.
   - **Adaptive Classic** is the live Core list;
   - **Adaptive Tuned** is the T1 list.
 - **Upload the list's picks:** the evening job puts tomorrow's picks there, and the 09:16 top-up adds any that changed. It needs a list.
+- **Multiplier:** a whole number from 1 to 10 (1 unless you set it): the platform multiplier the strategies would run at. **Saved only for now:** uploads and deploys do not use it yet.
+- **Include the Buy add-on:** whether the Buy add-on picks go with the list. **Saved only for now:** uploads and deploys do not use it yet.
 
 A warning badge on a block means its master switch holds it back.
+
+**Pause uploads and deploys.** Below the blocks, pick a day, or press **Skip next session**, to stop every upload, top-up and deploy for each session up to and including that day. **Clear pause** removes it.
+
+- The evening jobs prepare the next trading session; the 09:16–09:21 top-ups and deploys are for today. A pause through Monday therefore also holds Friday's evening jobs.
+- Logins, the picks, the results, the live capture and the checks carry on, and the 09:00 morning message says a pause is on.
+- A pause removes nothing already uploaded or enabled. The Telegram stop button squares off, and the 15:40 Quantiply switch-off still runs.
+- If the saved settings cannot be read, the upload and deploy jobs hold and say so, rather than assume there is no pause.
 
 **Saving.** Your edits are a draft until **Save**. The changes are listed above the button, and **Discard changes** puts the saved settings back. Each save:
 
