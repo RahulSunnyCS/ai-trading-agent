@@ -1,153 +1,133 @@
 {
- "followed": "Four Sectors Monthly, No Tilt \u00b7 all Fridays",
- "decided": "2026-10-20 (owner, BL-142 open question 1)",
- "source": "run id fbb7ab054238 of search_spaces/round7_A.toml (data/search/round7_A/results-*.jsonl), heavy and light copied unchanged; the rebalance_offset of the search record is dropped because the four sleeves cover offsets 0 to 3",
- "rule": "Written once for BL-025's weekly check (live_rules.py). Never edit: a different followed strategy is a new file named in live_rules.toml.",
- "sleeves": 4,
- "configs": [
-  {
-   "id": "fbb7ab054238#0",
-   "run_id": "fbb7ab054238",
-   "rebalance_every": 4,
-   "heavy": {
-    "series_break_policy": "verified",
-    "liq_min_turnover_cr": 2.0,
-    "liq_min_price": 30.0,
-    "liq_floor_ratio": 0.25,
-    "liq_circuit": true,
-    "liq_circuit_run": 3,
-    "voladj_skip_recent_month": true,
-    "lookbacks": [
-     4,
-     13,
-     26,
-     52
-    ],
-    "weight_scheme": "long",
-    "score": "voladj"
-   },
-   "light": {
-    "coverage_floor": 0.0313,
-    "pool_top_n": 193,
-    "category_top_n": 4,
-    "picks_per_category": 1,
-    "max_position": 0.25,
-    "rebalance_every": 4,
-    "entry": "wait",
-    "stock_tilt": 0.0,
-    "pool_exit_rank": 364,
-    "category_exit_rank": 11,
-    "rebalance_offset": 0
-   },
-   "rebalance_offset": 0
-  },
-  {
-   "id": "fbb7ab054238#1",
-   "run_id": "fbb7ab054238",
-   "rebalance_every": 4,
-   "heavy": {
-    "series_break_policy": "verified",
-    "liq_min_turnover_cr": 2.0,
-    "liq_min_price": 30.0,
-    "liq_floor_ratio": 0.25,
-    "liq_circuit": true,
-    "liq_circuit_run": 3,
-    "voladj_skip_recent_month": true,
-    "lookbacks": [
-     4,
-     13,
-     26,
-     52
-    ],
-    "weight_scheme": "long",
-    "score": "voladj"
-   },
-   "light": {
-    "coverage_floor": 0.0313,
-    "pool_top_n": 193,
-    "category_top_n": 4,
-    "picks_per_category": 1,
-    "max_position": 0.25,
-    "rebalance_every": 4,
-    "entry": "wait",
-    "stock_tilt": 0.0,
-    "pool_exit_rank": 364,
-    "category_exit_rank": 11,
-    "rebalance_offset": 1
-   },
-   "rebalance_offset": 1
-  },
-  {
-   "id": "fbb7ab054238#2",
-   "run_id": "fbb7ab054238",
-   "rebalance_every": 4,
-   "heavy": {
-    "series_break_policy": "verified",
-    "liq_min_turnover_cr": 2.0,
-    "liq_min_price": 30.0,
-    "liq_floor_ratio": 0.25,
-    "liq_circuit": true,
-    "liq_circuit_run": 3,
-    "voladj_skip_recent_month": true,
-    "lookbacks": [
-     4,
-     13,
-     26,
-     52
-    ],
-    "weight_scheme": "long",
-    "score": "voladj"
-   },
-   "light": {
-    "coverage_floor": 0.0313,
-    "pool_top_n": 193,
-    "category_top_n": 4,
-    "picks_per_category": 1,
-    "max_position": 0.25,
-    "rebalance_every": 4,
-    "entry": "wait",
-    "stock_tilt": 0.0,
-    "pool_exit_rank": 364,
-    "category_exit_rank": 11,
-    "rebalance_offset": 2
-   },
-   "rebalance_offset": 2
-  },
-  {
-   "id": "fbb7ab054238#3",
-   "run_id": "fbb7ab054238",
-   "rebalance_every": 4,
-   "heavy": {
-    "series_break_policy": "verified",
-    "liq_min_turnover_cr": 2.0,
-    "liq_min_price": 30.0,
-    "liq_floor_ratio": 0.25,
-    "liq_circuit": true,
-    "liq_circuit_run": 3,
-    "voladj_skip_recent_month": true,
-    "lookbacks": [
-     4,
-     13,
-     26,
-     52
-    ],
-    "weight_scheme": "long",
-    "score": "voladj"
-   },
-   "light": {
-    "coverage_floor": 0.0313,
-    "pool_top_n": 193,
-    "category_top_n": 4,
-    "picks_per_category": 1,
-    "max_position": 0.25,
-    "rebalance_every": 4,
-    "entry": "wait",
-    "stock_tilt": 0.0,
-    "pool_exit_rank": 364,
-    "category_exit_rank": 11,
-    "rebalance_offset": 3
-   },
-   "rebalance_offset": 3
-  }
- ]
+  "followed": "Four Sectors Monthly, No Tilt \u00b7 all Fridays",
+  "decided": "2026-10-20 (owner, BL-142 open question 1)",
+  "source": "run id fbb7ab054238 of search_spaces/round7_A.toml (data/search/round7_A/results-*.jsonl), heavy and light copied unchanged; the rebalance_offset of the search record is dropped because the four sleeves cover offsets 0 to 3",
+  "rule": "Written once for BL-025's weekly check (live_rules.py). Never edit: a different followed strategy is a new file named in live_rules.toml.",
+  "sleeves": 4,
+  "configs": [
+    {
+      "id": "fbb7ab054238#0",
+      "run_id": "fbb7ab054238",
+      "rebalance_every": 4,
+      "heavy": {
+        "series_break_policy": "verified",
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "lookbacks": [4, 13, 26, 52],
+        "weight_scheme": "long",
+        "score": "voladj"
+      },
+      "light": {
+        "coverage_floor": 0.0313,
+        "pool_top_n": 193,
+        "category_top_n": 4,
+        "picks_per_category": 1,
+        "max_position": 0.25,
+        "rebalance_every": 4,
+        "entry": "wait",
+        "stock_tilt": 0.0,
+        "pool_exit_rank": 364,
+        "category_exit_rank": 11,
+        "rebalance_offset": 0
+      },
+      "rebalance_offset": 0
+    },
+    {
+      "id": "fbb7ab054238#1",
+      "run_id": "fbb7ab054238",
+      "rebalance_every": 4,
+      "heavy": {
+        "series_break_policy": "verified",
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "lookbacks": [4, 13, 26, 52],
+        "weight_scheme": "long",
+        "score": "voladj"
+      },
+      "light": {
+        "coverage_floor": 0.0313,
+        "pool_top_n": 193,
+        "category_top_n": 4,
+        "picks_per_category": 1,
+        "max_position": 0.25,
+        "rebalance_every": 4,
+        "entry": "wait",
+        "stock_tilt": 0.0,
+        "pool_exit_rank": 364,
+        "category_exit_rank": 11,
+        "rebalance_offset": 1
+      },
+      "rebalance_offset": 1
+    },
+    {
+      "id": "fbb7ab054238#2",
+      "run_id": "fbb7ab054238",
+      "rebalance_every": 4,
+      "heavy": {
+        "series_break_policy": "verified",
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "lookbacks": [4, 13, 26, 52],
+        "weight_scheme": "long",
+        "score": "voladj"
+      },
+      "light": {
+        "coverage_floor": 0.0313,
+        "pool_top_n": 193,
+        "category_top_n": 4,
+        "picks_per_category": 1,
+        "max_position": 0.25,
+        "rebalance_every": 4,
+        "entry": "wait",
+        "stock_tilt": 0.0,
+        "pool_exit_rank": 364,
+        "category_exit_rank": 11,
+        "rebalance_offset": 2
+      },
+      "rebalance_offset": 2
+    },
+    {
+      "id": "fbb7ab054238#3",
+      "run_id": "fbb7ab054238",
+      "rebalance_every": 4,
+      "heavy": {
+        "series_break_policy": "verified",
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "lookbacks": [4, 13, 26, 52],
+        "weight_scheme": "long",
+        "score": "voladj"
+      },
+      "light": {
+        "coverage_floor": 0.0313,
+        "pool_top_n": 193,
+        "category_top_n": 4,
+        "picks_per_category": 1,
+        "max_position": 0.25,
+        "rebalance_every": 4,
+        "entry": "wait",
+        "stock_tilt": 0.0,
+        "pool_exit_rank": 364,
+        "category_exit_rank": 11,
+        "rebalance_offset": 3
+      },
+      "rebalance_offset": 3
+    }
+  ]
 }
