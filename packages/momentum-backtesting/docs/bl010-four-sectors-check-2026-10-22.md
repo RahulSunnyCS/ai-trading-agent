@@ -31,7 +31,7 @@ because they overlap. The tax is the same 8-9 points BL-085 measured.
 | G1 minimum bar, 5 points over Mom30 after tax | **pass** | E is +9.5 points (+11.2 with no Monday cost) |
 | G2 medium drawdown basket | **fail** | worst fall -32.8% (E -33.2%): past the 30% fixed limit and the Smallcap 250 rule; inside the -40% ceiling; passes the aggressive basket (reported) |
 | G3 no year more than 10 points behind Mom30 | **fail** | FY2024: 47.5% against Mom30's 70.0%, 22.5 points behind |
-| G4 plateau | pass | all 22 one-step neighbours are 32-45%, median 44.5% (-0.4); 6 of them are copies of A0 by construction (this score ignores lookbacks and weights); without them 15 neighbours, median -0.9, lowest `score ranksum` 32.2% |
+| G4 plateau | pass | all 22 one-step neighbours are 32-45%, median 44.5% (-0.4); 7 of them are copies of A0 (this score ignores lookbacks and weights, 6 neighbours, and `coverage_floor 0.0013` does not bind); without them 15 neighbours, median -0.9, lowest `score ranksum` 32.2% |
 | G5 alpha | pass, barely | 12.2% a year, t 2.03 against the 2.0 line; market beta 0.87, size 0.65, momentum 0.31 |
 | G6 fair placebo | pass | 44.9% against the placebo's 95th percentile 23.9%, +21 points |
 
@@ -49,8 +49,10 @@ because they overlap. The tax is the same 8-9 points BL-085 measured.
 - **Selection:** the config is in the top 0.8% of the 8,003 over the whole window (98th percentile
   in 2017-04 to 2022-03, 93rd in 2022-04 to 2026-03). The median config makes 28.1% pre-tax. The
   2017-2026 numbers are a selected result, so read E as an upper-leaning estimate.
-- **Monday open:** 1.6 points of CAGR and 0.5 of drawdown. It comes from the independent replay,
-  not the engine; the engine still fills at the Friday close (BL-010 E13 stays open).
+- **Monday open:** 1.6 points of CAGR and 0.5 of drawdown on the registered (signal-delay-1)
+  runs; on the signal-delay-0 runs that match your trade (signal Friday, buy Monday) it is 1.9
+  points and 1.1 of drawdown (supplement below). It comes from the independent replay, not the
+  engine; the engine still fills at the Friday close (BL-010 E13 stays open).
 
 ## What it cannot say
 
@@ -66,3 +68,36 @@ are judged to that week; G1 and G3 use all of the window.
   report step was edited once after it failed on the shorter benchmark series (the cutoff above) and
   once to add the A0 reproduction and the G4 figures without copies of A0. No gate, threshold or
   variant changed.
+
+## Supplement (addendum 7): the same on signal-delay-0 runs
+
+Code review found that the registered Monday-open measure used delay-1 runs, so its "next open" was
+a week and three days after the signal, not the Monday after it. Addendum 7 (committed before the run)
+repeats the variants with signal delay 0, which is your trade; the registered result above stays the record.
+Result: `search_spaces/bl010_four_sectors_supplement.json`.
+
+| | Registered (delay 1) | Supplement (delay 0) |
+|---|---|---|
+| Extended tags and tax | 27.7%, -32.8% | 27.4%, -32.8% |
+| Monday open, whole shares | -1.6 pts, -0.5 | -1.9 pts, -1.1 |
+| Expected case | 26.1%, -33.2% | **25.5%, -33.9%** |
+| Over Mom30 TRI (16.5%) | +9.5 pts | +9.0 pts |
+| Alpha (t) | 12.2% (2.03) | 11.9% (1.94) |
+| Worst year against Mom30 | FY2024, -22.5 pts | FY2024, -26.8 pts |
+| Verdict | MIXED | MIXED |
+
+The picture does not change: the minimum bar passes, the drawdown basket and the bad-year rule fail.
+Alpha now falls just under the t = 2 line (1.94), so it no longer passes; the registered G5 is a bare pass either way.
+
+Output addendum 6 listed and the first result left out:
+
+- **Falls of 10% or more (S3):** the long ones are Jan 2018 to Jan 2019 (-32.8%, 54 weeks down, 80 weeks
+  back to the old peak, about 2.6 years under water in all), Oct 2021 to Jun 2022 (-30.8%, 36 down, 22
+  back) and Jan to May 2025 (-22.6%, 17 down, 34 back). Registered A3 is similar (the 2018 fall: 41 down, 90 back).
+- **The Smallcap 250's five worst weeks:** 20 Mar 2020 (index -15.8%, strategy -7.8%), 13 Mar 2020 (-12.7%, -9.5%),
+  14 Feb 2025 (-9.6%, -8.6%), 28 Sep 2018 (-9.2%, -15.0%), 2 Feb 2018 (-8.5%, -11.9%). It fell more than the
+  index in the 2018 weeks and less in the 2020 and 2025 ones. The Midcap 150's worst weeks are in the result file.
+- Dropped: the financial-year table "of E". E is an estimate of two numbers, not a curve (addendum 7).
+
+Counts: the registered run recorded 512 backtests; it assumed four sleeves for every neighbour but one used two
+(about 510), and the reproduce stage added 8. The supplement ran 16.

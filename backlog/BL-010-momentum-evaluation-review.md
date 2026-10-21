@@ -561,3 +561,10 @@ Also parked here (owner, 2026-10-06), priority P3:
   report step was edited after its first failure (shorter benchmark series) and again for the A0
   reproduction; no gate or threshold changed. Live-money rules retargeted to this strategy on a
   separate branch (BL-025 Log).
+- 2026-10-22 — code review of PR 285 found that variant M measured the Monday-open cost on the
+  signal-delay-1 runs, not on the Monday after the signal. Addendum 7 (committed first) repeats the
+  variants on signal-delay-0 runs: expected case 25.5% with a -33.9% worst fall (registered 26.1%,
+  -33.2%); Monday-open cost 1.9 points of CAGR and 1.1 of drawdown (registered 1.6 and 0.5); same
+  gates pass and fail, alpha t 1.94 (just under 2). Supplement verdict MIXED, as registered. The
+  long falls took about 2.6 years to climb back (Jan 2018 to 2021). Outputs addendum 6 listed and the
+  result omitted are now in `bl010_four_sectors_supplement.json`. Doc and counts corrected.
