@@ -523,7 +523,7 @@ seen with an algo running: no algo of the owner's traded on 2026-10-20. The app 
 | leg `position: sell / buy` | `transactionType: "S" / "B"` |
 | leg `option_type` | `side: "CE" / "PE"` |
 | leg `expiry: weekly` | `expiryTag: "CURRENT_WEEK"` |
-| leg `lots: n` | `quantity: n` (lots), `multiplier: 1` |
+| leg `lots: n` | `quantity: n` (lots), `multiplier: 1` (in the export; BL-140 Phase 4: the uploader sets `configurations.multiplier` to the account row's 1-10 value, `quantiply-plan.ts` `withMultiplier`, read back by `readBackDiffs`; **a value above 1 has never been sent live**) |
 | `strike_type: ATM / ITMn / OTMn` | `selectionType: "STRIKE"`, `strike: "ATM" / "ITM_n" / "OTM_n"` |
 | `closest_premium: P` | `selectionType: "PREMIUM"`, `premium: {type: "PREMIUM_CLOSE_TO", value: P, specificStrikeSelection: false}` |
 | `stop_loss: {percent: p}` | `stoploss: {type: "PER_POSITION_PERCENT", value: -p}` |

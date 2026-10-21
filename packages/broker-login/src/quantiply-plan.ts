@@ -405,6 +405,30 @@ export const SERVER_KEYS = new Set([
  * server adds (its defaults) are ignored; every key we sent must come back unchanged. The same
  * rule as `legwise/quantiply.py`'s `comparable`.
  */
+/**
+ * BL-140 Phase 4: the export's text for an account whose row runs at `multiplier` (1-10): the
+ * algo's `configurations.multiplier` (1 in every export) set to it. At 1 the text is returned
+ * untouched, so the upload, its sha and the read-back are exactly what they were before the
+ * setting existed. The uploader, the deployer and the ledger's sha all go through here, so a
+ * changed multiplier is a changed algo (replaced in the evening) and an old one is never enabled.
+ * A body that is not an export (no `configurations`, or already not at 1) is refused.
+ */
+export function withMultiplier(text: string, multiplier: number): string {
+  if (!(Number.isInteger(multiplier) && multiplier >= 1 && multiplier <= 10)) {
+    throw new Error(`multiplier ${multiplier} is not a whole number from 1 to 10`);
+  }
+  if (multiplier === 1) return text;
+  const body = JSON.parse(text) as { configurations?: Record<string, unknown> };
+  const cfg = body.configurations;
+  if (!cfg || typeof cfg !== 'object' || cfg.multiplier !== 1) {
+    throw new Error(
+      `the export's configurations.multiplier is ${JSON.stringify(cfg?.multiplier)}, not 1: not applying ${multiplier}`,
+    );
+  }
+  cfg.multiplier = multiplier;
+  return JSON.stringify(body);
+}
+
 export function readBackDiffs(body: Record<string, unknown>, saved: unknown): string[] {
   const diffs: string[] = [];
   const walk = (sent: unknown, got: unknown, path: string): void => {

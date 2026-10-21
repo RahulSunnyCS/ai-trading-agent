@@ -8,6 +8,7 @@ import {
   type Automation,
   type Book,
   describeSource,
+  effectiveRow,
   quantiplyDeploy,
   readAutomation,
 } from './automation-settings.js';
@@ -41,6 +42,7 @@ import {
   parseQLedger,
   readBackDiffs,
   weekdayOf,
+  withMultiplier,
 } from './quantiply-plan.js';
 import { QUANTIPLY_SITES, parseQuantiplyBroker } from './quantiply-rules.js';
 import {
@@ -107,12 +109,13 @@ interface Picks {
   body: Map<string, Record<string, unknown>>;
 }
 
-async function readPicks(dir: string): Promise<Picks> {
+async function readPicks(dir: string, multiplier: number): Promise<Picks> {
   const manifest = await readJson<QManifest>(join(dir, 'manifest.json'));
   const sha = new Map<string, string>();
   const body = new Map<string, Record<string, unknown>>();
   for (const s of manifest.strategies) {
-    const text = await readFile(join(dir, s.file), 'utf8');
+    // the account row's multiplier (BL-140 Phase 4), as the uploader applied it: its ledger sha is of this text
+    const text = withMultiplier(await readFile(join(dir, s.file), 'utf8'), multiplier);
     sha.set(s.name, sha256(text));
     body.set(s.name, JSON.parse(text) as Record<string, unknown>);
   }
@@ -175,6 +178,8 @@ async function main(): Promise<number> {
   // The disable safety net reads nothing it does not use: no automation settings.
   let gate: ReturnType<typeof quantiplyDeploy> = { ok: false, book: null, why: '' };
   let decidedBy = 'settings not read (disable never needs them)';
+  /** the account row's platform multiplier the uploader applied (BL-140 Phase 4) */
+  let multiplier = 1;
   if (mode !== 'disable') {
     let automation: Automation;
     try {
@@ -185,6 +190,7 @@ async function main(): Promise<number> {
     }
     gate = quantiplyDeploy(automation, broker);
     decidedBy = describeSource(automation);
+    multiplier = effectiveRow(automation, 'quantiply', broker).multiplier;
   }
   // Gate 2: enabling also needs the dashboard's switch and the account's row.
   if (values.apply && mode === 'enable' && !gate.ok) {
@@ -249,7 +255,7 @@ async function main(): Promise<number> {
         return EXIT_RETRY;
       }
     }
-    picks = await readPicks(resolve(dir));
+    picks = await readPicks(resolve(dir), multiplier);
     const m = picks.manifest;
     // The picks must be the session's: the evening's preview, or today's recorded picks.
     const fits =

@@ -17,6 +17,7 @@ import {
   sessionOver,
   summaryQ,
   weekdayOf,
+  withMultiplier,
 } from './quantiply-plan.js';
 
 const P = 'Core · ';
@@ -388,4 +389,41 @@ test('brokerOutcome: enabled under the call is switched off; changed content is 
   assert.equal(changed.mismatch, true);
   assert.equal(changed.retry, false);
   assert.match(changed.note, /content changed under the broker call: configurations.startTime/);
+});
+
+test('withMultiplier: 1 is the export untouched, N sets only configurations.multiplier', () => {
+  const text = JSON.stringify({
+    name: 'Core · N_x_0917',
+    day: ['WED'],
+    configurations: { multiplier: 1, legs: [{ quantity: 2 }] },
+  });
+  // multiplier 1: the very same text, so its sha and the read-back are unchanged
+  assert.equal(withMultiplier(text, 1), text);
+  const three = JSON.parse(withMultiplier(text, 3));
+  assert.equal(three.configurations.multiplier, 3);
+  assert.deepEqual(three.configurations.legs, [{ quantity: 2 }]); // the lots stay the export's
+  assert.equal(three.name, 'Core · N_x_0917');
+  // deterministic: the uploader's sha and the deployer's are of the same text
+  assert.equal(withMultiplier(text, 3), withMultiplier(text, 3));
+  assert.notEqual(withMultiplier(text, 3), withMultiplier(text, 2));
+});
+
+test('withMultiplier refuses a bad multiplier or a body that is not at 1', () => {
+  const text = JSON.stringify({ configurations: { multiplier: 1 } });
+  for (const bad of [0, 11, 1.5, Number.NaN, -1]) assert.throws(() => withMultiplier(text, bad));
+  assert.throws(() => withMultiplier(JSON.stringify({ configurations: { multiplier: 2 } }), 3));
+  assert.throws(() => withMultiplier(JSON.stringify({ name: 'x' }), 3));
+  assert.throws(() => withMultiplier(JSON.stringify({ configurations: null }), 3));
+  // at 1 nothing is parsed or checked: an odd body passes through as it always did
+  assert.equal(withMultiplier('{"name":"x"}', 1), '{"name":"x"}');
+});
+
+test('the read-back catches a multiplier Quantiply saved differently from what was sent', () => {
+  const sent = JSON.parse(
+    withMultiplier(JSON.stringify({ day: ['WED'], configurations: { multiplier: 1 } }), 3),
+  );
+  assert.deepEqual(readBackDiffs(sent, { configurations: { multiplier: 3 } }), []);
+  assert.deepEqual(readBackDiffs(sent, { configurations: { multiplier: 1 } }), [
+    'configurations.multiplier',
+  ]);
 });
