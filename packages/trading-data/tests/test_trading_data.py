@@ -36,10 +36,11 @@ def test_fresh_catalog_migrates_once_and_loads_reference(root):
             ("011_momentum_result_changes",),
             ("012_momentum_orders",),
             ("013_momentum_kite",),
+            ("014_momentum_lots",),
         ]
         assert con.execute("SELECT count(*) FROM ref_lot_sizes").fetchone()[0] > 0
     with connect(root) as con:  # second open: nothing re-applied, nothing duplicated
-        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 13
+        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 14
 
 
 # The orders tables as the first draft of BL-051 Phase 3 created them, applied to the owner's live
@@ -148,7 +149,10 @@ def test_013_keeps_every_orders_row_and_accepts_kite(root):
         con.execute("DROP TABLE momentum_holding_rules")
         con.execute("DROP TABLE momentum_orders")
         con.execute(old_ddl)
-        con.execute("DELETE FROM schema_migrations WHERE version = '013_momentum_kite'")
+        con.execute(
+            "DELETE FROM schema_migrations WHERE version IN ('013_momentum_kite', "
+            "'014_momentum_lots')"
+        )
         con.execute(
             "INSERT INTO momentum_owner_settings (owner, min_trade_rs, holdings_source, "
             "paper_capital_rs) VALUES ('rahul', 7000, 'fyers', 50000)"

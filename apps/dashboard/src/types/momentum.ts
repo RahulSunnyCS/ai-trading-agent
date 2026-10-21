@@ -819,6 +819,8 @@ export interface MomentumOrderSettings {
   extra_cash_rs: number;
   holdings_source: 'paper' | 'fyers' | 'kite';
   paper_capital_rs: number;
+  /** A new weekly lot is funded with this much, or all free cash if more (BL-142). */
+  lot_size_rs: number;
   updated_at: string | null;
 }
 
@@ -832,6 +834,8 @@ export interface MomentumHoldingsSnapshot {
 
 export interface MomentumOrderRow {
   symbol: string;
+  /** The lot this order belongs to ("Lot 2"), when the strategy is followed lot by lot. */
+  lot?: string;
   /** SELL, TRIM, BUY, ADD, SKIP, HOLD (blocked), or '' (at the target). */
   action: string;
   held: number;
@@ -855,6 +859,20 @@ export interface MomentumOrderPlan {
   cash_after: number;
   not_traded: number;
   missing_prices: string[];
+}
+
+/** One lot of a group followed lot by lot, as the Friday run plans it. */
+export interface MomentumLotOrders {
+  id: string;
+  label: string;
+  name: string;
+  /** new: funded this week; rebalance: due; exit: only a forced exit; not due. */
+  status: 'new' | 'rebalance' | 'exit' | 'not due';
+  next: string | null;
+  budget: number | null;
+  holds: Record<string, number>;
+  outside: string[];
+  plan: MomentumOrderPlan | null;
 }
 
 /** One set of orders for a week, as `momentum_orders` keeps it. */
@@ -882,6 +900,17 @@ export interface MomentumOrders {
   prices?: string;
   sleeves?: MomentumWeekSleeve[];
   plan?: MomentumOrderPlan;
+  /** Followed lot by lot (BL-142 Phase 3): each lot's status and its own plan. */
+  lots?: MomentumLotOrders[];
+  /** What to add to Kite before buying a new lot. */
+  deposit_needed?: number;
+  lot_size?: number;
+  /** Shares to buy (+) or sell (-) per stock across all lots: one order per stock. */
+  net?: Record<string, number>;
+  ledger?: {
+    unexplained: Array<{ symbol: string; delta: number; reason: string }>;
+    booked: Array<{ sleeve_id: string; symbol: string; delta: number }>;
+  };
 }
 
 /** `GET /api/momentum/orders`. */

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — real money is already in (first ₹50k bought Mon 2026-10-19); the month's goal is Momentum the owner trusts with money (`overview.md`) |
-| **Status** | In progress — Phase 1 |
+| **Status** | In progress — Phases 1–3 built; Phase 4 (Lots panel) planned |
 | **Type** | feature |
 | **Area** | momentum / broker / dashboard / scheduler |
 | **Created** | 2026-10-19 |
@@ -225,4 +225,22 @@ Kite facts checked on 2026-10-19 ([portfolio](https://kite.trade/docs/connect/v3
   four weekly lots). The owner says Monday's first ₹50k (the five names bought 19 Oct) is from this
   strategy. Its status was set to Invested (still the headline) and Trio Fortnightly to Watching.
   Still to check on Fri 23 Oct: that the five BSE-listed holdings map to this strategy's names.
+- 2026-10-21 — Phases 2 and 3 built (before the first lot-by-lot Friday, 23 Oct). Design as built:
+  - a lot is a sleeve of the group, keyed by the saved-run id (the page's "Friday n of 4" is
+    renumbered from the paper start, so the engine's "Friday 4 of 4" is Lot 1, decided 16 Oct,
+    next due 13 Nov);
+  - the ledger books changes to the pending lot (the lot due on the last Friday the orders ran) and
+    refuses to guess: a purchase the lot cannot hold is *unexplained* until `mbt lots assign`;
+  - a new lot is funded with `lot_size_rs` (₹50,000) or all free cash when that is more, and the
+    message says what to add to Kite; a rebalancing lot gets its shares plus the free cash;
+  - **a lot that is not due never sells a difference from the model.** The first rehearsal (on a
+    copy of the live catalog) told the owner to sell the 1 GRWRHITECH in lot 1, because lot 1's
+    model target still held Nasdaq 100 and GRWRHITECH is the owner's swap for it. It now sells only
+    what the sleeve marks SELL. The swap is otherwise sold at the lot's next rebalance like any
+    holding the new target lacks (13 Nov for lot 1);
+  - the premium rule for Broad atomics (BL-136 Phase 1b) is not built: lots whose model holds a
+    blocked Nasdaq 100 still need the owner's swap by hand (the fallback is that week's rank-5
+    name; only five candidates exist for this strategy).
+  Rehearsal (a copy of the live catalog, Friday 23 Oct pinned, live prices): lot 1 not due, Lot 2
+  new ₹50,000: ACMESOLAR 30, CUPID 37, GRWRHITECH 1, NAZARA 30, add ₹45,491 to Kite.
 

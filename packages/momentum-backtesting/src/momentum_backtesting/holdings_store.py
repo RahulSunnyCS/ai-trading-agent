@@ -23,9 +23,16 @@ SETTINGS_DEFAULTS = {
     "extra_cash_rs": 0.0,
     "holdings_source": "paper",
     "paper_capital_rs": 100_000.0,
+    "lot_size_rs": 50_000.0,
     "updated_at": None,
 }
-SETTING_FIELDS = ("min_trade_rs", "extra_cash_rs", "holdings_source", "paper_capital_rs")
+SETTING_FIELDS = (
+    "min_trade_rs",
+    "extra_cash_rs",
+    "holdings_source",
+    "paper_capital_rs",
+    "lot_size_rs",
+)
 HOLDINGS_SOURCES = ("paper", "fyers", "kite")
 #: Held for options margin, never part of the strategy (owner, BL-142): LIQUIDBEES and every
 #: sovereign gold bond (symbols starting SGB). Always excluded: no holding rule overrides it, so
@@ -44,21 +51,15 @@ def _now() -> str:
 
 def settings(con: duckdb.DuckDBPyConnection, who: str) -> dict[str, Any]:
     row = con.execute(
-        "SELECT min_trade_rs, extra_cash_rs, holdings_source, paper_capital_rs, updated_at "
-        "FROM momentum_owner_settings WHERE owner = ?",
+        "SELECT min_trade_rs, extra_cash_rs, holdings_source, paper_capital_rs, "
+        "COALESCE(lot_size_rs, 50000), updated_at FROM momentum_owner_settings WHERE owner = ?",
         [who],
     ).fetchone()
     if row is None:
         return {"owner": who, **SETTINGS_DEFAULTS}
     return {
         "owner": who,
-        **dict(
-            zip(
-                (*SETTING_FIELDS[:2], "holdings_source", "paper_capital_rs", "updated_at"),
-                row,
-                strict=True,
-            )
-        ),
+        **dict(zip((*SETTING_FIELDS, "updated_at"), row, strict=True)),
     }
 
 
@@ -70,19 +71,20 @@ def save_settings(con: duckdb.DuckDBPyConnection, who: str, **changes: Any) -> d
     merged = {**current, **{k: v for k, v in changes.items() if v is not None}}
     if merged["holdings_source"] not in HOLDINGS_SOURCES:
         raise ValueError("holdings_source must be 'paper', 'fyers' or 'kite'.")
-    for key in ("min_trade_rs", "extra_cash_rs", "paper_capital_rs"):
+    for key in ("min_trade_rs", "extra_cash_rs", "paper_capital_rs", "lot_size_rs"):
         if float(merged[key]) < 0:
             raise ValueError(f"{key} cannot be negative.")
     con.execute(
         "INSERT OR REPLACE INTO momentum_owner_settings "
-        "(owner, min_trade_rs, extra_cash_rs, holdings_source, paper_capital_rs, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
+        "(owner, min_trade_rs, extra_cash_rs, holdings_source, paper_capital_rs, lot_size_rs, "
+        "updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [
             who,
             float(merged["min_trade_rs"]),
             float(merged["extra_cash_rs"]),
             merged["holdings_source"],
             float(merged["paper_capital_rs"]),
+            float(merged["lot_size_rs"]),
             _now(),
         ],
     )
