@@ -70,6 +70,8 @@ export interface QWanted {
 
 export interface QPlan {
   keep: string[];
+  /** the owned copies `keep` stands for (their content is the export's): checked for the broker */
+  kept: QAlgo[];
   create: QWanted[];
   /** owned algos to delete, with why they are deletable */
   delete: QAlgo[];
@@ -192,6 +194,7 @@ export function planQ(
   const mine = ownedIds(ledger);
   const out: QPlan = {
     keep: [],
+    kept: [],
     create: [],
     delete: [],
     heldBack: [],
@@ -222,8 +225,10 @@ export function planQ(
     for (const a of ours) handled.add(a.id);
     const fresh = ours.filter((a) => mine.get(a.id)?.sha === w.sha);
     if (mode === 'topup') {
-      if (fresh.length) out.keep.push(w.name);
-      else out.changed.push(w.name);
+      if (fresh.length) {
+        out.keep.push(w.name);
+        out.kept.push(...fresh);
+      } else out.changed.push(w.name);
       continue;
     }
     // Evening: keep one current copy; delete stale content (a strategy file was edited) and
@@ -235,8 +240,10 @@ export function planQ(
       continue;
     }
     out.delete.push(...extra);
-    if (fresh.length) out.keep.push(w.name);
-    else if (w.unconfirmed.length) out.unconfirmed.push(w);
+    if (fresh[0]) {
+      out.keep.push(w.name);
+      out.kept.push(fresh[0]);
+    } else if (w.unconfirmed.length) out.unconfirmed.push(w);
     else out.create.push(w);
   }
 
@@ -254,6 +261,84 @@ export function planQ(
     else out.heldBack.push(a);
   }
   return out;
+}
+
+/** An algo's broker as `GET /algos/:id` reads it (`parseDetail` in quantiply-deploy-plan.ts). */
+export interface BrokerState {
+  enabled: boolean;
+  /** '' = unset */
+  broker: string;
+}
+
+/**
+ * The uploader's broker step, before the call, for an owned algo whose content is the export's:
+ * `set` it to the account's broker, it is `done`, or it is skipped (why). Quantiply's broker menu
+ * is read-only once set, so another account's broker is never sent over; an enabled algo with
+ * none is left as the owner put it.
+ */
+export function brokerBefore(s: BrokerState, brokerId: string): 'set' | 'done' | { skip: string } {
+  if (s.broker === brokerId) return 'done';
+  if (s.broker) return { skip: 'its broker is another account' };
+  if (s.enabled) return { skip: 'ENABLED with no broker: left as it is' };
+  return 'set';
+}
+
+export interface BrokerOutcome {
+  ok: boolean;
+  /** for the run's report */
+  note: string;
+  /** enabled under the call: switch it off at once (the uploader never leaves one on) */
+  switchOff: boolean;
+  /** the content changed under the call: own it under a sha no export matches */
+  mismatch: boolean;
+  /** a later run may fix it (a network blip); otherwise the owner looks */
+  retry: boolean;
+}
+
+/**
+ * After the broker call, from one fresh read-back (`after`, or why it failed). `callError` is the
+ * call's own error; `refused` = a definite refusal (a 4xx, or never sent: `definitelyRefused`). A
+ * call that errored may still have applied, so the read-back decides. A read-back that failed
+ * leaves the content as it was checked before the call: never a mismatch, a retry (the next run
+ * finds the algo kept and checks it again).
+ */
+export function brokerOutcome(i: {
+  brokerId: string;
+  callError?: { text: string; refused: boolean };
+  after: BrokerState | { failed: string };
+  diffs: string[];
+}): BrokerOutcome {
+  if ('failed' in i.after) {
+    const why = i.callError ? `${i.callError.text}; read back: ${i.after.failed}` : i.after.failed;
+    return {
+      ok: false,
+      note: `broker not confirmed (${why})`,
+      switchOff: false,
+      mismatch: false,
+      retry: !i.callError?.refused,
+    };
+  }
+  const switchOff = i.after.enabled;
+  const mismatch = i.diffs.length > 0;
+  const set = i.after.broker === i.brokerId;
+  const notes: string[] = [];
+  if (switchOff) notes.push('ENABLED after the broker call');
+  if (mismatch)
+    notes.push(`content changed under the broker call: ${i.diffs.slice(0, 3).join(', ')}`);
+  if (!set) {
+    notes.push(
+      i.callError
+        ? `broker not set: ${i.callError.text}`
+        : 'broker reads back unset or another account',
+    );
+  }
+  return {
+    ok: !switchOff && !mismatch && set,
+    note: notes.length ? notes.join('; ') : 'broker set',
+    switchOff,
+    mismatch,
+    retry: !set && !switchOff && !mismatch && !!i.callError && !i.callError.refused,
+  };
 }
 
 export function summaryQ(p: QPlan, mode: Mode): string[] {

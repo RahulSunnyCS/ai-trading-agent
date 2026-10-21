@@ -5,6 +5,8 @@ import {
   type QAlgo,
   type QLedgerRow,
   type QWanted,
+  brokerBefore,
+  brokerOutcome,
   istWeekday,
   needsAttentionQ,
   ownedIds,
@@ -265,4 +267,125 @@ test('read-back: server defaults are ignored, a changed or missing field is not'
     'configurations.endTime',
     'configurations.legs[1].stoploss.value',
   ]);
+});
+
+test('kept lists the owned copy each kept pick stands for, evening and morning', () => {
+  const ledger = [
+    row('create', '1', `${P}A`),
+    row('create', '2', `${P}A`),
+    row('create', '3', `${P}B`, 'old'),
+  ];
+  const algos = [algo('1', `${P}A`, 'WED'), algo('2', `${P}A`, 'WED'), algo('3', `${P}B`, 'WED')];
+  const wants = [want(`${P}A`), want(`${P}B`)];
+  const evening = planQ('evening', 'WED', MON_AFTER_CLOSE, wants, ledger, algos);
+  // one current copy of A is kept (the duplicate is deleted); B's content changed: recreated
+  assert.deepEqual(
+    evening.kept.map((a) => a.id),
+    ['1'],
+  );
+  const morning = planQ(
+    'topup',
+    'WED',
+    { weekday: 'WED', sessionOver: false },
+    wants,
+    ledger,
+    algos,
+  );
+  assert.deepEqual(
+    morning.kept.map((a) => a.id),
+    ['1', '2'],
+  );
+  assert.deepEqual(morning.changed, [`${P}B`]);
+});
+
+test('brokerBefore sets an unset broker on a disabled algo only', () => {
+  assert.equal(brokerBefore({ enabled: false, broker: '' }, 'acct'), 'set');
+  assert.equal(brokerBefore({ enabled: true, broker: 'acct' }, 'acct'), 'done');
+  assert.deepEqual(brokerBefore({ enabled: false, broker: 'other' }, 'acct'), {
+    skip: 'its broker is another account',
+  });
+  assert.deepEqual(brokerBefore({ enabled: true, broker: '' }, 'acct'), {
+    skip: 'ENABLED with no broker: left as it is',
+  });
+});
+
+test('brokerOutcome: set and read back clean is ok', () => {
+  const o = brokerOutcome({
+    brokerId: 'acct',
+    after: { enabled: false, broker: 'acct' },
+    diffs: [],
+  });
+  assert.deepEqual(o, {
+    ok: true,
+    note: 'broker set',
+    switchOff: false,
+    mismatch: false,
+    retry: false,
+  });
+});
+
+test('brokerOutcome: a call that errored but applied is ok (the read-back decides)', () => {
+  const o = brokerOutcome({
+    brokerId: 'acct',
+    callError: { text: 'timeout', refused: false },
+    after: { enabled: false, broker: 'acct' },
+    diffs: [],
+  });
+  assert.equal(o.ok, true);
+});
+
+test('brokerOutcome: a blip is retried, a refusal is for the owner', () => {
+  const after = { enabled: false, broker: '' };
+  const blip = brokerOutcome({
+    brokerId: 'acct',
+    callError: { text: 'HTTP 502', refused: false },
+    after,
+    diffs: [],
+  });
+  assert.equal(blip.ok, false);
+  assert.equal(blip.retry, true);
+  assert.match(blip.note, /broker not set: HTTP 502/);
+  const refused = brokerOutcome({
+    brokerId: 'acct',
+    callError: { text: 'HTTP 400', refused: true },
+    after,
+    diffs: [],
+  });
+  assert.equal(refused.retry, false);
+  const silent = brokerOutcome({ brokerId: 'acct', after, diffs: [] });
+  assert.equal(silent.retry, false);
+  assert.match(silent.note, /reads back unset/);
+});
+
+test('brokerOutcome: a failed read-back is a retry, never a mismatch', () => {
+  const o = brokerOutcome({ brokerId: 'acct', after: { failed: 'HTTP 503' }, diffs: [] });
+  assert.equal(o.ok, false);
+  assert.equal(o.mismatch, false);
+  assert.equal(o.retry, true);
+  const refusedThenFailed = brokerOutcome({
+    brokerId: 'acct',
+    callError: { text: 'HTTP 400', refused: true },
+    after: { failed: 'HTTP 503' },
+    diffs: [],
+  });
+  assert.equal(refusedThenFailed.retry, false);
+});
+
+test('brokerOutcome: enabled under the call is switched off; changed content is a mismatch', () => {
+  const enabled = brokerOutcome({
+    brokerId: 'acct',
+    after: { enabled: true, broker: 'acct' },
+    diffs: [],
+  });
+  assert.equal(enabled.switchOff, true);
+  assert.equal(enabled.ok, false);
+  assert.equal(enabled.retry, false);
+  const changed = brokerOutcome({
+    brokerId: 'acct',
+    after: { enabled: false, broker: 'acct' },
+    diffs: ['configurations.startTime'],
+  });
+  assert.equal(changed.mismatch, true);
+  assert.equal(changed.retry, false);
+  assert.match(changed.note, /content changed under the broker call: configurations.startTime/);
 });
