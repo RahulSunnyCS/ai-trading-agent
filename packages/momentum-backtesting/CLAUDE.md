@@ -516,9 +516,13 @@ contract, not a shared service).
   lot per sleeve (BL-087). `momentum_lot_events` (append-only; a lot's shares are the sum of its
   deltas; trading-data migration 014) books shares to the saved-run id of a sleeve, never to the
   page's renumbered label. `reconcile` books each difference between Kite's holdings and the ledger
-  to the *pending* lot (`momentum_lot_state`: the lot due on the last Friday the orders ran;
-  moved only by a run on that Friday) and only for a name it may hold (its target or its current
-  shares); anything else is returned as unexplained, never guessed (`mbt lots assign`).
+  first against what each lot was told to trade (`momentum_lot_state.planned`, stored by the last
+  Friday run: a forced exit is booked to the lot told to sell it; the one net order a stock gets
+  is booked as planned), then the rest to the *pending* lot (the lot due on that Friday) when it
+  may hold the name (its target or its current shares; noted "beyond the planned orders"); anything
+  else is returned as unexplained, never guessed (`mbt lots assign`). The pending lot and the plan
+  move only on a run on the Friday itself with a Kite snapshot read that day. Symbols Kite still
+  holds that are not strategy names today are never booked as sold (`ignore`).
   `plan_lots`: each lot planned alone with `orders.plan`: a due lot with no shares is a *new lot*
   (funded with `lot_size_rs` or all free cash if more; `deposit_needed` is what to add to Kite),
   a due lot with shares rebalances with the free cash left, a lot not due sells only names its

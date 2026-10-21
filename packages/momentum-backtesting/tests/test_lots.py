@@ -69,6 +69,52 @@ def test_selling_more_than_the_lot_holds_books_what_it_holds_and_flags_the_rest(
     ]
 
 
+def test_a_forced_exit_in_a_lot_that_is_not_due_is_booked_to_that_lot_not_the_due_one():
+    # lot 1 is due and holds 40 CUPID; lot 2's sleeve marks CUPID SELL, so it was told to sell 37
+    ledger = {L1: {"CUPID": 40.0}, L2: {"CUPID": 37.0}}
+    planned = {L2: {"CUPID": -37.0}}
+    got = lots.reconcile({"CUPID": 40.0}, ledger, L1, _allowed(**{L1: {"CUPID"}}), planned)
+    assert got.unexplained == []
+    assert got.events == [
+        {"sleeve_id": L2, "symbol": "CUPID", "delta": -37.0, "kind": "attributed"}
+    ]
+    assert lots.apply(ledger, got.events) == {L1: {"CUPID": 40.0}}
+
+
+def test_one_net_order_a_stock_books_every_lot_as_planned():
+    # lot 2 was told to buy 73 CUPID while lot 1 exits 20: the one net order is BUY 53
+    ledger = {L1: {"CUPID": 20.0}}
+    planned = {L1: {"CUPID": -20.0}, L2: {"CUPID": 73.0}}
+    got = lots.reconcile({"CUPID": 73.0}, ledger, L2, _allowed(**{L2: {"CUPID"}}), planned)
+    booked = {(e["sleeve_id"], e["delta"]) for e in got.events}
+    assert booked == {(L1, -20.0), (L2, 73.0)} and got.unexplained == []
+
+
+def test_a_purchase_beyond_the_plan_is_booked_to_the_pending_lot_and_says_so():
+    ledger = {L1: {"CUPID": 28.0}}
+    planned = {
+        L2: {"CUPID": 36.0}
+    }  # the plan was for lot 2; the owner also topped up lot 1's CUPID
+    got = lots.reconcile(
+        {"CUPID": 28.0 + 36 + 6}, ledger, L1, _allowed(**{L1: {"CUPID"}, L2: {"CUPID"}}), planned
+    )
+    by = {e["sleeve_id"]: e for e in got.events}
+    assert by[L2]["delta"] == 36.0 and "note" not in by[L2]
+    assert by[L1]["delta"] == 6.0 and by[L1]["note"] == "beyond the planned orders"
+
+
+def test_a_symbol_kite_still_holds_but_the_strategy_no_longer_lists_is_never_booked_as_sold():
+    ledger = {L1: {"CUPID": 28.0, "NAZARA": 24.0}}
+    # NAZARA dropped out of the strategy's data today (not in `held`) but Kite still has it
+    got = lots.reconcile({"CUPID": 28.0}, ledger, L1, {}, ignore={"NAZARA"})
+    assert got.events == [] and got.unexplained == []
+    # a name Kite really no longer holds is a sale
+    got = lots.reconcile({"CUPID": 28.0}, ledger, L1, {}, ignore=set())
+    assert got.events == [
+        {"sleeve_id": L1, "symbol": "NAZARA", "delta": -24.0, "kind": "attributed"}
+    ]
+
+
 def test_the_ledger_is_stored_summed_and_cleared(tmp_path):
     with open_catalog() as con:
         assert not lots.has_ledger(con, "rahul", "g")
@@ -87,8 +133,17 @@ def test_the_ledger_is_stored_summed_and_cleared(tmp_path):
         assert lots.positions(con, "rahul", "g") == {L1: {"CUPID": 35.0}}  # NAZARA netted to zero
         assert lots.positions(con, "rahul", "other") == {}
         lots.set_pending(con, "rahul", "g", L2, "2026-10-23T14:15:00+05:30")
-        lots.set_pending(con, "rahul", "g", L3, "2026-10-30T14:15:00+05:30")
+        lots.set_pending(
+            con,
+            "rahul",
+            "g",
+            L3,
+            "2026-10-30T14:15:00+05:30",
+            {L3: {"CUPID": 36.0, "NAZARA": -5.0}},
+        )
         assert lots.pending(con, "rahul", "g") == L3
+        assert lots.pending_state(con, "rahul", "g")[1] == {L3: {"CUPID": 36.0, "NAZARA": -5.0}}
+        assert lots.funded(con, "rahul", "g") == {L1}  # a lot that has held a share, even if sold
         assert len(lots.history(con, "rahul", "g")) == 4
         lots.clear(con, "rahul", "g")
         assert lots.positions(con, "rahul", "g") == {} and lots.pending(con, "rahul", "g") is None
@@ -194,6 +249,27 @@ def test_a_lot_that_is_not_due_sells_only_what_its_sleeve_marks_sell():
     assert [(r["action"], r["symbol"], r["quantity"]) for r in only["plan"]["rows"]] == [
         ("SELL", "RATEGAIN", 12)
     ]  # not GRWRHITECH (no longer in the target) and no CUPID / NAZARA drift trades
+
+
+def test_a_due_lot_that_sold_out_is_rebalanced_not_funded_as_a_new_lot():
+    sold_out = lots.Lot(
+        "s1",
+        "Lot 1",
+        "Sleeve Lot 1",
+        True,
+        "2026-11-13",
+        {},
+        {"CUPID": 0.5, "NAZARA": 0.5},
+        has_history=True,
+    )
+    got = _plan([sold_out], 20_000.0)
+    lot = got["lots"][0]
+    assert lot["status"] == "rebalance" and lot["budget"] == 20_000.0
+    assert got["deposit_needed"] == 0.0  # no deposit after the ramp
+    never = lots.Lot(
+        "s2", "Lot 2", "Sleeve Lot 2", True, None, {}, {"CUPID": 1.0}, has_history=False
+    )
+    assert _plan([never], 20_000.0)["lots"][0]["status"] == "new"
 
 
 def test_a_rebalancing_lot_gets_its_own_shares_plus_the_free_cash():

@@ -18,12 +18,15 @@ CREATE TABLE IF NOT EXISTS momentum_lot_events (
     note       TEXT
 );
 
--- The lot whose orders were made most recently: the next change in Kite's holdings is booked to
--- it (the owner trades on Monday what Friday's orders said).
+-- The lot whose orders were made most recently, and what each lot was told to trade (JSON,
+-- {sleeve_id: {symbol: signed shares}}, sells negative): the next change in Kite's holdings is
+-- booked against those quantities first (the owner trades on Monday what Friday's orders said),
+-- and only what is left goes to the pending lot.
 CREATE TABLE IF NOT EXISTS momentum_lot_state (
     owner              TEXT NOT NULL,
     group_id           TEXT NOT NULL,
     pending_sleeve_id  TEXT,
+    planned            TEXT,
     updated_at         TEXT NOT NULL,
     PRIMARY KEY (owner, group_id)
 );

@@ -27,7 +27,12 @@ def client():
     return TestClient(api.create_app())
 
 
+_DAY = ["2026-10-21"]  # the date the stored snapshots and orders carry: the pinned Friday
+
+
 def _friday(monkeypatch, year, month, day):
+    _DAY[0] = f"{year}-{month:02d}-{day:02d}"
+
     class Fixed(datetime):
         @classmethod
         def now(cls, tz=None):
@@ -128,11 +133,12 @@ def _setup(client, monkeypatch, due_id_index, week):
 def _ticking_clock(monkeypatch):
     """Every stored snapshot and orders row gets its own second (a real run is never twice in
     one: both are keyed on it)."""
+    _DAY[0] = "2026-10-21"
     ticks = iter(range(1, 10_000))
 
     def now() -> str:
         n = next(ticks)
-        return f"2026-10-21T10:{n // 60:02d}:{n % 60:02d}+05:30"
+        return f"{_DAY[0]}T10:{n // 60:02d}:{n % 60:02d}+05:30"
 
     monkeypatch.setattr(holdings_store, "_now", now)
 
@@ -232,8 +238,8 @@ def test_a_top_up_before_friday_is_booked_to_lot_1_and_monday_s_buys_to_lot_2(cl
         {"symbol": "RATEGAIN", "quantity": 14.0},
         {"symbol": "GRWRHITECH", "quantity": 2.0},
     ]
-    _snapshot(topped, 1200.0)
     _friday(monkeypatch, 2026, 10, 23)
+    _snapshot(topped, 1200.0)
     first = api._compute_orders("scheduled")
     booked = {(e["sleeve_id"], e["symbol"]): e["delta"] for e in first["ledger"]["booked"]}
     assert booked == {
@@ -252,8 +258,8 @@ def test_a_top_up_before_friday_is_booked_to_lot_1_and_monday_s_buys_to_lot_2(cl
         {"symbol": "GRWRHITECH", "quantity": 3.0},
         {"symbol": "ACMESOLAR", "quantity": 30.0},
     ]
-    _snapshot(monday, 6000.0)
     _friday(monkeypatch, 2026, 10, 30)
+    _snapshot(monday, 6000.0)
     second = api._compute_orders("scheduled")
     booked = {(e["sleeve_id"], e["symbol"]): e["delta"] for e in second["ledger"]["booked"]}
     assert booked == {
@@ -285,8 +291,8 @@ def test_a_purchase_no_lot_can_hold_is_reported_not_booked(client, monkeypatch):
             "2026-10-20T12:25:13+05:30",
         )
         lots.set_pending(con, OWNER, gid, ids[0], "2026-10-20T12:25:13+05:30")
-    _snapshot(LOT1 + [{"symbol": "ACMESOLAR", "quantity": 5.0}], 4509.3)  # lot 1 cannot hold it
     _friday(monkeypatch, 2026, 10, 23)
+    _snapshot(LOT1 + [{"symbol": "ACMESOLAR", "quantity": 5.0}], 4509.3)  # lot 1 cannot hold it
     payload = api._compute_orders("scheduled")
     assert [(u["symbol"], u["delta"]) for u in payload["ledger"]["unexplained"]] == [
         ("ACMESOLAR", 5.0)
@@ -346,3 +352,76 @@ def test_seeding_books_the_strategys_holdings_to_the_lot_of_that_fridays_sleeve(
     assert api.seed_lots(week="2026-10-16", replace=True)["lot"] == "Lot 1"
     with open_catalog() as con:
         assert len(lots.history(con, OWNER, gid)) == 4  # replaced, not doubled
+
+
+def test_a_run_on_an_old_snapshot_does_not_move_the_pending_lot(client, monkeypatch):
+    gid, ids = _setup(client, monkeypatch, 1, "2026-10-23")
+    with open_catalog() as con:
+        lots.append(
+            con,
+            OWNER,
+            gid,
+            [
+                {"sleeve_id": ids[0], "symbol": r["symbol"], "delta": r["quantity"], "kind": "seed"}
+                for r in LOT1
+            ],
+            "2026-10-20T12:25:13+05:30",
+        )
+        lots.set_pending(con, OWNER, gid, ids[0], "2026-10-20T12:25:13+05:30")
+    _snapshot(LOT1, 4509.3)  # read on the 21st
+    _friday(monkeypatch, 2026, 10, 23)  # the run is on the 23rd: Kite was not read today
+    payload = api._compute_orders("manual")
+    assert payload["ledger"]["stale"] is True
+    assert "log in and press Sync" in api._orders_message(payload).body
+    with open_catalog() as con:
+        assert lots.pending(con, OWNER, gid) == ids[0]  # still lot 1: Monday's trades unseen
+
+
+def test_the_friday_run_stores_what_each_lot_was_told_to_trade(client, monkeypatch):
+    gid, ids = _setup(client, monkeypatch, 1, "2026-10-23")
+    _friday(monkeypatch, 2026, 10, 23)
+    with open_catalog() as con:
+        lots.append(
+            con,
+            OWNER,
+            gid,
+            [
+                {"sleeve_id": ids[0], "symbol": r["symbol"], "delta": r["quantity"], "kind": "seed"}
+                for r in LOT1
+            ],
+            "2026-10-20T12:25:13+05:30",
+        )
+        lots.set_pending(con, OWNER, gid, ids[0], "2026-10-20T12:25:13+05:30")
+    _snapshot(LOT1, 4509.3)
+    api._compute_orders("scheduled")
+    with open_catalog() as con:
+        pending_id, planned = lots.pending_state(con, OWNER, gid)
+    assert pending_id == ids[1]
+    assert planned == {ids[1]: {"ACMESOLAR": 30, "CUPID": 36, "GRWRHITECH": 1, "NAZARA": 30}}
+
+
+def test_a_symbol_that_drops_out_of_the_strategy_data_keeps_its_shares_in_the_lot(
+    client, monkeypatch
+):
+    gid, ids = _setup(client, monkeypatch, 1, "2026-10-23")
+    with open_catalog() as con:
+        lots.append(
+            con,
+            OWNER,
+            gid,
+            [
+                {"sleeve_id": ids[0], "symbol": r["symbol"], "delta": r["quantity"], "kind": "seed"}
+                for r in LOT1
+            ],
+            "2026-10-20T12:25:13+05:30",
+        )
+        lots.set_pending(con, OWNER, gid, ids[0], "2026-10-20T12:25:13+05:30")
+    _friday(monkeypatch, 2026, 10, 23)
+    _snapshot(LOT1, 4509.3)
+    # RATEGAIN has no price or rank today: the strategy's symbol map lacks it, Kite still holds it
+    narrowed = {k: v for k, v in SYMBOLS.items() if k != "RATEGAIN"}
+    monkeypatch.setattr(api, "_strategy_symbols", lambda rankings, today: (PRICES, narrowed))
+    payload = api._compute_orders("scheduled")
+    assert payload["ledger"]["booked"] == [] and payload["ledger"]["unexplained"] == []
+    with open_catalog() as con:
+        assert lots.positions(con, OWNER, gid)[ids[0]]["RATEGAIN"] == 12.0

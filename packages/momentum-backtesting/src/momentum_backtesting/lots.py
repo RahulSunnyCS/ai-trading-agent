@@ -24,6 +24,7 @@ short (the package's catalog rule).
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -94,21 +95,47 @@ def clear(con: duckdb.DuckDBPyConnection, who: str, group_id: str) -> None:
     con.execute("DELETE FROM momentum_lot_state WHERE owner = ? AND group_id = ?", [who, group_id])
 
 
-def pending(con: duckdb.DuckDBPyConnection, who: str, group_id: str) -> str | None:
+def funded(con: duckdb.DuckDBPyConnection, who: str, group_id: str) -> set[str]:
+    """Lots that have ever held a share: a due lot is *new* only if it is not in here (one that
+    sold out, or went to cash, is rebalanced, never funded as if it were the first week)."""
+    rows = con.execute(
+        "SELECT DISTINCT sleeve_id FROM momentum_lot_events WHERE owner = ? AND group_id = ?",
+        [who, group_id],
+    ).fetchall()
+    return {r[0] for r in rows}
+
+
+def pending_state(
+    con: duckdb.DuckDBPyConnection, who: str, group_id: str
+) -> tuple[str | None, dict[str, dict[str, float]]]:
+    """The lot whose orders were made last, and what each lot was told to trade then
+    (`{sleeve_id: {symbol: signed shares}}`)."""
     row = con.execute(
-        "SELECT pending_sleeve_id FROM momentum_lot_state WHERE owner = ? AND group_id = ?",
+        "SELECT pending_sleeve_id, planned FROM momentum_lot_state "
+        "WHERE owner = ? AND group_id = ?",
         [who, group_id],
     ).fetchone()
-    return row[0] if row else None
+    if not row:
+        return None, {}
+    return row[0], json.loads(row[1]) if row[1] else {}
+
+
+def pending(con: duckdb.DuckDBPyConnection, who: str, group_id: str) -> str | None:
+    return pending_state(con, who, group_id)[0]
 
 
 def set_pending(
-    con: duckdb.DuckDBPyConnection, who: str, group_id: str, sleeve_id: str | None, at: str
+    con: duckdb.DuckDBPyConnection,
+    who: str,
+    group_id: str,
+    sleeve_id: str | None,
+    at: str,
+    planned: dict[str, dict[str, float]] | None = None,
 ) -> None:
     con.execute(
         "INSERT OR REPLACE INTO momentum_lot_state "
-        "(owner, group_id, pending_sleeve_id, updated_at) VALUES (?, ?, ?, ?)",
-        [who, group_id, sleeve_id, at],
+        "(owner, group_id, pending_sleeve_id, planned, updated_at) VALUES (?, ?, ?, ?, ?)",
+        [who, group_id, sleeve_id, json.dumps(planned or {}), at],
     )
 
 
@@ -133,61 +160,127 @@ class Reconciled:
     unexplained: list[dict[str, Any]] = field(default_factory=list)
 
 
+def _note_beyond(planned: dict[str, dict[str, float]] | None) -> str | None:
+    return "beyond the planned orders" if planned else None
+
+
 def reconcile(
     held: dict[str, float],
     ledger: dict[str, dict[str, float]],
     pending_id: str | None,
     allowed: dict[str, set[str]],
+    planned: dict[str, dict[str, float]] | None = None,
+    ignore: set[str] | frozenset[str] = frozenset(),
 ) -> Reconciled:
     """Book what changed in Kite's holdings (`held`: base symbol -> shares, the strategy's names
-    only) to the lot whose orders were made last (`pending_id`).
+    only) to the lots.
 
-    A purchase is booked to that lot when it may hold the name (`allowed[lot]`: its target and its
-    current holdings). A sale is booked to the lot that holds the name (that lot first, else the
-    only holder). Everything else is `unexplained`: nothing is booked, so nothing is guessed."""
+    The last orders said what each lot should trade (`planned`: lot -> symbol -> signed shares).
+    A change is booked against those quantities first: a purchase to the lots that were told to buy
+    that stock, a sale to the lots told to sell it (so a forced exit in one lot is never booked to
+    another). What is left is the owner's own trade: a purchase goes to the lot whose orders were
+    made last (`pending_id`) when it may hold the name (`allowed[lot]`: its target and its current
+    holdings), a sale to the lot that holds the name (that lot first, else the only holder). Any
+    other difference is `unexplained`: nothing is booked, so nothing is guessed.
+
+    `ignore`: symbols Kite still holds that are not in `held` (outside the strategy today, or
+    excluded). The ledger cannot tell a sale from a name dropping out of the data, so these are
+    never booked as sold."""
     result = Reconciled()
+    plan = planned or {}
+    note = _note_beyond(plan)
     symbols = sorted(set(held) | {s for lot in ledger.values() for s in lot})
     for symbol in symbols:
+        if symbol in ignore and symbol not in held:
+            continue
         booked = sum(lot.get(symbol, 0.0) for lot in ledger.values())
         delta = held.get(symbol, 0.0) - booked
         if abs(delta) < EPS:
             continue
+        involved = [sid for sid, p in plan.items() if abs(p.get(symbol, 0.0)) > EPS]
+        # One order a stock: the orders asked for the lots' trades netted (lot 2 buys 73 while lot
+        # 1 sells 20: BUY 53). When Kite moved by exactly that, every lot did what it was told.
+        if len(involved) > 1 and abs(delta - sum(plan[sid][symbol] for sid in involved)) < EPS:
+            full = [
+                (sid, plan[sid][symbol])
+                for sid in involved
+                if plan[sid][symbol] > 0
+                or ledger.get(sid, {}).get(symbol, 0.0) + plan[sid][symbol] > -EPS
+            ]
+            if len(full) == len(involved):
+                for sid, qty in full:
+                    result.events.append(
+                        {"sleeve_id": sid, "symbol": symbol, "delta": qty, "kind": "attributed"}
+                    )
+                continue
+        order = sorted(set(plan) | set(ledger), key=lambda sid: (sid != pending_id, sid))
         if delta > 0:
-            if pending_id and symbol in allowed.get(pending_id, set()):
-                result.events.append(
-                    {
+            left = delta
+            for sid in order:
+                want = plan.get(sid, {}).get(symbol, 0.0)
+                if want > EPS and left > EPS:
+                    take = min(left, want)
+                    result.events.append(
+                        {"sleeve_id": sid, "symbol": symbol, "delta": take, "kind": "attributed"}
+                    )
+                    left -= take
+            if left > EPS:
+                if pending_id and symbol in allowed.get(pending_id, set()):
+                    event = {
                         "sleeve_id": pending_id,
                         "symbol": symbol,
-                        "delta": delta,
+                        "delta": left,
                         "kind": "attributed",
                     }
-                )
-            else:
-                result.unexplained.append(
-                    {
-                        "symbol": symbol,
-                        "delta": delta,
-                        "reason": "bought, and the lot whose orders were last made cannot hold it",
-                    }
-                )
+                    if note:
+                        event["note"] = note
+                    result.events.append(event)
+                else:
+                    result.unexplained.append(
+                        {
+                            "symbol": symbol,
+                            "delta": left,
+                            "reason": "bought, and the pending lot cannot hold it",
+                        }
+                    )
             continue
-        need = -delta
-        holders = [(sid, lot[symbol]) for sid, lot in ledger.items() if lot.get(symbol, 0) > EPS]
-        holders.sort(key=lambda h: (h[0] != pending_id, h[0]))
+        left = -delta
+        for sid in order:
+            want = -plan.get(sid, {}).get(symbol, 0.0)
+            have = ledger.get(sid, {}).get(symbol, 0.0)
+            if want > EPS and have > EPS and left > EPS:
+                take = min(left, want, have)
+                result.events.append(
+                    {"sleeve_id": sid, "symbol": symbol, "delta": -take, "kind": "attributed"}
+                )
+                left -= take
+        if left < EPS:
+            continue
+        remaining = {sid: lot[symbol] for sid, lot in ledger.items() if lot.get(symbol, 0) > EPS}
+        for event in result.events:  # shares already booked as sold above are no longer held
+            if event["symbol"] == symbol and event["delta"] < 0:
+                remaining[event["sleeve_id"]] = (
+                    remaining.get(event["sleeve_id"], 0.0) + event["delta"]
+                )
+        holders = sorted(
+            ((sid, q) for sid, q in remaining.items() if q > EPS),
+            key=lambda h: (h[0] != pending_id, h[0]),
+        )
         if len(holders) > 1 and holders[0][0] != pending_id:
             result.unexplained.append(
-                {"symbol": symbol, "delta": delta, "reason": "sold, and several lots hold it"}
+                {"symbol": symbol, "delta": -left, "reason": "sold, and several lots hold it"}
             )
             continue
         for sleeve_id, shares in holders[:1]:
-            take = min(need, shares)
-            result.events.append(
-                {"sleeve_id": sleeve_id, "symbol": symbol, "delta": -take, "kind": "attributed"}
-            )
-            need -= take
-        if need > EPS:
+            take = min(left, shares)
+            event = {"sleeve_id": sleeve_id, "symbol": symbol, "delta": -take, "kind": "attributed"}
+            if note:
+                event["note"] = note
+            result.events.append(event)
+            left -= take
+        if left > EPS:
             result.unexplained.append(
-                {"symbol": symbol, "delta": -need, "reason": "sold more than the lot holds"}
+                {"symbol": symbol, "delta": -left, "reason": "sold more than the lot holds"}
             )
     return result
 
@@ -200,7 +293,8 @@ def apply(
     for event in events:
         lot = out.setdefault(event["sleeve_id"], {})
         lot[event["symbol"]] = lot.get(event["symbol"], 0.0) + float(event["delta"])
-    return {sid: {s: q for s, q in lot.items() if q > EPS} for sid, lot in out.items()}
+    trimmed = {sid: {s: q for s, q in lot.items() if q > EPS} for sid, lot in out.items()}
+    return {sid: lot for sid, lot in trimmed.items() if lot}
 
 
 # --------------------------------------------------------------------------------------- planning
@@ -218,6 +312,8 @@ class Lot:
     positions: dict[str, float]  # base symbol -> shares, from the ledger
     target: dict[str, float]  # strategy name -> weight of the lot, cash and idle left out
     exits: frozenset[str] = frozenset()  # names the sleeve marks SELL this week (forced exits)
+    #: has the lot ever held a share? None = unknown: then "holds nothing" means new (tests).
+    has_history: bool | None = None
 
 
 def plan_lots(
@@ -247,8 +343,14 @@ def plan_lots(
 
     held = {lot.id: held_names(lot) for lot in lots}
     due = [lot for lot in lots if lot.due]
-    new = [lot for lot in due if not held[lot.id][0]]
-    rebalancing = [lot for lot in due if held[lot.id][0]]
+
+    def is_new(lot: Lot) -> bool:
+        if lot.has_history is not None:
+            return not lot.has_history
+        return not held[lot.id][0]
+
+    new = [lot for lot in due if is_new(lot)]
+    rebalancing = [lot for lot in due if not is_new(lot)]
 
     # Free cash goes first to a new lot (at least the weekly lot size, or all of it when it is
     # more and nothing else is due), then to the lots that rebalance, by the value they hold.
@@ -266,7 +368,9 @@ def plan_lots(
     }
     total_value = sum(values.values())
     for lot in rebalancing:
-        budget[lot.id] = left * (values[lot.id] / total_value) if total_value > 0 else 0.0
+        # by the value each holds; a lot that holds nothing now (it sold out) shares evenly
+        share = values[lot.id] / total_value if total_value > 0 else 1 / len(rebalancing)
+        budget[lot.id] = left * share
 
     results: list[dict[str, Any]] = []
     for lot in lots:

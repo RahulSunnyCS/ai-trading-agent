@@ -58,8 +58,10 @@ time. Nothing here places an order: you place them in your broker yourself.
     for a name blocked by the premium rule, whole shares). It sells only a name its sleeve marks
     SELL that week.
   - **One order per stock** adds the lots together, so you place a single order per stock.
-  - Shares you buy or sell in Kite between Fridays are booked to the lot whose orders were made
-    last. A change no lot can take (a stock that lot does not hold) is shown as *Not in any lot*:
+  - Shares you buy or sell in Kite between Fridays are booked first to the lots the last orders
+    named, then to the lot whose orders were made last (the message lists what was booked, and
+    marks anything not in the last orders). If Kite was not read that day, the message says so:
+    log in and press Sync. A change no lot can take (a stock that lot does not hold) is shown as *Not in any lot*:
     book it with `mbt lots assign SYMBOL --lot N`. Stocks outside the strategy (such as a stock you
     hold for another reason) and LIQUIDBEES / gold bonds are never part of a lot.
   - `mbt lots show` lists every lot's shares; `mbt lots seed` records the first lot from your Kite

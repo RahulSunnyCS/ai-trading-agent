@@ -243,4 +243,16 @@ Kite facts checked on 2026-10-19 ([portfolio](https://kite.trade/docs/connect/v3
     name; only five candidates exist for this strategy).
   Rehearsal (a copy of the live catalog, Friday 23 Oct pinned, live prices): lot 1 not due, Lot 2
   new ₹50,000: ACMESOLAR 30, CUPID 37, GRWRHITECH 1, NAZARA 30, add ₹45,491 to Kite.
+- 2026-10-21 — Review fixes on PR #278 (Opus review: two high, three medium):
+  - the ledger books a change against what each lot was *told to trade* (stored with the pending
+    lot), so a forced exit in a lot that is not due is not booked to the due lot, and the one net
+    order a stock gets (lot 2 buys 73 while lot 1 sells 20: BUY 53) books every lot as planned;
+  - Kite symbols that are not strategy names today are never booked as sold (a name can drop out
+    of the strategy's data for a day), and assigning a stock outside the strategy no longer gets
+    undone by the next run;
+  - the pending lot and the plan move only on a run on the Friday with a snapshot read that day,
+    and a run on an old snapshot says Kite was not read;
+  - a lot is *new* only if it never held a share: one that sold out is rebalanced (no deposit
+    after the ramp);
+  - the message states the free cash the plan used, and lists what was booked since the last run.
 

@@ -3560,6 +3560,7 @@ def _compute_lot_orders(
     held: dict[str, float] = {}
     outside: list[str] = []
     excluded: list[str] = []
+    kite_symbols = {row["symbol"] for row in (synced or {}).get("rows", [])}
     broker_cash = max(0.0, float((synced or {}).get("cash") or 0.0))
     cash = float(settings["extra_cash_rs"]) + broker_cash
     for row in (synced or {}).get("rows", []):
@@ -3607,16 +3608,22 @@ def _compute_lot_orders(
             sid: {base_of.get(name, name) for name in info["target"]} | set(ledger.get(sid, {}))
             for sid, info in sleeves.items()
         }
-        reconciled = lots.reconcile(held, ledger, lots.pending(con, who, group_id), allowed)
+        pending_id, planned_before = lots.pending_state(con, who, group_id)
+        # What Kite still holds that is not a strategy name today (outside, excluded, or a name
+        # that dropped out of the data) is never booked as sold.
+        reconciled = lots.reconcile(
+            held,
+            ledger,
+            pending_id,
+            allowed,
+            planned=planned_before,
+            ignore=kite_symbols - set(held),
+        )
         at = (synced or {}).get("synced_at") or datetime.now(IST).isoformat(timespec="seconds")
         if reconciled.events:
             lots.append(con, who, group_id, reconciled.events, at)
             ledger = lots.apply(ledger, reconciled.events)
-        # The next change in Kite belongs to the lot whose orders are made now, which is the lot
-        # due this Friday: only on the Friday itself, so a run on another day moves nothing.
-        due_ids = [sid for sid, info in sleeves.items() if info["due"]]
-        if today == target_week.date() and due_ids:
-            lots.set_pending(con, who, group_id, due_ids[0], at)
+        has_history = lots.funded(con, who, group_id)
 
     lot_inputs = [
         lots.Lot(
@@ -3628,6 +3635,7 @@ def _compute_lot_orders(
             ledger.get(sid, {}),
             info["target"],
             info["exits"],
+            sid in has_history,
         )
         for sid, info in sleeves.items()
     ]
@@ -3646,12 +3654,30 @@ def _compute_lot_orders(
         min_trade_rs=float(settings["min_trade_rs"]),
         blocked=blocked_names,
     )
+    # The next change in Kite belongs to the lots these orders name, and the rest to the lot due
+    # this Friday. Only a run on the Friday itself moves that, and only on a snapshot read today:
+    # a run on an old snapshot has not seen the Monday trades yet.
+    synced_at = (synced or {}).get("synced_at") or ""
+    fresh = synced_at[:10] == today.isoformat()
+    due_ids = [sid for sid, info in sleeves.items() if info["due"]]
+    if today == target_week.date() and due_ids and fresh:
+        planned_now: dict[str, dict[str, float]] = {}
+        for lot in planned["lots"]:
+            for row in (lot["plan"] or {}).get("rows", []):
+                if row["quantity"] and row["symbol"] in base_of:
+                    sign = -1 if row["action"] in ("SELL", "TRIM") else 1
+                    by_symbol = planned_now.setdefault(lot["id"], {})
+                    base = base_of[row["symbol"]]
+                    by_symbol[base] = by_symbol.get(base, 0.0) + sign * row["quantity"]
+        with open_catalog() as con:
+            lots.set_pending(con, who, group_id, due_ids[0], at, planned_now)
     payload.update(
         {
             "prices": source,
             "sleeves": signal.get("sleeves", []),
             "plan": planned["plan"],
             "lots": planned["lots"],
+            "free_cash": round(cash, 2),
             "deposit_needed": planned["deposit_needed"],
             "lot_size": float(settings["lot_size_rs"]),
             "net": lots.net_by_symbol(planned["plan"]),
@@ -3659,6 +3685,7 @@ def _compute_lot_orders(
                 "booked": reconciled.events,
                 "unexplained": reconciled.unexplained,
                 "excluded_from_lots": sorted(outside),
+                "stale": not fresh,
             },
             "holdings": {
                 "source": "kite",
@@ -3718,7 +3745,7 @@ def _lot_orders_message(payload: dict, title: str) -> Notification:
     if payload["deposit_needed"] > 0:
         lines.append(
             f"Add ₹{payload['deposit_needed']:,.0f} to Kite before you buy "
-            f"(free cash ₹{(holdings.get('broker_cash') or 0):,.0f}, the new lot needs "
+            f"(free cash ₹{payload.get('free_cash', 0):,.0f}, the new lot needs "
             f"₹{payload['lot_size']:,.0f})."
         )
     if payload["net"]:
@@ -3727,6 +3754,23 @@ def _lot_orders_message(payload: dict, title: str) -> Notification:
             for name, q in sorted(payload["net"].items())
         )
         lines.append(f"One order per stock: {net}")
+    labels = {lot["id"]: lot["label"] for lot in payload["lots"]}
+    booked = payload["ledger"]["booked"]
+    if booked:
+        lines.append(
+            "Booked to lots since the last run: "
+            + ", ".join(
+                f"{labels.get(e['sleeve_id'], '?')} {e['symbol']} {e['delta']:+.0f}"
+                + (" (not in the last orders)" if e.get("note") else "")
+                for e in booked
+            )
+        )
+    if payload["ledger"].get("stale"):
+        lines.append(
+            "Kite was last read "
+            f"{str(holdings.get('synced_at') or 'never')[:16].replace('T', ' ')}: "
+            "log in and press Sync for today's holdings and cash."
+        )
     unexplained = payload["ledger"]["unexplained"]
     if unexplained:
         lines.append(
@@ -3877,7 +3921,7 @@ def lots_status() -> dict:
         "group": headline["name"],
         "lots": {
             labels[m["id"]]: {"id": m["id"], "holds": ledger.get(m["id"], {})}
-            for m in sorted(members, key=lambda m: labels[m["id"]])
+            for m in sorted(members, key=lambda m: (len(labels[m["id"]]), labels[m["id"]]))
         },
         "pending": labels.get(pending) if pending else None,
         "snapshot": (snapshot or {}).get("synced_at"),
