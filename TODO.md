@@ -760,6 +760,15 @@ Pre-registered before any run.
 | 3.39.1 | Pre-registration committed | claude | **Done 2026-10-21** |
 | 3.39.2 | Run the event table and E1-E3, findings page | claude | **Done 2026-10-21.** E1 met, E2 met, E3 no change; `research/options/common/special-days.md` |
 
+### 3.40 Directional early exit at 14:55 — [BL-147](backlog/BL-147-directional-early-exit.md)
+
+Owner (2026-10-21): would closing the directional strategies at 14:55 help against a late recovery. Pre-registered before any run.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.40.1 | Pre-registration committed | claude | **Done 2026-10-21** |
+| 3.40.2 | Rerun every Dir variant at 14:55, populations A and B, the owner's pattern, findings page | claude | In progress |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |
