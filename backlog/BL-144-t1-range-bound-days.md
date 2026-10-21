@@ -110,4 +110,12 @@ and that Core is a column.
   [-172, +338], met (descriptive). Findings page `research/options/common/t1-range-bound-days.md`. The
   owner's CSV is `bl144_daily_results.csv`. Exploratory only: family mix by regime; one day (3 Feb 2026)
   makes 42% of the 3 x Widesl year.
+- 2026-10-21 — **addendum, registered before it was computed** (owner: "on the quiet days, is T1 able to
+  start all the wider SL from the morning so that it captures more move?"). Descriptive only, on the same
+  238 days and R7 regimes, no pass/kill rule. Measured per regime (R7 terciles, T1 and Core): the mean start
+  time of the day's picks, the share of picks starting by 09:47 ("morning"), the share of wide-stop picks
+  (every leg SL at least 100%) that start by 09:47, the share of days on which every pick is wide-stop, and
+  the share of days with at least one morning wide-stop pick. Counterfactual: T1 against the fixed 3 x Widesl
+  09:17 ("all wide, from the open") per lot-day by R7 regime and where R7 and the day's own range are both
+  lowest, to see what going all-wide from the morning would have earned when the week was known to be quiet.
 
