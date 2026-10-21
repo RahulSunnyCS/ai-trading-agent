@@ -767,7 +767,7 @@ Owner (2026-10-21): would closing the directional strategies at 14:55 help again
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.40.1 | Pre-registration committed | claude | **Done 2026-10-21** |
-| 3.40.2 | Rerun every Dir variant at 14:55, populations A and B, the owner's pattern, findings page | claude | In progress |
+| 3.40.2 | Rerun every Dir variant at 14:55, populations A and B, the owner's pattern, findings page | claude | **Done 2026-10-21.** The 14:55 exit hurts; `research/options/common/directional-early-exit.md` |
 
 ## Reference — where detail lives
 

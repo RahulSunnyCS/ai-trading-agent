@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades T1's and Core's directional picks with real money and suspects a late-session recovery |
-| **Status** | In progress |
+| **Status** | Done: the 14:55 exit hurts (-122 per trade-day [-168, -76]); helps only on late-recovery days (about 9%) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-21 |
@@ -84,3 +84,10 @@ None.
 ## Log
 
 - 2026-10-21 — created and pre-registered before any run. Owner left the choice of picks and method to me.
+- 2026-10-21 — ran (`research/bl147/run.py`). Control: 4,025 unchanged reruns match the stored 15:28 results
+  exactly. A pooled (710 pick-days): mean delta -121.8 per trade-day [-168.3, -76.4], total +436,602 -> +350,112,
+  max drawdown -33,379 -> -41,322. B: all 161 variants have a negative mean delta (-103 on average), 0%
+  positive. Verdict: **hurts** (the interval is below zero). The owner's pattern: down day then recovery
+  (8.9% of days) +219 per pick-day, up day then fade (7.3%) +217, every other day type -148 to -228; all down
+  days together -127. Findings page `research/options/common/directional-early-exit.md`.
+

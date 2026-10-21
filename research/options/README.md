@@ -34,6 +34,7 @@ data. Status words and the page template: [`../README.md`](../README.md).
 | [T1 on range-bound days](common/t1-range-bound-days.md) | Tested (re-scored) | BL-144 |
 | [T1 breadth, regime lag, opening range](common/t1-robustness-and-lag.md) | Tested (re-scored) | BL-145 |
 | [Special days: Budget, elections, RBI, high premium](common/special-days.md) | Tested (re-scored) | BL-146 |
+| [Directional early exit at 14:55](common/directional-early-exit.md) | Tested (re-scored) | BL-147 |
 | [Charges](common/charges.md) | Descriptive | BL-063, BL-096–099 |
 | [Rotation ranking (DRB, lists A/B/C/REF)](common/rotation-ranking.md) | Tested | BL-054, 057, 062, 064–075, 080, 100 |
 | [Intraday state and event triggers](common/intraday-state.md) | Tested | BL-053, BL-081, BL-083 |
