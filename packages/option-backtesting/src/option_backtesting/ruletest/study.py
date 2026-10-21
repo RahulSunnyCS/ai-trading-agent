@@ -5,6 +5,9 @@ result against its controls. The method is BL-083's event study, generalised to 
                  traded from the next minute with the template, to its exit
     placebo      the same template and side at the same entry minute on the 20 nearest days with no
                  event of this rule (10 before, 10 after, inside the period)
+    exit         the template's, or with `exit_when` the minute after the condition first holds
+                 from the entry minute on (capped at the template's exit) — for the events and the
+                 controls alike, each from its own entry
     random time  the same template and side on the event days at a random entry minute of the
                  window (a 5-minute grid), 200 draws; the event's mean is placed among the draws
 
@@ -56,6 +59,30 @@ class Options:
     extra: dict[str, Any] = field(default_factory=dict)
 
 
+def exit_minutes(
+    rule: CompiledRule, frame: E.Frame, keys: set[tuple[str, str, str]]
+) -> sim.Exits | None:
+    """{(day, entry, side): exit minute} under the rule's `exit_when`; None when it has none. A day
+    the frame does not hold gets no exit, so its trade is not simulated."""
+    if rule.exits is None:
+        return None
+    hh, mm = rule.exit_cap.split(":")
+    cap = min(E.N_BARS, int(hh) * 60 + int(mm) - E.OPEN_MIN)  # an exit here is the template's
+    truth = {side: E.evaluate(node, frame) for side, node in rule.exits.items()}
+    row = {d: i for i, d in enumerate(frame.days)}
+    out: sim.Exits = {}
+    for day, entry, side in keys:
+        i = row.get(day)
+        if i is None:
+            continue
+        start = E.clock_to_stamp(entry, "entry")
+        hits = np.flatnonzero(truth[side][i, start:cap])
+        out[(day, entry, side)] = (
+            E.stamp_to_clock(start + int(hits[0]) + 1) if len(hits) else rule.exit_cap
+        )
+    return out
+
+
 def placebo_days(day: str, days: list[str], event_days: set[str]) -> list[str]:
     i = days.index(day)
     before = [d for d in reversed(days[:i]) if d not in event_days][:PLACEBO_DAYS]
@@ -92,6 +119,7 @@ def summarise(
     draws: int,
     seed: int,
     slippage: tuple[float, ...],
+    exits: sim.Exits | None = None,
 ) -> dict[str, Any]:
     """The numbers of one period, from the events and a lookup of simulated rows. Pure: tests feed
     it a fake lookup."""
@@ -112,6 +140,7 @@ def summarise(
                 "day": ev["day"],
                 "stamp": ev["stamp"],
                 "entry": ev["entry"],
+                "exit": (exits or {}).get((ev["day"], ev["entry"], ev["side"])),
                 "side": ev["side"],
                 "net": round(net, 2),
                 "gross": float(row["gross"]),
@@ -311,7 +340,8 @@ def analyse_period(
             wanted.add((ev["day"], entry, ev["side"], 0.0))
         for pct in options.slippage:
             wanted.add((ev["day"], ev["entry"], ev["side"], pct))
-    got = sim.ensure(root, rule, wanted, options.workers, log)
+    exits = exit_minutes(rule, frame, {(d, e, s) for d, e, s, _p in wanted})
+    got = sim.ensure(root, rule, wanted, options.workers, log, exits)
     seed = int(rule.spec_hash[:8], 16) ^ (1 if period == "learning" else 2)
     result = summarise(
         rule.spec.underlying,
@@ -323,6 +353,7 @@ def analyse_period(
         options.draws,
         seed,
         options.slippage,
+        exits,
     )
     return {"period": period, "from": lo.isoformat(), "to": hi.isoformat(), **result}
 

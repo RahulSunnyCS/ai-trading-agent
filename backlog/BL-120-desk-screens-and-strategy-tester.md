@@ -245,3 +245,12 @@ The owner's answers to the open questions below; the screen order and placement 
   Two behaviours worth knowing: `strict_open` is on (a session with a bar before 09:15, about a dozen Angel One days, is
   left out, as BL-083's study did), and the confirmation lock is enforced in the CLI and API but a determined reader
   of the cache or the files can of course read those days: it is a discipline, not security.
+- 2026-10-20 — **Rule grammar: Supertrend, Bollinger bands, `exit_when`, premium-% strike** (owner's request, after
+  reviewing a video test of the "DD Nifty" four-indicator option-buying system: Supertrend (10, 3), RSI-14 > 70, close
+  > R1, close > the upper Bollinger band (20, 2) on 5-minute bars; buy the strike whose premium is ~1% of the index;
+  exit when the Supertrend flips). Added `{supertrend}`, `{supertrend_dir}` and `{bollinger}` leaves, a rule-level
+  `exit_when` (per side with `direction_up`; the controls use the same exit from their own entry) and
+  `strike: {premium_pct_of_spot}`; fixed an unquoted YAML `on:` key being read as `true`. The system is expressible
+  and reads back (`obt rule validate`); one trade a day at most is still the tester's limit (the video's system
+  re-enters after an exit). **No test run:** testing it needs its own pre-registered research item first (research gate).
+

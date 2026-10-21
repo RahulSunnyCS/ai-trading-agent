@@ -22,6 +22,17 @@ Leaves
                                    known yet) and where option bars are missing
     {rsi: {n: 14, minutes: 5}}     Wilder RSI of the closes of `minutes`-minute bars, continuous
                                    across sessions, held until the next bar completes
+    {supertrend: {n: 10, mult: 3, minutes: 5}}
+                                   the Supertrend line of `minutes`-minute bars (TradingView's
+                                   ta.supertrend: hl2 -/+ mult x Wilder ATR-n, bands that only
+                                   tighten), continuous across sessions, held until the next bar
+    {supertrend_dir: {n: 10, mult: 3, minutes: 5}}
+                                   its direction: +1 up (line below price), -1 down; NaN until
+                                   the ATR has n bars. Test it with gt / lt 0
+    {bollinger: {n: 20, k: 2, minutes: 5, band: upper}}
+                                   the upper / middle / lower Bollinger band of the closes of
+                                   `minutes`-minute bars: mean of n -/+ k population standard
+                                   deviations (as TradingView), continuous across sessions
     {bar_close: 5}                 true only at the stamps where a 5-minute bar completes
                                    (j + 1 is a multiple of 5), so a rule can act on bar closes
     a name from `define:`          an earlier definition of the same rule
@@ -142,7 +153,8 @@ _PARAMETRIC: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "prior_median": (("x", "sessions"), ("x", "sessions")),
     "prior_mean": (("x", "sessions"), ("x", "sessions")),
 }
-_LEAF_OPS = {"clock", "straddle", "rsi", "bar_close"}
+_LEAF_OPS = {"clock", "straddle", "rsi", "bar_close", "supertrend", "supertrend_dir", "bollinger"}
+BANDS = ("upper", "middle", "lower")
 ALL_OPS = set(_POSITIONAL) | _VARIADIC | set(_PARAMETRIC) | _LEAF_OPS
 
 
@@ -150,6 +162,12 @@ def _int_param(value: Any, path: str, low: int, high: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
         raise RuleError(f"{path}: expected a whole number from {low} to {high}, got {value!r}")
     return value
+
+
+def _float_param(value: Any, path: str, low: float, high: float) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not low <= value <= high:
+        raise RuleError(f"{path}: expected a number from {low:g} to {high:g}, got {value!r}")
+    return float(value)
 
 
 def parse(expr: Any, defs: dict[str, Node] | None = None, path: str = "when") -> Node:
@@ -190,6 +208,29 @@ def parse(expr: Any, defs: dict[str, Node] | None = None, path: str = "when") ->
         n = _int_param(body.get("n", 14), f"{here}.n", 2, 100)
         minutes = _int_param(body.get("minutes", 5), f"{here}.minutes", 1, 125)
         return Node("rsi", params={"n": n, "minutes": minutes}, kind="num", path=path)
+    if op in ("supertrend", "supertrend_dir"):
+        if not isinstance(body, dict) or set(body) - {"n", "mult", "minutes"}:
+            raise RuleError(f"{here}: write {{{op}: {{n: 10, mult: 3, minutes: 5}}}}")
+        params = {
+            "n": _int_param(body.get("n", 10), f"{here}.n", 1, 100),
+            "mult": _float_param(body.get("mult", 3), f"{here}.mult", 0.1, 20),
+            "minutes": _int_param(body.get("minutes", 5), f"{here}.minutes", 1, 125),
+        }
+        return Node(op, params=params, kind="num", path=path)
+    if op == "bollinger":
+        if not isinstance(body, dict) or set(body) - {"n", "k", "minutes", "band"}:
+            example = "{bollinger: {n: 20, k: 2, minutes: 5, band: upper}}"
+            raise RuleError(f"{here}: write {example}")
+        band = body.get("band", "upper")
+        if band not in BANDS:
+            raise RuleError(f"{here}.band: expected upper, middle or lower, got {band!r}")
+        params = {
+            "n": _int_param(body.get("n", 20), f"{here}.n", 2, 200),
+            "k": _float_param(body.get("k", 2), f"{here}.k", 0, 10),
+            "minutes": _int_param(body.get("minutes", 5), f"{here}.minutes", 1, 125),
+            "band": band,
+        }
+        return Node(op, params=params, kind="num", path=path)
     if op == "bar_close":
         minutes = body.get("minutes") if isinstance(body, dict) else body
         return Node(
@@ -378,6 +419,109 @@ def wilder_rsi(closes: np.ndarray, n: int = 14) -> np.ndarray:
     return out
 
 
+def _wilder_mean(x: np.ndarray, n: int) -> np.ndarray:
+    """Wilder's running mean (TradingView's ta.rma): the plain mean of the first n values, then
+    (prev x (n-1) + x) / n."""
+    out = np.full(len(x), np.nan)
+    if len(x) < n:
+        return out
+    out[n - 1] = x[:n].mean()
+    for i in range(n, len(x)):
+        out[i] = (out[i - 1] * (n - 1) + x[i]) / n
+    return out
+
+
+def supertrend(
+    high: np.ndarray, low: np.ndarray, close: np.ndarray, n: int = 10, mult: float = 3.0
+) -> tuple[np.ndarray, np.ndarray]:
+    """(line, direction) of one continuous series of bars, as TradingView's ta.supertrend: the
+    first bar with an ATR starts down; direction +1 means up (the line is the lower band)."""
+    prev_close = np.concatenate([[np.nan], close[:-1]])
+    tr = np.fmax(high - low, np.fmax(np.abs(high - prev_close), np.abs(low - prev_close)))
+    atr = _wilder_mean(tr, n)
+    mid = (high + low) / 2
+    line = np.full(len(close), np.nan)
+    direction = np.full(len(close), np.nan)
+    lower_prev = upper_prev = np.nan
+    dir_prev = 0
+    for i in range(len(close)):
+        if np.isnan(atr[i]):
+            continue
+        lower, upper = mid[i] - mult * atr[i], mid[i] + mult * atr[i]
+        if dir_prev:
+            if not (lower > lower_prev or close[i - 1] < lower_prev):
+                lower = lower_prev
+            if not (upper < upper_prev or close[i - 1] > upper_prev):
+                upper = upper_prev
+        if dir_prev == 0:
+            d = -1
+        elif dir_prev == -1:
+            d = 1 if close[i] > upper else -1
+        else:
+            d = -1 if close[i] < lower else 1
+        line[i] = lower if d == 1 else upper
+        direction[i] = d
+        lower_prev, upper_prev, dir_prev = lower, upper, d
+    return line, direction
+
+
+def bollinger(close: np.ndarray, n: int = 20, k: float = 2.0) -> dict[str, np.ndarray]:
+    """{upper, middle, lower} of one continuous series: mean of the last n closes -/+ k population
+    standard deviations; NaN until n closes exist."""
+    out = {band: np.full(len(close), np.nan) for band in BANDS}
+    if len(close) < n:
+        return out
+    windows = np.lib.stride_tricks.sliding_window_view(close, n)
+    mean, sd = windows.mean(axis=1), windows.std(axis=1)
+    out["middle"][n - 1 :] = mean
+    out["upper"][n - 1 :] = mean + k * sd
+    out["lower"][n - 1 :] = mean - k * sd
+    return out
+
+
+def _bars(frame: Frame, m: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """(high, low, close) of the complete `m`-minute bars from 09:15, (sessions x 375 // m); a
+    session's last part-bar, when m does not divide 375, is left out."""
+    nb = N_BARS // m
+    cols = nb * m
+    shape = (frame.n, nb, m)
+    return (
+        frame.H[:, :cols].reshape(shape).max(axis=2),
+        frame.L[:, :cols].reshape(shape).min(axis=2),
+        frame.C[:, m - 1 : cols : m],
+    )
+
+
+def _on_grid(frame: Frame, m: int, values: np.ndarray) -> np.ndarray:
+    """Per-bar values (sessions x bars) placed on each bar's last stamp and held until the next."""
+    out = _full(frame)
+    out[:, m - 1 : values.shape[1] * m : m] = values
+    return _ffill(out)
+
+
+def _indicator(frame: Frame, node: Node) -> np.ndarray:
+    p = node.params
+    m = p["minutes"]
+    if node.op == "bollinger":
+        key: tuple[Any, ...] = ("bollinger", p["n"], p["k"], m)
+        if key not in frame._cache:
+            close = _bars(frame, m)[2]
+            bands = bollinger(close.reshape(-1), p["n"], p["k"])
+            frame._cache[key] = {b: v.reshape(close.shape) for b, v in bands.items()}
+        return _on_grid(frame, m, frame._cache[key][p["band"]])
+    key = ("supertrend", p["n"], p["mult"], m)
+    if key not in frame._cache:
+        high, low, close = _bars(frame, m)
+        line, direction = supertrend(
+            high.reshape(-1), low.reshape(-1), close.reshape(-1), p["n"], p["mult"]
+        )
+        frame._cache[key] = {
+            "line": line.reshape(close.shape),
+            "dir": direction.reshape(close.shape),
+        }
+    return _on_grid(frame, m, frame._cache[key]["line" if node.op == "supertrend" else "dir"])
+
+
 def _ffill(a: np.ndarray) -> np.ndarray:
     """Hold the last valid value along each row (stamps)."""
     out = a.copy()
@@ -448,6 +592,8 @@ def _evaluate(node: Node, frame: Frame, memo: dict[int, np.ndarray]) -> np.ndarr
         out = _full(frame)
         out[:, m - 1 :: m] = rsi
         return _ffill(out)
+    if op in ("supertrend", "supertrend_dir", "bollinger"):
+        return _indicator(frame, node)
     args = [evaluate(a, frame, memo) for a in node.args]
     with np.errstate(invalid="ignore", divide="ignore"):
         if op == "add":
@@ -560,6 +706,15 @@ def describe(node: Node, top: bool = True) -> str:
         return f"the ATM straddle from {stamp_to_clock(node.params['at'])}"
     if op == "rsi":
         return f"RSI-{node.params['n']} of {node.params['minutes']}-minute bars"
+    if op in ("supertrend", "supertrend_dir"):
+        p = node.params
+        what = "line" if op == "supertrend" else "direction (+1 up, −1 down)"
+        return f"the Supertrend ({p['n']}, {p['mult']:g}) {what} of {p['minutes']}-minute bars"
+    if op == "bollinger":
+        p = node.params
+        return (
+            f"the {p['band']} Bollinger band ({p['n']}, {p['k']:g}) of {p['minutes']}-minute bars"
+        )
     if op == "bar_close":
         return f"a {node.params['minutes']}-minute bar has just completed"
     kids = [describe(a, False) for a in node.args]

@@ -139,3 +139,37 @@ def test_random_time_is_reproducible_for_a_seed():
     a = study.summarise(*args, draws=40, seed=3, slippage=())
     b = study.summarise(*args, draws=40, seed=3, slippage=())
     assert a["random_time"]["mean"] == b["random_time"]["mean"]
+
+
+def test_exit_minutes_take_the_first_stamp_from_the_entry_capped_by_the_template():
+    from option_backtesting.ruletest import expr as E
+    from option_backtesting.ruletest.spec import from_dict
+
+    close = np.full((2, E.N_BARS), 20000.0)
+    close[0, 120:] = 19990.0  # day 1 drops below its open at 11:15 (stamp 120)
+    fr = E.Frame(days=["2026-01-01", "2026-01-02"], O=close, H=close, L=close, C=close)
+    leg = {"id": "ce", "lots": 1, "position": "buy", "option_type": "CE",
+           "strike": {"strike_type": "ATM"}}  # fmt: skip
+    rule = from_dict(
+        {
+            "id": "x",
+            "underlying": "NIFTY",
+            "window": {"from": "09:20", "to": "14:00"},
+            "when": {"gt": ["close", 0]},
+            "exit_when": {"lt": ["close", "session_open"]},
+            "template": {"exit_time": "15:15", "legs": [leg]},
+        }
+    )
+    keys = {
+        ("2026-01-01", "09:21", "both"),  # exits the minute after 11:15
+        ("2026-01-01", "11:30", "both"),  # already below at entry: out the next minute
+        ("2026-01-02", "09:21", "both"),  # never: the template's exit
+        ("2026-01-09", "09:21", "both"),  # not in the frame: no exit, not simulated
+    }
+    assert study.exit_minutes(rule, fr, keys) == {
+        ("2026-01-01", "09:21", "both"): "11:16",
+        ("2026-01-01", "11:30", "both"): "11:31",
+        ("2026-01-02", "09:21", "both"): "15:15",
+    }
+    rule.exits = None
+    assert study.exit_minutes(rule, fr, keys) is None

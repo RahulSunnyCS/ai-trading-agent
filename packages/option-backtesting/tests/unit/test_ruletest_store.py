@@ -156,7 +156,7 @@ def test_an_append_after_a_torn_line_starts_a_line_of_its_own(tmp_path, monkeypa
              "best_mtm": 300, "stopped_by": "", "orders": 2, "buy_value": 900.0,
              "sell_value": 1234.5, "n_trades": 2, "weekly_expiry": "2026-01-08",
              "spot_entry": 23000, "spot_exit": 23005, "error": ""}
-            for e, s, p in items
+            for e, s, p, _exit in items
         ]  # fmt: skip
 
     class InlinePool:

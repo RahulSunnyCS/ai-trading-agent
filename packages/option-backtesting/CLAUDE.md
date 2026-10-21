@@ -199,7 +199,17 @@ Otherwise:
   `{straddle: {at: T}}` is NaN before `T` (its strike is chosen at `T`'s close); the straddle feature file saves only
   built rows and days whose option file lacks the strike, never a day without a file or a failed read (retried next
   run); the simulation cache skips and counts a torn row and starts every append on a fresh line. A result is labelled
-  "a screen, not a finding". `scripts/ruletest-acceptance.py` must print ACCEPTANCE OK: the four BL-083 triggers, said in
+  "a screen, not a finding". Indicators (2026-10-20): `{supertrend: {n, mult, minutes}}` (the line),
+  `{supertrend_dir: ...}` (+1 / -1) and `{bollinger: {n, k, minutes, band}}` are TradingView's definitions over
+  `minutes`-minute bars from 09:15, continuous across sessions like `rsi`, held between bar closes (`_bars`,
+  `_on_grid`, values cached on the frame); `tests/unit/test_ruletest_expr.py` pins the Supertrend to a longhand
+  ta.supertrend. A rule's optional `exit_when` (one condition, or `{up, down}` with `direction_up`) closes the trade
+  the minute after it first holds from the entry minute on, capped at the template's `exit_time`
+  (`study.exit_minutes`, applied to the events, placebo and random-time entries alike; the exit travels with each
+  simulation item, and `exit_when` joins `spec_hash` and `template_hash` only when set, so older rules keep their
+  hashes and cache). A leg's `strike: {premium_pct_of_spot: P}` is resolved per trade to `closest_premium` = P% of the
+  index at the entry (`spec._strike_for`). An unquoted YAML `on:` key (read by YAML 1.1 as `true`) is taken as `on`.
+  `scripts/ruletest-acceptance.py` must print ACCEPTANCE OK: the four BL-083 triggers, said in
   the grammar (`tests/fixtures/rules/`), fire on the same days and stamps as `research/bl083/`, and T1 and T4 with the Dir
   template reproduce its event-study rows to the rupee. A leg with its own `range_breakout` is not supported yet.
 - `notify.py` — Telegram sender (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID), a deliberate copy of

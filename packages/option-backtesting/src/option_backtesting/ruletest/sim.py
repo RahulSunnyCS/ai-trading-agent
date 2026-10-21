@@ -40,6 +40,10 @@ COLUMNS = [
     "error",
 ]
 Key = tuple[str, str, str, float]  # day, entry, side, slippage_pct
+#: (day, entry, side) -> the trade's `exit_when` exit minute; a rule with `exit_when` keys its
+#: cache on a template hash that includes it, so the exit is fixed by the key
+Exits = dict[tuple[str, str, str], str]
+Item = tuple[str, str, float, str | None]  # entry, side, slippage_pct, exit (None: the template's)
 
 
 def cache_path(root: Path, template_hash: str) -> Path:
@@ -136,9 +140,9 @@ def _early_reference():
 
 
 def simulate_items(
-    rule: CompiledRule, data: Any, items: list[tuple[str, str, float]], reference: Any
+    rule: CompiledRule, data: Any, items: list[Item], reference: Any
 ) -> list[dict[str, Any]]:
-    """Run (entry, side, slippage) items on one loaded day; one row each."""
+    """Run (entry, side, slippage, exit) items on one loaded day; one row each."""
     from ..legwise.engine import simulate_day
     from ..legwise.market import minute_index, pick_expiry
     from ..rotation.lists import SIZING_DATE
@@ -146,10 +150,11 @@ def simulate_items(
     sizing = date.fromisoformat(SIZING_DATE)
     expiry = pick_expiry(data, "weekly")
     rows = []
-    for entry, side, slip in items:
+    for entry, side, slip, exit_time in items:
         base = {"day": data.day.isoformat(), "entry": entry, "side": side, "slip": slip}
         try:
-            strategy = rule.strategy_for(entry, side, slip or None)
+            spot = data.spot.price_at(minute_index(entry))
+            strategy = rule.strategy_for(entry, side, slip or None, exit_time, spot)
             result = simulate_day(strategy, data, reference, sizing)
         except Exception as error:  # noqa: BLE001 - recorded and retried, never fatal to a test
             rows.append({**base, "error": f"ERR {type(error).__name__}: {error}"[:200]})
@@ -176,7 +181,7 @@ def simulate_items(
     return rows
 
 
-def _work(task: tuple[str, dict, str, list[tuple[str, str, float]]]) -> list[dict[str, Any]]:
+def _work(task: tuple[str, dict, str, list[Item]]) -> list[dict[str, Any]]:
     root_text, spec_data, day, items = task
     from ..legwise.market import load_day
 
@@ -186,7 +191,7 @@ def _work(task: tuple[str, dict, str, list[tuple[str, str, float]]]) -> list[dic
     except FileNotFoundError:
         return [
             {"day": day, "entry": e, "side": s, "slip": p, "error": "ERR no data"}
-            for e, s, p in items
+            for e, s, p, _x in items
         ]
     return simulate_items(rule, data, items, _early_reference())
 
@@ -197,17 +202,22 @@ def ensure(
     wanted: set[Key],
     workers: int = 4,
     progress: Callable[[str], None] | None = None,
+    exits: Exits | None = None,
 ) -> dict[Key, dict[str, Any]]:
     """Every wanted simulation, from the cache or run now (and appended to the cache). A day with no
-    data, or a simulation that errors, is simply absent from the answer."""
+    data, or a simulation that errors, is simply absent from the answer. `exits` gives each trade's
+    exit minute for a rule with `exit_when`; a wanted key it has no exit for is left out."""
+    if exits is not None:
+        wanted = {k for k in wanted if (k[0], k[1], k[2]) in exits}
     cache, torn = read_cache_counted(root, rule.template_hash)
     if torn and progress:
         progress(f"skipped {torn} torn simulation-cache rows; they are simulated again")
     missing = sorted(k for k in wanted if k not in cache)
     if missing:
-        by_day: dict[str, list[tuple[str, str, float]]] = {}
+        by_day: dict[str, list[Item]] = {}
         for day, entry, side, slip in missing:
-            by_day.setdefault(day, []).append((entry, side, slip))
+            exit_time = exits[(day, entry, side)] if exits is not None else None
+            by_day.setdefault(day, []).append((entry, side, slip, exit_time))
         spec_data = rule.spec.model_dump(by_alias=True)
         tasks = [
             (str(root), spec_data, day, sorted(items)) for day, items in sorted(by_day.items())
