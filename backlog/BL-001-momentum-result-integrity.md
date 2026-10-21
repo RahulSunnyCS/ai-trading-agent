@@ -351,7 +351,7 @@ Questions 2 to 4 above belong to Phases 3 and 4 and are still open.
 |---|---|---|---|
 | F1 | **Weights leave the waiting cash out.** After an off-cadence sale (`sell_every_week`, or a stop paid to cash) `engine.py` normalises `weights[week]` over the holdings only, so the rest look bigger and the idle share smaller (a two-name book that sells one shows the other at 100%, not 50%). Equity is right. Hits the Rotation rows, `max_position_share`, `idle_share`, the holdings share of blended sleeves. | Display and KPIs of runs that use those two switches. The live strategy uses neither. | Reproduced by `tests/test_weights_after_off_cadence_sell.py` (strict xfail). **Fix not applied: it moves frozen results, so it needs your yes.** One line in `engine.py` plus `--accept-results`. |
 | F2 | **`max_position` is not a hard cap off the weekly cadence.** The trim is inside `if is_buy_week`, so with `rebalance_every` above 1 or monthly rebalancing a holding can sit above cap + band until the next trade week (a 35% cap reached 54% in a fortnightly scenario, a 50% cap 59% four-weekly). The slots rule has no cap. | The invariant is asserted only for weekly buffer runs. Worth knowing for the 4-weekly sleeves you follow (25% cap). | Documented in the test; a design fact, not changed. |
-| F3 | **No scenario makes a circuit lock block a trade** (`blocked_entries` and `blocked_exits` are 0 in all of them), so a break in `broad_respect_circuits` would pass the goldens. | The fixture cannot prove circuit-lock fills are wired. | Open: needs a fixture window with a blocked fill. |
+| F3 | **Only one scenario depends on `broad_respect_circuits`.** Putting it back to its default changes the result of `broad_gates_loosened_and_tilted` and of no other of the five Broad scenarios that set it (the lock never changes a fill in them; `blocked_entries` and `blocked_exits` are 0 everywhere). The wiring test first missed this because the payload echoes the flag in `circuit_exposure`; it now compares result sections only. | A break that left that one scenario alone would still fail, but the setting is proved by a single scenario. | Open: a second scenario where a lock blocks a fill would make it robust. |
 | F4 | **No scenario makes `max_category` bind**, so a broken group cap would pass. | Same kind of hole. | Open. |
 | F5 | The payload has nulls in the newest week (`holdings_count`, often `idle_share`; the engine never trades its newest week) and in weeks before the first trade that hold nothing. | Charts must treat null as a gap. | Allowed explicitly in the test; nothing else may be null. |
 
@@ -380,7 +380,7 @@ favourite with the end pinned to its last accepted anchor and names the instrume
 
 1. F1: apply the one-line fix and accept the changed frozen result (which scenarios move is listed
    by the accept script)? Recommended yes: it only changes runs using `sell_every_week` or a stop.
-2. F3 and F4: add a fixture window and two scenarios so a lock blocks a fill and `max_category`
+2. F3 and F4: add a fixture window and two scenarios so a second lock blocks a fill and `max_category`
    binds? This grows the fixture (budget 15 MB, now 14.7 MB), so something must be trimmed.
 3. Phases 3 and 4: agree with the proposal above?
 4. The original Phase 4 questions 2 to 4 (hold a signal on a "same data, different result" alert,
@@ -395,6 +395,6 @@ favourite with the end pinned to its last accepted anchor and names the instrume
   script with a changelog, pre-push hook. A changed cost constant trips five scenarios.
 - 2026-10-22 — Phase 2's missing pieces built and run: always-true checks (all pass on the frozen
   results once the engine's documented limits are written into them), nightly reverse-order
-  re-run (passes), every-setting-wired (five settings could not be proven and are listed as inert with
-  reasons). Five findings F1 to F5 above. F1 reproduced by a strict-xfail test; the fix waits for the owner.
+  re-run (passes), every-setting-wired (nine setting/scenario pairs could not be proven and are listed as inert with
+  reasons; the first version compared the whole response and missed a setting the payload echoes, fixed after review). Five findings F1 to F5 above. F1 reproduced by a strict-xfail test; the fix waits for the owner.
   Gap analysis of Phases 3 and 4 against BL-052 written above.

@@ -49,7 +49,9 @@ def test_the_sale_happens_and_equity_keeps_the_money():
     assert result.equity[flip] == pytest.approx(result.equity.iloc[0])  # nothing lost
 
 
-@pytest.mark.xfail(strict=True, reason="BL-001 F1: weights leave the waiting cash out")
+@pytest.mark.xfail(
+    strict=True, raises=AssertionError, reason="BL-001 F1: weights leave the waiting cash out"
+)
 def test_the_week_after_an_off_cadence_sale_shows_the_proceeds_as_idle():
     result, flip = case()
     row = result.weights.loc[flip]
