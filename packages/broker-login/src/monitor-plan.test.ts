@@ -50,6 +50,7 @@ import {
   parseDeployedOn,
   parseMarginCsv,
   parseRupees,
+  pauseNote,
   pickNeed,
   pnlFromSocketFrame,
   quantiplyReading,
@@ -850,5 +851,13 @@ test('the day-wise list keeps multiplier and times; leg lots of an algo', () => 
   assert.deepEqual(
     legLots({ configurations: { legs: [{ quantity: 1 }, { quantity: 2 }] } }),
     [1, 2],
+  );
+});
+
+test('a pause covering today turns "missing picks" into a stated expectation', () => {
+  assert.equal(pauseNote(null), null);
+  assert.match(
+    pauseNote('2026-10-26') ?? '',
+    /paused until 2026-10-26.*missing picks are expected/,
   );
 });

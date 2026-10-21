@@ -12,6 +12,7 @@ import {
   type Book,
   type Broker,
   effectiveRow,
+  pausedFor,
   readAutomation,
 } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
@@ -75,6 +76,7 @@ import {
   parseDayWiseListed,
   parseDeployedOn,
   parseMarginCsv,
+  pauseNote,
   pickNeed,
   pnlFromSocketFrame,
   quantiplyReading,
@@ -914,6 +916,8 @@ class Monitor {
         );
         c.problems.unshift(...missing);
         c.notes.push(...notes);
+        const note = pauseNote(pausedFor(this.automation, this.day));
+        if (note) c.notes.push(note);
         checks.push(c);
       } catch (error) {
         checks.push({
@@ -954,6 +958,8 @@ class Monitor {
         const c = checkQuantiply(label, picks, list, weekday, lots);
         c.problems.unshift(...missing);
         c.notes.push(...notes);
+        const note = pauseNote(pausedFor(this.automation, this.day));
+        if (note) c.notes.push(note);
         checks.push(c);
       } catch (error) {
         checks.push({

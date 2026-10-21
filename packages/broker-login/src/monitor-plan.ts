@@ -899,6 +899,17 @@ export function checkQuantiply(
   return out;
 }
 
+/**
+ * BL-140 Phase 4: the line the 09:25 check adds when Settings › Automation has uploads and deploys
+ * paused through today's session, so a pick that is not on the platform reads as expected, not as
+ * a missed upload. Null when no pause covers today.
+ */
+export function pauseNote(pausedUntil: string | null): string | null {
+  return pausedUntil
+    ? `uploads and deploys are paused until ${pausedUntil} (Settings › Automation): missing picks are expected`
+    : null;
+}
+
 /** The headline: "AlgoTest T1 3/3 · Quantiply Core 3/3 ✅", then what is missing or extra. */
 export function deployMessage(
   day: string,
