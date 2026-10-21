@@ -741,6 +741,15 @@ study of whether T1 moves to wider stops on range-bound days. Pre-registered 202
 | 3.37.1 | Pre-registration committed | claude | **Done 2026-10-21** |
 | 3.37.2 | The table (CSV) and the study, verdicts against the registered rules, findings page | claude | **Done 2026-10-21.** H1 not met (+10.0 pp vs +15 pp), H2 met; `research/options/common/t1-range-bound-days.md` |
 
+### 3.38 T1 robustness, regime lag and opening range — [BL-145](backlog/BL-145-t1-robustness-lag-opening-range.md)
+
+Owner (2026-10-21): follow-ups to BL-144 (breadth, lag after a regime change, opening-range gate). Pre-registered before any run.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.38.1 | Pre-registration committed | claude | **Done 2026-10-21** |
+| 3.38.2 | Run Q2-Q4 (Q4 learning, then one confirmation run), findings page | claude | In progress |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

@@ -130,6 +130,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-145](BL-145-t1-robustness-lag-opening-range.md) | Is T1's year broad, does it lag regime changes, can the opening range split quiet weeks? | P1 | In progress | research | options |
 | [BL-144](BL-144-t1-range-bound-days.md) | T1 on range-bound days: a year of daily results (3 x Widesl, base, Core, T1) and does T1 move to wider stops | Done: T1's wide-stop share +10.0 pp in range-bound weeks vs +15 pp registered, not met (Core +7.6); T1 not worse than the base on quiet days; T1's edge is on volatile days; findings page written | 2026-10-21 |
 | [BL-134](BL-134-two-strategy-book.md) | Two-strategy book: top Widesl + Dir only | Informative, not adopted: worse than three picks with the Dir doubled in T1 (−254 / −330 a day net) and inconclusive in Core (one early stretch decides it); ~₹100/day brokerage saved does not pay for the dropped Widesl | 2026-10-18 |
 | [BL-133](BL-133-fourth-lot-on-normal-days.md) | A fourth lot on non-expiry days: Widesl (T1) or Dir (Core) | Informative: the Dir at two lots is the best fourth-lot home in both books (Core +149 / +230 a day over an even spread after brokerage; T1 +87 / +141, the last year only above zero) but the edge rests on a few days; no T1 Widesl placement beat the even spread; in-sample | 2026-10-18 |
