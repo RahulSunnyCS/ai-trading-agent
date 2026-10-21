@@ -90,4 +90,17 @@ None.
   positive. Verdict: **hurts** (the interval is below zero). The owner's pattern: down day then recovery
   (8.9% of days) +219 per pick-day, up day then fade (7.3%) +217, every other day type -148 to -228; all down
   days together -127. Findings page `research/options/common/directional-early-exit.md`.
+- 2026-10-21 — **addendum, registered before it was computed** (owner: "if Nifty or Sensex fall more than 0.6
+  percent at 14:55, would that be better"). A conditional exit on the 14:55 reruns already stored in
+  `out/deltas.csv`. **Rule:** a Dir-family strategy exits at 14:55 only when its own index (NIFTY for the N
+  variants, SENSEX for the S variants) is down 0.6% or more from the 09:15 open to the 14:55 price; on every
+  other day it holds to 15:28 as today. The change on a day is the 14:55 delta on triggered days and zero
+  otherwise. A second reading, fixed now and reported beside it: the same threshold measured from the previous
+  close. **Better** if all of: (1) the mean delta over triggered pick-days of population A (T1 and Core pooled)
+  is above zero and its 90% circular 5-day block bootstrap interval (2,000 resamples, seed 20261021, resampling
+  days) is above zero; (2) A's daily directional stream has a max drawdown no deeper than with the 15:28 exit;
+  (3) at least 60% of the Dir variants that have triggered days have a positive mean delta on them. With fewer
+  than 15 triggered days in A the verdict is "too few days" and the numbers are shown only. Reported too: the
+  share of days that trigger, the best and worst triggered delta, the mean delta by family. No other threshold
+  is run (a different threshold needs a dated line here first); the mirror (up 0.6% or more) was not asked for.
 
