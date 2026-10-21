@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades T1 and Core with real money and asked how they behave on event days and what, if anything, to add |
-| **Status** | In progress |
+| **Status** | Done: E1 met, E2 met, E3 no change suggested; RBI days favour the fixed Widesl (lead only) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-21 |
@@ -87,3 +87,10 @@ None.
 
 - 2026-10-21 — created and pre-registered before any run. Event dates confirmed against public sources
   (RBI MPC schedules, ECI counting dates, the Budget sessions are in the store).
+- 2026-10-21 — ran (`research/bl146/run.py`, 494 sessions). E1 met: over 60 special sessions T1 +929 per
+  lot-day vs Base +537. E2 met: T1's worst special day -3,306 vs -3,511 to -3,792. E3: T1 premium (VIX >=
+  18.37, 50 days) minus rest +506 [+91, +951]: no adjustment suggested. Groups: Budget week T1 +2,996 (8);
+  elections T1 +482 (3); RBI T1 +997 vs 3 x Widesl +2,236 on the same 10 days (6 of 10 days Widesl ahead);
+  premium T1 +1,049, 70% win. Findings page `research/options/common/special-days.md`; event table
+  `research/bl146/out/events.csv` (git-ignored). The weekend Budget sessions have no picks.
+

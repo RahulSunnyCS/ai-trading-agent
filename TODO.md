@@ -758,7 +758,7 @@ Pre-registered before any run.
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.39.1 | Pre-registration committed | claude | **Done 2026-10-21** |
-| 3.39.2 | Run the event table and E1-E3, findings page | claude | In progress |
+| 3.39.2 | Run the event table and E1-E3, findings page | claude | **Done 2026-10-21.** E1 met, E2 met, E3 no change; `research/options/common/special-days.md` |
 
 ## Reference — where detail lives
 
