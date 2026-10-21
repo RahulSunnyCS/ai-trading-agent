@@ -247,6 +247,11 @@ def _without_addon(picks, platform: str, book: str, settings: dict | None):
     from . import automation_settings
 
     if automation_settings.addon_wanted(settings, platform, book):
+        if automation_settings.addon_mixed(settings, platform, book):
+            typer.echo(
+                f"{platform} {book}: Buy add-on KEPT: one export serves every account and another "
+                "account uploading this list wants it, so the account with it off gets it too"
+            )
         return picks
     typer.echo(f"{platform} {book}: Buy add-on left out (Settings › Automation)")
     return replace(picks, buy=[])

@@ -109,6 +109,8 @@ def test_addon_wanted_follows_the_rows_that_upload_the_list(tmp_path, monkeypatc
     both = json.loads(json.dumps(data))
     both["rows"]["quantiply.finvasia"].update(list="core", upload=True, addon=True)
     assert a.addon_wanted(both, "quantiply", "core") is True
+    assert a.addon_mixed(both, "quantiply", "core") is True  # said by the export command
+    assert a.addon_mixed(data, "quantiply", "core") is False
 
 
 def test_from_settings_leaves_the_addon_out_only_when_no_row_wants_it(tmp_path, monkeypatch):
@@ -167,3 +169,13 @@ def test_the_export_commands_leave_the_addon_out_under_from_settings(tmp_path, m
     assert "Buy add-on left out" in out
     t, _ = manifest("algotest-export", "t")
     assert [s["addon"] for s in t["strategies"]] == [False, False, False, True]
+
+
+def test_a_shared_list_with_mixed_addon_settings_says_so(tmp_path, monkeypatch, capsys):
+    from option_backtesting.rotation import cli
+
+    settings = _write(tmp_path, monkeypatch)
+    settings["rows"]["quantiply.finvasia"].update(list="core", upload=True, addon=True)
+    picks = _picks("core")
+    assert cli._without_addon(picks, "quantiply", "core", settings) is picks
+    assert "Buy add-on KEPT" in capsys.readouterr().out
