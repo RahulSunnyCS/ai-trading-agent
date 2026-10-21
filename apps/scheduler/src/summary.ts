@@ -6,6 +6,7 @@ import { isTradingDay } from '@trading/market-reference';
 import { type AlertSink, telegramSink } from './alerts.js';
 import type { RunRow } from './history.js';
 import { JOBS } from './jobs.js';
+import { pauseNotice } from './pause.js';
 import type { Builtin, BuiltinContext } from './runner.js';
 import { addDays, formatIst, istAt, istDay, previousDue } from './schedule.js';
 
@@ -345,6 +346,20 @@ function catchUps(ctx: BuiltinContext): Check[] {
   return check ? [check] : [];
 }
 
+/** BL-140 Phase 4: a pause is on, so the owner is not surprised by a quiet 09:16. */
+function pauseChecks(ctx: BuiltinContext): Check[] {
+  const until = pauseNotice(ctx.env, ctx.now());
+  if (until === null) return [];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(until)) return [{ ok: false, label: 'Pause', detail: until }];
+  return [
+    {
+      ok: true,
+      label: 'Paused',
+      detail: `no uploads or deploys until ${until} (Settings › Automation); logins, picks and results go on`,
+    },
+  ];
+}
+
 /** The checks that look outside the history table: GitHub, Fyers, the lake, git, the disk. */
 export type SystemChecks = (ctx: BuiltinContext) => Check[];
 
@@ -360,7 +375,13 @@ const systemChecks: SystemChecks = (ctx) => [
 export function morningSummary(sink?: AlertSink, system: SystemChecks = systemChecks): Builtin {
   return async (ctx) => {
     const jobs = jobChecks(ctx);
-    const checks = [...jobs, ...system(ctx), ...catchUps(ctx), ...recentFailures(ctx, jobs)];
+    const checks = [
+      ...jobs,
+      ...system(ctx),
+      ...pauseChecks(ctx),
+      ...catchUps(ctx),
+      ...recentFailures(ctx, jobs),
+    ];
     const { text } = formatSummary(istDay(ctx.now()), checks);
     ctx.log(text);
     await (sink ?? telegramSink(ctx.env, 'scheduler.morning'))(text);

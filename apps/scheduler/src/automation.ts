@@ -14,7 +14,9 @@ import { jobPath } from './env.js';
  *   With a master off, no row can turn that kind of automation on.
  * - One row per platform + broker (AlgoTest / Quantiply × Shoonya (Finvasia) / Angel One):
  *   log in at 08:00, which list it gets (none, Core = Adaptive Classic, T1 = Adaptive Tuned),
- *   upload it.
+ *   upload it, the platform multiplier it runs at (BL-140 Phase 4, 1-10, default 1) and whether
+ *   it includes the Buy add-on (default yes).
+ * - A pause (BL-140 Phase 4): no uploads or deploys for any session up to and including a day.
  *
  * Every Save is a new version in the scheduler's SQLite (`automation_settings`); nothing is
  * ever updated in place, so the page can show the history. The current version is also
@@ -32,12 +34,25 @@ export type Broker = (typeof BROKERS)[number];
 export type List = (typeof LISTS)[number];
 export type RowKey = `${Platform}.${Broker}`;
 
+/** The platform multiplier a row may run at: an integer in this range, 1 unless the owner sets it. */
+export const MULTIPLIER_MIN = 1;
+export const MULTIPLIER_MAX = 10;
+
 export interface Row {
   /** log this broker in on this platform at 08:00 */
   login: boolean;
   list: List;
   /** upload `list`'s picks to this platform (evening and 09:16 top-up) */
   upload: boolean;
+  /** the platform multiplier (Quantiply's algo multiplier, AlgoTest's deploy-sheet multiplier) */
+  multiplier: number;
+  /** include the Buy add-on picks */
+  addon: boolean;
+}
+
+export interface Pause {
+  /** no uploads or deploys for any session up to and including this IST day; null = no pause */
+  until: string | null;
 }
 
 export interface Masters {
@@ -49,6 +64,7 @@ export interface Masters {
 export interface AutomationSettings {
   masters: Masters;
   rows: Record<RowKey, Row>;
+  pause: Pause;
 }
 
 export interface Version {
@@ -71,12 +87,43 @@ export const ROW_KEYS: RowKey[] = PLATFORMS.flatMap((p) =>
 export const DEFAULT_SETTINGS: AutomationSettings = {
   masters: { logins: true, uploads: true, deploy: false },
   rows: {
-    'algotest.finvasia': { login: true, list: 't1', upload: true },
-    'algotest.angelone': { login: false, list: 'none', upload: false },
-    'quantiply.angelone': { login: true, list: 'core', upload: true },
-    'quantiply.finvasia': { login: false, list: 'none', upload: false },
+    'algotest.finvasia': { login: true, list: 't1', upload: true, multiplier: 1, addon: true },
+    'algotest.angelone': { login: false, list: 'none', upload: false, multiplier: 1, addon: true },
+    'quantiply.angelone': { login: true, list: 'core', upload: true, multiplier: 1, addon: true },
+    'quantiply.finvasia': { login: false, list: 'none', upload: false, multiplier: 1, addon: true },
   },
+  pause: { until: null },
 };
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** `YYYY-MM-DD` that is a day on the calendar (not 2026-02-30). */
+function isRealDay(value: string): boolean {
+  if (!DAY.test(value)) return false;
+  const t = Date.parse(`${value}T00:00:00Z`);
+  return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === value;
+}
+
+/**
+ * Settings saved before Phase 4 have no multiplier, add-on or pause: they mean 1, yes and none,
+ * exactly what the jobs did. Anything present is kept as it is (and validated on a Save).
+ */
+export function withDefaults(settings: AutomationSettings): AutomationSettings {
+  const partial = settings as unknown as {
+    rows: Record<string, Partial<Row>>;
+    pause?: Partial<Pause>;
+  };
+  return {
+    ...settings,
+    rows: Object.fromEntries(
+      Object.entries(partial.rows).map(([k, r]) => [
+        k,
+        { ...r, multiplier: r.multiplier ?? 1, addon: r.addon ?? true },
+      ]),
+    ) as Record<RowKey, Row>,
+    pause: { until: partial.pause?.until ?? null },
+  };
+}
 
 /** `value` as settings, or the reasons it is not. Unknown keys are refused, not dropped. */
 export function validate(value: unknown): { settings: AutomationSettings } | { errors: string[] } {
@@ -84,7 +131,7 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
   const obj = (v: unknown): v is Record<string, unknown> =>
     !!v && typeof v === 'object' && !Array.isArray(v);
   if (!obj(value)) return { errors: ['settings must be an object'] };
-  const extra = Object.keys(value).filter((k) => k !== 'masters' && k !== 'rows');
+  const extra = Object.keys(value).filter((k) => !['masters', 'rows', 'pause'].includes(k));
   if (extra.length) errors.push(`unknown keys: ${extra.join(', ')}`);
 
   const masters = value.masters;
@@ -108,17 +155,45 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
         continue;
       }
       for (const k of Object.keys(row))
-        if (!['login', 'list', 'upload'].includes(k)) errors.push(`${key}: unknown field ${k}`);
+        if (!['login', 'list', 'upload', 'multiplier', 'addon'].includes(k))
+          errors.push(`${key}: unknown field ${k}`);
       if (typeof row.login !== 'boolean') errors.push(`${key}.login must be true or false`);
       if (typeof row.upload !== 'boolean') errors.push(`${key}.upload must be true or false`);
       if (!LISTS.includes(row.list as List))
         errors.push(`${key}.list must be one of ${LISTS.join(', ')}`);
       if (row.upload === true && row.list === 'none')
         errors.push(`${key}: upload is on but no list is chosen`);
+      if (
+        row.multiplier !== undefined &&
+        !(
+          typeof row.multiplier === 'number' &&
+          Number.isInteger(row.multiplier) &&
+          row.multiplier >= MULTIPLIER_MIN &&
+          row.multiplier <= MULTIPLIER_MAX
+        )
+      )
+        errors.push(
+          `${key}.multiplier must be a whole number from ${MULTIPLIER_MIN} to ${MULTIPLIER_MAX}`,
+        );
+      if (row.addon !== undefined && typeof row.addon !== 'boolean')
+        errors.push(`${key}.addon must be true or false`);
+    }
+  }
+  if (value.pause !== undefined) {
+    const pause = value.pause;
+    if (!obj(pause)) errors.push('pause must be an object');
+    else {
+      for (const k of Object.keys(pause))
+        if (k !== 'until') errors.push(`unknown pause field: ${k}`);
+      const until = pause.until;
+      if (until !== null && until !== undefined) {
+        if (!(typeof until === 'string' && isRealDay(until)))
+          errors.push('pause.until must be a day as YYYY-MM-DD, or null');
+      }
     }
   }
   if (errors.length) return { errors };
-  const v = value as unknown as AutomationSettings;
+  const v = withDefaults(value as unknown as AutomationSettings);
   // Rebuild in a fixed key order, so equal settings always serialise the same.
   return {
     settings: {
@@ -126,9 +201,19 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
       rows: Object.fromEntries(
         ROW_KEYS.map((k) => {
           const r = v.rows[k];
-          return [k, { login: r.login, list: r.list, upload: r.upload }];
+          return [
+            k,
+            {
+              login: r.login,
+              list: r.list,
+              upload: r.upload,
+              multiplier: r.multiplier,
+              addon: r.addon,
+            },
+          ];
         }),
       ) as Record<RowKey, Row>,
+      pause: { until: v.pause.until },
     },
   };
 }
@@ -140,7 +225,15 @@ export function effective(settings: AutomationSettings, key: RowKey): Row {
     login: settings.masters.logins && row.login,
     list: row.list,
     upload: settings.masters.uploads && row.upload && row.list !== 'none',
+    multiplier: row.multiplier,
+    addon: row.addon,
   };
+}
+
+/** The pause's last day when a session on `session` (IST day) is paused, else null. Inclusive. */
+export function pausedFor(settings: AutomationSettings, session: string): string | null {
+  const until = settings.pause.until;
+  return until !== null && session <= until ? until : null;
 }
 
 /**
@@ -274,7 +367,7 @@ export class SettingsStore {
     settings: string;
     github: string | null;
   }): Version {
-    return { ...r, settings: JSON.parse(r.settings) as AutomationSettings };
+    return { ...r, settings: withDefaults(JSON.parse(r.settings) as AutomationSettings) };
   }
 
   /** The latest version; the defaults (version 0, never saved) when nothing is saved yet. */

@@ -7,6 +7,7 @@ import {
   DEFAULT_AUTOMATION,
   describeSource,
   effectiveRow,
+  pausedFor,
   readAutomation,
   settingsPath,
   uploadBooks,
@@ -35,7 +36,13 @@ describe('automation settings for the jobs (BL-140)', () => {
   it('a saved file decides, and the master switches gate every row', () => {
     write(
       saved((s) => {
-        s.rows['algotest.angelone'] = { login: true, list: 'core', upload: true };
+        s.rows['algotest.angelone'] = {
+          login: true,
+          list: 'core',
+          upload: true,
+          multiplier: 1,
+          addon: true,
+        };
       }),
     );
     let a = readAutomation(file);
@@ -65,5 +72,57 @@ describe('automation settings for the jobs (BL-140)', () => {
 
   it('lives beside the scheduler database', () => {
     assert.equal(settingsPath({ SCHEDULER_STATE_DIR: '/x' }), '/x/automation-settings.json');
+  });
+});
+
+describe('multiplier, add-on and pause (BL-140 Phase 4)', () => {
+  const fixtures = join(import.meta.dirname, 'fixtures');
+  const fixture = (name: string) => join(fixtures, name);
+
+  it('a snapshot written before Phase 4 means multiplier 1, add-on yes and no pause', () => {
+    const a = readAutomation(fixture('automation-settings-v1.json'));
+    for (const row of Object.values(a.rows)) {
+      assert.equal(row.multiplier, 1);
+      assert.equal(row.addon, true);
+    }
+    assert.deepEqual(a.pause, { until: null });
+    assert.equal(effectiveRow(a, 'quantiply', 'angelone').multiplier, 1);
+    assert.equal(pausedFor(a, '2026-10-23'), null);
+  });
+
+  it('reads what the owner set and applies a pause to every session up to its last day', () => {
+    const a = readAutomation(fixture('automation-settings-v2.json'));
+    assert.equal(effectiveRow(a, 'quantiply', 'angelone').multiplier, 3);
+    assert.equal(effectiveRow(a, 'quantiply', 'angelone').addon, false);
+    assert.equal(effectiveRow(a, 'algotest', 'finvasia').multiplier, 2);
+    assert.equal(pausedFor(a, '2026-10-26'), '2026-10-27');
+    assert.equal(pausedFor(a, '2026-10-27'), '2026-10-27'); // inclusive
+    assert.equal(pausedFor(a, '2026-10-28'), null);
+  });
+
+  it('refuses a bad multiplier, add-on or pause date rather than guessing', () => {
+    for (const change of [
+      (s: typeof DEFAULT_AUTOMATION) => {
+        s.rows['quantiply.angelone'].multiplier = 0;
+      },
+      (s: typeof DEFAULT_AUTOMATION) => {
+        s.rows['quantiply.angelone'].multiplier = 11;
+      },
+      (s: typeof DEFAULT_AUTOMATION) => {
+        s.rows['quantiply.angelone'].multiplier = 1.5;
+      },
+      (s: typeof DEFAULT_AUTOMATION) => {
+        (s.rows['quantiply.angelone'] as unknown as { multiplier: unknown }).multiplier = '3';
+      },
+      (s: typeof DEFAULT_AUTOMATION) => {
+        (s.rows['algotest.finvasia'] as unknown as { addon: unknown }).addon = 'no';
+      },
+      (s: typeof DEFAULT_AUTOMATION) => {
+        s.pause = { until: 'tomorrow' };
+      },
+    ]) {
+      write(saved(change));
+      assert.throws(() => readAutomation(file));
+    }
   });
 });

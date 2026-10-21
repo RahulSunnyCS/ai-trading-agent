@@ -143,6 +143,12 @@ Shoonya's own hosts:
 
 ## Log
 
+- 2026-10-22 — Phase 4 started (owner, going to sleep: "take your own decision"; Sonnet overnight run). Owner's
+  answers: platform multiplier (Quantiply's algo `multiplier`, AlgoTest's deploy-sheet multiplier), integer 1-10;
+  Pause stops uploads and deploys only; the morning gap check extends the 09:25 `DEPLOY_CHECK`; merge on GitHub,
+  the owner pulls. **PR 2 (this):** the settings schema (`multiplier`, `addon`, `pause.until`; old versions read as
+  1, yes, none), readers in TS and Python, `pause.ts` gating, "Skip next session", the 09:00 notice, the page.
+  Multiplier and add-on are saved only until the next PRs make the uploaders and deployers follow them.
 - 2026-10-19 — Phases 3 and 3b built while the owner was out ("do it as per your thinking"). Code and stand-in tests only: nothing was logged in, uploaded or set on GitHub.
   - **Readers:** `packages/broker-login/src/automation-settings.ts` and `rotation/automation_settings.py`. With no file yet they use today's setup, so nothing changes until a save.
   - **Exports and uploaders:** `--from-settings` on `algotest-export`, `quantiply-export` (now accepts T1), `strategy-upload.ts` (several lists in one plan) and `quantiply-upload.ts` (`--broker angelone|finvasia`; own login, API host and ledger `ledger-finvasia.jsonl`). A block with upload off is left untouched.

@@ -9,6 +9,7 @@ import {
   SettingsStore,
   effective,
   githubVariables,
+  pausedFor,
   syncGithub,
   validate,
 } from '../automation.js';
@@ -32,7 +33,13 @@ describe('validate', () => {
     };
     bad.extra = 1;
     bad.masters.logins = 'yes';
-    bad.rows['algotest.zerodha'] = { login: true, list: 'core', upload: true };
+    bad.rows['algotest.zerodha'] = {
+      login: true,
+      list: 'core',
+      upload: true,
+      multiplier: 1,
+      addon: true,
+    };
     (bad.rows['quantiply.finvasia'] as Loose).list = 'classic';
     (bad.rows['algotest.angelone'] as Loose).upload = true; // list is 'none'
     bad.rows['quantiply.angelone'] = undefined as unknown as Loose;
@@ -75,6 +82,8 @@ describe('effective and the GitHub variables', () => {
       login: false,
       list: 'core',
       upload: false,
+      multiplier: 1,
+      addon: true,
     });
     const { vars, withheld } = githubVariables(s);
     expect(vars).toMatchObject({
@@ -204,6 +213,8 @@ describe('API /settings/automation', () => {
       login: true,
       list: 'core',
       upload: true,
+      multiplier: 1,
+      addon: true,
     });
     expect(body.github.QUANTIPLY_LOGIN).toBe('on');
   });
@@ -240,5 +251,91 @@ describe('API /settings/automation', () => {
   it('answers 503 without a store', async () => {
     const handle = createApi({ ctx: ctx(), jobs: [] });
     expect((await handle(new Request('http://x/settings/automation'))).status).toBe(503);
+  });
+});
+
+describe('multiplier, add-on and pause (BL-140 Phase 4)', () => {
+  it('settings saved before Phase 4 mean 1, yes and no pause, and a first Save keeps them', () => {
+    const old = clone(DEFAULT_SETTINGS) as unknown as {
+      rows: Record<string, Record<string, unknown>>;
+      pause?: unknown;
+    };
+    for (const row of Object.values(old.rows)) {
+      row.multiplier = undefined;
+      row.addon = undefined;
+    }
+    old.pause = undefined;
+    const checked = validate(JSON.parse(JSON.stringify(old)));
+    expect('settings' in checked && checked.settings).toEqual(DEFAULT_SETTINGS);
+    expect(DEFAULT_SETTINGS.pause.until).toBeNull();
+    expect(Object.values(DEFAULT_SETTINGS.rows).every((r) => r.multiplier === 1 && r.addon)).toBe(
+      true,
+    );
+  });
+
+  it('refuses a multiplier that is not a whole number from 1 to 10, a bad add-on or a bad day', () => {
+    for (const bad of [0, 11, 1.5, -1, '3', null, true]) {
+      const s = clone(DEFAULT_SETTINGS) as unknown as {
+        rows: Record<string, Record<string, unknown>>;
+      };
+      (s.rows['quantiply.angelone'] as Record<string, unknown>).multiplier = bad;
+      const checked = validate(s);
+      expect('errors' in checked && checked.errors.join()).toContain(
+        'quantiply.angelone.multiplier',
+      );
+    }
+    const s = clone(DEFAULT_SETTINGS) as unknown as {
+      rows: Record<string, Record<string, unknown>>;
+    };
+    (s.rows['algotest.finvasia'] as Record<string, unknown>).addon = 'no';
+    expect('errors' in validate(s)).toBe(true);
+    for (const until of ['tomorrow', '2026-13-40', '2026-02-30', 20261027, ''] as const) {
+      const p = { ...clone(DEFAULT_SETTINGS), pause: { until } } as unknown;
+      expect('errors' in validate(p)).toBe(true);
+    }
+    const extra = { ...clone(DEFAULT_SETTINGS), pause: { until: null, why: 'x' } } as unknown;
+    expect('errors' in validate(extra)).toBe(true);
+  });
+
+  it('accepts the owner’s choices and gives them to the jobs through effective and pausedFor', () => {
+    const s = clone(DEFAULT_SETTINGS);
+    s.rows['quantiply.angelone'].multiplier = 3;
+    s.rows['quantiply.angelone'].addon = false;
+    s.pause = { until: '2026-10-27' };
+    const checked = validate(s);
+    if (!('settings' in checked)) throw new Error(checked.errors.join());
+    expect(effective(checked.settings, 'quantiply.angelone')).toMatchObject({
+      multiplier: 3,
+      addon: false,
+    });
+    expect(pausedFor(checked.settings, '2026-10-27')).toBe('2026-10-27');
+    expect(pausedFor(checked.settings, '2026-10-28')).toBeNull();
+  });
+
+  it('a version saved before Phase 4 comes back from the store with the defaults filled in', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'automation-v1-'));
+    const store = new SettingsStore(
+      join(dir, 'scheduler.db'),
+      join(dir, 'automation-settings.json'),
+    );
+    const old = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as {
+      rows: Record<string, Record<string, unknown>>;
+      pause?: unknown;
+    };
+    for (const row of Object.values(old.rows)) {
+      row.multiplier = undefined;
+      row.addon = undefined;
+    }
+    old.pause = undefined;
+    // a row as an older build stored it, straight into the table
+    (store as unknown as { db: { query: (q: string) => { run: (...a: unknown[]) => void } } }).db
+      .query('INSERT INTO automation_settings (saved_at, settings) VALUES (?, ?)')
+      .run('2026-10-20T00:00:00Z', JSON.stringify(old));
+    expect(store.current().settings).toEqual(DEFAULT_SETTINGS);
+    store.writeSnapshot();
+    const snapshot = JSON.parse(readFileSync(join(dir, 'automation-settings.json'), 'utf8'));
+    expect(snapshot.pause).toEqual({ until: null });
+    expect(snapshot.rows['quantiply.angelone'].multiplier).toBe(1);
+    store.close();
   });
 });
