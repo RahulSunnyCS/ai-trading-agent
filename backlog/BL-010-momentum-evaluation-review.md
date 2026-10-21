@@ -540,3 +540,11 @@ Also parked here (owner, 2026-10-06), priority P3:
   Reading: the stock universe is already point in time for every favourite; the category tags
   are the remaining hindsight and cost 4–11 points and 7–14 points of drawdown. Today's list is
   not the upper bound here because these configs were found on the point-in-time universe.
+- 2026-10-22 — owner: "yes, check it". BL-010 never tested the strategy the money is in (Four
+  Sectors Monthly, No Tilt, all Fridays, `fbb7ab054238`, chosen 2026-10-20 from the 2026-10-08
+  top-10 ranking). Pre-registered as `search_spaces/bl010_criteria_addendum_6.json`, committed
+  before any run: variants (extended tags, tax at Rs 50,000 a sleeve, Monday-open fill with whole
+  shares from the audit replay), six gates (G1 5 points over Mom30 TRI after tax, G2 medium
+  drawdown basket, G3 no financial year more than 10 points behind, G4 plateau of one-step
+  neighbours, G5 factor alpha, G6 fair placebo), a verdict rule and what is only reported. The
+  2012-2016 window stays spent and is not read. Result goes in `bl010_four_sectors_result.json`.
