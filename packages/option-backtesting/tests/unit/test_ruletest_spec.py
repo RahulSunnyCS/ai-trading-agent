@@ -214,3 +214,54 @@ def test_an_unquoted_on_key_in_yaml_is_read_as_on():
     assert "\n    on: up" in text or "on: up" in text
     rule = load_spec(text)
     assert [leg["on"] for leg in rule.legs] == ["up", "down"]
+
+
+def test_the_rule_loader_keeps_on_off_yes_no_as_text():
+    text = (
+        "rule:\n"
+        "  id: t\n"
+        "  name: off\n"
+        "  notes: yes\n"
+        "  underlying: NIFTY\n"
+        '  window: { from: "10:30", to: "14:00" }\n'
+        "  when: { gt: [close, pivot] }\n"
+        "  direction_up: { gt: [close, open] }\n"
+        "  template:\n"
+        '    exit_time: "15:28"\n'
+        "    legs:\n"
+        "      - { id: ce, lots: 1, position: buy, option_type: CE,\n"
+        "          strike: { strike_type: ATM }, on: up }\n"
+        "      - { id: pe, lots: 1, position: buy, option_type: PE,\n"
+        "          strike: { strike_type: ATM }, on: down }\n"
+    )
+    rule = load_spec(text)
+    assert [leg["on"] for leg in rule.legs] == ["up", "down"]
+    assert rule.spec.name == "off" and rule.spec.notes == "yes"
+
+
+def test_missing_spot_is_refused_for_a_premium_pct_leg():
+    rule = from_dict(copy.deepcopy(BUY_TREND))
+    with pytest.raises(SpecError, match="no index price"):
+        rule.strategy_for("10:01", "up", spot=None)
+    # an ATM leg needs no spot
+    assert from_dict(spec()).strategy_for("11:01", "both").exit_time == "15:28"
+
+
+def test_exit_rules_share_one_template_hash_whatever_their_conditions():
+    a = from_dict(copy.deepcopy(BUY_TREND))
+    other = copy.deepcopy(BUY_TREND)
+    other["exit_when"] = {"up": {"lt": ["close", "pivot"]}, "down": {"gt": ["close", "pivot"]}}
+    other["define"] = {"unused": {"gt": ["close", 1]}}
+    other["control_when"] = {"up": {"gt": ["close", 1]}, "down": {"gt": ["close", 1]}}
+    b = from_dict(other)
+    assert a.template_hash == b.template_hash and a.spec_hash != b.spec_hash
+    no_exit = copy.deepcopy(BUY_TREND)
+    del no_exit["exit_when"]
+    assert from_dict(no_exit).template_hash != a.template_hash
+    assert set(b.controls) == {"up", "down"}
+    back = read_back(b)
+    assert any(s.startswith("Controls for up events: only where") for s in back["sentences"])
+    assert any(
+        s.startswith("Controls: only where the exit condition does not hold")
+        for s in read_back(a)["sentences"]
+    )

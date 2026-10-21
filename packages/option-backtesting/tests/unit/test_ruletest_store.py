@@ -183,3 +183,83 @@ def test_an_append_after_a_torn_line_starts_a_line_of_its_own(tmp_path, monkeypa
     assert float(again[("2026-01-06", "11:01", "both", 0.0)]["sell_value"]) == 1234.5
     assert float(again[("2026-01-05", "11:01", "both", 0.0)]["gross"]) == 100.0
     assert skipped == 1  # the cut line stays in the file, never trusted
+
+
+def test_an_exit_rule_cache_row_is_used_only_for_its_own_exit(tmp_path, monkeypatch):
+    """An exit_when rule's simulation is keyed by its exit minute too: when the history moves an
+    exit, the stale row is not returned and the trade is simulated again for the new exit."""
+    calls: list[tuple[str, str]] = []
+
+    def fake_work(task):
+        _root, _spec, day, items = task
+        out = []
+        for e, s, p, x in items:
+            calls.append((day, x))
+            out.append(
+                {"day": day, "entry": e, "side": s, "slip": p, "exit": x,
+                 "gross": 100.0 if x == "11:16" else 200.0, "worst_mtm": -1, "best_mtm": 300,
+                 "stopped_by": "", "orders": 2, "buy_value": 900.0, "sell_value": 1000.0,
+                 "n_trades": 2, "weekly_expiry": "2026-01-08", "spot_entry": 23000,
+                 "spot_exit": 23005, "error": ""}
+            )  # fmt: skip
+        return out
+
+    class InlinePool:
+        def __init__(self, _workers):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def map(self, fn, tasks, chunksize=1):
+            return map(fn, tasks)
+
+    monkeypatch.setattr(sim, "_work", fake_work)
+    monkeypatch.setattr(sim, "ProcessPoolExecutor", InlinePool)
+    rule = SimpleNamespace(template_hash="tplx", spec=SimpleNamespace(model_dump=lambda **_: {}))
+    key = ("2026-01-05", "09:21", "up", 0.0)
+    first = sim.ensure(tmp_path, rule, {key}, workers=1, exits={key[:3]: "11:16"})
+    assert float(first[key]["gross"]) == 100.0
+    again = sim.ensure(tmp_path, rule, {key}, workers=1, exits={key[:3]: "11:16"})
+    assert float(again[key]["gross"]) == 100.0 and len(calls) == 1  # cached
+    moved = sim.ensure(tmp_path, rule, {key}, workers=1, exits={key[:3]: "12:01"})
+    assert float(moved[key]["gross"]) == 200.0 and calls[-1] == ("2026-01-05", "12:01")
+    header = sim.cache_path(tmp_path, "tplx").read_text().splitlines()[0]
+    assert header.split(",") == sim.EXIT_COLUMNS
+    # a key with no exit (its day is not in the frame) is left out, not run to the template exit
+    assert (
+        sim.ensure(tmp_path, rule, {("2026-01-09", "09:21", "up", 0.0)}, workers=1, exits={}) == {}
+    )
+
+
+def test_simulate_items_passes_the_exit_and_the_spot_and_refuses_a_missing_spot(monkeypatch):
+    from option_backtesting.legwise import engine, market
+    from tests.unit.test_ruletest_spec import BUY_TREND
+
+    rule = from_dict(BUY_TREND)
+    seen = []
+
+    def fake_simulate_day(strategy, data, reference, sizing):
+        seen.append(strategy)
+        return SimpleNamespace(
+            gross=10.0, worst_mtm=-5.0, best_mtm=20.0, stopped_by=None, trades=[]
+        )
+
+    monkeypatch.setattr(engine, "simulate_day", fake_simulate_day)
+    monkeypatch.setattr(market, "pick_expiry", lambda data, kind: None)
+    prices = {6: 24165.0, 7: None}
+    data = SimpleNamespace(
+        day=datetime(2026, 4, 29).date(),
+        spot=SimpleNamespace(price_at=lambda m: prices.get(m, 24000.0)),
+    )
+    rows = sim.simulate_items(
+        rule, data, [("09:21", "up", 0.0, "11:16"), ("09:22", "up", 0.0, "11:16")], None
+    )
+    assert rows[0]["error"] == "" and rows[0]["exit"] == "11:16"
+    assert seen[0].exit_time == "11:16"
+    assert seen[0].legs[0].strike.closest_premium == pytest.approx(241.65)
+    assert rows[1]["error"].startswith("ERR SpecError") and "no index price" in rows[1]["error"]
+    assert len(seen) == 1  # the trade with no spot never reached the engine

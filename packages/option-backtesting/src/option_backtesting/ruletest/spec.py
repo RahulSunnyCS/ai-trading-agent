@@ -30,6 +30,11 @@ template's `exit_time`. With `direction_up`, it may be a mapping `{up: ..., down
 condition per side (a Supertrend exit is the usual case). The same exit rule is applied to the
 placebo and random-time controls from their own entry minute.
 
+`control_when` (optional, the same two forms) is what a placebo or random-time entry must satisfy at
+its decision minute (the minute before it enters) to be used as a control: the trend-matched
+control, so a control trade is not one the exit would close at once. With `exit_when` and no
+`control_when`, a control is used where the exit condition does not hold at its decision minute.
+
 A leg's strike may also be `{ premium_pct_of_spot: 1.0 }`: the strike whose premium is nearest that
 percentage of the index at the entry (its `closest_premium`, worked out per trade).
 """
@@ -38,6 +43,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -78,6 +84,7 @@ class RuleSpec(BaseModel):
     when: Any
     direction_up: Any = None
     exit_when: Any = None
+    control_when: Any = None
     template: dict[str, Any]
     #: hash of the spec this one was derived from, for the tested-strategies ledger
     parent: str | None = None
@@ -98,6 +105,7 @@ class CompiledRule:
     defs: dict[str, E.Node]
     direction: E.Node | None
     exits: dict[str, E.Node] | None  # side ("both" / "up" / "down") -> the exit condition
+    controls: dict[str, E.Node] | None  # side -> what a control entry must meet (`control_when`)
     start: int  # first stamp a firing may happen on
     stop: int  # last stamp
     legs: list[dict[str, Any]]  # the template's legs, each with its `on`
@@ -124,6 +132,9 @@ class CompiledRule:
     ) -> LegwiseStrategy:
         """The legwise strategy of one trade. `exit_time` is that trade's `exit_when` exit (None:
         the template's); `spot` prices a `premium_pct_of_spot` strike and is required for one."""
+        traded = [leg for leg in self.legs if leg["on"] in ("both", side) or side == "both"]
+        if spot is None and any(_is_pct(leg.get("strike")) for leg in traded):
+            raise SpecError(f"no index price at {entry_time} to price a {PCT_KEY} strike")
         body = _strategy_dict(self.spec, self.legs, entry_time, side, spot)
         if exit_time is not None:
             body["exit_time"] = exit_time
@@ -135,10 +146,14 @@ class CompiledRule:
 PCT_KEY = "premium_pct_of_spot"
 
 
+def _is_pct(strike: Any) -> bool:
+    return isinstance(strike, dict) and PCT_KEY in strike
+
+
 def _strike_for(strike: Any, spot: float | None) -> Any:
     """A `premium_pct_of_spot` strike as the legwise `closest_premium` it means at this spot. With
     no spot (checking the template's shape), the percentage itself stands in for the premium."""
-    if not isinstance(strike, dict) or PCT_KEY not in strike:
+    if not _is_pct(strike):
         return strike
     pct = strike[PCT_KEY]
     rest = {k: v for k, v in strike.items() if k != PCT_KEY}
@@ -169,21 +184,21 @@ def _strategy_dict(
     }
 
 
-def _parse_exits(spec: RuleSpec, defs: dict[str, E.Node], directional: bool):
-    """{side: exit condition} from `exit_when`, or None when the rule has none."""
-    body = spec.exit_when
+def _parse_sided(body: Any, name: str, defs: dict[str, E.Node], directional: bool):
+    """{side: condition} from `exit_when` / `control_when` (one condition, or `{up, down}`), or
+    None when the rule has none."""
     if body is None:
         return None
     if isinstance(body, dict) and set(body) == {"up", "down"}:
         if not directional:
-            raise E.RuleError("exit_when: an up / down exit needs `direction_up`")
-        nodes = {side: E.parse(body[side], defs, f"exit_when.{side}") for side in ("up", "down")}
+            raise E.RuleError(f"{name}: an up / down condition needs `direction_up`")
+        nodes = {side: E.parse(body[side], defs, f"{name}.{side}") for side in ("up", "down")}
     else:
-        node = E.parse(body, defs, "exit_when")
+        node = E.parse(body, defs, name)
         nodes = {side: node for side in (("up", "down") if directional else ("both",))}
     for side, node in nodes.items():
         if node.kind != "bool":
-            raise E.RuleError(f"exit_when ({side}): must be true / false, not a number")
+            raise E.RuleError(f"{name} ({side}): must be true / false, not a number")
     return nodes
 
 
@@ -199,7 +214,8 @@ def compile_spec(spec: RuleSpec) -> CompiledRule:
             direction = E.parse(spec.direction_up, defs, "direction_up")
             if direction.kind != "bool":
                 raise E.RuleError("direction_up: must be true / false, not a number")
-        exits = _parse_exits(spec, defs, direction is not None)
+        exits = _parse_sided(spec.exit_when, "exit_when", defs, direction is not None)
+        controls = _parse_sided(spec.control_when, "control_when", defs, direction is not None)
     except E.RuleError as error:
         raise SpecError(str(error)) from error
     start, stop = (E.clock_to_stamp(t, "window") for t in (spec.window.from_, spec.window.to))
@@ -213,8 +229,6 @@ def compile_spec(spec: RuleSpec) -> CompiledRule:
     for k, leg in enumerate(spec.template["legs"]):
         if not isinstance(leg, dict):
             raise SpecError(f"template.legs[{k}]: expected a mapping")
-        if True in leg:  # YAML 1.1 reads an unquoted `on:` key as true
-            leg = {("on" if key is True else key): value for key, value in leg.items()}
         on = leg.get("on", "both")
         if on not in LEG_SIDES:
             raise SpecError(f"template.legs[{k}].on: expected up, down or both, got {on!r}")
@@ -246,10 +260,12 @@ def compile_spec(spec: RuleSpec) -> CompiledRule:
             raise SpecError(f"template ({side}): {where}: {first['msg']}") from error
     if exits is not None and "exit_time" not in spec.template:
         raise SpecError("template.exit_time: an `exit_when` rule needs the latest exit time")
-    # `exit_when` (and the definitions it reads) joins both hashes only when set, so a rule without
-    # one keeps the hashes, the ledger rows and the simulation cache it always had. With one, the
-    # cached simulation of (day, entry, side) depends on the exit too, hence the template hash.
-    exit_part = {} if exits is None else {"exit_when": spec.exit_when, "define": spec.define}
+    # `exit_when` / `control_when` join the spec hash only when set, so a rule without them keeps
+    # the hashes, the ledger rows and the simulation cache it always had. The template hash takes
+    # only a marker: an exit rule's cache stores each simulation's exit minute and is read by it
+    # (`sim.ensure`), so rules with one template share simulations whatever their conditions, and
+    # never share them with the same template run to its own exit.
+    exit_part = {} if exits is None else {"exit": "per_trade"}
     spec_hash = hashlib.sha256(
         _canonical(
             {
@@ -260,6 +276,7 @@ def compile_spec(spec: RuleSpec) -> CompiledRule:
                 "direction_up": spec.direction_up,
                 "template": {**spec.template, "legs": legs},
                 **({"exit_when": spec.exit_when} if exits is not None else {}),
+                **({"control_when": spec.control_when} if controls is not None else {}),
             }
         ).encode()
     ).hexdigest()[:16]
@@ -273,14 +290,30 @@ def compile_spec(spec: RuleSpec) -> CompiledRule:
         ).encode()
     ).hexdigest()[:16]
     return CompiledRule(
-        spec, when, defs, direction, exits, start, stop, legs, spec_hash, template_hash
+        spec, when, defs, direction, exits, controls, start, stop, legs, spec_hash, template_hash
     )
+
+
+class _RuleLoader(yaml.SafeLoader):
+    """Safe YAML with only true / false as booleans: YAML 1.1 also reads on / off / yes / no as
+    booleans, which turned a leg's unquoted `on: up` key into `True: up`."""
+
+
+_RuleLoader.yaml_implicit_resolvers = {
+    first: [r for r in resolvers if r[0] != "tag:yaml.org,2002:bool"]
+    for first, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+}
+_RuleLoader.add_implicit_resolver(
+    "tag:yaml.org,2002:bool",
+    re.compile(r"^(?:true|True|TRUE|false|False|FALSE)$"),
+    list("tTfF"),
+)
 
 
 def load_spec(text: str) -> CompiledRule:
     """Parse YAML (or JSON) text into a compiled rule, or raise SpecError with a plain message."""
     try:
-        data = yaml.safe_load(text)
+        data = yaml.load(text, Loader=_RuleLoader)  # noqa: S506 - a SafeLoader subclass
     except yaml.YAMLError as error:
         mark = getattr(error, "problem_mark", None)
         where = f" at line {mark.line + 1}" if mark else ""
@@ -342,6 +375,21 @@ def read_back(rule: CompiledRule) -> dict[str, Any]:
         else:
             only = next(iter(rule.exits.values()))
             sentences.append(f"Exit early the minute after {E.describe(only)}.")
+    if rule.controls is not None:
+        controls = rule.controls
+        if set(controls) == {"up", "down"} and controls["up"] is not controls["down"]:
+            for side in ("up", "down"):
+                sentences.append(
+                    f"Controls for {side} events: only where "
+                    f"{E.describe(rule.controls[side])} the minute before they enter."
+                )
+        else:
+            only = next(iter(rule.controls.values()))
+            sentences.append(
+                f"Controls: only where {E.describe(only)} the minute before they enter."
+            )
+    elif rule.exits is not None:
+        sentences.append("Controls: only where the exit condition does not hold before they enter.")
     template = spec.template
     for leg in rule.legs:
         suffix = "" if leg["on"] == "both" else f" (only on {leg['on']} events)"

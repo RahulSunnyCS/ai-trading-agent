@@ -409,13 +409,10 @@ def wilder_rsi(closes: np.ndarray, n: int = 14) -> np.ndarray:
     if len(closes) <= n:
         return out
     d = np.diff(closes)
-    up, dn = np.maximum(d, 0), np.maximum(-d, 0)
-    au, ad = up[:n].mean(), dn[:n].mean()
-    out[n] = 100 - 100 / (1 + au / ad) if ad > 0 else 100.0
-    for i in range(n, len(d)):
-        au = (au * (n - 1) + up[i]) / n
-        ad = (ad * (n - 1) + dn[i]) / n
-        out[i + 1] = 100 - 100 / (1 + au / ad) if ad > 0 else 100.0
+    au = _wilder_mean(np.maximum(d, 0), n)[n - 1 :]
+    ad = _wilder_mean(np.maximum(-d, 0), n)[n - 1 :]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        out[n:] = np.where(ad > 0, 100 - 100 / (1 + au / ad), 100.0)
     return out
 
 

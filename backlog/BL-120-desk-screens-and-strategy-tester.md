@@ -253,4 +253,10 @@ The owner's answers to the open questions below; the screen order and placement 
   `strike: {premium_pct_of_spot}`; fixed an unquoted YAML `on:` key being read as `true`. The system is expressible
   and reads back (`obt rule validate`); one trade a day at most is still the tester's limit (the video's system
   re-enters after an exit). **No test run:** testing it needs its own pre-registered research item first (research gate).
+- 2026-10-22 — **PR #281 review fixed.** Controls are now trend-matched (owner's choice): a placebo day or random-time
+  minute is a control only where `control_when` holds (default: the exit does not) the minute before it enters, so
+  controls are no longer one-minute trades the exit closes at once. An exit rule's simulation cache stores each exit and
+  re-simulates when a history change moves it; exit rules with one template share the cache. A missing index price at
+  entry is an error, not a ₹1-premium strike. The YAML `on:` fix moved into the loader. `wilder_rsi` now uses the
+  shared Wilder mean (`rotation/triggers.wilder_rsi` keeps its own copy: it is parity-checked against the research).
 
