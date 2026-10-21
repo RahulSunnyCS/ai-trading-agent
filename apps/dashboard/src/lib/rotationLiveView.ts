@@ -5,13 +5,7 @@
  */
 
 import type { Tone } from '../components/ui/Badge';
-import type {
-  LiveDay,
-  LiveGroup,
-  LiveRunning,
-  LiveShape,
-  RotationLiveResponse,
-} from '../types/rotationLive';
+import type { LiveDay, LiveShape, RotationLiveResponse } from '../types/rotationLive';
 import { EMPTY, formatInr, formatPct } from './format';
 
 const PLATFORM: Record<string, string> = { algotest: 'AlgoTest', quantiply: 'Quantiply' };
@@ -86,7 +80,8 @@ export function dayBadges(d: LiveDay): DayBadge[] {
   if (d.not_traded.length)
     out.push({ tone: 'neutral', text: `${d.not_traded.length} did not trade` });
   if (d.off_slot.length) out.push({ tone: 'info', text: `${d.off_slot.length} off-slot` });
-  if (d.open_legs.length) out.push({ tone: 'warning', text: `${d.open_legs.length} legs open` });
+  if (d.open_legs.length)
+    out.push({ tone: 'warning', text: `${d.open_legs.length} with legs open` });
   if (d.no_paper.length)
     out.push({ tone: 'neutral', text: `${d.no_paper.length} no paper result` });
   if (d.unrecognised.length)
@@ -97,11 +92,6 @@ export function dayBadges(d: LiveDay): DayBadge[] {
 /** Days newest first, for the table. */
 export function newestFirst(days: LiveDay[]): LiveDay[] {
   return [...days].reverse();
-}
-
-/** The day's group for a running line, or undefined when it did not trade that day. */
-export function dayGroup(d: LiveDay, g: LiveRunning): LiveGroup | undefined {
-  return d.groups.find((x) => groupKey(x) === groupKey(g));
 }
 
 const POSITION: Record<string, string> = { sell: 'Sell', buy: 'Buy' };

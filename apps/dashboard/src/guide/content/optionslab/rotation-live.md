@@ -41,7 +41,7 @@ A flagged strategy is kept out of the gap and listed on its own.
 | **Not captured** | There is no file for the day (the scheduler was off, or a platform could not be read). It is a gap in the data, not a zero. |
 | **did not trade** | Deployed or enabled, but nothing filled. |
 | **off-slot** | The first fill was away from the strategy's entry minute (deployed late, say), so it is not the backtested trade. |
-| **legs open** | Legs were still open when read, so the P&L is not final. |
+| **with legs open** | Legs were still open when read, so the P&L is not final. |
 | **no paper result** | The engine has no stored result for that strategy and day yet. |
 | **unrecognised** | A tool copy whose name could not be read as a list and strategy. |
 

@@ -68,7 +68,7 @@ describe('dayBadges', () => {
       'Quantiply not read',
       '2 did not trade',
       '1 off-slot',
-      '1 legs open',
+      '1 with legs open',
       '1 no paper result',
     ]);
     expect(dayBadges(day())).toEqual([]);

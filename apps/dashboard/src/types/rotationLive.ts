@@ -4,8 +4,6 @@
  * after the same estimated costs on both sides, slippage = live − paper (+ live did better).
  */
 
-export type LivePlatform = 'algotest' | 'quantiply';
-
 /** One platform + broker + list on one day: the per-lot sums of its compared variants. */
 export interface LiveGroup {
   platform: string;

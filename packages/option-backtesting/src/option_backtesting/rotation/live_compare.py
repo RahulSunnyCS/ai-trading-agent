@@ -238,7 +238,28 @@ class DayComparison:
         return out
 
 
-def compare(day: date, root: Path | None = None) -> DayComparison:
+def _paper_for(
+    variant: str, day: date, root: Path | None, memo: dict[str, dict[str, dict]] | None
+) -> dict[str, Decimal] | None:
+    """`paper_row`, reading each variant's result file once when a `memo` is shared across days."""
+    if memo is None:
+        return paper_row(variant, day, root)
+    if variant not in memo:
+        rows: dict[str, dict] = {}
+        path = store.result_path(variant, root)
+        if path.exists():
+            with path.open() as f:
+                rows = {
+                    r["day"]: {k: _d(r[k]) for k in ("net", "gross", "costs")}
+                    for r in csv.DictReader(f)
+                }
+        memo[variant] = rows
+    return memo[variant].get(day.isoformat())
+
+
+def compare(
+    day: date, root: Path | None = None, memo: dict[str, dict[str, dict]] | None = None
+) -> DayComparison:
     lines = read_lines(day, root)
     if lines is None:
         return DayComparison(day, captured=False)
@@ -270,7 +291,7 @@ def compare(day: date, root: Path | None = None) -> DayComparison:
         )
         live = sum((_d(c.get("pnl")) for c in copies), Decimal(0))
         per_lot = live / lots
-        paper = paper_row(variant, day, root)
+        paper = _paper_for(variant, day, root, memo)
         costs = paper["costs"] if paper else Decimal(0)
         premium = _first_entry_premium(copies)
         premium_per_lot = premium / lots if premium else None
@@ -361,14 +382,16 @@ def compare_range(
     A group's running line adds up its per-lot live (after costs), paper and slippage day by day,
     over the days the group traded. Slippage by shape adds a variant's per-lot slippage over every
     day it was compared, so it counts variant-days: Quantiply has no fills, so no percentage."""
-    days = captured_days(root)
+    available = captured_days(root)
+    days = available
     if start is not None:
         days = [d for d in days if d >= start]
     if end is not None:
         days = [d for d in days if d <= end]
     if len(days) > MAX_RANGE_DAYS:
         days = days[-MAX_RANGE_DAYS:]
-    results = [compare(d, root) for d in days]
+    memo: dict[str, dict[str, dict]] = {}  # each variant's result file is read once
+    results = [compare(d, root, memo) for d in days]
 
     running: dict[tuple[str, str, str], dict] = {}
     shapes: dict[tuple[str, str, str], dict] = {}
@@ -444,7 +467,6 @@ def compare_range(
                 "slippage_pct": pct,
             }
         )
-    available = captured_days(root)
     return {
         "from": days[0].isoformat() if days else None,
         "to": days[-1].isoformat() if days else None,

@@ -480,3 +480,67 @@ def test_the_live_route_answers_an_unmounted_root_as_an_error(monkeypatch):
     rotation_live_routes._cache.clear()
     r = TestClient(create_app()).get("/legwise/rotation/live")
     assert r.status_code == 503 and "error" in r.json()
+
+
+def test_the_range_json_lists_what_each_day_left_out(root):
+    _paper(root, "N_wide_1117", 1000.0)
+    _capture(
+        root,
+        [
+            _section("algotest", "all"),
+            _section("quantiply", "angelone", ok=False),
+            _line("T1 · N_wide_1117", 1000.0, pid="a"),
+            _line("T1 · N_nopaper_0917", 50.0, pid="b"),
+            _line("T1 · N_p150-t1s11_1317", None, traded=False, pid="c"),
+            _line("T1 · N_ditm1-t1s36_0947", 10.0, open_legs=1, pid="d"),
+            _line(
+                "T1 · N_p150-t1s11_0917",
+                10.0,
+                fills=[_fill("2026-10-19 11:30:00", 100)],
+                pid="e",
+            ),
+        ],
+    )
+    [d] = live_compare.compare_range(root=root)["days"]
+    assert d["no_paper"] == ["N_nopaper_0917"]
+    assert d["not_traded"] == ["N_p150-t1s11_1317"]
+    assert d["open_legs"] == ["N_ditm1-t1s36_0947"]
+    assert d["off_slot"] == ["N_p150-t1s11_0917"]
+    assert [s["platform"] for s in d["failed_sections"]] == ["quantiply"]
+
+
+def test_a_long_history_keeps_the_newest_days_and_reads_each_result_file_once(root, monkeypatch):
+    monkeypatch.setattr(live_compare, "MAX_RANGE_DAYS", 2)
+    for n in (18, 19, 20):
+        day = date(2026, 10, n)
+        _paper(root, "N_wide_1117", 1000.0, day=day)
+        line = _line("T1 · N_wide_1117", 1100.0)
+        line["day"] = day.isoformat()
+        _capture(root, [_section("algotest", "all"), line], day=day)
+    reads = []
+    real = live_compare.store.result_path
+
+    def counting(variant, r=None):
+        reads.append(variant)
+        return real(variant, r)
+
+    monkeypatch.setattr(live_compare.store, "result_path", counting)
+    out = live_compare.compare_range(root=root)
+    assert [d["day"] for d in out["days"]] == ["2026-10-19", "2026-10-20"]
+    assert out["captured_days"] == ["2026-10-18", "2026-10-19", "2026-10-20"]
+    assert reads.count("N_wide_1117") == 1
+
+
+def test_the_live_route_cache_stays_small(root, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from option_backtesting.api import rotation_live_routes
+    from option_backtesting.api.app import create_app
+
+    _two_days(root)
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(root))
+    rotation_live_routes._cache.clear()
+    c = TestClient(create_app())
+    for n in range(1, 25):
+        c.get("/legwise/rotation/live", params={"to": f"2026-11-{n:02d}"})
+    assert len(rotation_live_routes._cache) <= rotation_live_routes.CACHE_ENTRIES
