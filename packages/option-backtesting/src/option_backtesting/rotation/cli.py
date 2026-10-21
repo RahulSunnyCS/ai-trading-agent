@@ -235,6 +235,24 @@ def _picks_or_skip(day, book, preview, next_session, variants, wait, from_settin
         return None
 
 
+def _without_addon(picks, platform: str, book: str, from_settings: bool):
+    """BL-140 Phase 4: under --from-settings, the Buy add-on picks stay out of the export when no
+    row that uploads this list wants them. The upload, deploy and checks all read the export, so
+    leaving them out here is the one place it takes effect; an add-on already uploaded is then
+    "no longer picked" and goes through the uploader's own delete rules."""
+    if not from_settings or not picks.buy:
+        return picks
+    from dataclasses import replace
+
+    from . import automation_settings
+
+    settings, _ = automation_settings.read()
+    if automation_settings.addon_wanted(settings, platform, book):
+        return picks
+    typer.echo(f"{platform} {book}: Buy add-on left out (Settings › Automation)")
+    return replace(picks, buy=[])
+
+
 def _end_missing(missing: list[str], books: list[str]) -> None:
     """Exit 2 (the scheduler retries) only when no list could be exported. With some exported,
     exit 0 so the uploads run; the uploader refuses a list whose export is stale and says so."""
@@ -300,6 +318,7 @@ def algotest_export(
         if picks is None:
             missing.append(b)
             continue
+        picks = _without_addon(picks, "algotest", b, from_settings)
         try:
             exports = ax.build(picks)
         except (Unmappable, FileNotFoundError) as error:
@@ -357,6 +376,7 @@ def quantiply_export(
         if picks is None:
             missing.append(b)
             continue
+        picks = _without_addon(picks, "quantiply", b, from_settings)
         try:
             built = qx.build(picks)
         except (Unmappable, FileNotFoundError) as error:

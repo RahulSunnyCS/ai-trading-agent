@@ -143,6 +143,12 @@ Shoonya's own hosts:
 
 ## Log
 
+- 2026-10-22 — **PR 3 (Buy add-on):** `obt rotation algotest-export|quantiply-export --from-settings` leaves the Buy
+  add-on out of a list's export when no row that uploads that list has it on (`automation_settings.addon_wanted`,
+  `cli._without_addon`). The uploaders, deployers and the margin and deploy checks all read the export, so this is the
+  one place it takes effect; an add-on already uploaded becomes "no longer picked" and goes through the evening
+  uploader's own delete rules (kept and alerted if deployed). Limit: one export serves every account of a platform, so
+  two Quantiply accounts on one list with different add-on settings keep it in. Defaults export exactly as before.
 - 2026-10-22 — Phase 4 started (owner, going to sleep: "take your own decision"; Sonnet overnight run). Owner's
   answers: platform multiplier (Quantiply's algo `multiplier`, AlgoTest's deploy-sheet multiplier), integer 1-10;
   Pause stops uploads and deploys only; the morning gap check extends the 09:25 `DEPLOY_CHECK`; merge on GitHub,

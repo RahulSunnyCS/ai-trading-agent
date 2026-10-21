@@ -116,3 +116,18 @@ def upload_books(settings: dict, platform: str, broker: str | None = None) -> li
         if row.get("upload") and row.get("list") in ("core", "t1"):
             books.add(row["list"])
     return sorted(books)
+
+
+def addon_wanted(settings: dict, platform: str, book: str) -> bool:
+    """Whether the `platform` export of `book` carries the Buy add-on picks: yes unless every row
+    that uploads that list has the add-on off. One export serves every account of a platform, so
+    while any account that shares the list wants the add-on it stays in."""
+    rows = [
+        settings["rows"][f"{platform}.{b}"]
+        for b in BROKERS
+        if settings["rows"][f"{platform}.{b}"].get("upload")
+        and settings["rows"][f"{platform}.{b}"].get("list") == book
+    ]
+    if not settings["masters"].get("uploads") or not rows:
+        return True  # nothing uploads this list: leave the export as it always was
+    return any(r.get("addon", True) for r in rows)

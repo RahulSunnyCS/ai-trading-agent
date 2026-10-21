@@ -208,7 +208,7 @@ export function AutomationSettingsCard() {
                     </div>
                     <SettingSwitch
                       label="Include the Buy add-on"
-                      description="Saved only: uploads and deploys do not use it yet."
+                      description="Off leaves the add-on picks out of this list's exports, so they are not uploaded, deployed or checked."
                       checked={row.addon}
                       disabled={saving}
                       onChange={(addon) => setDraft(withRow(draft, key, { addon }))}
