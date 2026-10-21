@@ -140,6 +140,20 @@ async function main(): Promise<number> {
     }
     latest = books[0];
   }
+  if (!values['from-settings']) {
+    // A manual run uploads at 1; say so when the row asks for more, because the deployer applies the
+    // row's multiplier and would then not recognise these algos (it enables nothing, fail closed).
+    try {
+      const asked = effectiveRow(readAutomation(), 'quantiply', broker).multiplier;
+      if (asked !== 1) {
+        console.log(
+          `note: the ${site.name} row is set to multiplier ${asked}, a manual run uploads at 1: the deployer will not recognise these algos (use --from-settings)`,
+        );
+      }
+    } catch {
+      // unreadable settings are the scheduled jobs' business, not a manual upload's
+    }
+  }
   if (!exportDir && latest) {
     if (!dataRoot) {
       console.error('--latest needs TRADING_DATA_ROOT');
