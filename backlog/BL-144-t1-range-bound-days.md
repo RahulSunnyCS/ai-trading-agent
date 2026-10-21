@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades T1 and Core with real money; the recent directional days favour T1, and a stretch of range-bound days is the case T1 has not been seen in |
-| **Status** | In progress |
+| **Status** | Done: H1 not met (+10.0 pp, rule +15 pp), H2 met; findings page written |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-21 |
@@ -100,3 +100,14 @@ and that Core is a column.
 
 - 2026-10-21 — created and pre-registered before any run. Owner choices: 3 x Widesl at 09:17, both 7-day
   range measures, T1 at 1 lot with the ₹10,000 stop (also shown without), Core as a fourth column.
+- 2026-10-21 — **owner dropped the basket stop** before any run ("stop loss study is not required ... just
+  give the without stop loss"). Every book is shown gross and without a stop; no `portfolio.book_day`
+  replay is run. This narrows Phase 0 only: H2 is judged on the no-stop per-lot-day figure (the same
+  threshold, BASE minus ₹250), the other rules are unchanged. Logged here before the first figure.
+- 2026-10-21 — ran (`research/bl144/run.py`, 238 days 2025-10-20 to 2026-10-19, nothing left out). H1: T1's
+  wide-stop share is 33.7% in range-bound weeks and 23.7% in volatile weeks, +10.0 pp [+1.0, +19.0], below the
+  registered +15 pp: not met; Core +7.6 pp [+2.1, +13.3]. H2: T1 minus Base on quiet days +78 per lot-day
+  [-172, +338], met (descriptive). Findings page `research/options/common/t1-range-bound-days.md`. The
+  owner's CSV is `bl144_daily_results.csv`. Exploratory only: family mix by regime; one day (3 Feb 2026)
+  makes 42% of the 3 x Widesl year.
+
