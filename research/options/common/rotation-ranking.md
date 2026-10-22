@@ -1,6 +1,6 @@
 # Options: rotation ranking (DRB and lists A / B / C / REF)
 
-**Status:** Tested · **Last updated:** 2026-10-18
+**Status:** Tested · **Last updated:** 2026-10-22
 
 ## What it is
 
@@ -51,11 +51,17 @@ per lot-day is above zero and its drawdown per lot is no worse.
 | BL-130 | Merge two same-index Widesl picks within 30 minutes into one two-lot entry at the earlier time | Core-298: no effect beyond the brokerage (intervals include zero). T1: the earlier entry earned more, merge +₹107 [+30, +186] (identical strategies) / +₹290 [+141, +437] (any Widesl, deeper drawdown) per one-lot day over two years; last year +90 / +217, the first inconclusive. Partly in T1's selection year | [BL-130][bl130] |
 | BL-133 | A fourth lot on non-expiry days (3 on expiry days): Core's Dir at two lots or an added Dir; T1's top / lowest Widesl at two lots, an added Widesl, or (owner override) its Dir at two lots; against the same size spread evenly | Core Dir ×2 beat the even spread (after brokerage +₹149 [+14, +279] two years, +₹230 [+90, +379] last year) but the top 10 days carry 68 % of it; no T1 Widesl placement beat it (lowest Widesl ×2 −₹95 / −₹105, an added Widesl −₹129 / −₹194); T1's Dir ×2 (owner override) +₹98 [−20, +215] / +₹150 [+27, +270], two-thirds of it from 5 days. In-sample | [BL-133][bl133] |
 | BL-134 | Two strategies a day: top Widesl ×2 + Dir (×2 normal days, ×1 expiry) vs three picks with the Dir doubled | T1 worse (−₹254 [−486, −30] / −₹330 [−621, −55] net per day); Core inconclusive (−₹152 [−392, +62] / +₹128 [−87, +337]); its −70k drawdown is one early stretch (2025-01 → 2025-05), outside which P is slightly ahead. The ~₹100/day brokerage saved does not pay for the dropped Widesl | [BL-134][bl134] |
+| BL-154 | Adaptive's weekday / DTE / VIX fits shrunk toward the variant's own window mean by n/(n+10); plus opening-gap and previous-day-range bands (÷ ATR, terciles) at weight 10 from weekday; P1 decides, 20 label shuffles | **Killed**: on P1 shrinkage −₹24 per lot-day [−116, +75], 1 of 20 shuffles above it, drawdown 21% deeper; labels −₹19 [−90, +50]. Out of P1 shrinkage is wholly negative (P2 −₹172 [−321, −38], whole span −₹71 [−146, −1]); the more weight on the plain mean, the worse. Today's fits beat all 20 label shuffles on P2 and the whole span (17 of 20 on P1). Gross, 431 days 2025-01 → 2026-10 | [BL-154][bl154] |
 
 ## What we know
 
 - With the weekday / days-to-expiry / VIX fits in it, the ranking beat random picks of the same shape
   on the 2022–24 hold-out (baseline beats 100%, P90 ₹8,65,554). That is the most solid result here.
+- The fits' small samples are not noise to be smoothed away (BL-154): shrinking them toward each
+  variant's own mean (k = 10) lowered Adaptive in every period, most out of the period its weights
+  came from.
+  Today's Adaptive beat all 20 label shuffles on Jan–Aug 2025 and on 2025-01 → 2026-10 (17 of 20 on
+  P1), so the fits look more real out of period than BL-068's P1-only shuffle suggested.
 - Own recent return is momentum that worked in 2025-12 → 2026-10 and **subtracted** in Jan–Aug 2025 and
   in 2022–24. Lists A, B and C keep it small (0–15%) for that reason; REF keeps the old 33%.
 - The rule is fragile: few weight cells are above chance in every period, and which one is best is not
@@ -100,3 +106,4 @@ per lot-day is above zero and its drawdown per lot is no worse.
 [bl130]: ../../../backlog/BL-130-merge-close-widesl-picks.md
 [bl133]: ../../../backlog/BL-133-fourth-lot-on-normal-days.md
 [bl134]: ../../../backlog/BL-134-two-strategy-book.md
+[bl154]: ../../../backlog/BL-154-adaptive-fit-shrinkage.md
