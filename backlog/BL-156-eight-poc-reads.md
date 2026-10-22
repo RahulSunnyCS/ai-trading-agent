@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — exploratory reads on stored data and the legwise engine; no verdicts, only leads |
-| **Status** | In progress (registered 2026-10-23, run overnight) |
+| **Status** | Done: no lead survives (2026-10-23) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-23 |
@@ -196,10 +196,41 @@ NIFTY 2024-10-09 to 2026-10-08, and is it worth a real item?
 
 ## Result
 
-(after the run)
+**One lead under the registered bar (read 4), and it does not survive its own sensitivity line. Nothing else
+clears the bar.** NIFTY, 2024-10-09 to 2026-10-08; 487 state days, 481 overnight pairs, 489 engine days × 8
+strategies (no errors; 2 days left out by data_quality). Full table: `research/bl156/out/report.md` (git-ignored;
+`report.py` rebuilds it).
+
+| Read | Result | Verdict |
+|---|---|---|
+| 1 VRP | Widesl high vs low VRP tercile +₹520 gross, t 1.50; Dir −₹47, t −0.15. Mechanism backwards: the 09:20 straddle decays *less* on high-VRP days (mean 3.4% vs 7.0%) | No lead |
+| 2a Skew (state) | Widesl high vs low skew +₹377, t 1.05 | No lead |
+| 2b Skew (asymmetric Widesl) | PE at OTM2 vs symmetric, high-skew days +₹12 net, t 0.17; low-skew +₹54, t 0.58. CE at OTM2 worse in both (−₹70, −₹85) | No lead |
+| 3 PCR | High vs low PCR: Widesl −₹374, t −1.06; Dir −₹411, t −1.28 | No lead |
+| 4 Overnight straddle | +₹232 net a night, t 2.15, hit 59%: **lead by the bar**. But exiting at the 09:15 open instead of 09:24 gives −₹6 (t −0.08): the whole gain is the first nine minutes' premium fall (+₹256), which is intraday, not overnight. Worst nights −₹12,327 (gaps of 1.4–2.4%). By days to expiry: dte 1 (into expiry morning) +₹1,153 over 93 nights, dte 3 −₹674, dte 8 −₹2,307 | Lead on paper, explained away |
+| 5 Post-event | Dir 10:02 on RBI days +₹119 vs others, t 0.14 (13 days); Dir 09:24 on Fed mornings −₹208, t −0.31 (15 days). Budget days: Dir 10:02 lost both (−₹3,357, −₹3,175) | No lead |
+| 6 Condor | Wings lose money: OTM4 condor −₹146 net a day (t −1.62), OTM6 −₹22 (t −0.24), against naked Widesl +₹270 (t 2.00). With the assumed margins the condors' return on margin is negative; their drawdown is 1.3 to 3.8 times their margin | No lead |
+| 7 Ratio spread | OTM2 +₹182 a day, t 1.45; OTM3 +₹55, t 0.49; base Dir +₹268, t 2.10 on the same days | No lead |
+| 8 Skip calendar | No group is bad for both strategies (bar: D ≤ −₹500, t ≤ −2 for both). The opposite showed: Widesl on **event days** +₹1,774 vs rest, t 1.98, shuffle p 0.002 (Holm 0.044); Dir before a holiday +₹1,175, t 1.87 | No lead (bar is for skips) |
+
+Notes on the two numbers that look interesting:
+
+- **Widesl on event days** (descriptive, not a test): RBI days mean +₹2,408 (8 of 13 positive), Fed mornings
+  +₹1,347 (10 of 15), the two budget days +₹4,654. Without the budget days +₹1,587, t 1.81; also without the best
+  day (2025-04-09, +₹15,122) +₹1,095, t 1.46. A handful of big days carry it. If the owner wants it followed up,
+  it is a new item: "Widesl on scheduled-event days, more lots", registered, tested on NIFTY 2022–24.
+- **Overnight into expiry morning (dte 1)**: +₹1,153 a night over 93 nights, but the same nine-minute caveat
+  applies and its worst night is −₹12,038. Descriptive.
+
+Ten tests are below |t| 1.5; with about 30 tests one |t| ≥ 2 is expected by chance, and the screen found one
+(read 4) that its own sensitivity line removes.
 
 ## Log
 
 - 2026-10-23 — Registered (this file, the eight reads, the lead bar) before any run. Event dates from the
   RBI's MPC schedule press releases (FY2025-26 and FY2026-27), the exchanges' Budget-day special-session
   notices (2025-02-01 and 2026-02-01) and the Federal Reserve's tentative FOMC calendar for 2025 and 2026.
+- 2026-10-23 — Phase 1 run: `states.py`, `overnight.py`, `engine_runs.py` (486 days × 8 strategies in about 3
+  minutes), `report.py`. One deviation from the plan, recorded here: 15 Fed mornings, not 16, are trading days
+  in the period (one listed date is outside the store's days). Nothing else was changed after the run.
+- 2026-10-23 — **Closed: no lead survives.** See Result. Findings pages to follow in the PR.
