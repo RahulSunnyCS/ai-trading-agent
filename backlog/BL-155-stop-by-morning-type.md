@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a cheap test on stored data; the only untested way to use the morning range |
-| **Status** | In progress |
+| **Status** | Done: killed at step 1 (2026-10-22) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-22 |
@@ -129,6 +129,55 @@ Decision period: the recent period decides, as the owner chose for BL-022 the sa
   - `research/options/common/intraday-state.md`.
 - **Done when:** merged with a code-review result on the PR.
 
+## Result (2026-10-22): killed at step 1
+
+**The morning-type stop does not beat the alternatives.** On NIFTY's straddles from 11:15 to 14:45,
+2025-01 → 2026-10 (436 days), the rule earns +₹40 per lot-day net, against:
+
+| Comparator | Mean net | Rule minus it (90% lower bound) |
+|---|---|---|
+| Fixed 60% | +₹35 | +₹4 (−31) |
+| Fixed 80% | +₹32 | +₹8 (−13) |
+| Fixed 100% | +₹32 | +₹8 (−30) |
+| Reversed rule | +₹32 | +₹8 (−31) |
+
+Every lower bound is below zero, and +₹40 is below the shuffled-label 95th percentile (+₹55). Step 2
+(the real Widesl) was **not run**, as registered.
+
+**By morning type, ₹ net per lot-day** (descriptive; this is how the rule was built, not a test of it):
+
+| Period | Type | Days | SL 60% | SL 80% | SL 100% |
+|---|---|---|---|---|---|
+| NIFTY 2025–26 (decides) | quiet | 144 | +61 | +83 | **+96** |
+| | normal | 192 | **+40** | +23 | −3 |
+| | wide | 100 | −9 | −25 | **+8** |
+| NIFTY 2022–24 (reported) | quiet | 274 | +99 | +103 | **+137** |
+| | normal | 294 | **+51** | +14 | −18 |
+| | wide | 170 | **+120** | +77 | +58 |
+| SENSEX 2024-10 → 2026-10 (reported) | quiet | 164 | **−40** | −72 | −73 |
+| | normal | 212 | **−41** | −81 | −91 |
+| | wide | 114 | **+100** | +20 | +59 |
+
+**What it shows:**
+- **The quiet half of the idea holds on NIFTY in both periods:** after a quiet morning the widest stop
+  is best, by about ₹35–38 a lot-day over 60%. It does not hold on SENSEX, where 60% is best on every
+  type.
+- **The wide half does not hold where it decides.** After a wide morning on NIFTY 2025–26 the widest
+  stop was best and 80% was worst. In 2022–24 and on SENSEX the tight stop was best, as the idea
+  expected. The direction flips between periods, as BL-081 saw for other morning states.
+- **The tight stop wins on normal days everywhere.** That is the unconditional BL-098 / BL-127 /
+  BL-128 finding again, which did not carry into Adaptive.
+- **What the rule gains is about the same as what a fixed stop gains**, and less than the variation
+  random labels produce.
+
+**A lead, not a finding:** "only quiet mornings get the wide stop" is visible after the fact. Testing
+it would need its own pre-registration and unseen days (forward); it is not adopted.
+
+**Evidence:** `packages/option-backtesting/research/bl155/`:
+- `morning.py`, `step1_heatmap.py`, `test_lookahead.py` (3 tests);
+- `out/step1_result.json` and `out/step1_days.csv` (git-ignored; regenerate with `step1_heatmap.py`,
+  about a minute).
+
 ## Risks
 
 - The heatmap is an ATM straddle without trail or MTM stop, not the live Widesl; that is why step 2
@@ -148,3 +197,6 @@ None at registration.
   above 80%; on a wide morning tighter, under 80%"). The owner approved the proposed rules and
   comparators ("Yes: add it as a new backlog item with the rules you described … commit Phase 0, then
   run the heatmap check and the real-Widesl check if it passes"). Phase 0 committed before any run.
+- 2026-10-22 — Step 1 **failed**. Rule +₹40 / lot-day against +₹32–35 for the four comparators; every
+  90% lower bound is below zero, and the rule is below the shuffle 95th percentile (+₹55). Step 2 was not
+  run. Item closed: killed. Lead noted (quiet → widest stop, NIFTY both periods), not adopted.

@@ -1,6 +1,6 @@
 # Widesl: leg stop
 
-**Status:** Tested · **Last updated:** 2026-10-18
+**Status:** Tested · **Last updated:** 2026-10-22
 
 ## What it is
 
@@ -22,6 +22,7 @@ AlgoTest). Every rotation Widesl file keeps its base file's stops.
 | BL-126 (POC) | NIFTY ₹100 at 75 % and ₹120 at 60 % vs ₹100 at 115 %, trail 15/10, MTM ₹2,500, all 25 rotation slots | 2024-10-09 → 2026-10-16, gross (no charges), in-sample, no hold-out | Not positive: +₹41 [−5, +89] and +₹47 [−18, +111] per lot-day standalone, deeper drawdown; in Adaptive −₹7 / +₹23, intervals include zero. Repeats BL-098 Phase 2's morning look | [BL-126][bl126] |
 | BL-127 | NIFTY ₹80 / ₹100 / ₹120 × SL 60, 70, 80, 90, 100, 115 %, trail 15/10, MTM ₹2,500, all 25 slots; a stop chosen per premium on the first year, then the best two in Adaptive on the second | Selection 2024-10-09 → 2025-10-08, test 2025-10-09 → 2026-10-16, gross (no charges) | Selection year: SL 70–80 % best (₹80 SL 80 % +230, ₹100 SL 70 % +281, ₹120 SL 70 % +295 per lot-day, vs +207 / +230 / +247 at 115 %; drawdown 35–60 % of the 115 % cell's). Test year, Adaptive with the best two added: −₹10 [−82, +63], drawdown deeper. **Not positive** (one replay; the interval includes zero) | [BL-127][bl127] |
 | BL-128 | SENSEX ₹240 / ₹300 / ₹350 × SL 60, 70, 80, 90, 100, 115 % (same value on both legs), trail 15/10, MTM ₹2,500, all 25 slots; a stop chosen per premium on the first year, then the best two in Adaptive on the second | Selection 2024-10-09 → 2025-10-08, test 2025-10-09 → 2026-10-16, gross (no charges) | Selection year: SL 60 % best at all three premiums, the grid's lowest (₹240 +153, ₹300 +160, ₹350 +155 per lot-day, vs +86 / +103 / +92 at 115 %; drawdown 68–78 % of the 115 % cell's; positive at 22–25 of 25 slots). Test year, Adaptive with the best two (₹300, ₹240 at 60 %) added: −₹2 [−88, +79], drawdown deeper. **Not positive** (one replay; the interval includes zero) | [BL-128][bl128] |
+| BL-155 | Stop set by the morning type at 11:00 (range so far vs the last 20 mornings): quiet 100 %, normal 80 %, wide 60 %; vs fixed 60 / 80 / 100 % and the reversed rule | Heatmap ATM straddles 11:15–14:45, exit 15:15, after charges; NIFTY 2025-01 → 2026-10 decides; NIFTY 2022–24 and SENSEX reported | **Killed**: +₹40 vs +₹32–35 a lot-day, every interval includes zero, below shuffled labels; the real-Widesl step was not run | [BL-155][bl155] |
 
 Leg-stop rows in the post-charge top four (holdout, mean over the band's start-time files):
 
@@ -47,6 +48,11 @@ Leg-stop rows in the post-charge top four (holdout, mean over the band's start-t
 - NIFTY closest-premium Widesl, gross, selection year 2024-10 → 2025-10 (BL-127): the stop chosen per premium (₹80 SL 80 %, ₹100 SL 70 %, ₹120 SL 70 %) beat 115 % on the mean (+₹23 to +₹51 per lot-day; not every 70–80 % cell did: ₹120 at 80 % equals 115 %) and cut the drawdown to roughly 35–60 % of it, positive at all 25 slots. That did not carry into Adaptive on the next year (adding the two chosen stops: −₹10, interval includes zero, deeper drawdown). Standalone benefit, no Adaptive benefit; the test year had already been seen by BL-098 and BL-126.
 - SENSEX closest-premium Widesl, gross, selection year 2024-10 → 2025-10 (BL-128): at ₹240, ₹300 and ₹350 the tightest stop tried (60 %) beat 115 % on the mean by +₹57 to +₹67 per lot-day and cut the drawdown by a fifth to a third, but the optimum is at the grid's edge and the cells are cells positive at only 18–25 of 25 slots across the grid, 22–25 for the 60 % winners (NIFTY: all 25). As for NIFTY it did not carry into Adaptive on the next year (adding the two chosen stops: −₹2, interval includes zero, deeper drawdown; either alone +₹20 / +₹25, intervals include zero). A second index with the same answer; the test year is the one BL-127 and BL-126 had already read.
 
+- By morning type (BL-155, heatmap ATM straddles from 11:15, descriptive): after a **quiet** morning the
+  widest stop (100 %) is best on NIFTY in both periods (+₹96 vs +₹61 at 60 %, 2025–26). After a **normal**
+  morning 60 % is best everywhere. After a **wide** morning the order flips between periods. The rule built
+  on it did not beat fixed stops.
+
 ## Not yet tested
 
 - BL-098 Phase 3: at most five candidates chosen on the fit period, then stop × strike, stop × MTM
@@ -62,6 +68,7 @@ Leg-stop rows in the post-charge top four (holdout, mean over the band's start-t
   into `research/bl097/`; it has no folder of its own). Git-ignored; regenerate with
   `research/bl097/run_family_sweep.py --family widesl`.
 
+[bl155]: ../../../../backlog/BL-155-stop-by-morning-type.md
 [bl098]: ../../../../backlog/BL-098-widesl-parameter-sweep.md
 [bl098q]: ../../../../backlog/BL-098-widesl-qualified-list-post-charge.md
 [bl126]: ../../../../backlog/BL-126-nifty-premium-widesl-tight-sl-poc.md

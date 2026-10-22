@@ -1,6 +1,6 @@
 # Options: intraday market state
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-10-22
 
 ## What it is
 
@@ -25,6 +25,7 @@ nothing acts on them.
 | BL-081 block 1 | A "no-trade" column and a rupee sit-out gate | same | Inert: the no-trade column is picked on 0 days | [BL-081][bl081] |
 | BL-081 block 3 | Re-score pending picks at each hour; swap / drop (owner's override) | explore 2025-01 → 2026-10; confirm 2022-04 → 2024-10 | Nothing kept under the registered rule (0 of 252 versions); state-blind re-timing does as well as state | [BL-081][bl081] |
 | BL-083 | Enter at a trigger (pivot with trend, VIX turn, straddle turn, RSI exhaustion), replacing the next pending pick | explore 2024-10 → 2026-10 both indices; confirm NIFTY 2022-01 → 2024-10 | **No lead** under the registered bar; owner's rule keeps two Dir leads (below) | [BL-083][bl083] |
+| BL-155 | Morning type at 11:00 (range so far vs the last 20 mornings) sets the straddle's leg stop: quiet 100 %, normal 80 %, wide 60 % | Heatmap ATM straddles 11:15–14:45; NIFTY 2025-01 → 2026-10 decides | **Killed**: no better than a fixed stop or the reversed rule | [BL-155][bl155] |
 
 BL-083 event study, trigger minus the same template at the same minute on the 20 nearest non-event
 days, ₹ per lot (t): pivot-with-trend → Dir +754 (3.5) explore, −20 (−0.1) confirm; RSI exhaustion →
@@ -60,6 +61,7 @@ and REF +₹54,556, above both random controls; 2022–24 −₹10k to −₹27k
   `event_study.py`, `override.py`, `analysis.py`). Outputs (`out/`) are git-ignored; regenerate with
   those scripts.
 
+[bl155]: ../../../backlog/BL-155-stop-by-morning-type.md
 [bl053]: ../../../backlog/BL-053-vix-at-10am-strategy-mix.md
 [bl058]: ../../../backlog/BL-058-options-rotation-forward-journal-and-ui.md
 [bl081]: ../../../backlog/BL-081-drb-hourly-checkpoints-and-no-trade.md
