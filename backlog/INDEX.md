@@ -32,7 +32,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-015](BL-015-research-gate.md) | Research gate: pre-register every experiment, log every override | P1 | In progress | chore | cross-cutting |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
-| [BL-022](BL-022-analog-day-search.md) | "Days like today": analog-day search for intraday options | P1 | Idea | research | options |
+| [BL-022](BL-022-analog-day-search.md) | "Days like today": the 20 earlier sessions most like today so far (path since the open + VIX, gap, expiry), first as a rest-of-day range forecast (gate), then to skip or swap Adaptive's pending picks at 10:30 / 11:00 / 12:00 via the heatmap; Phase 0 registered 2026-10-22 | P1 | In progress | research | options |
 | [BL-025](BL-025-live-money-rules.md) | Live-money rules for Momentum: written before the first rupee, enforced by alerts | P1 | In progress | feature | momentum |
 | [BL-026](BL-026-realised-vs-backtest-options.md) | Options: realised P&L against the backtest of the same days | P1 | Planned | feature | options |
 | [BL-030](BL-030-choose-journal-favourites.md) | Choose the ~8 favourites to track and trade | P1 | Idea | research | momentum |
@@ -122,6 +122,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-137](BL-137-algotest-strategy-export-upload.md) | Rotation picks to AlgoTest: export the day's Core and T1 picks to `.algtst` and upload them (read back, never deployed) | P1 | In progress | feature | options + broker-login |
 | [BL-138](BL-138-algotest-auto-deploy.md) | Deploy the rotation picks in AlgoTest automatically: built ready but off by default (the owner may not use it); only the recorded 09:16 picks on /live, deactivate everything at 15:30, 08:00–15:40 window, 6-strategy limit | P2 | In progress | feature | broker-login + options |
 | [BL-152](BL-152-margin-check-without-algotest.md) | Margin check: a free-margin read that does not need AlgoTest or Shoonya's login, the need estimate checked against what the broker blocks, then switched on (`MARGIN_CHECK`) | P2 | Planned | improvement | broker-login |
+| [BL-154](BL-154-adaptive-fit-shrinkage.md) | Adaptive: shrink the 09:16 weekday / days-to-expiry / VIX fits by how many days back them, plus opening-gap and previous-day-range labels; replay under the label-shuffle control | P2 | Idea | research | options |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
