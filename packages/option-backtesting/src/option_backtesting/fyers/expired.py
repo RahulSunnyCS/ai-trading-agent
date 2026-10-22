@@ -288,19 +288,26 @@ def merge_option_partition(path: Path, fresh: pa.Table) -> tuple[int, int]:
 #: Consecutive retryable failures (network, 5xx) after which a run stops. One is noise, left
 #: uncached so the next run asks again; several in a row mean Fyers or the network is down.
 RETRYABLE_STREAK = 3
-#: Consecutive refusals after which a known-good contract is asked again: the symbols come
-#: from Fyers' own listing, so a run of refusals may be about the account, not the contracts.
-#: If that contract still answers they are kept; if it is refused too the run stops, none
-#: of them cached.
+#: Consecutive refusals after which they are checked: the symbols come from Fyers' own
+#: listing, so a run of refusals may be about the account, not the contracts.
 REFUSAL_STREAK = 5
-#: Refusals held before any contract has answered (nothing to ask again yet, e.g. the
-#: deep strikes at the start of a first run): they wait for the first answer, up to this many.
-UNCONFIRMED_LIMIT = 50
 #: Days merged together: every day of a month needs its monthly, so they all become ready at
 #: once; merging them a few at a time bounds the rows held in memory.
 MERGE_CHUNK_DAYS = 5
 #: States a cached response may hold; any other is asked again.
 _FINAL = ("ok", "no_data", "permanent")
+
+
+@dataclass(frozen=True)
+class _Held:
+    """A refusal not cached yet: held until something shows it was about its contract."""
+
+    underlying: str
+    expiry: date
+    path: Path
+    contract: Contract
+    params: dict
+    body: dict
 
 
 @dataclass
@@ -313,30 +320,32 @@ class _Progress:
     #: contracts Fyers refused (state `permanent`): cached, so a rerun asks again only with
     #: `retry_refused`
     failed: list[dict] = field(default_factory=list)
-    #: retryable failures, and refusals not cached because they came in a run: the next run
-    #: asks again
+    #: retryable failures, and refusals left uncached: the next run asks again
     retryable: list[dict] = field(default_factory=list)
     #: days whose partition this run wrote, per underlying: judged and derived at the end
     touched: dict[str, set[date]] = field(default_factory=lambda: defaultdict(set))
     errors: list[str] = field(default_factory=list)
-    #: a contract that answered `ok` (symbol, window): asked again to confirm that held
-    #: refusals were about those contracts, not the account
+    #: a contract that answered `ok` (symbol, window), from this run or the cache: asked again
+    #: to check that held refusals were about their contracts, not the account
     last_ok: tuple[str, date, date] | None = None
-    #: refusals in a row not cached yet, (expiry, path, contract, params, body): held until an
-    #: answer, or `last_ok` asked again, shows they were about single contracts. Run-wide, so
-    #: refusals no answer has followed yet carry into the next expiry
-    held: list[tuple[date, Path, Contract, dict, dict]] = field(default_factory=list)
+    #: refusals in a row (run-wide: none has had an answer after it yet)
+    held: list[_Held] = field(default_factory=list)
 
 
 def _window(item: ExpiryPlan) -> tuple[date, date]:
     return min(item.days), min(max(item.days), item.expiry)
 
 
-def _failure(expiry: date, contract: Contract, body: dict, *, cached: bool = False) -> dict:
+def _failure(
+    underlying: str, expiry: date, contract: Contract, body: dict, *, cached: bool = False
+) -> dict:
     message = str(body.get("message") or body.get("s") or body)
-    return {"symbol": contract.symbol, "expiry": expiry.isoformat(), "message": message} | (
-        {"cached": True} if cached else {}
-    )
+    return {
+        "underlying": underlying,
+        "symbol": contract.symbol,
+        "expiry": expiry.isoformat(),
+        "message": message,
+    } | ({"cached": True} if cached else {})
 
 
 def _cached_answer(path: Path, lo: date, hi: date) -> tuple[dict, str] | None:
@@ -353,142 +362,171 @@ def _cached_answer(path: Path, lo: date, hi: date) -> tuple[dict, str] | None:
     return (body, state) if state in _FINAL else None
 
 
-def _fetch_expiry(
-    client: FyersClient,
-    root: Path,
-    underlying: str,
-    item: ExpiryPlan,
-    progress: _Progress,
-    max_requests: int | None,
-    log: Callable[[str], None],
-    *,
-    retry_refused: bool = False,
-) -> bool:
-    """Cache every contract of one expiry. True when all of them are cached, answers and
-    refusals alike; False when the run stopped or a contract is left to ask again."""
-    lo, hi = _window(item)
-    complete = True
-    if progress.last_ok is None:  # a rerun: a contract that answered before, from the cache
-        for contract in item.contracts:
-            cached = _cached_answer(
-                _cache_path(root, underlying, item.expiry, contract.symbol), lo, hi
-            )
-            if cached is not None and cached[1] == "ok":
-                progress.last_ok = (contract.symbol, lo, hi)
-                break
+def _seed_last_ok(root: Path, plans: list[BackfillPlan]) -> tuple[str, date, date] | None:
+    """Any cached `ok` contract in the plan, so a rerun can check refusals from its start."""
+    for plan in plans:
+        for item in plan.expiries:
+            lo, hi = _window(item)
+            for contract in item.contracts:
+                path = _cache_path(root, plan.underlying, item.expiry, contract.symbol)
+                cached = _cached_answer(path, lo, hi)
+                if cached is not None and cached[1] == "ok":
+                    return contract.symbol, lo, hi
+    return None
 
-    def keep_refusals() -> None:
-        for expiry, path, contract, params, body in progress.held:
-            _write_cache(path, contract.symbol, params, body)
-            progress.failed.append(_failure(expiry, contract, body))
-        progress.held.clear()
 
-    def release() -> None:
-        """Held refusals left uncached: the next run asks again."""
-        for expiry, _, contract, _, body in progress.held:
-            progress.retryable.append(_failure(expiry, contract, body))
-        progress.held.clear()
+@dataclass
+class _Fetcher:
+    """Asks Fyers for the plan's contracts and caches the answers. A refusal is cached only
+    once something shows it was about its contract: a later answer, or, at REFUSAL_STREAK
+    refusals in a row and at an expiry's end, a contract that answered before (or one from
+    the middle of the listing, nearest the money, when none has) answering again."""
 
-    def ask(symbol: str, lo: date, hi: date) -> tuple[dict, dict, str] | None:
-        """One request and its state; None when it stopped the run."""
-        try:
-            body, params = client.expired_history_response(symbol, lo, hi)
-            state = response_state(body)
-        except RateLimitedError as error:  # the client's own 429 count ran out
-            progress.errors.append(str(error))
-            return stop("rate_limited") or None
-        except FyersCredentialsError as error:  # e.g. the token died at 06:00: resume later
-            progress.errors.append(str(error))
-            return stop("credentials") or None
-        progress.fetched += 1
-        if state in ("rate_limited", "blocked"):  # every further request would fare the same
-            progress.errors.append(f"{symbol}: {body.get('message') or body}")
-            return stop(state) or None
-        return body, params, state
+    client: FyersClient
+    root: Path
+    progress: _Progress
+    max_requests: int | None
+    log: Callable[[str], None]
+    retry_refused: bool = False
 
-    def stop(reason: str) -> bool:
-        progress.stopped = reason
-        release()
+    def stop(self, reason: str) -> bool:
+        self.progress.stopped = reason
+        self.release()
         return False
 
-    def confirm() -> str:
-        """Ask `last_ok` again about the held refusals: `kept` (it answered: they are cached),
-        `retry` (a transient error: left to ask next run), `none` (no such contract yet:
-        still held), `stopped` (refused too, so about the account, or the run stopped)."""
-        if progress.last_ok is None:
+    def keep(self) -> None:
+        """Cache the held refusals: they were about their contracts."""
+        for h in self.progress.held:
+            _write_cache(h.path, h.contract.symbol, h.params, h.body)
+            self.progress.failed.append(_failure(h.underlying, h.expiry, h.contract, h.body))
+        self.progress.held.clear()
+
+    def release(self) -> None:
+        """Leave the held refusals uncached: the next run asks again."""
+        for h in self.progress.held:
+            self.progress.retryable.append(_failure(h.underlying, h.expiry, h.contract, h.body))
+        self.progress.held.clear()
+
+    def ask(self, symbol: str, lo: date, hi: date) -> tuple[dict, dict, str] | None:
+        """One request and its state; None when it stopped the run."""
+        p = self.progress
+        if self.max_requests is not None and p.fetched >= self.max_requests:
+            return self.stop("max_requests") or None
+        try:
+            body, params = self.client.expired_history_response(symbol, lo, hi)
+            state = response_state(body)
+        except RateLimitedError as error:  # the client's own 429 count ran out
+            p.errors.append(str(error))
+            return self.stop("rate_limited") or None
+        except FyersCredentialsError as error:  # e.g. the token died at 06:00: resume later
+            p.errors.append(str(error))
+            return self.stop("credentials") or None
+        p.fetched += 1
+        if state in ("rate_limited", "blocked"):  # every further request would fare the same
+            p.errors.append(f"{symbol}: {body.get('message') or body}")
+            return self.stop(state) or None
+        if state == "retryable":
+            p.retry_streak += 1
+            if p.retry_streak >= RETRYABLE_STREAK:
+                p.errors.append(f"{symbol}: {body.get('message') or body}")
+                return self.stop("retryable") or None
+        elif state != "permanent":
+            p.retry_streak = 0
+        return body, params, state
+
+    def check(self, probe: tuple[str, date, date] | None, cache_to: Path | None = None) -> str:
+        """Ask `probe` (a contract expected to answer) about the held refusals: `kept` (it
+        answered, so they are cached), `released` (a transient error: left to the next run),
+        `stopped` (refused too, so about the account; or the run stopped), `none` (nothing to
+        ask yet: still held). `cache_to` caches the probe's own answer (a fresh contract)."""
+        if probe is None:
             return "none"
-        if max_requests is not None and progress.fetched >= max_requests:
-            stop("max_requests")
-            return "stopped"
-        answer = ask(*progress.last_ok)
+        answer = self.ask(*probe)
         if answer is None:
             return "stopped"
-        body, _, state = answer
+        body, params, state = answer
         if state in ("ok", "no_data"):
-            keep_refusals()
+            if cache_to is not None:
+                _write_cache(cache_to, probe[0], params, body)
+            if state == "ok":
+                self.progress.last_ok = probe
+            self.keep()
             return "kept"
         if state == "permanent":
-            progress.errors.append(
-                f"{progress.last_ok[0]} answered before, now: {body.get('message') or body}"
+            self.progress.errors.append(
+                f"{probe[0]} was refused too: {body.get('message') or body}"
             )
-            stop("refused_streak")
+            self.stop("refused_streak")
             return "stopped"
-        release()
-        return "retry"
+        self.release()
+        return "released"
 
-    for number, contract in enumerate(item.contracts, 1):
-        path = _cache_path(root, underlying, item.expiry, contract.symbol)
-        cached = _cached_answer(path, lo, hi)
-        if cached is not None and not (retry_refused and cached[1] == "permanent"):
-            progress.cached += 1
-            if cached[1] == "ok":
-                progress.last_ok = (contract.symbol, lo, hi)
-            if cached[1] == "permanent":
-                progress.failed.append(_failure(item.expiry, contract, cached[0], cached=True))
-            continue
-        if max_requests is not None and progress.fetched >= max_requests:
-            return stop("max_requests")
-        answer = ask(contract.symbol, lo, hi)
-        if answer is None:
-            return False
-        body, params, state = answer
-        if state == "permanent":
-            progress.held.append((item.expiry, path, contract, params, body))
-            if len(progress.held) >= REFUSAL_STREAK:
-                outcome = confirm()
-                if outcome == "none" and len(progress.held) >= UNCONFIRMED_LIMIT:
-                    progress.errors.append(
-                        f"{len(progress.held)} refusals in a row and no contract answered"
+    def fetch_expiry(self, underlying: str, item: ExpiryPlan) -> bool:
+        """Cache every contract of one expiry. True when all of them are cached, answers and
+        refusals alike; False when the run stopped or a contract is left to ask again."""
+        p = self.progress
+        lo, hi = _window(item)
+        complete = True
+        for number, contract in enumerate(item.contracts, 1):
+            path = _cache_path(self.root, underlying, item.expiry, contract.symbol)
+            cached = _cached_answer(path, lo, hi)
+            if cached is not None and not (self.retry_refused and cached[1] == "permanent"):
+                p.cached += 1
+                if cached[1] == "ok":
+                    p.last_ok = (contract.symbol, lo, hi)
+                if cached[1] == "permanent":
+                    p.failed.append(
+                        _failure(underlying, item.expiry, contract, cached[0], cached=True)
                     )
-                    return stop("refused_streak")
-                if outcome == "stopped":
-                    return False
-                if outcome == "retry":
-                    complete = False
-            continue
-        if state == "retryable":
-            complete = False
-            progress.retryable.append(_failure(item.expiry, contract, body))
-            progress.retry_streak += 1
-            if progress.retry_streak >= RETRYABLE_STREAK:
-                return stop("retryable")
-            continue
-        keep_refusals()  # an answer: the refusals before it were about single contracts
-        progress.retry_streak = 0
-        _write_cache(path, contract.symbol, params, body)
-        if state == "ok":
-            progress.last_ok = (contract.symbol, lo, hi)
-        if number % 100 == 0:
-            log(
-                f"{underlying} {item.expiry}: {number}/{len(item.contracts)} "
-                f"contracts ({progress.fetched} fetched, {progress.cached} cached)"
-            )
-    if any(entry[0] == item.expiry for entry in progress.held):
-        # nothing answered after them: ask a known-good contract once to tell
-        outcome = confirm()
-        if outcome != "kept":  # `none`: held for an answer later in the run
+                continue
+            answer = self.ask(contract.symbol, lo, hi)
+            if answer is None:
+                return False
+            body, params, state = answer
+            if state == "retryable":
+                complete = False
+                p.retryable.append(_failure(underlying, item.expiry, contract, body))
+                continue
+            if state == "permanent":
+                p.held.append(_Held(underlying, item.expiry, path, contract, params, body))
+                if len(p.held) >= REFUSAL_STREAK:
+                    probe, cache_to = p.last_ok, None
+                    rest = item.contracts[number:]
+                    if probe is None and rest:  # nothing answered yet: one nearest the money
+                        middle = rest[len(rest) // 2]
+                        probe = (middle.symbol, lo, hi)
+                        cache_to = _cache_path(self.root, underlying, item.expiry, middle.symbol)
+                    outcome = self.check(probe, cache_to)
+                    if outcome == "stopped":
+                        return False
+                    if outcome == "released":
+                        complete = False
+                continue
+            self.keep()  # an answer: the refusals before it were about their contracts
+            _write_cache(path, contract.symbol, params, body)
+            if state == "ok":
+                p.last_ok = (contract.symbol, lo, hi)
+            if number % 100 == 0:
+                self.log(
+                    f"{underlying} {item.expiry}: {number}/{len(item.contracts)} "
+                    f"contracts ({p.fetched} fetched, {p.cached} cached)"
+                )
+        mine = any(h.underlying == underlying and h.expiry == item.expiry for h in p.held)
+        # nothing answered after them: check with a contract that answered before; with none
+        # yet, they wait for the first answer later in the run (`none`)
+        if mine and self.check(p.last_ok) != "kept":
             return False
-    return complete
+        return complete
+
+    def finish(self) -> None:
+        """Refusals still held at the end of the run: one last check, else left uncached."""
+        p = self.progress
+        if p.held and not p.stopped:  # e.g. only cached expiries came after them
+            self.check(p.last_ok)
+        if p.held:
+            p.errors.append(f"{len(p.held)} refusal(s) with no answer in the run to check them")
+            self.release()
+            p.stopped = p.stopped or "refused_unconfirmed"
 
 
 def _expiry_cached(root: Path, underlying: str, item: ExpiryPlan) -> bool:
@@ -560,21 +598,13 @@ def _judge(root: Path, touched: dict[str, set[date]]) -> None:
 
 
 def _run_underlying(
-    client: FyersClient,
-    root: Path,
-    plan: BackfillPlan,
-    items: list[ExpiryPlan],
-    progress: _Progress,
-    max_requests: int | None,
-    log: Callable[[str], None],
-    *,
-    retry_refused: bool = False,
-    allow_short: bool = False,
+    fetcher: _Fetcher, plan: BackfillPlan, items: list[ExpiryPlan], *, allow_short: bool = False
 ) -> list[date]:
     """Fetch `items` in order, merging each day as soon as every expiry it needs is cached.
     A day that may need an expiry not expired yet (`plan.short_days`) waits, unless
     `allow_short`: once written it would be skipped by every default run after.
     Returns this run's days left unmerged (they wait for a later run)."""
+    client, root, progress, log = fetcher.client, fetcher.root, fetcher.progress, fetcher.log
     needs = plan.needs()
     held = set() if allow_short else set(plan.short_days)
     by_expiry = {item.expiry: item for item in plan.expiries}
@@ -599,16 +629,7 @@ def _run_underlying(
         return True
 
     for item in items:
-        if _fetch_expiry(
-            client,
-            root,
-            plan.underlying,
-            item,
-            progress,
-            max_requests,
-            log,
-            retry_refused=retry_refused,
-        ):
+        if fetcher.fetch_expiry(plan.underlying, item):
             complete.add(item.expiry)
         if progress.stopped:
             log(f"{plan.underlying} {item.expiry}: stopped ({progress.stopped}); cache kept")
@@ -704,7 +725,8 @@ def run_backfill(
             con, "fyers-expired", "expired_options_backfill", None, ",".join(underlyings)
         )
     calls_at_start = client.calls
-    progress = _Progress()
+    progress = _Progress(last_ok=_seed_last_ok(root, plans))
+    fetcher = _Fetcher(client, root, progress, max_requests, log, retry_refused)
     pending: dict[str, list[str]] = {}
     errors = progress.errors
     failure: BaseException | None = None
@@ -714,27 +736,20 @@ def run_backfill(
                 left = sorted({day for item in fetch[plan.underlying] for day in item.days})
             else:
                 left = _run_underlying(
-                    client,
-                    root,
-                    plan,
-                    fetch[plan.underlying],
-                    progress,
-                    max_requests,
-                    log,
-                    retry_refused=retry_refused,
-                    allow_short=allow_short,
+                    fetcher, plan, fetch[plan.underlying], allow_short=allow_short
                 )
             if left:
                 pending[plan.underlying] = [day.isoformat() for day in left]
     except (Exception, KeyboardInterrupt) as error:
         failure = error
         errors.append(str(error) or type(error).__name__)
-    if progress.held:  # refusals, and no contract answered in the whole run to tell why
-        errors.append(f"{len(progress.held)} refusal(s) with no answer in the run to confirm them")
-        for expiry, _, contract, _, body in progress.held:
-            progress.retryable.append(_failure(expiry, contract, body))
-        progress.held.clear()
-        progress.stopped = progress.stopped or "refused_unconfirmed"
+    if failure is None:
+        try:  # refusals still held: one last check, else left uncached
+            fetcher.finish()
+        except Exception as error:
+            failure = error
+            errors.append(str(error) or type(error).__name__)
+    fetcher.release()  # after a failure: never cached unchecked
     try:  # the days already merged get their verdicts whatever stopped the run
         _judge(root, progress.touched)
     except Exception as error:
