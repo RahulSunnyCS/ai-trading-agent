@@ -98,6 +98,13 @@ against 0.69 for the independent replay of the same decisions, so the chip agree
 to 0.15 point of CAGR. The drawdowns differ more (-4.9 against -0.7 points) because the engine's
 Monday run values the portfolio at Monday opens, a different sampling of the same account.
 
+Two things to know about a Monday-open result. The newest Friday has no Monday in the data until the
+next Friday's stock sync, so a Monday run ends a week before its Friday twin (about 0.03 point of CAGR
+over 9.5 years), and its "This week" section is for that last week. Live decisions (weekly signal,
+orders, rebalance preview) always run on the Friday-close twin, because their flat sentinel week has
+no Monday. The `fill_companion` pass is eager (one engine pass per sleeve); a lazy section is a
+possible follow-up.
+
 **Phase 2b - Stock and Custom Index (open).** Stock columns are company ids over a total-return
 series with symbol renames, and a Custom Index category is a synthetic inner-rotation curve, so
 neither can take a Monday open from the stock bars the way Broad's columns can. Both refuse the
