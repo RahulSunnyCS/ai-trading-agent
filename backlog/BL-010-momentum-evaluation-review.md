@@ -351,7 +351,7 @@ Also parked here (owner, 2026-10-06), priority P3:
 
 1. For a delay-1 strategy the Rebalance preview targets last week's ranking, as backtested.
    When trading live, act on that or on the freshest ranking?
-2. Which strategy will be followed with real money (ETF signal or a Broad candidate) — not yet decided.
+2. ~~Which strategy will be followed with real money~~ Answered 2026-10-20 (BL-142): Four Sectors Monthly, No Tilt, all Fridays. Checked under addendum 6 on 2026-10-22: verdict MIXED (see the Log).
 3. **Pending — discuss when this item is picked up.** The category layer: build launch dates for the 113 themes, or fall back to
    NSE's sectoral and thematic indices? Claude's recommendation (2026-10-06): the NSE indices,
    dated by each index's official launch date — published and checkable, whereas dating
@@ -540,4 +540,40 @@ Also parked here (owner, 2026-10-06), priority P3:
   Reading: the stock universe is already point in time for every favourite; the category tags
   are the remaining hindsight and cost 4–11 points and 7–14 points of drawdown. Today's list is
   not the upper bound here because these configs were found on the point-in-time universe.
+- 2026-10-22 — owner: "yes, check it". BL-010 never tested the strategy the money is in (Four
+  Sectors Monthly, No Tilt, all Fridays, `fbb7ab054238`, chosen 2026-10-20 from the 2026-10-08
+  top-10 ranking). Pre-registered as `search_spaces/bl010_criteria_addendum_6.json`, committed
+  before any run: variants (extended tags, tax at Rs 50,000 a sleeve, Monday-open fill with whole
+  shares from the audit replay), six gates (G1 5 points over Mom30 TRI after tax, G2 medium
+  drawdown basket, G3 no financial year more than 10 points behind, G4 plateau of one-step
+  neighbours, G5 factor alpha, G6 fair placebo), a verdict rule and what is only reported. The
+  2012-2016 window stays spent and is not read. Result goes in `bl010_four_sectors_result.json`.
+- 2026-10-22 — addendum 6 run (`docs/bl010-four-sectors-check-2026-10-22.md`,
+  `search_spaces/bl010_four_sectors_result.json`): **verdict MIXED** for Four Sectors Monthly, No Tilt,
+  all Fridays. The 44.9% headline becomes about 26% a year (27.7% after the fuller tags and tax,
+  minus 1.6 for buying at Monday's open with whole shares), against 16.5% for Mom30 TRI: G1 passes
+  (+9.5 points). G2 fails (worst fall -32.8%, medium basket is 30%; the aggressive basket passes).
+  G3 fails (FY2024 22.5 points behind Mom30). G4 plateau, G5 alpha (12.2% a year, t 2.03) and G6
+  fair placebo (+21 points) pass. Top five names are 57% of the profit. A resampled history gives a
+  5th-percentile CAGR of 12.2% and a 1-in-20 worst fall of about -50%. Selected on the same data,
+  so read it as upper-leaning. Nothing is automatic: the owner decides the size and the rules. E13
+  (Monday-fill option in the engine) stays open: the 1.6 points come from the audit replay. The
+  report step was edited after its first failure (shorter benchmark series) and again for the A0
+  reproduction; no gate or threshold changed. Live-money rules retargeted to this strategy on a
+  separate branch (BL-025 Log).
+- 2026-10-22 — code review of PR 285 found that variant M measured the Monday-open cost on the
+  signal-delay-1 runs, not on the Monday after the signal. Addendum 7 (committed first) repeats the
+  variants on signal-delay-0 runs: expected case 25.5% with a -33.9% worst fall (registered 26.1%,
+  -33.2%); Monday-open cost 1.9 points of CAGR and 1.1 of drawdown (registered 1.6 and 0.5); same
+  gates pass and fail, alpha t 1.94 (just under 2). Supplement verdict MIXED, as registered. The
+  long falls took about 2.6 years to climb back (Jan 2018 to 2021). Outputs addendum 6 listed and the
+  result omitted are now in `bl010_four_sectors_supplement.json`. Doc and counts corrected.
+- 2026-10-22 — owner: fix the open review items on PR 285 as recommended. Done: the gate numbers are
+  read from `bl010_criteria_addendum_8.json` instead of retyped; the verdict rule and the plateau
+  gate are tested on synthetic inputs; the result file's commit field is explained in the doc (the
+  running script is the one in `6660d31a`). Not changed: the result file itself (the check runs once).
+  Phase 7's optional accuracy items and the 8 repeated sleeve runs are left alone (owner: skip).
+- 2026-10-22 — correction to the Monday-open figure: of the 1.9 points (replay, signal delay 0), the
+  Monday fill alone is 0.7 points (0.83 in the engine option built for BL-036) and whole-share rounding
+  on a Rs 50,000 sleeve is the other 1.2. The expected case (25.5%) includes both. Table in the doc.
 - 2026-10-22 — E13: the Monday-fill option is built for Broad (BL-036 Phase 2; `execution="mon_open"`, signal delay 0 only, a Friday-versus-Monday line on every Broad result). Stock and Custom Index are BL-036 Phase 2b.

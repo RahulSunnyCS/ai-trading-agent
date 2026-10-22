@@ -1,0 +1,349 @@
+{
+  "written": "2026-10-22",
+  "criteria": "bl010_criteria_addendum_7.json",
+  "window": ["2017-01-06", "2026-10-16"],
+  "benchmark_cutoff": "2026-10-02",
+  "variants": {
+    "S0_delay0_curated": {
+      "cagr": 0.46704150676148815,
+      "mdd": -0.3058201781808326,
+      "ulcer": 0.0998388255513592
+    },
+    "S1_delay0_extended": {
+      "cagr": 0.3536868097290802,
+      "mdd": -0.3094335779871663,
+      "ulcer": 0.13578845236300677
+    },
+    "S3_delay0_extended_tax": {
+      "cagr": 0.27359127788261484,
+      "mdd": -0.32781110801925406,
+      "ulcer": 0.145422213257896
+    }
+  },
+  "monday_open_delay0": {
+    "cagr_at_close": 0.35368680972907995,
+    "cagr_at_open_whole_shares": 0.3349571823807842,
+    "cagr_change": -0.018729627348295752,
+    "mdd_at_close": -0.3094335779871663,
+    "mdd_at_open_whole_shares": -0.32039851538608455,
+    "mdd_change": -0.01096493739891824,
+    "sleeves": [
+      {
+        "offset": 0,
+        "sleeve_cagr_at_close": 0.3544427634882572,
+        "sleeve_cagr_at_open_whole_shares": 0.3303693810016797,
+        "average_gap_on_buys": 0.003249832048803784,
+        "average_gap_on_sells": 0.0015682675303612373,
+        "orders_repriced": 619,
+        "orders_with_no_open_that_week": 1,
+        "idle_cash_share_mean": 0.018535859548568342,
+        "replay_problems": []
+      },
+      {
+        "offset": 1,
+        "sleeve_cagr_at_close": 0.34502243242740094,
+        "sleeve_cagr_at_open_whole_shares": 0.3470490440039351,
+        "average_gap_on_buys": 0.002474856325690091,
+        "average_gap_on_sells": 0.002647452155071773,
+        "orders_repriced": 624,
+        "orders_with_no_open_that_week": 0,
+        "idle_cash_share_mean": 0.010879229635925622,
+        "replay_problems": []
+      },
+      {
+        "offset": 2,
+        "sleeve_cagr_at_close": 0.30690724859806284,
+        "sleeve_cagr_at_open_whole_shares": 0.29400590644372304,
+        "average_gap_on_buys": 0.002675097243172669,
+        "average_gap_on_sells": 0.0006451539497009192,
+        "orders_repriced": 626,
+        "orders_with_no_open_that_week": 0,
+        "idle_cash_share_mean": 0.018285284437168297,
+        "replay_problems": []
+      },
+      {
+        "offset": 3,
+        "sleeve_cagr_at_close": 0.38963053365292155,
+        "sleeve_cagr_at_open_whole_shares": 0.3515425920370867,
+        "average_gap_on_buys": 0.003277123237638428,
+        "average_gap_on_sells": 0.001296020126009172,
+        "orders_repriced": 621,
+        "orders_with_no_open_that_week": 0,
+        "idle_cash_share_mean": 0.014995119996234546,
+        "replay_problems": []
+      }
+    ]
+  },
+  "se_expected_case": {
+    "cagr": 0.2548616505343191,
+    "mdd": -0.3387760454181723
+  },
+  "gates": {
+    "S_G1": {
+      "pass": true,
+      "se_cagr": 0.2548616505343191,
+      "mom30_cagr": 0.1651298126964933,
+      "excess_pts": 8.973183783782579
+    },
+    "S_G2": {
+      "pass": false,
+      "s3_passes_medium": false,
+      "s3_mdd": -0.32781110801925406,
+      "se_mdd": -0.3387760454181723
+    },
+    "S_G3": {
+      "pass": false,
+      "worst_fy": 2024,
+      "worst_fy_excess_pts": -26.814575730187485,
+      "fy_table": {
+        "2018": {
+          "S3": 0.2720802331109893,
+          "Nifty200 Momentum 30 TRI": 0.21575462443946192
+        },
+        "2019": {
+          "S3": -0.08593526659374084,
+          "Nifty200 Momentum 30 TRI": 0.11572399004987788
+        },
+        "2020": {
+          "S3": -0.08841791487302042,
+          "Nifty200 Momentum 30 TRI": -0.17796746645842598
+        },
+        "2021": {
+          "S3": 1.0049095152868839,
+          "Nifty200 Momentum 30 TRI": 0.6149157460414267
+        },
+        "2022": {
+          "S3": 0.2977033868599017,
+          "Nifty200 Momentum 30 TRI": 0.39168835865511786
+        },
+        "2023": {
+          "S3": 0.22875466783239196,
+          "Nifty200 Momentum 30 TRI": -0.08117012742606411
+        },
+        "2024": {
+          "S3": 0.43153316548968434,
+          "Nifty200 Momentum 30 TRI": 0.6996789227915592
+        },
+        "2025": {
+          "S3": 0.18046230787968698,
+          "Nifty200 Momentum 30 TRI": -0.0762771861399032
+        },
+        "2026": {
+          "S3": 0.1517715850735133,
+          "Nifty200 Momentum 30 TRI": -0.0029077986692872537
+        }
+      }
+    },
+    "S_G5": {
+      "pass": false,
+      "alpha_pa": 0.11952517897411022,
+      "alpha_t": 1.9383533415635785,
+      "beta_market": 0.8958423105964587,
+      "beta_size": 0.6560115985147591,
+      "beta_momentum": 0.306889907003365,
+      "r2": 0.48084638956989545,
+      "weeks": 508
+    },
+    "G4_carried": true,
+    "G6_carried": true
+  },
+  "supplement_verdict": "MIXED",
+  "registered_verdict": "MIXED",
+  "registered_e_expected_case": {
+    "cagr": 0.2605582070362198,
+    "mdd": -0.33199369721128047
+  },
+  "falls_10pct_or_more": {
+    "A3_delay1": [
+      {
+        "peak": "2018-01-12",
+        "trough": "2018-10-26",
+        "depth": -0.3222390307528311,
+        "weeks_peak_to_trough": 41,
+        "weeks_trough_to_recovery": 90,
+        "smallcap250_fall_same_window": -0.3549035024619279
+      },
+      {
+        "peak": "2021-10-15",
+        "trough": "2022-06-24",
+        "depth": -0.3274626637103014,
+        "weeks_peak_to_trough": 36,
+        "weeks_trough_to_recovery": 51,
+        "smallcap250_fall_same_window": -0.23907704209795355
+      },
+      {
+        "peak": "2024-02-16",
+        "trough": "2024-05-31",
+        "depth": -0.10344287221613002,
+        "weeks_peak_to_trough": 15,
+        "weeks_trough_to_recovery": 4,
+        "smallcap250_fall_same_window": -0.0821626471579382
+      },
+      {
+        "peak": "2024-07-05",
+        "trough": "2024-08-09",
+        "depth": -0.12185984434574437,
+        "weeks_peak_to_trough": 5,
+        "weeks_trough_to_recovery": 6,
+        "smallcap250_fall_same_window": -0.03031120943093113
+      },
+      {
+        "peak": "2024-10-18",
+        "trough": "2024-10-25",
+        "depth": -0.12328787700322152,
+        "weeks_peak_to_trough": 1,
+        "weeks_trough_to_recovery": 6,
+        "smallcap250_fall_same_window": -0.07022758941012541
+      },
+      {
+        "peak": "2025-01-03",
+        "trough": "2025-05-02",
+        "depth": -0.21510021110693822,
+        "weeks_peak_to_trough": 17,
+        "weeks_trough_to_recovery": 34,
+        "smallcap250_fall_same_window": -0.2290199972184519
+      },
+      {
+        "peak": "2026-01-30",
+        "trough": "2026-03-27",
+        "depth": -0.1780889852768689,
+        "weeks_peak_to_trough": 8,
+        "weeks_trough_to_recovery": 9,
+        "smallcap250_fall_same_window": -0.08309456432604223
+      }
+    ],
+    "S3_delay0": [
+      {
+        "peak": "2018-01-12",
+        "trough": "2019-01-25",
+        "depth": -0.32781110801925406,
+        "weeks_peak_to_trough": 54,
+        "weeks_trough_to_recovery": 80,
+        "smallcap250_fall_same_window": -0.3549035024619279
+      },
+      {
+        "peak": "2021-10-15",
+        "trough": "2022-06-24",
+        "depth": -0.3083514043202493,
+        "weeks_peak_to_trough": 36,
+        "weeks_trough_to_recovery": 22,
+        "smallcap250_fall_same_window": -0.23907704209795355
+      },
+      {
+        "peak": "2022-12-02",
+        "trough": "2022-12-23",
+        "depth": -0.1553684077175902,
+        "weeks_peak_to_trough": 3,
+        "weeks_trough_to_recovery": 25,
+        "smallcap250_fall_same_window": -0.08147471099274628
+      },
+      {
+        "peak": "2024-02-16",
+        "trough": "2024-04-19",
+        "depth": -0.11772912455860784,
+        "weeks_peak_to_trough": 9,
+        "weeks_trough_to_recovery": 10,
+        "smallcap250_fall_same_window": -0.0821626471579382
+      },
+      {
+        "peak": "2024-07-05",
+        "trough": "2024-08-09",
+        "depth": -0.1356421431740482,
+        "weeks_peak_to_trough": 5,
+        "weeks_trough_to_recovery": 6,
+        "smallcap250_fall_same_window": -0.03031120943093113
+      },
+      {
+        "peak": "2024-10-18",
+        "trough": "2024-10-25",
+        "depth": -0.13374875276205456,
+        "weeks_peak_to_trough": 1,
+        "weeks_trough_to_recovery": 6,
+        "smallcap250_fall_same_window": -0.07022758941012541
+      },
+      {
+        "peak": "2025-01-03",
+        "trough": "2025-05-02",
+        "depth": -0.22600051050953807,
+        "weeks_peak_to_trough": 17,
+        "weeks_trough_to_recovery": 34,
+        "smallcap250_fall_same_window": -0.2290199972184519
+      },
+      {
+        "peak": "2026-01-30",
+        "trough": "2026-03-27",
+        "depth": -0.17937474929096298,
+        "weeks_peak_to_trough": 8,
+        "weeks_trough_to_recovery": 9,
+        "smallcap250_fall_same_window": -0.08309456432604223
+      }
+    ]
+  },
+  "worst_weeks": {
+    "smallcap250": [
+      {
+        "week": "2020-03-20",
+        "index_return": -0.1578639802970805,
+        "A3": -0.06997012879193132,
+        "S3": -0.0781670207949755
+      },
+      {
+        "week": "2020-03-13",
+        "index_return": -0.12679304183234574,
+        "A3": -0.09790896116470071,
+        "S3": -0.09502453354013629
+      },
+      {
+        "week": "2025-02-14",
+        "index_return": -0.09554293693136695,
+        "A3": -0.09164457025580985,
+        "S3": -0.0858273487070883
+      },
+      {
+        "week": "2018-09-28",
+        "index_return": -0.09197613183082931,
+        "A3": -0.1563747330835228,
+        "S3": -0.15029727852901742
+      },
+      {
+        "week": "2018-02-02",
+        "index_return": -0.08451628633066754,
+        "A3": -0.12081715514018776,
+        "S3": -0.11850064475645383
+      }
+    ],
+    "midcap150": [
+      {
+        "week": "2020-03-20",
+        "index_return": -0.1287250420689573,
+        "A3": -0.06997012879193132,
+        "S3": -0.0781670207949755
+      },
+      {
+        "week": "2020-03-13",
+        "index_return": -0.10305774552149738,
+        "A3": -0.09790896116470071,
+        "S3": -0.09502453354013629
+      },
+      {
+        "week": "2025-02-14",
+        "index_return": -0.07400798406855658,
+        "A3": -0.09164457025580985,
+        "S3": -0.0858273487070883
+      },
+      {
+        "week": "2018-02-02",
+        "index_return": -0.07256088905576741,
+        "A3": -0.12081715514018776,
+        "S3": -0.11850064475645383
+      },
+      {
+        "week": "2020-02-28",
+        "index_return": -0.06825603941319203,
+        "A3": -0.04640561747487615,
+        "S3": -0.043067585249705664
+      }
+    ]
+  },
+  "backtests_run": 16
+}

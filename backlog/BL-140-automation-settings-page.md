@@ -143,6 +143,12 @@ Shoonya's own hosts:
 
 ## Log
 
+- 2026-10-22 — **PR 5 (the morning gap check):** decision (Claude): it is part of the 09:25 `DEPLOY_CHECK`, not a
+  09:20 job (that window forbids a login). On review it turned out the check already covers it: a pick never
+  uploaded reads "not in AlgoTest" (absent from /live) or "not in Quantiply for <weekday>", separate from "not
+  deployed" (the add-on switch already keeps add-on picks out of the manifest it reads). A first version that added
+  `GET /strategies` was dropped as a duplicate with one more call. What is new: when Settings has a pause covering
+  today, both platforms say so (`pauseNote`) instead of reading as a missed upload.
 - 2026-10-22 — **PR 3 (Buy add-on):** `obt rotation algotest-export|quantiply-export --from-settings` leaves the Buy
   add-on out of a list's export when no row that uploads that list has it on (`automation_settings.addon_wanted`,
   `cli._without_addon`). The uploaders, deployers and the margin and deploy checks all read the export, so this is the

@@ -107,15 +107,19 @@ def median_companion(curves: pd.DataFrame, group: list[str]) -> str:
     return sorted(distance.index[distance == distance.min()])[0]
 
 
-def run_config(runner, cfg: dict) -> pd.Series:
+def run_config(runner, cfg: dict, base=None, **window) -> pd.Series:
     """One frozen config's weekly equity through the latest week: the same call as the search
-    (and, per the parity tests, the live path), with the frozen rebalance offset."""
+    (and, per the parity tests, the live path), with the frozen rebalance offset. `base` is the
+    universe base for `cfg["heavy"]` when the caller already built it (configs that share their
+    heavy settings, such as the sleeves of one strategy, need it once). `window` (e.g. `start`)
+    goes to the run: a later start is a fresh portfolio from cash on that Friday."""
     heavy = cfg["heavy"]
     light = {
         **cfg["light"],
         "rebalance_offset": cfg.get("rebalance_offset", cfg["light"].get("rebalance_offset", 0)),
     }
-    outcome, _ = runner.run(runner.base(heavy), heavy, light)
+    base = base if base is not None else runner.base(heavy)
+    outcome, _ = runner.run(base, heavy, light, **window)
     return outcome.result.equity
 
 
