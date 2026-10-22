@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Priority** | P1 — Momentum is this month's goal; the Monday-open fill costs about 1.6 to 1.9 points a year against the backtest's Friday-close fill (BL-010 addendum 6), and the orders are keyed in by hand |
+| **Priority** | P1 — Momentum is this month's goal; the Monday-open fill costs about 0.7 points a year against the backtest's Friday-close fill, and whole-share rounding on Rs 50,000 lots another 1.2 (BL-010 addendum 6), and the orders are keyed in by hand |
 | **Status** | Planned |
 | **Type** | feature |
 | **Area** | momentum + scheduler + dashboard |
@@ -16,7 +16,7 @@ Owner, 2026-10-22: "rebalance can happen at 3 o'clock, and once the rebalance ha
 a Kite button, or a Telegram message; once I click it, the transaction should happen: this gets sold
 and I buy the new stock." Today the orders job (`momentum-orders`, Fri 14:15) plans the headline's
 orders and sends them; the owner places them by hand, on Monday (BL-142). BL-010's check of the
-followed strategy put that Monday fill at about 1.6 to 1.9 points of CAGR and 0.5 to 1.1 of drawdown against the
+followed strategy put the Monday fill itself at about 0.7 points of CAGR (and whole shares on a Rs 50,000 lot at another 1.2) against the
 Friday-close fill the backtest assumes. A Friday 15:00 to 15:25 fill sits much closer to the
 backtest's assumption, but plans from 15:00 prices, not the final close.
 
@@ -82,7 +82,7 @@ rules on API orders stay out of the picture.
   the two plans differ, in names and in rupees, and the fill price against the Friday close.
 - **Deliverables:** a stored comparison per Friday and a short read-out after 8 Fridays.
 - **Done when:** 8 Fridays are recorded and the read-out says whether 15:00 planning keeps most of
-  the 1.6 to 1.9 points the Monday fill loses.
+  the 0.7 points the Monday fill loses.
 
 ## Risks
 
