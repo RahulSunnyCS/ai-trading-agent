@@ -124,6 +124,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-138](BL-138-algotest-auto-deploy.md) | Deploy the rotation picks in AlgoTest automatically: built ready but off by default (the owner may not use it); only the recorded 09:16 picks on /live, deactivate everything at 15:30, 08:00–15:40 window, 6-strategy limit | P2 | In progress | feature | broker-login + options |
 | [BL-149](BL-149-fyers-greeks-validation.md) | Fyers' Greeks: do we need them? Validate our own IV and Greeks against the expired-F&O API on a pre-registered sample, and say what MCX must derive | P2 | Planned | research | options / trading-data |
 | [BL-152](BL-152-margin-check-without-algotest.md) | Margin check: a free-margin read that does not need AlgoTest or Shoonya's login, the need estimate checked against what the broker blocks, then switched on (`MARGIN_CHECK`) | P2 | Planned | improvement | broker-login |
+| [BL-156](BL-156-eight-poc-reads.md) | Eight out-of-the-box POC reads: VRP, skew, PCR, overnight straddle, post-event entry, condor margin, ratio spread, skip calendar | P2 | In progress | research | options |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
