@@ -17,7 +17,6 @@ import argparse
 import json
 import math
 import os
-import statistics
 import sys
 from datetime import date
 from pathlib import Path
@@ -25,14 +24,12 @@ from pathlib import Path
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-sys.path.insert(0, str(HERE.parent / "bl104"))
-from robust import cscv_pbo  # noqa: E402
-from specs import AXES, CRITERIA, grid  # noqa: E402
+sys.path.insert(0, str(HERE.parent / "common"))
+from breakout_specs import AXES, CRITERIA, grid  # noqa: E402
+from cscv import cscv_pbo  # noqa: E402
 
 OUT = HERE / "out"
 RULE = CRITERIA["pass_rule"]
-_NORMAL = statistics.NormalDist()
 
 
 def load_done() -> dict[str, dict]:
@@ -90,19 +87,20 @@ def series(rows: dict[str, dict], days: list[str]) -> tuple[np.ndarray, list[str
     return matrix, ids
 
 
-def deflated_sharpe(matrix: np.ndarray) -> dict:
-    """The simplified (Gaussian) deflated Sharpe of the best daily Sharpe, as analytics/overfit."""
-    sd = matrix.std(axis=0, ddof=1)
-    sharpe = np.where(sd > 0, matrix.mean(axis=0) / np.where(sd > 0, sd, 1), 0.0)
-    n, t = matrix.shape[1], matrix.shape[0]
-    var = float(np.var(sharpe, ddof=1)) if n > 1 else 0.0
-    gamma = 0.5772156649015329
-    sr0 = math.sqrt(var) * (
-        (1 - gamma) * _NORMAL.inv_cdf(1 - 1 / n) + gamma * _NORMAL.inv_cdf(1 - 1 / (n * math.e))
-    )
-    best = float(sharpe.max())
-    z = (best - sr0) * math.sqrt(t - 1) / math.sqrt(1 + best**2 / 2)
-    return {"best_daily_sharpe": best, "sr0": sr0, "dsr": _NORMAL.cdf(z), "n": n, "days": t}
+def deflated_sharpe(matrix: np.ndarray, ids: list[str]) -> dict:
+    """The simplified deflated Sharpe of the best variant's daily series, by the one formula in
+    `analytics.overfit` (the sweep tool's), over the days x variants matrix."""
+    from option_backtesting.analytics.overfit import deflated_sharpe_of_series
+
+    result = deflated_sharpe_of_series({v: matrix[:, j].tolist() for j, v in enumerate(ids)})
+    return {
+        "best": result.best_config_label,
+        "best_daily_sharpe": result.observed_sharpe,
+        "expected_max_sharpe": result.expected_max_sharpe,
+        "dsr": result.deflated_sharpe,
+        "n": result.n_trials,
+        "days": result.n_sessions,
+    }
 
 
 def confirm(root: Path, vids: list[str]) -> list[dict]:
@@ -178,7 +176,7 @@ def main() -> int:
     matrix, ids = series(rows, days)
     pbo = {b: cscv_pbo(matrix, b)[0] for b in RULE["pbo"]["n_blocks"]}
     pbo_ok = all(v <= RULE["pbo"]["max"] for v in pbo.values())
-    dsr = deflated_sharpe(matrix)
+    dsr = deflated_sharpe(matrix, ids)
     thin = [
         v for v in ids if rows[v].get("thin", True) or rows[v].get("events", 0) < RULE["min_events"]
     ]

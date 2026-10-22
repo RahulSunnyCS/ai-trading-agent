@@ -16,14 +16,14 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent / "bl152"))
-from specs import grid, levels  # noqa: E402
+sys.path.insert(0, str(HERE.parent / "common"))
+from breakout_specs import grid, levels  # noqa: E402
 
 from option_backtesting.rotation import triggers as T  # noqa: E402
 from option_backtesting.ruletest import expr as E  # noqa: E402
@@ -35,13 +35,21 @@ OUT = HERE / "out"
 INSTRUMENTS = (("BANKNIFTY", "index"), ("NIFTYIT", "index"), ("RELIANCE", "stock"))
 
 
-def load_frame(root: Path, symbol: str, asset: str, until: date) -> E.Frame:
+def load_frame(root: Path, symbol: str, asset: str, since: date, until: date) -> E.Frame:
+    """The instrument's sessions from just before `since` (a previous-day level needs the session
+    before the first one) to `until`, not its whole history."""
     from trading_data import lake
 
-    end = max(d for d in lake.available_days(root, asset, symbol) if d <= until)
-    grid_ = T.load_grid(root, symbol, end, sessions=3000, asset=asset)
+    days = [
+        d
+        for d in lake.available_days(root, asset, symbol)
+        if since - timedelta(days=15) <= d <= until
+    ]
+    if not days:
+        raise SystemExit(f"{symbol}: no bars between {since} and {until}")
+    grid_ = T.load_grid(root, symbol, max(days), sessions=len(days), asset=asset)
     if grid_ is None:
-        raise SystemExit(f"{symbol}: no bars up to {until}")
+        raise SystemExit(f"{symbol}: bars could not be read up to {until}")
     return E.Frame(days=grid_.days, O=grid_.O, H=grid_.H, L=grid_.L, C=grid_.C)
 
 
@@ -133,6 +141,9 @@ def passes(c: dict, p_holm: float | None) -> tuple[bool, str]:
 
 
 def confirmation_rows(root: Path, vid: str) -> tuple[list[dict], str]:
+    """The variant's confirmation-period trades. If the confirmation period was already looked at
+    (any mode), that test's rows are reused and labelled with its mode: BL-153 never takes a second
+    look. A look whose result file is missing stops here, it is not run again."""
     import yaml
 
     from option_backtesting.ruletest import frame as F
@@ -141,10 +152,18 @@ def confirmation_rows(root: Path, vid: str) -> tuple[list[dict], str]:
 
     rule = dict(grid())[vid]
     compiled = from_dict(rule)
-    seen = store.confirmation_tests(store.ledger(root), compiled.spec_hash)
-    if seen:  # BL-152 already looked: reuse that test, no second look
+    ledger = store.ledger(root)
+    seen = store.confirmation_tests(ledger, compiled.spec_hash)
+    if seen:  # already looked at (BL-152): reuse that test, no second look
         result = store.read_result(root, seen[0])
-        return result["periods"]["confirmation"].get("rows", []), f"reused {seen[0]}"
+        if result is None or "confirmation" not in (result.get("periods") or {}):
+            raise SystemExit(
+                f"{vid}: the confirmation period was already looked at (test {seen[0]}) but its "
+                "result is missing; not running a second look. Restore the result file, or log an "
+                "override in BL-153."
+            )
+        mode = next((r.get("mode") for r in ledger if r.get("id") == seen[0]), "unknown")
+        return result["periods"]["confirmation"].get("rows", []), f"reused {seen[0]} ({mode})"
     store.reveal(root, compiled.spec_hash, "BL-153 registered hold-out (research/bl153/support.py)")
     lo, hi = study.PERIODS["confirmation"]
     result = study.run_test(
@@ -167,7 +186,9 @@ def main() -> int:
         ]
     )
     until = date.fromisoformat(CRITERIA["learning_period"][1])
-    frames = {name: load_frame(root, name, asset, until) for name, asset in INSTRUMENTS}
+    since = date.fromisoformat(CRITERIA["confirmation_period"][0])
+    # one load per instrument covers both periods: levels read only earlier bars
+    frames = {name: load_frame(root, name, asset, since, until) for name, asset in INSTRUMENTS}
     shuffles, seed = CRITERIA["control"]["shuffles"], CRITERIA["control"]["seed"]
     results = {}
     for vid in variants:
@@ -181,12 +202,10 @@ def main() -> int:
     passing = [v for v, r in results.items() if r["passed"]]
     confirmation = {}
     if passing:
-        hi = date.fromisoformat(CRITERIA["confirmation_period"][1])
-        cframes = {name: load_frame(root, name, asset, hi) for name, asset in INSTRUMENTS}
         for vid in passing:
             rows, how = confirmation_rows(root, vid)
             level = vid.removeprefix("bl152_").split("_")[0]
-            c = compare(mark(rows, level, cframes), shuffles, seed)
+            c = compare(mark(rows, level, frames), shuffles, seed)
             c["how"] = how
             c["passed"] = (
                 c["D"] is not None

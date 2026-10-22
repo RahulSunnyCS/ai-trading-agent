@@ -206,7 +206,7 @@ one lot) and were judged by the rule registered in Phase 0 (`research/bl152/judg
   `sellopp` +₹59 (40); by level `or30` −₹157 (8 of 48), `roll30` −₹52 (14), `prevday` −₹97 (13), `held30` +₹267 (42).
   At 0.5% slippage 49 variants stay positive, at 1% 28.
 - **Multiple testing:** PBO 0.514 over 8 blocks (limit 0.5: fails) and 0.418 over 16; deflated Sharpe of the best
-  variant 0.265.
+  variant 0.267 (the shared `analytics.overfit` formula; the first run printed 0.265 from a copy of it).
 - **Confirmation period (2022-01-03 to 2024-10-08): never opened.** Nothing advanced, so no reveal, no test.
 - All 192 tests are in the ledger exactly once (the run was paused and resumed once; a finished variant was never rerun).
 
@@ -222,4 +222,10 @@ Findings pages: `research/options/strategies/breakout/`.
   compile to distinct rules), `run_grid.py` ran them (2 pilot variants, then a run paused for the owner's request and
   resumed on 2 workers, with the worker count re-read per variant), about 2 hours in all.
 - 2026-10-22 — **Phase 3 judged: killed** (see Result). No override was needed and none was used.
+- 2026-10-22 — **PR #294 review fixed.** `run_grid.py` now recovers a variant that is in the ledger but not in `done.jsonl`
+  from its stored result instead of testing it again (the ledger still holds 192 tests); CSCV and the 192 specs moved to
+  `research/common/` (`cscv.py`, `breakout_specs.py`) so no script imports from another item's folder; the judge uses
+  `analytics.overfit.deflated_sharpe_of_series`, the sweep tool's formula (0.265 became 0.267; the verdict and the PBO are
+  unchanged); tests pin the specs, the candidate and plateau rules and the grid recovery. The judge was rerun without
+  `--confirm`: still killed, nothing advanced, confirmation period still unopened.
 

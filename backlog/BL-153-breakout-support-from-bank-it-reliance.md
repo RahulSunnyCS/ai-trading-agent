@@ -144,4 +144,10 @@ Findings: `research/options/strategies/breakout/index-support.md`.
   those ranges only; NIFTY IT had none. All 1,185 files per series read cleanly afterwards. The six short NIFTY and
   Bank Nifty sessions the check also listed are genuine short sessions.
 - 2026-10-22 — **Phase 3 judged: killed** (see Result). No override was used.
+- 2026-10-22 — **PR #294 review fixed.** `support.py` loads each instrument once from 2021-12-20 (not back to 2015) and
+  reuses those frames for the confirmation period; its confirmation path stops, rather than crashes or looks again, when an
+  earlier look's result is missing, and labels a reused test with its mode; it no longer imports from BL-152's folder
+  (`research/common/breakout_specs.py`); tests cover Holm, the permutation test, `passes` and the support marking. The
+  comparison was not rerun: its inputs are unchanged. `bars_1m_stock` is now a lake view, so these shares are visible to
+  `tdata`.
 

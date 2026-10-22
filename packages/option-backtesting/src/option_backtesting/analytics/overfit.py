@@ -165,10 +165,29 @@ def run_deflated_sharpe(report: SweepReport) -> DeflatedSharpeResult:
         raise ValueError("Deflated Sharpe needs at least 2 successful configs (N trials).")
 
     n_sessions = _session_counts(report)
+    return deflated_sharpe_of_series(
+        {c.label: [s.net for s in c.result.sessions] for c in configs},  # type: ignore[union-attr]
+        n_sessions,
+    )
+
+
+def deflated_sharpe_of_series(
+    series: dict[str, list[float]], n_sessions: int | None = None
+) -> DeflatedSharpeResult:
+    """The same simplified Deflated Sharpe over any set of per-trial net series (`label -> one value
+    per session`, all of one length), so a research script that holds a days x variants matrix
+    (BL-152) uses this one formula instead of its own copy. `run_deflated_sharpe` is this over a
+    sweep's sessions."""
+    if len(series) < 2:
+        raise ValueError("Deflated Sharpe needs at least 2 trials.")
+    lengths = {len(values) for values in series.values()}
+    if len(lengths) != 1:
+        raise ValueError(f"Deflated Sharpe needs every trial on the same sessions, got {lengths}.")
+    n_sessions = lengths.pop() if n_sessions is None else n_sessions
     if n_sessions < 2:
         raise ValueError("Need at least 2 sessions to compute a Sharpe ratio.")
 
-    sharpes = {c.label: _sharpe([s.net for s in c.result.sessions]) for c in configs}  # type: ignore[union-attr]
+    sharpes = {label: _sharpe(values) for label, values in series.items()}
     n = len(sharpes)
     sigma_sr = statistics.pstdev(sharpes.values())
 

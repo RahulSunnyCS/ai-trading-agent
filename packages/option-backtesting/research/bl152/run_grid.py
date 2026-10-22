@@ -39,6 +39,41 @@ def done_ids() -> set[str]:
     return {json.loads(line)["id"] for line in path.read_text().splitlines() if line.strip()}
 
 
+def record(vid: str, result: dict) -> dict:
+    """Write a finished variant's event rows and its done line; return the summary."""
+    rows = result["periods"]["learning"].get("rows", [])
+    keep = ("day", "side", "entry", "exit", "net", "gross", "stopped_by", "expiry_day")
+    (OUT / "nets" / f"{vid}.json").write_text(
+        json.dumps([{k2: r.get(k2) for k2 in keep} for r in rows])
+    )
+    line = summary(vid, result)
+    with (OUT / "done.jsonl").open("a") as handle:
+        handle.write(json.dumps(line, default=float) + "\n")
+    return line
+
+
+def recover(root: Path, finished: set[str]) -> list[str]:
+    """Variants whose learning-period test is in the ledger but not in done.jsonl (a run cut off
+    between the two writes) are taken from their stored result, never tested again: a second test
+    would be a second ledger try for the same variant. Returns the ids recovered."""
+    from option_backtesting.ruletest import store
+    from option_backtesting.ruletest.spec import from_dict
+
+    by_hash = {from_dict(rule).spec_hash: vid for vid, rule in grid()}
+    got = []
+    for row in store.ledger(root):
+        vid = by_hash.get(row.get("spec_hash"))
+        if vid is None or vid in finished or "learning" not in (row.get("periods") or []):
+            continue
+        result = store.read_result(root, str(row["id"]))
+        if result is None:
+            continue
+        record(vid, result)
+        finished.add(vid)
+        got.append(vid)
+    return got
+
+
 def worker_count(default: int) -> int:
     """The worker count for the next variant: out/workers.txt when it holds a whole number, so a
     running grid can be given more (or fewer) cores without a restart."""
@@ -97,6 +132,8 @@ def main() -> int:
     root = Path(os.environ["TRADING_DATA_ROOT"])
     (OUT / "nets").mkdir(parents=True, exist_ok=True)
     finished = done_ids()
+    for vid in recover(root, finished):
+        print(f"recovered from the ledger, not run again: {vid}", flush=True)
     todo = [(vid, rule) for vid, rule in grid() if vid not in finished]
     if args.only:
         todo = todo[: args.only]
@@ -125,14 +162,7 @@ def main() -> int:
             with (OUT / "errors.jsonl").open("a") as handle:
                 handle.write(json.dumps(line) + "\n")
             continue
-        rows = result["periods"]["learning"].get("rows", [])
-        keep = ("day", "side", "entry", "exit", "net", "gross", "stopped_by", "expiry_day")
-        (OUT / "nets" / f"{vid}.json").write_text(
-            json.dumps([{k2: r.get(k2) for k2 in keep} for r in rows])
-        )
-        line = summary(vid, result)
-        with (OUT / "done.jsonl").open("a") as handle:
-            handle.write(json.dumps(line, default=float) + "\n")
+        line = record(vid, result)
         mean = line["net_mean"]
         print(
             f"[{k}/{len(todo)}] {vid}: {line['events']} events, "

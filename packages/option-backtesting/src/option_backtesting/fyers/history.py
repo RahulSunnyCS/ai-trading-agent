@@ -15,6 +15,7 @@ only costs a couple of requests per 95-day chunk.
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from collections.abc import Callable
 from datetime import date, datetime, timedelta, timezone
@@ -38,6 +39,10 @@ EMPTY_CHUNKS_TO_STOP = 3
 # The threshold is trading_data.quality.MIN_BARS: one definition, shared with data_quality.
 
 _IST = timezone(timedelta(hours=5, minutes=30))
+
+#: A lake name is a path part (`symbol=<name>`): capitals, digits, `&`, `-`, `_` only
+#: (M&M, BAJAJ-AUTO), so it can never leave its folder.
+LAKE_NAME = re.compile(r"^[A-Z0-9][A-Z0-9&_-]{0,31}$")
 
 
 def chunk_ranges(start: date, end: date, size: int = CHUNK_DAYS) -> list[tuple[date, date]]:
@@ -91,6 +96,8 @@ def backfill_symbol(
     Registered as an NSE instrument of that asset class (BL-153)."""
     if asset not in ("index", "stock"):
         raise ValueError(f"asset must be index or stock, got {asset!r}")
+    if not LAKE_NAME.match(name):
+        raise ValueError(f"name {name!r} must be capitals, digits, & - _ (a folder name)")
     spec = InstrumentSpec(asset, "NSE", name, vendor="fyers", vendor_symbol=symbol)
     with connect(root, views=()) as con:
         ids = {symbol: register(con, [spec])[spec.key]}

@@ -43,6 +43,16 @@ LAKE_VIEWS: dict[str, tuple[str, str]] = {
         "NULL::DOUBLE AS volume, NULL::DOUBLE AS oi, NULL::TEXT AS vendor_symbol, "
         "NULL::TEXT AS symbol, NULL::DATE AS date",
     ),
+    # Shares' 1-minute bars (BL-153: `obt fyers history --symbol NSE:RELIANCE-EQ --asset stock`),
+    # the index layout under asset=stock. Not in FIXED_SCHEMA_VIEWS: few files, so union_by_name
+    # is cheap.
+    "bars_1m_stock": (
+        "bars_1m/asset=stock/*/*/data.parquet",
+        "NULL::BIGINT AS instrument_id, NULL::TIMESTAMPTZ AS ts, NULL::DOUBLE AS open, "
+        "NULL::DOUBLE AS high, NULL::DOUBLE AS low, NULL::DOUBLE AS close, "
+        "NULL::DOUBLE AS volume, NULL::DOUBLE AS oi, NULL::TEXT AS vendor_symbol, "
+        "NULL::TEXT AS symbol, NULL::DATE AS date",
+    ),
     "bars_1m_future": (
         "bars_1m/asset=future/*/*/data.parquet",
         "NULL::BIGINT AS instrument_id, NULL::TIMESTAMPTZ AS ts, NULL::DOUBLE AS open, "

@@ -569,10 +569,14 @@ def fyers_history(
     from .fyers.auth import FyersCredentialsError, resolve_credentials
     from .fyers.client import FyersClient
     from .fyers.daily import UNDERLYINGS, data_dir
-    from .fyers.history import backfill_index, backfill_symbol
+    from .fyers.history import LAKE_NAME, backfill_index, backfill_symbol
 
     if symbol and (not name or asset not in ("index", "stock")):
         raise typer.BadParameter("--symbol needs --name and --asset index|stock")
+    if symbol and not LAKE_NAME.match(name):
+        raise typer.BadParameter(f"--name {name!r} must be capitals, digits, & - _ (a folder name)")
+    if symbol and underlying != "NIFTY":
+        raise typer.BadParameter("--underlying and --symbol are alternatives: give one")
     if not symbol and underlying not in UNDERLYINGS:
         raise typer.BadParameter(f"unknown underlying {underlying}; known: {sorted(UNDERLYINGS)}")
     window = {

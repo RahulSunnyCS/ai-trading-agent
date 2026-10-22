@@ -447,6 +447,10 @@ Otherwise:
   `regime_message` on `POST /runs`, `regime_status` in the MCP `run_backtest`
   output, `t33.status` on `/legwise/anatomy`). Any other query error still raises.
 
+- `research/common/` — code two research items share, imported by module name after a `sys.path` insert of this
+  folder (`varlib`, `early_ref`, `rotparse`; BL-152 added `cscv` (the numpy CSCV / PBO, moved out of `bl104/robust.py`, which
+  re-exports it) and `breakout_specs` (BL-152's 192 registered rule specs, also used by BL-153)). A script never imports
+  from another item's folder.
 - `research/bl104/` — BL-104, the full-factorial parameter sweep over the Widesl / Dir / Buy families:
   `grid.py` (the registered axes, cells and their SHA; `tests/unit/test_bl104_grid.py` holds the counts),
   `run_grid.py` (one job per cohort, resumable parts + day × cell series under `results/<tag>/`),
@@ -467,6 +471,7 @@ uv run obt run strategies/B_pyramid.yaml --from YYYY-MM-DD --to YYYY-MM-DD
 uv run obt fyers status                 # token source + data dir
 uv run obt fyers fetch                  # today's 1m data — run the SAME evening
 uv run obt fyers history                # backfill NIFTY + VIX index history (any time)
+uv run obt fyers history --symbol NSE:RELIANCE-EQ --name RELIANCE --asset stock   # BL-153: one symbol's history (`fyers.history.backfill_symbol`)
 uv run obt legwise run strategies/legwise/*.yaml [--from D] [--to D] [--trades] [--include-excluded] [--bars 5m]
 uv run python scripts/parity-5m.py --from D --to D   # same strategies on 1m vs 5m bars: agreement + timing
 uv run obt daily                        # evening routine: fetch + judge the day + derived tables + run strategies/legwise + summary (verdicts, IV percentile)
