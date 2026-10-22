@@ -1,6 +1,6 @@
 # Options: does NIFTY's daily range persist?
 
-**Status:** Tested · **Last updated:** 2026-10-15
+**Status:** Tested · **Last updated:** 2026-10-22
 
 ## What it is
 
@@ -85,6 +85,23 @@ the same-state probabilities barely differ from the base rates; and the result r
 2021: split post hoc, 2016 to 2019 alone shows nothing (lag-1 0.04 [−0.03, 0.09], gap +0.12
 [−0.02, +0.25]). Compare the two states with each other, not with 1.0.
 
+## Opening range against other forecasts (BL-022)
+
+[BL-022][bl022] used the opening range as one of its baselines for the rest-of-day range, with a
+different definition: the range from 09:15 up to the check time T (10:30, 11:00 or 12:00), scaled by
+the same window over the previous 20 sessions. Spearman ρ with the realised range from T to the
+close:
+
+| Window | Opening range | VIX-implied | Analog days (BL-022) |
+|---|---|---|---|
+| NIFTY 2025-01-01 → 2026-10-21 (441 days) | 0.49 / 0.49 / 0.52 | 0.45 / 0.44 / 0.43 | 0.38–0.44 |
+| NIFTY 2022–24 (738 days, reported only) | 0.49–0.53 | 0.47 | 0.44–0.46 |
+| SENSEX 2025-09-16 → 2026-10-21 (264 days, reported only) | 0.53–0.54 | 0.58–0.60 | 0.39–0.53 |
+
+On NIFTY the scaled opening range was the best of the forecasts tried at every check time; on
+SENSEX the VIX-implied move was. A range forecast, not P&L: BL-081 found the morning range does not
+help pending picks.
+
 ## Not yet tested
 
 - Whether any of this can time a strategy: BL-053 and BL-081 tried VIX and 14 intraday state
@@ -102,3 +119,4 @@ the same-state probabilities barely differ from the base rates; and the result r
   `posthoc_baseline.py`) and their JSON.
 
 [bl110]: ../../../backlog/BL-110-nifty-range-persistence.md
+[bl022]: ../../../backlog/BL-022-analog-day-search.md

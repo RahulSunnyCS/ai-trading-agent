@@ -33,7 +33,7 @@ data. Status words and the page template: [`../README.md`](../README.md).
 | [Portfolio (daily) stop](common/portfolio-stop.md) | Tested | BL-055, BL-066, BL-095 |
 | [Charges](common/charges.md) | Descriptive | BL-063, BL-096–099 |
 | [Rotation ranking (DRB, lists A/B/C/REF)](common/rotation-ranking.md) | Tested | BL-054, 057, 062, 064–075, 080, 100 |
-| [Intraday state and event triggers](common/intraday-state.md) | Tested | BL-053, BL-081, BL-083 |
+| [Intraday state and event triggers](common/intraday-state.md) | Tested | BL-053, BL-081, BL-083, BL-022 |
 | [Correlation and diverse baskets](common/correlation.md) | Descriptive | BL-090 |
 
 ## Other strategies
