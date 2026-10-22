@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a follow-up of BL-156 read 4 on stored 1-minute bars |
-| **Status** | In progress (registered 2026-10-23, before any run) |
+| **Status** | Done: failed (2026-10-23) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-23 |
@@ -66,9 +66,44 @@ margin of the hedged position; it is not adopted from here.
 
 ## Result
 
-(after the run)
+**Failed.** The registered test (NIFTY, DTE 0, hedged OTM6, exit 09:17, 2022-01-03 → 2024-10-08): **−₹34 a night,
+t −0.29**, hit 61%, 143 nights (1 of 144 skipped for a missing price), worst −₹5,935, max drawdown −₹16,581. The same
+cell unhedged: +₹168, t 0.90, worst −₹12,856. Neither is near t 2. SENSEX 2023-07 → 2024-10 is unusable: the vendor
+SENSEX option files cover only about 8 nights, so the supporting check did not run in any useful sense.
+
+Learning period, NIFTY and SENSEX 2024-10-09 → 2026-10-08 (descriptive; ₹ net per night, one lot, after charges;
+the full table is what the script prints):
+
+| Index | Exit DTE | Hedge | 09:15 open | 09:17 | 09:20 | 09:24 | Worst night (09:17) |
+|---|---|---|---|---|---|---|---|
+| NIFTY | 0 | none | +153 (t 0.31) | **+638 (t 1.57)** | +710 (1.61) | +731 (1.53) | −31,590 |
+| NIFTY | 0 | OTM6 | +113 (0.75) | +140 (0.80) | +192 (1.03) | +206 (1.01) | −9,083 |
+| NIFTY | 1 | none | +270 (1.52) | +461 (1.81) | +454 (1.65) | +381 (1.29) | −14,816 |
+| NIFTY | 1 | OTM6 | +49 (0.31) | −87 (−0.98) | −113 | −178 | −3,759 |
+| NIFTY | 2+ | none | −330 (−2.13) | −221 (−1.23) | −259 | −272 | −37,122 |
+| NIFTY | 2+ | OTM6 | −214 | −209 (−5.25) | −225 | −246 | −5,331 |
+| SENSEX | 0 | none | −410 (−1.56) | +266 (0.92) | +310 (1.05) | +202 (0.62) | −17,156 |
+| SENSEX | 0 | OTM6 | −497 (−3.74) | −191 (−1.94) | −180 | −242 | −3,900 |
+| SENSEX | 1 | none | −1,149 (−1.98) | −581 (−1.54) | −807 | −725 | −21,605 |
+| SENSEX | 1 | OTM6 | −638 | −306 (−4.94) | −303 | −314 | −2,269 |
+
+What the table says:
+
+- **The hedge works as insurance and kills the return.** OTM6 wings cut NIFTY DTE 0's worst night from −₹31,590 to
+  −₹9,083, but the mean falls from +₹638 to +₹140; on every other DTE and on SENSEX the hedged version loses with
+  t down to −5 to −9 (the wings' premium and four extra orders cost more than the straddle keeps).
+- **The 09:15 open is where it dies.** Exiting at the open gives little or nothing (NIFTY DTE 0 +₹153, SENSEX
+  −₹410); the gain is the first two to nine minutes' premium fall, as BL-156 found. That is an intraday effect
+  that does not need an overnight position.
+- **SENSEX does not show it.** Unhedged DTE 0 +₹266 (t 0.92), DTE 1 −₹581.
+- **Only NIFTY into expiry morning, unhedged, looks positive in the learning period**, and on 2022–24 that cell is
+  +₹168, t 0.90: the effect roughly a quarter the size and not distinguishable from zero.
+- Slippage of 0.5% a fill takes ₹100–150 a night off every hedged cell and ₹80–120 off the unhedged ones.
 
 ## Log
 
 - 2026-10-23 — Registered from the owner's follow-up to BL-156 read 4, before any of these cells were
   computed.
+- 2026-10-23 — Run (`research/bl157/overnight_hedged.py`, about two minutes). **Failed:** −₹34 a night, t −0.29 on
+  NIFTY 2022–24; SENSEX 2023–24 had about 8 usable nights (vendor coverage), so no supporting read. Nothing was
+  changed after the run.
