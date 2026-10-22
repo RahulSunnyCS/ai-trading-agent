@@ -101,3 +101,11 @@ Output addendum 6 listed and the first result left out:
 
 Counts: the registered run recorded 512 backtests; it assumed four sleeves for every neighbour but one used two
 (about 510), and the reproduce stage added 8. The supplement ran 16.
+
+## After review (PR 285)
+
+The gate numbers are now read from `search_spaces/bl010_criteria_addendum_8.json` (they restate
+addendum 6's words; nothing changed), the verdict rule and the plateau gate are plain functions with
+tests (`tests/test_bl010_four_sectors_check.py`), and the result file's recorded commit is the one
+before its last edits: the script that wrote `bl010_four_sectors_result.json` is the one committed in
+`6660d31a`, which also holds the result. The check runs once, so the file is not rewritten.

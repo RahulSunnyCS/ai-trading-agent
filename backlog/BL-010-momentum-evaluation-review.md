@@ -568,3 +568,8 @@ Also parked here (owner, 2026-10-06), priority P3:
   gates pass and fail, alpha t 1.94 (just under 2). Supplement verdict MIXED, as registered. The
   long falls took about 2.6 years to climb back (Jan 2018 to 2021). Outputs addendum 6 listed and the
   result omitted are now in `bl010_four_sectors_supplement.json`. Doc and counts corrected.
+- 2026-10-22 — owner: fix the open review items on PR 285 as recommended. Done: the gate numbers are
+  read from `bl010_criteria_addendum_8.json` instead of retyped; the verdict rule and the plateau
+  gate are tested on synthetic inputs; the result file's commit field is explained in the doc (the
+  running script is the one in `6660d31a`). Not changed: the result file itself (the check runs once).
+  Phase 7's optional accuracy items and the 8 repeated sleeve runs are left alone (owner: skip).

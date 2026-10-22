@@ -26,6 +26,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from momentum_backtesting import criteria
+
 PKG = Path(__file__).resolve().parent.parent
 SPACE = PKG / "search_spaces" / "round7_A.toml"
 RESULT = PKG / "search_spaces" / "bl010_four_sectors_result.json"
@@ -39,14 +41,35 @@ MID = "Nifty Midcap 150 TRI"
 N500 = "Nifty 500 TRI"
 HALVES = (("2017-04-01", "2022-03-31"), ("2022-04-01", "2026-03-31"))
 PLACEBO_SEEDS = 100
-# The gates' numbers, from the addendum's wording.
-G1_EXCESS_OVER_MOM30 = 0.05  # E CAGR minus Mom30 TRI CAGR, at least
-G3_WORST_FY_VS_MOM30 = -0.10  # no complete financial year behind Mom30 TRI by more than this
-G4_MEDIAN_GAP = -0.05  # median neighbour CAGR vs A0, at least
-G4_SHARE_ABOVE = 0.75  # neighbours at least 5 pts above Mom30 TRI, at least this share
-G4_ABOVE_MOM30 = 0.05
-G5_ALPHA, G5_ABS_T = 0.05, 2.0
-G6_MARGIN_OVER_P95 = 0.05
+# The gates' numbers, read from the committed criteria (addendum 8 restates addendum 6's words).
+_GATES = criteria.load()["four_sectors_gates"]
+G1_EXCESS_OVER_MOM30 = _GATES["g1_excess_over_mom30"]  # E CAGR minus Mom30 TRI CAGR, at least
+G3_WORST_FY_VS_MOM30 = _GATES["g3_worst_fy_vs_mom30"]  # no complete FY further behind Mom30 TRI
+G4_MEDIAN_GAP_PTS = _GATES["g4_median_gap_pts"]  # median neighbour CAGR vs A0, at least (points)
+G4_SHARE_ABOVE = _GATES["g4_share_above_mom30"]  # neighbours 5 pts above Mom30, at least this share
+G4_ABOVE_MOM30 = _GATES["g4_above_mom30"]
+G5_ALPHA, G5_ABS_T = _GATES["g5_alpha"], _GATES["g5_abs_t"]
+G6_MARGIN_OVER_P95 = _GATES["g6_margin_over_p95"]
+
+
+def g4_passes(median_gap_pts: float, share_above: float) -> bool:
+    """The plateau gate: the median neighbour is not further below A0 than the limit (in points)
+    and enough neighbours stay above Mom30 TRI."""
+    return bool(median_gap_pts >= G4_MEDIAN_GAP_PTS and share_above >= G4_SHARE_ABOVE)
+
+
+def verdict_of(g1: bool, g2: bool, g3: bool, soft: list[bool]) -> str:
+    """Addendum 6's verdict rule. `soft` is G4, G5 and G6 (or the supplement's equivalents):
+    HOLDS_UP needs G1, G2 and G3 and at most one soft failure; DOES_NOT_HOLD_UP is a failed G1 or
+    two soft failures; anything else is MIXED."""
+    soft_fails = sum(not ok for ok in soft)
+    if not g1 or soft_fails >= 2:
+        return "DOES_NOT_HOLD_UP"
+    if g2 and g3 and soft_fails <= 1:
+        return "HOLDS_UP"
+    return "MIXED"
+
+
 RUNS = {"count": 0}
 
 
@@ -566,7 +589,7 @@ def stage_report() -> None:
     median_gap = float((neigh["cagr"].median() - base_cagr) * 100)
     share_above = float(((neigh["cagr"] - neigh["mom30_cagr"]) >= G4_ABOVE_MOM30).mean())
     gates["G4_plateau"] = {
-        "pass": bool(median_gap >= G4_MEDIAN_GAP * 100 and share_above >= G4_SHARE_ABOVE),
+        "pass": g4_passes(median_gap, share_above),
         "neighbours": int(len(neigh)),
         "median_neighbour_cagr": float(neigh["cagr"].median()),
         "a0_cagr": base_cagr,
@@ -607,18 +630,12 @@ def stage_report() -> None:
     }
 
     def verdict(g1_pass: bool) -> str:
-        soft_fails = sum(
-            not gates[k]["pass"] for k in ("G4_plateau", "G5_alpha", "G6_fair_placebo")
+        return verdict_of(
+            g1_pass,
+            gates["G2_drawdown_basket"]["pass"],
+            gates["G3_no_bad_year"]["pass"],
+            [gates[k]["pass"] for k in ("G4_plateau", "G5_alpha", "G6_fair_placebo")],
         )
-        if not g1_pass or soft_fails >= 2:
-            return "DOES_NOT_HOLD_UP"
-        if (
-            gates["G2_drawdown_basket"]["pass"]
-            and gates["G3_no_bad_year"]["pass"]
-            and soft_fails <= 1
-        ):
-            return "HOLDS_UP"
-        return "MIXED"
 
     final = verdict(gates["G1_minimum_bar"]["pass"])
     flipped = verdict(g1(0.0)) != final
@@ -825,15 +842,12 @@ def stage_supplement() -> None:
         "G4_carried": registered["gates"]["G4_plateau"]["pass"],
         "G6_carried": registered["gates"]["G6_fair_placebo"]["pass"],
     }
-    soft_fails = sum(not gates[k] for k in ("G4_carried", "G6_carried")) + (
-        not gates["S_G5"]["pass"]
+    verdict = verdict_of(
+        gates["S_G1"]["pass"],
+        gates["S_G2"]["pass"],
+        gates["S_G3"]["pass"],
+        [gates["G4_carried"], gates["G6_carried"], gates["S_G5"]["pass"]],
     )
-    if not gates["S_G1"]["pass"] or soft_fails >= 2:
-        verdict = "DOES_NOT_HOLD_UP"
-    elif gates["S_G2"]["pass"] and gates["S_G3"]["pass"] and soft_fails <= 1:
-        verdict = "HOLDS_UP"
-    else:
-        verdict = "MIXED"
     small, mid = bench[SMALL], bench[MID]
     result = {
         "written": date.today().isoformat(),
