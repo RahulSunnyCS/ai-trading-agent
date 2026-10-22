@@ -636,7 +636,8 @@ The plan and the owner's decisions live in the backlog item; this table only tra
 | 3.23.1 | Phase 1 tasks 1–2 and the extended-tags companion: point-in-time universe as the default and a three-way choice, the universe on the result and in Saved runs, the trust note, the muted extended-tags figure | claude | **Built 2026-10-10** (branch `feat/bl-036-phase1-universe-and-companion`, PR pending). Default run 41.4% → 33.3%; extended tags 24.2% |
 | 3.23.2 | Phase 1 tasks 3–4: Midcap 150 / Smallcap 250 / Nifty 500 comparison lines, the rebalance cadence line on the Rebalance view | claude | Open: next PR |
 | 3.23.3 | Point-in-time categories from NSE Basic Industry — [BL-074](backlog/BL-074-point-in-time-categories-nse-basic-industry.md) | claude | Planned: starts after 3.23.1 merges; first check is delisted-company coverage |
-| 3.23.4 | Phases 2–4: execution realism, follow the frozen four, optional | claude | Planned; Phase 3 waits for the owner's paper-tracking decision (BL-010) |
+| 3.23.4 | Phase 2: execution realism (Monday-open fill) | claude | **Built 2026-10-22 for Broad** (BL-010 E13): `execution="mon_open"`, delay 0 only, toggle in Costs, `fill_companion` line on the headline, golden scenario `broad_monday_open`. **Open: Phase 2b, Stock and Custom Index** (they refuse the option meanwhile) |
+| 3.23.5 | Phases 3–4: follow the frozen four, optional | claude | Planned; Phase 3 waits for the owner's paper-tracking decision (BL-010) |
 
 ### 3.24 Strategy correlation and diverse baskets — [BL-090](backlog/BL-090-strategy-correlation-and-diverse-baskets.md)
 

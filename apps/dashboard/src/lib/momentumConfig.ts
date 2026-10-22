@@ -7,7 +7,7 @@
  * selection comes from the `broad_*` keys, which differ by category mode.
  */
 
-import type { MomentumCompanion } from '../types/momentum';
+import type { MomentumCompanion, MomentumFillCompanion } from '../types/momentum';
 import { formatNumber, formatPct, formatPp } from './format';
 import { BROAD_UNIVERSES, broadUniverse, isGatedUniverse } from './momentumUniverse';
 
@@ -532,6 +532,36 @@ export function companionLine(
     };
   }
   return null;
+}
+
+/**
+ * The muted line under the headline CAGR that says what filling on Monday instead of Friday does
+ * to this run (BL-036 Phase 2). Null when there is no figure: a run with a trade delay, a weekly
+ * job, or a result computed before the option existed.
+ */
+export function fillLine(fill: MomentumFillCompanion | null | undefined): CompanionLine | null {
+  if (!fill) return null;
+  if (fill.status === 'failed') {
+    return {
+      text: 'Monday-open figure unavailable',
+      title: fill.reason ?? 'The other fill could not be run for this strategy.',
+    };
+  }
+  if (fill.status !== 'computed' || !fill.friday_close || !fill.monday_open) return null;
+  const change = fill.cagr_change;
+  const text = `Monday open ${formatPct(fill.monday_open.cagr)}${
+    typeof change === 'number' ? ` (${formatPp(change)} vs Friday close)` : ''
+  }`;
+  return {
+    text,
+    title: `Filled at Friday's close: ${formatPct(fill.friday_close.cagr)} CAGR, ${formatPct(
+      fill.friday_close.max_drawdown,
+    )} max drawdown. Filled at the open of the first session after the signal Friday: ${formatPct(
+      fill.monday_open.cagr,
+    )} CAGR, ${formatPct(
+      fill.monday_open.max_drawdown,
+    )} max drawdown. Same ranking, same costs; only the fill price differs. A Monday run values the portfolio at Monday opens, so its drawdown is sampled at different moments from the Friday run's. Fractional shares: whole-share rounding on a small account costs more on top.`,
+  };
 }
 
 /**

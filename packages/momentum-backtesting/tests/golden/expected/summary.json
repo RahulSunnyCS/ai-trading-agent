@@ -147,6 +147,43 @@
   },
   "status": 200
  },
+ "broad_monday_open": {
+  "kpis": {
+   "avg_holdings": 7.868894602,
+   "avg_loss": -0.0393824609,
+   "avg_weeks_held": 3.02171767,
+   "avg_win": 0.06646850662,
+   "benchmark_cagr": 0.1217301806,
+   "benchmark_final_value": 235465.0339,
+   "benchmark_max_drawdown": -0.3607899924,
+   "benchmark_total_return": 1.354650339,
+   "best_trade": 1.845526545,
+   "cagr": 0.169138942,
+   "cash_cagr": 0.05981701482,
+   "excess_cagr": 0.04740876146,
+   "exits_per_year": 134.6716856,
+   "final_value": 320592.496,
+   "max_drawdown": -0.2781401333,
+   "max_drawdown_peak": "2020-02-21",
+   "max_drawdown_trough": "2020-03-20",
+   "max_position_share": 0.1962304278,
+   "new_buys_per_year": 135.8789019,
+   "pct_rolling_52w_ahead": 0.5355029586,
+   "sharpe": 0.5607259532,
+   "sortino": 0.7173214254,
+   "tax_paid": null,
+   "time_in_cash": 0.03272139356,
+   "top_ups_per_year": 96.97970988,
+   "total_return": 2.20592496,
+   "turnover_per_year": 15.18201002,
+   "volatility": 0.2176035474,
+   "win_rate": 0.4342629482,
+   "worst_trade": -0.3417552025,
+   "years": 8,
+   "years_beating_benchmark": 4
+  },
+  "status": 200
+ },
  "broad_one_category_three_picks_four_weekly": {
   "kpis": {
    "avg_holdings": 2.483290488,

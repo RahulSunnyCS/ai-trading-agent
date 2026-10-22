@@ -283,6 +283,9 @@ export function assumptionChips(config: Record<string, unknown>): string[] {
     config.cost_model === 'itemised' ? 'Itemised costs' : `${config.cost_pct}% cost per side`,
     dataset === 'etf' ? (config.track === 'etf' ? 'ETF prices' : 'Index prices') : null,
     dataset === 'etf' ? (execLabel[String(config.execution)] ?? null) : null,
+    dataset === 'broad' && config.execution === 'mon_open'
+      ? `Fills at ${execLabel.mon_open}`
+      : null,
     config.tax ? 'After tax' : 'Pre-tax',
   ].filter((value): value is string => Boolean(value));
 }

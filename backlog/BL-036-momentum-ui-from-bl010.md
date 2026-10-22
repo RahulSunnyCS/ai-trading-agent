@@ -87,6 +87,22 @@ doing against its pre-set fail lines.
 - **Deliverables:** engine option with a frozen scenario (BL-001), UI toggle and delta chip.
 - **Done when:** the delta chip equals the Phase 2 audit's figure for the same config.
 
+**Built 2026-10-22 for Broad** (owner: Broad, Stock and Custom Index; Friday close stays the default,
+the toggle is in the Costs section, a Monday fill with a signal delay is refused, the followed
+Four Sectors group is left as it is). The engine option is `BacktestRequest.execution="mon_open"`
+(`monday_fills.py`); the result carries `fill_companion` and the headline shows a muted
+"Monday open X% (-Y pts vs Friday close)" line. Checked on real data: the dashboard-default Broad run
+is 32.7% at Friday's close and 31.4% at Monday's open (-1.4 points); on the followed Four Sectors
+config (delay 0, extended tags, four Fridays, pre-tax) the engine's Monday fill costs 0.83 points
+against 0.69 for the independent replay of the same decisions, so the chip agrees with the audit
+to 0.15 point of CAGR. The drawdowns differ more (-4.9 against -0.7 points) because the engine's
+Monday run values the portfolio at Monday opens, a different sampling of the same account.
+
+**Phase 2b - Stock and Custom Index (open).** Stock columns are company ids over a total-return
+series with symbol renames, and a Custom Index category is a synthetic inner-rotation curve, so
+neither can take a Monday open from the stock bars the way Broad's columns can. Both refuse the
+option with a clear message until this is built.
+
 ### Phase 3 — Follow the frozen four (starts only when the owner starts paper tracking)
 - **Tasks:**
   1. Favourites: save the four frozen configs from `phase6.favourite_requests` as a group
@@ -124,7 +140,7 @@ doing against its pre-set fail lines.
    their own universe.
 2. **Which comparison lines are on by default?** Recommended: Nifty200 Momentum 30 and Midcap
    150; the rest one click away.
-3. **The default for the trade delay and the Monday-open option.** New Broad runs trade on the
+3. **Answered 2026-10-22: Friday close stays the default; the Monday-open toggle is there and its cost is shown beside the result.** (Original question:) **The default for the trade delay and the Monday-open option.** New Broad runs trade on the
    newest ranking (delay 0). Recommended: keep delay 0, add the Monday-open toggle, and show
    its cost beside every result.
 4. **Show the hold-out failure on the frozen four's badge?** Recommended: yes, with numbers.
@@ -167,3 +183,4 @@ doing against its pre-set fail lines.
 - 2026-10-10 — pre-registration (research gate): Phase 1 searches and selects nothing. The Broad
   default follows BL-010's pre-registered result, and the before/after figures above are descriptive
   only, so no new Phase 0 or `_EXPERIMENT.md` block applies.
+- 2026-10-22 — Phase 2 built for Broad (owner chose Broad, Stock and Custom Index; Stock and Custom Index become Phase 2b, see above). Friday close default, toggle, `fill_companion` chip.

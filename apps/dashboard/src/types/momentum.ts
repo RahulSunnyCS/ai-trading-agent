@@ -232,6 +232,30 @@ export interface MomentumCompanion {
   reason?: string;
 }
 
+/**
+ * Broad Momentum's "same run filled the other way" figure (BL-036 Phase 2): the CAGR and drawdown
+ * at Friday's close and at Monday's open, both from the same ranking. `not_applicable` when the
+ * run has a trade delay (Monday fills need delay 0).
+ */
+export interface MomentumFillFigure {
+  cagr: number;
+  max_drawdown: number;
+  total_return: number;
+  trades: number;
+}
+
+export interface MomentumFillCompanion {
+  status: 'computed' | 'not_applicable' | 'failed' | 'skipped';
+  this_execution?: 'fri_close' | 'mon_open';
+  other_execution?: 'fri_close' | 'mon_open';
+  friday_close?: MomentumFillFigure;
+  monday_open?: MomentumFillFigure;
+  /** Monday-open CAGR minus Friday-close CAGR (negative = Monday costs). */
+  cagr_change?: number;
+  max_drawdown_change?: number;
+  reason?: string;
+}
+
 export interface MomentumResult {
   benchmark_name: string;
   kpis: Record<string, number | string | null>;
@@ -261,6 +285,8 @@ export interface MomentumResult {
   missing_symbols?: string[];
   /** Broad Momentum only; absent on results computed before 2026-10-10. */
   companion?: MomentumCompanion | null;
+  /** Broad Momentum only; absent on results computed before 2026-10-22. */
+  fill_companion?: MomentumFillCompanion | null;
   /** Broad Momentum only; null when it couldn't be computed. */
   circuit_exposure?: MomentumCircuitExposure | null;
   /** Only on an "All Fridays" run (`split_fridays`). */
