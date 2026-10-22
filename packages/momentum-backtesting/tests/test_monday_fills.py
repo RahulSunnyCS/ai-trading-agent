@@ -106,3 +106,15 @@ def test_stock_and_custom_index_refuse_a_monday_fill_instead_of_ignoring_it(data
     with pytest.raises(HTTPException) as caught:
         api._refuse_monday_fill(monday, dataset)
     assert caught.value.status_code == 422 and "not available" in caught.value.detail
+
+
+def test_a_live_decision_is_made_on_the_friday_close_twin_of_a_monday_request():
+    from momentum_backtesting import api
+
+    friday = api.BacktestRequest.model_validate(
+        {"dataset": "broad", "universe": ["broad_momentum"]}
+    )
+    monday = friday.model_copy(update={"execution": "mon_open"})
+    assert api._decision_request(friday) is friday
+    assert api._decision_request(monday).execution == "fri_close"
+    assert monday.execution == "mon_open"  # the request itself is not changed

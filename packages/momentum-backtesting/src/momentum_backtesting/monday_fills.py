@@ -63,11 +63,13 @@ def build(
         sessions.append(day if day is not None and (day - week).days <= MAX_GAP_DAYS else None)
     has_session = pd.Series([d is not None for d in sessions], index=weeks)
     out = pd.DataFrame(index=weeks, columns=prices.columns, dtype="float64")
-    for col in stock_cols:
-        factor = [
-            1.0 + moves.open_gap.at[d, col] if d is not None else float("nan") for d in sessions
-        ]
-        out[col] = prices[col] * pd.Series(factor, index=weeks)
+    if stock_cols:
+        # One lookup per week, then one multiply: the gap of each week's first session, by column.
+        gaps = moves.open_gap.reindex(
+            pd.DatetimeIndex([d if d is not None else pd.NaT for d in sessions])
+        )
+        gaps.index = weeks
+        out[stock_cols] = prices[stock_cols] * (1.0 + gaps[stock_cols])
 
     at_close = []
     files = [c for c in other if (data_dir / "daily" / f"{c}.csv").exists()]

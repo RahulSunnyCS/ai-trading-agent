@@ -2544,6 +2544,16 @@ def _outer_with_sentinel(
     return outer.sort_index()
 
 
+def _decision_request(req: BacktestRequest) -> BacktestRequest:
+    """A live decision is made on Friday's data: which names to buy and sell does not depend on the
+    fill price, and the flat sentinel week the decision runs add has no Monday to fill on (the
+    engine would drop it, moving the decision a week back). So a Monday-open request decides as
+    its Friday-close twin (BL-036 Phase 2)."""
+    return (
+        req if req.execution == "fri_close" else req.model_copy(update={"execution": "fri_close"})
+    )
+
+
 def _broad_sentinel_run(
     req: BacktestRequest, *, ahead: bool = False
 ) -> tuple[broad.BroadBacktestResult, pd.Timestamp]:
@@ -2573,7 +2583,7 @@ def _broad_decide(
     with every rule it has (see `_broad_sentinel_run`). Weeks after `week` are dropped first."""
     sentinel = week + pd.Timedelta(days=7)
     outcome = _run_broad(
-        req.model_copy(update={"end": sentinel.strftime("%Y-%m-%d")}),
+        _decision_request(req).model_copy(update={"end": sentinel.strftime("%Y-%m-%d")}),
         rebalance.persisted_broad_ranking(ranking, through=week),
         _outer_with_sentinel(week, sentinel, outer_prices),
     )
@@ -2621,7 +2631,7 @@ def _broad_live_sentinel_run(
     ranking, _ltp, _symbols, week = _broad_live_ranking(req, quotes, today)
     sentinel = week + pd.Timedelta(days=7)
     outcome = _run_broad(
-        req.model_copy(update={"end": sentinel.strftime("%Y-%m-%d")}),
+        _decision_request(req).model_copy(update={"end": sentinel.strftime("%Y-%m-%d")}),
         ranking,
         _outer_with_sentinel(week, sentinel),
     )
@@ -2866,7 +2876,7 @@ def _rebalance_model(req: RebalanceRequest, now: datetime) -> dict:
             settlement_week = week + pd.Timedelta(days=7)
             model_req, schedule = model_request(week, settlement_week)
             outer = _outer_with_sentinel(week, settlement_week)
-            outcome = _run_broad(model_req, preview_ranking, outer).result
+            outcome = _run_broad(_decision_request(model_req), preview_ranking, outer).result
             target = rebalance.model_holdings(outcome, week)
     except (ValueError, KeyError, broad.TotalMarketDataNotFoundError) as error:
         raise HTTPException(422, str(error)) from None

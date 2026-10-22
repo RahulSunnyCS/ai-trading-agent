@@ -297,7 +297,7 @@ const KEYS: Record<string, KeyInfo> = {
   slippage_bps: { section: 'costs', label: 'Slippage (bps)' },
   signal_delay: { section: 'costs', label: 'Trade delay (weeks)' },
   track: { section: 'costs', label: 'P&L on', ...ETF },
-  execution: { section: 'costs', label: 'Fill at', ...ETF },
+  execution: { section: 'costs', label: 'Fill at', only: ['etf', 'broad'] },
   tax: { section: 'costs', label: 'Apply capital-gains tax', ...NOT_BROAD },
   slab_rate: { section: 'costs', label: 'Slab', fraction: true, ...NOT_BROAD },
 };

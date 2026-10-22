@@ -130,3 +130,15 @@ def test_trades_are_consistent_with_themselves(name, frozen):
         assert kpis["worst_trade"] <= kpis["best_trade"]
         assert min(returns) >= kpis["worst_trade"] - TOL
         assert max(returns) <= kpis["best_trade"] + TOL
+
+
+@pytest.mark.parametrize("name", sorted(SCENARIOS))
+def test_this_week_is_decided_for_the_last_week_of_the_run(name, frozen):
+    response = frozen[name]["response"]
+    latest = response.get("latest")
+    if not latest or not latest.get("week"):
+        pytest.skip("no live-week section in this result")
+    if latest["week"] != response["series"]["dates"][-1]:
+        # A Monday-open run ends a week earlier than the data (the newest Friday has no Monday
+        # yet) and its section is for that last week; anything else is a stale decision.
+        pytest.fail(f"decided {latest['week']}, run ends {response['series']['dates'][-1]}")

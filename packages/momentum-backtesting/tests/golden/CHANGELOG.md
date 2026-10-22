@@ -197,3 +197,11 @@ BL-036 Phase 2: Broad responses gain a fill_companion section (the same run fill
 | broad_eight_categories_one_pick | 26.32% -> 26.32% | -27.29% -> -27.29% |
 | broad_gates_loosened_and_tilted | 9.34% -> 9.34% | -27.78% -> -27.78% |
 | broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 13.94% | -18.09% -> -18.09% |
+
+## 2026-10-22 (on top of `edb5248b`)
+
+BL-036 Phase 2 review: a Monday-open request now decides the live week on its Friday-close twin (the sentinel week has no Monday). broad_monday_open's latest section moves from the week before to the newest week; nothing else changes.
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_monday_open | 16.91% -> 16.91% | -27.81% -> -27.81% |
