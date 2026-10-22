@@ -554,30 +554,43 @@ def fyers_history(
     ),
     to: str = typer.Option("", "--to", help="Newest day, YYYY-MM-DD. Blank = yesterday."),
     force: bool = typer.Option(False, help="Rewrite days already in the lake."),
+    symbol: str = typer.Option(
+        "", help="Instead: one Fyers symbol, e.g. NSE:NIFTYIT-INDEX or NSE:RELIANCE-EQ (BL-153)."
+    ),
+    name: str = typer.Option("", help="With --symbol: the lake name, e.g. NIFTYIT or RELIANCE."),
+    asset: str = typer.Option("index", help="With --symbol: index or stock."),
 ) -> None:
     """Backfill the index + India VIX 1-minute history (walks back from yesterday in
     95-day chunks until Fyers has no more). Index bars never expire, so unlike option
     contracts this can be done any time, and re-running only fills what is missing.
-    Feeds the Options Lab's market-regime study."""
+    Feeds the Options Lab's market-regime study. With --symbol/--name/--asset, backfills
+    that one symbol instead (another index, or a share as asset=stock)."""
 
     from .fyers.auth import FyersCredentialsError, resolve_credentials
     from .fyers.client import FyersClient
     from .fyers.daily import UNDERLYINGS, data_dir
-    from .fyers.history import backfill_index
+    from .fyers.history import LAKE_NAME, backfill_index, backfill_symbol
 
-    if underlying not in UNDERLYINGS:
+    if symbol and (not name or asset not in ("index", "stock")):
+        raise typer.BadParameter("--symbol needs --name and --asset index|stock")
+    if symbol and not LAKE_NAME.match(name):
+        raise typer.BadParameter(f"--name {name!r} must be capitals, digits, & - _ (a folder name)")
+    if symbol and underlying != "NIFTY":
+        raise typer.BadParameter("--underlying and --symbol are alternatives: give one")
+    if not symbol and underlying not in UNDERLYINGS:
         raise typer.BadParameter(f"unknown underlying {underlying}; known: {sorted(UNDERLYINGS)}")
+    window = {
+        "start": date.fromisoformat(from_) if from_ else None,
+        "end": date.fromisoformat(to) if to else None,
+        "force": force,
+        "log": typer.echo,
+    }
     try:
         client = FyersClient(resolve_credentials())
-        result = backfill_index(
-            client,
-            data_dir(),
-            underlying,
-            start=date.fromisoformat(from_) if from_ else None,
-            end=date.fromisoformat(to) if to else None,
-            force=force,
-            log=typer.echo,
-        )
+        if symbol:
+            result = backfill_symbol(client, data_dir(), name, symbol, asset, **window)
+        else:
+            result = backfill_index(client, data_dir(), underlying, **window)
     except FyersCredentialsError as error:
         typer.echo(f"stopped: {error}")
         raise typer.Exit(1) from None

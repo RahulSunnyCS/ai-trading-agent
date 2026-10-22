@@ -383,14 +383,15 @@ favourite with the end pinned to its last accepted anchor and names the instrume
   `date_from`, `date_to`) are dropped from scope; the stamp stays in each run's summary.
 - Phase 4: re-scoped to the one missing piece, a weekly check that re-runs each favourite with its
   end pinned to the last accepted anchor and names the instruments whose history changed. Not started.
-- F3 and F4 (second lock-blocking scenario, a binding `max_category`): no recommendation was given;
-  still open.
+- F3 and F4 (a second scenario where a circuit lock changes a fill, one where `max_category` binds):
+  **deferred (owner, 2026-10-22, "as per your recommendation").** The live strategy's fills and caps work
+  today; the gap is that the tests would not notice a future break. Revisit when the engine is next
+  changed in those areas, or when the fixture is next rebuilt (it is at 14.7 of its 15 MB).
 
 ## Open questions for when this resumes (2026-10-22)
 
 1. ~~F1~~ answered above.
-2. F3 and F4: add a fixture window and two scenarios so a second lock blocks a fill and `max_category`
-   binds? This grows the fixture (budget 15 MB, now 14.7 MB), so something must be trimmed.
+2. ~~F3 and F4~~ deferred, see Decisions.
 3. ~~Phases 3 and 4~~ answered above.
 4. The original Phase 4 questions 2 to 4 (hold a signal on a "same data, different result" alert,
    the anchor date, the badge) matter only when the re-scoped Phase 4 is started.
@@ -410,3 +411,4 @@ favourite with the end pinned to its last accepted anchor and names the instrume
 - 2026-10-22 — owner: "as per your recommendation". F1 fixed in `engine.py` (three golden scenarios
   accepted: equity, CAGR and trades unchanged; idle share, holdings count, time in cash and the cap
   figure moved). Phase 3 closed as superseded by BL-052; Phase 4 re-scoped. F3 and F4 still open.
+- 2026-10-22 — owner: F3 and F4 deferred as recommended; no work.

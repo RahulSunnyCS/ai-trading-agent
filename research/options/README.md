@@ -33,7 +33,7 @@ data. Status words and the page template: [`../README.md`](../README.md).
 | [Portfolio (daily) stop](common/portfolio-stop.md) | Tested | BL-055, BL-066, BL-095 |
 | [Charges](common/charges.md) | Descriptive | BL-063, BL-096–099 |
 | [Rotation ranking (DRB, lists A/B/C/REF)](common/rotation-ranking.md) | Tested | BL-054, 057, 062, 064–075, 080, 100 |
-| [Intraday state and event triggers](common/intraday-state.md) | Tested | BL-053, BL-081, BL-083 |
+| [Intraday state and event triggers](common/intraday-state.md) | Tested | BL-053, BL-081, BL-083, BL-022 |
 | [Correlation and diverse baskets](common/correlation.md) | Descriptive | BL-090 |
 
 ## Other strategies
@@ -43,6 +43,7 @@ data. Status words and the page template: [`../README.md`](../README.md).
 | [Long straddle hedge](strategies/long-straddle-hedge/README.md) | Tested (killed) | BL-101 |
 | [Straddle premium exhaustion](strategies/straddle-exhaustion/README.md) | Tested on the learning periods; P1 unread | BL-091 |
 | [ATM Widesl, SENSEX](strategies/atm-widesl-sensex/README.md) | Descriptive (side look, no item) | — |
+| [Five-minute breakout, hold, 1-minute entry (index)](strategies/breakout/README.md) | Tested (killed) | BL-152, BL-153 |
 
 ## Known mismatches between items and folders
 

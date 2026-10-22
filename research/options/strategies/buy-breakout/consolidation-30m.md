@@ -74,3 +74,4 @@ no per-bar record, no width test and no rolling window. So:
 
 [bl035]: ../../../../backlog/BL-035-consolidation-tightness-feature.md
 [bl097]: ../../../../backlog/BL-097-buy-parameter-sweep.md
+- The same ideas on the index with a 1-minute entry, tested in [BL-152](../breakout/README.md) (killed).

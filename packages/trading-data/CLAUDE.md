@@ -41,7 +41,8 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
     `momentum_owner_settings`, `momentum_orders` — Momentum's "Your orders" (BL-051 Phase 3).
     Shipped first as `011_momentum_orders`, so it is idempotent (see Migrations below)
 - `lake/` — immutable Parquet price data, read through TEMP views (`bars_1m_option`,
-  `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`). One file per
+  `bars_1m_index`, `bars_1m_stock` (shares' 1-minute bars, BL-153), `bars_1m_future`,
+  `symbol_master`, `bars_1d_stock`). One file per
   (asset, name, trading day); `lake.BAR_SCHEMA` / `lake.OPT_SCHEMA` are the one definition
   every bars_1m writer casts to (the Fyers collector imports them). `lake.write_parquet` refuses
   a bars_1m file with any other schema: the 1-minute and derived views bind from the first file

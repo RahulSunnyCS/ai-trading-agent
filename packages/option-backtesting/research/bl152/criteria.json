@@ -1,0 +1,52 @@
+{
+  "item": "BL-152",
+  "registered": "2026-10-22",
+  "underlying": "NIFTY",
+  "learning_period": ["2024-10-09", "2026-10-08"],
+  "confirmation_period": ["2022-01-03", "2024-10-08"],
+  "axes": {
+    "level": ["or30", "roll30", "held30", "prevday"],
+    "stop": ["lvl", "cndl", "prem30", "atr03"],
+    "trade": ["atm", "pct1", "sellopp"],
+    "exit": ["eod", "trail", "tgt2r", "t60"]
+  },
+  "n_variants": 192,
+  "rule": {
+    "body_share_beyond_level_min": 0.6,
+    "breakout_candle_minutes": 5,
+    "breakout_candle_close_by": "13:59",
+    "window": ["09:19", "14:15"],
+    "exit_time": "15:15",
+    "one_trade_a_day": true
+  },
+  "settings": {
+    "or30_until": "09:44",
+    "roll30_minutes": 30,
+    "held30_minutes": 30,
+    "prem30_percent": 30,
+    "atr03_multiple": 0.3,
+    "tgt2r_multiple": 2.0,
+    "tgt2r_premium_percent_with_prem30": 60,
+    "trail_supertrend": {"n": 10, "mult": 3, "minutes": 5},
+    "t60_minutes": 60,
+    "pct1_premium_pct_of_spot": 1.0,
+    "lots": 1,
+    "lot_sizing": "current"
+  },
+  "controls": "trend-matched: a control only where the frozen level exists and the index closed at or beyond it the minute before entry",
+  "pass_rule": {
+    "min_events": 40,
+    "candidate": {"net_mean_gt": 0, "net_t_min": 2.0, "random_time_percentile_min": 0.90},
+    "pbo": {"n_blocks": [8, 16], "max": 0.5, "series": "daily net, a day with no trade = 0"},
+    "plateau": {"neighbours": 11, "share_positive_min": 0.6},
+    "max_to_confirmation": 3,
+    "confirmation_pass": {"net_mean_gt": 0, "net_t_min": 2.0, "random_time_percentile_min": 0.90}
+  },
+  "costs": "BL-063 charges, after which every number is judged; slippage 0.5% and 1% per fill reported",
+  "will_not_run": [
+    "SENSEX",
+    "any parameter value not listed here",
+    "the confirmation period for a variant that did not advance",
+    "a second look at the confirmation period for any variant"
+  ]
+}

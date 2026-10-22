@@ -191,18 +191,24 @@ def _bars(con, paths: list[Path]):
 
 
 def load_grid(
-    root: Path, symbol: str, end_day: date, sessions: int = HISTORY, strict_open: bool = False
+    root: Path,
+    symbol: str,
+    end_day: date,
+    sessions: int = HISTORY,
+    strict_open: bool = False,
+    asset: str = "index",
 ) -> Grid | None:
     """The last `sessions` index sessions (weekend special sessions included) up to and including
     end_day on the 375-minute grid. A missing minute carries its close forward; a session with no
-    09:15 bar is dropped (strict_open: also one with a bar before 09:15, the study's rule)."""
+    09:15 bar is dropped (strict_open: also one with a bar before 09:15, the study's rule). `asset`
+    reads a share's bars instead (`stock`, BL-153)."""
     import duckdb
     from trading_data import lake
 
     days, d = [], end_day
     for _ in range(sessions * 2 + 40):
         if lake.bars_1m_path(
-            root, "index", symbol, d
+            root, asset, symbol, d
         ).exists():  # incl. weekend sessions, as the study
             days.append(d)
             if len(days) == sessions:
@@ -213,7 +219,7 @@ def load_grid(
     days.reverse()
     con = duckdb.connect()
     try:
-        rows = _bars(con, [lake.bars_1m_path(root, "index", symbol, x) for x in days])
+        rows = _bars(con, [lake.bars_1m_path(root, asset, symbol, x) for x in days])
     finally:
         con.close()
     epoch0 = {(x - date(1970, 1, 1)).days: x for x in days}

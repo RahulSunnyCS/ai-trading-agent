@@ -33,12 +33,17 @@ Leaves
                                    the upper / middle / lower Bollinger band of the closes of
                                    `minutes`-minute bars: mean of n -/+ k population standard
                                    deviations (as TradingView), continuous across sessions
+    {at_first: {x, when}}          x at the first stamp of the session where `when` holds, held
+                                   from then on (NaN before, and all day if it never holds)
+    {min_since_first: {x, when}}   the running min / max of x from (inclusive) that first stamp;
+    {max_since_first: {x, when}}   NaN before it
     {bar_close: 5}                 true only at the stamps where a 5-minute bar completes
                                    (j + 1 is a multiple of 5), so a rule can act on bar closes
     a name from `define:`          an earlier definition of the same rule
 
 Operators (a list of arguments, or a mapping with the named parameters)
     add sub mul div [a, b]     abs [a]   (a one-argument operator may take its expression directly)
+    max min [a, b]             the larger / smaller of two numbers (missing if either is)
     gt ge lt le [a, b]         all any [b, ...]          not [b]
     crosses_up [a, b]          a[j-1] < b[j] <= a[j]
     crosses_down [a, b]        a[j-1] > b[j] >= a[j]
@@ -51,6 +56,13 @@ Operators (a list of arguments, or a mapping with the named parameters)
     max_since min_since {x, from | after}  running extreme from (inclusive) or after (exclusive)
                                            a clock time
     prior_median prior_mean {x, sessions}  of x at the same stamp over the previous sessions
+
+Trade-relative (only in a rule's `exit_when`, and only under the elementwise operators add sub mul
+div abs max min gt ge lt le all any not; each trade evaluates them from its own entry)
+    {at_entry: x}                  x at the minute the trade's entry was decided (the minute
+                                   before it enters; its close is the entry fill)
+    minutes_in_trade               minutes the trade would have been held if it exits the next
+                                   minute (1 at the entry minute)
 
 A comparison with a missing value is false. `not` flips that false to true, so guard a `not` with a
 comparison on the value it needs. Nothing is interpolated.
@@ -98,6 +110,7 @@ class Node:
     kind: str = "num"  # "num" | "bool"
     path: str = "when"
     label: str | None = None  # the `define:` name this node was given, shown in plain words
+    trade: bool = False  # reads at_entry / minutes_in_trade: only evaluable per trade
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"Node({self.op}, {self.args}, {self.params})"
@@ -127,6 +140,8 @@ _POSITIONAL: dict[str, tuple[tuple[str, ...], str, str]] = {
     "sub": (("a", "b"), "num", "num"),
     "mul": (("a", "b"), "num", "num"),
     "div": (("a", "b"), "num", "num"),
+    "max": (("a", "b"), "num", "num"),
+    "min": (("a", "b"), "num", "num"),
     "abs": (("a",), "num", "num"),
     "gt": (("a", "b"), "bool", "num"),
     "ge": (("a", "b"), "bool", "num"),
@@ -154,8 +169,17 @@ _PARAMETRIC: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "prior_mean": (("x", "sessions"), ("x", "sessions")),
 }
 _LEAF_OPS = {"clock", "straddle", "rsi", "bar_close", "supertrend", "supertrend_dir", "bollinger"}
+_SINCE_FIRST = {"at_first", "min_since_first", "max_since_first"}
+_TRADE_OPS = {"at_entry"}
+#: the operators a trade-relative value may sit under (they work on one session's row alone)
+ELEMENTWISE = {"add", "sub", "mul", "div", "abs", "max", "min", "gt", "ge", "lt", "le"} | {
+    "all",
+    "any",
+    "not",
+}
+TRADE_LEAF = "minutes_in_trade"
 BANDS = ("upper", "middle", "lower")
-ALL_OPS = set(_POSITIONAL) | _VARIADIC | set(_PARAMETRIC) | _LEAF_OPS
+ALL_OPS = set(_POSITIONAL) | _VARIADIC | set(_PARAMETRIC) | _LEAF_OPS | _SINCE_FIRST | _TRADE_OPS
 
 
 def _int_param(value: Any, path: str, low: int, high: int) -> int:
@@ -171,7 +195,22 @@ def _float_param(value: Any, path: str, low: float, high: float) -> float:
 
 
 def parse(expr: Any, defs: dict[str, Node] | None = None, path: str = "when") -> Node:
-    """Turn a YAML / JSON expression into a tree, naming the path of the first problem."""
+    """Turn a YAML / JSON expression into a tree, naming the path of the first problem. A node that
+    reads a trade-relative value is marked `trade`; one may sit only under elementwise operators."""
+    node = _parse_node(expr, defs, path)
+    if node.op in _TRADE_OPS or node.op == TRADE_LEAF:
+        node.trade = True
+    elif any(isinstance(a, Node) and a.trade for a in node.args):
+        if node.op not in ELEMENTWISE:
+            raise RuleError(
+                f"{path}: at_entry / minutes_in_trade can only be used under "
+                f"{', '.join(sorted(ELEMENTWISE))}"
+            )
+        node.trade = True
+    return node
+
+
+def _parse_node(expr: Any, defs: dict[str, Node] | None, path: str) -> Node:
     defs = defs or {}
     if isinstance(expr, bool):
         raise RuleError(f"{path}: a bare true / false is not an expression")
@@ -182,9 +221,11 @@ def parse(expr: Any, defs: dict[str, Node] | None = None, path: str = "when") ->
     if isinstance(expr, str):
         if expr in defs:
             return defs[expr]
+        if expr == TRADE_LEAF:
+            return Node(TRADE_LEAF, kind="num", path=path)
         if expr in FEATURES:
             return Node("feature", (expr,), kind="num", path=path)
-        known = ", ".join(sorted(FEATURES | set(defs)))
+        known = ", ".join(sorted(FEATURES | set(defs) | {TRADE_LEAF}))
         raise RuleError(f"{path}: unknown name {expr!r} (known: {known})")
     if not isinstance(expr, dict) or len(expr) != 1:
         raise RuleError(f"{path}: expected a number, a name or a one-key mapping, got {expr!r}")
@@ -231,6 +272,17 @@ def parse(expr: Any, defs: dict[str, Node] | None = None, path: str = "when") ->
             "band": band,
         }
         return Node(op, params=params, kind="num", path=path)
+    if op in _SINCE_FIRST:
+        if not isinstance(body, dict) or set(body) != {"x", "when"}:
+            raise RuleError(f"{here}: write {{{op}: {{x: ..., when: ...}}}}")
+        x = _typed(parse(body["x"], defs, f"{here}.x"), "num", f"{here}.x")
+        when = _typed(parse(body["when"], defs, f"{here}.when"), "bool", f"{here}.when")
+        return Node(op, (x, when), kind="num", path=path)
+    if op == "at_entry":
+        x = _typed(parse(body, defs, here), "num", here)
+        if x.trade:
+            raise RuleError(f"{here}: at_entry cannot hold another trade-relative value")
+        return Node(op, (x,), kind="num", path=path)
     if op == "bar_close":
         minutes = body.get("minutes") if isinstance(body, dict) else body
         return Node(
@@ -311,12 +363,14 @@ def parse_rule(when: Any, define: dict[str, Any] | None = None) -> tuple[Node, d
     """Parse `define:` in order (a definition may use the ones before it) and then `when:`."""
     defs: dict[str, Node] = {}
     for name, body in (define or {}).items():
-        if name in FEATURES or name in ALL_OPS:
+        if name in FEATURES or name in ALL_OPS or name == TRADE_LEAF:
             raise RuleError(f"define.{name}: the name is already taken")
         defs[name] = parse(body, defs, f"define.{name}")
         if defs[name].label is None:
             defs[name].label = name
     root = parse(when, defs, "when")
+    if root.trade:
+        raise RuleError("when: at_entry / minutes_in_trade belong in exit_when only")
     if root.kind != "bool":
         raise RuleError("when: a rule's condition must be true / false, not a number")
     return root, defs
@@ -591,32 +645,14 @@ def _evaluate(node: Node, frame: Frame, memo: dict[int, np.ndarray]) -> np.ndarr
         return _ffill(out)
     if op in ("supertrend", "supertrend_dir", "bollinger"):
         return _indicator(frame, node)
+    if node.trade:
+        raise RuleError(f"{node.path}: at_entry / minutes_in_trade belong in exit_when only")
     args = [evaluate(a, frame, memo) for a in node.args]
+    if op in ELEMENTWISE:
+        return _elementwise(op, args)
+    if op in _SINCE_FIRST:
+        return _since_first(op, args[0], args[1])
     with np.errstate(invalid="ignore", divide="ignore"):
-        if op == "add":
-            return args[0] + args[1]
-        if op == "sub":
-            return args[0] - args[1]
-        if op == "mul":
-            return args[0] * args[1]
-        if op == "div":
-            return args[0] / args[1]
-        if op == "abs":
-            return np.abs(args[0])
-        if op == "gt":
-            return args[0] > args[1]
-        if op == "ge":
-            return args[0] >= args[1]
-        if op == "lt":
-            return args[0] < args[1]
-        if op == "le":
-            return args[0] <= args[1]
-        if op == "all":
-            return np.logical_and.reduce(args)
-        if op == "any":
-            return np.logical_or.reduce(args)
-        if op == "not":
-            return ~args[0]
         if op in ("crosses_up", "crosses_down"):
             a, b = args
             out = np.zeros(a.shape, dtype=bool)
@@ -658,6 +694,70 @@ def _evaluate(node: Node, frame: Frame, memo: dict[int, np.ndarray]) -> np.ndarr
         if op in ("prior_median", "prior_mean"):
             return _prior(x, node.params["sessions"], op.split("_")[1])
     raise RuleError(f"{node.path}: cannot evaluate {op!r}")  # pragma: no cover
+
+
+def _elementwise(op: str, args: list[np.ndarray]) -> np.ndarray:
+    """The operators that work stamp by stamp (on the whole grid or on one session's row)."""
+    with np.errstate(invalid="ignore", divide="ignore"):
+        if op == "add":
+            return args[0] + args[1]
+        if op == "sub":
+            return args[0] - args[1]
+        if op == "mul":
+            return args[0] * args[1]
+        if op == "div":
+            return args[0] / args[1]
+        if op == "max":
+            return np.maximum(args[0], args[1])  # a missing value stays missing
+        if op == "min":
+            return np.minimum(args[0], args[1])
+        if op == "abs":
+            return np.abs(args[0])
+        if op == "gt":
+            return args[0] > args[1]
+        if op == "ge":
+            return args[0] >= args[1]
+        if op == "lt":
+            return args[0] < args[1]
+        if op == "le":
+            return args[0] <= args[1]
+        if op == "all":
+            return np.logical_and.reduce(args)
+        if op == "any":
+            return np.logical_or.reduce(args)
+        if op == "not":
+            return ~args[0]
+    raise RuleError(f"{op!r} is not elementwise")  # pragma: no cover
+
+
+def _since_first(op: str, x: np.ndarray, when: np.ndarray) -> np.ndarray:
+    """at_first / min_since_first / max_since_first: from the first stamp `when` holds, per row."""
+    has = when.any(axis=1)
+    first = np.where(has, when.argmax(axis=1), N_BARS)
+    after = np.arange(N_BARS)[None, :] >= first[:, None]
+    if op == "at_first":
+        value = x[np.arange(x.shape[0]), np.minimum(first, N_BARS - 1)]
+        return np.where(after, value[:, None], np.nan)
+    masked = np.where(after, x, np.nan)
+    acc = np.fmin if op == "min_since_first" else np.fmax
+    return np.where(after, acc.accumulate(masked, axis=1), np.nan)
+
+
+def evaluate_trade(
+    node: Node, frame: Frame, row: int, decided: int, memo: dict[int, np.ndarray]
+) -> np.ndarray:
+    """One session's row of an exit condition for a trade whose entry was decided at stamp
+    `decided` (it enters at `decided` + 1). Parts with no trade-relative value come from the
+    whole-grid evaluation (`memo`, shared across trades); the rest are worked out on this row."""
+    if not node.trade:
+        return evaluate(node, frame, memo)[row]
+    if node.op == TRADE_LEAF:
+        return (np.arange(N_BARS) - decided).astype(float)
+    if node.op == "at_entry":
+        value = evaluate(node.args[0], frame, memo)[row, decided] if decided >= 0 else np.nan
+        return np.full(N_BARS, value, dtype=float)
+    args = [evaluate_trade(a, frame, row, decided, memo) for a in node.args]
+    return _elementwise(node.op, args)
 
 
 def first_firings(
@@ -714,6 +814,8 @@ def describe(node: Node, top: bool = True) -> str:
         )
     if op == "bar_close":
         return f"a {node.params['minutes']}-minute bar has just completed"
+    if op == TRADE_LEAF:
+        return "minutes in the trade"
     kids = [describe(a, False) for a in node.args]
     if op in _WORDS:
         return f"({kids[0]} {_WORDS[op]} {kids[1]})"
@@ -726,6 +828,15 @@ def describe(node: Node, top: bool = True) -> str:
         return f"not ({kids[0]})"
     if op == "abs":
         return f"|{kids[0]}|"
+    if op in ("max", "min"):
+        return f"{op}({kids[0]}, {kids[1]})"
+    if op == "at_entry":
+        return f"{kids[0]} at entry"
+    if op == "at_first":
+        return f"{kids[0]} when {kids[1]} first held today"
+    if op in ("min_since_first", "max_since_first"):
+        word = "lowest" if op == "min_since_first" else "highest"
+        return f"the {word} {kids[0]} since {kids[1]} first held today"
     if op == "crosses_up":
         return f"{kids[0]} crosses above {kids[1]}"
     if op == "crosses_down":

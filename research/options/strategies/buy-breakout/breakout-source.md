@@ -49,3 +49,4 @@ Change against the baseline on the same file, ₹, mean over files ([how to read
   also has an index-or-option choice).
 
 [bl097]: ../../../../backlog/BL-097-buy-parameter-sweep.md
+- The same ideas on the index with a 1-minute entry, tested in [BL-152](../breakout/README.md) (killed).

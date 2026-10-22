@@ -72,7 +72,13 @@ def exit_minutes(
         return None
     hh, mm = rule.exit_cap.split(":")
     cap = min(E.N_BARS, int(hh) * 60 + int(mm) - E.OPEN_MIN)  # an exit here is the template's
-    truth = {side: E.evaluate(node, frame) for side, node in rule.exits.items()}
+    # a trade-relative exit (at_entry / minutes_in_trade) is worked out per trade on its own row;
+    # its other parts, and every plain exit, are evaluated once over the grid
+    memo: dict[int, np.ndarray] = {}
+    truth = {
+        side: None if node.trade else E.evaluate(node, frame, memo)
+        for side, node in rule.exits.items()
+    }
     row = {d: i for i, d in enumerate(frame.days)}
     out: sim.Exits = {}
     for day, entry, side in keys:
@@ -80,7 +86,13 @@ def exit_minutes(
         if i is None:
             continue
         start = E.clock_to_stamp(entry, "entry")
-        hits = np.flatnonzero(truth[side][i, start:cap])
+        grid = truth[side]
+        session = (
+            grid[i]
+            if grid is not None
+            else E.evaluate_trade(rule.exits[side], frame, i, start - 1, memo)
+        )
+        hits = np.flatnonzero(session[start:cap])
         out[(day, entry, side)] = (
             E.stamp_to_clock(start + int(hits[0]) + 1) if len(hits) else rule.exit_cap
         )
@@ -422,16 +434,25 @@ def analyse_period(
     return {"period": period, "from": lo.isoformat(), "to": hi.isoformat(), **result}
 
 
-def run_test(root: Path, rule: CompiledRule, text: str, options: Options) -> dict[str, Any]:
+def run_test(
+    root: Path,
+    rule: CompiledRule,
+    text: str,
+    options: Options,
+    frame: E.Frame | None = None,
+) -> dict[str, Any]:
     """Run, record in the ledger and return the full result. Raises LockedError before any work when
-    the confirmation period is locked."""
+    the confirmation period is locked. `frame` is an index frame already loaded (from
+    `frame.HISTORY_START` to at least the periods' end, as `load_frame` gives) for a caller that
+    tests many rules on one underlying; by default it is loaded here."""
     for period in options.periods:
         check_allowed(root, rule, period, options.mode)
     log = options.progress or (lambda _m: None)
     store.save_spec(root, rule.spec_hash, text)
     end = max(PERIODS[p][1] for p in options.periods)
-    log(f"loading {rule.spec.underlying} sessions from {F.HISTORY_START}")
-    frame = F.load_frame(root, rule.spec.underlying, end, strict_open=options.strict_open)
+    if frame is None:
+        log(f"loading {rule.spec.underlying} sessions from {F.HISTORY_START}")
+        frame = F.load_frame(root, rule.spec.underlying, end, strict_open=options.strict_open)
     periods = {p: analyse_period(root, rule, frame, p, options) for p in options.periods}
     prior = store.ledger(root)
     test_id = store.new_test_id()

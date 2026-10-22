@@ -241,7 +241,13 @@ def test_a_concurrent_read_only_connect_does_not_fail_while_a_write_connection_i
 
 def test_views_exist_and_are_empty_on_a_fresh_lake(root):
     with connect(root) as con:
-        for view in ("bars_1m_option", "bars_1m_index", "bars_1m_future", "symbol_master"):
+        for view in (
+            "bars_1m_option",
+            "bars_1m_index",
+            "bars_1m_stock",
+            "bars_1m_future",
+            "symbol_master",
+        ):
             assert con.execute(f"SELECT count(*) FROM {view}").fetchone()[0] == 0
 
 
@@ -429,6 +435,19 @@ def test_fixed_schema_views_read_every_file(root):
         ).fetchone() == (3, 3, 303.0)
     assert LAKE_VIEWS.keys() >= FIXED_SCHEMA_VIEWS
     assert "bars_1d_stock" not in FIXED_SCHEMA_VIEWS  # its files differ in column order
+
+
+def test_stock_minute_bars_are_visible_through_their_own_view(root):
+    """Shares' 1-minute bars (asset=stock) have a catalog view, as the index bars do."""
+    for i, day in enumerate((DAY, date(2026, 9, 30))):
+        lake.write_parquet(
+            _index_bars(200.0 + i), lake.bars_1m_path(root, "stock", "RELIANCE", day)
+        )
+    with connect(root, views=("bars_1m_stock",)) as con:
+        assert con.execute(
+            "SELECT count(*), count(DISTINCT date), min(symbol), sum(close) FROM bars_1m_stock"
+        ).fetchone() == (2, 2, "RELIANCE", 401.0)
+    assert "bars_1m_stock" in LAKE_VIEWS
 
 
 def test_partitions_lists_every_day_file_of_one_asset(root):

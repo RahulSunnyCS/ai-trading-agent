@@ -265,3 +265,19 @@ def test_exit_rules_share_one_template_hash_whatever_their_conditions():
         s.startswith("Controls: only where the exit condition does not hold")
         for s in read_back(a)["sentences"]
     )
+
+
+def test_trade_relative_values_need_control_when_and_stay_out_of_entry_conditions():
+    timed = copy.deepcopy(BUY_TREND)
+    timed["exit_when"] = {"ge": ["minutes_in_trade", 60]}
+    del timed["exit_when"]
+    timed["exit_when"] = {"up": {"ge": ["minutes_in_trade", 60]},
+                          "down": {"ge": ["minutes_in_trade", 60]}}  # fmt: skip
+    with pytest.raises(SpecError, match="give control_when"):
+        from_dict(timed)
+    timed["control_when"] = {"up": {"gt": ["close", 1]}, "down": {"gt": ["close", 1]}}
+    assert from_dict(timed).exits["up"].trade
+    bad = copy.deepcopy(timed)
+    bad["control_when"] = {"up": {"ge": ["minutes_in_trade", 1]}, "down": {"gt": ["close", 1]}}
+    with pytest.raises(SpecError, match="control_when: at_entry"):
+        from_dict(bad)
