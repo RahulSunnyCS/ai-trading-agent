@@ -32,7 +32,6 @@ Sorted by priority (P0 first), then ID.
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-015](BL-015-research-gate.md) | Research gate: pre-register every experiment, log every override | P1 | In progress | chore | cross-cutting |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
-| [BL-022](BL-022-analog-day-search.md) | "Days like today": the 20 earlier sessions most like today so far (path since the open + VIX, gap, expiry), first as a rest-of-day range forecast (gate), then to skip or swap Adaptive's pending picks at 10:30 / 11:00 / 12:00 via the heatmap; Phase 0 registered 2026-10-22 | P1 | In progress | research | options |
 | [BL-025](BL-025-live-money-rules.md) | Live-money rules for Momentum: written before the first rupee, enforced by alerts | P1 | In progress | feature | momentum |
 | [BL-026](BL-026-realised-vs-backtest-options.md) | Options: realised P&L against the backtest of the same days | P1 | Planned | feature | options |
 | [BL-030](BL-030-choose-journal-favourites.md) | Choose the ~8 favourites to track and trade | P1 | Idea | research | momentum |
@@ -134,6 +133,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-022](BL-022-analog-day-search.md) | "Days like today": the 20 earlier sessions most like today so far, to forecast the rest-of-day range and skip or swap Adaptive's pending picks | Done: killed at the gate — the analog range forecast (ρ 0.38–0.44) loses to BL-110's opening-range rule (0.49–0.52) and VIX-implied (0.43–0.45) at 10:30 / 11:00 / 12:00; skip/swap replay not run | 2026-10-22 |
 | [BL-134](BL-134-two-strategy-book.md) | Two-strategy book: top Widesl + Dir only | Informative, not adopted: worse than three picks with the Dir doubled in T1 (−254 / −330 a day net) and inconclusive in Core (one early stretch decides it); ~₹100/day brokerage saved does not pay for the dropped Widesl | 2026-10-18 |
 | [BL-133](BL-133-fourth-lot-on-normal-days.md) | A fourth lot on non-expiry days: Widesl (T1) or Dir (Core) | Informative: the Dir at two lots is the best fourth-lot home in both books (Core +149 / +230 a day over an even spread after brokerage; T1 +87 / +141, the last year only above zero) but the edge rests on a few days; no T1 Widesl placement beat the even spread; in-sample | 2026-10-18 |
 | [BL-132](BL-132-mtm-stop-from-day-lows.md) | Book MTM stop sized not to be hit on 85–95 % of days | Informative: levels set on the first period were hit 2–10 points less often in the calmer test year; whole-period (in-sample) P95 ≈ ₹8,500 and P90 ≈ ₹7,000 for both books; protective, no clear money effect | 2026-10-18 |

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — owner wants it in week 3 of the October plan; still needs BL-009's clean data first |
-| **Status** | In progress |
+| **Status** | Done: killed at the gate (2026-10-22) |
 | **Type** | research |
 | **Area** | options (+ trading-data, dashboard) |
 | **Created** | 2026-10-06 |
@@ -190,6 +190,52 @@ the plan.
   `research/options/common/intraday-state.md` (a row per hypothesis).
 - **Done when:** merged with a code-review result on the PR.
 
+## Result (2026-10-22): killed at the gate
+
+**H1 fails at every check time, with both distance measures.** The rest-of-day range of the 20
+nearest days ranks today's rest-of-day range far better than chance and better than plain
+persistence. It ranks it **worse than the VIX-implied move and worse than BL-110's one-number
+opening-range rule**. Holm p ≥ 0.92 for all six tests, so **H2 (the skip / heatmap-swap replay) was
+not run**, as registered.
+
+Spearman ρ of each forecast with the realised rest-of-day range (NIFTY, deciding period 2025-01-01 →
+2026-10-21, 441 days):
+
+| Check | Analog (Euclid) | Analog (DTW) | VIX-implied | Opening range (BL-110) | Persistence | Random 95th pct |
+|---|---|---|---|---|---|---|
+| 10:30 | 0.41 | 0.42 | 0.45 | **0.49** | 0.32 | 0.08 |
+| 11:00 | 0.44 | 0.42 | 0.44 | **0.49** | 0.33 | 0.07 |
+| 12:00 | 0.38 | 0.38 | 0.43 | **0.52** | 0.34 | 0.08 |
+
+The 90% bootstrap lower bound of analog − opening range is −0.14 to −0.22. Analog − VIX-implied is
+−0.07 to −0.13. Analog − persistence is +0.01 to −0.05.
+
+Reported only:
+- **NIFTY 2022–24 (738 days):** the same order everywhere. Analog 0.44–0.46, VIX-implied 0.47,
+  opening range 0.49–0.53, persistence 0.37–0.39.
+- **SENSEX 2025–26 (264 days):** the pool is short, since days to expiry are known only from
+  2024-09. VIX-implied is best at 0.58–0.60, then opening range 0.53–0.54, then analog 0.39–0.53.
+
+**What it means:**
+- **Similar mornings do not share a similar afternoon** any more than one number predicts. The spot
+  check (`out/spotcheck_NIFTY_2026-10-21_1200_euclid.png`) shows it plainly. The 20 matched days
+  track 2026-10-21's morning closely, then fan out in every direction after 12:00.
+- **What predicts the size of the afternoon is how big the morning was,** taken against recent
+  mornings (BL-110), and the VIX level. A whole-path match adds noise on top of both.
+- **This is a range forecast, not a P&L test.** BL-081 already found that the morning range
+  (`atr_range`) does not help pending picks either, so the opening-range lead is not a rule to
+  adopt.
+
+**Not done:**
+- H2 (gated off).
+- Phase 4 (the "20 days like today" view). It stays open as a look-only research tool, if the owner
+  wants it.
+
+**Evidence:** `packages/option-backtesting/research/bl022/`:
+- `features.py`, `forecast.py`, `spotcheck.py`, `test_lookahead.py` (7 look-ahead tests pass);
+- `out/h1_result.json` and `out/h1_forecasts.parquet` (git-ignored; regenerate with `features.py`
+  then `forecast.py`, about a minute each).
+
 ## Risks
 
 - Look-ahead: any feature that reads past the cut-off, or an analog pool that includes later
@@ -226,3 +272,9 @@ the plan.
 
   Phase 0 committed before any run. The ETA given was about 4 working days, with the gate's answer
   after about 1.
+- 2026-10-22 — Phase 1 done: NIFTY features 2015-02 → 2026-10 (2,879 sessions; 95 without VIX, 12
+  without an expiry), SENSEX from 2018 (expiries known only from 2024-09). The look-ahead tests
+  pass.
+- 2026-10-22 — Phase 2: **gate failed** at all six (check, distance) tests (Holm p ≥ 0.92). Analog
+  ρ is 0.38–0.44, against 0.49–0.52 for the opening-range rule and 0.43–0.45 for VIX-implied
+  (Result above). H2 not run, as registered. Item closed: killed.
