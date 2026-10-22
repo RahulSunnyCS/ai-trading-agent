@@ -216,6 +216,15 @@ def compile_spec(spec: RuleSpec) -> CompiledRule:
                 raise E.RuleError("direction_up: must be true / false, not a number")
         exits = _parse_sided(spec.exit_when, "exit_when", defs, direction is not None)
         controls = _parse_sided(spec.control_when, "control_when", defs, direction is not None)
+        if direction is not None and direction.trade:
+            raise E.RuleError("direction_up: at_entry / minutes_in_trade belong in exit_when only")
+        if controls is not None and any(node.trade for node in controls.values()):
+            raise E.RuleError("control_when: at_entry / minutes_in_trade belong in exit_when only")
+        if exits is not None and controls is None and any(n.trade for n in exits.values()):
+            raise E.RuleError(
+                "exit_when uses at_entry / minutes_in_trade, so the controls cannot be derived "
+                "from it: give control_when"
+            )
     except E.RuleError as error:
         raise SpecError(str(error)) from error
     start, stop = (E.clock_to_stamp(t, "window") for t in (spec.window.from_, spec.window.to))
