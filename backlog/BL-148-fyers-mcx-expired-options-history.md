@@ -185,9 +185,14 @@ MCXBULLDEX and any other commodity index are excluded.
 
 Phase 2 reuses `fyers/expired.py`'s pieces rather than a second implementation: the client's
 `per_minute` / `max_rate_limit_hits` options, `client.response_state` (ok / no_data / permanent /
-retryable / rate_limited, the states this item asks for), the per-contract raw cache keyed on the
+retryable / blocked / rate_limited, the states this item asks for; `permanent` is an allow-list,
+so an unrecognised error is never cached as final), the per-contract raw cache keyed on the
 requested window, the stop-at-budget loop that merges a day only once every expiry it needs is
-cached, and the merge that never overwrites an existing row. What stays
+cached, and the merge that never overwrites an existing row.
+
+Runbook note (from the NIFTY/SENSEX repair): stored results for repaired days predate the
+repair, so run `obt legwise rerun` (and `obt rotation update --day D` for the days the rotation
+covers) afterwards; the command's summary says so too. What stays
 MCX-specific is discovery (`MCX:` symbols, session bounds) and the instrument identity.
 
 ## Open questions

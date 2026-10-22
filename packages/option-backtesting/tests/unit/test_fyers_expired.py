@@ -43,16 +43,18 @@ def _epoch(day: date, minute: int) -> int:
 
 class FakeClient:
     """`answers` maps a symbol to what its next requests give before the normal answer: an
-    exception to raise or an error body to return, one per request."""
+    exception to raise, an error body to return, or None for the normal answer, one per
+    request. `extra` adds symbols to an expiry's listing."""
 
     columns = ["timestamp", "open", "high", "low", "close", "volume", "open_interest"]
 
-    def __init__(self, expiries=(WEEKLY, MONTHLY), answers=None):
+    def __init__(self, expiries=(WEEKLY, MONTHLY), answers=None, extra=None):
         self.calls = 0
         self.history_calls = 0
         self.expiries = list(expiries)
         self.answers = {k: list(v) for k, v in (answers or {}).items()}
         self.asked: list[str] = []
+        self.extra = extra or {}
 
     def expired_expiries(self, symbol, start, end):
         self.calls += 1
@@ -60,17 +62,17 @@ class FakeClient:
 
     def expired_contracts(self, symbol, expiry):
         self.calls += 1
-        return list(SYMBOLS[expiry])
+        return list(SYMBOLS[expiry]) + list(self.extra.get(expiry, []))
 
     def expired_history_response(self, symbol, start, end):
         self.calls += 1
         self.history_calls += 1
         self.asked.append(symbol)
         params = {"symbol": symbol, "range_from": start.isoformat(), "range_to": end.isoformat()}
-        if self.answers.get(symbol):
-            answer = self.answers[symbol].pop(0)
-            if isinstance(answer, BaseException):
-                raise answer
+        answer = self.answers[symbol].pop(0) if self.answers.get(symbol) else None
+        if isinstance(answer, BaseException):
+            raise answer
+        if answer is not None:
             return answer, params
         rows, d = [], start
         while d <= end:
@@ -302,9 +304,11 @@ def test_a_rate_limit_stops_cleanly_judges_the_merged_days_and_a_rerun_resumes(r
     [
         ({"s": "error", "message": "Request limit reached", "_http_status": 429}, "rate_limited"),
         ({"s": "error", "message": "Invalid access token"}, "credentials"),
+        ({"s": "error", "message": "You are not subscribed to this API"}, "blocked"),
+        ({"s": "error", "message": "HTTP 403", "_http_status": 403}, "blocked"),
     ],
 )
-def test_a_rate_limit_or_rejected_token_body_stops_without_caching_it(root, body, stopped):
+def test_a_rate_limit_rejected_token_or_no_access_stops_without_caching_it(root, body, stopped):
     symbol = SYMBOLS[MONTHLY][0]
     out = _run(FakeClient(answers={symbol: [body]}), root)
     assert out["stopped"] == stopped
@@ -393,6 +397,95 @@ def test_the_plan_lists_days_short_of_an_unexpired_expiry(root):
     assert [e.expiry for e in plan.expiries] == [WEEKLY]  # what can be repaired still is
 
 
+REFUSED = {"s": "error", "code": -300, "message": "Invalid symbol provided"}
+
+
+def test_a_run_of_refusals_stops_the_run_and_caches_none_of_them(root, monkeypatch):
+    monkeypatch.setattr(expired, "REFUSAL_STREAK", 3)
+    refused = SYMBOLS[WEEKLY][:3]
+    out = _run(FakeClient(answers={s: [REFUSED] for s in refused}), root)
+    assert out["stopped"] == "refused_streak" and out["failed_contracts"] == []
+    assert [f["symbol"] for f in out["retryable_failures"]] == refused
+    assert not any(expired._cache_path(root, "NIFTY", WEEKLY, s).exists() for s in refused)
+    assert out["touched_days"] == {}
+
+
+def test_a_refusal_at_the_end_of_an_expiry_is_kept_once_a_good_contract_still_answers(root):
+    last = SYMBOLS[WEEKLY][-1]
+    client = FakeClient(answers={last: [REFUSED]})
+    out = _run(client, root)
+    assert out["stopped"] is None and out["fetched"] == 9  # 8 + one confirming request
+    assert client.asked[4] == SYMBOLS[WEEKLY][2]  # the last contract that answered
+    assert [f["symbol"] for f in out["failed_contracts"]] == [last]
+    assert all(_instruments(root, day) == 7 for day in GAP)
+
+
+def test_a_refusal_at_the_end_is_not_kept_when_a_good_contract_is_refused_too(root):
+    good, last = SYMBOLS[WEEKLY][2], SYMBOLS[WEEKLY][-1]
+    out = _run(FakeClient(answers={good: [None, REFUSED], last: [REFUSED]}), root)
+    assert out["stopped"] == "refused_streak" and out["failed_contracts"] == []
+    assert not expired._cache_path(root, "NIFTY", WEEKLY, last).exists()
+    assert out["touched_days"] == {}
+
+
+def test_retry_refused_asks_a_cached_refusal_again(root):
+    refused = SYMBOLS[WEEKLY][1]
+    _run(FakeClient(answers={refused: [REFUSED]}), root)
+    assert all(_instruments(root, day) == 7 for day in GAP)
+    again = FakeClient()
+    out = _run(again, root, missing_only=False, retry_refused=True)
+    assert again.asked == [refused] and out["failed_contracts"] == []
+    assert all(_instruments(root, day) == 8 for day in GAP)
+
+
+def test_a_refusal_cached_under_looser_rules_is_asked_again(root):
+    symbol = SYMBOLS[MONTHLY][0]
+    path = expired._cache_path(root, "NIFTY", MONTHLY, symbol)
+    window = {"range_from": GAP[0].isoformat(), "range_to": GAP[-1].isoformat()}
+    expired._write_cache(path, symbol, window, {"s": "error", "_http_status": 403})
+    client = FakeClient()
+    out = _run(client, root)
+    assert symbol in client.asked and out["cached"] == 0
+    assert all(_instruments(root, day) == 8 for day in GAP)
+
+
+def test_a_short_day_writes_nothing_by_default_and_allow_short_merges_it(root):
+    # run on 23 Sep: 29 Sep has not expired, so the gap days lack their monthly
+    out = _run(FakeClient(), root, today=LATE_DAY)
+    assert out["fetched"] == 4 and out["touched_days"] == {}
+    assert out["pending_days"] == {"NIFTY": [d.isoformat() for d in GAP]}
+    assert not any(lake.bars_1m_path(root, "option", "NIFTY", d).exists() for d in GAP)
+    forced = _run(FakeClient(), root, today=LATE_DAY, allow_short=True)
+    assert forced["cached"] == 4 and all(_instruments(root, day) == 4 for day in GAP)
+
+
+def test_an_undecodable_symbol_is_skipped_and_listed(root):
+    odd = "NSE:NIFTY26SEPFUT"
+    client = FakeClient(extra={MONTHLY: [odd]})
+    out = _run(client, root)
+    assert out["underlyings"]["NIFTY"]["undecodable_symbols"] == [odd]
+    assert odd not in client.asked and all(_instruments(root, day) == 8 for day in GAP)
+    assert "obt legwise rerun" in out["next"]
+
+
+def test_ready_days_are_merged_a_few_at_a_time(root, monkeypatch):
+    monkeypatch.setattr(expired, "MERGE_CHUNK_DAYS", 2)
+    chunks = []
+    real = expired._merge_days
+    monkeypatch.setattr(expired, "_merge_days", lambda *a: chunks.append(list(a[3])) or real(*a))
+    _run(FakeClient(), root)
+    assert chunks == [GAP[:2], GAP[2:]]
+    assert all(_instruments(root, day) == 8 for day in GAP)
+
+
+def test_a_new_partition_keeps_one_row_per_instrument_minute(root):
+    path = lake.bars_1m_path(root, "option", "NIFTY", GAP[0])
+    candle = _candle(GAP[0])
+    fresh = options_table([(_contract(), 7, [candle]), (_contract("NSE:ALIAS"), 7, [candle])])
+    assert expired.merge_option_partition(path, fresh) == (1, 0)
+    assert pq.read_table(path).num_rows == 1
+
+
 # --- the client: response classes, the per-minute throttle and the 429 stop -------------
 
 
@@ -402,6 +495,19 @@ def test_response_states():
     assert response_state({"s": "error", "message": "x", "_http_status": 502}) == "retryable"
     assert response_state({"s": "error", "message": "network: reset"}) == "retryable"
     assert response_state({"s": "error", "message": "rate limited"}) == "rate_limited"
+    # only a refusal about the request itself, on HTTP 200 / 400, is final
+    assert response_state({"s": "error", "message": "No data", "_http_status": 400}) == "permanent"
+    for unknown in (
+        {"s": "error", "message": "Something went wrong. Please try after some time"},
+        {"s": "error", "message": "HTTP 404", "_http_status": 404},
+        {"s": "error", "message": "Invalid symbol", "_http_status": 404},
+    ):
+        assert response_state(unknown) == "retryable"
+    for no_access in (
+        {"s": "error", "message": "You are not subscribed to this API"},
+        {"s": "error", "message": "HTTP 403", "_http_status": 403},
+    ):
+        assert response_state(no_access) == "blocked"
     with pytest.raises(FyersCredentialsError):
         response_state({"s": "error", "message": "Token expired"})
 

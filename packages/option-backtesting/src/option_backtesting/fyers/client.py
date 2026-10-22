@@ -38,39 +38,39 @@ class RateLimitedError(RuntimeError):
 
 _AUTH_WORDS = ("token", "auth", "unauthor", "login")
 _RATE_LIMIT_WORDS = ("rate limit", "too many", "request limit", "limit exceeded", "limit reached")
-_RETRYABLE_WORDS = (
-    "timeout",
-    "timed out",
-    "try again",
-    "temporar",
-    "service unavailable",
-    "internal server",
-)
+#: The account may not use this API at all (Prime not active, lapsed, not enabled): every
+#: further request would be refused the same way, so the run stops.
+_BLOCKED_WORDS = ("subscri", "not enabled", "not allowed", "permission", "upgrade", "prime")
+#: The only refusals taken as final for one contract: about the request itself, which asking
+#: again will not change. Anything else unrecognised is retried on a later run, never cached.
+_REFUSAL_WORDS = ("invalid symbol", "symbol not found", "no data")
 
 
 def response_state(body: dict) -> str:
-    """Classify one expired-history response (BL-148): `ok` and `no_data` are answers;
-    `rate_limited` means stop the run (Fyers blocks the account for the day after repeated
-    breaches); `retryable` (network, 5xx) is worth asking again on a later run; `permanent`
-    is a refusal of this request itself (e.g. an unknown symbol) that asking again will not
-    change. A rejected token raises FyersCredentialsError instead: nothing after it can work.
+    """Classify one expired-history response (BL-148).
+
+    `ok` / `no_data` are answers. `permanent` is a refusal of this request itself (an unknown
+    symbol, no data for the range), and only on HTTP 200/400: it is an allow-list, because a
+    refusal is cached and never asked again. `rate_limited` stops the run (Fyers blocks the
+    account for the day after repeated breaches); `blocked` (no subscription to the API, an
+    HTTP 401/403 gateway refusal) stops it too. Everything else, including an error this does
+    not recognise, is `retryable`: not cached, asked again by the next run. A rejected token
+    raises FyersCredentialsError: nothing after it can work.
     """
     status = body.get("s")
     if status in ("ok", "no_data"):
         return str(status)
     message = str(body.get("message") or body).lower()
+    http = body.get("_http_status")
     if any(word in message for word in _AUTH_WORDS):
         raise FyersCredentialsError(f"Fyers rejected the token: {body.get('message') or body}")
-    http = body.get("_http_status")
     if http == 429 or any(word in message for word in _RATE_LIMIT_WORDS):
         return "rate_limited"
-    if (
-        (isinstance(http, int) and http >= 500)
-        or message.startswith("network:")
-        or any(word in message for word in _RETRYABLE_WORDS)
-    ):
-        return "retryable"
-    return "permanent"
+    if http in (401, 403) or any(word in message for word in _BLOCKED_WORDS):
+        return "blocked"
+    if http in (None, 200, 400) and any(word in message for word in _REFUSAL_WORDS):
+        return "permanent"
+    return "retryable"
 
 
 @dataclass(frozen=True)

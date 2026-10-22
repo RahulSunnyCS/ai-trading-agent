@@ -57,6 +57,8 @@ class BackfillPlan:
     #: contract the collector would have kept that day but that has not expired yet cannot
     #: come from this API. The day is still repaired with the expiries that can.
     short_days: tuple[date, ...] = ()
+    #: Listed symbols `_contract` could not decode: skipped, never guessed.
+    undecodable: tuple[str, ...] = ()
 
     @property
     def history_requests(self) -> int:
@@ -177,11 +179,18 @@ def build_plan(
 
     reference = reference or default_reference_data()
     plans = []
+    undecodable: list[str] = []
     for expiry, days in sorted(wanted.items()):
-        symbols = client.expired_contracts(spec.index_symbol, expiry)
-        contracts = tuple(_contract(symbol, underlying, expiry, reference) for symbol in symbols)
-        plans.append(ExpiryPlan(expiry, tuple(sorted(days)), contracts))
-    return BackfillPlan(underlying, start, end, trading_days, tuple(plans), short)
+        contracts = []
+        for symbol in client.expired_contracts(spec.index_symbol, expiry):
+            try:
+                contracts.append(_contract(symbol, underlying, expiry, reference))
+            except ValueError:  # one odd symbol must not stop the whole plan
+                undecodable.append(symbol)
+        plans.append(ExpiryPlan(expiry, tuple(sorted(days)), tuple(contracts)))
+    return BackfillPlan(
+        underlying, start, end, trading_days, tuple(plans), short, tuple(undecodable)
+    )
 
 
 def _cache_path(root: Path, underlying: str, expiry: date, symbol: str) -> Path:
@@ -235,13 +244,25 @@ def _split_days(candles: list[Candle], wanted: set[date]) -> dict[date, list[Can
 def merge_option_partition(path: Path, fresh: pa.Table) -> tuple[int, int]:
     """Add missing keys, preserving every existing row. Returns (added, preserved)."""
     fresh = fresh.cast(OPT_SCHEMA)
-    if not path.exists():
-        lake.write_parquet(
-            fresh.sort_by([("instrument_id", "ascending"), ("ts", "ascending")]), path
-        )
-        return fresh.num_rows, 0
-    old = pq.read_table(path).cast(OPT_SCHEMA)
     con = duckdb.connect()
+    if not path.exists():
+        try:  # one row per key here too: two listed symbols may resolve to one instrument
+            con.register("fresh_rows", fresh)
+            first = (
+                con.execute(
+                    "SELECT * FROM fresh_rows "
+                    "QUALIFY row_number() OVER (PARTITION BY instrument_id, ts ORDER BY ts) = 1 "
+                    "ORDER BY instrument_id, ts"
+                )
+                .arrow()
+                .read_all()
+                .cast(OPT_SCHEMA)
+            )
+        finally:
+            con.close()
+        lake.write_parquet(first, path)
+        return first.num_rows, 0
+    old = pq.read_table(path).cast(OPT_SCHEMA)
     try:
         con.register("old_rows", old)
         con.register("fresh_rows", fresh)
@@ -267,6 +288,14 @@ def merge_option_partition(path: Path, fresh: pa.Table) -> tuple[int, int]:
 #: Consecutive retryable failures (network, 5xx) after which a run stops. One is noise, left
 #: uncached so the next run asks again; several in a row mean Fyers or the network is down.
 RETRYABLE_STREAK = 3
+#: Consecutive refusals after which a run stops without caching them: the symbols come from
+#: Fyers' own listing, so a run of refusals is about the account or the API, not the contracts.
+REFUSAL_STREAK = 5
+#: Days merged together: every day of a month needs its monthly, so they all become ready at
+#: once; merging them a few at a time bounds the rows held in memory.
+MERGE_CHUNK_DAYS = 5
+#: States a cached response may hold; any other is asked again.
+_FINAL = ("ok", "no_data", "permanent")
 
 
 @dataclass
@@ -276,13 +305,18 @@ class _Progress:
     rows_added: int = 0
     retry_streak: int = 0
     stopped: str | None = None
-    #: contracts Fyers refused (state `permanent`): cached, so a rerun never asks again
+    #: contracts Fyers refused (state `permanent`): cached, so a rerun asks again only with
+    #: `retry_refused`
     failed: list[dict] = field(default_factory=list)
-    #: retryable failures: not cached, so the next run asks again
+    #: retryable failures, and refusals not cached because they came in a run: the next run
+    #: asks again
     retryable: list[dict] = field(default_factory=list)
     #: days whose partition this run wrote, per underlying: judged and derived at the end
     touched: dict[str, set[date]] = field(default_factory=lambda: defaultdict(set))
     errors: list[str] = field(default_factory=list)
+    #: a contract that answered `ok` (symbol, window): asked again to confirm that refusals
+    #: at the end of an expiry were about those contracts, not the account
+    last_ok: tuple[str, date, date] | None = None
 
 
 def _window(item: ExpiryPlan) -> tuple[date, date]:
@@ -296,6 +330,20 @@ def _failure(expiry: date, contract: Contract, body: dict, *, cached: bool = Fal
     )
 
 
+def _cached_answer(path: Path, lo: date, hi: date) -> tuple[dict, str] | None:
+    """The cached response and its state, when it covers [lo, hi] and is final. A record an
+    earlier version cached under looser rules (a 403, an unrecognised error) is not final
+    now, so it is asked again rather than trusted."""
+    body = _read_cache(path, lo, hi) if path.exists() else None
+    if body is None:
+        return None
+    try:
+        state = response_state(body)
+    except FyersCredentialsError:
+        return None
+    return (body, state) if state in _FINAL else None
+
+
 def _fetch_expiry(
     client: FyersClient,
     root: Path,
@@ -304,65 +352,113 @@ def _fetch_expiry(
     progress: _Progress,
     max_requests: int | None,
     log: Callable[[str], None],
+    *,
+    retry_refused: bool = False,
 ) -> bool:
     """Cache every contract of one expiry. True when all of them are cached, answers and
-    refusals alike; False when the run stopped or a retryable failure left one out."""
+    refusals alike; False when the run stopped or a contract is left to ask again."""
     lo, hi = _window(item)
     complete = True
-    for number, contract in enumerate(item.contracts, 1):
-        path = _cache_path(root, underlying, item.expiry, contract.symbol)
-        body = _read_cache(path, lo, hi) if path.exists() else None
-        if body is not None:
-            progress.cached += 1
-            if response_state(body) == "permanent":
-                progress.failed.append(_failure(item.expiry, contract, body, cached=True))
-            continue
-        if max_requests is not None and progress.fetched >= max_requests:
-            progress.stopped = "max_requests"
-            return False
+    #: refusals in a row, held back until an answer shows they were about single contracts
+    refusals: list[tuple[Path, Contract, dict, dict]] = []
+
+    def keep_refusals() -> None:
+        for path, contract, params, body in refusals:
+            _write_cache(path, contract.symbol, params, body)
+            progress.failed.append(_failure(item.expiry, contract, body))
+        refusals.clear()
+
+    def ask(symbol: str, lo: date, hi: date) -> tuple[dict, dict, str] | None:
+        """One request and its state; None when it stopped the run."""
         try:
-            body, params = client.expired_history_response(contract.symbol, lo, hi)
+            body, params = client.expired_history_response(symbol, lo, hi)
             state = response_state(body)
         except RateLimitedError as error:  # the client's own 429 count ran out
-            progress.stopped = "rate_limited"
             progress.errors.append(str(error))
-            return False
+            return stop("rate_limited") or None
         except FyersCredentialsError as error:  # e.g. the token died at 06:00: resume later
-            progress.stopped = "credentials"
             progress.errors.append(str(error))
-            return False
+            return stop("credentials") or None
         progress.fetched += 1
-        if state == "rate_limited":
-            progress.stopped = "rate_limited"
+        if state in ("rate_limited", "blocked"):  # every further request would fare the same
+            progress.errors.append(f"{symbol}: {body.get('message') or body}")
+            return stop(state) or None
+        return body, params, state
+
+    def stop(reason: str) -> bool:
+        progress.stopped = reason
+        for _, contract, _, body in refusals:  # not cached: asked again next run
+            progress.retryable.append(_failure(item.expiry, contract, body))
+        refusals.clear()
+        return False
+
+    for number, contract in enumerate(item.contracts, 1):
+        path = _cache_path(root, underlying, item.expiry, contract.symbol)
+        cached = _cached_answer(path, lo, hi)
+        if cached is not None and not (retry_refused and cached[1] == "permanent"):
+            progress.cached += 1
+            if cached[1] == "ok":
+                progress.last_ok = (contract.symbol, lo, hi)
+            if cached[1] == "permanent":
+                progress.failed.append(_failure(item.expiry, contract, cached[0], cached=True))
+            continue
+        if max_requests is not None and progress.fetched >= max_requests:
+            return stop("max_requests")
+        answer = ask(contract.symbol, lo, hi)
+        if answer is None:
             return False
+        body, params, state = answer
+        if state == "permanent":
+            refusals.append((path, contract, params, body))
+            if len(refusals) >= REFUSAL_STREAK:
+                progress.errors.append(
+                    f"{len(refusals)} refusals in a row, last: {body.get('message') or body}"
+                )
+                return stop("refused_streak")
+            continue
         if state == "retryable":
             complete = False
             progress.retryable.append(_failure(item.expiry, contract, body))
             progress.retry_streak += 1
             if progress.retry_streak >= RETRYABLE_STREAK:
-                progress.stopped = "retryable"
-                return False
+                return stop("retryable")
             continue
+        keep_refusals()  # an answer: the refusals before it were about single contracts
         progress.retry_streak = 0
         _write_cache(path, contract.symbol, params, body)
-        if state == "permanent":
-            progress.failed.append(_failure(item.expiry, contract, body))
+        if state == "ok":
+            progress.last_ok = (contract.symbol, lo, hi)
         if number % 100 == 0:
             log(
                 f"{underlying} {item.expiry}: {number}/{len(item.contracts)} "
                 f"contracts ({progress.fetched} fetched, {progress.cached} cached)"
             )
+    if refusals:  # nothing answered after them: ask a known-good contract once to tell
+        if progress.last_ok is None:  # nothing to compare with: ask again next run
+            for _, contract, _, body in refusals:
+                progress.retryable.append(_failure(item.expiry, contract, body))
+            refusals.clear()
+            return False
+        if max_requests is not None and progress.fetched >= max_requests:
+            return stop("max_requests")
+        answer = ask(*progress.last_ok)
+        if answer is None:
+            return False
+        if answer[2] not in ("ok", "no_data"):  # refused as well: about the account
+            message = answer[0].get("message") or answer[0]
+            progress.errors.append(f"{progress.last_ok[0]} answered before, now: {message}")
+            return stop("refused_streak" if answer[2] == "permanent" else "retryable")
+        keep_refusals()
     return complete
 
 
 def _expiry_cached(root: Path, underlying: str, item: ExpiryPlan) -> bool:
     """Every contract of an expiry this run does not fetch is in the raw cache for its window."""
     lo, hi = _window(item)
-    for contract in item.contracts:
-        path = _cache_path(root, underlying, item.expiry, contract.symbol)
-        if not path.exists() or _read_cache(path, lo, hi) is None:
-            return False
-    return True
+    return all(
+        _cached_answer(_cache_path(root, underlying, item.expiry, c.symbol), lo, hi) is not None
+        for c in item.contracts
+    )
 
 
 def _merge_days(
@@ -400,13 +496,15 @@ def _merge_days(
     for day in sorted(days):
         if not parts[day]:
             continue
+        # the symbol master first: a stop between the two leaves a day without a file, which
+        # the next run plans again, never a file without its master
+        write_symbol_master(root, day, listed[day])
         added, _ = merge_option_partition(
             lake.bars_1m_path(root, "option", plan.underlying, day), pa.concat_tables(parts[day])
         )
         progress.rows_added += added
         if added:  # a day that gained nothing keeps its verdict and derived files
             progress.touched[plan.underlying].add(day)
-        write_symbol_master(root, day, listed[day])
         del parts[day]
 
 
@@ -430,10 +528,16 @@ def _run_underlying(
     progress: _Progress,
     max_requests: int | None,
     log: Callable[[str], None],
+    *,
+    retry_refused: bool = False,
+    allow_short: bool = False,
 ) -> list[date]:
     """Fetch `items` in order, merging each day as soon as every expiry it needs is cached.
+    A day that may need an expiry not expired yet (`plan.short_days`) waits, unless
+    `allow_short`: once written it would be skipped by every default run after.
     Returns this run's days left unmerged (they wait for a later run)."""
     needs = plan.needs()
+    held = set() if allow_short else set(plan.short_days)
     by_expiry = {item.expiry: item for item in plan.expiries}
     fetching = {item.expiry for item in items}
     complete: set[date] = set()
@@ -442,6 +546,8 @@ def _run_underlying(
     done: set[date] = set()
 
     def ready(day: date) -> bool:
+        if day in held:
+            return False
         for expiry in needs[day]:
             if expiry in fetching:
                 if expiry not in complete:
@@ -454,18 +560,30 @@ def _run_underlying(
         return True
 
     for item in items:
-        if _fetch_expiry(client, root, plan.underlying, item, progress, max_requests, log):
+        if _fetch_expiry(
+            client,
+            root,
+            plan.underlying,
+            item,
+            progress,
+            max_requests,
+            log,
+            retry_refused=retry_refused,
+        ):
             complete.add(item.expiry)
         if progress.stopped:
             log(f"{plan.underlying} {item.expiry}: stopped ({progress.stopped}); cache kept")
             break
         days = [day for day in item.days if day not in done and ready(day)]
-        if days:
-            _merge_days(client, root, plan, days, needs, ids, progress)
-            done.update(days)
+        for at in range(0, len(days), MERGE_CHUNK_DAYS):
+            chunk = days[at : at + MERGE_CHUNK_DAYS]
+            _merge_days(client, root, plan, chunk, needs, ids, progress)
+            done.update(chunk)
+        waiting = set(item.days) - done
         log(
             f"{plan.underlying} {item.expiry}: merged {len(days)} day(s); "
-            f"{len(set(item.days) - done)} wait for another expiry"
+            f"{len(waiting - held)} wait for another expiry, "
+            f"{len(waiting & held)} for an expiry not expired yet"
         )
     return sorted({day for item in items for day in item.days} - done)
 
@@ -482,19 +600,33 @@ def run_backfill(
     missing_only: bool = True,
     max_requests: int | None = None,
     only_expiry: date | None = None,
+    retry_refused: bool = False,
+    allow_short: bool = False,
+    today: date | None = None,
     log: Callable[[str], None] = print,
 ) -> dict:
     """Plan, cache and merge an expired-options repair for the given index underlyings.
 
-    A day is merged only once every expiry it needs is in the raw cache, so a run stopped
-    anywhere (`max_requests`, a rate limit, a rejected token, a crash) never leaves a day
-    with a file but missing an expiry, and the next run resumes from the cache. A refused
-    contract is recorded and skipped; days already merged are judged even when a run fails.
+    A day is merged only once every expiry it needs is in the raw cache, and not while an
+    expiry it may need has yet to expire (unless `allow_short`), so a run stopped anywhere
+    (`max_requests`, a rate limit, a rejected token, a crash) never leaves a day with a file
+    but missing an expiry, and the next run resumes from the cache. A contract refused for
+    itself is recorded and skipped (`retry_refused` asks again); a run of refusals or no
+    access to the API stops the run. Days already merged are judged even when a run fails.
     """
     reference = reference or default_reference_data()
     metadata_calls_at_start = client.calls
     plans = [
-        build_plan(client, root, name, start, end, reference=reference, missing_only=missing_only)
+        build_plan(
+            client,
+            root,
+            name,
+            start,
+            end,
+            reference=reference,
+            today=today,
+            missing_only=missing_only,
+        )
         for name in underlyings
     ]
     fetch = {
@@ -510,6 +642,7 @@ def run_backfill(
                 "expiries": len(fetch[p.underlying]),
                 "contracts": sum(len(e.contracts) for e in fetch[p.underlying]),
                 "days_short_of_unexpired_expiries": [d.isoformat() for d in p.short_days],
+                "undecodable_symbols": list(p.undecodable),
             }
             for p in plans
         },
@@ -518,9 +651,12 @@ def run_backfill(
         if p.short_days:
             log(
                 f"{p.underlying}: {len(p.short_days)} day(s) may also need an expiry that has "
-                f"not expired yet, which this API cannot serve: "
+                f"not expired yet, which this API cannot serve; "
+                f"{'merged without it' if allow_short else 'held until it expires'}: "
                 f"{', '.join(d.isoformat() for d in p.short_days)}"
             )
+        if p.undecodable:
+            log(f"{p.underlying}: skipped {len(p.undecodable)} symbol(s) it could not decode")
     if plan_only:
         return summary
 
@@ -539,7 +675,15 @@ def run_backfill(
                 left = sorted({day for item in fetch[plan.underlying] for day in item.days})
             else:
                 left = _run_underlying(
-                    client, root, plan, fetch[plan.underlying], progress, max_requests, log
+                    client,
+                    root,
+                    plan,
+                    fetch[plan.underlying],
+                    progress,
+                    max_requests,
+                    log,
+                    retry_refused=retry_refused,
+                    allow_short=allow_short,
                 )
             if left:
                 pending[plan.underlying] = [day.isoformat() for day in left]
@@ -564,6 +708,13 @@ def run_backfill(
             "retryable_failures": progress.retryable,
         }
     )
+    if progress.touched:
+        # stored backtest and rotation results for these days predate the repair
+        summary["next"] = (
+            "obt legwise rerun; obt rotation update --day D for each repaired day the "
+            "rotation covers"
+        )
+        log(f"repaired days' stored results are stale: run {summary['next']}")
     new_failures = sum(1 for f in progress.failed if not f.get("cached"))
     with connect(root, views=()) as con:
         ingest.finish_run(
