@@ -190,9 +190,17 @@ so an unrecognised error is never cached as final), the per-contract raw cache k
 requested window, the stop-at-budget loop that merges a day only once every expiry it needs is
 cached, and the merge that never overwrites an existing row.
 
-Runbook note (from the NIFTY/SENSEX repair): stored results for repaired days predate the
-repair, so run `obt legwise rerun` (and `obt rotation update --day D` for the days the rotation
-covers) afterwards; the command's summary says so too. What stays
+Runbook notes (from the NIFTY/SENSEX repair):
+- Stored results for repaired days predate the repair, so run `obt legwise rerun` (and
+  `obt rotation update --day D` for the days the rotation covers) afterwards; the command's
+  summary says so too.
+- A contract that keeps getting an unrecognised error (say a 404) is `retryable` on every run
+  and holds back its expiry's days (`pending_days`, `retryable_failures`), with exit 0 and no
+  override yet. If it persists, a per-symbol skip (`--skip-symbol`) or an attempt count
+  across runs is the fix.
+- Merging ready days in chunks (`MERGE_CHUNK_DAYS`, 5) re-reads every cached contract of the
+  expiries each chunk needs: about 4 passes over a monthly's files. IO only, accepted to bound
+  memory. What stays
 MCX-specific is discovery (`MCX:` symbols, session bounds) and the instrument identity.
 
 ## Open questions

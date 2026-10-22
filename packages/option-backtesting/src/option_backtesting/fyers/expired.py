@@ -288,9 +288,14 @@ def merge_option_partition(path: Path, fresh: pa.Table) -> tuple[int, int]:
 #: Consecutive retryable failures (network, 5xx) after which a run stops. One is noise, left
 #: uncached so the next run asks again; several in a row mean Fyers or the network is down.
 RETRYABLE_STREAK = 3
-#: Consecutive refusals after which a run stops without caching them: the symbols come from
-#: Fyers' own listing, so a run of refusals is about the account or the API, not the contracts.
+#: Consecutive refusals after which a known-good contract is asked again: the symbols come
+#: from Fyers' own listing, so a run of refusals may be about the account, not the contracts.
+#: If that contract still answers they are kept; if it is refused too the run stops, none
+#: of them cached.
 REFUSAL_STREAK = 5
+#: Refusals held before any contract has answered (nothing to ask again yet, e.g. the
+#: deep strikes at the start of a first run): they wait for the first answer, up to this many.
+UNCONFIRMED_LIMIT = 50
 #: Days merged together: every day of a month needs its monthly, so they all become ready at
 #: once; merging them a few at a time bounds the rows held in memory.
 MERGE_CHUNK_DAYS = 5
@@ -314,9 +319,13 @@ class _Progress:
     #: days whose partition this run wrote, per underlying: judged and derived at the end
     touched: dict[str, set[date]] = field(default_factory=lambda: defaultdict(set))
     errors: list[str] = field(default_factory=list)
-    #: a contract that answered `ok` (symbol, window): asked again to confirm that refusals
-    #: at the end of an expiry were about those contracts, not the account
+    #: a contract that answered `ok` (symbol, window): asked again to confirm that held
+    #: refusals were about those contracts, not the account
     last_ok: tuple[str, date, date] | None = None
+    #: refusals in a row not cached yet, (expiry, path, contract, params, body): held until an
+    #: answer, or `last_ok` asked again, shows they were about single contracts. Run-wide, so
+    #: refusals no answer has followed yet carry into the next expiry
+    held: list[tuple[date, Path, Contract, dict, dict]] = field(default_factory=list)
 
 
 def _window(item: ExpiryPlan) -> tuple[date, date]:
@@ -359,14 +368,26 @@ def _fetch_expiry(
     refusals alike; False when the run stopped or a contract is left to ask again."""
     lo, hi = _window(item)
     complete = True
-    #: refusals in a row, held back until an answer shows they were about single contracts
-    refusals: list[tuple[Path, Contract, dict, dict]] = []
+    if progress.last_ok is None:  # a rerun: a contract that answered before, from the cache
+        for contract in item.contracts:
+            cached = _cached_answer(
+                _cache_path(root, underlying, item.expiry, contract.symbol), lo, hi
+            )
+            if cached is not None and cached[1] == "ok":
+                progress.last_ok = (contract.symbol, lo, hi)
+                break
 
     def keep_refusals() -> None:
-        for path, contract, params, body in refusals:
+        for expiry, path, contract, params, body in progress.held:
             _write_cache(path, contract.symbol, params, body)
-            progress.failed.append(_failure(item.expiry, contract, body))
-        refusals.clear()
+            progress.failed.append(_failure(expiry, contract, body))
+        progress.held.clear()
+
+    def release() -> None:
+        """Held refusals left uncached: the next run asks again."""
+        for expiry, _, contract, _, body in progress.held:
+            progress.retryable.append(_failure(expiry, contract, body))
+        progress.held.clear()
 
     def ask(symbol: str, lo: date, hi: date) -> tuple[dict, dict, str] | None:
         """One request and its state; None when it stopped the run."""
@@ -387,10 +408,33 @@ def _fetch_expiry(
 
     def stop(reason: str) -> bool:
         progress.stopped = reason
-        for _, contract, _, body in refusals:  # not cached: asked again next run
-            progress.retryable.append(_failure(item.expiry, contract, body))
-        refusals.clear()
+        release()
         return False
+
+    def confirm() -> str:
+        """Ask `last_ok` again about the held refusals: `kept` (it answered: they are cached),
+        `retry` (a transient error: left to ask next run), `none` (no such contract yet:
+        still held), `stopped` (refused too, so about the account, or the run stopped)."""
+        if progress.last_ok is None:
+            return "none"
+        if max_requests is not None and progress.fetched >= max_requests:
+            stop("max_requests")
+            return "stopped"
+        answer = ask(*progress.last_ok)
+        if answer is None:
+            return "stopped"
+        body, _, state = answer
+        if state in ("ok", "no_data"):
+            keep_refusals()
+            return "kept"
+        if state == "permanent":
+            progress.errors.append(
+                f"{progress.last_ok[0]} answered before, now: {body.get('message') or body}"
+            )
+            stop("refused_streak")
+            return "stopped"
+        release()
+        return "retry"
 
     for number, contract in enumerate(item.contracts, 1):
         path = _cache_path(root, underlying, item.expiry, contract.symbol)
@@ -409,12 +453,18 @@ def _fetch_expiry(
             return False
         body, params, state = answer
         if state == "permanent":
-            refusals.append((path, contract, params, body))
-            if len(refusals) >= REFUSAL_STREAK:
-                progress.errors.append(
-                    f"{len(refusals)} refusals in a row, last: {body.get('message') or body}"
-                )
-                return stop("refused_streak")
+            progress.held.append((item.expiry, path, contract, params, body))
+            if len(progress.held) >= REFUSAL_STREAK:
+                outcome = confirm()
+                if outcome == "none" and len(progress.held) >= UNCONFIRMED_LIMIT:
+                    progress.errors.append(
+                        f"{len(progress.held)} refusals in a row and no contract answered"
+                    )
+                    return stop("refused_streak")
+                if outcome == "stopped":
+                    return False
+                if outcome == "retry":
+                    complete = False
             continue
         if state == "retryable":
             complete = False
@@ -433,22 +483,11 @@ def _fetch_expiry(
                 f"{underlying} {item.expiry}: {number}/{len(item.contracts)} "
                 f"contracts ({progress.fetched} fetched, {progress.cached} cached)"
             )
-    if refusals:  # nothing answered after them: ask a known-good contract once to tell
-        if progress.last_ok is None:  # nothing to compare with: ask again next run
-            for _, contract, _, body in refusals:
-                progress.retryable.append(_failure(item.expiry, contract, body))
-            refusals.clear()
+    if any(entry[0] == item.expiry for entry in progress.held):
+        # nothing answered after them: ask a known-good contract once to tell
+        outcome = confirm()
+        if outcome != "kept":  # `none`: held for an answer later in the run
             return False
-        if max_requests is not None and progress.fetched >= max_requests:
-            return stop("max_requests")
-        answer = ask(*progress.last_ok)
-        if answer is None:
-            return False
-        if answer[2] not in ("ok", "no_data"):  # refused as well: about the account
-            message = answer[0].get("message") or answer[0]
-            progress.errors.append(f"{progress.last_ok[0]} answered before, now: {message}")
-            return stop("refused_streak" if answer[2] == "permanent" else "retryable")
-        keep_refusals()
     return complete
 
 
@@ -690,6 +729,12 @@ def run_backfill(
     except (Exception, KeyboardInterrupt) as error:
         failure = error
         errors.append(str(error) or type(error).__name__)
+    if progress.held:  # refusals, and no contract answered in the whole run to tell why
+        errors.append(f"{len(progress.held)} refusal(s) with no answer in the run to confirm them")
+        for expiry, _, contract, _, body in progress.held:
+            progress.retryable.append(_failure(expiry, contract, body))
+        progress.held.clear()
+        progress.stopped = progress.stopped or "refused_unconfirmed"
     try:  # the days already merged get their verdicts whatever stopped the run
         _judge(root, progress.touched)
     except Exception as error:

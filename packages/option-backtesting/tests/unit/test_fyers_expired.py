@@ -400,14 +400,90 @@ def test_the_plan_lists_days_short_of_an_unexpired_expiry(root):
 REFUSED = {"s": "error", "code": -300, "message": "Invalid symbol provided"}
 
 
-def test_a_run_of_refusals_stops_the_run_and_caches_none_of_them(root, monkeypatch):
+NO_DATA = {"s": "error", "message": "No data found", "_http_status": 400}
+
+
+def test_a_run_of_refusals_stops_when_a_good_contract_is_refused_too(root, monkeypatch):
     monkeypatch.setattr(expired, "REFUSAL_STREAK", 3)
+    good, refused = SYMBOLS[WEEKLY][-1], SYMBOLS[MONTHLY][:3]
+    answers = {s: [REFUSED] for s in refused} | {good: [None, REFUSED]}
+    out = _run(FakeClient(answers=answers), root)
+    assert out["stopped"] == "refused_streak" and out["failed_contracts"] == []
+    assert [f["symbol"] for f in out["retryable_failures"]] == refused
+    assert not any(expired._cache_path(root, "NIFTY", MONTHLY, s).exists() for s in refused)
+    assert out["touched_days"] == {}
+
+
+def test_a_run_of_refusals_is_kept_when_a_good_contract_still_answers(root, monkeypatch):
+    monkeypatch.setattr(expired, "REFUSAL_STREAK", 3)
+    refused = SYMBOLS[MONTHLY][:3]
+    client = FakeClient(answers={s: [NO_DATA] for s in refused})
+    out = _run(client, root)
+    assert out["stopped"] is None and client.asked[7] == SYMBOLS[WEEKLY][-1]  # asked again
+    assert [f["symbol"] for f in out["failed_contracts"]] == refused
+    assert all(_instruments(root, day) == 5 for day in GAP)
+
+
+def test_neighbouring_no_data_refusals_before_any_answer_do_not_stall_reruns(root, monkeypatch):
+    # the first contracts of a first run: nothing has answered yet to ask again
+    monkeypatch.setattr(expired, "REFUSAL_STREAK", 3)
+    refused = SYMBOLS[WEEKLY][:3]
+    out = _run(FakeClient(answers={s: [NO_DATA] for s in refused}), root)
+    assert out["stopped"] is None and len(out["failed_contracts"]) == 3  # kept at the answer
+    assert all(_instruments(root, day) == 5 for day in GAP)
+    again = FakeClient()  # a rerun has nothing left to ask
+    assert _run(again, root, missing_only=False)["stopped"] is None
+    assert again.history_calls == 0
+
+
+def test_refusals_with_no_answer_at_all_stop_at_the_limit(root, monkeypatch):
+    monkeypatch.setattr(expired, "REFUSAL_STREAK", 2)
+    monkeypatch.setattr(expired, "UNCONFIRMED_LIMIT", 3)
     refused = SYMBOLS[WEEKLY][:3]
     out = _run(FakeClient(answers={s: [REFUSED] for s in refused}), root)
     assert out["stopped"] == "refused_streak" and out["failed_contracts"] == []
-    assert [f["symbol"] for f in out["retryable_failures"]] == refused
     assert not any(expired._cache_path(root, "NIFTY", WEEKLY, s).exists() for s in refused)
-    assert out["touched_days"] == {}
+
+
+def test_retry_refused_with_refusals_still_refused_finishes(root, monkeypatch):
+    monkeypatch.setattr(expired, "REFUSAL_STREAK", 2)
+    a, b = SYMBOLS[WEEKLY][0], SYMBOLS[WEEKLY][2]  # not neighbours: an answer between
+    _run(FakeClient(answers={a: [REFUSED], b: [REFUSED]}), root)
+    again = FakeClient(answers={a: [REFUSED], b: [REFUSED]})
+    out = _run(again, root, missing_only=False, retry_refused=True)
+    # cached answers are skipped, so the two refusals are in a row: a cached good contract
+    # is asked again, answers, and the run carries on
+    assert out["stopped"] is None and again.asked == [a, b, SYMBOLS[WEEKLY][1]]
+    assert sorted(f["symbol"] for f in out["failed_contracts"]) == sorted([a, b])
+    again2 = FakeClient(answers={a: [REFUSED], b: [REFUSED]})
+    assert _run(again2, root, missing_only=False, retry_refused=True)["stopped"] is None
+
+
+def test_an_expiry_refused_before_any_answer_waits_for_one_later_in_the_run(root):
+    # every weekly refused and nothing answered yet: held, then kept once the monthly answers
+    out = _run(FakeClient(answers={s: [REFUSED] for s in SYMBOLS[WEEKLY]}), root)
+    assert out["stopped"] is None and len(out["failed_contracts"]) == 4
+    assert out["pending_days"] == {"NIFTY": [d.isoformat() for d in GAP]}  # this run
+    again = FakeClient()
+    out2 = _run(again, root)  # the refusals are cached now: nothing asked, days merged
+    assert again.history_calls == 0 and all(_instruments(root, day) == 4 for day in GAP)
+    assert out2["pending_days"] == {}
+
+
+def test_refusals_with_no_answer_in_the_whole_run_are_reported(root):
+    every = [*SYMBOLS[WEEKLY], *SYMBOLS[MONTHLY]]
+    out = _run(FakeClient(answers={s: [REFUSED] for s in every}), root)
+    assert out["stopped"] == "refused_unconfirmed" and out["failed_contracts"] == []
+    assert len(out["retryable_failures"]) == 8
+
+
+def test_a_transient_error_on_the_confirming_request_does_not_stop_the_run(root):
+    good, last = SYMBOLS[WEEKLY][2], SYMBOLS[WEEKLY][-1]
+    flaky = {"s": "error", "message": "network: reset"}
+    out = _run(FakeClient(answers={good: [None, flaky], last: [REFUSED]}), root)
+    assert out["stopped"] is None and out["fetched"] == 9  # 8 + the confirm; the monthly too
+    assert [f["symbol"] for f in out["retryable_failures"]] == [last]
+    assert not expired._cache_path(root, "NIFTY", WEEKLY, last).exists()
 
 
 def test_a_refusal_at_the_end_of_an_expiry_is_kept_once_a_good_contract_still_answers(root):

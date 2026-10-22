@@ -681,7 +681,13 @@ def fyers_expired_options(
     typer.echo(json.dumps(result, indent=2, default=str))
     if result.get("stopped") == "credentials":
         raise typer.Exit(1)
-    if result.get("stopped") in ("rate_limited", "retryable", "blocked", "refused_streak"):
+    if result.get("stopped") in (
+        "rate_limited",
+        "retryable",
+        "blocked",
+        "refused_streak",
+        "refused_unconfirmed",
+    ):
         raise typer.Exit(2)
 
 
