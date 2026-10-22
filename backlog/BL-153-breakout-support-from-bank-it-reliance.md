@@ -111,3 +111,10 @@ more after charges than the ones they do not, by more than dropping the same sha
 - 2026-10-22 — created from the owner's follow-up; support definition (own breakout) and data source
   (Fyers download) chosen by the owner. Phase 0 registered and committed while BL-152's grid was running,
   before any of its results were read.
+- 2026-10-22 — **Phase 1 done.** `obt fyers history --symbol --name --asset` (new `fyers/history.backfill_symbol`)
+  downloaded 1-minute bars from 2022-01-03 to 2026-10-22: NIFTY IT (`asset=index/symbol=NIFTYIT`) and Reliance shares
+  (`asset=stock/symbol=RELIANCE`), 1,185 days each, 19 requests each, 6 short sessions each skipped. Coverage of
+  NIFTY's weekday sessions: confirmation period BANKNIFTY 100%, NIFTYIT 99.9%, RELIANCE 99.9% (missing 2022-10-24);
+  learning period 100% / 99.6% / 99.6% (missing 2024-11-01, 2025-10-21). The missing days are the Diwali muhurat
+  sessions (short by design). Above the 98% bar.
+

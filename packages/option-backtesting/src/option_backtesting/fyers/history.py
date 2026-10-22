@@ -22,6 +22,7 @@ from pathlib import Path
 
 from trading_data import ingest, lake
 from trading_data.db import connect
+from trading_data.instruments import InstrumentSpec, register
 from trading_data.quality import MIN_BARS
 
 from .client import Candle, FyersClient
@@ -67,28 +68,67 @@ def backfill_index(
     force: bool = False,
     log: Callable[[str], None] = print,
 ) -> dict:
+    """An underlying's index and India VIX, as the evening collector names them."""
     spec = UNDERLYINGS[underlying]
+    ids = register_contracts(root, [], [spec])
+    series = [("index", spec.name, spec.index_symbol), ("index", VIX_NAME, VIX_SYMBOL)]
+    return _backfill(client, root, series, ids, underlying, start, end, force, log)
+
+
+def backfill_symbol(
+    client: FyersClient,
+    root: Path,
+    name: str,
+    symbol: str,
+    asset: str = "index",
+    start: date | None = None,
+    end: date | None = None,
+    force: bool = False,
+    log: Callable[[str], None] = print,
+) -> dict:
+    """Any one Fyers symbol with 1-minute history (an index such as `NSE:NIFTYIT-INDEX`, or a share
+    such as `NSE:RELIANCE-EQ` with `asset="stock"`), into `bars_1m/asset=<asset>/symbol=<name>/`.
+    Registered as an NSE instrument of that asset class (BL-153)."""
+    if asset not in ("index", "stock"):
+        raise ValueError(f"asset must be index or stock, got {asset!r}")
+    spec = InstrumentSpec(asset, "NSE", name, vendor="fyers", vendor_symbol=symbol)
+    with connect(root, views=()) as con:
+        ids = {symbol: register(con, [spec])[spec.key]}
+    return _backfill(client, root, [(asset, name, symbol)], ids, name, start, end, force, log)
+
+
+def _backfill(
+    client: FyersClient,
+    root: Path,
+    series: list[tuple[str, str, str]],
+    ids: dict[str, int],
+    label: str,
+    start: date | None,
+    end: date | None,
+    force: bool,
+    log: Callable[[str], None],
+) -> dict:
+    """Walk back in 95-day chunks writing each (asset, name, symbol) series; the first series is the
+    one whose absence for EMPTY_CHUNKS_TO_STOP chunks means the start of Fyers' history."""
     end = end or date.today() - timedelta(days=1)  # today's session may still be open
     floor = start or date(2015, 1, 1)
-    ids = register_contracts(root, [], [spec])
-    series = [(spec.name, spec.index_symbol), (VIX_NAME, VIX_SYMBOL)]
-
+    lead = series[0][1]
     with connect(root, views=()) as con:
-        run_id = ingest.start_run(con, "fyers", "bars_1m_index_history", None, underlying)
+        run_id = ingest.start_run(con, "fyers", "bars_1m_index_history", None, label)
     calls_at_start = client.calls
-    written = {name: 0 for name, _ in series}
+    written = {name: 0 for _asset, name, _symbol in series}
     short_days: list[str] = []
     empty_streak = 0
     oldest: date | None = None
     try:
         for lo, hi in chunk_ranges(floor, end):
-            got_spot = False
-            for name, symbol in series:
+            got_lead = False
+            for asset, name, symbol in series:
                 by_day = split_by_day(client.minute_candles_range(symbol, lo, hi))
-                if name == spec.name and by_day:
-                    got_spot = True
+                if name == lead and by_day:
+                    got_lead = True
                 for day, candles in sorted(by_day.items()):
-                    path = lake.bars_1m_path(root, "index", name, day)
+                    path = lake.bars_1m_path(root, asset, name, day)
                     if path.exists() and not force:
                         continue
                     if len(candles) < MIN_BARS:
@@ -96,10 +136,10 @@ def backfill_index(
                         continue
                     lake.write_parquet(bars_table(ids[symbol], symbol, candles), path)
                     written[name] += 1
-                    if name == spec.name:
+                    if name == lead:
                         oldest = min(oldest, day) if oldest else day
-            log(f"{lo} .. {hi}: spot days written so far {written[spec.name]}")
-            empty_streak = 0 if got_spot else empty_streak + 1
+            log(f"{lo} .. {hi}: {lead} days written so far {written[lead]}")
+            empty_streak = 0 if got_lead else empty_streak + 1
             if empty_streak >= EMPTY_CHUNKS_TO_STOP:
                 log(f"no data in {EMPTY_CHUNKS_TO_STOP} consecutive chunks — reached the start")
                 break
