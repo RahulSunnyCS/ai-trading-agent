@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner's follow-up to BL-152; evidence only |
-| **Status** | In progress (Phase 0 registered 2026-10-22, before any BL-152 result was seen) |
+| **Status** | Done: killed, no variant's filter passes (2026-10-22) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-22 |
@@ -104,7 +104,24 @@ more after charges than the ones they do not, by more than dropping the same sha
 
 ## Open questions
 
-- None now; the owner chose the definition and the data source.
+- None.
+
+## Result
+
+**Killed.** Support = at least 2 of {BANKNIFTY, NIFTY IT, RELIANCE} beyond their own level of the same type at the
+decision minute. Learning period, four reference variants (stop `lvl`, trade `atm`, exit `eod`), BL-063 charges,
+D = mean net supported minus unsupported, p from 10,000 shuffles (seed 20261022), Holm over the four tests
+(`research/bl153/support.py`; BL-152 left no advancing variant to add):
+
+| Variant | Trades | Supported / not | D | p (Holm) | Result |
+|---|---|---|---|---|---|
+| `or30` | 200 | 86 / 114 | +₹53 | 0.434 (0.868) | fails: p |
+| `roll30` | 370 | 185 / 185 | +₹224 | 0.231 (0.692) | fails: p |
+| `held30` | 52 | 4 / 48 | +₹4,090 | 0.027 (0.106) | fails: fewer than 20 supported, Holm p |
+| `prevday` | 113 | 45 / 68 | −₹500 | 0.785 (0.868) | fails: D below zero |
+
+No variant was non-selective (supported shares 8% to 50%). The confirmation period was not read, as registered.
+Findings: `research/options/strategies/breakout/index-support.md`.
 
 ## Log
 
@@ -117,4 +134,14 @@ more after charges than the ones they do not, by more than dropping the same sha
   NIFTY's weekday sessions: confirmation period BANKNIFTY 100%, NIFTYIT 99.9%, RELIANCE 99.9% (missing 2022-10-24);
   learning period 100% / 99.6% / 99.6% (missing 2024-11-01, 2025-10-21). The missing days are the Diwali muhurat
   sessions (short by design). Above the 98% bar.
+- 2026-10-22 — **Phase 2 changed, logged:** the registered plan had the rule tester read other instruments. The support
+  comparison needs only the three instruments' bars and the variants' existing trades, so `research/bl153/support.py`
+  reads the bars directly (`rotation.triggers.load_grid(..., asset=)`) and builds each level with the same grammar
+  operators as BL-152's; the rule, the definition and the pass rule are as registered. Nothing in BL-153 reads another
+  instrument inside the tester.
+- 2026-10-22 — **Data repair:** the first run stopped on a truncated Reliance file. A check of every downloaded file found 10
+  such Reliance days (30 Sep to 9 Oct 2024 and 26 to 28 Mar 2025), re-downloaded with `obt fyers history --force` for
+  those ranges only; NIFTY IT had none. All 1,185 files per series read cleanly afterwards. The six short NIFTY and
+  Bank Nifty sessions the check also listed are genuine short sessions.
+- 2026-10-22 — **Phase 3 judged: killed** (see Result). No override was used.
 

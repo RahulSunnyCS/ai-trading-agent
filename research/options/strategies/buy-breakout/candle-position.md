@@ -68,3 +68,4 @@ per-day results re-run with per-day rows saved; a live rule would need a new fie
 - [30-minute consolidation](consolidation-30m.md), [breakout window](breakout-window.md).
 
 [bl097]: ../../../../backlog/BL-097-buy-parameter-sweep.md
+- The same ideas on the index with a 1-minute entry, tested in [BL-152](../breakout/README.md) (killed).

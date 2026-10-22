@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a new intraday entry idea from the owner; useful evidence, nothing waits on it |
-| **Status** | In progress (Phase 0 registered 2026-10-22; Phase 1 building) |
+| **Status** | Done: killed, no variant passes (2026-10-22) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-22 |
@@ -189,10 +189,37 @@ confirmation period for any variant.
 
 ## Open questions
 
-- Idea 2: what is it?
-- The trail (Supertrend flip instead of a premium trail): keep, or supersede before the run?
+- Idea 2: the owner's second idea never arrived in chat. The index-support follow-up (Bank Nifty, Nifty IT, Reliance) was
+  handled as [BL-153](BL-153-breakout-support-from-bank-it-reliance.md); anything else needs its own item.
+- The trail (Supertrend flip instead of a premium trail): kept as registered; the owner did not supersede it.
+
+## Result
+
+**Killed: no candidate.** All 192 variants ran on the learning period (NIFTY, 2024-10-09 to 2026-10-08, BL-063 charges,
+one lot) and were judged by the rule registered in Phase 0 (`research/bl152/judge.py`):
+
+- Events per level: `or30` 200, `roll30` 370, `held30` 52, `prevday` 113. No variant is thin (all at least 40).
+- **Candidates: 0.** The best t-statistic is 1.65 (`roll30_prem30_sellopp_trail`, 370 trades, +₹156 a trade), then
+  1.57 and 1.49 (both `held30`, 52 trades). The registered bar is t >= 2.0 with the event mean at or above the 90th
+  percentile of random entries.
+- 77 of 192 variants have a positive mean net; by trade type `atm` −₹71 (15 of 64 positive), `pct1` −₹16 (22),
+  `sellopp` +₹59 (40); by level `or30` −₹157 (8 of 48), `roll30` −₹52 (14), `prevday` −₹97 (13), `held30` +₹267 (42).
+  At 0.5% slippage 49 variants stay positive, at 1% 28.
+- **Multiple testing:** PBO 0.514 over 8 blocks (limit 0.5: fails) and 0.418 over 16; deflated Sharpe of the best
+  variant 0.265.
+- **Confirmation period (2022-01-03 to 2024-10-08): never opened.** Nothing advanced, so no reveal, no test.
+- All 192 tests are in the ledger exactly once (the run was paused and resumed once; a finished variant was never rerun).
+
+Findings pages: `research/options/strategies/breakout/`.
 
 ## Log
 
 - 2026-10-22 — created from the owner's request ("test all", 192 variants; "log it as a BL, do it
   overnight"). Phase 0 registered and committed before any code or run. Next: Phase 1.
+- 2026-10-22 — **Phase 1 built** (PR #281's grammar plus `max` / `min`, `at_first`, `min_since_first`, `max_since_first`,
+  trade-relative `at_entry` and `minutes_in_trade` in `exit_when`, with `control_when` required for such an exit; the
+  causality test covers each; `ruletest-acceptance.py` OK) and **Phase 2 run**: `specs.py` writes the 192 specs (all
+  compile to distinct rules), `run_grid.py` ran them (2 pilot variants, then a run paused for the owner's request and
+  resumed on 2 workers, with the worker count re-read per variant), about 2 hours in all.
+- 2026-10-22 — **Phase 3 judged: killed** (see Result). No override was needed and none was used.
+
