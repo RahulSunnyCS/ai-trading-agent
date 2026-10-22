@@ -101,7 +101,7 @@ Evidence and numbers: `packages/momentum-backtesting/docs/evaluation-review.md`.
 | ~~E10~~ fixed 2026-10-06 | **A holding whose stock stops trading is sold at its last close.** FORCEMOT did not trade on NSE for 3.5 months; four of six runs sold it in the gap. Should block the sale, like a lower-circuit lock. | Either way |
 | ~~E11~~ fixed 2026-10-06 | **A retired price series stays buyable until the next quarterly pool refresh.** One run added to pre-demerger `VEDL` at a frozen price for 11 weeks. | Distorts picks |
 | ~~E12~~ fixed 2026-10-06 | A taxed run's final sell-off charges the ₹16 depository fee per lot, not per stock. | Under 0.001 pt |
-| E13 | **Broad fills at Friday's close; the first real fill is Monday's open.** Costs a delay-0 run 1.0 pt of CAGR on average, over 1 pt on two of six. Add a Monday-fill option (committed rule, addendum 1). | Optimistic |
+| E13 | **Broad fills at Friday's close; the first real fill is Monday's open.** Costs a delay-0 run 1.0 pt of CAGR on average, over 1 pt on two of six. Add a Monday-fill option (committed rule, addendum 1). **Built for Broad 2026-10-22 (BL-036 Phase 2).** | Optimistic |
 | F9a | F9 confirmed and sized: 15 of 292 filed splits and bonuses in the universe since 2016 are not adjusted, all small bonuses. Held ones cost 0.1–0.3 pt. Fix in Phase 3 step 2. | Pessimistic |
 | F17 | **Concentration.** The top five companies are 42–81% of the compounded return; CUPID alone is 17–33% in every one of the six runs. | Fragile |
 | F18 | Unverified assumptions seen while reading: zero brokerage (not true at every broker), trims sell every tax lot pro rata (the rule is first-in-first-out), index-level instruments pay equity costs. | Small |
@@ -576,3 +576,4 @@ Also parked here (owner, 2026-10-06), priority P3:
 - 2026-10-22 — correction to the Monday-open figure: of the 1.9 points (replay, signal delay 0), the
   Monday fill alone is 0.7 points (0.83 in the engine option built for BL-036) and whole-share rounding
   on a Rs 50,000 sleeve is the other 1.2. The expected case (25.5%) includes both. Table in the doc.
+- 2026-10-22 — E13: the Monday-fill option is built for Broad (BL-036 Phase 2; `execution="mon_open"`, signal delay 0 only, a Friday-versus-Monday line on every Broad result). Stock and Custom Index are BL-036 Phase 2b.

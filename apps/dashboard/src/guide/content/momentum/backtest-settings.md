@@ -97,7 +97,7 @@ See [crash protection](glossary:crash-protection).
 | Cost model | **Flat %** per buy and sell (0.10% default), or **Itemised** real Indian charges (STT, stamp duty, exchange fees, DP charge, [slippage](glossary:slippage)) on an actual rupee capital. |
 | Trade | Trade at the signal week's close, or 1–2 weeks later, to see how much acting late hurts. |
 | P&L on (ETF) | Measure profit on the index or on the ETF you would actually hold. |
-| Fill at | Friday close, Monday open, or Monday 10:00. |
+| Fill at | Friday close, Monday open, or Monday 10:00 (ETF). On Broad Momentum: Friday close, or **Monday open** (the open of the first session after the signal Friday, with the trade delay at the signal close). The result then carries a line with the Monday-open figure next to the Friday-close one, so you see what trading on Monday costs. Stock and Custom Index do not have it yet. |
 | Apply capital-gains tax / Slab | Deduct Indian capital-gains tax on every sale, using your income-tax slab where needed. |
 
 ## Running

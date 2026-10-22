@@ -612,6 +612,18 @@ contract, not a shared service).
   feeds Custom Index only). A new dated row moves the live signal from its launch week on. Anything that *describes* the past
   with category membership must respect the date too: `exit_reasons.explain_exits(launches=...)` drops a
   dated category from a stock's tags for weeks before it launched, and `api._broad_parts` passes it.
+- `monday_fills.py` (BL-036 Phase 2, BL-010 E13) - Monday-open fills for a stock-based run.
+  `BacktestRequest.execution="mon_open"` on a **Broad** request builds a fill table (`run_backtest(
+  trade_prices=...)`, the same hook the ETF dataset uses) from the weekly adjusted close times one
+  plus the first following session's `open_gap` (`categories/daily_moves.py`); other columns use their
+  `daily/<name>.csv` open, or the signal close when there is none. Every buy, sell and holding is
+  valued on those prices, so the equity curve is sampled at Monday opens (its drawdown is not
+  comparable point for point with a Friday-close run). Needs `signal_delay` 0 (422 otherwise);
+  `mon_10am` is refused for Broad; Stock and Custom Index refuse any non-Friday fill (BL-036 Phase
+  2b). `circuit_exposure.lock_masks(session="first")` aligns the lock masks to the Monday session. A
+  Broad result carries `fill_companion` (`api._fill_companion`: the same run filled the other way, one
+  extra engine pass per sleeve; the weekly job skips it). In `saved_identity` a Broad `execution` is
+  dropped while it is `fri_close`, so no existing fingerprint moves.
 - `categories/exit_reasons.py` — display-only: for Broad Momentum closed trades the engine records as
   "ineligible" (rank NaN: the stock stopped being selected), fills the blank `exit_rank` (pool rank, else
   momentum rank) and sets a specific `reason` + `exit_cause` (`liquidity` with the failing gate test and its

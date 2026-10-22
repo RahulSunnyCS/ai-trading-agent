@@ -6,6 +6,7 @@ import {
   companionLine,
   describeConfig,
   diffConfigs,
+  fillLine,
   formEndDate,
   hindsightWarning,
   modifiedSections,
@@ -483,5 +484,36 @@ describe('formEndDate', () => {
   it('keeps a saved end date, and starts a fresh form on the data last week', () => {
     expect(formEndDate({ end: '2025-03-28' }, true, '2026-10-16')).toBe('2025-03-28');
     expect(formEndDate({}, false, '2026-10-16')).toBe('2026-10-16');
+  });
+});
+
+describe('fillLine', () => {
+  it('says what filling on Monday does, with both figures in the hover', () => {
+    const line = fillLine({
+      status: 'computed',
+      this_execution: 'fri_close',
+      other_execution: 'mon_open',
+      friday_close: { cagr: 0.1867, max_drawdown: -0.267, total_return: 2.59, trades: 2825 },
+      monday_open: { cagr: 0.1691, max_drawdown: -0.278, total_return: 2.2, trades: 2836 },
+      cagr_change: -0.0176,
+      max_drawdown_change: -0.011,
+    });
+    expect(line?.text).toMatch(/^Monday open 16\.9%/);
+    expect(line?.text).toMatch(/vs Friday close/);
+    expect(line?.title).toMatch(/18\.7% CAGR/);
+    expect(line?.title).toMatch(/Monday opens/);
+  });
+
+  it('says nothing when there is no figure to compare', () => {
+    expect(fillLine({ status: 'not_applicable', reason: 'needs delay 0' })).toBeNull();
+    expect(fillLine({ status: 'skipped', reason: 'weekly run' })).toBeNull();
+    expect(fillLine(undefined)).toBeNull();
+    expect(fillLine(null)).toBeNull();
+  });
+
+  it('reports a failed second run instead of hiding it', () => {
+    const line = fillLine({ status: 'failed', reason: 'see the server log' });
+    expect(line?.text).toMatch(/unavailable/);
+    expect(line?.title).toBe('see the server log');
   });
 });

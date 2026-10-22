@@ -77,12 +77,15 @@ _BROAD_ONLY = frozenset(
 )
 _INNER = frozenset({"commodity_copies", "debt_copies", "inner_exit_rank", "inner_top_n"})
 _ETF_LEVERS = frozenset({"exclude_high_vol", "execution", "reversal_screen_pct", "reversal_tilt"})
+#: The ETF levers a stock-based dataset still never reads. `execution` is read by all four now
+#: (Broad fills on Monday; Stock and Custom Index refuse anything but Friday close).
+_ETF_LEVERS_NO_FILL = _ETF_LEVERS - {"execution"}
 IGNORED_FIELDS: dict[str, frozenset[str]] = {
     "etf": _BROAD_ONLY | _INNER,
-    "stock": _BROAD_ONLY | _INNER | _ETF_LEVERS | {"track"},
-    "custom_index": _BROAD_ONLY | _ETF_LEVERS | {"track"},
+    "stock": _BROAD_ONLY | _INNER | _ETF_LEVERS_NO_FILL | {"track"},
+    "custom_index": _BROAD_ONLY | _ETF_LEVERS_NO_FILL | {"track"},
     "broad": _INNER
-    | _ETF_LEVERS
+    | _ETF_LEVERS_NO_FILL
     | {"defensive", "exit_rank", "filter_lookback", "slab_rate", "tax", "top_n", "track"}
     | {"universe"},
 }
@@ -133,6 +136,10 @@ def normalise(dataset: str, config: dict[str, Any]) -> dict[str, Any] | None:
         settings.pop("rebalance_offset", None)
     else:
         settings.pop("split_fridays", None)
+    # BL-036 Phase 2: a Monday-open fill is part of a Broad strategy only where it is on; every
+    # config saved before the option existed fills at Friday's close and keeps its fingerprint.
+    if dataset != "etf" and settings.get("execution") == "fri_close":
+        settings.pop("execution")
     if "broad_liquidity_filter" in settings:
         # A gated universe runs with the filter on whatever was sent (`api._liquidity_config`), so
         # the stored flag is not a setting there: both spellings are the same strategy.

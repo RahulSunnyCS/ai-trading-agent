@@ -85,6 +85,11 @@ SCENARIOS: dict[str, dict] = {
     # point-in-time `turnover_rank` universe (BL-036 Phase 1), which needs the whole stock lake;
     # the frozen fixture holds 170 stocks. The pin keeps each frozen request what it was.
     "broad_default": {"$meta": "broad", "with": {"broad_universe": "total_market"}},
+    # BL-036 Phase 2: the same run filled at Monday's open instead of Friday's close.
+    "broad_monday_open": {
+        "$meta": "broad",
+        "with": {"broad_universe": "total_market", "execution": "mon_open"},
+    },
     "broad_category_mode_off": {
         "$meta": "broad",
         "with": {
