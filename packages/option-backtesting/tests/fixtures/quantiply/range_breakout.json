@@ -1,0 +1,209 @@
+{
+  "_id": "6ab4a8015b54ddd42e7e6664",
+  "algoType": {
+    "code": "OPTIONS_SPREADS_LEGS",
+    "description": "Choose ATM, OTM or ITM strikes to create a spread",
+    "name": "Options Spreads: Legs",
+    "order": 1,
+    "shortName": "Legs"
+  },
+  "code": "OPTIONS_SPREADS_LEGS",
+  "configurations": {
+    "calcBaseSlTgt": "AVG_PRICE",
+    "calculationBase": "AVG_PRICE",
+    "calculationBaseExitPrice": "AVG_PRICE",
+    "endDay": 0,
+    "endTime": "15:15:00",
+    "entryOrderDelayType": null,
+    "entryOrderLimitPrice": {
+      "type": "PERCENT_VALUE",
+      "value": 3
+    },
+    "entryOrderTimeoutSeconds": 3,
+    "entryOrderType": "L",
+    "errorAutoSquareOff": false,
+    "exitOrderDelayType": null,
+    "handleCancelled": true,
+    "isORBEnabled": true,
+    "isReEntryEnabled": false,
+    "isWaitAndTradeEnabled": false,
+    "jOrderPlacement": "LATER",
+    "legs": [
+      {
+        "base": "NIFTY",
+        "expiryTag": "CURRENT_MONTH",
+        "id": "f5LXuSJYHVYHh2NiE3",
+        "mp": false,
+        "orb": {
+          "entryAt": "LOW",
+          "type": "ORB_INSTRUMENT"
+        },
+        "premium": {
+          "specificStrikeSelection": false,
+          "type": "PREMIUM_CLOSE_TO",
+          "value": 150
+        },
+        "product": "I",
+        "quantity": 1,
+        "segment": "SEGMENT_OPTIONS",
+        "selectionType": "PREMIUM",
+        "side": "CE",
+        "specificStrikeSelection": false,
+        "stoploss": {
+          "type": "ORB_PERCENT",
+          "value": 0
+        },
+        "target": {
+          "type": "ORB_PERCENT",
+          "value": 0
+        },
+        "transactionType": "S"
+      },
+      {
+        "base": "NIFTY",
+        "expiryTag": "CURRENT_MONTH",
+        "id": "uw7ia32VMmOzZd8Lfh",
+        "mp": false,
+        "orb": {
+          "entryAt": "LOW",
+          "type": "ORB_INSTRUMENT"
+        },
+        "premium": {
+          "specificStrikeSelection": false,
+          "type": "PREMIUM_CLOSE_TO",
+          "value": 150
+        },
+        "product": "I",
+        "quantity": 1,
+        "segment": "SEGMENT_OPTIONS",
+        "selectionType": "PREMIUM",
+        "side": "PE",
+        "specificStrikeSelection": false,
+        "stoploss": {
+          "type": "PER_POSITION_POINT",
+          "value": -30
+        },
+        "target": {
+          "type": "PER_POSITION_POINT",
+          "value": 100
+        },
+        "transactionType": "S"
+      },
+      {
+        "base": "NIFTY",
+        "expiryTag": "CURRENT_WEEK",
+        "id": "JiDUK8EA4jTo5vwSvX",
+        "mp": false,
+        "orb": {
+          "entryAt": "HIGH",
+          "type": "ORB_INSTRUMENT"
+        },
+        "premium": {
+          "specificStrikeSelection": false,
+          "type": "PREMIUM_CLOSE_TO",
+          "value": 100
+        },
+        "product": "I",
+        "quantity": 1,
+        "segment": "SEGMENT_OPTIONS",
+        "selectionType": "PREMIUM",
+        "side": "CE",
+        "specificStrikeSelection": false,
+        "stoploss": {
+          "type": "PER_POSITION_PERCENT",
+          "value": -50
+        },
+        "target": {
+          "type": "PER_POSITION_PERCENT",
+          "value": 50
+        },
+        "transactionType": "B"
+      },
+      {
+        "base": "NIFTY",
+        "expiryTag": "CURRENT_WEEK",
+        "id": "P4zzl5uwottIkkfGZq",
+        "mp": false,
+        "orb": {
+          "entryAt": "HIGH",
+          "type": "ORB_INSTRUMENT"
+        },
+        "premium": {
+          "specificStrikeSelection": false,
+          "type": "PREMIUM_CLOSE_TO",
+          "value": 100
+        },
+        "product": "I",
+        "quantity": 1,
+        "segment": "SEGMENT_OPTIONS",
+        "selectionType": "PREMIUM",
+        "side": "PE",
+        "specificStrikeSelection": false,
+        "stoploss": {
+          "type": "UNDERLYING_PERCENT",
+          "value": -50
+        },
+        "target": {
+          "type": "UNDERLYING_PERCENT",
+          "value": 150
+        },
+        "transactionType": "B"
+      }
+    ],
+    "legsAction": "SQ_OFF_LEG",
+    "limitOrderTimeoutSeconds": 3,
+    "lockTrailProfit": {
+      "lockAt": 600,
+      "moveBy": 1600,
+      "reachedTo": 3000,
+      "trailBy": 800,
+      "type": "TOTAL_AMOUNT"
+    },
+    "mDayInitEntry": true,
+    "matching": [
+      {
+        "active": true,
+        "mode": "NO_MATCHING"
+      }
+    ],
+    "moveStoplossToCost": false,
+    "mtmReEntryRepeatMode": "RE_ENTRY_REPEAT_SEPARATE",
+    "mtmStoplossSquareOffDelay": 0,
+    "multiplier": 1,
+    "orbEndTime": "10:30:00",
+    "positionReEntryRepeatMode": "RE_ENTRY_REPEAT_SEPARATE",
+    "reEntryAsapOrderDelay": 0,
+    "reEntryOrderPlacement": "LATER",
+    "startTime": "09:20:00",
+    "stoploss": {
+      "action": "SQ_OFF_ALL",
+      "type": "TOTAL_AMOUNT",
+      "value": -1716
+    },
+    "stoplossLimitPrice": {
+      "type": "PERCENT_VALUE",
+      "value": 3
+    },
+    "stoplossOrderPlacement": "ADVANCE",
+    "stoplossSquareOffBy": "SL",
+    "stoplossSquareOffDelay": 0,
+    "tradeOnlyFirstEntry": false,
+    "tradingType": "INTRADAY",
+    "trailingInterval": {
+      "frequency": "M",
+      "value": 1
+    },
+    "underlying": "UNDERLYING_INDEX"
+  },
+  "createdAt": "2026-09-24T04:33:05.908Z",
+  "day": "WED",
+  "enabled": false,
+  "entryErrorCount": 0,
+  "exitErrorCount": 0,
+  "hasError": false,
+  "hasWaiting": false,
+  "hasWaitingWT": false,
+  "name": "Sample Strategy- Range Breakout with different TG/SL (NIFTY)",
+  "status": "NOT_RUNNING",
+  "updatedAt": "2026-09-24T04:33:05.908Z"
+}

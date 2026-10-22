@@ -143,6 +143,25 @@ export const angelOneForm = {
   error: (page: Page): Locator => page.locator('#login-error'),
 };
 
+/**
+ * Quantiply (Angel One's algo platform), used by src/quantiply.ts. Its login screen
+ * (app.quantiply.angelone.in/auth?resume=/algos) shows one "Login / Sign Up" button, which
+ * navigates to Angel's SmartAPI publisher login ("Login to Quantiply") - the same page as
+ * AlgoTest's Angel One login, so the verified `angelOneForm` locators above fill it.
+ *
+ * Confirmed by a real headed login on 2026-10-18 (auth -> SmartAPI publisher login -> /algos in
+ * 11 s). If a step fails after a redesign, the run's diagnostics artifact holds a screenshot
+ * (inputs blanked) and redacted HTML named after the step (`fail-quantiply-...`); fix it from that.
+ */
+export const quantiplyPage = {
+  /** The single button on the /auth screen. Also the logged-OUT marker after the round trip. */
+  loginButton: (page: Page): Locator =>
+    page
+      .getByRole('button', { name: /log\s*in\s*\/\s*sign\s*up/i })
+      .or(page.getByRole('link', { name: /log\s*in\s*\/\s*sign\s*up/i }))
+      .first(),
+};
+
 /** Matched against error text to decide whether a retry is safe. */
 export const errorPatterns = {
   totpRejected:
@@ -216,4 +235,55 @@ export const fyersLogin = {
       .getByText(/invalid|incorrect|wrong|expired|blocked|locked|too many attempts/i)
       .locator('visible=true')
       .first(),
+};
+
+/**
+ * BL-137: the strategy builder (/backtest) at desktop width (1440 x 900; below about 500 px AlgoTest
+ * switches to a phone layout without "Save Strategy"). VERIFIED 2026-10-19 by importing and saving
+ * four strategies in the owner's session: the hidden file input, "Strategy imported successfully",
+ * "Save Strategy" → "Save New Strategy" (name pre-filled) → "Done" → "Strategy Saved", "Export .algtst".
+ * Deleting does not click (`strategy-delete.ts`).
+ */
+export const strategyPage = {
+  importInput: (page: Page): Locator => page.locator('input[type=file][accept*=".algtst"]'),
+  importButton: (page: Page): Locator => page.getByText('Import .algtst').first(),
+  newStrategy: (page: Page): Locator => page.getByText('New Strategy').first(),
+  title: (page: Page, name: string): Locator => page.getByText(name, { exact: true }).first(),
+  saveButton: (page: Page): Locator => page.getByRole('button', { name: /Save Strategy/ }),
+  saveDialog: (page: Page): Locator => page.getByText('Save New Strategy'),
+  saveName: (page: Page): Locator =>
+    page.getByText('Strategy Name:').locator('xpath=following::input[1]'),
+  saveDone: (page: Page): Locator => page.getByRole('button', { name: 'Done', exact: true }),
+  savedToast: (page: Page): Locator => page.getByText('Strategy Saved'),
+  exportButton: (page: Page): Locator => page.getByText('Export .algtst'),
+};
+
+/**
+ * BL-138: Algo Trade (/live). VERIFIED 2026-10-19 from the owner's session: the Activation rows
+ * (select a row by its name, then "Setup Execution" / "Edit Execution" and "Activate"), and the
+ * "Edit execution for <name>" sheet (Quantity Multiplier, per-leg NRML/MIS selects, Weekdays/DTE
+ * day boxes, "Setup Execution Settings"). What "Activate" opens is NOT yet seen.
+ */
+export const livePage = {
+  header: (page: Page): Locator => page.getByText('Strategy Deployed').first(),
+  anyRowCount: (page: Page): Locator => page.getByText(/^\d+ Deployed$/).first(),
+  row: (page: Page, name: string): Locator => page.getByText(name, { exact: true }).first(),
+  setupExecution: (page: Page): Locator =>
+    page.getByRole('button', { name: /^(Setup|Edit) Execution$/ }).first(),
+  activate: (page: Page): Locator =>
+    page.getByRole('button', { name: 'Activate', exact: true }).filter({ visible: true }).first(),
+  /** The sheet: the innermost element holding its title and its save button. */
+  sheet: (page: Page, name: string): Locator =>
+    page
+      .locator('div')
+      .filter({ has: page.getByText(`Edit execution for ${name}`) })
+      .filter({ has: page.getByRole('button', { name: 'Setup Execution Settings' }) })
+      .last(),
+  sheetSave: (sheet: Locator): Locator =>
+    sheet.getByRole('button', { name: 'Setup Execution Settings' }),
+  /** Anything that may open after "Activate": a dialog or a bottom sheet. */
+  popup: (page: Page): Locator =>
+    page
+      .locator('[role=dialog], [role=alertdialog], [class*="fixed bottom-0"][class*="flex-col"]')
+      .filter({ visible: true }),
 };

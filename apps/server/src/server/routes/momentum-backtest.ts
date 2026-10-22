@@ -557,6 +557,15 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     await forward(reply, '/api/holdings/sync', { method: 'POST' });
   });
 
+  // BL-142: the Kite connection (read-only). Login returns Kite's login URL as JSON; the login
+  // itself comes back to the Momentum API on the laptop, never through this proxy.
+  fastify.get('/api/momentum/kite/status', async (_request, reply) => {
+    await forward(reply, '/api/kite/status');
+  });
+  fastify.post('/api/momentum/kite/login', async (_request, reply) => {
+    await forward(reply, '/api/kite/login', { method: 'POST' });
+  });
+
   // BL-051: the latest live-money rules check, and a manual re-check (never sends).
   fastify.get('/api/momentum/live-rules', async (_request, reply) => {
     await forward(reply, '/api/live-rules');

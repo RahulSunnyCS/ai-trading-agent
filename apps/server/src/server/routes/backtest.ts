@@ -52,6 +52,10 @@
  *                                                 Correlation). Both requireAccess, no credit
  *  GET  /api/backtest/legwise/rotation/basket   — one list's (or the fixed base's) picks for a day,
  *                                                 correlated over a window. requireAccess
+ *  GET  /api/backtest/legwise/live/days         — collected days the Live page can replay. requireAccess
+ *  GET  /api/backtest/legwise/live/session      — one day on the 1-minute grid (spot, VIX, the rolling and
+ *                                                 the fixed 09:15 straddle). requireAccess; underlying is an
+ *                                                 enum, the day a date, nothing else is forwarded
  *  GET  /api/backtest/legwise/rotation/regime   — the forward window's market mix beside P1, P2 and P3.
  *  GET  /api/backtest/legwise/rotation/drawdowns — a list's drawdown episodes against the fixed base.
  *                                                 requireAccess
@@ -59,6 +63,9 @@
  *                                                 start band, against its own past. requireAccess
  *  GET  /api/backtest/legwise/rotation/lot-plans — As picked, Dir Boost and Duo for one book's Adaptive
  *                                                 picks, forward from 2026-10-19 (BL-135). requireAccess
+ *  GET  /api/backtest/legwise/rotation/live    — the days' live results beside the paper ones: running
+ *                                                 totals per platform + list, slippage by shape (BL-141).
+ *                                                 requireAccess
  *  GET  /api/backtest/legwise/rotation/portfolio/day  — one list's basket under a portfolio MTM stop
  *                                                 (BL-095): the day replayed, stop level and minute.
  *  GET  /api/backtest/legwise/rotation/portfolio/days — every scored list-day with and without the stop.
@@ -799,6 +806,49 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation basket ---
+  // --- live page --- the Live tab's data (live/session.py, read-only). The underlying is an enum and
+  // the day a date; nothing else is forwarded.
+  fastify.get(
+    '/api/backtest/legwise/live/days',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { underlying: { type: 'string', enum: ['NIFTY', 'SENSEX'] } },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(reply, `/legwise/live/days${upstreamQuery(q, ['underlying'])}`);
+    },
+  );
+  fastify.get(
+    '/api/backtest/legwise/live/session',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            underlying: { type: 'string', enum: ['NIFTY', 'SENSEX'] },
+            day: { type: 'string', pattern: DATE_RE },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/live/session${upstreamQuery(q, ['underlying', 'day'])}`,
+      );
+    },
+  );
+  // --- end live page ---
   // --- rotation regime --- "Forward days vs research periods" (rotation/regime.py, read-only).
   // No parameters: the periods are the registered ones, so nothing from the query is forwarded.
   fastify.get(
@@ -885,6 +935,33 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation lot plans ---
+
+  // --- rotation live vs paper --- the Rotation page's "Live vs paper" card (BL-141 Phase 3,
+  // rotation/live_compare.py, read-only). Only `from` and `to` are forwarded, as plain days.
+  fastify.get(
+    '/api/backtest/legwise/rotation/live',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', pattern: '^(\\d{4}-\\d{2}-\\d{2})?$' },
+            to: { type: 'string', pattern: '^(\\d{4}-\\d{2}-\\d{2})?$' },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/live${upstreamQuery(q, ['from', 'to'])}`,
+      );
+    },
+  );
+  // --- end rotation live vs paper ---
 
   // --- rotation portfolio stop --- BL-095: what a list's basket did under a portfolio MTM stop
   // (rotation/portfolio.py, read-only). `stop` is rupees (empty, 0 or below = none) and `trail`

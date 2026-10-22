@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { telegramSink } from './alerts.js';
 import { startApi } from './api.js';
+import { SettingsStore, syncGithub, validate } from './automation.js';
 import { allBuiltins } from './builtins.js';
 import { jobEnv } from './env.js';
 import { History, pidAlive } from './history.js';
@@ -11,6 +12,7 @@ import { JOBS, findJob } from './jobs.js';
 import { skippedToday, startLoop } from './loop.js';
 import { type RunContext, runJob } from './runner.js';
 import { formatIst, nextDue } from './schedule.js';
+import { startStopListener } from './stop-button.js';
 
 /**
  * `bun run jobs status` — every job, its schedule, last run and next run.
@@ -45,6 +47,45 @@ function context(history: History): RunContext {
 function openHistory(): History {
   mkdirSync(stateDir(), { recursive: true });
   return new History(join(stateDir(), 'scheduler.db'));
+}
+
+export function settingsSnapshotPath(): string {
+  return join(stateDir(), 'automation-settings.json');
+}
+
+function openSettings(): SettingsStore {
+  mkdirSync(stateDir(), { recursive: true });
+  return new SettingsStore(join(stateDir(), 'scheduler.db'), settingsSnapshotPath());
+}
+
+/**
+ * `jobs settings [show]` — the current automation settings (BL-140).
+ * `jobs settings set <file.json>` — save a new version from a file, then set the GitHub variables.
+ */
+async function settingsCommand(sub: string | undefined, file: string | undefined): Promise<number> {
+  const store = openSettings();
+  try {
+    if (sub === undefined || sub === 'show') {
+      console.log(JSON.stringify(store.current(), null, 2));
+      return 0;
+    }
+    if (sub === 'set' && file) {
+      const checked = validate(JSON.parse(readFileSync(file, 'utf8')));
+      if ('errors' in checked) {
+        console.error(`invalid settings:\n  ${checked.errors.join('\n  ')}`);
+        return 1;
+      }
+      const saved = store.save(checked.settings);
+      const outcome = await syncGithub(checked.settings);
+      store.noteGithub(saved.version, outcome);
+      console.log(`saved version ${saved.version}; GitHub variables ${outcome}`);
+      return outcome.startsWith('ok') ? 0 : 1;
+    }
+    console.error('usage: bun run jobs settings [show | set <file.json>]');
+    return 2;
+  } finally {
+    store.close();
+  }
 }
 
 function status(): void {
@@ -122,18 +163,36 @@ function serve(): void {
   console.log(
     `scheduler started ${formatIst(new Date())} IST — ${JOBS.length} jobs, logs in ${logDir()}`,
   );
-  startApi({ ctx, jobs: JOBS, logRoots: [join(REPO_ROOT, 'packages/momentum-backtesting/data')] });
+  const settings = openSettings();
+  settings.writeSnapshot(); // the jobs always find the current version, even before a first Save
+  startApi({
+    ctx,
+    jobs: JOBS,
+    logRoots: [join(REPO_ROOT, 'packages/momentum-backtesting/data')],
+    settings,
+  });
   startLoop({ ctx, jobs: JOBS, alerts: telegramSink(ctx.env) });
+  // BL-143 Phase 4, only with STOP_BUTTON=on: then this process is the bot's one getUpdates
+  // consumer. (The stop hold itself is checked by runJob, for every way a job starts.)
+  startStopListener({
+    repoRoot: REPO_ROOT,
+    env: () => jobEnv(REPO_ROOT),
+    logDir: logDir(),
+    history: ctx.history,
+  });
 }
 
 if (import.meta.main) {
-  const [command, arg] = process.argv.slice(2);
+  const [command, arg, arg2] = process.argv.slice(2);
   if (command === 'status' || command === undefined) status();
   else if (command === 'run') process.exitCode = await runNow(arg);
   else if (command === 'serve') serve();
   else if (command === 'skipped') skipped();
+  else if (command === 'settings') process.exitCode = await settingsCommand(arg, arg2);
   else {
-    console.error('usage: bun run jobs [status | run <job> | serve | skipped]');
+    console.error(
+      'usage: bun run jobs [status | run <job> | serve | skipped | settings [show | set <file>]]',
+    );
     process.exitCode = 2;
   }
 }

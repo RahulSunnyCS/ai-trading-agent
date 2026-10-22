@@ -41,7 +41,8 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
     `momentum_owner_settings`, `momentum_orders` — Momentum's "Your orders" (BL-051 Phase 3).
     Shipped first as `011_momentum_orders`, so it is idempotent (see Migrations below)
 - `lake/` — immutable Parquet price data, read through TEMP views (`bars_1m_option`,
-  `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`). One file per
+  `bars_1m_index`, `bars_1m_stock` (shares' 1-minute bars, BL-153), `bars_1m_future`,
+  `symbol_master`, `bars_1d_stock`). One file per
   (asset, name, trading day); `lake.BAR_SCHEMA` / `lake.OPT_SCHEMA` are the one definition
   every bars_1m writer casts to (the Fyers collector imports them). `lake.write_parquet` refuses
   a bars_1m file with any other schema: the 1-minute and derived views bind from the first file
@@ -57,7 +58,8 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
   rank `iv_7d_1500`). Views of the same names (static placeholder columns in `db.LAKE_VIEWS`,
   checked against the schemas by a test, so `db` never imports numpy).
   Each file carries `derived_version` in its Parquet metadata; a rebuild redoes only missing
-  or out-of-version files; the default window starts at `DERIVED_FROM` (2024-10-01), an explicit
+  or out-of-version files, plus any `force_days` (`derived.rebuild(force_days=...)`: days whose
+  option partition gained rows, e.g. the expired-option repair's top-up); the default window starts at `DERIVED_FROM` (2024-10-01), an explicit
   `--day` / `--days` may reach back before it (the 2013-2021 vendor history).
   `obt legwise run --bars 5m` runs the unchanged engine on them
 - `raw/` — gzipped verbatim vendor responses

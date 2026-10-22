@@ -35,10 +35,12 @@ def test_fresh_catalog_migrates_once_and_loads_reference(root):
             ("010_ref_rates",),
             ("011_momentum_result_changes",),
             ("012_momentum_orders",),
+            ("013_momentum_kite",),
+            ("014_momentum_lots",),
         ]
         assert con.execute("SELECT count(*) FROM ref_lot_sizes").fetchone()[0] > 0
     with connect(root) as con:  # second open: nothing re-applied, nothing duplicated
-        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 12
+        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 14
 
 
 # The orders tables as the first draft of BL-051 Phase 3 created them, applied to the owner's live
@@ -136,6 +138,50 @@ def test_012_applies_over_catalog_with_old_011_ledger(root):
         assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == ledger_rows
 
 
+def test_013_keeps_every_orders_row_and_accepts_kite(root):
+    """BL-142: 013 rebuilds momentum_holdings and momentum_owner_settings to widen their CHECKs.
+    A catalog at 012 with rows in both keeps every row, and then takes Kite snapshots, a 'kite'
+    holdings source and a Kite and a Fyers snapshot in the same second."""
+    old_ddl = dict(_migrations())["012_momentum_orders"]
+    with connect(root, views=()) as con:  # a current catalog, rewound to 012's tables
+        for table in ("momentum_cash", "momentum_holdings", "momentum_owner_settings"):
+            con.execute(f"DROP TABLE {table}")
+        con.execute("DROP TABLE momentum_holding_rules")
+        con.execute("DROP TABLE momentum_orders")
+        con.execute(old_ddl)
+        con.execute(
+            "DELETE FROM schema_migrations WHERE version IN ('013_momentum_kite', "
+            "'014_momentum_lots')"
+        )
+        con.execute(
+            "INSERT INTO momentum_owner_settings (owner, min_trade_rs, holdings_source, "
+            "paper_capital_rs) VALUES ('rahul', 7000, 'fyers', 50000)"
+        )
+        con.execute(
+            "INSERT INTO momentum_holdings VALUES ('rahul', '2026-10-16T14:15:00+05:30', 'fyers', "
+            "'SBIN', 10, 800.5)"
+        )
+        with pytest.raises(Exception, match="CHECK"):
+            con.execute("UPDATE momentum_owner_settings SET holdings_source = 'kite'")
+    with connect(root, views=()) as con:
+        assert con.execute(
+            "SELECT owner, min_trade_rs, holdings_source, paper_capital_rs "
+            "FROM momentum_owner_settings"
+        ).fetchall() == [("rahul", 7000.0, "fyers", 50000.0)]
+        assert con.execute("SELECT source, symbol, quantity FROM momentum_holdings").fetchall() == [
+            ("fyers", "SBIN", 10.0)
+        ]
+        con.execute("UPDATE momentum_owner_settings SET holdings_source = 'kite'")
+        at = "2026-10-23T14:15:00+05:30"
+        con.execute(f"INSERT INTO momentum_holdings VALUES ('rahul', '{at}', 'kite', 'SBIN', 5, 1)")
+        con.execute(
+            f"INSERT INTO momentum_holdings VALUES ('rahul', '{at}', 'fyers', 'SBIN', 3, 1)"
+        )
+        con.execute(f"INSERT INTO momentum_cash VALUES ('rahul', '{at}', 'kite', 25000)")
+        with pytest.raises(Exception, match="CHECK"):
+            con.execute("UPDATE momentum_owner_settings SET holdings_source = 'broker'")
+
+
 def test_004_moves_stock_benchmark_tris_out_of_momentum_prices(root):
     """A catalog written under 003 kept the stock dataset's TRIs in momentum_prices;
     004 moves them to stock_weekly_series and leaves everything else (incl. the
@@ -195,7 +241,13 @@ def test_a_concurrent_read_only_connect_does_not_fail_while_a_write_connection_i
 
 def test_views_exist_and_are_empty_on_a_fresh_lake(root):
     with connect(root) as con:
-        for view in ("bars_1m_option", "bars_1m_index", "bars_1m_future", "symbol_master"):
+        for view in (
+            "bars_1m_option",
+            "bars_1m_index",
+            "bars_1m_stock",
+            "bars_1m_future",
+            "symbol_master",
+        ):
             assert con.execute(f"SELECT count(*) FROM {view}").fetchone()[0] == 0
 
 
@@ -383,6 +435,19 @@ def test_fixed_schema_views_read_every_file(root):
         ).fetchone() == (3, 3, 303.0)
     assert LAKE_VIEWS.keys() >= FIXED_SCHEMA_VIEWS
     assert "bars_1d_stock" not in FIXED_SCHEMA_VIEWS  # its files differ in column order
+
+
+def test_stock_minute_bars_are_visible_through_their_own_view(root):
+    """Shares' 1-minute bars (asset=stock) have a catalog view, as the index bars do."""
+    for i, day in enumerate((DAY, date(2026, 9, 30))):
+        lake.write_parquet(
+            _index_bars(200.0 + i), lake.bars_1m_path(root, "stock", "RELIANCE", day)
+        )
+    with connect(root, views=("bars_1m_stock",)) as con:
+        assert con.execute(
+            "SELECT count(*), count(DISTINCT date), min(symbol), sum(close) FROM bars_1m_stock"
+        ).fetchone() == (2, 2, "RELIANCE", 401.0)
+    assert "bars_1m_stock" in LAKE_VIEWS
 
 
 def test_partitions_lists_every_day_file_of_one_asset(root):

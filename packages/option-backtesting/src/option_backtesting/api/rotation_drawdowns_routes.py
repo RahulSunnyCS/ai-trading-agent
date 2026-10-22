@@ -4,10 +4,11 @@ Rotation page's "Drawdown episodes" card (BL-058 Phase 4, widget 8). The maths i
 writes anything.
 
     GET /legwise/rotation/drawdowns?list=A|B|C|REF&window=P1|P2|last63|forward&min_depth=500
-        [&stop=10000&trail=sl:1000,500]
+        [&stop=8000&trail=sl:1000,500&lots=1]
 
 `stop` / `trail` (BL-095) also run the series through the portfolio stop and return it under
-`with_stop` beside the registered figures; empty, 0 or below is no stop. While that replay is
+`with_stop` beside the registered figures; empty, 0 or below is no stop; `lots=1..10` replays
+each pick at that many lots (the per-lot series itself does not depend on it). While that replay is
 still running the registered figures come back with `with_stop_pending: true` and `with_stop`
 null; the page asks again.
 
@@ -26,6 +27,7 @@ from fastapi.responses import JSONResponse
 
 from ..rotation import drawdowns, warm
 from ..rotation.portfolio import PortfolioStopError, settings_from_query
+from .rotation_routes import track_and_lots
 
 router = APIRouter(prefix="/legwise/rotation/drawdowns")
 
@@ -46,16 +48,18 @@ def get_drawdowns(
     min_depth: float = Query(default=drawdowns.DEFAULT_MIN_DEPTH),
     stop: str | None = None,
     trail: str | None = None,
+    lots: str | None = None,
 ) -> Any:
     from ..fyers.daily import data_dir
 
     try:
         setting = settings_from_query(stop, trail)
-    except PortfolioStopError as error:
+        _, lots_ = track_and_lots(None, lots)
+    except (PortfolioStopError, ValueError) as error:
         return _error(422, str(error))
     pf = setting if (setting[0] is not None and setting[0] > 0) or setting[1] else None
     root = data_dir()
-    key = (root, list_, window, min_depth, None if pf is None else (pf[0], pf[1]))
+    key = (root, list_, window, min_depth, None if pf is None else (pf[0], pf[1]), lots_)
     now = time.monotonic()
     with _lock:
         hit = _cache.get(key)
@@ -70,7 +74,9 @@ def get_drawdowns(
             # page asks again; the replay keeps running and fills the path cache.
             done, value = warm.run_within(
                 ("drawdowns", *key),
-                lambda: drawdowns.build(list_, window, min_depth, root, portfolio=pf),
+                lambda: drawdowns.build(
+                    list_, window, min_depth, root, portfolio=pf, lots_per=lots_
+                ),
             )
             if not done:
                 registered = drawdowns.build(list_, window, min_depth, root)

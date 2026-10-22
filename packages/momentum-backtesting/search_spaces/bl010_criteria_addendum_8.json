@@ -1,0 +1,17 @@
+{
+  "written_before_running": "2026-10-22T09:30:00+05:30",
+  "name": "BL-010 criteria, addendum 8: the gate numbers of addendum 6 as keys, so the check script reads them instead of restating them",
+  "adds_to": "bl010_criteria_addendum_6.json (gates G1 to G6) and addendum 7 (the supplement's repeats of G1, G2, G3, G5)",
+  "rule": "Restates, as machine-readable keys, numbers addendum 6 gave in words. Nothing here changes a threshold, a variant or a verdict; the check already ran on these numbers. Never edited after the fact: a change is a new file that names this one as superseded, with the reason.",
+  "reason": "Code review of PR 285, finding 4: the package rule is that code never restates a threshold (criteria.py reads the committed files), and scripts/bl010_four_sectors_check.py had retyped the numbers as constants. The script now reads them from here.",
+  "four_sectors_gates": {
+    "g1_excess_over_mom30": 0.05,
+    "g3_worst_fy_vs_mom30": -0.1,
+    "g4_median_gap_pts": -5.0,
+    "g4_share_above_mom30": 0.75,
+    "g4_above_mom30": 0.05,
+    "g5_alpha": 0.05,
+    "g5_abs_t": 2.0,
+    "g6_margin_over_p95": 0.05
+  }
+}

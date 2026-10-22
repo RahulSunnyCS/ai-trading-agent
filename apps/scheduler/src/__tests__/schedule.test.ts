@@ -174,8 +174,96 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('is the 23rd job', () => {
-    expect(JOBS).toHaveLength(23);
+  it('has 36 jobs', () => {
+    expect(JOBS).toHaveLength(36); // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor
+  });
+});
+
+describe('live capture (BL-141)', () => {
+  const job = (id: string) => JOBS.find((j) => j.id === id);
+  const minutes = (at = '') => {
+    const [h = 0, m = 0] = at.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  it('one attempt at 15:40 that never holds the Quantiply group past 15:50 or alerts itself', () => {
+    const capture = job('live-capture');
+    expect(minutes(capture?.schedule.at)).toBeGreaterThan(15 * 60 + 28); // the last exit
+    expect(capture?.retries).toBe(0);
+    expect(minutes(capture?.schedule.at) + (capture?.timeoutMinutes ?? 99)).toBeLessThanOrEqual(
+      15 * 60 + 50,
+    );
+    expect(capture?.steps).toEqual([
+      ['node_modules/.bin/tsx', 'src/live-capture.ts', '--soft-fail'],
+    ]);
+    expect(capture?.schedule.on('2026-10-20')).toBe(false); // a market holiday
+    const ids = JOBS.map((j) => j.id);
+    expect(ids.indexOf('live-capture')).toBeLessThan(ids.indexOf('quantiply-disable'));
+  });
+
+  it('its retries come after the disable and end before the 16:45 Quantiply upload', () => {
+    const retry = job('live-capture-retry');
+    const start = minutes(retry?.schedule.at);
+    expect(start).toBeGreaterThan(minutes(job('quantiply-disable')?.schedule.at));
+    const tries = (retry?.retries ?? 0) + 1;
+    const end =
+      start +
+      tries * (retry?.timeoutMinutes ?? 0) +
+      (retry?.retries ?? 0) * (retry?.retryDelayMinutes ?? 0);
+    expect(end).toBeLessThanOrEqual(16 * 60 + 30);
+    expect(end).toBeLessThan(minutes(job('quantiply-evening')?.schedule.at));
+    expect(retry?.steps).toEqual([
+      ['node_modules/.bin/tsx', 'src/live-capture.ts', '--no-backfill'],
+    ]);
+    expect(retry?.noRetryExitCodes).toEqual([3]);
+  });
+
+  it('both in the Quantiply group, so their logins never overlap another Quantiply job', () => {
+    for (const id of ['live-capture', 'live-capture-retry']) {
+      expect(job(id)?.group).toBe('quantiply');
+    }
+  });
+});
+
+describe('Quantiply deploy jobs (BL-139 Phase 4)', () => {
+  const job = (id: string) => JOBS.find((j) => j.id === id);
+  const minutes = (id: string) => {
+    const [h = 0, m = 0] = (job(id)?.schedule.at ?? '').split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  it('disable after the session, before the upload; enable after each upload', () => {
+    expect(minutes('quantiply-disable')).toBeGreaterThan(15 * 60 + 28); // the last exit
+    expect(minutes('quantiply-disable')).toBeLessThan(minutes('quantiply-evening'));
+    expect(minutes('quantiply-deploy')).toBeGreaterThan(minutes('quantiply-evening'));
+    expect(minutes('quantiply-deploy-topup')).toBeGreaterThan(minutes('quantiply-topup'));
+    // one group: a deploy waits for the upload (and its retries); logins never overlap
+    for (const id of [
+      'quantiply-disable',
+      'quantiply-evening',
+      'quantiply-topup',
+      'quantiply-deploy',
+      'quantiply-deploy-topup',
+    ]) {
+      expect(job(id)?.group).toBe('quantiply');
+      expect(job(id)?.schedule.on('2026-10-20')).toBe(false); // a market holiday
+    }
+    // the loop starts due jobs in this order: a disable caught up with the upload goes first
+    const ids = JOBS.map((j) => j.id);
+    expect(ids.indexOf('quantiply-disable')).toBeLessThan(ids.indexOf('quantiply-evening'));
+  });
+
+  it('never retries an enable; both accounts run, each with --apply', () => {
+    for (const id of ['quantiply-deploy', 'quantiply-deploy-topup']) {
+      expect(job(id)?.retries).toBe(0);
+      const cmd = job(id)?.steps.at(-1)?.at(-1) ?? '';
+      expect(cmd).toContain('--broker angelone --mode enable --apply');
+      expect(cmd).toContain('--broker finvasia --mode enable --apply');
+    }
+    const disable = job('quantiply-disable');
+    expect(disable?.retries).toBeGreaterThan(0); // disabling again changes nothing
+    expect(disable?.noRetryExitCodes).toEqual([3]);
+    expect(disable?.steps.at(-1)?.at(-1)).toContain('--mode disable --apply');
   });
 });
 

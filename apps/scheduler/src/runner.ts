@@ -3,7 +3,9 @@ import { closeSync, mkdirSync, openSync, writeSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 import type { History, Trigger } from './history.js';
 import { JOBS, type Job } from './jobs.js';
+import { pausedReason } from './pause.js';
 import { formatIst, istDay } from './schedule.js';
+import { heldReason } from './stop-hold.js';
 
 export interface RunContext {
   repoRoot: string;
@@ -55,17 +57,37 @@ function runStep(
   env: Record<string, string>,
   logFd: number,
   timeoutMs: number,
+  onSpawn: (pgid: number) => void = () => undefined,
 ): Promise<{ code: number; error: string | null }> {
   const [cmd = '', ...args] = step;
   const exe = resolveExecutable(cmd, cwd, env.PATH ?? '');
   if (!exe) return Promise.resolve({ code: NOT_FOUND, error: `${cmd}: not found on PATH` });
   return new Promise((resolve) => {
-    const child = spawn(exe, args, { cwd, env, stdio: ['ignore', logFd, logFd] });
+    // Its own process group, so a timeout ends everything the step started (a `sh -c` step's
+    // commands, a browser), not just the first process: a retry must never overlap a survivor.
+    const child = spawn(exe, args, { cwd, env, stdio: ['ignore', logFd, logFd], detached: true });
+    // detached: the child leads its own group, whose id is its pid. Recorded on the run row, so a
+    // scheduler that stops mid-step does not make the step look ended while it still runs.
+    if (child.pid) {
+      try {
+        onSpawn(child.pid);
+      } catch {
+        // a bookkeeping failure must not fail the step
+      }
+    }
+    const killAll = (signal: NodeJS.Signals) => {
+      try {
+        if (child.pid) process.kill(-child.pid, signal);
+        else child.kill(signal);
+      } catch {
+        child.kill(signal);
+      }
+    };
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      child.kill('SIGTERM');
-      setTimeout(() => child.kill('SIGKILL'), 10_000).unref();
+      killAll('SIGTERM');
+      setTimeout(() => killAll('SIGKILL'), 10_000).unref();
     }, timeoutMs);
     child.on('error', (error) => {
       clearTimeout(timer);
@@ -154,6 +176,21 @@ export function runJob(
       fd = openSync(logPath, 'a');
       const logFd = fd;
       for (attempts = 1; attempts <= job.retries + 1; attempts++) {
+        // BL-143: the stop button's hold (and BL-140's pause), checked after any wait for the group
+        // and before every attempt, whoever started the run (schedule, catch-up, `jobs run`, Apply now).
+        const held = heldReason(job.id, ctx.env) ?? pausedReason(job.id, ctx.env, now());
+        if (held) {
+          writeSync(logFd, `\n=== ${job.id} · ${trigger} · ${formatIst(now())} IST: ${held}\n`);
+          const tried = attempts - 1;
+          if (tried === 0) {
+            ctx.history.finish(runId, 0, 0, now(), held);
+            return { runId, ok: true, exitCode: 0, attempts: 0, logPath, error: held };
+          }
+          // held before a retry: the earlier attempt's failure stays the run's result
+          const error = `${result.error ?? `exit ${result.code}`}; retry ${held}`;
+          ctx.history.finish(runId, result.code, tried, now(), error);
+          return { runId, ok: false, exitCode: result.code, attempts: tried, logPath, error };
+        }
         writeSync(
           logFd,
           `\n=== ${job.id} · ${trigger} · attempt ${attempts} · ${formatIst(now())} IST\n`,
@@ -172,12 +209,16 @@ export function runJob(
         }
         for (const step of job.steps) {
           writeSync(logFd, `$ ${step.join(' ')}\n`);
-          result = await runStep(step, cwd, ctx.env, logFd, job.timeoutMinutes * 60_000);
+          result = await runStep(step, cwd, ctx.env, logFd, job.timeoutMinutes * 60_000, (pgid) =>
+            ctx.history.setChild(runId, pgid),
+          );
           if (result.error) writeSync(logFd, `! ${result.error}\n`);
           if (result.code !== 0) break;
         }
         writeSync(logFd, `=== exit ${result.code}\n`);
         if (result.code === 0 || attempts > job.retries) break;
+        // A failure a retry cannot fix (a refused login, a conflict the owner must look at).
+        if (job.noRetryExitCodes?.includes(result.code)) break;
         await sleep(job.retryDelayMinutes * 60_000);
       }
     } catch (error) {

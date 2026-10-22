@@ -110,7 +110,7 @@ export async function waitVisibleDismissing(
  * Closes notices automatically on every page of the context, including the broker's popup: while
  * any click/fill is waiting on a covered element, Playwright runs this first and then retries.
  */
-export function installOverlayHandlers(context: BrowserContext): void {
+export function installOverlayHandlers(context: BrowserContext): () => void {
   const attach = (page: Page) => {
     void page
       .addLocatorHandler(
@@ -125,4 +125,8 @@ export function installOverlayHandlers(context: BrowserContext): void {
   };
   for (const page of context.pages()) attach(page);
   context.on('page', attach);
+  // pages opened from now on get no handler (BL-143's kept Quantiply page must never click)
+  return () => {
+    context.off('page', attach);
+  };
 }

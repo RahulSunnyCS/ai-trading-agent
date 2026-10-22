@@ -9,25 +9,18 @@ import { type StockScore, markKey } from '../../../lib/momentumScores';
 import {
   SECTION_LABEL,
   groupRows,
+  isSkipAction,
   rankDelta,
   roomToExit,
   sleeveLabel,
   tradingSleeves,
 } from '../../../lib/momentumWeek';
+import { actionTone } from '../../../lib/momentumWeekly';
 import type { MomentumWeekCard } from '../../../types/momentum';
 import { Badge } from '../../ui/Badge';
 import { Card } from '../../ui/Card';
 import { THead, TRow, Table, Td, Th } from '../../ui/Table';
 import { ScoreStrip } from '../scores/ScoreStrip';
-
-const ACTION_TONE: Record<string, 'positive' | 'negative' | 'warning' | 'neutral'> = {
-  BUY: 'positive',
-  ADD: 'positive',
-  'TOP UP': 'positive',
-  SELL: 'negative',
-  TRIM: 'warning',
-  HOLD: 'neutral',
-};
 
 /**
  * The selected favourite's week (BL-051): its sleeves (a group), then one table grouped Sell /
@@ -134,14 +127,22 @@ export function SignalCard({
                         onClick={stock ? () => onStock(stock.symbol) : undefined}
                       >
                         <Td>
-                          <Badge tone={ACTION_TONE[row.action] ?? 'neutral'}>
-                            {row.action || '—'}
-                          </Badge>
+                          <Badge tone={actionTone(row.action)}>{row.action || '—'}</Badge>
                         </Td>
                         <Td className="max-w-64">
                           <span className="font-semibold text-foreground">{row.asset}</span>
                           {stock ? (
                             <span className="ml-1.5 text-xs text-faint">{stock.parent_group}</span>
+                          ) : null}
+                          {isSkipAction(row.action) && row.reason ? (
+                            // BL-136: the gate's own words, so the card says why a top name is
+                            // not a buy without a trip to the Telegram message.
+                            <span
+                              className="mt-0.5 block truncate text-xs text-warning"
+                              title={row.reason}
+                            >
+                              {row.reason}
+                            </span>
                           ) : null}
                         </Td>
                         {card.group ? (

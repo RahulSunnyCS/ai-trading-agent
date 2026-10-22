@@ -194,6 +194,91 @@ browser inside a GitHub Action — the trigger is an RPC either way.
 
 ---
 
+### 7. Saved strategies and live deploys through the website (BL-137 / BL-138, 2026-10-19)
+
+AlgoTest support confirmed by phone (2026-10-19) that automating one's own account through the website is
+fine. Everything below was read off the site at desktop width (1440 x 900); below about 500 px the site switches
+to a phone layout with no "Save Strategy" button.
+
+**Import and save (`/backtest`).** "Import .algtst" is a hidden `<input type=file accept=".algtst,.json">`;
+setting a file fills the builder ("Strategy imported successfully") and nothing is saved. The name comes from
+the file's `name`. "Save Strategy" (bottom bar) opens "Save New Strategy" with that name filled in; "Done"
+saves it through `api.algotest.in/strategy` ("Strategy Saved"), and the bar then shows Update / Save As New.
+"Export .algtst" downloads the saved strategy. The saved list is Saved Strategies › MY STRATEGIES (its ⋮ menu:
+Add to folder, Delete); the page itself reads it from `GET api.algotest.in/strategies`, an array of
+`{_id, name, folder, archived, template}`.
+
+**Delete (2026-10-20).** The web app deletes with `DELETE api.algotest.in/strategy/<_id>` (its bundle:
+`SP.delete("/strategy/" + id)`). Its API client sends the session cookies (`withCredentials`) and the CSRF
+header `X-CSRF-TOKEN-ACCESS`, copied from the `csrf_access_token` cookie. Strategies saved outside a folder
+(`folder: null`, every one the uploader saves) are not listed in the sidebar at all, so the uploader never
+clicks: it makes that call for the `_id` it recorded at upload, then lists again (`strategy-delete.ts`).
+`GET /strategies` without the CSRF header answers 401 "Missing CSRF token".
+
+**Live (`/live`, "Algo Trade").** Header: "Broker Login n/m", "n/6 Strategy Deployed" (6 at once on the
+owner's plan), Auto Activation, Auto restart paused executions. Deploys are allowed only **08:00–15:40 IST**
+("Strategies can only be deployed during 08:00 IST to 15:40 IST"). Two sections:
+
+- **Activation:** one row per saved strategy: status ("Setup Pending" → "Ready to deploy"), "n Deployed", the
+  execution days (M–Su, "-" when none), and the buttons "Setup Execution" (then "Edit Execution") and
+  "Activate".
+- **Deployed Strategies:** one card per deploy: "Deployed on 19 OCT 26 · Intraday · <name> · NIFTY ·
+  Open Pos: n · RUNNING · ₹ MTM · <broker - account>", with Switch to manual / Square Off / View Trades; the
+  section has "Switch all to manual" and "Square off all". Filters: Running, Paused, Sq Off, Error, Manual.
+
+**Setup Execution** opens a sheet "Edit execution for <name>":
+
+| Field | Seen (default) |
+|---|---|
+| Notice | limit and SL-limit orders are watched for 50 s; still open → cancelled and the strategy marked Error |
+| Notice | for MIS orders the exit time must be strictly before 15:24; the rotation exits at 15:28, so NRML |
+| Quantity Multiplier | 1 |
+| Auto Sq Off on Margin Error | on |
+| Trade monitoring | on LTP / **on Candle Close** |
+| Strategy execution time | the strategy's entry time (11:37:00 for the owner's Widesl file) |
+| Per leg (Leg 1, Leg 2, "Copy To Legs") | NRML/MIS **NRML**; Tgt/SL ref price Traded/**Trigger**; delay entry 0 s; entry and exit order type **Limit**/MPP; buffer type **Points**/%; trigger buffer 0; limit buffer 3; monitoring **Continuous**/Delayed, frequency 5 s |
+| Execution days | Weekdays / DTE; M T W Th F Sa Su, **none ticked** |
+| Buttons | Cancel · "Setup Execution Settings" |
+
+**Read-only calls the /live and /broker pages make (BL-143, seen 2026-10-20 15:13 IST; GETs only, with the
+session cookies and the CSRF header).** The trade monitor (`packages/broker-login/src/trade-monitor.ts`) uses
+the first two:
+
+| Call | What it answers |
+|---|---|
+| `GET /brokers` | one entry per linked broker: `broker` (`Broker.Finvasia`, `Broker.AngelOne`), `logged_until` and `margin: {available, updated_ts}` (UTC, no zone: `02:47` = the 08:17 IST broker login). The funds are read at AlgoTest's broker login, not live. The entry also carries `app_keys`; the monitor never reads or logs them |
+| `GET /executable-strategies?page=&page_size=&weekday=tuesday` | the Activation rows, each with `multiplier` (the Quantity Multiplier) and `weekdays` |
+| `GET /execution/v2/executions?environment=live` | today's deploys (`[]` with none) |
+
+/live's "Total MTM" (and each broker's) is **computed in the page** from the executions and live prices (its
+bundle, chunk `2331-*.js`, `overallMTM`), not answered by an API, so the monitor reads the figure off the open
+page: the card `[data-testid="broker-mtm"]` whose first line is "Total MTM" (one per broker beside it, labelled
+with the broker's alias), its figure a `p.tabular-nums` coloured `text-green-500` when >= 0 and `text-red-500`
+when < 0 (a loading-dots element while it computes). Read live 2026-10-20 16:13 IST: `₹ 0`, green. The header also shows "Available Margin" and "Margin Blocked (approx)".
+
+The owner's first live deploy (2026-10-19, `T1 · N_p150-t1s11_0917` on Finvasia) left the days unticked, and the
+row shows "-" for every day: **a deploy with no days ticked runs that day only**. Not yet seen: what "Activate"
+asks (broker or account choice, a confirmation), and what stopping a deploy before its entry looks like.
+
+**Square off, stop, list (BL-143 Phase 4; read from the /live page's public JavaScript, 2026-10-20).** The page's
+chunks (`algotest.in/_next/static/chunks/*.js`, fetched with curl, no login) hold the `/execution` client the
+cards' buttons call, on `api.algotest.in` with the same cookies and `X-CSRF-TOKEN-ACCESS` header as the delete:
+
+| Call | In the app | Answer |
+|---|---|---|
+| `GET /execution/v2/executions?environment=live` | the Deployed Strategies list | an array of executions: `_id`, `name` (the strategy's), `status`, `active_on_server`, … |
+| `PUT /execution/v2/square-off/<execution _id>`, no body | a card's **Square Off** ("Are you sure you want to square off this strategy?"); squaring off a selection calls it once per execution | `{msg}`, shown as a toast; the card turns `pending_square_off` |
+| `PUT /execution/v2/stop/<execution _id>`, no body | **Cancel Deployment** (before the entry time) and **Switch to manual** (after it: the legs stay open and unmanaged) | `{msg}` |
+| `PUT /execution/v2/square-off-all`, body `{execution_type: "live", broker_ids, executions?, portfolio?, signal_execution}` | the section's "Square off all" bulk path | `{msg}` |
+
+Statuses: `StrategyStatus.Live`, `StrategyStatus.Error`, `StrategyStatus.SquaredOff`, `StrategyStatus.Stopped`,
+`paused`. The app offers Square Off only when the status is Live or Error **and** `active_on_server` (its
+`canSquareOff`); otherwise it offers Restart. The stop button (`packages/broker-login/src/stop-button.ts`) uses
+only the list and the per-execution square-off, for the tool's executions (by the uploader's strategy id, a name it
+saved, or the `T1 · ` / `Core · ` prefix); never `stop` (switching to manual would leave positions open) and never
+the bulk call. It waits while a card shows `pending_square_off` and never calls that "square off by hand"; a
+`Stopped` deploy is reported for a check (its legs may be open). Not sent yet: the first is the owner's.
+
 <a id="pending"></a>
 
 ## Pending actions → moved
@@ -356,3 +441,166 @@ change. Getting there needed two container fixes in the workflow — `unzip` for
 
 Tracked in [`/TODO.md`](../TODO.md) → Priority 1.
 
+
+## Quantiply algos through its API (BL-139, captured 2026-10-19)
+
+Captured from the web app in a browser while the owner saved, opened and deleted algos by hand. The
+recorder kept header names only, never values. Fixtures, with the user and broker ids removed:
+`packages/option-backtesting/tests/fixtures/quantiply/`.
+
+**Host and auth.** `https://api-prod.quantiply.angelone.in`. Every call sends an `authorization`
+header with a JWT. The web app keeps the JWT in `localStorage["quantiply-dashboard-local"].token`
+after the Angel One login (`src/quantiply.ts`). The JWT seen was valid for 9 hours from login
+(claims `_id, name, clientId, familyContext, iat, exp`). The JWT is a live credential to the owner's
+algos: never log it, store it in a file or put it in a fixture.
+
+**Calls seen**
+
+| Call | What it does |
+|---|---|
+| `GET /algos/config` | days, expiry tags per underlying and weekday, lot sizes (NIFTY 65, SENSEX 20 on 2026-10-19) |
+| `GET /algos/day-wise` | the list: one entry per weekday (`MON`…`SUN`, `ELSE`) with `active` and `algos` (summaries: `_id`, `name`, `day`, `enabled`, `status` such as `NOT_RUNNING` or `TRADE_CLOSED`; no configuration) |
+| `GET /algos/:id` | one algo, full `configurations` (the read-back) |
+| `POST /algos` | create: body `{code, name, day: [..], configurations}`. Answers 201 with `data`: **one algo per weekday in `day`**, each `enabled: false`, with the server defaults filled in |
+| `DELETE /algos/:id` | delete one algo (one weekday's copy): `{"message":"Deleted successfully"}` |
+
+The header is `authorization: Bearer <JWT>` (the web app's API client sets it so). In the app's
+code but not yet seen: `DELETE /algos/bulk/action/delete` with `{algoIds}`, `/algos/bulk/action/{clone,
+edit,mtm-edit,TERMINATE,SQ_OFF_TERMINATE}`, `/algos/clone`, `/algos/types`.
+
+**Enable, disable, broker (BL-139 Phase 4; read from the web app's own JavaScript, 2026-10-20).** The
+public bundle (`app.quantiply.angelone.in/static/js/main.c34824e5.js`; Shoonya's
+`quantiply.shoonya.com/static/js/main.b6ba1293.js` has the same calls, against
+`api-prod.quantiply.shoonya.com`) was fetched with curl, no login. An algo is deployed for its
+weekday, **every week**, while `enabled` is true.
+
+| Call | In the app | How the app reads the answer |
+|---|---|---|
+| `PUT /algos/:id/enable`, `PUT /algos/:id/disable`, **no body** | `toggleAlgo(id, "enable"\|"disable")`, the switch on each algo row; no confirmation, no other call around it | done when the JSON's `status` is `"success"`; it then sets that row's `enabled` locally and shows "Algo enabled successfully". An HTTP error's `message` is shown |
+| `PUT /algos/bulk/action/enable`, `.../disable`, body `{algoIds: [..]}` | `bulkActionEnable` / `bulkActionDisable`, the bulk bar | `data` is one entry per id, `{id, success, message}`; `success: false` ones are reported "Error occured in n algos" |
+| `PUT /algos/:id`, body `{broker: <broker account id>}` | `updateBroker`, the "Select Client ID / Broker" menu; read-only once a broker is set | `data` is the updated algo |
+| `GET /brokers` | the menu's options: each account's `id` (the value sent as `broker`), `clientId`, `status` (`"disabled"` greyed) | |
+
+**Square off & terminate (BL-143 Phase 4; same bundles, read 2026-10-20).** Both web apps (Angel One's
+`main.c34824e5.js`, Shoonya's `main.b6ba1293.js`) have the same calls:
+
+| Call | In the app |
+|---|---|
+| `PUT /algos/:id/action/SQ_OFF_TERMINATE`, no body | `sqOffAll(id)`: the row's "Square off all positions & Terminate algo" icon, after a confirm dialog. Shown only while the algo's `status` is `TRADE_ACTIVE`. The app does not read the answer (no error = done) |
+| `PUT /algos/:id/action/TERMINATE`, no body | `terminate(id)`: "Terminate algo" (positions left open), same row |
+| `PUT /algos/bulk/action/SQ_OFF_TERMINATE`, body `{algoIds}` | `bulkActionSquareOffTerminate` |
+| `PUT /algos/broker/:brokerId/action/SQ_OFF_TERMINATE` | `clientWiseSqOffTerminate`: every algo of one broker account, the owner's own included |
+| `PUT /algos/:id/positions/:positions/action/SQ_OFF_POSITION` | `exitSelectedLegs` |
+
+Statuses seen in the app: `NOT_RUNNING`, `READY`, `TRADE_ACTIVE`, `TRADE_CLOSED`. The stop button squares off and
+terminates the tool's `TRADE_ACTIVE` algos one id at a time (never the account-wide call: it would close the
+owner's own algos too) and switches off its enabled ones; it confirms by listing again. Not sent yet.
+
+The deployer (`packages/broker-login/src/quantiply-deploy.ts`) uses the per-algo switch, one id at a
+time, so each answer belongs to one algo, and the broker call for an algo the upload left without
+one (its account is the `GET /brokers` entry whose `clientId` is the `.env` login). None of these
+has been sent yet: the first `--apply` is the owner's.
+
+The uploader (`packages/broker-login/src/quantiply-upload.ts`) logs in through Angel One in a
+browser, takes this token, closes the browser and uses `GET /algos/day-wise`, `POST /algos`,
+`GET /algos/:id` (the read-back) and `DELETE /algos/:id`.
+
+**Live MTM (BL-143; read from the bundle 2026-10-20).** `GET /algos/day-wise` gives each algo's `multiplier`,
+`status` and broker, but no MTM. The app's MTM column (`pnl`) comes over its socket.io connection
+(`wss-prod.quantiply.angelone.in`): one CSV string per algo update, `<algo id>,,,,<pnl>,<error flags>,,<waiting>,<waitingWT>`
+(the SUBSCRIBE_LITE_POSITION_UPDATES reducer splits it on commas). The trade monitor keeps the app open on
+/algos and reads those frames as they arrive (`pnlFromSocketFrame`); it sends nothing on the socket. Not yet
+seen with an algo running: no algo of the owner's traded on 2026-10-20. The app also has `GET /pnl-chart/algo`
+(`graphLevel=account|broker|algo`, `from`, `to`), not used.
+
+**Body: `code: "OPTIONS_SPREADS_LEGS"`, `configurations`**
+
+| YAML (legwise) | Quantiply |
+|---|---|
+| `entry_time` / `exit_time` | `startTime` / `endTime` `"HH:MM:SS"` |
+| `square_off: partial` | `legsAction: "SQ_OFF_LEG"` |
+| `overall.stop_loss_inr: N` | `stoploss: {type: "TOTAL_AMOUNT", value: -N, action: "SQ_OFF_ALL"}` |
+| leg `position: sell / buy` | `transactionType: "S" / "B"` |
+| leg `option_type` | `side: "CE" / "PE"` |
+| leg `expiry: weekly` | `expiryTag: "CURRENT_WEEK"` |
+| leg `lots: n` | `quantity: n` (lots); the algo's `configurations.multiplier` is not in the export or the web app's own create request (Quantiply saves `1`); BL-140 Phase 4: the uploader adds it at the account row's 2-10 value (`quantiply-plan.ts` `withMultiplier`), and the read-back (`readBackDiffs`) shows whether Quantiply saved it; **never tried live above 1** |
+| `strike_type: ATM / ITMn / OTMn` | `selectionType: "STRIKE"`, `strike: "ATM" / "ITM_n" / "OTM_n"` |
+| `closest_premium: P` | `selectionType: "PREMIUM"`, `premium: {type: "PREMIUM_CLOSE_TO", value: P, specificStrikeSelection: false}` |
+| `stop_loss: {percent: p}` | `stoploss: {type: "PER_POSITION_PERCENT", value: -p}` |
+| `stop_loss: {points: p}` | `stoploss: {type: "PER_POSITION_POINT", value: -p}` |
+| `trail_sl: {percent: [x, y]}` | `trailingStoploss: {type: "PER_POSITION_PERCENT", moveBy: x, trailBy: y}` |
+| `trail_sl: {points: [x, y]}` | `trailingStoploss: {type: "PER_POSITION_POINT", moveBy: x, trailBy: y}`, beside a percent stop (the owner's `test1`, saved 2026-10-19) |
+| `reentry_on_sl: {mode: cost, count: n}` | `isReEntryEnabled: true`, leg `reEntry: {type: "RE_ENTRY_COST", repeat: n}` |
+| `range_breakout: {until: T, side: high/low, source: instrument}` | `isORBEnabled: true`, `orbEndTime: T`, leg `orb: {type: "ORB_INSTRUMENT", entryAt: "HIGH"/"LOW"}`; the range starts at `startTime` |
+
+Execution settings with no YAML counterpart, as on the owner's own algos (N_ITM1_SL21_3000):
+`product: "D"`, limit orders (`entryOrderType: "L"`, buffer `FIXED_VALUE` 3, timeouts 5 / 4 s),
+SL limit buffer 1, `stoplossOrderPlacement: "LATER"`, exit delay 3 s, `errorAutoSquareOff: true`.
+The algo the owner built for the capture used market orders (`"M"`) instead.
+
+<a id="live-results"></a>
+
+## Live results: per-strategy P&L and fills (BL-141, read 2026-10-20)
+
+Found in both web apps' public JavaScript (fetched with curl, no login), then confirmed with a few
+GET calls after a real login (2026-10-20, a market holiday, reading Monday 2026-10-19). Nothing
+but GET was sent. Fixtures, every id replaced: `packages/option-backtesting/tests/fixtures/live/`.
+`packages/broker-login/src/live-capture.ts` (the 15:40 `live-capture` job) makes these calls;
+`live-capture-plan.ts` parses them.
+
+**AlgoTest** (`api.algotest.in`; the site login, session cookies + `X-CSRF-TOKEN-ACCESS` from
+`csrf_access_token`, as for §7). The app's API client (`SP`, `withCredentials`, the CSRF header) has
+a second base for orders, `orders.algotest.in` (`fw`), and a third for prices.
+
+| Call | What it answers |
+|---|---|
+| `GET /execution/v2/executions?environment=live&is_signal=false` | the /live "Deployed Strategies" cards: an array of executions (today's, until the day is over; `[]` on the holiday) |
+| `GET /execution/v2/exited-executions?start_date=YYYY-MM-DDT00:00&end_date=YYYY-MM-DDT23:59&environment=live&is_signal=false` | past trades for the range (the page sends the day's minute 0 and 1439, IST; its UI allows only days before today and 7 days back). The same execution shape |
+| `GET /execution/v2/execution-info/<execution _id>` | one execution with its settings: `config.ExecutionConfig.LotMultiplier` (the Quantity Multiplier), `LegsConfig` (order types, buffers, product), plus `trades`, `ongoing_trade`, `notifications` |
+| `GET /execution/v2/execution-strategy/<execution _id>` | the strategy as deployed (legs, entry and exit indicators) |
+| `GET orders.algotest.in/today-orders`, `/data/monitored-orders-and-trades`, `/data/orders-and-trades?user_tags=…` | the order book (`[]` on the holiday); `manual-trades` rows. Not used |
+
+An execution: `_id`, `name` = the saved strategy's name plus ` (n)` (the n-th deploy of it),
+`strategy_id` = the saved strategy's `_id` (what the uploader's ledger records), `broker_type`
+(`Broker.Finvasia`, `Broker.AngelOne`), `status` (`StrategyStatus.SquaredOff`, `Stopped`, …),
+`creation_ts` / `last_activation_ts` / `entry_time` / `exit_time` (IST, no zone), and `legs`: one
+per leg and re-entry, `{id, symbol, strike, option, lot_size, quantity, position:
+PositionType.Sell|Buy, status (2 = exited), entry_trade, exit_trade, last_saw_price}`, each trade
+`{price, quantity, exchange_timestamp, traded_timestamp, trigger_price, underlying_at_trade}`,
+quantity in units (65 = one NIFTY lot). A leg that never entered has `entry_trade: null`. There is
+no P&L field: the app sums it from the legs (its `XT`), sell = (entry − exit) × quantity, buy the
+other way, and that is what the capture records (the 2026-10-19 read is in the BL-141 Log).
+
+**Quantiply** (`api-prod.quantiply.angelone.in`, the uploader's JWT; the same paths on
+`api-prod.quantiply.shoonya.com`, not read yet).
+
+| Call | What it answers |
+|---|---|
+| `GET /pnl-chart/algo?graphLevel=account&from=D&to=D[&after=…]` | the P&L chart: `data` = minute candles `"epoch ms,open,high,low,close"` of the account's MTM; `metaData.totalMTM`, `minMTM`/`maxMTM` (+`At`), and **`lastValues`: one entry per algo run of the period, `{algo: <algo id>, state: <run id>, t, o, h, l, c}`, `c` its closing MTM**. `paging.after` pages. On 2026-10-19 the six `c` added up to `totalMTM` to the paisa |
+| `GET /pnl-chart/algo?graphLevel=algo&from=&to=&algoIds[]=…` | the same per algo; answered an error for the ids tried, so not used |
+| `GET /pnl-chart/algo?graphLevel=broker&broker=…` and `/pnl-chart/underlying?underlyingName=…` | per client id, per underlying. Not used |
+| `GET /algos/day-wise` | names, `multiplier`, `status`, `broker`, `brokerDisplayName`, `brokerClientId` per algo (no `pnl` field once the day's state is reset) |
+| `GET /algos/:id` | the algo; `state` is `null` after the overnight reset. While the day's state is there, the web app reads the positions from `state.positions` (a socket.io message `position_updates`, its reducer), shape not seen yet |
+
+**Back-fill and repeated runs (read 2026-10-20, GET only).** Both platforms keep a day's results
+after its strategies are deleted: Quantiply's account chart for 13 and 14 Oct still gave every
+run of algos that are no longer listed (2 and 3 of them), and they added up to `totalMTM`; AlgoTest's
+exited list keeps past deploys (12 to 19 Oct read). A `lastValues` key is the run id (`state`), and an
+algo can run twice in a day (15 Oct: 6 runs of 5 algos), so the day's P&L is the sum of its runs.
+`exited-executions` for today answers 200 with the day's exited ones (`[]` on the holiday), not an
+error. So the capture never needs to hold the evening deletes: a missed day is read later
+(`live-capture.ts --day D`, or the next evening's back-fill).
+
+**Deploys that span days.** A /live deploy with execution days ticked keeps one execution across
+days, its `legs` growing day by day; the capture counts only the legs whose `entry_trade` is on the
+day read.
+
+**What is not seen.** Only the platform + broker rows the automation settings have on (login or
+upload) are read; a discretionary trade on an account whose row is off is not captured (turn its
+login on, or read it with `--only` after switching it on).
+
+The order book is `POST algos/order-book {brokers}` and the trade report `POST
+/reports/download/trade-report` (a blob): both are POSTs, so the capture does not call them. Fills on
+Quantiply are therefore read only from `GET /algos/:id`'s `state.positions` on the day, and only
+when its fields are plain (`transactionType`, `quantity`, `entryPrice`, `exitPrice`); otherwise
+`fills: null`. Slippage % needs fills, so it is AlgoTest-only until a traded day shows that shape.

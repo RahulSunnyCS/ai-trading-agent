@@ -14,6 +14,7 @@ import {
   useSettingsStore,
 } from '../store/settings';
 import { type ThemePreference, useThemeStore } from '../store/theme';
+import { AutomationSettingsCard } from './settings/AutomationSettingsCard';
 import { NavigationSection } from './settings/NavigationSection';
 import { SchedulerNotificationsCard } from './settings/SchedulerNotificationsCard';
 import { SettingRow, SettingSwitch } from './settings/SettingSwitch';
@@ -281,6 +282,7 @@ export function SettingsView({ preferences, onChange }: SettingsViewProps) {
       <NavigationSection preferences={preferences} onChange={onChange} />
       <DefaultsSection preferences={preferences} />
       <NotificationsSection />
+      <AutomationSettingsCard />
       <SchedulerNotificationsCard />
       <AccountSection />
       <AboutSection />

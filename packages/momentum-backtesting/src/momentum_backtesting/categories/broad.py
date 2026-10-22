@@ -72,7 +72,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-from momentum_backtesting import engine
+from momentum_backtesting import engine, monday_fills
 from momentum_backtesting import tax as tax_mod
 from momentum_backtesting.categories import compose, daily_moves, residual, snapshots, sources
 from momentum_backtesting.categories import liquidity as liquidity_mod
@@ -1220,6 +1220,10 @@ def run_broad_backtest(
     off_exit_rank: int = 20,
     cost_pct: float = 0.10,
     signal_delay: int = 0,
+    # BL-036 Phase 2: "mon_open" fills an order decided on Friday W at the open of the first
+    # session after W (monday_fills.py) and values every holding at those prices; needs
+    # signal_delay 0. "fri_close" (default) is the backtest's original assumption.
+    execution: Literal["fri_close", "mon_open"] = "fri_close",
     portfolio: Literal["buffer", "slots"] = "buffer",
     rebalance: Literal["weekly", "monthly"] = "weekly",
     rebalance_every: int = 1,
@@ -1281,6 +1285,10 @@ def run_broad_backtest(
     # that week (higher feature = better; a name without a value gets the week's middle rank),
     # re-ranked. None (default) changes nothing.
     feature_tilt: tuple[pd.DataFrame, float] | None = None,
+    # BL-116 Phase 2: a buy week's money goes to picks from the best-placed sector held that week
+    # (its category is first in `held_by_week`) at this many times the share of the others.
+    # 1.0 (default) changes nothing; category mode only.
+    top_sector_weight: float = 1.0,
 ) -> BroadBacktestResult:
     """Step 2 (if `ranking` isn't already supplied -- e.g. by a caller's own cache, see
     `api.py`'s `get_categories_universe` for the equivalent Custom Index pattern) plus either
@@ -1321,6 +1329,13 @@ def run_broad_backtest(
     all, it only changes which categories this function's own
     `compute_category_selection_mass_exit` call admits.
     """
+    if execution not in ("fri_close", "mon_open"):
+        raise ValueError(f"execution {execution!r} is not available for Broad Momentum")
+    if execution == "mon_open" and signal_delay != 0:
+        raise ValueError(
+            "Monday-open fills need signal delay 0: the ranking is made on Friday and the order "
+            "fills at the next open. With a delay the fill would be a week and a few days late."
+        )
     if category_mode == "off" and mass_exit_response != "off":
         raise ValueError("mass_exit_response needs category_mode='on'")
     if category_mode == "off" and max_category is not None:
@@ -1431,6 +1446,7 @@ def run_broad_backtest(
         exit_rank=effective.exit_rank,
         cost_pct=cost_pct,
         signal_delay=signal_delay,
+        execution=execution,
         start=start,
         end=end,
         universe=tuple(prices.columns),
@@ -1470,10 +1486,29 @@ def run_broad_backtest(
             str(prices.index[0].date()),
             str(prices.index[-1].date()),
         )
+    buy_weights = None
+    if top_sector_weight != 1.0:
+        if category_mode != "on" or held_by_week is None or effective.groups is None:
+            raise ValueError("top_sector_weight needs category_mode='on'")
+        picked_through = effective.groups.reindex(prices.index)
+        top = pd.Series(
+            [(held_by_week.get(w) or [None])[0] for w in picked_through.index],
+            index=picked_through.index,
+            dtype=object,
+        )
+        buy_weights = pd.DataFrame(1.0, index=picked_through.index, columns=picked_through.columns)
+        buy_weights = buy_weights.mask(picked_through.eq(top, axis=0), float(top_sector_weight))
+    fills = (
+        monday_fills.build(prices, ranking.column_to_base_symbol).prices
+        if execution == "mon_open"
+        else None
+    )
     result = engine.run_backtest(
         prices,
         includes,
         config,
+        trade_prices=fills,
+        buy_weights=buy_weights,
         external_ranks=(ranks_full, scores_full),
         mass_exit_weeks=mass_exit_weeks if mass_exit_response == "throttle" else None,
         groups=(

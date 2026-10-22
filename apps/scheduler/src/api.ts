@@ -1,9 +1,22 @@
 import { mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, sep } from 'node:path';
 import { NOTIFICATION_TYPES, disabledTypes, prefsPath } from '@trading/notify';
-import { JOBS, type Job } from './jobs.js';
+import {
+  type GhRunner,
+  ROW_KEYS,
+  type SettingsStore,
+  effective,
+  githubVariables,
+  realGh,
+  syncGithub,
+  validate,
+} from './automation.js';
+import { rowAlive } from './history.js';
+import { JOBS, type Job, maxRunMinutes } from './jobs.js';
+import { nextSession, pausedReason } from './pause.js';
 import { type RunContext, runJob } from './runner.js';
-import { nextDue } from './schedule.js';
+import { nextDue, previousDue } from './schedule.js';
+import { heldReason } from './stop-hold.js';
 
 /**
  * Loopback HTTP API over the scheduler (BL-012 PR 6): what the dashboard's Jobs and
@@ -26,6 +39,10 @@ export interface ApiOptions {
   prefsFile?: string;
   /** Extra directories a run log may live in, besides `ctx.logDir`. */
   logRoots?: string[];
+  /** The automation settings (BL-140); without it the settings routes answer 503. */
+  settings?: SettingsStore;
+  /** How the GitHub variables are set on Save; tests pass a fake. */
+  gh?: GhRunner;
 }
 
 const json = (body: unknown, status = 200): Response => Response.json(body, { status });
@@ -67,24 +84,48 @@ function writePrefs(path: string, disabled: string[]): void {
   renameSync(tmp, path);
 }
 
-export function createApi({ ctx, jobs = JOBS, prefsFile, logRoots = [] }: ApiOptions) {
+export function createApi({
+  ctx,
+  jobs = JOBS,
+  prefsFile,
+  logRoots = [],
+  settings,
+  gh = realGh,
+}: ApiOptions) {
   const now = () => (ctx.now ?? (() => new Date()))();
   const roots = [ctx.logDir, ...logRoots];
   const inFlight = new Set<string>();
   const prefs = () => prefsFile ?? prefsPath();
 
+  /** An open row says whether its work still runs (its writer or its step's process group). */
+  const withAlive = <R extends Parameters<typeof rowAlive>[0] & { ended_at: string | null }>(
+    row: R | null,
+  ) => (row && row.ended_at === null ? { ...row, alive: rowAlive(row) } : row);
+
   function listJobs(): Response {
     const at = now();
+    // A row whose process is gone (a scheduler restart, a Ctrl-C'd `jobs run`) is closed first, so
+    // no reader (the trade monitor, BL-143) waits on a run that is not running.
+    ctx.history.reapDead(at);
     return json(
-      jobs.map((job) => ({
-        id: job.id,
-        description: job.description,
-        schedule: job.schedule.label,
-        nextRun: nextDue(job.schedule, at)?.toISOString() ?? null,
-        lastRun: ctx.history.last(job.id),
-        needs: job.needs ?? [],
-        group: job.group ?? null,
-      })),
+      jobs.map((job) => {
+        // BL-143: the latest slot that has come and the row serving it (none yet = still due or
+        // queued behind its group): the trade monitor waits for the morning deploy jobs to end.
+        const slot = previousDue(job.schedule, at);
+        return {
+          id: job.id,
+          description: job.description,
+          schedule: job.schedule.label,
+          nextRun: nextDue(job.schedule, at)?.toISOString() ?? null,
+          lastRun: withAlive(ctx.history.last(job.id)),
+          previousSlot: slot?.toISOString() ?? null,
+          previousSlotRun: withAlive(slot ? ctx.history.forSlot(job.id, slot) : null),
+          maxRunMinutes: maxRunMinutes(job),
+          catchUpHours: job.catchUpHours,
+          needs: job.needs ?? [],
+          group: job.group ?? null,
+        };
+      }),
     );
   }
 
@@ -120,6 +161,9 @@ export function createApi({ ctx, jobs = JOBS, prefsFile, logRoots = [] }: ApiOpt
     if (!job) return fail(404, `unknown job '${id}'`);
     const busy = busyReason(job);
     if (busy) return fail(409, busy);
+    // BL-143: Apply now and Run now say so at once (runJob would only record it as held)
+    const held = heldReason(job.id, ctx.env) ?? pausedReason(job.id, ctx.env, now());
+    if (held) return fail(409, held);
     const before = ctx.history.last(job.id)?.id ?? 0;
     inFlight.add(job.id);
     void runJob(job, { ...ctx, jobs }, 'manual').finally(() => inFlight.delete(job.id));
@@ -160,6 +204,36 @@ export function createApi({ ctx, jobs = JOBS, prefsFile, logRoots = [] }: ApiOpt
     return listNotifications();
   }
 
+  function automationView(): Response {
+    if (!settings) return fail(503, 'automation settings are not available');
+    const current = settings.current();
+    return json({
+      current,
+      effective: Object.fromEntries(ROW_KEYS.map((k) => [k, effective(current.settings, k)])),
+      github: githubVariables(current.settings).vars,
+      history: settings.history(20),
+      next_session: nextSession(now()),
+    });
+  }
+
+  async function putAutomation(req: Request): Promise<Response> {
+    if (!settings) return fail(503, 'automation settings are not available');
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return fail(400, 'body must be JSON');
+    }
+    const checked = validate(body);
+    if ('errors' in checked)
+      return json({ error: 'invalid settings', errors: checked.errors }, 400);
+    const saved = settings.save(checked.settings, now());
+    // The 08:15 GitHub backstop reads repository variables, not this database: set them now.
+    // A failed sync does not undo the save; the page shows the outcome.
+    settings.noteGithub(saved.version, await syncGithub(checked.settings, gh));
+    return automationView();
+  }
+
   return async function handle(req: Request): Promise<Response> {
     const url = new URL(req.url);
     const path = url.pathname.replace(/\/+$/, '') || '/';
@@ -173,7 +247,10 @@ export function createApi({ ctx, jobs = JOBS, prefsFile, logRoots = [] }: ApiOpt
       if (run && method === 'POST') return await startRun(decodeURIComponent(run[1] ?? ''));
       if (path === '/notifications' && method === 'GET') return listNotifications();
       if (path === '/notifications' && method === 'PUT') return await putNotifications(req);
-      const known = ['/jobs', '/runs', '/notifications'].includes(path) || log || run;
+      if (path === '/settings/automation' && method === 'GET') return automationView();
+      if (path === '/settings/automation' && method === 'PUT') return await putAutomation(req);
+      const known =
+        ['/jobs', '/runs', '/notifications', '/settings/automation'].includes(path) || log || run;
       return known ? fail(405, 'method not allowed') : fail(404, 'not found');
     } catch (error) {
       return fail(500, error instanceof Error ? error.message : String(error));
@@ -183,7 +260,14 @@ export function createApi({ ctx, jobs = JOBS, prefsFile, logRoots = [] }: ApiOpt
 
 /** Bind the API to loopback only. */
 export function startApi(options: ApiOptions, port: number = apiPort()) {
-  const server = Bun.serve({ hostname: '127.0.0.1', port, fetch: createApi(options) });
+  // A settings save waits for its GitHub sync (up to five `gh` calls); Bun's default 10 s idle
+  // timeout would drop that response although the version was saved. 255 s is Bun's maximum.
+  const server = Bun.serve({
+    hostname: '127.0.0.1',
+    port,
+    idleTimeout: 255,
+    fetch: createApi(options),
+  });
   console.log(`scheduler API on http://127.0.0.1:${server.port}`);
   return server;
 }

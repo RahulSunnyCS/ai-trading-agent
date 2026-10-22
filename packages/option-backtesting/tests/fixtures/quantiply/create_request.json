@@ -1,0 +1,120 @@
+{
+  "code": "OPTIONS_SPREADS_LEGS",
+  "configurations": {
+    "endDay": 0,
+    "endTime": "15:28:00",
+    "entryOrderDelayType": null,
+    "entryOrderLimitPrice": {
+      "type": "FIXED_VALUE",
+      "value": 5
+    },
+    "entryOrderTimeoutSeconds": 5,
+    "entryOrderType": "M",
+    "errorAutoSquareOff": true,
+    "exitOrderDelayType": null,
+    "isReEntryEnabled": false,
+    "isWaitAndTradeEnabled": false,
+    "legs": [
+      {
+        "base": "NIFTY",
+        "expiryTag": "CURRENT_WEEK",
+        "id": "QUvhseAhKWD0mgtYR9",
+        "mp": false,
+        "product": "D",
+        "quantity": 1,
+        "segment": "SEGMENT_OPTIONS",
+        "selectionType": "STRIKE",
+        "side": "CE",
+        "specificStrikeSelection": false,
+        "stoploss": {
+          "type": "PER_POSITION_PERCENT",
+          "value": -115
+        },
+        "strike": "OTM_1",
+        "trailingStoploss": {
+          "moveBy": 15,
+          "trailBy": 10,
+          "type": "PER_POSITION_PERCENT"
+        },
+        "transactionType": "S"
+      },
+      {
+        "base": "NIFTY",
+        "expiryTag": "CURRENT_WEEK",
+        "id": "XdAA05ljgNlFCjo2Sf",
+        "mp": false,
+        "product": "D",
+        "quantity": 1,
+        "segment": "SEGMENT_OPTIONS",
+        "selectionType": "STRIKE",
+        "side": "PE",
+        "specificStrikeSelection": false,
+        "stoploss": {
+          "type": "PER_POSITION_PERCENT",
+          "value": -115
+        },
+        "strike": "OTM_1",
+        "trailingStoploss": {
+          "moveBy": 15,
+          "trailBy": 10,
+          "type": "PER_POSITION_PERCENT"
+        },
+        "transactionType": "S"
+      }
+    ],
+    "legsAction": "SQ_OFF_LEG",
+    "limitOrderTimeoutSeconds": 5,
+    "matching": [
+      {
+        "active": true,
+        "mode": "NO_MATCHING"
+      },
+      {
+        "active": false,
+        "maxDiff": 1,
+        "mode": "MATCH_PREMIUM_WITH_MAX_DIFF"
+      },
+      {
+        "active": false,
+        "mode": "PREMIUM_CLOSE_TO",
+        "premiumCloseTo": 1
+      },
+      {
+        "active": false,
+        "lower": 1,
+        "mode": "PREMIUM_RANGE",
+        "upper": 1
+      },
+      {
+        "active": false,
+        "mode": "COMB_PREM",
+        "type": "LT",
+        "val1": 1
+      }
+    ],
+    "moveStoplossToCost": false,
+    "startTime": "09:17:00",
+    "stoploss": {
+      "action": "SQ_OFF_ALL",
+      "type": "TOTAL_AMOUNT",
+      "value": -2500
+    },
+    "stoplossLimitPrice": {
+      "type": "FIXED_VALUE",
+      "value": 5
+    },
+    "stoplossSquareOffBy": "M",
+    "tradeOnlyFirstEntry": false,
+    "tradingType": "INTRADAY",
+    "trailingInterval": {
+      "frequency": "M",
+      "value": 1
+    },
+    "underlying": "UNDERLYING_INDEX"
+  },
+  "day": [
+    "TUE",
+    "MON"
+  ],
+  "name": "N_OTM1_SL115_TSL15%10%_9_17"
+}

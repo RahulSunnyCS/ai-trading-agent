@@ -83,6 +83,11 @@ def combine(group: dict[str, Any], members: list[dict[str, Any]], week: str) -> 
     )
     after = _mix([(v, _target(m["signal"])) for v, m in zip(values, members, strict=True)])
     acted: dict[str, list[str]] = {}
+    # A sleeve's "SKIP (...)" (BL-136's premium gate, or any entry gate): the sleeve wanted the
+    # name and did not buy it. Not a trade, so it never becomes a TRIM of a name nobody holds;
+    # it is shown as the skip it is, with the sleeve's reason, when no sleeve holds the name.
+    skipped: dict[str, list[str]] = {}
+    skip_rows: dict[str, dict[str, Any]] = {}
     # Each sleeve ranks within its own configuration (Broad: within its categories), so ranks
     # from different sleeves are not comparable: keep the best one from the sleeves that acted
     # on a name, else from any sleeve that ranks it.
@@ -97,7 +102,11 @@ def combine(group: dict[str, Any], members: list[dict[str, Any]], week: str) -> 
             has_rank = rank is not None and not pd.isna(rank)
             if has_rank:
                 ranks[asset] = min(ranks.get(asset, rank), rank)
-            if str(row.get("action") or "").upper() not in QUIET_ACTIONS:
+            action = str(row.get("action") or "").upper()
+            if action.startswith("SKIP"):
+                skipped.setdefault(asset, []).append(member["id"])
+                skip_rows.setdefault(asset, row)
+            elif action not in QUIET_ACTIONS:
                 acted.setdefault(asset, []).append(member["id"])
                 if has_rank:
                     acted_ranks[asset] = min(acted_ranks.get(asset, rank), rank)
@@ -129,8 +138,27 @@ def combine(group: dict[str, Any], members: list[dict[str, Any]], week: str) -> 
                 "sleeves": sorted(set(holders) | set(acted.get(asset, []))),
             }
         )
+    shown = {r["asset"] for r in rows}
+    for asset, sleeve_ids in skipped.items():
+        if asset in shown:
+            continue
+        row = skip_rows[asset]
+        rows.append(
+            {
+                "asset": asset,
+                "action": row.get("action"),
+                "rank": ranks.get(asset),
+                "held": False,
+                "before": 0.0,
+                "after": 0.0,
+                "sleeves": sorted(sleeve_ids),
+                **{k: row[k] for k in ("reason", "premium", "premium_limit") if k in row},
+            }
+        )
     order = {"SELL": 0, "TRIM": 1, "BUY": 2, "ADD": 3, "HOLD": 4}
-    rows.sort(key=lambda r: (order[r["action"]], r["rank"] if r["rank"] is not None else 1e9))
+    rows.sort(
+        key=lambda r: (order.get(r["action"], 5), r["rank"] if r["rank"] is not None else 1e9)
+    )
     sleeves = [
         {
             "id": m["id"],
@@ -172,7 +200,8 @@ def notification(signal: dict[str, Any], run: str = "final") -> Notification:
     configuration, so a rank is not comparable across the group."""
     label = signal["label"]
     trading = [s for s in signal["sleeves"] if s.get("on_cadence")]
-    trades = [r for r in signal["rows"] if r["action"] != "HOLD"]
+    skips = [r for r in signal["rows"] if str(r["action"]).startswith("SKIP")]
+    trades = [r for r in signal["rows"] if r["action"] != "HOLD" and r not in skips]
     held_after = [r for r in signal["rows"] if r["after"] > EPS]
     lines = [f"{label} · {len(signal['sleeves'])} sleeves"]
     if trading:
@@ -198,6 +227,8 @@ def notification(signal: dict[str, Any], run: str = "final") -> Notification:
             )
     if trading and not trades:
         lines.append("No trades this week.")
+    for row in skips:  # BL-136: a sleeve wanted the name and the premium gate kept it out
+        lines.append(f"• {row['asset']} — not bought: {row.get('reason') or row['action']}")
     held = f"{len(held_after)} name{'' if len(held_after) == 1 else 's'}"
     lines.append(f"Holds {held} after these trades · cash {signal['cash']:.1%}")
     return Notification(

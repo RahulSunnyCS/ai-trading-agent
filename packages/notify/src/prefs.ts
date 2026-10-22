@@ -13,6 +13,8 @@ import { join } from 'node:path';
 export const NOTIFICATION_TYPES = {
   'broker.algotest': 'AlgoTest broker login report and failures',
   'broker.fyers': 'Fyers login failures',
+  'broker.kite': 'Kite: the Friday 13:30 login reminder (BL-142)',
+  'broker.quantiply': 'Quantiply: the Core picks created or deleted, and failures (BL-139)',
   'momentum.preview': 'Momentum weekly preview (Fri 14:40)',
   'momentum.final': 'Momentum weekly final signal / rebalance (Fri 16:45)',
   'momentum.orders': 'Momentum: your orders for the headline favourite (Fri 14:15)',
@@ -20,6 +22,10 @@ export const NOTIFICATION_TYPES = {
   'momentum.problem': 'Momentum: no signal, stale data, blocked favourite or failed job',
   'momentum.live_rules':
     'Momentum live-money rules: the weekly status (a rule that is hit is always sent)',
+  'monitor.margin': 'Trade monitor: the 09:05 margin check per broker account (BL-143)',
+  'monitor.deploy': 'Trade monitor: the 09:25 deploy check of AlgoTest and Quantiply (BL-143)',
+  'monitor.loss':
+    'Trade monitor: the -₹5,000 loss warning (the -₹8,000 alert and "cannot read" are always sent)',
   'options.daily': 'Options evening collection and leg-wise P&L summary',
   'options.problem': 'Options evening collection could not run',
   'scheduler.morning': 'Scheduler morning summary (09:00 on trading days)',

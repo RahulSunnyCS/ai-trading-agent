@@ -9,7 +9,17 @@
  * Python callers do not import this — they mirror the Notification shape.
  * See docs/architecture.md for why the boundary is the contract, not a service.
  */
-export { send, sendText, istTimestamp } from './telegram.js';
+export {
+  TELEGRAM_MAX_TEXT,
+  istTimestamp,
+  send,
+  sendText,
+  sendTextChecked,
+  splitText,
+} from './telegram.js';
+export type { SendOutcome } from './telegram.js';
+export { answerCallbackQuery, getUpdates } from './updates.js';
+export type { TgCallbackQuery, TgMessage, TgUpdate, UpdatesResult } from './updates.js';
 export { registerSecret, redact } from './secrets.js';
 export { NOTIFICATION_TYPES, disabledTypes, isEnabled, prefsPath } from './prefs.js';
 export type { NotificationType } from './prefs.js';

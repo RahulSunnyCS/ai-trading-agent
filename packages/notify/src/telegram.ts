@@ -47,9 +47,13 @@ function keyboard(actions: Action[] | undefined) {
  * Every outbound string passes through redact() — this is the last point at
  * which a credential can be stopped from leaving the process.
  */
-async function post(config: TelegramConfig, body: Record<string, unknown>): Promise<void> {
+async function post(
+  config: TelegramConfig,
+  body: Record<string, unknown>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
   try {
-    const response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
+    const response = await fetchImpl(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ chat_id: config.chatId, disable_web_page_preview: true, ...body }),
@@ -57,25 +61,37 @@ async function post(config: TelegramConfig, body: Record<string, unknown>): Prom
     });
     if (!response.ok) {
       console.error(`  telegram returned ${response.status}: ${redact(await response.text())}`);
+      return false;
     }
+    return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`  telegram send failed: ${redact(message)}`);
+    return false;
   }
 }
 
+/**
+ * What became of a message: Telegram accepted it, the owner switched its type off, Telegram is
+ * not configured, or the send failed. A caller that must not lose a message (BL-143's loss
+ * alert) marks it sent only when it was `sent` or `muted`, and tries again otherwise.
+ */
+export type SendOutcome = 'sent' | 'muted' | 'unconfigured' | 'failed';
+/** Telegram refuses a message longer than this (characters). */
+export const TELEGRAM_MAX_TEXT = 4096;
+
 /** Structured send. Prefer this — it renders consistently across every caller. */
-export async function send(config: TelegramConfig | null, n: Notification): Promise<void> {
+export async function send(config: TelegramConfig | null, n: Notification): Promise<SendOutcome> {
   const text = redact(render(n));
   if (!isEnabled(n.type)) {
     console.log(`\n[telegram: '${n.type}' is switched off, message below]\n${text}`);
-    return;
+    return 'muted';
   }
   if (!config) {
     console.log(`\n[telegram not configured, message below]\n${text}`);
-    return;
+    return 'unconfigured';
   }
-  await post(config, { text, reply_markup: keyboard(n.actions) });
+  return (await post(config, { text, reply_markup: keyboard(n.actions) })) ? 'sent' : 'failed';
 }
 
 /**
@@ -86,15 +102,62 @@ export async function sendText(
   config: TelegramConfig | null,
   text: string,
   type?: string,
-): Promise<void> {
+): Promise<SendOutcome> {
   const safe = redact(text);
   if (!isEnabled(type)) {
     console.log(`\n[telegram: '${type}' is switched off, message below]\n${safe}`);
-    return;
+    return 'muted';
   }
   if (!config) {
     console.log(`\n[telegram not configured, message below]\n${safe}`);
-    return;
+    return 'unconfigured';
   }
-  await post(config, { text: safe });
+  return (await post(config, { text: safe })) ? 'sent' : 'failed';
+}
+
+/**
+ * For a message whose delivery matters (the stop button's report): never type-gated, cut into
+ * parts of at most `TELEGRAM_MAX_TEXT` characters on line breaks, and true only when Telegram
+ * accepted every part. False when not configured. Still redacted, still never throws.
+ */
+export async function sendTextChecked(
+  config: TelegramConfig | null,
+  text: string,
+  fetchImpl?: typeof fetch,
+): Promise<boolean> {
+  const safe = redact(text);
+  if (!config) {
+    console.log(`\n[telegram not configured, message below]\n${safe}`);
+    return false;
+  }
+  let all = true;
+  for (const part of splitText(safe)) {
+    if (!(await post(config, { text: part }, fetchImpl))) all = false;
+  }
+  return all;
+}
+
+/** Parts of at most `max` characters, cut at line breaks where possible, numbered when several. */
+export function splitText(text: string, max = TELEGRAM_MAX_TEXT - 96): string[] {
+  const parts: string[] = [];
+  let cur = '';
+  for (const line of text.split('\n')) {
+    let piece = line;
+    for (;;) {
+      const room = max - (cur ? cur.length + 1 : 0);
+      if (piece.length <= room) {
+        cur = cur ? `${cur}\n${piece}` : piece;
+        break;
+      }
+      if (cur) {
+        parts.push(cur);
+        cur = '';
+        continue;
+      }
+      parts.push(piece.slice(0, max));
+      piece = piece.slice(max);
+    }
+  }
+  if (cur || !parts.length) parts.push(cur);
+  return parts.length > 1 ? parts.map((p, i) => `(${i + 1}/${parts.length})\n${p}`) : parts;
 }

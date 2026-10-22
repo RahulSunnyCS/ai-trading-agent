@@ -328,6 +328,23 @@ def test_the_route_takes_stop_and_trail_and_refuses_a_bad_one(world, dive):
         assert r.status_code == 422 and "error" in r.json(), q
 
 
+def test_lots_sets_the_basket_the_stop_is_replayed_on_and_the_series_stays_per_lot(world, dive):
+    root, _ = world
+    two = drawdowns.build("A", "P1", 0.0, root, portfolio=(8000.0, None))
+    one = drawdowns.build("A", "P1", 0.0, root, portfolio=(8000.0, None), lots_per=1)
+    assert [r["per_lot"] for r in one["series"]] == [r["per_lot"] for r in two["series"]]
+    # 3 one-lot picks diving 4,000 each reach -8,000 later than 6 lots do: a deeper per-lot close
+    worst_one = min(r["per_lot_with"] for r in one["series"] if r["stopped"])
+    worst_two = min(r["per_lot_with"] for r in two["series"] if r["stopped"])
+    assert worst_one == pytest.approx(-8000 / 3, abs=60)
+    assert worst_two == pytest.approx(-8000 / 6, abs=60)
+    c = TestClient(create_app())
+    assert c.get("/legwise/rotation/drawdowns?list=A&stop=8000&lots=1").status_code == 200
+    for q in ("lots=0", "lots=11", "lots=x"):
+        r = c.get(f"/legwise/rotation/drawdowns?list=A&stop=8000&{q}")
+        assert r.status_code == 422 and "error" in r.json(), q
+
+
 def test_a_slow_replay_returns_the_registered_figures_pending_then_the_stopped_ones(
     world, monkeypatch
 ):

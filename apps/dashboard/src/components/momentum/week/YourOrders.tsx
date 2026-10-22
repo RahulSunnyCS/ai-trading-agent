@@ -6,8 +6,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { usePolledResource } from '../../../hooks/usePolledResource';
 import { apiPost, apiPut } from '../../../lib/api';
 import { cn } from '../../../lib/cn';
-import { formatInr, formatInt, formatIstDateTime, formatPct, formatPp } from '../../../lib/format';
+import {
+  formatDay,
+  formatInr,
+  formatInt,
+  formatIstDateTime,
+  formatPct,
+  formatPp,
+} from '../../../lib/format';
 import type {
+  MomentumLotOrders,
   MomentumOrderRow,
   MomentumOrderSettings,
   MomentumOrders,
@@ -60,7 +68,10 @@ function OrderRow({ row }: { row: MomentumOrderRow }) {
           <span className="text-faint">—</span>
         )}
       </Td>
-      <Td className="font-semibold text-foreground">{row.symbol}</Td>
+      <Td className="font-semibold text-foreground">
+        {row.symbol}
+        {row.lot ? <span className="ml-1.5 text-xs font-normal text-faint">{row.lot}</span> : null}
+      </Td>
       <Td align="right" numeric>
         {row.held ? formatInt(row.held) : '0'}
       </Td>
@@ -147,7 +158,7 @@ export function YourOrders() {
           <Badge tone={settings.holdings_source === 'paper' ? 'info' : 'positive'}>
             {settings.holdings_source === 'paper'
               ? `Paper portfolio ${formatInr(settings.paper_capital_rs)}`
-              : 'Holdings from Fyers'}
+              : `Holdings from ${brokerName(settings.holdings_source)}`}
           </Badge>
         ) : null}
         {latest && latest.kind !== 'unavailable' ? (
@@ -213,6 +224,7 @@ export function YourOrders() {
               sub={`under ${formatInr(settings?.min_trade_rs ?? 10_000)}, or held`}
             />
           </div>
+          {latest.lots ? <LotsPanel orders={latest} /> : null}
           <Table>
             <THead>
               <Th>Order</Th>
@@ -230,7 +242,7 @@ export function YourOrders() {
             </THead>
             <tbody>
               {plan.rows.map((row) => (
-                <OrderRow key={row.symbol} row={row} />
+                <OrderRow key={`${row.lot ?? ''}-${row.symbol}`} row={row} />
               ))}
             </tbody>
           </Table>
@@ -240,7 +252,9 @@ export function YourOrders() {
             always go through. Made {formatIstDateTime(latest.created_at)} (
             {latest.trigger === 'scheduled' ? 'the 14:15 job' : 'by hand'}).
             {plan.missing_prices.length ? ` No price for ${plan.missing_prices.join(', ')}.` : ''}
-            {latest.holdings?.source === 'fyers' && latest.holdings.outside?.length
+            {latest.holdings &&
+            latest.holdings.source !== 'paper' &&
+            latest.holdings.outside?.length
               ? ` Left alone, not part of this strategy: ${latest.holdings.outside.join(', ')}.`
               : ''}
           </p>
@@ -253,6 +267,68 @@ export function YourOrders() {
         onChanged={refetch}
       />
     </Card>
+  );
+}
+
+const LOT_STATUS: Record<MomentumLotOrders['status'], string> = {
+  new: 'New lot: buy',
+  rebalance: 'Rebalance',
+  exit: 'Sell only',
+  'not due': 'Not due',
+};
+
+/** BL-142: the strategy followed lot by lot: what each lot does this Friday, what to add to Kite,
+ * the one order per stock, and any change in Kite no lot could take. */
+function LotsPanel({ orders }: { orders: MomentumOrders }) {
+  const lots = orders.lots ?? [];
+  const net = Object.entries(orders.net ?? {});
+  const unexplained = orders.ledger?.unexplained ?? [];
+  return (
+    <div className="space-y-2 border-b border-border px-4 py-3 text-sm">
+      <ul className="space-y-1">
+        {lots.map((lot) => (
+          <li key={lot.id} className="flex flex-wrap items-baseline gap-x-2">
+            <span className="font-semibold text-foreground">{lot.label}</span>
+            <Badge tone={lot.status === 'not due' ? 'neutral' : 'primary'}>
+              {LOT_STATUS[lot.status]}
+            </Badge>
+            {lot.budget != null && lot.status !== 'not due' ? (
+              <span className="text-muted">{formatInr(lot.budget)}</span>
+            ) : null}
+            {lot.status === 'not due' && lot.next ? (
+              <span className="text-muted">next {formatDay(lot.next)}</span>
+            ) : null}
+            <span className="text-xs text-faint">
+              {Object.entries(lot.holds)
+                .map(([name, shares]) => `${name} ${formatInt(shares)}`)
+                .join(' · ') || 'holds nothing yet'}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {orders.deposit_needed ? (
+        <p className="text-warning">
+          Add <b>{formatInr(orders.deposit_needed)}</b> to Kite before you buy: the new lot needs{' '}
+          {formatInr(orders.lot_size ?? 0)}.
+        </p>
+      ) : null}
+      {net.length ? (
+        <p className="text-muted">
+          One order per stock:{' '}
+          {net
+            .map(([name, q]) => `${q > 0 ? 'BUY' : 'SELL'} ${name} ${formatInt(Math.abs(q))}`)
+            .join(', ')}
+        </p>
+      ) : null}
+      {unexplained.length ? (
+        <p className="text-negative">
+          Not in any lot (run <span className="font-mono">mbt lots assign SYMBOL --lot N</span>):{' '}
+          {unexplained
+            .map((u) => `${u.symbol} ${u.delta > 0 ? '+' : ''}${formatInt(u.delta)}`)
+            .join(', ')}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -269,6 +345,8 @@ function OrdersSettingsDrawer({
 }) {
   const settings = view?.settings ?? null;
   const [draft, setDraft] = useState<Partial<MomentumOrderSettings>>({});
+  // The paper source keeps the Fyers button, as before Kite existed.
+  const broker = settings?.holdings_source === 'kite' ? 'Kite' : 'Fyers';
   const [paste, setPaste] = useState('');
   const [busy, setBusy] = useState(false);
   const value = <K extends keyof MomentumOrderSettings>(
@@ -293,8 +371,8 @@ function OrdersSettingsDrawer({
     setBusy(true);
     const response = await apiPost('/api/momentum/holdings/sync', {});
     setBusy(false);
-    if (!response.ok) toast(`Could not read Fyers: ${response.error}`, 'error');
-    else toast('Holdings read from Fyers');
+    if (!response.ok) toast(`Could not read ${broker}: ${response.error}`, 'error');
+    else toast(`Holdings read from ${broker}`);
     onChanged();
   }
 
@@ -317,7 +395,10 @@ function OrdersSettingsDrawer({
     onChanged();
   }
 
-  const number = (key: 'min_trade_rs' | 'paper_capital_rs' | 'extra_cash_rs', label: string) => (
+  const number = (
+    key: 'min_trade_rs' | 'paper_capital_rs' | 'extra_cash_rs' | 'lot_size_rs',
+    label: string,
+  ) => (
     <div className="block text-sm">
       <span className="text-xs text-muted">{label}</span>
       <NumberField
@@ -349,16 +430,20 @@ function OrdersSettingsDrawer({
             options={[
               { value: 'paper', label: 'Paper portfolio' },
               { value: 'fyers', label: 'Holdings from Fyers' },
+              { value: 'kite', label: 'Holdings from Kite' },
             ]}
           />
           <p className="text-xs text-muted">
-            Paper: the model portfolio at your paper capital, until money goes in. Fyers: what your
-            account holds, read-only, at 14:15 and when you press Sync.
+            Paper: the model portfolio at your paper capital, until money goes in. Fyers or Kite:
+            what your account holds, read-only, at 14:15 and when you press Sync. Kite also reads
+            the account&apos;s free cash, which the orders use. LIQUIDBEES and gold bonds (SGB) are
+            options margin and always left out.
           </p>
         </div>
         {number('paper_capital_rs', 'Paper capital (₹)')}
+        {number('lot_size_rs', 'A new weekly lot is funded with (₹)')}
         {number('min_trade_rs', 'Skip top-ups and trims smaller than (₹)')}
-        {number('extra_cash_rs', 'Cash for the strategy held outside Fyers (₹)')}
+        {number('extra_cash_rs', 'Cash for the strategy held outside the broker (₹)')}
         <Button
           variant="primary"
           onClick={() => void save()}
@@ -372,16 +457,18 @@ function OrdersSettingsDrawer({
             <h3 className="text-sm font-semibold text-foreground">Holdings</h3>
             <span className="text-xs text-muted">
               {view?.holdings
-                ? `${view.holdings.source === 'fyers' ? 'from Fyers' : 'pasted'} · ${formatIstDateTime(view.holdings.synced_at)}`
+                ? `${view.holdings.source === 'paste' ? 'pasted' : `from ${brokerName(view.holdings.source)}`} · ${formatIstDateTime(view.holdings.synced_at)}`
                 : 'none saved yet'}
+              {view?.holdings?.cash != null ? ` · free cash ${formatInr(view.holdings.cash)}` : ''}
             </span>
             <Button size="sm" className="ml-auto" onClick={() => void sync()} disabled={busy}>
-              Sync from Fyers
+              Sync from {broker}
             </Button>
           </div>
           {view?.holdings?.rows.length ? (
             <ul className="mt-2 divide-y divide-border rounded-lg border border-border">
               {view.holdings.rows.map((row) => {
+                const margin = isMarginSymbol(row.symbol, view.margin);
                 const rule = view.rules[row.symbol] ?? null;
                 return (
                   <li key={row.symbol} className="flex items-center gap-2 px-3 py-1.5 text-sm">
@@ -389,26 +476,35 @@ function OrdersSettingsDrawer({
                       {row.symbol}
                     </span>
                     <span className="metric text-xs text-muted">{formatInt(row.quantity)} sh</span>
-                    <span className="ml-auto">
-                      <SegmentedControl
-                        ariaLabel={`How ${row.symbol} counts`}
-                        size="sm"
-                        value={rule ?? 'use'}
-                        onChange={(next) => void setRule(row.symbol, next === 'use' ? null : next)}
-                        options={[
-                          { value: 'use', label: 'Use' },
-                          { value: 'exclude', label: 'Exclude' },
-                          { value: 'cash', label: 'As cash' },
-                        ]}
-                      />
-                    </span>
+                    {margin ? (
+                      // Options margin is always left out (BL-142): no rule can change it.
+                      <span className="ml-auto text-xs text-faint">
+                        Options margin · always left out
+                      </span>
+                    ) : (
+                      <span className="ml-auto">
+                        <SegmentedControl
+                          ariaLabel={`How ${row.symbol} counts`}
+                          size="sm"
+                          value={rule ?? 'use'}
+                          onChange={(next) =>
+                            void setRule(row.symbol, next === 'use' ? null : next)
+                          }
+                          options={[
+                            { value: 'use', label: 'Use' },
+                            { value: 'exclude', label: 'Exclude' },
+                            { value: 'cash', label: 'As cash' },
+                          ]}
+                        />
+                      </span>
+                    )}
                   </li>
                 );
               })}
             </ul>
           ) : null}
           <label className="mt-3 block text-xs text-muted">
-            Or paste <span className="font-mono">SYMBOL quantity</span>, one per line (when Fyers
+            Or paste <span className="font-mono">SYMBOL quantity</span>, one per line (when {broker}{' '}
             cannot be read)
             <textarea
               value={paste}
@@ -430,4 +526,14 @@ function OrdersSettingsDrawer({
       </div>
     </Drawer>
   );
+}
+
+function brokerName(source: 'fyers' | 'kite'): string {
+  return source === 'kite' ? 'Kite' : 'Fyers';
+}
+
+/** LIQUIDBEES and sovereign gold bonds are options margin, left out with no rule (BL-142). */
+function isMarginSymbol(symbol: string, margin: MomentumOrdersView['margin']): boolean {
+  if (!margin) return false;
+  return margin.symbols.includes(symbol) || margin.prefixes.some((p) => symbol.startsWith(p));
 }

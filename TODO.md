@@ -445,6 +445,12 @@ collector is forward-only".
 | 3.10.30 | Expiring-index rule for Adaptive — [BL-122](backlog/BL-122-expiring-index-only-rule.md) | claude | **Built 2026-10-18 (owner decision, override of BL-111 H3's "adopt nothing").** From Mon 2026-10-19 09:16, on a day exactly one index expires, list C (live and T1) takes only that index's strategies: a filter of the unrestricted ranking, Widesl minimum kept, Buy kept only if on that index. Entries record `expiry_only` and the unfiltered picks; A / B / REF and every earlier day unchanged. Kill switch `ROTATION_EXPIRY_ONLY_FROM=off`. Open: check the first NIFTY and SENSEX rule days. |
 | 3.10.31 | Rotation Telegram messages redone — [BL-125](backlog/BL-125-rotation-telegram-v2.md) | claude | **Built 2026-10-18 (owner request).** 09:16: one message, Adaptive then T1 labelled testing phase, strategies shown as self-explaining labels with their settings; T1 never delays Adaptive. Evening: a short message at 16:00 (new job `options-rotation-result`) with both results and tomorrow's strategies in full; the T1 update moved into the 15:45 evening chain. Picks, scoring and journal unchanged. Open: restart the scheduler after merge (it reads `jobs.ts` at start); read the first days' messages. |
 | 3.10.32 | Lot plans tracked forward — [BL-135](backlog/BL-135-rotation-lot-plans-forward.md) | claude | **In progress 2026-10-18 (owner request).** Phase 0 registered before the 2026-10-19 09:16 entry: As picked, Dir Boost and Duo per book (Core, T1) from the journals and stored one-lot results, brokerage included; read-out at 60 forward scored days. Read-only; changes no pick. |
+| 3.10.33 | Desk screens and strategy tester — [BL-120](backlog/BL-120-desk-screens-and-strategy-tester.md) | claude | **In progress 2026-10-18.** Phase 0 answers recorded (Live tab + Options Lab placement, confirmation locked by default, chat route before the page text box, frozen Live-group tabs hidden in Phase 3). Phase 1 built 2026-10-18 (rule spec and grammar, event detection, simulation cache, placebo / random-time / charges, store and ledger, `obt rule`, `/legwise/rules/*`): reproduces BL-083's four triggers' firings and T1 / T4 → Dir event rows to the rupee; a two-year test runs in under a minute. 2026-10-20: the grammar gained Supertrend, Bollinger bands, a rule `exit_when` and a premium-% -of-spot strike (no test run). Next: Phase 2 (MCP tool). |
+| 3.10.34 | Rotation page at 1 lot, Core ₹8,000 / T1 ₹9,000 / base ₹8,000 stops, T1 and Fixed base cards, "Without the portfolio stop" — owner requests 2026-10-19 | claude | **Built 2026-10-19.** Every rupee figure on the page (cards, headline, chart, Daily log, Drawdown episodes' stopped line, replays) at 1 lot a strategy via a display-only `lots` query (`/summary`, `/log`, `/day/{day}`, `/portfolio/day\|days`, `/drawdowns`); per-lot figures, the verdict and the journal's recorded 2 lots unchanged. Cards titled Adaptive Classic (Core, stop ₹8,000, `pfstop`/`pftrail`, storage key bumped to v2) and Adaptive Tuned (T1 journal via `track=t1`, stop ₹9,000, `pfstop_t1`/`pftrail_t1`); dashboard-only names, Telegram and `list_names.json` unchanged. Tuned's REF comparison is omitted (the track records no REF); its gap to the fixed base is shown. Third card **Fixed base** (the registered base, unchanged, over Classic's sessions at 1 lot = 3 lots a day; no gap-to-base line), its own stop ₹8,000 (`pfstop_base`/`pftrail_base`) replayed through `/portfolio/days\|day?book=base` (the base's Dir leg accepted by name, its registered file sha-checked; the replay reproduces the stored base results, `matches_log`). Under each card's stop, "Without the portfolio stop": latest day with vs without (or "stop not reached"), total and max drawdown with vs without, days fired and their net effect. |
+| 3.10.35 | Five-minute breakout, hold and 1-minute entry, 192-variant grid — [BL-152](backlog/BL-152-five-minute-breakout-hold-entry.md) | claude | **Done 2026-10-22: killed.** No candidate (best t 1.65), PBO 0.51; confirmation period never opened. Findings in `research/options/strategies/breakout/`. |
+| 3.10.36 | Breakout support from Bank Nifty, Nifty IT and Reliance — [BL-153](backlog/BL-153-breakout-support-from-bank-it-reliance.md) | claude | **Done 2026-10-22: killed.** Two of three beyond their own level made no reliable difference in the four reference variants. |
+| 3.10.37 | "Days like today" for Adaptive's late picks — [BL-022](backlog/BL-022-analog-day-search.md) | claude | **Done 2026-10-22: killed at the gate.** Phase 0 registered before any run (owner's choices: 10:30 / 11:00 / 12:00, skip or heatmap swap, recent period decides). The 20 nearest earlier sessions' rest-of-day range ranks today's at Spearman 0.38–0.44, below BL-110's opening-range rule (0.49–0.52) and the VIX-implied move (0.43–0.45), at every check time and with both distances (Holm p ≥ 0.92; same order in 2022–24 and on SENSEX). The skip / swap replay was not run, as registered. The "20 days like today" view (Phase 4) is open as a look-only tool. |
+| 3.10.38 | Stop size by the morning — [BL-155](backlog/BL-155-stop-by-morning-type.md) | claude | **Done 2026-10-22: killed at step 1.** Phase 0 registered before any run (owner idea: wide stop after a quiet morning, tight after a wide one). On the heatmap's NIFTY ATM straddles 11:15–14:45, 2025-01 → 2026-10, the rule made +₹40 per lot-day net against +₹32–35 for fixed 60 / 80 / 100 % and the reversed rule; every 90% lower bound is below zero, and the rule is below shuffled labels. The real-Widesl step was not run, as registered. Lead, not adopted: after a quiet morning the widest stop is best on NIFTY in both periods. |
 
 ### 3.11 Local research database (`packages/trading-data`)
 
@@ -481,6 +487,7 @@ monthly copy to another disk. Design notes: `packages/trading-data/DECISIONS.md`
 | 3.11.23 | Send rotation picks and results to the owner's Telegram group and private chat | codex | **Done 2026-10-13.** Created Option signals with the owner and the existing alert bot; configured the additional destination and verified delivery to both chats. At 09:16, successful picks go to both; errors and other alerts stay private. The message uses Steady / Adaptive (Calendar and Baseline are recorded in the journal, not sent) and omits VIX in the picks and result text; shared display-name JSON keeps the dashboard and Telegram consistent. The 15:45 evening pipeline sends a second message when calculation finishes (normally around 16:00), with each section's one-lot net paper gain after estimated costs and every selected strategy's contribution; a per-entry marker prevents retry duplicates. Routing / formatting tests and dashboard name tests / typecheck pass. |
 | 3.11.24 | "Tomorrow" section of the evening result: expected picks and base rates by weekday and days to expiry (PR #210) | claude | **Done 2026-10-15.** `obt rotation result` appends the next session's expected picks (the 09:16 ranking re-run on the stored results with tonight's VIX close, with a chance for each pick and the likely changes) and the win rate and mean ₹ per lot-day of Adaptive and the fixed base on all days, the same weekday and the same NIFTY/SENSEX days to expiry. Rows are fixed in advance (no row is chosen by its result); each message states how many of the sessions were recorded forward and how many re-scored from history (in-sample), and that it is not evidence of an edge over the base. Calendar is no longer in the picks or result messages (owner, 2026-10-15). `--no-tomorrow` drops the section; a failure in it never blocks the result. Tests: `tests/unit/test_rotation_tomorrow.py`. From 2026-10-16 (owner) the picks, result and Tomorrow messages carry Adaptive only (`lists.PUBLIC_KEYS`; the journal still records every list), and the picks and Tomorrow messages add a separate "Next best, optional" line with the best unpicked Widesl and Dir. |
 | 3.11.25 | Rotation days to expiry count weekdays only, not calendar days — [BL-109](backlog/BL-109-rotation-weekday-dte.md) | claude | **Done 2026-10-15.** Owner: DTE skips Saturday and Sunday. Registered 12-month re-score (238 days, 2025-10-16 to 2026-10-15): Adaptive +₹406 → +₹430 and Steady +₹395 → +₹406 per lot-day, newer minus older +₹25 [-₹6, +₹63] and +₹11 [-₹16, +₹46]; Adaptive drawdown 6% deeper (limit 20%); adopted as "no worse", not as "better" (in-sample, lists fitted on calendar labels). Stored days and journal entries keep calendar days and are converted on read; new entries record `dte_basis: weekdays`. Tomorrow (Fri 16 Oct) reads NIFTY 1 / SENSEX 4 instead of 3 / 6. |
+| 3.11.26 | Repair the Sep–Oct option gaps with Fyers' expired-F&O API — NIFTY 16–22 Sep, SENSEX 18–24 Sep, BANKNIFTY / FINNIFTY / MIDCPNIFTY 26 Aug–22 Sep (the hole between the vendor files, which end 17 Sep, and the daily collector, from 23 Sep); decision on vendor Greeks — [BL-149](backlog/BL-149-fyers-greeks-validation.md); commodity history — [BL-148](backlog/BL-148-fyers-mcx-expired-options-history.md) | claude | **Built 2026-10-21, not yet run.** `obt fyers expired-options --from D --to D --underlyings A,B [--plan] [--max-requests N] [--only-expiry D] [--all-days]` plans only days with no option file, caches each contract's raw response (resumable; reused only if it covers the window), merges a day only once every expiry it needs is cached (and holds a day that may need an expiry not yet expired, `--allow-short` to override) without overwriting an existing row, skips and lists a contract refused for itself (`--retry-refused` asks again), stops cleanly on a rate limit, no access to the API, a run of refusals or a rejected token, rebuilds `data_quality` and the NIFTY/SENSEX derived tables for the merged days even when a run fails. After a repair run `obt legwise rerun` (and `obt rotation update --day D` for the repaired days). Review fixes 2026-10-22/23 (PR #280). Dry plan (read-only): NIFTY+SENSEX 1,822 candle requests, the three monthly indices 1,844. **Needs Fyers Prime** (Standard allows 10 a day). Stock options after 25 Aug (221 names) are not covered. |
 
 ### 3.12 Consolidate research frontend in `apps/dashboard`
 
@@ -529,6 +536,7 @@ where each phase stands. No momentum CAGR is a "result" until Phases 1–3 pass.
 | 3.13.6 | Weekly stop-loss on the Broad strategies — [BL-084](backlog/BL-084-momentum-stop-loss.md) | claude | **Done 2026-10-08: killed.** 0 of 30 pre-registered cells pass on the 10 top configs and the frozen ensemble (`search_spaces/bl084_result.json`); stops cost under 2 pts CAGR but do not reduce Ulcer or worst falls. Engine stop kept, off by default |
 | 3.13.7 | Six improvement levers — [BL-085](backlog/BL-085-momentum-improvement-levers.md) | claude | **Done 2026-10-09: no lever adopted.** After tax at Rs 5 lakh (baseline 29.9% / 32.4%, tax 8-9 pts a year): slower cadence, ETF blend, daily stop (sold next open), inverse-vol sizing and residual momentum all killed; the tax hold never fires in Broad. Write-up `packages/momentum-backtesting/docs/bl085-levers-2026-10-09.md` |
 | 3.13.8 | Momentum filter POC — [BL-050](backlog/BL-050-momentum-filter-poc.md) | claude | **Done 2026-10-09 (phases 0-3): no survivor.** Screen passes V1/V2/T1/R1; the engine test on the frozen ensemble passes none (PBO 0.72, dCAGR within +/-0.4 pts); hold-out unread; Phase 4 not applicable |
+| 3.13.9 | Check of the followed strategy (Four Sectors Monthly, No Tilt, all Fridays) under the real trade's assumptions (addendum 6) | claude | **Done 2026-10-22: verdict MIXED.** About 26% a year after tags, tax and Monday-open fills (25.5% on the delay-0 supplement; 44.9% as ranked), about 9 points over Mom30 TRI; fails the medium drawdown basket (-32.8%) and the bad-year rule (FY2024 -22.5 points); plateau, alpha and placebo pass. `packages/momentum-backtesting/docs/bl010-four-sectors-check-2026-10-22.md`. **Open:** owner decides size and rules; E13 Monday-fill option in the engine |
 | 3.13.9 | voladj follows the selected lookbacks — [BL-086](backlog/BL-086-voladj-follows-lookbacks.md) | claude | **Done 2026-10-09: killed, all three skip rules** (-7.5 to -12.0 pts a year after tax on FY2018-22, 0-1 of 10 better). Keep today's score. Found: its 'skip-month' widens the window (30/56 weeks to the latest close) instead of skipping; relabel or fix is an owner decision |
 
 ### 3.14 Momentum result integrity — [BL-001](backlog/BL-001-momentum-result-integrity.md)
@@ -536,9 +544,9 @@ where each phase stands. No momentum CAGR is a "result" until Phases 1–3 pass.
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.14.1 | Phase 1: frozen results on frozen data | claude | **Done 2026-10-05.** `packages/momentum-backtesting/tests/golden/` (16 scenarios, 14.7 MB fixture); accept with `scripts/update-goldens.py --accept-results --reason`; pre-push hook |
-| 3.14.2 | Phase 2: settings coverage and the look-ahead test | claude | **Done 2026-10-05** except the always-true checks and nightly runs. Look-ahead passes at three cut dates on all four datasets |
-| 3.14.3 | Phase 3: code and data stamp on every saved run | claude | Open |
-| 3.14.4 | Phase 4: weekly favourites check | claude | Open — three owner questions in the backlog item |
+| 3.14.2 | Phase 2: settings coverage and the look-ahead test | claude | **Done 2026-10-05**; always-true checks, nightly reverse-order and every-setting-wired runs and the CI flag **built 2026-10-22** (PR open) with five findings F1 to F5 in the BL-001 item (F1, weights omitted waiting cash, **fixed 2026-10-22**). Look-ahead passes at three cut dates on all four datasets |
+| 3.14.3 | Phase 3: code and data stamp on every saved run | claude | **Closed 2026-10-22 as superseded by BL-052** (versions on every run); the three catalog columns are dropped from scope |
+| 3.14.4 | Phase 4: weekly favourites check | claude | **Re-scoped 2026-10-22** to the pinned-anchor restated-history check (BL-052 delivered the rest); not started |
 | 3.14.5 | Data-dependent test failures — [BL-018](backlog/BL-018-brittle-benchmark-tests.md) | claude | **Done 2026-10-07.** Six tests failed on live data only: two benchmark session-count checks (3,900 hard-coded, now a floor plus NSE's bhavcopy session calendar), two reference-loading tests that read the live `benchmarks_weekly.csv`, the membership check against a current-list snapshot older than the Sep-2026 review, and the stock smoke test looking up a tax class for BSE before the data is rebuilt. Tests only; full suite 1,142 passed on live data |
 | 3.14.6 | Download `data/stocks/raw/nifty50_current.csv` again (niftyindices `ind_nifty50list.csv`) | owner | **Open — before Fri 2026-10-09 19:30.** The 2026-09-27 copy predates BSE replacing WIPRO (2026-09-30), so `mbt stocks fetch`'s membership guard (severity F) fails and `mbt stocks sync` exits 1 |
 
@@ -634,7 +642,8 @@ The plan and the owner's decisions live in the backlog item; this table only tra
 | 3.23.1 | Phase 1 tasks 1–2 and the extended-tags companion: point-in-time universe as the default and a three-way choice, the universe on the result and in Saved runs, the trust note, the muted extended-tags figure | claude | **Built 2026-10-10** (branch `feat/bl-036-phase1-universe-and-companion`, PR pending). Default run 41.4% → 33.3%; extended tags 24.2% |
 | 3.23.2 | Phase 1 tasks 3–4: Midcap 150 / Smallcap 250 / Nifty 500 comparison lines, the rebalance cadence line on the Rebalance view | claude | Open: next PR |
 | 3.23.3 | Point-in-time categories from NSE Basic Industry — [BL-074](backlog/BL-074-point-in-time-categories-nse-basic-industry.md) | claude | Planned: starts after 3.23.1 merges; first check is delisted-company coverage |
-| 3.23.4 | Phases 2–4: execution realism, follow the frozen four, optional | claude | Planned; Phase 3 waits for the owner's paper-tracking decision (BL-010) |
+| 3.23.4 | Phase 2: execution realism (Monday-open fill) | claude | **Built 2026-10-22 for Broad** (BL-010 E13): `execution="mon_open"`, delay 0 only, toggle in Costs, `fill_companion` line on the headline, golden scenario `broad_monday_open`. **Open: Phase 2b, Stock and Custom Index** (they refuse the option meanwhile) |
+| 3.23.5 | Phases 3–4: follow the frozen four, optional | claude | Planned; Phase 3 waits for the owner's paper-tracking decision (BL-010) |
 
 ### 3.24 Strategy correlation and diverse baskets — [BL-090](backlog/BL-090-strategy-correlation-and-diverse-baskets.md)
 
@@ -695,6 +704,40 @@ Steady / Calendar / Adaptive lists, favourites, a leg-grid builder. Features fol
 | 3.28.3 | Phase 1c: Builder design A (token strip, leg grid, backtest settings popover) | claude | **Built 2026-10-15.** On `main`: `bars` / `include_excluded` on `POST /legwise/backtest`, the grid helpers and components. The Builder page uses them (PR #227) with period, bar size and include-excluded in the Run panel |
 | 3.28.4 | Phase 2–3: Analytics page pattern on Today, Builder result, Runs, Heatmap, Correlation, Regimes; declutter | claude | **In progress.** Today is one page (list cards, What happened, Is the rule still working?, Experiments) with no mode switch; the evening run bar is on Today and Daily results is retired with a redirect (2026-10-15); Regimes and the YAML engine sit under Advanced (2026-10-15); Heatmap has chips and a settings drawer; correlation / regimes run-bar and drawer controls are not done |
 
+### 3.29 Momentum ETF premium gate — [BL-136](backlog/BL-136-momentum-etf-premium-gate.md)
+
+Owner (2026-10-18), after MON100 read +16.89% above NAV on a Friday the ranking put Nasdaq 100 first:
+never open a new position in an ETF too far above its NAV; the research decides whether the rule stays.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.29.1 | Phase 1: the live gate (`premium_block_pct` 2% / `premium_block_international_pct` 5% in `live_config.toml`, every ETF favourite): a new buy over the limit becomes `SKIP (premium)` with the premium, its date, the limit and the reason; the next-best name takes the slot; Telegram "NOT BOUGHT" group, journal rows, This week "Not bought" section, Journal page chips; a sleeve's skip never reads as a TRIM in a group | claude | **Built 2026-10-18.** Decision-only: the model portfolio still records the buy (Phase 2 task 3 decides whether the gate enters the engine) |
+| 3.29.2 | Phase 1b: the same gate on Broad and Custom Index atomics (Nasdaq 100, Hang Seng), on the Broad engine decision and the 14:15 orders; until then the followed Broad headline still buys MON100 at any premium | claude | Planned, next |
+| 3.29.3 | Phase 2: rebuild the premium history on matching units (MON100 from 2016, not 2021), run the pre-registered arms A–D, apply the pass / kill rule, findings page, keep or zero the limits | claude | Planned; Phase 0 committed with the item |
+
+### 3.30 Rotation picks to AlgoTest — [BL-137](backlog/BL-137-algotest-strategy-export-upload.md)
+
+Owner (2026-10-19): the picks are typed into AlgoTest by hand each morning; export them to `.algtst` and upload
+them. Every evening after the result message, delete what the tool uploaded and upload tomorrow's predicted picks; at
+09:16 add any pick that changed. T1 first. Nothing is ever deployed by the tool.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.30.1 | Phase 1: `legwise/algtst.py` + `obt rotation algotest-export`: YAML → `.algtst`, unmapped settings refused | claude | **Built 2026-10-19.** Every mapping read off four AlgoTest exports (the test fixtures); three earlier guesses corrected; all 521 Core-298 and T1 files export |
+| 3.30.2 | Phase 2: how AlgoTest imports, saves, lists and deletes a strategy | owner + claude | **Mostly done 2026-10-19:** website route (Playwright, AlgoTest's verbal OK); import, save and list seen; the delete dialog still to be seen |
+| 3.30.3 | Phase 3: uploader in `packages/broker-login` (dry run by default, ledger, read-back, delete only its own) | claude | **Built 2026-10-19** (`src/strategy-upload.ts`, `src/strategy-plan.ts`); first supervised `--apply` and the delete dialog still to be seen |
+| 3.30.4 | Phase 4: evening replace + 09:16 top-up in the scheduler | claude | **Registered 2026-10-19** (`algotest-evening` 16:40, `algotest-topup` 09:18), off until `ALGOTEST_UPLOAD=on`; restart the scheduler after merge. The top-up sends its own Telegram line, not one inside the 09:16 message |
+| 3.30.5 | Phase 5: compare the first week's AlgoTest trades with the files | claude | Planned |
+
+### 3.31 Deploy the rotation picks in AlgoTest — [BL-138](backlog/BL-138-algotest-auto-deploy.md)
+
+Owner (2026-10-19): build the deploy function ready, off by default; it may never be used.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.31.1 | The /live page and the Setup Execution sheet, read from the screen | claude | **Done 2026-10-19** (`docs/algotest-execution.md` §7); what Activate asks is still unseen |
+| 3.31.2 | Deployer `packages/broker-login/src/strategy-deploy.ts` + `deploy-plan.ts` (8 tests), jobs `algotest-deploy` 09:16 and `algotest-deploy-check` 15:35 | claude | **Built 2026-10-19**, off until `ALGOTEST_DEPLOY=on`; the first `--apply` must be watched by the owner |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |
@@ -704,3 +747,67 @@ Steady / Calendar / Adaptive lists, favourites, a leg-grid builder. Features fol
 | `.claude/project/overview.md` | What is **built** (Implementation Phases). This file holds what is **left** |
 | `docs/epics.md` | Permanent delivery record. Never deleted, never a TODO |
 | `docs/architecture.md`, `product.md`, `setup.md`, `testing.md` | Reference specs. No status, no tasks |
+
+### 3.32 Rotation Core picks to Quantiply — [BL-139](backlog/BL-139-quantiply-core-upload.md)
+
+Owner (2026-10-19): add the Core Adaptive picks to Quantiply (Angel One) too, on AlgoTest's schedule: evening replace,
+09:16 top-up. Through Quantiply's own API (the call its web app makes), not the form. Deploy built but off.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.32.1 | Phase 1: capture the web app's calls (create, list, read, delete, auth) with the owner | owner + claude | **Done 2026-10-19** (`docs/algotest-execution.md`, `tests/fixtures/quantiply/`); the enable (deploy) call is not sent |
+| 3.32.2 | Phase 2: `legwise/quantiply.py` + `obt rotation quantiply-export`: YAML → `POST /algos` body, the owner's execution settings, unmapped settings refused | claude | **Built 2026-10-19** (25 tests); all of Core-298 maps, trail in points confirmed by the owner's `test1` |
+| 3.32.3 | Phase 3: uploader over the API (ledger by algo id, read-back, delete only its own finished algos) + jobs `quantiply-evening` 16:45, `quantiply-topup` 09:19 | claude | **Built 2026-10-19** (`src/quantiply-upload.ts`, 12 planner tests), off until `QUANTIPLY_UPLOAD=on`; first dry run and first `--apply` by the owner 2026-10-19: 3 Wednesday algos created, each read back identical; to switch on: merge (after PR #264), restart the scheduler, set `QUANTIPLY_UPLOAD=on` |
+| 3.32.4 | Phase 4: enable / disable over the API (`src/quantiply-deploy.ts`, 16 planner tests) + jobs `quantiply-disable` 15:40, `quantiply-deploy` 16:55, `quantiply-deploy-topup` 09:21 | claude | **Built 2026-10-20**, off until `QUANTIPLY_DEPLOY=on` + Automated deployment; live dry run lists Wednesday's three Core algos; the first `--apply` is the owner's |
+
+### 3.33 Automation settings page — [BL-140](backlog/BL-140-automation-settings-page.md)
+
+Owner (2026-10-19): one place in the dashboard says what runs, with one row per platform + broker. Each row sets
+the 08:00 login, the list (Adaptive Classic / Tuned) and uploads. Three master switches: logins, uploads,
+deployment. The settings are saved in the scheduler's database, the GitHub variables are synced for the 08:15
+backstop, and the `.env` switches stay as hard safety.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.33.1 | Phase 1: versioned settings store + scheduler API + CLI + GitHub variable sync | claude | **Built 2026-10-19** (`apps/scheduler/src/automation.ts`, `GET`/`PUT /settings/automation`, `jobs settings`, 13 tests). The workflow does not read the new variables until Phase 3 |
+| 3.33.2 | Phase 2: Settings › Automation page + Guide | claude | **Built 2026-10-19** (`components/settings/AutomationSettingsCard.tsx`, `lib/automation.ts`, 8 tests; checked in a preview against a throwaway scheduler API). Apply now waits for Phase 3 |
+| 3.33.3 | Phase 3: the jobs follow the settings (08:00 logins, exports, uploaders); 3b: Quantiply login through Shoonya | claude | **Built 2026-10-19** (stand-in tested, not yet run live): `--from-settings` exports and uploaders, Quantiply per broker (`--broker`, own ledger), Shoonya login (`quantiply-shoonya.ts`), dispatch and the 08:15 backstop follow the logins switch, `ONLY=none`, Quantiply · Shoonya at 08:00 (own line, never the exit code), deploy gated by the deploy switch, Apply now |
+| 3.33.4 | Phase 4: more settings (lots multiplier, add-on, pause, portfolio stop, 09:20 check) | claude | **Started 2026-10-22:** settings schema + Pause built; the Buy add-on toggle applies to the exports (`--from-settings`); the 09:25 deploy check already names a never-uploaded pick and now says when a pause explains the gap (built); the platform multiplier is built in PR 4 and left open for the owner (Quantiply sets it, AlgoTest refuses to auto-deploy above 1; never run live above 1); portfolio stop not started |
+
+### 3.34 Momentum on Zerodha Kite, weekly lots — [BL-142](backlog/BL-142-momentum-kite-weekly-lots.md)
+
+Owner (2026-10-19): the Momentum money is on Kite, bought on Mondays at ₹50k a week up to ₹2 lakh.
+Each week's buy is a lot, rebalanced every K weeks with Kite's free cash. LIQUIDBEES and SGBs are
+options margin and are never part of the strategy. Kite access is read-only.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.34.1 | Phase 1: Kite read-only access (Login button, Friday reminder, holdings + free cash snapshot, LIQUIDBEES / `SGB*` excluded); login stays manual (Zerodha does not allow automating it; owner, 2026-10-19) | claude | **Built 2026-10-19, not yet run live.** `kite.py`, `/api/kite/*`, migration 013, `mbt kite …`, `kite-login-reminder` Fri 13:30, Broker logins Kite card. Holdings source is Kite and the first real read is stored (2026-10-20: five BSE-listed names, ₹4,509 cash). Open: Fri 23 Oct 14:15 run: check each holding maps to its strategy name |
+| 3.34.2 | Phase 2: the lot ledger (strategy chosen 2026-10-20: Four Sectors Monthly, No Tilt · all Fridays, K = 4, a lot = one sleeve) (seed from the first Kite snapshot, weekly diff attribution, flags, `mbt lots`) | claude | **Built 2026-10-21** (`lots.py`, migration 014, `mbt lots seed/show/assign`). Seed the live ledger once after the merge |
+| 3.34.3 | Phase 3: per-sleeve orders on Friday with free cash | claude | **Built 2026-10-21**, rehearsed on a copy of the live catalog. Open: the premium rule for Broad atomics (BL-136 Phase 1b) for lots whose model holds Nasdaq 100 |
+| 3.34.4 | Phase 4: Lots panel, Guide, `business.md` / `technical.md` | claude | Planned |
+
+### 3.35 Trade monitoring and safety — [BL-143](backlog/BL-143-trade-monitoring-and-safety.md)
+
+Owner (2026-10-20): "lets build all 7" (item 3 is BL-141). Read-only checks of the real trades on AlgoTest
+(Finvasia) and Quantiply (Angel One); every new part off until its `.env` switch is `on`, the Fyers reminder on.
+Phase 4 is the Telegram stop button: switch off AND square off, only after a second confirm tap.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.35.1 | Phase 1: wake schedule documented (`deploy/launchd/README.md`); morning summary lists the previous day's catch-ups after sleep | claude + owner | **Built 2026-10-20.** Owner: run the `pmset` line(s) in the README (07:55 recommended over 08:50: the 08:00 jobs); done when a trading day's 16:40 job runs on time |
+| 3.35.2 | Phase 2: the morning summary's Fyers line asks Fyers (`mbt token-status --probe`); 09:25 deploy check in `trade-monitor` (`DEPLOY_CHECK`), per Settings › Automation row and broker | claude | **Built 2026-10-20**, reworked after the #276 review (no login or session 09:10-09:25, login locks, per-row brokers) and its re-review (no login on a platform while one of its scheduler jobs runs, a due one until 10:00 / 17:30; no login within 10 min of a lost session, while another login is recent, or while the stop button runs). Readers checked live by hand 2026-10-20 (`--now --print`; nothing deployed that day). To switch on: merge, restart the scheduler, `DEPLOY_CHECK=on`; done when its 09:25 line matches the platforms on a trading day |
+| 3.35.3 | Phase 3: 09:05-09:10 margin check (`MARGIN_CHECK`) and loss alerts -₹5,000 / -₹8,000 from 09:25 (`LOSS_ALERTS`) in `trade-monitor` | claude | **Built 2026-10-20.** Margin read live (Angel One SmartAPI `getRMS`; Finvasia from AlgoTest `GET /brokers`, no Shoonya API login). AlgoTest's Total MTM read live from its card (₹0, green; a red figure is a loss). Quantiply's socket MTM is from its bundle, **not yet seen with an algo running**: until a fresh figure arrives for a running algo it says "cannot read", never ₹0. Before `LOSS_ALERTS=on`: check by hand whether a second login logs out the first on each platform |
+| 3.35.4 | Phase 4: stop button (`apps/scheduler/src/stop-button.ts` listener, `packages/broker-login/src/stop-button.ts` runner, a hold that lasts until Resume, held jobs) | claude | **Built 2026-10-20** (review fixes in), stand-in tested, never sent live; off until `STOP_BUTTON=on` + scheduler restart. Done when the owner has pressed it once on a day of their choice |
+
+### 3.36 Live vs paper: slippage and discretionary trades — [BL-141](backlog/BL-141-live-vs-backtest-slippage-discretionary.md)
+
+Owner (2026-10-19): before the evening deletes, read what AlgoTest and Quantiply show for the day, compare it with
+the backtest, report the slippage signed at 16:00 (owner only), and track the trades added by hand apart.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.36.1 | Phase 1: the read-only calls behind each platform's per-strategy P&L and fills (`docs/algotest-execution.md`, "Live results") | claude | **Found 2026-10-20** from the public bundles, confirmed with GETs after a real login (a holiday, reading 19 Oct). Quantiply fills not seen yet: needs a traded day's `GET /algos/:id` state |
+| 3.36.2 | Phase 2: `live-capture` 15:40 + `live-capture-retry` 15:55 (`src/live-capture.ts`), the day file, back-fill of missed days (no delete gate: both platforms keep the results) | claude | **Built 2026-10-20**, run by hand for 14, 15 and 19 Oct into scratch files; needs the scheduler restart (new jobs) |
+| 3.36.3 | Phase 3: `obt rotation live-compare` and the lines in the owner's 16:00 message | claude | **Built 2026-10-20**; the Rotation page's Live vs paper card (live, paper, gap, discretionary, running chart, by shape) **built 2026-10-22**. Reconciling a week against the contract notes is the owner's |
+| 3.36.4 | Phase 4: slippage per shape into the backtests (research, pre-register first) | — | After 20 forward days |

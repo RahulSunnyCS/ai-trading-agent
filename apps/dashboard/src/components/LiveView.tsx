@@ -1,157 +1,450 @@
 /**
- * LiveView — the NIFTY index and the ATM straddle as they arrive over /ws/ticks.
+ * LiveView — the Live page (BL-117 Phase 3): spot, India VIX, the ATM strike and two straddles for
+ * NIFTY or SENSEX, minute by minute.
  *
- *  - Market session badge first, so after hours the page says the market is closed and when
- *    it opens, rather than "Connected" and "Waiting for first tick…" forever.
- *  - Each value says how old it is ("Updated 4s ago") and its feed badge reads Live only when
- *    real ticks are fresh: Simulation in simulation mode, Stale once the last tick is older
- *    than lib/overview.ts's FEED_STALE_AFTER_MS while ticks are expected.
- *  - One banner for simulation / broker-token trouble, with the Fyers Login button inline
- *    (lib/live.ts `tokenBanner`); /api/meta comes from the shared `useMeta` hook.
- *  - The recent ticks and straddle values are kept by useLiveTicks across tab switches.
+ *  - Today the only source is a collected day, played back from the lake (live/session.py). The
+ *    page says so at the top. There is no live capture yet (BL-117 Phase 2); when it exists the
+ *    same URL answers with the day so far, and this page needs no change.
+ *  - Two straddles on the nearest weekly expiry: the rolling ATM (re-strikes as the index moves)
+ *    and the strike that was ATM at the 09:15 open, held all day. A minute with no bar of its own
+ *    (a leg that had not traded, or did not trade in that minute) is a gap in the line, never a
+ *    carried value.
+ *  - A response is shown only when it is the index and day the controls ask for
+ *    (`isCurrentSession`): while the next one loads the page shows a skeleton, never the last
+ *    one's figures.
+ *  - Changes are measured since 09:15 and are never coloured as profit or loss: spot, VIX and a
+ *    straddle moving is not the reader's P&L.
+ *  - Index and day live in the URL query (`ix`, `d`), so a copied link shows the same session.
  *
- * Not shown: day change against the previous close — the tick frame carries only symbol, ltp
- * and timestamp, and /api/meta no previous close or day open.
+ * It does not use the old tick socket (`hooks/useLiveTicks.ts`): that needs the frozen server's
+ * Redis stream, which does not run here.
  */
 
-import { useMemo } from 'react';
+import { Info } from 'lucide-react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { useFyersAuthStatus } from '../hooks/useFyersAuthStatus';
-import { useLiveTicks } from '../hooks/useLiveTicks';
-import { useMeta } from '../hooks/useMeta';
-import { useNow } from '../hooks/useNow';
-import { formatInt, formatIstTime, formatNumber } from '../lib/format';
-import { type FeedView, liveFeedView, tokenBanner } from '../lib/live';
-import { marketSession } from '../lib/market';
-import { type FeedHealth, feedHealth } from '../lib/overview';
-import { MarketSessionBadge, UpdatedAgo } from './live/LiveClock';
-import { LiveFeedBanner } from './live/LiveFeedBanner';
-import { LiveLineChart } from './live/LiveLineChart';
-import { StraddlePanel } from './live/StraddlePanel';
+import { useLiveDays, useLiveSession } from '../hooks/useLiveSession';
+import { useQueryState } from '../hooks/useQueryState';
+import { formatDay, formatInt, formatNumber, formatPct } from '../lib/format';
+import {
+  type Change,
+  type LiveFrame,
+  type SpeedId,
+  frameAt,
+  isCurrentSession,
+  pointsUpTo,
+} from '../lib/liveSession';
+import type { LiveUnderlying } from '../types/liveSession';
+import { MarketSessionBadge } from './live/LiveClock';
+import { LivePlayback } from './live/LivePlayback';
+import { type ChartLine, LiveSessionChart } from './live/LiveSessionChart';
 import { Badge } from './ui/Badge';
-import { Card } from './ui/Card';
-import { StatusDot } from './ui/StatusDot';
+import { Card, CardHeader } from './ui/Card';
+import { Select } from './ui/Input';
+import { RefreshButton } from './ui/RefreshButton';
+import { SegmentedControl } from './ui/SegmentedControl';
+import { Skeleton } from './ui/Skeleton';
+import { StatCard } from './ui/StatCard';
+import { StateMessage } from './ui/StateMessage';
+import { THead, TRow, Table, Td, Th } from './ui/Table';
 
-/**
- * How often the page re-judges feed health (Live / Stale, market open). Stale means no tick for
- * lib/overview.ts's FEED_STALE_AFTER_MS (45 s), so a few seconds' lag is invisible; the
- * once-a-second clock lives in the leaves in live/LiveClock.tsx instead of re-rendering the
- * whole page.
- */
-const HEALTH_CLOCK_MS = 5000;
+const INDEXES: ReadonlyArray<{ value: LiveUnderlying; label: string }> = [
+  { value: 'NIFTY', label: 'NIFTY' },
+  { value: 'SENSEX', label: 'SENSEX' },
+];
 
-function FeedBadge({ view }: { view: FeedView }) {
+/** "+12.35 (+0.05%)" for a change since 09:15, or a dash when there is nothing to compare. */
+function changeText(change: Change | null, unit = ''): string {
+  if (change === null) return '–';
+  const abs = formatNumber(change.abs, 2, { sign: true });
+  const pct =
+    change.pct === null ? '' : ` (${formatPct(change.pct, 2, { unit: 'percent', sign: true })})`;
+  return `${abs}${unit}${pct}`;
+}
+
+/** "Fri 16 Oct 2026": a replay is picked by date, so the weekday is shown with it. */
+function dayLabel(day: string): string {
+  return formatDay(day, { weekday: true });
+}
+
+function value(n: number | null, dp = 2): string {
+  return n === null ? '–' : formatNumber(n, dp);
+}
+
+function Swatch({ slot }: { slot: 1 | 2 | 3 | 4 }) {
+  const color = { 1: 'bg-series-1', 2: 'bg-series-2', 3: 'bg-series-3', 4: 'bg-series-4' }[slot];
+  return <span aria-hidden="true" className={`inline-block h-2.5 w-2.5 rounded-sm ${color}`} />;
+}
+
+function ChartTitle({ children }: { children: ReactNode }) {
   return (
-    <Badge tone={view.tone}>
-      <StatusDot tone={view.tone} pulse={view.pulse} />
-      {view.label}
-    </Badge>
+    <div className="mb-1 mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted first:mt-0">
+      {children}
+    </div>
   );
 }
 
-function indexCaption(health: FeedHealth | null): string {
-  switch (health) {
-    case 'idle':
-      return 'Market closed · no ticks until it opens';
-    case 'connecting':
-      return 'Connecting to the tick feed…';
-    case 'disconnected':
-      return 'Tick feed unreachable · retrying';
-    case null:
-      return '…';
-    default:
-      return 'Waiting for the first tick…';
-  }
+function LegendItem({ slot, label }: { slot: 1 | 2 | 3 | 4; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <Swatch slot={slot} />
+      {label}
+    </span>
+  );
+}
+
+function Headline({
+  frame,
+  underlying,
+  expiry,
+  dte,
+  fixedStrike,
+}: {
+  frame: LiveFrame;
+  underlying: LiveUnderlying;
+  expiry: string;
+  dte: number;
+  fixedStrike: number | null;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <StatCard
+        label={`${underlying} spot`}
+        value={value(frame.spot)}
+        delta={changeText(frame.spotChange)}
+        deltaTone="muted"
+        note="Change since the 09:15 open"
+      />
+      <StatCard
+        label="India VIX"
+        value={value(frame.vix)}
+        delta={changeText(frame.vixChange)}
+        deltaTone="muted"
+        note="Change since 09:15"
+      />
+      <StatCard
+        label="ATM strike"
+        value={frame.atm === null ? '–' : formatInt(frame.atm)}
+        note={`Expiry ${formatDay(expiry)} · ${dte} weekday${dte === 1 ? '' : 's'} away`}
+      />
+      <StatCard
+        label="Rolling ATM straddle"
+        value={value(frame.rolling.straddle)}
+        delta={changeText(frame.rolling.change)}
+        deltaTone="muted"
+        hint="Call plus put at each minute's own ATM strike, so it re-strikes as the index moves. The change is against the straddle at the 09:15 open."
+        note={
+          frame.straddlePctOfSpot === null
+            ? 'Re-strikes with the index'
+            : `${formatPct(frame.straddlePctOfSpot, 2, { unit: 'percent' })} of spot`
+        }
+      />
+      <StatCard
+        label="09:15 straddle, held"
+        value={value(frame.fixed.straddle)}
+        delta={changeText(frame.fixed.change)}
+        deltaTone="muted"
+        hint="Call plus put at the strike that was ATM at the 09:15 open, held all day: what a seller of the morning straddle holds."
+        note={fixedStrike === null ? 'No strike' : `Strike ${formatInt(fixedStrike)}`}
+      />
+    </div>
+  );
+}
+
+function LegsTable({
+  frame,
+  step,
+}: {
+  frame: LiveFrame;
+  step: number;
+}) {
+  const rows = [
+    {
+      key: 'rolling',
+      label: 'Rolling ATM',
+      strike: frame.atm,
+      ce: frame.rolling.ce,
+      pe: frame.rolling.pe,
+      straddle: frame.rolling.straddle,
+    },
+    {
+      key: 'fixed',
+      label: '09:15 strike, held',
+      strike: frame.fixed.strike,
+      ce: frame.fixed.ce,
+      pe: frame.fixed.pe,
+      straddle: frame.fixed.straddle,
+    },
+  ];
+  return (
+    <Table>
+      <THead>
+        <Th>Straddle</Th>
+        <Th align="right">Strike</Th>
+        <Th align="right">Call</Th>
+        <Th align="right">Put</Th>
+        <Th align="right">Call + put</Th>
+      </THead>
+      <tbody>
+        {rows.map((row) => (
+          <TRow key={row.key}>
+            <Td className="whitespace-nowrap">{row.label}</Td>
+            <Td numeric align="right">
+              {row.strike === null ? '–' : formatInt(row.strike)}
+            </Td>
+            <Td numeric align="right">
+              {value(row.ce)}
+            </Td>
+            <Td numeric align="right">
+              {value(row.pe)}
+            </Td>
+            <Td numeric align="right">
+              {value(row.straddle)}
+            </Td>
+          </TRow>
+        ))}
+      </tbody>
+      <caption className="sr-only">Strike step {step}</caption>
+    </Table>
+  );
 }
 
 export function LiveView() {
-  const { status, latestLtp, latestTimestamp, ticks, latestStraddle, straddles } = useLiveTicks();
-  const { meta } = useMeta();
-  const auth = useFyersAuthStatus();
-  const now = useNow(HEALTH_CLOCK_MS);
+  const [ixParam, setIx] = useQueryState('ix');
+  const [dayParam, setDay] = useQueryState('d');
+  const underlying: LiveUnderlying = ixParam === 'SENSEX' ? 'SENSEX' : 'NIFTY';
 
-  // A standalone Momentum preview also answers /api/meta, with a different payload: ignore it.
-  const simulate = meta !== null && typeof meta.simulate === 'boolean' ? meta.simulate : null;
-  const broker = typeof meta?.broker === 'string' ? meta.broker : '';
-  const banner = tokenBanner({
-    simulate,
-    broker,
-    authDegraded: meta?.authDegraded === true,
-    fyersConfigured: auth.status?.configured === true,
-    tokenState: auth.tokenState,
-    msLeft: auth.msLeft,
-  });
+  const days = useLiveDays(underlying);
+  const sessionState = useLiveSession(underlying, dayParam);
+  // The hook keeps the previous response while the next one loads: show a response only when it
+  // is the index and day the controls ask for, never the last one's figures under new controls.
+  const session = isCurrentSession(sessionState.data, underlying, dayParam)
+    ? sessionState.data
+    : null;
 
-  const session = now ? marketSession(now) : null;
-  const healthOf = (lastTickAt: number | null): FeedHealth | null =>
-    now === null || session === null
-      ? null
-      : feedHealth({
-          connection: status,
-          lastTickAt,
-          now: now.getTime(),
-          marketOpen: session.state === 'open',
-          simulate: simulate === true,
-        });
-  const indexHealth = healthOf(latestTimestamp);
-  const straddleHealth = healthOf(latestStraddle?.timestamp ?? null);
-  const indexView = indexHealth ? liveFeedView(indexHealth, simulate === true) : null;
-  const straddleView = straddleHealth ? liveFeedView(straddleHealth, simulate === true) : null;
+  // null = the end of the day (the whole session drawn); a number = the minute replayed to.
+  const [minute, setMinute] = useState<number | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState<SpeedId>('10');
 
-  // Memoised: the health clock and every tick re-render this, and the chart re-sets its data on change.
-  const tickPoints = useMemo(() => ticks.map((t) => ({ time: t.time, value: t.ltp })), [ticks]);
+  const sessionKey = session ? `${session.underlying}:${session.day}` : '';
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a different session starts at its end, paused
+  useEffect(() => {
+    setMinute(null);
+    setPlaying(false);
+  }, [sessionKey]);
+
+  const shown = session ? Math.min(minute ?? session.last_minute, session.last_minute) : 0;
+  const whole = Math.floor(shown);
+  const frame = useMemo(() => (session ? frameAt(session, whole) : null), [session, whole]);
+
+  const spotLines = useMemo<ChartLine[]>(
+    () =>
+      session
+        ? [
+            {
+              id: 'spot',
+              palette: 0,
+              points: pointsUpTo(session.minutes, session.spot.close, whole),
+            },
+          ]
+        : [],
+    [session, whole],
+  );
+  const straddleLines = useMemo<ChartLine[]>(
+    () =>
+      session
+        ? [
+            {
+              id: 'rolling',
+              palette: 1,
+              points: pointsUpTo(session.minutes, session.rolling.straddle, whole),
+            },
+            {
+              id: 'fixed',
+              palette: 2,
+              points: pointsUpTo(session.minutes, session.fixed.straddle, whole),
+            },
+          ]
+        : [],
+    [session, whole],
+  );
+  const vixLines = useMemo<ChartLine[]>(
+    () =>
+      session?.vix
+        ? [{ id: 'vix', palette: 3, points: pointsUpTo(session.minutes, session.vix, whole) }]
+        : [],
+    [session, whole],
+  );
+
+  const onMinute = useCallback((next: number) => setMinute(next), []);
+  const dayOptions = useMemo(() => {
+    // the same rule for the day list: another index's days are not offered under this one
+    const list = days.data?.underlying === underlying ? days.data.days : [];
+    const chosen = dayParam || session?.day;
+    return chosen && !list.includes(chosen) ? [chosen, ...list] : list;
+  }, [days.data, underlying, dayParam, session]);
+
+  const replay = session ? !session.live.available : true;
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3">
         <MarketSessionBadge />
+        <SegmentedControl
+          ariaLabel="Index"
+          value={underlying}
+          options={INDEXES}
+          onChange={(next) => {
+            setIx(next === 'NIFTY' ? null : next);
+            setDay(null);
+          }}
+        />
+        {replay ? (
+          <>
+            <Badge tone="info">Replay</Badge>
+            <Select
+              aria-label="Day to replay"
+              value={dayParam || session?.day || ''}
+              onChange={(event) => setDay(event.target.value)}
+              disabled={dayOptions.length === 0}
+              className="w-auto"
+            >
+              {dayOptions.map((d) => (
+                <option key={d} value={d}>
+                  {dayLabel(d)}
+                </option>
+              ))}
+            </Select>
+          </>
+        ) : (
+          <Badge tone="positive">Live</Badge>
+        )}
+        <div className="ml-auto">
+          <RefreshButton onClick={sessionState.refetch} loading={sessionState.loading} />
+        </div>
       </div>
 
-      {banner ? <LiveFeedBanner banner={banner} /> : null}
-
-      <Card>
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-faint">
-              NIFTY 50 index
-            </p>
-            {latestLtp !== null && latestTimestamp !== null ? (
-              <>
-                <p className="metric mt-1 text-4xl font-semibold tracking-tight text-foreground">
-                  {formatNumber(latestLtp, 2)}
-                </p>
-                <p className="mt-1 text-xs text-faint">
-                  Updated <UpdatedAgo at={latestTimestamp} /> ·{' '}
-                  {formatIstTime(latestTimestamp, { seconds: true })} IST
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="metric mt-1 text-4xl font-semibold tracking-tight text-faint">––</p>
-                <p className="mt-1 text-xs text-faint">{indexCaption(indexHealth)}</p>
-              </>
-            )}
-          </div>
-          {indexView ? <FeedBadge view={indexView} /> : null}
+      {session && replay ? (
+        <div className="flex items-start gap-2.5 rounded-lg border border-info/30 bg-info/10 px-4 py-3 text-sm">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-info" aria-hidden="true" />
+          <p className="text-foreground">
+            <span className="font-medium">Replay of {dayLabel(session.day)}.</span>{' '}
+            <span className="text-muted">{session.live.reason}</span>
+          </p>
         </div>
+      ) : null}
 
-        {ticks.length > 1 ? (
-          <LiveLineChart
-            points={tickPoints}
-            height={180}
-            series={0}
-            ariaLabel={`NIFTY 50 index over the last ${formatInt(ticks.length)} ticks this session`}
-            className="rounded-lg border border-border bg-surface-2/40 p-1"
+      {sessionState.error && !session ? (
+        <StateMessage
+          variant="error"
+          title="The session could not be loaded"
+          description={`${sessionState.error}. The research API (obt-api) must be running; the dashboard reads it through /api/backtest.`}
+        />
+      ) : null}
+
+      {!session && !sessionState.error ? (
+        <div className="space-y-3">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-72 w-full" />
+        </div>
+      ) : null}
+
+      {session && frame ? (
+        <>
+          {sessionState.error ? (
+            <StateMessage
+              variant="error"
+              title="Showing the last loaded session"
+              description={sessionState.error}
+            />
+          ) : null}
+
+          <Headline
+            frame={frame}
+            underlying={session.underlying}
+            expiry={session.expiry}
+            dte={session.dte_weekdays}
+            fixedStrike={session.fixed.strike}
           />
-        ) : null}
-      </Card>
 
-      <StraddlePanel
-        straddle={latestStraddle}
-        history={straddles}
-        health={straddleHealth}
-        view={straddleView}
-      />
+          <Card>
+            <CardHeader
+              title="Spot and straddles"
+              description={`${session.underlying} on ${dayLabel(session.day)}, one minute a point, 09:15 to 15:30 IST.`}
+            />
+            {replay ? (
+              <div className="mb-4">
+                <LivePlayback
+                  minute={shown}
+                  last={session.last_minute}
+                  timeAt={frame.time}
+                  playing={playing}
+                  speed={speed}
+                  onMinute={onMinute}
+                  onPlaying={setPlaying}
+                  onSpeed={setSpeed}
+                />
+              </div>
+            ) : null}
+
+            <ChartTitle>
+              <LegendItem slot={1} label={`${session.underlying} spot`} />
+            </ChartTitle>
+            <LiveSessionChart
+              lines={spotLines}
+              height={200}
+              minutes={session.minutes}
+              timeAxis={false}
+              ariaLabel={`${session.underlying} spot minute by minute on ${dayLabel(session.day)}`}
+              className="rounded-lg border border-border bg-surface-2/40 p-1"
+            />
+
+            <ChartTitle>
+              <LegendItem slot={2} label="Rolling ATM straddle" />
+              <LegendItem slot={3} label="09:15 straddle, held" />
+            </ChartTitle>
+            <LiveSessionChart
+              lines={straddleLines}
+              height={220}
+              minutes={session.minutes}
+              timeAxis={!session.vix}
+              ariaLabel={`Call plus put premium minute by minute on ${dayLabel(session.day)}: the rolling ATM straddle and the straddle at the 09:15 strike`}
+              className="rounded-lg border border-border bg-surface-2/40 p-1"
+            />
+
+            {session.vix ? (
+              <>
+                <ChartTitle>
+                  <LegendItem slot={4} label="India VIX" />
+                </ChartTitle>
+                <LiveSessionChart
+                  lines={vixLines}
+                  height={130}
+                  minutes={session.minutes}
+                  ariaLabel={`India VIX minute by minute on ${dayLabel(session.day)}`}
+                  className="rounded-lg border border-border bg-surface-2/40 p-1"
+                />
+              </>
+            ) : null}
+          </Card>
+
+          <Card>
+            <CardHeader
+              title="The legs at this minute"
+              description={`Nearest weekly expiry ${formatDay(session.expiry)}, strikes every ${formatInt(session.strike_step)}. A dash is a leg that had not traded or a strike that was not collected.`}
+            />
+            <LegsTable frame={frame} step={session.strike_step} />
+            <p className="mt-3 text-xs text-faint">
+              Range so far {value(frame.range.soFar)} points
+              {frame.range.versusMedian === null
+                ? ''
+                : `, ${formatNumber(frame.range.versusMedian, 2)}× the median full session of the last ${session.range.median_sessions}`}
+              . Descriptive only: nothing here is a signal.
+            </p>
+          </Card>
+        </>
+      ) : null}
     </div>
   );
 }

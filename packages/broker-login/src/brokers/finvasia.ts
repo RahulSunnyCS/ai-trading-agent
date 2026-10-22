@@ -4,7 +4,7 @@ import type { Config } from '../config.js';
 import { safeScreenshot, step } from '../diagnose.js';
 import { waitVisibleDismissing } from '../overlays.js';
 import { brokerNames, brokerPage, dataBrokerKeys, finvasiaForm } from '../selectors.js';
-import { freshTotp } from '../totp.js';
+import { shoonyaTotp } from '../totp.js';
 import { type Broker, BrokerLoginError } from './types.js';
 
 /**
@@ -57,7 +57,7 @@ export const finvasia: Broker = {
         await finvasiaForm.userId(target).fill(config.finvasia.clientId);
         await finvasiaForm.password(target).fill(config.finvasia.password);
         // Generated last so as little of the 30-second window as possible is spent.
-        await finvasiaForm.totp(target).fill(await freshTotp(config.finvasia.totpSecret));
+        await finvasiaForm.totp(target).fill(await shoonyaTotp(config.finvasia.totpSecret));
       });
 
       await step(target, 'finvasia-submit', async () => {

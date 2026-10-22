@@ -8,6 +8,7 @@ import { type PortfolioStopSetting, isOn, queryOf } from '../lib/portfolioStop';
 import type { RotationListKey, RotationLogSource } from '../types/rotationDailyLog';
 import type { PortfolioDay, PortfolioDays } from '../types/rotationPortfolio';
 import { usePolledResource } from './usePolledResource';
+import { ROTATION_PAGE_LOTS } from './useRotation';
 import { useWarmingResource } from './useWarmingResource';
 
 const BASE = '/api/backtest/legwise/rotation/portfolio';
@@ -37,15 +38,31 @@ export function useRotationPortfolioDays(
   source: RotationLogSource,
   range: { from?: string | undefined; to?: string | undefined },
   setting: PortfolioStopSetting,
+  /** `lots` books every pick at that many lots (the Rotation page's cards ask for 1); `track`
+   * reads a parallel track's journal; `book: 'base'` books the fixed base instead of a list
+   * (rows keyed `BASE`). Absent = the entry's recorded lots, the live journal. */
+  opts: { lots?: number; track?: 't1'; book?: 'base' } = {},
 ) {
   const { stop, trail } = queryOf(setting);
-  return useWarmingResource<PortfolioDays>(
-    `${BASE}/days${query({ source: sourceOf(source), from: range.from, to: range.to, stop, trail })}`,
-    { enabled: isOn(setting) },
-  );
+  const lots = opts.lots === undefined ? null : String(opts.lots);
+  const params = {
+    source: sourceOf(source),
+    from: range.from,
+    to: range.to,
+    stop,
+    trail,
+    lots,
+    track: opts.track,
+    book: opts.book,
+  };
+  return useWarmingResource<PortfolioDays>(`${BASE}/days${query(params)}`, {
+    enabled: isOn(setting),
+  });
 }
 
-/** One list's basket on one day. Mount the component that calls it only when a replay is asked for. */
+/** One list's basket on one day, each pick at the Rotation page's lots (the daily log's replay;
+ * the stop it is given is set for those lots). Mount the component that calls it only when a
+ * replay is asked for. */
 export function useRotationPortfolioDay(
   day: string,
   list: RotationListKey,
@@ -53,7 +70,8 @@ export function useRotationPortfolioDay(
   setting: PortfolioStopSetting,
 ) {
   const { stop, trail } = queryOf(setting);
+  const lots = String(ROTATION_PAGE_LOTS);
   return usePolledResource<PortfolioDay>(
-    `${BASE}/day${query({ day, list, source: daySourceOf(source), stop, trail })}`,
+    `${BASE}/day${query({ day, list, source: daySourceOf(source), stop, trail, lots })}`,
   );
 }

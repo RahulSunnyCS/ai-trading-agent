@@ -1,0 +1,185 @@
+{
+  "item": "BL-116",
+  "committed": "2026-10-17",
+  "note": "Pre-registered before any sector score was computed and before any trade of the nine 'confirmation' groups was looked at. The sector-position pattern was SEEN on Trio Fortnightly and Four Sectors Monthly, No Tilt (BL-115 descriptive follow-up), so those two only describe it here and the verdict on it comes from the other nine groups. Never edit after a run; supersede with bl116_criteria_addendum_N.json.",
+  "questions": {
+    "H1_sector_position": "Do picks from the best-placed sector held (position 1) beat Nifty 500 more often than picks from the other fresh positions?",
+    "H2_sector_score": "Does the chosen sector's own average-weekly score at the decision week (the mean of its members' scores, each the sum over the strategy's lookbacks of return / weeks) separate the picks that beat Nifty 500 from those that did not?"
+  },
+  "samples": {
+    "H1_decides_on": {
+      "groups": {
+        "Five Sectors, Rank Sum \u00b7 all Fridays": {
+          "group": "8973a68a4e914cd39a07951e4c54e42e",
+          "sleeves": {
+            "78eba5bfc02948de985bbf64a7adc5da": "b5684b9dc01c",
+            "4e0c34e3035748beb5e0e43feb63f88d": "395267bcaf8a",
+            "19171daebdd34f4c8e2f08c5ae586ccf": "866e1f7517ed",
+            "ebf6e79843524dc495f743c0c83f1f53": "c37991f6cb6d"
+          },
+          "category_top_n": 5,
+          "picks_per_category": 1
+        },
+        "Five Sectors, Wide Pool \u00b7 all Fridays": {
+          "group": "e8c16e2fc1da4f87872a1bbbbb5fa2e9",
+          "sleeves": {
+            "4dd2d5f3543047ebb397ca16e1051ef9": "99687ee43ab6",
+            "1c78b7322f464457b440b4b8ab3f8366": "b65a7a5376a1",
+            "65407a91110f4fcda55f3779133ee2ad": "e379da91b092",
+            "416f69bf4862456b82923881352dd3b2": "ed6a5b1b6e58"
+          },
+          "category_top_n": 5,
+          "picks_per_category": 1
+        },
+        "Six Sectors, Make Room \u00b7 all Fridays": {
+          "group": "faac6e92e4ff44c4b03ba3dc81067f70",
+          "sleeves": {
+            "feb32ac8675343abbbe99dd14bda0654": "42fdbd259670",
+            "0cac763037e449b5a144c20a5e197e73": "5bb95dd3ff4c",
+            "ead11580a888475e8208d8bc3d6800d1": "1815bcadf56a",
+            "15b17fa8dbf84c878ae91a086a1c8b5c": "2fcdbdb94c99"
+          },
+          "category_top_n": 6,
+          "picks_per_category": 1
+        },
+        "Four Sectors, Half Tilt \u00b7 all Fridays": {
+          "group": "0114cc82baed41a5af968f893a6f6a08",
+          "sleeves": {
+            "e242eb1c686a4198b9529f2c9410c75a": "446a35f30e44",
+            "eb01bc6167e045bf9a55809a825ea8dc": "634400ae8f13",
+            "5496ba5b926f4410ba2b399b8718a9d5": "8b4d1413d41b",
+            "b1e37feb07f443e29b2b1831e38a1db7": "ebfcd8475d7f"
+          },
+          "category_top_n": 4,
+          "picks_per_category": 1
+        },
+        "Four Sectors, Quick Exit \u00b7 all Fridays": {
+          "group": "109198e3f2484f778c6fdca296db1707",
+          "sleeves": {
+            "2458faf54cbd487aa5a1640a430aad1d": "d769447379a1",
+            "34917a966fa447ca92a6241336b13e4d": "7717189d421a",
+            "1b3bd57cb3774b9a9ddcbda304516fc5": "2d9cb7fbda8c",
+            "ade3121c132140a484841d388e8bd1ed": "2737fb58290f"
+          },
+          "category_top_n": 4,
+          "picks_per_category": 1
+        },
+        "Five Sectors, Stock Tilt \u00b7 all Fridays": {
+          "group": "8fd31cf90b2f42e79466914abe8f3ee1",
+          "sleeves": {
+            "7c5a5afc16ce40f7b922fbecb18a172e": "db7dcfd47ff2",
+            "b3273b1d213f4c38846cdaab8c0c274f": "7b959f9c6abc",
+            "88723484619d4e9b984942f517970c8d": "226ce91069fa",
+            "cf58b0df92524ec8becf7e711d1f4353": "7d631f1acbc4"
+          },
+          "category_top_n": 5,
+          "picks_per_category": 1
+        },
+        "Five Sectors Monthly \u00b7 all Fridays": {
+          "group": "d885045e82f145ca833cedb8ede93d8d",
+          "sleeves": {
+            "395730e8609e4b64a986d9443cc337d8": "7dc6bb26f040",
+            "0afece8f5f594b3f800356b1d11f85b5": "9381ef2e2462",
+            "62daf0a94cbe4a068f6926ba97f35d96": "698058df3bd6",
+            "fdd16ffd52a54b238c9fad8f098f31a4": "81fab816fad5"
+          },
+          "category_top_n": 5,
+          "picks_per_category": 1
+        },
+        "Six Sectors Monthly, No Tilt \u00b7 all Fridays": {
+          "group": "58ecf339091140a2b5a7da6c8a4bb1bd",
+          "sleeves": {
+            "735ca04adeb7465d9a86ce1668a072ab": "43fda5edc5fd",
+            "8b75339b65cc4751ba5e352c508a1c7b": "5a3ce1d55a0b",
+            "5da756b46f8f4ca69a1622c8c7fee5fe": "955ef80c3d97",
+            "7d483330e50849beb6cab0812983cff1": "19c20f652339"
+          },
+          "category_top_n": 6,
+          "picks_per_category": 1
+        },
+        "Phase 6 ensemble": {
+          "group": "9f553845b09c4361a32d5ccc34e729ea",
+          "sleeves": {
+            "0ece9a0a83074e9a9e6916bfac98a893": "1ffbdd211644",
+            "2e6716049f444e078e6a3541304cd8be": "84284258e890",
+            "d9ebefe07f5147a9bffe729cfc75b721": "801dfc2ebada",
+            "81e66ed4c755428cb18bba584d9767af": "8ac53f56134e"
+          },
+          "category_top_n": 6,
+          "picks_per_category": 2
+        }
+      },
+      "note": "every saved Broad group except the two below; each sleeve re-run with its saved config_full and end = 2022-12-30; settings fingerprints checked before the run"
+    },
+    "H1_describes_only": "trio_fortnightly and four_sectors_monthly_no_tilt as in bl115_criteria.json (already seen)",
+    "H2_decides_on": {
+      "trio_fortnightly": {
+        "group": "1258177078c9468e90329185848a4895",
+        "sleeves": {
+          "b2346e4f76564acd85e3b60661a8e803": "c91c330dc5a1",
+          "9633357266ee4300819a7ab203145b87": "a398b1ffd51f"
+        },
+        "lookbacks_weeks": [13, 26, 52]
+      },
+      "four_sectors_monthly_no_tilt": {
+        "group": "80be04f664714f70b0d4017e6b681eef",
+        "sleeves": {
+          "79c93a8fcffd46a3ba04881509e25170": "3a031da9a4e7",
+          "d468f277a0214753b84ac632e1ffc5f2": "f0813ef775be",
+          "a1480efe183247bd9f5bda28af80d6c5": "9467a8921c3e",
+          "3d68ddf8cee74df28433aa1fa912de0c": "a92aeeec1adc"
+        },
+        "lookbacks_weeks": [4, 13, 26, 52]
+      }
+    }
+  },
+  "windows": {
+    "run": {
+      "start": "2017-01-01",
+      "end": "2022-12-30"
+    },
+    "sealed": "2023-01-06 to 2026-10-16 is not read",
+    "caveat": "All eleven groups were chosen on results that include 2017-2026; the nine groups share many sectors and stocks with the two, so they are not independent evidence, only unseen trades"
+  },
+  "trades": {
+    "which": "every new position (engine BUY) filled from 2017-01-06 and closed by 2022-12-30, as in BL-115; positions open at the end excluded and counted",
+    "decision_week": "the week whose ranks chose the stock: the fill week minus the sleeve's signal_delay weeks",
+    "stocks_only": "non-stock picks (Gold, Silver, Nasdaq 100, Hang Seng and any other ATOMIC_NAMES) are excluded from both tests and counted: judging a diversifier against an equity index says nothing about the sector",
+    "sector": "the category the engine bought the stock through (BroadBacktestResult.effective.groups at the decision week)",
+    "sector_position": "the category's place in that week's held list, best first (BroadBacktestResult.held_by_week). Only fresh positions 1..category_top_n are tested; a pick from a lingering position is excluded and counted"
+  },
+  "outcome": {
+    "excess": "the position's return (position_return) minus Nifty 500 TRI's return from the fill week to the exit week",
+    "winner": "excess > 0"
+  },
+  "H1_rule": {
+    "per_group": "beat rate of position-1 picks minus beat rate of picks from positions 2..category_top_n",
+    "pass": "the difference is above zero in at least 7 of the 9 groups AND, over the nine groups' trades together, it is at least 5 percentage points with a 90% block-bootstrap interval (2,000 resamples of decision weeks, seed 116) entirely above zero",
+    "kill": "otherwise"
+  },
+  "H2_sector_score": {
+    "definition": "at the decision week d, for each member of the chosen category that is in the point-in-time universe that week (UniverseRanking.stock_membership true for its live column) and has prices back to the longest lookback: sum over the strategy's lookbacks k of (p[d] / p[d-k] - 1) / k, in percent; the sector score is the mean over those members (at least 3, else missing)",
+    "members": "categories.broad.load_stock_groups(curated, dated=True): the curated tags these sleeves run on",
+    "expected_sign": "+"
+  },
+  "H2_rule": {
+    "a_rank_correlation": "Spearman rho between the sector score and the trade's excess; t = rho / standard deviation over 2,000 block-bootstrap resamples of decision weeks (seed 116); holds when rho > 0 and t >= 3",
+    "b_losers_in_worst_fifth": "the trades in the lowest fifth of sector scores (cut points from that strategy's own trades) have a loser share at least 10 percentage points above the strategy's overall loser share",
+    "pass": "a and b both hold in BOTH strategies",
+    "kill": "otherwise"
+  },
+  "report_only": [
+    "H1 on Trio and Four Sectors (already seen), by position 1, 2, 3 ...",
+    "H1 mean excess and worst-20% share by position, per group",
+    "H2 within the same week: the sector score relative to the other held sectors' scores that week against the excess",
+    "H2 alongside sector position: the score's rank correlation inside each position",
+    "the sector's score against the stock's own score (BL-115 F0): correlation"
+  ],
+  "look_ahead_check": "a test recomputes the sector score with every price after d removed and requires the same value; nothing after 2022-12-30 is read",
+  "will_not_run": [
+    "other sector measures (breadth, volatility, turnover)",
+    "other lookbacks or weights for the score",
+    "a tuned threshold or a change to the engine (a later phase, only if a hypothesis passes, under its own pre-registration)",
+    "reading 2023-01-06 onwards"
+  ]
+}

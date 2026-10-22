@@ -232,6 +232,30 @@ export interface MomentumCompanion {
   reason?: string;
 }
 
+/**
+ * Broad Momentum's "same run filled the other way" figure (BL-036 Phase 2): the CAGR and drawdown
+ * at Friday's close and at Monday's open, both from the same ranking. `not_applicable` when the
+ * run has a trade delay (Monday fills need delay 0).
+ */
+export interface MomentumFillFigure {
+  cagr: number;
+  max_drawdown: number;
+  total_return: number;
+  trades: number;
+}
+
+export interface MomentumFillCompanion {
+  status: 'computed' | 'not_applicable' | 'failed' | 'skipped';
+  this_execution?: 'fri_close' | 'mon_open';
+  other_execution?: 'fri_close' | 'mon_open';
+  friday_close?: MomentumFillFigure;
+  monday_open?: MomentumFillFigure;
+  /** Monday-open CAGR minus Friday-close CAGR (negative = Monday costs). */
+  cagr_change?: number;
+  max_drawdown_change?: number;
+  reason?: string;
+}
+
 export interface MomentumResult {
   benchmark_name: string;
   kpis: Record<string, number | string | null>;
@@ -261,6 +285,8 @@ export interface MomentumResult {
   missing_symbols?: string[];
   /** Broad Momentum only; absent on results computed before 2026-10-10. */
   companion?: MomentumCompanion | null;
+  /** Broad Momentum only; absent on results computed before 2026-10-22. */
+  fill_companion?: MomentumFillCompanion | null;
   /** Broad Momentum only; null when it couldn't be computed. */
   circuit_exposure?: MomentumCircuitExposure | null;
   /** Only on an "All Fridays" run (`split_fridays`). */
@@ -610,7 +636,16 @@ export interface MomentumJournalEntry {
   row_hash: string;
   /** Model portfolio (fractions) at the signal's close, BEFORE the signal's own actions. */
   holdings_before: Record<string, number>;
-  actions: Array<{ asset: string; action: string; rank: number | null }>;
+  actions: Array<{
+    asset: string;
+    action: string;
+    rank: number | null;
+    /** A gate's row (BL-136 "SKIP (premium)"): why the name was not bought. */
+    reason?: string | null;
+    /** The ETF's premium to NAV that decided, as a fraction. */
+    premium?: number | null;
+    premium_limit?: number | null;
+  }>;
   /** The paper start Friday: shown as nothing held going in and a buy for every name held after. */
   first_week: boolean;
   /** Benchmark rows only: the index level recorded. */
@@ -656,7 +691,10 @@ export interface MomentumJournal {
 /** One name on a favourite's card: what the signal does with it this week. */
 export interface MomentumWeekRow {
   asset: string;
-  /** BUY, SELL, TRIM, ADD, HOLD, or an engine action such as TOP UP / WAIT. */
+  /**
+   * BUY, SELL, TRIM, ADD, HOLD, an engine action such as TOP UP / WAIT, or a gate's
+   * "SKIP (premium)" (BL-136: a top-N name not bought because its ETF was too far above NAV).
+   */
   action: string;
   /** The strategy's own rank (a group: the rank in the sleeve that acted on it). */
   rank: number | null;
@@ -667,6 +705,10 @@ export interface MomentumWeekRow {
   /** Groups only: share before the trades, and the sleeves holding or trading it. */
   before?: number;
   sleeves?: string[] | null;
+  /** A skip's reason, in words, and the premium to NAV (a fraction) and limit that decided. */
+  reason?: string | null;
+  premium?: number | null;
+  premium_limit?: number | null;
 }
 
 /** One configuration inside a group, and its rebalance cadence. */
@@ -801,19 +843,25 @@ export interface MomentumOrderSettings {
   owner: string;
   min_trade_rs: number;
   extra_cash_rs: number;
-  holdings_source: 'paper' | 'fyers';
+  holdings_source: 'paper' | 'fyers' | 'kite';
   paper_capital_rs: number;
+  /** A new weekly lot is funded with this much, or all free cash if more (BL-142). */
+  lot_size_rs: number;
   updated_at: string | null;
 }
 
 export interface MomentumHoldingsSnapshot {
   synced_at: string;
-  source: 'fyers' | 'paste';
+  source: 'fyers' | 'kite' | 'paste';
   rows: Array<{ symbol: string; quantity: number; avg_price: number | null }>;
+  /** Free cash read with a Kite snapshot (BL-142); null for other sources. */
+  cash?: number | null;
 }
 
 export interface MomentumOrderRow {
   symbol: string;
+  /** The lot this order belongs to ("Lot 2"), when the strategy is followed lot by lot. */
+  lot?: string;
   /** SELL, TRIM, BUY, ADD, SKIP, HOLD (blocked), or '' (at the target). */
   action: string;
   held: number;
@@ -839,12 +887,26 @@ export interface MomentumOrderPlan {
   missing_prices: string[];
 }
 
+/** One lot of a group followed lot by lot, as the Friday run plans it. */
+export interface MomentumLotOrders {
+  id: string;
+  label: string;
+  name: string;
+  /** new: funded this week; rebalance: due; exit: only a forced exit; not due. */
+  status: 'new' | 'rebalance' | 'exit' | 'not due';
+  next: string | null;
+  budget: number | null;
+  holds: Record<string, number>;
+  outside: string[];
+  plan: MomentumOrderPlan | null;
+}
+
 /** One set of orders for a week, as `momentum_orders` keeps it. */
 export interface MomentumOrders {
   created_at: string;
   trigger: 'scheduled' | 'manual';
   favourite_id: string;
-  holdings_source: 'paper' | 'fyers';
+  holdings_source: 'paper' | 'fyers' | 'kite';
   week: string;
   headline: { id: string; name: string };
   /** exact: decided before the close by last Friday's ranks; final: from the week's own data. */
@@ -853,15 +915,28 @@ export interface MomentumOrders {
   holdings?:
     | { source: 'paper'; capital: number }
     | {
-        source: 'fyers';
+        source: 'fyers' | 'kite';
         synced_at: string | null;
         excluded: string[];
+        /** Free cash in Kite counted in the plan (BL-142). */
+        broker_cash?: number | null;
         /** Holdings that are not something this strategy holds or could buy: left alone. */
         outside?: string[];
       };
   prices?: string;
   sleeves?: MomentumWeekSleeve[];
   plan?: MomentumOrderPlan;
+  /** Followed lot by lot (BL-142 Phase 3): each lot's status and its own plan. */
+  lots?: MomentumLotOrders[];
+  /** What to add to Kite before buying a new lot. */
+  deposit_needed?: number;
+  lot_size?: number;
+  /** Shares to buy (+) or sell (-) per stock across all lots: one order per stock. */
+  net?: Record<string, number>;
+  ledger?: {
+    unexplained: Array<{ symbol: string; delta: number; reason: string }>;
+    booked: Array<{ sleeve_id: string; symbol: string; delta: number }>;
+  };
 }
 
 /** `GET /api/momentum/orders`. */
@@ -870,6 +945,8 @@ export interface MomentumOrdersView {
   settings: MomentumOrderSettings;
   holdings: MomentumHoldingsSnapshot | null;
   rules: Record<string, 'exclude' | 'cash'>;
+  /** Held for options margin, excluded with no rule (BL-142): LIQUIDBEES, and SGB* by prefix. */
+  margin?: { symbols: string[]; prefixes: string[] };
   orders: MomentumOrders[];
   job: MomentumLiveRules['job'];
 }

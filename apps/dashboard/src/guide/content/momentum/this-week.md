@@ -19,32 +19,59 @@ Open this page to read the week, to run something by hand, or to classify a poss
 | Needs attention | Only shown when something needs you: a [possible split](glossary:corporate-action) to classify, a dataset not ready when it should be, or a journal entry still missing after the 21:00 check. The same items also reach you from any screen as [alerts](guide:start/alerts). |
 | Live-money rules | The last [rules check](guide:momentum/journal): weeks of paper tracking against the money gate, drawdown against your cut and exit lines, paper against the backtest, and the benchmark. **Check now** re-runs it here without sending anything. |
 | Favourites | Every favourite with its [status](glossary:favourite-status): the [headline](glossary:headline) first and larger, then the rest, scrolling sideways. Each shows this week's trades and how many names it shares with the headline. Click one to show its table below. |
-| The favourite's table | Sell, Buy and Hold, each by rank: the 1–10 score strip from Scores, the rank and how it moved since last week, the room left before the exit rank (when the strategy has a single exit rank), and the name's share after the trades. A [group](glossary:favourite-group) shows its sleeves first: the ones that trade this week, and when the others next do. Click a scored stock for its drawer. |
+| The favourite's table | Sell, Buy, Not bought and Hold, each by rank: the 1–10 score strip from Scores, the rank and how it moved since last week, the room left before the exit rank (when the strategy has a single exit rank), and the name's share after the trades. A [group](glossary:favourite-group) shows its sleeves first: the ones that trade this week, and when the others next do. Click a scored stock for its drawer. |
+| Not bought | An ETF Rotation favourite's top-ranked name that was **not** bought because its ETF traded too far above its NAV at the last NAV published before that Friday (normally Thursday's; Friday's own NAV comes out after the close): over 2% for an Indian ETF, over 5% for Nasdaq 100 and Hang Seng. The row says the premium and the limit; the next-best name within the exit rank took its slot. A name already held is never sold for its premium, and a top-up of a held name is only flagged. On a week that buys nothing anyway the name keeps its Wait and shows the same note. The model portfolio still counts the buy, so next week the name can show as held: whether this gate belongs inside the backtest is still being researched. **Broad Momentum and Custom Index favourites are not gated yet**, although they rank Nasdaq 100 and Hang Seng too: their signal still says Buy at any premium, so check the premium yourself before placing it. |
 | Since the 14:40 preview | ETF favourites: what the final changed against the preview, so you know whether a trade made on the preview still stands. |
 | Names at the edge | The weakest names held and the strongest not held, by rank: next rebalance's likely trades. For a group, in the sleeve that trades next. |
 | Telegram message | The headline's message for the week, word for word, and whether it was sent. **Re-send…** opens Run by hand, where a final run can be sent again after you confirm. |
-| Your orders | The headline's trades in whole shares, against your paper portfolio (until money goes in) or your holdings read from Fyers. See below. |
+| Your orders | The headline's trades in whole shares, against your paper portfolio (until money goes in) or your holdings read from Kite or Fyers. See below. |
 
 ## Your orders
 
 At **14:15** on Friday a job works out the headline's orders and sends a short summary to
 Telegram, so they can be placed before the 15:30 close; **Make orders now** does the same at any
-time. Nothing here places an order: you place them in Fyers yourself.
+time. Nothing here places an order: you place them in your broker yourself.
 
 - **Exact before the close.** A strategy with a one-week signal delay (the Phase 6 sleeves)
   decides this Friday's trades from last Friday's ranks, which are already stored at 14:15. Which
   names are bought and sold is therefore exact; only the share counts and a few checks that read
   Friday's own prices (the price ceiling, circuit limits, cap trims) use the latest prices.
 - **Paper portfolio** (the default until money goes in): the model's portfolio at your paper
-  capital (₹1,00,000, changeable in **Settings**). **Holdings from Fyers**: what your account
-  holds, read-only, at 14:15 or when you press **Sync from Fyers**; any holding can be left out
-  or counted as cash, and holdings can be pasted when Fyers cannot be read.
+  capital (₹1,00,000, changeable in **Settings**). **Holdings from Kite** or **from Fyers**: what
+  your account holds, read-only, at 14:15 or when you press **Sync**; any holding can be left out
+  or counted as cash, and holdings can be pasted when the broker cannot be read.
+- **Kite** (where the Momentum money is, from 19 Oct 2026) is read with its **free cash**, and
+  the orders use all of it. **LIQUIDBEES** and every **sovereign gold bond** (symbols starting
+  `SGB`) are options margin: they are always left out, marked *options margin*, and no rule
+  changes that. Free cash is Kite's cash after margins, without the margin your pledged holdings
+  give, so the orders never spend the options margin. Kite needs a login each day it is read: log in on [Broker logins](app:/brokerLogins)
+  before 14:15 on Friday; a Telegram reminder comes at 13:30 when you have not.
+- **Lot by lot** (a strategy with a sleeve for every Friday, followed with your Kite money: you buy
+  about ₹50,000 a week, one **lot** per sleeve, each rebalanced on its own calendar). Your orders
+  then plans every lot on its own, and the table adds a *Lot* tag to each order. **Lot 1** is the
+  sleeve that traded on your paper start Friday, **Lot 2** the next, and so on. On a Friday:
+  - A lot that is **due** trades. A **new lot** (one that holds nothing yet) is funded with the
+    weekly lot size (Settings, ₹50,000) or all your free Kite cash when that is more, and the page
+    says how much to **add to Kite** before you buy. A lot that **rebalances** uses its own shares
+    plus the free cash.
+  - A lot that is **not due** trades nothing, even if what you hold differs from the model (a swap
+    for a name blocked by the premium rule, whole shares). It sells only a name its sleeve marks
+    SELL that week.
+  - **One order per stock** adds the lots together, so you place a single order per stock.
+  - Shares you buy or sell in Kite between Fridays are booked first to the lots the last orders
+    named, then to the lot whose orders were made last (the message lists what was booked, and
+    marks anything not in the last orders). If Kite was not read that day, the message says so:
+    log in and press Sync. A change no lot can take (a stock that lot does not hold) is shown as *Not in any lot*:
+    book it with `mbt lots assign SYMBOL --lot N`. Stocks outside the strategy (such as a stock you
+    hold for another reason) and LIQUIDBEES / gold bonds are never part of a lot.
+  - `mbt lots show` lists every lot's shares; `mbt lots seed` records the first lot from your Kite
+    holdings once, when you start.
 - **What is traded.** A name the model drops is sold in full and a new name is bought, whatever
   the amount. Top-ups and trims smaller than the **minimum trade** (₹10,000 by default) are shown
   as SKIP with what they would have cost. Whole shares, rounded down; sells first. A name with a
   possible split still to classify is held, never traded.
 - **Charges** are estimated with the backtest's rates: STT, stamp duty, exchange fees and the DP
-  charge per sale. Fyers charges no brokerage on delivery.
+  charge per sale. Neither Kite nor Fyers charges brokerage on delivery.
 
 ## Reading a group
 

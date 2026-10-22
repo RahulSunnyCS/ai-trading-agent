@@ -53,7 +53,7 @@ describe('GuideLink', () => {
   });
 
   it('renders nothing for a screen with no guide page', () => {
-    const { container } = render(<GuideLink tab="live" />);
+    const { container } = render(<GuideLink tab="trades" />);
     expect(container.innerHTML).toBe('');
   });
 });

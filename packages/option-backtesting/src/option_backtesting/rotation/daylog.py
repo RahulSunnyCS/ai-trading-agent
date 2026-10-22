@@ -73,7 +73,7 @@ def _number(text: str | None) -> float | None:
 def read_rows(name: str, root: Path) -> dict[date, dict]:
     """{day: {gross, worst_mtm, stopped_by, n_trades}} of one variant's stored results. A row that
     does not parse is left out (a missing day is never read as zero)."""
-    path = store.results_dir(root) / f"{name}.csv"
+    path = store.result_path(name, root)  # a parallel track's variants live in its own folder
     if not path.exists():
         return {}
     out: dict[date, dict] = {}
@@ -413,9 +413,13 @@ def recorded_row(
     attrs: dict[date, dict],
     placement_now: dict[tuple[str, str], dict],
     prev_hash: str,
+    lots_per: int | None = None,
 ) -> dict:
+    """One journal entry as a log row. `lots_per` is a display override (the Rotation page shows
+    1 lot a strategy); without it the entry's own `lots_per_strategy` is used. The entry itself is
+    never changed: it is what was recorded."""
     day = date.fromisoformat(entry["day"])
-    lots_per = int(entry.get("lots_per_strategy") or LOTS_PER)
+    lots_per = lots_per or int(entry.get("lots_per_strategy") or LOTS_PER)
     lists = {
         key: list_block(day, picked, results, lots_per)
         for key, picked in (entry.get("lists") or {}).items()
@@ -472,12 +476,16 @@ def recorded_row(
     }
 
 
-def reconstructed_row(day: date, rec: _Recon, results: _Results) -> dict | None:
+def reconstructed_row(
+    day: date, rec: _Recon, results: _Results, lots_per: int | None = None
+) -> dict | None:
+    """A research-history day re-scored, at `lots_per` lots a strategy (display only; default the
+    registered LOTS_PER), like a recorded row."""
     picked = rec.picks(day)
     if picked is None:
         return None
     a = rec.attrs[day]
-    lists = {key: list_block(day, p, results) for key, p in picked.items()}
+    lists = {key: list_block(day, p, results, lots_per or LOTS_PER) for key, p in picked.items()}
     row = _row_common(day, lists)
     lacking = sorted({n for b in lists.values() for n in b["missing"]})
     scored = row["scored"]
@@ -568,14 +576,23 @@ def counters(rows: list[dict]) -> dict:
 # --- the log ----------------------------------------------------------------------------------
 
 
-def _registered() -> dict:
+def _registered(track: str | None = None) -> dict:
+    keys = pick.TRACK_LISTS[track] if track else tuple(LISTS)
     return {
         "first_day": REGISTERED_FIRST_DAY.isoformat(),
         "record_time": RECORD_TIME,
         "cutoff_time": f"{pick.FIRST_ENTRY:%H:%M}",
         "lots_per_strategy": LOTS_PER,
-        "lists": [{"key": k, "description": v.description} for k, v in LISTS.items()],
+        "lists": [{"key": k, "description": LISTS[k].description} for k in keys],
     }
+
+
+def first_due_day(entries: list[dict], track: str | None) -> date | None:
+    """The first trading day an entry was due: the registered first day for the live journal, a
+    track's own first entry for a track (it started later; None before its first entry)."""
+    if not track:
+        return REGISTERED_FIRST_DAY
+    return min((date.fromisoformat(e["day"]) for e in entries), default=None)
 
 
 def _chain(path: Path, entries: list[dict]) -> dict:
@@ -589,13 +606,19 @@ def _chain(path: Path, entries: list[dict]) -> dict:
 
 
 def expected_missing_days(
-    entries: list[dict], today: date, now_time: time, holidays: dict[date, str]
+    entries: list[dict],
+    today: date,
+    now_time: time,
+    holidays: dict[date, str],
+    first: date | None = REGISTERED_FIRST_DAY,
 ) -> list[date]:
-    """Trading days from the registered first day to today with no journal entry. Today counts only
-    once the 09:17 entry window has passed."""
+    """Trading days from `first` (default the registered first day) to today with no journal
+    entry. Today counts only once the 09:17 entry window has passed. `first` None: none is due."""
+    if first is None:
+        return []
     have = {e["day"] for e in entries}
     out = []
-    d = REGISTERED_FIRST_DAY
+    d = first
     while d <= today:
         due = d < today or now_time >= pick.FIRST_ENTRY
         if due and is_trading_day(d, holidays) and d.isoformat() not in have:
@@ -611,20 +634,28 @@ def build_log(
     source: str = "recorded",
     now: datetime | None = None,
     names: list[str] | None = None,
+    track: str | None = None,
+    lots_per: int | None = None,
 ) -> dict:
     """The log over [start, end] (inclusive; None = open). Raises journal.JournalCorrupt when the
-    journal cannot be read: showing a partial journal as the whole record would be worse."""
+    journal cannot be read: showing a partial journal as the whole record would be worse.
+
+    `track` ("t1") reads that parallel track's own journal instead of the live one: its recorded
+    rows and the trading days since its own first entry that have none; no reconstruction (the
+    research history is the live lists') and no placements (recorded for the live lists only).
+    `lots_per` shows every recorded list at that many lots a strategy (display only; the entries
+    keep their recorded `lots_per_strategy`)."""
     if source not in SOURCES:
         raise ValueError(f"source must be one of {', '.join(SOURCES)}")
     root = root or data_dir()
     now = (now or now_ist()).astimezone(IST)
     today = now.date()
-    path = store.journal_path(root)
+    path = store.journal_path(root, track)
     entries = journal.read(path)
     attrs = store.read_days(root)
     holidays = holiday_names()
     results = _Results(root)
-    placement_now = placements.current(placements.read(root).rows)
+    placement_now = {} if track else placements.current(placements.read(root).rows)
 
     def within(d: date, lo: date | None) -> bool:
         return (lo is None or d >= lo) and (end is None or d <= end)
@@ -635,9 +666,10 @@ def build_log(
         for n, e in enumerate(entries, 1):
             d = date.fromisoformat(e["day"])
             if within(d, start):
-                rows.append(recorded_row(e, n, results, attrs, placement_now, prev))
+                rows.append(recorded_row(e, n, results, attrs, placement_now, prev, lots_per))
             prev = e.get("hash", "")
-        for d in expected_missing_days(entries, today, now.time(), holidays):
+        first = first_due_day(entries, track)
+        for d in expected_missing_days(entries, today, now.time(), holidays, first):
             if within(d, start):
                 rows.append(missing_row(d, attrs, today))
 
@@ -645,21 +677,25 @@ def build_log(
         REGISTERED_FIRST_DAY,
         min((date.fromisoformat(e["day"]) for e in entries), default=REGISTERED_FIRST_DAY),
     )
-    rec = reconstruction(root, names)
-    available = [d for d in rec.days_available() if d < cut]
-    recon_info = {
-        "error": rec.error,
-        "available": len(available),
-        "first": available[0].isoformat() if available else None,
-        "last": available[-1].isoformat() if available else None,
-    }
-    if source in ("reconstructed", "all"):
+    available: list[date] = []
+    if track:  # a track has no research history of its own to reconstruct
+        recon_info = {"error": None, "available": 0, "first": None, "last": None}
+    else:
+        rec = reconstruction(root, names)
+        available = [d for d in rec.days_available() if d < cut]
+        recon_info = {
+            "error": rec.error,
+            "available": len(available),
+            "first": available[0].isoformat() if available else None,
+            "last": available[-1].isoformat() if available else None,
+        }
+    if source in ("reconstructed", "all") and available:
         recon_start = start or (
             (end or min(today, cut - timedelta(days=1))) - timedelta(days=RECON_DEFAULT_DAYS)
         )
         for d in available:
             if within(d, recon_start):
-                row = reconstructed_row(d, rec, results)
+                row = reconstructed_row(d, rec, results, lots_per)
                 if row is not None:
                     rows.append(row)
 
@@ -674,9 +710,11 @@ def build_log(
         "today": today.isoformat(),
         "entry_window_open": now.time() < pick.FIRST_ENTRY,
         "source": source,
+        "track": track,
+        "lots_per_strategy": lots_per,
         "from": start.isoformat() if start else None,
         "to": end.isoformat() if end else None,
-        "registered": _registered(),
+        "registered": _registered(track),
         "chain": _chain(path, entries),
         "journal_entries": len(entries),
         "last_collected_day": max(attrs).isoformat() if attrs else None,
@@ -684,7 +722,7 @@ def build_log(
         "holidays": [{"day": d.isoformat(), "name": holidays[d]} for d in sorted(in_window)],
         "rows": rows,
         "counters": {k: counters(v) for k, v in by_source.items()},
-        "placement_skipped_lines": placements.read(root).skipped,
+        "placement_skipped_lines": 0 if track else placements.read(root).skipped,
         "basis": "gross",
     }
 
@@ -728,16 +766,20 @@ def build_day(
     root: Path | None = None,
     now: datetime | None = None,
     names: list[str] | None = None,
+    track: str | None = None,
+    lots_per: int | None = None,
 ) -> dict | None:
-    """One day in full, or None when neither the journal nor the research history covers it."""
+    """One day in full, or None when neither the journal nor the research history covers it.
+    `track` and `lots_per` as in `build_log`; a track's entry is not re-scored here (the check
+    replays the live lists' ranking) and a track has no reconstructed days."""
     root = root or data_dir()
     now = (now or now_ist()).astimezone(IST)
     today = now.date()
-    path = store.journal_path(root)
+    path = store.journal_path(root, track)
     entries = journal.read(path)
     attrs = store.read_days(root)
     results = _Results(root)
-    read = placements.read(root)
+    read = placements.Read([], 0) if track else placements.read(root)
     placement_now = placements.current(read.rows)
     iso = day.isoformat()
     history = [r for r in read.rows if r["day"] == iso]
@@ -748,7 +790,7 @@ def build_day(
     for n, e in enumerate(entries, 1):
         if e.get("day") == iso:
             prev = entries[n - 2]["hash"] if n > 1 else journal.GENESIS
-            row = recorded_row(e, n, results, attrs, placement_now, prev)
+            row = recorded_row(e, n, results, attrs, placement_now, prev, lots_per)
             extra = {
                 "entry": {
                     "universe": e.get("universe"),
@@ -759,15 +801,20 @@ def build_day(
                     "prev": e.get("prev"),
                     "hash": e.get("hash"),
                 },
-                "rescore": _rescore(e, root, names),
+                "rescore": (
+                    {"checked": False, "note": "a track's entry is not re-scored here"}
+                    if track
+                    else _rescore(e, root, names)
+                ),
             }
             break
-    if row is None and day in expected_missing_days(entries, today, now.time(), holidays):
+    first = first_due_day(entries, track)
+    if row is None and day in expected_missing_days(entries, today, now.time(), holidays, first):
         row = missing_row(day, attrs, today)
-    if row is None:
+    if row is None and not track:
         first = min((date.fromisoformat(e["day"]) for e in entries), default=REGISTERED_FIRST_DAY)
         if day < min(first, REGISTERED_FIRST_DAY):
-            row = reconstructed_row(day, reconstruction(root, names), results)
+            row = reconstructed_row(day, reconstruction(root, names), results, lots_per)
     if row is None:
         return None
     lists_info = {

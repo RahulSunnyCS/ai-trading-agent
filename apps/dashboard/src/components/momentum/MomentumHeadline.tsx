@@ -26,6 +26,7 @@ import {
   type CompanionLine,
   EVALUATION_REVIEW_URL,
   companionLine,
+  fillLine,
   hindsightWarning,
   trustNote,
 } from '../../lib/momentumConfig';
@@ -77,6 +78,7 @@ function Headline({
   gap,
   gapTone = 'neutral',
   note = null,
+  moreNotes,
 }: {
   label: string;
   help: string;
@@ -87,6 +89,8 @@ function Headline({
   gapTone?: Tone;
   /** A muted third line, for a companion figure. It wraps rather than truncating the figure. */
   note?: CompanionLine | null;
+  /** More muted lines under the first, in order. */
+  moreNotes?: (CompanionLine | null)[];
 }) {
   return (
     <div className="min-w-0 border-border px-4 py-3 sm:px-5 lg:border-l lg:first:border-l-0">
@@ -112,11 +116,13 @@ function Headline({
           </Badge>
         ) : null}
       </p>
-      {note ? (
-        <p className="mt-0.5 break-words text-xs text-faint" title={note.title}>
-          {note.text}
-        </p>
-      ) : null}
+      {[note, ...(moreNotes ?? [])].map((line) =>
+        line ? (
+          <p key={line.text} className="mt-0.5 break-words text-xs text-faint" title={line.title}>
+            {line.text}
+          </p>
+        ) : null,
+      )}
     </div>
   );
 }
@@ -212,6 +218,7 @@ export function MomentumHeadline({
       : baseLabel;
   const trust = trustNote(config);
   const companion = companionLine(result.companion);
+  const fill = fillLine(result.fill_companion);
 
   const since = (key: string, now: number | null, digits = 'pp'): string => {
     const before = num(previous?.result?.kpis[key]);
@@ -281,6 +288,7 @@ export function MomentumHeadline({
           gap={view.excessCagr === null ? null : formatPp(view.excessCagr)}
           gapTone={toneOf(view.excessCagr)}
           note={companion}
+          moreNotes={[fill]}
         />
         <Headline
           label="Max drawdown"

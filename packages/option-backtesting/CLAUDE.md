@@ -112,7 +112,10 @@ Otherwise:
   longest first, the client code masked, then cut), and the last result, with the client masked
   (`R1•••56`), goes to `angelone/last_check.json`. The status lists the settings by name with a
   yes/no only, and the newest `ingest_runs` row with source `angelone` as the last collection.
-  Tests fake the login; none sends a real one.
+  Tests fake the login; none sends a real one. `funds.py` (BL-143, `obt angel funds [--json]`): one login
+  under the guard with source `margin` (`check.session(source=...)`), one `getRMS` GET, the account's free
+  margin (`net`) for the 09:05 margin check; SmartAPI sessions are per API key and client (Angel's FAQ on
+  AB1010), so this app's login does not replace Quantiply's (Angel's publisher login, its own key).
 - `rotation/` — the options rotation's forward paper journal (BL-058): `lists.py` (the registered lists
   A / B / C / REF, never edited after the first entry), `score.py` (a port of research/bl057/rotate.py's
   ranking, numpy only; `scripts/rotation-parity.py` must print PARITY OK), `update.py` (nightly one-day
@@ -133,6 +136,19 @@ Otherwise:
   the 298 universe; its Dir results in `rotation/base/`) and the read-out (per list ₹ per lot-day, drawdown,
   random same-shape percentile, list minus REF and minus base by a circular 5-day block bootstrap, 2,000
   resamples, seed 20261012). Read-only over the journal; `obt rotation readout | base`.
+  Display overrides for the Rotation page (owner, 2026-10-19), every default unchanged:
+  `lots_per` (`readout.build`, `daylog.build_log|build_day`, `portfolio_log.days|list_day`,
+  `drawdowns.build`'s stop replay) books every pick at that many lots, so rupee totals scale and
+  per-lot figures, the random-basket percentile and the pass rule do not, and no entry's recorded
+  `lots_per_strategy` is rewritten; `track="t1"` (`readout.build`, `daylog`, `portfolio_log`,
+  `overview.baskets`) reads the T1 journal (list C only, Core-298 + the track's variants via
+  `store.result_path`; no reconstruction, placements or re-score; missing days counted from the
+  track's own first entry; `vs_ref` None, the gap to the fixed base kept). The fixed base can be
+  booked under a portfolio stop (`portfolio_log.base_days|base_day`, `book=base`): picks
+  [(`N_wide_0917`, 2 x lots), (`N_dir_atm_0924`, 1 x lots)], weekdays both legs are stored, from
+  the registered first day; `portfolio.one_lot_path` accepts the Dir leg by its enumerated name
+  (`portfolio.strategy_file` resolves it to `strategies/rotation_base/`, refused if its sha256 is
+  not `base.BASE_YAML_SHA256`) and replays it with `base.score_days`' own call and sizing date.
 - `rotation/expiry.py` — the expiring-index rule (BL-122, owner 2026-10-18): from `EXPIRY_ONLY_FROM` (Mon
   2026-10-19), on a day when exactly one index expires (weekday label `0`; both, neither or an unknown label =
   no rule), Adaptive (list C, live and T1) is a FILTER of the unrestricted ranking: `filter_picks` runs
@@ -150,7 +166,65 @@ Otherwise:
   routine, collect → `refresh_day` → run → summary/Telegram, called by both `obt daily` and the
   dashboard's `POST /legwise/daily` job; add a step here, never in one caller), `store.py` (strategies, versions and
   results in the trading-data catalog — a version is a hash of the validated spec). Separate from `engine/` on purpose — see `DECISIONS.md`.
-  Also `anatomy.py` (per-day, per-segment index shape — QUIET/CHOP/TREND from spot + India VIX, descriptive only: lag it a day before using it for anything actionable; `DTE_RELIABLE_FROM` guards a wrong pre-Sep-2025 expiry calendar) and `forensics.py` (one saved day re-simulated for the dashboard; `DayResult.mtm` is the per-minute curve, never persisted). `fyers/history.py` backfills index + VIX history (`obt fyers history`).
+  Also `anatomy.py` (per-day, per-segment index shape — QUIET/CHOP/TREND from spot + India VIX, descriptive only: lag it a day before using it for anything actionable; `DTE_RELIABLE_FROM` guards a wrong pre-Sep-2025 expiry calendar) and `forensics.py` (one saved day re-simulated for the dashboard; `DayResult.mtm` is the per-minute curve, never persisted). `fyers/history.py` backfills index + VIX history (`obt fyers history`). `fyers/expired.py` repairs holes in the option lake from Fyers' expired-F&O API (`obt fyers expired-options`, 2026-10-21): it plans only the index sessions with no option file (`--all-days` to top up thin ones too), takes expiries and contract symbols from the API (never reconstructed), caches every contract's raw response under `raw/fyers-expired/` (reused only when it covers the requested window), merges by (instrument_id, ts) with existing rows winning, and merges a day only once every expiry it needs is cached (one partition write per day), so a stop anywhere never leaves a day with a file but short of an expiry (which `missing_only` would then skip). `client.response_state` classifies each response: `ok` / `no_data` / `permanent` (an allow-list: "invalid symbol" / "symbol not found" / "no data", on HTTP 200/400 only; cached and listed in `failed_contracts`, asked again only with `--retry-refused`) / `retryable` (everything unrecognised, network, 5xx, other 4xx; not cached; three in a row stop the run) / `blocked` (no subscription to the API, 401/403: stops) / `rate_limited` (stops). Refusals are held (run-wide, keyed by underlying and expiry; `fyers/expired.py`'s `_Fetcher`) and cached only once a later contract answers, or once a contract that answered before (`last_ok`, seeded from any cached `ok` in the plan) answers again when asked, at five in a row, at an expiry's end and at the end of the run. With nothing answered yet, a contract from the middle of the rest of the listing (nearest the money) is asked instead. If the contract asked is refused too, the run stops with none cached (`refused_streak`); with nothing to ask at all, the run ends `refused_unconfirmed` (exit 2). A transient error on that request leaves the refusals to the next run and counts toward the retry stop. A rejected token stops too (CLI exit 1; the other stops exit 2), and the days merged so far are judged and derived even when a run fails (topped-up days with `derived.rebuild(force_days=)`). Days whose expiry set may include one not yet expired (the API lists only expired ones) are listed as `days_short_of_unexpired_expiries` and held (in `pending_days`) unless `--allow-short`; ready days merge `MERGE_CHUNK_DAYS` (5) at a time, the symbol master before the partition; an undecodable listed symbol is skipped and listed. Ingest runs are recorded as source `fyers-expired`; after a repair, `obt legwise rerun` (and `obt rotation update --day D`) refresh stored results. `FyersClient(per_minute=, max_rate_limit_hits=)` is opt-in (Prime: stay under 10/s and 500/min; a second 429 raises `RateLimitedError`, because repeated per-minute breaches block the account for the day); `candles_from_response` reads an expired response's candles by `columns` name. Plan: Prime for the real run.
+- `live/session.py` + `api/live_routes.py` — the Live page's data (BL-117 Phase 3; `GET /legwise/live/days` and
+  `/session?underlying=NIFTY|SENSEX&day=`, proxied at `/api/backtest/legwise/live/*`), read-only. One day on the
+  375-minute grid, trimmed to the last real index bar: spot, India VIX, the ATM strike of each minute, the **rolling**
+  ATM straddle (CE + PE at each minute's own ATM, so it re-strikes) and the straddle **held** from the strike that was
+  ATM at the 09:15 open, both on the nearest weekly expiry; a minute with no bar of its own is `None`, never carried
+  (`market.load_day` forward-fills for the engine, so `_load` blanks those minutes again from the files' bar
+  minutes, for spot, VIX and every leg); days to expiry are
+  weekdays (`rotation/dte.py`); the median full-session range of the last 20 sessions is context only. Today the
+  source is always a collected lake day (`source.kind: replay`, `live.available: false` with the reason); a live reader
+  over `TRADING_DATA_ROOT/live/<day>/` (BL-117 Phase 2) is meant to return the same shape. Replays are cached
+  (`lru_cache`); nothing is written.
+- `ruletest/` + `api/rule_routes.py` — rule strategies and the tester (BL-120 Phase 1; `obt rule validate|test|reveal|ledger`,
+  `/legwise/rules/*`). A rule is WHEN (a condition on the index's bars, `expr.py`'s small grammar over (sessions x 375)
+  arrays; every operator reads only stamps <= j and earlier sessions, held by a causality test) → WHAT (a legwise
+  template's legs, each `on: up|down|both`, entered at the firing stamp + 1) → how it is managed (the template's stops
+  and exit). `spec.py` validates and hashes it (`spec_hash` ignores id / name / notes; `template_hash` ignores the
+  condition, so the simulation cache is shared by rules with one template) and reads it back in plain words;
+  `frame.py` loads index + VIX sessions from 2020-09 and the cached ATM-straddle feature; `sim.py` runs the template
+  with the legwise engine and keeps gross + turnover per (template, day, entry, side, slippage) in
+  `TRADING_DATA_ROOT/ruletest/simcache/` (charges are applied on read by `charges.py`, the BL-063 model);
+  `study.py` is BL-083's event study generalised: events (first firing in the window, one per session), the placebo
+  (same template and side at the same minute on the 20 nearest no-event days), the random-time control (a 5-minute entry
+  grid, 200 draws, seeded from the spec hash), slippage 0.5% / 1% on the events, by half-year / weekday / expiry day.
+  `store.py` keeps specs, results, the **ledger** (`tests.jsonl`, every test, a sweep of K counts K) and the **reveals**
+  (`reveals.jsonl`) as files, not the catalog. The learning period (2024-10-09 to 2026-10-08) is always open; the
+  confirmation period (NIFTY 2022-01 to 2024-10-08) is locked until `obt rule reveal <hash>` (once per spec hash, logged)
+  or an exploratory run (`--open-all`), which is itself logged as the spec's reveal (`note: exploratory test <id>`); a
+  test that includes it lists every earlier test of the spec that already saw it (`confirmation_seen_before`, in the
+  result and its ledger line); sessions after 2026-10-08 are forward only and never tested.
+  `{straddle: {at: T}}` is NaN before `T` (its strike is chosen at `T`'s close); the straddle feature file saves only
+  built rows and days whose option file lacks the strike, never a day without a file or a failed read (retried next
+  run); the simulation cache skips and counts a torn row and starts every append on a fresh line. A result is labelled
+  "a screen, not a finding". Indicators (2026-10-20): `{supertrend: {n, mult, minutes}}` (the line),
+  `{supertrend_dir: ...}` (+1 / -1) and `{bollinger: {n, k, minutes, band}}` are TradingView's definitions over
+  `minutes`-minute bars from 09:15, continuous across sessions like `rsi`, held between bar closes (`_bars`,
+  `_on_grid`, values cached on the frame); `tests/unit/test_ruletest_expr.py` pins the Supertrend to a longhand
+  ta.supertrend. A rule's optional `exit_when` (one condition, or `{up, down}` with `direction_up`) closes the trade
+  the minute after it first holds from the entry minute on, capped at the template's `exit_time`
+  (`study.exit_minutes`, applied to the events, placebo and random-time entries alike). An exit rule's cache file
+  has an `exit` column and a row is used only for the exit asked for (`sim.EXIT_COLUMNS`), because an exit depends on
+  indicators built from every earlier session; its `template_hash` takes only a marker, so exit rules with one template
+  share simulations. The controls are trend-matched (`study.control_filter`): a placebo day or random minute is used
+  only where `control_when` holds (or, without it, `exit_when` does not) the minute before it enters; the placebo looks
+  further out for its ten days a side, and `random_time` reports `minutes` / `minutes_used`. `exit_when` /
+  `control_when` join `spec_hash` only when set, so older rules keep their hashes and cache. A leg's
+  `strike: {premium_pct_of_spot: P}` is resolved per trade to `closest_premium` = P% of the index at the entry
+  (`spec._strike_for`; no index price at the entry is an error row). `load_spec` reads only true / false as YAML
+  booleans (`_RuleLoader`), so an unquoted `on: up` key stays `on`.
+  Event and trade values (BL-152): `max` / `min`; `{at_first: {x, when}}` and `{min_since_first | max_since_first:
+  {x, when}}` hold a value from the first stamp `when` holds in the session (a breakout candle's high, a level frozen
+  at the breakout, "no close below it since"); `{at_entry: x}` and `minutes_in_trade` are trade-relative, allowed only
+  in `exit_when` under elementwise operators (a `trade` flag set at parse), evaluated per trade by
+  `expr.evaluate_trade` from `study.exit_minutes` (the rest of the exit from one grid evaluation, shared); a rule
+  whose exit uses them must give `control_when`. `study.run_test(..., frame=)` takes a frame already loaded, for a
+  caller testing many rules (BL-152's `research/bl152/run_grid.py`).
+  `scripts/ruletest-acceptance.py` must print ACCEPTANCE OK: the four BL-083 triggers, said in
+  the grammar (`tests/fixtures/rules/`), fire on the same days and stamps as `research/bl083/`, and T1 and T4 with the Dir
+  template reproduce its event-study rows to the rupee. A leg with its own `range_breakout` is not supported yet.
 - `notify.py` — Telegram sender (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID), a deliberate copy of
   `momentum-backtesting`'s notify.py mirroring `@trading/notify`'s contract (never `parse_mode`,
   redacts known secrets, never raises; prints when unconfigured). Tests must stub `send` —
@@ -185,6 +259,27 @@ Otherwise:
   tonight's VIX close standing in for the open, under the BL-122 rule for that session, for Core-298 or Core-298 plus a
   track's variants; the message lists those strategies in full. The old history tables, probabilities and likely changes
   are no longer sent (`build`/`Tomorrow` are kept, tested, unused by the message).
+- `legwise/algtst.py` + `rotation/algtst_export.py` — BL-137: a leg-wise strategy as an AlgoTest `.algtst` (import
+  format, one strategy per file) and a day's picks as files + zip (`obt rotation algotest-export`). Every mapping was read
+  off an AlgoTest export in `tests/fixtures/algtst/` (a closest premium is a bare number; re-entry at cost is
+  `ReentryType.AtCost` / `ReentryCount`; a range breakout is `LegMomentum` `MomentumType.DelayedBreadthHigh` with `Time` in
+  minutes after entry); anything else that is set raises `Unmappable`. Not `legwise/algotest.py`, which is BL-009's
+  trade-log comparison.
+- `legwise/quantiply.py` + `rotation/quantiply_export.py` — BL-139: a leg-wise strategy as the body of Quantiply's create
+  call (`POST /algos` on `api-prod.quantiply.angelone.in`) and a day's Core picks as one `<variant>.json` body each plus
+  `manifest.json` (`obt rotation quantiply-export`). The mappings were read off calls the web app made, in
+  `tests/fixtures/quantiply/`. A closest premium is `selectionType: PREMIUM` + `PREMIUM_CLOSE_TO`. Re-entry at cost is a
+  leg `reEntry: RE_ENTRY_COST`. A range breakout is a leg `orb: ORB_INSTRUMENT` with `orbEndTime`. Every body copies
+  the execution settings of the owner's own `N_ITM1_SL21_3000` (`EXECUTION`: limit orders with buffer 3, product D,
+  SL limit 1, a 3 s exit delay). One algo per weekday, so a body carries the session's weekday only. A trail in points
+  is `PER_POSITION_POINT` (confirmed by the owner's `test1`). `Export.unconfirmed` lists any mapping never seen
+  saved, which the uploader refuses; none is left. Anything else that is set raises `Unmappable`.
+- `rotation/live_compare.py` — BL-141: the 15:40 capture's day file (`rotation/live/<day>.jsonl`, written by
+  `packages/broker-login/src/live-capture.ts`) beside the stored paper results (`store.result_path`, so T1 variants
+  too): per variant, list and platform + broker, live per lot (copies' multipliers added up) minus paper per lot
+  after the same costs, signed, summed in `Decimal`; copies that did not trade, have open legs or are off-slot, and
+  discretionary lines, apart. `owner_lines` is what `deliver.send_result`
+  adds to the owner's 16:00 message only, and returns None (no block) until `rotation/live/` exists.
 - `api/legwise_routes.py` — `/legwise/*` on `obt-api` for the dashboard's Options Lab: `/day` and `/anatomy` (see above; `/anatomy` also overlays apps/server's T-33 `daily_regime_tags` as `t33` when `DATABASE_URL` is set in this process, with an explicit status), list/
   validate/save strategies (slug-checked name, `yaml.safe_dump` of the validated model — never
   raw client text), ad-hoc backtest over collected days, saved results, data/token status, and
@@ -352,6 +447,10 @@ Otherwise:
   `regime_message` on `POST /runs`, `regime_status` in the MCP `run_backtest`
   output, `t33.status` on `/legwise/anatomy`). Any other query error still raises.
 
+- `research/common/` — code two research items share, imported by module name after a `sys.path` insert of this
+  folder (`varlib`, `early_ref`, `rotparse`; BL-152 added `cscv` (the numpy CSCV / PBO, moved out of `bl104/robust.py`, which
+  re-exports it) and `breakout_specs` (BL-152's 192 registered rule specs, also used by BL-153)). A script never imports
+  from another item's folder.
 - `research/bl104/` — BL-104, the full-factorial parameter sweep over the Widesl / Dir / Buy families:
   `grid.py` (the registered axes, cells and their SHA; `tests/unit/test_bl104_grid.py` holds the counts),
   `run_grid.py` (one job per cohort, resumable parts + day × cell series under `results/<tag>/`),
@@ -372,6 +471,7 @@ uv run obt run strategies/B_pyramid.yaml --from YYYY-MM-DD --to YYYY-MM-DD
 uv run obt fyers status                 # token source + data dir
 uv run obt fyers fetch                  # today's 1m data — run the SAME evening
 uv run obt fyers history                # backfill NIFTY + VIX index history (any time)
+uv run obt fyers history --symbol NSE:RELIANCE-EQ --name RELIANCE --asset stock   # BL-153: one symbol's history (`fyers.history.backfill_symbol`)
 uv run obt legwise run strategies/legwise/*.yaml [--from D] [--to D] [--trades] [--include-excluded] [--bars 5m]
 uv run python scripts/parity-5m.py --from D --to D   # same strategies on 1m vs 5m bars: agreement + timing
 uv run obt daily                        # evening routine: fetch + judge the day + derived tables + run strategies/legwise + summary (verdicts, IV percentile)

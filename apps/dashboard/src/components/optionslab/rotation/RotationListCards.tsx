@@ -1,12 +1,15 @@
 /**
- * The Today page's list cards (BL-102): one per shown list (VISIBLE_LIST_KEYS),
- * answering "how is the list doing?" before anything else. With several lists a card is a button
- * that makes its list the page's focus, and the focus list is outlined. Today's picks sit inside,
- * collapsed.
+ * The Today page's list cards (BL-102): one per shown list (VISIBLE_LIST_KEYS), answering "how is
+ * the list doing?" before anything else, plus any extra card the page adds (Adaptive Tuned, the
+ * T1 track). With several lists a card is a button that makes its list the page's focus, and the
+ * focus list is outlined. Today's picks sit inside, collapsed; a card's `action` (its portfolio
+ * stop and what it does) sits under its figures.
  *
  * Figures come from the read-out (`lib/rotationListCards.ts`); a day not yet scored shows a
  * dash, never a zero.
  */
+
+import type { ReactNode } from 'react';
 
 import { cn } from '../../../lib/cn';
 import { EMPTY, formatDay, formatInr } from '../../../lib/format';
@@ -28,19 +31,33 @@ function Figure({ label, value, hint }: { label: string; value: string; hint?: s
   );
 }
 
+/** "Today's 3 picks", or the day they were recorded when that is not today. */
+function picksTitleFor(entryDay: string | null, today: string) {
+  return (count: number) =>
+    entryDay === today
+      ? `Today's ${count} picks`
+      : entryDay
+        ? `${count} picks recorded for ${formatDay(entryDay)}`
+        : `${count} picks`;
+}
+
 function ListCardView({
   card,
   focused,
+  focusable,
   basket,
   picksTitle,
   onFocus,
+  action,
 }: {
   card: ListCard;
   focused: boolean;
+  /** A button that makes the card's list the page's focus (several lists shown). */
+  focusable: boolean;
   basket: RotationBasket | undefined;
-  /** "Today's 3 picks", or the day they were recorded when that is not today. */
   picksTitle: (count: number) => string;
   onFocus: () => void;
+  action?: ReactNode;
 }) {
   const picks = basket ? [...basket.core, ...basket.buy] : [];
   return (
@@ -48,12 +65,10 @@ function ListCardView({
       aria-label={`${card.name} list`}
       className={cn(
         'flex flex-col gap-2 rounded-xl border bg-surface p-4',
-        focused && SEVERAL_LISTS_VISIBLE
-          ? 'border-primary ring-1 ring-primary/40'
-          : 'border-border',
+        focused && focusable ? 'border-primary ring-1 ring-primary/40' : 'border-border',
       )}
     >
-      {SEVERAL_LISTS_VISIBLE ? (
+      {focusable ? (
         <button
           type="button"
           onClick={onFocus}
@@ -86,17 +101,21 @@ function ListCardView({
         <Figure
           label="Since the first day"
           value={formatInr(card.total, { sign: true })}
-          hint="Gross, two lots a strategy, over the scored forward days."
+          hint="Gross, one lot a strategy, over the scored forward days."
         />
         <Figure label="Max drawdown" value={formatInr(card.maxDrawdown)} />
-        <Figure
-          label="Against the fixed base"
-          value={
-            card.vsBase === null ? EMPTY : `${formatInr(card.vsBase, { sign: true })} / lot-day`
-          }
-          hint="The mean daily gap per lot, the list minus the fixed base. A description of the days so far, not a verdict: the registered read-out is at 60 sessions."
-        />
+        {card.isBase ? null : (
+          <Figure
+            label="Against the fixed base"
+            value={
+              card.vsBase === null ? EMPTY : `${formatInr(card.vsBase, { sign: true })} / lot-day`
+            }
+            hint="The mean daily gap per lot, the list minus the fixed base. A description of the days so far, not a verdict: the registered read-out is at 60 sessions."
+          />
+        )}
       </dl>
+
+      {action ? <div className="space-y-1.5 border-t border-border pt-2">{action}</div> : null}
 
       {picks.length > 0 ? (
         <details className="border-t border-border pt-2 text-xs">
@@ -117,6 +136,15 @@ function ListCardView({
   );
 }
 
+/** A card the page adds beside the shown lists' (Adaptive Tuned), with its own picks. */
+export interface ExtraListCard {
+  card: ListCard;
+  basket: RotationBasket | undefined;
+  /** The day those picks were recorded for. */
+  entryDay: string | null;
+  action?: ReactNode;
+}
+
 export function RotationListCards({
   summary,
   baskets,
@@ -124,6 +152,8 @@ export function RotationListCards({
   today,
   focus,
   onFocus,
+  action,
+  extra = [],
 }: {
   summary: RotationSummary | null;
   baskets: Partial<Record<RotationListKey, RotationBasket>> | undefined;
@@ -132,24 +162,44 @@ export function RotationListCards({
   today: string;
   focus: RotationListKey;
   onFocus: (key: RotationListKey) => void;
+  /** Shown on the focus list's card: the page's (Core) portfolio stop. */
+  action?: ReactNode;
+  extra?: readonly ExtraListCard[];
 }) {
   const cards = listCards(summary);
-  const picksTitle = (count: number) =>
-    entryDay === today
-      ? `Today's ${count} picks`
-      : entryDay
-        ? `${count} picks recorded for ${formatDay(entryDay)}`
-        : `${count} picks`;
+  const count = cards.length + extra.length;
   return (
-    <div className={cn('grid gap-4', cards.length > 1 ? 'lg:grid-cols-3' : 'max-w-md')}>
-      {cards.map((card) => (
+    <div
+      className={cn(
+        'grid gap-4',
+        count > 2 ? 'lg:grid-cols-3' : count === 2 ? 'max-w-4xl md:grid-cols-2' : 'max-w-md',
+      )}
+    >
+      {cards.map((card) => {
+        const key = card.key;
+        return (
+          <ListCardView
+            key={card.id}
+            card={card}
+            focused={key === focus}
+            focusable={SEVERAL_LISTS_VISIBLE}
+            basket={key ? baskets?.[key] : undefined}
+            picksTitle={picksTitleFor(entryDay, today)}
+            onFocus={() => (key ? onFocus(key) : undefined)}
+            action={key === focus ? action : undefined}
+          />
+        );
+      })}
+      {extra.map((x) => (
         <ListCardView
-          key={card.key}
-          card={card}
-          focused={card.key === focus}
-          basket={baskets?.[card.key]}
-          picksTitle={picksTitle}
-          onFocus={() => onFocus(card.key)}
+          key={x.card.id}
+          card={x.card}
+          focused={false}
+          focusable={false}
+          basket={x.basket}
+          picksTitle={picksTitleFor(x.entryDay, today)}
+          onFocus={() => undefined}
+          action={x.action}
         />
       ))}
     </div>

@@ -16,10 +16,16 @@
     "fyers-token": "tsx src/fyers.ts",
     "fyers-login": "tsx src/fyers.ts --store",
     "dispatch": "tsx src/dispatch.ts",
-    "test": "tsx --test src/*.test.ts"
+    "test": "tsx --test src/*.test.ts",
+    "record-strategies": "tsx scripts/record-strategies.ts",
+    "strategy-upload": "tsx src/strategy-upload.ts",
+    "quantiply-upload": "tsx src/quantiply-upload.ts",
+    "quantiply-deploy": "tsx src/quantiply-deploy.ts",
+    "stop-button": "tsx src/stop-button.ts"
   },
   "dependencies": {
     "@trading/broker-identity": "workspace:*",
+    "@trading/market-reference": "workspace:*",
     "@trading/notify": "workspace:*",
     "pg": "^8.13.0",
     "playwright": "1.63.0"

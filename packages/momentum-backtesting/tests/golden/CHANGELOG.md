@@ -172,3 +172,36 @@ BL-036 companion on the All Fridays scenario: the extended-tags figure is the wh
 | Scenario | CAGR | Max drawdown |
 |---|---|---|
 | broad_one_category_three_picks_four_weekly_all_fridays | 17.88% -> 17.88% | -35.50% -> -35.50% |
+
+## 2026-10-22 (on top of `d66bc2da`)
+
+BL-001 F1: the weights of a week now include cash waiting for the next buy week (the start before the first buy, a sell_every_week sale, a stop paid to cash). Equity, CAGR, trades unchanged; idle_share, holdings_count, avg_holdings, time_in_cash, avg_share and rotation shares move in three scenarios; etf_fortnightly_make_room_sized max_position_share 54.1% -> 39.2%.
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| etf_fortnightly_make_room_sized | 19.81% -> 19.81% | -25.81% -> -25.81% |
+| stock_voladj_monthly | 13.70% -> 13.70% | -16.00% -> -16.00% |
+| broad_one_category_three_picks_four_weekly | 32.13% -> 32.13% | -35.20% -> -35.20% |
+
+## 2026-10-22 (on top of `22c02631`)
+
+BL-036 Phase 2: Broad responses gain a fill_companion section (the same run filled the other way: Friday close vs Monday open); new scenario broad_monday_open. No other field moves.
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_default | 18.67% -> 18.67% | -26.72% -> -26.72% |
+| broad_monday_open | n/a -> 16.91% | n/a -> -27.81% |
+| broad_category_mode_off | 36.99% -> 36.99% | -28.58% -> -28.58% |
+| broad_one_category_three_picks_four_weekly | 32.13% -> 32.13% | -35.20% -> -35.20% |
+| broad_one_category_three_picks_four_weekly_all_fridays | 17.88% -> 17.88% | -35.50% -> -35.50% |
+| broad_eight_categories_one_pick | 26.32% -> 26.32% | -27.29% -> -27.29% |
+| broad_gates_loosened_and_tilted | 9.34% -> 9.34% | -27.78% -> -27.78% |
+| broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 13.94% | -18.09% -> -18.09% |
+
+## 2026-10-22 (on top of `edb5248b`)
+
+BL-036 Phase 2 review: a Monday-open request now decides the live week on its Friday-close twin (the sentinel week has no Monday). broad_monday_open's latest section moves from the week before to the newest week; nothing else changes.
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_monday_open | 16.91% -> 16.91% | -27.81% -> -27.81% |

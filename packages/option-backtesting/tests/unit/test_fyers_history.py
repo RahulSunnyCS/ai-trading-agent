@@ -82,3 +82,31 @@ def test_the_short_session_threshold_is_shared_with_data_quality():
     from option_backtesting.fyers import history
 
     assert history.MIN_BARS is quality.MIN_BARS
+
+
+def test_backfill_symbol_writes_one_series_under_its_asset(root):
+    client = FakeClient(date(2026, 8, 3))
+    out = history.backfill_symbol(
+        client,
+        root,
+        "RELIANCE",
+        "NSE:RELIANCE-EQ",
+        "stock",
+        end=date(2026, 8, 14),
+        log=lambda _: None,
+    )
+    assert out["written_days"] == {"RELIANCE": 10}
+    assert lake.available_days(root, "stock", "RELIANCE")[0] == date(2026, 8, 3)
+    assert lake.available_days(root, "index", "RELIANCE") == []
+    with pytest.raises(ValueError, match="index or stock"):
+        history.backfill_symbol(client, root, "X", "NSE:X", "option", log=lambda _: None)
+
+
+@pytest.mark.parametrize("name", ["../x", "a/b", "reliance", "", "X" * 40, "NIFTY IT"])
+def test_backfill_symbol_refuses_a_name_that_is_not_a_safe_folder_name(root, name):
+    client = FakeClient(date(2026, 8, 3))
+    with pytest.raises(ValueError, match="folder name"):
+        history.backfill_symbol(client, root, name, "NSE:X-EQ", "stock", log=lambda _: None)
+    assert client.calls == 0  # refused before any request
+    for ok in ("RELIANCE", "M&M", "BAJAJ-AUTO", "NIFTYIT"):
+        assert history.LAKE_NAME.match(ok)

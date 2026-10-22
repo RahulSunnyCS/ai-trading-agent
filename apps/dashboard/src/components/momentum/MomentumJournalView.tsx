@@ -12,6 +12,7 @@ import {
   formatNumber,
   formatPct,
 } from '../../lib/format';
+import { isSkipAction } from '../../lib/momentumWeek';
 import { actionTone, isTradeAction } from '../../lib/momentumWeekly';
 import type {
   MomentumJournal,
@@ -251,7 +252,11 @@ function JournalEntriesCard({
           </THead>
           <tbody>
             {entries.map((entry) => {
-              const trades = entry.actions.filter((row) => isTradeAction(row.action));
+              // A gate's skip (BL-136) is shown with the trades: the entry is the record that
+              // the strategy wanted the name and did not buy it.
+              const trades = entry.actions.filter(
+                (row) => isTradeAction(row.action) || isSkipAction(row.action),
+              );
               const isOpen = open === entry.entry_id;
               return (
                 <Fragment key={entry.entry_id}>
@@ -320,11 +325,14 @@ function JournalEntryDetail({ entry }: { entry: MomentumJournalEntry }) {
         ) : (
           <ul className="space-y-1">
             {entry.actions.map((row) => (
-              <li key={row.asset} className="flex items-center gap-2">
+              <li key={row.asset} className="flex flex-wrap items-center gap-2">
                 <Badge tone={actionTone(row.action)}>{row.action}</Badge>
                 <span className="text-foreground">{row.asset}</span>
                 {row.rank != null ? (
                   <span className="text-xs text-muted">rank {formatInt(row.rank)}</span>
+                ) : null}
+                {row.reason ? (
+                  <span className="basis-full text-xs text-warning">{row.reason}</span>
                 ) : null}
               </li>
             ))}

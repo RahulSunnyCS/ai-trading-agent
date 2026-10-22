@@ -1,3 +1,4 @@
+import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
   existsSync,
@@ -73,6 +74,33 @@ describe('GET /jobs and /runs', () => {
     expect(body[0]).toMatchObject({ schedule: 'daily 08:00', lastRun: null, group: null });
     expect(typeof body[0]?.nextRun).toBe('string');
     expect(body[2]).toMatchObject({ needs: ['home'], group: 'catalog' });
+  });
+
+  it("gives each job's latest slot that has come and the row serving it (BL-143)", async () => {
+    ctx.now = () => new Date('2026-10-20T04:00:00Z'); // 09:30 IST, after the 08:00 slot
+    const slot = new Date('2026-10-20T02:30:00Z'); // 08:00 IST
+    let body = (await (await get('/jobs')).json()) as Array<Record<string, unknown>>;
+    expect(body[0]).toMatchObject({ previousSlot: slot.toISOString(), previousSlotRun: null });
+    const id = ctx.history.start('fast', 'schedule', slot, '', new Date('2026-10-20T02:30:10Z'));
+    body = (await (await get('/jobs')).json()) as Array<Record<string, unknown>>;
+    expect(body[0]?.previousSlotRun).toMatchObject({ id, ended_at: null });
+    expect(body[0]).toMatchObject({ maxRunMinutes: 1, catchUpHours: 0 });
+    // an open row says whether its work still runs (this process wrote it: alive)
+    expect(body[0]?.previousSlotRun).toMatchObject({ alive: true });
+    expect(body[0]?.lastRun).toMatchObject({ alive: true });
+  });
+
+  it('GET /jobs closes a row whose process is gone before answering (BL-143)', async () => {
+    const path = join(dir, 'reap.db');
+    ctx.history.close();
+    ctx.history = new History(path);
+    handle = createApi({ ctx, jobs, prefsFile });
+    const id = ctx.history.start('fast', 'manual', null, '', new Date());
+    const db = new Database(path);
+    db.query('UPDATE runs SET pid = ? WHERE id = ?').run(999_999_999, id);
+    db.close();
+    const body = (await (await get('/jobs')).json()) as Array<Record<string, unknown>>;
+    expect(body[0]?.lastRun).toMatchObject({ id, exit_code: -2 });
   });
 
   it('filters runs by job and 404s an unknown job', async () => {

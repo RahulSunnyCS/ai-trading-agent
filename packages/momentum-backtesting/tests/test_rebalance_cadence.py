@@ -10,6 +10,7 @@ from momentum_backtesting.engine import (
     BENCHMARK,
     CADENCE_EPOCH,
     CASH,
+    IDLE,
     Config,
     cadence_weeks,
     run_backtest,
@@ -269,13 +270,14 @@ def test_sell_every_week_still_waits_for_the_cadence_to_buy():
 
 
 def test_sell_every_week_parks_the_proceeds_as_idle_until_the_buy_week():
-    """A fully-idle week (nothing held, nothing invested) has an empty `weights` row, which
-    pandas drops entirely - a pre-existing display quirk (the same thing happens before the
-    very first trade under rebalance="monthly"). `holdings` is built from a plain list of
-    per-week dicts instead, so it always has a row and shows the 0 holdings directly."""
+    """A week that holds nothing but the sale's proceeds shows them as 100% idle cash (BL-001 F1:
+    it used to have no weights row at all, because the waiting cash was left out of the total).
+    `holdings` is built from a plain list of per-week dicts, so it always has a row and shows the
+    0 holdings directly."""
     result, flip_week = cadence_case(sell_every_week=True)
-    assert flip_week not in result.weights.index
+    assert result.weights.loc[flip_week, IDLE] == pytest.approx(1.0)
     assert result.holdings.loc[flip_week, "count"] == 0
+    assert result.holdings.loc[flip_week, "idle_share"] == pytest.approx(1.0)
     assert result.weights.loc[CADENCE_WEEKS[6], "B"] > 0.99
     assert result.holdings.loc[CADENCE_WEEKS[6], "holdings"] == "B"
 

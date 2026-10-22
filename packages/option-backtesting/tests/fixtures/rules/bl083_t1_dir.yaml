@@ -1,0 +1,42 @@
+# BL-083 T1 pivot-with-trend, said in the BL-120 rule grammar. Acceptance fixture: the tester must find the same
+# firings as research/bl083/triggers.py and the same event-minus-placebo as its event study.
+rule:
+  id: bl083_t1_dir
+  name: BL-083 T1 to Dir
+  underlying: NIFTY
+  window: { from: "10:30", to: "14:00" }
+  define:
+    trend: { div: [{ sub: [close, session_open] }, atr14] }
+    cross_p: { any: [{ crosses_up: [close, pivot] }, { crosses_down: [close, pivot] }] }
+    cross_r1: { any: [{ crosses_up: [close, r1] }, { crosses_down: [close, r1] }] }
+    cross_s1: { any: [{ crosses_up: [close, s1] }, { crosses_down: [close, s1] }] }
+    with_p: { any: [{ all: [{ crosses_up: [close, pivot] }, { ge: [trend, 0.3] }] }, { all: [{ crosses_down: [close, pivot] }, { le: [trend, -0.3] }] }] }
+    with_r1: { any: [{ all: [{ crosses_up: [close, r1] }, { ge: [trend, 0.3] }] }, { all: [{ crosses_down: [close, r1] }, { le: [trend, -0.3] }] }] }
+    with_s1: { any: [{ all: [{ crosses_up: [close, s1] }, { ge: [trend, 0.3] }] }, { all: [{ crosses_down: [close, s1] }, { le: [trend, -0.3] }] }] }
+  when:
+    any:
+      - all: [{ first: cross_p }, with_p]
+      - all: [{ first: cross_r1 }, with_r1]
+      - all: [{ first: cross_s1 }, with_s1]
+  template:
+    exit_time: "15:28"
+    square_off: partial
+    legs:
+      - id: ce
+        lots: 1
+        position: sell
+        option_type: CE
+        expiry: weekly
+        strike: { strike_type: ATM }
+        stop_loss: { percent: 21 }
+        reentry_on_sl: { mode: cost, count: 1 }
+      - id: pe
+        lots: 1
+        position: sell
+        option_type: PE
+        expiry: weekly
+        strike: { strike_type: ATM }
+        stop_loss: { percent: 21 }
+        reentry_on_sl: { mode: cost, count: 1 }
+    overall:
+      stop_loss_inr: 3000

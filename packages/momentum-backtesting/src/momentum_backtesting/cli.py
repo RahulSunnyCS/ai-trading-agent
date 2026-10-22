@@ -59,7 +59,14 @@ def login() -> None:
 
 
 @app.command()
-def token_status() -> None:
+def token_status(
+    probe: bool = typer.Option(
+        False,
+        "--probe",
+        help="Also ask Fyers (read-only profile call) whether it accepts the token now; a token "
+        "with no known expiry (FYERS_ACCESS_TOKEN in .env) that cannot be confirmed is not ready.",
+    ),
+) -> None:
     """Show where the Fyers token would come from and when it expires (never prints it)."""
     try:
         creds = fyers.resolve_credentials()
@@ -67,7 +74,29 @@ def token_status() -> None:
         typer.echo(f"not ready: {error}")
         raise typer.Exit(1) from None
     expiry = f", expires {creds.expires_at:%Y-%m-%d %H:%M %Z}" if creds.expires_at else ""
+    if probe:
+        verdict = token_verdict(
+            creds.source, creds.expires_at is not None, fyers.probe_token(creds)
+        )
+        if verdict:
+            typer.echo(f"not ready: {verdict}")
+            raise typer.Exit(1)
+        typer.echo(f"ok: token from {creds.source}{expiry} (Fyers accepts it)")
+        return
     typer.echo(f"ok: token from {creds.source}{expiry}")
+
+
+def token_verdict(source: str, has_expiry: bool, probe: str) -> str | None:
+    """BL-143: why a token is not ready after the profile probe, or None when it is usable.
+    Rejected = not ready; not reachable = usable only when its expiry is known (a `.env`
+    token carries none, so yesterday's would otherwise pass)."""
+    if probe == "valid":
+        return None
+    if probe == "rejected":
+        return f"Fyers rejects the token from {source}: log in again"
+    if not has_expiry:
+        return f"the token from {source} has no known expiry and Fyers could not be asked"
+    return None
 
 
 @app.command()
@@ -1754,7 +1783,7 @@ app.add_typer(orders_app, name="orders")
 def orders_run(
     send: bool = typer.Option(False, help="Also send the summary to Telegram."),
     sync: bool = typer.Option(
-        True, help="Read the Fyers holdings first when the source is 'fyers'."
+        True, help="Read the broker's holdings first when the source is 'fyers' or 'kite'."
     ),
     fresh: bool = typer.Option(
         False,
@@ -1767,7 +1796,7 @@ def orders_run(
 ) -> None:
     """Fri 14:15 (scheduler job `momentum-orders`): the headline's orders for this Friday against
     the paper portfolio or the synced Fyers holdings, saved for This week. Never trades."""
-    from . import api, fyers, holdings_store, notify
+    from . import api, holdings_store, holdings_sync, notify
     from .config import load_repo_env
     from .db_read import open_catalog
 
@@ -1775,25 +1804,24 @@ def orders_run(
     if sync:
         with open_catalog() as con:
             source = holdings_store.settings(con, holdings_store.owner())["holdings_source"]
-        if source == "fyers":
+        if source in ("fyers", "kite"):
+            broker = source.title()
             try:
-                rows = fyers.holdings(fyers.resolve_credentials())
-            except (fyers.FyersCredentialsError, RuntimeError) as error:
+                holdings_sync.sync(source)
+            except (*holdings_sync.LOGIN_ERRORS, RuntimeError) as error:
                 message = notify.redact(f"{type(error).__name__}: {error}")
-                typer.echo(f"orders: could not read the Fyers holdings: {message}")
+                typer.echo(f"orders: could not read the {broker} holdings: {message}")
                 if send:
                     notify.send(
                         notify.Notification(
                             "momentum-orders",
                             "error",
-                            "Your orders: Fyers holdings could not be read",
+                            f"Your orders: {broker} holdings could not be read",
                             f"{message}\nLog in again (Broker logins), then: mbt orders run --send",
                             type="momentum.problem",
                         )
                     )
                 raise typer.Exit(1) from error
-            with open_catalog() as con:
-                holdings_store.save_holdings(con, holdings_store.owner(), "fyers", rows)
     payload = api._compute_orders(
         "manual" if fresh or favourite else "scheduled",
         start_fresh=fresh,
@@ -1803,6 +1831,196 @@ def orders_run(
     typer.echo(f"{note.title}\n{note.body}")
     if send:
         notify.send(note)
+
+
+lots_app = typer.Typer(
+    help="BL-142: which Kite shares belong to which weekly lot (one lot per sleeve; never trades)."
+)
+app.add_typer(lots_app, name="lots")
+
+
+@lots_app.command("seed")
+def lots_seed_cmd(
+    week: str = typer.Option(
+        "", help="The Friday this lot was decided (default: the paper start)."
+    ),
+    note: str = typer.Option("", help="Why a holding differs from the strategy, kept with it."),
+    replace: bool = typer.Option(False, help="Start the ledger again (lots already exist)."),
+) -> None:
+    """Book the latest Kite snapshot to the lot of that Friday's sleeve, once, at the start."""
+    from . import api
+    from .config import load_repo_env
+
+    load_repo_env()
+    try:
+        got = api.seed_lots(week=week or None, note=note, replace=replace)
+    except ValueError as error:
+        typer.echo(f"lots seed: {error}")
+        raise typer.Exit(1) from None
+    typer.echo(f"{got['group']}: {got['lot']} ({got['sleeve']}, decided {got['week']})")
+    for symbol, shares in got["booked"].items():
+        typer.echo(f"  {symbol:<14} {shares:>8,.0f}")
+    if got["left_out"]:
+        typer.echo(f"left out (not part of this strategy, or margin): {', '.join(got['left_out'])}")
+
+
+@lots_app.command("show")
+def lots_show_cmd() -> None:
+    """Each lot's shares, the lot whose orders were made last, and what no lot has."""
+    from . import api
+    from .config import load_repo_env
+
+    load_repo_env()
+    try:
+        got = api.lots_status()
+    except ValueError as error:
+        typer.echo(f"lots show: {error}")
+        raise typer.Exit(1) from None
+    typer.echo(
+        f"{got['group']} · Kite snapshot {got['snapshot']} · orders last made for {got['pending']}"
+    )
+    for label, lot in got["lots"].items():
+        held = ", ".join(f"{s} {q:,.0f}" for s, q in sorted(lot["holds"].items())) or "nothing yet"
+        typer.echo(f"  {label}: {held}")
+    if got["not_in_a_lot"]:
+        typer.echo("Kite minus the lots (assign with: mbt lots assign SYMBOL --lot N):")
+        for symbol, delta in got["not_in_a_lot"].items():
+            typer.echo(f"  {symbol:<14} {delta:+,.0f}")
+    else:
+        typer.echo("Every strategy holding in Kite is in a lot.")
+
+
+@lots_app.command("assign")
+def lots_assign_cmd(
+    symbol: str = typer.Argument(..., help="The Kite symbol, e.g. CUPID."),
+    lot: str = typer.Option(..., help="Which lot: 2 or 'Lot 2'."),
+    shares: float = typer.Option(0.0, help="Shares (default: all of the difference)."),
+) -> None:
+    """Book a change in Kite the ledger could not explain to a lot."""
+    from . import api
+    from .config import load_repo_env
+
+    load_repo_env()
+    try:
+        got = api.assign_lot(symbol, lot, shares or None)
+    except ValueError as error:
+        typer.echo(f"lots assign: {error}")
+        raise typer.Exit(1) from None
+    typer.echo(f"{got['symbol']} {got['delta']:+,.0f} booked to {got['lot']}")
+
+
+kite_app = typer.Typer(
+    help="BL-142: Zerodha Kite, read-only (holdings and free cash for Your orders; never trades)."
+)
+app.add_typer(kite_app, name="kite")
+KITE_START_URL = "http://127.0.0.1:8765/api/kite/start"
+
+
+@kite_app.command("status")
+def kite_status_cmd() -> None:
+    """Is Kite configured and logged in today, and what did the last snapshot hold?"""
+    from . import holdings_store, kite
+    from .config import load_repo_env
+    from .db_read import open_catalog
+    from .notify import IST
+
+    load_repo_env()
+    if not kite.configured():
+        typer.echo("Kite: not configured (set KITE_API_KEY and KITE_API_SECRET in .env)")
+        raise typer.Exit(1)
+    creds = kite.cached_credentials()
+    if creds is None:
+        typer.echo("Kite: not logged in today (mbt kite login)")
+    else:
+        typer.echo(f"Kite: logged in until {creds.expires_at.astimezone(IST):%d %b %H:%M} IST")
+    with open_catalog() as con:
+        who = holdings_store.owner()
+        source = holdings_store.settings(con, who)["holdings_source"]
+        snap = holdings_store.latest_holdings(con, who, ("kite",))
+    typer.echo(f"holdings source: {source}")
+    if snap:
+        cash = "no cash reading" if snap["cash"] is None else f"free cash ₹{snap['cash']:,.0f}"
+        typer.echo(f"last Kite snapshot {snap['synced_at']}: {len(snap['rows'])} names, {cash}")
+        for row in snap["rows"]:
+            mark = (
+                "  (excluded: options margin)"
+                if holdings_store.is_margin_symbol(row["symbol"])
+                else ""
+            )
+            typer.echo(f"  {row['symbol']:<14} {row['quantity']:>8,.0f}{mark}")
+
+
+@kite_app.command("login")
+def kite_login_cmd() -> None:
+    """Open the Kite login in the browser. Needs `mbt serve` running: Kite sends the browser back
+    to http://127.0.0.1:8765/api/kite/callback, which stores today's token."""
+    import webbrowser
+
+    typer.echo(f"Opening {KITE_START_URL} (mbt serve must be running).")
+    webbrowser.open(KITE_START_URL)
+
+
+@kite_app.command("sync")
+def kite_sync_cmd() -> None:
+    """Read the Kite holdings and free cash now (read-only) and store them as a snapshot."""
+    from . import holdings_sync
+    from .config import load_repo_env
+
+    load_repo_env()
+    try:
+        snap = holdings_sync.sync("kite")
+    except (*holdings_sync.LOGIN_ERRORS, RuntimeError) as error:
+        typer.echo(f"kite sync failed: {error}")
+        raise typer.Exit(1) from None
+    typer.echo(
+        f"stored {len(snap.get('rows', []))} names, free cash ₹{(snap.get('cash') or 0):,.0f}"
+    )
+
+
+@kite_app.command("remind")
+def kite_remind_cmd(
+    send: bool = typer.Option(False, help="Send the reminder to Telegram when a login is needed."),
+) -> None:
+    """Fri 13:30 (scheduler job `kite-login-reminder`): when Kite is the holdings source and today
+    has no valid Kite login, remind the owner to log in before the 14:15 orders. Always exits 0."""
+    from . import holdings_store, kite, notify
+    from .config import load_repo_env
+    from .db_read import open_catalog
+
+    load_repo_env()
+    with open_catalog() as con:
+        source = holdings_store.settings(con, holdings_store.owner())["holdings_source"]
+    if source != "kite":
+        typer.echo(f"holdings source is {source!r}, not 'kite': no reminder")
+        return
+    creds = kite.cached_credentials() if kite.configured() else None
+    alive = False
+    if creds is not None:
+        try:
+            alive = kite.probe(creds)
+        except RuntimeError:
+            alive = True  # Kite unreachable: do not nag about a token that may be fine
+    if alive:
+        typer.echo("Kite: logged in, nothing to remind")
+        return
+    body = (
+        "Your orders at 14:15 read your Kite holdings and free cash.\n"
+        "On the laptop: dashboard > Broker logins > Kite > Log in "
+        "(or run: mbt kite login)."
+    )
+    if not kite.configured():
+        body = "KITE_API_KEY / KITE_API_SECRET are missing from .env, so Kite cannot be read."
+    typer.echo(f"Kite login needed. {body}")
+    if send:
+        notify.send(
+            notify.Notification(
+                "kite-login-reminder",
+                "action_required",
+                "Log in to Kite before 14:15",
+                body,
+                type="broker.kite",
+            )
+        )
 
 
 @app.command("paper-start")

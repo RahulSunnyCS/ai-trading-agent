@@ -32,6 +32,7 @@ DIR_NAME = "N_dir_atm_0924"
 WIDE_NAME = "N_wide_0917"  # a rotation variant: its results are already stored nightly
 N_WIDE, N_DIR = 2, 1
 BASE_LOTS = N_WIDE + N_DIR  # one-lot strategies in the base
+UNDERLYING = "NIFTY"  # both legs
 #: The registered file, byte for byte (BL-058 amendment 2026-10-10). The base must not drift: a
 #: changed file is a different strategy, so scoring refuses it instead of mixing the two.
 BASE_YAML_SHA256 = "0369c2afee0ff4f6fbd7bf09a9e804b82acbb81c469476a796e33f1535d57b39"
@@ -122,7 +123,7 @@ def score_days(
             out["already"] += 1
             continue
         try:
-            loaded = load_day(root, "NIFTY", day)
+            loaded = load_day(root, UNDERLYING, day)
             r = simulate_day(strategy, loaded, reference, sizing)
         except Exception as error:  # noqa: BLE001 - one bad day must not stop the rest
             out["skipped"].append(f"{day}: {type(error).__name__}: {error}")

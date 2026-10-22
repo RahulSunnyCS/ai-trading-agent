@@ -27,7 +27,7 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import journal, messages, result, store, tomorrow
+from . import journal, live_compare, messages, result, store, tomorrow
 from . import pick as pick_mod
 from .journal import AlreadyRecorded
 from .pick import PickError, PickResult
@@ -419,7 +419,9 @@ def _send_result_locked(
             t1_part = messages.T1_RESULT_NOT_RECORDED
         else:  # pending or error
             t1_part = messages.T1_RESULT_NOT_READY
-        private = result.render(adaptive, t1_part, next_adaptive, next_t1)
+        # BL-141: the day's live slippage, in the owner's copy only (never the friends' group)
+        live = live_compare.owner_lines(day, root, echo)
+        private = result.render(adaptive, t1_part, next_adaptive, next_t1, live)
         group = result.render(adaptive, None, next_adaptive, None)
         echo(private)
         if not telegram:

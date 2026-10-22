@@ -14,7 +14,14 @@ variants)". It mixes five criteria; the numbers are the weights in percent. From
 strategies: the same ranking with the other index left out, and a Buy add-on kept only when it is
 on the expiring index (the expiry rule; the 09:16 message says so in one line).
 The 09:16 Telegram message lists Adaptive's strategies with their settings, then the T1 testing track (not traded);
-the 16:00 message gives the day's result for both and tomorrow's strategies in full.
+the 16:00 message gives the day's result for both and tomorrow's strategies in full. Your copy (never the
+friends' group) also says how the real trades did against paper, per platform and list, per lot: "AlgoTest ·
+Shoonya T1  +₹910 vs +₹790 · slip +₹120 (+0.6%)" means live made ₹120 a lot more than paper, 0.6% of the
+premium at entry ([slippage](glossary:slippage)). A copy deployed at another time than its entry minute is listed
+as off-slot, and strategies you added by hand as [discretionary](glossary:discretionary-trade). A copy that did not trade, or whose legs were still open when read, is
+named on its own line and left out, as is a copy of the tool's whose name the capture could not read (❓). "1x
+assumed" means the platform no longer showed its multiplier (a day read late). "Live · not captured" means the 15:40 read did not happen; the next evening reads
+that day, and `obt rotation live-compare --day` shows it (the 16:00 message is not sent again).
 
 | Name | Key | Own recent results | Weekday | Days to expiry | VIX | Family band |
 |---|---|---|---|---|---|---|
@@ -38,13 +45,16 @@ The screen is one page, in the order you read it:
   One when it is not), when the run last finished, a *Run* button, and under *Options & log*
   the Day field, *Collect data first* and *Send summary to Telegram*. The run is also scheduled at
   15:45 on trading days; this bar is for running it by hand or seeing how the last one went.
-- **The list and the headline** — forward-test status, the Adaptive card, the headline numbers,
-  the verdict, the cumulative chart and today's basket. Before the first scored day it shows the
+- **The list and the headline** — forward-test status, the three cards (Adaptive Classic,
+  Adaptive Tuned and the Fixed base), the headline numbers, the verdict, the cumulative chart and today's basket. Before the first scored day it shows the
   next entry instead of reserving a large empty chart area.
 - **What happened** — the recorded or reconstructed day log. Below it, *Drawdowns and selection
   drift* opens the risk review for the list.
 - **Lot plans** — the same morning picks traded three ways (As picked, Dir Boost, Duo), followed
   from 19 Oct 2026 for Core and T1. See [Rotation: lot plans](guide:optionslab/rotation-lot-plans).
+- **Live vs paper** — what AlgoTest and Quantiply actually made on each captured day against the
+  backtest for the same picks, the gap running day by day, and by shape. See
+  [Rotation: live vs paper](guide:optionslab/rotation-live).
 - **Is the rule still working?** — optional diagnostics, each closed until you open it: why a pick
   was selected, the family pulse, rank correlation, and what market the forward days tested.
 - **Experiments** — *Ideas being watched*: the unregistered candidates and trigger studies, each
@@ -59,12 +69,32 @@ anything.
 that day's result, whether today's entry was recorded on time, which source gave the 09:15 VIX open,
 and whether the journal's hash chain is intact. A problem names its fix underneath.
 
-**The Adaptive card.** It comes first on the page and shows the list's gross on the latest scored
-day, its total since the first forward day, its largest drawdown and its mean daily gap to the fixed
-base per lot (on the same basis as the headline below, so it follows a portfolio stop when one is
-applied). Before a day is scored every figure is a dash, not a zero. The picks line opens the
-strategies the list chose; it says "Today's" only when the latest entry is today's, and otherwise
-names the day it was recorded for.
+**One lot a strategy.** The owner trades one lot of each pick, so every rupee figure on this page
+(the cards, the cumulative gross, the chart, the Daily log, the portfolio stop replays) is at
+**1 lot per strategy**. This is display only: the journal records 2 lots a strategy and keeps that
+fact; ₹ per lot-day, beats random baskets, the verdict and the 60-day read-out are the same at any
+number of lots, so none of them moves.
+
+**The three cards.** They come first on the page, side by side:
+
+- **Adaptive Classic** — Adaptive as the journal records it: the 298 tested variants (Core), list C
+  of the live journal.
+- **Adaptive Tuned** — the same picker with the 223 tuned-settings variants of the T1 track added,
+  read from the T1 track's own journal (recorded at 09:16 like the live list, from 19 Oct 2026).
+- **Fixed base** — the registered base, unchanged: 2 × NIFTY Widesl OTM1 09:17 + 1 × NIFTY Dir ATM
+  09:24 every day, no ranking, over the same scored sessions as Adaptive Classic, at 1 lot per
+  strategy (3 lots a day). It has no "Against the fixed base" line: it is the base. Its own stop
+  changes only its card; the headline's comparison with the base always uses the base without a
+  stop.
+
+The Adaptive names are the cards' only: the 09:16 and 16:00 Telegram messages and the rest of the page
+still say Adaptive and T1. Each card shows the gross on the latest scored day, the total since the
+first forward day, the largest drawdown and the mean daily gap to the fixed base per lot (on the
+same basis as the headline, so it follows that card's portfolio stop). Forward days only: a late
+entry or a day not yet scored is left out. Before a day is scored every figure is a dash, not a
+zero, and Adaptive Tuned says why it is waiting. The picks line opens the strategies the list
+chose; it says "Today's" only when the latest entry is today's, and otherwise names the day it was
+recorded for. The headline, the verdict and the chart below are Adaptive Classic's.
 
 **Read-out banner.** "Day 18 of 60" counts scored forward sessions. The review is at 60. Until then
 every figure is descriptive and changes nothing.
@@ -73,9 +103,9 @@ every figure is descriptive and changes nothing.
 
 | Number | What it is |
 |---|---|
-| Cumulative gross | The list's total over the scored sessions, 2 lots per strategy |
+| Cumulative gross | The list's total over the scored sessions, 1 lot per strategy |
 | Max drawdown | The largest fall from the running peak, the peak starting at zero |
-| ₹ per lot-day | Average gross per lot per day. The fair way to compare with the base, because the list holds 6 lots, or 8 on a day its Buy add-on fires |
+| ₹ per lot-day | Average gross per lot per day. The fair way to compare with the base, because the list holds 3 strategies, or 4 on a day its Buy add-on fires |
 | Beats random baskets | Share of 1,000 random baskets of the same shape that the list's cumulative is above |
 | Sessions scored | Forward sessions counted so far, against the 60 of the read-out |
 
@@ -99,17 +129,41 @@ Adaptive's picks fall. See [the Family pulse](guide:optionslab/rotation-pulse).
 
 ## The portfolio stop
 
-The **Portfolio stop** button in the run bar applies one stop to the combined P&L of the list's
-basket (10,000 rupees by default; empty or 0 is none; optional trailing: Trail SL, Lock profit,
-Lock and trail). It changes what the **Daily log**, **Drawdown episodes** and, once there are
-forward sessions, the **headline figures and the cumulative chart** show: the basket is replayed
-minute by minute and closed the first minute the stop is reached. See the
-[Daily log](guide:optionslab/rotation-daily-log) page for how the stop works.
+Each card has its own **Portfolio stop** button. It applies one stop to the combined P&L of that
+card's basket at 1 lot per strategy (empty or 0 is none; optional trailing: Trail SL, Lock profit,
+Lock and trail):
+
+| Card | Default stop | Kept in the link as |
+|---|---|---|
+| Adaptive Classic | **8,000 rupees** | `pfstop`, `pftrail` |
+| Adaptive Tuned | **9,000 rupees** | `pfstop_t1`, `pftrail_t1` |
+| Fixed base | **8,000 rupees** | `pfstop_base`, `pftrail_base` |
+
+Adaptive Classic's stop also drives the **Daily log**, **Drawdown episodes** and, once there are
+forward sessions, the **headline figures and the cumulative chart**; Adaptive Tuned's and the Fixed
+base's change only their own card. The basket is replayed minute by minute and closed the first minute the stop is
+reached. See the [Daily log](guide:optionslab/rotation-daily-log) page for how the stop works. Your
+last setting is kept in this browser for each card separately (a stop kept from before 19 Oct 2026,
+when the default was 10,000 at 2 lots, is not carried over).
 
 The registered read-out does not move with it. **Beats random baskets**, the **verdict** and its
 intervals always stay on the registered basis, without a portfolio stop, because the pre-registered
-test must not change after the fact. A line above the headline says when the figures shown are the
+test must not change after the fact. A line under each card's button says when its figures are the
 stopped ones.
+
+**Without the portfolio stop.** Under each card's stop (once its replay is in) a short block says
+what the stop changed, over that card's own scored days:
+
+| Line | What it says |
+|---|---|
+| Latest day | The latest scored day's gross with the stop and without it |
+| That day | "stop reached at 11:14" and what that changed in rupees, or "stop not reached" |
+| Since the first day | The total with the stop, without it, and the difference |
+| Max drawdown | The largest fall of the running total, with and without the stop |
+| Stop fired | On how many of the days the stop closed the basket, and its net effect on those days (with minus without) |
+| Not counted | Days whose replay no longer matches the stored result (bars repaired since), left out |
+
+Some traders call this stop an MTM SL; it is the same thing.
 
 ## How to read it
 

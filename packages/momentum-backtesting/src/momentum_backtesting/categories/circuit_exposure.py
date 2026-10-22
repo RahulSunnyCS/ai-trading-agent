@@ -56,25 +56,38 @@ def lock_masks(
     weeks: pd.Index,
     *,
     min_days: int = LOCK_MIN_DAYS,
+    session: str = "last",
     root: Path | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """(uc_locked, lc_locked): week x column booleans, True when the stock's last session of
     that week (the day a weekly trade fills) sits inside a same-direction band-edge run of at
-    least `min_days` sessions. The whole run counts, from its first day, because that is known
-    only in hindsight -- which is the point: this is a what-would-have-been-impossible check,
-    not something a live rule could see coming.
+    least `min_days` sessions. `session="first"` is for a Monday-open fill (BL-036 Phase 2): row W
+    then describes the first session AFTER week W's Friday, the day an order decided on W fills.
+    The whole run counts, from its first day, because that is known only in hindsight -- which
+    is the point: this is a what-would-have-been-impossible check, not something a live rule
+    could see coming.
 
     Both are also True in a week the stock did not trade at all, between its first and last
     session (a suspension, or FORCEMOT's 3.5 months off NSE in 2023-24): with no session there
     is nobody to buy from or sell to, and the only price is a stale one."""
     from .. import db_read  # noqa: PLC0415 (avoid an import cycle at module load)
 
+    if session not in ("last", "first"):
+        raise ValueError(f"session must be 'last' or 'first', not {session!r}")
     symbols = sorted(set(column_to_base.values()))
-    key = (db_read.data_version(root), tuple(symbols), tuple(weeks), min_days)
+    key = (db_read.data_version(root), tuple(symbols), tuple(weeks), min_days, session)
     hit = _mask_cache.get(key)
     if hit is not None:
         return hit
     n = int(min_days)
+    # The Friday that closes the signal week a session belongs to: its own week's Friday for the
+    # last session, the Friday before it for the first one.
+    week_of = (
+        "(date_trunc('week', date) + interval 4 day)::date"
+        if session == "last"
+        else "(date_trunc('week', date) - interval 3 day)::date"
+    )
+    pick = "arg_max" if session == "last" else "arg_min"
     sql = f"""
     with d as (
       select i.symbol, b.date, b.close / nullif(b.prevclose, 0) - 1 as r
@@ -87,16 +100,21 @@ def lock_masks(
                 over (partition by symbol order by date) as grp from c),
     t as (
       select *, count(*) over (partition by symbol, grp) as run_total from g where hit <> 0)
-    select symbol, (date_trunc('week', date) + interval 4 day)::date as wk,
-           arg_max(case when hit = 1 and run_total >= {n} then 1 else 0 end, date) as up,
-           arg_max(case when hit = -1 and run_total >= {n} then 1 else 0 end, date) as down
+    select symbol, {week_of} as wk,
+           {pick}(case when hit = 1 and run_total >= {n} then 1 else 0 end, date) as up,
+           {pick}(case when hit = -1 and run_total >= {n} then 1 else 0 end, date) as down
     from (
       select d2.symbol, d2.date, coalesce(t.hit, 0) as hit, t.run_total
       from d d2 left join t on t.symbol = d2.symbol and t.date = d2.date)
     group by 1, 2"""
     start = (pd.Timestamp(weeks.min()) - pd.Timedelta(days=14)).date()
-    traded_sql = """
-    select i.symbol, cast(b.date + ((5 - dayofweek(b.date) + 7) % 7) * interval 1 day as date) as wk
+    traded_week = (
+        "cast(b.date + ((5 - dayofweek(b.date) + 7) % 7) * interval 1 day as date)"
+        if session == "last"
+        else "cast(date_trunc('week', b.date) - interval 3 day as date)"
+    )
+    traded_sql = f"""
+    select i.symbol, {traded_week} as wk
     from bars_1d_stock b join instruments i using (instrument_id)
     where i.symbol in (select unnest(?)) group by 1, 2"""
     with stock_bars(root) as con:

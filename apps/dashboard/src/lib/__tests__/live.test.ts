@@ -1,15 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  NIFTY_INDEX_SYMBOL,
-  TICK_BUFFER_CAP,
-  type TokenBannerInput,
-  appendPoint,
-  isIndexTick,
-  liveFeedView,
-  toChartSeries,
-  tokenBanner,
-} from '../live';
+import { NIFTY_INDEX_SYMBOL, TICK_BUFFER_CAP, appendPoint, isIndexTick } from '../live';
 
 const p = (time: number, value = time) => ({ time, value });
 
@@ -66,87 +57,5 @@ describe('isIndexTick', () => {
   it('keeps a frame with no symbol (older server)', () => {
     expect(isIndexTick(undefined)).toBe(true);
     expect(isIndexTick('')).toBe(true);
-  });
-});
-
-describe('toChartSeries', () => {
-  it('keeps the last value per second, ascending, in seconds', () => {
-    expect(toChartSeries([p(2_000, 1), p(1_000, 5), p(2_500, 2), p(3_100, 3)])).toEqual([
-      { time: 1, value: 5 },
-      { time: 2, value: 2 },
-      { time: 3, value: 3 },
-    ]);
-  });
-
-  it('skips non-finite values', () => {
-    expect(toChartSeries([p(1_000, Number.NaN), p(2_000, 4)])).toEqual([{ time: 2, value: 4 }]);
-  });
-});
-
-describe('liveFeedView', () => {
-  it('says Live only for fresh, real ticks', () => {
-    expect(liveFeedView('live', false).label).toBe('Live');
-    expect(liveFeedView('live', true)).toMatchObject({ label: 'Simulation', tone: 'info' });
-  });
-
-  it('says Stale with the warning tone', () => {
-    expect(liveFeedView('stale', false)).toMatchObject({ label: 'Stale', tone: 'warning' });
-    expect(liveFeedView('stale', true).label).toBe('Stale');
-  });
-});
-
-describe('tokenBanner', () => {
-  const base: TokenBannerInput = {
-    simulate: false,
-    broker: 'fyers',
-    authDegraded: false,
-    fyersConfigured: true,
-    tokenState: 'valid',
-    msLeft: 6 * 60 * 60 * 1000,
-  };
-
-  it('says nothing before /api/meta answers or when all is well', () => {
-    expect(tokenBanner({ ...base, simulate: null })).toBeNull();
-    expect(tokenBanner(base)).toBeNull();
-  });
-
-  it('marks simulation with the info tone and no login', () => {
-    expect(tokenBanner({ ...base, simulate: true, tokenState: 'expired' })).toMatchObject({
-      tone: 'info',
-      canLogin: false,
-    });
-  });
-
-  it('uses warning for an expiring token and a degraded feed', () => {
-    expect(tokenBanner({ ...base, tokenState: 'expiring', msLeft: 42 * 60_000 })).toMatchObject({
-      tone: 'warning',
-      title: 'Fyers token expires in 42m',
-      canLogin: true,
-    });
-    expect(tokenBanner({ ...base, authDegraded: true })).toMatchObject({
-      tone: 'warning',
-      canLogin: true,
-    });
-  });
-
-  it('uses negative for an expired token, even when the feed also reports degraded', () => {
-    expect(tokenBanner({ ...base, tokenState: 'expired', authDegraded: true })).toMatchObject({
-      tone: 'negative',
-      title: 'Fyers token has expired',
-      canLogin: true,
-    });
-  });
-
-  it('ignores the Fyers token when the broker is not Fyers', () => {
-    expect(tokenBanner({ ...base, broker: 'angelone', tokenState: 'expired' })).toBeNull();
-    expect(tokenBanner({ ...base, broker: 'angelone', authDegraded: true })).toMatchObject({
-      tone: 'warning',
-      title: "Angelone rejected the feed's token",
-      canLogin: false,
-    });
-  });
-
-  it('ignores the Fyers token when Fyers login is not configured', () => {
-    expect(tokenBanner({ ...base, fyersConfigured: false, tokenState: 'expired' })).toBeNull();
   });
 });

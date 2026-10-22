@@ -1,0 +1,154 @@
+{
+  "_id": "6ab4a8015b54ddd42e7e6678",
+  "algoType": {
+    "code": "OPTIONS_SPREADS_LEGS",
+    "description": "Choose ATM, OTM or ITM strikes to create a spread",
+    "name": "Options Spreads: Legs",
+    "order": 1,
+    "shortName": "Legs"
+  },
+  "code": "OPTIONS_SPREADS_LEGS",
+  "configurations": {
+    "calcBaseSlTgt": "AVG_PRICE",
+    "calculationBase": "AVG_PRICE",
+    "calculationBaseExitPrice": "AVG_PRICE",
+    "endDay": 0,
+    "endTime": "15:15:00",
+    "entryOrderDelayType": null,
+    "entryOrderLimitPrice": {
+      "type": "PERCENT_VALUE",
+      "value": 3
+    },
+    "entryOrderTimeoutSeconds": 5,
+    "entryOrderType": "L",
+    "errorAutoSquareOff": false,
+    "exitOrderDelayType": null,
+    "handleCancelled": true,
+    "isORBEnabled": false,
+    "isReEntryEnabled": true,
+    "isWaitAndTradeEnabled": false,
+    "jOrderPlacement": "LATER",
+    "legs": [
+      {
+        "base": "NIFTY",
+        "expiryTag": "CURRENT_WEEK",
+        "id": "zXOlajj36U4V3k5R6e",
+        "mp": false,
+        "product": "I",
+        "quantity": 1,
+        "reEntry": {
+          "repeat": 2,
+          "type": "RE_ENTRY_COST"
+        },
+        "segment": "SEGMENT_OPTIONS",
+        "selectionType": "STRIKE",
+        "side": "CE",
+        "specificStrikeSelection": false,
+        "stoploss": {
+          "type": "PER_POSITION_PERCENT",
+          "value": -45
+        },
+        "strike": "ATM",
+        "target": {
+          "type": "PER_POSITION_PERCENT",
+          "value": 70
+        },
+        "targetReEntry": {
+          "repeat": 1,
+          "type": "RE_ENTRY_ASAP"
+        },
+        "transactionType": "S"
+      },
+      {
+        "base": "NIFTY",
+        "expiryTag": "CURRENT_WEEK",
+        "id": "GKdU99nR6xP68pJpcd",
+        "mp": false,
+        "product": "I",
+        "quantity": 1,
+        "reEntry": {
+          "repeat": 2,
+          "type": "RE_ENTRY_COST"
+        },
+        "segment": "SEGMENT_OPTIONS",
+        "selectionType": "STRIKE",
+        "side": "PE",
+        "specificStrikeSelection": false,
+        "stoploss": {
+          "type": "PER_POSITION_PERCENT",
+          "value": -45
+        },
+        "strike": "ATM",
+        "target": {
+          "type": "PER_POSITION_PERCENT",
+          "value": 70
+        },
+        "targetReEntry": {
+          "repeat": 1,
+          "type": "RE_ENTRY_ASAP"
+        },
+        "transactionType": "S"
+      }
+    ],
+    "legsAction": "SQ_OFF_LEG",
+    "limitOrderTimeoutSeconds": 5,
+    "mDayInitEntry": true,
+    "matching": [
+      {
+        "active": true,
+        "mode": "NO_MATCHING"
+      }
+    ],
+    "moveStoplossToCost": false,
+    "mtmReEntryRepeatMode": "RE_ENTRY_REPEAT_SEPARATE",
+    "mtmStoplossSquareOffDelay": 0,
+    "multiplier": 1,
+    "positionReEntryRepeatMode": "RE_ENTRY_REPEAT_SEPARATE",
+    "reEntry": {
+      "repeat": 0,
+      "type": "MTM_RE_ENTRY_ASAP"
+    },
+    "reEntryAsapOrderDelay": 0,
+    "reEntryOrderPlacement": "LATER",
+    "startTime": "09:15:00",
+    "stoploss": {
+      "action": "SQ_OFF_ALL",
+      "type": "TOTAL_AMOUNT",
+      "value": -5000
+    },
+    "stoplossLimitPrice": {
+      "type": "PERCENT_VALUE",
+      "value": 3
+    },
+    "stoplossOrderPlacement": "ADVANCE",
+    "stoplossSquareOffBy": "SL",
+    "stoplossSquareOffDelay": 0,
+    "target": {
+      "action": "SQ_OFF_ALL",
+      "type": "TOTAL_AMOUNT",
+      "value": 5000
+    },
+    "targetReEntry": {
+      "repeat": 0,
+      "type": "MTM_RE_ENTRY_ASAP"
+    },
+    "tradeOnlyFirstEntry": false,
+    "tradingType": "INTRADAY",
+    "trailingInterval": {
+      "frequency": "M",
+      "value": 1
+    },
+    "underlying": "UNDERLYING_INDEX"
+  },
+  "createdAt": "2026-09-24T04:33:05.909Z",
+  "day": "WED",
+  "enabled": false,
+  "entryErrorCount": 0,
+  "exitErrorCount": 0,
+  "hasError": false,
+  "hasWaiting": false,
+  "hasWaitingWT": false,
+  "name": "Sample Strategy- Recost/Rexecute With MTM Reentry (NIFTY)",
+  "status": "NOT_RUNNING",
+  "updatedAt": "2026-09-24T04:33:05.909Z"
+}

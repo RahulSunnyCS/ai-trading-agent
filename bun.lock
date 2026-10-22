@@ -109,6 +109,7 @@
       "version": "1.0.0",
       "dependencies": {
         "@trading/broker-identity": "workspace:*",
+        "@trading/market-reference": "workspace:*",
         "@trading/notify": "workspace:*",
         "pg": "^8.13.0",
         "playwright": "1.63.0",

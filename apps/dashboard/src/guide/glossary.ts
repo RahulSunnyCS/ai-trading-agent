@@ -119,7 +119,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     group: 'Options',
     short:
       'One stop on the combined P&L of a whole basket: the first minute it reaches the level, every pick closes and nothing else enters that day. Separate from each strategy’s own stop.',
-    long: 'On the Rotation page you type the level in rupees (10,000 by default; empty or 0 means none) and can add AlgoTest’s trailing modes: Trail SL (every X of profit moves the stop Y), Lock profit (once profit reaches A, lock B) and Lock and trail. The figures are replayed from the strategy files at the minute close, gross and in-sample; the recorded entries, the stored results and the registered 60-day read-out are not changed.',
+    long: 'On the Rotation page each Adaptive card has its own level in rupees at 1 lot a strategy (8,000 for Adaptive Classic, 9,000 for Adaptive Tuned and 8,000 for the Fixed base by default; empty or 0 means none; each card also says what its stop changed) and can add AlgoTest’s trailing modes: Trail SL (every X of profit moves the stop Y), Lock profit (once profit reaches A, lock B) and Lock and trail. The figures are replayed from the strategy files at the minute close, gross and in-sample; the recorded entries, the stored results and the registered 60-day read-out are not changed.',
     seeAlso: ['stop-loss', 'trailing-sl'],
   },
   {
@@ -179,6 +179,16 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     group: 'Options',
     short:
       'The gap between the price a backtest assumes and the price you would really get. Options Lab takes it as a % of premium; Momentum in basis points (5 bps = 0.05%).',
+    long: 'The 16:00 result message measures it on the real trades too: for each of the tool’s strategies that ran on AlgoTest or Quantiply, live ₹ per lot minus the paper result for the same strategy and day, after the same costs. A plus means live did better than paper. The % is that gap as a share of the premium at entry, where the platform shows the fills. A copy deployed at another time than the strategy’s entry is listed as off-slot and left out.',
+    seeAlso: ['discretionary-trade'],
+  },
+  {
+    id: 'discretionary-trade',
+    term: 'Discretionary trade',
+    group: 'Options',
+    short:
+      'A strategy you run by hand on AlgoTest or Quantiply beside the tool’s picks. The tool never touches it; the 16:00 message shows its P&L on its own line, never as slippage.',
+    seeAlso: ['slippage'],
   },
   {
     id: 'day-type',

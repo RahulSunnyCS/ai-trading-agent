@@ -36,6 +36,10 @@ from .heatmap.cli import heatmap_app  # noqa: E402  (BL-094: the straddle heatma
 
 app.add_typer(heatmap_app, name="heatmap")
 
+from .ruletest.cli import rule_app  # noqa: E402  (BL-120: rule strategies and the tester)
+
+app.add_typer(rule_app, name="rule")
+
 
 @app.callback()
 def _load_env() -> None:
@@ -475,6 +479,35 @@ def angel_test(
     raise typer.Exit(1)
 
 
+@angel_app.command("funds")
+def angel_funds(
+    as_json: bool = typer.Option(False, "--json", help="One JSON line (for the margin check)."),
+) -> None:
+    """BL-143: the Angel One account's free margin, read-only: ONE guarded SmartAPI login (the
+    same guard as Test connection: one at a time, the 60 s cool-down waited out, a refused login
+    held 15 minutes), one `getRMS` read, the session dropped. Never a token or PIN printed.
+    Exit 0 = read; 1 = the login or the read failed, or a refused login holds it."""
+    import json as _json
+
+    from .angelone.auth import AngelCredentialsError
+    from .angelone.check import session
+    from .angelone.funds import read_funds
+
+    try:
+        with session(source="margin") as sess:
+            funds = read_funds(sess)
+    except (AngelCredentialsError, OSError, RuntimeError) as error:
+        if as_json:
+            typer.echo(_json.dumps({"ok": False, "error": str(error)[:200]}))
+        else:
+            typer.echo(f"Angel One funds not read: {error}")
+        raise typer.Exit(1) from None
+    if as_json:
+        typer.echo(_json.dumps({"ok": True, **funds.as_dict()}))
+    else:
+        typer.echo(f"Angel One free margin (net): {funds.net:,.0f}")
+
+
 @angel_app.command("fetch")
 def angel_fetch(
     day: str = typer.Option(date.today().isoformat(), "--date", help="Trading day, YYYY-MM-DD."),
@@ -521,30 +554,43 @@ def fyers_history(
     ),
     to: str = typer.Option("", "--to", help="Newest day, YYYY-MM-DD. Blank = yesterday."),
     force: bool = typer.Option(False, help="Rewrite days already in the lake."),
+    symbol: str = typer.Option(
+        "", help="Instead: one Fyers symbol, e.g. NSE:NIFTYIT-INDEX or NSE:RELIANCE-EQ (BL-153)."
+    ),
+    name: str = typer.Option("", help="With --symbol: the lake name, e.g. NIFTYIT or RELIANCE."),
+    asset: str = typer.Option("index", help="With --symbol: index or stock."),
 ) -> None:
     """Backfill the index + India VIX 1-minute history (walks back from yesterday in
     95-day chunks until Fyers has no more). Index bars never expire, so unlike option
     contracts this can be done any time, and re-running only fills what is missing.
-    Feeds the Options Lab's market-regime study."""
+    Feeds the Options Lab's market-regime study. With --symbol/--name/--asset, backfills
+    that one symbol instead (another index, or a share as asset=stock)."""
 
     from .fyers.auth import FyersCredentialsError, resolve_credentials
     from .fyers.client import FyersClient
     from .fyers.daily import UNDERLYINGS, data_dir
-    from .fyers.history import backfill_index
+    from .fyers.history import LAKE_NAME, backfill_index, backfill_symbol
 
-    if underlying not in UNDERLYINGS:
+    if symbol and (not name or asset not in ("index", "stock")):
+        raise typer.BadParameter("--symbol needs --name and --asset index|stock")
+    if symbol and not LAKE_NAME.match(name):
+        raise typer.BadParameter(f"--name {name!r} must be capitals, digits, & - _ (a folder name)")
+    if symbol and underlying != "NIFTY":
+        raise typer.BadParameter("--underlying and --symbol are alternatives: give one")
+    if not symbol and underlying not in UNDERLYINGS:
         raise typer.BadParameter(f"unknown underlying {underlying}; known: {sorted(UNDERLYINGS)}")
+    window = {
+        "start": date.fromisoformat(from_) if from_ else None,
+        "end": date.fromisoformat(to) if to else None,
+        "force": force,
+        "log": typer.echo,
+    }
     try:
         client = FyersClient(resolve_credentials())
-        result = backfill_index(
-            client,
-            data_dir(),
-            underlying,
-            start=date.fromisoformat(from_) if from_ else None,
-            end=date.fromisoformat(to) if to else None,
-            force=force,
-            log=typer.echo,
-        )
+        if symbol:
+            result = backfill_symbol(client, data_dir(), name, symbol, asset, **window)
+        else:
+            result = backfill_index(client, data_dir(), underlying, **window)
     except FyersCredentialsError as error:
         typer.echo(f"stopped: {error}")
         raise typer.Exit(1) from None
@@ -553,6 +599,96 @@ def fyers_history(
         f"{f', oldest {result["oldest"]}' if result['oldest'] else ''}; "
         f"{len(result['short_days'])} short days skipped -> {data_dir()}"
     )
+
+
+@fyers_app.command("expired-options")
+def fyers_expired_options(
+    from_: str = typer.Option(..., "--from", help="Oldest trading day, YYYY-MM-DD."),
+    to: str = typer.Option(..., "--to", help="Newest trading day, YYYY-MM-DD."),
+    underlyings: str = typer.Option(
+        "NIFTY,SENSEX", help="Comma-separated index underlyings to repair."
+    ),
+    plan: bool = typer.Option(
+        False,
+        "--plan",
+        help="Inventory metadata and print request counts without downloading candles.",
+    ),
+    all_days: bool = typer.Option(
+        False,
+        "--all-days",
+        help="Also top up days that already have an option file (default: only days with none).",
+    ),
+    max_requests: int | None = typer.Option(
+        None, "--max-requests", help="Stop cleanly after this many candle requests (resume later)."
+    ),
+    only_expiry: str | None = typer.Option(
+        None, "--only-expiry", help="Fetch just this expiry, YYYY-MM-DD."
+    ),
+    retry_refused: bool = typer.Option(
+        False,
+        "--retry-refused",
+        help="Ask Fyers again for contracts whose cached answer is a refusal.",
+    ),
+    allow_short: bool = typer.Option(
+        False,
+        "--allow-short",
+        help="Also merge days that may need an expiry not expired yet (written without it).",
+    ),
+) -> None:
+    """Backfill expired 1-minute option contracts with Fyers Prime.
+
+    Raw responses are cached per contract, making the command resumable; a day is merged only
+    once every expiry it needs is cached, and not while one it may need has yet to expire.
+    Existing lake rows win on overlap, so a thin vendor day gains missing rows without changing
+    vendor prices. A contract Fyers refuses (an unknown symbol, no data) is listed and skipped;
+    a rate limit, no access to the API, a run of refusals, a rejected token or repeated network
+    errors stop the run (exit 2, or 1 for the token) after the merged days are judged, and a
+    rerun resumes. Afterwards, `obt legwise rerun` (and `obt rotation update --day D` for the
+    repaired days) bring the stored results up to date.
+    """
+    from .fyers.auth import FyersCredentialsError, resolve_credentials
+    from .fyers.client import FyersClient
+    from .fyers.daily import data_dir
+    from .fyers.expired import run_backfill
+
+    try:
+        # Prime allows 10/s, 500/min and blocks the account for the day after repeated
+        # per-minute breaches: at most 8/s (the gap) and 450 in any 60 s (the cap, which is
+        # the one that binds over a minute), and stop at the second 429.
+        client = FyersClient(
+            resolve_credentials(), min_interval_s=0.125, per_minute=450, max_rate_limit_hits=2
+        )
+        result = run_backfill(
+            client,
+            data_dir(),
+            _underlyings(underlyings),
+            date.fromisoformat(from_),
+            date.fromisoformat(to),
+            plan_only=plan,
+            missing_only=not all_days,
+            max_requests=max_requests,
+            only_expiry=date.fromisoformat(only_expiry) if only_expiry else None,
+            retry_refused=retry_refused,
+            allow_short=allow_short,
+            log=typer.echo,
+        )
+    except FyersCredentialsError as error:
+        typer.echo(f"stopped: {error}")
+        raise typer.Exit(1) from None
+    except (RuntimeError, ValueError) as error:
+        typer.echo(f"stopped: {error}")
+        raise typer.Exit(2) from None
+    typer.echo(json.dumps(result, indent=2, default=str))
+    if result.get("stopped") == "credentials":
+        raise typer.Exit(1)
+    if result.get("stopped") in (
+        "rate_limited",
+        "retryable",
+        "blocked",
+        "refused_streak",
+        "refused_unconfirmed",
+    ):
+        raise typer.Exit(2)
 
 
 def _collect(

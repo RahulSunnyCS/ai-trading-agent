@@ -113,7 +113,7 @@ test('Switching between Live / Trades / P&L / Billing via the sidebar renders th
   await sidebarLink(page, 'Live').click();
   await expect(page).toHaveURL(/\/live$/);
   await expect(viewTitle(page)).toHaveText('Live');
-  await expect(page.getByRole('heading', { name: 'ATM straddle' })).toBeVisible();
+  await expect(page.getByRole('radiogroup', { name: 'Index' })).toBeVisible();
   await expect(sidebarLink(page, 'Live')).toHaveAttribute('aria-current', 'page');
   await expect(sidebarLink(page, 'Overview')).not.toHaveAttribute('aria-current', 'page');
 
@@ -122,7 +122,7 @@ test('Switching between Live / Trades / P&L / Billing via the sidebar renders th
   await expect(page).toHaveURL(/\/trades$/);
   await expect(viewTitle(page)).toHaveText('Trades');
   await expect(page.getByRole('heading', { name: 'Paper Trades' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'ATM straddle' })).not.toBeVisible();
+  await expect(page.getByRole('radiogroup', { name: 'Index' })).not.toBeVisible();
   await expect(sidebarLink(page, 'Trades')).toHaveAttribute('aria-current', 'page');
 
   // Switch to P&L.
@@ -144,7 +144,7 @@ test('Switching between Live / Trades / P&L / Billing via the sidebar renders th
   // Switch back to Live.
   await sidebarLink(page, 'Live').click();
   await expect(page).toHaveURL(/\/live$/);
-  await expect(page.getByRole('heading', { name: 'ATM straddle' })).toBeVisible();
+  await expect(page.getByRole('radiogroup', { name: 'Index' })).toBeVisible();
 });
 
 // ---------------------------------------------------------------------------
@@ -173,13 +173,12 @@ test('All three wired views show an error or unavailable state when the backend 
   // --- Live view ---
   await sidebarLink(page, 'Live').click();
   await expect(page).toHaveURL(/\/live$/);
-  // No white-screen / crash.
-  await expect(page.getByRole('heading', { name: 'ATM straddle' })).toBeVisible();
-  // The WebSocket cannot connect, and the feed badge says so.
-  await expect(page.getByText('Tick feed unreachable · retrying')).toBeVisible({
-    timeout: 6_000,
-  });
-  await expect(page.getByRole('main').getByText('Not connected', { exact: true })).toBeVisible();
+  // No white-screen / crash: the controls render and the replay says it could not load.
+  await expect(page.getByRole('radiogroup', { name: 'Index' })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('alert')).toContainText(
+    'The session could not be loaded',
+    { timeout: 8_000 },
+  );
 
   // --- Trades view ---
   await sidebarLink(page, 'Trades').click();
