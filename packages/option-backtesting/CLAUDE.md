@@ -215,6 +215,13 @@ Otherwise:
   `strike: {premium_pct_of_spot: P}` is resolved per trade to `closest_premium` = P% of the index at the entry
   (`spec._strike_for`; no index price at the entry is an error row). `load_spec` reads only true / false as YAML
   booleans (`_RuleLoader`), so an unquoted `on: up` key stays `on`.
+  Event and trade values (BL-152): `max` / `min`; `{at_first: {x, when}}` and `{min_since_first | max_since_first:
+  {x, when}}` hold a value from the first stamp `when` holds in the session (a breakout candle's high, a level frozen
+  at the breakout, "no close below it since"); `{at_entry: x}` and `minutes_in_trade` are trade-relative, allowed only
+  in `exit_when` under elementwise operators (a `trade` flag set at parse), evaluated per trade by
+  `expr.evaluate_trade` from `study.exit_minutes` (the rest of the exit from one grid evaluation, shared); a rule
+  whose exit uses them must give `control_when`. `study.run_test(..., frame=)` takes a frame already loaded, for a
+  caller testing many rules (BL-152's `research/bl152/run_grid.py`).
   `scripts/ruletest-acceptance.py` must print ACCEPTANCE OK: the four BL-083 triggers, said in
   the grammar (`tests/fixtures/rules/`), fire on the same days and stamps as `research/bl083/`, and T1 and T4 with the Dir
   template reproduce its event-study rows to the rupee. A leg with its own `range_breakout` is not supported yet.

@@ -176,6 +176,10 @@ CAUSAL_RULES = [
     {"gt": ["close", {"supertrend": {"n": 10, "mult": 3, "minutes": 5}}]},
     {"gt": [{"supertrend_dir": {"n": 7, "mult": 2, "minutes": 3}}, 0]},
     {"gt": ["close", {"bollinger": {"n": 20, "k": 2, "minutes": 5, "band": "upper"}}]},
+    {"gt": [{"max": ["close", "open"]}, {"min": ["high", "pivot"]}]},
+    {"gt": ["close", {"at_first": {"x": "high", "when": {"gt": ["close", "r1"]}}}]},
+    {"ge": [{"min_since_first": {"x": "close", "when": {"gt": ["close", "pivot"]}}}, "pivot"]},
+    {"le": [{"max_since_first": {"x": "high", "when": {"lt": ["close", "s1"]}}}, "prev_high"]},
     # the straddle's strike is chosen at the `at` bar's close: 12:00 is after the cut below, so a
     # stamp before it must not see the strike (09:20 is before the cut, so it is known there)
     {"gt": [{"straddle": {"at": "12:00"}}, "close"]},
@@ -320,3 +324,58 @@ def test_indicator_parse_errors_and_words():
     assert E.describe(E.parse({"bollinger": {"band": "lower"}})) == (
         "the lower Bollinger band (20, 2) of 5-minute bars"
     )
+
+
+# --- max / min, values tied to an event, values tied to the trade ----------------------------
+
+
+def test_max_and_min_keep_a_missing_value_missing():
+    fr = frame(3)
+    hi = E.evaluate(E.parse({"max": ["close", "open"]}), fr)
+    assert np.allclose(hi, np.maximum(fr.C, fr.O))
+    lo = E.evaluate(E.parse({"min": ["close", "atr14"]}), fr)  # atr14 is NaN before 14 sessions
+    assert np.isnan(lo).all()
+
+
+def test_at_first_and_since_first():
+    close = np.tile(np.arange(E.N_BARS, dtype=float), (2, 1))
+    close[0, 50:] = 10.0  # session 1 falls back at stamp 50
+    fr = E.Frame(days=["2026-01-01", "2026-01-02"], O=close, H=close + 1, L=close - 1, C=close)
+    when = {"ge": ["close", 40]}  # first true at stamp 40 on both sessions
+    at = E.evaluate(E.parse({"at_first": {"x": "high", "when": when}}), fr)
+    assert np.isnan(at[:, :40]).all() and (at[:, 40:] == 41.0).all()
+    lo = E.evaluate(E.parse({"min_since_first": {"x": "close", "when": when}}), fr)
+    assert np.isnan(lo[0, :40]).all() and lo[0, 49] == 40.0 and lo[0, 50] == 10.0
+    assert lo[1, 300] == 40.0
+    hi = E.evaluate(E.parse({"max_since_first": {"x": "close", "when": when}}), fr)
+    assert hi[0, 60] == 49.0 and hi[1, 300] == 300.0
+    never = E.evaluate(E.parse({"at_first": {"x": "high", "when": {"lt": ["close", -1]}}}), fr)
+    assert np.isnan(never).all()
+    assert E.describe(E.parse({"at_first": {"x": "high", "when": when}})) == (
+        "high when (close ≥ 40) first held today"
+    )
+
+
+def test_trade_relative_values_only_where_allowed():
+    ok = E.parse({"lt": ["close", {"sub": [{"at_entry": "close"}, {"mul": [0.3, "atr14"]}]}]})
+    assert ok.trade
+    assert E.parse({"ge": ["minutes_in_trade", 60]}).trade
+    assert not E.parse({"gt": ["close", "open"]}).trade
+    with pytest.raises(E.RuleError, match="can only be used under"):
+        E.parse({"gt": [{"roll_max": {"x": {"at_entry": "close"}, "n": 5}}, 0]})
+    with pytest.raises(E.RuleError, match="another trade-relative"):
+        E.parse({"gt": [{"at_entry": "minutes_in_trade"}, 0]})
+    with pytest.raises(E.RuleError, match="exit_when only"):
+        E.parse_rule({"ge": ["minutes_in_trade", 5]})
+    with pytest.raises(E.RuleError, match="exit_when only"):
+        E.evaluate(ok, frame(2))
+
+
+def test_evaluate_trade_reads_the_entry_minute():
+    fr = frame(3, seed=8)
+    memo: dict = {}
+    held = E.evaluate_trade(E.parse({"ge": ["minutes_in_trade", 60]}), fr, 1, 99, memo)
+    assert not held[:159].any() and held[159:].all()  # enters at 100; out at 160 = 60 minutes
+    node = E.parse({"lt": ["close", {"sub": [{"at_entry": "close"}, 5]}]})
+    row = E.evaluate_trade(node, fr, 2, 120, memo)
+    assert (row == (fr.C[2] < fr.C[2, 120] - 5)).all()

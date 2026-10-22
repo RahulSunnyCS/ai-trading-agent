@@ -235,3 +235,42 @@ def test_random_time_draws_only_matching_minutes_and_counts_them():
     )
     assert set(seen) == {"10:01", "10:11"}
     assert out["matched"] and (out["minutes"], out["minutes_used"]) == (3, 2)
+
+
+def test_exit_minutes_for_a_trade_relative_exit():
+    from option_backtesting.ruletest import expr as E
+    from option_backtesting.ruletest.spec import from_dict
+
+    close = np.full((2, E.N_BARS), 20000.0)
+    close[0, 200:] = 19900.0  # session 1 drops 100 points at 12:35 (stamp 200)
+    fr = E.Frame(days=["2026-01-01", "2026-01-02"], O=close, H=close, L=close, C=close)
+    leg = {"id": "ce", "lots": 1, "position": "buy", "option_type": "CE",
+           "strike": {"strike_type": "ATM"}}  # fmt: skip
+    rule = from_dict(
+        {
+            "id": "x",
+            "underlying": "NIFTY",
+            "window": {"from": "09:20", "to": "14:00"},
+            "when": {"gt": ["close", 0]},
+            "exit_when": {
+                "any": [
+                    {"lt": ["close", {"sub": [{"at_entry": "close"}, 50]}]},
+                    {"ge": ["minutes_in_trade", 60]},
+                ]
+            },
+            "control_when": {"gt": ["close", 0]},
+            "template": {"exit_time": "15:15", "legs": [leg]},
+        }
+    )
+    keys = {
+        ("2026-01-01", "12:00", "both"),  # the 50-point stop at 12:35 comes before 60 minutes
+        ("2026-01-01", "09:30", "both"),  # 60 minutes first: out at 10:30
+        ("2026-01-01", "12:40", "both"),  # entered after the drop: its own entry close, 60 minutes
+        ("2026-01-02", "14:30", "both"),  # 60 minutes would be 15:30: the template's 15:15
+    }
+    assert study.exit_minutes(rule, fr, keys) == {
+        ("2026-01-01", "12:00", "both"): "12:36",
+        ("2026-01-01", "09:30", "both"): "10:30",
+        ("2026-01-01", "12:40", "both"): "13:40",
+        ("2026-01-02", "14:30", "both"): "15:15",
+    }
