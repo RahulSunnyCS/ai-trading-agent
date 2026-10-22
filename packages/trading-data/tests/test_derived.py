@@ -204,6 +204,9 @@ def test_rebuild_writes_versioned_files_once_and_views_read_them(root):
         assert derived.file_version(path) == derived.DERIVED_VERSION
     again = derived.rebuild(root, ("NIFTY",), log=lambda _: None)["NIFTY"]
     assert (again.built, again.skipped_current) == (0, 1)
+    # a day named in force_days is rebuilt although current (its option partition grew)
+    forced = derived.rebuild(root, ("NIFTY",), force_days={DAY}, log=lambda _: None)["NIFTY"]
+    assert (forced.built, forced.skipped_current) == (1, 0)
     assert derived.check_day(root, "NIFTY", DAY) == []
     with connect(root) as con:
         assert con.execute("SELECT count(*) FROM chain_snapshots_5m").fetchone()[0] > 0

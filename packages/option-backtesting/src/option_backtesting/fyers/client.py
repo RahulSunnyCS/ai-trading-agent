@@ -36,6 +36,43 @@ class RateLimitedError(RuntimeError):
     rest of the day after repeated per-minute breaches, so a bulk job stops rather than retry."""
 
 
+_AUTH_WORDS = ("token", "auth", "unauthor", "login")
+_RATE_LIMIT_WORDS = ("rate limit", "too many", "request limit", "limit exceeded", "limit reached")
+_RETRYABLE_WORDS = (
+    "timeout",
+    "timed out",
+    "try again",
+    "temporar",
+    "service unavailable",
+    "internal server",
+)
+
+
+def response_state(body: dict) -> str:
+    """Classify one expired-history response (BL-148): `ok` and `no_data` are answers;
+    `rate_limited` means stop the run (Fyers blocks the account for the day after repeated
+    breaches); `retryable` (network, 5xx) is worth asking again on a later run; `permanent`
+    is a refusal of this request itself (e.g. an unknown symbol) that asking again will not
+    change. A rejected token raises FyersCredentialsError instead: nothing after it can work.
+    """
+    status = body.get("s")
+    if status in ("ok", "no_data"):
+        return str(status)
+    message = str(body.get("message") or body).lower()
+    if any(word in message for word in _AUTH_WORDS):
+        raise FyersCredentialsError(f"Fyers rejected the token: {body.get('message') or body}")
+    http = body.get("_http_status")
+    if http == 429 or any(word in message for word in _RATE_LIMIT_WORDS):
+        return "rate_limited"
+    if (
+        (isinstance(http, int) and http >= 500)
+        or message.startswith("network:")
+        or any(word in message for word in _RETRYABLE_WORDS)
+    ):
+        return "retryable"
+    return "permanent"
+
+
 @dataclass(frozen=True)
 class Candle:
     epoch: int
@@ -112,9 +149,12 @@ class FyersClient:
                     time.sleep(2**attempt * 5)
                     continue
                 try:
-                    return json.loads(error.read().decode() or "{}")
+                    body = json.loads(error.read().decode() or "{}")
                 except (ValueError, OSError):
-                    return {"s": "error", "message": f"HTTP {error.code}"}
+                    body = {"s": "error", "message": f"HTTP {error.code}"}
+                if isinstance(body, dict):  # response_state tells a 5xx from a refusal by it
+                    body.setdefault("_http_status", error.code)
+                return body
             except (urllib.error.URLError, TimeoutError) as error:
                 if attempt < 4:
                     time.sleep(2**attempt)
@@ -127,7 +167,7 @@ class FyersClient:
         if body.get("s") == "ok":
             return
         message = str(body.get("message") or body)
-        if any(word in message.lower() for word in ("token", "auth", "unauthor", "login")):
+        if any(word in message.lower() for word in _AUTH_WORDS):
             raise FyersCredentialsError(f"Fyers rejected the token: {message}")
         raise RuntimeError(f"{label}: {message}")
 
@@ -156,7 +196,9 @@ class FyersClient:
         return list(body.get("data", {}).get("contracts", {}).get("options", []))
 
     def expired_history_response(self, symbol: str, start: date, end: date) -> tuple[dict, dict]:
-        """Raw expired-F&O response plus its request params, for durable caching."""
+        """Raw expired-F&O response plus its request params, for durable caching. An error
+        body is returned, not raised: the caller classifies it with `response_state`, so one
+        refused contract does not stop a bulk run."""
         params: dict[str, str | int] = {
             "symbol": symbol,
             "resolution": "1",
@@ -169,8 +211,6 @@ class FyersClient:
         body = self._get(params, endpoint=EXPIRED_HISTORY_URL)
         if self.on_response is not None:
             self.on_response(symbol, params, body)
-        if body.get("s") not in ("ok", "no_data"):
-            self._raise_for_error(body, f"{symbol} {start}..{end}")
         return body, params
 
     @staticmethod

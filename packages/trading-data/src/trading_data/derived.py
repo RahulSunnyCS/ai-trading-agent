@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import csv
 import math
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Collection, Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from pathlib import Path
@@ -883,17 +883,24 @@ def rebuild(
     *,
     days: tuple[date, date] | None = None,
     force: bool = False,
+    force_days: Collection[date] = (),
     log: Callable[[str], None] = print,
 ) -> dict[str, RebuildReport]:
-    """Build every missing or out-of-version day file, then iv_daily for each underlying."""
+    """Build every missing or out-of-version day file, then iv_daily for each underlying.
+
+    `force_days` are rebuilt even when their files are current: a day whose option partition
+    gained rows after its derived files were written (the expired-option repair's top-up).
+    """
     reference = Reference.load()
     reports = {}
+    force_days = set(force_days)
     for u in underlyings:
         report = RebuildReport()
         todo = candidate_days(root, u, days)
         for n, day in enumerate(todo, 1):
             paths = {ds: derived_path(root, ds, u, day) for ds in DATASETS}
-            if not force and all(file_version(p) == DERIVED_VERSION for p in paths.values()):
+            current = all(file_version(p) == DERIVED_VERSION for p in paths.values())
+            if not force and day not in force_days and current:
                 report.skipped_current += 1
                 continue
             try:

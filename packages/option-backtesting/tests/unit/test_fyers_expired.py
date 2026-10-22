@@ -1,19 +1,25 @@
 """The expired-option repair against a fake Fyers client: planning only the missing days,
-resumable raw cache, clean stop at a request budget, merge that never overwrites, and the
-by-name candle parser. No network."""
+resumable raw cache, clean stop at a request budget or a rate limit, a day merged only with
+all its expiries, refused contracts skipped, merge that never overwrites, the by-name candle
+parser, and the client's per-minute throttle and 429 stop. No network."""
 
 import gzip
+import io
 import json
+import urllib.error
 from datetime import date, datetime, timedelta, timezone
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 from trading_data import lake
+from trading_data.db import connect
 
 from option_backtesting.data.reference.loader import default_reference_data
+from option_backtesting.fyers import client as client_module
 from option_backtesting.fyers import expired
-from option_backtesting.fyers.client import FyersClient
+from option_backtesting.fyers.auth import Credentials, FyersCredentialsError
+from option_backtesting.fyers.client import FyersClient, RateLimitedError, response_state
 from option_backtesting.fyers.daily import options_table
 from option_backtesting.fyers.symbols import Contract
 
@@ -22,9 +28,12 @@ HEALTHY = date(2026, 9, 15)
 GAP = [date(2026, 9, 16), date(2026, 9, 17), date(2026, 9, 18)]
 WEEKLY = date(2026, 9, 22)
 MONTHLY = date(2026, 9, 29)
+LATER = date(2026, 10, 6)
+LATE_DAY = date(2026, 9, 23)  # needs MONTHLY and LATER; the GAP days need WEEKLY and MONTHLY
 SYMBOLS = {
     WEEKLY: [f"NSE:NIFTY2692222{k}{t}" for k in ("000", "050") for t in ("CE", "PE")],
     MONTHLY: [f"NSE:NIFTY26SEP22{k}{t}" for k in ("000", "050") for t in ("CE", "PE")],
+    LATER: [f"NSE:NIFTY26O0622{k}{t}" for k in ("000", "050") for t in ("CE", "PE")],
 }
 
 
@@ -33,15 +42,21 @@ def _epoch(day: date, minute: int) -> int:
 
 
 class FakeClient:
+    """`answers` maps a symbol to what its next requests give before the normal answer: an
+    exception to raise or an error body to return, one per request."""
+
     columns = ["timestamp", "open", "high", "low", "close", "volume", "open_interest"]
 
-    def __init__(self):
+    def __init__(self, expiries=(WEEKLY, MONTHLY), answers=None):
         self.calls = 0
         self.history_calls = 0
+        self.expiries = list(expiries)
+        self.answers = {k: list(v) for k, v in (answers or {}).items()}
+        self.asked: list[str] = []
 
     def expired_expiries(self, symbol, start, end):
         self.calls += 1
-        return [WEEKLY, MONTHLY]
+        return [e for e in self.expiries if start <= e <= end]
 
     def expired_contracts(self, symbol, expiry):
         self.calls += 1
@@ -50,12 +65,18 @@ class FakeClient:
     def expired_history_response(self, symbol, start, end):
         self.calls += 1
         self.history_calls += 1
+        self.asked.append(symbol)
+        params = {"symbol": symbol, "range_from": start.isoformat(), "range_to": end.isoformat()}
+        if self.answers.get(symbol):
+            answer = self.answers[symbol].pop(0)
+            if isinstance(answer, BaseException):
+                raise answer
+            return answer, params
         rows, d = [], start
         while d <= end:
             if d.weekday() < 5:
                 rows += [[_epoch(d, m), 10, 12, 9, 11, 5, 100] for m in range(3)]
             d += timedelta(days=1)
-        params = {"symbol": symbol, "range_from": start.isoformat(), "range_to": end.isoformat()}
         return {"s": "ok", "columns": self.columns, "candles": rows}, params
 
     candles_from_response = staticmethod(FyersClient.candles_from_response)
@@ -89,9 +110,26 @@ def root(tmp_path, monkeypatch):
         options_table([(_contract(), 7, [_candle(HEALTHY)])]),
         lake.bars_1m_path(root, "option", "NIFTY", HEALTHY),
     )
-    monkeypatch.setattr(expired.quality, "rebuild", lambda *a, **k: None)
-    monkeypatch.setattr(expired.derived, "rebuild", lambda *a, **k: None)
     return root
+
+
+@pytest.fixture(autouse=True)
+def judged(monkeypatch):
+    """The verdict and derived rebuilds a run asked for: (what, name, days, force_days)."""
+    calls = []
+    monkeypatch.setattr(
+        expired.quality,
+        "rebuild",
+        lambda root, **k: calls.append(("quality", k["name"], k["days"], None)),
+    )
+    monkeypatch.setattr(
+        expired.derived,
+        "rebuild",
+        lambda root, names, **k: calls.append(
+            ("derived", names[0], k["days"], set(k.get("force_days", ())))
+        ),
+    )
+    return calls
 
 
 def _candle(day, minute=0, close=11.0):
@@ -197,3 +235,229 @@ def test_merge_keeps_existing_rows_and_adds_only_missing_minutes(root):
     assert merged["close"].to_pylist() == [11.0, 12.0]  # the existing price won
     again, _ = expired.merge_option_partition(path, fresh)
     assert again == 0
+
+
+def _run(client, root, end=GAP[-1], **kw):
+    return expired.run_backfill(client, root, ["NIFTY"], GAP[0], end, log=lambda _: None, **kw)
+
+
+def _instruments(root, day):
+    path = lake.bars_1m_path(root, "option", "NIFTY", day)
+    return len(set(pq.read_table(path)["instrument_id"].to_pylist())) if path.exists() else 0
+
+
+def _runs(root):
+    with connect(root, read_only=True, views=()) as con:
+        return con.execute(
+            "SELECT source, status, errors FROM ingest_runs ORDER BY started_at"
+        ).fetchall()
+
+
+def test_a_stop_after_the_first_expiry_merges_no_day_and_the_rerun_completes_it(root):
+    # each gap day needs the weekly AND the monthly: the budget runs out after the weekly
+    first = FakeClient()
+    out = _run(first, root, max_requests=4)
+    assert out["stopped"] == "max_requests" and out["fetched"] == 4
+    assert out["pending_days"] == {"NIFTY": [d.isoformat() for d in GAP]}
+    for day in GAP:  # no day got a file with the weekly alone, so none is skipped next time
+        assert not lake.bars_1m_path(root, "option", "NIFTY", day).exists()
+    second = FakeClient()
+    out2 = _run(second, root)
+    assert (out2["cached"], out2["fetched"], out2["stopped"]) == (4, 4, None)
+    assert all(_instruments(root, day) == 8 for day in GAP)  # 4 weekly + 4 monthly
+
+
+def test_only_expiry_merges_a_day_once_its_other_expiries_are_in_the_cache(root):
+    out = _run(FakeClient(), root, only_expiry=WEEKLY)
+    assert out["fetched"] == 4 and out["touched_days"] == {}
+    assert out["pending_days"] == {"NIFTY": [d.isoformat() for d in GAP]}
+    again = FakeClient()
+    out2 = _run(again, root, only_expiry=MONTHLY)
+    assert out2["fetched"] == 4 and again.asked == SYMBOLS[MONTHLY]
+    assert all(_instruments(root, day) == 8 for day in GAP)
+
+
+def test_a_rate_limit_stops_cleanly_judges_the_merged_days_and_a_rerun_resumes(root, judged):
+    _index_partition(root, LATE_DAY)
+    limited = FakeClient(
+        expiries=(WEEKLY, MONTHLY, LATER),
+        answers={SYMBOLS[LATER][1]: [RateLimitedError("Fyers rate-limited 2 times")]},
+    )
+    out = _run(limited, root, end=LATE_DAY)
+    assert out["stopped"] == "rate_limited" and out["fetched"] == 9  # 4 + 4 + the first LATER
+    assert all(_instruments(root, day) == 8 for day in GAP)  # complete before the stop
+    assert _instruments(root, LATE_DAY) == 0 and out["pending_days"] == {"NIFTY": ["2026-09-23"]}
+    assert ("quality", "NIFTY", (GAP[0], GAP[-1]), None) in judged
+    assert ("derived", "NIFTY", (GAP[0], GAP[-1]), set(GAP)) in judged
+    assert _runs(root)[-1] == ("fyers-expired", "partial", 1)
+
+    resumed = FakeClient(expiries=(WEEKLY, MONTHLY, LATER))
+    out2 = _run(resumed, root, end=LATE_DAY)  # plans 23 Sep only
+    assert (out2["fetched"], out2["cached"]) == (3, 5)  # the monthly and 1 LATER were cached
+    assert _instruments(root, LATE_DAY) == 8 and out2["stopped"] is None
+
+
+@pytest.mark.parametrize(
+    ("body", "stopped"),
+    [
+        ({"s": "error", "message": "Request limit reached", "_http_status": 429}, "rate_limited"),
+        ({"s": "error", "message": "Invalid access token"}, "credentials"),
+    ],
+)
+def test_a_rate_limit_or_rejected_token_body_stops_without_caching_it(root, body, stopped):
+    symbol = SYMBOLS[MONTHLY][0]
+    out = _run(FakeClient(answers={symbol: [body]}), root)
+    assert out["stopped"] == stopped
+    assert not expired._cache_path(root, "NIFTY", MONTHLY, symbol).exists()
+    assert out["touched_days"] == {}
+
+
+def test_an_unexpected_error_still_judges_the_days_merged_before_it(root, judged):
+    _index_partition(root, LATE_DAY)
+    broken = FakeClient(
+        expiries=(WEEKLY, MONTHLY, LATER), answers={SYMBOLS[LATER][0]: [OSError("disk gone")]}
+    )
+    with pytest.raises(OSError):
+        _run(broken, root, end=LATE_DAY)
+    assert ("quality", "NIFTY", (GAP[0], GAP[-1]), None) in judged
+    assert _runs(root)[-1][:2] == ("fyers-expired", "failed")
+
+
+def test_a_refused_contract_is_recorded_and_skipped_and_never_asked_again(root):
+    refused = SYMBOLS[WEEKLY][2]
+    body = {"s": "error", "code": -300, "message": "Invalid symbol provided"}
+    out = _run(FakeClient(answers={refused: [body]}), root)
+    assert out["stopped"] is None and out["fetched"] == 8
+    assert [f["symbol"] for f in out["failed_contracts"]] == [refused]
+    assert all(_instruments(root, day) == 7 for day in GAP)  # merged without it
+    # the refusal is cached: a top-up run re-reads it and asks Fyers nothing
+    again = FakeClient()
+    out2 = _run(again, root, missing_only=False)
+    assert again.history_calls == 0 and out2["failed_contracts"][0]["cached"] is True
+    assert _runs(root)[-1] == ("fyers-expired", "ok", 0)
+
+
+def test_a_retryable_failure_is_not_cached_and_its_days_wait_for_the_rerun(root):
+    flaky = SYMBOLS[MONTHLY][3]
+    out = _run(FakeClient(answers={flaky: [{"s": "error", "message": "network: timed out"}]}), root)
+    assert out["stopped"] is None and [f["symbol"] for f in out["retryable_failures"]] == [flaky]
+    assert out["touched_days"] == {} and len(out["pending_days"]["NIFTY"]) == 3
+    again = FakeClient()
+    out2 = _run(again, root)
+    assert again.asked == [flaky] and all(_instruments(root, day) == 8 for day in GAP)
+    assert out2["retryable_failures"] == []
+
+
+def test_repeated_retryable_failures_stop_the_run(root):
+    down = {"s": "error", "message": "HTTP 503", "_http_status": 503}
+    symbols = SYMBOLS[WEEKLY]
+    out = _run(FakeClient(answers={s: [down] for s in symbols}), root)
+    assert out["stopped"] == "retryable" and out["fetched"] == expired.RETRYABLE_STREAK
+
+
+def test_a_top_up_forces_the_derived_rebuild_of_the_days_it_changed(root, judged):
+    _run(FakeClient(), root)
+    judged.clear()
+    # a thin day: drop one contract's rows, then top it up
+    path = lake.bars_1m_path(root, "option", "NIFTY", GAP[1])
+    table = pq.read_table(path).cast(lake.OPT_SCHEMA)
+    first = table["instrument_id"][0].as_py()
+    lake.write_parquet(table.filter(pa.compute.not_equal(table["instrument_id"], first)), path)
+    out = _run(FakeClient(), root, missing_only=False)
+    assert out["fetched"] == 0 and out["rows_added"] == 3  # its 3 minutes, from the cache
+    assert out["touched_days"] == {"NIFTY": 1}
+    assert ("derived", "NIFTY", (GAP[1], GAP[1]), {GAP[1]}) in judged
+
+
+def test_days_that_may_need_an_unexpired_expiry_are_reported():
+    # weekly cadence: two later weeklies and the month's monthly must be provably listed
+    sep, oct_ = [date(2026, 9, d) for d in (22, 29)], [date(2026, 10, d) for d in (6, 13)]
+    assert not expired._may_be_short(sep + oct_, date(2026, 9, 16), "weekly", date(2026, 10, 21))
+    # the listing ends 30 Sep: September's monthly is known, but only one weekly is left
+    assert expired._may_be_short(sep, date(2026, 9, 23), "weekly", date(2026, 9, 30))
+    # two weeklies, but nothing past September yet: is 29 Sep the monthly? unknown
+    assert expired._may_be_short(sep, date(2026, 9, 16), "weekly", date(2026, 9, 29))
+    # on the monthly expiry day the next month's monthly is wanted too
+    assert expired._may_be_short(sep + oct_, date(2026, 9, 29), "weekly", date(2026, 10, 21))
+    assert expired._may_be_short([date(2026, 9, 29)], date(2026, 9, 29), "monthly", date.max)
+    assert not expired._may_be_short(sep, date(2026, 9, 23), "monthly", date(2026, 9, 30))
+
+
+def test_the_plan_lists_days_short_of_an_unexpired_expiry(root):
+    # run on 23 Sep: the listing ends 22 Sep, so 29 Sep (still trading) is not in it
+    plan = expired.build_plan(
+        FakeClient(expiries=(WEEKLY, MONTHLY)), root, "NIFTY", GAP[0], GAP[-1],
+        today=date(2026, 9, 23),
+    )  # fmt: skip
+    assert plan.short_days == tuple(GAP)
+    assert [e.expiry for e in plan.expiries] == [WEEKLY]  # what can be repaired still is
+
+
+# --- the client: response classes, the per-minute throttle and the 429 stop -------------
+
+
+def test_response_states():
+    assert response_state({"s": "ok"}) == "ok" and response_state({"s": "no_data"}) == "no_data"
+    assert response_state({"s": "error", "message": "Invalid symbol provided"}) == "permanent"
+    assert response_state({"s": "error", "message": "x", "_http_status": 502}) == "retryable"
+    assert response_state({"s": "error", "message": "network: reset"}) == "retryable"
+    assert response_state({"s": "error", "message": "rate limited"}) == "rate_limited"
+    with pytest.raises(FyersCredentialsError):
+        response_state({"s": "error", "message": "Token expired"})
+
+
+class FakeClock:
+    def __init__(self):
+        self.now = 1000.0
+        self.slept: list[float] = []
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.slept.append(seconds)
+        self.now += seconds
+
+
+def _client(monkeypatch, **kw):
+    clock = FakeClock()
+    monkeypatch.setattr(client_module.time, "monotonic", clock.monotonic)
+    monkeypatch.setattr(client_module.time, "sleep", clock.sleep)
+    return FyersClient(Credentials("APP-100", "token"), **kw), clock
+
+
+def test_the_per_minute_cap_waits_for_the_oldest_request_to_leave_the_window(monkeypatch):
+    client, clock = _client(monkeypatch, min_interval_s=0.0, per_minute=3)
+    for _ in range(3):
+        client._throttle()
+        clock.now += 1  # three requests in three seconds
+    assert clock.slept == []
+    client._throttle()  # the fourth waits until the first is 60 s old
+    assert clock.slept == [pytest.approx(57.0)]
+    client._throttle()  # the window holds requests 2, 3 and 4: wait for the second's 60 s
+    assert clock.slept[-1] == pytest.approx(1.0)
+
+
+def test_the_second_429_raises_rate_limited_instead_of_retrying(monkeypatch):
+    client, clock = _client(monkeypatch, min_interval_s=0.0, max_rate_limit_hits=2)
+
+    def too_many(request, timeout):
+        raise urllib.error.HTTPError(request.full_url, 429, "Too Many", {}, io.BytesIO(b""))
+
+    monkeypatch.setattr(client_module.urllib.request, "urlopen", too_many)
+    with pytest.raises(RateLimitedError):
+        client.expired_history_response("NSE:NIFTY2692222000CE", WEEKLY, WEEKLY)
+    assert client.calls == 2 and client.rate_limit_hits == 2
+    assert 65 in clock.slept  # the first 429 waited out the minute, once
+
+
+def test_a_5xx_body_carries_its_status_so_it_is_retryable(monkeypatch):
+    client, _ = _client(monkeypatch, min_interval_s=0.0)
+
+    def server_error(request, timeout):
+        body = io.BytesIO(b'{"s": "error", "message": "oops"}')
+        raise urllib.error.HTTPError(request.full_url, 502, "Bad Gateway", {}, body)
+
+    monkeypatch.setattr(client_module.urllib.request, "urlopen", server_error)
+    body, _ = client.expired_history_response("NSE:NIFTY2692222000CE", WEEKLY, WEEKLY)
+    assert body["_http_status"] == 502 and response_state(body) == "retryable"

@@ -184,8 +184,10 @@ MCXBULLDEX and any other commodity index are excluded.
   instrument identities. Never collapse them by root/strike/expiry alone.
 
 Phase 2 reuses `fyers/expired.py`'s pieces rather than a second implementation: the client's
-`per_minute` / `max_rate_limit_hits` options, the per-contract raw cache keyed on the requested
-window, the stop-at-budget loop and the merge that never overwrites an existing row. What stays
+`per_minute` / `max_rate_limit_hits` options, `client.response_state` (ok / no_data / permanent /
+retryable / rate_limited, the states this item asks for), the per-contract raw cache keyed on the
+requested window, the stop-at-budget loop that merges a day only once every expiry it needs is
+cached, and the merge that never overwrites an existing row. What stays
 MCX-specific is discovery (`MCX:` symbols, session bounds) and the instrument identity.
 
 ## Open questions

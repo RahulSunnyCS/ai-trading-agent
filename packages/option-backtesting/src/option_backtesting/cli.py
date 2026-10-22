@@ -614,8 +614,11 @@ def fyers_expired_options(
 ) -> None:
     """Backfill expired 1-minute option contracts with Fyers Prime.
 
-    Raw responses are cached per contract, making the command resumable. Existing lake rows
-    win on overlap, so a thin vendor day gains missing rows without changing vendor prices.
+    Raw responses are cached per contract, making the command resumable; a day is merged only
+    once every expiry it needs is cached. Existing lake rows win on overlap, so a thin vendor
+    day gains missing rows without changing vendor prices. A contract Fyers refuses is listed
+    and skipped; a rate limit, a rejected token or repeated network errors stop the run
+    (exit 2, or 1 for the token) after the merged days are judged, and a rerun resumes.
     """
     from .fyers.auth import FyersCredentialsError, resolve_credentials
     from .fyers.client import FyersClient
@@ -647,6 +650,10 @@ def fyers_expired_options(
         typer.echo(f"stopped: {error}")
         raise typer.Exit(2) from None
     typer.echo(json.dumps(result, indent=2, default=str))
+    if result.get("stopped") == "credentials":
+        raise typer.Exit(1)
+    if result.get("stopped") in ("rate_limited", "retryable"):
+        raise typer.Exit(2)
 
 
 def _collect(
