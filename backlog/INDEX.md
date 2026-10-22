@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-19
+Last updated: 2026-10-22
 
 ## Open
 
@@ -119,6 +119,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-118](BL-118-order-adapter-gated.md) | Order adapter for the rotation picks on Angel One, gated on BL-058's read-out, BL-117's paper-desk parity and an owner decision; exchange-resident stops, kill switch, compliance (was the uncommitted BL-113 execution item; its live-paper phases moved to BL-117) | P2 | Planned | feature | options |
 | [BL-137](BL-137-algotest-strategy-export-upload.md) | Rotation picks to AlgoTest: export the day's Core and T1 picks to `.algtst` and upload them (read back, never deployed) | P1 | In progress | feature | options + broker-login |
 | [BL-138](BL-138-algotest-auto-deploy.md) | Deploy the rotation picks in AlgoTest automatically: built ready but off by default (the owner may not use it); only the recorded 09:16 picks on /live, deactivate everything at 15:30, 08:00–15:40 window, 6-strategy limit | P2 | In progress | feature | broker-login + options |
+| [BL-152](BL-152-five-minute-breakout-hold-entry.md) | Five-minute breakout, hold and 1-minute entry: 4 levels x 4 stops x 3 trades x 4 exits = 192 variants, pre-registered, NIFTY | P2 | In progress (Phase 0 registered) | research | options |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
