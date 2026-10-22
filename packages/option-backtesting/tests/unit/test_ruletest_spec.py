@@ -139,3 +139,145 @@ def test_load_spec_text_errors():
     with pytest.raises(SpecError, match="not valid YAML at line"):
         load_spec("rule: [unclosed")
     assert load_spec(yaml.safe_dump({"rule": BASE})).spec.id == "gap_up_dir"
+
+
+# --- exit_when and the premium-% strike --------------------------------------------------------
+
+BUY_TREND = {
+    "id": "st_buy",
+    "underlying": "NIFTY",
+    "window": {"from": "09:15", "to": "14:00"},
+    "when": {"gt": [{"supertrend_dir": {}}, 0]},
+    "direction_up": {"gt": [{"supertrend_dir": {}}, 0]},
+    "exit_when": {
+        "up": {"lt": [{"supertrend_dir": {}}, 0]},
+        "down": {"gt": [{"supertrend_dir": {}}, 0]},
+    },
+    "template": {
+        "exit_time": "15:15",
+        "legs": [
+            {"id": "ce", "lots": 1, "position": "buy", "option_type": "CE",
+             "strike": {"premium_pct_of_spot": 1.0}, "on": "up"},
+            {"id": "pe", "lots": 1, "position": "buy", "option_type": "PE",
+             "strike": {"premium_pct_of_spot": 1.0}, "on": "down"},
+        ],
+    },
+}  # fmt: skip
+
+
+def test_exit_when_per_side_and_premium_pct_compile_and_read_back():
+    rule = from_dict(copy.deepcopy(BUY_TREND))
+    assert set(rule.exits) == {"up", "down"} and rule.exit_cap == "15:15"
+    strategy = rule.strategy_for("10:01", "up", exit_time="11:42", spot=24165.0)
+    assert strategy.exit_time == "11:42" and [leg.id for leg in strategy.legs] == ["ce"]
+    assert strategy.legs[0].strike.closest_premium == pytest.approx(241.65)
+    assert rule.strategy_for("10:01", "down", spot=20000).exit_time == "15:15"
+    back = read_back(rule)
+    assert any(s.startswith("On up events, exit the minute after") for s in back["sentences"])
+    assert any("premium is nearest 1% of the index" in s for s in back["sentences"])
+    assert any("exit by 15:15" in s for s in back["sentences"])
+
+
+def test_one_exit_applies_to_every_side_and_joins_both_hashes():
+    plain = from_dict(spec())
+    with_exit = from_dict(spec(exit_when={"lt": ["close", "session_open"]}))
+    assert set(with_exit.exits) == {"both"}
+    assert with_exit.spec_hash != plain.spec_hash
+    assert with_exit.template_hash != plain.template_hash
+    assert plain.exits is None
+
+
+@pytest.mark.parametrize(
+    "changes, needle",
+    [
+        ({"exit_when": {"up": {"gt": ["close", 1]}, "down": {"gt": ["close", 1]}}}, "direction_up"),
+        ({"exit_when": "close"}, "true / false"),
+    ],
+)
+def test_exit_when_refusals(changes, needle):
+    with pytest.raises(SpecError, match=needle):
+        from_dict(spec(**changes))
+
+
+def test_premium_pct_refusals():
+    bad = copy.deepcopy(BUY_TREND)
+    bad["template"]["legs"][0]["strike"] = {"premium_pct_of_spot": 0}
+    with pytest.raises(SpecError, match="premium_pct_of_spot"):
+        from_dict(bad)
+    bad["template"]["legs"][0]["strike"] = {"premium_pct_of_spot": 1, "closest_premium": 200}
+    with pytest.raises(SpecError, match="alone"):
+        from_dict(bad)
+
+
+def test_an_unquoted_on_key_in_yaml_is_read_as_on():
+    text = yaml.safe_dump({"rule": copy.deepcopy(BUY_TREND)}).replace("'on'", "on")
+    assert "\n    on: up" in text or "on: up" in text
+    rule = load_spec(text)
+    assert [leg["on"] for leg in rule.legs] == ["up", "down"]
+
+
+def test_the_rule_loader_keeps_on_off_yes_no_as_text():
+    text = (
+        "rule:\n"
+        "  id: t\n"
+        "  name: off\n"
+        "  notes: yes\n"
+        "  underlying: NIFTY\n"
+        '  window: { from: "10:30", to: "14:00" }\n'
+        "  when: { gt: [close, pivot] }\n"
+        "  direction_up: { gt: [close, open] }\n"
+        "  template:\n"
+        '    exit_time: "15:28"\n'
+        "    legs:\n"
+        "      - { id: ce, lots: 1, position: buy, option_type: CE,\n"
+        "          strike: { strike_type: ATM }, on: up }\n"
+        "      - { id: pe, lots: 1, position: buy, option_type: PE,\n"
+        "          strike: { strike_type: ATM }, on: down }\n"
+    )
+    rule = load_spec(text)
+    assert [leg["on"] for leg in rule.legs] == ["up", "down"]
+    assert rule.spec.name == "off" and rule.spec.notes == "yes"
+
+
+def test_missing_spot_is_refused_for_a_premium_pct_leg():
+    rule = from_dict(copy.deepcopy(BUY_TREND))
+    with pytest.raises(SpecError, match="no index price"):
+        rule.strategy_for("10:01", "up", spot=None)
+    # an ATM leg needs no spot
+    assert from_dict(spec()).strategy_for("11:01", "both").exit_time == "15:28"
+
+
+def test_exit_rules_share_one_template_hash_whatever_their_conditions():
+    a = from_dict(copy.deepcopy(BUY_TREND))
+    other = copy.deepcopy(BUY_TREND)
+    other["exit_when"] = {"up": {"lt": ["close", "pivot"]}, "down": {"gt": ["close", "pivot"]}}
+    other["define"] = {"unused": {"gt": ["close", 1]}}
+    other["control_when"] = {"up": {"gt": ["close", 1]}, "down": {"gt": ["close", 1]}}
+    b = from_dict(other)
+    assert a.template_hash == b.template_hash and a.spec_hash != b.spec_hash
+    no_exit = copy.deepcopy(BUY_TREND)
+    del no_exit["exit_when"]
+    assert from_dict(no_exit).template_hash != a.template_hash
+    assert set(b.controls) == {"up", "down"}
+    back = read_back(b)
+    assert any(s.startswith("Controls for up events: only where") for s in back["sentences"])
+    assert any(
+        s.startswith("Controls: only where the exit condition does not hold")
+        for s in read_back(a)["sentences"]
+    )
+
+
+def test_trade_relative_values_need_control_when_and_stay_out_of_entry_conditions():
+    timed = copy.deepcopy(BUY_TREND)
+    timed["exit_when"] = {"ge": ["minutes_in_trade", 60]}
+    del timed["exit_when"]
+    timed["exit_when"] = {"up": {"ge": ["minutes_in_trade", 60]},
+                          "down": {"ge": ["minutes_in_trade", 60]}}  # fmt: skip
+    with pytest.raises(SpecError, match="give control_when"):
+        from_dict(timed)
+    timed["control_when"] = {"up": {"gt": ["close", 1]}, "down": {"gt": ["close", 1]}}
+    assert from_dict(timed).exits["up"].trade
+    bad = copy.deepcopy(timed)
+    bad["control_when"] = {"up": {"ge": ["minutes_in_trade", 1]}, "down": {"gt": ["close", 1]}}
+    with pytest.raises(SpecError, match="control_when: at_entry"):
+        from_dict(bad)

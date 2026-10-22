@@ -199,7 +199,30 @@ Otherwise:
   `{straddle: {at: T}}` is NaN before `T` (its strike is chosen at `T`'s close); the straddle feature file saves only
   built rows and days whose option file lacks the strike, never a day without a file or a failed read (retried next
   run); the simulation cache skips and counts a torn row and starts every append on a fresh line. A result is labelled
-  "a screen, not a finding". `scripts/ruletest-acceptance.py` must print ACCEPTANCE OK: the four BL-083 triggers, said in
+  "a screen, not a finding". Indicators (2026-10-20): `{supertrend: {n, mult, minutes}}` (the line),
+  `{supertrend_dir: ...}` (+1 / -1) and `{bollinger: {n, k, minutes, band}}` are TradingView's definitions over
+  `minutes`-minute bars from 09:15, continuous across sessions like `rsi`, held between bar closes (`_bars`,
+  `_on_grid`, values cached on the frame); `tests/unit/test_ruletest_expr.py` pins the Supertrend to a longhand
+  ta.supertrend. A rule's optional `exit_when` (one condition, or `{up, down}` with `direction_up`) closes the trade
+  the minute after it first holds from the entry minute on, capped at the template's `exit_time`
+  (`study.exit_minutes`, applied to the events, placebo and random-time entries alike). An exit rule's cache file
+  has an `exit` column and a row is used only for the exit asked for (`sim.EXIT_COLUMNS`), because an exit depends on
+  indicators built from every earlier session; its `template_hash` takes only a marker, so exit rules with one template
+  share simulations. The controls are trend-matched (`study.control_filter`): a placebo day or random minute is used
+  only where `control_when` holds (or, without it, `exit_when` does not) the minute before it enters; the placebo looks
+  further out for its ten days a side, and `random_time` reports `minutes` / `minutes_used`. `exit_when` /
+  `control_when` join `spec_hash` only when set, so older rules keep their hashes and cache. A leg's
+  `strike: {premium_pct_of_spot: P}` is resolved per trade to `closest_premium` = P% of the index at the entry
+  (`spec._strike_for`; no index price at the entry is an error row). `load_spec` reads only true / false as YAML
+  booleans (`_RuleLoader`), so an unquoted `on: up` key stays `on`.
+  Event and trade values (BL-152): `max` / `min`; `{at_first: {x, when}}` and `{min_since_first | max_since_first:
+  {x, when}}` hold a value from the first stamp `when` holds in the session (a breakout candle's high, a level frozen
+  at the breakout, "no close below it since"); `{at_entry: x}` and `minutes_in_trade` are trade-relative, allowed only
+  in `exit_when` under elementwise operators (a `trade` flag set at parse), evaluated per trade by
+  `expr.evaluate_trade` from `study.exit_minutes` (the rest of the exit from one grid evaluation, shared); a rule
+  whose exit uses them must give `control_when`. `study.run_test(..., frame=)` takes a frame already loaded, for a
+  caller testing many rules (BL-152's `research/bl152/run_grid.py`).
+  `scripts/ruletest-acceptance.py` must print ACCEPTANCE OK: the four BL-083 triggers, said in
   the grammar (`tests/fixtures/rules/`), fire on the same days and stamps as `research/bl083/`, and T1 and T4 with the Dir
   template reproduce its event-study rows to the rupee. A leg with its own `range_breakout` is not supported yet.
 - `notify.py` — Telegram sender (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID), a deliberate copy of
@@ -424,6 +447,10 @@ Otherwise:
   `regime_message` on `POST /runs`, `regime_status` in the MCP `run_backtest`
   output, `t33.status` on `/legwise/anatomy`). Any other query error still raises.
 
+- `research/common/` — code two research items share, imported by module name after a `sys.path` insert of this
+  folder (`varlib`, `early_ref`, `rotparse`; BL-152 added `cscv` (the numpy CSCV / PBO, moved out of `bl104/robust.py`, which
+  re-exports it) and `breakout_specs` (BL-152's 192 registered rule specs, also used by BL-153)). A script never imports
+  from another item's folder.
 - `research/bl104/` — BL-104, the full-factorial parameter sweep over the Widesl / Dir / Buy families:
   `grid.py` (the registered axes, cells and their SHA; `tests/unit/test_bl104_grid.py` holds the counts),
   `run_grid.py` (one job per cohort, resumable parts + day × cell series under `results/<tag>/`),
@@ -444,6 +471,7 @@ uv run obt run strategies/B_pyramid.yaml --from YYYY-MM-DD --to YYYY-MM-DD
 uv run obt fyers status                 # token source + data dir
 uv run obt fyers fetch                  # today's 1m data — run the SAME evening
 uv run obt fyers history                # backfill NIFTY + VIX index history (any time)
+uv run obt fyers history --symbol NSE:RELIANCE-EQ --name RELIANCE --asset stock   # BL-153: one symbol's history (`fyers.history.backfill_symbol`)
 uv run obt legwise run strategies/legwise/*.yaml [--from D] [--to D] [--trades] [--include-excluded] [--bars 5m]
 uv run python scripts/parity-5m.py --from D --to D   # same strategies on 1m vs 5m bars: agreement + timing
 uv run obt daily                        # evening routine: fetch + judge the day + derived tables + run strategies/legwise + summary (verdicts, IV percentile)

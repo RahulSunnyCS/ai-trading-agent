@@ -22,12 +22,28 @@ Leaves
                                    known yet) and where option bars are missing
     {rsi: {n: 14, minutes: 5}}     Wilder RSI of the closes of `minutes`-minute bars, continuous
                                    across sessions, held until the next bar completes
+    {supertrend: {n: 10, mult: 3, minutes: 5}}
+                                   the Supertrend line of `minutes`-minute bars (TradingView's
+                                   ta.supertrend: hl2 -/+ mult x Wilder ATR-n, bands that only
+                                   tighten), continuous across sessions, held until the next bar
+    {supertrend_dir: {n: 10, mult: 3, minutes: 5}}
+                                   its direction: +1 up (line below price), -1 down; NaN until
+                                   the ATR has n bars. Test it with gt / lt 0
+    {bollinger: {n: 20, k: 2, minutes: 5, band: upper}}
+                                   the upper / middle / lower Bollinger band of the closes of
+                                   `minutes`-minute bars: mean of n -/+ k population standard
+                                   deviations (as TradingView), continuous across sessions
+    {at_first: {x, when}}          x at the first stamp of the session where `when` holds, held
+                                   from then on (NaN before, and all day if it never holds)
+    {min_since_first: {x, when}}   the running min / max of x from (inclusive) that first stamp;
+    {max_since_first: {x, when}}   NaN before it
     {bar_close: 5}                 true only at the stamps where a 5-minute bar completes
                                    (j + 1 is a multiple of 5), so a rule can act on bar closes
     a name from `define:`          an earlier definition of the same rule
 
 Operators (a list of arguments, or a mapping with the named parameters)
     add sub mul div [a, b]     abs [a]   (a one-argument operator may take its expression directly)
+    max min [a, b]             the larger / smaller of two numbers (missing if either is)
     gt ge lt le [a, b]         all any [b, ...]          not [b]
     crosses_up [a, b]          a[j-1] < b[j] <= a[j]
     crosses_down [a, b]        a[j-1] > b[j] >= a[j]
@@ -40,6 +56,13 @@ Operators (a list of arguments, or a mapping with the named parameters)
     max_since min_since {x, from | after}  running extreme from (inclusive) or after (exclusive)
                                            a clock time
     prior_median prior_mean {x, sessions}  of x at the same stamp over the previous sessions
+
+Trade-relative (only in a rule's `exit_when`, and only under the elementwise operators add sub mul
+div abs max min gt ge lt le all any not; each trade evaluates them from its own entry)
+    {at_entry: x}                  x at the minute the trade's entry was decided (the minute
+                                   before it enters; its close is the entry fill)
+    minutes_in_trade               minutes the trade would have been held if it exits the next
+                                   minute (1 at the entry minute)
 
 A comparison with a missing value is false. `not` flips that false to true, so guard a `not` with a
 comparison on the value it needs. Nothing is interpolated.
@@ -87,6 +110,7 @@ class Node:
     kind: str = "num"  # "num" | "bool"
     path: str = "when"
     label: str | None = None  # the `define:` name this node was given, shown in plain words
+    trade: bool = False  # reads at_entry / minutes_in_trade: only evaluable per trade
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"Node({self.op}, {self.args}, {self.params})"
@@ -116,6 +140,8 @@ _POSITIONAL: dict[str, tuple[tuple[str, ...], str, str]] = {
     "sub": (("a", "b"), "num", "num"),
     "mul": (("a", "b"), "num", "num"),
     "div": (("a", "b"), "num", "num"),
+    "max": (("a", "b"), "num", "num"),
+    "min": (("a", "b"), "num", "num"),
     "abs": (("a",), "num", "num"),
     "gt": (("a", "b"), "bool", "num"),
     "ge": (("a", "b"), "bool", "num"),
@@ -142,8 +168,18 @@ _PARAMETRIC: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "prior_median": (("x", "sessions"), ("x", "sessions")),
     "prior_mean": (("x", "sessions"), ("x", "sessions")),
 }
-_LEAF_OPS = {"clock", "straddle", "rsi", "bar_close"}
-ALL_OPS = set(_POSITIONAL) | _VARIADIC | set(_PARAMETRIC) | _LEAF_OPS
+_LEAF_OPS = {"clock", "straddle", "rsi", "bar_close", "supertrend", "supertrend_dir", "bollinger"}
+_SINCE_FIRST = {"at_first", "min_since_first", "max_since_first"}
+_TRADE_OPS = {"at_entry"}
+#: the operators a trade-relative value may sit under (they work on one session's row alone)
+ELEMENTWISE = {"add", "sub", "mul", "div", "abs", "max", "min", "gt", "ge", "lt", "le"} | {
+    "all",
+    "any",
+    "not",
+}
+TRADE_LEAF = "minutes_in_trade"
+BANDS = ("upper", "middle", "lower")
+ALL_OPS = set(_POSITIONAL) | _VARIADIC | set(_PARAMETRIC) | _LEAF_OPS | _SINCE_FIRST | _TRADE_OPS
 
 
 def _int_param(value: Any, path: str, low: int, high: int) -> int:
@@ -152,8 +188,29 @@ def _int_param(value: Any, path: str, low: int, high: int) -> int:
     return value
 
 
+def _float_param(value: Any, path: str, low: float, high: float) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not low <= value <= high:
+        raise RuleError(f"{path}: expected a number from {low:g} to {high:g}, got {value!r}")
+    return float(value)
+
+
 def parse(expr: Any, defs: dict[str, Node] | None = None, path: str = "when") -> Node:
-    """Turn a YAML / JSON expression into a tree, naming the path of the first problem."""
+    """Turn a YAML / JSON expression into a tree, naming the path of the first problem. A node that
+    reads a trade-relative value is marked `trade`; one may sit only under elementwise operators."""
+    node = _parse_node(expr, defs, path)
+    if node.op in _TRADE_OPS or node.op == TRADE_LEAF:
+        node.trade = True
+    elif any(isinstance(a, Node) and a.trade for a in node.args):
+        if node.op not in ELEMENTWISE:
+            raise RuleError(
+                f"{path}: at_entry / minutes_in_trade can only be used under "
+                f"{', '.join(sorted(ELEMENTWISE))}"
+            )
+        node.trade = True
+    return node
+
+
+def _parse_node(expr: Any, defs: dict[str, Node] | None, path: str) -> Node:
     defs = defs or {}
     if isinstance(expr, bool):
         raise RuleError(f"{path}: a bare true / false is not an expression")
@@ -164,9 +221,11 @@ def parse(expr: Any, defs: dict[str, Node] | None = None, path: str = "when") ->
     if isinstance(expr, str):
         if expr in defs:
             return defs[expr]
+        if expr == TRADE_LEAF:
+            return Node(TRADE_LEAF, kind="num", path=path)
         if expr in FEATURES:
             return Node("feature", (expr,), kind="num", path=path)
-        known = ", ".join(sorted(FEATURES | set(defs)))
+        known = ", ".join(sorted(FEATURES | set(defs) | {TRADE_LEAF}))
         raise RuleError(f"{path}: unknown name {expr!r} (known: {known})")
     if not isinstance(expr, dict) or len(expr) != 1:
         raise RuleError(f"{path}: expected a number, a name or a one-key mapping, got {expr!r}")
@@ -190,6 +249,40 @@ def parse(expr: Any, defs: dict[str, Node] | None = None, path: str = "when") ->
         n = _int_param(body.get("n", 14), f"{here}.n", 2, 100)
         minutes = _int_param(body.get("minutes", 5), f"{here}.minutes", 1, 125)
         return Node("rsi", params={"n": n, "minutes": minutes}, kind="num", path=path)
+    if op in ("supertrend", "supertrend_dir"):
+        if not isinstance(body, dict) or set(body) - {"n", "mult", "minutes"}:
+            raise RuleError(f"{here}: write {{{op}: {{n: 10, mult: 3, minutes: 5}}}}")
+        params = {
+            "n": _int_param(body.get("n", 10), f"{here}.n", 1, 100),
+            "mult": _float_param(body.get("mult", 3), f"{here}.mult", 0.1, 20),
+            "minutes": _int_param(body.get("minutes", 5), f"{here}.minutes", 1, 125),
+        }
+        return Node(op, params=params, kind="num", path=path)
+    if op == "bollinger":
+        if not isinstance(body, dict) or set(body) - {"n", "k", "minutes", "band"}:
+            example = "{bollinger: {n: 20, k: 2, minutes: 5, band: upper}}"
+            raise RuleError(f"{here}: write {example}")
+        band = body.get("band", "upper")
+        if band not in BANDS:
+            raise RuleError(f"{here}.band: expected upper, middle or lower, got {band!r}")
+        params = {
+            "n": _int_param(body.get("n", 20), f"{here}.n", 2, 200),
+            "k": _float_param(body.get("k", 2), f"{here}.k", 0, 10),
+            "minutes": _int_param(body.get("minutes", 5), f"{here}.minutes", 1, 125),
+            "band": band,
+        }
+        return Node(op, params=params, kind="num", path=path)
+    if op in _SINCE_FIRST:
+        if not isinstance(body, dict) or set(body) != {"x", "when"}:
+            raise RuleError(f"{here}: write {{{op}: {{x: ..., when: ...}}}}")
+        x = _typed(parse(body["x"], defs, f"{here}.x"), "num", f"{here}.x")
+        when = _typed(parse(body["when"], defs, f"{here}.when"), "bool", f"{here}.when")
+        return Node(op, (x, when), kind="num", path=path)
+    if op == "at_entry":
+        x = _typed(parse(body, defs, here), "num", here)
+        if x.trade:
+            raise RuleError(f"{here}: at_entry cannot hold another trade-relative value")
+        return Node(op, (x,), kind="num", path=path)
     if op == "bar_close":
         minutes = body.get("minutes") if isinstance(body, dict) else body
         return Node(
@@ -270,12 +363,14 @@ def parse_rule(when: Any, define: dict[str, Any] | None = None) -> tuple[Node, d
     """Parse `define:` in order (a definition may use the ones before it) and then `when:`."""
     defs: dict[str, Node] = {}
     for name, body in (define or {}).items():
-        if name in FEATURES or name in ALL_OPS:
+        if name in FEATURES or name in ALL_OPS or name == TRADE_LEAF:
             raise RuleError(f"define.{name}: the name is already taken")
         defs[name] = parse(body, defs, f"define.{name}")
         if defs[name].label is None:
             defs[name].label = name
     root = parse(when, defs, "when")
+    if root.trade:
+        raise RuleError("when: at_entry / minutes_in_trade belong in exit_when only")
     if root.kind != "bool":
         raise RuleError("when: a rule's condition must be true / false, not a number")
     return root, defs
@@ -368,14 +463,114 @@ def wilder_rsi(closes: np.ndarray, n: int = 14) -> np.ndarray:
     if len(closes) <= n:
         return out
     d = np.diff(closes)
-    up, dn = np.maximum(d, 0), np.maximum(-d, 0)
-    au, ad = up[:n].mean(), dn[:n].mean()
-    out[n] = 100 - 100 / (1 + au / ad) if ad > 0 else 100.0
-    for i in range(n, len(d)):
-        au = (au * (n - 1) + up[i]) / n
-        ad = (ad * (n - 1) + dn[i]) / n
-        out[i + 1] = 100 - 100 / (1 + au / ad) if ad > 0 else 100.0
+    au = _wilder_mean(np.maximum(d, 0), n)[n - 1 :]
+    ad = _wilder_mean(np.maximum(-d, 0), n)[n - 1 :]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        out[n:] = np.where(ad > 0, 100 - 100 / (1 + au / ad), 100.0)
     return out
+
+
+def _wilder_mean(x: np.ndarray, n: int) -> np.ndarray:
+    """Wilder's running mean (TradingView's ta.rma): the plain mean of the first n values, then
+    (prev x (n-1) + x) / n."""
+    out = np.full(len(x), np.nan)
+    if len(x) < n:
+        return out
+    out[n - 1] = x[:n].mean()
+    for i in range(n, len(x)):
+        out[i] = (out[i - 1] * (n - 1) + x[i]) / n
+    return out
+
+
+def supertrend(
+    high: np.ndarray, low: np.ndarray, close: np.ndarray, n: int = 10, mult: float = 3.0
+) -> tuple[np.ndarray, np.ndarray]:
+    """(line, direction) of one continuous series of bars, as TradingView's ta.supertrend: the
+    first bar with an ATR starts down; direction +1 means up (the line is the lower band)."""
+    prev_close = np.concatenate([[np.nan], close[:-1]])
+    tr = np.fmax(high - low, np.fmax(np.abs(high - prev_close), np.abs(low - prev_close)))
+    atr = _wilder_mean(tr, n)
+    mid = (high + low) / 2
+    line = np.full(len(close), np.nan)
+    direction = np.full(len(close), np.nan)
+    lower_prev = upper_prev = np.nan
+    dir_prev = 0
+    for i in range(len(close)):
+        if np.isnan(atr[i]):
+            continue
+        lower, upper = mid[i] - mult * atr[i], mid[i] + mult * atr[i]
+        if dir_prev:
+            if not (lower > lower_prev or close[i - 1] < lower_prev):
+                lower = lower_prev
+            if not (upper < upper_prev or close[i - 1] > upper_prev):
+                upper = upper_prev
+        if dir_prev == 0:
+            d = -1
+        elif dir_prev == -1:
+            d = 1 if close[i] > upper else -1
+        else:
+            d = -1 if close[i] < lower else 1
+        line[i] = lower if d == 1 else upper
+        direction[i] = d
+        lower_prev, upper_prev, dir_prev = lower, upper, d
+    return line, direction
+
+
+def bollinger(close: np.ndarray, n: int = 20, k: float = 2.0) -> dict[str, np.ndarray]:
+    """{upper, middle, lower} of one continuous series: mean of the last n closes -/+ k population
+    standard deviations; NaN until n closes exist."""
+    out = {band: np.full(len(close), np.nan) for band in BANDS}
+    if len(close) < n:
+        return out
+    windows = np.lib.stride_tricks.sliding_window_view(close, n)
+    mean, sd = windows.mean(axis=1), windows.std(axis=1)
+    out["middle"][n - 1 :] = mean
+    out["upper"][n - 1 :] = mean + k * sd
+    out["lower"][n - 1 :] = mean - k * sd
+    return out
+
+
+def _bars(frame: Frame, m: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """(high, low, close) of the complete `m`-minute bars from 09:15, (sessions x 375 // m); a
+    session's last part-bar, when m does not divide 375, is left out."""
+    nb = N_BARS // m
+    cols = nb * m
+    shape = (frame.n, nb, m)
+    return (
+        frame.H[:, :cols].reshape(shape).max(axis=2),
+        frame.L[:, :cols].reshape(shape).min(axis=2),
+        frame.C[:, m - 1 : cols : m],
+    )
+
+
+def _on_grid(frame: Frame, m: int, values: np.ndarray) -> np.ndarray:
+    """Per-bar values (sessions x bars) placed on each bar's last stamp and held until the next."""
+    out = _full(frame)
+    out[:, m - 1 : values.shape[1] * m : m] = values
+    return _ffill(out)
+
+
+def _indicator(frame: Frame, node: Node) -> np.ndarray:
+    p = node.params
+    m = p["minutes"]
+    if node.op == "bollinger":
+        key: tuple[Any, ...] = ("bollinger", p["n"], p["k"], m)
+        if key not in frame._cache:
+            close = _bars(frame, m)[2]
+            bands = bollinger(close.reshape(-1), p["n"], p["k"])
+            frame._cache[key] = {b: v.reshape(close.shape) for b, v in bands.items()}
+        return _on_grid(frame, m, frame._cache[key][p["band"]])
+    key = ("supertrend", p["n"], p["mult"], m)
+    if key not in frame._cache:
+        high, low, close = _bars(frame, m)
+        line, direction = supertrend(
+            high.reshape(-1), low.reshape(-1), close.reshape(-1), p["n"], p["mult"]
+        )
+        frame._cache[key] = {
+            "line": line.reshape(close.shape),
+            "dir": direction.reshape(close.shape),
+        }
+    return _on_grid(frame, m, frame._cache[key]["line" if node.op == "supertrend" else "dir"])
 
 
 def _ffill(a: np.ndarray) -> np.ndarray:
@@ -448,32 +643,16 @@ def _evaluate(node: Node, frame: Frame, memo: dict[int, np.ndarray]) -> np.ndarr
         out = _full(frame)
         out[:, m - 1 :: m] = rsi
         return _ffill(out)
+    if op in ("supertrend", "supertrend_dir", "bollinger"):
+        return _indicator(frame, node)
+    if node.trade:
+        raise RuleError(f"{node.path}: at_entry / minutes_in_trade belong in exit_when only")
     args = [evaluate(a, frame, memo) for a in node.args]
+    if op in ELEMENTWISE:
+        return _elementwise(op, args)
+    if op in _SINCE_FIRST:
+        return _since_first(op, args[0], args[1])
     with np.errstate(invalid="ignore", divide="ignore"):
-        if op == "add":
-            return args[0] + args[1]
-        if op == "sub":
-            return args[0] - args[1]
-        if op == "mul":
-            return args[0] * args[1]
-        if op == "div":
-            return args[0] / args[1]
-        if op == "abs":
-            return np.abs(args[0])
-        if op == "gt":
-            return args[0] > args[1]
-        if op == "ge":
-            return args[0] >= args[1]
-        if op == "lt":
-            return args[0] < args[1]
-        if op == "le":
-            return args[0] <= args[1]
-        if op == "all":
-            return np.logical_and.reduce(args)
-        if op == "any":
-            return np.logical_or.reduce(args)
-        if op == "not":
-            return ~args[0]
         if op in ("crosses_up", "crosses_down"):
             a, b = args
             out = np.zeros(a.shape, dtype=bool)
@@ -515,6 +694,70 @@ def _evaluate(node: Node, frame: Frame, memo: dict[int, np.ndarray]) -> np.ndarr
         if op in ("prior_median", "prior_mean"):
             return _prior(x, node.params["sessions"], op.split("_")[1])
     raise RuleError(f"{node.path}: cannot evaluate {op!r}")  # pragma: no cover
+
+
+def _elementwise(op: str, args: list[np.ndarray]) -> np.ndarray:
+    """The operators that work stamp by stamp (on the whole grid or on one session's row)."""
+    with np.errstate(invalid="ignore", divide="ignore"):
+        if op == "add":
+            return args[0] + args[1]
+        if op == "sub":
+            return args[0] - args[1]
+        if op == "mul":
+            return args[0] * args[1]
+        if op == "div":
+            return args[0] / args[1]
+        if op == "max":
+            return np.maximum(args[0], args[1])  # a missing value stays missing
+        if op == "min":
+            return np.minimum(args[0], args[1])
+        if op == "abs":
+            return np.abs(args[0])
+        if op == "gt":
+            return args[0] > args[1]
+        if op == "ge":
+            return args[0] >= args[1]
+        if op == "lt":
+            return args[0] < args[1]
+        if op == "le":
+            return args[0] <= args[1]
+        if op == "all":
+            return np.logical_and.reduce(args)
+        if op == "any":
+            return np.logical_or.reduce(args)
+        if op == "not":
+            return ~args[0]
+    raise RuleError(f"{op!r} is not elementwise")  # pragma: no cover
+
+
+def _since_first(op: str, x: np.ndarray, when: np.ndarray) -> np.ndarray:
+    """at_first / min_since_first / max_since_first: from the first stamp `when` holds, per row."""
+    has = when.any(axis=1)
+    first = np.where(has, when.argmax(axis=1), N_BARS)
+    after = np.arange(N_BARS)[None, :] >= first[:, None]
+    if op == "at_first":
+        value = x[np.arange(x.shape[0]), np.minimum(first, N_BARS - 1)]
+        return np.where(after, value[:, None], np.nan)
+    masked = np.where(after, x, np.nan)
+    acc = np.fmin if op == "min_since_first" else np.fmax
+    return np.where(after, acc.accumulate(masked, axis=1), np.nan)
+
+
+def evaluate_trade(
+    node: Node, frame: Frame, row: int, decided: int, memo: dict[int, np.ndarray]
+) -> np.ndarray:
+    """One session's row of an exit condition for a trade whose entry was decided at stamp
+    `decided` (it enters at `decided` + 1). Parts with no trade-relative value come from the
+    whole-grid evaluation (`memo`, shared across trades); the rest are worked out on this row."""
+    if not node.trade:
+        return evaluate(node, frame, memo)[row]
+    if node.op == TRADE_LEAF:
+        return (np.arange(N_BARS) - decided).astype(float)
+    if node.op == "at_entry":
+        value = evaluate(node.args[0], frame, memo)[row, decided] if decided >= 0 else np.nan
+        return np.full(N_BARS, value, dtype=float)
+    args = [evaluate_trade(a, frame, row, decided, memo) for a in node.args]
+    return _elementwise(node.op, args)
 
 
 def first_firings(
@@ -560,8 +803,19 @@ def describe(node: Node, top: bool = True) -> str:
         return f"the ATM straddle from {stamp_to_clock(node.params['at'])}"
     if op == "rsi":
         return f"RSI-{node.params['n']} of {node.params['minutes']}-minute bars"
+    if op in ("supertrend", "supertrend_dir"):
+        p = node.params
+        what = "line" if op == "supertrend" else "direction (+1 up, −1 down)"
+        return f"the Supertrend ({p['n']}, {p['mult']:g}) {what} of {p['minutes']}-minute bars"
+    if op == "bollinger":
+        p = node.params
+        return (
+            f"the {p['band']} Bollinger band ({p['n']}, {p['k']:g}) of {p['minutes']}-minute bars"
+        )
     if op == "bar_close":
         return f"a {node.params['minutes']}-minute bar has just completed"
+    if op == TRADE_LEAF:
+        return "minutes in the trade"
     kids = [describe(a, False) for a in node.args]
     if op in _WORDS:
         return f"({kids[0]} {_WORDS[op]} {kids[1]})"
@@ -574,6 +828,15 @@ def describe(node: Node, top: bool = True) -> str:
         return f"not ({kids[0]})"
     if op == "abs":
         return f"|{kids[0]}|"
+    if op in ("max", "min"):
+        return f"{op}({kids[0]}, {kids[1]})"
+    if op == "at_entry":
+        return f"{kids[0]} at entry"
+    if op == "at_first":
+        return f"{kids[0]} when {kids[1]} first held today"
+    if op in ("min_since_first", "max_since_first"):
+        word = "lowest" if op == "min_since_first" else "highest"
+        return f"the {word} {kids[0]} since {kids[1]} first held today"
     if op == "crosses_up":
         return f"{kids[0]} crosses above {kids[1]}"
     if op == "crosses_down":

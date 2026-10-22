@@ -9,6 +9,7 @@ next minute, and how they are managed (the legwise template's own stops, trail a
         trend: { div: [{ sub: [close, session_open] }, atr14] }
       when: { ge: [trend, 0.3] }                   # the grammar is in ruletest/expr.py
       direction_up: { gt: [close, open] }          # optional; needed only for legs that say `on:`
+      exit_when: { lt: [close, session_open] }     # optional; or { up: ..., down: ... } per side
       template:           # a legwise strategy without id / underlying / entry_time
         exit_time: "15:28"
         legs:
@@ -22,12 +23,27 @@ The first stamp in the window where `when` is true is the event (one per session
 at the open of the next stamp, as BL-083: `entry_time` is the firing bar's stamp + 1 minute.
 `direction_up` picks the legs for an event: a leg with `on: up` trades only when it is true there.
 A leg with its own `range_breakout` is not supported yet, because its `until` is a clock time.
+
+`exit_when` (optional) closes the trade early: at the first stamp from the entry minute on where it
+is true, every leg exits the next minute (the bar-close fill, as the entry), never later than the
+template's `exit_time`. With `direction_up`, it may be a mapping `{up: ..., down: ...}`, one
+condition per side (a Supertrend exit is the usual case). The same exit rule is applied to the
+placebo and random-time controls from their own entry minute.
+
+`control_when` (optional, the same two forms) is what a placebo or random-time entry must satisfy at
+its decision minute (the minute before it enters) to be used as a control: the trend-matched
+control, so a control trade is not one the exit would close at once. With `exit_when` and no
+`control_when`, a control is used where the exit condition does not hold at its decision minute.
+
+A leg's strike may also be `{ premium_pct_of_spot: 1.0 }`: the strike whose premium is nearest that
+percentage of the index at the entry (its `closest_premium`, worked out per trade).
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -67,6 +83,8 @@ class RuleSpec(BaseModel):
     define: dict[str, Any] = Field(default_factory=dict)
     when: Any
     direction_up: Any = None
+    exit_when: Any = None
+    control_when: Any = None
     template: dict[str, Any]
     #: hash of the spec this one was derived from, for the tested-strategies ledger
     parent: str | None = None
@@ -86,6 +104,8 @@ class CompiledRule:
     when: E.Node
     defs: dict[str, E.Node]
     direction: E.Node | None
+    exits: dict[str, E.Node] | None  # side ("both" / "up" / "down") -> the exit condition
+    controls: dict[str, E.Node] | None  # side -> what a control entry must meet (`control_when`)
     start: int  # first stamp a firing may happen on
     stop: int  # last stamp
     legs: list[dict[str, Any]]  # the template's legs, each with its `on`
@@ -97,29 +117,89 @@ class CompiledRule:
         """The side keys a simulation can have: `both` when no leg depends on direction."""
         return ("up", "down") if self.direction is not None else ("both",)
 
+    @property
+    def exit_cap(self) -> str:
+        """The template's own exit time, the latest an `exit_when` exit can happen."""
+        return str(self.spec.template["exit_time"])
+
     def strategy_for(
-        self, entry_time: str, side: str, slippage_pct: float | None = None
+        self,
+        entry_time: str,
+        side: str,
+        slippage_pct: float | None = None,
+        exit_time: str | None = None,
+        spot: float | None = None,
     ) -> LegwiseStrategy:
-        body = _strategy_dict(self.spec, self.legs, entry_time, side)
+        """The legwise strategy of one trade. `exit_time` is that trade's `exit_when` exit (None:
+        the template's); `spot` prices a `premium_pct_of_spot` strike and is required for one."""
+        traded = [leg for leg in self.legs if leg["on"] in ("both", side) or side == "both"]
+        if spot is None and any(_is_pct(leg.get("strike")) for leg in traded):
+            raise SpecError(f"no index price at {entry_time} to price a {PCT_KEY} strike")
+        body = _strategy_dict(self.spec, self.legs, entry_time, side, spot)
+        if exit_time is not None:
+            body["exit_time"] = exit_time
         if slippage_pct is not None:
             body["execution"] = {**body.get("execution", {}), "slippage_pct": slippage_pct}
         return LegwiseStrategy.model_validate(body)
 
 
-def _legs_for(legs: list[dict[str, Any]], side: str) -> list[dict[str, Any]]:
+PCT_KEY = "premium_pct_of_spot"
+
+
+def _is_pct(strike: Any) -> bool:
+    return isinstance(strike, dict) and PCT_KEY in strike
+
+
+def _strike_for(strike: Any, spot: float | None) -> Any:
+    """A `premium_pct_of_spot` strike as the legwise `closest_premium` it means at this spot. With
+    no spot (checking the template's shape), the percentage itself stands in for the premium."""
+    if not _is_pct(strike):
+        return strike
+    pct = strike[PCT_KEY]
+    rest = {k: v for k, v in strike.items() if k != PCT_KEY}
+    premium = pct if spot is None else round(spot * pct / 100, 2)
+    return {**rest, "closest_premium": premium}
+
+
+def _legs_for(
+    legs: list[dict[str, Any]], side: str, spot: float | None = None
+) -> list[dict[str, Any]]:
     chosen = [leg for leg in legs if leg["on"] in ("both", side) or side == "both"]
-    return [{k: v for k, v in leg.items() if k != "on"} for leg in chosen]
+    return [
+        {k: (_strike_for(v, spot) if k == "strike" else v) for k, v in leg.items() if k != "on"}
+        for leg in chosen
+    ]
 
 
-def _strategy_dict(spec: RuleSpec, legs: list[dict[str, Any]], entry: str, side: str) -> dict:
+def _strategy_dict(
+    spec: RuleSpec, legs: list[dict[str, Any]], entry: str, side: str, spot: float | None = None
+) -> dict:
     template = {k: v for k, v in spec.template.items() if k != "legs"}
     return {
         "id": f"rule_{spec.id}",
         "underlying": spec.underlying,
         "entry_time": entry,
-        "legs": _legs_for(legs, side),
+        "legs": _legs_for(legs, side, spot),
         **template,
     }
+
+
+def _parse_sided(body: Any, name: str, defs: dict[str, E.Node], directional: bool):
+    """{side: condition} from `exit_when` / `control_when` (one condition, or `{up, down}`), or
+    None when the rule has none."""
+    if body is None:
+        return None
+    if isinstance(body, dict) and set(body) == {"up", "down"}:
+        if not directional:
+            raise E.RuleError(f"{name}: an up / down condition needs `direction_up`")
+        nodes = {side: E.parse(body[side], defs, f"{name}.{side}") for side in ("up", "down")}
+    else:
+        node = E.parse(body, defs, name)
+        nodes = {side: node for side in (("up", "down") if directional else ("both",))}
+    for side, node in nodes.items():
+        if node.kind != "bool":
+            raise E.RuleError(f"{name} ({side}): must be true / false, not a number")
+    return nodes
 
 
 def _canonical(obj: Any) -> str:
@@ -134,6 +214,17 @@ def compile_spec(spec: RuleSpec) -> CompiledRule:
             direction = E.parse(spec.direction_up, defs, "direction_up")
             if direction.kind != "bool":
                 raise E.RuleError("direction_up: must be true / false, not a number")
+        exits = _parse_sided(spec.exit_when, "exit_when", defs, direction is not None)
+        controls = _parse_sided(spec.control_when, "control_when", defs, direction is not None)
+        if direction is not None and direction.trade:
+            raise E.RuleError("direction_up: at_entry / minutes_in_trade belong in exit_when only")
+        if controls is not None and any(node.trade for node in controls.values()):
+            raise E.RuleError("control_when: at_entry / minutes_in_trade belong in exit_when only")
+        if exits is not None and controls is None and any(n.trade for n in exits.values()):
+            raise E.RuleError(
+                "exit_when uses at_entry / minutes_in_trade, so the controls cannot be derived "
+                "from it: give control_when"
+            )
     except E.RuleError as error:
         raise SpecError(str(error)) from error
     start, stop = (E.clock_to_stamp(t, "window") for t in (spec.window.from_, spec.window.to))
@@ -150,6 +241,13 @@ def compile_spec(spec: RuleSpec) -> CompiledRule:
         on = leg.get("on", "both")
         if on not in LEG_SIDES:
             raise SpecError(f"template.legs[{k}].on: expected up, down or both, got {on!r}")
+        strike = leg.get("strike")
+        if isinstance(strike, dict) and PCT_KEY in strike:
+            pct = strike[PCT_KEY]
+            if isinstance(pct, bool) or not isinstance(pct, (int, float)) or not 0 < pct <= 20:
+                raise SpecError(f"template.legs[{k}].strike.{PCT_KEY}: expected 0 < % <= 20")
+            if "closest_premium" in strike or "strike_type" in strike:
+                raise SpecError(f"template.legs[{k}].strike: give {PCT_KEY} alone")
         if leg.get("range_breakout") is not None:
             raise SpecError(
                 f"template.legs[{k}].range_breakout: not supported in a rule yet "
@@ -169,6 +267,14 @@ def compile_spec(spec: RuleSpec) -> CompiledRule:
             first = error.errors()[0]
             where = ".".join(str(p) for p in first["loc"])
             raise SpecError(f"template ({side}): {where}: {first['msg']}") from error
+    if exits is not None and "exit_time" not in spec.template:
+        raise SpecError("template.exit_time: an `exit_when` rule needs the latest exit time")
+    # `exit_when` / `control_when` join the spec hash only when set, so a rule without them keeps
+    # the hashes, the ledger rows and the simulation cache it always had. The template hash takes
+    # only a marker: an exit rule's cache stores each simulation's exit minute and is read by it
+    # (`sim.ensure`), so rules with one template share simulations whatever their conditions, and
+    # never share them with the same template run to its own exit.
+    exit_part = {} if exits is None else {"exit": "per_trade"}
     spec_hash = hashlib.sha256(
         _canonical(
             {
@@ -178,21 +284,45 @@ def compile_spec(spec: RuleSpec) -> CompiledRule:
                 "when": spec.when,
                 "direction_up": spec.direction_up,
                 "template": {**spec.template, "legs": legs},
+                **({"exit_when": spec.exit_when} if exits is not None else {}),
+                **({"control_when": spec.control_when} if controls is not None else {}),
             }
         ).encode()
     ).hexdigest()[:16]
     template_hash = hashlib.sha256(
         _canonical(
-            {"underlying": spec.underlying, "template": {**spec.template, "legs": legs}}
+            {
+                "underlying": spec.underlying,
+                "template": {**spec.template, "legs": legs},
+                **exit_part,
+            }
         ).encode()
     ).hexdigest()[:16]
-    return CompiledRule(spec, when, defs, direction, start, stop, legs, spec_hash, template_hash)
+    return CompiledRule(
+        spec, when, defs, direction, exits, controls, start, stop, legs, spec_hash, template_hash
+    )
+
+
+class _RuleLoader(yaml.SafeLoader):
+    """Safe YAML with only true / false as booleans: YAML 1.1 also reads on / off / yes / no as
+    booleans, which turned a leg's unquoted `on: up` key into `True: up`."""
+
+
+_RuleLoader.yaml_implicit_resolvers = {
+    first: [r for r in resolvers if r[0] != "tag:yaml.org,2002:bool"]
+    for first, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+}
+_RuleLoader.add_implicit_resolver(
+    "tag:yaml.org,2002:bool",
+    re.compile(r"^(?:true|True|TRUE|false|False|FALSE)$"),
+    list("tTfF"),
+)
 
 
 def load_spec(text: str) -> CompiledRule:
     """Parse YAML (or JSON) text into a compiled rule, or raise SpecError with a plain message."""
     try:
-        data = yaml.safe_load(text)
+        data = yaml.load(text, Loader=_RuleLoader)  # noqa: S506 - a SafeLoader subclass
     except yaml.YAMLError as error:
         mark = getattr(error, "problem_mark", None)
         where = f" at line {mark.line + 1}" if mark else ""
@@ -217,11 +347,12 @@ def from_dict(data: dict[str, Any]) -> CompiledRule:
 
 def _leg_words(leg: dict[str, Any]) -> str:
     strike = leg["strike"]
-    where = (
-        strike["strike_type"]
-        if strike.get("strike_type")
-        else f"the strike nearest ₹{strike['closest_premium']:g}"
-    )
+    if strike.get("strike_type"):
+        where = strike["strike_type"]
+    elif PCT_KEY in strike:
+        where = f"the strike whose premium is nearest {strike[PCT_KEY]:g}% of the index"
+    else:
+        where = f"the strike nearest ₹{strike['closest_premium']:g}"
     bits = [f"{leg['position']} {leg['lots']} lot {where} {leg['option_type']}"]
     stop = leg.get("stop_loss")
     if stop:
@@ -244,11 +375,37 @@ def read_back(rule: CompiledRule) -> dict[str, Any]:
         sentences.append(
             f"It counts as an upward event when {E.describe(rule.direction)}, else downward."
         )
+    if rule.exits is not None:
+        if set(rule.exits) == {"up", "down"} and rule.exits["up"] is not rule.exits["down"]:
+            for side in ("up", "down"):
+                sentences.append(
+                    f"On {side} events, exit the minute after {E.describe(rule.exits[side])}."
+                )
+        else:
+            only = next(iter(rule.exits.values()))
+            sentences.append(f"Exit early the minute after {E.describe(only)}.")
+    if rule.controls is not None:
+        controls = rule.controls
+        if set(controls) == {"up", "down"} and controls["up"] is not controls["down"]:
+            for side in ("up", "down"):
+                sentences.append(
+                    f"Controls for {side} events: only where "
+                    f"{E.describe(rule.controls[side])} the minute before they enter."
+                )
+        else:
+            only = next(iter(rule.controls.values()))
+            sentences.append(
+                f"Controls: only where {E.describe(only)} the minute before they enter."
+            )
+    elif rule.exits is not None:
+        sentences.append("Controls: only where the exit condition does not hold before they enter.")
     template = spec.template
     for leg in rule.legs:
         suffix = "" if leg["on"] == "both" else f" (only on {leg['on']} events)"
         sentences.append(f"Trade: {_leg_words(leg)}{suffix}.")
-    manage = [f"exit at {template.get('exit_time', '15:28')}"]
+    manage = [
+        f"exit {'by' if rule.exits is not None else 'at'} {template.get('exit_time', '15:28')}"
+    ]
     overall = template.get("overall") or {}
     if overall.get("stop_loss_inr"):
         manage.append(f"overall stop ₹{overall['stop_loss_inr']:g}")

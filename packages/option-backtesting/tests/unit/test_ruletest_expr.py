@@ -173,6 +173,13 @@ CAUSAL_RULES = [
     {"gt": [{"div": [{"sub": ["close", "session_open"]}, "atr14"]}, 0.3]},
     {"gt": [{"sub": [{"div": ["vix", "vix_open"]}, 1]}, 0.001]},
     {"crosses_up": ["close", "r1"]},
+    {"gt": ["close", {"supertrend": {"n": 10, "mult": 3, "minutes": 5}}]},
+    {"gt": [{"supertrend_dir": {"n": 7, "mult": 2, "minutes": 3}}, 0]},
+    {"gt": ["close", {"bollinger": {"n": 20, "k": 2, "minutes": 5, "band": "upper"}}]},
+    {"gt": [{"max": ["close", "open"]}, {"min": ["high", "pivot"]}]},
+    {"gt": ["close", {"at_first": {"x": "high", "when": {"gt": ["close", "r1"]}}}]},
+    {"ge": [{"min_since_first": {"x": "close", "when": {"gt": ["close", "pivot"]}}}, "pivot"]},
+    {"le": [{"max_since_first": {"x": "high", "when": {"lt": ["close", "s1"]}}}, "prev_high"]},
     # the straddle's strike is chosen at the `at` bar's close: 12:00 is after the cut below, so a
     # stamp before it must not see the strike (09:20 is before the cut, so it is known there)
     {"gt": [{"straddle": {"at": "12:00"}}, "close"]},
@@ -218,3 +225,157 @@ def test_value_at_a_stamp_ignores_the_future(when):
     assert np.array_equal(
         np.nan_to_num(same_until.astype(float), nan=-1), np.nan_to_num(other.astype(float), nan=-1)
     )
+
+
+# --- Supertrend and Bollinger bands ----------------------------------------------------------
+
+
+def reference_supertrend(h, lo, c, n, mult):
+    """TradingView's ta.supertrend written out longhand (direction -1 = up there; +1 here)."""
+    tr = [h[0] - lo[0]] + [
+        max(h[i] - lo[i], abs(h[i] - c[i - 1]), abs(lo[i] - c[i - 1])) for i in range(1, len(c))
+    ]
+    atr = [None] * len(c)
+    atr[n - 1] = sum(tr[:n]) / n
+    for i in range(n, len(c)):
+        atr[i] = (atr[i - 1] * (n - 1) + tr[i]) / n
+    line, up = [None] * len(c), [None] * len(c)
+    pl = pu = ps = None
+    for i in range(len(c)):
+        if atr[i] is None:
+            continue
+        mid = (h[i] + lo[i]) / 2
+        lower, upper = mid - mult * atr[i], mid + mult * atr[i]
+        if pl is not None:
+            lower = lower if (lower > pl or c[i - 1] < pl) else pl
+            upper = upper if (upper < pu or c[i - 1] > pu) else pu
+        if ps is None:
+            d = False
+        elif ps == pu:
+            d = c[i] > upper
+        else:
+            d = not c[i] < lower
+        line[i], up[i] = (lower if d else upper), d
+        pl, pu, ps = lower, upper, line[i]
+    return line, up
+
+
+def test_supertrend_matches_the_longhand_definition_across_sessions():
+    fr = frame(6, seed=4)
+    m, n, mult = 5, 10, 3.0
+    nb = E.N_BARS // m
+    h = fr.H[:, : nb * m].reshape(fr.n, nb, m).max(2).reshape(-1)
+    lo = fr.L[:, : nb * m].reshape(fr.n, nb, m).min(2).reshape(-1)
+    c = fr.C[:, m - 1 :: m].reshape(-1)
+    want_line, want_up = reference_supertrend(list(h), list(lo), list(c), n, mult)
+    line = E.evaluate(E.parse({"supertrend": {"n": n, "mult": mult, "minutes": m}}), fr)
+    sdir = E.evaluate(E.parse({"supertrend_dir": {"n": n, "mult": mult, "minutes": m}}), fr)
+    got_line = line[:, m - 1 :: m].reshape(-1)
+    got_dir = sdir[:, m - 1 :: m].reshape(-1)
+    for k, (wl, wu) in enumerate(zip(want_line, want_up, strict=True)):
+        if wl is None:
+            assert np.isnan(got_line[k]) and np.isnan(got_dir[k])
+        else:
+            assert got_line[k] == pytest.approx(wl) and got_dir[k] == (1 if wu else -1)
+    assert set(np.unique(got_dir[~np.isnan(got_dir)])) <= {-1.0, 1.0}
+    # held between bar closes, and the first bar of a session waits for its own close
+    assert line[2, 4] == line[2, 8] != line[2, 9] and np.isnan(line[2, 3])
+
+
+def test_supertrend_follows_a_trend_and_flips():
+    n = 4
+    up = np.linspace(20000, 20400, E.N_BARS)
+    down = np.linspace(20400, 19800, E.N_BARS)
+    close = np.vstack([up, down])
+    fr = E.Frame(days=["2026-01-01", "2026-01-02"], O=close, H=close + 2, L=close - 2, C=close)
+    sdir = E.evaluate(E.parse({"supertrend_dir": {"n": n, "mult": 3, "minutes": 5}}), fr)
+    line = E.evaluate(E.parse({"supertrend": {"n": n, "mult": 3, "minutes": 5}}), fr)
+    assert sdir[0, 100] == 1 and line[0, 100] < close[0, 100]
+    assert sdir[1, 300] == -1 and line[1, 300] > close[1, 300]
+
+
+def test_bollinger_bands():
+    fr = frame(3, seed=6)
+    m, n, k = 5, 20, 2.0
+    c = fr.C[:, m - 1 :: m].reshape(-1)
+    got = {
+        band: E.evaluate(E.parse({"bollinger": {"n": n, "k": k, "minutes": m, "band": band}}), fr)[
+            :, m - 1 :: m
+        ].reshape(-1)
+        for band in ("upper", "middle", "lower")
+    }
+    assert np.isnan(got["middle"][: n - 1]).all()
+    for i in (n - 1, 40, len(c) - 1):
+        window = c[i - n + 1 : i + 1]
+        assert got["middle"][i] == pytest.approx(window.mean())
+        assert got["upper"][i] == pytest.approx(window.mean() + k * window.std())
+        assert got["lower"][i] == pytest.approx(window.mean() - k * window.std())
+
+
+def test_indicator_parse_errors_and_words():
+    with pytest.raises(E.RuleError, match="band"):
+        E.parse({"bollinger": {"band": "top"}})
+    with pytest.raises(E.RuleError, match="mult"):
+        E.parse({"supertrend": {"mult": 0}})
+    with pytest.raises(E.RuleError, match="write"):
+        E.parse({"supertrend_dir": {"period": 10}})
+    words = E.describe(E.parse({"supertrend_dir": {}}))
+    assert words == "the Supertrend (10, 3) direction (+1 up, −1 down) of 5-minute bars"
+    assert E.describe(E.parse({"bollinger": {"band": "lower"}})) == (
+        "the lower Bollinger band (20, 2) of 5-minute bars"
+    )
+
+
+# --- max / min, values tied to an event, values tied to the trade ----------------------------
+
+
+def test_max_and_min_keep_a_missing_value_missing():
+    fr = frame(3)
+    hi = E.evaluate(E.parse({"max": ["close", "open"]}), fr)
+    assert np.allclose(hi, np.maximum(fr.C, fr.O))
+    lo = E.evaluate(E.parse({"min": ["close", "atr14"]}), fr)  # atr14 is NaN before 14 sessions
+    assert np.isnan(lo).all()
+
+
+def test_at_first_and_since_first():
+    close = np.tile(np.arange(E.N_BARS, dtype=float), (2, 1))
+    close[0, 50:] = 10.0  # session 1 falls back at stamp 50
+    fr = E.Frame(days=["2026-01-01", "2026-01-02"], O=close, H=close + 1, L=close - 1, C=close)
+    when = {"ge": ["close", 40]}  # first true at stamp 40 on both sessions
+    at = E.evaluate(E.parse({"at_first": {"x": "high", "when": when}}), fr)
+    assert np.isnan(at[:, :40]).all() and (at[:, 40:] == 41.0).all()
+    lo = E.evaluate(E.parse({"min_since_first": {"x": "close", "when": when}}), fr)
+    assert np.isnan(lo[0, :40]).all() and lo[0, 49] == 40.0 and lo[0, 50] == 10.0
+    assert lo[1, 300] == 40.0
+    hi = E.evaluate(E.parse({"max_since_first": {"x": "close", "when": when}}), fr)
+    assert hi[0, 60] == 49.0 and hi[1, 300] == 300.0
+    never = E.evaluate(E.parse({"at_first": {"x": "high", "when": {"lt": ["close", -1]}}}), fr)
+    assert np.isnan(never).all()
+    assert E.describe(E.parse({"at_first": {"x": "high", "when": when}})) == (
+        "high when (close ≥ 40) first held today"
+    )
+
+
+def test_trade_relative_values_only_where_allowed():
+    ok = E.parse({"lt": ["close", {"sub": [{"at_entry": "close"}, {"mul": [0.3, "atr14"]}]}]})
+    assert ok.trade
+    assert E.parse({"ge": ["minutes_in_trade", 60]}).trade
+    assert not E.parse({"gt": ["close", "open"]}).trade
+    with pytest.raises(E.RuleError, match="can only be used under"):
+        E.parse({"gt": [{"roll_max": {"x": {"at_entry": "close"}, "n": 5}}, 0]})
+    with pytest.raises(E.RuleError, match="another trade-relative"):
+        E.parse({"gt": [{"at_entry": "minutes_in_trade"}, 0]})
+    with pytest.raises(E.RuleError, match="exit_when only"):
+        E.parse_rule({"ge": ["minutes_in_trade", 5]})
+    with pytest.raises(E.RuleError, match="exit_when only"):
+        E.evaluate(ok, frame(2))
+
+
+def test_evaluate_trade_reads_the_entry_minute():
+    fr = frame(3, seed=8)
+    memo: dict = {}
+    held = E.evaluate_trade(E.parse({"ge": ["minutes_in_trade", 60]}), fr, 1, 99, memo)
+    assert not held[:159].any() and held[159:].all()  # enters at 100; out at 160 = 60 minutes
+    node = E.parse({"lt": ["close", {"sub": [{"at_entry": "close"}, 5]}]})
+    row = E.evaluate_trade(node, fr, 2, 120, memo)
+    assert (row == (fr.C[2] < fr.C[2, 120] - 5)).all()
