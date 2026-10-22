@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -50,20 +51,43 @@ def test_path_points_are_complete_at_check():
         assert cols[0] == 14  # the bar stamped 09:29, complete at 09:30
 
 
-@pytest.mark.parametrize("variant", ["euclid", "dtw"])
-def test_neighbours_ignore_later_days(variant):
-    rng = np.random.default_rng(7)
-    pool = rng.normal(size=(300, 12))
-    x = rng.normal(size=12)
-    later = rng.normal(size=(50, 12))
-    a = A.nearest(pool, x, 7, variant)
-    # a caller that slices the pool to earlier days must get the same answer whatever comes later
-    b = A.nearest(np.vstack([pool, later])[: len(pool)], x, 7, variant)
-    assert (a == b).all()
-    assert len(a) == A.K and a.max() < len(pool)
+def _synthetic_features(n_days: int, seed: int) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    days = pd.bdate_range("2023-01-02", periods=n_days).strftime("%Y-%m-%d")
+    df = pd.DataFrame(
+        rng.normal(size=(n_days, len(A.feature_names("1030")))), columns=A.feature_names("1030")
+    )
+    df["vix"] = 12 + rng.random(n_days) * 8
+    df["dte"] = rng.integers(0, 8, n_days).astype(float)
+    df["rod"] = 0.004 + rng.random(n_days) * 0.01
+    df["rsf_raw"] = 0.003 + rng.random(n_days) * 0.01
+    df["minutes_left"], df["index"], df["check"], df["day"] = 285, "NIFTY", "1030", days
+    return df
 
 
-def test_dtw_equals_euclid_squared_on_identical_timing():
+def test_forecast_pool_ignores_later_days():
+    """forecast.forecasts: a day's analog forecasts are unchanged when every later day's features
+    and outcome change, so the pool is earlier days only (`valid[:i]`)."""
+    import forecast as F
+
+    df = _synthetic_features(F.MIN_POOL + 60, seed=11)
+    cut = df.day.iloc[F.MIN_POOL + 30]
+    moved = df.copy()
+    later = moved.day > cut
+    cols = [*A.feature_names("1030"), "rod", "rsf_raw"]
+    moved.loc[later, cols] = moved.loc[later, cols] * 3 + 1
+    # the cut day's own outcome too (its morning features are known at T and stay): a pool that
+    # included the day itself would move its forecast
+    moved.loc[moved.day == cut, "rod"] += 1
+    a = F.forecasts(df, "NIFTY", "1030", df.day.iloc[0], cut, np.random.default_rng(1))
+    b = F.forecasts(moved, "NIFTY", "1030", df.day.iloc[0], cut, np.random.default_rng(1))
+    assert len(a) == 31
+    for col in ("analog_euclid", "analog_dtw", "persistence"):
+        assert np.allclose(a[col], b[col]), col
+    assert np.allclose(a.opening_range, b.opening_range)
+
+
+def test_dtw_is_zero_on_itself_and_bounded_by_lockstep_distance():
     rng = np.random.default_rng(3)
     p = rng.normal(size=(5, 6))
     x = p[2].copy()

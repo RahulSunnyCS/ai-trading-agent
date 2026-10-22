@@ -25,12 +25,14 @@ OUT = Path(__file__).parent / "out"
 INDICES = ("NIFTY", "SENSEX")
 
 
-def nearest_expiries(c) -> pd.DataFrame:
+def nearest_expiries(c, through: str) -> pd.DataFrame:
     """(underlying, day) -> the nearest listed expiry on or after the day, from contracts_daily.
-    Cached: the scan takes about a minute."""
+    Cached (the scan takes about a minute); rebuilt when the cache ends before `through`."""
     path = OUT / "expiries.csv"
     if path.exists():
-        return pd.read_csv(path, dtype=str)
+        cached = pd.read_csv(path, dtype=str)
+        if cached.d.max() >= through:
+            return cached
     df = c.execute(
         f"""select underlying, date::varchar d, min(expiry)::varchar expiry
             from read_parquet('{A.LAKE}/derived/contracts_daily/**/*.parquet', hive_partitioning=true)
@@ -46,7 +48,7 @@ def build() -> pd.DataFrame:
     c = A.con()
     vix = A.load_grid(c, "INDIAVIX")
     vix_ix = {d: i for i, d in enumerate(vix.days)}
-    exp = nearest_expiries(c)
+    exp = nearest_expiries(c, through=vix.days[-1])
     rows = []
     for und in INDICES:
         g = A.load_grid(c, und)

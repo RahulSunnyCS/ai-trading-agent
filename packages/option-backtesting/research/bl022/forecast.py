@@ -109,10 +109,10 @@ def main() -> None:
     for label, (und, start, end) in [("decide", DECIDE)] + [("report", r) for r in REPORT]:
         for check in A.CHECKS:
             f = forecasts(df, und, check, start, end, rng)
-            f["index"], f["check"], f["period"] = und, check, label
-            frames.append(f.drop(columns="random").assign(random_mean=f.random.map(np.mean)))
             if f.empty:
                 continue
+            f["index"], f["check"], f["period"] = und, check, label
+            frames.append(f.drop(columns="random").assign(random_mean=f.random.map(np.mean)))
             for v in VARIANTS:
                 key = f"{und} {start[:4]}-{end[:4]} {check} {v}"
                 result[label][key] = judge(f, v, rng)
