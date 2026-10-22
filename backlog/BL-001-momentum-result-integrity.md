@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — protects the correctness of the numbers favourites and weekly signals are chosen on |
-| **Status** | In progress (Phases 1 and 2 done; 3 and 4 not started) |
+| **Status** | In progress (Phases 1 and 2 done, F1 fixed; Phase 3 closed as superseded by BL-052; Phase 4 re-scoped, not started) |
 | **Type** | improvement |
 | **Area** | momentum (+ trading-data for one migration, dashboard for one provenance line) |
 | **Created** | 2026-10-04 |
@@ -340,6 +340,61 @@ Questions 2 to 4 above belong to Phases 3 and 4 and are still open.
 - Not built: the always-true checks, the nightly reverse-order and wiring runs, and the CI
   nightly flag.
 
+## Where it stands (2026-10-22)
+
+**Phase 2's missing pieces are built** (branch `feat/bl001-invariants`): `tests/golden/test_invariants.py`
+(the always-true checks, on the frozen payloads, no extra runs), `tests/golden/test_nightly.py`
+(reverse-order re-run, which passes; every setting wired, 141 variants, 4 minutes) and the CI flag
+`MOMENTUM_GOLDEN_FULL` on the schedule trigger. Findings from building them, in order of weight:
+
+| # | Finding | Effect | Status |
+|---|---|---|---|
+| F1 | **Weights left the waiting cash out.** After an off-cadence sale (`sell_every_week`, or a stop paid to cash), and in the weeks before the first buy of a slow-cadence run, `engine.py` normalised `weights[week]` over the holdings only, so the rest looked bigger and the idle share smaller (a two-name book that sells one showed the other at 100%, not 50%). Equity was right. | Display and KPIs only: `idle_share`, `holdings_count`, `avg_holdings`, `time_in_cash`, `avg_share`, the Rotation rows and `max_position_share`. Equity, CAGR and trades did not move. | **Fixed 2026-10-22 (owner: as recommended).** `uninvested` is part of the total and of the idle share. Three golden scenarios moved and were accepted with a reason (`tests/golden/CHANGELOG.md`); `tests/test_weights_after_off_cadence_sell.py` is now an ordinary test.
+| F2 | **`max_position` is not a hard cap off the weekly cadence.** The trim is inside `if is_buy_week`, so with `rebalance_every` above 1 or monthly rebalancing a holding can sit above cap + band until the next trade week (a 50% cap reached 59% in the four-weekly Broad scenario; the 54% first seen in a fortnightly ETF scenario was the F1 artefact and is 39% now). The slots rule has no cap. | The invariant is asserted only for weekly buffer runs. Worth knowing for the 4-weekly sleeves you follow (25% cap). | Documented in the test; a design fact, not changed. |
+| F3 | **Only one scenario depends on `broad_respect_circuits`.** Putting it back to its default changes the result of `broad_gates_loosened_and_tilted` and of no other of the five Broad scenarios that set it (the lock never changes a fill in them; `blocked_entries` and `blocked_exits` are 0 everywhere). The wiring test first missed this because the payload echoes the flag in `circuit_exposure`; it now compares result sections only. | A break that left that one scenario alone would still fail, but the setting is proved by a single scenario. | Open: a second scenario where a lock blocks a fill would make it robust. |
+| F4 | **No scenario makes `max_category` bind**, so a broken group cap would pass. | Same kind of hole. | Open. |
+| F5 | The payload has nulls in the newest week (`holdings_count`, often `idle_share`; the engine never trades its newest week). Before the F1 fix, all-cash weeks had nulls too. | Charts must treat null as a gap in the last point. | Only the newest week may be null; the test now says so. |
+
+`tax` on a Broad request is accepted and ignored (documented in `api.py` and `IGNORED_FIELDS`);
+the wiring test lists it as inert with that reason.
+
+**Phases 3 and 4 against what BL-052 built.** BL-052's `saved_identity` already stores, for every
+run, the data version (catalog tables, lake files, input files) and the code commit, and labels a
+moved result `data_revised`, `intended` (a same-dataset accepted golden change lies between the
+commits), `check` or `not_reproducible`; a favourite that is `not_reproducible` sends a Telegram, and
+`check` shows in the alerts bell. That delivers the intent of Phase 3 and half of Phase 4. What it does not do:
+
+- the three catalog columns this item names (`code_version`, `date_from`, `date_to`) are still empty;
+  the stamp lives in the run's summary instead;
+- the data fingerprint is per table, not per instrument, so a restated old price is named only as
+  "a table changed";
+- there is no pinned end date, so every Friday's new week reads as `data_revised`, and a restated
+  history hides in that noise (this was the design point of Phase 4);
+- `data_revised` and `check` send no Telegram.
+
+**Proposal:** close Phase 3 as superseded by BL-052 (fill the three empty columns in one small
+change, or drop them); re-scope Phase 4 to the one thing missing: a weekly check that re-runs each
+favourite with the end pinned to its last accepted anchor and names the instruments whose history changed.
+
+## Decisions (owner, 2026-10-22: "as per your recommendation")
+
+- F1: apply the engine fix and accept the changed frozen results. Done.
+- Phase 3: closed as superseded by BL-052. The three empty catalog columns (`code_version`,
+  `date_from`, `date_to`) are dropped from scope; the stamp stays in each run's summary.
+- Phase 4: re-scoped to the one missing piece, a weekly check that re-runs each favourite with its
+  end pinned to the last accepted anchor and names the instruments whose history changed. Not started.
+- F3 and F4 (second lock-blocking scenario, a binding `max_category`): no recommendation was given;
+  still open.
+
+## Open questions for when this resumes (2026-10-22)
+
+1. ~~F1~~ answered above.
+2. F3 and F4: add a fixture window and two scenarios so a second lock blocks a fill and `max_category`
+   binds? This grows the fixture (budget 15 MB, now 14.7 MB), so something must be trimmed.
+3. ~~Phases 3 and 4~~ answered above.
+4. The original Phase 4 questions 2 to 4 (hold a signal on a "same data, different result" alert,
+   the anchor date, the badge) matter only when the re-scoped Phase 4 is started.
+
 ## Log
 
 - 2026-10-04 — created from the planning conversation. Priority P0 (protects result
@@ -347,3 +402,11 @@ Questions 2 to 4 above belong to Phases 3 and 4 and are still open.
 - 2026-10-05 — started. Phases 1 and 2 built: 16 scenarios frozen, coverage test, look-ahead
   test (passes on all four datasets at three cut dates; fails on a planted `shift(-1)`), accept
   script with a changelog, pre-push hook. A changed cost constant trips five scenarios.
+- 2026-10-22 — Phase 2's missing pieces built and run: always-true checks (all pass on the frozen
+  results once the engine's documented limits are written into them), nightly reverse-order
+  re-run (passes), every-setting-wired (nine setting/scenario pairs could not be proven and are listed as inert with
+  reasons; the first version compared the whole response and missed a setting the payload echoes, fixed after review). Five findings F1 to F5 above. F1 reproduced by a strict-xfail test; the fix waits for the owner.
+  Gap analysis of Phases 3 and 4 against BL-052 written above.
+- 2026-10-22 — owner: "as per your recommendation". F1 fixed in `engine.py` (three golden scenarios
+  accepted: equity, CAGR and trades unchanged; idle share, holdings count, time in cash and the cap
+  figure moved). Phase 3 closed as superseded by BL-052; Phase 4 re-scoped. F3 and F4 still open.

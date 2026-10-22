@@ -1695,8 +1695,12 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
             # than vanishing; it's added back into equity below until the next buy week.
             uninvested = proceeds
 
-        total = sum(value(a, week) for a in lots)
+        # `uninvested` is cash waiting for the next buy week (the start before the first buy, a
+        # `sell_every_week` sale, a stop paid to cash): equity includes it, so the shares do too.
+        total = sum(value(a, week) for a in lots) + uninvested
         weights[week] = {(IDLE if a == _POOL else a): value(a, week) / total for a in lots}
+        if uninvested > 0:
+            weights[week][IDLE] = weights[week].get(IDLE, 0.0) + uninvested / total
         held = sorted(a for a in lots if a != _POOL)
         holdings_rows.append(
             {

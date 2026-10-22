@@ -190,6 +190,7 @@ uv run mbt lots seed | show | assign SYMBOL --lot N  # BL-142 Phase 2-3: which K
 uv run mbt paper-start [show | set YYYY-MM-DD | clear]  # the Friday your portfolio starts from nothing (data/paper_start.json): that week This week shows every held name as a buy and Your orders plans from cash; groups' sleeves are numbered from it on the page only
 uv run mbt live-rules check [--send] [--simulate drawdown-cut|drawdown-exit|trailing|gate-ready]  # BL-025: the owner's live-money rules vs the followed money (Fri 21:30 scheduler job); never trades
 uv run python scripts/update-goldens.py   # check frozen results; --accept-results --reason "..." after an intended change
+MOMENTUM_GOLDEN_FULL=1 uv run pytest tests/golden   # + the nightly slow checks (reverse-order re-run, every setting wired); CI sets it on the schedule
 uv run python scripts/bench-backtest.py [--scenario broad_default] [--live] [--profile out.prof]   # time one backtest cold/warm/cached/via jobs, with the seconds per stage; golden-fixture data by default
 uv run python scripts/result-baseline.py capture --data-dir <data> --out <dir>   # snapshot every result on LIVE data; `compare --baseline <dir>` after a change meant to keep them
 uv run mbt stocks fetch --skip-download  # rebuild the Nifty 50 stock data layer from the raw cache, no network
