@@ -11,7 +11,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-LAKE = "/Volumes/TradingData/lake"
 OPEN_MIN = 9 * 60 + 15
 CHECK_MIN = 11 * 60
 LOOKBACK = 20
@@ -28,10 +27,12 @@ def minute_bars(index: str, start: str = "2021-10-01") -> pd.DataFrame:
     """The index's 1-minute bars from the lake: day, minute of the day (IST), open, high, low."""
     import duckdb
 
+    from option_backtesting.fyers.daily import data_dir
+
     c = duckdb.connect()
     return c.execute(
         f"""select date::varchar AS "day", ((epoch(ts) + 19800)::BIGINT % 86400) / 60 m, open, high, low
-            from read_parquet('{LAKE}/bars_1m/asset=index/symbol={index}/**/*.parquet',
+            from read_parquet('{data_dir() / "lake"}/bars_1m/asset=index/symbol={index}/**/*.parquet',
                               hive_partitioning=true)
             where date >= '{start}' order by 1, 2"""
     ).df()
@@ -46,7 +47,7 @@ def morning_types(bars: pd.DataFrame) -> pd.DataFrame:
     g = b.groupby("day")
     out = pd.DataFrame(
         {
-            "open": g.apply(lambda x: x.loc[x.m.idxmin(), "open"], include_groups=False),
+            "open": b[b.m == OPEN_MIN].set_index("day").open,
             "hi": g.high.max(),
             "lo": g.low.min(),
         }

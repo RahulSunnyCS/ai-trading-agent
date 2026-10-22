@@ -18,12 +18,12 @@ import numpy as np
 import pandas as pd
 
 from option_backtesting.data.reference.loader import default_reference_data
+from option_backtesting.heatmap.store import path_for
 
 sys.path.insert(0, str(Path(__file__).parent))
 import morning as M  # noqa: E402
 
 OUT = Path(__file__).parent / "out"
-HEATMAP = "/Volumes/TradingData/heatmap/{}.parquet"
 ENTRIES = ["11:15", "11:45", "12:15", "12:45", "13:15", "13:45", "14:15", "14:45"]
 EXIT = "15:15"
 SLS = (60, 80, 100)
@@ -43,9 +43,10 @@ PERIODS = {
 BLOCK, RESAMPLES, SHUFFLES, SEED = 5, 2000, 1000, 20261022
 
 
-def day_values(index: str) -> pd.DataFrame:
-    """day x SL: the mean over the 8 entries of net ₹ per lot. Days missing an entry are dropped."""
-    hm = pd.read_parquet(HEATMAP.format(index))
+def day_values(index: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(net, gross): day x SL, the mean over the 8 entries of ₹ per lot. Days missing an entry are
+    dropped."""
+    hm = pd.read_parquet(path_for(index))
     hm = hm[(hm.exit == EXIT) & hm.time.isin(ENTRIES) & hm.sl.isin(SLS)].copy()
     lot = default_reference_data().lot_size(index, date.today())  # the heatmap's own convention
     hm["day"] = hm.day.astype(str)
