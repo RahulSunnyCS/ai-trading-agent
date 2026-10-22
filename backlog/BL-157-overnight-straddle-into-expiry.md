@@ -107,3 +107,11 @@ What the table says:
 - 2026-10-23 — Run (`research/bl157/overnight_hedged.py`, about two minutes). **Failed:** −₹34 a night, t −0.29 on
   NIFTY 2022–24; SENSEX 2023–24 had about 8 usable nights (vendor coverage), so no supporting read. Nothing was
   changed after the run.
+- 2026-10-23 — **Descriptive, after the verdict (owner's request): the 09:17 cells by VIX band** (India VIX at
+  15:25 on the entry day, the repo's bands < 13 / 13–15 / 15–18 / 18+; 48 cells, so this is data mining). The
+  only band positive in all three sets for the unhedged DTE 0 night is **15–18**: NIFTY 2024–26 +₹846 a night
+  (t 2.16, 16 nights, max drawdown −₹3,880), NIFTY 2022–24 +₹577 (t 2.79, 28 nights, −₹1,577), SENSEX 2024–26
+  +₹923 (t 2.59, 17 nights, −₹1,375). Every other band flips sign between sets; 13–15 holds the three worst
+  nights (−₹31,590, −₹37,122 and −₹25,479 across the cells). Hedged OTM6 loses in most bands (SENSEX every band, t
+  −3 to −4). Because the band was chosen after looking at 2022–24 as well, no period is left to confirm it; only
+  a forward record could, at about 13 qualifying nights a year per index.
