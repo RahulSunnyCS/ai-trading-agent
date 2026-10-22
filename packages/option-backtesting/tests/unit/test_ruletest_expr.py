@@ -173,6 +173,9 @@ CAUSAL_RULES = [
     {"gt": [{"div": [{"sub": ["close", "session_open"]}, "atr14"]}, 0.3]},
     {"gt": [{"sub": [{"div": ["vix", "vix_open"]}, 1]}, 0.001]},
     {"crosses_up": ["close", "r1"]},
+    {"gt": ["close", {"supertrend": {"n": 10, "mult": 3, "minutes": 5}}]},
+    {"gt": [{"supertrend_dir": {"n": 7, "mult": 2, "minutes": 3}}, 0]},
+    {"gt": ["close", {"bollinger": {"n": 20, "k": 2, "minutes": 5, "band": "upper"}}]},
     # the straddle's strike is chosen at the `at` bar's close: 12:00 is after the cut below, so a
     # stamp before it must not see the strike (09:20 is before the cut, so it is known there)
     {"gt": [{"straddle": {"at": "12:00"}}, "close"]},
@@ -217,4 +220,103 @@ def test_value_at_a_stamp_ignores_the_future(when):
     # earlier sessions entirely, and this session up to and including `stamp`
     assert np.array_equal(
         np.nan_to_num(same_until.astype(float), nan=-1), np.nan_to_num(other.astype(float), nan=-1)
+    )
+
+
+# --- Supertrend and Bollinger bands ----------------------------------------------------------
+
+
+def reference_supertrend(h, lo, c, n, mult):
+    """TradingView's ta.supertrend written out longhand (direction -1 = up there; +1 here)."""
+    tr = [h[0] - lo[0]] + [
+        max(h[i] - lo[i], abs(h[i] - c[i - 1]), abs(lo[i] - c[i - 1])) for i in range(1, len(c))
+    ]
+    atr = [None] * len(c)
+    atr[n - 1] = sum(tr[:n]) / n
+    for i in range(n, len(c)):
+        atr[i] = (atr[i - 1] * (n - 1) + tr[i]) / n
+    line, up = [None] * len(c), [None] * len(c)
+    pl = pu = ps = None
+    for i in range(len(c)):
+        if atr[i] is None:
+            continue
+        mid = (h[i] + lo[i]) / 2
+        lower, upper = mid - mult * atr[i], mid + mult * atr[i]
+        if pl is not None:
+            lower = lower if (lower > pl or c[i - 1] < pl) else pl
+            upper = upper if (upper < pu or c[i - 1] > pu) else pu
+        if ps is None:
+            d = False
+        elif ps == pu:
+            d = c[i] > upper
+        else:
+            d = not c[i] < lower
+        line[i], up[i] = (lower if d else upper), d
+        pl, pu, ps = lower, upper, line[i]
+    return line, up
+
+
+def test_supertrend_matches_the_longhand_definition_across_sessions():
+    fr = frame(6, seed=4)
+    m, n, mult = 5, 10, 3.0
+    nb = E.N_BARS // m
+    h = fr.H[:, : nb * m].reshape(fr.n, nb, m).max(2).reshape(-1)
+    lo = fr.L[:, : nb * m].reshape(fr.n, nb, m).min(2).reshape(-1)
+    c = fr.C[:, m - 1 :: m].reshape(-1)
+    want_line, want_up = reference_supertrend(list(h), list(lo), list(c), n, mult)
+    line = E.evaluate(E.parse({"supertrend": {"n": n, "mult": mult, "minutes": m}}), fr)
+    sdir = E.evaluate(E.parse({"supertrend_dir": {"n": n, "mult": mult, "minutes": m}}), fr)
+    got_line = line[:, m - 1 :: m].reshape(-1)
+    got_dir = sdir[:, m - 1 :: m].reshape(-1)
+    for k, (wl, wu) in enumerate(zip(want_line, want_up, strict=True)):
+        if wl is None:
+            assert np.isnan(got_line[k]) and np.isnan(got_dir[k])
+        else:
+            assert got_line[k] == pytest.approx(wl) and got_dir[k] == (1 if wu else -1)
+    assert set(np.unique(got_dir[~np.isnan(got_dir)])) <= {-1.0, 1.0}
+    # held between bar closes, and the first bar of a session waits for its own close
+    assert line[2, 4] == line[2, 8] != line[2, 9] and np.isnan(line[2, 3])
+
+
+def test_supertrend_follows_a_trend_and_flips():
+    n = 4
+    up = np.linspace(20000, 20400, E.N_BARS)
+    down = np.linspace(20400, 19800, E.N_BARS)
+    close = np.vstack([up, down])
+    fr = E.Frame(days=["2026-01-01", "2026-01-02"], O=close, H=close + 2, L=close - 2, C=close)
+    sdir = E.evaluate(E.parse({"supertrend_dir": {"n": n, "mult": 3, "minutes": 5}}), fr)
+    line = E.evaluate(E.parse({"supertrend": {"n": n, "mult": 3, "minutes": 5}}), fr)
+    assert sdir[0, 100] == 1 and line[0, 100] < close[0, 100]
+    assert sdir[1, 300] == -1 and line[1, 300] > close[1, 300]
+
+
+def test_bollinger_bands():
+    fr = frame(3, seed=6)
+    m, n, k = 5, 20, 2.0
+    c = fr.C[:, m - 1 :: m].reshape(-1)
+    got = {
+        band: E.evaluate(E.parse({"bollinger": {"n": n, "k": k, "minutes": m, "band": band}}), fr)[
+            :, m - 1 :: m
+        ].reshape(-1)
+        for band in ("upper", "middle", "lower")
+    }
+    assert np.isnan(got["middle"][: n - 1]).all()
+    for i in (n - 1, 40, len(c) - 1):
+        window = c[i - n + 1 : i + 1]
+        assert got["middle"][i] == pytest.approx(window.mean())
+        assert got["upper"][i] == pytest.approx(window.mean() + k * window.std())
+        assert got["lower"][i] == pytest.approx(window.mean() - k * window.std())
+
+
+def test_indicator_parse_errors_and_words():
+    with pytest.raises(E.RuleError, match="band"):
+        E.parse({"bollinger": {"band": "top"}})
+    with pytest.raises(E.RuleError, match="mult"):
+        E.parse({"supertrend": {"mult": 0}})
+    with pytest.raises(E.RuleError, match="write"):
+        E.parse({"supertrend_dir": {"period": 10}})
+    words = E.describe(E.parse({"supertrend_dir": {}}))
+    assert words == "the Supertrend (10, 3) direction (+1 up, −1 down) of 5-minute bars"
+    assert E.describe(E.parse({"bollinger": {"band": "lower"}})) == (
+        "the lower Bollinger band (20, 2) of 5-minute bars"
     )
