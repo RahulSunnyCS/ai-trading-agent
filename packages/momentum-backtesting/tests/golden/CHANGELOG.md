@@ -172,3 +172,13 @@ BL-036 companion on the All Fridays scenario: the extended-tags figure is the wh
 | Scenario | CAGR | Max drawdown |
 |---|---|---|
 | broad_one_category_three_picks_four_weekly_all_fridays | 17.88% -> 17.88% | -35.50% -> -35.50% |
+
+## 2026-10-22 (on top of `d66bc2da`)
+
+BL-001 F1: the weights of a week now include cash waiting for the next buy week (the start before the first buy, a sell_every_week sale, a stop paid to cash). Equity, CAGR, trades unchanged; idle_share, holdings_count, avg_holdings, time_in_cash, avg_share and rotation shares move in three scenarios; etf_fortnightly_make_room_sized max_position_share 54.1% -> 39.2%.
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| etf_fortnightly_make_room_sized | 19.81% -> 19.81% | -25.81% -> -25.81% |
+| stock_voladj_monthly | 13.70% -> 13.70% | -16.00% -> -16.00% |
+| broad_one_category_three_picks_four_weekly | 32.13% -> 32.13% | -35.20% -> -35.20% |

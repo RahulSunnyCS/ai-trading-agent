@@ -77,14 +77,12 @@ def test_calendar_years_compound_to_the_total_return(name, frozen):
 @pytest.mark.parametrize("name", sorted(SCENARIOS))
 def test_money_in_cash_and_holdings_are_shares(name, frozen):
     series = frozen[name]["response"]["series"]
-    equity = _equity(frozen[name]["response"])
-    flat = equity.diff().fillna(0.0) == 0  # nothing held yet: the engine writes no weights row
+    last = len(series["dates"]) - 1
     for field in ("idle_share", "holdings_count"):
         for i, value in enumerate(series[field]):
-            if value is None:
-                # Known gaps (BL-001 Log): the newest week is never traded, so it has no weights
-                # row, and a week that holds nothing has none either. Anything else is a hole.
-                assert i == len(equity) - 1 or flat.iloc[i], (field, series["dates"][i])
+            # The newest week is never traded, so it has no weights row (BL-001 F5). Every other
+            # week has one: a week that holds only waiting cash is 100% idle (F1 fix).
+            assert value is not None or i == last, (field, series["dates"][i])
     assert all(0 <= x <= 1 + TOL for x in series["idle_share"] if x is not None)
     assert all(n >= 0 for n in series["holdings_count"] if n is not None)
     kpis = frozen[name]["response"]["kpis"]

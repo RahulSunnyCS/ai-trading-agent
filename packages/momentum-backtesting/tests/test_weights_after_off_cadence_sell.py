@@ -1,14 +1,15 @@
 """BL-001 finding F1: the weights of a week that sold on an off-cadence week (`sell_every_week`,
-or a stop paid out to cash) leave the proceeds out of the denominator.
+or a stop paid out to cash) left the proceeds out of the denominator.
 
-`engine.py` builds `weights[week]` from `sum(value(a) for a in lots)`. The cash waiting for the
+`engine.py` built `weights[week]` from `sum(value(a) for a in lots)`. The cash waiting for the
 next buy week (`uninvested`) is added to equity but not to that total, so the holdings that remain
 are shown as a bigger share of the portfolio than they are and the idle share is too small. The
 money is right (equity includes it); the shares, `max_position_share`, `idle_share`,
 `holdings_count`-based averages and the Rotation rows are not. The owner's live strategy sets
 neither switch, so no live signal is affected.
 
-Remove the xfail when the engine is fixed; `strict=True` makes the fix visible.
+Fixed in the same change as this file (BL-001 F1): `uninvested` is now part of the total and of
+the idle share.
 """
 
 import pandas as pd
@@ -49,9 +50,6 @@ def test_the_sale_happens_and_equity_keeps_the_money():
     assert result.equity[flip] == pytest.approx(result.equity.iloc[0])  # nothing lost
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="BL-001 F1: weights leave the waiting cash out"
-)
 def test_the_week_after_an_off_cadence_sale_shows_the_proceeds_as_idle():
     result, flip = case()
     row = result.weights.loc[flip]

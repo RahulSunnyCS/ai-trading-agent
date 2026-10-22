@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — protects the correctness of the numbers favourites and weekly signals are chosen on |
-| **Status** | In progress (Phases 1 and 2 done, with five findings below; 3 and 4 mostly delivered by BL-052 and need re-scoping: owner to decide) |
+| **Status** | In progress (Phases 1 and 2 done, F1 fixed; Phase 3 closed as superseded by BL-052; Phase 4 re-scoped, not started) |
 | **Type** | improvement |
 | **Area** | momentum (+ trading-data for one migration, dashboard for one provenance line) |
 | **Created** | 2026-10-04 |
@@ -349,11 +349,11 @@ Questions 2 to 4 above belong to Phases 3 and 4 and are still open.
 
 | # | Finding | Effect | Status |
 |---|---|---|---|
-| F1 | **Weights leave the waiting cash out.** After an off-cadence sale (`sell_every_week`, or a stop paid to cash) `engine.py` normalises `weights[week]` over the holdings only, so the rest look bigger and the idle share smaller (a two-name book that sells one shows the other at 100%, not 50%). Equity is right. Hits the Rotation rows, `max_position_share`, `idle_share`, the holdings share of blended sleeves. | Display and KPIs of runs that use those two switches. The live strategy uses neither. | Reproduced by `tests/test_weights_after_off_cadence_sell.py` (strict xfail). **Fix not applied: it moves frozen results, so it needs your yes.** One line in `engine.py` plus `--accept-results`. |
-| F2 | **`max_position` is not a hard cap off the weekly cadence.** The trim is inside `if is_buy_week`, so with `rebalance_every` above 1 or monthly rebalancing a holding can sit above cap + band until the next trade week (a 35% cap reached 54% in a fortnightly scenario, a 50% cap 59% four-weekly). The slots rule has no cap. | The invariant is asserted only for weekly buffer runs. Worth knowing for the 4-weekly sleeves you follow (25% cap). | Documented in the test; a design fact, not changed. |
+| F1 | **Weights left the waiting cash out.** After an off-cadence sale (`sell_every_week`, or a stop paid to cash), and in the weeks before the first buy of a slow-cadence run, `engine.py` normalised `weights[week]` over the holdings only, so the rest looked bigger and the idle share smaller (a two-name book that sells one showed the other at 100%, not 50%). Equity was right. | Display and KPIs only: `idle_share`, `holdings_count`, `avg_holdings`, `time_in_cash`, `avg_share`, the Rotation rows and `max_position_share`. Equity, CAGR and trades did not move. | **Fixed 2026-10-22 (owner: as recommended).** `uninvested` is part of the total and of the idle share. Three golden scenarios moved and were accepted with a reason (`tests/golden/CHANGELOG.md`); `tests/test_weights_after_off_cadence_sell.py` is now an ordinary test.
+| F2 | **`max_position` is not a hard cap off the weekly cadence.** The trim is inside `if is_buy_week`, so with `rebalance_every` above 1 or monthly rebalancing a holding can sit above cap + band until the next trade week (a 50% cap reached 59% in the four-weekly Broad scenario; the 54% first seen in a fortnightly ETF scenario was the F1 artefact and is 39% now). The slots rule has no cap. | The invariant is asserted only for weekly buffer runs. Worth knowing for the 4-weekly sleeves you follow (25% cap). | Documented in the test; a design fact, not changed. |
 | F3 | **Only one scenario depends on `broad_respect_circuits`.** Putting it back to its default changes the result of `broad_gates_loosened_and_tilted` and of no other of the five Broad scenarios that set it (the lock never changes a fill in them; `blocked_entries` and `blocked_exits` are 0 everywhere). The wiring test first missed this because the payload echoes the flag in `circuit_exposure`; it now compares result sections only. | A break that left that one scenario alone would still fail, but the setting is proved by a single scenario. | Open: a second scenario where a lock blocks a fill would make it robust. |
 | F4 | **No scenario makes `max_category` bind**, so a broken group cap would pass. | Same kind of hole. | Open. |
-| F5 | The payload has nulls in the newest week (`holdings_count`, often `idle_share`; the engine never trades its newest week) and in weeks before the first trade that hold nothing. | Charts must treat null as a gap. | Allowed explicitly in the test; nothing else may be null. |
+| F5 | The payload has nulls in the newest week (`holdings_count`, often `idle_share`; the engine never trades its newest week). Before the F1 fix, all-cash weeks had nulls too. | Charts must treat null as a gap in the last point. | Only the newest week may be null; the test now says so. |
 
 `tax` on a Broad request is accepted and ignored (documented in `api.py` and `IGNORED_FIELDS`);
 the wiring test lists it as inert with that reason.
@@ -376,15 +376,24 @@ commits), `check` or `not_reproducible`; a favourite that is `not_reproducible` 
 change, or drop them); re-scope Phase 4 to the one thing missing: a weekly check that re-runs each
 favourite with the end pinned to its last accepted anchor and names the instruments whose history changed.
 
+## Decisions (owner, 2026-10-22: "as per your recommendation")
+
+- F1: apply the engine fix and accept the changed frozen results. Done.
+- Phase 3: closed as superseded by BL-052. The three empty catalog columns (`code_version`,
+  `date_from`, `date_to`) are dropped from scope; the stamp stays in each run's summary.
+- Phase 4: re-scoped to the one missing piece, a weekly check that re-runs each favourite with its
+  end pinned to the last accepted anchor and names the instruments whose history changed. Not started.
+- F3 and F4 (second lock-blocking scenario, a binding `max_category`): no recommendation was given;
+  still open.
+
 ## Open questions for when this resumes (2026-10-22)
 
-1. F1: apply the one-line fix and accept the changed frozen result (which scenarios move is listed
-   by the accept script)? Recommended yes: it only changes runs using `sell_every_week` or a stop.
+1. ~~F1~~ answered above.
 2. F3 and F4: add a fixture window and two scenarios so a second lock blocks a fill and `max_category`
    binds? This grows the fixture (budget 15 MB, now 14.7 MB), so something must be trimmed.
-3. Phases 3 and 4: agree with the proposal above?
+3. ~~Phases 3 and 4~~ answered above.
 4. The original Phase 4 questions 2 to 4 (hold a signal on a "same data, different result" alert,
-   the anchor date, the badge) matter only if Phase 4 is built.
+   the anchor date, the badge) matter only when the re-scoped Phase 4 is started.
 
 ## Log
 
@@ -398,3 +407,6 @@ favourite with the end pinned to its last accepted anchor and names the instrume
   re-run (passes), every-setting-wired (nine setting/scenario pairs could not be proven and are listed as inert with
   reasons; the first version compared the whole response and missed a setting the payload echoes, fixed after review). Five findings F1 to F5 above. F1 reproduced by a strict-xfail test; the fix waits for the owner.
   Gap analysis of Phases 3 and 4 against BL-052 written above.
+- 2026-10-22 — owner: "as per your recommendation". F1 fixed in `engine.py` (three golden scenarios
+  accepted: equity, CAGR and trades unchanged; idle share, holdings count, time in cash and the cap
+  figure moved). Phase 3 closed as superseded by BL-052; Phase 4 re-scoped. F3 and F4 still open.
