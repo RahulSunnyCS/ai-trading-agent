@@ -100,3 +100,20 @@ A `live_rules` file the owner writes once, and a weekly check that alerts when a
   - **A bug the tests caught:** with the data ending before `paper_start` the check took an
     earlier week as the start and reported all clear. It now reports "paper tracking has not
     started".
+- 2026-10-22 — the weekly check now measures the strategy the money is in: Four Sectors Monthly,
+  No Tilt, all Fridays (BL-142, owner 2026-10-20), as its four sleeves
+  (`search_spaces/bl142_followed.json`, named by `strategy.config_file` in `live_rules.toml`),
+  not the BL-010 Phase 6 frozen ensemble. `stage.paper_start` moves from 2026-10-09 to
+  2026-10-16, Friday 1 of 4 of the Kite lots (first buy Monday 2026-10-19). No rule number
+  changed. Reason: the ensemble was never what the money followed, so its drawdown said nothing
+  about the account. **Owner to confirm** the new start date and that the money gate's
+  `min_paper_weeks = 13` still means what you want now that real money is already in; both are
+  yours. Stage stays `paper`; real-fills equity (BL-024 Phase 3) is still not built, so these
+  numbers are the model portfolio's, not the account's.
+- 2026-10-22 — owner: model the ramp-in (review finding on PR 286). `live_rules.paper_curves`
+  now puts the four lots in from cash one Friday after another from `paper_start` (16 Oct,
+  23 Oct, 30 Oct, 6 Nov), each as the sleeve that trades that Friday (offsets 3, 0, 1, 2), and
+  measures the drawdown on the time-weighted index of the lots, so a new lot adds money, not
+  return. A lot put in this week shows no return yet (the engine needs two weeks). Approximations:
+  each lot buys on the research engine's own fill convention (signal delay 1), lots are equal and
+  not reset in April, and the Mom30 line it is compared with is a lump sum from `paper_start`.
