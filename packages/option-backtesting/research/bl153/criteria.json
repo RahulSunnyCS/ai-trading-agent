@@ -1,0 +1,33 @@
+{
+  "item": "BL-153",
+  "registered": "2026-10-22",
+  "registered_before": "any BL-152 result was read (its grid was still running)",
+  "depends_on": "BL-152",
+  "instruments": {"BANKNIFTY": "lake index bars", "NIFTYIT": "NSE:NIFTYIT-INDEX (Fyers download)", "RELIANCE": "NSE:RELIANCE-EQ (Fyers download)"},
+  "support": "at the NIFTY decision minute, the instrument's 1-minute close is beyond its own level of the same type as the variant's (built from its own bars); missing bar or level = not supporting",
+  "supported_min": 2,
+  "excluded": "a day missing any of the three instruments entirely",
+  "variants": {
+    "reference": ["bl152_or30_lvl_atm_eod", "bl152_roll30_lvl_atm_eod", "bl152_held30_lvl_atm_eod", "bl152_prevday_lvl_atm_eod"],
+    "plus": "BL-152 advancing variants, at most 3"
+  },
+  "learning_period": ["2024-10-09", "2026-10-08"],
+  "confirmation_period": ["2022-01-03", "2024-10-08"],
+  "comparison": "D = mean net supported - mean net unsupported, BL-063 charges, 1 lot",
+  "control": {"kind": "permutation of supported labels within a variant's trades", "shuffles": 10000, "seed": 20261022},
+  "pass_rule": {
+    "D_gt": 0,
+    "p_max_holm": 0.05,
+    "supported_mean_net_gt": 0,
+    "min_supported": 20,
+    "min_unsupported": 20,
+    "non_selective_if_supported_share_above": 0.8,
+    "confirmation": {"D_gt": 0, "p_max": 0.05}
+  },
+  "will_not_run": [
+    "other support definitions (same direction since open, last 30 minutes)",
+    "other thresholds (1 of 3, 3 of 3)",
+    "variants not listed",
+    "a second look at the confirmation period"
+  ]
+}
