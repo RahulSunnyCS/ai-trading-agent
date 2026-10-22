@@ -143,6 +143,14 @@ Shoonya's own hosts:
 
 ## Log
 
+- 2026-10-22 — **PR 4 (platform multiplier) — left OPEN for the owner's review, not merged** (Claude's call: the one
+  piece that can change an order's size; never sent live above 1). Quantiply: `withMultiplier` sets
+  `configurations.multiplier` on the export's text at upload; the ledger sha is of that text, the deployer applies the
+  same function (so it matches the ledger), and the read-back fails a saved value that differs. At 1 the text is
+  untouched (tests pin it). AlgoTest: the deployer cannot set the sheet's multiplier and refuses a row above 1
+  (`algotestMultiplierRefusal`): deploy by hand. The 09:25 check expects the row's multiplier (rows disagreeing on a
+  pick are named) and the margin check scales each pick's lots by it. Before relying on it: set Quantiply · Angel One to
+  2 for one evening upload with `--apply` watched, and confirm the algo's multiplier on Quantiply.
 - 2026-10-22 — **PR 5 (the morning gap check):** decision (Claude): it is part of the 09:25 `DEPLOY_CHECK`, not a
   09:20 job (that window forbids a login). On review it turned out the check already covers it: a pick never
   uploaded reads "not in AlgoTest" (absent from /live) or "not in Quantiply for <weekday>", separate from "not

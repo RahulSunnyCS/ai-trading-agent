@@ -3,7 +3,12 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { sendText } from '@trading/notify';
-import { describeSource, readAutomation, uploadBooks } from './automation-settings.js';
+import {
+  describeSource,
+  effectiveRow,
+  readAutomation,
+  uploadBooks,
+} from './automation-settings.js';
 import { readTelegramConfig } from './config.js';
 import { describe } from './diagnose.js';
 import { definitelyRefused } from './quantiply-api.js';
@@ -23,6 +28,7 @@ import {
   sessionOver,
   summaryQ,
   weekdayOf,
+  withMultiplier,
 } from './quantiply-plan.js';
 import { QUANTIPLY_SITES, parseQuantiplyBroker } from './quantiply-rules.js';
 import {
@@ -121,15 +127,32 @@ async function main(): Promise<number> {
   let exportDir = values.dir;
   let latest = values.latest;
   let decidedBy = '';
+  /** the account row's platform multiplier (BL-140 Phase 4); a manual --dir / --latest run is at 1 */
+  let multiplier = 1;
   if (values['from-settings']) {
     const automation = readAutomation();
     decidedBy = describeSource(automation);
+    multiplier = effectiveRow(automation, 'quantiply', broker).multiplier;
     const books = uploadBooks(automation, 'quantiply', broker);
     if (!books.length) {
       console.log(`${site.name}: nothing to upload (${decidedBy}); nothing changed`);
       return 0;
     }
     latest = books[0];
+  }
+  if (!values['from-settings']) {
+    // A manual run uploads at 1; say so when the row asks for more, because the deployer applies the
+    // row's multiplier and would then not recognise these algos (it enables nothing, fail closed).
+    try {
+      const asked = effectiveRow(readAutomation(), 'quantiply', broker).multiplier;
+      if (asked !== 1) {
+        console.log(
+          `note: the ${site.name} row is set to multiplier ${asked}, a manual run uploads at 1: the deployer will not recognise these algos (use --from-settings)`,
+        );
+      }
+    } catch {
+      // unreadable settings are the scheduled jobs' business, not a manual upload's
+    }
   }
   if (!exportDir && latest) {
     if (!dataRoot) {
@@ -175,7 +198,7 @@ async function main(): Promise<number> {
   const wanted: QWanted[] = [];
   for (const s of manifest.strategies) {
     const file = join(dir, s.file);
-    const text = await readFile(file, 'utf8');
+    const text = withMultiplier(await readFile(file, 'utf8'), multiplier);
     const body = JSON.parse(text) as Record<string, unknown>;
     if (JSON.stringify(body.day) !== JSON.stringify([manifest.weekday]) || body.name !== s.name) {
       console.error(`${s.file}: its name or day does not match the manifest; refusing`);
@@ -225,7 +248,7 @@ async function main(): Promise<number> {
     }
   }
   const when = mode === 'evening' ? 'evening' : '09:16 top-up';
-  const label = `${site.name} ${manifest.book.toUpperCase()} ${when} for ${manifest.day} (${manifest.weekday})${decidedBy ? `, ${decidedBy}` : ''}`;
+  const label = `${site.name} ${manifest.book.toUpperCase()} ${when} for ${manifest.day} (${manifest.weekday})${decidedBy ? `, ${decidedBy}` : ''}${multiplier === 1 ? '' : `, multiplier ${multiplier}`}`;
   const lines: string[] = [];
   let failed = false;
   /** a failure a later attempt may fix */

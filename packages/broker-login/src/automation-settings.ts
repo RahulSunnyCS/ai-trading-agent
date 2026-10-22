@@ -156,3 +156,16 @@ export function quantiplyDeploy(
 export function describeSource(a: Automation): string {
   return a.source === 'file' ? `settings v${a.version}` : 'settings: defaults (none saved yet)';
 }
+
+/**
+ * Why the AlgoTest deployer must not run: it checks the deploy sheet's multiplier but never sets
+ * it (AlgoTest's is 1 until changed in the sheet by hand), so a row that uploads at more than 1 is
+ * deployed by the owner. Null when every uploading AlgoTest row is at 1.
+ */
+export function algotestMultiplierRefusal(a: Automation): string | null {
+  const wrong = BROKERS.map((b) => ({ b, row: effectiveRow(a, 'algotest', b) })).filter(
+    ({ row }) => row.upload && row.multiplier !== 1,
+  );
+  if (!wrong.length) return null;
+  return `AlgoTest multiplier ${wrong.map(({ b, row }) => `${b} ${row.multiplier}`).join(', ')}: the deployer never sets the multiplier, so it deploys nothing; deploy by hand`;
+}

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
   DEFAULT_AUTOMATION,
+  algotestMultiplierRefusal,
   describeSource,
   effectiveRow,
   pausedFor,
@@ -124,5 +125,20 @@ describe('multiplier, add-on and pause (BL-140 Phase 4)', () => {
       write(saved(change));
       assert.throws(() => readAutomation(file));
     }
+  });
+});
+
+describe('the AlgoTest deployer and a multiplier it cannot set (BL-140 Phase 4)', () => {
+  it('does not refuse at 1, and names a row that uploads at more', () => {
+    assert.equal(algotestMultiplierRefusal(DEFAULT_AUTOMATION), null);
+    const a = JSON.parse(JSON.stringify(DEFAULT_AUTOMATION)) as typeof DEFAULT_AUTOMATION;
+    a.rows['algotest.finvasia'].multiplier = 3;
+    assert.match(algotestMultiplierRefusal(a) ?? '', /finvasia 3.*deploy by hand/);
+    // a row that uploads nothing, or a Quantiply row, does not matter to this deployer
+    a.rows['algotest.finvasia'].multiplier = 1;
+    a.rows['algotest.angelone'].multiplier = 5;
+    assert.equal(algotestMultiplierRefusal(a), null);
+    a.rows['quantiply.angelone'].multiplier = 4;
+    assert.equal(algotestMultiplierRefusal(a), null);
   });
 });
