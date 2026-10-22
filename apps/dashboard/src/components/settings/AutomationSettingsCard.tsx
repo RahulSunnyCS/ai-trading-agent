@@ -189,8 +189,10 @@ export function AutomationSettingsCard() {
                       >
                         Multiplier
                         <span className="ml-2 text-xs font-normal text-muted">
-                          1 to {MULTIPLIER_MAX}, a whole number. Saved only: uploads and deploys do
-                          not use it yet.
+                          1 to {MULTIPLIER_MAX}, a whole number.{' '}
+                          {platform === 'Quantiply'
+                            ? 'Set on each algo the tool creates, then read back; the 09:25 and margin checks expect it.'
+                            : 'The deployer never sets it: above 1 it deploys nothing and you deploy by hand; the 09:25 and margin checks expect it.'}
                         </span>
                       </label>
                       <NumberField

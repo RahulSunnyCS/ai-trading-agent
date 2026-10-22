@@ -523,7 +523,7 @@ seen with an algo running: no algo of the owner's traded on 2026-10-20. The app 
 | leg `position: sell / buy` | `transactionType: "S" / "B"` |
 | leg `option_type` | `side: "CE" / "PE"` |
 | leg `expiry: weekly` | `expiryTag: "CURRENT_WEEK"` |
-| leg `lots: n` | `quantity: n` (lots), `multiplier: 1` |
+| leg `lots: n` | `quantity: n` (lots); the algo's `configurations.multiplier` is not in the export or the web app's own create request (Quantiply saves `1`); BL-140 Phase 4: the uploader adds it at the account row's 2-10 value (`quantiply-plan.ts` `withMultiplier`), and the read-back (`readBackDiffs`) shows whether Quantiply saved it; **never tried live above 1** |
 | `strike_type: ATM / ITMn / OTMn` | `selectionType: "STRIKE"`, `strike: "ATM" / "ITM_n" / "OTM_n"` |
 | `closest_premium: P` | `selectionType: "PREMIUM"`, `premium: {type: "PREMIUM_CLOSE_TO", value: P, specificStrikeSelection: false}` |
 | `stop_loss: {percent: p}` | `stoploss: {type: "PER_POSITION_PERCENT", value: -p}` |

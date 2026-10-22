@@ -17,6 +17,7 @@ import {
   sessionOver,
   summaryQ,
   weekdayOf,
+  withMultiplier,
 } from './quantiply-plan.js';
 
 const P = 'Core · ';
@@ -388,4 +389,55 @@ test('brokerOutcome: enabled under the call is switched off; changed content is 
   assert.equal(changed.mismatch, true);
   assert.equal(changed.retry, false);
   assert.match(changed.note, /content changed under the broker call: configurations.startTime/);
+});
+
+test('withMultiplier: 1 is the export untouched, N adds only configurations.multiplier', () => {
+  // the real export shape: no multiplier key at all (Quantiply adds `multiplier: 1` when it saves)
+  const text = JSON.stringify({
+    name: 'Core · N_x_0917',
+    day: ['WED'],
+    configurations: { legs: [{ quantity: 2 }] },
+  });
+  assert.equal(withMultiplier(text, 1), text); // the very same text: sha and read-back unchanged
+  const three = JSON.parse(withMultiplier(text, 3));
+  assert.equal(three.configurations.multiplier, 3);
+  assert.deepEqual(three.configurations.legs, [{ quantity: 2 }]); // the lots stay the export's
+  assert.equal(three.name, 'Core · N_x_0917');
+  assert.equal(withMultiplier(text, 3), withMultiplier(text, 3)); // deterministic for the sha
+  assert.notEqual(withMultiplier(text, 3), withMultiplier(text, 2));
+  // a body that already says 1 is fine too
+  const one = JSON.stringify({ configurations: { multiplier: 1 } });
+  assert.equal(JSON.parse(withMultiplier(one, 2)).configurations.multiplier, 2);
+});
+
+test('withMultiplier works on the web app’s own captured create request', () => {
+  const real = readFileSync(
+    new URL(
+      '../../option-backtesting/tests/fixtures/quantiply/create_request.json',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+  assert.equal(withMultiplier(real, 1), real);
+  const body = JSON.parse(withMultiplier(real, 2));
+  assert.equal(body.configurations.multiplier, 2);
+  assert.equal(body.name, JSON.parse(real).name);
+});
+
+test('withMultiplier refuses a bad multiplier or a body that is not an export', () => {
+  const text = JSON.stringify({ configurations: {} });
+  for (const bad of [0, 11, 1.5, Number.NaN, -1]) assert.throws(() => withMultiplier(text, bad));
+  assert.throws(() => withMultiplier(JSON.stringify({ configurations: { multiplier: 2 } }), 3));
+  assert.throws(() => withMultiplier(JSON.stringify({ name: 'x' }), 3));
+  assert.throws(() => withMultiplier(JSON.stringify({ configurations: null }), 3));
+  // at 1 nothing is parsed or checked: an odd body passes through as it always did
+  assert.equal(withMultiplier('{"name":"x"}', 1), '{"name":"x"}');
+});
+
+test('the read-back catches a multiplier Quantiply saved differently from what was sent', () => {
+  const sent = JSON.parse(withMultiplier(JSON.stringify({ day: ['WED'], configurations: {} }), 3));
+  assert.deepEqual(readBackDiffs(sent, { configurations: { multiplier: 3 } }), []);
+  assert.deepEqual(readBackDiffs(sent, { configurations: { multiplier: 1 } }), [
+    'configurations.multiplier',
+  ]);
 });
