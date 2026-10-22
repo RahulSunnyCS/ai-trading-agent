@@ -573,3 +573,6 @@ Also parked here (owner, 2026-10-06), priority P3:
   gate are tested on synthetic inputs; the result file's commit field is explained in the doc (the
   running script is the one in `6660d31a`). Not changed: the result file itself (the check runs once).
   Phase 7's optional accuracy items and the 8 repeated sleeve runs are left alone (owner: skip).
+- 2026-10-22 — correction to the Monday-open figure: of the 1.9 points (replay, signal delay 0), the
+  Monday fill alone is 0.7 points (0.83 in the engine option built for BL-036) and whole-share rounding
+  on a Rs 50,000 sleeve is the other 1.2. The expected case (25.5%) includes both. Table in the doc.

@@ -109,3 +109,19 @@ addendum 6's words; nothing changed), the verdict rule and the plateau gate are 
 tests (`tests/test_bl010_four_sectors_check.py`), and the result file's recorded commit is the one
 before its last edits: the script that wrote `bl010_four_sectors_result.json` is the one committed in
 `6660d31a`, which also holds the result. The check runs once, so the file is not rewritten.
+
+## Correction found while building the Monday-fill option (BL-036 Phase 2)
+
+The "Monday open" cost of 1.6 to 1.9 points mixes two things. The replay prices the same decisions
+three ways on the signal-delay-0 runs (extended tags, four Fridays, pre-tax):
+
+| Fill | CAGR | Max drawdown |
+|---|---|---|
+| Friday close, fractional shares | 35.4% | -30.9% |
+| Monday open, fractional shares | 34.7% | -31.7% |
+| Monday open, whole shares at Rs 50,000 a sleeve | 33.5% | -32.0% |
+
+So **the Monday fill itself costs about 0.7 points** (0.83 in the new engine option), and **rounding to
+whole shares on a Rs 50,000 sleeve costs another 1.2 points**. The expected case of 25.5% already
+includes both; the split matters for what can be fixed: the second part shrinks with a larger lot or
+by topping up the leftover cash next week, the first does not.
