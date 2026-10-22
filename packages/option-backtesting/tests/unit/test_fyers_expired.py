@@ -504,6 +504,19 @@ def test_an_expiry_refused_before_any_answer_waits_for_one_later_in_the_run(root
     assert out2["pending_days"] == {}
 
 
+def test_the_check_with_nothing_answered_asks_the_middle_strike_not_the_middle_of_the_listing(
+    root, monkeypatch
+):
+    # Fyers may list every CE before every PE: the listing's middle is then a deep strike
+    strikes = range(18000, 28000, 250)
+    listing = [f"NSE:NIFTY26922{k}{r}" for r in ("CE", "PE") for k in strikes]
+    monkeypatch.setitem(SYMBOLS, WEEKLY, listing)
+    deep = [s for s in listing if abs(int(s[-7:-2]) - 22875) > 750]
+    for _ in range(2):
+        out = _run(FakeClient(answers={s: [NO_DATA] * 5 for s in deep}), root, missing_only=False)
+        assert out["stopped"] is None
+
+
 def test_refusals_with_nothing_to_check_them_against_are_reported(root):
     # the only expiry asked is refused in full and nothing has ever answered
     out = _run(

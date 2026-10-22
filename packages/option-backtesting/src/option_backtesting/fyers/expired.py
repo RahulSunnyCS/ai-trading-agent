@@ -493,7 +493,8 @@ class _Fetcher:
                     probe, cache_to = p.last_ok, None
                     rest = item.contracts[number:]
                     if probe is None and rest:  # nothing answered yet: one nearest the money
-                        middle = rest[len(rest) // 2]
+                        # by strike, not listing position: Fyers may list every CE before every PE
+                        middle = sorted(rest, key=lambda c: c.strike)[len(rest) // 2]
                         probe = (middle.symbol, lo, hi)
                         cache_to = _cache_path(self.root, underlying, item.expiry, middle.symbol)
                     outcome = self.check(probe, cache_to)
