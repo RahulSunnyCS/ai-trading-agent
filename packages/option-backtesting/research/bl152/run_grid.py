@@ -10,6 +10,7 @@ try in the ledger). Writes, under out/ (git-ignored):
 
     uv run python research/bl152/run_grid.py --only 2        # the timing pilot
     uv run python research/bl152/run_grid.py --workers 6     # the rest
+    echo 10 > research/bl152/out/workers.txt                 # more cores from the next variant on
 """
 
 from __future__ import annotations
@@ -36,6 +37,15 @@ def done_ids() -> set[str]:
     if not path.exists():
         return set()
     return {json.loads(line)["id"] for line in path.read_text().splitlines() if line.strip()}
+
+
+def worker_count(default: int) -> int:
+    """The worker count for the next variant: out/workers.txt when it holds a whole number, so a
+    running grid can be given more (or fewer) cores without a restart."""
+    try:
+        return max(1, int((OUT / "workers.txt").read_text().strip()))
+    except (OSError, ValueError):
+        return default
 
 
 def summary(vid: str, result: dict) -> dict:
@@ -97,11 +107,16 @@ def main() -> int:
     t0 = time.time()
     frame = F.load_frame(root, CRITERIA["underlying"], end)
     print(f"frame: {frame.n} sessions in {time.time() - t0:.0f} s", flush=True)
+    shown = None
     for k, (vid, rule) in enumerate(todo, 1):
         started = time.time()
+        workers = worker_count(args.workers)  # out/workers.txt can change it between variants
+        if workers != shown:
+            print(f"workers: {workers}", flush=True)
+            shown = workers
         text = yaml.safe_dump({"rule": rule}, sort_keys=False)
         compiled = from_dict(rule)
-        options = study.Options(periods=("learning",), workers=args.workers)
+        options = study.Options(periods=("learning",), workers=workers)
         try:
             result = study.run_test(root, compiled, text, options, frame=frame)
         except Exception as error:  # noqa: BLE001 - recorded, the grid goes on
