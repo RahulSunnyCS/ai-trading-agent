@@ -143,6 +143,32 @@ Shoonya's own hosts:
 
 ## Log
 
+- 2026-10-22 — **PR 4 (platform multiplier) — left OPEN for the owner's review, not merged** (Claude's call: the one
+  piece that can change an order's size; never sent live above 1). Quantiply: `withMultiplier` sets
+  `configurations.multiplier` on the export's text at upload; the ledger sha is of that text, the deployer applies the
+  same function (so it matches the ledger), and the read-back fails a saved value that differs. At 1 the text is
+  untouched (tests pin it). AlgoTest: the deployer cannot set the sheet's multiplier and refuses a row above 1
+  (`algotestMultiplierRefusal`): deploy by hand. The 09:25 check expects the row's multiplier (rows disagreeing on a
+  pick are named) and the margin check scales each pick's lots by it. Before relying on it: set Quantiply · Angel One to
+  2 for one evening upload with `--apply` watched, and confirm the algo's multiplier on Quantiply.
+- 2026-10-22 — **PR 5 (the morning gap check):** decision (Claude): it is part of the 09:25 `DEPLOY_CHECK`, not a
+  09:20 job (that window forbids a login). On review it turned out the check already covers it: a pick never
+  uploaded reads "not in AlgoTest" (absent from /live) or "not in Quantiply for <weekday>", separate from "not
+  deployed" (the add-on switch already keeps add-on picks out of the manifest it reads). A first version that added
+  `GET /strategies` was dropped as a duplicate with one more call. What is new: when Settings has a pause covering
+  today, both platforms say so (`pauseNote`) instead of reading as a missed upload.
+- 2026-10-22 — **PR 3 (Buy add-on):** `obt rotation algotest-export|quantiply-export --from-settings` leaves the Buy
+  add-on out of a list's export when no row that uploads that list has it on (`automation_settings.addon_wanted`,
+  `cli._without_addon`). The uploaders, deployers and the margin and deploy checks all read the export, so this is the
+  one place it takes effect; an add-on already uploaded becomes "no longer picked" and goes through the evening
+  uploader's own delete rules (kept and alerted if deployed). Limit: one export serves every account of a platform, so
+  two Quantiply accounts on one list with different add-on settings keep it in. Defaults export exactly as before.
+- 2026-10-22 — Phase 4 started (owner, going to sleep: "take your own decision"; Sonnet overnight run). Owner's
+  answers: platform multiplier (Quantiply's algo `multiplier`, AlgoTest's deploy-sheet multiplier), integer 1-10;
+  Pause stops uploads and deploys only; the morning gap check extends the 09:25 `DEPLOY_CHECK`; merge on GitHub,
+  the owner pulls. **PR 2 (this):** the settings schema (`multiplier`, `addon`, `pause.until`; old versions read as
+  1, yes, none), readers in TS and Python, `pause.ts` gating, "Skip next session", the 09:00 notice, the page.
+  Multiplier and add-on are saved only until the next PRs make the uploaders and deployers follow them.
 - 2026-10-19 — Phases 3 and 3b built while the owner was out ("do it as per your thinking"). Code and stand-in tests only: nothing was logged in, uploaded or set on GitHub.
   - **Readers:** `packages/broker-login/src/automation-settings.ts` and `rotation/automation_settings.py`. With no file yet they use today's setup, so nothing changes until a save.
   - **Exports and uploaders:** `--from-settings` on `algotest-export`, `quantiply-export` (now accepts T1), `strategy-upload.ts` (several lists in one plan) and `quantiply-upload.ts` (`--broker angelone|finvasia`; own login, API host and ledger `ledger-finvasia.jsonl`). A block with upload off is left untouched.

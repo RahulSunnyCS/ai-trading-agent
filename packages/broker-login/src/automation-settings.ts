@@ -21,12 +21,18 @@ export interface Row {
   login: boolean;
   list: 'none' | Book;
   upload: boolean;
+  /** the platform multiplier (BL-140 Phase 4): an integer 1-10, 1 unless the owner sets it */
+  multiplier: number;
+  /** include the Buy add-on picks (default yes) */
+  addon: boolean;
 }
 
 export interface Automation {
   version: number;
   masters: { logins: boolean; uploads: boolean; deploy: boolean };
   rows: Record<`${Platform}.${Broker}`, Row>;
+  /** no uploads or deploys for any session up to and including this IST day; null = none */
+  pause: { until: string | null };
   /** 'file' when read from the scheduler's snapshot, 'default' when there is none yet */
   source: 'file' | 'default';
 }
@@ -35,11 +41,12 @@ export const DEFAULT_AUTOMATION: Automation = {
   version: 0,
   masters: { logins: true, uploads: true, deploy: false },
   rows: {
-    'algotest.finvasia': { login: true, list: 't1', upload: true },
-    'algotest.angelone': { login: false, list: 'none', upload: false },
-    'quantiply.angelone': { login: true, list: 'core', upload: true },
-    'quantiply.finvasia': { login: false, list: 'none', upload: false },
+    'algotest.finvasia': { login: true, list: 't1', upload: true, multiplier: 1, addon: true },
+    'algotest.angelone': { login: false, list: 'none', upload: false, multiplier: 1, addon: true },
+    'quantiply.angelone': { login: true, list: 'core', upload: true, multiplier: 1, addon: true },
+    'quantiply.finvasia': { login: false, list: 'none', upload: false, multiplier: 1, addon: true },
   },
+  pause: { until: null },
   source: 'default',
 };
 
@@ -62,21 +69,44 @@ export function readAutomation(path: string = settingsPath()): Automation {
   }
   const raw = JSON.parse(text) as Partial<Automation>;
   if (!raw.masters || !raw.rows) throw new Error(`${path}: not automation settings`);
+  const rows = {} as Automation['rows'];
   for (const p of ['algotest', 'quantiply'] as const) {
     for (const b of BROKERS) {
-      const row = raw.rows[`${p}.${b}`];
+      const row = raw.rows[`${p}.${b}`] as Partial<Row> | undefined;
       if (!row) throw new Error(`${path}: row ${p}.${b} missing`);
-      if (!['none', 'core', 't1'].includes(row.list)) {
+      if (!['none', 'core', 't1'].includes(row.list as string)) {
         throw new Error(`${path}: row ${p}.${b} has list ${JSON.stringify(row.list)}`);
       }
+      // A snapshot written before Phase 4 has neither field: 1 and yes, what the jobs did. A bad
+      // value is an error, never a guess: a wrong multiplier changes the size of a real order.
+      const multiplier = row.multiplier ?? 1;
+      if (!(Number.isInteger(multiplier) && multiplier >= 1 && multiplier <= 10)) {
+        throw new Error(`${path}: row ${p}.${b} has multiplier ${JSON.stringify(row.multiplier)}`);
+      }
+      const addon = row.addon ?? true;
+      if (typeof addon !== 'boolean') {
+        throw new Error(`${path}: row ${p}.${b} has addon ${JSON.stringify(row.addon)}`);
+      }
+      rows[`${p}.${b}`] = { ...(row as Row), multiplier, addon };
     }
+  }
+  const until = (raw.pause as { until?: unknown } | undefined)?.until ?? null;
+  if (until !== null && !(typeof until === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(until))) {
+    throw new Error(`${path}: pause.until is ${JSON.stringify(until)}`);
   }
   return {
     version: Number(raw.version ?? 0),
     masters: raw.masters,
-    rows: raw.rows,
+    rows,
+    pause: { until },
     source: 'file',
   };
+}
+
+/** The pause's last day when a session on `session` (IST day) is paused, else null. Inclusive. */
+export function pausedFor(a: Automation, session: string): string | null {
+  const until = a.pause.until;
+  return until !== null && session <= until ? until : null;
 }
 
 /** A row as the jobs must treat it: its choices gated by the master switches. */
@@ -86,6 +116,8 @@ export function effectiveRow(a: Automation, platform: Platform, broker: Broker):
     login: a.masters.logins && row.login,
     list: row.list,
     upload: a.masters.uploads && row.upload && row.list !== 'none',
+    multiplier: row.multiplier,
+    addon: row.addon,
   };
 }
 
@@ -123,4 +155,17 @@ export function quantiplyDeploy(
 /** One line for logs and Telegram: which version decided, or that none was saved yet. */
 export function describeSource(a: Automation): string {
   return a.source === 'file' ? `settings v${a.version}` : 'settings: defaults (none saved yet)';
+}
+
+/**
+ * Why the AlgoTest deployer must not run: it checks the deploy sheet's multiplier but never sets
+ * it (AlgoTest's is 1 until changed in the sheet by hand), so a row that uploads at more than 1 is
+ * deployed by the owner. Null when every uploading AlgoTest row is at 1.
+ */
+export function algotestMultiplierRefusal(a: Automation): string | null {
+  const wrong = BROKERS.map((b) => ({ b, row: effectiveRow(a, 'algotest', b) })).filter(
+    ({ row }) => row.upload && row.multiplier !== 1,
+  );
+  if (!wrong.length) return null;
+  return `AlgoTest multiplier ${wrong.map(({ b, row }) => `${b} ${row.multiplier}`).join(', ')}: the deployer never sets the multiplier, so it deploys nothing; deploy by hand`;
 }

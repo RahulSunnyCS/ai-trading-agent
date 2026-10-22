@@ -3,13 +3,23 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { sendText } from '@trading/notify';
-import { describeSource, readAutomation, uploadBooks } from './automation-settings.js';
+import {
+  describeSource,
+  effectiveRow,
+  readAutomation,
+  uploadBooks,
+} from './automation-settings.js';
 import { readTelegramConfig } from './config.js';
 import { describe } from './diagnose.js';
+import { definitelyRefused } from './quantiply-api.js';
+import { parseBrokers, parseDetail, pickBroker } from './quantiply-deploy-plan.js';
 import {
+  type BrokerState,
   type QLedgerRow,
   type QManifest,
   type QWanted,
+  brokerBefore,
+  brokerOutcome,
   istWeekday,
   needsAttentionQ,
   parseQLedger,
@@ -18,6 +28,7 @@ import {
   sessionOver,
   summaryQ,
   weekdayOf,
+  withMultiplier,
 } from './quantiply-plan.js';
 import { QUANTIPLY_SITES, parseQuantiplyBroker } from './quantiply-rules.js';
 import {
@@ -54,7 +65,11 @@ import { type Mode, istToday, sha256 } from './strategy-plan.js';
  * nothing. `--apply` needs `QUANTIPLY_UPLOAD=on`. The ledger (`--ledger`, default
  * TRADING_DATA_ROOT/rotation/quantiply/ledger.jsonl) records every create and delete by algo id;
  * only algos in it are ever deleted. Each created algo is read back (`GET /algos/:id`) and compared
- * with what was sent; a difference is recorded and alerted.
+ * with what was sent; a difference is recorded and alerted. Then every algo created or kept with the
+ * export's content gets the account's own broker when it has none (`GET /brokers`, the one whose
+ * client code is the `.env` login; the web app's "Select Client ID / Broker"), so switching it on
+ * by hand needs nothing else, and is read back once more (the call rewrites the algo): one found
+ * enabled is switched off, changed content is owned under a mismatch sha, a blip is retried.
  */
 
 const READ_BACK_OK = 'read back: identical';
@@ -112,15 +127,32 @@ async function main(): Promise<number> {
   let exportDir = values.dir;
   let latest = values.latest;
   let decidedBy = '';
+  /** the account row's platform multiplier (BL-140 Phase 4); a manual --dir / --latest run is at 1 */
+  let multiplier = 1;
   if (values['from-settings']) {
     const automation = readAutomation();
     decidedBy = describeSource(automation);
+    multiplier = effectiveRow(automation, 'quantiply', broker).multiplier;
     const books = uploadBooks(automation, 'quantiply', broker);
     if (!books.length) {
       console.log(`${site.name}: nothing to upload (${decidedBy}); nothing changed`);
       return 0;
     }
     latest = books[0];
+  }
+  if (!values['from-settings']) {
+    // A manual run uploads at 1; say so when the row asks for more, because the deployer applies the
+    // row's multiplier and would then not recognise these algos (it enables nothing, fail closed).
+    try {
+      const asked = effectiveRow(readAutomation(), 'quantiply', broker).multiplier;
+      if (asked !== 1) {
+        console.log(
+          `note: the ${site.name} row is set to multiplier ${asked}, a manual run uploads at 1: the deployer will not recognise these algos (use --from-settings)`,
+        );
+      }
+    } catch {
+      // unreadable settings are the scheduled jobs' business, not a manual upload's
+    }
   }
   if (!exportDir && latest) {
     if (!dataRoot) {
@@ -166,7 +198,7 @@ async function main(): Promise<number> {
   const wanted: QWanted[] = [];
   for (const s of manifest.strategies) {
     const file = join(dir, s.file);
-    const text = await readFile(file, 'utf8');
+    const text = withMultiplier(await readFile(file, 'utf8'), multiplier);
     const body = JSON.parse(text) as Record<string, unknown>;
     if (JSON.stringify(body.day) !== JSON.stringify([manifest.weekday]) || body.name !== s.name) {
       console.error(`${s.file}: its name or day does not match the manifest; refusing`);
@@ -216,7 +248,7 @@ async function main(): Promise<number> {
     }
   }
   const when = mode === 'evening' ? 'evening' : '09:16 top-up';
-  const label = `${site.name} ${manifest.book.toUpperCase()} ${when} for ${manifest.day} (${manifest.weekday})${decidedBy ? `, ${decidedBy}` : ''}`;
+  const label = `${site.name} ${manifest.book.toUpperCase()} ${when} for ${manifest.day} (${manifest.weekday})${decidedBy ? `, ${decidedBy}` : ''}${multiplier === 1 ? '' : `, multiplier ${multiplier}`}`;
   const lines: string[] = [];
   let failed = false;
   /** a failure a later attempt may fix */
@@ -278,18 +310,35 @@ async function main(): Promise<number> {
         }
       }
     };
-    /** Read an algo back and compare it with what was sent, its weekday included. */
-    const check = async (body: Record<string, unknown>, id: string): Promise<string> => {
+    /**
+     * Read an algo back and compare it with what was sent, its weekday included. `raw` is the
+     * algo as read, for the broker step.
+     */
+    const check = async (
+      body: Record<string, unknown>,
+      id: string,
+    ): Promise<{ verdict: string; raw?: Record<string, unknown> }> => {
       try {
-        const saved = await api.get(id);
-        const diffs = readBackDiffs(body, saved);
-        if (saved.day !== manifest.weekday) diffs.unshift(`day ${String(saved.day)}`);
-        return diffs.length ? `READ-BACK DIFFERS: ${diffs.slice(0, 5).join(', ')}` : READ_BACK_OK;
+        const raw = await api.get(id);
+        const diffs = readBackDiffs(body, raw);
+        if (raw.day !== manifest.weekday) diffs.unshift(`day ${String(raw.day)}`);
+        const verdict = diffs.length
+          ? `READ-BACK DIFFERS: ${diffs.slice(0, 5).join(', ')}`
+          : READ_BACK_OK;
+        return { verdict, raw };
       } catch (error) {
-        return `READ-BACK FAILED: ${describe(error)}`;
+        return { verdict: `READ-BACK FAILED: ${describe(error)}` };
       }
     };
-    const owned = async (w: QWanted, id: string, verdict: string, note = '') => {
+    /** Owned algos whose content is the export's, for the broker step after the creates. */
+    const forBroker: { w: QWanted; id: string; raw?: Record<string, unknown> }[] = [];
+    const owned = async (
+      w: QWanted,
+      id: string,
+      read: { verdict: string; raw?: Record<string, unknown> },
+      note = '',
+    ) => {
+      const { verdict } = read;
       const ok = verdict === READ_BACK_OK;
       // Created but not as sent: owned (so it can be replaced), under a sha no export will match.
       await record({
@@ -304,8 +353,115 @@ async function main(): Promise<number> {
         failed = true;
         if (verdict.startsWith('READ-BACK FAILED')) retryable = true;
         else attention = true;
-      }
+      } else forBroker.push({ w, id, raw: read.raw });
       lines.push(`${ok ? '✅' : '❌'} created ${w.name} (${note}${verdict})`);
+    };
+    // The account's own broker (the web app's "Select Client ID / Broker"), looked up once, only
+    // when an algo needs it.
+    let ownBroker: Promise<{ id: string } | { error: string; retry: boolean }> | undefined;
+    const brokerId = () => {
+      ownBroker ??= api.brokers().then(
+        (json) => {
+          const pb = pickBroker(parseBrokers(json), creds.user);
+          return 'error' in pb ? { ...pb, retry: false } : pb;
+        },
+        (error: unknown) => ({
+          error: `brokers list: ${describe(error)}`,
+          retry: !definitelyRefused(error),
+        }),
+      );
+      return ownBroker;
+    };
+    /**
+     * Give each algo the account's broker when it has none, so switching it on by hand needs
+     * nothing else; read it back once after the call (the call rewrites the algo). It never
+     * leaves an algo enabled: one found enabled under the call is switched off at once.
+     */
+    const setBrokers = async (
+      items: { w: QWanted; id: string; raw?: Record<string, unknown> }[],
+    ) => {
+      for (const { w, id, raw: known } of items) {
+        const body = bodies.get(w.name) ?? {};
+        const flag = (retry: boolean) => {
+          failed = true;
+          if (retry) retryable = true;
+          else attention = true;
+        };
+        let raw = known;
+        if (!raw) {
+          try {
+            raw = await api.get(id);
+          } catch (error) {
+            flag(true);
+            lines.push(`❌ ${w.name}: broker not checked, read back: ${describe(error)}`);
+            continue;
+          }
+        }
+        // A kept copy edited since it was made (by hand) is not the tool's to touch now.
+        if (readBackDiffs(body, raw).length) {
+          flag(false);
+          lines.push(`❌ ${w.name}: broker not set, its content differs from the export`);
+          continue;
+        }
+        const pb = await brokerId();
+        if ('error' in pb) {
+          flag(pb.retry);
+          lines.push(`❌ ${w.name}: broker not set: ${pb.error}`);
+          continue;
+        }
+        const step = brokerBefore(parseDetail(raw), pb.id);
+        if (step === 'done') continue;
+        if (step !== 'set') {
+          flag(false);
+          lines.push(`❌ ${w.name}: broker not set, ${step.skip}`);
+          continue;
+        }
+        let callError: { text: string; refused: boolean } | undefined;
+        try {
+          await api.setBroker(id, pb.id);
+        } catch (error) {
+          callError = { text: describe(error), refused: definitelyRefused(error) };
+        }
+        let after: BrokerState | { failed: string };
+        let diffs: string[] = [];
+        try {
+          const back = await api.get(id);
+          after = parseDetail(back);
+          diffs = readBackDiffs(body, back);
+          if (back.day !== manifest.weekday) diffs.unshift(`day ${String(back.day)}`);
+        } catch (error) {
+          after = { failed: describe(error) };
+        }
+        const o = brokerOutcome({ brokerId: pb.id, callError, after, diffs });
+        lines.push(`${o.ok ? '✅' : '❌'} ${w.name}: ${o.note}`);
+        if (o.ok) continue;
+        flag(o.retry);
+        if (o.mismatch) {
+          // still the tool's, under a sha no export matches: replaced, never enabled as it is
+          await record({
+            action: 'create',
+            id,
+            name: w.name,
+            sha: `mismatch:${w.sha}`,
+            ok: true,
+            detail: o.note,
+          });
+        }
+        if (o.switchOff) {
+          let off = false;
+          try {
+            await api.setEnabled(id, false);
+            off = !parseDetail(await api.get(id)).enabled;
+          } catch (error) {
+            lines.push(`  switching it off failed: ${describe(error)}`);
+          }
+          lines.push(
+            off
+              ? `  ⚠️ ${w.name} switched off again (read back disabled)`
+              : `  🚨 ${w.name} may be ENABLED on the real account: switch it off in Quantiply NOW`,
+          );
+        }
+      }
     };
     const listedBefore = new Set(algos.map((a) => a.id));
 
@@ -383,6 +539,12 @@ async function main(): Promise<number> {
       }
       for (const s of saved) await owned(w, s.id, await check(body, s.id));
     }
+    const wantedBy = new Map(wanted.map((w) => [w.name, w]));
+    for (const a of p.kept) {
+      const w = wantedBy.get(a.name);
+      if (w) forBroker.push({ w, id: a.id });
+    }
+    await setBrokers(forBroker);
     if (needsAttentionQ(p)) {
       failed = true;
       attention = true;

@@ -1,0 +1,32 @@
+{
+  "written_before_running": "2026-10-22T05:10:00+05:30",
+  "name": "BL-010 criteria, addendum 7: the real trade is signal Friday, buy Monday, so the Monday-open and tax/tags variants are repeated on signal-delay-0 runs, beside the registered ones",
+  "adds_to": "bl010_criteria_addendum_6.json (variants A0 to A3, M and E, gates G1 to G6, the verdict rule: all unchanged and still the record) and addendum 1 (the Monday-open repricing, defined on signal-delay-0 runs)",
+  "rule": "Committed before the supplement runs. Never edited after results are seen: a change is a new file that names this one as superseded, with the reason. This addendum adds a supplement; it does not replace the verdict of addendum 6 and it does not choose the better of the two.",
+  "reason": "Code review of PR 285 (2026-10-22), finding 1: addendum 6's variant M replays A1, which runs with the research space's signal_delay of 1, so its 'next open' is the Monday after the fill Friday, a week and three days after the signal. The owner's trade is signal Friday, buy on the Monday (BL-142). Addendum 1 had defined this repricing on delay-0 runs and shown the delay-1 pair 'for reference only'. The -1.6 point change and E of addendum 6 are therefore not the real-trade figures.",
+  "supplement": {
+    "S0_delay0_curated": "A0 with signal_delay 0 (curated tags, pre-tax, four Fridays at Rs 50,000 each, April reset)",
+    "S1_delay0_extended": "A1 with signal_delay 0",
+    "S3_delay0_extended_tax": "A3 with signal_delay 0 (extended tags and tax)",
+    "SM_monday_open": "the audit replay of S1's decisions: the same decisions at the signal Friday's close in fractional shares, against the next trading day's open with whole shares, per sleeve, blended with the April reset (addendum 1's pair; taxes not modelled by the replay, applied to S3 as an estimate as in addendum 6)",
+    "SE_expected_case": "S3 CAGR + SM's CAGR change, and S3 max drawdown + SM's drawdown change"
+  },
+  "gates_repeated": {
+    "S_G1": "SE CAGR minus Nifty200 Momentum 30 TRI CAGR over the same weeks is at least 5.0 points (as G1)",
+    "S_G2": "criteria.basket_passes on S3's curve to the benchmark cutoff for the medium basket, and SE's max drawdown no deeper than the -40% ceiling (as G2)",
+    "S_G3": "no complete financial year of S3 trails Nifty200 Momentum 30 TRI by more than 10 points (as G3)",
+    "S_G5": "factor_regression on S3: alpha at least 5% a year with |t| at least 2 (as G5)",
+    "carried_over": "G4 (plateau) and G6 (fair placebo) are about the ranking, not the fill day, and are not re-run; their registered results are carried into the supplement's verdict",
+    "supplement_verdict": "the verdict rule of addendum 6 applied to S_G1, S_G2, S_G3, S_G5 and the carried-over G4, G6. Reported beside the registered verdict. If the two differ, both are reported and the owner decides which to read; neither replaces the other."
+  },
+  "also_reported": [
+    "recovery weeks per fall of 10% or more for A3 and S3, from the peak's loss to the first week back at the old peak (None if not yet recovered), with the Smallcap 250's fall in the same window",
+    "the five weeks the Smallcap 250 and the five the Midcap 150 fell most, and A3's and S3's return in each (addendum 6 listed these and the result omitted them)",
+    "the exact number of backtests each stage ran, counted in the stage that ran them"
+  ],
+  "dropped_from_addendum_6": [
+    "The financial-year table 'of A3 and E': E is an estimate of two numbers (CAGR and drawdown), not a curve, so there is no table for it. The table of A3 stands, and S3's is added."
+  ],
+  "supplement_runs_allowed": 1,
+  "supplement_how_enforced": "scripts/bl010_four_sectors_check.py supplement writes search_spaces/bl010_four_sectors_supplement.json once and refuses to overwrite it."
+}

@@ -1744,7 +1744,14 @@ export function MomentumSettingsPanel({
               <Select
                 className="mt-1"
                 value={num('signal_delay', 0)}
-                onChange={(event) => onChange('signal_delay', Number(event.target.value))}
+                onChange={(event) => {
+                  const delay = Number(event.target.value);
+                  onChange('signal_delay', delay);
+                  // A Monday-open fill is only defined for orders decided on the signal Friday.
+                  if (broad && delay !== 0 && str('execution', 'fri_close') === 'mon_open') {
+                    onChange('execution', 'fri_close');
+                  }
+                }}
               >
                 <option value={0}>at the signal close</option>
                 <option value={1}>1 week later</option>
@@ -1752,6 +1759,23 @@ export function MomentumSettingsPanel({
               </Select>
             </Field>
           </div>
+          {broad ? (
+            <Field
+              label="Fill at"
+              help="When an order decided at Friday's close actually fills. Friday close is the backtest's original assumption; Monday open is when you can really trade a signal that arrives after the close, and it is what the result's Monday-open line compares against. Needs the trade delay set to the signal close."
+            >
+              <Select
+                className="mt-1"
+                value={str('execution', 'fri_close')}
+                onChange={(event) => onChange('execution', event.target.value)}
+              >
+                <option value="fri_close">Friday close</option>
+                <option value="mon_open" disabled={num('signal_delay', 0) !== 0}>
+                  Monday open
+                </option>
+              </Select>
+            </Field>
+          ) : null}
           {dataset === 'etf' ? (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field

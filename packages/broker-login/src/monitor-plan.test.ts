@@ -50,11 +50,13 @@ import {
   parseDeployedOn,
   parseMarginCsv,
   parseRupees,
+  pauseNote,
   pickNeed,
   pnlFromSocketFrame,
   quantiplyReading,
   readMtmCardsInPage,
   readTotalMtm,
+  scaleLegs,
   switchOn,
   waitKey,
 } from './monitor-plan.js';
@@ -851,4 +853,61 @@ test('the day-wise list keeps multiplier and times; leg lots of an algo', () => 
     legLots({ configurations: { legs: [{ quantity: 1 }, { quantity: 2 }] } }),
     [1, 2],
   );
+});
+
+test('a pause covering today turns "missing picks" into a stated expectation', () => {
+  assert.equal(pauseNote(null), null);
+  assert.match(
+    pauseNote('2026-10-26') ?? '',
+    /paused until 2026-10-26.*missing picks are expected/,
+  );
+});
+
+test('the 09:25 check expects the row’s multiplier, not always 1', () => {
+  // Quantiply: an algo at 3 passes for a row at 3 and fails for a row at 1
+  const picks = [{ name: 'Core · N_a_0917', lots: [1] }];
+  const algos = (multiplier: number | null): QListed[] => [
+    { id: 'a1', name: 'Core · N_a_0917', day: 'WED', enabled: true, multiplier } as QListed,
+  ];
+  const lots = new Map([['a1', [1]]]);
+  assert.deepEqual(checkQuantiply('Q', picks, algos(3), 'WED', lots, 3).problems, []);
+  assert.deepEqual(checkQuantiply('Q', picks, algos(3), 'WED', lots).problems, [
+    'Core · N_a_0917: multiplier 3, not 1',
+  ]);
+  assert.deepEqual(checkQuantiply('Q', picks, algos(1), 'WED', lots, 3).problems, [
+    'Core · N_a_0917: multiplier 1, not 3',
+  ]);
+});
+
+test('AlgoTest: the row’s multiplier is expected, and rows that disagree are named', () => {
+  const name = 'T1 · N_a_0917';
+  const live = parseLive(liveText('1/2', '', row(name, 1)));
+  const liveTwice = parseLive(liveText('2/2', '', row(name, 2)));
+  const rowsAt = (a: number, b?: number) => [
+    { broker: 'finvasia' as const, picks: [name], multiplier: a },
+    ...(b === undefined ? [] : [{ broker: 'angelone' as const, picks: [name], multiplier: b }]),
+  ];
+  const mults = (m: number) => new Map([[name, m]]);
+  // default rows (no multiplier given) are at 1, exactly as before
+  assert.deepEqual(
+    checkAlgoTest('A', [{ broker: 'finvasia', picks: [name] }], live, mults(1), []).problems.filter(
+      (p) => p.includes('multiplier'),
+    ),
+    [],
+  );
+  const wrong = checkAlgoTest('A', rowsAt(1), live, mults(3), []);
+  assert.ok(wrong.problems.includes(`${name}: multiplier 3, not 1`));
+  const right = checkAlgoTest('A', rowsAt(3), live, mults(3), []);
+  assert.ok(!right.problems.some((p) => p.includes('multiplier')));
+  const disagree = checkAlgoTest('A', rowsAt(1, 3), liveTwice, mults(1), []);
+  assert.ok(disagree.problems.some((p) => p.includes('different multipliers (1, 3)')));
+});
+
+test('the margin counts a row’s multiplier: every leg’s lots times it', () => {
+  const legs = [{ underlying: 'NIFTY', sell: true, lots: 1, premium: null }];
+  assert.equal(scaleLegs(legs, 1), legs); // untouched at 1
+  assert.deepEqual(scaleLegs(legs, 3), [
+    { underlying: 'NIFTY', sell: true, lots: 3, premium: null },
+  ]);
+  assert.equal(legs[0]?.lots, 1); // the export's own legs are never changed
 });

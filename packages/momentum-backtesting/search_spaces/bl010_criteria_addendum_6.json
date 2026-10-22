@@ -1,0 +1,65 @@
+{
+  "written_before_running": "2026-10-22T01:05:00+05:30",
+  "name": "BL-010 criteria, addendum 6: does the strategy the owner actually follows (Four Sectors Monthly, No Tilt, all Fridays) hold up under the assumptions of the real trade?",
+  "adds_to": "bl010_criteria.json and addenda 1 to 5; uses their thresholds wherever one exists and says so",
+  "rule": "Committed before any run of this check. Never edited after results are seen: a change is a new file that names this one as superseded, with the reason. Every variant below is run once; a run that errors or is repeated because data moved is logged, never swapped for a better one.",
+  "reason": "Owner, 2026-10-21 ('yes, check it'). The money is in Four Sectors Monthly, No Tilt, all Fridays (BL-142 decision, 2026-10-20), chosen from the 2026-10-08 top-10 ranking. BL-010 never tested that config: Phase 6 froze a different four-config ensemble, which then failed its one-shot 2012-2016 backcast. The Phase 5 walk-forward showed that picking the top of a ranking does not persist, so the config's 2017-2026 numbers are a selected result, not an expected return.",
+  "subject": {
+    "what": "run id fbb7ab054238 from search_spaces/round7_A.toml, heavy and light parameters exactly as stored in data/search/round7_A/results-*.jsonl, run on the point-in-time universe (universe_kind turnover_rank) as the 2026-10-08 ranking was",
+    "followed_as": "all Fridays: four sleeves, rebalance_offset 0 to 3 of rebalance_every 4, Rs 2,00,000 in total (Rs 50,000 a sleeve), equal capital restored each April (tranches.blend_reset / choose.ensemble_curve), as BL-087 and BL-142 follow it",
+    "window": "first Friday of 2017 (2017-01-06) to the last complete Friday in the data on the run day; the end date and the catalog data version are written into the result",
+    "benchmarks": [
+      "Nifty200 Momentum 30 TRI",
+      "Nifty Smallcap 250 TRI",
+      "Nifty Midcap 150 TRI",
+      "Nifty 500 TRI"
+    ],
+    "sealed_data": "The 2012-2016 window was spent by addendum 5's one-shot backcast and is NOT read here. The sealed 2024-01-01 to 2026-09-25 window of the filter research (BL-050, BL-115) is not a hold-out for this config, which was selected on all of 2017-2026, so it is not treated as one."
+  },
+  "red_team": {
+    "selection": "No clean hold-out is left for this config. The check therefore cannot certify an out-of-sample return. It measures what the live trade does differently from the search (tags, fill day, tax, lot size), whether the config sits on a plateau or a spike, and whether it beats a fair random baseline. The verdict says 'holds up under the assumptions of the real trade', never 'will earn X'.",
+    "look_ahead": "Extended tags are the current BSE classification applied to all years (hindsight). The Monday-open fill uses the open of the first trading day after the signal Friday, which is known only at the fill. Every run re-uses the audited engine and universe: the truncation test (Phase 2 step 4) is unchanged and not repeated.",
+    "survivorship": "The universe is point in time (turnover_rank). The tag layer is not: stocks BSE does not list (NSE-only, delisted) stay untagged and so can never be picked. That favours the result; a pass is weaker evidence than a fail.",
+    "data_snooping": "Variants and thresholds are fixed here. The number of backtests the script ran is written into the result. The config is the third of the top ten by composite score of 8,003 (2026-10-08 ranking), so any margin it clears is read against the PBO of 0.69 recorded in BL-010 Phase 4."
+  },
+  "variants": {
+    "A0_as_ranked": "curated tags, pre-tax, Rs 2,00,000: reproduces the 2026-10-08 ranking row (44.2% CAGR, -27.0% max drawdown, all Fridays blended). Reported; if it differs by more than 0.5 pt of CAGR from that row the difference is explained before anything else is read.",
+    "A1_extended_tags": "extended tags (category_tags=extended), pre-tax",
+    "A2_after_tax": "curated tags, tax.TaxRules() on every sleeve (separate ledgers, as BL-087), Rs 50,000 a sleeve",
+    "A3_real_tags_and_tax": "extended tags and tax: the closest backtest to the real trade before the fill-day and share-count effects",
+    "M_monday_open_whole_shares": "the audit replay (audit/replay.py, shares no code with the engine) of A1's decisions filled at the next trading day's open with whole shares at the raw price, against the same decisions filled at the close in fractional shares, per sleeve at Rs 50,000, blended with the April reset. Reported as the change in CAGR and max drawdown. Taxes are not modelled by the replay, so the change is measured pre-tax and applied to A3 as an estimate",
+    "E_expected_case": "A3 CAGR + M's CAGR change, and A3 max drawdown + M's drawdown change: the figure every gate below that says E is judged on. An estimate; the script prints A3 and E side by side and flags a verdict that would flip if M's change were set to zero"
+  },
+  "gates": {
+    "G1_minimum_bar": "E CAGR minus Nifty200 Momentum 30 TRI CAGR over the same weeks is at least 5.0 points (bl010_criteria.json minimum_bar, after tax)",
+    "G2_drawdown_basket": "criteria.basket_passes(E's curve, ..., 'medium'): every drawdown episode within -30%, or within 1.0 x the Smallcap 250's fall in the same window, and none beyond the -40% hard ceiling. E's curve is A3's curve with M's drawdown change reported beside it; if A3 passes and the change would push its worst fall past -40% the gate fails. The aggressive basket is reported, not judged",
+    "G3_no_bad_year": "no complete financial year of A3 trails Nifty200 Momentum 30 TRI by more than 10 points (bl010_criteria.json phase_5_robustness.config_pass.no_fy_trailing_mom30_by_pts)",
+    "G4_plateau": "robust.nudges(record, round7_A space), every one-step neighbour except the start shifts, each run as A0 (curated, pre-tax, four Fridays blended, Rs 2,00,000) and compared with A0: the median neighbour CAGR is no more than 5.0 points below A0's, AND at least 75% of neighbours are at least 5.0 points above Nifty200 Momentum 30 TRI. The offset nudges are the other three Fridays and are folded into A0's blend, so they are skipped. New thresholds, set here; the 5-point margin is the repo's usual one (phase_4_method.placebo.by_pts, threshold_stability_pts)",
+    "G5_alpha": "choose.factor_regression on A3's weekly returns: alpha at least 5% a year with |t| at least 2 (bl010_criteria.json phase_5_robustness.factor_regression)",
+    "G6_fair_placebo": "A0's CAGR beats the 95th percentile of 100 persistent-random-rank runs (method.persistent_random_ranks, 13-week hold, stock tilt off, same four Fridays blended, same universe and tags) by at least 5.0 points (bl010_criteria.json phase_4_method.placebo)"
+  },
+  "verdict": {
+    "HOLDS_UP": "G1, G2 and G3 pass and at most one of G4, G5, G6 fails",
+    "DOES_NOT_HOLD_UP": "G1 fails, or two or more of G4, G5, G6 fail",
+    "MIXED": "anything else",
+    "action": "None is automatic. The verdict is reported to the owner. The live-money rules (BL-025) and the position size stay the owner's decisions; a DOES_NOT_HOLD_UP result is reported the day it is known."
+  },
+  "reported_not_judged": [
+    "A0 to A3 and E: CAGR, max drawdown, Ulcer index, per-Friday spread (CAGR and max drawdown of each of the four sleeves)",
+    "financial-year table of A3 and E against the four benchmarks; rolling two-year windows (worst, median, best)",
+    "stationary block bootstrap of A3 (13 and 26 week blocks, 2,000 draws, seed 0): 5th, 50th, 95th percentile CAGR and max drawdown",
+    "drawdown as a share of the whole portfolio at 10%, 15% and 20% slices; recovery weeks per major fall; the Smallcap 250 / Midcap 150 worst weeks",
+    "contribution profile of A3: top five companies' share of the log return (flag above 50%), largest financial year's share (flag above 40%), the largest single name",
+    "Monday-open details: average gap on buys and sells, orders with no open that week, idle cash share with whole shares at Rs 50,000 a sleeve",
+    "the config's percentile among the 8,003 point-in-time scored configs in 2017-04 to 2022-03 and 2022-04 to 2026-03, and the median config's CAGR (28.1% pre-tax), so the size of the selection effect is visible",
+    "number of backtests run, the code commit, the data version"
+  ],
+  "known_biases": [
+    "Selected on the same data it is judged on: the headline can only shrink toward the median config's 28.1%.",
+    "Today's classification in the extended tags; today's tax rates from 2017; delisted names valued at their last close.",
+    "Engine costs carry no brokerage (Kite is zero brokerage for delivery); STT, stamp duty, exchange and GST charges are itemised.",
+    "The real account ramps in over four Mondays from 2026-10-19; the backtest starts all four sleeves in 2017 with equal capital."
+  ],
+  "runs_allowed": 1,
+  "how_enforced": "scripts/bl010_four_sectors_check.py writes search_spaces/bl010_four_sectors_result.json once, with the commit and data version, and refuses to overwrite it. The result is committed. A fail is reported, not tuned around."
+}

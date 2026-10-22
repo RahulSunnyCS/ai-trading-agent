@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 import pytest
 from typer.testing import CliRunner
@@ -11,7 +13,7 @@ from momentum_backtesting import cli, live_rules, notify
 RULES = live_rules.load()
 
 
-def _curve(values: list[float], start: str = "2026-10-09") -> pd.Series:
+def _curve(values: list[float], start: str = "2026-10-16") -> pd.Series:
     return pd.Series(values, index=pd.date_range(start, periods=len(values), freq="W-FRI"))
 
 
@@ -41,6 +43,145 @@ def test_rules_file_holds_the_owners_numbers():
     assert RULES["trailing"]["review_action"] and RULES["money_gate"]["confirm_action"]
 
 
+def test_the_followed_money_is_four_sectors_on_the_four_kite_lots():
+    # BL-142: the owner follows Four Sectors Monthly, No Tilt, all Fridays; the check measures
+    # that, one config per sleeve, not the BL-010 Phase 6 ensemble it tracked before.
+    assert RULES["stage"]["paper_start"] == "2026-10-16"
+    configs = live_rules.followed_configs(RULES)
+    assert [c["rebalance_offset"] for c in configs] == [0, 1, 2, 3]
+    assert {c["run_id"] for c in configs} == {"fbb7ab054238"}
+    assert {c["rebalance_every"] for c in configs} == {4}
+    assert len({json.dumps(c["heavy"], sort_keys=True) for c in configs}) == 1
+    assert [c["light"]["rebalance_offset"] for c in configs] == [0, 1, 2, 3]
+    assert len({c["id"] for c in configs}) == 4
+
+
+def test_without_a_config_file_the_frozen_ensemble_is_followed():
+    rules = {"strategy": {}}
+    ids = [c["id"] for c in live_rules.followed_configs(rules)]
+    assert ids == ["1281e8ed6824", "08c4307d7aa9", "535b17b44ba5", "bad83df3821a"]
+
+
+def test_lots_are_put_in_one_friday_after_another_on_their_own_sleeves():
+    starts = live_rules.lot_starts("2026-10-16", 4)
+    assert [d.date().isoformat() for d in starts] == [
+        "2026-10-16",
+        "2026-10-23",
+        "2026-10-30",
+        "2026-11-06",
+    ]
+    # the sleeve that trades on each lot's first Friday (calendar-anchored offsets)
+    assert [live_rules.lot_offset(d, 4) for d in starts] == [3, 0, 1, 2]
+
+
+def test_a_new_lot_adds_money_not_return():
+    weeks = pd.date_range("2026-10-16", periods=4, freq="W-FRI")
+    first = pd.Series([1.0, 1.1, 1.1, 1.21], index=weeks)
+    second = pd.Series([1.0, 0.9, 0.99], index=weeks[1:])  # put in a week later, then falls
+    index = live_rules.twr_index([first, second])
+    assert list(index.round(6)) == [1.0, 1.1, round(1.1 * 2.0 / 2.1, 6), round(1.1 * 2.2 / 2.1, 6)]
+    # the second lot's deposit did not lift the peak: the drawdown is only the real fall
+    assert index.iloc[2] / index.iloc[1] - 1 == pytest.approx(2.0 / 2.1 - 1)
+
+
+def test_paper_curves_runs_each_lot_from_cash_on_its_own_friday(monkeypatch):
+    from momentum_backtesting import bias, reference_benchmarks, search, tracker
+
+    built, ran = [], []
+    weeks = pd.date_range("2026-03-27", "2026-11-13", freq="W-FRI")
+
+    class FakeRunner:
+        common = {"outer_prices": pd.DataFrame(index=weeks)}
+
+        def __init__(self, *_a, **_k):
+            pass
+
+        def base(self, heavy):
+            built.append(heavy)
+            return "base"
+
+    def fake_run_config(_runner, cfg, base=None, **window):
+        ran.append((cfg["id"], cfg["rebalance_offset"], base, window["start"]))
+        index = weeks[weeks >= pd.Timestamp(window["start"])]
+        return pd.Series([1.0 + 0.01 * i for i in range(len(index))], index=index)
+
+    monkeypatch.setattr(bias, "Runner", FakeRunner)
+    monkeypatch.setattr(search, "load_space", lambda _p: None)
+    monkeypatch.setattr(tracker, "run_config", fake_run_config)
+    monkeypatch.setattr(
+        reference_benchmarks, "load_references", lambda: {"Nifty200 Momentum 30 TRI": _flat(30)}
+    )
+    followed, _bench = live_rules.paper_curves(echo=lambda _m: None, rules=RULES)
+    assert [(i, o, s) for i, o, _b, s in ran] == [
+        ("fbb7ab054238#3", 3, "2026-10-16"),
+        ("fbb7ab054238#0", 0, "2026-10-23"),
+        ("fbb7ab054238#1", 1, "2026-10-30"),
+        ("fbb7ab054238#2", 2, "2026-11-06"),
+    ]
+    assert len(built) == 1 and {b for _, _, b, _ in ran} == {"base"}
+    assert followed.index[0] == pd.Timestamp("2026-10-16") and followed.iloc[0] == 1.0
+
+
+def test_a_lot_put_in_this_week_is_cash_not_a_crash(monkeypatch):
+    from momentum_backtesting import bias, reference_benchmarks, search, tracker
+
+    weeks = pd.date_range("2026-03-27", "2026-10-16", freq="W-FRI")
+
+    class FakeRunner:
+        common = {"outer_prices": pd.DataFrame(index=weeks)}
+
+        def __init__(self, *_a, **_k):
+            pass
+
+        def base(self, _heavy):
+            return "base"
+
+    def too_short(_runner, _cfg, base=None, **_window):
+        raise ValueError("not enough history to run from the chosen start date")
+
+    monkeypatch.setattr(bias, "Runner", FakeRunner)
+    monkeypatch.setattr(search, "load_space", lambda _p: None)
+    monkeypatch.setattr(tracker, "run_config", too_short)
+    monkeypatch.setattr(
+        reference_benchmarks, "load_references", lambda: {"Nifty200 Momentum 30 TRI": _flat(30)}
+    )
+    followed, bench = live_rules.paper_curves(echo=lambda _m: None, rules=RULES)
+    assert list(followed.index) == [pd.Timestamp("2026-10-16")] and followed.iloc[0] == 1.0
+    report = live_rules.evaluate(RULES, followed, bench)
+    assert not report.breached
+
+
+def test_a_lot_not_yet_due_is_left_out(monkeypatch):
+    from momentum_backtesting import bias, reference_benchmarks, search, tracker
+
+    weeks = pd.date_range("2026-03-27", "2026-10-23", freq="W-FRI")
+
+    class FakeRunner:
+        common = {"outer_prices": pd.DataFrame(index=weeks)}
+
+        def __init__(self, *_a, **_k):
+            pass
+
+        def base(self, _heavy):
+            return "base"
+
+    ran = []
+
+    def fake_run_config(_runner, cfg, base=None, **window):
+        ran.append(window["start"])
+        index = weeks[weeks >= pd.Timestamp(window["start"])]
+        return pd.Series(1.0, index=index)
+
+    monkeypatch.setattr(bias, "Runner", FakeRunner)
+    monkeypatch.setattr(search, "load_space", lambda _p: None)
+    monkeypatch.setattr(tracker, "run_config", fake_run_config)
+    monkeypatch.setattr(
+        reference_benchmarks, "load_references", lambda: {"Nifty200 Momentum 30 TRI": _flat(30)}
+    )
+    live_rules.paper_curves(echo=lambda _m: None, rules=RULES)
+    assert ran == ["2026-10-16", "2026-10-23"]  # lots 3 and 4 are not in yet
+
+
 # --- drawdown -----------------------------------------------------------------------------------
 
 
@@ -59,11 +200,11 @@ def test_drawdown_levels_and_the_peak_moves_up():
     f = _find(out, "drawdown")
     assert f.level == "breach" and "exit at 30%" in f.title  # exit outranks cut
     assert f.action == RULES["drawdown"]["exit_action"]
-    assert "First past the line on 2026-11-06" in f.detail  # the week it first fell 30%
+    assert "First past the line on 2026-11-13" in f.detail  # the week it first fell 30%
 
 
 def test_paper_tracking_not_started_before_paper_start():
-    early = _curve([1, 1.01], start="2026-09-25")  # data ends before 2026-10-09
+    early = _curve([1, 1.01], start="2026-10-02")  # data ends 2026-10-09, before 2026-10-16
     report = live_rules.evaluate(RULES, early, _flat(2))
     assert report.weeks == 0 and report.findings[0].level == "pending"
     assert not report.breached
@@ -72,9 +213,9 @@ def test_paper_tracking_not_started_before_paper_start():
 
 
 def test_weeks_are_counted_from_the_paper_start():
-    data = _curve([1, 1, 1, 1, 1, 1], start="2026-10-02")  # starts one week before paper_start
+    data = _curve([1, 1, 1, 1, 1, 1], start="2026-10-09")  # starts one week before paper_start
     report = live_rules.evaluate(RULES, data, _flat(6))
-    assert report.weeks == 4  # 10-09, 10-16, 10-23, 10-30, 11-06 -> 4 weeks after the start week
+    assert report.weeks == 4  # 10-16, 10-23, 10-30, 11-06, 11-13 -> 4 weeks after the start week
 
 
 # --- trailing -----------------------------------------------------------------------------------
@@ -202,11 +343,11 @@ def test_routine_status_is_the_optional_type(sent, monkeypatch):
 
 
 def test_stale_data_fails_loudly(sent, monkeypatch):
-    stale = live_rules.evaluate(RULES, _curve([1, 1.01, 1.02]), _flat(3))  # ends 2026-10-23
+    stale = live_rules.evaluate(RULES, _curve([1, 1.01, 1.02]), _flat(3))  # ends 2026-10-30
     monkeypatch.setattr(live_rules, "run_check", lambda **_: stale)
     monkeypatch.setattr(
         "momentum_backtesting.weekly.week_ending_on_or_before",
-        lambda _day: __import__("datetime").date(2026, 10, 30),
+        lambda _day: __import__("datetime").date(2026, 11, 6),
     )
     result = _invoke("--send")
     assert result.exit_code == 1 and "stale data" in sent[0].title

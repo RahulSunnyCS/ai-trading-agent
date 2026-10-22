@@ -11,10 +11,23 @@ export type RowKey =
   | 'quantiply.angelone'
   | 'quantiply.finvasia';
 
+/** The platform multiplier a row may run at: a whole number in this range. */
+export const MULTIPLIER_MIN = 1;
+export const MULTIPLIER_MAX = 10;
+
 export interface Row {
   login: boolean;
   list: List;
   upload: boolean;
+  /** the platform multiplier (Quantiply's algo multiplier, AlgoTest's deploy-sheet multiplier) */
+  multiplier: number;
+  /** include the Buy add-on picks */
+  addon: boolean;
+}
+
+export interface Pause {
+  /** no uploads or deploys for any session up to and including this IST day; null = none */
+  until: string | null;
 }
 
 export interface Masters {
@@ -26,6 +39,7 @@ export interface Masters {
 export interface AutomationSettings {
   masters: Masters;
   rows: Record<RowKey, Row>;
+  pause: Pause;
 }
 
 export interface SettingsVersion {
@@ -40,6 +54,37 @@ export interface AutomationView {
   effective: Record<RowKey, Row>;
   github: Record<string, string>;
   history: SettingsVersion[];
+  /** the first session an upload or deploy would change (today before 09:21 IST, else the next trading day) */
+  next_session?: string;
+}
+
+/**
+ * Settings from a scheduler that predates the multiplier, add-on and pause have none of them:
+ * 1, yes and no pause, what the jobs did. Applied to everything read, so the page never meets a
+ * missing field.
+ */
+export function withDefaults(settings: AutomationSettings): AutomationSettings {
+  const rows = Object.fromEntries(
+    Object.entries(settings.rows).map(([key, row]) => [
+      key,
+      { ...row, multiplier: row.multiplier ?? 1, addon: row.addon ?? true },
+    ]),
+  ) as Record<RowKey, Row>;
+  return { ...settings, rows, pause: { until: settings.pause?.until ?? null } };
+}
+
+/** The view with its settings (current and history) filled in by `withDefaults`. */
+export function withViewDefaults(view: AutomationView): AutomationView {
+  const version = (v: SettingsVersion): SettingsVersion => ({
+    ...v,
+    settings: withDefaults(v.settings),
+  });
+  return { ...view, current: version(view.current), history: view.history.map(version) };
+}
+
+/** `settings` with the pause's last day changed (null clears it). */
+export function withPause(settings: AutomationSettings, until: string | null): AutomationSettings {
+  return { ...settings, pause: { until } };
 }
 
 /** The page's row order: AlgoTest first, each platform's usual broker first. */
@@ -107,6 +152,15 @@ export function describeChanges(before: AutomationSettings, after: AutomationSet
       lines.push(`${rowLabel(key)} list: ${LIST_LABEL[a.list]} → ${LIST_LABEL[b.list]}`);
     if (a.upload !== b.upload)
       lines.push(`${rowLabel(key)} upload: ${onOff(a.upload)} → ${onOff(b.upload)}`);
+    if (a.multiplier !== b.multiplier)
+      lines.push(`${rowLabel(key)} multiplier: ${a.multiplier} → ${b.multiplier}`);
+    if (a.addon !== b.addon)
+      lines.push(`${rowLabel(key)} Buy add-on: ${onOff(a.addon)} → ${onOff(b.addon)}`);
+  }
+  if (before.pause.until !== after.pause.until) {
+    lines.push(
+      `Pause: ${before.pause.until ? `until ${before.pause.until}` : 'none'} → ${after.pause.until ? `until ${after.pause.until}` : 'none'}`,
+    );
   }
   return lines;
 }

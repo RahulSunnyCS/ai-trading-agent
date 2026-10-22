@@ -10,20 +10,25 @@ import {
   LIST_LABEL,
   type List,
   MASTER_LABEL,
+  MULTIPLIER_MAX,
+  MULTIPLIER_MIN,
   ROWS,
   applyNowOpen,
   describeChanges,
   githubOutcome,
   heldByMaster,
   withMaster,
+  withPause,
   withRow,
+  withViewDefaults,
 } from '../../lib/automation';
-import { formatIstDateTime } from '../../lib/format';
+import { formatDay, formatIstDateTime } from '../../lib/format';
 import { SCHEDULER_API, runNowError } from '../../lib/scheduler';
 import { Accordion } from '../ui/Accordion';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
+import { Input, NumberField } from '../ui/Input';
 import { RefreshButton } from '../ui/RefreshButton';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
@@ -61,8 +66,9 @@ export function AutomationSettingsCard() {
 
   useEffect(() => {
     if (!data) return;
-    setView(data);
-    setDraft(data.current.settings);
+    const next = withViewDefaults(data);
+    setView(next);
+    setDraft(next.current.settings);
   }, [data]);
 
   const saved = view?.current.settings ?? null;
@@ -80,8 +86,9 @@ export function AutomationSettingsCard() {
       toast(`Not saved: ${result.error}. Your changes are still here.`, 'error');
       return;
     }
-    setView(result.data);
-    setDraft(result.data.current.settings);
+    const next = withViewDefaults(result.data);
+    setView(next);
+    setDraft(next.current.settings);
     const sync = githubOutcome(result.data.current.github);
     toast(
       `Saved as version ${result.data.current.version}.${sync ? ` ${sync.text}.` : ''}`,
@@ -175,10 +182,83 @@ export function AutomationSettingsCard() {
                       disabled={saving || row.list === 'none'}
                       onChange={(upload) => setDraft(withRow(draft, key, { upload }))}
                     />
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                      <label
+                        htmlFor={`multiplier-${key}`}
+                        className="text-sm font-medium text-foreground"
+                      >
+                        Multiplier
+                        <span className="ml-2 text-xs font-normal text-muted">
+                          1 to {MULTIPLIER_MAX}, a whole number.{' '}
+                          {platform === 'Quantiply'
+                            ? 'Set on each algo the tool creates, then read back; the 09:25 and margin checks expect it.'
+                            : 'The deployer never sets it: above 1 it deploys nothing and you deploy by hand; the 09:25 and margin checks expect it.'}
+                        </span>
+                      </label>
+                      <NumberField
+                        id={`multiplier-${key}`}
+                        className="w-20"
+                        min={MULTIPLIER_MIN}
+                        max={MULTIPLIER_MAX}
+                        step={1}
+                        value={row.multiplier}
+                        disabled={saving}
+                        onChange={(multiplier) =>
+                          setDraft(withRow(draft, key, { multiplier: Math.round(multiplier) }))
+                        }
+                      />
+                    </div>
+                    <SettingSwitch
+                      label="Include the Buy add-on"
+                      description="Off leaves the add-on picks out of this list's exports, so they are not uploaded, deployed or checked."
+                      checked={row.addon}
+                      disabled={saving}
+                      onChange={(addon) => setDraft(withRow(draft, key, { addon }))}
+                    />
                   </div>
                 </div>
               );
             })}
+          </section>
+
+          <section className="space-y-3 border-t border-border pt-4" aria-label="Pause">
+            <div>
+              <p className="text-sm font-medium text-foreground">Pause uploads and deploys</p>
+              <p className="text-xs text-muted">
+                No uploads, top-ups or deploys for any session up to and including this day. Logins,
+                the picks, results and the live capture carry on, and nothing already uploaded or
+                enabled is removed (the stop button and the 15:40 switch-off do that).
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                type="date"
+                aria-label="Pause until"
+                className="w-44"
+                value={draft.pause.until ?? ''}
+                min={view.next_session}
+                disabled={saving}
+                onChange={(event) => setDraft(withPause(draft, event.target.value || null))}
+              />
+              {view.next_session ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={saving || draft.pause.until === view.next_session}
+                  onClick={() => setDraft(withPause(draft, view.next_session ?? null))}
+                >
+                  Skip next session ({formatDay(view.next_session)})
+                </Button>
+              ) : null}
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={saving || draft.pause.until === null}
+                onClick={() => setDraft(withPause(draft, null))}
+              >
+                Clear pause
+              </Button>
+            </div>
           </section>
 
           <section className="space-y-3 border-t border-border pt-4" aria-label="Save">

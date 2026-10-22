@@ -5,7 +5,11 @@ import { parseArgs } from 'node:util';
 import { sendText } from '@trading/notify';
 import { type Page, chromium } from 'playwright';
 import { BASE_URL } from './algotest.js';
-import { describeSource, readAutomation } from './automation-settings.js';
+import {
+  algotestMultiplierRefusal,
+  describeSource,
+  readAutomation,
+} from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
 import {
   ACTIVATE_LEAD_SECONDS,
@@ -148,6 +152,12 @@ async function main(): Promise<number> {
     const automation = readAutomation();
     if (!automation.masters.deploy) {
       console.log(`Automated deployment is off (${describeSource(automation)}): nothing deployed`);
+      return 0;
+    }
+    // BL-140 Phase 4: the deployer only checks the sheet's multiplier, never sets it
+    const refusal = algotestMultiplierRefusal(automation);
+    if (refusal) {
+      console.log(`${refusal} (${describeSource(automation)})`);
       return 0;
     }
   }

@@ -488,6 +488,11 @@ export interface LegNeed {
   premium: number | null;
 }
 
+/** A pick's legs at an account's platform multiplier (BL-140 Phase 4): every leg's lots times it. */
+export function scaleLegs(legs: LegNeed[], multiplier: number): LegNeed[] {
+  return multiplier === 1 ? legs : legs.map((l) => ({ ...l, lots: l.lots * multiplier }));
+}
+
 /** An AlgoTest `.algtst` (the export's file): `strategy.Ticker`, each leg's side, lots, premium. */
 export function legsFromAlgtst(doc: unknown): LegNeed[] {
   const s = (doc as { strategy?: Record<string, unknown> }).strategy ?? {};
@@ -712,6 +717,8 @@ export function parseDeployedOn(text: string, names: string[]): DeployedOn[] {
 export interface AlgoTestRowPicks {
   broker: BrokerKey;
   picks: string[];
+  /** the row's platform multiplier (BL-140 Phase 4): 1 when the row does not say */
+  multiplier?: number;
 }
 
 /**
@@ -728,9 +735,12 @@ export function checkAlgoTest(
   deployedOn: DeployedOn[],
 ): PlatformCheck {
   const wantedCount = new Map<string, BrokerKey[]>();
+  const wantedMult = new Map<string, Set<number>>();
   for (const row of rows) {
-    for (const name of row.picks)
+    for (const name of row.picks) {
       wantedCount.set(name, [...(wantedCount.get(name) ?? []), row.broker]);
+      wantedMult.set(name, (wantedMult.get(name) ?? new Set<number>()).add(row.multiplier ?? 1));
+    }
   }
   const out: PlatformCheck = {
     label,
@@ -763,8 +773,16 @@ export function checkAlgoTest(
       out.problems.push(`${name}: deployed ${row.deployed} times, expected ${brokers.length}`);
       continue;
     }
-    if (mult !== undefined && mult !== 1) {
-      out.problems.push(`${name}: multiplier ${mult}, not 1`);
+    // A pick two rows hold is one saved strategy with one multiplier: rows that disagree on it
+    // cannot both be right.
+    const asked = [...(wantedMult.get(name) ?? [1])];
+    if (asked.length > 1) {
+      out.problems.push(`${name}: the rows ask for different multipliers (${asked.join(', ')})`);
+      continue;
+    }
+    const expected = asked[0] ?? 1;
+    if (mult !== undefined && mult !== expected) {
+      out.problems.push(`${name}: multiplier ${mult}, not ${expected}`);
       continue;
     }
     if (mult === undefined) multUnread.push(name);
@@ -839,7 +857,7 @@ export function legLots(algo: unknown): number[] {
 
 /**
  * Quantiply's list for today's weekday against the day's picks: each pick enabled once, at
- * multiplier 1 and with the export's lots on every leg (`lots` by algo id, from `GET /algos/:id`;
+ * the account row's multiplier (1 unless the owner set it) and with the export's lots on every leg (`lots` by algo id, from `GET /algos/:id`;
  * absent = not read, said in a note), and no tool algo enabled that is not a pick. The owner's
  * own enabled algos are a note, not a problem.
  */
@@ -849,6 +867,8 @@ export function checkQuantiply(
   algos: QListed[],
   weekday: string,
   lots: Map<string, number[]>,
+  /** the account row's platform multiplier (BL-140 Phase 4) */
+  expectedMultiplier = 1,
 ): PlatformCheck {
   const out: PlatformCheck = {
     label,
@@ -876,8 +896,8 @@ export function checkQuantiply(
       continue;
     }
     const algo = on[0] as QListed;
-    if (algo.multiplier !== null && algo.multiplier !== 1) {
-      out.problems.push(`${pick.name}: multiplier ${algo.multiplier}, not 1`);
+    if (algo.multiplier !== null && algo.multiplier !== expectedMultiplier) {
+      out.problems.push(`${pick.name}: multiplier ${algo.multiplier}, not ${expectedMultiplier}`);
       continue;
     }
     const got = lots.get(algo.id);
@@ -897,6 +917,17 @@ export function checkQuantiply(
     else out.notes.push(`also enabled for ${weekday} (not the tool's): ${a.name}`);
   }
   return out;
+}
+
+/**
+ * BL-140 Phase 4: the line the 09:25 check adds when Settings › Automation has uploads and deploys
+ * paused through today's session, so a pick that is not on the platform reads as expected, not as
+ * a missed upload. Null when no pause covers today.
+ */
+export function pauseNote(pausedUntil: string | null): string | null {
+  return pausedUntil
+    ? `uploads and deploys are paused until ${pausedUntil} (Settings › Automation): missing picks are expected`
+    : null;
 }
 
 /** The headline: "AlgoTest T1 3/3 · Quantiply Core 3/3 ✅", then what is missing or extra. */

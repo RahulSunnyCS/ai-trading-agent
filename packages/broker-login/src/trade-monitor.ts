@@ -12,6 +12,7 @@ import {
   type Book,
   type Broker,
   effectiveRow,
+  pausedFor,
   readAutomation,
 } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
@@ -75,11 +76,13 @@ import {
   parseDayWiseListed,
   parseDeployedOn,
   parseMarginCsv,
+  pauseNote,
   pickNeed,
   pnlFromSocketFrame,
   quantiplyReading,
   readMtmCardsInPage,
   readTotalMtm,
+  scaleLegs,
   switchOn,
   waitKey,
 } from './monitor-plan.js';
@@ -307,11 +310,14 @@ class Monitor {
   }
 
   /** The lists each platform row uploads today (BL-140): only those rows have exports. */
-  rowBooks(platform: 'algotest' | 'quantiply'): Array<{ broker: Broker; book: Book }> {
-    const out: Array<{ broker: Broker; book: Book }> = [];
+  rowBooks(
+    platform: 'algotest' | 'quantiply',
+  ): Array<{ broker: Broker; book: Book; multiplier: number }> {
+    const out: Array<{ broker: Broker; book: Book; multiplier: number }> = [];
     for (const broker of ['finvasia', 'angelone'] as Broker[]) {
       const row = effectiveRow(this.automation, platform, broker);
-      if (row.upload && row.list !== 'none') out.push({ broker, book: row.list });
+      if (row.upload && row.list !== 'none')
+        out.push({ broker, book: row.list, multiplier: row.multiplier });
     }
     return out;
   }
@@ -801,7 +807,9 @@ class Monitor {
           }
           account.uses.push(`${label} ${p.source}`);
           for (const pick of p.picks) {
-            account.picks.push(pickNeed(pick.name, pick.legs, perStraddle, lotOf));
+            account.picks.push(
+              pickNeed(pick.name, scaleLegs(pick.legs, u.multiplier), perStraddle, lotOf),
+            );
           }
         } catch (error) {
           account.uses.push(`${label}: picks not read (${describe(error)})`);
@@ -899,7 +907,11 @@ class Monitor {
               `checked against last evening's expected ${r.book} picks (no recorded export yet)`,
             );
           }
-          rows.push({ broker: r.broker, picks: p.picks.map((x) => x.name) });
+          rows.push({
+            broker: r.broker,
+            picks: p.picks.map((x) => x.name),
+            multiplier: r.multiplier,
+          });
         }
         const page = await this.livePageReady(true);
         const text = await page.evaluate(() => document.body.innerText);
@@ -914,6 +926,8 @@ class Monitor {
         );
         c.problems.unshift(...missing);
         c.notes.push(...notes);
+        const note = pauseNote(pausedFor(this.automation, this.day));
+        if (note) c.notes.push(note);
         checks.push(c);
       } catch (error) {
         checks.push({
@@ -927,7 +941,7 @@ class Monitor {
         });
       }
     }
-    for (const { broker, book } of this.rowBooks('quantiply')) {
+    for (const { broker, book, multiplier } of this.rowBooks('quantiply')) {
       const label = `Quantiply ${BOOK_NAME[book]}${broker === 'finvasia' ? ' (Shoonya)' : ''}`;
       try {
         const p = await this.picks('quantiply', book);
@@ -951,9 +965,11 @@ class Monitor {
             notes.push(`${a.name}: lots not read (${describe(error)})`);
           }
         }
-        const c = checkQuantiply(label, picks, list, weekday, lots);
+        const c = checkQuantiply(label, picks, list, weekday, lots, multiplier);
         c.problems.unshift(...missing);
         c.notes.push(...notes);
+        const note = pauseNote(pausedFor(this.automation, this.day));
+        if (note) c.notes.push(note);
         checks.push(c);
       } catch (error) {
         checks.push({

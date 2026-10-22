@@ -136,6 +136,15 @@ The scheduler sets the repository variables on every save. `.env` switches (`ALG
   - A create that errors on this side is checked against a fresh list: a new algo of that name on the day is
     taken over (owned, read back) rather than left unowned. The ledger is checked writable before any change;
     if a row cannot be written, the run stops and the message carries the row to add by hand.
+  - After the creates, every owned algo with the export's content, created or kept (`QPlan.kept`), gets the
+    account's own broker when it has none (`PUT /algos/:id {broker}`, the web app's "Select Client ID / Broker";
+    the id is `pickBroker` over `GET /brokers`, looked up once and only when an algo is checked), so the owner's
+    switch-on by hand needs nothing else. Pure rules: `brokerBefore` (set only an unset broker on a disabled algo
+    whose content is the export's; another account's broker is never sent over, the menu is read-only once set)
+    and `brokerOutcome` (one read-back after the call decides, also after a call that errored). An algo found
+    enabled under the call is switched off at once and read back; content changed under it is re-owned under a
+    `mismatch:` sha; a network blip exits 1 (retried: the next run finds the algo kept and checks it again); a
+    refusal or no single matching account needs the owner (exit 3).
   - `--apply` needs `QUANTIPLY_UPLOAD=on`; Telegram type `broker.quantiply`. It never enables (deploys) an algo.
   - It reads `latest-core.json`, written by `obt rotation quantiply-export`.
   - The login, the refused-login hold and the token are `src/quantiply-session.ts`, shared with the deployer.

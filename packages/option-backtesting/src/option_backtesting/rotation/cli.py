@@ -235,6 +235,28 @@ def _picks_or_skip(day, book, preview, next_session, variants, wait, from_settin
         return None
 
 
+def _without_addon(picks, platform: str, book: str, settings: dict | None):
+    """BL-140 Phase 4: under --from-settings, the Buy add-on picks stay out of the export when no
+    row that uploads this list wants them. The upload, deploy and checks all read the export, so
+    leaving them out here is the one place it takes effect; an add-on already uploaded is then
+    "no longer picked" and goes through the uploader's own delete rules."""
+    if settings is None or not picks.buy:
+        return picks
+    from dataclasses import replace
+
+    from . import automation_settings
+
+    if automation_settings.addon_wanted(settings, platform, book):
+        if automation_settings.addon_mixed(settings, platform, book):
+            typer.echo(
+                f"{platform} {book}: Buy add-on KEPT: one export serves every account and another "
+                "account uploading this list wants it, so the account with it off gets it too"
+            )
+        return picks
+    typer.echo(f"{platform} {book}: Buy add-on left out (Settings › Automation)")
+    return replace(picks, buy=[])
+
+
 def _end_missing(missing: list[str], books: list[str]) -> None:
     """Exit 2 (the scheduler retries) only when no list could be exported. With some exported,
     exit 0 so the uploads run; the uploader refuses a list whose export is stale and says so."""
@@ -244,14 +266,15 @@ def _end_missing(missing: list[str], books: list[str]) -> None:
         typer.echo(f"not exported yet: {', '.join(missing)}")
 
 
-def _settings_books(platform: str) -> list[str]:
-    """BL-140: the lists the dashboard's Settings › Automation gives `platform` (empty: none)."""
+def _settings_books(platform: str) -> tuple[list[str], dict]:
+    """BL-140: the lists the dashboard's Settings › Automation gives `platform` (empty: none), and
+    the settings they came from (read once, so the add-on decision is of the same version)."""
     from . import automation_settings
 
     settings, source = automation_settings.read()
     books = automation_settings.upload_books(settings, platform)
     typer.echo(f"{platform}: {', '.join(books) or 'nothing to upload'} ({source})")
-    return books
+    return books, settings
 
 
 _FROM_SETTINGS_HELP = (
@@ -288,7 +311,7 @@ def algotest_export(
     from . import algtst_export as ax
     from . import store
 
-    books = _settings_books("algotest") if from_settings else [book]
+    books, settings = _settings_books("algotest") if from_settings else ([book], None)
     for b in books:
         if b not in ax.BOOKS:
             raise typer.BadParameter(f"--book must be one of {', '.join(ax.BOOKS)}")
@@ -300,6 +323,7 @@ def algotest_export(
         if picks is None:
             missing.append(b)
             continue
+        picks = _without_addon(picks, "algotest", b, settings)
         try:
             exports = ax.build(picks)
         except (Unmappable, FileNotFoundError) as error:
@@ -345,7 +369,7 @@ def quantiply_export(
     from . import quantiply_export as qx
     from . import store
 
-    books = _settings_books("quantiply") if from_settings else [book]
+    books, settings = _settings_books("quantiply") if from_settings else ([book], None)
     for b in books:
         if b not in qx.BOOKS:
             raise typer.BadParameter(f"--book must be one of {', '.join(qx.BOOKS)}")
@@ -357,6 +381,7 @@ def quantiply_export(
         if picks is None:
             missing.append(b)
             continue
+        picks = _without_addon(picks, "quantiply", b, settings)
         try:
             built = qx.build(picks)
         except (Unmappable, FileNotFoundError) as error:

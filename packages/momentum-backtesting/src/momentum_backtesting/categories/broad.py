@@ -72,7 +72,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-from momentum_backtesting import engine
+from momentum_backtesting import engine, monday_fills
 from momentum_backtesting import tax as tax_mod
 from momentum_backtesting.categories import compose, daily_moves, residual, snapshots, sources
 from momentum_backtesting.categories import liquidity as liquidity_mod
@@ -1220,6 +1220,10 @@ def run_broad_backtest(
     off_exit_rank: int = 20,
     cost_pct: float = 0.10,
     signal_delay: int = 0,
+    # BL-036 Phase 2: "mon_open" fills an order decided on Friday W at the open of the first
+    # session after W (monday_fills.py) and values every holding at those prices; needs
+    # signal_delay 0. "fri_close" (default) is the backtest's original assumption.
+    execution: Literal["fri_close", "mon_open"] = "fri_close",
     portfolio: Literal["buffer", "slots"] = "buffer",
     rebalance: Literal["weekly", "monthly"] = "weekly",
     rebalance_every: int = 1,
@@ -1325,6 +1329,13 @@ def run_broad_backtest(
     all, it only changes which categories this function's own
     `compute_category_selection_mass_exit` call admits.
     """
+    if execution not in ("fri_close", "mon_open"):
+        raise ValueError(f"execution {execution!r} is not available for Broad Momentum")
+    if execution == "mon_open" and signal_delay != 0:
+        raise ValueError(
+            "Monday-open fills need signal delay 0: the ranking is made on Friday and the order "
+            "fills at the next open. With a delay the fill would be a week and a few days late."
+        )
     if category_mode == "off" and mass_exit_response != "off":
         raise ValueError("mass_exit_response needs category_mode='on'")
     if category_mode == "off" and max_category is not None:
@@ -1435,6 +1446,7 @@ def run_broad_backtest(
         exit_rank=effective.exit_rank,
         cost_pct=cost_pct,
         signal_delay=signal_delay,
+        execution=execution,
         start=start,
         end=end,
         universe=tuple(prices.columns),
@@ -1486,10 +1498,16 @@ def run_broad_backtest(
         )
         buy_weights = pd.DataFrame(1.0, index=picked_through.index, columns=picked_through.columns)
         buy_weights = buy_weights.mask(picked_through.eq(top, axis=0), float(top_sector_weight))
+    fills = (
+        monday_fills.build(prices, ranking.column_to_base_symbol).prices
+        if execution == "mon_open"
+        else None
+    )
     result = engine.run_backtest(
         prices,
         includes,
         config,
+        trade_prices=fills,
         buy_weights=buy_weights,
         external_ranks=(ranks_full, scores_full),
         mass_exit_weeks=mass_exit_weeks if mass_exit_response == "throttle" else None,

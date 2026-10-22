@@ -35,8 +35,20 @@ Three master switches, then one block per platform and broker.
   - **Adaptive Classic** is the live Core list;
   - **Adaptive Tuned** is the T1 list.
 - **Upload the list's picks:** the evening job puts tomorrow's picks there, and the 09:16 top-up adds any that changed. It needs a list.
+- **Multiplier:** a whole number from 1 to 10 (1 unless you set it): the platform multiplier, so each strategy runs at that many times its lots.
+  - **Quantiply:** the uploader sets it on each algo it creates and reads it back; a different saved value is reported and nothing is enabled. A changed multiplier replaces the algo at the next evening upload.
+  - **AlgoTest:** the deployer never sets the sheet's multiplier. With a row above 1 it deploys nothing and says so; you deploy by hand at that multiplier.
+  - The 09:25 deploy check expects the row's multiplier instead of 1, and the 09:05 margin check counts it. **Raising it above 1 has not been tried live yet: watch the first upload.**
+- **Include the Buy add-on:** whether the Buy add-on picks go with the list. Off leaves them out of the export, so they are not uploaded, deployed or checked, and an add-on already uploaded counts as no longer picked: the evening run deletes it unless it is deployed on /live (then it is kept and reported). On AlgoTest and Quantiply an export serves every account that uploads that list, so the add-on stays in while any of them has it on.
 
 A warning badge on a block means its master switch holds it back.
+
+**Pause uploads and deploys.** Below the blocks, pick a day, or press **Skip next session**, to stop every upload, top-up and deploy for each session up to and including that day. **Clear pause** removes it.
+
+- The evening jobs prepare the next trading session; the 09:16–09:21 top-ups and deploys are for today. A pause through Monday therefore also holds Friday's evening jobs.
+- Logins, the picks, the results, the live capture and the checks carry on, and the 09:00 morning message says a pause is on.
+- A pause removes nothing already uploaded or enabled. The Telegram stop button squares off, and the 15:40 Quantiply switch-off still runs.
+- If the saved settings cannot be read, the upload and deploy jobs hold and say so, rather than assume there is no pause.
 
 **Saving.** Your edits are a draft until **Save**. The changes are listed above the button, and **Discard changes** puts the saved settings back. Each save:
 

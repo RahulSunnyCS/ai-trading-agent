@@ -469,7 +469,12 @@ contract, not a shared service).
   sends a Telegram message naming the rule and quoting the action written in the file. Never
   trades. **Numbers in the TOML are the owner's:** change one only in a commit that also updates
   `tests/test_live_rules.py` and logs the reason in BL-025. Drawdown and the money gate read the
-  frozen ensemble's model portfolio rebased at `stage.paper_start` (`tracker.run_config`); the
+  followed strategy's equity (`strategy.config_file` names its sleeves,
+  `search_spaces/bl142_followed.json`: Four Sectors Monthly, No Tilt on four Fridays; the lots are put
+  in from cash one Friday after another from `stage.paper_start`, each as the sleeve that trades that
+  Friday, and `live_rules.twr_index` makes the time-weighted index the drawdown is measured on, so a
+  new lot never lifts the peak; without that key, the BL-010 frozen ensemble rebased at
+  `paper_start`, `tracker.run_config`); the
   trailing rule needs the journal-scored live series (BL-024 Phase 2, not built) and says "not
   measurable" until then; stage `live` is reported as blocked until real fills are recorded
   (BL-024 Phase 3). A breach is sent untagged (never switchable); the routine status is the
@@ -555,6 +560,12 @@ contract, not a shared service).
   `uv run python scripts/update-goldens.py --accept-results --reason "..."` and commit the
   changelog entry it writes. A new request field needs a scenario (`test_coverage.py`).
   `test_lookahead.py` re-runs each dataset on data cut off at a date; never weaken it.
+  `test_invariants.py` checks every frozen result is internally consistent (totals, drawdown,
+  calendar years compound, shares in [0,1], the position cap on weekly buffer runs, trades): a check that
+  fails on a baseline is a finding for BL-001's Log, never a reason to loosen it. `test_nightly.py`
+  (`MOMENTUM_GOLDEN_FULL=1`; CI sets it on the schedule trigger) re-runs the scenarios in reverse
+  order and checks that putting each non-default setting back changes the result (`INERT` lists
+  the ones that cannot, with reasons).
 - `patterns/` (`mbt patterns detect|formation|gallery|study|rank|holdout`) — BL-042's chart-pattern
   POC (tight range, flag, cup and handle). Research only: nothing here reaches `api.py`, the
   default ranking or the weekly signal. Rules live in `search_spaces/bl042_criteria.json` (+
@@ -601,6 +612,18 @@ contract, not a shared service).
   feeds Custom Index only). A new dated row moves the live signal from its launch week on. Anything that *describes* the past
   with category membership must respect the date too: `exit_reasons.explain_exits(launches=...)` drops a
   dated category from a stock's tags for weeks before it launched, and `api._broad_parts` passes it.
+- `monday_fills.py` (BL-036 Phase 2, BL-010 E13) - Monday-open fills for a stock-based run.
+  `BacktestRequest.execution="mon_open"` on a **Broad** request builds a fill table (`run_backtest(
+  trade_prices=...)`, the same hook the ETF dataset uses) from the weekly adjusted close times one
+  plus the first following session's `open_gap` (`categories/daily_moves.py`); other columns use their
+  `daily/<name>.csv` open, or the signal close when there is none. Every buy, sell and holding is
+  valued on those prices, so the equity curve is sampled at Monday opens (its drawdown is not
+  comparable point for point with a Friday-close run). Needs `signal_delay` 0 (422 otherwise);
+  `mon_10am` is refused for Broad; Stock and Custom Index refuse any non-Friday fill (BL-036 Phase
+  2b). `circuit_exposure.lock_masks(session="first")` aligns the lock masks to the Monday session. A
+  Broad result carries `fill_companion` (`api._fill_companion`: the same run filled the other way, one
+  extra engine pass per sleeve; the weekly job skips it). In `saved_identity` a Broad `execution` is
+  dropped while it is `fri_close`, so no existing fingerprint moves.
 - `categories/exit_reasons.py` — display-only: for Broad Momentum closed trades the engine records as
   "ineligible" (rank NaN: the stock stopped being selected), fills the blank `exit_rank` (pool rank, else
   momentum rank) and sets a specific `reason` + `exit_cause` (`liquidity` with the failing gate test and its

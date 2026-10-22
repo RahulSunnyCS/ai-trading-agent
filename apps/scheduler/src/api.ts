@@ -13,6 +13,7 @@ import {
 } from './automation.js';
 import { rowAlive } from './history.js';
 import { JOBS, type Job, maxRunMinutes } from './jobs.js';
+import { nextSession, pausedReason } from './pause.js';
 import { type RunContext, runJob } from './runner.js';
 import { nextDue, previousDue } from './schedule.js';
 import { heldReason } from './stop-hold.js';
@@ -161,7 +162,7 @@ export function createApi({
     const busy = busyReason(job);
     if (busy) return fail(409, busy);
     // BL-143: Apply now and Run now say so at once (runJob would only record it as held)
-    const held = heldReason(job.id, ctx.env);
+    const held = heldReason(job.id, ctx.env) ?? pausedReason(job.id, ctx.env, now());
     if (held) return fail(409, held);
     const before = ctx.history.last(job.id)?.id ?? 0;
     inFlight.add(job.id);
@@ -211,6 +212,7 @@ export function createApi({
       effective: Object.fromEntries(ROW_KEYS.map((k) => [k, effective(current.settings, k)])),
       github: githubVariables(current.settings).vars,
       history: settings.history(20),
+      next_session: nextSession(now()),
     });
   }
 

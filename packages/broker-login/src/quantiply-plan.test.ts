@@ -5,6 +5,8 @@ import {
   type QAlgo,
   type QLedgerRow,
   type QWanted,
+  brokerBefore,
+  brokerOutcome,
   istWeekday,
   needsAttentionQ,
   ownedIds,
@@ -15,6 +17,7 @@ import {
   sessionOver,
   summaryQ,
   weekdayOf,
+  withMultiplier,
 } from './quantiply-plan.js';
 
 const P = 'Core · ';
@@ -264,5 +267,177 @@ test('read-back: server defaults are ignored, a changed or missing field is not'
   assert.deepEqual(readBackDiffs(sent, saved), [
     'configurations.endTime',
     'configurations.legs[1].stoploss.value',
+  ]);
+});
+
+test('kept lists the owned copy each kept pick stands for, evening and morning', () => {
+  const ledger = [
+    row('create', '1', `${P}A`),
+    row('create', '2', `${P}A`),
+    row('create', '3', `${P}B`, 'old'),
+  ];
+  const algos = [algo('1', `${P}A`, 'WED'), algo('2', `${P}A`, 'WED'), algo('3', `${P}B`, 'WED')];
+  const wants = [want(`${P}A`), want(`${P}B`)];
+  const evening = planQ('evening', 'WED', MON_AFTER_CLOSE, wants, ledger, algos);
+  // one current copy of A is kept (the duplicate is deleted); B's content changed: recreated
+  assert.deepEqual(
+    evening.kept.map((a) => a.id),
+    ['1'],
+  );
+  const morning = planQ(
+    'topup',
+    'WED',
+    { weekday: 'WED', sessionOver: false },
+    wants,
+    ledger,
+    algos,
+  );
+  assert.deepEqual(
+    morning.kept.map((a) => a.id),
+    ['1', '2'],
+  );
+  assert.deepEqual(morning.changed, [`${P}B`]);
+});
+
+test('brokerBefore sets an unset broker on a disabled algo only', () => {
+  assert.equal(brokerBefore({ enabled: false, broker: '' }, 'acct'), 'set');
+  assert.equal(brokerBefore({ enabled: true, broker: 'acct' }, 'acct'), 'done');
+  assert.deepEqual(brokerBefore({ enabled: false, broker: 'other' }, 'acct'), {
+    skip: 'its broker is another account',
+  });
+  assert.deepEqual(brokerBefore({ enabled: true, broker: '' }, 'acct'), {
+    skip: 'ENABLED with no broker: left as it is',
+  });
+});
+
+test('brokerOutcome: set and read back clean is ok', () => {
+  const o = brokerOutcome({
+    brokerId: 'acct',
+    after: { enabled: false, broker: 'acct' },
+    diffs: [],
+  });
+  assert.deepEqual(o, {
+    ok: true,
+    note: 'broker set',
+    switchOff: false,
+    mismatch: false,
+    retry: false,
+  });
+});
+
+test('brokerOutcome: a call that errored but applied is ok (the read-back decides)', () => {
+  const o = brokerOutcome({
+    brokerId: 'acct',
+    callError: { text: 'timeout', refused: false },
+    after: { enabled: false, broker: 'acct' },
+    diffs: [],
+  });
+  assert.equal(o.ok, true);
+});
+
+test('brokerOutcome: a blip is retried, a refusal is for the owner', () => {
+  const after = { enabled: false, broker: '' };
+  const blip = brokerOutcome({
+    brokerId: 'acct',
+    callError: { text: 'HTTP 502', refused: false },
+    after,
+    diffs: [],
+  });
+  assert.equal(blip.ok, false);
+  assert.equal(blip.retry, true);
+  assert.match(blip.note, /broker not set: HTTP 502/);
+  const refused = brokerOutcome({
+    brokerId: 'acct',
+    callError: { text: 'HTTP 400', refused: true },
+    after,
+    diffs: [],
+  });
+  assert.equal(refused.retry, false);
+  const silent = brokerOutcome({ brokerId: 'acct', after, diffs: [] });
+  assert.equal(silent.retry, false);
+  assert.match(silent.note, /reads back unset/);
+});
+
+test('brokerOutcome: a failed read-back is a retry, never a mismatch', () => {
+  const o = brokerOutcome({ brokerId: 'acct', after: { failed: 'HTTP 503' }, diffs: [] });
+  assert.equal(o.ok, false);
+  assert.equal(o.mismatch, false);
+  assert.equal(o.retry, true);
+  const refusedThenFailed = brokerOutcome({
+    brokerId: 'acct',
+    callError: { text: 'HTTP 400', refused: true },
+    after: { failed: 'HTTP 503' },
+    diffs: [],
+  });
+  assert.equal(refusedThenFailed.retry, false);
+});
+
+test('brokerOutcome: enabled under the call is switched off; changed content is a mismatch', () => {
+  const enabled = brokerOutcome({
+    brokerId: 'acct',
+    after: { enabled: true, broker: 'acct' },
+    diffs: [],
+  });
+  assert.equal(enabled.switchOff, true);
+  assert.equal(enabled.ok, false);
+  assert.equal(enabled.retry, false);
+  const changed = brokerOutcome({
+    brokerId: 'acct',
+    after: { enabled: false, broker: 'acct' },
+    diffs: ['configurations.startTime'],
+  });
+  assert.equal(changed.mismatch, true);
+  assert.equal(changed.retry, false);
+  assert.match(changed.note, /content changed under the broker call: configurations.startTime/);
+});
+
+test('withMultiplier: 1 is the export untouched, N adds only configurations.multiplier', () => {
+  // the real export shape: no multiplier key at all (Quantiply adds `multiplier: 1` when it saves)
+  const text = JSON.stringify({
+    name: 'Core · N_x_0917',
+    day: ['WED'],
+    configurations: { legs: [{ quantity: 2 }] },
+  });
+  assert.equal(withMultiplier(text, 1), text); // the very same text: sha and read-back unchanged
+  const three = JSON.parse(withMultiplier(text, 3));
+  assert.equal(three.configurations.multiplier, 3);
+  assert.deepEqual(three.configurations.legs, [{ quantity: 2 }]); // the lots stay the export's
+  assert.equal(three.name, 'Core · N_x_0917');
+  assert.equal(withMultiplier(text, 3), withMultiplier(text, 3)); // deterministic for the sha
+  assert.notEqual(withMultiplier(text, 3), withMultiplier(text, 2));
+  // a body that already says 1 is fine too
+  const one = JSON.stringify({ configurations: { multiplier: 1 } });
+  assert.equal(JSON.parse(withMultiplier(one, 2)).configurations.multiplier, 2);
+});
+
+test('withMultiplier works on the web app’s own captured create request', () => {
+  const real = readFileSync(
+    new URL(
+      '../../option-backtesting/tests/fixtures/quantiply/create_request.json',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+  assert.equal(withMultiplier(real, 1), real);
+  const body = JSON.parse(withMultiplier(real, 2));
+  assert.equal(body.configurations.multiplier, 2);
+  assert.equal(body.name, JSON.parse(real).name);
+});
+
+test('withMultiplier refuses a bad multiplier or a body that is not an export', () => {
+  const text = JSON.stringify({ configurations: {} });
+  for (const bad of [0, 11, 1.5, Number.NaN, -1]) assert.throws(() => withMultiplier(text, bad));
+  assert.throws(() => withMultiplier(JSON.stringify({ configurations: { multiplier: 2 } }), 3));
+  assert.throws(() => withMultiplier(JSON.stringify({ name: 'x' }), 3));
+  assert.throws(() => withMultiplier(JSON.stringify({ configurations: null }), 3));
+  // at 1 nothing is parsed or checked: an odd body passes through as it always did
+  assert.equal(withMultiplier('{"name":"x"}', 1), '{"name":"x"}');
+});
+
+test('the read-back catches a multiplier Quantiply saved differently from what was sent', () => {
+  const sent = JSON.parse(withMultiplier(JSON.stringify({ day: ['WED'], configurations: {} }), 3));
+  assert.deepEqual(readBackDiffs(sent, { configurations: { multiplier: 3 } }), []);
+  assert.deepEqual(readBackDiffs(sent, { configurations: { multiplier: 1 } }), [
+    'configurations.multiplier',
   ]);
 });

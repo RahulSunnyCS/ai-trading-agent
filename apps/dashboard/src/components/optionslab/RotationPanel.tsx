@@ -78,6 +78,7 @@ import { RotationDailyLog } from './RotationDailyLog';
 import { RotationDrawdowns } from './RotationDrawdowns';
 import { RotationDrift } from './RotationDrift';
 import { RotationExplain } from './RotationExplain';
+import { RotationLiveVsPaper } from './RotationLiveVsPaper';
 import { RotationLotPlans } from './RotationLotPlans';
 import { RotationPulse } from './RotationPulse';
 import { RotationRegime } from './RotationRegime';
@@ -516,6 +517,21 @@ export function RotationPanel() {
           </p>
         </header>
         <RotationLotPlans />
+      </section>
+
+      <section aria-labelledby="band-live-vs-paper" className="space-y-3">
+        <header>
+          <h2
+            id="band-live-vs-paper"
+            className="text-base font-semibold tracking-tight text-foreground"
+          >
+            Live vs paper
+          </h2>
+          <p className="mt-0.5 text-sm text-muted">
+            What AlgoTest and Quantiply actually made, against the backtest for the same picks.
+          </p>
+        </header>
+        <RotationLiveVsPaper />
       </section>
 
       <section aria-labelledby="band-working" className="space-y-3">

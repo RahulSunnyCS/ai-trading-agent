@@ -1253,8 +1253,19 @@ def _stock_backtest(req: BacktestRequest) -> dict:
     return _full(*_stock_parts(req))
 
 
+def _refuse_monday_fill(req: BacktestRequest, dataset: str) -> None:
+    """Stock and Custom Index have no Monday-open fill yet (BL-036 Phase 2b); Broad and the ETF
+    dataset do. Refuse the option rather than run a Friday-close backtest under its name."""
+    if req.execution != "fri_close":
+        raise HTTPException(
+            422,
+            f"Monday-open fills are not available for {dataset} yet; choose Friday close.",
+        )
+
+
 def _stock_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
     report("loading")
+    _refuse_monday_fill(req, "Stock")
     stock = DATA.get_stock()
     classification = _stock_classification(stock)
     includes = {cid: include for cid, (include, _group) in classification.items()}
@@ -1530,6 +1541,7 @@ def _custom_index_backtest(req: BacktestRequest) -> dict:
 
 def _custom_index_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
     report("loading")
+    _refuse_monday_fill(req, "Custom Index")
     if not (
         db_read.has_category_data()
         or (DATA_DIR / "categories" / "category_membership.csv").exists()
@@ -1958,8 +1970,11 @@ def _run_broad(
         )
     uc_locked = lc_locked = None
     if req.broad_respect_circuits:
+        # An order fills on the first session after the signal Friday under a Monday-open run.
         uc_locked, lc_locked = circuit_exposure_mod.lock_masks(
-            ranking.column_to_base_symbol, ranking.prices.index
+            ranking.column_to_base_symbol,
+            ranking.prices.index,
+            session="first" if req.execution == "mon_open" else "last",
         )
     return broad.run_broad_backtest(
         outer_prices=outer_prices,
@@ -1984,6 +1999,7 @@ def _run_broad(
         off_exit_rank=req.broad_off_exit_rank,
         cost_pct=req.cost_pct,
         signal_delay=req.signal_delay,
+        execution=req.execution,
         portfolio=req.portfolio,
         rebalance=req.rebalance,
         rebalance_every=req.rebalance_every,
@@ -2110,6 +2126,56 @@ def _extended_tags_companion(
         return {
             "status": "failed",
             "reason": "The extended tags could not be applied to this run (see the server log).",
+        }
+
+
+def _fill_companion(
+    req: BacktestRequest,
+    ranking: broad.UniverseRanking,
+    outcome: broad.BroadBacktestResult,
+    outer_prices: pd.DataFrame,
+    *,
+    split: tuple[Result, list[BacktestRequest]] | None = None,
+) -> dict:
+    """The same run filled the other way (BL-036 Phase 2, BL-010 E13): at the open of the first
+    session after the signal Friday if this run fills at Friday's close, and the reverse. The
+    cost of trading on Monday, beside every result. Needs signal delay 0 (the ranking is made on
+    Friday, the order fills at the next open); with a delay there is no Monday fill to compare.
+    The ranking does not depend on the fill, so the run's own `ranking` is reused: one extra
+    engine pass per sleeve. Never raises; a failure is reported in the payload instead."""
+    if req.execution not in ("fri_close", "mon_open"):
+        return {"status": "not_applicable", "reason": "this fill is not a Friday or Monday fill"}
+    if req.signal_delay != 0:
+        return {
+            "status": "not_applicable",
+            "reason": "Monday-open fills need signal delay 0, so there is nothing to compare",
+        }
+    other_execution = "fri_close" if req.execution == "mon_open" else "mon_open"
+    try:
+        this_run = _equity_summary(split[0] if split else outcome.result)
+        sleeves = split[1] if split else [req]
+        others = [
+            _run_broad(
+                r.model_copy(update={"execution": other_execution}), ranking, outer_prices
+            ).result
+            for r in sleeves
+        ]
+        other = _equity_summary(tranches.blend_reset(others) if split else others[0])
+        monday, friday = (this_run, other) if req.execution == "mon_open" else (other, this_run)
+        return {
+            "status": "computed",
+            "this_execution": req.execution,
+            "other_execution": other_execution,
+            "friday_close": friday,
+            "monday_open": monday,
+            "cagr_change": monday["cagr"] - friday["cagr"],
+            "max_drawdown_change": monday["max_drawdown"] - friday["max_drawdown"],
+        }
+    except Exception:  # noqa: BLE001 - a companion figure must never fail the run
+        logging.getLogger(__name__).exception("fill companion failed")
+        return {
+            "status": "failed",
+            "reason": "The other fill could not be run for this strategy (see the server log).",
         }
 
 
@@ -2240,6 +2306,17 @@ def _broad_parts(
         if companion
         else {"status": "skipped", "reason": "weekly run"}
     )
+    fill_figure = (
+        _fill_companion(
+            req,
+            ranking,
+            outcome,
+            outer_prices,
+            split=(result, phase_reqs) if phases else None,
+        )
+        if companion
+        else {"status": "skipped", "reason": "weekly run"}
+    )
     report("analysing")
     core, lazy = analysis.payload_parts(
         result,
@@ -2273,6 +2350,7 @@ def _broad_parts(
     )
     core["missing_symbols"] = outcome.ranking.missing_symbols
     core["companion"] = companion_figure
+    core["fill_companion"] = fill_figure
     base_trades = lazy["trades"]
 
     def trades() -> object:
@@ -2466,6 +2544,16 @@ def _outer_with_sentinel(
     return outer.sort_index()
 
 
+def _decision_request(req: BacktestRequest) -> BacktestRequest:
+    """A live decision is made on Friday's data: which names to buy and sell does not depend on the
+    fill price, and the flat sentinel week the decision runs add has no Monday to fill on (the
+    engine would drop it, moving the decision a week back). So a Monday-open request decides as
+    its Friday-close twin (BL-036 Phase 2)."""
+    return (
+        req if req.execution == "fri_close" else req.model_copy(update={"execution": "fri_close"})
+    )
+
+
 def _broad_sentinel_run(
     req: BacktestRequest, *, ahead: bool = False
 ) -> tuple[broad.BroadBacktestResult, pd.Timestamp]:
@@ -2495,7 +2583,7 @@ def _broad_decide(
     with every rule it has (see `_broad_sentinel_run`). Weeks after `week` are dropped first."""
     sentinel = week + pd.Timedelta(days=7)
     outcome = _run_broad(
-        req.model_copy(update={"end": sentinel.strftime("%Y-%m-%d")}),
+        _decision_request(req).model_copy(update={"end": sentinel.strftime("%Y-%m-%d")}),
         rebalance.persisted_broad_ranking(ranking, through=week),
         _outer_with_sentinel(week, sentinel, outer_prices),
     )
@@ -2543,7 +2631,7 @@ def _broad_live_sentinel_run(
     ranking, _ltp, _symbols, week = _broad_live_ranking(req, quotes, today)
     sentinel = week + pd.Timedelta(days=7)
     outcome = _run_broad(
-        req.model_copy(update={"end": sentinel.strftime("%Y-%m-%d")}),
+        _decision_request(req).model_copy(update={"end": sentinel.strftime("%Y-%m-%d")}),
         ranking,
         _outer_with_sentinel(week, sentinel),
     )
@@ -2788,7 +2876,7 @@ def _rebalance_model(req: RebalanceRequest, now: datetime) -> dict:
             settlement_week = week + pd.Timedelta(days=7)
             model_req, schedule = model_request(week, settlement_week)
             outer = _outer_with_sentinel(week, settlement_week)
-            outcome = _run_broad(model_req, preview_ranking, outer).result
+            outcome = _run_broad(_decision_request(model_req), preview_ranking, outer).result
             target = rebalance.model_holdings(outcome, week)
     except (ValueError, KeyError, broad.TotalMarketDataNotFoundError) as error:
         raise HTTPException(422, str(error)) from None
