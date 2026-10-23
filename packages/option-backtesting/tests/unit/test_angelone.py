@@ -395,3 +395,52 @@ def test_fallback_failure_keeps_the_fyers_login_hint(monkeypatch):
     with pytest.raises(auth.AngelNetworkError) as err:
         evening.collect_with_fallback(DAY, ["NIFTY"], log=lambda m: None)
     assert "Fyers login" in str(err.value) and "token expired" in str(err.value)
+
+
+def test_a_plain_text_rate_limit_keeps_its_words(monkeypatch):
+    """SmartAPI's rate limit is a plain-text 403: its words reach the back-off (2026-10-23)."""
+    import io
+    import urllib.error
+
+    def limited(request, timeout):
+        raise urllib.error.HTTPError(
+            request.full_url,
+            403,
+            "Forbidden",
+            {},
+            io.BytesIO(b"Access denied because of exceeding access rate"),
+        )
+
+    monkeypatch.setattr(auth.urllib.request, "urlopen", limited)
+    status, body = auth.post_json("/x", {}, {})
+    assert status == 403
+    assert body["message"] == "HTTP 403, not JSON: Access denied because of exceeding access rate"
+    assert auth.rate_limited(body["message"])
+
+
+def test_a_call_backs_off_through_a_plain_text_rate_limit(monkeypatch):
+    from option_backtesting.angelone import client as client_mod
+
+    limited = (403, {"status": False, "message": "HTTP 403, not JSON: exceeding access rate"})
+    answers = [limited, limited, (200, {"status": True, "data": []})]
+    sent = []
+
+    def post(path, body, headers):
+        sent.append(path)
+        return answers[len(sent) - 1]
+
+    monkeypatch.setattr(client_mod.time, "sleep", lambda s: None)
+    c = AngelClient(auth.Session("jwt", "key"), min_interval_s=0, post=post)
+    assert c._call(CANDLE_PATH, {}) == {"status": True, "data": []}
+    assert len(sent) == 3
+
+
+def test_a_rate_limited_login_is_not_a_refused_one():
+    def post(path, body, headers):
+        return 403, {
+            "status": False,
+            "message": "HTTP 403, not JSON: Access denied because of exceeding access rate",
+        }
+
+    with pytest.raises(auth.AngelUnavailableError):
+        auth.login(CREDS, post=post, now=lambda: 10, sleep=lambda s: None)
