@@ -18,7 +18,7 @@ the end of the 1-minute bar, so on fast days the realised loss overshoots the le
 |---|---|---|---|---|
 | BL-070 | ₹2,500 vs no overall stop (leg stops kept), all 150 Widesl variants | 2025-09-01 → 2026-10-08, 1 lot, before charges | **Keep only for SENSEX OTM2**; elsewhere the stop costs more than it saves | [BL-070][bl070] |
 | BL-098 Phase 2 | none, ₹1,000, ₹1,500, ₹2,000, ₹2,500, ₹3,000, ₹3,500, ₹4,000 | holdout 2025-10-09 → 2026-10-09, **after charges** | Descriptive ranking; Phase 3 pending | [BL-098 report][bl098q] |
-| BL-156 | Overall stop checked at each 1-minute candle close (the engine) vs on every tick (live; modelled from each minute's high / low, calibrated on the 23 Oct live stop) | T1's and Core's Adaptive picks, 2025-01-10 → 2026-10-22, 1 lot, after brokerage | **No meaningful difference**: close +₹56 / day on T1, 90% [−17, +143]; Core +₹39 [−35, +131] | [BL-156][bl156] |
+| BL-156 | Overall stop checked at each 1-minute candle close (the engine) vs on every tick (live; modelled from each minute's high / low, calibrated on the 23 Oct live stop) | T1's and Core's Adaptive picks, 2025-01-10 → 2026-10-22, 1 lot, after brokerage | **No meaningful difference**: close +₹60 / day on T1, 90% [−14, +149]; Core +₹41 [−33, +133] | [BL-156][bl156] |
 
 Family means, 1 lot, with ₹2,500 → without ([BL-070][bl070], before charges):
 
@@ -48,7 +48,7 @@ baseline ₹13,883 in the afternoon.
 
 - **Paper checks this stop at each minute's close; Quantiply checks every tick** (BL-156). On a spike that
   comes back inside the minute, live stops out where paper does not: 23 Oct `N_p100_1217` made −₹2,554
-  live against +₹1,053 on paper. Over 431 days of T1's picks, the candle close earned about ₹56 a day
+  live against +₹1,053 on paper. Over 431 days of T1's picks, the candle close earned about ₹60 a day
   more, but the interval includes zero. Paper therefore overstates live by about ₹40–55 a day for the
   book. AlgoTest can be set to check on candle close; Quantiply cannot.
 

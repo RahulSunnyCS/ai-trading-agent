@@ -65,7 +65,10 @@ class RuleSim(_DaySim):
         return self.realised + sum(r.sign * (p - r.entry_price) * r.qty for r, p in prices)  # type: ignore[attr-defined]
 
     def _tick_fire(self, minute: int, start: int, stop: float) -> float | None:
-        """The day's total if the tick stop fires in this minute, else None."""
+        """The day's total if the tick stop fires in this minute, else None. With no leg open the
+        realised P&L is final: nothing is left for a tick stop to close (the close rule keeps it too)."""
+        if not self._leg_prices(minute, start, "open"):
+            return None
         if self.rule == "tick_pess":
             worst = self._mtm_at(self._leg_prices(minute, start, "pess"))
         else:

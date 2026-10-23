@@ -67,6 +67,15 @@ def test_pessimistic_counts_both_highs_together():
     assert _sim("tick_pess", legs)._tick_fire(3, 0, 2500) is not None  # both legs high: -3,575
 
 
+def test_no_open_leg_keeps_the_realised_loss():
+    legs = _straddle(150.0, 90.0)
+    for leg in legs:
+        leg.state = "done"
+    sim = _sim("tick", legs)
+    sim.realised = -3200.0  # both legs already stopped out on their own leg stops
+    assert sim._tick_fire(3, 0, 2500) is None
+
+
 def test_gap_through_the_stop_exits_at_the_open():
     sim = _sim("tick", _straddle(160.0, 100.0, ce_open_at3=150.0))
     assert sim._tick_fire(3, 0, 2500) == pytest.approx(

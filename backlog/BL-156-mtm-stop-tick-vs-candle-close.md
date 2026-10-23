@@ -143,15 +143,15 @@ Everything below is Claude's proposal, recorded before any run.
 
 The close rule reproduced every stored result (0 mismatches over 2,271 strategy-days).
 
-**T1's Adaptive picks, 1 lot a pick, 2025-01-10 → 2026-10-22 (431 days; the rules differ on 124):**
+**T1's Adaptive picks, 1 lot a pick, 2025-01-10 → 2026-10-22 (431 days; the rules differ on 126):**
 
 | Rule | ₹ / day net | Total | Worst day | Max drawdown |
 |---|---|---|---|---|
 | Candle close (paper today) | **+1,526** | +6,57,708 | −14,092 | **−25,806** |
-| Tick, 2% overshoot (live today) | +1,470 | +6,33,626 | **−12,896** | −29,367 |
-| **Close − tick** | **+56**, 90% [−17, +143] | +24,082 | | |
+| Tick, 2% overshoot (live today) | +1,466 | +6,31,635 | **−12,896** | −29,367 |
+| **Close − tick** | **+60**, 90% [−14, +149] | +26,073 | | |
 
-- **By half-year (close − tick, ₹ / day):** 2025H1 +57, 2025H2 −28, 2026H1 +144, 2026H2 +53.
+- **By half-year (close − tick, ₹ / day):** 2025H1 +57, 2025H2 −23, 2026H1 +156, 2026H2 +53.
 - **Verdict under the registered rule: the interval includes zero, so there is no meaningful
   difference; keep live as it is.**
 
@@ -159,13 +159,13 @@ The close rule reproduced every stored result (0 mismatches over 2,271 strategy-
 
 | Comparison | T1 | Core |
 |---|---|---|
-| Tick, no overshoot | +33 [−41, +127] | +11 [−67, +106] |
-| Tick, 5% overshoot | +90 [+14, +183] | +81 [+8, +174] |
-| Pessimistic tick (every leg at its extreme at once) | +250 [+86, +460] | +383 [+221, +559] |
+| Tick, no overshoot | +38 [−36, +132] | +13 [−64, +109] |
+| Tick, 5% overshoot | +95 [+20, +187] | +83 [+10, +175] |
+| Pessimistic tick (every leg at its extreme at once) | +254 [+92, +463] | +385 [+225, +561] |
 | 5-minute close | +43 [+9, +79] | −16 [−80, +42] |
-| Tick, 2% overshoot (Core's headline) | — | +39 [−35, +131] |
+| Tick, 2% overshoot (Core's headline) | — | +41 [−33, +133] |
 
-Core: close +₹917 against tick +₹878 a day; max drawdown −₹38,572 against −₹36,388.
+Core: close +₹917 against tick +₹876 a day; max drawdown −₹38,572 against −₹36,603.
 
 **Reading:**
 - **The candle close leans ahead but is not proven.** It rides through spikes that come back, as on
@@ -208,6 +208,9 @@ Core: close +₹917 against tick +₹878 a day; max drawdown −₹38,572 agains
   committed before any run.
 - 2026-10-23 — owner, while it was being built: it matters whether the platforms can be told to check
   on candle close when the strategies are created. Checked: AlgoTest yes (deploy sheet), Quantiply no.
-- 2026-10-23 — Phase 2 run. The calibration passed. **T1: close − tick +₹56 / day, 90% [−17, +143]:
-  no meaningful difference**, so keep live as it is. Core +₹39 [−35, +131]. Close is clearly better
+- 2026-10-23 — Phase 2 run. The calibration passed. **T1: close − tick +₹60 / day, 90% [−14, +149]:
+  no meaningful difference**, so keep live as it is. Core +₹41 [−33, +133]. Close is clearly better
   under a 5% overshoot or the pessimistic model (Result). Item closed.
+- 2026-10-23 — self-review fix: the tick model now never fires once every leg is closed (it had
+  replaced a realised loss beyond the stop with −stop × 1.02, which flattered tick). Re-run: T1 +₹60
+  [−14, +149] (was +₹56), Core +₹41; the verdict is unchanged. Numbers above are the corrected run.
