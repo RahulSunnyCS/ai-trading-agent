@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — it decides how the live platforms should be set, and how far paper overstates live |
-| **Status** | Done: no meaningful difference — keep live as it is (2026-10-23) |
+| **Status** | In progress: Amendment 1 (four combinations); Phase 0 verdict: no meaningful difference |
 | **Type** | research |
 | **Area** | options (rotation, Quantiply, AlgoTest) |
 | **Created** | 2026-10-23 |
@@ -116,6 +116,50 @@ Everything below is Claude's proposal, recorded before any run.
   some families and tick for others after seeing the results). Running one needs
   `override: <reason>` in the Log.
 
+### Phase 0 — Amendment 1 (2026-10-23, before any run): leg stop × MTM stop, four combinations
+
+Owner (2026-10-23, after reading the Result): "do the permutation of both … leg candle close or tick,
+MTM candle close or tick … four combinations of T1, and tell if there is a significant edge". The
+original Phase 0 and its verdict stand; this adds a second, separately registered question.
+
+- **Hypothesis (two-sided):** at least one combination's mean daily net differs from today's live
+  setting (④ below).
+- **The two switches:**
+  - **Leg stop at candle close:** each leg's stop is checked against the 1-minute **close** (sell:
+    close ≥ stop; buy: close ≤ stop), and the leg exits at that close. The trail moves on closes.
+  - **Leg stop on tick:** the engine as it is (the bar's high/low; fill at the stop, or at the open
+    on a gap).
+  - **MTM stop:** "close" and "tick" exactly as in Phase 0 (tick: two index-driven scenarios, 2%
+    overshoot, open on a gap; never fires with no leg open).
+  - Re-entries (RE COST) and targets keep the engine's rule in all four combinations.
+- **Order within a minute when the leg stop is at candle close:** the tick MTM check runs first,
+  inside the minute, then the leg checks at the close, then the close MTM check. With leg stops on
+  tick, the engine's order holds: legs, then MTM.
+- **The four combinations:**
+  - ① leg close + MTM close;
+  - ② leg close + MTM tick;
+  - ③ leg tick + MTM close (paper today);
+  - ④ leg tick + MTM tick (Quantiply live today).
+- **Universe, period, money:** as in Phase 0. T1's Adaptive picks, 2025-01-10 → 2026-10-22, 1 lot a
+  pick, brokerage ₹20 + GST per order. Core is reported, not deciding.
+- **Parity check:** ③ must reproduce every stored result, as Phase 2 did.
+- **Pass rule:**
+  - **The three tests:** ① − ④, ② − ④ and ③ − ④, each as the mean daily Δ. Two-sided bootstrap
+    p-value from 2,000 circular 5-session-block resamples, p = 2 × min(share ≤ 0, share ≥ 0).
+  - **Holm across the three at α = 0.10** (a 90% interval, as in Phase 0).
+  - **Read-out:** a combination that passes is a **significant edge** over today's live setting;
+    otherwise there is no significant edge.
+  - **Also reported:** all six pairwise differences, the two main effects (leg: mean of ① − ③ and
+    ② − ④; MTM: mean of ① − ② and ③ − ④), per-combination total, worst day and maximum drawdown,
+    half-years, and the 0% / 5% overshoot sensitivity.
+- **Platform note (not part of the test):**
+  - **Quantiply:** checks leg stops and the MTM stop on LTP and has no candle-close option for
+    either, so ① – ③ are not settable there.
+  - **AlgoTest:** its Candle Close monitoring covers the overall stop. Whether it covers premium leg
+    stops is unclear.
+- **Will not run:** other stop levels, per-family or per-index choices made after seeing results,
+  5-minute candles for the leg stop.
+
 ### Phase 1 — The two rules
 - **Tasks:** `packages/option-backtesting/research/bl156/`:
   - a `_DaySim` subclass that adds the tick check (the engine itself is unchanged);
@@ -214,3 +258,6 @@ Core: close +₹917 against tick +₹876 a day; max drawdown −₹38,572 agains
 - 2026-10-23 — self-review fix: the tick model now never fires once every leg is closed (it had
   replaced a realised loss beyond the stop with −stop × 1.02, which flattered tick). Re-run: T1 +₹60
   [−14, +149] (was +₹56), Core +₹41; the verdict is unchanged. Numbers above are the corrected run.
+- 2026-10-23 — Amendment 1 registered before any run: leg stop (candle close / tick) × MTM stop
+  (candle close / tick), four combinations on T1, Holm over the three comparisons with today's live
+  setting.
