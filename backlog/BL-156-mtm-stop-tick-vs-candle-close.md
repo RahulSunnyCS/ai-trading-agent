@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — it decides how the live platforms should be set, and how far paper overstates live |
-| **Status** | In progress: Amendment 1 (four combinations); Phase 0 verdict: no meaningful difference |
+| **Status** | Done (2026-10-23): keep leg stops on tick; the MTM rule makes no significant difference |
 | **Type** | research |
 | **Area** | options (rotation, Quantiply, AlgoTest) |
 | **Created** | 2026-10-23 |
@@ -234,6 +234,52 @@ Core: close +₹917 against tick +₹876 a day; max drawdown −₹38,572 agains
 - `out/result.json` and `out/sims.json` (git-ignored; regenerate with `replay.py`, about 10 minutes
   with 6 workers).
 
+## Result, Amendment 1 (2026-10-23): keep leg stops on tick; the MTM rule does not matter
+
+T1's picks over 431 days, 1 lot a pick. The paper combination ③ reproduced every stored result.
+
+| Combination | ₹ / day | Total | Worst day | Max DD | vs live ④, 90% [interval], Holm |
+|---|---|---|---|---|---|
+| ① Leg close + MTM close | +1,112 | +4,79,168 | −13,660 | −33,413 | **−354** [−526, −180], **significantly worse** |
+| ② Leg close + MTM tick | +1,021 | +4,40,125 | −12,570 | −34,211 | **−444** [−619, −272], **significantly worse** |
+| ③ Leg tick + MTM close (paper) | **+1,526** | **+6,57,708** | −14,092 | **−25,806** | +60 [−14, +155], not significant |
+| ④ Leg tick + MTM tick (live) | +1,466 | +6,31,635 | −12,896 | −29,367 | — |
+
+**Verdict under the registered rule:**
+- ① and ② are **significantly worse** than live, so there is no significant edge over it.
+- ③ does not differ from it.
+
+**Main effects (T1, ₹ / day):**
+- **Leg stop, close − tick: −429** [−588, −270], in every half-year (the leg-close combinations sit
+  −121 to −638 a day below live).
+- **MTM stop, close − tick: +76** [−0, +172], p 0.10: borderline, not significant.
+
+**Where the leg-close loss comes from** (T1, ① − ③, descriptive):
+
+| Family | Picks | Total | Per pick |
+|---|---|---|---|
+| Dir (21% stop) | 363 | −₹79,833 | −₹220 |
+| Widesl | 930 | −₹88,459 | −₹95 |
+| Buy | 52 | −₹10,248 | −₹197 |
+
+A stop checked at the minute's close exits after the option has run through the stop, so the fill
+is worse. That cost is larger than the losses saved on spikes that come back.
+
+**Core (reported):** no significant difference from live. Leg close − tick main effect −182
+[−317, −46]; MTM +31 [−47, +125]. ① −152, ② −172, ③ +41.
+
+**What it means for the platforms:**
+- **Leg stops:** keep them on tick (LTP), as Quantiply and AlgoTest do now. Do **not** switch them to
+  candle close.
+- **The overall MTM stop:** the candle close is slightly ahead but not proven. Switching it is
+  optional and would only be possible on AlgoTest.
+- **If AlgoTest's "Candle Close" monitoring also moves premium leg stops to candle close,** it would
+  cost more on the legs than it gains on the MTM. Check this before ever turning it on.
+
+**Evidence:**
+- `research/bl156/rules.py` (`leg_rule`), `replay4.py` and `test_rules.py` (8 tests);
+- `out/result4.json` and `out/sims4.json` (git-ignored; regenerate with `replay4.py`).
+
 ## Risks
 
 - **High/low is not the tick path.** The two-scenario model assumes the calls' high and the puts'
@@ -261,3 +307,8 @@ Core: close +₹917 against tick +₹876 a day; max drawdown −₹38,572 agains
 - 2026-10-23 — Amendment 1 registered before any run: leg stop (candle close / tick) × MTM stop
   (candle close / tick), four combinations on T1, Holm over the three comparisons with today's live
   setting.
+- 2026-10-23 — Amendment 1 run. On T1, the leg-close combinations are significantly worse than live
+  (① −₹354, ② −₹444 a day); paper (③) +₹60 is not significant. Leg stop close − tick −₹429 a day in
+  every half-year; MTM close − tick +₹76, borderline. Core: no significant difference. Recommendation:
+  keep leg stops on tick; the MTM rule is optional (AlgoTest only), and check first whether AlgoTest's
+  Candle Close mode also moves leg stops. Item closed.

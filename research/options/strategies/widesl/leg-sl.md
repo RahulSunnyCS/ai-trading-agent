@@ -1,6 +1,6 @@
 # Widesl: leg stop
 
-**Status:** Tested · **Last updated:** 2026-10-22
+**Status:** Tested · **Last updated:** 2026-10-23
 
 ## What it is
 
@@ -34,6 +34,7 @@ Leg-stop rows in the post-charge top four (holdout, mean over the band's start-t
 | NIFTY 13:00–15:30 | ₹80, 150% | ₹19,964 | 82 | −₹18,698 | 6.0% |
 | SENSEX, all three bands | ₹250, 80% | ₹5,697 / ₹11,119 / ₹14,702 | 24 / 46 / 61 | −₹33.0k / −₹34.1k / −₹16.9k | 17.6% / 12.1% / 5.2% |
 | SENSEX 13:00–15:30 | ₹250, baseline 114/115% | ₹13,883 | 57 | −₹18,819 | 4.9% |
+| BL-156 Amendment 1 | Leg stop checked on every tick (the engine: bar high / low) vs at the 1-minute close (exit at that close), crossed with the MTM rule | T1's Adaptive picks, 2025-01-10 → 2026-10-22, 1 lot, after brokerage | **Tick is better**: candle-close leg stops cost −₹429 a day on the book (−₹588 to −₹270), in every half-year; Widesl: −₹95 a pick | [BL-156][bl156] |
 
 ## What we know
 
@@ -74,3 +75,4 @@ Leg-stop rows in the post-charge top four (holdout, mean over the band's start-t
 [bl126]: ../../../../backlog/BL-126-nifty-premium-widesl-tight-sl-poc.md
 [bl127]: ../../../../backlog/BL-127-nifty-premium-widesl-sl-selection.md
 [bl128]: ../../../../backlog/BL-128-sensex-premium-widesl-sl-selection.md
+[bl156]: ../../../../backlog/BL-156-mtm-stop-tick-vs-candle-close.md

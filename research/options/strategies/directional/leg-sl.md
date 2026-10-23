@@ -1,6 +1,6 @@
 # Directional: leg stop
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Descriptive · **Last updated:** 2026-10-23
 
 ## What it is
 
@@ -28,6 +28,7 @@ Charged shortlist, mean over the 100 bases, ₹ per day net (before charges in b
 | 25% / ₹4,000 | 184 (341) |
 | 30% / ₹4,000 | 170 (320) |
 | 30% / ₹4,000 + trail [10,5]% | 187 (344) |
+| BL-156 Amendment 1 | Leg stop checked on every tick (the engine: bar high / low) vs at the 1-minute close (exit at that close), crossed with the MTM rule | T1's Adaptive picks, 2025-01-10 → 2026-10-22, 1 lot, after brokerage | **Tick is better**: candle-close leg stops cost −₹429 a day on the book (−₹588 to −₹270), in every half-year; Dir (21 % stop): −₹220 a pick | [BL-156][bl156] |
 
 Post-charge band leaders use leg stops of 21–35%: NIFTY 30% (09:15–11:00), 25% (11:00–13:00), 35%
 (13:00–15:30); SENSEX 25%, 21%, 35% ([BL-096 post-charge][bl096pc]).
@@ -60,3 +61,4 @@ Post-charge band leaders use leg stops of 21–35%: NIFTY 30% (09:15–11:00), 2
 [bl096]: ../../../../backlog/BL-096-directional-parameter-sweep.md
 [bl096pc]: ../../../../backlog/BL-096-directional-qualified-list-post-charge.md
 [bl096x]: ../../../../backlog/BL-096-directional-qualified-list-primary-15k-exact-times.md
+[bl156]: ../../../../backlog/BL-156-mtm-stop-tick-vs-candle-close.md

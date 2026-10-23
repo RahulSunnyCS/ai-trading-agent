@@ -111,3 +111,62 @@ def test_calibration_23_oct():
     tick = R.simulate(s, d, ref, sizing, "tick")
     assert close.stopped_by is None and round(close.gross) == 1053
     assert tick.stopped_by == "overall SL (tick) at 13:45" and round(tick.gross) == -2550
+
+
+def _close_sim():
+    sim = object.__new__(R.RuleSim)
+    sim.exits = []
+    sim._exit = lambda run, minute, price, reason: sim.exits.append((minute, price, reason))
+    return sim
+
+
+def _sell_leg(high, close, sl=200.0):
+    series = SimpleNamespace(open=[100.0] * N, high=high, low=[90.0] * N, close=close)
+    return SimpleNamespace(
+        series=series,
+        fresh_intrabar=False,
+        spec=SimpleNamespace(position="sell", trail_sl=None),
+        sl=sl,
+        target=None,
+    )
+
+
+def test_leg_stop_at_close_ignores_an_intrabar_spike_and_exits_at_the_close():
+    spike = [
+        150.0,
+        150.0,
+        210.0,
+        150.0,
+        205.0,
+        150.0,
+    ]  # highs through the 200 stop at minutes 2 and 4
+    closes = [140.0, 140.0, 190.0, 140.0, 202.0, 140.0]  # only minute 4 closes through it
+    sim = _close_sim()
+    leg = _sell_leg(spike, closes)
+    assert [sim._step_open_close(leg, m) for m in range(4)] == [None] * 4
+    assert sim._step_open_close(leg, 4) == "sl"
+    assert sim.exits == [(4, 202.0, "SL")]
+
+
+@pytest.mark.skipif(not LAKE.exists(), reason="the lake is not mounted")
+def test_four_combinations_on_23_oct():
+    from option_backtesting.data.reference.loader import default_reference_data
+    from option_backtesting.fyers.daily import data_dir
+    from option_backtesting.legwise.market import load_day
+    from option_backtesting.legwise.schema import load_legwise
+    from option_backtesting.rotation.lists import SIZING_DATE
+
+    here = Path(__file__).resolve().parents[2]
+    s = load_legwise(here / "strategies" / "rotation" / "N_p100_1217.yaml")
+    d = load_day(data_dir(), "NIFTY", date(2026, 10, 23))
+    ref, sizing = default_reference_data(), date.fromisoformat(SIZING_DATE)
+    res = {
+        (leg, mtm): R.simulate(s, d, ref, sizing, mtm, 0.02, leg)
+        for leg in ("close", "tick")
+        for mtm in ("close", "tick")
+    }
+    assert round(res[("tick", "close")].gross) == 1053  # paper
+    assert res[("tick", "tick")].stopped_by == "overall SL (tick) at 13:45"  # live
+    assert (
+        res[("close", "tick")].stopped_by == "overall SL (tick) at 13:45"
+    )  # leg rule does not matter here

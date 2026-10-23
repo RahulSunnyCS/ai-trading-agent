@@ -15,22 +15,32 @@ Rules:
 - "tick_pess": as "tick", but every leg at its own adverse extreme at once (sells at the high, buys at
              the low): an upper bound on how often a tick stop fires.
 A leg that entered intrabar in the minute counts at that minute's close.
+
+Leg stop (Amendment 1), `leg_rule`:
+- "tick"  : the engine as it is (the bar's high/low; fill at the stop, or the open on a gap).
+- "close" : the stop is checked against the 1-minute close and the leg exits at that close; the trail
+            moves on closes. The tick MTM check then runs before the legs' close checks in a minute.
 """
 
 from __future__ import annotations
 
-from option_backtesting.legwise.engine import DayResult, _DaySim  # noqa: PLC2701
+import math
+
+from option_backtesting.legwise.engine import _EPS, DayResult, _DaySim, to_tick  # noqa: PLC2701
 from option_backtesting.legwise.market import N_MINUTES, minute_index, minute_label
 
 RULES = ("close", "close5", "tick", "tick_pess")
 
 
 class RuleSim(_DaySim):
-    def __init__(self, *args, rule: str = "close", overshoot: float = 0.02, **kwargs) -> None:
-        if rule not in RULES:
-            raise ValueError(rule)
+    def __init__(
+        self, *args, rule: str = "close", overshoot: float = 0.02, leg_rule: str = "tick", **kwargs
+    ) -> None:
+        if rule not in RULES or leg_rule not in ("tick", "close"):
+            raise ValueError((rule, leg_rule))
         super().__init__(*args, **kwargs)
         self.rule = rule
+        self.leg_rule = leg_rule
         self.overshoot = overshoot
         self.adjust = (
             0.0  # tick rules: the day's total set to the stop level, minus the trades' P&L
@@ -83,7 +93,41 @@ class RuleSim(_DaySim):
             return at_open
         return -stop * (1 + self.overshoot)
 
-    # -- the engine's loop, with the stop check switched ----------------------------------------
+    # -- the leg stop at the candle close (Amendment 1) -----------------------------------------
+
+    def _step_open_close(self, run, minute: int) -> str | None:
+        """The engine's `_step_open`, with the stop, target and trail read at the bar's close."""
+        assert run.series is not None
+        if run.fresh_intrabar:
+            run.fresh_intrabar = False
+            return None
+        c = run.series.close[minute]
+        if c is None:
+            return None
+        buy = run.spec.position == "buy"
+        sl, tgt = run.sl, run.target
+        if sl is not None and (c <= sl if buy else c >= sl):
+            self._exit(run, minute, c, "SL")
+            return "sl"
+        if tgt is not None and (c >= tgt if buy else c <= tgt):
+            self._exit(run, minute, c, "TARGET")
+            return "target"
+        if run.spec.trail_sl is not None:
+            run.best = max(run.best, c) if buy else min(run.best, c)
+            x, y = run.spec.trail_sl.step(run.entry_price)
+            moved = run.sign * (run.best - run.entry_price)
+            steps = math.floor(moved / x + _EPS) if moved > 0 else 0
+            trailed = to_tick(run.initial_sl + run.sign * steps * y)
+            run.sl = max(run.sl, trailed) if buy else min(run.sl, trailed)
+        return None
+
+    def _after_hit(self, run, minute: int, hit: str | None) -> None:
+        if hit and self.s.square_off == "complete":
+            self._close_all(minute, "close", "SQUARE_OFF")
+        elif hit:
+            self._arm_reentry(run, minute, hit)
+
+    # -- the engine's loop, with the stop checks switched ---------------------------------------
 
     def run(self) -> DayResult:
         start = minute_index(self.s.entry_time)
@@ -102,13 +146,10 @@ class RuleSim(_DaySim):
                     self._step_armed(run, minute)
                 if run.state == "reentry" and minute > run.trade.exit_min:  # type: ignore[union-attr,operator]
                     self._step_reentry(run, minute)
-                if run.state == "open":
-                    hit = self._step_open(run, minute)
-                    if hit and self.s.square_off == "complete":
-                        self._close_all(minute, "close", "SQUARE_OFF")
-                    elif hit:
-                        self._arm_reentry(run, minute, hit)
-            self._roll_exhausted_legs(minute)
+                if run.state == "open" and self.leg_rule == "tick":
+                    self._after_hit(run, minute, self._step_open(run, minute))
+            if self.leg_rule == "tick":
+                self._roll_exhausted_legs(minute)
             if stop is not None and self.rule in ("tick", "tick_pess"):
                 total = self._tick_fire(minute, start, stop)
                 if total is not None:
@@ -117,6 +158,11 @@ class RuleSim(_DaySim):
                     self.stopped_by = f"overall SL (tick) at {minute_label(minute)}"
                     worst = min(worst, total)
                     break
+            if self.leg_rule == "close":
+                for run in self.legs:
+                    if run.state == "open":
+                        self._after_hit(run, minute, self._step_open_close(run, minute))
+                self._roll_exhausted_legs(minute)
             mtm = self._mtm(minute)
             curve.append((minute, mtm))
             worst, best = min(worst, mtm), max(best, mtm)
@@ -149,6 +195,14 @@ class RuleSim(_DaySim):
 
 
 def simulate(
-    strategy, data, reference, sizing_date, rule: str, overshoot: float = 0.02
+    strategy,
+    data,
+    reference,
+    sizing_date,
+    rule: str,
+    overshoot: float = 0.02,
+    leg_rule: str = "tick",
 ) -> DayResult:
-    return RuleSim(strategy, data, reference, sizing_date, rule=rule, overshoot=overshoot).run()
+    return RuleSim(
+        strategy, data, reference, sizing_date, rule=rule, overshoot=overshoot, leg_rule=leg_rule
+    ).run()
