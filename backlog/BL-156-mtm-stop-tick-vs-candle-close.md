@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — it decides how the live platforms should be set, and how far paper overstates live |
-| **Status** | In progress |
+| **Status** | Done: no meaningful difference — keep live as it is (2026-10-23) |
 | **Type** | research |
 | **Area** | options (rotation, Quantiply, AlgoTest) |
 | **Created** | 2026-10-23 |
@@ -135,6 +135,61 @@ Everything below is Claude's proposal, recorded before any run.
   - a note in `research/options/common/` on how far paper overstates live.
 - **Done when:** merged with a code-review result on the PR.
 
+## Result (2026-10-23): no meaningful difference
+
+**Calibration passed.** On 2026-10-23, `N_p100_1217`:
+- **tick model:** fires at **13:45**, −₹2,550 (live: 13:45:04, −₹2,554.50);
+- **close model:** does not fire, +₹1,053 (the stored paper result exactly).
+
+The close rule reproduced every stored result (0 mismatches over 2,271 strategy-days).
+
+**T1's Adaptive picks, 1 lot a pick, 2025-01-10 → 2026-10-22 (431 days; the rules differ on 124):**
+
+| Rule | ₹ / day net | Total | Worst day | Max drawdown |
+|---|---|---|---|---|
+| Candle close (paper today) | **+1,526** | +6,57,708 | −14,092 | **−25,806** |
+| Tick, 2% overshoot (live today) | +1,470 | +6,33,626 | **−12,896** | −29,367 |
+| **Close − tick** | **+56**, 90% [−17, +143] | +24,082 | | |
+
+- **By half-year (close − tick, ₹ / day):** 2025H1 +57, 2025H2 −28, 2026H1 +144, 2026H2 +53.
+- **Verdict under the registered rule: the interval includes zero, so there is no meaningful
+  difference; keep live as it is.**
+
+**Sensitivity (reported, not deciding), close minus each:**
+
+| Comparison | T1 | Core |
+|---|---|---|
+| Tick, no overshoot | +33 [−41, +127] | +11 [−67, +106] |
+| Tick, 5% overshoot | +90 [+14, +183] | +81 [+8, +174] |
+| Pessimistic tick (every leg at its extreme at once) | +250 [+86, +460] | +383 [+221, +559] |
+| 5-minute close | +43 [+9, +79] | −16 [−80, +42] |
+| Tick, 2% overshoot (Core's headline) | — | +39 [−35, +131] |
+
+Core: close +₹917 against tick +₹878 a day; max drawdown −₹38,572 against −₹36,388.
+
+**Reading:**
+- **The candle close leans ahead but is not proven.** It rides through spikes that come back, as on
+  23 Oct, and so ends higher in three of four half-years.
+- **Tick caps the worst day better** (−₹12.9k against −₹14.1k on T1), but its drawdown is deeper.
+- **The size of the overshoot matters.** At 5%, or if the stop fires as often as the pessimistic
+  model, the candle close is clearly better. The forward live captures (BL-141's `live-compare`)
+  will show the real overshoot.
+- **How far paper overstates live:** about ₹40–55 a day for the book, so roughly 3–4%. That is the
+  close − tick gap.
+
+**Platforms** (checked 2026-10-23, read-only):
+- **AlgoTest:** has "Trade monitoring: on LTP / on Candle Close" in the deploy sheet (1-minute; the
+  overall stop is checked at candle close in that mode) (`docs/algotest-execution.md`, AlgoTest's
+  "candle close implementation" blog).
+- **Quantiply:** no candle-close mode for the overall stop (`stoploss: TOTAL_AMOUNT` only). Its
+  candle-close switches cover re-entry and "journey" only.
+
+**Evidence:** `packages/option-backtesting/research/bl156/`:
+- `rules.py` (the engine's day loop with the stop check switched), `replay.py`, `test_rules.py`
+  (5 tests, including the 23 Oct calibration);
+- `out/result.json` and `out/sims.json` (git-ignored; regenerate with `replay.py`, about 10 minutes
+  with 6 workers).
+
 ## Risks
 
 - **High/low is not the tick path.** The two-scenario model assumes the calls' high and the puts'
@@ -151,3 +206,8 @@ Everything below is Claude's proposal, recorded before any run.
 
 - 2026-10-23 — created from the 23 Oct live stop on `N_p100_1217` and the owner's request. Phase 0
   committed before any run.
+- 2026-10-23 — owner, while it was being built: it matters whether the platforms can be told to check
+  on candle close when the strategies are created. Checked: AlgoTest yes (deploy sheet), Quantiply no.
+- 2026-10-23 — Phase 2 run. The calibration passed. **T1: close − tick +₹56 / day, 90% [−17, +143]:
+  no meaningful difference**, so keep live as it is. Core +₹39 [−35, +131]. Close is clearly better
+  under a 5% overshoot or the pessimistic model (Result). Item closed.
