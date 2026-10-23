@@ -444,3 +444,11 @@ def test_a_rate_limited_login_is_not_a_refused_one():
 
     with pytest.raises(auth.AngelUnavailableError):
         auth.login(CREDS, post=post, now=lambda: 10, sleep=lambda s: None)
+
+
+def test_a_coded_too_many_refusal_is_still_a_refused_login():
+    def post(path, body, headers):
+        return 200, {"status": False, "errorcode": "AB1050", "message": "Too many invalid attempts"}
+
+    with pytest.raises(auth.AngelCredentialsError):
+        auth.login(CREDS, post=post, now=lambda: 10, sleep=lambda s: None)

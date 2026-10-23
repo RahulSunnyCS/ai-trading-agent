@@ -67,7 +67,8 @@ OPTIONAL = ("ANGELONE_PUBLIC_IP",)
 KEYS = (*auth.REQUIRED, *OPTIONAL)
 SOURCES = ("manual", "scheduled", "collector", "margin")
 #: ok, not_configured (no login sent), rejected (Angel One refused the login), network (not
-#: reached), unavailable (HTTP 5xx), error (anything else, e.g. a TOTP seed that is not base32).
+#: reached), unavailable (HTTP 5xx or a rate-limited login), error (anything else, e.g. a TOTP
+#: seed that is not base32).
 REASONS = ("ok", "not_configured", "rejected", "network", "unavailable", "error")
 #: The repo .env the ANGELONE_* settings are re-read from (tests point it elsewhere).
 DOTENV_PATH = REPO_ROOT / ".env"

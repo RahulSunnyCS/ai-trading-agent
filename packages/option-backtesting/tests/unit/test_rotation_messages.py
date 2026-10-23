@@ -325,3 +325,12 @@ def test_the_tentative_lists_are_kept_and_the_t1_followup_adds_to_them(tmp_path)
     doc = rotation_result.read_tentative(date(2026, 10, 21), tmp_path)
     assert doc["t1"]["core"] == T1_CORE and doc["adaptive"]["core"][0] == "N_wide_1117"
     assert rotation_result.read_tentative("2026-10-22", tmp_path) == {}
+
+
+def test_a_malformed_evening_list_only_leaves_the_line_out():
+    for bad in (
+        {"adaptive": "oops"},
+        {"adaptive": {"day": "2026-10-20", "sent_on": "not-a-date", "core": 5}},
+    ):
+        _, group = messages.render_morning(_entry(), None, None, previous=bad)
+        assert group.startswith("🎯 ADAPTIVE · Tue 20 Oct\n\n1️⃣")

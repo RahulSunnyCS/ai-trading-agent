@@ -169,7 +169,10 @@ def login(
         code = body.get("errorcode") or ""
         if status == 0:
             raise AngelNetworkError(f"Angel One could not be reached: {detail}")
-        if status >= 500 or rate_limited(detail):  # a rate limit is not a refused login
+        # A rate limit is not a refused login: a 429, or SmartAPI's plain-text 403 (no error code).
+        # A refusal that carries a code ("Too many invalid attempts") stays a refusal, so its hold
+        # stops the same wrong PIN being sent again.
+        if status >= 500 or status == 429 or (not code and rate_limited(detail)):
             raise AngelUnavailableError(f"Angel One is unavailable (HTTP {status}): {detail}")
         raise AngelCredentialsError(f"Angel One login failed: {code} {detail}".strip())
     return Session(jwt=jwt, api_key=creds.api_key, public_ip=creds.public_ip)

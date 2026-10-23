@@ -69,8 +69,16 @@ def _with_dte(head: str, dte: dict | None) -> str:
 def change_line(day: date | str, previous: dict | None, core, buy) -> str:
     """How the 09:16 picks compare with the list the evening message sent (`previous`:
     `{'day', 'sent_on', 'core', 'buy'}`): `✅ No change from yesterday's list` or `🔄 Changed from
-    yesterday's list: ➖ 12:17 N_widesl_p100 · ➕ 09:32 S_dir_ATM`; '' with no evening list."""
-    if not previous or str(previous.get("day")) != str(day):
+    yesterday's list: ➖ 12:17 N_widesl_p100 · ➕ 09:32 S_dir_ATM`; '' with no evening list, or
+    one it cannot read (never raises: the 09:16 message is sent after the entry is recorded)."""
+    try:
+        return _change_line(day, previous, core, buy)
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _change_line(day: date | str, previous: dict | None, core, buy) -> str:
+    if not isinstance(previous, dict) or str(previous.get("day")) != str(day):
         return ""
     sent_on = str(previous.get("sent_on") or "")
     d = date.fromisoformat(day) if isinstance(day, str) else day
