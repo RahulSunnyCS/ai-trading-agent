@@ -132,3 +132,4 @@ None.
   - `conditional.py` has no `/Volumes/TradingData` mount guard, unlike the other scripts, and imports
     `run.py` as a script-folder import.
 - 2026-10-24 — TODO row renumbered 3.37–3.40 -> 3.42–3.45 on 2026-10-24 after #304 took 3.37.
+- 2026-10-24 — `override: owner confirmed in chat (recorded by Claude): the addendum was an exploratory follow-up to the down-day / recovery breakdown; it stays as an exploratory read, not a pre-registered test.` Its verdict (not better) is unchanged.

@@ -71,7 +71,7 @@ Descriptive; leads, not findings.
 
 **Post-hoc, exploratory.** Phase 0 listed "conditioning an exit on the trend" under "Will not run", no owner
 `override:` line was recorded when this ran, and the idea came after the owner had seen the down-day breakdown
-on the same data. The owner should confirm or retract it (BL-147 Log, 2026-10-24).
+on the same data. The owner confirmed the override after the run, as an exploratory read (BL-147 Log, 2026-10-24).
 
 Its rule was registered before its own figures were computed (BL-147 Log, 2026-10-21): a Dir strategy exits at 14:55 only if its own
 index (Nifty for the N variants, Sensex for the S variants) is down 0.6% or more from the open to 14:55, and
