@@ -1,0 +1,66 @@
+{
+  "written_before_running": "2026-10-24T13:30:00+05:30",
+  "name": "BL-156 criteria: the followed Four Sectors group at Monday's open (delay 0) against as followed (delay 1, Friday close)",
+  "rule": "Committed before the test runs. Never edited after results are seen: a change is a new file that names this one as superseded, with the reason.",
+  "reason": "Owner, 2026-10-24: switch the followed strategy to Monday-open fills only if a pre-registered test says so (BL-156 Phase 0). One full-period run had already been seen (see seen_before_writing), so the decision rests on rolling windows that were not.",
+  "base_run": "569508772cca42a8b5255203326fc1db (saved run 'Run 258': the followed config fbb7ab054238 with split_fridays on, every 4 weeks, signal_delay 1, fri_close, turnover_rank universe, curated tags, itemised costs, pre-tax). Its params equal the four followed sleeves' (search_spaces/bl142_followed.json) except split_fridays and fields Broad does not read.",
+  "arms": {
+    "A": { "label": "As followed", "changes": {}, "role": "incumbent" },
+    "C": {
+      "label": "Monday open",
+      "changes": { "signal_delay": 0, "execution": "mon_open" },
+      "role": "candidate"
+    },
+    "B": {
+      "label": "Delay 0, Friday close",
+      "changes": { "signal_delay": 0 },
+      "role": "reference only: separates the delay effect from the fill effect; reported, never judged"
+    }
+  },
+  "windows": {
+    "how": "momentum_backtesting.sweep.rolling_windows over arm A's full-period weekly index (data through 2026-10-23), years 3.0, step_weeks 13. Every arm is a fresh run from each window's start to its end (sweep.rerun_windows), so each starts from the same empty portfolio. Scored with sweep.compare_rolling, baseline A.",
+    "data_cutoff": "2026-10-23 (the data_version and code commit are recorded with the result)"
+  },
+  "pass_rule": {
+    "all_must_hold": [
+      {
+        "id": "wins_most",
+        "test": "C has a higher CAGR AND a higher Sharpe than A in more than half of the windows (compare_rolling 'wins most')"
+      },
+      {
+        "id": "median_cagr",
+        "test": "median over windows of CAGR(C) - CAGR(A) >= +1.0 point",
+        "why": "the 1-point materiality BL-010 uses for fill effects; less is not worth a new routine"
+      },
+      {
+        "id": "median_drawdown",
+        "test": "median over windows of maxDD(C) - maxDD(A) >= -3.0 points (C at most 3 points deeper)"
+      },
+      {
+        "id": "worst_drawdown",
+        "test": "the deepest window max drawdown of C is at most 5.0 points deeper than the deepest of A"
+      },
+      { "id": "after_tax", "test": "full period with tax on (slab 30%): CAGR(C) >= CAGR(A)" }
+    ],
+    "if_all_hold": "pass: Phase 2 switches the followed strategy to arm C and realigns every Kite lot at once (owner, 2026-10-24)",
+    "otherwise": "kill: the followed strategy stays on arm A. No second set of thresholds is tried on these results."
+  },
+  "drawdown_note": "A Monday-open run values the account at Monday opens, a different sampling from a Friday-close run (BL-036 Phase 2: -4.9 against -0.7 points for the engine and the replay on one config). The drawdown rules accept that sampling as it is, since it is how the switched account would be measured.",
+  "seen_before_writing": {
+    "full_period_2017_to_2026-10-23_pre_tax": {
+      "A": { "cagr": 0.4244, "max_drawdown": -0.2707, "sharpe": 1.3076 },
+      "B": { "cagr": 0.4434, "max_drawdown": -0.3224, "sharpe": 1.3473 },
+      "C": { "cagr": 0.4401, "max_drawdown": -0.369, "sharpe": 1.2502 }
+    },
+    "other": [
+      "BL-036 Phase 2: on the delay-0, extended-tags variant of this config the Monday fill cost 0.83 CAGR points (replay 0.69)",
+      "TODO 3.9.23: over 28 rolling 3-year windows a one-week delay beat delay 0 by about 4 points on the then-default Broad run (a different config)"
+    ],
+    "not_seen": "any rolling-window result of arms A, B or C, and any after-tax result"
+  },
+  "will_not_run": [
+    "re-tuning cadence, lookbacks, categories or picks at delay 0",
+    "mon_10am fills, a delay of 2 or more, Stock or Custom Index",
+    "the 2012-2016 backcast (one-shot, already used by BL-010)"
+  ]
+}

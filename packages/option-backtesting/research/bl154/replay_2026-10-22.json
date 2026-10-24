@@ -1,0 +1,653 @@
+{
+ "phase0": "backlog/BL-154-adaptive-fit-shrinkage.md",
+ "data_root": "/Volumes/TradingData",
+ "days": [
+  "2025-01-10",
+  "2026-10-22"
+ ],
+ "variants": 298,
+ "k": 10.0,
+ "boot": {
+  "resamples": 2000,
+  "block": 5,
+  "seed": 20261022,
+  "level": 0.9
+ },
+ "parity_days": 431,
+ "arms": {
+  "C0": {
+   "P1": {
+    "days": 202,
+    "mean_per_lot_day": 386.98,
+    "total_per_lot": 78169.43,
+    "max_drawdown_per_lot": -10688.37,
+    "win_rate": 0.6287,
+    "net_mean_per_lot_day": 283.41
+   },
+   "P2": {
+    "days": 157,
+    "mean_per_lot_day": 343.53,
+    "total_per_lot": 53933.8,
+    "max_drawdown_per_lot": -11818.95,
+    "win_rate": 0.5669,
+    "net_mean_per_lot_day": 240.33
+   },
+   "all": {
+    "days": 431,
+    "mean_per_lot_day": 378.94,
+    "total_per_lot": 163321.21,
+    "max_drawdown_per_lot": -11818.95,
+    "win_rate": 0.6218,
+    "net_mean_per_lot_day": 275.37
+   }
+  },
+  "S": {
+   "P1": {
+    "days": 202,
+    "mean_per_lot_day": 363.25,
+    "total_per_lot": 73377.1,
+    "max_drawdown_per_lot": -12975.83,
+    "win_rate": 0.6287,
+    "net_mean_per_lot_day": 260.09
+   },
+   "P2": {
+    "days": 157,
+    "mean_per_lot_day": 171.33,
+    "total_per_lot": 26899.47,
+    "max_drawdown_per_lot": -13289.45,
+    "win_rate": 0.5541,
+    "net_mean_per_lot_day": 67.34
+   },
+   "all": {
+    "days": 431,
+    "mean_per_lot_day": 308.23,
+    "total_per_lot": 132848.56,
+    "max_drawdown_per_lot": -13289.45,
+    "win_rate": 0.6079,
+    "net_mean_per_lot_day": 204.74
+   }
+  },
+  "SL": {
+   "P1": {
+    "days": 202,
+    "mean_per_lot_day": 343.06,
+    "total_per_lot": 69297.31,
+    "max_drawdown_per_lot": -11778.08,
+    "win_rate": 0.6485,
+    "net_mean_per_lot_day": 239.85
+   },
+   "P2": {
+    "days": 157,
+    "mean_per_lot_day": 227.37,
+    "total_per_lot": 35697.56,
+    "max_drawdown_per_lot": -12873.57,
+    "win_rate": 0.5478,
+    "net_mean_per_lot_day": 123.98
+   },
+   "all": {
+    "days": 431,
+    "mean_per_lot_day": 330.18,
+    "total_per_lot": 142309.37,
+    "max_drawdown_per_lot": -12873.57,
+    "win_rate": 0.6172,
+    "net_mean_per_lot_day": 226.85
+   }
+  },
+  "M": {
+   "P1": {
+    "days": 202,
+    "mean_per_lot_day": 320.45,
+    "total_per_lot": 64729.93,
+    "max_drawdown_per_lot": -14365.48,
+    "win_rate": 0.6634,
+    "net_mean_per_lot_day": 218.24
+   },
+   "P2": {
+    "days": 157,
+    "mean_per_lot_day": 185.77,
+    "total_per_lot": 29166.02,
+    "max_drawdown_per_lot": -12522.9,
+    "win_rate": 0.535,
+    "net_mean_per_lot_day": 83.4
+   },
+   "all": {
+    "days": 431,
+    "mean_per_lot_day": 312.39,
+    "total_per_lot": 134640.61,
+    "max_drawdown_per_lot": -14365.48,
+    "win_rate": 0.6241,
+    "net_mean_per_lot_day": 210.01
+   }
+  },
+  "S_k5": {
+   "P1": {
+    "days": 202,
+    "mean_per_lot_day": 396.76,
+    "total_per_lot": 80145.74,
+    "max_drawdown_per_lot": -15419.73,
+    "win_rate": 0.6436,
+    "net_mean_per_lot_day": 293.19
+   },
+   "P2": {
+    "days": 157,
+    "mean_per_lot_day": 195.55,
+    "total_per_lot": 30701.07,
+    "max_drawdown_per_lot": -14527.55,
+    "win_rate": 0.5541,
+    "net_mean_per_lot_day": 91.2
+   },
+   "all": {
+    "days": 431,
+    "mean_per_lot_day": 326.33,
+    "total_per_lot": 140648.57,
+    "max_drawdown_per_lot": -15419.73,
+    "win_rate": 0.6125,
+    "net_mean_per_lot_day": 222.34
+   }
+  },
+  "S_k20": {
+   "P1": {
+    "days": 202,
+    "mean_per_lot_day": 330.55,
+    "total_per_lot": 66772.09,
+    "max_drawdown_per_lot": -13414.17,
+    "win_rate": 0.6436,
+    "net_mean_per_lot_day": 227.2
+   },
+   "P2": {
+    "days": 157,
+    "mean_per_lot_day": 189.6,
+    "total_per_lot": 29767.35,
+    "max_drawdown_per_lot": -15173.18,
+    "win_rate": 0.5414,
+    "net_mean_per_lot_day": 86.38
+   },
+   "all": {
+    "days": 431,
+    "mean_per_lot_day": 300.15,
+    "total_per_lot": 129365.19,
+    "max_drawdown_per_lot": -15173.18,
+    "win_rate": 0.6102,
+    "net_mean_per_lot_day": 196.84
+   }
+  },
+  "S_family": {
+   "P1": {
+    "days": 202,
+    "mean_per_lot_day": 351.13,
+    "total_per_lot": 70927.97,
+    "max_drawdown_per_lot": -16201.58,
+    "win_rate": 0.6089,
+    "net_mean_per_lot_day": 249.08
+   },
+   "P2": {
+    "days": 157,
+    "mean_per_lot_day": 277.22,
+    "total_per_lot": 43523.59,
+    "max_drawdown_per_lot": -14339.79,
+    "win_rate": 0.535,
+    "net_mean_per_lot_day": 175.3
+   },
+   "all": {
+    "days": 431,
+    "mean_per_lot_day": 325.18,
+    "total_per_lot": 140151.04,
+    "max_drawdown_per_lot": -16201.58,
+    "win_rate": 0.594,
+    "net_mean_per_lot_day": 222.79
+   }
+  }
+ },
+ "vs": {
+  "S-C0": {
+   "P1": {
+    "mean": -23.72,
+    "lo90": -116.32,
+    "hi90": 75.28,
+    "days_with_different_picks": 187,
+    "dd_arm": -12975.83,
+    "dd_base": -10688.37
+   },
+   "P2": {
+    "mean": -172.19,
+    "lo90": -321.23,
+    "hi90": -38.29,
+    "days_with_different_picks": 149,
+    "dd_arm": -13289.45,
+    "dd_base": -11818.95
+   },
+   "all": {
+    "mean": -70.7,
+    "lo90": -146.38,
+    "hi90": -0.75,
+    "days_with_different_picks": 405,
+    "dd_arm": -13289.45,
+    "dd_base": -11818.95
+   }
+  },
+  "SL-S": {
+   "P1": {
+    "mean": -20.2,
+    "lo90": -90.64,
+    "hi90": 48.45,
+    "days_with_different_picks": 124,
+    "dd_arm": -11778.08,
+    "dd_base": -12975.83
+   },
+   "P2": {
+    "mean": 56.04,
+    "lo90": -17.11,
+    "hi90": 130.18,
+    "days_with_different_picks": 99,
+    "dd_arm": -12873.57,
+    "dd_base": -13289.45
+   },
+   "all": {
+    "mean": 21.95,
+    "lo90": -23.76,
+    "hi90": 63.82,
+    "days_with_different_picks": 259,
+    "dd_arm": -12873.57,
+    "dd_base": -13289.45
+   }
+  },
+  "SL-C0": {
+   "P1": {
+    "mean": -43.92,
+    "lo90": -146.34,
+    "hi90": 59.77,
+    "days_with_different_picks": 195,
+    "dd_arm": -11778.08,
+    "dd_base": -10688.37
+   },
+   "P2": {
+    "mean": -116.15,
+    "lo90": -244.87,
+    "hi90": 10.42,
+    "days_with_different_picks": 154,
+    "dd_arm": -12873.57,
+    "dd_base": -11818.95
+   },
+   "all": {
+    "mean": -48.75,
+    "lo90": -124.1,
+    "hi90": 18.63,
+    "days_with_different_picks": 419,
+    "dd_arm": -12873.57,
+    "dd_base": -11818.95
+   }
+  },
+  "M-C0": {
+   "P1": {
+    "mean": -66.53,
+    "lo90": -189.79,
+    "hi90": 57.41,
+    "days_with_different_picks": 198,
+    "dd_arm": -14365.48,
+    "dd_base": -10688.37
+   },
+   "P2": {
+    "mean": -157.76,
+    "lo90": -349.18,
+    "hi90": 20.51,
+    "days_with_different_picks": 154,
+    "dd_arm": -12522.9,
+    "dd_base": -11818.95
+   },
+   "all": {
+    "mean": -66.54,
+    "lo90": -165.86,
+    "hi90": 24.39,
+    "days_with_different_picks": 423,
+    "dd_arm": -14365.48,
+    "dd_base": -11818.95
+   }
+  },
+  "S_k5-C0": {
+   "P1": {
+    "mean": 9.78,
+    "lo90": -78.83,
+    "hi90": 102.53,
+    "days_with_different_picks": 179,
+    "dd_arm": -15419.73,
+    "dd_base": -10688.37
+   },
+   "P2": {
+    "mean": -147.98,
+    "lo90": -306.29,
+    "hi90": -0.2,
+    "days_with_different_picks": 142,
+    "dd_arm": -14527.55,
+    "dd_base": -11818.95
+   },
+   "all": {
+    "mean": -52.6,
+    "lo90": -127.62,
+    "hi90": 18.91,
+    "days_with_different_picks": 385,
+    "dd_arm": -15419.73,
+    "dd_base": -11818.95
+   }
+  },
+  "S_k20-C0": {
+   "P1": {
+    "mean": -56.42,
+    "lo90": -149.14,
+    "hi90": 35.14,
+    "days_with_different_picks": 194,
+    "dd_arm": -13414.17,
+    "dd_base": -10688.37
+   },
+   "P2": {
+    "mean": -153.93,
+    "lo90": -303.02,
+    "hi90": -18.82,
+    "days_with_different_picks": 154,
+    "dd_arm": -15173.18,
+    "dd_base": -11818.95
+   },
+   "all": {
+    "mean": -78.78,
+    "lo90": -155.01,
+    "hi90": -10.53,
+    "days_with_different_picks": 418,
+    "dd_arm": -15173.18,
+    "dd_base": -11818.95
+   }
+  },
+  "S_family-C0": {
+   "P1": {
+    "mean": -35.85,
+    "lo90": -144.44,
+    "hi90": 78.73,
+    "days_with_different_picks": 185,
+    "dd_arm": -16201.58,
+    "dd_base": -10688.37
+   },
+   "P2": {
+    "mean": -66.31,
+    "lo90": -219.94,
+    "hi90": 85.55,
+    "days_with_different_picks": 136,
+    "dd_arm": -14339.79,
+    "dd_base": -11818.95
+   },
+   "all": {
+    "mean": -53.76,
+    "lo90": -129.38,
+    "hi90": 22.11,
+    "days_with_different_picks": 388,
+    "dd_arm": -16201.58,
+    "dd_base": -11818.95
+   }
+  },
+  "S-M": {
+   "P1": {
+    "mean": 42.81,
+    "lo90": -61.3,
+    "hi90": 147.95,
+    "days_with_different_picks": 174,
+    "dd_arm": -12975.83,
+    "dd_base": -14365.48
+   },
+   "P2": {
+    "mean": -14.44,
+    "lo90": -132.53,
+    "hi90": 112.69,
+    "days_with_different_picks": 131,
+    "dd_arm": -13289.45,
+    "dd_base": -12522.9
+   },
+   "all": {
+    "mean": -4.16,
+    "lo90": -74.07,
+    "hi90": 69.55,
+    "days_with_different_picks": 367,
+    "dd_arm": -13289.45,
+    "dd_base": -14365.48
+   }
+  }
+ },
+ "shuffles": {
+  "C0": {
+   "P1": [
+    31155.31,
+    33898.67,
+    37635.66,
+    39413.87,
+    40495.99,
+    42264.82,
+    42814.76,
+    44700.36,
+    44800.12,
+    45699.07,
+    47717.68,
+    47960.86,
+    58197.05,
+    64119.62,
+    66678.27,
+    70386.85,
+    70983.1,
+    78430.43,
+    80534.89,
+    82457.13
+   ],
+   "P2": [
+    9494.53,
+    16868.38,
+    17800.95,
+    20018.43,
+    20627.4,
+    25523.4,
+    27070.39,
+    28222.15,
+    28896.81,
+    30354.24,
+    33099.05,
+    33746.84,
+    36333.31,
+    38956.4,
+    39098.35,
+    39108.95,
+    40957.81,
+    42522.76,
+    45160.68,
+    51366.41
+   ],
+   "all": [
+    85552.36,
+    92488.89,
+    94083.12,
+    97696.75,
+    98379.75,
+    98452.67,
+    99924.31,
+    107190.58,
+    107555.28,
+    114118.41,
+    117162.06,
+    118002.25,
+    118327.29,
+    120224.75,
+    121774.69,
+    122874.72,
+    127322.39,
+    136604.87,
+    140417.45,
+    145304.19
+   ]
+  },
+  "S": {
+   "P1": [
+    46329.29,
+    47903.9,
+    49629.28,
+    50002.76,
+    52805.26,
+    53641.04,
+    56585.32,
+    56938.17,
+    58101.55,
+    58275.52,
+    59172.44,
+    60430.23,
+    62264.08,
+    62606.71,
+    62850.93,
+    65339.36,
+    66183.97,
+    67139.2,
+    69842.12,
+    79949.71
+   ],
+   "P2": [
+    14543.21,
+    15058.76,
+    17936.12,
+    19683.35,
+    21498.6,
+    21943.0,
+    22686.03,
+    24632.68,
+    25846.05,
+    26916.82,
+    32438.16,
+    34070.27,
+    34981.92,
+    36179.73,
+    38544.38,
+    38562.09,
+    41726.83,
+    42060.83,
+    44511.98,
+    46607.52
+   ],
+   "all": [
+    91016.65,
+    103971.8,
+    108085.35,
+    108299.22,
+    114402.52,
+    115644.69,
+    115867.8,
+    118757.72,
+    120427.34,
+    122952.41,
+    123099.1,
+    123309.11,
+    127702.45,
+    132044.39,
+    132502.83,
+    135996.78,
+    136854.04,
+    139089.15,
+    141649.62,
+    143607.85
+   ]
+  },
+  "SL": {
+   "P1": [
+    36182.97,
+    47978.09,
+    50134.88,
+    51828.14,
+    53520.71,
+    54471.34,
+    57193.44,
+    58727.48,
+    59045.73,
+    59376.17,
+    61402.39,
+    61576.16,
+    61606.27,
+    63197.57,
+    64035.38,
+    65027.55,
+    65284.38,
+    65876.73,
+    70490.87,
+    71765.35
+   ],
+   "P2": [
+    5398.65,
+    16540.61,
+    18983.95,
+    19201.32,
+    23145.9,
+    23470.05,
+    23582.05,
+    25449.03,
+    27570.1,
+    30109.38,
+    30493.39,
+    34294.43,
+    34638.35,
+    34904.5,
+    36929.28,
+    38797.82,
+    38983.26,
+    39056.58,
+    41650.5,
+    41949.62
+   ],
+   "all": [
+    105055.03,
+    105735.06,
+    107327.58,
+    108417.16,
+    110215.49,
+    111234.84,
+    112271.38,
+    114845.66,
+    118661.34,
+    123012.17,
+    124703.12,
+    124706.74,
+    127620.01,
+    129290.16,
+    131570.89,
+    131979.79,
+    131981.11,
+    132603.56,
+    138142.81,
+    150745.78
+   ]
+  }
+ },
+ "decision": {
+  "H1_shrinkage_S_vs_C0": {
+   "mean": -23.72,
+   "lo90": -116.32,
+   "hi90": 75.28,
+   "days_with_different_picks": 187,
+   "dd_arm": -12975.83,
+   "dd_base": -10688.37,
+   "true_total": 73377.1,
+   "shuffles_beating_true": 1,
+   "shuffle_max": 79949.71,
+   "interval_above_zero": false,
+   "above_all_shuffles": false,
+   "drawdown_ok": false,
+   "pass": false
+  },
+  "H2_labels_SL_vs_S": {
+   "mean": -20.2,
+   "lo90": -90.64,
+   "hi90": 48.45,
+   "days_with_different_picks": 124,
+   "dd_arm": -11778.08,
+   "dd_base": -12975.83,
+   "true_total": 69297.31,
+   "shuffles_beating_true": 2,
+   "shuffle_max": 71765.35,
+   "interval_above_zero": false,
+   "above_all_shuffles": false,
+   "drawdown_ok": true,
+   "pass": false
+  },
+  "C0_true_vs_its_shuffles_P1": {
+   "true_total": 78169.43,
+   "shuffles_beating_true": 3
+  }
+ }
+}

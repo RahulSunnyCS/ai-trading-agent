@@ -1,6 +1,6 @@
 # Directional: leg stop
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Descriptive · **Last updated:** 2026-10-23
 
 ## What it is
 
@@ -18,6 +18,7 @@ closes; with RE COST ×1 it can be re-sold once (see [re-entry](re-entry.md)).
 |---|---|---|---|---|
 | BL-096 primary | 10, 15, 21, 25, 30, 35% × MTM ₹2,000–₹4,000 × exit 14:50–15:28, all 100 Dir bases (15,000 cells) | fit 2024-10-09 → 2025-10-08, holdout 2025-10-09 → 2026-10-09, 488 sessions | Descriptive (registered as descriptive) | [BL-096][bl096] |
 | BL-096 charged shortlist | 21% / 25% / 30% with ₹3,000–₹4,000 | holdout, **after charges** (₹20 an order + statutory), no slippage | Descriptive; shortlist chosen after viewing the holdout | [BL-096][bl096] |
+| BL-156 Amendment 1 | Leg stop checked on every tick (the engine: bar high / low) vs at the 1-minute close (exit at that close), crossed with the MTM rule | T1's Adaptive picks, 2025-01-10 → 2026-10-22, 1 lot, after brokerage | **Tick is better**: candle-close leg stops cost −₹432 a day on the book (−₹591 to −₹272), in every half-year; Dir (21 % stop): −₹220 a pick | [BL-156][bl156] |
 
 Charged shortlist, mean over the 100 bases, ₹ per day net (before charges in brackets) ([BL-096][bl096]):
 
@@ -60,3 +61,4 @@ Post-charge band leaders use leg stops of 21–35%: NIFTY 30% (09:15–11:00), 2
 [bl096]: ../../../../backlog/BL-096-directional-parameter-sweep.md
 [bl096pc]: ../../../../backlog/BL-096-directional-qualified-list-post-charge.md
 [bl096x]: ../../../../backlog/BL-096-directional-qualified-list-primary-15k-exact-times.md
+[bl156]: ../../../../backlog/BL-156-mtm-stop-tick-vs-candle-close.md
