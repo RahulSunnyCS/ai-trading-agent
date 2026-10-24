@@ -618,7 +618,8 @@ def local_migrate(
     allow_price_shrink: bool = typer.Option(
         False,
         help="Replace momentum_prices even when data/ has less history than the database "
-        "(e.g. an instrument removed from universe.csv). Refused otherwise.",
+        "(e.g. an instrument removed from universe.csv). Otherwise momentum_prices is kept as "
+        "stored, everything else is still copied, and the command exits 1.",
     ),
 ) -> None:
     """Copy companies/renames/corporate-actions/membership, stock daily bars, and the
@@ -649,7 +650,12 @@ def local_migrate(
     )
     typer.echo(
         f"stock instruments {report.stock_instruments}, bars {report.stock_bars:,} "
-        f"over {report.stock_years} year(s), momentum_prices rows {report.momentum_prices:,}"
+        f"over {report.stock_years} year(s), momentum_prices "
+        + (
+            "REFUSED (kept as stored)"
+            if report.momentum_prices_refused
+            else f"rows {report.momentum_prices:,}"
+        )
     )
     typer.echo(
         f"stock weekly prices {report.stock_weekly_prices:,}, "
