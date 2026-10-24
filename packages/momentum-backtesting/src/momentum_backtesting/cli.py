@@ -2296,6 +2296,63 @@ def _audit_runs(bundles: list[Path]) -> dict:
     return runs
 
 
+verify_app = typer.Typer(
+    help="Checks that the stored market data still says what it said (BL-001 Phase 4).",
+    no_args_is_help=True,
+)
+app.add_typer(verify_app, name="verify")
+
+
+@verify_app.command("history")
+def verify_history(
+    accept: bool = typer.Option(False, "--accept", help="Take the changes: re-baseline."),
+    reason: str = typer.Option(None, "--reason", help="Why (required with --accept)."),
+    send: bool = typer.Option(False, "--send", help="Send a change to Telegram (never an OK)."),
+    no_bars: bool = typer.Option(False, "--no-bars", help="Skip the stock lake (fast; tests)."),
+) -> None:
+    """Did old history change? Fingerprints every price series, stock bar and corporate action up
+    to a fixed anchor Friday and names each instrument whose history differs from the stored
+    baseline (the first run just records one). New weeks never trip it. Read-only on the shared
+    database; exits 1 on a change or when it cannot run. Nothing is ever accepted unasked."""
+    from datetime import datetime
+
+    from . import notify, verify
+    from .this_week import state_dir
+
+    try:
+        outcome = verify.run(
+            state_dir(),
+            datetime.now(notify.IST).date(),
+            accept=accept,
+            reason=reason,
+            bars=not no_bars,
+        )
+    except Exception as error:
+        message = notify.redact(f"{type(error).__name__}: {error}")
+        typer.echo(f"history check FAILED: {message}")
+        if send:
+            notify.send(
+                notify.Notification(
+                    "momentum-history",
+                    "error",
+                    "History check could not run",
+                    f"{message}\nRerun it: mbt verify history --send",
+                    type="momentum.problem",
+                )
+            )
+        raise typer.Exit(1) from error
+    title, body = verify.summary(outcome)
+    typer.echo(f"{title}\n{body}")
+    if outcome.status == "changed":
+        if send:
+            notify.send(
+                notify.Notification(
+                    "momentum-history", "warn", title, body, type="momentum.problem"
+                )
+            )
+        raise typer.Exit(1)
+
+
 @audit_app.command("bundle")
 def audit_bundle(
     space: Path = typer.Argument(..., help="The search-space TOML the runs came from."),
@@ -2381,6 +2438,35 @@ def audit_lookahead(
             failures += bool(found)
             typer.echo(f"{day} {path.stem}: {'same' if not found else '; '.join(found)}")
     if failures:
+        raise typer.Exit(1)
+
+
+@audit_app.command("lookahead-requests")
+def audit_lookahead_requests(
+    favourite: list[str] = typer.Option(
+        [], "--favourite", help="A saved favourite or group by exact name (repeat for several)."
+    ),
+    frozen: Path = typer.Option(None, "--frozen", help="A Phase 6 frozen record (its configs)."),
+    first: int = typer.Option(None, help="With --frozen: only the first N configs."),
+    cut: list[str] = typer.Option(..., help="A cut date, YYYY-MM-DD (repeat for several)."),
+    out: Path = typer.Option(None, "--out", help="Where to write (default data/audit/lookahead)."),
+) -> None:
+    """Whole requests (saved favourites, frozen configs) posted to the real API twice per cut:
+    on the live database stopped at the date, and on a copy holding nothing after it. Covers
+    the `turnover_rank` universe and the followed strategy as saved, which `lookahead` and the
+    golden fixture do not. Exits 1 if any result differs. Needs disk space for one copy of the
+    database per cut date (removed afterwards); never writes to the live database."""
+    from .audit import request_lookahead as rl
+
+    requests: dict[str, dict] = {}
+    if favourite:
+        requests |= rl.requests_from_catalog(favourite)
+    if frozen is not None:
+        requests |= rl.requests_from_frozen(frozen, first=first)
+    if not requests:
+        raise typer.BadParameter("give --favourite and/or --frozen")
+    report = rl.check(requests, cut, out or DATA_DIR / "audit" / "lookahead", echo=typer.echo)
+    if any(found for per_label in report.values() for found in per_label.values()):
         raise typer.Exit(1)
 
 
