@@ -3,6 +3,9 @@ module docstring says, and no value at stamp j depends on a later stamp or sessi
 
 from __future__ import annotations
 
+import gc
+import weakref
+
 import numpy as np
 import pytest
 
@@ -379,3 +382,17 @@ def test_evaluate_trade_reads_the_entry_minute():
     node = E.parse({"lt": ["close", {"sub": [{"at_entry": "close"}, 5]}]})
     row = E.evaluate_trade(node, fr, 2, 120, memo)
     assert (row == (fr.C[2] < fr.C[2, 120] - 5)).all()
+
+
+def test_memo_keeps_its_nodes_alive():
+    """The memo is keyed by node, so a freed node's address can't be reused by another node and
+    return the first node's cached grid (this made test_evaluate_trade_reads_the_entry_minute flaky)."""
+    fr = frame(3, seed=8)
+    memo: dict = {}
+    node = E.parse({"ge": ["minutes_in_trade", 60]})
+    E.evaluate_trade(node, fr, 1, 99, memo)
+    assert memo and all(isinstance(k, E.Node) for k in memo)
+    refs = [weakref.ref(k) for k in memo]
+    del node
+    gc.collect()
+    assert all(r() is not None for r in refs)

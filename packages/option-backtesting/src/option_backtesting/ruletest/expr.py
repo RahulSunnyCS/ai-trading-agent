@@ -605,18 +605,20 @@ def _prior(x: np.ndarray, sessions: int, how: str) -> np.ndarray:
     return out
 
 
-def evaluate(node: Node, frame: Frame, memo: dict[int, np.ndarray] | None = None) -> np.ndarray:
+def evaluate(node: Node, frame: Frame, memo: dict[Node, np.ndarray] | None = None) -> np.ndarray:
     """The node's value on every (session, stamp): float for numbers, bool for conditions."""
     memo = {} if memo is None else memo
-    key = id(node)
-    if key in memo:
-        return memo[key]
+    # Keyed by the node itself (Node is `eq=False`, so by identity), not by `id(node)`: the memo
+    # then keeps the node alive, so a freed node's address can't be reused by another node and
+    # hit a stale entry.
+    if node in memo:
+        return memo[node]
     out = _evaluate(node, frame, memo)
-    memo[key] = out
+    memo[node] = out
     return out
 
 
-def _evaluate(node: Node, frame: Frame, memo: dict[int, np.ndarray]) -> np.ndarray:
+def _evaluate(node: Node, frame: Frame, memo: dict[Node, np.ndarray]) -> np.ndarray:
     op = node.op
     if op == "const":
         return np.full((frame.n, N_BARS), node.args[0], dtype=float)
@@ -744,7 +746,7 @@ def _since_first(op: str, x: np.ndarray, when: np.ndarray) -> np.ndarray:
 
 
 def evaluate_trade(
-    node: Node, frame: Frame, row: int, decided: int, memo: dict[int, np.ndarray]
+    node: Node, frame: Frame, row: int, decided: int, memo: dict[Node, np.ndarray]
 ) -> np.ndarray:
     """One session's row of an exit condition for a trade whose entry was decided at stamp
     `decided` (it enters at `decided` + 1). Parts with no trade-relative value come from the
