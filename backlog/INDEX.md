@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-22
+Last updated: 2026-10-24
 
 ## Open
 
@@ -30,6 +30,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-089](BL-089-backlog-tracks-and-github-board.md) | Backlog restructure: research / product / platform tracks, a generated index and `DONE.md`, one issue per item and a GitHub Projects board with a "Needs me" view | P0 | Ready | chore | cross-cutting |
 | [BL-107](BL-107-nse-fo-bhavcopy-daily.md) | Daily NSE F&O bhavcopy: official end-of-day record and a cross-check on the Fyers data | P0 | Planned | feature | options |
 | [BL-148](BL-148-fyers-mcx-expired-options-history.md) | Fyers MCX expired options history: Prime two-year 1-minute OHLCV+OI backfill into the canonical lake, then daily continuation | P0 | Planned | feature | options / trading-data |
+| [BL-157](BL-157-dashboard-nextjs-16.md) | Dashboard on Next.js 16: OpenNext refuses Next 15 since 2026-10-21 (two years past its release), so the hosted dashboard cannot deploy | P0 | Planned | chore | dashboard / infra |
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-015](BL-015-research-gate.md) | Research gate: pre-register every experiment, log every override | P1 | In progress | chore | cross-cutting |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
@@ -134,6 +135,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-158](BL-158-momentum-monday-open-fill.md) | Momentum: test the followed group at Monday's open (delay 0), switch only if the pre-registered test passes | Killed: fails 3 of 5 rules over 28 rolling 3-year windows (C beats A on CAGR and Sharpe in 5 of 28; median drawdown 3.3 pts deeper; worst 11.3 pts deeper); the followed group stays at delay 1, Friday close | 2026-10-24 |
 | [BL-156](BL-156-mtm-stop-tick-vs-candle-close.md) | Leg stop and overall MTM stop: every tick or the 1-minute candle close (four combinations on T1) | Done: keep leg stops on tick. Candle-close leg stops are significantly worse (−₹358 / −₹449 a day on T1, every half-year, all families, Dir most). The MTM rule is not significant (close +₹56 / day [−18, +153]). Paper overstates live by about ₹40–60 a day. AlgoTest can check the MTM on candle close; Quantiply cannot | 2026-10-23 |
 | [BL-155](BL-155-stop-by-morning-type.md) | Stop size by the morning: wide leg stop after a quiet morning, tight after a wide one | Done: killed at step 1 — on the heatmap straddles (NIFTY 2025–26) the rule made +₹40 / lot-day vs +₹32–35 for fixed 60 / 80 / 100 % and the reversed rule, every interval includes zero, below shuffled labels; the real-Widesl step was not run. Lead: quiet mornings favour the widest stop on NIFTY in both periods | 2026-10-22 |
 | [BL-154](BL-154-adaptive-fit-shrinkage.md) | Adaptive: shrink the 09:16 weekday / days-to-expiry / VIX fits by sample size, plus opening-gap and previous-day-range labels | Done: killed — on P1 shrinkage −₹24 per lot-day [−116, +75], 1 of 20 shuffles above, drawdown 21% deeper; labels −₹20 [−91, +48]; shrinkage wholly negative on P2 (−₹172) and the whole span; today's fits beat all 20 shuffles on P2 and the whole span | 2026-10-22 |

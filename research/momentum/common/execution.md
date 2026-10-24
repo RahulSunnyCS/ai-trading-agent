@@ -1,6 +1,6 @@
 # Momentum: signal delay, fill time, tracking and premium warning
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -20,8 +20,9 @@ When a signal is traded, at what price, and what the P&L is measured on.
   close.
 - Broad: new runs default to delay 0 (owner, 2026-10-05). The search spaces and the frozen
   ensemble pin `signal_delay = 1`
-  ([`round7_A.toml`](../../../packages/momentum-backtesting/search_spaces/round7_A.toml)). The
-  engine fills Broad only at a Friday close; there is no Monday-open option yet.
+  ([`round7_A.toml`](../../../packages/momentum-backtesting/search_spaces/round7_A.toml)). Broad
+  can fill at Monday's open (`execution="mon_open"`, delay 0 only; BL-036 Phase 2). The followed
+  Four Sectors group stays at delay 1, Friday close: Monday open was killed against it (BL-158).
 
 ## Tested
 
@@ -32,6 +33,7 @@ When a signal is traded, at what price, and what the P&L is measured on.
 | `mbt tracking` (package README), TODO 3.9.23 | `track` index vs ETF | ETF live config | The live job tracks the ETF | ETF gap +0.72 CAGR points a year (index track 25.0% vs ETF 25.8%), past the owner's 0.5 threshold |
 | [BL-010](../../../backlog/BL-010-momentum-evaluation-review.md) Phase 2 step 7 | the same Broad decisions filled at Friday close and at the next open | six configs at delay 0 | Flag tripped (finding E13) | Costs a delay-0 run 1.0 point of CAGR on average, over 1 point on two of six. Threshold committed in [`bl010_criteria_addendum_1.json`](../../../packages/momentum-backtesting/search_spaces/bl010_criteria_addendum_1.json) before the step ran |
 | BL-010 Log, 2026-10-05 | one-week delay on the default Broad run (pre-point-in-time) | 2017-01 to 2026-10 | Descriptive | 53.2% as shipped; 44.3% with a one-week delay; 40.3% with circuit locks, the tradability filter and the delay together |
+| [BL-158](../../../backlog/BL-158-momentum-monday-open-fill.md) | the followed Four Sectors group (all Fridays): delay 0 at Monday's open (C) against delay 1 at Friday's close (A); delay 0 at Friday's close (B) for reference | 28 rolling 3-year windows, 2017-01 to 2026-09 | **Killed**: fails 3 of 5 pre-registered rules ([`bl158_criteria.json`](../../../packages/momentum-backtesting/search_spaces/bl158_criteria.json)) | C beats A on CAGR and Sharpe in 5 of 28 windows (CAGR 61%, Sharpe 18%); median CAGR +1.12 pts; median drawdown 3.34 pts deeper, worst 11.26 deeper; after tax +1.28. B: median +3.0 pts, drawdown level with A |
 
 ## What we know
 
@@ -41,14 +43,18 @@ When a signal is traded, at what price, and what the P&L is measured on.
   cut the same churn ([cadence](cadence.md)).
 - A Broad signal can first be traded at Monday's open (Friday's stock data arrives at 19:30 IST).
   BL-010's rule: if Monday-open costs more than 1 point, the fix is a Monday-fill option, not a
-  week's delay. The option is planned in
-  [BL-036](../../../backlog/BL-036-momentum-ui-from-bl010.md) Phase 2.
+  week's delay. The option is built
+  ([BL-036](../../../backlog/BL-036-momentum-ui-from-bl010.md) Phase 2).
+- On the followed group, Monday's open does not beat the one-week delay at Friday's close (BL-158):
+  slightly more return in most windows, but a lower Sharpe in most and a worst 3-year fall 11
+  points deeper. Dropping the delay is where the extra return comes from (arm B); the Monday fill
+  gives most of it back as volatility. Arm B cannot be traded (the close the ranks are made on).
 - The BL-084 and BL-085 stop tests bracketed the Monday open between a same-Friday and a
   next-Friday fill ([Broad stop-loss](../strategies/broad/stop.md)).
 
 ## Not yet tested
 
-- A Monday-open fill option for Broad, as an engine setting with its own scenario (BL-036 Phase 2).
+- Monday-open fills for Stock and Custom Index (BL-036 Phase 2b).
 
 ## In plain words
 
