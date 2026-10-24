@@ -114,7 +114,7 @@ None.
   breakdown on the same data, so it is **post-hoc and exploratory**, not a clean pre-registered test (its rule
   was fixed before its own figures were computed, but not before the breakdown that prompted it). Its verdict
   (not better) does not change. The owner should confirm the override or retract the addendum.
-  `override: (not recorded — owner to confirm)`
+  `override: owner confirmed 2026-10-24 (in chat, recorded by Claude): exploratory follow-up to the down-day / recovery breakdown; kept as an exploratory read, not a pre-registered test`
 - 2026-10-24 — **review caveats** (Opus review of PR #306; no result is changed, nothing was rerun):
   - `research/bl147/run.py:190-192` computes the max drawdown with `np.maximum.accumulate(np.concatenate([[0],
     cum])[1:])`, which is just `np.maximum.accumulate(cum)`: the zero starting peak is dropped. A stream that
