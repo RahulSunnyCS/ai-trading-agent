@@ -234,13 +234,12 @@ def test_replace_allows_a_small_trim(tmp_path):
 def test_replace_allowance_is_the_larger_of_two_percent_and_a_capped_five_rows(
     tmp_path, count, allowed
 ):
-    assert db_migrate.shrink_allowance(count) == pytest.approx(allowed, abs=0.5)
+    assert int(db_migrate.shrink_allowance(count)) == allowed
     _weekly(tmp_path, {"Nifty 50": [100.0 + i for i in range(count)]})
     with connect() as con:
         db_migrate.import_momentum_prices(con, tmp_path)
         _weekly(tmp_path, {"Nifty 50": [100.0 + i for i in range(count - allowed)]})
         assert db_migrate.import_momentum_prices(con, tmp_path) == count - allowed
-        db_migrate.import_momentum_prices(con, tmp_path, allow_shrink=True)
 
     _weekly(tmp_path, {"Nifty 50": [100.0 + i for i in range(count)]})
     with connect() as con:
@@ -385,12 +384,42 @@ def test_a_shorter_etf_history_keeps_the_stored_etf_file_and_premium(data_dir, m
     assert any("SHORTER" in line for line in logs)
 
 
-def test_a_shorter_nav_history_keeps_the_stored_premium_column(data_dir, monkeypatch):
+def test_a_premium_keeps_the_stored_days_the_nav_lacks(data_dir, monkeypatch):
+    """Older history and the newest days before the NAV is published: the fetch never leaves
+    fewer premium rows than the database push accepts."""
     pd.DataFrame({"Gold": 0.01}, index=DAYS).rename_axis("date").to_csv(
         data_dir / "etf_premium.csv"
     )
+    nav_days = DAYS[(DAYS >= "2026-09-01") & (DAYS <= "2026-10-13")]
     logs: list[str] = []
-    premiums = _etf_fetch(data_dir, monkeypatch, DAYS, DAYS[DAYS >= "2026-09-01"], logs)
-    assert "Gold" not in premiums
-    assert any("premium history SHORTER" in line for line in logs)
+    premiums = _etf_fetch(data_dir, monkeypatch, DAYS, nav_days, logs)
+    assert premiums["Gold"].index.equals(DAYS)  # every stored day is still there
+    assert premiums["Gold"].loc[nav_days].round(4).eq(0.01).all()  # the fetched days: 1% NAV gap
+    assert (premiums["Gold"].drop(nav_days) == 0.01).all()  # the stored ones, untouched
+    assert any("stored premium days the NAV lacks kept" in line for line in logs)
     assert len(pd.read_csv(data_dir / "daily_etf" / "Gold.csv")) == len(DAYS)  # the ETF was fine
+
+
+def test_fetch_all_holds_back_a_shorter_etf_and_keeps_its_premium(data_dir, monkeypatch):
+    """End to end: the stored ETF file and premium column survive, and the coverage says so."""
+    monkeypatch.setattr(fetch, "load_universe", lambda: [NIFTY, GOLD, CASH])
+    monkeypatch.setattr(angelone, "resolve_prices", lambda **_: FYERS)
+    monkeypatch.setattr(fyers, "daily_candles", lambda symbol, start, end, creds: _daily(50.0))
+    etf = {"days": DAYS}
+    monkeypatch.setattr(
+        fetch, "_etf_daily", lambda inst, start, end, creds: (_daily(50.0, etf["days"]), "test")
+    )
+    nav = _daily(50.0)["close"] / 1.01
+    monkeypatch.setattr(fetch, "amfi_nav", lambda code, start, adjust=True: nav)
+    fetch.fetch_all(use_fyers=True, log=lambda m: None, etfs=True)
+    etf_file = (data_dir / "daily_etf" / "Gold.csv").read_text()
+    premium_before = _stored(data_dir, "etf_premium.csv")["Gold"]
+    assert len(premium_before) == len(DAYS)
+
+    etf["days"] = DAYS[DAYS >= "2026-09-01"]  # the ETF source returned less history
+    _, coverage = fetch.fetch_all(use_fyers=True, log=lambda m: None, etfs=True)
+    assert (data_dir / "daily_etf" / "Gold.csv").read_text() == etf_file
+    pd.testing.assert_series_equal(
+        _stored(data_dir, "etf_premium.csv")["Gold"], premium_before, check_freq=False
+    )
+    assert "kept the stored ETF and premium" in coverage.loc["Gold", "etf_kept"]

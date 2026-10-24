@@ -203,8 +203,13 @@ def fetch_etfs(
     signal: dict[str, pd.DataFrame],
     log: Callable[[str], None] = print,
     intraday: bool = False,
+    held_back: dict[str, str] | None = None,
 ) -> pd.DataFrame:
-    """Fetch the traded ETFs (and, with an amfi_code, their NAV). Returns daily premiums."""
+    """Fetch the traded ETFs (and, with an amfi_code, their NAV). Returns daily premiums.
+
+    An ETF whose fetched history starts later than the stored file keeps the stored ETF file and
+    premium (named in `held_back` when given). A premium keeps every stored day the NAV overlap
+    lacks, so a fetch never leaves fewer premium rows than the database push accepts."""
     premiums: dict[str, pd.Series] = {}
     stored_premiums = read_stored(DATA_DIR / "etf_premium.csv")
     for inst in load_universe():
@@ -222,11 +227,15 @@ def fetch_etfs(
             continue
         factors = split_factors(raw["close"], signal[inst.name]["close"])
         adjusted = raw.mul(factors, axis=0)
-        if _starts_later(adjusted, read_stored(DATA_DIR / "daily_etf" / f"{inst.name}.csv")):
-            log(
-                f"  {inst.trade_etf:<12} ETF SHORTER: history starts {adjusted.index[0].date()}, "
-                "kept the stored ETF and premium history"
+        stored_etf = read_stored(DATA_DIR / "daily_etf" / f"{inst.name}.csv")
+        if _starts_later(adjusted, stored_etf):
+            reason = (
+                f"fetched history starts {adjusted.index[0].date()}, stored starts "
+                f"{stored_etf.dropna(how='all').index[0].date()}: kept the stored ETF and premium"
             )
+            if held_back is not None:
+                held_back[inst.name] = reason
+            log(f"  {inst.trade_etf:<12} ETF SHORTER: {reason}")
             continue
         _write(adjusted, DATA_DIR / "daily_etf" / f"{inst.name}.csv")
         extra = ""
@@ -239,13 +248,17 @@ def fetch_etfs(
                 nav = amfi_nav(inst.amfi_code, start, adjust=False)
                 premium = (raw["close"] / nav.reindex(raw.index) - 1).dropna()
                 bad = premium.abs() > MAX_PREMIUM
-                if len(premium[~bad]) and _starts_later(
-                    premium[~bad],
-                    stored_premiums.get(inst.name) if stored_premiums is not None else None,
-                ):
-                    extra += "  (premium history SHORTER: kept the stored premium)"
-                else:
-                    premiums[inst.name] = premium[~bad]
+                good = premium[~bad]
+                stored = stored_premiums.get(inst.name) if stored_premiums is not None else None
+                if stored is not None:
+                    # Days the NAV overlap does not cover (older history, or the newest days
+                    # before the NAV is published). A day dropped as a unit mismatch is not one.
+                    keep = stored.dropna()
+                    keep = keep[~keep.index.isin(premium.index)]
+                    if len(keep):
+                        good = pd.concat([good, keep]).sort_index()
+                        extra += f"  ({len(keep)} stored premium days the NAV lacks kept)"
+                premiums[inst.name] = good
                 last = premium[~bad].iloc[-1] if (~bad).any() else float("nan")
                 extra += f"  premium now {last:+.2%}"
                 if bad.any():
@@ -425,7 +438,11 @@ def fetch_all(
     premiums = pd.DataFrame()
     if etfs:
         log("\nETFs (what you'd actually trade):")
-        premiums = fetch_etfs(start, end, creds, signal, log, intraday)
+        held_back: dict[str, str] = {}
+        premiums = fetch_etfs(start, end, creds, signal, log, intraday, held_back)
+        for name, reason in held_back.items():
+            if name in coverage.index:
+                coverage.loc[name, "etf_kept"] = reason
         premiums, _ = _keep_stored(
             premiums,
             read_stored(DATA_DIR / "etf_premium.csv"),
