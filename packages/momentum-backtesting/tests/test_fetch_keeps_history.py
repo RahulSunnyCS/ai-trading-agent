@@ -12,8 +12,9 @@ import numpy as np
 import pandas as pd
 import pytest
 from trading_data.db import connect
+from typer.testing import CliRunner
 
-from momentum_backtesting import angelone, db_migrate, fetch, fyers
+from momentum_backtesting import angelone, db_migrate, fetch, fyers, local_store
 from momentum_backtesting.fetch import Instrument
 
 NIFTY = Instrument("core", "Broad", "Nifty 50", "NIFTYBEES", "equity", "NSE:NIFTY50-INDEX", "", "")
@@ -114,8 +115,48 @@ def test_a_fetch_that_lost_older_history_keeps_the_stored_series(data_dir, monke
 def test_a_series_removed_from_the_universe_leaves_the_table(data_dir, monkeypatch):
     _full_fetch(monkeypatch)
     monkeypatch.setattr(fetch, "load_universe", lambda: [NIFTY, CASH])
-    fetch.fetch_all(use_fyers=True, log=lambda m: None, etfs=False)
+    logs: list[str] = []
+    fetch.fetch_all(use_fyers=True, log=logs.append, etfs=False)
     assert list(_stored(data_dir).columns) == ["Nifty 50", "Cash"]
+    said = [line for line in logs if "no longer in universe.csv" in line]
+    assert said and "Nifty Bank" in said[0] and "--allow-price-shrink" in said[0]
+
+
+def test_stored_days_past_the_fetched_end_are_kept(data_dir, monkeypatch):
+    """E.g. ETF-implied closes a refresh stored for days the official source has not published."""
+    _full_fetch(monkeypatch)
+    path = data_dir / "daily" / "Nifty Bank.csv"
+    daily = pd.read_csv(path, index_col=0, parse_dates=True)
+    extra = pd.DataFrame(
+        {"open": [None, None], "close": [9000.0, 9001.0]},
+        index=pd.to_datetime(["2026-10-19", "2026-10-20"]),
+    )
+    pd.concat([daily, extra]).to_csv(path, index_label="date")
+    fetch.fetch_all(use_fyers=True, log=lambda m: None, etfs=False)
+    after = pd.read_csv(path, index_col=0, parse_dates=True)
+    assert list(after.index[-2:]) == list(extra.index)
+    assert after["close"].iloc[-1] == 9001.0
+
+
+def test_a_shorter_silver_splice_keeps_the_stored_column(data_dir, monkeypatch):
+    silver = Instrument("core", "Commodity", "Silver", "SILVERBEES", "gold", "SILVER", "", "")
+    monkeypatch.setattr(fetch, "load_universe", lambda: [silver, CASH])
+    weeks = pd.date_range("2016-01-01", "2026-10-16", freq="W-FRI")
+    full = pd.Series(np.arange(len(weeks), dtype=float) + 50, index=weeks)
+    splice = {"prices": full}
+    monkeypatch.setattr(
+        fetch,
+        "silver_weekly",
+        lambda start: (splice["prices"], pd.Series("yahoo", splice["prices"].index)),
+    )
+    monkeypatch.setattr(fetch, "silver_daily", lambda start: _daily(50.0)["close"])
+    fetch.fetch_all(use_fyers=False, log=lambda m: None, etfs=False)
+    before = _stored(data_dir)["Silver"]
+
+    splice["prices"] = full[full.index >= "2020-01-01"]  # Yahoo returned less history
+    _, coverage = fetch.fetch_all(use_fyers=False, log=lambda m: None, etfs=False)
+    pd.testing.assert_series_equal(_stored(data_dir)["Silver"], before, check_freq=False)
+    assert "kept the stored history" in coverage.loc["Silver", "error"]
 
 
 def test_premium_columns_of_etfs_not_fetched_are_kept(data_dir, monkeypatch):
@@ -178,13 +219,84 @@ def test_replace_allows_a_small_trim(tmp_path):
         assert db_migrate.import_momentum_prices(con, tmp_path) == 39
 
 
-def test_migrate_checks_prices_before_touching_any_table(tmp_path, monkeypatch):
-    _weekly(tmp_path, {"Nifty 50": [100.0 + i for i in range(40)]})
-    monkeypatch.setattr(
-        db_migrate, "import_curated", lambda *a: pytest.fail("ran before the check")
+def test_replace_refuses_a_series_that_starts_later_whatever_the_count(tmp_path):
+    weeks = pd.date_range("2026-01-02", periods=40, freq="W-FRI")
+    pd.DataFrame({"Nifty 50": 100.0}, index=weeks).to_csv(
+        tmp_path / "weekly_closes.csv", index_label="week_ending"
     )
     with connect() as con:
         db_migrate.import_momentum_prices(con, tmp_path)
+        later = pd.date_range("2026-02-06", periods=40, freq="W-FRI")  # same count, older lost
+        pd.DataFrame({"Nifty 50": 100.0}, index=later).to_csv(
+            tmp_path / "weekly_closes.csv", index_label="week_ending"
+        )
+        with pytest.raises(db_migrate.PriceShrinkError, match="starts 2026-02-06"):
+            db_migrate.import_momentum_prices(con, tmp_path)
+
+
+def test_push_dir_refuses_too(tmp_path):
+    """The weekly job's push (refresh_weekly_snapshot) goes through the same check."""
+    _weekly(tmp_path, {"Nifty 50": [100.0 + i for i in range(40)]})
+    with connect() as con:
+        local_store.push_dir(con, tmp_path)
         _weekly(tmp_path, {"Cash": [10.0]})
         with pytest.raises(db_migrate.PriceShrinkError):
-            db_migrate.migrate(con, tmp_path, data_dir=tmp_path)
+            local_store.push_dir(con, tmp_path, pd.Timestamp("2026-09-01"))
+
+
+def _stub_other_imports(monkeypatch, seen: list[str]) -> None:
+    for name, value in (
+        ("import_curated", (0, 0, 0)),
+        ("import_category_membership", 0),
+        ("import_total_market_membership", 0),
+        ("import_corporate_actions", 0),
+        ("migrate_stock_bars", (0, 0, 0)),
+        ("import_stock_weekly", (0, 0, 0)),
+    ):
+        monkeypatch.setattr(
+            db_migrate, name, lambda *a, _n=name, _v=value, **k: seen.append(_n) or _v
+        )
+
+
+def test_a_refused_price_replace_does_not_block_the_stock_imports(tmp_path, monkeypatch):
+    """The 19:30 stock sync must not leave the stock tables a week behind because data/'s ETF
+    series shrank: migrate keeps momentum_prices, copies the rest and reports the refusal."""
+    _weekly(tmp_path, {"Nifty 50": [100.0 + i for i in range(40)]})
+    seen: list[str] = []
+    _stub_other_imports(monkeypatch, seen)
+    with connect() as con:
+        db_migrate.import_momentum_prices(con, tmp_path)
+        _weekly(tmp_path, {"Cash": [10.0]})
+        report = db_migrate.migrate(con, tmp_path, data_dir=tmp_path)
+        assert con.execute("SELECT count(*) FROM momentum_prices").fetchone()[0] == 40
+    assert "Nifty 50 (weekly) 40 -> 0" in report.momentum_prices_refused
+    assert "import_stock_weekly" in seen and "migrate_stock_bars" in seen
+
+
+@pytest.mark.parametrize("refused, code", [(None, 0), ("Nifty 50 (weekly) 40 -> 0 rows", 1)])
+def test_local_migrate_exits_1_after_copying_the_rest_when_prices_are_refused(
+    monkeypatch, refused, code
+):
+    from contextlib import nullcontext
+
+    from momentum_backtesting import cli, db_read, stock_actions
+
+    calls = {}
+
+    def migrate(con, root, allow_price_shrink=False):
+        calls["allow"] = allow_price_shrink
+        return db_migrate.MigrationReport(momentum_prices_refused=refused)
+
+    monkeypatch.setattr(db_migrate, "migrate", migrate)
+    monkeypatch.setattr(db_read, "open_catalog", lambda *a, **k: nullcontext())
+    scan = {"candidates": 0, "confirmed": 0, "review": 0}
+    monkeypatch.setattr(stock_actions, "scan_and_store", lambda *a: calls.setdefault("scan", scan))
+
+    result = CliRunner().invoke(cli.app, ["local", "migrate"])
+    assert result.exit_code == code, result.output
+    assert calls["allow"] is False and "scan" in calls  # the large-drop scan still ran
+    if refused:
+        assert "momentum_prices kept as stored" in result.output
+
+    CliRunner().invoke(cli.app, ["local", "migrate", "--allow-price-shrink"])
+    assert calls["allow"] is True

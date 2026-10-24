@@ -624,20 +624,17 @@ def local_migrate(
     """Copy companies/renames/corporate-actions/membership, stock daily bars, and the
     index/ETF/premium/weekly price series into the shared local database. The curated
     CSVs and data/ stay the master copies — safe to re-run; every table/partition this
-    touches is replaced wholesale, never appended to. Refuses (and changes nothing) when
-    data/'s price series hold less history than momentum_prices already does."""
+    touches is replaced wholesale, never appended to. When data/'s price series hold less
+    history than momentum_prices already does, that table is kept, everything else is
+    copied, and the command exits 1."""
     from trading_data.db import data_root
 
     from . import db_migrate
     from .db_read import open_catalog
 
     root = data_root()
-    try:
-        with open_catalog(root) as con:
-            report = db_migrate.migrate(con, root, allow_price_shrink=allow_price_shrink)
-    except db_migrate.PriceShrinkError as error:
-        typer.echo(str(error))
-        raise typer.Exit(1) from None
+    with open_catalog(root) as con:
+        report = db_migrate.migrate(con, root, allow_price_shrink=allow_price_shrink)
     # Reopen after the Parquet write: lake views are fixed when connect() opens.
     from . import stock_actions
 
@@ -665,6 +662,9 @@ def local_migrate(
         f"{action_report['confirmed']} exchange-confirmed, "
         f"{action_report['review']} need review"
     )
+    if report.momentum_prices_refused:
+        typer.echo(f"\nmomentum_prices kept as stored: {report.momentum_prices_refused}")
+        raise typer.Exit(1)
 
 
 stocks_app = typer.Typer(

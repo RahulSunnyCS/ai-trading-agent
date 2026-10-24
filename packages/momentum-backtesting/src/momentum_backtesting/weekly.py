@@ -32,7 +32,7 @@ import pandas as pd
 from . import analysis, fyers
 from .config import DATA_DIR
 from .engine import Config, run_backtest
-from .fetch import ETF_SAME, Instrument, load_universe
+from .fetch import ETF_SAME, Instrument, load_universe, read_stored
 from .notify import IST, Notification
 from .sources import (
     amfi_nav,
@@ -158,15 +158,9 @@ def last_nse_session(health: Health, names: list[str], week_ending: date) -> dat
     return max(dates, default=None)
 
 
-def _read(path: Path) -> pd.DataFrame | None:
-    if not path.exists():
-        return None
-    return pd.read_csv(path, index_col=0, parse_dates=True).sort_index()
-
-
 def _merge(path: Path, new: pd.DataFrame, rescale: float = 1.0) -> pd.DataFrame:
     """New rows win; older rows are multiplied by `rescale` (a unit split in the window)."""
-    old = _read(path)
+    old = read_stored(path)
     if old is not None and not old.empty:
         kept = old[old.index < new.index.min()] * rescale if len(new) else old
         later = old[(old.index > new.index.max())] if len(new) else old.iloc[0:0]
@@ -268,7 +262,7 @@ def refresh(
             raise
         except Exception as error:
             health.failures[inst.name] = str(error)[:120]
-        old = _read(daily_dir / f"{inst.name}.csv")
+        old = read_stored(daily_dir / f"{inst.name}.csv")
         if frame is not None and len(frame):
             frame = window(frame)
         if (frame is None or frame.empty or frame.index[-1].date() < until) and (
@@ -292,7 +286,7 @@ def refresh(
         if inst.name not in etf_new or etf_new[inst.name].empty:
             continue
         raw = etf_new[inst.name]
-        reference = _read(daily_dir / f"{inst.name}.csv")
+        reference = read_stored(daily_dir / f"{inst.name}.csv")
         factors = (
             split_factors(raw["close"], reference["close"])
             if reference is not None
@@ -304,7 +298,7 @@ def refresh(
                 nav = amfi_nav(inst.amfi_code, start, adjust=False)
                 premium = (raw["close"] / nav.reindex(raw.index) - 1).dropna()
                 premium = premium[premium.abs() <= 0.5]
-                table = _read(data_dir / "etf_premium.csv")
+                table = read_stored(data_dir / "etf_premium.csv")
                 table = pd.DataFrame() if table is None else table
                 for day, value in premium.items():
                     table.loc[day, inst.name] = value
@@ -318,11 +312,11 @@ def refresh(
 
 def _rebuild_weekly(data_dir: Path, fresh: dict[str, pd.DataFrame], start: date) -> None:
     path = data_dir / "weekly_closes.csv"
-    table = _read(path)
+    table = read_stored(path)
     table = pd.DataFrame() if table is None else table
     first_week = pd.offsets.Week(weekday=4).rollforward(pd.Timestamp(start))  # Friday on/after
     for name in fresh:
-        daily = _read(data_dir / "daily" / f"{name}.csv")
+        daily = read_stored(data_dir / "daily" / f"{name}.csv")
         if daily is None:
             continue
         recent = weekly(daily["close"])
@@ -356,7 +350,7 @@ def live_prices(
                 fyers_quotes = {}
     index_now, etf_now, how = {}, {}, {}
     for inst in universe:
-        daily = _read(data_dir / "daily" / f"{inst.name}.csv")
+        daily = read_stored(data_dir / "daily" / f"{inst.name}.csv")
         if daily is None or daily.empty:
             continue
         last_close = float(daily["close"].iloc[-1])
@@ -382,7 +376,7 @@ def live_prices(
             except Exception:
                 pass
         elif etf_price is not None:
-            etf_daily = _read(data_dir / "daily_etf" / f"{inst.name}.csv")
+            etf_daily = read_stored(data_dir / "daily_etf" / f"{inst.name}.csv")
             if etf_daily is not None and not etf_daily.empty:
                 ratio = etf_price / float(etf_daily["close"].iloc[-1])
                 index_now[inst.name], how[inst.name] = last_close * ratio, "ETF-implied live"
