@@ -176,7 +176,7 @@ original Phase 0 and its verdict stand; this adds a second, separately registere
 - **Tasks:**
   - Result and Log here; INDEX and TODO;
   - `research/options/strategies/widesl/mtm-sl.md`;
-  - a note in `research/options/common/` on how far paper overstates live.
+  - a note in `research/options/common/` on how far paper overstates live (`paper-vs-live.md`).
 - **Done when:** merged with a code-review result on the PR.
 
 ## Result (2026-10-23): no meaningful difference
@@ -187,15 +187,15 @@ original Phase 0 and its verdict stand; this adds a second, separately registere
 
 The close rule reproduced every stored result (0 mismatches over 2,271 strategy-days).
 
-**T1's Adaptive picks, 1 lot a pick, 2025-01-10 → 2026-10-22 (431 days; the rules differ on 126):**
+**T1's Adaptive picks, 1 lot a pick, 2025-01-10 → 2026-10-22 (431 days; the rules differ on 123):**
 
 | Rule | ₹ / day net | Total | Worst day | Max drawdown |
 |---|---|---|---|---|
 | Candle close (paper today) | **+1,526** | +6,57,708 | −14,092 | **−25,806** |
-| Tick, 2% overshoot (live today) | +1,466 | +6,31,635 | **−12,896** | −29,367 |
-| **Close − tick** | **+60**, 90% [−14, +149] | +26,073 | | |
+| Tick, 2% overshoot (live today) | +1,470 | +6,33,486 | **−12,896** | −29,367 |
+| **Close − tick** | **+56**, 90% [−17, +144] | +24,222 | | |
 
-- **By half-year (close − tick, ₹ / day):** 2025H1 +57, 2025H2 −23, 2026H1 +156, 2026H2 +53.
+- **By half-year (close − tick, ₹ / day):** 2025H1 +58, 2025H2 −28, 2026H1 +144, 2026H2 +53.
 - **Verdict under the registered rule: the interval includes zero, so there is no meaningful
   difference; keep live as it is.**
 
@@ -203,13 +203,13 @@ The close rule reproduced every stored result (0 mismatches over 2,271 strategy-
 
 | Comparison | T1 | Core |
 |---|---|---|
-| Tick, no overshoot | +38 [−36, +132] | +13 [−64, +109] |
-| Tick, 5% overshoot | +95 [+20, +187] | +83 [+10, +175] |
-| Pessimistic tick (every leg at its extreme at once) | +254 [+92, +463] | +385 [+225, +561] |
+| Tick, no overshoot | +34 [−40, +128] | +11 [−68, +106] |
+| Tick, 5% overshoot | +90 [+13, +182] | +80 [+8, +173] |
+| Pessimistic tick (every leg at its extreme at once) | +250 [+86, +460] | +383 [+221, +559] |
 | 5-minute close | +43 [+9, +79] | −16 [−80, +42] |
-| Tick, 2% overshoot (Core's headline) | — | +41 [−33, +133] |
+| Tick, 2% overshoot (Core's headline) | — | +38 [−35, +130] |
 
-Core: close +₹917 against tick +₹876 a day; max drawdown −₹38,572 against −₹36,603.
+Core: close +₹917 against tick +₹878 a day; max drawdown −₹38,572 against −₹36,373.
 
 **Reading:**
 - **The candle close leans ahead but is not proven.** It rides through spikes that come back, as on
@@ -240,19 +240,19 @@ T1's picks over 431 days, 1 lot a pick. The paper combination ③ reproduced eve
 
 | Combination | ₹ / day | Total | Worst day | Max DD | vs live ④, 90% [interval], Holm |
 |---|---|---|---|---|---|
-| ① Leg close + MTM close | +1,112 | +4,79,168 | −13,660 | −33,413 | **−354** [−526, −180], **significantly worse** |
-| ② Leg close + MTM tick | +1,021 | +4,40,125 | −12,570 | −34,211 | **−444** [−619, −272], **significantly worse** |
-| ③ Leg tick + MTM close (paper) | **+1,526** | **+6,57,708** | −14,092 | **−25,806** | +60 [−14, +155], not significant |
-| ④ Leg tick + MTM tick (live) | +1,466 | +6,31,635 | −12,896 | −29,367 | — |
+| ① Leg close + MTM close | +1,112 | +4,79,168 | −13,660 | −33,413 | **−358** [−531, −182], **significantly worse** |
+| ② Leg close + MTM tick | +1,021 | +4,40,052 | −12,570 | −34,211 | **−449** [−623, −276], **significantly worse** |
+| ③ Leg tick + MTM close (paper) | **+1,526** | **+6,57,708** | −14,092 | **−25,806** | +56 [−18, +153], not significant |
+| ④ Leg tick + MTM tick (live) | +1,470 | +6,33,486 | −12,896 | −29,367 | — |
 
 **Verdict under the registered rule:**
 - ① and ② are **significantly worse** than live, so there is no significant edge over it.
 - ③ does not differ from it.
 
 **Main effects (T1, ₹ / day):**
-- **Leg stop, close − tick: −429** [−588, −270], in every half-year (the leg-close combinations sit
-  −121 to −638 a day below live).
-- **MTM stop, close − tick: +76** [−0, +172], p 0.10: borderline, not significant.
+- **Leg stop, close − tick: −432** [−591, −272], in every half-year (the leg-close combinations sit
+  −125 to −638 a day below live).
+- **MTM stop, close − tick: +73** [−2, +170], p 0.11: borderline, not significant.
 
 **Where the leg-close loss comes from** (T1, ① − ③, descriptive):
 
@@ -265,8 +265,9 @@ T1's picks over 431 days, 1 lot a pick. The paper combination ③ reproduced eve
 A stop checked at the minute's close exits after the option has run through the stop, so the fill
 is worse. That cost is larger than the losses saved on spikes that come back.
 
-**Core (reported):** no significant difference from live. Leg close − tick main effect −182
-[−317, −46]; MTM +31 [−47, +125]. ① −152, ② −172, ③ +41.
+**Core (reported):** ② (leg close + MTM tick) is significantly worse than live, −174 [−302, −39]
+(Holm); ① and ③ do not differ from it. Leg close − tick main effect −183 [−318, −47]; MTM +29
+[−48, +122]. ① −154, ② −174, ③ +38.
 
 **What it means for the platforms:**
 - **Leg stops:** keep them on tick (LTP), as Quantiply and AlgoTest do now. Do **not** switch them to
@@ -277,7 +278,7 @@ is worse. That cost is larger than the losses saved on spikes that come back.
   cost more on the legs than it gains on the MTM. Check this before ever turning it on.
 
 **Evidence:**
-- `research/bl156/rules.py` (`leg_rule`), `replay4.py` and `test_rules.py` (8 tests);
+- `research/bl156/rules.py` (`leg_rule`), `replay4.py` and `test_rules.py` (10 tests);
 - `out/result4.json` and `out/sims4.json` (git-ignored; regenerate with `replay4.py`).
 
 ## Risks
@@ -312,3 +313,13 @@ is worse. That cost is larger than the losses saved on spikes that come back.
   every half-year; MTM close − tick +₹76, borderline. Core: no significant difference. Recommendation:
   keep leg stops on tick; the MTM rule is optional (AlgoTest only), and check first whether AlgoTest's
   Candle Close mode also moves leg stops. Item closed.
+- 2026-10-24 — review fix (PR #301), no rule changed: under the tick MTM rules the close check was
+  switched off, so the two index-driven scenarios could fire later than the close (both legs rising
+  in one minute, e.g. `N_wide_0917` on 2025-05-12: 09:51 instead of 09:22) or never (every leg out on
+  its own stop beyond −stop, so a pending re-entry traded on: `N_ditm1_1102` on 2026-05-05, −₹4,326
+  instead of −₹3,104). The close check now runs as a backstop under the tick rules (`rules.py`;
+  `test_rules.py` pins both days). Re-run over the same span (`--until 2026-10-22`): T1 close − tick
+  +₹56 [−17, +144] (was +₹60), still no meaningful difference; Amendment 1 on T1 unchanged in
+  substance (① −₹358, ② −₹449, significantly worse; ③ +₹56). On Core, ② is now significantly worse
+  than live (−₹174 [−302, −39], was −₹172 and just short under Holm). The recommendation stands:
+  keep leg stops on tick. Numbers above are this run.

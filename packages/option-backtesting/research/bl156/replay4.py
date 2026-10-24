@@ -1,7 +1,7 @@
 """BL-156 Amendment 1: T1's (and Core's) Adaptive picks under the four leg-stop x MTM-stop
 combinations. Rules: backlog/BL-156-mtm-stop-tick-vs-candle-close.md, Phase 0 Amendment 1.
 
-    TRADING_DATA_ROOT=/Volumes/TradingData uv run python research/bl156/replay4.py [--workers 6]
+    TRADING_DATA_ROOT=/Volumes/TradingData uv run python research/bl156/replay4.py [--workers 6] [--until D]
 """
 
 from __future__ import annotations
@@ -184,10 +184,13 @@ def summarise(book: str, picks: dict, sims: dict, rng) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=6)
+    ap.add_argument(
+        "--until", type=date.fromisoformat, help="last day (2026-10-22 = the registered run)"
+    )
     args = ap.parse_args()
     OUT.mkdir(exist_ok=True)
     root = data_dir()
-    books = {b: P.picks_for(b, root) for b in ("t1", "core")}
+    books = {b: P.picks_for(b, root, args.until) for b in ("t1", "core")}
     need: dict[str, set[str]] = defaultdict(set)
     for picks in books.values():
         for d, names in picks.items():

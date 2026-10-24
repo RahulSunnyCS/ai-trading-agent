@@ -1,6 +1,6 @@
 # Buy: overall MTM stop
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Descriptive · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -19,6 +19,7 @@ reached at a bar's close, every open leg is closed and the strategy is done for 
 |---|---|---|---|---|
 | BL-070 | ₹2,000 vs none, all 48 Buy variants | 2024-10 → 2026-10 (268 days), before charges | Mean per variant with → without: NIFTY ₹2,569 → ₹2,503, SENSEX ₹6,632 → ₹6,632; the stop fired about 1 day (NIFTY) and 0 days (SENSEX) | [BL-070][bl070] |
 | BL-097 | ₹1,000, ₹1,500, ₹2,500, ₹3,000, ₹4,000 (base ₹2,000) | 48 files, fit 2024-10 → 2025-10, holdout 2025-10 → 2026-10, after charges | Screen only; ₹1,000 is third in NIFTY 11:00–13:00 | [BL-097][bl097], [report][bl097q] |
+| BL-156 | Overall stop checked at each 1-minute candle close (the engine) vs on every tick (live; modelled from each minute's high / low, calibrated on the 23 Oct live stop) | T1's and Core's Adaptive picks (every family together), 2025-01-10 → 2026-10-22, 1 lot, after brokerage | **No meaningful difference** on the whole book: close +₹56 / day on T1, 90% [−17, +144]; Core +₹38 [−35, +130]; not split by family | [BL-156][bl156] |
 
 Change against the baseline on the same file, ₹, mean over files ([how to read](README.md#how-to-read-the-bl-097-tables-on-these-pages)):
 
@@ -57,3 +58,4 @@ Change against the baseline on the same file, ₹, mean over files ([how to read
 [bl070]: ../../../../backlog/BL-070-drb-without-per-strategy-stops.md
 [bl097]: ../../../../backlog/BL-097-buy-parameter-sweep.md
 [bl097q]: ../../../../backlog/BL-097-buy-qualified-list-post-charge.md
+[bl156]: ../../../../backlog/BL-156-mtm-stop-tick-vs-candle-close.md

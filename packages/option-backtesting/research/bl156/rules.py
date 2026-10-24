@@ -14,7 +14,10 @@ Rules:
              open MTM if that is already through (a gap).
 - "tick_pess": as "tick", but every leg at its own adverse extreme at once (sells at the high, buys at
              the low): an upper bound on how often a tick stop fires.
-A leg that entered intrabar in the minute counts at that minute's close.
+A leg that entered intrabar in the minute counts at that minute's close. Under the tick rules the
+close check still runs after them as a backstop: a close is itself a traded price, so a tick monitor
+never fires later than a close-checked one (the two scenarios miss both legs rising in one minute, and
+a day whose legs have all closed on their own stops beyond -stop).
 
 Leg stop (Amendment 1), `leg_rule`:
 - "tick"  : the engine as it is (the bar's high/low; fill at the stop, or the open on a gap).
@@ -167,7 +170,7 @@ class RuleSim(_DaySim):
             curve.append((minute, mtm))
             worst, best = min(worst, mtm), max(best, mtm)
             check = self.rule != "close5" or (minute + 1) % 5 == 0
-            if stop is not None and self.rule in ("close", "close5") and check and mtm <= -stop:
+            if stop is not None and check and mtm <= -stop:  # the tick rules' backstop too
                 self._close_all(minute, "close", "OVERALL_SL")
                 self.stopped_by = f"overall SL at {minute_label(minute)}"
                 break

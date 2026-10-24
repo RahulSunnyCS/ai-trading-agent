@@ -1,6 +1,6 @@
 # Options: shared findings
 
-**Last updated:** 2026-10-18
+**Last updated:** 2026-10-24
 
 These pages hold findings that belong to no single strategy: they concern the basket, the money, the
 ranking that picks strategies each day, or the market state that might time them. A strategy's
@@ -9,6 +9,7 @@ variable page links here instead of repeating them.
 | Page | Status | One-line takeaway |
 |---|---|---|
 | [Portfolio stop](portfolio-stop.md) | Tested | A daily stop on the whole book trims the worst day; its effect on total and drawdown changes sign from mix to mix; no level passes |
+| [Paper vs live](paper-vs-live.md) | Tested | Paper checks the overall stop at the candle close, live on tick: paper overstates live by about ₹40–55 a day a book (3–4%), interval includes zero |
 | [Charges](charges.md) | Descriptive | Charges take 19–37% of gross in the rotations; at ₹20 an order Buy turns negative, Dir and Widesl survive thinly |
 | [Rotation ranking](rotation-ranking.md) | Tested | The ranked basket beats random picks on the 2022–24 hold-out when the weekday / expiry / VIX fits carry it; recent return helps in one year and hurts in 2½ |
 | [Intraday state](intraday-state.md) | Tested | No hourly market-state variable or VIX reading passes; two Dir trigger leads hold only in 2024–26 |

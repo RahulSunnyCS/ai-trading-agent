@@ -1,7 +1,7 @@
 """BL-156 Phase 2: T1's (and Core's) Adaptive picks under the two overall-stop rules. Rules:
 backlog/BL-156-mtm-stop-tick-vs-candle-close.md, Phase 0. Read-only on the data; writes out/ only.
 
-    TRADING_DATA_ROOT=/Volumes/TradingData uv run python research/bl156/replay.py [--workers 6]
+    TRADING_DATA_ROOT=/Volumes/TradingData uv run python research/bl156/replay.py [--workers 6] [--until D]
 """
 
 from __future__ import annotations
@@ -54,11 +54,11 @@ def strategy_path(name: str) -> Path:
     return (TRACK_DIRS[track] if track else STRATEGIES_DIR) / f"{name}.yaml"
 
 
-def picks_for(book: str, root: Path) -> dict[date, list[str]]:
+def picks_for(book: str, root: Path, until: date | None = None) -> dict[date, list[str]]:
     names = variant_names() + (track_names("t1") if book == "t1" else [])
     m = store.load_matrix(names, root)
     attrs = store.read_days(root, "weekdays")
-    keep = [i for i, d in enumerate(m.days) if d in attrs]
+    keep = [i for i, d in enumerate(m.days) if d in attrs and (until is None or d <= until)]
     days = [m.days[i] for i in keep]
     values = m.values[keep]
     recorded = {
@@ -194,10 +194,13 @@ def summarise(book: str, picks: dict[date, list[str]], sims: dict[str, dict], rn
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=6)
+    ap.add_argument(
+        "--until", type=date.fromisoformat, help="last day (2026-10-22 = the registered run)"
+    )
     args = ap.parse_args()
     OUT.mkdir(exist_ok=True)
     root = data_dir()
-    books = {b: picks_for(b, root) for b in ("t1", "core")}
+    books = {b: picks_for(b, root, args.until) for b in ("t1", "core")}
     need: dict[str, set[str]] = defaultdict(set)
     for picks in books.values():
         for d, names in picks.items():

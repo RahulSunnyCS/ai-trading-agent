@@ -170,3 +170,34 @@ def test_four_combinations_on_23_oct():
     assert (
         res[("close", "tick")].stopped_by == "overall SL (tick) at 13:45"
     )  # leg rule does not matter here
+
+
+@pytest.mark.skipif(not LAKE.exists(), reason="the lake is not mounted")
+@pytest.mark.parametrize(
+    ("name", "day", "close_stop"),
+    [
+        # both legs rose in one minute: the two index-driven scenarios missed the close's -2,535
+        ("N_wide_0917", date(2025, 5, 12), "overall SL at 09:22"),
+        # every leg already out on its own stop beyond -stop: a pending re-entry must not trade on
+        ("N_ditm1_1102", date(2026, 5, 5), "overall SL at 11:44"),
+    ],
+)
+def test_tick_never_stops_later_than_the_close(name, day, close_stop):
+    from replay import strategy_path
+
+    from option_backtesting.data.reference.loader import default_reference_data
+    from option_backtesting.fyers.daily import data_dir
+    from option_backtesting.legwise.market import load_day
+    from option_backtesting.legwise.schema import load_legwise
+    from option_backtesting.rotation.lists import SIZING_DATE
+
+    s = load_legwise(strategy_path(name))
+    d = load_day(data_dir(), "NIFTY", day)
+    ref, sizing = default_reference_data(), date.fromisoformat(SIZING_DATE)
+    close = R.simulate(s, d, ref, sizing, "close")
+    assert close.stopped_by == close_stop
+    for rule in ("tick", "tick_pess"):
+        tick = R.simulate(s, d, ref, sizing, rule)
+        assert tick.stopped_by is not None
+        assert tick.stopped_by[-5:] <= close.stopped_by[-5:]
+        assert tick.gross >= close.gross - 0.02 * 2500 - 1  # no worse than the close plus overshoot
