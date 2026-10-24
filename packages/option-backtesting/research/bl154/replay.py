@@ -3,7 +3,7 @@ label-shuffle control. The rule it applies is the item's Phase 0. Read-only: it 
 results, `days.csv` and the lake's index bars, and writes only under this folder.
 
     TRADING_DATA_ROOT=/Volumes/TradingData uv run --with pandas --with pyarrow \\
-        python research/bl154/replay.py
+        python research/bl154/replay.py [--until YYYY-MM-DD]
 """
 
 from __future__ import annotations
@@ -71,11 +71,11 @@ def _read_cols(name: str, root: Path) -> dict[date, tuple[float, int]]:
         }
 
 
-def load(root: Path) -> Data:
+def load(root: Path, until: date | None = None) -> Data:
     names = variant_names()
     m = store.load_matrix(names, root)
     attrs = store.read_days(root, "weekdays")
-    keep = [i for i, d in enumerate(m.days) if d in attrs]
+    keep = [i for i, d in enumerate(m.days) if d in attrs and (until is None or d <= until)]
     days = [m.days[i] for i in keep]
     cols = list(m.names)
     extra = [_read_cols(n, root) for n in cols]
@@ -274,7 +274,10 @@ def verdict(arm: Run, base: Run, shuffles: list[Run]) -> dict:
 
 def main() -> None:
     root = data_dir()
-    data = load(root)
+    # `--until YYYY-MM-DD` replays only the days up to that one (the shuffles permute every day, so
+    # a later day changes them): 2026-10-22 reproduces the registered run's span.
+    until = date.fromisoformat(sys.argv[sys.argv.index("--until") + 1]) if "--until" in sys.argv else None
+    data = load(root, until)
     print(f"{len(data.days)} days {data.days[0]} -> {data.days[-1]}, {len(data.cols)} variants")
     fam = family_index(data.cols)
     arms: dict[str, tuple[dict, Fit]] = {

@@ -8,7 +8,7 @@
 | **Area** | options |
 | **Created** | 2026-10-22 |
 | **Depends on** | none to test; any live change waits for BL-058 / BL-113's 60-day read-outs |
-| **TODO.md row** | 3.10.38 |
+| **TODO.md row** | 3.10.39 |
 
 ## Context
 
@@ -127,7 +127,7 @@ reproduced `pick.score_history`'s list C picks and `score.composite` on all 431 
 | Test | Mean diff per lot-day | 90% interval | Shuffles beating the arm | Drawdown, arm vs comparator | Verdict |
 |---|---|---|---|---|---|
 | H1: S − C0 | −₹24 | [−₹116, +₹75] | 1 of 20 | −₹12,976 vs −₹10,688 (21% deeper) | **Fail** on all three |
-| H2: SL − S | −₹19 | [−₹90, +₹50] | 1 of 20 | −₹11,778 vs −₹12,976 | **Fail** (interval, shuffles) |
+| H2: SL − S | −₹20 | [−₹91, +₹48] | 2 of 20 | −₹11,778 vs −₹12,976 | **Fail** (interval, shuffles) |
 
 **Per arm, ₹ per lot-day (gross; net after brokerage in brackets):**
 
@@ -135,7 +135,7 @@ reproduced `pick.score_history`'s list C picks and `score.composite` on all 431 
 |---|---|---|---|
 | C0, today's Adaptive | 387 (283) | 344 (240) | 379 (275) |
 | S, shrunk k = 10 | 363 (260) | 171 (67) | 308 (205) |
-| SL, S + gap / prev-range | 345 (241) | 227 (124) | 331 (228) |
+| SL, S + gap / prev-range | 343 (240) | 227 (124) | 330 (227) |
 | M, window mean only (k = ∞) | 320 (218) | 186 (83) | 312 (210) |
 | S at k = 5 / k = 20 | 397 / 331 | 196 / 190 | 326 / 300 |
 | S toward the family's same-label mean | 351 | 277 | 325 |
@@ -152,7 +152,7 @@ reproduced `pick.score_history`'s list C picks and `score.composite` on all 431 
   of 20 on P1 (BL-068 had 19 of 20 on P1, with an older universe and weights). That is the opposite
   of the worry behind this item: the fits look weakest in the period they were tuned on and
   strongest out of it.
-- The opening labels: SL − S is +₹56 [−₹17, +₹130] on P2 and +₹23 [−₹23, +₹65] on the whole span:
+- The opening labels: SL − S is +₹56 [−₹17, +₹130] on P2 and +₹22 [−₹24, +₹64] on the whole span:
   positive in both, but the intervals include zero and P1 is negative. Not shown real.
 
 **Conclusion:** sample-size shrinkage of the fits does not help Adaptive and costs it out of
@@ -181,3 +181,9 @@ mean (the family's same-label mean is reported).
   not in Phase 0: an index session needs at least 300 one-minute bars (a Muhurat evening is not a
   session); the stored `net` equals `gross` (no costs stored), so the reported net uses
   `lot_plans`' brokerage (₹20 × 1.18 × 2 per trade).
+- 2026-10-24 — review fix (PR #298), no rule changed: `labels.daily_ohlc` took each day's first bar
+  as its open, but the lake has pre-open index bars (09:08–09:10) on 2026-09-07/08/09, sitting at the
+  previous close; Phase 0 says the 09:15 bar. It now reads 09:15–15:29 in IST. Re-run over the same
+  span (`replay.py --until 2026-10-22`: the shuffles permute every stored day, so a later day would
+  move them): only SL moves. H2 is −₹20 [−₹91, +₹48] (was −₹19 [−₹90, +₹50]), 2 of 20 shuffles
+  above it (was 1); still fails. H1, C0 and every S and M figure are unchanged.

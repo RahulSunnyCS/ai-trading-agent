@@ -25,15 +25,18 @@ INDICES = ("NIFTY", "SENSEX")
 
 
 def daily_ohlc(root: Path, symbol: str) -> pd.DataFrame:
-    """One row per weekday session: open (first bar), high, low, close (last bar), bars."""
+    """One row per weekday session from the 09:15-15:29 bars (pre-open bars excluded): open
+    (09:15 bar), high, low, close (last bar), bars."""
     glob = f"{root}/lake/bars_1m/asset=index/symbol={symbol}/date=*/*.parquet"
     con = duckdb.connect()
+    con.execute("SET TimeZone='Asia/Kolkata'")
     df = con.execute(
         f"""
         SELECT CAST(date AS DATE) AS day,
                arg_min(open, ts) AS open, max(high) AS high, min(low) AS low,
                arg_max(close, ts) AS close, count(*) AS bars
         FROM read_parquet('{glob}', hive_partitioning = true)
+        WHERE strftime(ts, '%H:%M') BETWEEN '09:15' AND '15:29'
         GROUP BY 1 ORDER BY 1
         """
     ).df()

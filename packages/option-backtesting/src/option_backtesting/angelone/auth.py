@@ -114,7 +114,11 @@ def _answer(request: urllib.request.Request) -> tuple[int, dict]:
     try:
         parsed = json.loads(raw)
     except ValueError:
-        return status, {"status": False, "message": f"HTTP {status}, not JSON"}
+        # SmartAPI's rate limit answers in plain text ("Access denied because of exceeding access
+        # rate", HTTP 403): its words are kept so the callers' rate-limit back-off sees them.
+        text = " ".join(raw.decode("utf-8", "replace").split())[:120]
+        message = f"HTTP {status}, not JSON" + (f": {text}" if text else "")
+        return status, {"status": False, "message": message}
     return status, parsed if isinstance(parsed, dict) else {"status": False, "message": "bad body"}
 
 
@@ -165,10 +169,21 @@ def login(
         code = body.get("errorcode") or ""
         if status == 0:
             raise AngelNetworkError(f"Angel One could not be reached: {detail}")
-        if status >= 500:
+        # A rate limit is not a refused login: a 429, or SmartAPI's plain-text 403 (no error code).
+        # A refusal that carries a code ("Too many invalid attempts") stays a refusal, so its hold
+        # stops the same wrong PIN being sent again.
+        if status >= 500 or status == 429 or (not code and rate_limited(detail)):
             raise AngelUnavailableError(f"Angel One is unavailable (HTTP {status}): {detail}")
         raise AngelCredentialsError(f"Angel One login failed: {code} {detail}".strip())
     return Session(jwt=jwt, api_key=creds.api_key, public_ip=creds.public_ip)
+
+
+#: what SmartAPI's rate-limit answers say (JSON or the plain-text 403)
+RATE_WORDS = ("exceeding access rate", "rate limit", "too many")
+
+
+def rate_limited(message: str) -> bool:
+    return any(w in message.lower() for w in RATE_WORDS)
 
 
 def mask_client(code: str | None) -> str | None:

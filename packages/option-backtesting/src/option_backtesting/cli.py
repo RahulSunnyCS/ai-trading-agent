@@ -601,6 +601,96 @@ def fyers_history(
     )
 
 
+@fyers_app.command("expired-options")
+def fyers_expired_options(
+    from_: str = typer.Option(..., "--from", help="Oldest trading day, YYYY-MM-DD."),
+    to: str = typer.Option(..., "--to", help="Newest trading day, YYYY-MM-DD."),
+    underlyings: str = typer.Option(
+        "NIFTY,SENSEX", help="Comma-separated index underlyings to repair."
+    ),
+    plan: bool = typer.Option(
+        False,
+        "--plan",
+        help="Inventory metadata and print request counts without downloading candles.",
+    ),
+    all_days: bool = typer.Option(
+        False,
+        "--all-days",
+        help="Also top up days that already have an option file (default: only days with none).",
+    ),
+    max_requests: int | None = typer.Option(
+        None, "--max-requests", help="Stop cleanly after this many candle requests (resume later)."
+    ),
+    only_expiry: str | None = typer.Option(
+        None, "--only-expiry", help="Fetch just this expiry, YYYY-MM-DD."
+    ),
+    retry_refused: bool = typer.Option(
+        False,
+        "--retry-refused",
+        help="Ask Fyers again for contracts whose cached answer is a refusal.",
+    ),
+    allow_short: bool = typer.Option(
+        False,
+        "--allow-short",
+        help="Also merge days that may need an expiry not expired yet (written without it).",
+    ),
+) -> None:
+    """Backfill expired 1-minute option contracts with Fyers Prime.
+
+    Raw responses are cached per contract, making the command resumable; a day is merged only
+    once every expiry it needs is cached, and not while one it may need has yet to expire.
+    Existing lake rows win on overlap, so a thin vendor day gains missing rows without changing
+    vendor prices. A contract Fyers refuses (an unknown symbol, no data) is listed and skipped;
+    a rate limit, no access to the API, a run of refusals, a rejected token or repeated network
+    errors stop the run (exit 2, or 1 for the token) after the merged days are judged, and a
+    rerun resumes. Afterwards, `obt legwise rerun` (and `obt rotation update --day D` for the
+    repaired days) bring the stored results up to date.
+    """
+    from .fyers.auth import FyersCredentialsError, resolve_credentials
+    from .fyers.client import FyersClient
+    from .fyers.daily import data_dir
+    from .fyers.expired import run_backfill
+
+    try:
+        # Prime allows 10/s, 500/min and blocks the account for the day after repeated
+        # per-minute breaches: at most 8/s (the gap) and 450 in any 60 s (the cap, which is
+        # the one that binds over a minute), and stop at the second 429.
+        client = FyersClient(
+            resolve_credentials(), min_interval_s=0.125, per_minute=450, max_rate_limit_hits=2
+        )
+        result = run_backfill(
+            client,
+            data_dir(),
+            _underlyings(underlyings),
+            date.fromisoformat(from_),
+            date.fromisoformat(to),
+            plan_only=plan,
+            missing_only=not all_days,
+            max_requests=max_requests,
+            only_expiry=date.fromisoformat(only_expiry) if only_expiry else None,
+            retry_refused=retry_refused,
+            allow_short=allow_short,
+            log=typer.echo,
+        )
+    except FyersCredentialsError as error:
+        typer.echo(f"stopped: {error}")
+        raise typer.Exit(1) from None
+    except (RuntimeError, ValueError) as error:
+        typer.echo(f"stopped: {error}")
+        raise typer.Exit(2) from None
+    typer.echo(json.dumps(result, indent=2, default=str))
+    if result.get("stopped") == "credentials":
+        raise typer.Exit(1)
+    if result.get("stopped") in (
+        "rate_limited",
+        "retryable",
+        "blocked",
+        "refused_streak",
+        "refused_unconfirmed",
+    ):
+        raise typer.Exit(2)
+
+
 def _collect(
     trading_day: date, underlyings: str, premium_floor: float, max_extra: int, force: bool
 ) -> int:

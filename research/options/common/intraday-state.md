@@ -26,6 +26,7 @@ nothing acts on them.
 | BL-081 block 3 | Re-score pending picks at each hour; swap / drop (owner's override) | explore 2025-01 → 2026-10; confirm 2022-04 → 2024-10 | Nothing kept under the registered rule (0 of 252 versions); state-blind re-timing does as well as state | [BL-081][bl081] |
 | BL-083 | Enter at a trigger (pivot with trend, VIX turn, straddle turn, RSI exhaustion), replacing the next pending pick | explore 2024-10 → 2026-10 both indices; confirm NIFTY 2022-01 → 2024-10 | **No lead** under the registered bar; owner's rule keeps two Dir leads (below) | [BL-083][bl083] |
 | BL-022 | The 20 nearest earlier sessions (path since the open ÷ ATR, gap, range so far, VIX, days to expiry; Euclid and DTW) at 10:30 / 11:00 / 12:00 as a rest-of-day range forecast, gating a skip / heatmap swap of Adaptive's pending picks | NIFTY, decide 2025-01 → 2026-10 (recent period decides, owner); 2022–24 and SENSEX reported | **Killed at the gate**: ρ 0.38–0.44 vs opening range 0.49–0.52 and VIX-implied 0.43–0.45; the replay was not run | [BL-022][bl022] |
+| BL-155 | Morning type at 11:00 (range so far vs the last 20 mornings) sets the straddle's leg stop: quiet 100 %, normal 80 %, wide 60 % | Heatmap ATM straddles 11:15–14:45; NIFTY 2025-01 → 2026-10 decides | **Killed**: no better than a fixed stop or the reversed rule | [BL-155][bl155] |
 
 BL-083 event study, trigger minus the same template at the same minute on the 20 nearest non-event
 days, ₹ per lot (t): pivot-with-trend → Dir +754 (3.5) explore, −20 (−0.1) confirm; RSI exhaustion →
@@ -67,6 +68,7 @@ and REF +₹54,556, above both random controls; 2022–24 −₹10k to −₹27k
   those scripts.
 
 [bl022]: ../../../backlog/BL-022-analog-day-search.md
+[bl155]: ../../../backlog/BL-155-stop-by-morning-type.md
 [bl053]: ../../../backlog/BL-053-vix-at-10am-strategy-mix.md
 [bl058]: ../../../backlog/BL-058-options-rotation-forward-journal-and-ui.md
 [bl081]: ../../../backlog/BL-081-drb-hourly-checkpoints-and-no-trade.md

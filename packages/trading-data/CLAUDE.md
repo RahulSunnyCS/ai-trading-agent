@@ -58,7 +58,8 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
   rank `iv_7d_1500`). Views of the same names (static placeholder columns in `db.LAKE_VIEWS`,
   checked against the schemas by a test, so `db` never imports numpy).
   Each file carries `derived_version` in its Parquet metadata; a rebuild redoes only missing
-  or out-of-version files; the default window starts at `DERIVED_FROM` (2024-10-01), an explicit
+  or out-of-version files, plus any `force_days` (`derived.rebuild(force_days=...)`: days whose
+  option partition gained rows, e.g. the expired-option repair's top-up); the default window starts at `DERIVED_FROM` (2024-10-01), an explicit
   `--day` / `--days` may reach back before it (the 2013-2021 vendor history).
   `obt legwise run --bars 5m` runs the unchanged engine on them
 - `raw/` — gzipped verbatim vendor responses

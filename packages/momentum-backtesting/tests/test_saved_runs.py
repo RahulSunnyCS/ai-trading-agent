@@ -441,13 +441,13 @@ def test_stocks_sync_calls_stocks_fetch_and_migrate_with_real_arguments(monkeypa
 
     seen = {}
     monkeypatch.setattr(cli, "stocks_fetch", lambda **kwargs: seen.setdefault("fetch", kwargs))
-    monkeypatch.setattr(cli, "local_migrate", lambda: seen.setdefault("migrate", True))
+    monkeypatch.setattr(cli, "local_migrate", lambda **kwargs: seen.setdefault("migrate", kwargs))
 
     cli.stocks_sync()
 
     assert isinstance(seen["fetch"]["from_"], str)
     assert seen["fetch"]["skip_download"] is False
-    assert seen["migrate"] is True
+    assert seen["migrate"] == {"allow_price_shrink": False}
 
 
 def test_stocks_sync_falls_back_to_both_fyers_topups_when_nse_fails(monkeypatch):
