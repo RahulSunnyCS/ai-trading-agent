@@ -8,7 +8,7 @@
 | **Area** | options, agents, scheduler |
 | **Created** | 2026-10-18 |
 | **Depends on** | BL-083 (event-versus-placebo method, trigger code), BL-022 (analog days), BL-110 (range persistence), BL-117 Phases 2 and 4 (live feed, paper desk: needed only for Phase 4 here), BL-063 charge model |
-| **TODO.md row** | 3.37.1 |
+| **TODO.md row** | 3.41.1 |
 
 ## Context
 

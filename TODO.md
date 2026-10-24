@@ -815,12 +815,24 @@ the backtest, report the slippage signed at 16:00 (owner only), and track the tr
 | 3.36.3 | Phase 3: `obt rotation live-compare` and the lines in the owner's 16:00 message | claude | **Built 2026-10-20**; the Rotation page's Live vs paper card (live, paper, gap, discretionary, running chart, by shape) **built 2026-10-22**. Reconciling a week against the contract notes is the owner's |
 | 3.36.4 | Phase 4: slippage per shape into the backtests (research, pre-register first) | — | After 20 forward days |
 
-### 3.37 Rule agents — [BL-119](backlog/BL-119-rule-agents-paper-and-retrospection.md)
+### 3.37 Momentum at Monday's open — [BL-158](backlog/BL-158-momentum-monday-open-fill.md)
+
+Owner (2026-10-24): test the followed Four Sectors group at Monday's open (signal delay 0) against how it
+is followed now; switch only if the pre-registered test passes, then realign every Kite lot at once.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.37.1 | Phase 0: pre-registration (`search_spaces/bl158_criteria.json`) | claude→owner | **Done 2026-10-24**, approved by the owner and committed before the run |
+| 3.37.2 | Phase 1: run the rolling-window test, record pass or kill | claude | **Done 2026-10-24: killed.** Fails 3 of 5 rules (wins CAGR and Sharpe in 5 of 28 windows; median drawdown 3.34 pts deeper; worst 11.26 pts deeper); passes median CAGR +1.12 and after tax +1.28 |
+| 3.37.3 | Phase 2: switch the followed strategy, Friday-evening orders for Monday AMOs, realign the lots (only on a pass) | — | Dropped: Phase 1 killed it |
+| 3.37.4 | Phase 3: 13-week forward read-out (only if switched) | — | Dropped: not switched |
+
+### 3.41 Rule agents — [BL-119](backlog/BL-119-rule-agents-paper-and-retrospection.md)
 
 Owner (2026-10-18): agents that follow rules he gives, trade them as paper trades, retrospect each evening, and
 are replaced by better ones. First rule: a break of a rolling 60-bar NIFTY range after a consolidation.
 
 | # | Task | Owner | State |
 |---|---|---|---|
-| 3.37.1 | Phase 0 and Amendment 1 (rolling rule, long and short-premium arms, 2019-2021 confirmation period) pre-registered before any run | claude | **Done 2026-10-18.** Nothing run |
-| 3.37.2 | Phase 1: event study on periods A and B (event counts first, then placebo and trades) | claude | **Next** |
+| 3.41.1 | Phase 0 and Amendment 1 (rolling rule, long and short-premium arms, 2019-2021 confirmation period) pre-registered before any run | claude | **Done 2026-10-18.** Nothing run |
+| 3.41.2 | Phase 1: event study on periods A and B (event counts first, then placebo and trades) | claude | **Next** |
