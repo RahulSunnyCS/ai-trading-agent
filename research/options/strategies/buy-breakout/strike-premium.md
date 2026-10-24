@@ -1,6 +1,6 @@
 # Buy: strike / premium
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Descriptive · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -48,7 +48,7 @@ The baseline (₹50) has 3 files net positive in the holdout.
 
 ## Not yet tested
 
-- BL-097 Phase 3: strike × breakout window and strike × leg stop, with the drawdown gate.
+- BL-097 Phase 3, now BL-104: strike × breakout window and strike × leg stop, with the drawdown gate.
 - A SENSEX-specific premium (SENSEX uses NIFTY's ₹50; [BL-056][bl056] kept the NIFTY rupee values).
 
 ## Related

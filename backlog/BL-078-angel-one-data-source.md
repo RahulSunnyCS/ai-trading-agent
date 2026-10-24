@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — Fyers needs a human tick every trading day (BL-076/077), and an expiring contract's 1-minute data cannot be re-downloaded |
-| **Status** | In progress |
+| **Status** | Done 2026-10-24 — go as a backup source, not a replacement; shipped as BL-079 |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
 | **Depends on** | BL-034 (lake), TODO 3.10 (`obt fyers fetch`) |
-| **TODO.md row** | — (added if the spike says go) |
+| **TODO.md row** | 1.12 (through BL-079) |
 
 ## Context
 
@@ -119,4 +119,4 @@ Written then, with the gaps Phase 1 finds as its constraints.
   reached authentication, so no credential was tested and nothing counts toward a lockout. To
   repeat on a weekday before 08:30 IST and again in market hours, to see whether the API is simply
   down outside the week. Whether `<uid>_U` is the right vendor code is still unconfirmed.
-
+- 2026-10-24 — closed. Verdict: **go, as a backup** (Phase 1's field table: Angel One can stand in for Fyers' daily collection, not replace its files). Phase 2 shipped as BL-079 (Done 2026-10-10: `obt daily` falls back to Angel One; TODO 1.12), and Angel One's VIX is in daily use. The 1c Shoonya re-probe is dropped: nothing needs it now that BL-143 reads Finvasia's margin through AlgoTest.

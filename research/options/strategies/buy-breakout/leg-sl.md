@@ -47,7 +47,7 @@ Charges hardly move (a leg stop does not add trades); the gross and net changes 
 
 ## Not yet tested
 
-- BL-097 Phase 3: leg stop × overall stop, and the reserved trailing-percent rows.
+- BL-097 Phase 3: leg stop × overall stop (now BL-104); the reserved trailing-percent rows (not carried).
 
 ## Related
 

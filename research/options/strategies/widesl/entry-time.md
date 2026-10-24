@@ -43,7 +43,7 @@ After charges, the band leaders earn (₹ per day, [BL-098 report][bl098q]): NIF
   between the two halves is −0.45 (NIFTY) and −0.01 (SENSEX).
 - SENSEX OTM2 is weakest in the morning, before charges; its closest-premium ₹250 version is stronger in
   the afternoon (see [strike-premium](strike-premium.md)).
-- After charges Widesl margins are thin in every band. One holdout year; Phase 3 of BL-098 is pending.
+- After charges Widesl margins are thin in every band. One holdout year; BL-098 Phase 3 went to BL-104, whose results are not on this page yet.
 - Late starts rely on 1-minute fills with no spread. All Widesl and Dir curves jump at 14:47 (NIFTY
   ₹268 a day) and fall back at 15:02; a spot check did not explain it (BL-059). A ₹100–₹300 extra cost
   per late lot takes the BL-062 rotation from ₹3.36 lakh to ₹3.05–2.43 lakh (rough, not registered).

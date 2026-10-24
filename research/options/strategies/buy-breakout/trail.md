@@ -1,6 +1,6 @@
 # Buy: trail
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Descriptive · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -38,9 +38,9 @@ Change against the baseline on the same file, ₹, mean over files ([how to read
 
 ## Not yet tested
 
-- The trailing-percent rows reserved for BL-097 Phase 3 (`[5, 2.5]`, `[10, 5]`, `[15, 5]`), to be
+- The trailing-percent rows reserved for BL-097 Phase 3, not carried to BL-104 (`[5, 2.5]`, `[10, 5]`, `[15, 5]`), to be
   run only if point trailing shows a stable signal; it has not.
-- Trail × exit time (a BL-097 Phase 3 interaction).
+- Trail × exit time (a BL-097 Phase 3 interaction, not carried to BL-104).
 
 ## Related
 

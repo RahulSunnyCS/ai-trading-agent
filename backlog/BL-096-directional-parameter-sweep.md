@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — improve the understanding of the existing Directional family without changing the live baseline |
-| **Status** | In progress |
+| **Status** | Done 2026-10-24 — Phases 1–2 and the after-charge grid delivered; Phase 3 superseded by BL-104 |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-11 |
@@ -169,3 +169,4 @@ rankings are before brokerage/statutory charges and slippage.
   shortlist was chosen after viewing holdout, so these numbers are optimistic.
   Open: extend MTM past ₹4,000 (needs a committed pre-registration first).
 - 2026-10-14 — Phase 3 (interactions, robustness) superseded by BL-104's full-factorial grid; the holdout used here was later spent by BL-099.
+- 2026-10-24 — closed. Delivered: the primary (15k) and secondary (4.4k) sweeps, the diagnostics and the after-charge grid (`primary_diagnostics_charged.csv`, 15,000 rows) and shortlist; Phase 3 went to BL-104 on 2026-10-14. Not carried anywhere: Dir MTM stops above ₹4,000 (BL-104's Dir grid also stops at ₹4,000; needs a new pre-registration) and the odd 15:20-below-15:10 exit (check the late-bar fills). Both are left for a new item if wanted.
