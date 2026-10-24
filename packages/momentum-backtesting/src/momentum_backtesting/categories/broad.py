@@ -494,9 +494,10 @@ def _compute_pool_membership(
     """Quarterly-refreshed pool cut (Step 2's own hysteresis, `apply_hysteresis` applied once per
     quarter-end using that week's Total-Market-membership-gated candidates), forward-filled onto
     every week in between -- "the top-200 qualifying pool... refreshed quarterly, fixed" per the
-    plan. Weeks before the very first quarter-end use that first quarter's own decision (there is
-    no earlier data to decide from; `run_backtest`'s own lookback-eligibility gate excludes very
-    early weeks from the backtest regardless)."""
+    plan. Weeks before the very first quarter-end have NO pool: deciding them from that quarter-end
+    would use ranks from after those weeks (a look-ahead, found 2026-10-24 reading this code). With
+    the default 52-week lookback those weeks have no rank anyway, so a real run is unchanged; a
+    short-lookback run simply starts at the first quarter-end."""
     quarter_ends = _quarter_end_weeks(weeks)
     symbols = list(global_ranks.columns)
     out = pd.DataFrame(False, index=weeks, columns=symbols)
@@ -517,7 +518,7 @@ def _compute_pool_membership(
         held = apply_hysteresis(held, candidates, top_n, exit_rank)
         decisions[qw] = list(held)
 
-    current = decisions[quarter_ends[0]]
+    current: list[str] = []
     qi = 0
     for w in weeks:
         while qi < len(quarter_ends) and w >= quarter_ends[qi]:
