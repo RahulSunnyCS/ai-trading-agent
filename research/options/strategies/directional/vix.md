@@ -1,6 +1,6 @@
 # Directional: India VIX
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -46,7 +46,8 @@ None. The rotation lists use a VIX-band fit as one ranking criterion
 
 ## Related
 
-- [Widesl VIX](../widesl/vix.md); [intraday state](../../common/intraday-state.md).
+- [Widesl VIX](../widesl/vix.md); [intraday state](../../common/intraday-state.md);
+  [previous-session state](../../common/previous-session-state.md) (the previous session's VRP, skew and put/call ratio, BL-159: no lead).
 - Tables: `research/bl056/out/{nifty,sensex}_by_vix.csv` (git-ignored; regenerate with
   `research/bl056/analyse.py`).
 
