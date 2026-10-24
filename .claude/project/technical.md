@@ -178,7 +178,7 @@ uv run pytest
 uv run mbt login            # browser login; caches today's Fyers token in data/ (never printed)
 uv run mbt token-status [--probe]  # where the token would come from and when it expires; --probe also asks Fyers (read-only profile call) and is "not ready" for a rejected token or a .env one with no known expiry (the 09:00 morning summary's Fyers line, BL-143)
 uv run mbt fetch            # daily history from 2016 -> data/weekly_closes.csv + .xlsx
-uv run mbt fetch --no-fyers # only the public sources (cash NAV, silver)
+uv run mbt fetch --no-fyers # only the public sources (cash NAV, silver); every series not fetched keeps its stored history
 uv run mbt compare         # rank-and-rotate backtest, off/ranked/filter modes -> data/backtests/
 uv run mbt serve           # private Momentum API on 127.0.0.1:8765
 uv run mbt journal show    # forward-signal journal (BL-024): every weekly signal as recorded
