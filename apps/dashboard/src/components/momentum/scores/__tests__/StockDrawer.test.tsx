@@ -196,6 +196,15 @@ describe('StockDrawer', () => {
     expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(2);
   });
 
+  it('gives its sections keys that do not clash', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setup();
+    await act(async () => {});
+    const clash = error.mock.calls.find((args) => String(args[0]).includes('same key'));
+    error.mockRestore();
+    expect(clash).toBeUndefined();
+  });
+
   it('is closed with no symbol', () => {
     setup({ symbol: null });
     expect(screen.queryByRole('dialog')).toBeNull();
