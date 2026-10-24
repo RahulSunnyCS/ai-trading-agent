@@ -100,6 +100,6 @@ Things found while setting this up:
   expiry / VIX breakdown, and the owner decided on 2026-10-10 (BL-087 Log) that this item takes a new
   number when pushed. The scripts and result files were renamed `bl056_*` → `bl161_*`; their
   contents are unchanged except the item number in the docstrings. The report script re-run on the
-  stored rows reproduces `bl161_summary.json` byte for byte. The Monday-open half of the question
+  stored rows reproduces `bl161_summary.json` value for value (the file was reformatted by Biome, as the pre-push hook requires; same values). The Monday-open half of the question
   (a real fill after the signal Friday) is BL-158 (open in PR #304 when this was ported). The
   Phase 0 text above is kept verbatim, so its "BL-055" is today's BL-086.
