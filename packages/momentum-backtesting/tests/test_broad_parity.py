@@ -554,3 +554,31 @@ def test_your_orders_from_the_real_week_ahead_signal_trade_only_what_the_backtes
         assert bought == after - before and sold == before - after, f"{week:%Y-%m-%d}"
         checked += bool(bought or sold)
     assert checked >= 2
+
+
+@pytest.mark.parametrize(("execution", "session"), [("fri_close", "last"), ("mon_open", "first")])
+def test_respect_circuits_hands_the_engine_masks_for_the_fill_session(
+    execution, session, monkeypatch
+):
+    """No golden scenario's result depends on `broad_respect_circuits` (BL-001 F3: no lock in the
+    fixture falls on a name the ranking ranks), so the nightly wiring check cannot catch a break.
+    This pins the wiring: the masks are built for the session the order fills on and reach the
+    engine; with the setting off, none are built."""
+    built: list[dict] = []
+    runs: list[dict] = []
+    monkeypatch.setattr(cx, "lock_masks", lambda *a, **k: built.append(k) or ("UC", "LC"))
+    monkeypatch.setattr(broad, "run_broad_backtest", lambda **kw: runs.append(kw))
+    ranking = _stub_ranking()
+    for respect in (True, False):
+        request = api.BacktestRequest(
+            dataset="broad",
+            universe=["*"],
+            execution=execution,
+            signal_delay=0,
+            broad_respect_circuits=respect,
+        )
+        api._run_broad(request, ranking, "OUTER")
+
+    assert [k["session"] for k in built] == [session]
+    assert (runs[0]["uc_locked"], runs[0]["lc_locked"]) == ("UC", "LC")
+    assert (runs[1]["uc_locked"], runs[1]["lc_locked"]) == (None, None)
