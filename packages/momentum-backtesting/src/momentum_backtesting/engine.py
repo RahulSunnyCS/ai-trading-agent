@@ -869,6 +869,14 @@ def cadence_weeks(weeks: list[pd.Timestamp], every: int, offset: int) -> frozens
     return frozenset(w for w in weeks if round((w - CADENCE_EPOCH).days / 7) % every == offset)
 
 
+def _weights_frame(by_week: dict) -> pd.DataFrame:
+    """One row per week, one column per name held, in date order. `from_dict` orders rows by when
+    each column first appears (pandas 3), not by date, and readers walk the rows in order."""
+    weights = pd.DataFrame.from_dict(by_week, orient="index").sort_index().fillna(0.0)
+    weights.index.name = "week"
+    return weights
+
+
 def run_backtest(
     prices: pd.DataFrame,
     includes: dict[str, str],
@@ -1057,10 +1065,7 @@ def run_backtest(
     trades = pd.DataFrame(sim.trade_rows)
     if not trades.empty:
         trades["week"] = pd.to_datetime(trades["week"])
-    # from_dict orders rows by when each column first appears, not by date (pandas 3), and the
-    # circuit card and the weekly signal read the first and last rows.
-    weights = pd.DataFrame.from_dict(outcome.weights, orient="index").sort_index().fillna(0.0)
-    weights.index.name = "week"
+    weights = _weights_frame(outcome.weights)
     return Result(
         config=config,
         equity=equity_series,
