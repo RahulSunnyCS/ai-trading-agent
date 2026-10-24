@@ -124,4 +124,19 @@ and that Core is a column.
   09:17 (3 x Widesl) in quiet weeks: +119 per lot-day against T1's +554 over 80 days; it wins on the 40 days
   that stayed quiet (+1,037 vs +809) and loses on the 13 that did not (-1,637 vs +1,225). Written into the
   findings page.
-
+- 2026-10-24 — **review caveats** (Opus review of PR #306; no result is changed, nothing was rerun):
+  - The CORE and T1 books in `research/bl144/run.py` (lines 85-89) add the Buy add-on pick (`C.buy`) to
+    Adaptive's picks, but Phase 0 defines them as "Adaptive's three core picks". 34 T1 days and 36 Core days
+    have four picks, so the add-on enters the gross and the H1 denominator. Without it H1 is +10.4 pp for T1 and
+    +8.3 pp for Core (the review's recomputation): still below the registered +15 pp, so **H1 stays not met**.
+    The same `picks_for` helper is used in BL-145 to BL-147. The findings page now says the books are core
+    picks plus the Buy add-on.
+  - "Known at the open" (Phase 0 and the findings page) is overstated. R7 itself is known at the open, but the
+    R7 and D tercile cut points are computed over the whole window, so which tercile a day falls in is not
+    known that morning. Harmless for descriptive labels; do not read them as a tradable gate.
+  - Registration timing git cannot show: the narrowing logged above (no basket stop; H2 judged on the no-stop
+    figure) was committed together with the results, so "logged here before the first figure" rests on the
+    owner's word and the file timestamps, not on commit order. Next time commit the amendment first.
+  - The wide-stop helper differs between scripts (`run.py` keeps legs with `stop_loss.percent`, `morning.py`
+    keeps any leg with a `stop_loss`); they agree on today's strategy files. `bl144_daily_results.csv`, named
+    above, is not written by any committed script (`run.py` writes `daily.csv`).

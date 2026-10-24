@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades T1's and Core's directional picks with real money and suspects a late-session recovery |
-| **Status** | Done: the 14:55 exit hurts (-122 per trade-day [-168, -76]); helps only on late-recovery days (about 9%) |
+| **Status** | Done: the 14:55 exit hurts (-122 per trade-day [-168, -76]); helps only on late-recovery or late-fade days (about 16% of days; the fade gain is in the picks only) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-21 |
@@ -107,4 +107,27 @@ None.
   index is down 0.6% or more. From the open: 15.4% of variant-days trigger; picks' mean change per triggered
   pick-day -153 [-336, +15] (101 pick-days, 54 days), drawdown -33,379 -> -45,260, 4 of 161 variants positive:
   **not better**. From the previous close: -222 [-341, -108], 0 of 161 positive. Added to the findings page.
-
+- 2026-10-24 — **gate breach, recorded for the owner.** The 2026-10-21 addendum ran a test that Phase 0
+  ("Will not run") had ruled out: conditioning an exit on the trend (exit at 14:55 only when the index is down
+  0.6% or more). No owner `override: <reason>` line was recorded in this Log at the time, which the research
+  gate in CLAUDE.md requires. The addendum was requested after the owner had seen the down-day / recovery
+  breakdown on the same data, so it is **post-hoc and exploratory**, not a clean pre-registered test (its rule
+  was fixed before its own figures were computed, but not before the breakdown that prompted it). Its verdict
+  (not better) does not change. The owner should confirm the override or retract the addendum.
+  `override: (not recorded — owner to confirm)`
+- 2026-10-24 — **review caveats** (Opus review of PR #306; no result is changed, nothing was rerun):
+  - `research/bl147/run.py:190-192` computes the max drawdown with `np.maximum.accumulate(np.concatenate([[0],
+    cum])[1:])`, which is just `np.maximum.accumulate(cum)`: the zero starting peak is dropped. A stream that
+    opens negative is measured from its first value, so the quoted drawdowns (-33,379 -> -41,322; addendum
+    -45,260 and -43,590) can be **understated**. `conditional.py` imports the same function. The verdicts do
+    not move: "hurts" rests on A's mean-delta interval, and the addendum fails conditions 1 and 3 regardless.
+  - The population-B variant count is stated three ways: Phase 0 reads as 4 x 25 + 3 = 103, Risks says 175, the
+    run covers 161 (the review's reading: 7 families x 23 start slots before 14:55). The 161 is the count
+    behind every figure here.
+  - Fades: the +217 on up-then-fade days is population A (the picks) only; in population B the late-fade days
+    average -64 (the review's reading of `out/study.json`).
+  - The addendum's secondary "from the previous close" reading skips the weekend Budget sessions (Mon
+    2025-02-03 and Mon 2026-02-02 use Friday's close, not the special session's close). It affects only that
+    secondary reading.
+  - `conditional.py` has no `/Volumes/TradingData` mount guard, unlike the other scripts, and imports
+    `run.py` as a script-folder import.

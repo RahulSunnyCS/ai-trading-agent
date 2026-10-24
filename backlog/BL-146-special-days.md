@@ -75,7 +75,7 @@ event definitions or thresholds.
 
 ## Risks
 
-Few events per group (Budget 2, elections 4, RBI 11); one stress period (March to April 2026) dominates the
+Few events per group (Budget 2, elections 4, RBI 12); one stress period (March to April 2026) dominates the
 high-VIX days, so the premium group is clustered. A re-scored T1 is not forward, and the first year of T1's
 results is in-sample for its settings.
 
@@ -93,4 +93,22 @@ None.
   elections T1 +482 (3); RBI T1 +997 vs 3 x Widesl +2,236 on the same 10 days (6 of 10 days Widesl ahead);
   premium T1 +1,049, 70% win. Findings page `research/options/common/special-days.md`; event table
   `research/bl146/out/events.csv` (git-ignored). The weekend Budget sessions have no picks.
-
+- 2026-10-24 — **review caveats** (Opus review of PR #306; no result is changed, nothing was rerun):
+  - E1 as run leaves out Budget week. Phase 0 names it among the special days, but `research/bl146/run.py`
+    (line 173) builds the special set from the two Budget sessions themselves (weekends, so no T1 picks),
+    elections, RBI days and VIX >= P90 only. With the 8 Budget-week sessions included E1 covers 67 sessions:
+    T1 +1,119 vs Base +757, **still met**; E2 is unchanged (the review's recomputation).
+  - Phase 0 says Budget week is "the 5 trading sessions around each" and explains it as two before and two after,
+    which is 4; the code takes 4.
+  - Phase 0 says Core and T1 are re-scored "from 2025-01-10 as in BL-144", but BL-144's window starts
+    2025-10-20; the 2025-01-10 start is the first session with 63 days of history and is what the code uses.
+  - T1 is pooled across its in-sample days (before 2025-10-09, Phase 0 says to mark them) in E1 and E3; only
+    `events.csv` marks them. Split from `all_days.csv` (the review's recomputation): E3 is +1,426 on the 11
+    in-sample premium days and +185 on the 39 out-of-sample ones (pooled +506 [+91, +951]); E1 in-sample is T1
+    +1,765 vs Base +2,597, out of sample T1 +651 vs Base -150. The E3 verdict ("no change suggested") holds
+    either way, but "better on premium days" leans on the in-sample days.
+  - "Known at the open" (high-premium line in Phase 0) is overstated: the P90 VIX cut (18.37) is computed over
+    the whole window, so whether a day is in the premium group is not known that morning. A label, not a gate.
+  - The August 2025 MPC is left out as registered ("sources disagree"); the review believes the decision was
+    announced on 6 Aug 2025, so it could have been included. Left as registered.
+  - Risks said "RBI 11"; the list has 12 dates, and the Risks line now says 12 (outside Phase 0).

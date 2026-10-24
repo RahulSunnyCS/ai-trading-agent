@@ -86,4 +86,11 @@ None.
   quiet-week days +1,446 [+426, +2,578] (46 vs 7 days): works. Confirmation, run once with the same cuts:
   +723 [-92, +1,879] (22 vs 5 days): confirmed by the rule (same sign, >= +250), thin. Findings page
   `research/options/common/t1-robustness-and-lag.md`.
-
+- 2026-10-24 — **review caveats** (Opus review of PR #306; no result is changed, nothing was rerun):
+  - Registration timing git cannot show: the Q4 confirmation ran 13 seconds after `learning.json` was written
+    and both were committed together, so "run once after the learning verdict is recorded" holds only loosely.
+    Next time commit the learning verdict first.
+  - The books inherit BL-144's picks, which include the Buy add-on (see BL-144 Log); Q4 itself uses a fixed
+    Core variant (`N_wide_0947`) and the main window's cut points in both runs, so it is unaffected.
+  - The R7 and D cut points are computed over the whole window (BL-144 Log): the Q3 event definitions
+    (surprise-wide, calm-down) are labels assigned with hindsight, not a rule available at the open.

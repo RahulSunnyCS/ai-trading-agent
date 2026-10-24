@@ -1,6 +1,6 @@
 # Options: is T1's year broad, does it lag regime changes, does the opening range split quiet weeks?
 
-**Status:** Tested (re-scored, not forward) · **Last updated:** 2026-10-21
+**Status:** Tested (re-scored, not forward) · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -68,6 +68,14 @@ Descriptive; leads, not findings.
   +₹1,225 per lot-day, while the all-wide strategies lost; the picker did not need to see the change coming.
 - **A wide opening range in a quiet week is a warning sign, rarely seen.** Only 7 and 5 days in two years
   had a quiet week and a high opening range, and 57% / 20% of them turned wide. Too few to build a rule on.
+
+## Caveats from the 2026-10-24 review
+
+No number above was changed. The Q4 confirmation was run 13 seconds after the learning result was written and
+both were committed together, so its "run once, after the learning verdict" order is not provable from git. The
+books carry the Buy add-on picks and the R7 / D cut points are whole-window (see
+[BL-144](t1-range-bound-days.md)); Q4 uses a fixed variant and fixed cuts in both runs. The result files are
+git-ignored; regenerate with `research/bl145/run.py` (needs the TradingData volume).
 
 ## Open questions
 

@@ -1,6 +1,6 @@
 # Options: closing the directional strategies at 14:55 instead of 15:28
 
-**Status:** Tested (re-scored, not forward) · **Last updated:** 2026-10-21
+**Status:** Tested (re-scored, not forward) · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -34,7 +34,7 @@ Pre-registered (BL-147 Phase 0) before any figure. Delta = result with the 14:55
 
 Every family loses: Dir ATM (Core, Nifty) −88, Dir ITM1 (Core, Nifty) −115, Sensex Dir ATM −85, Sensex ITM1
 −103, T1's directional relatives −110. **0 of 161 variants** have a positive mean delta. The 14:55 exit
-changed the result on 83% to 89% of trade-days (the legs were still open).
+changed the result on 82% to 89% of trade-days (the legs were still open).
 
 Verdict under the registered rule: **closing at 14:55 hurts.** The interval of the mean delta is entirely below
 zero, the drawdown is deeper and no variant improves.
@@ -46,7 +46,7 @@ rally of 0.1% or more after that):
 |---|---|---|---|
 | Down day, then a recovery | 8.9% | 52 | **+219** |
 | Down day, no recovery | | 178 | −228 |
-| Up day, then a fade | 7.3% | 58 | **+217** |
+| Up day, then a fade | 7.3% | 58 | **+217** (picks only; B's fade days average −64) |
 | Up day, no fade | | 140 | −202 |
 | Flat day | | 282 | −148 |
 
@@ -62,13 +62,18 @@ Descriptive; leads, not findings.
   the last 33 minutes, decide the result.
 - **Knowing the trend at 14:55 does not rescue it.** The trend is known by then, but only about 1 down day
   in 4 recovers: all down days together average −127 per trade and all up days −79. An exit that applied only
-  on down days would still lose. (Read from the registered table; a conditional exit rule was not tested.)
+  on down days would still lose. (Read from the registered table; the conditional exit actually run is the
+  post-hoc addendum below.)
 - **It makes no difference whether the trade was winning.** Delta is about −101 (Core) and −140 (T1) both for
   trades in profit and in loss at 14:55.
 
 ## Addendum: exit at 14:55 only when the index is down 0.6% or more
 
-Registered before it was computed (BL-147 Log, 2026-10-21): a Dir strategy exits at 14:55 only if its own
+**Post-hoc, exploratory.** Phase 0 listed "conditioning an exit on the trend" under "Will not run", no owner
+`override:` line was recorded when this ran, and the idea came after the owner had seen the down-day breakdown
+on the same data. The owner should confirm or retract it (BL-147 Log, 2026-10-24).
+
+Its rule was registered before its own figures were computed (BL-147 Log, 2026-10-21): a Dir strategy exits at 14:55 only if its own
 index (Nifty for the N variants, Sensex for the S variants) is down 0.6% or more from the open to 14:55, and
 holds to 15:28 otherwise. Computed from the same 14:55 reruns.
 
@@ -87,6 +92,16 @@ the mean is negative, the drawdown is deeper and only 4 of 161 variants gain; fr
 interval is entirely below zero. Even on days when the index is down 0.6% or more by 14:55, holding to the
 close did better on average: only about a quarter of those triggered trades improved by exiting.
 
+## Caveats from the 2026-10-24 review
+
+No number above was changed. The drawdown figures come from a function that drops the zero starting peak
+(`run.py:190-192`), so they can be understated; the verdicts do not depend on them (the "hurts" verdict rests
+on the mean-delta interval, and the addendum fails two conditions regardless). The "from the previous close"
+reading skips the weekend Budget sessions. Details: BL-147 Log. Earlier evidence that a 14:50 or 15:00 exit is
+worse after charges: [BL-096][bl096] ([directional exit time](../strategies/directional/exit-time.md)). The
+result files (`research/bl147/out/`) are git-ignored; regenerate with `research/bl147/run.py` then
+`conditional.py` (needs the TradingData volume).
+
 ## Open questions
 
 - Whether a tighter version, such as moving the stop up after 14:55 or taking profit only in recovery-prone
@@ -94,3 +109,4 @@ close did better on average: only about a quarter of those triggered trades impr
 - Whether the last 33 minutes behave the same on expiry days, where decay is fastest. Not split here.
 
 [bl147]: ../../../backlog/BL-147-directional-early-exit.md
+[bl096]: ../../../backlog/BL-096-directional-parameter-sweep.md

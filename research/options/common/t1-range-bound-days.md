@@ -1,6 +1,6 @@
 # Options: does T1 move to wider stops on range-bound days?
 
-**Status:** Tested (re-scored, not forward) · **Last updated:** 2026-10-21
+**Status:** Tested (re-scored, not forward) · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -19,7 +19,8 @@ None. Nothing in the picker reads a range. T1's list is traded as it is.
 
 Pre-registered before any figure (BL-144 Phase 0; narrowed on 2026-10-21 by the owner to no basket stop).
 Regime = tercile of R7, the mean daily range (percent of the previous close) of the 7 sessions before the
-day, known at the open. Range-bound: R7 ≤ 0.75%, volatile: R7 ≥ 1.05%; 80 / 78 / 80 days. "Wide stop" =
+day. R7 is known at the open, but the tercile cut points are computed over the whole window, so the labels
+are descriptive, not a gate a trader could have used that morning. Range-bound: R7 ≤ 0.75%, volatile: R7 ≥ 1.05%; 80 / 78 / 80 days. "Wide stop" =
 every leg's stop loss in the strategy file is at least 100%. 90% circular 5-day block bootstrap.
 
 | Statistic | Range-bound weeks | Middle | Volatile weeks | Low minus high |
@@ -54,8 +55,9 @@ Descriptive readings; leads, not findings.
 - **T1 does not lose on quiet days: it loses less on wide days.** It makes +935 per lot-day on quiet days
   against +1,347 for 3 × Widesl, but +803 on wide days against −1,204. Its edge here is on the volatile
   side.
-- **The fixed Widesl strategies carry the day-range risk.** 3 × Widesl lost on 12 of 80 quiet days and has
-  a worst day of −₹11,242; T1 lost on 14 of 80 quiet days.
+- **The fixed Widesl strategies carry the day-range risk.** 3 × Widesl lost on 12 of 80 quiet days. Its worst
+  day of the year, −₹11,242, was 17 Mar 2026, a wide day (range 1.33%); its worst quiet day was −₹9,662.
+  T1 lost on 14 of 80 quiet days.
 - **One day dominates 3 × Widesl.** 3 Feb 2026 (range 2.79%, an expiry Tuesday) made +₹49,676; without it
   the year total is +₹68,617 instead of +₹118,293.
 - **Year totals (gross, before charges, no basket stop), at the lots each book holds:** 3 × Widesl
@@ -78,7 +80,7 @@ Registered before it was computed (BL-144 Log, 2026-10-21), descriptive only. "M
 
 | What all-wide from the open would have earned (₹ per lot-day) | Days | T1 | 3 × Widesl 09:17 | Base |
 |---|---|---|---|---|
-| Quiet week (known at the open) | 80 | +554 | +119 | +240 |
+| Quiet week (R7 known at the open; cut over the full window) | 80 | +554 | +119 | +240 |
 | Quiet week and the day was quiet | 40 | +809 | +1,037 | +681 |
 | Quiet week but the day was wide | 13 | +1,225 | −1,637 | −595 |
 
@@ -92,6 +94,15 @@ Registered before it was computed (BL-144 Log, 2026-10-21), descriptive only. "M
 - So T1's partial lean is the part of the picker that adds value: it keeps some early wide strategies in
   quiet weeks and still holds other strategies for the day the market moves. A rule that forces all-wide
   from the morning in a quiet week was not tested as a rule and would give up the 13 wide-day cases.
+
+## Caveats from the 2026-10-24 review
+
+No number above was changed. The Core and T1 books are Adaptive's core picks **plus the Buy add-on** (four
+picks on 34 T1 days and 36 Core days), not the three core picks Phase 0 names. Without the add-on H1 is
++10.4 pp for T1 and +8.3 pp for Core, so the verdict (not met) is the same. The no-stop narrowing was committed
+together with the results, so git cannot show it was logged first. Details: BL-144 Log. The CSVs this page cites
+(`research/bl144/out/daily.csv`, `events`) are git-ignored; regenerate with `research/bl144/run.py` and
+`morning.py` (needs the TradingData volume).
 
 ## Open questions
 

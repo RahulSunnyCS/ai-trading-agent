@@ -1,12 +1,13 @@
 # Options: how do the fixed strategies, Core and T1 behave on special days?
 
-**Status:** Tested (re-scored, not forward) · **Last updated:** 2026-10-21
+**Status:** Tested (re-scored, not forward) · **Last updated:** 2026-10-24
 
 ## What it is
 
 Behaviour on Budget days and the week around them, election-result sessions, RBI policy decision days and
-high-premium days (India VIX at the open at or above the 90th percentile of all stored sessions, 18.37),
-registered in [BL-146][bl146] before any figure. 494 sessions from 2024-10-09 to 2026-10-19 for the fixed
+high-premium days (India VIX at the open at or above the 90th percentile of all stored sessions, 18.37;
+the cut is computed over the full window, so the flag is a label and not something a trader could have used
+that morning), registered in [BL-146][bl146] before any figure. 494 sessions from 2024-10-09 to 2026-10-19 for the fixed
 books (3 × Widesl 09:17 and the Base); Core and T1 are re-scored from 2025-01-10. Gross ₹ per lot-day, no
 stop, no charges. T1's setting-selection window ended 2025-10-08, so T1's figures on earlier events are
 in-sample for its settings (marked in the event table).
@@ -41,8 +42,13 @@ Verdicts under the registered rules:
 
 Descriptive; leads, not findings (few events per group, one stress period, re-scored picks).
 
-- **High-premium days were good for every book, best for T1.** 33 of the 50 premium sessions fall in two
-  clusters (April 2025 and March to April 2026); T1's 70% win rate there is its best regime so far.
+- **High-premium days were good for every book, best for T1.** 49 of the 50 premium sessions fall in two
+  clusters (April to May 2025: 10, March to May 2026: 39; the counts are the 2026-10-24 review's, from
+  `study.json`); T1's 70% win rate there is its best regime so far.
+- **Part of that edge is in-sample for T1.** Split at T1's selection window (the 2026-10-24 review, from
+  `all_days.csv`): T1's premium-day minus other-day mean is +1,426 on 11 in-sample days and +185 on 39
+  out-of-sample days. Special sessions overall, in-sample: T1 +1,765 vs Base +2,597; out of sample: T1 +651 vs
+  Base −150. Pooled, as registered, E3 is +506.
 - **RBI decision days favour the fixed 09:17 Widesl.** Over the 10 days where T1 has picks, 3 × Widesl made
   +2,236 per lot-day against T1's +997 (+804 against +163 without the one huge 9 Apr 2025, +15,122 for
   Widesl, +8,506 for T1). 3 × Widesl was ahead on 6 of 10 days; T1 was ahead on the 4 days Widesl lost
@@ -54,6 +60,16 @@ Descriptive; leads, not findings (few events per group, one stress period, re-sc
   −2,675) was a gain for T1 (+512).
 - **T1 picks barely change with the premium.** Its wide-stop share is 38% on premium days against 33% on
   the others (Core 68% against 71%), so its edge on those days is not from switching style.
+
+## Caveats from the 2026-10-24 review
+
+No number above was changed. E1 as run leaves out Budget week (the special set was built from the two weekend
+Budget sessions, which have no T1 picks); with the 8 Budget-week sessions in, E1 covers 67 sessions, T1 +1,119
+vs Base +757, still met. Phase 0 says "5 trading sessions" around each Budget but lists two before and two
+after (4), which the code uses. The August 2025 MPC was left out as registered because sources disagreed; the
+decision was probably announced on 6 Aug 2025, so a later version could include it. The event table
+(`research/bl146/out/events.csv`) is git-ignored; regenerate with `research/bl146/run.py` (needs the
+TradingData volume). Details: BL-146 Log.
 
 ## Open questions
 
