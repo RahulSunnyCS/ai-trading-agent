@@ -1,6 +1,6 @@
 # Momentum: signal delay, fill time, tracking and premium warning
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -31,6 +31,7 @@ When a signal is traded, at what price, and what the P&L is measured on.
 | TODO 3.9.18, 3.9.23 | `execution="mon_open"` | ETF | Friday close stays | CAGR better in 79% of windows but Sharpe in 36%, MaxDD in 7% (-31.2%) |
 | `mbt tracking` (package README), TODO 3.9.23 | `track` index vs ETF | ETF live config | The live job tracks the ETF | ETF gap +0.72 CAGR points a year (index track 25.0% vs ETF 25.8%), past the owner's 0.5 threshold |
 | [BL-010](../../../backlog/BL-010-momentum-evaluation-review.md) Phase 2 step 7 | the same Broad decisions filled at Friday close and at the next open | six configs at delay 0 | Flag tripped (finding E13) | Costs a delay-0 run 1.0 point of CAGR on average, over 1 point on two of six. Threshold committed in [`bl010_criteria_addendum_1.json`](../../../packages/momentum-backtesting/search_spaces/bl010_criteria_addendum_1.json) before the step ran |
+| [BL-161](../../../backlog/BL-161-favourites-score-and-friday-fill.md) (written as BL-056) | each favourite at `signal_delay` 0 against its saved 1, nothing else changed | the 14 individual favourite configs (Broad), 2017-01-06 to 2026-10-02, pre-tax; registered rule: delay "matters" if the median absolute change in CAGR is above 1 pt (BL-010 E13's threshold) | Delay matters, no fixed direction | Median absolute change 3.4 pts (signed -1.1); single configs move from -7.1 (Five Sectors Monthly) to +6.9 pts (Four Sectors, Four Lookbacks); 8 of 14 are worse at delay 0 on each of CAGR, max drawdown, Martin and Sharpe. Delay 0 here fills at the same Friday close the ranking used, so it is an upper bound, not a tradable fill. [`bl161_summary.json`](../../../packages/momentum-backtesting/search_spaces/bl161_summary.json) |
 | BL-010 Log, 2026-10-05 | one-week delay on the default Broad run (pre-point-in-time) | 2017-01 to 2026-10 | Descriptive | 53.2% as shipped; 44.3% with a one-week delay; 40.3% with circuit locks, the tradability filter and the delay together |
 
 ## What we know
@@ -43,6 +44,12 @@ When a signal is traded, at what price, and what the P&L is measured on.
   BL-010's rule: if Monday-open costs more than 1 point, the fix is a Monday-fill option, not a
   week's delay. The option is planned in
   [BL-036](../../../backlog/BL-036-momentum-ui-from-bl010.md) Phase 2.
+- **A one-week shift moves a single config by several points either way** (BL-161: median
+  absolute change 3.4 pts of CAGR, from -7.1 to +6.9 across the 14 favourites). That is timing
+  luck, which is why one Friday's CAGR cannot be read to within a few points and why splitting a
+  config across every Friday ([cadence](cadence.md)) is the fair comparison. The delay-0 side of
+  that test is the untradable same-close fill; the planned Friday 14:30 trade should be judged on
+  the journal's live fills, not on it.
 - The BL-084 and BL-085 stop tests bracketed the Monday open between a same-Friday and a
   next-Friday fill ([Broad stop-loss](../strategies/broad/stop.md)).
 
