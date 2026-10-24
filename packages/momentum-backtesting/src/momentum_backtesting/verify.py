@@ -29,6 +29,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import duckdb
+
 BASELINE_FILE = "history_baseline.json"
 LOG_FILE = "history_baseline_log.jsonl"
 #: The default anchor is the last Friday at least this many days back, so the stopgap rows the
@@ -154,14 +156,17 @@ def load_baseline(state: Path) -> dict | None:
     if not path.exists():
         return None
     data = json.loads(path.read_text())
-    return data if data.get("schema") == SCHEMA else None
+    if data.get("schema") != SCHEMA:
+        # Returning None would record a new baseline over this one and lose any unaccepted change.
+        raise ValueError(f"{path} has schema {data.get('schema')}, this code reads {SCHEMA}")
+    return data
 
 
 def save_baseline(
     state: Path, anchor: date, labels: Fingerprint, *, event: str, reason: str | None = None
 ) -> None:
-    """Write the baseline and append the event to the log. Both written, then the log line:
-    a failed log write must not leave a baseline nobody can account for."""
+    """Append the event to the log, then replace the baseline. The log goes first: a failed log
+    write must not leave a new baseline nobody can account for."""
     state.mkdir(parents=True, exist_ok=True)
     now = datetime.now().astimezone().isoformat(timespec="seconds")
     record = {
@@ -169,11 +174,9 @@ def save_baseline(
         "anchor": anchor.isoformat(),
         "created_at": now,
         "commit": _commit(),
+        "duckdb": duckdb.__version__,
         "labels": labels,
     }
-    tmp = baseline_path(state).with_suffix(".tmp")
-    tmp.write_text(json.dumps(record, separators=(",", ":")))
-    tmp.replace(baseline_path(state))
     entry = {
         "at": now,
         "event": event,
@@ -184,6 +187,9 @@ def save_baseline(
     }
     with (state / LOG_FILE).open("a") as handle:
         handle.write(json.dumps(entry) + "\n")
+    tmp = baseline_path(state).with_suffix(".tmp")
+    tmp.write_text(json.dumps(record, separators=(",", ":")))
+    tmp.replace(baseline_path(state))
 
 
 @dataclass
@@ -214,6 +220,12 @@ def run(
         save_baseline(state, target, labels, event="new_baseline")
         return Outcome("new_baseline", target)
 
+    if stored.get("duckdb") != duckdb.__version__ and not accept:
+        # DuckDB's hash() is not promised stable across versions: every label would look changed.
+        raise ValueError(
+            f"the baseline was made with DuckDB {stored.get('duckdb')}, this is "
+            f"{duckdb.__version__}: re-baseline with --accept --reason"
+        )
     anchor = date.fromisoformat(stored["anchor"])
     current = fingerprint(anchor, root, bars=bars)
     found = diff(stored["labels"], current)

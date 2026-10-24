@@ -59,3 +59,19 @@ def test_a_length_mismatch_is_reported():
     other = copy.deepcopy(_ok())
     other["response"]["series"]["strategy"].append(1.0)
     assert any("3 items against 4" in line for line in rl.compare(_ok(), other))
+
+
+def test_nan_against_a_number_is_a_difference_and_nan_against_nan_is_not():
+    nan = float("nan")
+    assert rl.differences({"a": nan}, {"a": 5.0})
+    assert rl.differences({"a": 5.0}, {"a": nan})
+    assert not rl.differences({"a": nan}, {"a": nan})
+    assert rl.differences({"a": float("inf")}, {"a": 5.0})
+    assert not rl.differences({"a": float("inf")}, {"a": float("inf")})
+
+
+def test_only_broad_requests_are_accepted(tmp_path):
+    import pytest
+
+    with pytest.raises(ValueError, match="only Broad"):
+        rl.check({"etf run": {"dataset": "etf"}}, ["2021-06-25"], tmp_path)

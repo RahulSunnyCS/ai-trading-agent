@@ -2319,6 +2319,8 @@ def verify_history(
     from . import notify, verify
     from .this_week import state_dir
 
+    if accept and not reason:
+        raise typer.BadParameter("--accept needs --reason")
     try:
         outcome = verify.run(
             state_dir(),

@@ -200,3 +200,51 @@ def test_a_restated_stock_bar_is_named_by_symbol_and_year(root, tmp_path):
     _bars(root, date(2025, 6, 2), 10.5)  # a past close restated
     out = verify.run(state, TODAY, root=root)
     assert [(c.label, c.first_year) for c in out.diff.changed] == [("bars:AAA", 2025)]
+
+
+def test_a_baseline_with_another_schema_is_refused_not_replaced(root, tmp_path):
+    state = _state(tmp_path)
+    verify.run(state, TODAY, root=root, bars=False)
+    path = verify.baseline_path(state)
+    data = json.loads(path.read_text())
+    data["schema"] = 99
+    path.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="schema"):
+        verify.run(state, TODAY, root=root, bars=False)
+    assert json.loads(path.read_text())["schema"] == 99  # untouched
+
+
+def test_a_different_duckdb_version_asks_for_a_rebaseline_instead_of_alarming(root, tmp_path):
+    state = _state(tmp_path)
+    verify.run(state, TODAY, root=root, bars=False)
+    path = verify.baseline_path(state)
+    data = json.loads(path.read_text())
+    data["duckdb"] = "0.0.1"
+    path.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="re-baseline"):
+        verify.run(state, TODAY, root=root, bars=False)
+    assert verify.run(state, TODAY, root=root, accept=True, reason="duckdb upgrade", bars=False)
+    assert verify.run(state, TODAY, root=root, bars=False).status == "ok"
+
+
+def test_the_log_line_is_written_before_the_baseline_moves(root, tmp_path, monkeypatch):
+    state = _state(tmp_path)
+    verify.run(state, TODAY, root=root, bars=False)
+    before = verify.baseline_path(state).read_text()
+
+    def boom(self, *args, **kwargs):  # the log append fails
+        raise OSError("disk full")
+
+    real_open = type(state).open
+    monkeypatch.setattr(
+        type(state),
+        "open",
+        lambda self, *a, **k: (
+            boom(self) if self.name == verify.LOG_FILE else real_open(self, *a, **k)
+        ),
+    )
+    with connect(root) as con:
+        con.execute("UPDATE momentum_prices SET close = 1.0 WHERE instrument = 'GOLD'")
+    with pytest.raises(OSError):
+        verify.run(state, TODAY, root=root, accept=True, reason="x", bars=False)
+    assert verify.baseline_path(state).read_text() == before

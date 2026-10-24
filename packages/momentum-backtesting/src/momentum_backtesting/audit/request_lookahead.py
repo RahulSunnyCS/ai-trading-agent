@@ -16,6 +16,7 @@ list). See `truncate.py`.
 from __future__ import annotations
 
 import json
+import math
 import os
 import subprocess
 import sys
@@ -114,7 +115,14 @@ def differences(old: Any, new: Any, where: str = "", limit: int = 12) -> list[st
             and not isinstance(a, bool)
             and not isinstance(b, bool)
         ):
-            if abs(a - b) > REL_TOL * max(abs(a), abs(b), 1e-12):
+            if math.isnan(a) or math.isnan(b):
+                # abs(nan - x) > tol is False, so NaN against a number must be caught here.
+                if not (math.isnan(a) and math.isnan(b)):
+                    out.append(f"{path[:-1]}: {a!r} against {b!r}")
+            elif math.isinf(a) or math.isinf(b):
+                if a != b:
+                    out.append(f"{path[:-1]}: {a!r} against {b!r}")
+            elif abs(a - b) > REL_TOL * max(abs(a), abs(b), 1e-12):
                 out.append(f"{path[:-1]}: {a!r} against {b!r}")
         elif a != b:
             out.append(f"{path[:-1]}: {a!r} against {b!r}")
@@ -184,6 +192,11 @@ def check(
     folder: both runs use a scratch data folder, and the cut run a copy of the database."""
     from trading_data.db import data_root
 
+    other = sorted(label for label, req in requests.items() if req.get("dataset") != "broad")
+    if other:
+        # The scratch data folder holds no files, which the ETF, Stock and Custom Index datasets
+        # may read; only Broad is known to run from the database alone.
+        raise ValueError(f"only Broad requests are supported, not: {other}")
     out_dir.mkdir(parents=True, exist_ok=True)
     requests_file = out_dir / "requests.json"
     requests_file.write_text(json.dumps(requests, indent=1))
