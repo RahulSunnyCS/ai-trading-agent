@@ -55,7 +55,7 @@ baseline ₹13,883 in the afternoon.
 ## Not yet tested
 
 - Per-family levels as a pre-registered rule on unseen days (BL-070 ran no other level).
-- Stop × leg-stop and stop × trail interactions (BL-098 Phase 3).
+- Stop × leg-stop and stop × trail interactions (BL-098 Phase 3, now BL-104).
 - Daily stops on a whole mix: see [portfolio stop](../../common/portfolio-stop.md).
 
 ## Related

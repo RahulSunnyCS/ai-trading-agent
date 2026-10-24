@@ -1,6 +1,6 @@
 # Widesl: days to expiry
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Descriptive · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -27,6 +27,7 @@ two largest weights. See [rotation ranking](../../common/rotation-ranking.md).
 | BL-059 | Same tables for start times 12:02–15:02 | same | Descriptive; morning patterns agree with BL-056 | [BL-059][bl059] |
 | BL-060 | SENSEX ₹250 / ₹320 vs OTM2, 24 start times | same | Descriptive: expiry day best for all three rules | [BL-060][bl060] |
 | BL-061, BL-062 | Which Widesl the rotation picks, by DTE | rotation, 2025-12 → 2026-10 | Descriptive: closest premium takes 47–51% of core lots at DTE 0, 10–20% at DTE 2–3 | [BL-061][bl061], [BL-062][bl062] |
+| BL-159 read 8 (monthly-expiry week) | The five trading days ending on the month's last NIFTY weekly expiry vs the other days, the live Widesl OTM1 09:17 (stored rotation results, gross per lot) | NIFTY, 2024-10-09 → 2026-10-08 | Screen, **no lead**: not a skip for both base strategies (bar: mean in group minus out of group of −₹500 or worse with t ≤ −2 for both) | [BL-159][bl159] |
 
 **NIFTY OTM1, ₹ per day per lot** (BL-056):
 
@@ -92,6 +93,7 @@ expiry day) and negative on Monday and Friday.
 
 [bl056]: ../../../../backlog/BL-056-weekday-dte-vix-breakdown.md
 [bl057]: ../../../../backlog/BL-057-daily-four-criteria-rotation.md
+[bl159]: ../../../../backlog/BL-159-eight-poc-reads.md
 [bl059]: ../../../../backlog/BL-059-whole-day-start-time-curve.md
 [bl060]: ../../../../backlog/BL-060-sensex-widesl-closest-premium.md
 [bl061]: ../../../../backlog/BL-061-rotation-with-closest-premium-widesl.md

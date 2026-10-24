@@ -56,7 +56,7 @@ Leg-stop rows in the post-charge top four (holdout, mean over the band's start-t
 
 ## Not yet tested
 
-- BL-098 Phase 3: at most five candidates chosen on the fit period, then stop × strike, stop × MTM
+- BL-098 Phase 3, now BL-104: at most five candidates chosen on the fit period, then stop × strike, stop × MTM
   interactions, then the holdout once.
 - CE/PE-asymmetric stops (out of scope by registration).
 - The NIFTY 2022–24 period.

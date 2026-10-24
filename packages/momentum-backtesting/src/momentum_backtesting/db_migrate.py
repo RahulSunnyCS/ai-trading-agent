@@ -41,6 +41,7 @@ not a data loss).
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -98,6 +99,8 @@ class MigrationReport:
     stock_membership_weekly: int = 0
     stock_weekly_series: int = 0
     total_market_membership: int = 0
+    # Why the momentum_prices replace was refused (it then kept the stored rows), else None.
+    momentum_prices_refused: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -247,10 +250,12 @@ class PriceShrinkError(RuntimeError):
     """`data/` holds less price history than `momentum_prices` already does."""
 
 
-# A stored series may lose this share of its rows (a premium day dropped as a unit mismatch, an
-# unfinished week trimmed) before a replace is refused; vanishing outright is always refused.
+# A stored series may lose a few rows (a premium day dropped as a unit mismatch, an unfinished
+# week trimmed): more than SHRINK_ROWS and SHRINK_SHARE of them is refused, and so is vanishing
+# or starting more than SHRINK_START later (older history lost, whatever the count).
 SHRINK_ROWS = 5
-SHRINK_SHARE = 0.10
+SHRINK_SHARE = 0.02
+SHRINK_START = pd.Timedelta(days=7)
 
 
 def check_price_shrink(con: duckdb.DuckDBPyConnection, rows: list) -> None:
@@ -259,17 +264,21 @@ def check_price_shrink(con: duckdb.DuckDBPyConnection, rows: list) -> None:
     replace from that folder emptied them in the database too, and every Broad favourite then
     failed on an all-NaN Nifty 50 benchmark."""
     stored = con.execute(
-        "SELECT instrument, kind, count(*) FROM momentum_prices GROUP BY 1, 2"
+        "SELECT instrument, kind, count(*), min(date) FROM momentum_prices GROUP BY 1, 2"
     ).fetchall()
-    new: dict[tuple[str, str], int] = {}
-    for instrument, kind, *_ in rows:
-        new[(instrument, kind)] = new.get((instrument, kind), 0) + 1
+    new = Counter((instrument, kind) for instrument, kind, *_ in rows)
+    first: dict[tuple[str, str], pd.Timestamp] = {}
+    for instrument, kind, day, *_ in rows:
+        key = (instrument, kind)
+        first[key] = min(first.get(key, day), day)
     shrunk = []
-    for instrument, kind, count in stored:
-        now = new.get((instrument, kind), 0)
-        lost = count - now
-        if now == 0 or (lost >= SHRINK_ROWS and lost > SHRINK_SHARE * count):
+    for instrument, kind, count, start in stored:
+        key = (instrument, kind)
+        now, lost = new[key], count - new[key]
+        if now == 0 or (lost > SHRINK_ROWS and lost > SHRINK_SHARE * count):
             shrunk.append(f"{instrument} ({kind}) {count} -> {now} rows")
+        elif first[key] > pd.Timestamp(start) + SHRINK_START:
+            shrunk.append(f"{instrument} ({kind}) starts {first[key].date()}, stored from {start}")
     if shrunk:
         raise PriceShrinkError(
             "refusing to replace momentum_prices: data/ has less history than the database "
@@ -473,8 +482,14 @@ def migrate(
     curated_dir: Path = CURATED_DIR,
     allow_price_shrink: bool = False,
 ) -> MigrationReport:
-    # First, so a refused price replace (PriceShrinkError) leaves every table untouched.
-    n_prices = import_momentum_prices(con, data_dir, allow_shrink=allow_price_shrink)
+    # A refused price replace keeps the stored rows and is reported, never raised here: the
+    # stock tables below do not depend on data/'s ETF series, and the 19:30 stock sync must not
+    # leave them a week behind because of them. The caller fails on `momentum_prices_refused`.
+    refused = None
+    try:
+        n_prices = import_momentum_prices(con, data_dir, allow_shrink=allow_price_shrink)
+    except PriceShrinkError as error:
+        n_prices, refused = 0, str(error)
     n_companies, n_aliases, n_membership = import_curated(con, curated_dir)
     n_category = import_category_membership(
         con, data_dir / "categories" / "category_membership.csv"
@@ -501,4 +516,5 @@ def migrate(
         stock_membership_weekly=n_stock_membership,
         stock_weekly_series=n_extra,
         total_market_membership=n_total_market,
+        momentum_prices_refused=refused,
     )

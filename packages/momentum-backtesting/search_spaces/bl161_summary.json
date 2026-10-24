@@ -1,0 +1,97 @@
+{
+  "runs": 84,
+  "errors": [],
+  "control_drift_over_half_pt": [],
+  "rule_a": {
+    "ranksum": {
+      "n": 11,
+      "median_d_martin": -2.0812114005127684,
+      "martin_improved": 1,
+      "median_d_max_dd_pts": -6.870044223456495,
+      "median_d_cagr_pts": -8.001502268618044,
+      "pass": false
+    },
+    "blend": {
+      "n": 11,
+      "median_d_martin": -1.1954757645100798,
+      "martin_improved": 2,
+      "median_d_max_dd_pts": -5.718886302775883,
+      "median_d_cagr_pts": -4.088786924358034,
+      "pass": false
+    }
+  },
+  "rule_b": {
+    "n": 14,
+    "median_d_cagr_pts": -1.1112703815877922,
+    "median_abs_d_cagr_pts": 3.426437467999499,
+    "matters": true
+  },
+  "median_by_variant": [
+    {
+      "score": "blend",
+      "signal_delay": 0,
+      "cagr": 0.3614,
+      "excess_cagr": 0.2532,
+      "max_drawdown": -0.4107,
+      "ulcer": 0.1388,
+      "martin": 2.3928,
+      "cdar95": -0.2984,
+      "sharpe": 1.0491
+    },
+    {
+      "score": "blend",
+      "signal_delay": 1,
+      "cagr": 0.369,
+      "excess_cagr": 0.2608,
+      "max_drawdown": -0.3843,
+      "ulcer": 0.1228,
+      "martin": 2.9153,
+      "cdar95": -0.2892,
+      "sharpe": 1.088
+    },
+    {
+      "score": "ranksum",
+      "signal_delay": 0,
+      "cagr": 0.3253,
+      "excess_cagr": 0.2171,
+      "max_drawdown": -0.4567,
+      "ulcer": 0.1707,
+      "martin": 1.8793,
+      "cdar95": -0.3865,
+      "sharpe": 0.9175
+    },
+    {
+      "score": "ranksum",
+      "signal_delay": 1,
+      "cagr": 0.3375,
+      "excess_cagr": 0.2293,
+      "max_drawdown": -0.4137,
+      "ulcer": 0.1565,
+      "martin": 2.0642,
+      "cdar95": -0.349,
+      "sharpe": 0.9533
+    },
+    {
+      "score": "voladj",
+      "signal_delay": 0,
+      "cagr": 0.3749,
+      "excess_cagr": 0.2666,
+      "max_drawdown": -0.3802,
+      "ulcer": 0.1222,
+      "martin": 3.0473,
+      "cdar95": -0.2739,
+      "sharpe": 1.1547
+    },
+    {
+      "score": "voladj",
+      "signal_delay": 1,
+      "cagr": 0.4048,
+      "excess_cagr": 0.2965,
+      "max_drawdown": -0.3125,
+      "ulcer": 0.1051,
+      "martin": 3.7549,
+      "cdar95": -0.2428,
+      "sharpe": 1.2418
+    }
+  ]
+}

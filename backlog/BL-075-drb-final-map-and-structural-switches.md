@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; the last backtest before the forward journal |
-| **Status** | In progress |
+| **Status** | Done 2026-10-10 — no cell meets the 0.85 bar; 3 of the top 10 weightings real (list A) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
@@ -188,3 +188,4 @@ whatever it finds.
 - 2026-10-10 — block 2 (combined A+B+C) ran: a hedge, not an improvement; not adopted.
 - 2026-10-10 — stage 3 done: 3 of the top 10 cells are real (list A among them); B and C are not. No cell meets the 0.85 adoption bar. Charges pass for A, B and C next.
 - 2026-10-10 — charges pass for A, B, C recorded.
+- 2026-10-24 — status line set to Done to match INDEX (the item finished 2026-10-10; only the line was stale).
