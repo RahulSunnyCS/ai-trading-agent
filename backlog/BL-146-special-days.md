@@ -8,7 +8,7 @@
 | **Area** | options |
 | **Created** | 2026-10-21 |
 | **Depends on** | BL-144 (`research/bl144/run.py` and its helpers), BL-145, BL-113 |
-| **TODO.md row** | §3.39 |
+| **TODO.md row** | §3.44 |
 
 ## Context
 
@@ -112,3 +112,4 @@ None.
   - The August 2025 MPC is left out as registered ("sources disagree"); the review believes the decision was
     announced on 6 Aug 2025, so it could have been included. Left as registered.
   - Risks said "RBI 11"; the list has 12 dates, and the Risks line now says 12 (outside Phase 0).
+- 2026-10-24 — TODO row renumbered 3.37–3.40 -> 3.42–3.45 on 2026-10-24 after #304 took 3.37.

@@ -8,7 +8,7 @@
 | **Area** | options |
 | **Created** | 2026-10-21 |
 | **Depends on** | BL-144 (the daily table `research/bl144/out/daily.csv`, the R7 regimes), BL-110 (opening range), BL-113 |
-| **TODO.md row** | §3.38 |
+| **TODO.md row** | §3.43 |
 
 ## Context
 
@@ -94,3 +94,4 @@ None.
     Core variant (`N_wide_0947`) and the main window's cut points in both runs, so it is unaffected.
   - The R7 and D cut points are computed over the whole window (BL-144 Log): the Q3 event definitions
     (surprise-wide, calm-down) are labels assigned with hindsight, not a rule available at the open.
+- 2026-10-24 — TODO row renumbered 3.37–3.40 -> 3.42–3.45 on 2026-10-24 after #304 took 3.37.

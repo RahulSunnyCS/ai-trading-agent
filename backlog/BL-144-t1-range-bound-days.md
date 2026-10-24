@@ -8,7 +8,7 @@
 | **Area** | options |
 | **Created** | 2026-10-21 |
 | **Depends on** | BL-113 (T1 track), BL-110 (index range persistence), BL-095 (portfolio stop), BL-058 (journal and results) |
-| **TODO.md row** | §3.37 |
+| **TODO.md row** | §3.42 |
 
 ## Context
 
@@ -140,3 +140,4 @@ and that Core is a column.
   - The wide-stop helper differs between scripts (`run.py` keeps legs with `stop_loss.percent`, `morning.py`
     keeps any leg with a `stop_loss`); they agree on today's strategy files. `bl144_daily_results.csv`, named
     above, is not written by any committed script (`run.py` writes `daily.csv`).
+- 2026-10-24 — TODO row renumbered 3.37–3.40 -> 3.42–3.45 on 2026-10-24 after #304 took 3.37.

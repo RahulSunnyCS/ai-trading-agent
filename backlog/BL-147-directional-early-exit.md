@@ -8,7 +8,7 @@
 | **Area** | options |
 | **Created** | 2026-10-21 |
 | **Depends on** | BL-144 (the re-scored T1 / Core picks), BL-113, BL-058 |
-| **TODO.md row** | §3.40 |
+| **TODO.md row** | §3.45 |
 
 ## Context
 
@@ -131,3 +131,4 @@ None.
     secondary reading.
   - `conditional.py` has no `/Volumes/TradingData` mount guard, unlike the other scripts, and imports
     `run.py` as a script-folder import.
+- 2026-10-24 — TODO row renumbered 3.37–3.40 -> 3.42–3.45 on 2026-10-24 after #304 took 3.37.
