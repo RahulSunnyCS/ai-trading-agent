@@ -40,6 +40,10 @@ INERT: dict[tuple[str, str], str] = {
         "broad_respect_circuits",
     ): LOCKS_IDLE,
     (
+        "broad_monday_open",
+        "broad_respect_circuits",
+    ): LOCKS_IDLE,
+    (
         "broad_one_category_three_picks_four_weekly",
         "broad_respect_circuits",
     ): LOCKS_IDLE,

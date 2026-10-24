@@ -412,3 +412,8 @@ favourite with the end pinned to its last accepted anchor and names the instrume
   accepted: equity, CAGR and trades unchanged; idle share, holdings count, time in cash and the cap
   figure moved). Phase 3 closed as superseded by BL-052; Phase 4 re-scoped. F3 and F4 still open.
 - 2026-10-22 — owner: F3 and F4 deferred as recommended; no work.
+- 2026-10-24 — nightly CI red since about 2026-10-19: `test_every_setting_a_scenario_changes_changes_its_result`
+  flagged `broad_monday_open::broad_respect_circuits` (the scenario BL-036 Phase 2 added). Not a wiring
+  gap: a Monday-open run builds its lock masks for the first session (`api._run_broad`, `session="first"`),
+  and the frozen result shows `blocked_entries: 0`, `blocked_exits: 0`, like `broad_default`. Listed in
+  `INERT` as `LOCKS_IDLE`, the reason the other Broad scenarios already carry (finding F3).
