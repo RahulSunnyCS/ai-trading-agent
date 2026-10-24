@@ -215,7 +215,8 @@ after 60 sessions. Not started by this item.
 
 - 2026-10-18 — created from the owner's chat. Defaults above are mine (give-back 15 on both indices;
   ₹1,000 as the overall stop; the series, trade and periods from BL-091). Phase 0 committed before any
-  run (commit 8e5918e4).
+  run (commit 8e5918e4; block 2 in `321680aa`; the registration commits are on
+  `origin/research/bl121-opening-straddle-break`, since this PR squashes them).
 - 2026-10-18 — **Phase 1, build and checks.** `research/common/straddle_series.py` (BL-091's series
   builder, copied) and `widesl_trade.py` (BL-091's Widesl runner, copied); `research/bl123/`:
   `rule.py`, `periods.py` (read guard: only the three registered cells open), `design.py` (placebo and
@@ -263,8 +264,8 @@ after 60 sessions. Not started by this item.
   P&L is computed. The owner's answer to open question 4 below decides it.
 - 2026-10-18 — **Block 2 registered** (Phase 0b), before any placebo or trade P&L: the day's-low reading,
   NIFTY P2 + P3 pooled as the judged cell, SENSEX reported only. Prompted by the owner: "at 14:30, if it
-  is already up 20 points from the day's low, that is also included." Committed in this commit; the run
-  follows.
+  is already up 20 points from the day's low, that is also included." Committed in `321680aa`
+  (backlog file only, before any placebo or trade P&L); the run follows.
 - 2026-10-18 — **Block 2 build and checks** (before any simulation): `rule.detect_b`, `events.py
   --reading B`, `selfcheck_b.py`. 18 synthetic cases pass (a spike already given back before 14:30 does
   not fire; a rise held before 14:30 and given back after fires; a hold completing at 14:29 counts; a new
@@ -307,4 +308,17 @@ after 60 sessions. Not started by this item.
   series counts strike switches as movement (median 30 inside the window from 09:20), so a "rise" can be
   the strike moving. P2 + P3 are not clean for this rule (see Context); a pass would only have been a
   screen. Counted tries in this item: rule A (counts only), three other readings (counts only), block 2.
+- 2026-10-24 — **Review of PR #307 (Opus): caveats added, no result or rule changed.**
+  - **Test 3 favours short trades.** "Above the random-minute P95 (97 % of draws)" is a positive above, and it
+    is weaker than it reads. The random minutes are drawn on the event days; for a **short** trade like this
+    Widesl, a random minute that falls before the fire sells before the rise, so the draws come out low and
+    the event mean clears them more easily. The BL-124 Log gives the opposite effect for a long straddle. The
+    verdict (inconclusive) does not change, since test 2 failed.
+  - **Figures computed ad hoc, not by a committed script:** the 90 % bootstrap intervals, "67 % of events
+    beat their own placebo", the standard deviation of event minus placebo (₹805) and "about 162 events" are
+    not produced by `read.py` or any committed script. They were recomputed independently in review and agree
+    within Monte Carlo noise. Neighbouring events share placebo days, so the per-event differences are not
+    independent and t is slightly optimistic; no verdict depends on it.
+  - The "five real events inspected against the raw bars" in the Phase 1 checklist is not reported as done in
+    this Log.
 - 2026-10-18 — **Parked by the owner** ("park BL-120 and BL-121 as they stand"). **Renumbered from BL-120**: that number was taken on `main`'s line of work (BL-120 desk screens and strategy tester); nothing of this item had been pushed. Folder `research/bl120` is now `research/bl123`.

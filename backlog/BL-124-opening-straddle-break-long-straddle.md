@@ -152,7 +152,8 @@ Not started by this item.
 
 - 2026-10-18 — created from the owner's chat. Defaults are mine: the high window is 09:17–09:30, the watch
   window ends at 14:00, exit 15:14, trail in points, two arms for the two readings. Phase 0 committed
-  before any run.
+  before any run (Phase 0 committed in `dee24559`, with `long_straddle_trade.py`, before any result; the
+  registration commit is on `origin/research/bl121-opening-straddle-break`, since this PR squashes it).
 - 2026-10-18 — **Build and checks** (before any simulation): `research/common/long_straddle_trade.py`,
   `research/common/event_design.py`, `research/bl124/` (`rule.py`, `periods.py`, `events.py`, `design.py`,
   `selfcheck.py`, `run.py`, `read.py`). 17 synthetic cases pass (R1 fires where R2 does not; 10 over the noted
@@ -198,4 +199,11 @@ Not started by this item.
   window end other than 14:00 were not run (the owner gave none of those, the choices are mine). The two
   arms are nested, so four cells come from two signals. P2 + P3 are not clean for this rule; P1 was never
   needed. Counted tries in this item: two arms in two cells.
+- 2026-10-24 — **Review of PR #307 (Opus): notes added, no result or rule changed.**
+  - The Log's "the event mean is below every draw" is not exact: in R1 P2 one draw of 200 (0.5 %) is below
+    the event mean.
+  - Neighbouring events share placebo days, so the per-event differences are not independent and t is
+    slightly optimistic; the verdicts do not depend on it (t is negative in every cell).
+  - The "five real events inspected against the raw bars" in the Phase 1 checklist, and the Risks promise to
+    report the share of events carried by switches (only medians are in the Log), are not reported as done.
 - 2026-10-18 — **Parked as it stands by the owner** (killed; nothing further). **Renumbered from BL-121**: that number was taken on `main` (BL-121 moved expiry days) and BL-120 by the desk-screens item; nothing of this item had been pushed. Folder `research/bl121` is now `research/bl124`.

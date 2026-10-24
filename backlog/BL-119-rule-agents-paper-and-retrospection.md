@@ -171,9 +171,10 @@ reported but not judged; they are judged forward.
 
 ### Phase 0b — Amendment 1 (2026-10-18, the owner's answers on "Start BL-119"; committed before any run)
 
-Owner's answers: (1) "60 candles" means **a rolling 60-bar range at any time**, not only the opening window;
-(2) the template is **both**, as two separate arms; (3) **add 2019-02-11 → 2021-12-31 as an unread
-confirmation period**; (4) momentum exhaustion is **left out for now**. This amendment replaces Phase 0's
+Owner's answers (numbered as the open questions below): Q1 "60 candles" means **a rolling 60-bar range at any
+time**, not only the opening window; Q2 the template is **both**, as two separate arms; Q3 **NIFTY only**
+(default kept); Q4 momentum exhaustion is **left out for now**. A fifth question, raised by the assistant:
+**add 2019-02-11 → 2021-12-31 as an unread confirmation period**, answered yes. This amendment replaces Phase 0's
 rule definitions with the rolling rule below. Everything else in Phase 0 stands (universe filters, costs,
 look-ahead discipline, the hold-out idea) except where restated here. Nothing had been run when it was
 committed.
@@ -259,6 +260,9 @@ paragraphs above are superseded by this block.
   opening-window arms, the analog filter, the personalities, momentum exhaustion, SENSEX, other templates
   or stops, a short arm on days the range holds, C before the screen, any parameter search.
 - **Done when:** this amendment is in a commit, named in the Log, before `research/bl119/` holds a run.
+- **Review notes, 2026-10-24 (nothing above is changed; see the Log):** the random-minute test favours short
+  trades, so for arm S test 3 is easier to pass than it reads; period B contains P1; and arm S sells at the
+  break, which may not be what the owner meant by "both". Two are open questions for the owner.
 
 ### Phase 1 — Event study (research only, a few hours of compute)
 
@@ -390,3 +394,27 @@ Questions 5 (the evening post-mortem) and 6 (blocked dates) belong to later phas
   programme and becomes the confirmation period C; the strategy tester another session is building
   (`ruletest/`, uncommitted in the main checkout) is not needed for Phase 1, which stays a research script.
   Owner's answers recorded in Phase 0b. Amendment 1 committed before any run.
+- 2026-10-24 — **Review of PR #307 (Opus); caveats and open questions added, no registered rule or result
+  changed, nothing run.**
+  - **Caveat on test 3 for arm S.** The random-minute draws are taken on the event days. For a long trade a
+    random minute before the break buys before the move (hindsight, BL-124 Log), which makes test 3 hard to
+    pass. For a **short** trade it works the other way: a random minute that falls before the break sells
+    before the rise, so the random-minute means come out low and test 3 is **easier** to pass for arm S. The
+    amendment's comparator 2 note covers only the long direction. Until the owner decides otherwise, read a
+    pass of test 3 on arm S as weak evidence (it can veto arm S; it adds little when it holds). Options, both
+    rule changes and so a dated block before Phase 1: test 3 can only veto arm S and never counts toward its
+    pass, or S's random minutes are taken from non-event days.
+  - **Open question for the owner: period B contains P1.** B runs 2024-10-09 to 2026-10-08, which includes P1
+    (2025-12-03 to 2026-10-08), the one period BL-091 (R3 / F1450, TODO row 3.26.6) and BL-123 keep unread.
+    Arm S trades that same live Widesl across P1. Choose one before Phase 1: **(a)** end B at 2025-12-02 for
+    arm S (and keep it so for L, or only for S), or **(b)** record in BL-091 and BL-123 that P1 is consumed
+    for Widesl rules. Phase 0 on `main` already had this B; the Widesl arm is what makes it matter. Not
+    decided here.
+  - **Confirm with the owner: does arm S sell at the break?** Open question 2 asked "a long ATM option
+    (default), or sell something when the range holds?" and the answer was "both". Arm S sells **at the
+    break**, which is the assistant's reading (Phase 0b says so); "sell when the range holds" (no break) is a
+    different hypothesis that Phase 0b leaves to a later block. Confirm before Phase 1 that arm S is wanted
+    as registered.
+  - **Pre-registration evidence for the lineage cited above:** BL-123 and BL-124 were registered in commits
+    `8e5918e4`, `321680aa` (BL-123) and `dee24559` (BL-124), which exist on
+    `origin/research/bl121-opening-straddle-break` (this PR squashes them).
