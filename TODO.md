@@ -739,6 +739,44 @@ Owner (2026-10-19): build the deploy function ready, off by default; it may neve
 | 3.31.1 | The /live page and the Setup Execution sheet, read from the screen | claude | **Done 2026-10-19** (`docs/algotest-execution.md` §7); what Activate asks is still unseen |
 | 3.31.2 | Deployer `packages/broker-login/src/strategy-deploy.ts` + `deploy-plan.ts` (8 tests), jobs `algotest-deploy` 09:16 and `algotest-deploy-check` 15:35 | claude | **Built 2026-10-19**, off until `ALGOTEST_DEPLOY=on`; the first `--apply` must be watched by the owner |
 
+### 3.37 T1 on range-bound days — [BL-144](backlog/BL-144-t1-range-bound-days.md)
+
+Owner (2026-10-21): a year of daily results for 3 x Widesl, the base, Core and T1 with day and 7-day ranges, and a
+study of whether T1 moves to wider stops on range-bound days. Pre-registered 2026-10-21 before any run.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.37.1 | Pre-registration committed | claude | **Done 2026-10-21** |
+| 3.37.2 | The table (CSV) and the study, verdicts against the registered rules, findings page | claude | **Done 2026-10-21.** H1 not met (+10.0 pp vs +15 pp), H2 met; `research/options/common/t1-range-bound-days.md` |
+
+### 3.38 T1 robustness, regime lag and opening range — [BL-145](backlog/BL-145-t1-robustness-lag-opening-range.md)
+
+Owner (2026-10-21): follow-ups to BL-144 (breadth, lag after a regime change, opening-range gate). Pre-registered before any run.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.38.1 | Pre-registration committed | claude | **Done 2026-10-21** |
+| 3.38.2 | Run Q2-Q4 (Q4 learning, then one confirmation run), findings page | claude | **Done 2026-10-21.** Broad; no lag; gate works but thin; `research/options/common/t1-robustness-and-lag.md` |
+
+### 3.39 Special days — [BL-146](backlog/BL-146-special-days.md)
+
+Owner (2026-10-21): behaviour on Budget, election-result, RBI-policy and high-premium days; anything to add to T1.
+Pre-registered before any run.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.39.1 | Pre-registration committed | claude | **Done 2026-10-21** |
+| 3.39.2 | Run the event table and E1-E3, findings page | claude | **Done 2026-10-21.** E1 met, E2 met, E3 no change; `research/options/common/special-days.md` |
+
+### 3.40 Directional early exit at 14:55 — [BL-147](backlog/BL-147-directional-early-exit.md)
+
+Owner (2026-10-21): would closing the directional strategies at 14:55 help against a late recovery. Pre-registered before any run.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.40.1 | Pre-registration committed | claude | **Done 2026-10-21** |
+| 3.40.2 | Rerun every Dir variant at 14:55, populations A and B, the owner's pattern, findings page | claude | **Done 2026-10-21.** The 14:55 exit hurts; `research/options/common/directional-early-exit.md` |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |
