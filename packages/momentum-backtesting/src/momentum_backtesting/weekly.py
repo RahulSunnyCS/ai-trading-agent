@@ -469,7 +469,11 @@ def compute_signal(data_dir: Path, settings: LiveSettings) -> dict:
                 out["action"] = ungated.get(name, "")
                 out["reason"] = f"{over}: it will not be bought while it stays there (BL-136)."
         rows.append(out)
-    weights = result.weights.iloc[-1] if len(result.weights) else pd.Series(dtype=float)
+    weights = (
+        result.weights.loc[result.weights.index.max()]
+        if len(result.weights)
+        else pd.Series(dtype=float)
+    )
     return {
         "week": f"{signal['week']:%Y-%m-%d}",
         "label": config.label,

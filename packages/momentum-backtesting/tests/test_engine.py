@@ -1131,7 +1131,10 @@ def test_weights_index_is_in_date_order_when_names_first_appear_out_of_order():
     # [1, 3, 2, 4]. Everything that reads weights.iloc[-1] or walks the rows relies on dates.
     # Here A is held first, then B, then C: the columns' first appearance is not the date order.
     toy = {1: {"a": 1.0}, 2: {"b": 1.0}, 3: {"a": 0.5, "c": 0.5}, 4: {"c": 1.0}}
-    assert list(pd.DataFrame.from_dict(toy, orient="index").sort_index().index) == [1, 2, 3, 4]
+    frame_of_toy = engine._weights_frame(toy)
+    assert list(frame_of_toy.index) == [1, 2, 3, 4]
+    assert frame_of_toy.index.name == "week"
+    assert frame_of_toy.loc[3].to_dict() == {"a": 0.5, "b": 0.0, "c": 0.5}
 
     prices = frame(
         A=path((3, 0.03), (26, 0.0)),
