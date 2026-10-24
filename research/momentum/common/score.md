@@ -50,12 +50,12 @@ on the [skip-month](skip-month.md) page.
   score) and then fell 4.4% over the next 4 (0.9%); the two top-30 lists shared 9 names.
 - **Swapping the score on the favourites does not help.** Under the BL-161 rule neither
   `ranksum` nor `blend` beat `voladj` on the 11 `voladj` favourites (they win 1 and 2 of 11). The
-  `voladj` lead is mostly shallower, shorter drawdowns (median max drawdown -31.3% against -38.4%
+  `voladj` lead is mostly shallower drawdowns (median max drawdown -31.3% against -38.4%
   and -41.4%). Caveat as registered: those favourites were chosen while they ran `voladj`, so their
   other settings suit it, and under `ranksum` their saved lookbacks and weights apply for the first
   time (nobody tuned them); the result is a screen, not proof. It was run on 2026-10-09 against the
   engine's `voladj` of that day (the 30/56-week window described on [skip-month](skip-month.md)),
-  before BL-086 looked at it.
+  before BL-086 ran (BL-086 ran and was killed the same day, 2026-10-09).
 - **Residual momentum, as defined, removes the momentum.** The regression keeps an intercept (as
   in Blitz, Huij and Martens 2011), so a stock's whole-year outperformance goes into the
   intercept. The residual top 30 had a median 52-week return of 3%, -3% and 34% on three sampled

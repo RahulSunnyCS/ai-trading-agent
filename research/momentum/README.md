@@ -41,7 +41,7 @@ Pages tested on one strategy only live in that strategy's folder.
 | [Sizing and exposure overlays](common/sizing.md) | ETF, Broad | Tested | all off | Every rule gives up return; vol targeting and the ETF blend are risk dials |
 | [Costs](common/costs.md) | all | Descriptive | flat 0.10% per side | Itemised costs take 0.7 (ETF) and 2.3 (Broad) points; the edge survives |
 | [Tax and the tax hold](common/tax.md) | all | Tested | off | Tax takes 4.9 points (ETF) and 8-9 (Broad); the tax hold is neutral on ETF and never fires in Broad |
-| [Execution: delay, fill, track](common/execution.md) | all | Tested | delay 0, Friday close, ETF track live | Friday close is right for ETFs; a one-week delay wins on Broad, but moves single configs by a median 3.4 pts either way (BL-161); Monday-open fill option still to build |
+| [Execution: delay, fill, track](common/execution.md) | all | Tested | delay 0, Friday close, ETF track live | Friday close is right for ETFs; a one-week delay wins on Broad, but moves single configs by a median 3.4 pts either way (BL-161); a Monday-open fill is built (BL-036 Phase 2) and was killed against the followed group (BL-158) |
 | [Cadence, phase, tranches](common/cadence.md) | all | Tested | weekly | Weekly for ETFs; every 2 or 4 weeks wins on Broad; slower than 4 loses after tax; split across Fridays to remove luck |
 | [Reversal sleeve](common/reversal-sleeve.md) | Stock pool, ETF | Tested | not used | A slightly better cash substitute, not alpha |
 | [Sector relative strength](strategies/etf-rotation/sector-rs.md) | ETF | Not tested | — | BL-088 idea; waiting on the post's exact rule |

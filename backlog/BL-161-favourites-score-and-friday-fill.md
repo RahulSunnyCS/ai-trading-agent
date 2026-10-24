@@ -79,8 +79,9 @@ Things found while setting this up:
     delay 1: rank-sum Martin improved on 1 of 11 (median Δ Martin −2.08, Δ max DD −6.9 pts,
     Δ CAGR −8.0 pts); Blend on 2 of 11 (median Δ Martin −1.20, Δ max DD −5.7 pts, Δ CAGR −4.1 pts).
     Medians across all 14 at delay 1: voladj 40.5% CAGR / −31.3% max DD / Martin 3.75; Blend
-    36.9% / −38.4% / 2.92; rank-sum 33.8% / −41.4% / 2.06. Voladj's lead is mostly shallower,
-    shorter drawdowns. Caveat as registered: these configs were chosen under voladj.
+    36.9% / −38.4% / 2.92; rank-sum 33.8% / −41.4% / 2.06. Voladj's lead is mostly shallower
+    drawdowns (median Ulcer index 0.105 against 0.123 and 0.157; the Ulcer index mixes depth and
+    duration and drawdown duration itself is not measured). Caveat as registered: these configs were chosen under voladj.
   - **(b) Delay matters, but in no fixed direction.** Median |Δ CAGR| (delay 0 − delay 1, saved
     score) 3.4 pts > 1 pt; signed median −1.1 pts. 8 of 14 are worse at delay 0 on each of CAGR, max DD,
     Martin and Sharpe (5 of them on all four); the spread runs from −7.1 pts (Five Sectors Monthly) to +6.9 pts
@@ -101,5 +102,29 @@ Things found while setting this up:
   number when pushed. The scripts and result files were renamed `bl056_*` → `bl161_*`; their
   contents are unchanged except the item number in the docstrings. The report script re-run on the
   stored rows reproduces `bl161_summary.json` value for value (the file was reformatted by Biome, as the pre-push hook requires; same values). The Monday-open half of the question
-  (a real fill after the signal Friday) is BL-158 (open in PR #304 when this was ported). The
+  (a real fill after the signal Friday) is BL-158 (killed 2026-10-24). The
   Phase 0 text above is kept verbatim, so its "BL-055" is today's BL-086.
+- 2026-10-24 — caveats from the PR #310 review (Opus); no result, number or Phase 0 text changed.
+  - **Wording.** Phase 0 calls delay 0 an "upper bound". On these configs delay 0 did worse on
+    median (signed -1.1 pts), so it bounds nothing; it is the optimistic, untradable fill timing (no
+    gap between signal and fill). The findings pages say so. Phase 0 is left as registered.
+  - **Delay 0 vs BL-158.** [BL-158](BL-158-momentum-monday-open-fill.md) arm B (delay 0 at Friday's
+    close on the followed group, +3.0 pts median over 28 rolling windows) and (b) above (signed
+    median -1.1 over the 14 favourites, one full window) are different configs and windows; see
+    [execution](../research/momentum/common/execution.md).
+  - **Registered but not reported.** Phase 0 says the 3 blend / rank-sum favourites "are reported the
+    same way, outside the rule"; the Result never reports them. The review found, in the stored rows,
+    that `voladj` has the higher Martin at delay 1 than the favourite's saved score on 2 of the 3
+    (Five Sectors Rank Sum 4.67 against 3.14; Phase 6 ensemble 08c4307d 4.49 against 3.66; Trio
+    Fortnightly the other way, 2.92 against 4.59). Attributed to the review; not re-verified here.
+  - **Not reproducible from the repo.** The runner reads a snapshot of `GET /api/favorite-strategies`
+    that was never committed, and the rows in `bl161_results.jsonl` carry `id`, `name`, saved score
+    and KPIs but not the configs. Saved favourites change (e.g. the BL-087 Friday splits), so a
+    re-run would not recreate the 14 inputs. Nothing was re-run for this note.
+  - **Pre-registration commit.** `b5de3c0d` (pre-registration, 2026-10-09) exists only on a local
+    branch (`research/bl-056-favourites-score-delay`, no remote ref); on `main` the pre-registration
+    and the result land together. Pushing a tag (e.g. `bl161-prereg`) would make the citation
+    resolve; not done.
+  - **Runner nits.** `curve_stats` in `scripts/bl161_favourites_score_delay.py` takes a `bench`
+    argument it never uses, and recomputes CAGR from the equity endpoints for Martin instead of using
+    `stats["CAGR"]`. Negligible; code left unchanged (the rows were produced by it).

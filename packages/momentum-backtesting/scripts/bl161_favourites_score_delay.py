@@ -1,9 +1,11 @@
 """BL-161: every favourite re-run with only the score and the signal delay changed.
 
-Pre-registered in backlog/BL-161-favourites-score-and-friday-fill.md (Phase 0), committed before
-this ran. Reads a snapshot of GET /api/favorite-strategies, runs each individual favourite config
-6 ways (score in voladj/ranksum/blend x signal_delay in 1/0) through the same Broad path the API
-uses, and writes one JSON row per run. Resumable: rows already in the output are skipped.
+Pre-registered in backlog/BL-161-favourites-score-and-friday-fill.md (Phase 0). On the original
+local branch the pre-registration was committed (b5de3c0d) before this ran; on main it lands
+together with the result. Reads a snapshot of GET /api/favorite-strategies, runs each individual
+favourite config 6 ways (score in voladj/ranksum/blend x signal_delay in 1/0) through the same
+Broad path the API uses, and writes one JSON row per run. Resumable: rows already in the output
+are skipped.
 
     uv run python scripts/bl161_favourites_score_delay.py <favourites.json> <out.jsonl>
 """
