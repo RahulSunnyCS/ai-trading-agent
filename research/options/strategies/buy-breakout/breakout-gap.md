@@ -1,6 +1,6 @@
 # Buy: breakout gap (buffer)
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Descriptive · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -41,7 +41,7 @@ Baseline no-entry days 4.9%.
 
 ## Not yet tested
 
-- Range window × gap (a registered BL-097 Phase 3 interaction, now BL-104).
+- Range window × gap (a registered BL-097 Phase 3 interaction, not carried to BL-104, whose Buy gap is fixed at 0).
 - An absolute gap in points.
 - A random-skip control: dropping the same share of entries at random would show how much of any net
   gain is just fewer charges.

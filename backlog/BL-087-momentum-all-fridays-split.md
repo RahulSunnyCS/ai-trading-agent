@@ -171,4 +171,4 @@ Answered by the owner on 2026-10-09:
   merged (10 favourites become 10 groups, 38 sleeves; the dry run lists them) and watch the next
   Friday's job, which now evaluates 38 favourites instead of 10; (2) mark this Done once that is
   applied and one weekly job has journalled every sleeve.
-- 2026-10-24 — closed. The live migration was applied: the weekly jobs of Fri 2026-10-16 and 2026-10-23 each journalled 43 of 43 entries, 38 of them "· all Fridays · Friday n of K" sleeves from 10 groups (plus the 4 ensemble configs and the benchmark). Both done-when conditions are met.
+- 2026-10-24 — closed. The live migration was applied: the weeks of Fri 2026-10-16 and 2026-10-23 each have 43 of 43 journal entries (the 23 Oct week was recorded by a catch-up run on Sat 24 Oct, 10:01–10:31 IST; 16 Oct alone meets the done-when), 38 of them "· all Fridays · Friday n of K" sleeves from 10 groups (plus the 4 ensemble configs and the benchmark). Both done-when conditions are met.

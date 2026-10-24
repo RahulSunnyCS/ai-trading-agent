@@ -202,4 +202,4 @@ near-one profit factors require the Phase 3 robustness checks before adoption.
 - 2026-10-12 — Phase 2 one-factor sweep completed with post-charge accounting;
   report generated. Phase 3 remains pending.
 - 2026-10-14 — Phase 3 superseded by BL-104 (full grid with strike ATM–OTM3 and premium as an axis).
-- 2026-10-24 — closed. Phase 2 (one-factor, after charges: `research/bl097/results/widesl_sweep_postcharge.csv` — saved under bl097, there is no bl098 folder — and the qualified / index-level reports) is the deliverable; Phase 3's interactions went to BL-104's full grid, and Phase 4's costs and read-out are in the after-charge reports.
+- 2026-10-24 — closed. Phase 2 (one-factor, after charges: `research/bl097/results/widesl_sweep_postcharge.csv` — saved under bl097, there is no bl098 folder — and the qualified / index-level reports) is the deliverable; Phase 3's interactions went to BL-104's full grid, and Phase 4's costs and read-out are in the after-charge reports. Not carried: the point trails `[1,1]` / `[2,1]` / `[3,1]` (BL-104's Widesl trails are percent only).

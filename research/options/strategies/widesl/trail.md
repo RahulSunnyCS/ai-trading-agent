@@ -1,6 +1,6 @@
 # Widesl: trail
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Descriptive · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -33,7 +33,7 @@ leaders (the others −₹29.1k to −₹36.7k).
 
 ## Not yet tested
 
-- Point trails `[1,1]`, `[2,1]`, `[3,1]` (BL-098 Phase 3, now BL-104, if a candidate needs them).
+- Point trails `[1,1]`, `[2,1]`, `[3,1]` (BL-098 Phase 3, not carried to BL-104, whose Widesl trails are percent only).
 - Trail × MTM stop interaction (BL-098 Phase 3, now BL-104).
 - Points vs percent for the live ₹65 file.
 

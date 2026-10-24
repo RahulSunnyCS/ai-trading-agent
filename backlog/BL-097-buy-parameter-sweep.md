@@ -225,4 +225,4 @@ or adoption decision; the targeted interaction phase is not yet run.
 - 2026-10-12 — Phase 2 one-factor sweep completed with post-charge accounting;
   report generated. Phase 3 remains pending.
 - 2026-10-14 — Phase 3 superseded by BL-104 (full grid with a target axis and MTM ₹1,000; SENSEX premiums at 3× NIFTY).
-- 2026-10-24 — closed. Phase 2 (one-factor, after charges: `research/bl097/results/buy_sweep_postcharge.csv`, `BL-097-buy-qualified-list-post-charge.md`) is the deliverable; Phase 3 and its interactions went to BL-104's full grid. The open questions (charges, the ₹100 premium, gap in points) are covered there or went with Phase 3.
+- 2026-10-24 — closed. Phase 2 (one-factor, after charges: `research/bl097/results/buy_sweep_postcharge.csv`, `BL-097-buy-qualified-list-post-charge.md`) is the deliverable; Phase 3 and its interactions went to BL-104's full grid. Charges are covered there. Not carried anywhere: the ₹100 premium, the gap (% or points) and valid-until, the trailing-percent rows and trail × exit time (BL-104 fixes Buy at point trails, exit 15:14, gap 0, NIFTY premiums ₹30 / ₹50 / ₹75).

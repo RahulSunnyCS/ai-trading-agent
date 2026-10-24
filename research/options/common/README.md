@@ -15,6 +15,7 @@ variable page links here instead of repeating them.
 | [Intraday state](intraday-state.md) | Tested | No hourly market-state variable or VIX reading passes; two Dir trigger leads hold only in 2024–26 |
 | [Index range persistence](index-range-persistence.md) | Tested | NIFTY's daily range persists in both directions: after an expanded session the next days run about 0.14 above a typical session, after a quiet one about 0.09–0.15 below it; VIX carries part of it, not all; expansion confirmed on 2016–21 with a close-to-close proxy |
 | [Moved expiry days](moved-expiry-days.md) | Tested | Inconclusive: 11 holiday-shifted expiry days cannot show whether Adaptive on Core-298 or T1 earns less (intervals ±₹1,000–1,500; the positive point estimate rests on one day); NIFTY Buy reads worse, borderline |
+| [Previous-session state](previous-session-state.md) | Descriptive | The previous session's VRP, skew and put/call ratio do not separate good Widesl or Dir days from bad (no t reaches 2 in size, 2024–26 NIFTY); asymmetric Widesl legs do not help |
 | [Correlation](correlation.md) | Descriptive | Widesl variants are near-copies (0.85–0.92); Buy moves against Widesl; a correlation cap is registered, not run |
 
 ## The periods these pages use

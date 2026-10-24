@@ -1,6 +1,6 @@
 # Widesl: India VIX
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -51,6 +51,7 @@ None: the live strategies trade at any VIX. The rotation lists use a VIX-band fi
 ## Related
 
 - [Directional VIX](../directional/vix.md); [intraday state](../../common/intraday-state.md);
+  [previous-session state](../../common/previous-session-state.md) (the previous session's VRP, skew and put/call ratio, BL-159: no lead);
   [rotation ranking](../../common/rotation-ranking.md).
 - Tables: `research/bl056/out/{nifty,sensex}_by_vix.csv`; BL-081 states under `research/bl081/out/`.
   Git-ignored; regenerate with `research/bl056/analyse.py` and `research/bl081/state.py`.

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner's "proper sweep over every parameter" before any of these families gets real money |
-| **Status** | In progress: Stages 1–3 done except the finalists' correlation, the Buy ₹1-per-fill check and the bootstrap against the BL-099 picks; Phase 4 advisory run done, forward test not started; pool POC awaiting the owner's go; owner `override:` owed for the post-hoc tail gate and the Buy 60 % day-stop cap |
+| **Status** | In progress: Stages 1–3 done except the finalists' correlation, the Buy ₹1-per-fill check and the bootstrap against the BL-099 picks; Phase 4 advisory run done, forward test not started; the pool POC ran as BL-106 (Done 2026-10-15, no list won); owner `override:` owed for the post-hoc tail gate and the Buy 60 % day-stop cap |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-14 |

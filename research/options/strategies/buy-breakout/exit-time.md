@@ -1,6 +1,6 @@
 # Buy: exit time
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Descriptive · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -39,7 +39,7 @@ Files missing from a row are start times the exit makes invalid (the range would
 
 ## Not yet tested
 
-- Trail × exit time, a registered BL-097 Phase 3 interaction, now BL-104.
+- Trail × exit time, a registered BL-097 Phase 3 interaction, not carried to BL-104 (its Buy exit is fixed at 15:14).
 
 ## Related
 

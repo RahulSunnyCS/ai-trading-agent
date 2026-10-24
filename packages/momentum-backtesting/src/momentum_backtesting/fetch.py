@@ -124,19 +124,30 @@ def _write(frame: pd.DataFrame | pd.Series, path) -> None:
     frame.to_csv(path, index_label="date")
 
 
-def _read_stored(path) -> pd.DataFrame | None:
+def read_stored(path) -> pd.DataFrame | None:
+    """A stored data/ CSV (date index), or None when there is none."""
     if not path.exists():
         return None
     return pd.read_csv(path, index_col=0, parse_dates=True).sort_index()
 
 
-def _keep_stored(new: pd.DataFrame, path, names: list[str]) -> tuple[pd.DataFrame, list[str]]:
+def _starts_later(new: pd.Series | pd.DataFrame, stored) -> bool:
+    """Whether `new` lost history `stored` has (starts more than START_TOLERANCE later)."""
+    return (
+        stored is not None
+        and len(stored.dropna(how="all")) > 0
+        and (new.index[0] > stored.dropna(how="all").index[0] + START_TOLERANCE)
+    )
+
+
+def _keep_stored(
+    new: pd.DataFrame, stored: pd.DataFrame | None, names: list[str]
+) -> tuple[pd.DataFrame, list[str]]:
     """`new` plus the stored column of each of `names` it lacks (a series this run did not
     fetch), in `names` order. Returns (table, names whose stored column was kept)."""
-    stored = _read_stored(path)
     kept = [n for n in names if n not in new and stored is not None and n in stored]
     parts = [new] + [stored[n].dropna() for n in kept]
-    table = pd.concat(parts, axis=1) if kept else new
+    table = pd.concat(parts, axis=1, sort=True) if kept else new
     return table[[n for n in names if n in table]], kept
 
 
@@ -273,6 +284,7 @@ def fetch_all(
     signal: dict[str, pd.DataFrame] = {}
     failures: dict[str, str] = {}
     universe = load_universe()
+    stored_weekly = read_stored(DATA_DIR / "weekly_closes.csv")
 
     for inst in universe:
         source = inst.price_source
@@ -300,6 +312,14 @@ def fetch_all(
                     log(f"  {inst.name:<24} {creds.source} failed ({error}): public source")
             if daily is None:  # silver
                 prices, labels = silver_weekly(start)
+                stored = stored_weekly.get(inst.name) if stored_weekly is not None else None
+                if _starts_later(prices, stored):
+                    failures[inst.name] = (
+                        f"fetched history starts {prices.index[0].date()}, stored starts "
+                        f"{stored.dropna().index[0].date()}: kept the stored history"
+                    )
+                    log(f"  {inst.name:<24} SHORTER: {failures[inst.name]}")
+                    continue
                 pd.DataFrame({"close": prices, "source": labels}).to_csv(
                     daily_dir / "Silver (weekly).csv", index_label="week_ending"
                 )
@@ -337,18 +357,17 @@ def fetch_all(
             failures[inst.name] = "no data returned"
             log(f"  {inst.name:<24} no data returned")
             continue
-        stored = _read_stored(daily_dir / f"{inst.name}.csv")
-        if (
-            stored is not None
-            and len(stored)
-            and daily.index[0] > stored.index[0] + START_TOLERANCE
-        ):
+        stored = read_stored(daily_dir / f"{inst.name}.csv")
+        if _starts_later(daily, stored):
             failures[inst.name] = (
                 f"fetched history starts {daily.index[0].date()}, stored starts "
                 f"{stored.index[0].date()}: kept the stored history"
             )
             log(f"  {inst.name:<24} SHORTER: {failures[inst.name]}{extra}")
             continue
+        if stored is not None and len(stored) and stored.index[-1] > daily.index[-1]:
+            # Days the source does not have yet (e.g. ETF-implied closes a refresh stored).
+            daily = pd.concat([daily, stored[stored.index > daily.index[-1]]])
         _write(daily, daily_dir / f"{inst.name}.csv")
         signal[inst.name] = daily
         columns[inst.name] = weekly(daily["close"])
@@ -361,9 +380,16 @@ def fetch_all(
         log(f"  {inst.name:<24} {len(daily):>4} days  from {daily.index[0].date()}{extra}")
 
     names = [inst.name for inst in universe]
-    table, kept = _keep_stored(pd.DataFrame(columns), DATA_DIR / "weekly_closes.csv", names)
+    table, kept = _keep_stored(pd.DataFrame(columns), stored_weekly, names)
     if kept:
         log(f"\nnot fetched this run, stored weekly history kept: {', '.join(kept)}")
+    dropped = [c for c in (stored_weekly if stored_weekly is not None else []) if c not in table]
+    if dropped:
+        log(
+            f"\nno longer in universe.csv, left out of weekly_closes.csv: {', '.join(dropped)}. "
+            "The weekly job's database push refuses that loss: run "
+            "`mbt local migrate --allow-price-shrink` once to accept it."
+        )
     table = table.sort_index()
     table = table[table.index >= pd.Timestamp(start)]
     if len(table) and table.index[-1].date() > end:
@@ -388,7 +414,9 @@ def fetch_all(
         log("\nETFs (what you'd actually trade):")
         premiums = fetch_etfs(start, end, creds, signal, log, intraday)
         premiums, _ = _keep_stored(
-            premiums, DATA_DIR / "etf_premium.csv", [i.name for i in universe if i.amfi_code]
+            premiums,
+            read_stored(DATA_DIR / "etf_premium.csv"),
+            [i.name for i in universe if i.amfi_code],
         )
         premiums = premiums.sort_index()
         premiums.index.name = "date"
