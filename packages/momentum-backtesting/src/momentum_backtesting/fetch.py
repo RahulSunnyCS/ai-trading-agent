@@ -206,6 +206,7 @@ def fetch_etfs(
 ) -> pd.DataFrame:
     """Fetch the traded ETFs (and, with an amfi_code, their NAV). Returns daily premiums."""
     premiums: dict[str, pd.Series] = {}
+    stored_premiums = read_stored(DATA_DIR / "etf_premium.csv")
     for inst in load_universe():
         if not inst.has_etf or inst.name not in signal:
             continue
@@ -221,6 +222,12 @@ def fetch_etfs(
             continue
         factors = split_factors(raw["close"], signal[inst.name]["close"])
         adjusted = raw.mul(factors, axis=0)
+        if _starts_later(adjusted, read_stored(DATA_DIR / "daily_etf" / f"{inst.name}.csv")):
+            log(
+                f"  {inst.trade_etf:<12} ETF SHORTER: history starts {adjusted.index[0].date()}, "
+                "kept the stored ETF and premium history"
+            )
+            continue
         _write(adjusted, DATA_DIR / "daily_etf" / f"{inst.name}.csv")
         extra = ""
         splits = factors[factors.ne(factors.shift(-1))].iloc[:-1]
@@ -232,7 +239,13 @@ def fetch_etfs(
                 nav = amfi_nav(inst.amfi_code, start, adjust=False)
                 premium = (raw["close"] / nav.reindex(raw.index) - 1).dropna()
                 bad = premium.abs() > MAX_PREMIUM
-                premiums[inst.name] = premium[~bad]
+                if len(premium[~bad]) and _starts_later(
+                    premium[~bad],
+                    stored_premiums.get(inst.name) if stored_premiums is not None else None,
+                ):
+                    extra += "  (premium history SHORTER: kept the stored premium)"
+                else:
+                    premiums[inst.name] = premium[~bad]
                 last = premium[~bad].iloc[-1] if (~bad).any() else float("nan")
                 extra += f"  premium now {last:+.2%}"
                 if bad.any():
@@ -361,7 +374,7 @@ def fetch_all(
         if _starts_later(daily, stored):
             failures[inst.name] = (
                 f"fetched history starts {daily.index[0].date()}, stored starts "
-                f"{stored.index[0].date()}: kept the stored history"
+                f"{stored.dropna(how='all').index[0].date()}: kept the stored history"
             )
             log(f"  {inst.name:<24} SHORTER: {failures[inst.name]}{extra}")
             continue

@@ -6,6 +6,7 @@ the 22 broker-sourced columns (every Nifty index, Gold, Gilt) then held only the
 refreshes added, the replace carried that into momentum_prices, and on 2026-10-24 every
 Broad favourite failed on an all-NaN Nifty 50 benchmark."""
 
+from datetime import date
 from types import SimpleNamespace
 
 import numpy as np
@@ -219,6 +220,37 @@ def test_replace_allows_a_small_trim(tmp_path):
         assert db_migrate.import_momentum_prices(con, tmp_path) == 39
 
 
+@pytest.mark.parametrize(
+    "count, allowed",
+    [
+        (14, 1),  # a short premium series: 5 rows would be 36% of it
+        (40, 4),  # the flat 5 rows never exceeds 10% of a short series
+        (100, 5),  # the flat allowance
+        (250, 5),  # 2% is 5 rows
+        (400, 8),  # 2% takes over: 400 -> 390 (the old 10% rule's pass) is refused
+        (1000, 20),
+    ],
+)
+def test_replace_allowance_is_the_larger_of_two_percent_and_a_capped_five_rows(
+    tmp_path, count, allowed
+):
+    assert db_migrate.shrink_allowance(count) == pytest.approx(allowed, abs=0.5)
+    _weekly(tmp_path, {"Nifty 50": [100.0 + i for i in range(count)]})
+    with connect() as con:
+        db_migrate.import_momentum_prices(con, tmp_path)
+        _weekly(tmp_path, {"Nifty 50": [100.0 + i for i in range(count - allowed)]})
+        assert db_migrate.import_momentum_prices(con, tmp_path) == count - allowed
+        db_migrate.import_momentum_prices(con, tmp_path, allow_shrink=True)
+
+    _weekly(tmp_path, {"Nifty 50": [100.0 + i for i in range(count)]})
+    with connect() as con:
+        db_migrate.import_momentum_prices(con, tmp_path)
+        _weekly(tmp_path, {"Nifty 50": [100.0 + i for i in range(count - allowed - 1)]})
+        with pytest.raises(db_migrate.PriceShrinkError, match=rf"{count} -> {count - allowed - 1}"):
+            db_migrate.import_momentum_prices(con, tmp_path)
+        assert con.execute("SELECT count(*) FROM momentum_prices").fetchone()[0] == count
+
+
 def test_replace_refuses_a_series_that_starts_later_whatever_the_count(tmp_path):
     weeks = pd.date_range("2026-01-02", periods=40, freq="W-FRI")
     pd.DataFrame({"Nifty 50": 100.0}, index=weeks).to_csv(
@@ -297,6 +329,68 @@ def test_local_migrate_exits_1_after_copying_the_rest_when_prices_are_refused(
     assert calls["allow"] is False and "scan" in calls  # the large-drop scan still ran
     if refused:
         assert "momentum_prices kept as stored" in result.output
+        assert (
+            "momentum_prices REFUSED" in result.output
+            and "momentum_prices rows 0" not in result.output
+        )
+    else:
+        assert "momentum_prices rows 0" in result.output
 
     CliRunner().invoke(cli.app, ["local", "migrate", "--allow-price-shrink"])
     assert calls["allow"] is True
+
+
+# --- fetch_etfs keeps a longer stored ETF / premium history too ----------------------------------
+
+GOLD = Instrument(
+    "core",
+    "Gold",
+    "Gold",
+    "GOLDBEES",
+    "gold",
+    "NSE:GOLDBEES-EQ",
+    "",
+    "",
+    "NSE:GOLDBEES-EQ",
+    "140088",
+)
+
+
+def _etf_fetch(data_dir, monkeypatch, etf_days, nav_days, log=None):
+    monkeypatch.setattr(fetch, "load_universe", lambda: [GOLD])
+    monkeypatch.setattr(
+        fetch, "_etf_daily", lambda inst, start, end, creds: (_daily(50.0, etf_days), "test")
+    )
+    nav = _daily(50.0)["close"].loc[nav_days] / 1.01  # the same days' closes, 1% under
+    monkeypatch.setattr(fetch, "amfi_nav", lambda code, start, adjust=True: nav)
+    signal = {"Gold": _daily(50.0)}
+    return fetch.fetch_etfs(
+        date(2016, 1, 1), date(2026, 10, 16), None, signal, (log if log is not None else []).append
+    )
+
+
+def test_fetch_etfs_writes_the_full_history(data_dir, monkeypatch):
+    premiums = _etf_fetch(data_dir, monkeypatch, DAYS, DAYS)
+    assert len(premiums["Gold"]) == len(DAYS)
+    assert len(pd.read_csv(data_dir / "daily_etf" / "Gold.csv")) == len(DAYS)
+
+
+def test_a_shorter_etf_history_keeps_the_stored_etf_file_and_premium(data_dir, monkeypatch):
+    _etf_fetch(data_dir, monkeypatch, DAYS, DAYS)
+    stored = (data_dir / "daily_etf" / "Gold.csv").read_text()
+    logs: list[str] = []
+    premiums = _etf_fetch(data_dir, monkeypatch, DAYS[DAYS >= "2026-09-01"], DAYS, logs)
+    assert (data_dir / "daily_etf" / "Gold.csv").read_text() == stored
+    assert "Gold" not in premiums  # fetch_all then carries the stored premium column
+    assert any("SHORTER" in line for line in logs)
+
+
+def test_a_shorter_nav_history_keeps_the_stored_premium_column(data_dir, monkeypatch):
+    pd.DataFrame({"Gold": 0.01}, index=DAYS).rename_axis("date").to_csv(
+        data_dir / "etf_premium.csv"
+    )
+    logs: list[str] = []
+    premiums = _etf_fetch(data_dir, monkeypatch, DAYS, DAYS[DAYS >= "2026-09-01"], logs)
+    assert "Gold" not in premiums
+    assert any("premium history SHORTER" in line for line in logs)
+    assert len(pd.read_csv(data_dir / "daily_etf" / "Gold.csv")) == len(DAYS)  # the ETF was fine
