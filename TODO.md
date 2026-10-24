@@ -683,6 +683,8 @@ should be re-entered; P2 + P3 first, P1 once the rule is frozen.
 | 3.26.4 | Stage 2: true vs false tops over 32 parameters; rule R1 through the trading test | claude | **Done 2026-10-11.** IV change separates; R1 does not pass |
 | 3.26.5 | Time gates: no re-entry before 13:30 / 14:00 / 14:30 / 14:50, and gating every entry (F) | claude | **Done 2026-10-11 as an unregistered look (13 variants).** F1450 meets the screening bar on P2 + P3 (NIFTY 2025 +₹241 vs comparator, t 2.45); a lead, not a result. Owner's `override:` line owed in the BL-091 Log |
 | 3.26.6 | Owner decision: register R3 or F1450 (counting all 31 arms tried, with a causal comparator) as one question for the held-back year, or close | owner | **Open** |
+| 3.26.7 | [BL-123](backlog/BL-123-late-straddle-giveback-widesl.md): the owner's late-day rule (after 14:30, a held rise from the day's low then a 15-point give-back starts a Widesl, ₹1,000 stop), pre-registered; rule as first stated inconclusive by construction (4 / 8 / 7 events), day's-low reading run on NIFTY P2 + P3 pooled | claude | **Run 2026-10-18: inconclusive** (36 events, +₹151 per Widesl, +₹126 over a causal placebo, t 0.94). P1 unread. **Parked by the owner 2026-10-18** (renumbered from BL-120) |
+| 3.26.8 | [BL-124](backlog/BL-124-opening-straddle-break-long-straddle.md): the owner's opening-straddle break rule (after 09:30, the 09:17–09:30 high broken and 10 points up buys a long straddle, 25% leg stops, trail 3:2), two readings, NIFTY P2 and P3 | claude | **Done 2026-10-18: killed.** Both readings lose in both periods (−₹292 to −₹596 per straddle) and are no better than the same straddle on ordinary days. P1 unread. Parked by the owner (renumbered from BL-121) |
 
 ### 3.27 Portfolio MTM stop on the Rotation page — [BL-095](backlog/BL-095-portfolio-mtm-stop-in-rotation.md)
 
@@ -866,3 +868,12 @@ is followed now; switch only if the pre-registered test passes, then realign eve
 | 3.37.3 | Phase 2: switch the followed strategy, Friday-evening orders for Monday AMOs, realign the lots (only on a pass) | — | Dropped: Phase 1 killed it |
 | 3.37.4 | Phase 3: 13-week forward read-out (only if switched) | — | Dropped: not switched |
 
+### 3.41 Rule agents — [BL-119](backlog/BL-119-rule-agents-paper-and-retrospection.md)
+
+Owner (2026-10-18): agents that follow rules he gives, trade them as paper trades, retrospect each evening, and
+are replaced by better ones. First rule: a break of a rolling 60-bar NIFTY range after a consolidation.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.41.1 | Phase 0 and Amendment 1 (rolling rule, long and short-premium arms, 2019-2021 confirmation period) pre-registered before any run | claude | **Done 2026-10-18.** Nothing run |
+| 3.41.2 | Phase 1: event study on periods A and B (event counts first, then placebo and trades) | claude | **Next** |
