@@ -1,6 +1,6 @@
 # Directional: overall MTM stop
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -19,6 +19,7 @@ rupees with a much smaller lot, so it binds less often there ([BL-056][bl056]).
 |---|---|---|---|---|
 | BL-070 | ₹3,000 vs no overall stop, all 50 Dir ATM variants (leg stops and re-entry kept) | 2025-09-01 → 2026-10-08, 1 lot, before charges | **Costs more than it saves** on both indices | [BL-070][bl070] |
 | BL-096 | ₹2,000, ₹2,500, ₹3,000, ₹3,500, ₹4,000 × leg stop × exit, ATM and ITM1 | holdout 2025-10-09 → 2026-10-09, before and **after charges** | Descriptive: net rises with the stop up to ₹4,000, the grid edge | [BL-096][bl096] |
+| BL-156 | Overall stop checked at each 1-minute candle close (the engine) vs on every tick (live; modelled from each minute's high / low, calibrated on the 23 Oct live stop) | T1's and Core's Adaptive picks (every family together), 2025-01-10 → 2026-10-22, 1 lot, after brokerage | **No meaningful difference** on the whole book: close +₹56 / day on T1, 90% [−17, +144]; Core +₹38 [−35, +130]; not split by family | [BL-156][bl156] |
 
 Family means, 1 lot, with ₹3,000 → without ([BL-070][bl070], before charges):
 
@@ -57,3 +58,4 @@ On the days it fired, the unstopped strategy lost less (NIFTY −₹77,634 → �
 [bl070]: ../../../../backlog/BL-070-drb-without-per-strategy-stops.md
 [bl096]: ../../../../backlog/BL-096-directional-parameter-sweep.md
 [bl096pc]: ../../../../backlog/BL-096-directional-qualified-list-post-charge.md
+[bl156]: ../../../../backlog/BL-156-mtm-stop-tick-vs-candle-close.md
