@@ -122,7 +122,7 @@ What the table says:
   afterwards.
 - 2026-10-24 — **Disclosure, the VIX-band split.** It ran after the verdict (the entry above) with no owner
   `override:` line, and "Will not run" excludes "any change after a result is seen".
-  `override: owner confirmed 2026-10-24 (in chat, recorded by Claude): descriptive VIX-band split, drives no pass/fail; no period is left to confirm it`. The split is **post-hoc and descriptive**: it drives no
+  `override: (not recorded — owner to confirm)`. The split is **post-hoc and descriptive**: it drives no
   pass/fail and the failed verdict stands. The code that produced its 48 cells is not committed
   (`research/bl160/overnight_hedged.py` has no VIX logic), so those numbers cannot be rebuilt from the
   repository; it was a one-off. Treat the 15–18 band as a lead for a forward record only.
@@ -132,3 +132,4 @@ What the table says:
   Definitions (entry from the 15:24 close, the expiry listed on day d, DTE from the trading calendar), so this
   is a form gap only. (3) The lot sizes 65 and 20 are hard-coded in `overnight_hedged.py` (line 26), correct for
   the sizing date 2026-10-12 but not read from the reference data.
+- 2026-10-24 — `override: owner confirmed in chat (recorded by Claude): the VIX-band split is descriptive, drives no pass/fail, and no period is left to confirm it.`
