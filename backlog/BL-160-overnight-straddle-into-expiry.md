@@ -116,3 +116,19 @@ What the table says:
   −3 to −4). Because the band was chosen after looking at 2022–24 as well, no period is left to confirm it; only
   a forward record could, at about 13 qualifying nights a year per index.
 - 2026-10-24 — Renumbered from BL-157 (this item was BL-157 on the branch `research/bl156-poc-ideas`; the commits `research(bl157): ...` are this item; its TODO row moved from 3.10.40 to 3.10.42, and the folder `research/bl157/` is now `research/bl160/`; "BL-156" in its text now reads BL-159, the POC reads) because other open PRs took BL-156, BL-157 and BL-158. No rule text or result changed.
+- 2026-10-24 — Findings page added: `research/options/strategies/overnight-straddle/README.md` (BL-159 read 4
+  and this item), with a row in `research/options/README.md`. NIFTY 2022-01 → 2024-10 is now used up for
+  overnight-straddle questions: the registered test read it, and the VIX-band split above looked at it
+  afterwards.
+- 2026-10-24 — **Disclosure, the VIX-band split.** It ran after the verdict (the entry above) with no owner
+  `override:` line, and "Will not run" excludes "any change after a result is seen".
+  `override: (not recorded — owner to confirm)`. The split is **post-hoc and descriptive**: it drives no
+  pass/fail and the failed verdict stands. The code that produced its 48 cells is not committed
+  (`research/bl160/overnight_hedged.py` has no VIX logic), so those numbers cannot be rebuilt from the
+  repository; it was a one-off. Treat the 15–18 band as a lead for a forward record only.
+- 2026-10-24 — Review notes, nothing re-run: (1) the Result's "with t down to −5 to −9" for the hedged cells
+  is not matched by its table, whose most negative t is −5.25 (NIFTY 2+, OTM6); read it as "down to about −5". (2)
+  Phase 0 has no "Look-ahead check" bullet (`_TEMPLATE.md` Phase 0); the timing is fully specified in
+  Definitions (entry from the 15:24 close, the expiry listed on day d, DTE from the trading calendar), so this
+  is a form gap only. (3) The lot sizes 65 and 20 are hard-coded in `overnight_hedged.py` (line 26), correct for
+  the sizing date 2026-10-12 but not read from the reference data.

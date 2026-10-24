@@ -235,3 +235,38 @@ Ten tests are below |t| 1.5; with about 30 tests one |t| ≥ 2 is expected by ch
   in the period (one listed date is outside the store's days). Nothing else was changed after the run.
 - 2026-10-23 — **Closed: no lead survives.** See Result. Findings pages to follow in the PR.
 - 2026-10-24 — Renumbered from BL-156 (this item was BL-156 on the branch `research/bl156-poc-ideas`; the commits `research(bl156): ...` are this item; its TODO row moved from 3.10.39 to 3.10.41, and the folder `research/bl156/` is now `research/bl159/`) because other open PRs took BL-156, BL-157 and BL-158. No rule text or result changed.
+- 2026-10-24 — Findings pages added (after the Opus review of PR #309): `research/options/strategies/overnight-straddle/README.md`
+  (read 4, with BL-160), `strategies/condor/README.md` (read 6), `strategies/ratio-spread/README.md` (read 7),
+  `common/previous-session-state.md` (reads 1–3, linked from both VIX pages), a read 2b row in
+  `widesl/strike-premium.md`, and read 5 / 8 rows on the Widesl and Directional weekday and days-to-expiry pages.
+  The event-day findings are not on a `common/special-days.md` page: PR #306 (BL-146) adds that page and this
+  PR does not depend on it. No Result number was changed; the disclosures below correct how two of them read.
+- 2026-10-24 — **Disclosure, the event-day "shuffle p 0.002 (Holm 0.044)" in the Result is too strong.** (a) The
+  label shuffle (`stats.shuffle_p`) compares the groups as if they had the same spread; the event group (about
+  43 days) is much more volatile than the rest (it holds the +₹15,122 day), which makes the shuffle p too small.
+  The Welch t is 1.98, about p 0.05 before any correction; that is the figure to quote, as "one of about 30
+  tests". The same optimism applies to every two-group shuffle p in the report; the lead bar uses the Welch t,
+  so no lead changes. (b) `report.py` (line 138) runs Holm over the 21 tests that have a p; the one-sample and
+  paired tests carry p = NaN. The registration says Holm over all of the item's registered tests, and there are
+  30 of them (the Result itself says about 30; the registration's "about 22" was a miscount). So 0.044 is about
+  0.002 × 21 and is not a corrected p over the registered set; over 30 tests, with the Welch p, the event-day
+  result is nowhere near 0.05. Result text left as recorded.
+- 2026-10-24 — **The event-day lead is not new evidence.** BL-146 (PR #306) found "RBI days favour the fixed
+  09:17 Widesl (lead only)" on the same 2024–2026 NIFTY days. The +₹1,774 here is that observation seen a
+  second time on the same sample, not corroboration. The follow-up the Result proposes ("Widesl on
+  scheduled-event days") must cite BL-146 and use a period neither item has read; NIFTY 2022–24 is still unread
+  for this question.
+- 2026-10-24 — Review notes, nothing re-run (the data is on the external volume): (1) the RBI date
+  2025-08-07 in `research/bl159/events.py` (line 15) and in read 5 needs checking; the August 2025 MPC decision
+  is believed to have been on 6 August, and 7 August 2025 was a NIFTY Thursday expiry. One day of 13 changes
+  nothing here, but the list is meant to be reused. Not corrected, because the registered list is not edited
+  after a run. (2) Tercile cut points (`states.py`, lines 103–107) use the whole period, so a day's label
+  depends on later days; registered that way for a screen, and any follow-up needs trailing cut points. (3)
+  `overnight.py` (lines 42–46) pairs consecutive days found in `chain_snapshots_5m`, without the registered
+  `rotation/days.csv` or data_quality, so a day missing from the snapshots would turn a night into a two-night
+  hold and a special session could become the "next day"; BL-160 fixed this (lake days plus data_quality). (4)
+  Counts disagree: the Log says 486 days × 8 strategies (the smoke run) and the Result says 489 engine days;
+  the plan names `calendar.py` but the script is `events.py` (a `calendar.py` would shadow the standard
+  library); the registration says "about 22" tests and there are 30. (5) The lot size 65 is hard-coded in
+  `overnight.py` (line 25) and `report.py` (lines 20 and 82), correct for the sizing date 2026-10-12 but not
+  read from the reference data.

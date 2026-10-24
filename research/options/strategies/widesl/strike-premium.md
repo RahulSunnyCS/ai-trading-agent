@@ -1,6 +1,6 @@
 # Widesl: strike and premium
 
-**Status:** Tested · **Last updated:** 2026-10-18
+**Status:** Tested · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -28,6 +28,7 @@ file sells the NIFTY strike closest to ₹65 (`nifty_widesl_917_closest_premium.
 | BL-126 (POC) | NIFTY ₹120 at SL 60 % (and ₹100 at SL 75 %) added beside Core ₹100, all 25 slots | 2024-10-09 → 2026-10-16, gross, in-sample | Not positive standalone or in Adaptive (₹120: +₹23 [−33, +81] per lot-day in Adaptive, shallower drawdown) | [BL-126][bl126] |
 | BL-127 | NIFTY ₹80, ₹100, ₹120 × six leg stops (60–115 %), a stop chosen per premium on 2024-10 → 2025-10, the best two added to Adaptive and read on 2025-10 → 2026-10 | Gross, selection and test years | Standalone in the selection year ₹120 (SL 70 %, +295) > ₹100 (SL 70 %, +281) > ₹80 (SL 80 %, +230) per lot-day; Adaptive with ₹80 SL 80 % and ₹120 SL 70 % added: −₹10 [−82, +63] on the test year, deeper drawdown. **Not positive**; ₹120's own first-year Stage B gain (+₹15) did not repeat | [BL-127][bl127] |
 | BL-128 | SENSEX ₹240, ₹300, ₹350 × six leg stops (60–115 %), a stop chosen per premium on 2024-10 → 2025-10, the best two added to Adaptive and read on 2025-10 → 2026-10 | Gross, selection and test years | Standalone in the selection year ₹300 (SL 60 %, +160) > ₹350 (SL 60 %, +155) > ₹240 (SL 60 %, +153) per lot-day; Adaptive with ₹300 and ₹240 at SL 60 % added: −₹2 [−88, +79] on the test year, drawdown deeper (₹300 alone +₹20, ₹240 alone +₹25, intervals include zero). **Not positive**; ₹300's first-year Stage B gain (+₹79 [+15, +149]) did not repeat | [BL-128][bl128] |
+| BL-159 read 2b | Asymmetric legs: PE at OTM2 with CE at OTM1, and CE at OTM2 with PE at OTM1, vs the symmetric OTM1 file, split by the previous session's skew tercile | NIFTY, 2024-10-09 → 2026-10-08, 489 engine days, **after charges** | Screen, **no lead**: PE at OTM2 +₹12 a day on high-skew days (t 0.17) and +₹54 on low-skew days (t 0.58); CE at OTM2 worse in both (−₹70, −₹85) | [BL-159][bl159] |
 
 Fixed mixes, no portfolio stop, total / max drawdown, OTM1 | ₹80 | ₹100 ([BL-055][bl055], before
 charges): 5 × Widesl ₹8.73L / −₹2.26L | ₹7.02L / −₹1.99L | ₹7.37L / −₹1.76L; 3 Widesl + 2 Dir ₹9.47L /
@@ -50,6 +51,9 @@ charges): 5 × Widesl ₹8.73L / −₹2.26L | ₹7.02L / −₹1.99L | ₹7.37L
 - The rotation picks closest premium most on expiry days (about half its core lots at 0 days to expiry,
   10–20% at 2–3 days; [BL-061][bl061], [BL-062][bl062]). A fixed premium sells near the money close to
   expiry, a different position; not tested.
+- **Unequal distances do not help.** Moving only the put (or only the call) to OTM2 did not beat the
+  symmetric OTM1 file in either skew tercile, after charges (BL-159 read 2b; one of about 30 screens). See
+  [previous-session state](../../common/previous-session-state.md).
 
 ## Not yet tested
 
@@ -61,11 +65,13 @@ charges): 5 × Widesl ₹8.73L / −₹2.26L | ₹7.02L / −₹1.99L | ₹7.37L
 
 ## Related
 
-- [Directional strike](../directional/strike-premium.md); [rotation ranking](../../common/rotation-ranking.md).
+- [Directional strike](../directional/strike-premium.md); [rotation ranking](../../common/rotation-ranking.md);
+  [previous-session state](../../common/previous-session-state.md) (skew); [Widesl with bought wings](../condor/README.md).
 - Scripts: `research/bl055/gen_premium.py`, `research/bl060/`, `research/bl080/` (`ablate.py`,
   `family_years.py`); outputs git-ignored, regenerate with them.
 
 [bl055]: ../../../../backlog/BL-055-daily-portfolio-stop-loss.md
+[bl159]: ../../../../backlog/BL-159-eight-poc-reads.md
 [bl060]: ../../../../backlog/BL-060-sensex-widesl-closest-premium.md
 [bl061]: ../../../../backlog/BL-061-rotation-with-closest-premium-widesl.md
 [bl062]: ../../../../backlog/BL-062-whole-day-rotation.md
