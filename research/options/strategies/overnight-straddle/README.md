@@ -25,7 +25,7 @@ Not live; not in the rotation universe. Nothing here changes any list, file or t
 | BL-160 (registered test) | NIFTY, DTE 0 nights, hedged OTM6, exit 09:17 | NIFTY, unseen 2022-01-03 → 2024-10-08, 143 nights | **Failed**: −₹34 a night, t −0.29, hit 61%; the same cell unhedged +₹168, t 0.90 | [BL-160][bl160] |
 | BL-160 (supporting) | Same cell on SENSEX | SENSEX, 2023-07-26 → 2024-10-08 | **Not usable**: the vendor SENSEX option files cover about 8 nights | [BL-160][bl160] |
 | BL-160 (learning period) | Index × DTE × hedge × exit, descriptive | NIFTY and SENSEX, 2024-10-09 → 2026-10-08, after charges | Descriptive, no verdict (below) | [BL-160][bl160] |
-| BL-160 (VIX band, post-hoc) | The 09:17 cells split by India VIX at 15:25: < 13, 13–15, 15–18, 18+ (48 cells) | all three sets above | **Post-hoc and descriptive**; ran after the verdict, with no owner `override:` recorded. See What we know | [BL-160][bl160] |
+| BL-160 (VIX band, post-hoc) | The 09:17 cells split by India VIX at 15:25: < 13, 13–15, 15–18, 18+ (48 cells) | all three sets above | **Post-hoc and descriptive**; ran after the verdict; owner override recorded after the run (2026-10-24). See What we know | [BL-160][bl160] |
 
 BL-160 learning period, ₹ net per night, one lot, after charges, exit at 09:17 unless stated (the item's
 table):

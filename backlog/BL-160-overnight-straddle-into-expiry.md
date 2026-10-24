@@ -122,7 +122,7 @@ What the table says:
   afterwards.
 - 2026-10-24 — **Disclosure, the VIX-band split.** It ran after the verdict (the entry above) with no owner
   `override:` line, and "Will not run" excludes "any change after a result is seen".
-  `override: (not recorded — owner to confirm)`. The split is **post-hoc and descriptive**: it drives no
+  `override: owner confirmed 2026-10-24 (in chat, recorded by Claude): descriptive VIX-band split, drives no pass/fail; no period is left to confirm it`. The split is **post-hoc and descriptive**: it drives no
   pass/fail and the failed verdict stands. The code that produced its 48 cells is not committed
   (`research/bl160/overnight_hedged.py` has no VIX logic), so those numbers cannot be rebuilt from the
   repository; it was a one-off. Treat the 15–18 band as a lead for a forward record only.
