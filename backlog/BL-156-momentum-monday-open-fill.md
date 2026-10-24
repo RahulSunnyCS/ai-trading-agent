@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — decides how the real Kite money is traded; nothing changes until the test passes |
-| **Status** | Planned (Phase 0 written, awaiting the owner's approval before any run) |
+| **Status** | Done: killed 2026-10-24 (Phase 1 failed 3 of 5 rules); the followed group stays as it is |
 | **Type** | research |
 | **Area** | momentum (+ scheduler and dashboard if it passes) |
 | **Created** | 2026-10-24 |
@@ -105,3 +105,30 @@ placed as AMOs for Monday's open; on a pass, realign all lots at once.
 ## Log
 
 - 2026-10-24 — created; Phase 0 written with `bl156_criteria.json`, awaiting the owner's approval.
+- 2026-10-24 — owner approved Phase 0 as written; committed (5eebb4ec) before any run. Look-ahead
+  gate passed on commit 9f579d4c: `test_lookahead.py` (12 cuts, Broad among them, at Friday close)
+  and the golden `broad_monday_open` scenario. The runner `scripts/bl156_monday_open.py` was
+  committed before it ran.
+- 2026-10-24 — **Phase 1: killed.** 28 rolling 3-year windows (2017-01-06 to 2026-09-25), code
+  9f579d4c, criteria sha256 b393cc5e…, data through 2026-10-23; output in
+  `data/research/bl156/verdict.json` (git-ignored). C against A:
+
+  | Rule | Needs | C vs A | Holds |
+  |---|---|---|---|
+  | wins_most | CAGR and Sharpe better in > 14 of 28 | 5 of 28 | no |
+  | median_cagr | ≥ +1.0 pt | +1.12 pts | yes |
+  | median_drawdown | ≥ −3.0 pts | −3.34 pts | no |
+  | worst_drawdown | ≥ −5.0 pts | −11.26 pts | no |
+  | after_tax | ≥ 0 | +1.28 pts (A 32.54%, C 33.82%, full period, slab 30%) | yes |
+
+  Medians over the windows: A 51.1% CAGR / 1.47 Sharpe / −26.4% max drawdown; C 52.2% / 1.38 /
+  −26.6%; B (reference, delay 0 at Friday close) 54.0% / 1.52 / −25.2%. C's CAGR was higher in 61%
+  of windows, its Sharpe in 18%. Most of the gain is dropping the delay (B); filling at Monday's open
+  gives most of it back as volatility and a deeper worst fall. The followed group stays at delay 1,
+  Friday close; Phases 2 and 3 are dropped. Arm B is not a candidate (no one can trade the close
+  the ranks are made on); any test of it is a new pre-registered item.
+- 2026-10-24 — runner fixes between the first and the reported run, no rule changed: `_run_broad`
+  ignores `req.tax` (tax reaches a Broad run only through its `tax=` argument, BL-116), so the first
+  run's after-tax figures were pre-tax; and the verdict's numpy booleans did not print. The re-run
+  gave every window figure identical to the first, and the after-tax rule its real numbers. The
+  dashboard offers no tax switch for Broad ("Costs & timing"), so no screen is affected.

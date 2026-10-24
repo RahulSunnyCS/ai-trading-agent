@@ -1,6 +1,7 @@
 """BL-156 Phase 1: the followed Four Sectors group at Monday's open (delay 0) against as followed
 (delay 1, Friday close). The rules are search_spaces/bl156_criteria.json (committed before this
-ran); this script reads them and never restates a threshold.
+ran); this script reads its arms and base run from it, and `verdict` copies each rule's number
+from the file's wording (a rule whose id is not in the file fails the run).
 
     uv run python scripts/bl156_monday_open.py
 
@@ -24,6 +25,7 @@ import pandas as pd
 
 from momentum_backtesting import api, db_read, sweep, tranches
 from momentum_backtesting.engine import Result
+from momentum_backtesting.tax import TaxRules
 
 CRITERIA_PATH = Path(__file__).resolve().parent.parent / "search_spaces" / "bl156_criteria.json"
 CRITERIA = json.loads(CRITERIA_PATH.read_text())
@@ -53,7 +55,9 @@ def run(req: api.BacktestRequest) -> Result:
         req.model_copy(update={"rebalance_offset": offset, "capital": req.capital / every})
         for offset in range(every)
     ]
-    phases = [api._run_broad(r, ranking, outer).result for r in reqs]
+    # `_run_broad` ignores `req.tax`: tax reaches a Broad run only as this argument (BL-116).
+    tax = TaxRules(slab_rate=req.slab_rate) if req.tax else None
+    phases = [api._run_broad(r, ranking, outer, tax=tax).result for r in reqs]
     return tranches.blend_reset(phases) if every > 1 else phases[0]
 
 
@@ -106,6 +110,8 @@ def verdict(frames: dict[str, pd.DataFrame], after_tax: dict[str, float]) -> dic
     }
     expected = {r["id"] for r in CRITERIA["pass_rule"]["all_must_hold"]}
     assert expected == set(rules), f"criteria rules {expected} != computed {set(rules)}"
+    for rule in rules.values():
+        rule["holds"] = bool(rule["holds"])
     return {"rules": rules, "pass": all(r["holds"] for r in rules.values())}
 
 
