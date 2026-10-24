@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — protects every future result from the problems BL-010 had to undo after the fact |
-| **Status** | In progress |
+| **Status** | Done 2026-10-24 |
 | **Type** | chore |
 | **Area** | cross-cutting |
 | **Created** | 2026-10-06 |
@@ -68,3 +68,4 @@ and any deviation is written down with a reason.
   `_TEMPLATE.md`, `_EXPERIMENT.md`, both listed in `README.md`, and the research-gate paragraph
   in root `CLAUDE.md`. Phase 2 done. Phase 1 stays open until the next research item is
   created from the template.
+- 2026-10-24 — closed. Phase 1's condition is met: BL-104 (2026-10-14) and every research item since were created from the template's Phase 0 — Pre-register, and BL-104 records the `override:` lines it still needs. Phase 2 was already done.

@@ -30,7 +30,7 @@ The minute any leg still open is bought back. Set by `exit_time` (HH:MM); it mus
 ## Not yet tested
 
 - An exit-time table for Widesl: the rows exist in the raw sweep file and only need summarising.
-- Exit × MTM stop interaction (BL-098 Phase 3).
+- Exit × MTM stop interaction (BL-098 Phase 3, now BL-104).
 - 15:25 (the ₹65 file) against 15:28.
 
 ## Related

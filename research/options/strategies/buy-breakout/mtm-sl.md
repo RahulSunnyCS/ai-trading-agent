@@ -44,7 +44,7 @@ Change against the baseline on the same file, ₹, mean over files ([how to read
 
 ## Not yet tested
 
-- BL-097 Phase 3's leg stop × overall stop interaction.
+- BL-097 Phase 3's leg stop × overall stop interaction, now BL-104.
 - A stop scaled to the premium paid (for example a share of both legs' entry cost) instead of rupees.
 
 ## Related

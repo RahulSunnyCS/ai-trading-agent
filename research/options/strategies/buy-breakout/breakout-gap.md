@@ -41,7 +41,7 @@ Baseline no-entry days 4.9%.
 
 ## Not yet tested
 
-- Range window × gap (a registered BL-097 Phase 3 interaction).
+- Range window × gap (a registered BL-097 Phase 3 interaction, now BL-104).
 - An absolute gap in points.
 - A random-skip control: dropping the same share of entries at random would show how much of any net
   gain is just fewer charges.

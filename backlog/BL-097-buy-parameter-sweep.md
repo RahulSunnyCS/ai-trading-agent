@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — quantify whether the existing long-option Buy family has a robust improvement over its current breakout settings |
-| **Status** | In progress — Phase 2 one-factor screen complete; Phase 3 pending |
+| **Status** | Done 2026-10-24 — Phase 2 screen delivered; Phase 3 superseded by BL-104 |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-11 |
@@ -225,3 +225,4 @@ or adoption decision; the targeted interaction phase is not yet run.
 - 2026-10-12 — Phase 2 one-factor sweep completed with post-charge accounting;
   report generated. Phase 3 remains pending.
 - 2026-10-14 — Phase 3 superseded by BL-104 (full grid with a target axis and MTM ₹1,000; SENSEX premiums at 3× NIFTY).
+- 2026-10-24 — closed. Phase 2 (one-factor, after charges: `research/bl097/results/buy_sweep_postcharge.csv`, `BL-097-buy-qualified-list-post-charge.md`) is the deliverable; Phase 3 and its interactions went to BL-104's full grid. The open questions (charges, the ₹100 premium, gap in points) are covered there or went with Phase 3.

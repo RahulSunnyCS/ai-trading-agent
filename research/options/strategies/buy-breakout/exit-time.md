@@ -39,7 +39,7 @@ Files missing from a row are start times the exit makes invalid (the range would
 
 ## Not yet tested
 
-- Trail × exit time, a registered BL-097 Phase 3 interaction.
+- Trail × exit time, a registered BL-097 Phase 3 interaction, now BL-104.
 
 ## Related
 

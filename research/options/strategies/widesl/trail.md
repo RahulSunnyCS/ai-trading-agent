@@ -33,8 +33,8 @@ leaders (the others −₹29.1k to −₹36.7k).
 
 ## Not yet tested
 
-- Point trails `[1,1]`, `[2,1]`, `[3,1]` (BL-098 Phase 3, if a candidate needs them).
-- Trail × MTM stop interaction (BL-098 Phase 3).
+- Point trails `[1,1]`, `[2,1]`, `[3,1]` (BL-098 Phase 3, now BL-104, if a candidate needs them).
+- Trail × MTM stop interaction (BL-098 Phase 3, now BL-104).
 - Points vs percent for the live ₹65 file.
 
 ## Related

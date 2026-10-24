@@ -45,8 +45,8 @@ year, positive days 38.4%); SENSEX 11:00–13:00 −₹4 a day (−₹1,005), SE
   days 4.9% → 9.7%), so fewer orders are paid. The other half is gross (+₹4,056 a file at + 30).
 - It does not make Buy profitable after charges. Summed over its 44 files, + 30 made ₹3.13 lakh gross
   and −₹3.49 lakh net in the holdout. Its best ranked sections are still slightly negative.
-- One-factor screen; BL-097 Phase 3 (which would combine it with premium and gap) has not run, so no
-  verdict.
+- One-factor screen; BL-097 Phase 3 (which would combine it with premium and gap) went to BL-104,
+  whose results are not on this page yet, so no verdict.
 
 ## Not yet tested
 

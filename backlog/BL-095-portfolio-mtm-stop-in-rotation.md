@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades the lists with a portfolio stop (about ₹10k on 6 lots); the Rotation log today shows losses that book could not reach |
-| **Status** | In progress (Phases 1–4 built; PR open; trailing modes to confirm against AlgoTest) |
+| **Status** | In progress (Phases 1–4 built and merged, #190; trailing modes to confirm against AlgoTest) |
 | **Type** | feature |
 | **Area** | options / dashboard |
 | **Created** | 2026-10-11 |

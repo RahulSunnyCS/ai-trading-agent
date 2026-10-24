@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — set by the owner (2026-10-09); how real money should follow any config that trades every 2 or 4 weeks |
-| **Status** | Built 2026-10-09 (all four phases); migrating today's favourites on the live catalog is the owner's call |
+| **Status** | Done 2026-10-24 — live migration applied; every sleeve journalled |
 | **Type** | feature |
 | **Area** | momentum / dashboard |
 | **Created** | 2026-10-09 |
@@ -171,3 +171,4 @@ Answered by the owner on 2026-10-09:
   merged (10 favourites become 10 groups, 38 sleeves; the dry run lists them) and watch the next
   Friday's job, which now evaluates 38 favourites instead of 10; (2) mark this Done once that is
   applied and one weekly job has journalled every sleeve.
+- 2026-10-24 — closed. The live migration was applied: the weekly jobs of Fri 2026-10-16 and 2026-10-23 each journalled 43 of 43 entries, 38 of them "· all Fridays · Friday n of K" sleeves from 10 groups (plus the 4 ensemble configs and the benchmark). Both done-when conditions are met.

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — a change to the live picks (and the T1 track) from Mon 2026-10-19 09:16, adopted by the owner |
-| **Status** | In progress — built 2026-10-18; first rule day Mon 2026-10-19 (a moved NIFTY expiry) |
+| **Status** | Done 2026-10-24 — both first rule days recorded and scored cleanly |
 | **Type** | feature |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -124,3 +124,4 @@ hashed entry content; `journal.py` hashing is unchanged.
   `--track t1`): DTE NIFTY 0 / SENSEX 3 from the symbol master; both Adaptive baskets NIFTY-only with
   the `Expiry rule (NIFTY)` line (live: unfiltered had two SENSEX picks; T1: two SENSEX picks).
   A dry run for Fri 2026-10-16 reproduced the journal entry exactly (same lists, same `inputs_sha`).
+- 2026-10-24 — Phase 2 checked and the item closed. Mon 2026-10-19 (`expiry_only: NIFTY`) and Thu 2026-10-22 (`expiry_only: SENSEX`) are recorded in the live and the T1 journal with Adaptive (C) holding only the expiring index's strategies and `unfiltered` stored (live 19 Oct unfiltered: S_ditm1_0917, N_wide_1117, S_p320_1132; 22 Oct: S_ditm1_0917, N_wide_1317, N_wide_1302). `obt rotation verify`: live intact (9 entries), T1 intact (4). The daily log's re-score for both days: `same_inputs`, `same_picks`, no differences. Scored: C −₹6,740 (19 Oct), −₹152 (22 Oct). The read-out caveat under Risks stands for BL-058 and BL-113.
