@@ -22,8 +22,8 @@ Major versions are supported for 2 years from their release date.
 
 The check is `isNextVersionSupported()` in `@opennextjs/aws` (`dist/build/helper.js`, pulled in by
 `@opennextjs/cloudflare`): release date of the major plus two years. Next.js 15 came out on
-2024-10-21, so every OpenNext build has refused it since 2026-10-22. Nothing in the repo changed;
-the calendar did. `dashboard.codifie.dev` still serves the 2026-10-18 build, and every later
+2024-10-21, so every OpenNext build has refused it since 2026-10-21 00:00 UTC (the 22 Oct release
+was just the first push to hit it). Nothing in the repo changed; the calendar did. `dashboard.codifie.dev` still serves the 2026-10-18 build, and every later
 release will fail the same way. Local `next dev` / `bun run start:prod` are unaffected (the check
 is OpenNext's, not Next's).
 
@@ -47,7 +47,9 @@ What in `apps/dashboard` Next 16 touches:
   while a webpack config is present. Every `next build` / `next dev` caller needs `--webpack`, or
   the rule moves to `turbopack.rules`. Callers: `package.json` `dev` / `build` (OpenNext runs the
   package's `build` script; CI's Dashboard job runs it too), and `scripts/dev-stack.mjs`
-  (`next dev`, and `next build` for `start:prod`).
+  (`next dev`, and `next build` for `start:prod`). `next start` has no `--webpack` option, and
+  dev-stack builds the `dev` and `start` calls from one argument list, so the flag goes on the
+  `dev` branch only.
 - **`middleware.ts` is deprecated in favour of `proxy.ts`**, which runs on the Node.js runtime
   only. `middleware.ts` keeps working on the edge runtime in 16. The login gate, the Access-token
   check and the upstream service-token injection all live there (`docs/remote-dashboard.md`), and
@@ -55,8 +57,9 @@ What in `apps/dashboard` Next 16 touches:
   stays `middleware.ts` in this item's first phases.
 - **Async request APIs only.** Already done: `[[...slug]]/page.tsx` awaits `params` and
   `login/page.tsx` awaits `searchParams`. Nothing calls `cookies()` / `headers()`.
-- **`experimental.proxyTimeout`** (180 s for long Momentum runs): check the key is still accepted;
-  if it was renamed or dropped, long Broad Momentum runs would be cut at the default 30 s again.
+- **`experimental.proxyTimeout`** (180 s for long Momentum runs): still accepted by 16.4.3. It
+  applies to Next's own Node server (`next dev`, `next start`), not to the OpenNext Worker, so
+  it is checked locally, not on `wrangler dev`.
 - **`next dev` writes to `.next/dev`** in 16, so a running dev server no longer clobbers a
   production build. `cf-build.mjs`'s refusal while `next dev` runs and `start:prod`'s separate
   `.next-prod` folder may no longer be needed. Left as they are here; noted for later.
@@ -84,19 +87,25 @@ the login gate and the API rewrites behaving as before.
   1. In a worktree: `next@^16.4.1` and `@opennextjs/cloudflare@^1.20.13` in
      `apps/dashboard/package.json`; `bun install` (the root `bun.lock` changes); check that
      `wrangler` still meets OpenNext's `^4.148.0`.
-  2. Add `--webpack` to the `dev` and `build` scripts and to both `next` calls in
-     `scripts/dev-stack.mjs`. Keep the `?raw` webpack rule.
-  3. Run `next build --webpack` and read every warning: deprecated config keys
-     (`experimental.proxyTimeout`), the middleware deprecation notice, and any change Next
-     writes into `tsconfig.json` / `next-env.d.ts`. Commit Next's tsconfig changes; keep
-     `next-env.d.ts` as dev-stack expects.
-  4. `bun run --filter @ata/dashboard typecheck`, `test` (Vitest, the Tailwind class test
-     included) and the Playwright e2e suite against `bun run start` (not in CI; see the
-     e2e-suite notes).
+  2. Add `--webpack` to the `dev` and `build` scripts, and in `scripts/dev-stack.mjs` to the
+     `dev` branch of the dashboard's argument list (not `start`) and to its `next build` call.
+     Keep the `?raw` webpack rule.
+  3. Run `next build --webpack` and read every warning: config keys, the middleware deprecation
+     notice, and what Next writes into `tsconfig.json` / `next-env.d.ts`. In 16, `next dev` also
+     writes types under `.next/dev/types`, rewrites `next-env.d.ts` (dev-stack restores it only
+     after a build) and adds `.next/dev/types/**/*.ts` to `tsconfig.json`. Commit the tsconfig
+     changes Next needs; keep the tracked `next-env.d.ts` as dev-stack expects.
+  4. `bun run --filter @ata/dashboard typecheck` and `test` (Vitest, the Tailwind class test
+     included). Then the Playwright e2e suite (not in CI): against `bun run start` with
+     `BASE_URL=http://127.0.0.1:5190` (Playwright's default is `localhost:5173`, the `dev`
+     script's port).
+  5. The proxy timeout: a Broad Momentum run longer than 30 s completes through the dashboard
+     under both `bun run start` (`next dev`) and `bun run start:prod` (`next start`).
 - **Deliverables:** one PR with the bumps, the lockfile and the script changes; the build log's
   warnings and how each was handled in the PR description.
-- **Done when:** CI's four required jobs are green, `next build --webpack` prints no error, and
-  the e2e suite passes locally.
+- **Done when:** CI's four required jobs are green, `next build --webpack` prints no error, the
+  e2e suite passes except `e2e/personalities-api.spec.ts` (it fails by design without
+  `apps/server`), and task 5's long run completes.
 
 ### Phase 2 — Deploy check before it reaches `release`
 - **Tasks:**
@@ -109,8 +118,7 @@ the login gate and the API rewrites behaving as before.
      - Basic auth on `/api/*` and the 503 for a missing `DASHBOARD_PASSWORD`;
      - Access mode if `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` are set;
      - a Momentum page and an Options Lab page load through the rewrites, with the service
-       token added upstream;
-     - a Broad Momentum run longer than 30 s is not cut off (the `proxyTimeout` check).
+       token added upstream (a plain Workers check; the proxy timeout was Phase 1's).
   3. Merge the Phase 1 PR into `main`, then the usual `main` → `release` promotion PR. Watch
      `deploy-dashboard.yml` and open the live site.
 - **Deliverables:** the preview checks recorded in this item's Log; a green deploy run.
@@ -151,3 +159,7 @@ the login gate and the API rewrites behaving as before.
 - 2026-10-24 — created after the 2026-10-22 `release` deploy failed on OpenNext's Next.js support
   check. The owner chose the Next 16 upgrade over the unsupported-version flag. Nothing built or
   run yet.
+- 2026-10-24 — review (#305) fixes: the proxy-timeout check moved to Phase 1 (it applies to Next's
+  Node server, not the Worker); the e2e step names its address and the spec that fails by design;
+  `--webpack` goes on dev-stack's `dev` branch only; the cut-off is 2026-10-21; Next 16's
+  `.next/dev/types` and `next-env.d.ts` rewrites named.

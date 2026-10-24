@@ -30,7 +30,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-089](BL-089-backlog-tracks-and-github-board.md) | Backlog restructure: research / product / platform tracks, a generated index and `DONE.md`, one issue per item and a GitHub Projects board with a "Needs me" view | P0 | Ready | chore | cross-cutting |
 | [BL-107](BL-107-nse-fo-bhavcopy-daily.md) | Daily NSE F&O bhavcopy: official end-of-day record and a cross-check on the Fyers data | P0 | Planned | feature | options |
 | [BL-148](BL-148-fyers-mcx-expired-options-history.md) | Fyers MCX expired options history: Prime two-year 1-minute OHLCV+OI backfill into the canonical lake, then daily continuation | P0 | Planned | feature | options / trading-data |
-| [BL-157](BL-157-dashboard-nextjs-16.md) | Dashboard on Next.js 16: OpenNext refuses Next 15 since 2026-10-22 (two years past its release), so the hosted dashboard cannot deploy | P0 | Planned | chore | dashboard / infra |
+| [BL-157](BL-157-dashboard-nextjs-16.md) | Dashboard on Next.js 16: OpenNext refuses Next 15 since 2026-10-21 (two years past its release), so the hosted dashboard cannot deploy | P0 | Planned | chore | dashboard / infra |
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-015](BL-015-research-gate.md) | Research gate: pre-register every experiment, log every override | P1 | In progress | chore | cross-cutting |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
