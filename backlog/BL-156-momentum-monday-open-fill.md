@@ -132,3 +132,8 @@ placed as AMOs for Monday's open; on a pass, realign all lots at once.
   run's after-tax figures were pre-tax; and the verdict's numpy booleans did not print. The re-run
   gave every window figure identical to the first, and the after-tax rule its real numbers. The
   dashboard offers no tax switch for Broad ("Costs & timing"), so no screen is affected.
+- 2026-10-24 — review notes (PR #304), no rule or result changed. `wins_most` reads two ways: the
+  runner counts windows where C beats A on CAGR and Sharpe at once; `compare_rolling`'s "wins most",
+  which the rule cites, needs each win share above half on its own. Both say no (CAGR 61%, Sharpe 18%
+  of windows). The criteria file's `written_before_running` (13:30 IST) is wrong: the file was
+  committed in 5eebb4ec at 11:59 IST, before the runner and the 12:21 run; the file stays as written.
