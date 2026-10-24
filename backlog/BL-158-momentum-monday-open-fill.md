@@ -1,4 +1,4 @@
-# BL-156 — Momentum: test the followed group at Monday's open, switch only if it passes
+# BL-158 — Momentum: test the followed group at Monday's open, switch only if it passes
 
 | | |
 |---|---|
@@ -37,7 +37,7 @@ Re-tuning any other setting at delay 0; Stock and Custom Index (they have no Mon
 ## Plan
 
 ### Phase 0 — Pre-register
-Committed before any run; the numbers are in `packages/momentum-backtesting/search_spaces/bl156_criteria.json`,
+Committed before any run; the numbers are in `packages/momentum-backtesting/search_spaces/bl158_criteria.json`,
 which the runner reads and never restates.
 - **Hypothesis:** the followed group filled at Monday's open with signal delay 0 (arm C) beats it as
   followed (arm A) on return without a materially deeper fall, in most 3-year windows.
@@ -49,7 +49,7 @@ which the runner reads and never restates.
   Before the windows run, `tests/golden/test_lookahead.py` and the golden Monday-open scenario must
   pass on the code that runs them. Category tags are today's classification for every year (BL-074);
   that applies to both arms alike.
-- **Pass / kill rule:** all five rules of `bl156_criteria.json` against arm A: C wins CAGR and Sharpe
+- **Pass / kill rule:** all five rules of `bl158_criteria.json` against arm A: C wins CAGR and Sharpe
   in more than half the windows; median CAGR gap at least +1.0 point; median drawdown at most 3.0
   points deeper; deepest window at most 5.0 points deeper; full-period after-tax CAGR not lower. Any
   miss is a kill. Arm B (delay 0, Friday close) is reported only.
@@ -62,9 +62,9 @@ which the runner reads and never restates.
   thresholds after the result. Running one needs `override: <reason>` in the Log.
 
 ### Phase 1 — Run the test
-- **Tasks:** `scripts/bl156_monday_open.py` reads `bl156_criteria.json`, runs arms A, B and C over the
+- **Tasks:** `scripts/bl158_monday_open.py` reads `bl158_criteria.json`, runs arms A, B and C over the
   rolling windows (`sweep.rerun_windows`, `compare_rolling` against A) and the full period after tax,
-  writes the windows table and the verdict under `data/research/bl156/` (git-ignored) with the data
+  writes the windows table and the verdict under `data/research/bl158/` (git-ignored) with the data
   version and code commit.
 - **Deliverables:** the verdict with every rule's number in the Log; `research/momentum/common/execution.md`
   updated with the result (and its stale "no Monday-open option" line).
@@ -72,7 +72,7 @@ which the runner reads and never restates.
 
 ### Phase 2 — Switch (only if Phase 1 passes)
 - **Tasks:**
-  - A new followed file `search_spaces/bl156_followed.json` (the four sleeves at delay 0, `mon_open`),
+  - A new followed file `search_spaces/bl158_followed.json` (the four sleeves at delay 0, `mon_open`),
     named in `live_rules.toml`; `bl142_followed.json` stays as written.
   - The four sleeves re-saved with the new settings, grouped, made the headline; the old group kept.
   - Orders on Friday evening from Friday's final data and that evening's Kite snapshot, sent on
@@ -104,10 +104,10 @@ placed as AMOs for Monday's open; on a pass, realign all lots at once.
 
 ## Log
 
-- 2026-10-24 — created; Phase 0 written with `bl156_criteria.json`, awaiting the owner's approval.
+- 2026-10-24 — created; Phase 0 written with `bl158_criteria.json`, awaiting the owner's approval.
 - 2026-10-24 — owner approved Phase 0 as written; committed (5eebb4ec) before any run. Look-ahead
   gate passed on commit 9f579d4c: `test_lookahead.py` (12 cuts, Broad among them, at Friday close)
-  and the golden `broad_monday_open` scenario. The runner `scripts/bl156_monday_open.py` was
+  and the golden `broad_monday_open` scenario. The runner `scripts/bl158_monday_open.py` was
   committed before it ran.
 - 2026-10-24 — **Phase 1: killed.** 28 rolling 3-year windows (2017-01-06 to 2026-09-25), code
   9f579d4c, criteria sha256 b393cc5e…, data through 2026-10-23; output in
@@ -137,3 +137,9 @@ placed as AMOs for Monday's open; on a pass, realign all lots at once.
   which the rule cites, needs each win share above half on its own. Both say no (CAGR 61%, Sharpe 18%
   of windows). The criteria file's `written_before_running` (13:30 IST) is wrong: the file was
   committed in 5eebb4ec at 11:59 IST, before the runner and the 12:21 run; the file stays as written.
+- 2026-10-24 — renumbered from BL-156 to BL-158 (owner, PR #304 review): BL-156 is the tick vs
+  candle-close stop item (PR #301, registered first) and BL-157 was already taken twice. The item,
+  `scripts/bl158_monday_open.py` and `search_spaces/bl158_criteria.json` were renamed; the criteria
+  file's contents are unchanged (it still says BL-156, sha256 `b393cc5e…` as recorded with the
+  result). The registered run's output is under `data/research/bl156/`; a new run writes to
+  `data/research/bl158/`.

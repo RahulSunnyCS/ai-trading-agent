@@ -1,14 +1,14 @@
-"""BL-156 Phase 1: the followed Four Sectors group at Monday's open (delay 0) against as followed
-(delay 1, Friday close). The rules are search_spaces/bl156_criteria.json (committed before this
+"""BL-158 Phase 1: the followed Four Sectors group at Monday's open (delay 0) against as followed
+(delay 1, Friday close). The rules are search_spaces/bl158_criteria.json (committed before this
 ran); this script reads its arms and base run from it, and `verdict` copies each rule's number
 from the file's wording (a rule whose id is not in the file fails the run).
 
-    uv run python scripts/bl156_monday_open.py
+    uv run python scripts/bl158_monday_open.py
 
 Arms A, B and C each run fresh over every rolling 3-year window (`sweep.rerun_windows`), each window
 as the followed account: one run per Friday sleeve on a shared ranking, blended like the backtest
 (`tranches.blend_reset`). Then A and C over the full period with tax on. Output goes to
-data/research/bl156/ (git-ignored): windows per arm, the comparison and verdict.json.
+data/research/bl158/ (git-ignored): windows per arm, the comparison and verdict.json.
 """
 
 from __future__ import annotations
@@ -27,10 +27,10 @@ from momentum_backtesting import api, db_read, sweep, tranches
 from momentum_backtesting.engine import Result
 from momentum_backtesting.tax import TaxRules
 
-CRITERIA_PATH = Path(__file__).resolve().parent.parent / "search_spaces" / "bl156_criteria.json"
+CRITERIA_PATH = Path(__file__).resolve().parent.parent / "search_spaces" / "bl158_criteria.json"
 CRITERIA = json.loads(CRITERIA_PATH.read_text())
 BASE_RUN = CRITERIA["base_run"].split()[0]
-OUT = api.DATA_DIR / "research" / "bl156"
+OUT = api.DATA_DIR / "research" / "bl158"
 IST = ZoneInfo("Asia/Kolkata")
 
 
@@ -141,7 +141,7 @@ def main() -> None:
     result = verdict(frames, after_tax)
 
     record = {
-        "item": "BL-156 Phase 1",
+        "item": "BL-158 Phase 1",
         "criteria": str(CRITERIA_PATH.name),
         "criteria_sha256": hashlib.sha256(CRITERIA_PATH.read_bytes()).hexdigest(),
         "ran_at": datetime.now(IST).isoformat(timespec="seconds"),
