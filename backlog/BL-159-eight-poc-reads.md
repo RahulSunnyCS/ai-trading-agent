@@ -1,4 +1,4 @@
-# BL-156 — Eight out-of-the-box POC reads: VRP, skew, PCR, overnight, post-event, condor margin, ratio spread, skip calendar
+# BL-159 — Eight out-of-the-box POC reads: VRP, skew, PCR, overnight, post-event, condor margin, ratio spread, skip calendar
 
 | | |
 |---|---|
@@ -8,7 +8,7 @@
 | **Area** | options |
 | **Created** | 2026-10-23 |
 | **Depends on** | rotation results store (BL-058), derived tables (BL-034 Phase 3), legwise engine, BL-063 charges |
-| **TODO.md row** | 3.10.39 |
+| **TODO.md row** | 3.10.41 |
 
 ## Context
 
@@ -155,7 +155,7 @@ NIFTY 2024-10-09 to 2026-10-08, and is it worth a real item?
 
 ## Plan
 
-### Phase 1 — Scripts (`packages/option-backtesting/research/bl156/`)
+### Phase 1 — Scripts (`packages/option-backtesting/research/bl159/`)
 
 - `calendar.py`: the event dates and the day groups of read 8 (holidays from `reference/holidays.csv`,
   observed expiries from the lake).
@@ -198,7 +198,7 @@ NIFTY 2024-10-09 to 2026-10-08, and is it worth a real item?
 
 **One lead under the registered bar (read 4), and it does not survive its own sensitivity line. Nothing else
 clears the bar.** NIFTY, 2024-10-09 to 2026-10-08; 487 state days, 481 overnight pairs, 489 engine days × 8
-strategies (no errors; 2 days left out by data_quality). Full table: `research/bl156/out/report.md` (git-ignored;
+strategies (no errors; 2 days left out by data_quality). Full table: `research/bl159/out/report.md` (git-ignored;
 `report.py` rebuilds it).
 
 | Read | Result | Verdict |
@@ -234,3 +234,4 @@ Ten tests are below |t| 1.5; with about 30 tests one |t| ≥ 2 is expected by ch
   minutes), `report.py`. One deviation from the plan, recorded here: 15 Fed mornings, not 16, are trading days
   in the period (one listed date is outside the store's days). Nothing else was changed after the run.
 - 2026-10-23 — **Closed: no lead survives.** See Result. Findings pages to follow in the PR.
+- 2026-10-24 — Renumbered from BL-156 (this item was BL-156 on the branch `research/bl156-poc-ideas`; the commits `research(bl156): ...` are this item; its TODO row moved from 3.10.39 to 3.10.41, and the folder `research/bl156/` is now `research/bl159/`) because other open PRs took BL-156, BL-157 and BL-158. No rule text or result changed.

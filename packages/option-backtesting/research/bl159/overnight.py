@@ -1,10 +1,10 @@
-"""BL-156 read 4: the overnight ATM short straddle from the 5-minute chain snapshots.
+"""BL-159 read 4: the overnight ATM short straddle from the 5-minute chain snapshots.
 
 Sell the ATM CE + PE (offset 0) of the nearest expiry with dte >= 1 at the close of day d's 15:25 bucket;
 buy back at the close of the next session's 09:20 bucket (the same strike and expiry); one lot, four orders,
 BL-063 charges. Writes out/overnight.csv, one row per night.
 
-    uv run python research/bl156/overnight.py
+    uv run python research/bl159/overnight.py
 """
 
 from __future__ import annotations

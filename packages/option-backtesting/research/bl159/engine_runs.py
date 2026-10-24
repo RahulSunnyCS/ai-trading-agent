@@ -1,8 +1,8 @@
-"""BL-156 reads 2b, 6, 7: the legwise engine on every day of the period, eight strategies per day, each
+"""BL-159 reads 2b, 6, 7: the legwise engine on every day of the period, eight strategies per day, each
 day loaded once. Writes out/engine_days.csv (day, strategy, gross, charges, net, worst_mtm, stopped_by,
 n_trades, orders); a day already in the file is not rerun, so the script resumes.
 
-    uv run python research/bl156/engine_runs.py [--days N] [--from D --to D]
+    uv run python research/bl159/engine_runs.py [--days N] [--from D --to D]
 """
 
 from __future__ import annotations
@@ -17,13 +17,13 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+import yaml  # noqa: E402
+
 from option_backtesting.legwise.engine import simulate_day  # noqa: E402
 from option_backtesting.legwise.market import backtest_days, load_day  # noqa: E402
 from option_backtesting.legwise.schema import LegwiseStrategy  # noqa: E402
 from option_backtesting.rotation.lists import SIZING_DATE  # noqa: E402
 from option_backtesting.ruletest.charges import day_charges, trade_values  # noqa: E402
-
-import yaml  # noqa: E402
 
 START, END = date(2024, 10, 9), date(2026, 10, 8)
 PKG = Path(__file__).resolve().parents[2]
@@ -59,14 +59,14 @@ def strategies() -> dict[str, LegwiseStrategy]:
 
     for n in (2, 3):
         out[f"ratio_otm{n}"] = {
-            "id": f"bl156_ratio_otm{n}", "underlying": "NIFTY", "entry_time": "09:24", "exit_time": "15:28",
+            "id": f"bl159_ratio_otm{n}", "underlying": "NIFTY", "entry_time": "09:24", "exit_time": "15:28",
             "square_off": "partial",
             "legs": [_leg("ce_long", "buy", "CE", "ATM"), _leg("pe_long", "buy", "PE", "ATM"),
                      _leg("ce_short", "sell", "CE", f"OTM{n}", lots=2), _leg("pe_short", "sell", "PE", f"OTM{n}", lots=2)],
             "overall": {"stop_loss_inr": 3000},
         }
     for name, body in out.items():
-        body["id"] = f"bl156_{name}"
+        body["id"] = f"bl159_{name}"
     return {name: LegwiseStrategy.model_validate(body) for name, body in out.items()}
 
 

@@ -1,6 +1,6 @@
-"""BL-156: the registered read-outs of all eight reads and the lead table -> out/report.md, out/reads.csv.
+"""BL-159: the registered read-outs of all eight reads and the lead table -> out/report.md, out/reads.csv.
 
-    uv run python research/bl156/report.py
+    uv run python research/bl159/report.py
 """
 
 from __future__ import annotations
@@ -139,7 +139,7 @@ def main() -> int:
     df.to_csv(OUT / "reads.csv", index=False)
     show = df[["read", "test", "n_a", "n_b", "mean_a", "mean_b", "D", "t", "p", "p_holm", "lead"]].round(
         {"mean_a": 0, "mean_b": 0, "D": 0, "t": 2, "p": 4, "p_holm": 3})
-    text = "# BL-156 read-outs\n\n" + show.to_markdown(index=False) + "\n\n" + "\n\n".join(lines) + "\n"
+    text = "# BL-159 read-outs\n\n" + show.to_markdown(index=False) + "\n\n" + "\n\n".join(lines) + "\n"
     (OUT / "report.md").write_text(text)
     print(text)
     return 0

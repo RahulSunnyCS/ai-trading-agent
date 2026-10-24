@@ -1,6 +1,6 @@
-"""BL-156: the event dates (read 5) and the day groups of read 8, all known in advance.
+"""BL-159: the event dates (read 5) and the day groups of read 8, all known in advance.
 
-Event dates are the ones registered in backlog/BL-156-eight-poc-reads.md (RBI MPC decision days, the two
+Event dates are the ones registered in backlog/BL-159-eight-poc-reads.md (RBI MPC decision days, the two
 Budget-day special sessions, the Indian session after a US FOMC decision). Groups are built from the
 trading days themselves plus `reference/holidays.csv`; nothing here reads a result.
 """

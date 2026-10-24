@@ -1,4 +1,4 @@
-"""BL-156 statistics: Welch t, a label-shuffle p and a Holm adjustment. Small and plain on purpose."""
+"""BL-159 statistics: Welch t, a label-shuffle p and a Holm adjustment. Small and plain on purpose."""
 
 from __future__ import annotations
 

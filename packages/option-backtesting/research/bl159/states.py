@@ -1,8 +1,8 @@
-"""BL-156 reads 1, 2a, 3, 5, 8: one row per trading day with every state, group and the stored gross
+"""BL-159 reads 1, 2a, 3, 5, 8: one row per trading day with every state, group and the stored gross
 of the base strategies. Writes out/states.csv. Reads nothing after the entry minute of the day it labels:
 iv_daily values are the PREVIOUS session's, PCR is the previous session's, groups are calendar facts.
 
-    uv run python research/bl156/states.py
+    uv run python research/bl159/states.py
 """
 
 from __future__ import annotations

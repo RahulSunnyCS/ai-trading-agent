@@ -1,18 +1,18 @@
-# BL-157 — Overnight short straddle into expiry morning: far hedges, NIFTY and SENSEX, exit minute
+# BL-160 — Overnight short straddle into expiry morning: far hedges, NIFTY and SENSEX, exit minute
 
 | | |
 |---|---|
-| **Priority** | P2 — a follow-up of BL-156 read 4 on stored 1-minute bars |
+| **Priority** | P2 — a follow-up of BL-159 read 4 on stored 1-minute bars |
 | **Status** | Done: failed (2026-10-23) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-23 |
 | **Depends on** | lake option and index 1-minute bars, BL-063 charges |
-| **TODO.md row** | 3.10.40 |
+| **TODO.md row** | 3.10.42 |
 
 ## Context
 
-BL-156 read 4 found an overnight ATM short straddle (sell at the 15:25 bucket, buy back at the 09:20 bucket's
+BL-159 read 4 found an overnight ATM short straddle (sell at the 15:25 bucket, buy back at the 09:20 bucket's
 close) made +₹232 a night on NIFTY 2024-10 → 2026-10, all of it from the first nine minutes of the morning; the
 nights into expiry morning (dte 1 at entry) made +₹1,153 over 93 nights, worst −₹12,038. The owner (2026-10-23)
 asked to try it with far hedges ("6 legs away"), on SENSEX as well as NIFTY, split by DTE 0 and 1, and with the
@@ -56,7 +56,7 @@ margin of the hedged position; it is not adopted from here.
 
 ## Risks
 
-- **Second look:** the idea was chosen from BL-156's best cell; the 2022–24 test is why that is acceptable.
+- **Second look:** the idea was chosen from BL-159's best cell; the 2022–24 test is why that is acceptable.
 - **Thin far strikes in vendor data:** OTM6 may lack bars on some 2022–24 nights; skips are counted and
   reported, and a hedged cell with more than 10% skips is flagged.
 - **Fills at the open:** 09:15–09:17 prints are wide; the 0.5% / 1% slippage lines matter more here than for
@@ -93,7 +93,7 @@ What the table says:
   −₹9,083, but the mean falls from +₹638 to +₹140; on every other DTE and on SENSEX the hedged version loses with
   t down to −5 to −9 (the wings' premium and four extra orders cost more than the straddle keeps).
 - **The 09:15 open is where it dies.** Exiting at the open gives little or nothing (NIFTY DTE 0 +₹153, SENSEX
-  −₹410); the gain is the first two to nine minutes' premium fall, as BL-156 found. That is an intraday effect
+  −₹410); the gain is the first two to nine minutes' premium fall, as BL-159 found. That is an intraday effect
   that does not need an overnight position.
 - **SENSEX does not show it.** Unhedged DTE 0 +₹266 (t 0.92), DTE 1 −₹581.
 - **Only NIFTY into expiry morning, unhedged, looks positive in the learning period**, and on 2022–24 that cell is
@@ -102,9 +102,9 @@ What the table says:
 
 ## Log
 
-- 2026-10-23 — Registered from the owner's follow-up to BL-156 read 4, before any of these cells were
+- 2026-10-23 — Registered from the owner's follow-up to BL-159 read 4, before any of these cells were
   computed.
-- 2026-10-23 — Run (`research/bl157/overnight_hedged.py`, about two minutes). **Failed:** −₹34 a night, t −0.29 on
+- 2026-10-23 — Run (`research/bl160/overnight_hedged.py`, about two minutes). **Failed:** −₹34 a night, t −0.29 on
   NIFTY 2022–24; SENSEX 2023–24 had about 8 usable nights (vendor coverage), so no supporting read. Nothing was
   changed after the run.
 - 2026-10-23 — **Descriptive, after the verdict (owner's request): the 09:17 cells by VIX band** (India VIX at
@@ -115,3 +115,4 @@ What the table says:
   nights (−₹31,590, −₹37,122 and −₹25,479 across the cells). Hedged OTM6 loses in most bands (SENSEX every band, t
   −3 to −4). Because the band was chosen after looking at 2022–24 as well, no period is left to confirm it; only
   a forward record could, at about 13 qualifying nights a year per index.
+- 2026-10-24 — Renumbered from BL-157 (this item was BL-157 on the branch `research/bl156-poc-ideas`; the commits `research(bl157): ...` are this item; its TODO row moved from 3.10.40 to 3.10.42, and the folder `research/bl157/` is now `research/bl160/`; "BL-156" in its text now reads BL-159, the POC reads) because other open PRs took BL-156, BL-157 and BL-158. No rule text or result changed.

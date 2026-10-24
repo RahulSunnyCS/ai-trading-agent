@@ -1,8 +1,8 @@
-"""BL-157: the overnight short straddle into expiry morning, hedged and not, NIFTY and SENSEX, four exit
-minutes, from the lake's 1-minute bars. Definitions: backlog/BL-157-overnight-straddle-into-expiry.md.
+"""BL-160: the overnight short straddle into expiry morning, hedged and not, NIFTY and SENSEX, four exit
+minutes, from the lake's 1-minute bars. Definitions: backlog/BL-160-overnight-straddle-into-expiry.md.
 Writes out/nights.csv (one row per index x night x hedge x exit) and prints the registered tables.
 
-    uv run python research/bl157/overnight_hedged.py
+    uv run python research/bl160/overnight_hedged.py
 """
 
 from __future__ import annotations
@@ -18,8 +18,9 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
-from option_backtesting.ruletest.charges import day_charges  # noqa: E402
 from trading_data import lake, quality  # noqa: E402
+
+from option_backtesting.ruletest.charges import day_charges  # noqa: E402
 
 STEP = {"NIFTY": 50, "SENSEX": 100}
 LOT = {"NIFTY": 65, "SENSEX": 20}  # lot_sizing current (sizing date 2026-10-12)
