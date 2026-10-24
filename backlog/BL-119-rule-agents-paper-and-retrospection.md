@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner's main aim for the live work (2026-10-18): agents that follow rules he gives, trade them on live data as paper, retrospect, improve |
-| **Status** | Planned (pre-registration in Phase 0; nothing run) |
+| **Status** | In progress (started 2026-10-18: Phase 0 and Amendment 1 registered, owner's answers recorded; nothing run) |
 | **Type** | feature + research |
 | **Area** | options, agents, scheduler |
 | **Created** | 2026-10-18 |
 | **Depends on** | BL-083 (event-versus-placebo method, trigger code), BL-022 (analog days), BL-110 (range persistence), BL-117 Phases 2 and 4 (live feed, paper desk: needed only for Phase 4 here), BL-063 charge model |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.37.1 |
 
 ## Context
 
@@ -169,6 +169,97 @@ reported but not judged; they are judged forward.
   loop, any search over parameters, (c)'s trades if its gate fails.
 - **Done when:** this block is in a commit, named in the Log, before `research/bl119/` holds a run.
 
+### Phase 0b — Amendment 1 (2026-10-18, the owner's answers on "Start BL-119"; committed before any run)
+
+Owner's answers: (1) "60 candles" means **a rolling 60-bar range at any time**, not only the opening window;
+(2) the template is **both**, as two separate arms; (3) **add 2019-02-11 → 2021-12-31 as an unread
+confirmation period**; (4) momentum exhaustion is **left out for now**. This amendment replaces Phase 0's
+rule definitions with the rolling rule below. Everything else in Phase 0 stands (universe filters, costs,
+look-ahead discipline, the hold-out idea) except where restated here. Nothing had been run when it was
+committed.
+
+**What it replaces.** Phase 0's opening-window arms (a and b), their controls (a0, b0), the analog filter (c)
+and the two personality subsets are **not run in Phase 1**; each is a dated block if wanted later (the
+personalities need the blocked-dates CSV, open question 6). The default "Template" and "First rules"
+paragraphs above are superseded by this block.
+
+- **Hypotheses.** L: a close beyond a narrow, just-completed 60-bar range is followed by more movement in its
+  direction than on ordinary days, enough for a long ATM option to pay its charges. S: the same break is a
+  premium spike that decays, so selling a Widesl at it beats selling the same Widesl at that minute on
+  ordinary days. They are opposite bets on the same events.
+- **Definitions (one each; any other value is a new dated block):**
+  - *Bars:* NIFTY index 1-minute bars, completed bars only; bar index j, 09:15 = 0.
+  - *Window:* for bar j, W(j) is the 60 completed bars j − 60 … j − 1, all inside the session (so j ≥ 60,
+    the bar stamped 10:15). H(j) is the highest high in W(j), L(j) the lowest low, width w(j) = H(j) − L(j).
+  - *Baseline:* b(j) is the median of w at the same bar index j (the 60-bar window ending at the same minute)
+    over the previous 20 sessions. A session without that bar is skipped; with fewer than 15 usable
+    sessions there is no event that day (counted). Only index bars of earlier sessions are read, including
+    sessions outside a judged period; no trade outcome is read for the baseline.
+  - *Narrow:* w(j) < **0.70** × b(j). The 0.70 is the assistant's choice for "clearly tighter than usual"
+    and is not tuned; control a0 shows what the condition adds.
+  - *Break:* the close of bar j is above H(j) (up) or below L(j) (down).
+  - *Event (arm a):* the first bar j from 60 to 285 (stamps 10:15 to 14:00) at which the window is narrow
+    and a break holds. One event per day; its direction is the side of the break. *Entry:* the minute after
+    the breaking bar (entry label = bar j + 1, last 14:01; the engine prices an entry at T with the close of
+    the bar ending at T).
+  - *Control a0:* the first break in the same window with no narrowness condition. Reported, not judged.
+- **Templates (the same events traded two ways, so each arm has the same comparators):**
+  - **Arm L, long:** buy one ATM option of the nearest weekly, a call after an up-break and a put after a
+    down-break; leg stop 25 % of the entry premium, trailing stop [1, 1] points, overall stop ₹2,000, exit
+    15:14 (the Buy family's management, without its own range-breakout leg).
+  - **Arm S, short premium:** the live Widesl (`strategies/rotation/N_wide_1202.yaml`: OTM1 call and put sold,
+    115 % leg stops trailed 15/10, overall stop ₹2,500, exit 15:28), 1 lot a leg, entered at the same
+    minute whatever the direction. *This is the assistant's reading of "both"*: the opposite trade on the
+    same events. If the owner meant "sell when the range holds" (no break at all), that is a different
+    hypothesis and a dated block, not this arm.
+  - Legwise engine, `lot_sizing: current`, sizing date 2026-10-12, the early reference wrapper before
+    2024-10-03. Rupees per strategy.
+- **Periods.** **A** 2022-01-03 → 2024-10-08 and **B** 2024-10-09 → 2026-10-08: the screening periods
+  (BL-083, BL-091 and BL-110 read these days for other rules, so neither is unseen; the rule has no tuned
+  parameter, so nothing is fitted on them). **C** 2019-02-11 → 2021-12-31: weekly expiries begin in the
+  lake on 2019-02-11 (nearest expiry 2019-02-14); about 740 usable weekday sessions; **read once**, only
+  for an arm that screen-passes in A and B, and unread by this programme. 2015-01 → 2019-02-08 is
+  monthly-expiry only (100-point strikes in 2016) and is not used. Data caveats for C: vendor option bars
+  imported later (BL-034); `lot_sizing: current` makes a rupee stop a different number of points at 2019
+  index levels; COVID in 2020. Before C is read: five days inspected by hand against the raw bars and the
+  ATM contract coverage at the entry minute counted; a day with no priced ATM contract is excluded and
+  counted, never filled.
+- **Comparators (amended from Phase 0; same method, causal):**
+  1. **Causal placebo:** the same template and side at the same entry minute on the 20 nearest days (10
+     before, 10 after) of the same period on which the rule had **not fired at or before the event's fire
+     minute** (no event all day, or a later one). Phase 0's "days with no event of that arm" reads the rest of
+     the day and was shown to bias a short-premium placebo (BL-091 review); it is replaced.
+  2. **Random minute:** the same template and side on the event days at an entry minute drawn from the
+     pooled entry minutes of the cell's own events (time of day matched), 200 draws, seed 20261018 plus a
+     per-cell offset. It is conditioned on the event day, so a random minute before the break benefits from
+     hindsight (BL-124 Log): test 3 is informative and the kill rests on tests 1 and 2.
+- **Costs:** as Phase 0: net = gross minus the BL-063 charge model on the recorded trades; slippage 0.5 % and
+  1 % a fill as a sensitivity, not in the rule. If `charges.py`'s date table does not cover 2019–2021, C is
+  read after ₹20 an order and labelled so.
+- **Pass / kill rule (two judged arms, so the t bar is 2.5), for each of L and S, in A and in B
+  separately:**
+  1. mean **net** per trade > 0;
+  2. event minus the causal placebo > 0, day-clustered t ≥ **2.5**;
+  3. the event mean above the 95th percentile of the 200 random-minute means.
+  **Screen pass** = all three in A **and** in B. **Kill** = test 1 or the sign of test 2 fails in A or in B.
+  **Inconclusive** = a period has fewer than 40 event days, or tests 1 and the sign of 2 hold but t < 2.5 or
+  test 3 fails. A screen-passed arm is read **once** on C with the same three tests (t ≥ 2.5); the C verdict
+  stands, and **pass = screen pass and C pass**. A killed or inconclusive arm does not read C.
+- **Look-ahead check (adds to Phase 0):** a rule at bar j reads bars ≤ j and earlier sessions only; a
+  truncation test (the detector on the series cut at j gives the same event, cut at j − 1 none); the
+  baseline never reads the event day or later; placebo selection reads bars up to the entry minute; an
+  independently written implementation must agree on real days; entry is at j + 1.
+- **Counted tries:** eight cells (arms aL, aS, a0L, a0S in A and B; four judged), plus one read of C per
+  screen-passed arm. Lineage disclosed: BL-083 (four triggers), BL-091 (31 arms), BL-101, BL-123 and BL-124
+  read these days for other rules; BL-124 found a tight-stop long straddle loses on ordinary days
+  (−₹170 to −₹381 per straddle), which is the bar arm L's placebo sets.
+- **Reported, not judged:** events by year, half-year, hour and direction; expiry day versus other days;
+  share of days with an event; the share of windows that are narrow; arms a0L and a0S.
+- **Will not run:** other window lengths (60), other narrow thresholds (0.70), other baselines, the
+  opening-window arms, the analog filter, the personalities, momentum exhaustion, SENSEX, other templates
+  or stops, a short arm on days the range holds, C before the screen, any parameter search.
+- **Done when:** this amendment is in a commit, named in the Log, before `research/bl119/` holds a run.
+
 ### Phase 1 — Event study (research only, a few hours of compute)
 
 - **Tasks:** `research/bl119/events.py` (the five arms' first break per day from the lake's index
@@ -265,6 +356,12 @@ reported but not judged; they are judged forward.
 
 ## Open questions (for the owner, when started)
 
+**Answered 2026-10-18 (on "Start BL-119"; recorded in Phase 0b):** 1 → a rolling 60-bar range at any time;
+2 → both templates as two arms; 3 → NIFTY only (default kept); 4 → left out for now. A fifth question the
+assistant raised, whether to use the 2019–2021 data as an unread confirmation period, was answered yes.
+Questions 5 (the evening post-mortem) and 6 (blocked dates) belong to later phases and stay open.
+
+
 1. **"60 candles":** 60 one-minute bars from the open (my default), 60-minute candles (a daily-scale
    consolidation, far fewer events), or a rolling 60 bars ending at any minute (closer to your words;
    needs a fixed definition of "tight" and is a dated block 2 if (a) shows any life)?
@@ -285,3 +382,11 @@ reported but not judged; they are judged forward.
   Written after reading BL-083, BL-091, BL-022, BL-110, `research/options/common/intraday-state.md`,
   the Buy research pages, `rotation/triggers.py`, `research/bl083/`, the frozen personality filter
   and evolution engine, and BL-117. Planning only: no code, no runs.
+- 2026-10-18 — **Started by the owner** ("park BL-120 and BL-121 and move on to the BL-119 range-breakout
+  rules"; those two were renumbered BL-123 and BL-124 and parked). Read before starting: this item, BL-083,
+  BL-091, BL-110, `research/bl123` and `research/bl124` (the series, placebo and trade helpers), the lake's
+  coverage. Findings that changed the plan: the lake holds NIFTY option bars back to 2014 with weekly
+  expiries from 2019-02-11, so 2019-02-11 → 2021-12-31 (about 740 usable sessions) is unread by this
+  programme and becomes the confirmation period C; the strategy tester another session is building
+  (`ruletest/`, uncommitted in the main checkout) is not needed for Phase 1, which stays a research script.
+  Owner's answers recorded in Phase 0b. Amendment 1 committed before any run.
