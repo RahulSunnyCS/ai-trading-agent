@@ -166,10 +166,12 @@ def pick_and_send(
                 _send_to_all(live.text, live.text, _severity(live.entry), send)
         return 0
 
+    # What last evening's message listed for today: each list says whether its picks changed.
+    previous = result.read_tentative(day, root)
     # The group's copy is Adaptive alone: it never waits for T1.
     group_id = group_chat_id()
     if live is not None and send_live and group_id:
-        _, group = messages.render_morning(live.entry, live.options, None)
+        _, group = messages.render_morning(live.entry, live.options, None, previous=previous)
         send(group, _severity(live.entry), chat_id=group_id)
 
     # T1 next, sharing the live entry's VIX read: one poll, one value.
@@ -192,7 +194,9 @@ def pick_and_send(
         if in_time and (t1 is not None or t1_already):
             t1_entry = t1.entry if t1 else _journal_entry(day, root, "t1")
             t1_options = t1.options if t1 else None
-            private, _ = messages.render_morning(live.entry, live.options, t1_entry, t1_options)
+            private, _ = messages.render_morning(
+                live.entry, live.options, t1_entry, t1_options, previous=previous
+            )
             echo(private)
             if send_live:
                 send(private, _severity(live.entry))
@@ -205,7 +209,9 @@ def pick_and_send(
             t1_error is not None and _needs_catch_up(t1_error, "t1") and not dry_run
         )
         note = messages.T1_FOLLOWS if follows else messages.T1_NOT_RECORDED
-        private, _ = messages.render_morning(live.entry, live.options, None, t1_note=note)
+        private, _ = messages.render_morning(
+            live.entry, live.options, None, t1_note=note, previous=previous
+        )
         echo(private)
         if send_live:
             send(private, _severity(live.entry))
@@ -430,6 +436,7 @@ def _send_result_locked(
         if owner_needed:
             if send(private):
                 result.mark_sent(adaptive, root)
+                result.save_tentative(day, next_adaptive, next_t1, root)
                 owner_out = True
                 if kind in ("ready", "none"):
                     result.mark_sent(adaptive, root, "t1")
@@ -463,6 +470,7 @@ def _send_result_locked(
             echo(text)
             if send(text):
                 result.mark_sent(adaptive, root, "t1")
+                result.save_tentative(day, None, next_t1, root)
             else:
                 ok = False
                 err("Telegram delivery of the T1 result failed; it is not marked sent")
