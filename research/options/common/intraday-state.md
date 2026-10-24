@@ -1,6 +1,6 @@
 # Options: intraday market state
 
-**Status:** Tested · **Last updated:** 2026-10-22
+**Status:** Tested · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -27,6 +27,7 @@ nothing acts on them.
 | BL-083 | Enter at a trigger (pivot with trend, VIX turn, straddle turn, RSI exhaustion), replacing the next pending pick | explore 2024-10 → 2026-10 both indices; confirm NIFTY 2022-01 → 2024-10 | **No lead** under the registered bar; owner's rule keeps two Dir leads (below) | [BL-083][bl083] |
 | BL-022 | The 20 nearest earlier sessions (path since the open ÷ ATR, gap, range so far, VIX, days to expiry; Euclid and DTW) at 10:30 / 11:00 / 12:00 as a rest-of-day range forecast, gating a skip / heatmap swap of Adaptive's pending picks | NIFTY, decide 2025-01 → 2026-10 (recent period decides, owner); 2022–24 and SENSEX reported | **Killed at the gate**: ρ 0.38–0.44 vs opening range 0.49–0.52 and VIX-implied 0.43–0.45; the replay was not run | [BL-022][bl022] |
 | BL-155 | Morning type at 11:00 (range so far vs the last 20 mornings) sets the straddle's leg stop: quiet 100 %, normal 80 %, wide 60 % | Heatmap ATM straddles 11:15–14:45; NIFTY 2025-01 → 2026-10 decides | **Killed**: no better than a fixed stop or the reversed rule | [BL-155][bl155] |
+| BL-145 Q4 | The opening range (09:15 to 09:44 high minus low, percent of the previous close, terciles) as a gate on quiet-week days (R7 lowest third) for Core's `N_wide_0947` (Widesl OTM1 entering 09:47) | NIFTY; learning 2025-10-20 → 2026-10-19 (80 quiet-week days), confirmation 2024-10-09 → 2025-10-17 (46); gross per lot-day, no charges, re-scored | **Works under the registered rule, thinly**: low minus high OR +1,446 [+426, +2,578] (46 vs 7 days); confirmation +723 [−92, +1,879] (22 vs 5 days) | [BL-145][bl145]; [page](t1-robustness-and-lag.md) |
 
 BL-083 event study, trigger minus the same template at the same minute on the 20 nearest non-event
 days, ₹ per lot (t): pivot-with-trend → Dir +754 (3.5) explore, −20 (−0.1) confirm; RSI exhaustion →
@@ -51,6 +52,11 @@ and REF +₹54,556, above both random controls; 2022–24 −₹10k to −₹27k
   recent mornings (BL-110). A range forecast is not P&L, and that number did not help pending picks
   in BL-081 either.
 
+- In quiet weeks a wide opening range marked days that went wrong for a 09:47 Widesl (BL-145 Q4): −1,284
+  per lot-day on 7 high-OR days against +162 on 46 low-OR days, and in the year before −1,011 on 5 days against
+  −288 on 22. Only 7 and 5 days, an interval that includes zero in the confirmation year, and the OR terciles
+  and R7 cuts are whole-window; a lead for a later pre-registered test, not a rule.
+
 ## Not yet tested
 
 - A real VWAP from futures bars ([BL-082][bl082], not before 2027-03-23).
@@ -70,6 +76,7 @@ and REF +₹54,556, above both random controls; 2022–24 −₹10k to −₹27k
 [bl022]: ../../../backlog/BL-022-analog-day-search.md
 [bl155]: ../../../backlog/BL-155-stop-by-morning-type.md
 [bl053]: ../../../backlog/BL-053-vix-at-10am-strategy-mix.md
+[bl145]: ../../../backlog/BL-145-t1-robustness-lag-opening-range.md
 [bl058]: ../../../backlog/BL-058-options-rotation-forward-journal-and-ui.md
 [bl081]: ../../../backlog/BL-081-drb-hourly-checkpoints-and-no-trade.md
 [bl082]: ../../../backlog/BL-082-hourly-checkpoint-futures-vwap.md
