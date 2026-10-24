@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-22
+Last updated: 2026-10-24
 
 ## Open
 
@@ -24,6 +24,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-058](BL-058-options-rotation-forward-journal-and-ui.md) | Options rotation: forward paper journal from Mon 12 Oct (picks recorded before 09:17, scored nightly) and the Options Lab screens it needs | P0 | In progress: journal built, first entry Mon 12 Oct 09:16 (lists A, B, C, REF); Phase 4 view built 2026-10-11 (page, shadow, explain, matrix, daily log, basket mode, forward vs periods, drawdowns, drift, family pulse; paper vs real waits for the charge model and contract notes); day-60 read-out pending | feature | options |
 | [BL-087](BL-087-momentum-all-fridays-split.md) | Momentum: backtest and follow a config split across every rebalance Friday | P0 | Built; live migration pending | feature | momentum |
 | [BL-150](BL-150-friday-3pm-orders-kite-basket.md) | Friday 15:00 Momentum orders, one tap into a pre-filled Kite basket (the owner places the order in Kite; this repo places none) | P1 | Planned | feature | momentum + scheduler |
+| [BL-156](BL-156-momentum-monday-open-fill.md) | Momentum: test the followed group at Monday's open (delay 0), switch it and realign every Kite lot only if the pre-registered test passes | P1 | Planned | research | momentum |
 | [BL-151](BL-151-monthly-trending-theme-scout.md) | Monthly trending-theme scout (an agent reads Reddit, news and, if affordable, X) and a starting date for every Broad theme, so a theme cannot be used before it became one | P2 | Idea | feature + research | momentum + scheduler |
 | [BL-143](BL-143-trade-monitoring-and-safety.md) | Trade monitoring and safety: wake schedule, 09:25 deploy check, −₹5k/−₹8k loss alerts, Telegram stop button (switch off + square off, confirm tap), margin check, Fyers reminder | P1 | In progress | feature | broker-login + scheduler |
 | [BL-142](BL-142-momentum-kite-weekly-lots.md) | Momentum on Zerodha Kite: weekly ₹50k lots read from Kite each Friday, each rebalanced on its own calendar with free cash; LIQUIDBEES and SGBs excluded | P0 | In progress | feature | momentum |

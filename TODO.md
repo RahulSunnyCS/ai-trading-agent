@@ -811,3 +811,16 @@ the backtest, report the slippage signed at 16:00 (owner only), and track the tr
 | 3.36.2 | Phase 2: `live-capture` 15:40 + `live-capture-retry` 15:55 (`src/live-capture.ts`), the day file, back-fill of missed days (no delete gate: both platforms keep the results) | claude | **Built 2026-10-20**, run by hand for 14, 15 and 19 Oct into scratch files; needs the scheduler restart (new jobs) |
 | 3.36.3 | Phase 3: `obt rotation live-compare` and the lines in the owner's 16:00 message | claude | **Built 2026-10-20**; the Rotation page's Live vs paper card (live, paper, gap, discretionary, running chart, by shape) **built 2026-10-22**. Reconciling a week against the contract notes is the owner's |
 | 3.36.4 | Phase 4: slippage per shape into the backtests (research, pre-register first) | — | After 20 forward days |
+
+### 3.37 Momentum at Monday's open — [BL-156](backlog/BL-156-momentum-monday-open-fill.md)
+
+Owner (2026-10-24): test the followed Four Sectors group at Monday's open (signal delay 0) against how it
+is followed now; switch only if the pre-registered test passes, then realign every Kite lot at once.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.37.1 | Phase 0: pre-registration (`search_spaces/bl156_criteria.json`) | claude→owner | Written 2026-10-24, awaiting the owner's approval |
+| 3.37.2 | Phase 1: run the rolling-window test, record pass or kill | claude | Planned |
+| 3.37.3 | Phase 2: switch the followed strategy, Friday-evening orders for Monday AMOs, realign the lots (only on a pass) | claude | Planned |
+| 3.37.4 | Phase 3: 13-week forward read-out (only if switched) | claude | Planned |
+
