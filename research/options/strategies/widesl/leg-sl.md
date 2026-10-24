@@ -23,6 +23,7 @@ AlgoTest). Every rotation Widesl file keeps its base file's stops.
 | BL-127 | NIFTY ₹80 / ₹100 / ₹120 × SL 60, 70, 80, 90, 100, 115 %, trail 15/10, MTM ₹2,500, all 25 slots; a stop chosen per premium on the first year, then the best two in Adaptive on the second | Selection 2024-10-09 → 2025-10-08, test 2025-10-09 → 2026-10-16, gross (no charges) | Selection year: SL 70–80 % best (₹80 SL 80 % +230, ₹100 SL 70 % +281, ₹120 SL 70 % +295 per lot-day, vs +207 / +230 / +247 at 115 %; drawdown 35–60 % of the 115 % cell's). Test year, Adaptive with the best two added: −₹10 [−82, +63], drawdown deeper. **Not positive** (one replay; the interval includes zero) | [BL-127][bl127] |
 | BL-128 | SENSEX ₹240 / ₹300 / ₹350 × SL 60, 70, 80, 90, 100, 115 % (same value on both legs), trail 15/10, MTM ₹2,500, all 25 slots; a stop chosen per premium on the first year, then the best two in Adaptive on the second | Selection 2024-10-09 → 2025-10-08, test 2025-10-09 → 2026-10-16, gross (no charges) | Selection year: SL 60 % best at all three premiums, the grid's lowest (₹240 +153, ₹300 +160, ₹350 +155 per lot-day, vs +86 / +103 / +92 at 115 %; drawdown 68–78 % of the 115 % cell's; positive at 22–25 of 25 slots). Test year, Adaptive with the best two (₹300, ₹240 at 60 %) added: −₹2 [−88, +79], drawdown deeper. **Not positive** (one replay; the interval includes zero) | [BL-128][bl128] |
 | BL-155 | Stop set by the morning type at 11:00 (range so far vs the last 20 mornings): quiet 100 %, normal 80 %, wide 60 %; vs fixed 60 / 80 / 100 % and the reversed rule | Heatmap ATM straddles 11:15–14:45, exit 15:15, after charges; NIFTY 2025-01 → 2026-10 decides; NIFTY 2022–24 and SENSEX reported | **Killed**: +₹40 vs +₹32–35 a lot-day, every interval includes zero, below shuffled labels; the real-Widesl step was not run | [BL-155][bl155] |
+| BL-156 Amendment 1 | Leg stop checked on every tick (the engine: bar high / low) vs at the 1-minute close (exit at that close), crossed with the MTM rule | T1's Adaptive picks, 2025-01-10 → 2026-10-22, 1 lot, after brokerage | **Tick is better**: candle-close leg stops cost −₹429 a day on the book (−₹588 to −₹270), in every half-year; Widesl: −₹95 a pick | [BL-156][bl156] |
 
 Leg-stop rows in the post-charge top four (holdout, mean over the band's start-time files):
 
@@ -34,7 +35,6 @@ Leg-stop rows in the post-charge top four (holdout, mean over the band's start-t
 | NIFTY 13:00–15:30 | ₹80, 150% | ₹19,964 | 82 | −₹18,698 | 6.0% |
 | SENSEX, all three bands | ₹250, 80% | ₹5,697 / ₹11,119 / ₹14,702 | 24 / 46 / 61 | −₹33.0k / −₹34.1k / −₹16.9k | 17.6% / 12.1% / 5.2% |
 | SENSEX 13:00–15:30 | ₹250, baseline 114/115% | ₹13,883 | 57 | −₹18,819 | 4.9% |
-| BL-156 Amendment 1 | Leg stop checked on every tick (the engine: bar high / low) vs at the 1-minute close (exit at that close), crossed with the MTM rule | T1's Adaptive picks, 2025-01-10 → 2026-10-22, 1 lot, after brokerage | **Tick is better**: candle-close leg stops cost −₹429 a day on the book (−₹588 to −₹270), in every half-year; Widesl: −₹95 a pick | [BL-156][bl156] |
 
 ## What we know
 
