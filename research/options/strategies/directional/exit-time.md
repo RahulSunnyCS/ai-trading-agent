@@ -15,7 +15,7 @@ The minute any leg still open is bought back. Set by `exit_time` (HH:MM).
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
 | BL-096 primary | 14:50, 15:00, 15:10, 15:20, 15:28 × leg stop × MTM, all 100 Dir bases | holdout 2025-10-09 → 2026-10-09, before and **after charges** (15k charged grid) | Descriptive: 15:28 clearly best after charges | [BL-096][bl096] |
-| BL-147 | 14:55 vs 15:28, all else unchanged: the 710 T1 + Core Dir pick-days (A) and all 161 Dir variants (B) | A 2025-01-10 → 2026-10-19 (re-scored, not forward); B 2024-10-09 → 2026-10-19; gross per lot, no charges | Pre-registered: **closing at 14:55 hurts**, −122 per trade-day [−168, −76], 0 of 161 variants improve, drawdown −33,379 → −41,322 (can be understated, see page). A conditional exit (14:55 only when the index is down ≥ 0.6%) is **not better**; that part is **post-hoc, exploratory** (no owner `override:` recorded) | [BL-147][bl147]; [page](../../common/directional-early-exit.md) |
+| BL-147 | 14:55 vs 15:28, all else unchanged: the 710 T1 + Core Dir pick-days (A) and all 161 Dir variants (B) | A 2025-01-10 → 2026-10-19 (re-scored, not forward); B 2024-10-09 → 2026-10-19; gross per lot, no charges | Pre-registered: **closing at 14:55 hurts**, −122 per trade-day [−168, −76], 0 of 161 variants improve, drawdown −33,379 → −41,322 (can be understated, see page). A conditional exit (14:55 only when the index is down ≥ 0.6%) is **not better**; that part is **post-hoc, exploratory** (owner override recorded after the run, 2026-10-24) | [BL-147][bl147]; [page](../../common/directional-early-exit.md) |
 
 Full 15k charged grid, mean net ₹ per day by exit ([BL-096][bl096] Log): 15:28 ₹136, 15:10 ₹62, 15:20 ₹45,
 15:00 ₹32, 14:50 −₹23.
