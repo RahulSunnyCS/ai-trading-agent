@@ -12,7 +12,7 @@ overall stop) instead of an id.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, timedelta
 
 from . import labels
 from .lists import DISPLAY_NAMES
@@ -49,6 +49,48 @@ def rupees(value: float) -> str:
 def expiry_day_line(index: str) -> str:
     """The one line a BL-122 rule day adds to the morning message."""
     return f"⚡ Expiry day · {index} only"
+
+
+def dte_text(dte: dict | None) -> str:
+    """`NIFTY 2 DTE · SENSEX 4 DTE` (weekdays to each index's expiry), or '' when not known."""
+    parts = [
+        f"{index} {dte[index]} DTE"
+        for index in ("NIFTY", "SENSEX")
+        if dte and str(dte.get(index, "unknown")) != "unknown"
+    ]
+    return " · ".join(parts)
+
+
+def _with_dte(head: str, dte: dict | None) -> str:
+    text = dte_text(dte)
+    return f"{head} · {text}" if text else head
+
+
+def change_line(day: date | str, previous: dict | None, core, buy) -> str:
+    """How the 09:16 picks compare with the list the evening message sent (`previous`:
+    `{'day', 'sent_on', 'core', 'buy'}`): `✅ No change from yesterday's list` or `🔄 Changed from
+    yesterday's list: ➖ 12:17 N_widesl_p100 · ➕ 09:32 S_dir_ATM`; '' with no evening list, or
+    one it cannot read (never raises: the 09:16 message is sent after the entry is recorded)."""
+    try:
+        return _change_line(day, previous, core, buy)
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _change_line(day: date | str, previous: dict | None, core, buy) -> str:
+    if not isinstance(previous, dict) or str(previous.get("day")) != str(day):
+        return ""
+    sent_on = str(previous.get("sent_on") or "")
+    d = date.fromisoformat(day) if isinstance(day, str) else day
+    yesterday = sent_on == (d - timedelta(days=1)).isoformat()
+    when = "yesterday's" if yesterday or not sent_on else f"{day_text(sent_on)[:3]}'s"
+    before = {*previous.get("core", []), *previous.get("buy", [])}
+    now = {*core, *buy}
+    if before == now:
+        return f"✅ No change from {when} list"
+    gone = [f"➖ {_at(n, labels.label(n).head)}" for n in _by_time(sorted(before - now))]
+    new = [f"➕ {_at(n, labels.label(n).head)}" for n in _by_time(sorted(now - before))]
+    return f"🔄 Changed from {when} list: " + " · ".join([*gone, *new])
 
 
 def _at(name: str, head: str) -> str:
@@ -112,16 +154,26 @@ def _entry_picks(entry: dict) -> tuple[list[str], list[str]]:
     return list(block["core"]), list(block["buy"])
 
 
-def _adaptive_block(entry: dict, options: dict[str, str | None] | None) -> list[str]:
-    lines = [f"🎯 {DISPLAY_NAMES.get(ADAPTIVE_KEY, 'Adaptive').upper()} · {day_text(entry['day'])}"]
+def _adaptive_block(
+    entry: dict, options: dict[str, str | None] | None, previous: dict | None = None
+) -> list[str]:
+    head = f"🎯 {DISPLAY_NAMES.get(ADAPTIVE_KEY, 'Adaptive').upper()} · {day_text(entry['day'])}"
+    lines = [_with_dte(head, entry.get("dte"))]
     if entry.get("expiry_only"):
         lines.append(expiry_day_line(entry["expiry_only"]))
     core, buy = _entry_picks(entry)
+    change = change_line(entry["day"], previous, core, buy)
+    if change:
+        lines.append(change)
     return [*lines, "", *pick_lines(core, buy, options)]
 
 
 def _t1_block(
-    entry: dict, options: dict[str, str | None] | None, *, dated: bool = False
+    entry: dict,
+    options: dict[str, str | None] | None,
+    *,
+    dated: bool = False,
+    previous: dict | None = None,
 ) -> list[str]:
     head = f"{T1_HEAD} · {day_text(entry['day'])}" if dated else T1_HEAD
     lines = [head]
@@ -131,6 +183,9 @@ def _t1_block(
     if not dated and not entry.get("before_first_entry", True):
         lines.append(f"   {LATE_LINE}")
     core, buy = _entry_picks(entry)
+    change = change_line(entry["day"], previous, core, buy)
+    if change:
+        lines.append(change)
     return [*lines, "", *pick_lines(core, buy, options)]
 
 
@@ -153,14 +208,24 @@ def render_morning(
     t1: dict | None,
     t1_options: dict[str, dict[str, str | None]] | None = None,
     t1_note: str = T1_NOT_RECORDED,
+    previous: dict | None = None,
 ) -> tuple[str, str]:
     """(the owner's message, the group's copy). The owner sees Adaptive, then the T1 track (or,
     with no T1 entry, `t1_note`: not recorded, or follows separately); the group sees Adaptive
-    alone. Both end with the Adaptive entry's chain hash."""
-    adaptive = _adaptive_block(live, (live_options or {}).get(ADAPTIVE_KEY))
+    alone. Both end with the Adaptive entry's chain hash. `previous` is the list the evening
+    message sent for this session (`result.read_tentative`): each list then says whether it
+    changed."""
+    previous = previous or {}
+    adaptive = _adaptive_block(
+        live, (live_options or {}).get(ADAPTIVE_KEY), previous.get("adaptive")
+    )
     prefix = _late_prefix(live)
     group = "\n".join([*prefix, *adaptive, "", footer(live)])
-    t1_lines = [t1_note] if t1 is None else _t1_block(t1, (t1_options or {}).get(ADAPTIVE_KEY))
+    t1_lines = (
+        [t1_note]
+        if t1 is None
+        else _t1_block(t1, (t1_options or {}).get(ADAPTIVE_KEY), previous=previous.get("t1"))
+    )
     private = "\n".join([*prefix, *adaptive, "", SEPARATOR, *t1_lines, "", footer(live)])
     return private, group
 
@@ -219,12 +284,12 @@ def render_result(
         lines += ["", *live]
     first = tomorrow_adaptive or (None if isinstance(tomorrow_t1, str) else tomorrow_t1)
     if first is not None:
-        lines += ["", f"➡️ {day_text(first.day)}"]
+        lines += ["", f"➡️ {day_text(first.day)} (Tentative)"]
         if first.expiry_only:
             lines.append(f"⚡ {first.expiry_only} only")
         lines.append("")
         if tomorrow_adaptive is not None:
-            lines += _next_lines("🎯 Adaptive", tomorrow_adaptive)
+            lines += _next_lines(_with_dte("🎯 Adaptive", tomorrow_adaptive.dte), tomorrow_adaptive)
         if isinstance(tomorrow_t1, str):
             lines.append(tomorrow_t1)
         elif tomorrow_t1 is not None:

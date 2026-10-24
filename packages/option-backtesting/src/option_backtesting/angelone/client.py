@@ -20,7 +20,7 @@ from collections.abc import Callable
 from datetime import date, datetime, timedelta, timezone
 
 from ..fyers.client import Candle
-from .auth import AngelCredentialsError, Post, Session, post_json, request_headers
+from .auth import AngelCredentialsError, Post, Session, post_json, rate_limited, request_headers
 from .symbols import Target
 
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -30,7 +30,6 @@ OI_PATH = "/rest/secure/angelbroking/historical/v1/getOIData"
 MIN_INTERVAL_S = 0.4
 OPEN_MINUTE, LAST_MINUTE = (9, 15), (15, 29)
 _AUTH_CODES = {"AG8001", "AG8002", "AG8003", "AB8051"}  # invalid / expired token
-_RATE_WORDS = ("exceeding access rate", "rate limit", "too many")
 
 
 def _minute_epochs(day: date) -> list[int]:
@@ -92,7 +91,7 @@ class AngelClient:
             self.calls += 1
             status, payload = self._post(path, body, headers)
             message = str(payload.get("message") or "")
-            limited = status == 429 or any(w in message.lower() for w in _RATE_WORDS)
+            limited = status == 429 or rate_limited(message)
             if limited and attempt < 4:
                 time.sleep(2**attempt)
                 continue

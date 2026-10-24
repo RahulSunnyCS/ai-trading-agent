@@ -113,11 +113,12 @@ def test_message_uses_strategy_names_and_keeps_recording_witness(on_time):
         "before_first_entry": on_time,
     }
     text = pick.render(entry)
-    assert "🎯 ADAPTIVE · Tue 13 Oct" in text
+    # the owner asked for each index's DTE on the heading (2026-10-23); the VIX stays out
+    assert "🎯 ADAPTIVE · Tue 13 Oct · NIFTY 0 DTE · SENSEX 2 DTE" in text
     assert "1️⃣ 09:32  N_dir_ITM1" in text and "2️⃣ 11:17  N_widesl_OTM1" in text
     assert "➕ Buy\n   11:47  N_buy_p50" in text
     assert "Steady" not in text and "Calendar" not in text
-    assert "VIX" not in text and "DTE" not in text
+    assert "VIX" not in text and text.count("DTE") == 2
     assert "Baseline" not in text and "REF:" not in text
     assert "REF" in entry["lists"]
     assert text.endswith("🔒 f1a77247 · 09:16")

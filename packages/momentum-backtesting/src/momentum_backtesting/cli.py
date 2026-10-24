@@ -614,19 +614,30 @@ app.add_typer(local_app, name="local")
 
 
 @local_app.command("migrate")
-def local_migrate() -> None:
+def local_migrate(
+    allow_price_shrink: bool = typer.Option(
+        False,
+        help="Replace momentum_prices even when data/ has less history than the database "
+        "(e.g. an instrument removed from universe.csv). Refused otherwise.",
+    ),
+) -> None:
     """Copy companies/renames/corporate-actions/membership, stock daily bars, and the
     index/ETF/premium/weekly price series into the shared local database. The curated
     CSVs and data/ stay the master copies — safe to re-run; every table/partition this
-    touches is replaced wholesale, never appended to."""
+    touches is replaced wholesale, never appended to. Refuses (and changes nothing) when
+    data/'s price series hold less history than momentum_prices already does."""
     from trading_data.db import data_root
 
     from . import db_migrate
     from .db_read import open_catalog
 
     root = data_root()
-    with open_catalog(root) as con:
-        report = db_migrate.migrate(con, root)
+    try:
+        with open_catalog(root) as con:
+            report = db_migrate.migrate(con, root, allow_price_shrink=allow_price_shrink)
+    except db_migrate.PriceShrinkError as error:
+        typer.echo(str(error))
+        raise typer.Exit(1) from None
     # Reopen after the Parquet write: lake views are fixed when connect() opens.
     from . import stock_actions
 
@@ -990,7 +1001,7 @@ def stocks_sync(
 
     try:
         stocks_fetch(from_="2011-01-01", skip_download=False, accept_ca_diff=None)
-        local_migrate()
+        local_migrate(allow_price_shrink=False)
         return
     except NseError as error:
         # Specifically NSE connectivity/bot-detection failures — never a bare `Exception`
