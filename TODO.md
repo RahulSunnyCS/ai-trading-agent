@@ -452,6 +452,7 @@ collector is forward-only".
 | 3.10.37 | "Days like today" for Adaptive's late picks — [BL-022](backlog/BL-022-analog-day-search.md) | claude | **Done 2026-10-22: killed at the gate.** Phase 0 registered before any run (owner's choices: 10:30 / 11:00 / 12:00, skip or heatmap swap, recent period decides). The 20 nearest earlier sessions' rest-of-day range ranks today's at Spearman 0.38–0.44, below BL-110's opening-range rule (0.49–0.52) and the VIX-implied move (0.43–0.45), at every check time and with both distances (Holm p ≥ 0.92; same order in 2022–24 and on SENSEX). The skip / swap replay was not run, as registered. The "20 days like today" view (Phase 4) is open as a look-only tool. |
 | 3.10.38 | Stop size by the morning — [BL-155](backlog/BL-155-stop-by-morning-type.md) | claude | **Done 2026-10-22: killed at step 1.** Phase 0 registered before any run (owner idea: wide stop after a quiet morning, tight after a wide one). On the heatmap's NIFTY ATM straddles 11:15–14:45, 2025-01 → 2026-10, the rule made +₹40 per lot-day net against +₹32–35 for fixed 60 / 80 / 100 % and the reversed rule; every 90% lower bound is below zero, and the rule is below shuffled labels. The real-Widesl step was not run, as registered. Lead, not adopted: after a quiet morning the widest stop is best on NIFTY in both periods. |
 | 3.10.39 | Adaptive: shrink the 09:16 fits by sample size, plus opening labels — [BL-154](backlog/BL-154-adaptive-fit-shrinkage.md) | claude | **Done 2026-10-22: killed.** Phase 0 registered before any run (owner: P1 decides, shrink toward the variant's own mean, k = 10). Replay of list C over Core-298, 431 days, parity with `score_history` on every day. On P1, shrinkage −₹24 per lot-day [−116, +75], 1 of 20 shuffles above it, drawdown 21% deeper; the gap / previous-range labels −₹20 [−91, +48]. Shrinkage is wholly negative on P2 (−₹172) and on the whole span (−₹71). Today's fits beat all 20 label shuffles on P2 and the whole span. Nothing live changes. |
+| 3.10.40 | Leg and overall MTM stop: tick or candle close — [BL-156](backlog/BL-156-mtm-stop-tick-vs-candle-close.md) | claude | **Done 2026-10-23.** Tick model calibrated on the 23 Oct live stop (13:45, −₹2,550 vs −₹2,554.50); paper reproduced exactly. T1, 431 days, four combinations: leg tick + MTM close (paper) +₹1,526 / day; leg tick + MTM tick (live) +₹1,470; leg close + MTM close +₹1,112; leg close + MTM tick +₹1,021. **Candle-close leg stops are significantly worse** (−₹432 / day main effect, every half-year; Dir −₹220 a pick). The MTM rule is not significant (+₹56 [−18, +153]). Keep leg stops on tick; the MTM candle close is optional (AlgoTest only). (3.10.39 left for BL-154.) |
 
 ### 3.11 Local research database (`packages/trading-data`)
 
@@ -739,6 +740,44 @@ Owner (2026-10-19): build the deploy function ready, off by default; it may neve
 |---|---|---|---|
 | 3.31.1 | The /live page and the Setup Execution sheet, read from the screen | claude | **Done 2026-10-19** (`docs/algotest-execution.md` §7); what Activate asks is still unseen |
 | 3.31.2 | Deployer `packages/broker-login/src/strategy-deploy.ts` + `deploy-plan.ts` (8 tests), jobs `algotest-deploy` 09:16 and `algotest-deploy-check` 15:35 | claude | **Built 2026-10-19**, off until `ALGOTEST_DEPLOY=on`; the first `--apply` must be watched by the owner |
+
+### 3.42 T1 on range-bound days — [BL-144](backlog/BL-144-t1-range-bound-days.md)
+
+Owner (2026-10-21): a year of daily results for 3 x Widesl, the base, Core and T1 with day and 7-day ranges, and a
+study of whether T1 moves to wider stops on range-bound days. Pre-registered 2026-10-21 before any run.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.42.1 | Pre-registration committed | claude | **Done 2026-10-21** |
+| 3.42.2 | The table (CSV) and the study, verdicts against the registered rules, findings page | claude | **Done 2026-10-21.** H1 not met (+10.0 pp vs +15 pp), H2 met; `research/options/common/t1-range-bound-days.md` |
+
+### 3.43 T1 robustness, regime lag and opening range — [BL-145](backlog/BL-145-t1-robustness-lag-opening-range.md)
+
+Owner (2026-10-21): follow-ups to BL-144 (breadth, lag after a regime change, opening-range gate). Pre-registered before any run.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.43.1 | Pre-registration committed | claude | **Done 2026-10-21** |
+| 3.43.2 | Run Q2-Q4 (Q4 learning, then one confirmation run), findings page | claude | **Done 2026-10-21.** Broad; no lag; gate works but thin; `research/options/common/t1-robustness-and-lag.md` |
+
+### 3.44 Special days — [BL-146](backlog/BL-146-special-days.md)
+
+Owner (2026-10-21): behaviour on Budget, election-result, RBI-policy and high-premium days; anything to add to T1.
+Pre-registered before any run.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.44.1 | Pre-registration committed | claude | **Done 2026-10-21** |
+| 3.44.2 | Run the event table and E1-E3, findings page | claude | **Done 2026-10-21.** E1 met, E2 met, E3 no change; `research/options/common/special-days.md` |
+
+### 3.45 Directional early exit at 14:55 — [BL-147](backlog/BL-147-directional-early-exit.md)
+
+Owner (2026-10-21): would closing the directional strategies at 14:55 help against a late recovery. Pre-registered before any run.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.45.1 | Pre-registration committed | claude | **Done 2026-10-21** |
+| 3.45.2 | Rerun every Dir variant at 14:55, populations A and B, the owner's pattern, findings page | claude | **Done 2026-10-21.** The 14:55 exit hurts; `research/options/common/directional-early-exit.md` |
 
 ## Reference — where detail lives
 
