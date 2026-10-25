@@ -82,6 +82,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-149](BL-149-fyers-greeks-validation.md) | Fyers' Greeks: do we need them? Validate our own IV and Greeks against the expired-F&O API on a pre-registered sample, and say what MCX must derive | P2 | Planned | research | options / trading-data |
 | [BL-151](BL-151-monthly-trending-theme-scout.md) | Monthly trending-theme scout (an agent reads Reddit, news and, if affordable, X) and a starting date for every Broad theme, so a theme cannot be used before it became one | P2 | Idea | feature + research | momentum + scheduler |
 | [BL-152](BL-152-margin-check-without-algotest.md) | Margin check: a free-margin read that does not need AlgoTest or Shoonya's login, the need estimate checked against what the broker blocks, then switched on (`MARGIN_CHECK`) | P2 | Planned | improvement | broker-login |
+| [BL-164](BL-164-gap-and-go-williams-chain.md) | NIFTY gap-and-go 10% opening-range band → Williams back-up chain, 150-point ITM weekly buys, exactly as published (3 tests through the rule tester; POC) | P2 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
