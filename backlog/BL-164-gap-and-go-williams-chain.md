@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner's idea from a public source (OptionsBuyer.in); evidence only, nothing waits on it; the repo's prior is against intraday option buying (BL-152, BL-097), so the value is a clean verdict, not a candidate |
-| **Status** | Planned (pre-registration drafted; nothing run) |
+| **Status** | In progress (Phase 1; pre-registration settled 2026-10-25, nothing run) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-25 |
 | **Depends on** | BL-120 (the rule tester: grammar, placebo and random-time controls, ledger, locked confirmation period), BL-063 (the charge model), BL-152 (the breakout grammar and the verdict this must beat) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.10.43 |
 
 ## Context
 
@@ -120,7 +120,9 @@ hold on the locked confirmation period. Three tests, every one counted in the le
 - **Fills and stops.** Entry fills at the signal minute's close (the BL-083 / BL-120 convention, a minute
   earlier than "the next bar"); the published "next bar" fill is covered by the 0.5% and 1% slippage rows.
   The −30% stop and the 105% / 80% peak trail are checked on the option's 1-minute close and fill at that
-  close; the time exit is 15:15.
+  close, not on the bar's high / low (owner, 2026-10-25: as published, although BL-156 found
+  close-checked stops worse for the sellers' legs); the time exit is 15:15.
+- **Costs:** the BL-063 model only (owner, 2026-10-25); the source's 0.1% a side is not shown.
 - **Universe:** NIFTY index 1-minute bars and the NIFTY weekly option chain of each day from the
   trading-data lake (expired contracts included; days `data_quality` excludes are skipped and counted).
   The index has no constituents to be survivorship-biased.
@@ -155,8 +157,10 @@ hold on the locked confirmation period. Three tests, every one counted in the le
   of `x` over its 375 bars), plus `{ever: a}` (true from the first stamp `a` held in the session; a
   bool `cum_max`). In `legwise/schema.py` + `engine.py`, an optional leg field `trail_peak:
   {activate_percent, pullback_percent}` (off unless set, so every golden stays byte-identical) checked on
-  the option's 1-minute close, and a check that a leg stop can be judged on the close (BL-156's
-  candle-close mode) rather than the bar's high / low. Causality test for each operator, unit tests,
+  the option's 1-minute close, and an optional leg field `stop_on: tick | close` (default `tick`, left
+  out of the dump at its default so no strategy gets a new version) that judges the leg's stop on the
+  1-minute close and fills it at that close. The engine has no such mode today: BL-156's candle-close
+  stops live only in `research/bl156/`. Causality test for each operator, unit tests,
   `scripts/ruletest-acceptance.py` still ACCEPTANCE OK, legwise goldens unchanged.
 - **Deliverables:** the operators and the field, tests, the package `CLAUDE.md` lines.
 - **Done when:** the three Phase 2 specs validate, read back in plain words, and `obt rule validate`
@@ -190,17 +194,20 @@ hold on the locked confirmation period. Three tests, every one counted in the le
 - **Grammar drift:** adding operators for one item grows the grammar; each is small, causal and tested,
   and `ever` and `prev_at` are general.
 
-## Open questions
+## Decisions (owner, 2026-10-25)
 
-- The 09:15 "price": the bar's open (registered above) or its close? Changing it is a dated rule before
-  the run, not after.
-- Does the owner want the source's cost assumption (0.1% a side) shown as an extra row beside the BL-063
-  model, for comparison with the published figures? (Description only; the verdict uses BL-063.)
-- If H1 passes and the chain does not, is the forward proposal H1 alone? (Registered as yes.)
-- Should a SENSEX run follow a NIFTY pass, as its own item?
+- Stops and the trail are judged on the option's 1-minute close, as published (Phase 1 adds `stop_on:
+  close` to the engine).
+- The 09:15 price is the 09:15 bar's open (`session_open`).
+- Costs: BL-063 only; no row at the source's 0.1% a side.
+- If H1 passes and the chain does not, the forward proposal is H1 alone (as registered).
+- SENSEX: a separate, pre-registered item after a NIFTY pass, not part of BL-164.
 
 ## Log
 
 - 2026-10-25 — created from the owner's request ("What do you think of the strategies? Let's do a POC");
   the published rules recorded in full, the assessment written, Phase 0 drafted. Nothing run, no code.
   Next: the owner's answers to the open questions, then Phase 1.
+- 2026-10-25 — started. Owner's answers recorded under Decisions: close-checked stops as published
+  (the engine gains `stop_on: close`; today only BL-156's research replay has one), 09:15 open, BL-063
+  costs only, SENSEX as its own item later. TODO 3.10.43. Phase 1 begins.
