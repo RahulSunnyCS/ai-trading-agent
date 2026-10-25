@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner's idea from a public source (OptionsBuyer.in); evidence only, nothing waits on it; the repo's prior is against intraday option buying (BL-152, BL-097), so the value is a clean verdict, not a candidate |
-| **Status** | In progress (Phase 1; pre-registration settled 2026-10-25, nothing run) |
+| **Status** | Done — killed (2026-10-25): no test is a candidate; confirmation period never opened |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-25 |
@@ -194,6 +194,30 @@ hold on the locked confirmation period. Three tests, every one counted in the le
 - **Grammar drift:** adding operators for one item grows the grammar; each is small, causal and tested,
   and `ever` and `prev_at` are general.
 
+## Result
+
+**Killed: no candidate.** The three registered tests ran on the learning period (NIFTY, 2024-10-09 to
+2026-10-08, 489 usable days, BL-063 charges, one lot, 200 random-time draws, 20 placebo days;
+`research/bl164/run.py`, ledger tests `20261025-182758-345a`, `-182830-27fc`, `-182915-6f35`):
+
+| Test | Events | Net / trade | t | Win rate | Random-time pct (mean of draws) | 0.5% slip | 1% slip | Candidate |
+|---|---|---|---|---|---|---|---|---|
+| H1 gap-and-go | 147 | +₹111 | 0.33 | 39% | 1.00 (−₹484) | −₹35 | −₹210 | no (t) |
+| H2 Williams | 163 | −₹119 | −0.35 | 34% | 1.00 (−₹914) | −₹252 | −₹396 | no |
+| H3 chain | 310 | −₹10 | −0.04 | 36% | 1.00 (−₹487) | −₹149 | −₹308 | no |
+
+- None is thin; none reaches t ≥ 2.0, so steps 3–4 give **killed** and nothing was revealed.
+- H3 is H1 plus H2 exactly (310 = 147 + 163 events; −₹3,206 = +₹16,261 − ₹19,467 in total).
+- H1 earns a little before slippage and nothing after 0.5%. Its result is a fat right tail on a 39%
+  win rate (best trades +₹15k to +₹18k, worst about −₹7k), which is why the t is low.
+- Every test beats entering the same trade at a random later minute while still beyond the level
+  (percentile 1.00): entering at the first break is better than later in the same move, as BL-152
+  found, but the trade itself does not pay.
+- Description only, not findings: H1 by half-year −₹674 / +₹80 / +₹377 / +₹352 / −₹26 (2024H2 →
+  2026H2); by side down +₹273 (64), up −₹15 (83); expiry days +₹724 (23 trades). H3's placebo
+  (−₹1,042 a trade) is drawn from the few no-event days left (no-break and mid-gap days), so its
+  "+₹1,032 vs placebo, t 4.2" is a biased comparison and is not read.
+
 ## Decisions (owner, 2026-10-25)
 
 - Stops and the trail are judged on the option's 1-minute close, as published (Phase 1 adds `stop_on:
@@ -237,3 +261,7 @@ hold on the locked confirmation period. Three tests, every one counted in the le
   at the 1-minute close below 70% of entry, the trail exits (TRAIL) at 80% of the closing peak, the
   time exit at 15:15. One month's gross is not read as evidence. Next: the full learning-period run of
   the three tests (three ledger tries).
+- 2026-10-25 — owner: run the full learning period. Three ledger tests, learning only. **Killed**: no
+  candidate (H1 +₹111 t 0.33, H2 −₹119 t −0.35, H3 −₹10 t −0.04); numbers under Result. `run.py`
+  applies steps 1–2; with no candidate there is nothing for a `judge.py` to reveal, so none was
+  written. Findings: `research/options/strategies/gap-and-go/`. Closed.
