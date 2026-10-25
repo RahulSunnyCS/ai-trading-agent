@@ -134,3 +134,18 @@ ledger tests `20261025-185402-cdd4`, `20261025-185405-6061`):
 - 2026-10-25 — **Phase 2 run.** Expiry check and reproduction check passed; both specs revealed
   (note "BL-165 …") and tested on the confirmation period. **Killed, both** (L1 +₹485 a trade, t 1.01;
   L2 +₹746, t 1.21; bar 2.24); numbers under Result. Findings: the gap-and-go pages. Closed.
+- 2026-10-25 — **override:** owner, after being told both periods are now seen for this family and the
+  strikes / expiries below are on BL-164's and BL-165's will-not-run lists: "Yes test the new variants"
+  (asked: "Have you tried with 100, 80, 120 premium and next week options in expiry day. What is win
+  rate"). Registered here before any run, as an **exploratory screen, not a verdict** (`mode:
+  exploratory`, every variant counted in the ledger, `research/bl165/screen.py`); H1's rules otherwise
+  unchanged (band, window, −30% stop, 105% / 80% trail on closes, 15:15, BL-063 charges, one lot):
+  - **A** (all gap-and-go days, nearest weekly): `closest_premium` ₹80 / ₹100 / ₹120; both periods.
+  - **B** (expiry days only, the same-day expiry): ₹80 / ₹100 / ₹120; both periods.
+  - **C** (expiry days only, next week's expiry): ITM3 and ₹80 / ₹100 / ₹120; **learning period only**:
+    the 2022–24 vendor files carry only the current weekly (41 of 43 confirmation expiry-day events have
+    no next-week chain, and `pick_expiry(..., "next_weekly")` there falls on a long-dated contract), so
+    a 2022–24 run would trade the wrong option. C has 23 events: thin by the 40-trade floor.
+  - 10 variants. Read: trades, win rate, net / trade, t, 0.5% slippage, random-time percentile per
+    period. A variant with t ≥ 2.0 in both periods would be a lead for forward tracking only; nothing
+    here passes or fails anything.
