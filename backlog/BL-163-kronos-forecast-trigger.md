@@ -149,6 +149,14 @@ reason, and both stay here.
   setting, so a missing file is an error, never zeros); write `R1.yaml` and `R2.yaml` in
   `research/bl163/rules/`; run `obt rule test` on the clean window first, then the possibly-in-training
   period; apply the Phase 0 rule.
+- **The tester cannot isolate the clean window as it stands.** `obt rule test --period` takes `learning`
+  (2024-10 to 2026-10), `confirmation` (2022-01 to 2024-10) or both, and `ruletest/study.py::analyse_period`
+  reads the whole period from `PERIODS[period]`. So Phase 2 starts with a small, off-by-default
+  `--from YYYY-MM-DD` that raises the lower bound of the learning period for the events, the placebo
+  days and the random-time control alike, with a test that default behaviour is unchanged. Cutting the
+  events by date after a full-period run is not allowed: the placebo and random-time draws would still
+  use the unclean days. R2's realised-range baseline may look back before the clean start, because it
+  uses realised bars only, never the model. No verdict is recorded without this option.
 - **Deliverables:** the tester's result files, the ledger lines, a table in this item (event minus placebo,
   t, n events, random-time P90, slippage rows), the verdict in the Log, a `research/options/common/`
   page (`external-forecast.md`) with the result and the training-overlap caveat, and its row in
