@@ -16,6 +16,8 @@ Leaves
                                    R1 = 2P-L, S1 = 2P-H
     atr14                          mean true range of the previous 14 completed sessions
     minute                         the stamp index (0 = 09:15)
+    expiry_day                     true all session when its nearest listed weekly expiry is
+                                   that session (BL-165; known before the open)
     {clock: "10:30"}               the stamp index of a clock time
     {straddle: {at: "09:20"}}      CE + PE close of the strike that was ATM at that bar's spot
                                    close, nearest expiry; NaN before that bar (its strike is not
@@ -190,6 +192,7 @@ ELEMENTWISE = {"add", "sub", "mul", "div", "abs", "max", "min", "gt", "ge", "lt"
     "not",
 }
 TRADE_LEAF = "minutes_in_trade"
+EXPIRY_LEAF = "expiry_day"
 BANDS = ("upper", "middle", "lower")
 ALL_OPS = set(_POSITIONAL) | _VARIADIC | set(_PARAMETRIC) | _LEAF_OPS | _SINCE_FIRST | _TRADE_OPS
 
@@ -235,9 +238,11 @@ def _parse_node(expr: Any, defs: dict[str, Node] | None, path: str) -> Node:
             return defs[expr]
         if expr == TRADE_LEAF:
             return Node(TRADE_LEAF, kind="num", path=path)
+        if expr == EXPIRY_LEAF:
+            return Node(EXPIRY_LEAF, kind="bool", path=path)
         if expr in FEATURES:
             return Node("feature", (expr,), kind="num", path=path)
-        known = ", ".join(sorted(FEATURES | set(defs) | {TRADE_LEAF}))
+        known = ", ".join(sorted(FEATURES | set(defs) | {TRADE_LEAF, EXPIRY_LEAF}))
         raise RuleError(f"{path}: unknown name {expr!r} (known: {known})")
     if not isinstance(expr, dict) or len(expr) != 1:
         raise RuleError(f"{path}: expected a number, a name or a one-key mapping, got {expr!r}")
@@ -379,7 +384,7 @@ def parse_rule(when: Any, define: dict[str, Any] | None = None) -> tuple[Node, d
     """Parse `define:` in order (a definition may use the ones before it) and then `when:`."""
     defs: dict[str, Node] = {}
     for name, body in (define or {}).items():
-        if name in FEATURES or name in ALL_OPS or name == TRADE_LEAF:
+        if name in FEATURES or name in ALL_OPS or name in (TRADE_LEAF, EXPIRY_LEAF):
             raise RuleError(f"define.{name}: the name is already taken")
         defs[name] = parse(body, defs, f"define.{name}")
         if defs[name].label is None:
@@ -408,6 +413,8 @@ class Frame:
     vix_close: np.ndarray | None = None
     vix_open: np.ndarray | None = None
     straddle_loader: Any = None
+    #: () -> (sessions,) bool, the session is its own nearest weekly expiry (`expiry_day`)
+    expiry_loader: Any = None
     _cache: dict[Any, np.ndarray] = field(default_factory=dict, repr=False)
 
     @property
@@ -649,6 +656,11 @@ def _evaluate(node: Node, frame: Frame, memo: dict[Node, np.ndarray]) -> np.ndar
         # bar: every earlier stamp is unavailable, and a window opening before `at` cannot see it.
         out[:, :at] = np.nan
         return out
+    if op == EXPIRY_LEAF:
+        if frame.expiry_loader is None:
+            raise RuleError(f"{node.path}: expiry_day needs the expiry calendar, not loaded")
+        days = np.asarray(frame.expiry_loader(), dtype=bool)
+        return np.repeat(days[:, None], N_BARS, axis=1)
     if op == "bar_close":
         m = node.params["minutes"]
         out = np.zeros((frame.n, N_BARS), dtype=bool)
@@ -841,6 +853,8 @@ def describe(node: Node, top: bool = True) -> str:
         return f"a {node.params['minutes']}-minute bar has just completed"
     if op == TRADE_LEAF:
         return "minutes in the trade"
+    if op == EXPIRY_LEAF:
+        return "today is a weekly expiry day"
     kids = [describe(a, False) for a in node.args]
     if op in _WORDS:
         return f"({kids[0]} {_WORDS[op]} {kids[1]})"

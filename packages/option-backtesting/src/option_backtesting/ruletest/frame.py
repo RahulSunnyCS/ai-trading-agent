@@ -74,7 +74,74 @@ def load_frame(
         days=grid.days, O=grid.O, H=grid.H, L=grid.L, C=grid.C, vix_close=vclose, vix_open=vopen
     )
     frame.straddle_loader = StraddleLoader(root, underlying, frame)
+    frame.expiry_loader = ExpiryDayLoader(root, underlying, frame)
     return frame
+
+
+def nearest_expiry(root: Path, underlying: str, day: date) -> date | None:
+    """The nearest listed expiry on or after `day`, as the simulator picks the traded one
+    (`legwise.market.load_day` + `pick_expiry(day, "weekly")`): the day's Fyers symbol master when
+    there is one, else the expiries in that day's option file. None without an option file."""
+    import pyarrow.parquet as pq
+    from trading_data import lake
+
+    opt_path = lake.bars_1m_path(root, "option", underlying, day)
+    if not opt_path.exists():
+        return None
+    listed: set[date] = set()
+    symbols_path = lake.symbol_master_path(root, "fyers", day)
+    if symbols_path.exists():
+        table = pq.read_table(symbols_path, columns=["underlying", "option_type", "expiry"])
+        listed = {
+            s["expiry"]
+            for s in table.to_pylist()
+            if s["underlying"] == underlying and s["option_type"] != "FUT"
+        }
+    if not listed:
+        listed = set(pq.read_table(opt_path, columns=["expiry"]).column("expiry").to_pylist())
+    upcoming = sorted(e for e in listed if e >= day)
+    return upcoming[0] if upcoming else None
+
+
+class ExpiryDayLoader:
+    """`expiry_day`: per session, is it its own nearest weekly expiry (BL-165). Cached under
+    TRADING_DATA_ROOT/ruletest/features/; a session without an option file reads False and is
+    looked for again next run."""
+
+    def __init__(self, root: Path, underlying: str, frame: E.Frame):
+        self.root, self.underlying, self.frame = root, underlying, frame
+        self._values: np.ndarray | None = None
+
+    def __call__(self) -> np.ndarray:
+        if self._values is not None:
+            return self._values
+        path = store.features_dir(self.root) / f"expiry_day_{self.underlying}.npz"
+        known: dict[str, bool] = {}
+        if path.exists():
+            with np.load(path, allow_pickle=False) as z:
+                known = dict(zip(z["days"].tolist(), z["data"].astype(bool).tolist(), strict=True))
+        out = np.zeros(self.frame.n, dtype=bool)
+        added = 0
+        for i, d in enumerate(self.frame.days):
+            if d not in known:
+                day = date.fromisoformat(d)
+                if day < OPTIONS_FROM:
+                    known[d] = False
+                else:
+                    expiry = nearest_expiry(self.root, self.underlying, day)
+                    if expiry is None:
+                        continue  # no option file (yet): False this run, not saved
+                    known[d] = expiry == day
+                added += 1
+            out[i] = known[d]
+        if added:
+            days = sorted(known)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".tmp.npz")
+            np.savez_compressed(tmp, days=np.array(days), data=np.array([known[d] for d in days]))
+            tmp.replace(path)
+        self._values = out
+        return out
 
 
 class StraddleLoader:

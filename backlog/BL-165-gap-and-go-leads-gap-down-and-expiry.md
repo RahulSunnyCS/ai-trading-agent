@@ -106,3 +106,8 @@ slippage, on data neither rule was chosen on.
 
 - 2026-10-25 — created from the owner's request after BL-164's verdict. Pre-registration written and
   committed before any code or run. Next: Phase 1.
+- 2026-10-25 — **Phase 1 done** (nothing run). `expiry_day` leaf in `ruletest/expr.py` (in the
+  causality test), built by `ruletest/frame.py`'s `ExpiryDayLoader` from `nearest_expiry` (the
+  simulator's rule) and cached under `ruletest/features/`. BL-164's rule definitions moved to
+  `research/common/gap_and_go_specs.py` (its spec hashes unchanged). `research/bl165/run.py` writes the
+  two specs (L1 `cc2525aebfd4`, L2 `07b33d473cb1`); both validate and read back. Next: Phase 2.
