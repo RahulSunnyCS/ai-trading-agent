@@ -110,3 +110,9 @@ the locked 2022–24 period.
 - 2026-10-25 — created from the owner's request and answers (5-minute bars, fractal 2 each side, buy the
   break of the last swing high, exit on the structure break plus time). Strike (weekly ATM) and the −30%
   backstop fixed here before any run. Nothing run.
+- 2026-10-25 — **Phase 1 done**: `{swing: {kind, back, minutes, n}}` in `ruletest/expr.py` (causality
+  test rows, a hand-built session test). Spec `bl166_s1_hh_hl_break` (`a326ffb36ac5`) validates and reads
+  back. **Pilot** (`research/bl166/pilot.py`, 2024-10-09 → 11-08, 22 sessions, nothing in the ledger):
+  swings, structure, entries and structure exits recomputed in plain Python equal the grammar's on every
+  session (0 mismatches); 20 events (it fires on most days); strikes ATM at entry, the −30% backstop hit
+  three times, structure exits read as the trade's exit time. Next: the learning-period test.
