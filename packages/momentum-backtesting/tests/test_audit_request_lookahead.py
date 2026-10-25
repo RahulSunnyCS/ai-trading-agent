@@ -75,3 +75,15 @@ def test_only_broad_requests_are_accepted(tmp_path):
 
     with pytest.raises(ValueError, match="only Broad"):
         rl.check({"etf run": {"dataset": "etf"}}, ["2021-06-25"], tmp_path)
+
+
+def test_holdings_listed_in_a_different_order_are_not_a_difference():
+    def week(order):
+        return {
+            "rotations": [{"week": "w", "holdings": [{"asset": a, "share": 0.25} for a in order]}]
+        }
+
+    a, b = _ok(**week(["POWERGRID", "JKPAPER"])), _ok(**week(["JKPAPER", "POWERGRID"]))
+    assert rl.compare(a, b) == []
+    c = _ok(**week(["JKPAPER", "OTHER"]))
+    assert rl.compare(a, c)  # a different holding still counts

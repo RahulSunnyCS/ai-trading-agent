@@ -407,6 +407,7 @@ def load_stock_universe_frame(
         turnover_spike_multiple=turnover_spike_multiple,
         series_breaks=series_breaks,
         return_raw_weekly=True,
+        fill_internal_gaps=False,  # BL-001 F6: a gap's treatment must not depend on later data
     )
     if frame.empty:
         raise ValueError("no priced weeks for the Total Market universe -- check daily.parquet")
@@ -471,6 +472,34 @@ class UniverseRanking:
     # the gate). Kept so the live preview (`rebalance.live_broad_ranking`) can rebuild the pool
     # without reloading the whole universe from disk (~150 s on the real data).
     stock_membership: pd.DataFrame | None = None
+
+    def cross_section(self) -> pd.DataFrame | None:
+        """`cross_section_mask` for this ranking's weeks and columns, or None when it carries no
+        membership (then every column with a value is ranked, as before)."""
+        if self.stock_membership is None:
+            return None
+        return cross_section_mask(self.stock_membership, self.prices)
+
+
+def cross_section_mask(stock_membership: pd.DataFrame, full_frame: pd.DataFrame) -> pd.DataFrame:
+    """Who is ranked against whom each week (BL-001 F6): the stocks that are point-in-time members
+    behind the tradability gate that week, plus the always-present atomic instruments (their own
+    value decides, as before). A stock outside it that week gets no rank and takes no part in the
+    voladj mean and spread or in the rank positions the others are measured against.
+
+    Without this the cross-section was every column of the frame, and the frame holds a stock from
+    its first price on if ANY later year's universe lists it: a stock that only became liquid in
+    2022 sat in the 2012 cross-section and moved 2012's ranks, so a backtest at a past date changed
+    when later data arrived. Members of a week are known at that week."""
+    mask = pd.DataFrame(False, index=full_frame.index, columns=full_frame.columns)
+    stock_columns = [c for c in stock_membership.columns if c in mask.columns]
+    mask[stock_columns] = (
+        stock_membership.reindex(index=mask.index, columns=stock_columns).fillna(False).astype(bool)
+    )
+    for name in ATOMIC_NAMES:
+        if name in mask.columns:
+            mask[name] = True
+    return mask
 
 
 def _dense_rank(masked: pd.DataFrame) -> pd.DataFrame:
@@ -641,7 +670,10 @@ def compute_universe_base(
     if score == "residual":
         global_ranks = _residual_global_ranks(full_frame)
     else:
-        global_ranks, _global_scores = engine.compute_ranks(full_frame, config)
+        # `score="residual"` (killed in BL-085, off by default) does not take the cross-section yet.
+        global_ranks, _global_scores = engine.compute_ranks(
+            full_frame, config, cross_section_mask(universe.stock_membership, full_frame)
+        )
 
     return UniverseBase(
         universe=universe,
@@ -1426,6 +1458,7 @@ def run_broad_backtest(
                 Config(lookbacks=lookbacks),
                 tilt=stock_tilt,
                 screen_top_pct=stock_tilt_screen_pct,
+                cross_section=ranking.cross_section(),
             )
         eligible = effective.ranks.notna()
         masked = tilt_scores.reindex(index=eligible.index, columns=eligible.columns).where(eligible)

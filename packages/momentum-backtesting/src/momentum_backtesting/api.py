@@ -322,6 +322,7 @@ class _Data:
             Config(lookbacks=tuple(lookbacks)),
             tilt=tilt,
             screen_top_pct=screen_top_pct,
+            cross_section=ranking.cross_section(),
         )
         with self._lock:
             levers.tilt_cache_put(

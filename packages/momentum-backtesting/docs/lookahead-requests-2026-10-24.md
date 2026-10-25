@@ -86,3 +86,75 @@ holdings) have more near-ties.
   (`tests/categories/test_broad.py`).
 - The run itself was done with the pool fix applied part way through. The fix changes none of the
   results, as the comparison above shows, so the table stands.
+
+## Fixed 2026-10-25 (owner: "fix F6")
+
+Branch `fix/momentum-f6-point-in-time-ranking`, stacked on the PR that added the check.
+
+What changed (Broad only; ETF, Stock and Custom Index results are byte-identical, all ten golden
+controls and every live control run):
+
+1. **The cross-section is the week's point-in-time members behind the gate** (plus the atomic
+   instruments). `engine.compute_ranks(..., cross_section=)` takes a week x column table; an
+   instrument outside it that week gets no rank and takes no part in the voladj mean and spread or
+   in the rank positions. `broad.cross_section_mask` builds it from `stock_membership`;
+   `compute_universe_base`, the live preview (`rebalance.live_broad_ranking`) and the stock-tilt
+   ranking (`levers.grouped_momentum_ranks`, which ranked the whole frame a second time) all use it.
+   `persisted_broad_ranking` and the live ranking now carry membership forward so the tilt sees it
+   for the sentinel and live weeks.
+2. **Only the weeks after a stale column's last real price are forward-filled** in the Broad price
+   frame (`build_stock_weekly_prices(fill_internal_gaps=False)`). Gaps inside a history stay empty;
+   Broad already values positions on a forward-filled copy, so a held stock in a gap keeps a price.
+   Custom Index still fills the whole column.
+
+Check (same dates, same two groups, `mbt audit lookahead-requests`): **24 of 24 pairs identical**
+(orders, equity curve, KPIs, rotations, yearly, open positions). Before the second change the
+stock-tilt sleeves of the ensemble still differed; that is how the tilt call was found.
+
+### What it does to the numbers (live data, headline run, before to after)
+
+The check removes a hindsight-bearing cross-section, so levels move, not just noise. Mean CAGR over
+a strategy's sleeves, pre-tax as the dashboard shows it:
+
+| Strategy | Sleeves | CAGR before | CAGR after | Change | Max drawdown before / after |
+|---|---|---|---|---|---|
+| **Four Sectors Monthly, No Tilt (followed)** | 4 | 42.93% | 35.03% | **-7.90** | -30.8 / -36.9 |
+| Four Sectors, Quick Exit | 4 | 38.65% | 28.45% | -10.20 | -33.1 / -37.7 |
+| Six Sectors Monthly, No Tilt | 4 | 36.92% | 31.62% | -5.29 | -28.5 / -34.1 |
+| Five Sectors, Wide Pool | 4 | 36.02% | 31.61% | -4.40 | -30.9 / -31.4 |
+| Five Sectors, Stock Tilt | 4 | 39.87% | 35.88% | -3.99 | -29.6 / -35.6 |
+| Six Sectors, Make Room | 4 | 37.05% | 33.21% | -3.84 | -32.6 / -38.1 |
+| Five Sectors Monthly | 4 | 39.31% | 35.82% | -3.49 | -29.9 / -37.0 |
+| Trio Fortnightly | 2 | 42.18% | 40.65% | -1.53 | -26.2 / -32.9 |
+| Phase 6 ensemble (4 saved sleeves) | 1 each | 29.11 to 34.60 | 27.66 to 33.72 | -0.63 to -1.45 | |
+| Five Sectors, Rank Sum | 4 | 39.43% | 39.40% | -0.03 | -30.8 / -37.0 |
+| Four Sectors, Half Tilt | 4 | 39.07% | 39.47% | +0.40 | -32.0 / -34.8 |
+
+Eight golden Broad scenarios moved by -3.44 to +0.35 points (`tests/golden/CHANGELOG.md`).
+
+Reading it: the old ranking let stocks that were not in the week's universe set the scale the
+members were scored on. Removing them lowers the headline for most strategies (3.5 to 10 points
+for seven of the eleven) and deepens the average worst fall for most (0.5 to 9 points; one
+ensemble sleeve gets shallower). The followed strategy still beats
+the momentum index by a wide margin on this headline, but BL-010's figures and the search that
+picked these strategies both used the old ranking, so the selection itself carries some of the
+hindsight. Nothing here re-ran the search.
+
+### What the merge changes in live use
+
+- **This Friday's orders for lot 1 of the followed strategy change.** With the old ranking the model
+  buys NAZARA, GRWRHITECH, THELEELA and sells ATHERENERG, AZAD, KPIL; with the fix it buys NAZARA and
+  SYRMA, adds ATHERENERG, trims CUPID and sells ACMESOLAR, KIRLOSENG, NAVINFLUOR#2. (Lots 2 to 4 have
+  no trades that week either way.) Do not merge on a Friday before the orders run without choosing
+  which ranking the money follows.
+- Rank numbers in "why this pick" texts and the Momentum Scores page are unchanged in meaning; the
+  Scores page already ranked within the members.
+
+### Not done
+
+- `score="residual"` (killed in BL-085, off by default) does not take the cross-section.
+- Custom Index keeps whole-column gap filling and its own cross-section.
+- Search results already on disk (`data/search/*`) and the BL-010 write-ups were produced with the
+  old ranking and are not re-run. Re-running the search on the fixed ranking is a separate decision.
+- `live_rules.toml`'s drawdown rules were set against the old backtest; the followed strategy's
+  backtest drawdown is now about 6 points deeper.

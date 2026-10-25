@@ -383,6 +383,7 @@ contract, not a shared service).
   the stock tilt; weights never matter. `Config.voladj_lookbacks=True` (BL-086, a heavy key in the
   rank-cache key) makes it follow them; tested and killed (short lookbacks without the skip-month
   chase reversing spikes), so it stays off.
+- **Broad ranks over the week's point-in-time members (BL-001 F6, 2026-10-25):** `engine.compute_ranks(prices, config, cross_section=)` takes a week x column boolean table; `broad.cross_section_mask(stock_membership, frame)` builds it (members behind the gate, plus the atomic instruments) and `UniverseRanking.cross_section()` hands it to anything that ranks the same frame again (the stock tilt in `levers.grouped_momentum_ranks`). A new Broad ranking path must pass it, or a stock that joins the universe years later moves earlier weeks' ranks. `build_stock_weekly_prices(fill_internal_gaps=False)` (Broad only) forward-fills only after a stale column's last real price. `mbt audit lookahead-requests` is the check. `score="residual"` and Custom Index do not take it yet.
 - `categories/broad.py` — Broad Momentum's category-selection funnel
   (`compute_universe_ranking`, `compute_category_selection*`,
   `run_broad_backtest`) — a pure, no-P&L ranking layer that feeds `engine.py`
