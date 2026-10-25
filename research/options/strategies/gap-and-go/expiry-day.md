@@ -25,10 +25,15 @@ None.
 - There it stayed positive: +₹746 a trade, 51% winners, +₹649 at 0.5% slippage, better than a random later
   minute on every draw. But t is 1.21 and without its three best trades the mean is −₹18.
 - Description only: down +₹961 (22 trades), up +₹521 (21).
+- Exploratory screen (BL-165 Log, owner override): with ₹80 / ₹100 / ₹120 premium strikes the expiry-day
+  trade won 47–63% on 2022–24 (+₹719 to +₹858) but 22–30% on 2024–26 (−₹661 to +₹61, thin); with next
+  week's options (2024–26 only, 23 trades) ITM3 won 52%, +₹761, t 0.71. No variant is consistent across
+  both periods.
 
 ## Not yet tested
 
 - Expiry day combined with gap-down; days to expiry other than 0; SENSEX (will-not-run in BL-165).
+- Next week's options on 2022–24 (no next-week chain in the vendor files).
 
 ## Related
 

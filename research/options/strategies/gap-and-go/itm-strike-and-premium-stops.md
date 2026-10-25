@@ -19,12 +19,18 @@ None.
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
 | Strike and exits | the published values only | NIFTY, 2024-10-09 to 2026-10-08 | Killed with the rules they were tested in | [BL-164][bl164] Result |
+| Strike: closest premium ₹80 / ₹100 / ₹120, all days and expiry days; next-week expiry on expiry days | 10 variants, exploratory (owner override) | NIFTY, both periods (next week: 2024–26 only) | No lead: no variant t ≥ 2.0 in both periods; every premium variant flips sign between them | [BL-165][bl165] Log |
 
 ## What we know
 
 - Checked by hand in the pilot month: strikes were 139–173 points in the money at the entry spot; stops
   filled at the first close below 70% of entry; trail exits at 80% of the closing peak.
-- No other strike, stop or trail was run, so this page says nothing about which setting would be better.
+- The premium strikes (BL-165's exploratory screen) lost on 2024–26 (−₹154 to −₹245 a trade, 31–34% winners)
+  and made money on 2022–24 (+₹356 to +₹394, 37–42%): the period, not the strike, sets the sign. ₹80 on
+  2022–24 reached t 2.24, but it is −1.14 on 2024–26.
+- Next week's options on expiry day (2024–26 only; the 2022–24 vendor files have no next-week chain):
+  ITM3 won 52% of 23 trades, +₹761 a trade, t 0.71, −₹847 without its best three. Thin.
+- No other stop or trail was run.
 - Closes rather than ticks was the owner's choice (as published), although BL-156 found close-checked leg
   stops worse for the sellers' legs.
 
@@ -37,3 +43,4 @@ None.
 - [Buy breakout: strike / premium](../buy-breakout/strike-premium.md), [trail](../buy-breakout/trail.md).
 
 [bl164]: ../../../../backlog/BL-164-gap-and-go-williams-chain.md
+[bl165]: ../../../../backlog/BL-165-gap-and-go-leads-gap-down-and-expiry.md

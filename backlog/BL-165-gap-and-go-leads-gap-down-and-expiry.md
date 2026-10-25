@@ -149,3 +149,32 @@ ledger tests `20261025-185402-cdd4`, `20261025-185405-6061`):
   - 10 variants. Read: trades, win rate, net / trade, t, 0.5% slippage, random-time percentile per
     period. A variant with t ≥ 2.0 in both periods would be a lead for forward tracking only; nothing
     here passes or fails anything.
+- 2026-10-25 — **exploratory screen run** (10 ledger tests, `research/bl165/out/screen/summary.csv`,
+  git-ignored; BL-063 charges, one lot, no errors). **No lead:** no variant has t ≥ 2.0 in both
+  periods. Every A and B premium variant changes sign between the periods: negative on 2024–26,
+  positive on 2022–24, so the period moves the result far more than the strike does. C (next week) is
+  thin on 2024–26 and its means rest on a few trades.
+
+| Variant | Period | Trades | Win rate | Net / trade | t | Median | Without best 3 | 0.5% slip |
+|---|---|---|---|---|---|---|---|---|
+| A ₹80, all days | 2024–26 | 147 | 34% | −₹154 | −1.14 | −₹514 | −₹270 | −₹193 |
+| A ₹80, all days | 2022–24 | 205 | 42% | +₹394 | 2.24 | −₹226 | +₹207 | +₹331 |
+| A ₹100, all days | 2024–26 | 147 | 33% | −₹245 | −1.59 | −₹638 | −₹385 | −₹251 |
+| A ₹100, all days | 2022–24 | 205 | 40% | +₹382 | 1.93 | −₹352 | +₹176 | +₹303 |
+| A ₹120, all days | 2024–26 | 147 | 31% | −₹208 | −1.01 | −₹760 | −₹433 | −₹212 |
+| A ₹120, all days | 2022–24 | 205 | 37% | +₹356 | 1.60 | −₹414 | +₹135 | +₹282 |
+| B ₹80, expiry day | 2024–26 | 23 (thin) | 30% | −₹611 | −2.61 | −₹720 | −₹908 | −₹694 |
+| B ₹80, expiry day | 2022–24 | 43 | 63% | +₹846 | 1.84 | +₹170 | +₹176 | +₹735 |
+| B ₹100, expiry day | 2024–26 | 23 (thin) | 30% | −₹661 | −2.23 | −₹1,018 | −₹1,060 | −₹757 |
+| B ₹100, expiry day | 2022–24 | 43 | 56% | +₹858 | 1.68 | +₹150 | +₹172 | +₹775 |
+| B ₹120, expiry day | 2024–26 | 23 (thin) | 22% | +₹61 | 0.07 | −₹1,055 | −₹1,248 | −₹19 |
+| B ₹120, expiry day | 2022–24 | 43 | 47% | +₹719 | 1.30 | −₹105 | −₹8 | +₹661 |
+| C ITM3, next week | 2024–26 | 23 (thin) | 52% | +₹761 | 0.71 | +₹272 | −₹847 | +₹594 |
+| C ₹80, next week | 2024–26 | 23 (thin) | 39% | +₹399 | 0.87 | −₹445 | −₹319 | +₹347 |
+| C ₹100, next week | 2024–26 | 23 (thin) | 39% | +₹458 | 0.83 | −₹532 | −₹404 | +₹390 |
+| C ₹120, next week | 2024–26 | 23 (thin) | 39% | +₹483 | 0.76 | −₹553 | −₹521 | +₹378 |
+
+  Description only: 2022–24 is kinder to every buying variant of this family (L1, L2 and A / B alike),
+  in Fyers-free vendor bars; whether that is the market (2022's larger moves) or the data was not
+  checked. The highest win rates are B ₹80 on 2022–24 (63%) and C ITM3 (52%, thin), neither consistent
+  with its other period or significant.
