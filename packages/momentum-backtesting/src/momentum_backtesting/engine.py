@@ -441,6 +441,14 @@ def _within(eligible: pd.DataFrame, cross_section: pd.DataFrame | None) -> pd.Da
     """`eligible` limited to the week's cross-section (see `compute_ranks`)."""
     if cross_section is None:
         return eligible
+    missing_weeks = eligible.index.difference(cross_section.index)
+    missing_columns = eligible.columns.difference(cross_section.columns)
+    if len(missing_weeks) or len(missing_columns):
+        # Filling these with False would rank nobody that week and look like "no signal".
+        raise ValueError(
+            f"cross_section lacks {len(missing_weeks)} weeks and {len(missing_columns)} columns "
+            f"of the prices (first: {list(missing_weeks[:2])}, {list(missing_columns[:2])})"
+        )
     return eligible & cross_section.reindex_like(eligible).fillna(False).astype(bool)
 
 

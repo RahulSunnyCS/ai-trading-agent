@@ -116,3 +116,54 @@ def test_a_gap_is_treated_the_same_whether_or_not_the_stock_ends_later():
     a = _forward_filled(still_trading, [], tail_only=True)["X"].iloc[:8]
     b = _forward_filled(ends_later, ["X"], tail_only=True)["X"].iloc[:8]
     np.testing.assert_array_equal(a.to_numpy(), b.to_numpy())
+
+
+def _ranking_with_membership():
+    weeks = WEEKS[:6]
+    prices = pd.DataFrame({"AAA": 1.0, "BBB": 2.0}, index=weeks)
+    membership = pd.DataFrame(
+        {"AAA": [True] * 6, "BBB": [False, False, False, True, True, True]}, index=weeks
+    )
+    nan = pd.DataFrame(float("nan"), index=weeks, columns=prices.columns)
+    return broad.UniverseRanking(
+        prices=prices,
+        weeks=list(weeks),
+        global_ranks=nan,
+        pool_membership=pd.DataFrame(False, index=weeks, columns=prices.columns),
+        stock_pool_ranks=nan,
+        combined_pool_ranks=nan,
+        column_to_base_symbol={"AAA": "AAA", "BBB": "BBB"},
+        events=pd.DataFrame(),
+        stale_columns={},
+        missing_symbols=[],
+        stock_membership=membership,
+    )
+
+
+def test_the_sentinel_week_carries_membership_so_the_tilt_still_ranks_it():
+    """BL-001 F6: the stock tilt reads ranking.cross_section() on the persisted (sentinel) ranking.
+    A sentinel week without membership would give every tilt strategy no picks, silently."""
+    from momentum_backtesting import rebalance
+
+    ranking = _ranking_with_membership()
+    week = ranking.prices.index[-1]
+    persisted = rebalance.persisted_broad_ranking(ranking)
+    mask = persisted.cross_section()
+    sentinel = week + pd.Timedelta(days=7)
+    assert list(mask.index) == list(persisted.prices.index) and sentinel in mask.index
+    assert mask.loc[sentinel, ["AAA", "BBB"]].tolist() == [True, True]  # last week's members
+    # stopped at an earlier week: the later weeks are dropped and that week's members carry over
+    through = ranking.prices.index[2]
+    earlier = rebalance.persisted_broad_ranking(ranking, through=through).cross_section()
+    assert earlier.index[-1] == through + pd.Timedelta(days=7)
+    assert earlier.iloc[-1][["AAA", "BBB"]].tolist() == [True, False]
+
+
+def test_a_mask_that_does_not_cover_the_prices_is_refused_not_read_as_nobody():
+    prices = _prices()
+    short = pd.DataFrame(True, index=prices.index[:-3], columns=prices.columns)
+    with pytest.raises(ValueError, match="cross_section lacks"):
+        engine.compute_ranks(prices, CONFIGS["ranksum"], short)
+    narrow = pd.DataFrame(True, index=prices.index, columns=prices.columns[:-1])
+    with pytest.raises(ValueError, match="cross_section lacks"):
+        engine.compute_ranks(prices, CONFIGS["voladj"], narrow)
