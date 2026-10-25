@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-24
+Last updated: 2026-10-25
 
 ## Open
 
@@ -88,6 +88,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-037](BL-037-stock-options-in-the-lake.md) | Stock options in the lake: finish loading the vendor's 216 stocks (deferred) | P3 | Planned | feature | trading-data |
 | [BL-048](BL-048-dormant-server-surfaces.md) | Dormant surfaces: test-only server, broken personality edit, unwritten regime tags, the YAML engine's future | P3 | Planned | chore | server |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
+| [BL-163](BL-163-kronos-forecast-trigger.md) | Kronos hour-ahead forecast as an intraday trigger: two fixed rules (direction → Dir, contraction → Widesl) through the rule tester, zero-shot, NIFTY, sessions after the weights were published only | P3 | Planned | research | options |
 
 ## Done / Dropped
 
