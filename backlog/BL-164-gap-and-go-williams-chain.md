@@ -156,7 +156,7 @@ hold on the locked confirmation period. Three tests, every one counted in the le
   clock, constant over the session) and `{prev_agg: {x, how: max|min}}` (the previous session's max / min
   of `x` over its 375 bars), plus `{ever: a}` (true from the first stamp `a` held in the session; a
   bool `cum_max`). In `legwise/schema.py` + `engine.py`, an optional leg field `trail_peak:
-  {activate_percent, pullback_percent}` (off unless set, so every golden stays byte-identical) checked on
+  {activate_percent, exit_percent}` (off unless set, so every golden stays byte-identical) checked on
   the option's 1-minute close, and an optional leg field `stop_on: tick | close` (default `tick`, left
   out of the dump at its default so no strategy gets a new version) that judges the leg's stop on the
   1-minute close and fills it at that close. The engine has no such mode today: BL-156's candle-close
@@ -211,3 +211,19 @@ hold on the locked confirmation period. Three tests, every one counted in the le
 - 2026-10-25 — started. Owner's answers recorded under Decisions: close-checked stops as published
   (the engine gains `stop_on: close`; today only BL-156's research replay has one), 09:15 open, BL-063
   costs only, SENSEX as its own item later. TODO 3.10.43. Phase 1 begins.
+- 2026-10-25 — **Phase 1 done** (nothing run on market data). `expr.py`: `prev_at`, `prev_agg`, `ever`,
+  each in the causality test. Legwise: `trail_peak: {activate_percent, exit_percent}` (renamed from
+  `pullback_percent`, which read as "falls by 80%"; bought legs only; reason TRAIL; with the SL on one
+  tick-mode bar the higher level wins) and `stop_on: tick | close`, both off and out of the dump by
+  default; the `.algtst` / Quantiply exporters refuse them. 1,719 package tests pass, legwise goldens
+  unchanged, `ruletest-acceptance.py` ACCEPTANCE OK. `research/bl164/specs.py` writes the three specs;
+  all validate and read back (H1 `b8c5d30f8f1b`, H2 `dcbd546a7420`, H3 `b7628a83dfe5`, first 12 of the
+  spec hashes).
+  **Definitions written out in the specs, registered here before any run:** "touched before the break"
+  = a bar with low ≤ prev 15:15 close ≤ high whose first stamp is earlier than the break stamp; the
+  stand-down minute is the opposite band's first break with no gap-direction break before it
+  (`opposite_first`), or the gap-direction first break after a touch (`filled`), both within
+  09:46–12:00; H2 fires from the stamp after it (window 09:47–14:29). H3's direction is the gap's on an
+  H1 event, else the side of the Williams level the close is beyond; H3's trend-matched control takes a
+  minute where the close is beyond either the band or the Williams level on the trade's side. Next:
+  Phase 2's one-month pilot.
