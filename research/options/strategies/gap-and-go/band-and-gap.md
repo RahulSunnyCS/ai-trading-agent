@@ -18,6 +18,7 @@ None. Nothing trades this.
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
 | H1 | the published band (10%), gap direction, both stand-downs | NIFTY, 2024-10-09 to 2026-10-08, BL-063 charges, 1 lot | Killed: +₹111 a trade, t 0.33 (147 trades) | [BL-164][bl164] Result |
+| L1: H1 on gap-down days only | the same rule, PE side only | NIFTY, 2022-01-03 to 2024-10-08 (unseen), after charges | Killed: +₹485 a trade, t 1.01 (75 trades; bar 2.24) | [BL-165][bl165] Result |
 
 ## What we know
 
@@ -26,7 +27,10 @@ None. Nothing trades this.
 - The trade beats the same trade at a random later minute beyond the band (percentile 1.00; random mean
   −₹484), like every BL-152 level: the first break is the best entry, not a profitable one.
 - Description only: by half-year −₹674 / +₹80 / +₹377 / +₹352 / −₹26; down days +₹273 (64), up −₹15 (83);
-  expiry days +₹724 (23). Not findings; any one of them would be a new, registered test.
+  expiry days +₹724 (23).
+- The down-day slice, tested on unseen 2022–24 data (BL-165), stayed positive (+₹485 a trade, +₹363 at
+  0.5% slippage) but is not significant (t 1.01). Its median trade is −₹552 and without its three best
+  trades the mean is −₹44: a few large trend days, not a reliable edge.
 - The pilot month (2024-10-09 to 11-08) had 2 H1 days in 22, and 11 stand-downs on 0.2–0.5% gap days.
 
 ## Not yet tested
@@ -40,3 +44,4 @@ None. Nothing trades this.
 - [Intraday state and event triggers](../../common/intraday-state.md).
 
 [bl164]: ../../../../backlog/BL-164-gap-and-go-williams-chain.md
+[bl165]: ../../../../backlog/BL-165-gap-and-go-leads-gap-down-and-expiry.md

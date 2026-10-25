@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner asked for it (2026-10-25); two post-hoc slices of a killed strategy, so the expected value is a clean "no", but each is cheap and the 2022–24 period is unseen for them |
-| **Status** | In progress (pre-registration committed before any run) |
+| **Status** | Done — killed (2026-10-25): both leads positive on 2022–24 but t 1.0 / 1.2, below 2.24 |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-25 |
@@ -93,6 +93,26 @@ slippage, on data neither rule was chosen on.
   then the pass rule. Outputs under `research/bl165/out/` (git-ignored).
 - **Done when:** the verdict is in the Log and Result, and the gap-and-go findings pages cite it.
 
+## Result
+
+**Killed, both.** Checks first: `expiry_day` matched `pick_expiry` on 100 sampled sessions (144 of 682
+usable 2022–24 sessions and 103 of 486 learning sessions are expiry days), and both leads reproduced
+BL-164's slices on the learning period exactly (L1 64 trades, +₹273; L2 23 trades, +₹724). Then the
+confirmation period (NIFTY 2022-01-03 → 2024-10-08, revealed once per spec, BL-063 charges, one lot;
+ledger tests `20261025-185402-cdd4`, `20261025-185405-6061`):
+
+| Lead | Trades | Net / trade | t | Win rate | Median | Without the best 3 | Random-time pct | 0.5% slip | 1% slip | Verdict |
+|---|---|---|---|---|---|---|---|---|---|---|
+| L1 gap-down | 75 | +₹485 | 1.01 | 40% | −₹552 | −₹44 | 1.00 | +₹363 | +₹235 | killed (t) |
+| L2 expiry day | 43 | +₹746 | 1.21 | 51% | +₹449 | −₹18 | 1.00 | +₹649 | +₹543 | killed (t) |
+
+- Neither is thin; neither reaches t ≥ 2.24, so both are killed by the registered rule.
+- Both kept their sign on unseen data, which is more than most leads do, but the mean of each rests on
+  three trades (L1's best +₹15,148 / +₹14,748 / +₹9,689); without them both are about zero.
+- Description only: L1 by half-year +₹222 / +₹1,537 / −₹188 / −₹563 / +₹941 / +₹1,863 (2022H1 →
+  2024H2); L2 down +₹961 (22), up +₹521 (21). At a t of about 1 on 75 trades, reaching 2 at the same
+  mean would need roughly four times the trades, several years of forward data.
+
 ## Risks
 
 - **Thin L2:** about one session in five is an expiry day and H1 fires on about a third of sessions, so
@@ -111,3 +131,6 @@ slippage, on data neither rule was chosen on.
   simulator's rule) and cached under `ruletest/features/`. BL-164's rule definitions moved to
   `research/common/gap_and_go_specs.py` (its spec hashes unchanged). `research/bl165/run.py` writes the
   two specs (L1 `cc2525aebfd4`, L2 `07b33d473cb1`); both validate and read back. Next: Phase 2.
+- 2026-10-25 — **Phase 2 run.** Expiry check and reproduction check passed; both specs revealed
+  (note "BL-165 …") and tested on the confirmation period. **Killed, both** (L1 +₹485 a trade, t 1.01;
+  L2 +₹746, t 1.21; bar 2.24); numbers under Result. Findings: the gap-and-go pages. Closed.
