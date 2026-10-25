@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner's idea (2026-10-25); one registered test; the repo's prior is against intraday option buying (BL-152, BL-164), so the value is a clean verdict |
-| **Status** | In progress (pre-registration committed before any code or run) |
+| **Status** | Done — killed (2026-10-25): +₹27 a trade, t 0.20; the break is worse than a random later minute; confirmation never opened |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-25 |
@@ -96,6 +96,26 @@ the locked 2022–24 period.
   only on a candidate). Outputs under `research/bl166/out/` (git-ignored).
 - **Done when:** the verdict is in the Log and Result, and a findings page cites it.
 
+## Result
+
+**Killed: not a candidate.** One registered test on the learning period (NIFTY 2024-10-09 → 2026-10-08,
+489 usable days, BL-063 charges, one lot; ledger test `20261025-225038-d403`; `research/bl166/run.py`):
+
+| Trades | Win rate | Net / trade | t | Median | Without best 3 | Random-time pct (draws' mean) | 0.5% slip | 1% slip |
+|---|---|---|---|---|---|---|---|---|
+| 399 | 30% | +₹27 | 0.20 | −₹642 | −₹132 | **0.00** (+₹287) | −₹46 | −₹118 |
+
+- It fires on most sessions (399 of 489), so structure on 5-minute bars is not selective.
+- The entry is the worst moment of the move: every one of the 200 random-time draws (the same trade
+  entered at a random later minute where the structure exit had not yet triggered) did better than the
+  break itself (their mean +₹287 a trade). Buying the close through the latest swing high buys the
+  extreme of the pullback-prone move; BL-152's and BL-164's breaks were the opposite (better than
+  later minutes, percentile 1.00).
+- Description only, not findings: up side +₹191 (195), down −₹129 (204); expiry days +₹518 (80), other
+  days −₹96 (319); half-years +₹275 / +₹221 / −₹105 / −₹41 / −₹164, fading from 2025H2. Expiry days
+  looked best in BL-164 too, and failed BL-165's bar on unseen data.
+- The confirmation period was not opened.
+
 ## Risks
 
 - **Few events:** a full HH + HL sequence needs four confirmed swings, the earliest about 09:40; many
@@ -116,3 +136,6 @@ the locked 2022–24 period.
   swings, structure, entries and structure exits recomputed in plain Python equal the grammar's on every
   session (0 mismatches); 20 events (it fires on most days); strikes ATM at entry, the −30% backstop hit
   three times, structure exits read as the trade's exit time. Next: the learning-period test.
+- 2026-10-25 — **killed** (one ledger test): +₹27 a trade, t 0.20, 30% winners, below every random-time
+  draw; numbers under Result. Confirmation not opened. Findings:
+  `research/options/strategies/market-structure/`. Closed.

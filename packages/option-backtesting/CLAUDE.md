@@ -233,7 +233,9 @@ Otherwise:
   `not: {first: b}`, "b held at an earlier stamp"). A leg's `trail_peak` / `stop_on` (legwise, below) pass
   through a template and read back. BL-165 added the leaf `expiry_day` (the session is its own nearest
   listed weekly expiry, `frame.nearest_expiry`, the simulator's rule; built by `ExpiryDayLoader`, cached
-  under `ruletest/features/`; a frame without the loader raises).
+  under `ruletest/features/`; a frame without the loader raises). BL-166 added `{swing: {kind: high|low,
+  back, minutes, n}}`: the session's back-th latest fractal swing of `minutes`-minute bars (strictly beyond
+  n bars each side), held from the close of the n-th bar after it; swings do not carry across sessions.
   `scripts/ruletest-acceptance.py` must print ACCEPTANCE OK: the four BL-083 triggers, said in
   the grammar (`tests/fixtures/rules/`), fire on the same days and stamps as `research/bl083/`, and T1 and T4 with the Dir
   template reproduce its event-study rows to the rupee. A leg with its own `range_breakout` is not supported yet.

@@ -457,7 +457,7 @@ collector is forward-only".
 | 3.10.42 | Overnight short straddle into expiry morning, hedged, NIFTY + SENSEX — [BL-160](backlog/BL-160-overnight-straddle-into-expiry.md) | claude | **Done 2026-10-23: failed.** −₹34 a night (t −0.29) on NIFTY 2022–24; hedges cut the tail but take the return. |
 | 3.10.43 | NIFTY gap-and-go band → Williams back-up chain, 150-point ITM buys (POC) — [BL-164](backlog/BL-164-gap-and-go-williams-chain.md) | claude | **Done 2026-10-25: killed.** No candidate: H1 +₹111 a trade (t 0.33), H2 −₹119, chain −₹10; confirmation never opened. Adds `prev_at` / `prev_agg` / `ever`, `trail_peak`, `stop_on: close`. Findings in `research/options/strategies/gap-and-go/`. |
 | 3.10.44 | BL-164's leads on 2022–24: gap-and-go on gap-down days, on expiry days — [BL-165](backlog/BL-165-gap-and-go-leads-gap-down-and-expiry.md) | claude | **Done 2026-10-25: killed.** Gap-down +₹485 a trade (t 1.01), expiry days +₹746 (t 1.21), bar 2.24; each rests on three trades. Adds `expiry_day` to the rule grammar. |
-| 3.10.45 | Higher-high / higher-low structure, 5-minute NIFTY swings, ATM buys — [BL-166](backlog/BL-166-higher-high-higher-low-structure.md) | claude | **In progress 2026-10-25.** Pre-registered; next the swing operator, a pilot month, then the learning-period test. |
+| 3.10.45 | Higher-high / higher-low structure, 5-minute NIFTY swings, ATM buys — [BL-166](backlog/BL-166-higher-high-higher-low-structure.md) | claude | **Done 2026-10-25: killed.** +₹27 a trade (t 0.20, 399 trades); the break is worse than a random later entry. Adds `swing` to the rule grammar. |
 
 ### 3.11 Local research database (`packages/trading-data`)
 

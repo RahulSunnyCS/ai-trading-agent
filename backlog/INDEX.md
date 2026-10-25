@@ -82,7 +82,6 @@ Sorted by priority (P0 first), then ID.
 | [BL-149](BL-149-fyers-greeks-validation.md) | Fyers' Greeks: do we need them? Validate our own IV and Greeks against the expired-F&O API on a pre-registered sample, and say what MCX must derive | P2 | Planned | research | options / trading-data |
 | [BL-151](BL-151-monthly-trending-theme-scout.md) | Monthly trending-theme scout (an agent reads Reddit, news and, if affordable, X) and a starting date for every Broad theme, so a theme cannot be used before it became one | P2 | Idea | feature + research | momentum + scheduler |
 | [BL-152](BL-152-margin-check-without-algotest.md) | Margin check: a free-margin read that does not need AlgoTest or Shoonya's login, the need estimate checked against what the broker blocks, then switched on (`MARGIN_CHECK`) | P2 | Planned | improvement | broker-login |
-| [BL-166](BL-166-higher-high-higher-low-structure.md) | Higher-high / higher-low structure on 5-minute NIFTY bars: buy the weekly ATM on the break of the last swing, exit on the structure break (one rule) | P2 | In progress | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
@@ -95,6 +94,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-166](BL-166-higher-high-higher-low-structure.md) | Higher-high / higher-low structure on 5-minute NIFTY swings: buy the weekly ATM on the break of the last swing, exit on the structure break | Killed: +₹27 a trade (t 0.20, 399 trades, 30% winners), negative at 0.5% slippage; the break did worse than every random later entry (percentile 0.00); confirmation never opened | 2026-10-25 |
 | [BL-165](BL-165-gap-and-go-leads-gap-down-and-expiry.md) | BL-164's two leads on the locked 2022–24 period: gap-and-go on gap-down days only, and on expiry days only | Killed: both positive but not significant — gap-down +₹485 a trade (t 1.01, 75 trades), expiry days +₹746 (t 1.21, 43); bar t ≥ 2.24; each mean rests on its three best trades (about zero without them) | 2026-10-25 |
 | [BL-164](BL-164-gap-and-go-williams-chain.md) | NIFTY gap-and-go 10% opening-range band → Williams back-up chain, 150-point ITM weekly buys, exactly as published (3 tests; POC) | Killed: no candidate — H1 gap-and-go +₹111 a trade (t 0.33, 147 trades, negative at 0.5% slippage), H2 Williams −₹119, the chain −₹10; entering at the first break beats a later minute, but the trade does not pay; confirmation period never opened | 2026-10-25 |
 | [BL-078](BL-078-angel-one-data-source.md) | Angel One SmartAPI as a second 1-minute data source: what it can and cannot give versus the Fyers files | Done: go as a backup, not a replacement; shipped as BL-079 (Angel One fallback in `obt daily`, VIX) | 2026-10-24 |
