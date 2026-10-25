@@ -227,3 +227,13 @@ hold on the locked confirmation period. Three tests, every one counted in the le
   H1 event, else the side of the Williams level the close is beyond; H3's trend-matched control takes a
   minute where the close is beyond either the band or the Williams level on the trade's side. Next:
   Phase 2's one-month pilot.
+- 2026-10-25 — **Phase 2 pilot** (`research/bl164/pilot.py`, 2024-10-09 → 2024-11-08, 22 sessions,
+  all usable; nothing in the ledger, no simulation cache written). The grammar's H1 / H2 / H3 stamps
+  equal a plain-Python restatement of the rules on every session (0 mismatches; both written from the
+  registered definitions, so this checks the implementation, not the reading of the source). Day
+  reasons: H1 2, opposite_first 3, filled 3, no_break 3, and 11 stand-downs on 0.2–0.5% gap days
+  (Williams skipped). Events: H1 2, H2 5, H3 7. Checked by hand: every strike is ITM3 of the nearest
+  weekly (139–173 points in the money at the entry spot; 2024-11-07 the same-day expiry), stops fill
+  at the 1-minute close below 70% of entry, the trail exits (TRAIL) at 80% of the closing peak, the
+  time exit at 15:15. One month's gross is not read as evidence. Next: the full learning-period run of
+  the three tests (three ledger tries).
