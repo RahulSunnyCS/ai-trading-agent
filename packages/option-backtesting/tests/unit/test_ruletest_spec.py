@@ -281,3 +281,24 @@ def test_trade_relative_values_need_control_when_and_stay_out_of_entry_condition
     bad["control_when"] = {"up": {"ge": ["minutes_in_trade", 1]}, "down": {"gt": ["close", 1]}}
     with pytest.raises(SpecError, match="control_when: at_entry"):
         from_dict(bad)
+
+
+def test_a_peak_trail_and_close_stops_read_back():
+    """BL-164: the template's trail_peak and stop_on reach the legwise strategy and the words."""
+    leg = {
+        "id": "ce",
+        "lots": 1,
+        "position": "buy",
+        "option_type": "CE",
+        "strike": {"strike_type": "ITM3"},
+        "stop_loss": {"percent": 30},
+        "trail_peak": {"activate_percent": 105, "exit_percent": 80},
+        "stop_on": "close",
+    }
+    rule = from_dict(spec(template={"exit_time": "15:15", "legs": [leg]}))
+    [built] = rule.strategy_for("10:31", "both").legs
+    assert built.stop_on == "close" and built.trail_peak.exit_percent == 80
+    words = " ".join(read_back(rule)["sentences"])
+    assert "once above 105% of entry, out at 80% of its highest" in words
+    assert "stops judged on the 1-minute close" in words
+    assert rule.template_hash != from_dict(spec()).template_hash

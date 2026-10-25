@@ -48,6 +48,7 @@ Operators (a list of arguments, or a mapping with the named parameters)
     crosses_up [a, b]          a[j-1] < b[j] <= a[j]
     crosses_down [a, b]        a[j-1] > b[j] >= a[j]
     first [b]                  true only at the first stamp of the session where b is true
+    ever [b]                   true from the first stamp of the session where b is true on
     lag {x, n}                 x at j-n
     pct_change {x, n}          x[j] / x[j-n] - 1
     roll_max roll_min roll_mean {x, n}     over the n stamps ending at j (NaN until n exist)
@@ -56,6 +57,10 @@ Operators (a list of arguments, or a mapping with the named parameters)
     max_since min_since {x, from | after}  running extreme from (inclusive) or after (exclusive)
                                            a clock time
     prior_median prior_mean {x, sessions}  of x at the same stamp over the previous sessions
+    prev_at {x, clock}                     the previous session's x at that clock stamp,
+                                           constant over the session (BL-164)
+    prev_agg {x, how: max | min}           the previous session's highest / lowest x over its
+                                           375 stamps, constant over the session (BL-164)
 
 Trade-relative (only in a rule's `exit_when`, and only under the elementwise operators add sub mul
 div abs max min gt ge lt le all any not; each trade evaluates them from its own entry)
@@ -151,6 +156,7 @@ _POSITIONAL: dict[str, tuple[tuple[str, ...], str, str]] = {
     "crosses_down": (("a", "b"), "bool", "num"),
     "not": (("a",), "bool", "bool"),
     "first": (("a",), "bool", "bool"),
+    "ever": (("a",), "bool", "bool"),
 }
 _VARIADIC = {"all", "any"}
 # op -> (parameter names, required, result kind); `x` is always a num expression
@@ -167,6 +173,8 @@ _PARAMETRIC: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "min_since": (("x", "from", "after"), ("x",)),
     "prior_median": (("x", "sessions"), ("x", "sessions")),
     "prior_mean": (("x", "sessions"), ("x", "sessions")),
+    "prev_at": (("x", "clock"), ("x", "clock")),
+    "prev_agg": (("x", "how"), ("x", "how")),
 }
 _LEAF_OPS = {"clock", "straddle", "rsi", "bar_close", "supertrend", "supertrend_dir", "bollinger"}
 _SINCE_FIRST = {"at_first", "min_since_first", "max_since_first"}
@@ -325,6 +333,10 @@ def _parse_node(expr: Any, defs: dict[str, Node] | None, path: str) -> Node:
         params["sessions"] = _int_param(body["sessions"], f"{here}.sessions", 1, 600)
     if "clock" in body:
         params["clock"] = clock_to_stamp(body["clock"], f"{here}.clock")
+    if "how" in body:
+        if body["how"] not in ("max", "min"):
+            raise RuleError(f"{here}.how: expected max or min, got {body['how']!r}")
+        params["how"] = body["how"]
     if op in ("max_since", "min_since"):
         if ("from" in body) == ("after" in body):
             raise RuleError(f"{here}: give exactly one of from / after")
@@ -669,6 +681,8 @@ def _evaluate(node: Node, frame: Frame, memo: dict[Node, np.ndarray]) -> np.ndar
             rows = x.any(axis=1)
             out[rows, x[rows].argmax(axis=1)] = True
             return out
+        if op == "ever":
+            return np.logical_or.accumulate(args[0], axis=1)
         x = args[0]
         if op == "lag":
             return _lag(x, node.params["n"])
@@ -695,6 +709,11 @@ def _evaluate(node: Node, frame: Frame, memo: dict[Node, np.ndarray]) -> np.ndar
             return out
         if op in ("prior_median", "prior_mean"):
             return _prior(x, node.params["sessions"], op.split("_")[1])
+        if op == "prev_at":
+            return _per_session(frame, _prev(frame, x[:, node.params["clock"]]))
+        if op == "prev_agg":
+            acc = np.fmax if node.params["how"] == "max" else np.fmin
+            return _per_session(frame, _prev(frame, acc.reduce(x, axis=1)))
     raise RuleError(f"{node.path}: cannot evaluate {op!r}")  # pragma: no cover
 
 
@@ -845,6 +864,8 @@ def describe(node: Node, top: bool = True) -> str:
         return f"{kids[0]} crosses below {kids[1]}"
     if op == "first":
         return f"{kids[0]} for the first time today"
+    if op == "ever":
+        return f"{kids[0]} at some minute today so far"
     p = node.params
     if op == "lag":
         return f"{kids[0]} {p['n']} minutes ago"
@@ -863,6 +884,11 @@ def describe(node: Node, top: bool = True) -> str:
     if op in ("prior_median", "prior_mean"):
         word = "median" if op == "prior_median" else "average"
         return f"the {word} of {kids[0]} at this minute over the last {p['sessions']} sessions"
+    if op == "prev_at":
+        return f"the previous session's {kids[0]} at {stamp_to_clock(p['clock'])}"
+    if op == "prev_agg":
+        word = "highest" if p["how"] == "max" else "lowest"
+        return f"the previous session's {word} {kids[0]}"
     return op  # pragma: no cover
 
 
