@@ -80,23 +80,32 @@ reason, and both stay here.
     the Dir template enters at j+1 on the forecast's side (`on: up` / `on: down`). Hypothesis: event minus
     placebo per lot, after charges, is positive.
   - **R2 contraction → Widesl.** Fires the first time in the window that the forecast range is below 0.6 ×
-    the median realised 60-minute range at the same clock hour over the previous 20 sessions; the Widesl
-    template enters at j+1. Hypothesis: event minus placebo per lot, after charges, is positive.
+    the realised baseline, where the baseline at stamp j is the median, over the previous 20 completed
+    sessions, of (high − low) of the bars j+1 … j+60 at the **same stamp j** on each of those sessions
+    (not an hour bucket); the Widesl template enters at j+1. Hypothesis: event minus placebo per lot,
+    after charges, is positive.
   The thresholds (0.15%, 0.6, 60 bars, 400-bar context) are set here without looking at any output and are
   not tuned afterwards.
 - **Model and sampling (fixed):** `NeoQuasar/Kronos-small` + `NeoQuasar/Kronos-Tokenizer-base`, at the
   Hugging Face commits recorded in the Log; `max_context 512`, `lookback 400`, `pred_len 60`, `T 1.0`,
-  `top_p 0.9`, `sample_count 10`, a fixed seed derived from (session, stamp); direction and range are taken
-  from the averaged path the predictor returns. Volume is passed; `amount` is left empty (the README allows
-  it). One forecast per stamp, stamps 10:30–14:00 (BL-083's window), one event per rule per session.
+  `top_p 0.9`, `sample_count 10`, a fixed seed derived from (session, stamp). The 10 sampled paths are kept
+  (not only the predictor's averaged path): **direction** is the mean over the 10 paths of (close at j+60 −
+  close at j); **range** is the mean over the 10 paths of each path's own (high − low). The averaged path's
+  range is not used: averaging smooths the extremes, so it would read far below any single path's range and
+  R2 would fire on most stamps. Volume is passed; `amount` is left empty (the README allows it). One forecast per stamp, stamps 10:30–14:00 (BL-083's window), one event per rule per session.
 - **Templates:** BL-083's three live shapes as the rule tester has them (Widesl, Dir, Buy), 1 lot, entry
   j+1, exit 15:28, `lot_sizing: current`. Buy is run as a third arm of R1 for the event study only
   (`on: up` / `on: down`), with no hypothesis attached.
 - **Universe:** NIFTY only (nearest weekly expiry, as the templates). SENSEX is reported as supporting
   evidence only (data from 2024-10, trained on nothing, and half the clean window).
 - **Periods:**
-  - *Clean window (the verdict):* NIFTY sessions 2025-08-18 → 2026-10-08. Nothing before the weights were
-    public counts.
+  - *Clean window (the verdict):* NIFTY sessions from the **clean start** to 2026-10-08, where the clean
+    start is the latest of 2025-08-18, the Hugging Face commit date of the weights used, and the paper's
+    stated pre-training cut-off, each recorded in the Log in Phase 1 before any rule is run. Nothing before
+    the weights were public counts. Sessions in the window with no NIFTY option file in the lake (the
+    26 Aug – 24 Sep 2026 gap, BL-040 / BL-148) cannot be simulated: they are excluded and counted, for
+    events and placebo alike; a repair of those days before Phase 2 is allowed only if logged here before
+    the first test.
   - *Possibly-in-training (descriptive only):* the tester's learning period before 2025-08-18 and its
     confirmation period (2022-01 → 2024-10-08). Reported in a separate table, labelled, never a verdict.
     The confirmation period stays locked until `obt rule reveal`, as for any rule.
@@ -142,14 +151,16 @@ reason, and both stay here.
   period; apply the Phase 0 rule.
 - **Deliverables:** the tester's result files, the ledger lines, a table in this item (event minus placebo,
   t, n events, random-time P90, slippage rows), the verdict in the Log, a `research/options/common/`
-  page (`external-forecast.md`) with the result and the training-overlap caveat.
+  page (`external-forecast.md`) with the result and the training-overlap caveat, and its row in
+  `research/options/common/README.md`'s page table.
 - **Done when:** both rules have a logged pass / kill / inconclusive on the clean window and the page is
   committed in the same change.
 
 ## Risks
 
-- **Training overlap:** if the paper's data cut-off is later than 2025-08-18, the clean window shrinks; if it
-  cannot be established, the clean window is as registered and the uncertainty is stated with the verdict.
+- **Training overlap:** the clean start moves later with the recorded weights date or data cut-off (by the
+  Phase 0 definition, no amendment needed); if the cut-off cannot be established, 2025-08-18 stands and the
+  uncertainty is stated with the verdict.
 - **Sampling noise:** 10 samples per stamp leave the forecast noisy; a fixed seed makes it reproducible but
   not less noisy. The rule reads only two coarse statistics, so this is accepted; it is not a reason to
   raise `sample_count` after the fact.
@@ -173,3 +184,6 @@ reason, and both stay here.
 
 - 2026-10-25 — created from the owner's question about the 24 Oct "fast-growing finance repos" list;
   pre-registration drafted; nothing run. Priority P3 by Claude's judgement (low prior, Momentum month).
+- 2026-10-25 — review of PR #320 before any run: range now the mean of per-path ranges (the averaged
+  path's range is biased low), R2's baseline defined at the same stamp, the clean start defined as the
+  latest of three dates, the vendor gap's days excluded and counted, the README row added.
