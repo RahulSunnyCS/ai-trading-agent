@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trade book mockups</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+@font-face{font-family:Plex;src:url(../../../apps/dashboard/src/app/fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2");font-weight:400}
+@font-face{font-family:Plex;src:url(../../../apps/dashboard/src/app/fonts/ibm-plex-sans-latin-500-normal.woff2) format("woff2");font-weight:500}
+@font-face{font-family:Plex;src:url(../../../apps/dashboard/src/app/fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2");font-weight:600}
+@font-face{font-family:PlexMono;src:url(../../../apps/dashboard/src/app/fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2");font-weight:400}
+@font-face{font-family:PlexMono;src:url(../../../apps/dashboard/src/app/fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2");font-weight:500}
+:root{
+  --background:#121417;--surface:#191c21;--surface-2:#20242b;--border:#2a2f38;--border-strong:#3a414d;
+  --foreground:#e8eaee;--muted:#9aa1ac;--faint:#868d99;--primary:#7f9cff;--primary-fg:#0d1020;
+  --positive:#4cc072;--negative:#f07079;--warning:#e0a24a;--info:#6cb6ff;--accent:#b49cf0;
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--radius:8px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#0b0c0e;color:var(--foreground);font:14px/1.45 Plex,system-ui,sans-serif;padding:24px}
+.cap{width:1440px;margin:0 auto 10px;color:var(--muted);font-size:13px;display:flex;gap:10px;align-items:baseline}
+.cap b{color:var(--foreground);font-weight:600;font-size:15px}
+.screen{width:1440px;margin:0 auto 48px;background:var(--background);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:grid;grid-template-columns:56px 1fr;position:relative}
+.rail{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 0}
+.rail i{font-size:20px;color:var(--faint);width:36px;height:36px;display:grid;place-items:center;border-radius:8px}
+.rail i.on{background:var(--surface-2);color:var(--primary)}
+.main{padding:0 0 24px;min-width:0}
+.top{height:48px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:0 20px;color:var(--muted);font-size:13px}
+.top .crumb{color:var(--foreground);font-weight:500}
+.runbar{display:flex;align-items:center;gap:8px;padding:12px 20px;border-bottom:1px solid var(--border)}
+.chip{border:1px solid var(--border-strong);border-radius:999px;padding:3px 11px;font-size:12.5px;color:var(--muted);white-space:nowrap;display:inline-flex;gap:6px;align-items:center}
+.chip.on{background:var(--surface-2);color:var(--foreground);border-color:var(--border-strong)}
+.chip .k{color:var(--faint)}
+.seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden}
+.seg span{padding:4px 12px;font-size:12.5px;color:var(--muted)}
+.seg span.on{background:var(--surface-2);color:var(--foreground)}
+.btn{border:1px solid var(--border-strong);border-radius:8px;padding:5px 12px;font-size:12.5px;color:var(--foreground);background:transparent;display:inline-flex;gap:6px;align-items:center}
+.btn.pri{background:var(--primary);color:var(--primary-fg);border-color:var(--primary);font-weight:500}
+.sp{flex:1}
+.mono,.num{font-family:PlexMono,ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.pos{color:var(--positive)}.neg{color:var(--negative)}.warn{color:var(--warning)}.mut{color:var(--muted)}.fnt{color:var(--faint)}
+.strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) 220px;gap:0;border-bottom:1px solid var(--border)}
+.kpi{padding:14px 20px;border-right:1px solid var(--border)}
+.kpi .l{font-size:12px;color:var(--faint);display:flex;gap:6px;align-items:center}
+.kpi .v{font-family:PlexMono,monospace;font-size:26px;font-weight:500;margin-top:2px;letter-spacing:-.5px}
+.kpi .b{font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:6px;align-items:center}
+.badge{font-family:PlexMono,monospace;font-size:11.5px;padding:1px 6px;border-radius:5px;background:var(--surface-2);color:var(--foreground)}
+.badge.p{background:rgba(76,192,114,.15);color:var(--positive)}
+.badge.n{background:rgba(240,112,121,.15);color:var(--negative)}
+.badge.w{background:rgba(224,162,74,.15);color:var(--warning)}
+.badge.i{background:rgba(108,182,255,.13);color:var(--info)}
+.badge.g{background:var(--surface-2);color:var(--muted)}
+.bench{padding:14px 16px;font-size:12px;color:var(--faint)}
+.sec{white-space:nowrap;overflow:hidden;padding:9px 20px;font-size:12.5px;color:var(--muted);border-bottom:1px solid var(--border);-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent)}
+.sec b{color:var(--foreground);font-weight:500;font-family:PlexMono,monospace}
+.hero{padding:14px 20px 0;position:relative}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--muted);align-items:center}
+.sw{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:5px;vertical-align:-1px}
+.grid{display:grid;gap:16px;padding:16px 20px 0}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;min-width:0}
+.card h3{margin:0;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.card .d{font-size:12px;color:var(--faint);margin:2px 0 10px}
+.card .act{margin-left:auto;display:flex;gap:6px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{font-weight:500;color:var(--faint);text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);white-space:nowrap;background:var(--surface-2)}
+td{padding:0 8px;height:32px;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+td.r,th.r{text-align:right}
+tr.sel td{background:rgba(127,156,255,.08)}
+.tt{position:absolute;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;padding:7px 10px;font-size:12px;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.drawer{position:absolute;top:0;right:0;bottom:0;width:560px;background:var(--surface);border-left:1px solid var(--border-strong);box-shadow:-12px 0 40px rgba(0,0,0,.45);padding:0;overflow:hidden}
+.drawer .hd{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.drawer .bd{padding:14px 18px;display:flex;flex-direction:column;gap:14px}
+.lbl{font-size:11.5px;color:var(--faint);text-transform:none;margin-bottom:5px}
+.bar{display:flex;height:10px;border-radius:3px;overflow:hidden;gap:2px}
+.mcell{border-radius:6px;padding:6px 4px;text-align:center;font-size:11.5px}
+.banner{margin:12px 20px 0;border:1px solid rgba(224,162,74,.45);background:rgba(224,162,74,.08);border-radius:10px;padding:9px 14px;font-size:13px;display:flex;gap:10px;align-items:center}
+.src{font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--border-strong);color:var(--muted)}
+.src.c{border-color:rgba(57,135,229,.6);color:#8ab8f0}.src.t{border-color:rgba(25,158,112,.6);color:#6fd3ad}
+.src.o{border-color:rgba(201,133,0,.6);color:#e3b45c}.src.m{border-color:rgba(217,89,38,.65);color:#ef9a78}
+.note{width:1440px;margin:-36px auto 48px;color:var(--faint);font-size:12px}
+svg text{font-family:PlexMono,monospace;font-size:11px;fill:var(--faint)}
+.map{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;padding:22px}
+.node{border:1px solid var(--border-strong);border-radius:10px;padding:12px 14px;background:var(--surface)}
+.node h4{margin:0 0 4px;font-size:13.5px;font-weight:600}
+.node p{margin:0;font-size:12px;color:var(--muted)}
+.node .go{margin-top:8px;font-size:11.5px;color:var(--primary)}
+.field{border:1px solid var(--border-strong);border-radius:8px;padding:7px 10px;font-family:PlexMono,monospace;font-size:13px;background:var(--background)}
+</style>
+</head>
+<body>
+
+<!-- 1 · page map -->
+<div class="cap"><b>1 · Page map</b> what each part is and where a click leads</div>
+<section class="screen" id="s1" style="grid-template-columns:1fr">
+<div class="map" id="map"></div>
+</section>
+
+<!-- 2 · first screen -->
+<div class="cap"><b>2 · Trade book — first screen</b> run bar, headline strip against a benchmark, hero chart with the follow tooltip</div>
+<section class="screen" id="s2">
+<nav class="rail" id="rail2"></nav>
+<div class="main">
+  <div class="top"><span>Trade book</span><i class="ti ti-chevron-right"></i><span class="crumb">F&amp;O</span><span class="sp"></span><span class="chip"><i class="ti ti-circle-filled pos" style="font-size:9px"></i>Notes in through Tue 31 Mar · 3 accounts</span><span class="chip"><i class="ti ti-help"></i>How this works</span></div>
+  <div class="runbar">
+    <div class="seg"><span class="on">F&amp;O</span><span>Trades</span><span>Money</span><span>Momentum</span></div>
+    <span style="width:8px"></span>
+    <span class="chip on"><span class="k">Year</span>FY 2025-26 <i class="ti ti-chevron-down"></i></span>
+    <span class="chip on"><span class="k">Accounts</span>All 3 <i class="ti ti-chevron-down"></i></span>
+    <span class="chip"><span class="k">Source</span>All trades <i class="ti ti-chevron-down"></i></span>
+    <span class="chip"><span class="k">Capital</span>15:50 reading</span>
+    <span class="sp"></span>
+    <span class="btn"><i class="ti ti-refresh"></i></span><span class="btn"><i class="ti ti-share"></i>Share</span><span class="btn"><i class="ti ti-adjustments"></i>Settings</span>
+  </div>
+  <div class="strip" id="strip"></div>
+  <div class="sec" id="secline"></div>
+  <div class="hero">
+    <div class="legend"><span><span class="sw" style="background:var(--s1)"></span>Cumulative net</span><span><span class="sw" style="background:var(--muted);opacity:.6"></span>Target pace 24% a year</span><span class="sp"></span><span class="chip">Drawdown pane <i class="ti ti-toggle-left"></i></span><span class="chip">Daily bars <i class="ti ti-toggle-left"></i></span></div>
+    <div id="hero" style="margin-top:6px"></div>
+    <div class="tt" id="tt" style="display:none"></div>
+  </div>
+</div>
+</section>
+
+<!-- 3 · widgets -->
+<div class="cap"><b>3 · Trade book — widgets below the chart</b> your sheet's ratios and summary block, monthly and FY, accounts, charges</div>
+<section class="screen" id="s3">
+<nav class="rail" id="rail3"></nav>
+<div class="main">
+  <div class="grid" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)">
+    <div class="card">
+      <h3>Ratios<span class="badge g">sheet formulas · every row to 26 May 26</span><span class="act"><span class="chip">Per account <i class="ti ti-toggle-left"></i></span></span></h3>
+      <div class="d">Rolling over the last 50 or 100 sessions, the same columns as your sheet (T, U, V, W, Z).</div>
+      <div id="ratioSeg" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
+      <div style="display:flex;gap:14px;align-items:baseline"><span id="ratioNow" class="mono" style="font-size:22px;font-weight:500"></span><span id="ratioSub" class="fnt" style="font-size:12px"></span></div>
+      <div id="ratio"></div>
+      <div id="ratioDef" class="fnt" style="font-size:12px"></div>
+    </div>
+    <div class="card">
+      <h3>Summary<span class="badge g">FY 2025-26</span></h3>
+      <div class="d">The block under your daily rows.</div>
+      <div id="summary" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
+    </div>
+  </div>
+  <div class="grid" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)">
+    <div class="card">
+      <h3>Monthly returns<span class="act"><span class="chip on">% of capital</span><span class="chip">₹</span></span></h3>
+      <div class="d">Your Monthly returns tab: gain, % of capital, 3-month average; FY rows below.</div>
+      <div id="months" style="display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:5px"></div>
+      <table style="margin-top:12px" id="fy"></table>
+    </div>
+    <div class="card">
+      <h3>By account<span class="badge g">illustrative split</span></h3>
+      <div class="d">Each account's net, capital and return; the 50:50 rule applies to Finvasia's capital.</div>
+      <table>
+        <tr><th>Account</th><th class="r">Net</th><th class="r">Capital</th><th class="r">Return</th><th class="r">Charge/profit</th></tr>
+        <tr><td>Finvasia · FA··14</td><td class="r num pos">₹1,80,400</td><td class="r num">₹6,00,000</td><td class="r num">30.1%</td><td class="r num">52.4%</td></tr>
+        <tr><td>Angel One · R5··20</td><td class="r num pos">₹1,11,250</td><td class="r num">₹6,00,000</td><td class="r num">18.5%</td><td class="r num">61.9%</td></tr>
+        <tr><td>Finvasia 2 · FA··08</td><td class="r num pos">₹23,438</td><td class="r num fnt">—</td><td class="r num fnt">—</td><td class="r num">48.0%</td></tr>
+        <tr><td class="mut">Algo fees (AlgoTest, from the sheet)</td><td class="r num neg">−₹34,523</td><td></td><td></td><td></td></tr>
+      </table>
+      <div class="lbl" style="margin-top:14px">Charges by kind · FY 2025-26</div>
+      <div class="bar"><span style="flex:38;background:var(--s1)"></span><span style="flex:20;background:var(--s2)"></span><span style="flex:12;background:var(--s3)"></span><span style="flex:8;background:var(--s4)"></span><span style="flex:20;background:var(--accent)"></span><span style="flex:2;background:var(--muted)"></span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin-top:8px">
+        <span><span class="sw" style="background:var(--s1)"></span>Brokerage 38%</span><span><span class="sw" style="background:var(--s2)"></span>STT 20%</span><span><span class="sw" style="background:var(--s3)"></span>Exchange 12%</span><span><span class="sw" style="background:var(--s4)"></span>GST 8%</span><span><span class="sw" style="background:var(--accent)"></span>Algo fees 20%</span><span><span class="sw" style="background:var(--muted)"></span>Collateral interest 2%</span></div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- 4 · days and day detail -->
+<div class="cap"><b>4 · Days and the day detail</b> a row opens the day in a drawer: accounts, every charge, every fill, the manual inputs</div>
+<section class="screen" id="s4" style="min-height:760px">
+<nav class="rail" id="rail4"></nav>
+<div class="main">
+  <div class="grid" style="grid-template-columns:minmax(0,1fr);padding-right:600px">
+    <div class="card">
+      <h3>Days<span class="badge g">net, charges, to date, drawdown real · notes, algos, sources illustrative</span><span class="act"><span class="chip">Show open and no-note days <i class="ti ti-toggle-right"></i></span><span class="chip"><i class="ti ti-download"></i>CSV</span></span></h3>
+      <div class="d">One row per session; an open day is a note not received yet, never a zero.</div>
+      <table id="days"></table>
+    </div>
+  </div>
+  <aside class="drawer">
+    <div class="hd"><i class="ti ti-file-invoice mut"></i><b>Fri 27 Mar 2026</b><span class="badge">3 notes</span><span class="badge g">net and charges real · split illustrative</span><span class="sp"></span><span class="chip"><i class="ti ti-chevron-left"></i></span><span class="chip"><i class="ti ti-chevron-right"></i></span><span class="chip"><i class="ti ti-x"></i></span></div>
+    <div class="bd">
+      <div style="display:flex;gap:20px"><div><div class="lbl">Net</div><div class="mono pos" style="font-size:22px">₹7,754</div></div><div><div class="lbl">Charges</div><div class="mono" style="font-size:22px">₹547</div></div><div><div class="lbl">Fills</div><div class="mono" style="font-size:22px">24</div></div><div><div class="lbl">Context</div><div style="font-size:12.5px;margin-top:5px">VIX 14.2 · gap +0.4% · SENSEX 4 DTE</div></div></div>
+      <div><div class="lbl">Accounts</div><table>
+        <tr><th>Account · segment</th><th class="r">Obligation</th><th class="r">Charges</th><th class="r">Net</th><th></th></tr>
+        <tr><td>Finvasia · NSEFNO</td><td class="r num">₹5,600</td><td class="r num">₹210</td><td class="r num pos">₹5,390</td><td><i class="ti ti-file-type-pdf mut"></i></td></tr>
+        <tr><td>Angel One · BSE-FUTURES</td><td class="r num">₹2,500</td><td class="r num">₹240</td><td class="r num pos">₹2,260</td><td><i class="ti ti-file-type-pdf mut"></i></td></tr>
+        <tr><td>Finvasia 2 · NSEFNO</td><td class="r num">₹201</td><td class="r num">₹97</td><td class="r num pos">₹104</td><td><i class="ti ti-file-type-pdf mut"></i></td></tr>
+        <tr><td class="mut">Finvasia 2 · NSECAP (cash, not counted)</td><td class="r num fnt">₹11,200</td><td class="r num fnt">₹21</td><td class="r num fnt">—</td><td></td></tr></table></div>
+      <div><div class="lbl">Charges</div><div class="bar" style="height:8px"><span style="flex:120;background:var(--s1)"></span><span style="flex:98;background:var(--s2)"></span><span style="flex:58;background:var(--s3)"></span><span style="flex:34;background:var(--s4)"></span><span style="flex:200;background:var(--accent)"></span><span style="flex:32;background:var(--muted)"></span></div>
+      <div class="mono" style="font-size:12px;color:var(--muted);margin-top:6px">Brokerage ₹120 · STT ₹98 · exchange ₹58 · GST ₹34 · SEBI ₹1 · stamp ₹4 · algo fees ₹200 (14 algos) · collateral interest ₹32</div></div>
+      <div><div class="lbl">Fills, paired into trades</div><table>
+        <tr><th>Time</th><th>Contract</th><th>Source</th><th class="r">Lots</th><th class="r">In → out</th><th class="r">Gross P&amp;L</th></tr>
+        <tr><td class="num">09:17–15:15</td><td>SENSEX 2 Apr 76400 CE</td><td><span class="src c">Core</span></td><td class="r num">2</td><td class="r num">212.4 → 118.0</td><td class="r num pos">₹3,776</td></tr>
+        <tr><td class="num">09:17–15:15</td><td>SENSEX 2 Apr 76400 PE</td><td><span class="src c">Core</span></td><td class="r num">2</td><td class="r num">198.1 → 171.6</td><td class="r num pos">₹1,060</td></tr>
+        <tr><td class="num">09:24–11:02</td><td>NIFTY 7 Apr 22600 PE</td><td><span class="src t">T1</span></td><td class="r num">1</td><td class="r num">84.0 → 96.3</td><td class="r num neg">−₹799</td></tr>
+        <tr><td class="num">13:41–14:20</td><td>NIFTY 7 Apr 22700 CE</td><td><span class="src m">Manual</span></td><td class="r num">2</td><td class="r num">61.2 → 88.9</td><td class="r num pos">₹3,601</td></tr>
+        <tr><td colspan="6" class="fnt">… 8 more trades</td></tr></table></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="chip"><span class="k">Algos</span>14 · from the sheet</span><span class="chip"><span class="k">Capital</span>₹6L · ₹6L · read 15:50</span><span class="btn"><i class="ti ti-pencil"></i>Edit inputs</span><span class="btn"><i class="ti ti-file-type-pdf"></i>Open notes</span></div>
+    </div>
+  </aside>
+</div>
+</section>
+
+<!-- 5 · trades -->
+<div class="cap"><b>5 · Trades</b> every round trip by source, its best and worst point, and the day's context</div>
+<section class="screen" id="s5">
+<nav class="rail" id="rail5"></nav>
+<div class="main">
+  <div class="runbar">
+    <div class="seg"><span>F&amp;O</span><span class="on">Trades</span><span>Money</span><span>Momentum</span></div>
+    <span style="width:8px"></span>
+    <span class="chip on"><span class="k">Year</span>FY 2026-27</span><span class="chip on"><span class="k">Source</span>All <i class="ti ti-chevron-down"></i></span><span class="chip"><span class="k">Index</span>All</span><span class="chip"><span class="k">Days to expiry</span>Any</span><span class="chip"><span class="k">VIX at open</span>Any</span><span class="chip"><span class="k">Expiry day</span>Either</span><span class="sp"></span><span class="btn"><i class="ti ti-adjustments"></i>Settings</span>
+  </div>
+  <div class="grid" style="grid-template-columns:repeat(4,minmax(0,1fr))" id="srcCards"></div>
+  <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+    <div class="card">
+      <h3>Best and worst point of each trade<span class="badge g">illustrative</span></h3>
+      <div class="d">How far each trade went against you (left) and how much of its best point you kept (up). Only contracts the collector stores.</div>
+      <div id="mfe"></div>
+      <div class="legend" style="margin-top:4px"><span><span class="sw" style="background:var(--s1)"></span>Core</span><span><span class="sw" style="background:var(--s3)"></span>T1</span><span><span class="sw" style="background:var(--s4)"></span>Own algos</span><span><span class="sw" style="background:var(--s2)"></span>Manual</span></div>
+    </div>
+    <div class="card">
+      <h3>By day context<span class="badge g">descriptive · illustrative</span></h3>
+      <div class="d">Net per trade by the day's conditions. A pattern here is a question for the research gate, not a rule.</div>
+      <table>
+        <tr><th>Condition</th><th class="r">Trades</th><th class="r">Win %</th><th class="r">Avg trade</th><th style="width:34%"></th></tr>
+        <tr><td>VIX at open below 13</td><td class="r num">142</td><td class="r num">63%</td><td class="r num pos">₹612</td><td><div class="bar" style="height:7px"><span style="flex:61;background:var(--positive)"></span><span style="flex:39;background:transparent"></span></div></td></tr>
+        <tr><td>VIX 13–16</td><td class="r num">208</td><td class="r num">58%</td><td class="r num pos">₹431</td><td><div class="bar" style="height:7px"><span style="flex:43;background:var(--positive)"></span><span style="flex:57"></span></div></td></tr>
+        <tr><td>VIX above 16</td><td class="r num">61</td><td class="r num">46%</td><td class="r num neg">−₹284</td><td><div class="bar" style="height:7px"><span style="flex:28;background:var(--negative)"></span><span style="flex:72"></span></div></td></tr>
+        <tr><td>Expiry day</td><td class="r num">118</td><td class="r num">55%</td><td class="r num pos">₹356</td><td><div class="bar" style="height:7px"><span style="flex:36;background:var(--positive)"></span><span style="flex:64"></span></div></td></tr>
+        <tr><td>Gap above 0.5%</td><td class="r num">47</td><td class="r num">43%</td><td class="r num neg">−₹402</td><td><div class="bar" style="height:7px"><span style="flex:40;background:var(--negative)"></span><span style="flex:60"></span></div></td></tr>
+        <tr><td>Event day (RBI, budget)</td><td class="r num fnt">9</td><td class="r num fnt">—</td><td class="r num fnt">too few</td><td></td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="grid"><div class="card">
+    <h3>Round trips<span class="badge g">illustrative</span><span class="act"><span class="chip"><i class="ti ti-download"></i>CSV</span></span></h3>
+    <div class="d">Fills paired per contract, account and day.</div>
+    <table>
+      <tr><th>Day</th><th>Time</th><th>Contract</th><th>Source</th><th class="r">DTE</th><th class="r">From ATM</th><th class="r">Lots</th><th class="r">Held</th><th class="r">Worst</th><th class="r">Best</th><th class="r">Charges</th><th class="r">Gross P&amp;L</th></tr>
+      <tr><td>Fri 23 Oct</td><td class="num">09:17</td><td>SENSEX 29 Oct 81400 CE</td><td><span class="src c">Core</span></td><td class="r num">4</td><td class="r num">ATM</td><td class="r num">2</td><td class="r num">5h 58m</td><td class="r num neg">−₹1,240</td><td class="r num pos">₹4,410</td><td class="r num">₹214</td><td class="r num pos">₹3,776</td></tr>
+      <tr><td>Fri 23 Oct</td><td class="num">09:24</td><td>NIFTY 27 Oct 25700 PE</td><td><span class="src t">T1</span></td><td class="r num">2</td><td class="r num">−1</td><td class="r num">1</td><td class="r num">1h 38m</td><td class="r num neg">−₹1,105</td><td class="r num pos">₹260</td><td class="r num">₹96</td><td class="r num neg">−₹799</td></tr>
+      <tr><td>Fri 23 Oct</td><td class="num">13:41</td><td>NIFTY 27 Oct 25800 CE</td><td><span class="src m">Manual</span></td><td class="r num">2</td><td class="r num">+1</td><td class="r num">2</td><td class="r num">39m</td><td class="r num neg">−₹410</td><td class="r num pos">₹4,020</td><td class="r num">₹118</td><td class="r num pos">₹3,601</td></tr>
+      <tr><td>Thu 22 Oct</td><td class="num">09:17</td><td>SENSEX 29 Oct 81200 PE</td><td><span class="src o">Own algo</span></td><td class="r num">5</td><td class="r num">ATM</td><td class="r num">1</td><td class="r num">6h 1m</td><td class="r num neg">−₹2,880</td><td class="r num pos">₹640</td><td class="r num">₹107</td><td class="r num neg">−₹2,214</td></tr>
+      <tr><td>Thu 22 Oct</td><td class="num">10:05</td><td>BANKNIFTY 27 Oct 57000 CE</td><td><span class="src m">Manual</span></td><td class="r num">3</td><td class="r num">+2</td><td class="r num">1</td><td class="r num">22m</td><td class="r num neg">−₹1,650</td><td class="r num pos">₹300</td><td class="r num">₹94</td><td class="r num neg">−₹1,560</td></tr>
+    </table>
+  </div></div>
+</div>
+</section>
+
+<!-- 6 · money -->
+<div class="cap"><b>6 · Money</b> capital per account, deposits and withdrawals, margin pressure, collateral interest</div>
+<section class="screen" id="s6">
+<nav class="rail" id="rail6"></nav>
+<div class="main">
+  <div class="runbar">
+    <div class="seg"><span>F&amp;O</span><span>Trades</span><span class="on">Money</span><span>Momentum</span></div><span style="width:8px"></span>
+    <span class="chip on"><span class="k">Year</span>FY 2026-27</span><span class="chip on"><span class="k">Accounts</span>All 3</span><span class="sp"></span><span class="btn"><i class="ti ti-adjustments"></i>Settings</span>
+  </div>
+  <div class="grid" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+    <div class="card"><div class="lbl">Return on money in the account <span class="badge g">illustrative</span></div><div class="mono pos" style="font-size:24px">10.6%</div><div class="fnt" style="font-size:12px">time-weighted; deposits taken out</div></div>
+    <div class="card"><div class="lbl">Money in · out</div><div class="mono" style="font-size:24px">₹3,00,000 · ₹40,000</div><div class="fnt" style="font-size:12px">2 deposits, 1 settlement</div></div>
+    <div class="card"><div class="lbl">Collateral interest (Angel One)</div><div class="mono neg" style="font-size:24px">−₹6,812</div><div class="fnt" style="font-size:12px">115 days · avg ₹59 · posted 1st and 16th</div></div>
+    <div class="card"><div class="lbl">Margin above 95%</div><div class="mono warn" style="font-size:24px">23 days</div><div class="fnt" style="font-size:12px">from Margin Shortfall Intimation</div></div>
+  </div>
+  <div class="grid" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)">
+    <div class="card"><h3>Capital per account<span class="badge g">illustrative</span></h3><div class="d">Usable margin read at 15:50 for the next session; Finvasia counts collateral at 50:50, Angel One in full.</div><div id="capchart"></div>
+      <div class="legend"><span><span class="sw" style="background:var(--s1)"></span>Finvasia</span><span><span class="sw" style="background:var(--s3)"></span>Angel One</span><span><span class="sw" style="background:var(--s4)"></span>Finvasia 2</span><span>▲ deposit ▼ withdrawal</span></div></div>
+    <div class="card"><h3>Ledger events<span class="badge g">illustrative</span></h3><div class="d">From the brokers' e-mails; a deposit is never profit.</div>
+      <table><tr><th>Day</th><th>Account</th><th>Event</th><th class="r">Amount</th></tr>
+      <tr><td>Thu 22 Oct</td><td>Angel One</td><td><span class="badge w">margin 97.9%</span> 10:05</td><td class="r num fnt">—</td></tr>
+      <tr><td>Fri 16 Oct</td><td>Angel One</td><td>Interest posted (1–15 Oct)</td><td class="r num neg">−₹812</td></tr>
+      <tr><td>Mon 5 Oct</td><td>Finvasia</td><td>Quarterly fund settlement</td><td class="r num neg">−₹40,000</td></tr>
+      <tr><td>Thu 1 Oct</td><td>Angel One</td><td>Funds added</td><td class="r num pos">₹1,00,000</td></tr>
+      <tr><td>Wed 16 Sep</td><td>Angel One</td><td>Interest posted (1–15 Sep)</td><td class="r num neg">−₹1,046</td></tr>
+      <tr><td>Tue 1 Sep</td><td>Finvasia</td><td>Funds added</td><td class="r num pos">₹2,00,000</td></tr></table></div>
+  </div>
+</div>
+</section>
+
+<!-- 7 · momentum -->
+<div class="cap"><b>7 · Momentum</b> Kite's contract notes booked to the weekly lots</div>
+<section class="screen" id="s7">
+<nav class="rail" id="rail7"></nav>
+<div class="main">
+  <div class="runbar">
+    <div class="seg"><span>F&amp;O</span><span>Trades</span><span>Money</span><span class="on">Momentum</span></div><span style="width:8px"></span>
+    <span class="chip on"><span class="k">From</span>Fri 16 Oct (paper start)</span><span class="chip"><span class="k">Lots</span>All</span><span class="sp"></span><span class="btn"><i class="ti ti-external-link"></i>Open Momentum › This week</span>
+  </div>
+  <div class="strip" style="grid-template-columns:repeat(4,minmax(0,1fr)) 1fr">
+    <div class="kpi"><div class="l">Realised</div><div class="v pos">₹3,420</div><div class="b">from 2 sells</div></div>
+    <div class="kpi"><div class="l">Bought · sold</div><div class="v">₹1.12L · ₹13.2k</div><div class="b">17 buys · 2 sells</div></div>
+    <div class="kpi"><div class="l">Charges</div><div class="v">₹612</div><div class="b">0.49% of turnover</div></div>
+    <div class="kpi"><div class="l">Fills vs the Friday plan</div><div class="v neg">−0.4%</div><div class="b"><span class="badge n">−₹450</span> slippage on value</div></div>
+    <div class="bench"><span class="badge g">illustrative</span><div style="margin-top:6px">Every Kite transaction is booked to Momentum: that account trades nothing else.</div></div>
+  </div>
+  <div class="grid"><div class="card"><h3>Lots<span class="badge g">illustrative</span></h3><div class="d">One row per weekly lot and Friday; the planned order beside what the note shows.</div>
+    <table><tr><th>Lot</th><th>Friday</th><th>What happened</th><th class="r">Planned</th><th class="r">Filled</th><th class="r">Gap</th><th class="r">Charges</th><th class="r">Realised</th></tr>
+    <tr><td>Lot 1</td><td>Fri 16 Oct</td><td>8 buys (fresh start)</td><td class="r num">₹49,920</td><td class="r num">₹49,860</td><td class="r num pos">₹60</td><td class="r num">₹182</td><td class="r num fnt">—</td></tr>
+    <tr><td>Lot 2</td><td>Fri 23 Oct</td><td>7 buys</td><td class="r num">₹49,180</td><td class="r num">₹49,410</td><td class="r num neg">−₹230</td><td class="r num">₹176</td><td class="r num fnt">—</td></tr>
+    <tr><td>Lot 1</td><td>Fri 23 Oct</td><td>2 sells, 2 buys (rebalance)</td><td class="r num">₹13,480</td><td class="r num">₹13,200</td><td class="r num neg">−₹280</td><td class="r num">₹254</td><td class="r num pos">₹3,420</td></tr></table></div></div>
+</div>
+</section>
+
+<!-- 8 · states and inputs -->
+<div class="cap"><b>8 · States and manual inputs</b> notes late, an open day, the inputs dialog, a new year with no data</div>
+<section class="screen" id="s8" style="min-height:620px">
+<nav class="rail" id="rail8"></nav>
+<div class="main">
+  <div class="banner"><i class="ti ti-alert-triangle warn"></i><span><b>Angel One's note for Fri 23 Oct has not arrived.</b> <span class="mut">The day stays open and every figure above leaves it out; the 07:30 run looks again. Open days older than 10 sessions alert on Telegram.</span></span><span class="sp"></span><span class="btn">Mark as no trade</span></div>
+  <div class="grid" style="grid-template-columns:minmax(0,1.25fr) 460px minmax(0,.75fr)">
+    <div class="card"><h3>Day rows by state<span class="badge g">illustrative</span></h3><div class="d">How the day table shows each case.</div>
+      <table><tr><th>Day</th><th class="r">Net</th><th>State</th></tr>
+      <tr><td>Fri 23 Oct</td><td class="r num pos">₹7,410</td><td><span class="badge">2 of 3 notes</span> <span class="badge w">Angel One open</span></td></tr>
+      <tr><td>Thu 22 Oct</td><td class="r num neg">−₹4,120</td><td><span class="badge">3 notes</span></td></tr>
+      <tr><td>Wed 21 Oct</td><td class="r num pos">₹12,880</td><td><span class="badge">2 notes</span> <span class="badge g">Finvasia 2 no trade</span></td></tr>
+      <tr><td>Mon 19 Oct</td><td class="r num fnt">—</td><td><span class="badge n">parse failed</span> <span class="mut" style="font-size:12px">new segment label</span></td></tr>
+      <tr><td>Sun 8 Nov (Muhurat)</td><td class="r num pos">₹540</td><td><span class="badge i">special session</span></td></tr>
+      <tr><td>Wed 2 Apr 25</td><td class="r num pos">₹6,095</td><td><span class="badge g">from sheet</span> <span class="mut" style="font-size:12px">no e-mail kept</span></td></tr></table></div>
+    <div class="card" style="border-color:var(--border-strong);box-shadow:0 18px 50px rgba(0,0,0,.5)"><h3>Inputs for Fri 23 Oct<span class="act"><i class="ti ti-x mut"></i></span></h3><div class="d">The two columns your sheet asked you to type; pre-filled where the repo can read them.</div>
+      <div class="lbl">Algo trades taken</div><div style="display:flex;gap:8px;align-items:center"><div class="field" style="width:90px">9</div><span class="badge i">from live capture</span><span class="fnt" style="font-size:12px">algo fees ₹138</span></div>
+      <div class="lbl" style="margin-top:12px">Capital, per account (morning)</div>
+      <div style="display:grid;grid-template-columns:1fr 130px auto;gap:8px;align-items:center;font-size:13px">
+        <span>Finvasia</span><div class="field">6,00,000</div><span class="badge i">read 15:50</span>
+        <span>Angel One</span><div class="field">6,12,400</div><span class="badge i">read 15:50</span>
+        <span>Finvasia 2</span><div class="field" style="color:var(--faint)">—</div><span class="badge g">type it</span></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><span class="btn">Cancel</span><span class="btn pri">Save</span></div></div>
+    <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;min-height:300px"><i class="ti ti-notebook" style="font-size:30px;color:var(--faint)"></i><b>FY 2027-28 starts on 1 Apr</b><div class="mut" style="font-size:13px;max-width:300px">The first contract note of the year lands here the night after the first session.</div><span class="btn">See FY 2026-27</span></div>
+  </div>
+</div>
+</section>
+
+<script>
+const L=["1 Apr 25","2 Apr 25","3 Apr 25","4 Apr 25","7 Apr 25","8 Apr 25","9 Apr 25","10 Apr 25","11 Apr 25","14 Apr 25","15 Apr 25","16 Apr 25","17 Apr 25","18 Apr 25","21 Apr 25","22 Apr 25","23 Apr 25","24 Apr 25","28 Apr 25","29 Apr 25","30 Apr 25","2 May 25","5 May 25","6 May 25","7 May 25","8 May 25","9 May 25","12 May 25","13 May 25","14 May 25","15 May 25","16 May 25","19 May 25","20 May 25","20 May 25","21 May 25","22 May 25","23 May 25","26 May 25","27 May 25","28 May 25","29 May 25","30 May 25","2 Jun 25","3 Jun 25","4 Jun 25","5 Jun 25","6 Jun 25","9 Jun 25","10 Jun 25","11 Jun 25","12 Jun 25","13 Jun 25","16 Jun 25","17 Jun 25","18 Jun 25","19 Jun 25","20 Jun 25","23 Jun 25","24 Jun 25","25 Jun 25","26 Jun 25","27 Jun 25","30 Jun 25","1 Jul 25","2 Jul 25","3 Jul 25","4 Jul 25","7 Jul 25","8 Jul 25","9 Jul 25","10 Jul 25","11 Jul 25","14 Jul 25","15 Jul 25","16 Jul 25","17 Jul 25","18 Jul 25","21 Jul 25","22 Jul 25","23 Jul 25","24 Jul 25","25 Jul 25","28 Jul 25","29 Jul 25","30 Jul 25","31 Jul 25","1 Aug 25","4 Aug 25","5 Aug 25","6 Aug 25","7 Aug 25","8 Aug 25","11 Aug 25","12 Aug 25","13 Aug 25","14 Aug 25","18 Aug 25","19 Aug 25","20 Aug 25","21 Aug 25","22 Aug 25","25 Aug 25","26 Aug 25","28 Aug 25","29 Aug 25","1 Sep 25","2 Sep 25","3 Sep 25","4 Sep 25","5 Sep 25","8 Sep 25","9 Sep 25","10 Sep 25","11 Sep 25","12 Sep 25","15 Sep 25","16 Sep 25","17 Sep 25","18 Sep 25","19 Sep 25","22 Sep 25","23 Sep 25","24 Sep 25","25 Sep 25","26 Sep 25","29 Sep 25","30 Sep 25","1 Oct 25","3 Oct 25","6 Oct 25","7 Oct 25","8 Oct 25","9 Oct 25","10 Oct 25","13 Oct 25","14 Oct 25","15 Oct 25","16 Oct 25","17 Oct 25","20 Oct 25","21 Oct 25","23 Oct 25","24 Oct 25","27 Oct 25","28 Oct 25","29 Oct 25","30 Oct 25","31 Oct 25","3 Nov 25","4 Nov 25","6 Nov 25","7 Nov 25","10 Nov 25","11 Nov 25","12 Nov 25","13 Nov 25","14 Nov 25","17 Nov 25","18 Nov 25","19 Nov 25","20 Nov 25","21 Nov 25","24 Nov 25","25 Nov 25","26 Nov 25","27 Nov 25","28 Nov 25","1 Dec 25","2 Dec 25","3 Dec 25","4 Dec 25","5 Dec 25","8 Dec 25","9 Dec 25","10 Dec 25","11 Dec 25","12 Dec 25","15 Dec 25","16 Dec 25","17 Dec 25","18 Dec 25","19 Dec 25","22 Dec 25","23 Dec 25","24 Dec 25","26 Dec 25","29 Dec 25","30 Dec 25","31 Dec 25","1 Jan 26","2 Jan 26","5 Jan 26","6 Jan 26","7 Jan 26","8 Jan 26","9 Jan 26","12 Jan 26","13 Jan 26","14 Jan 26","16 Jan 26","19 Jan 26","20 Jan 26","21 Jan 26","22 Jan 26","23 Jan 26","27 Jan 26","28 Jan 26","29 Jan 26","30 Jan 26","1 Feb 26","2 Feb 26","3 Feb 26","4 Feb 26","5 Feb 26","6 Feb 26","9 Feb 26","10 Feb 26","11 Feb 26","12 Feb 26","13 Feb 26","16 Feb 26","17 Feb 26","18 Feb 26","19 Feb 26","20 Feb 26","23 Feb 26","24 Feb 26","25 Feb 26","26 Feb 26","27 Feb 26","2 Mar 26","4 Mar 26","5 Mar 26","6 Mar 26","9 Mar 26","10 Mar 26","11 Mar 26","12 Mar 26","13 Mar 26","16 Mar 26","17 Mar 26","18 Mar 26","19 Mar 26","20 Mar 26","23 Mar 26","24 Mar 26","25 Mar 26","27 Mar 26","30 Mar 26","1 Apr 26","2 Apr 26","6 Apr 26","7 Apr 26","8 Apr 26","9 Apr 26","10 Apr 26","13 Apr 26","15 Apr 26","16 Apr 26","17 Apr 26","20 Apr 26","21 Apr 26","22 Apr 26","23 Apr 26","24 Apr 26","28 Apr 26","29 Apr 26","30 Apr 26","4 May 26","5 May 26","6 May 26","7 May 26","8 May 26","11 May 26","12 May 26","13 May 26","14 May 26","15 May 26","18 May 26","19 May 26","20 May 26","21 May 26","22 May 26","25 May 26","26 May 26"];
+const P=[-4059,6095,10312,8264,-2868,4010,13609,null,5091,null,228,-508,-13163,5500,null,1381,-14213,-17125,-5205,208,-7709,3607,-3948,4710,3201,3675,-2379,-14819,1116,4804,-27953,9457,6562,1821,-1373,-20982,28715,-15943,-6745,4203,65653,-8125,-8125,6757,4704,1211,496,2168,8332,19499,-3408,-6300,833,-6801,16366,2548,7821,-4889,-13758,-53507,10028,-753,13427,1476,18224,1844,467,4234,984,15302,2017,2980,-5053,1275,8240,-1090,10194,3324,1801,9962,-5124,7566,-6583,3271,-4262,2662,-46336,-13451,-10302,14999,6744,1442,1148,-3881,-5547,5694,25847,8245,4988,-8380,10103,6116,3656,-529,-3165,10231,-1304,347,-2845,-3556,4826,-1530,7390,7867,13602,-2721,5992,5180,-1457,3991,7813,-37,2435,6435,608,4142,119,7424,16383,3904,1640,-2840,-5931,2544,6523,7345,-3892,-19643,1626,-12088,-2901,112,4843,-2075,7094,7204,1708,740,379,10105,12441,2335,-2997,6560,854,-1503,-9418,12746,5472,-7980,-8084,12495,2268,-1413,-4562,-14103,-3624,6426,-3690,6893,3070,-86,-248,-55,7022,-3490,-830,8206,3301,5084,2255,8737,2037,4854,7020,5258,1673,216,3847,2383,-5276,-5993,4326,-3259,4851,3803,-6312,6296,-4407,-14715,-8522,15960,4337,-9285,-8912,-3731,10909,6664,6920,6956,4954,18296,37891,348,-4360,-3924,-1331,5253,6706,6732,-15293,-1882,-879,716,-8177,-4323,6267,5061,6975,4470,3089,260,3904,-6698,-42035,8528,14438,-10902,11415,-14265,-18165,-13571,-3531,2871,-3201,5176,9282,2865,7754,-2717,-200,-724,-200,2756,2266,2422,-909,7676,1281,-309,-894,2557,10303,-84,-12120,-10215,2162,-7849,10999,-2920,1502,-6567,4266,4322,10527,-5155,-11728,1835,5210,1497,9613,3354,2757,3182,3932,1517];
+const C=[1988,423,255,410,3310,1763,213,125,1104,125,315,535,163,398,360,3200,1213,125,352,555,955,979,408,354,320,495,883,1161,1626,469,2303,368,319,792,177,1066,749,1059,760,1854,515,125,125,841,1250,630,1210,523,274,560,337,1777,818,1287,774,561,725,878,982,1612,469,1962,531,208,297,372,1359,588,179,494,286,523,385,259,636,231,366,572,372,630,413,722,1001,563,1407,516,2833,1275,816,755,670,1258,585,647,1909,602,894,427,471,824,720,795,433,963,1687,265,245,1201,904,1529,838,1565,1421,302,205,330,167,315,182,249,247,233,454,228,852,914,384,222,269,194,368,322,840,287,382,180,607,1398,414,1388,652,287,275,1167,675,470,176,273,274,199,202,185,289,168,420,523,876,539,201,669,1410,224,289,234,396,492,177,160,159,233,160,462,551,139,659,437,264,253,149,200,148,197,197,145,269,396,183,124,335,231,244,181,241,362,232,315,535,881,698,1020,678,171,210,1953,998,589,702,285,561,1956,1822,342,305,444,739,760,231,264,259,371,902,1482,779,843,2617,842,354,407,720,444,768,641,1606,698,3265,1566,1048,1629,572,1502,3452,975,424,685,1147,458,591,537,547,485,200,363,200,441,305,341,371,417,233,398,570,874,296,677,1039,939,443,559,1263,848,772,504,1159,450,507,870,855,640,362,360,422,295,858,302,283,472];
+const CAP=1200000;
+const inr=v=>{const s=Math.abs(Math.round(v)).toString();const last3=s.slice(-3),rest=s.slice(0,-3);const g=rest?rest.replace(/\B(?=(\d{2})+(?!\d))/g,',')+','+last3:last3;return(v<0?'−':'')+'₹'+g};
+const lak=v=>(v<0?'−':'')+'₹'+(Math.abs(v)/100000).toFixed(2)+'L';
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const ym=l=>{const p=l.split(' ');return [2000+ +p[2],MON.indexOf(p[1])]};
+const fy=L.map(l=>{const [y,m]=ym(l);return m>=3?y:y-1});
+const IDX=L.map((_,i)=>i).filter(i=>fy[i]===2025);
+const fP=IDX.map(i=>P[i]),fC=IDX.map(i=>C[i]),fL=IDX.map(i=>L[i]);
+
+function lineSVG(o){
+  const W=o.w,H=o.h,pl=64,pr=14,pt=10,pb=26,iw=W-pl-pr,ih=H-pt-pb;
+  const all=o.series.flatMap(s=>s.d.filter(v=>v!=null));
+  let lo=Math.min(0,...all),hi=Math.max(...all);if(o.lo!=null)lo=o.lo;const pad=(hi-lo)*.06;hi+=pad;lo-=lo<0?pad:0;
+  const n=o.series[0].d.length,x=i=>pl+i*iw/(n-1),y=v=>pt+(hi-v)*ih/(hi-lo);
+  let g='';const raw=(hi-lo)/5,mag=Math.pow(10,Math.floor(Math.log10(raw))),step=[1,2,2.5,5,10].map(m=>m*mag).find(m=>m>=raw);for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step){g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="#2a2f38"/><text x="${pl-8}" y="${y(v)+4}" text-anchor="end">${o.fmt(v)}</text>`}
+  if(lo<0)g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(0)}" y2="${y(0)}" stroke="#3a414d"/>`;
+  (o.xt||[]).forEach(([i,t])=>{g+=`<text x="${x(i)}" y="${H-8}" text-anchor="middle">${t}</text>`});
+  o.series.forEach(s=>{let d='',area='',started=false,first=0;s.d.forEach((v,i)=>{if(v==null){started=false;return}d+=(started?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1);if(!started)first=i;started=true});
+    if(s.fill){area=d+`L${x(n-1)} ${y(Math.max(lo,0))}L${x(s.d.findIndex(v=>v!=null))} ${y(Math.max(lo,0))}Z`;g+=`<path d="${area}" fill="${s.fill}"/>`}
+    g+=`<path d="${d}" fill="none" stroke="${s.c}" stroke-width="${s.wd||2}" ${s.dash?'stroke-dasharray="5 4"':''} stroke-linejoin="round" stroke-linecap="round"/>`});
+  if(o.mark){const [i,v]=o.mark;g+=`<line x1="${x(i)}" x2="${x(i)}" y1="${pt}" y2="${pt+ih}" stroke="#868d99" stroke-dasharray="3 3"/><circle cx="${x(i)}" cy="${y(v)}" r="5" fill="${o.series[0].c}" stroke="#121417" stroke-width="2"/>`}
+  return {svg:`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${g}</svg>`,x,y};
+}
+function monthTicks(labels){const t=[];labels.forEach((l,i)=>{const [y,m]=ym(l);if(i===0||ym(labels[i-1])[1]!==m)t.push([i,MON[m]+(m===0||i===0?" '"+String(y).slice(2):'')])});return t}
+
+/* rail */
+const RAIL=['ti-layout-dashboard','ti-broadcast','ti-flask','ti-trending-up','ti-notebook','ti-database','ti-key','ti-clock-play','ti-settings','ti-book'];
+document.querySelectorAll('.rail').forEach(r=>{r.innerHTML=RAIL.map((c,i)=>`<i class="ti ${c} ${i===4?'on':''}"></i>`).join('')});
+
+/* page map */
+const MAP=[
+ ['F&O','Headline, hero chart, ratios, summary, monthly and FY, accounts, charges, days.','Day row → day drawer'],
+ ['Day drawer','One session: accounts, every charge, fills paired into trades, inputs, the PDFs.','Edit inputs → inputs dialog'],
+ ['Trades','Round trips by source, best and worst point, day context.','Trade row → its day'],
+ ['Money','Capital per account, deposits and withdrawals, interest, margin pressure.','Event → its e-mail'],
+ ['Momentum','Kite notes booked to the weekly lots, planned against filled.','Lot → Momentum › This week'],
+ ['Inputs dialog','Algo trades and capital per account, pre-filled where readable.','Save → the day'],
+ ['States','Notes late, open days, parse failures, days from the sheet.','Banner → the open day'],
+ ['Guide page','How the Trade book reads the notes; every ratio\'s formula.','How this works']];
+document.getElementById('map').innerHTML=MAP.map(m=>`<div class="node"><h4>${m[0]}</h4><p>${m[1]}</p><div class="go">${m[2]}</div></div>`).join('');
+
+/* FY figures (real) */
+let cum=0,pk=0,mdd=0,run=0,longest=0,w=0,l=0,sw=0,sl=0,best=-1e9,worst=1e9,mddAt=0;const CUM=[],DD=[];
+fP.forEach((p,i)=>{if(p!=null){cum+=p;if(p>0){w++;sw+=p}else if(p<0){l++;sl+=p}best=Math.max(best,p);worst=Math.min(worst,p)}pk=Math.max(pk,cum);const dd=cum-pk;if(dd<mdd){mdd=dd;mddAt=i}run=dd<0?run+1:0;longest=Math.max(longest,run);CUM.push(cum);DD.push(dd)});
+const tc=fC.reduce((a,b)=>a+b,0),n=fP.length,target=fP.map((_,i)=>CAP*0.24*(i+1)/n);
+const roc=cum*100/CAP;
+document.getElementById('strip').innerHTML=[
+ ['Net profit',inr(cum),'pos',`<span class="badge n">${inr(cum-CAP*0.24)}</span> target ${inr(CAP*0.24)}`],
+ ['Return vs target',roc.toFixed(1)+'%','',`<span class="badge n">${(roc-24).toFixed(1)}pp</span> target 24.0%`],
+ ['Max drawdown',inr(mdd),'neg',`${(mdd*100/CAP).toFixed(1)}% · <span class="fnt">no target figure</span>`],
+ ['Charges / net profit',(tc*100/cum).toFixed(0)+'%','',`${inr(tc)} · <span class="fnt">no target figure</span>`],
+ ['Win days',Math.round(w*100/(w+l))+'%','',`${w} won · ${l} lost · <span class="fnt">no target figure</span>`]
+].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v ${k[2]}">${k[1]}</div><div class="b">${k[3]}</div></div>`).join('')+
+`<div class="bench"><div class="lbl">Compare with</div><span class="chip on">Target pace 24% <i class="ti ti-chevron-down"></i></span><div style="margin-top:8px;line-height:1.5">A target pace has a figure for profit and return only, and says so on the other tiles. Last FY, Adaptive paper (from 19 Oct) and NIFTY compare every tile.</div></div>`;
+document.getElementById('secline').innerHTML=`Avg day <b>${inr(cum/(w+l))}</b> · avg win <b>${inr(sw/w)}</b> · avg loss <b>${inr(sl/l)}</b> · best <b>${inr(best)}</b> · worst <b>${inr(worst)}</b> · 100-day avg profit to 31 Mar <b>${inr(fP.slice(-100).filter(v=>v!=null).reduce((a,b)=>a+b,0)/fP.slice(-100).filter(v=>v!=null).length)}</b> · profit/capital <b>${(fP.slice(-100).filter(v=>v!=null).reduce((a,b)=>a+b,0)/fP.slice(-100).filter(v=>v!=null).length*10000/CAP).toFixed(0)} bps/day</b> · sessions <b>${n}</b> · <span style="color:var(--primary)">All metrics</span>`;
+const HW=1340,mark=IDX.length-60;
+const hero=lineSVG({w:HW,h:430,series:[{d:CUM,c:'#3987e5',fill:'rgba(57,135,229,.10)'},{d:target,c:'#9aa1ac',wd:1.5,dash:true}],fmt:v=>(v/100000).toFixed(1).replace(/\.0$/,'')+'L',xt:monthTicks(fL),mark:[mark,CUM[mark]]});
+document.getElementById('hero').innerHTML=hero.svg;
+const tt=document.getElementById('tt');tt.style.display='block';tt.style.left=(hero.x(mark)+20-80)+'px';tt.style.top=(hero.y(CUM[mark])+6+40+30)+'px';
+tt.innerHTML=`<div class="mono" style="font-weight:500">${fL[mark]}</div><div>Day <span class="mono ${fP[mark]<0?'neg':'pos'}">${inr(fP[mark])}</span> · to date <span class="mono">${inr(CUM[mark])}</span></div><div class="fnt">Drawdown <span class="mono">${inr(DD[mark])}</span> · click for the day</div>`;
+
+/* ratios (real, all data) */
+const avg=(a,i,k)=>{let s=0,c=0;for(let j=Math.max(0,i-k+1);j<=i;j++)if(a[j]!=null){s+=a[j];c++}return i+1<k?null:(c?s/c:null)};
+const A50=P.map((_,i)=>avg(P,i,50)),A100=P.map((_,i)=>avg(P,i,100)),C100=C.map((_,i)=>avg(C,i,100));
+const RT=A100.map((p,i)=>p==null?null:C100[i]*100/p),BPS=A100.map(p=>p==null?null:p*10000/CAP);
+const MET=[['50-day avg profit',A50,inr,'T: average daily profit over the last 50 sessions.'],['100-day avg profit',A100,inr,'U: the same over 100 sessions.'],['100-day avg charge',C100,inr,'V: average daily charges, algo fees included, over 100 sessions.'],['Charge / profit (W)',RT,v=>v.toFixed(1)+'%','W: V ÷ U, charges per rupee of net profit. Lower is better.'],['Profit / capital',BPS,v=>v.toFixed(0)+' bps','Z: U in basis points of capital a day; 10 bps a day is about 25% a year.']];
+const seg=document.getElementById('ratioSeg');
+function pick(k){const m=MET[k];[...seg.children].forEach((b,i)=>b.className='chip'+(i===k?' on':''));
+ const r=lineSVG({w:780,h:230,series:[{d:m[1],c:'#3987e5',fill:'rgba(57,135,229,.10)'}],fmt:v=>k===3?v.toFixed(0)+'%':k===4?v.toFixed(0):(Math.abs(v)>=1000?(v/1000).toFixed(1)+'k':v.toFixed(0)),xt:monthTicks(L).filter((_,j)=>j%2===0)});
+ document.getElementById('ratio').innerHTML=r.svg;const last=m[1][m[1].length-1],v=m[1].filter(x=>x!=null);
+ document.getElementById('ratioNow').textContent=m[2](last);document.getElementById('ratioSub').textContent='on 26 May 26 · range '+m[2](Math.min(...v))+' to '+m[2](Math.max(...v));document.getElementById('ratioDef').textContent=m[3]}
+MET.forEach((m,i)=>{const b=document.createElement('span');b.textContent=m[0];b.className='chip';b.style.cursor='pointer';b.onclick=()=>pick(i);seg.appendChild(b)});pick(3);
+document.getElementById('summary').innerHTML=[['Net profit',inr(cum),'pos',roc.toFixed(1)+'% of capital'],['Max drawdown',inr(mdd),'neg',(mdd*100/CAP).toFixed(1)+'% of capital'],['Longest drawdown',longest+' sessions','','below the running peak'],['Win days',Math.round(w*100/(w+l))+'%','',w+' won · '+l+' lost'],['Avg win day',inr(sw/w),'pos','profit on a winning day'],['Avg loss day',inr(sl/l),'neg','loss on a losing day'],['Avg day',inr(cum/(w+l)),'','net per traded day'],['Charges',inr(tc),'',(tc*100/(cum+tc)).toFixed(0)+'% of profit before charges']]
+ .map(s=>`<div style="background:var(--surface-2);border-radius:8px;padding:9px 11px"><div class="lbl" style="margin:0">${s[0]}</div><div class="mono ${s[2]}" style="font-size:18px;font-weight:500">${s[1]}</div><div class="fnt" style="font-size:11.5px">${s[3]}</div></div>`).join('');
+
+/* monthly + FY (real) */
+const mon={};fL.forEach((l,i)=>{const [y,m]=ym(l);const k=y*12+m;mon[k]=(mon[k]||0)+(fP[i]||0)});
+const keys=Object.keys(mon).map(Number).sort((a,b)=>a-b);const pct=keys.map(k=>mon[k]*100/CAP);
+document.getElementById('months').innerHTML=keys.map((k,i)=>{const g=mon[k],p=pct[i],a=i>=2?(pct[i]+pct[i-1]+pct[i-2])/3:null;const pos=g>=0;const al=Math.min(.35,.08+Math.abs(p)/16);
+ return `<div class="mcell" style="background:${pos?`rgba(76,192,114,${al})`:`rgba(240,112,121,${al})`}"><div class="fnt" style="font-size:11px">${MON[k%12]} '${String(Math.floor(k/12)).slice(2)}</div><div class="mono" style="font-weight:500;color:${pos?'var(--positive)':'var(--negative)'}">${p>0?'+':''}${p.toFixed(1)}%</div><div class="mono fnt" style="font-size:10.5px">${a==null?'·':'3m '+a.toFixed(1)}</div></div>`}).join('');
+const fy27=P.map((p,i)=>fy[i]===2026?(p||0):0).reduce((a,b)=>a+b,0);
+document.getElementById('fy').innerHTML=`<tr><th>Year</th><th class="r">Profit</th><th class="r">% of capital</th><th class="r">Avg capital</th><th class="r">Sessions</th><th class="r">Max drawdown</th></tr><tr><td>FY 2025-26</td><td class="r num pos">${inr(cum)}</td><td class="r num">${roc.toFixed(2)}%</td><td class="r num">₹12,00,000</td><td class="r num">${n}</td><td class="r num neg">${inr(mdd)}</td></tr><tr><td>FY 2026-27 <span class="fnt">to 26 May</span></td><td class="r num pos">${inr(fy27)}</td><td class="r num">${(fy27*100/CAP).toFixed(2)}%</td><td class="r num">₹12,00,000</td><td class="r num">${P.filter((_,i)=>fy[i]===2026).length}</td><td class="r num fnt">—</td></tr>`;
+
+/* days (real net and charges; accounts illustrative) */
+const last=IDX.slice(-14).reverse();
+document.getElementById('days').innerHTML=`<tr><th>Day</th><th>Notes</th><th class="r">Net</th><th class="r">Charges</th><th class="r">Algos</th><th class="r">To date</th><th class="r">Drawdown</th><th>Sources</th></tr>`+last.map((i,k)=>{const j=IDX.indexOf(i);const p=P[i];const d=new Date(2000+ +L[i].split(' ')[2],MON.indexOf(L[i].split(' ')[1]),+L[i].split(' ')[0]);const wd=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+ const sel=L[i]==='27 Mar 26';return `<tr class="${sel?'sel':''}"><td>${wd} ${L[i]}</td><td>${k===3?'<span class="badge">2</span> <span class="badge g">F2 no trade</span>':'<span class="badge">3</span>'}</td><td class="r num ${p<0?'neg':'pos'}">${inr(p)}</td><td class="r num">${inr(C[i])}</td><td class="r num">${sel?14:8+(k%3)}</td><td class="r num">${inr(CUM[j])}</td><td class="r num ${DD[j]<0?'neg':'fnt'}">${DD[j]<0?inr(DD[j]):'—'}</td><td>${sel?'<span class="src c">Core</span> <span class="src t">T1</span> <span class="src m">Manual</span>':'<span class="src c">Core</span> <span class="src o">Own</span>'+(k%3===0?' <span class="src m">Manual</span>':'')}</td></tr>`}).join('');
+
+/* trades: source cards + scatter (illustrative) */
+document.getElementById('srcCards').innerHTML=[['Adaptive Core','c','₹38,420','218 trades · 61% won · avg ₹176'],['T1','t','₹12,960','104 trades · 57% won · avg ₹125'],['Own algos','o','₹41,180','286 trades · 59% won · avg ₹144'],['Manual','m','−₹4,310','37 trades · 41% won · avg −₹116']]
+ .map(s=>`<div class="card"><div style="display:flex;align-items:center;gap:8px"><span class="src ${s[1]}">${s[0]}</span><span class="badge g">illustrative</span></div><div class="mono ${s[2][0]==='−'?'neg':'pos'}" style="font-size:24px;margin-top:6px">${s[2]}</div><div class="fnt" style="font-size:12px">${s[3]}</div></div>`).join('');
+let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+const COLS={c:'#3987e5',t:'#199e70',o:'#c98500',m:'#d95926'};let pts='';const W=640,H=300,pl=56,pb=30;
+for(let k=0;k<150;k++){const s=['c','c','t','o','o','m'][Math.floor(rnd()*6)];const mae=Math.pow(rnd(),1.6)*(s==='m'?3400:2600);const kept=Math.max(-.6,Math.min(1,(s==='m'?.15:.45)+(rnd()-.5)*1.1-(mae/6000)));
+ const x=pl+mae/3600*(W-pl-14),y=12+(1-(kept+.6)/1.6)*(H-pb-12);pts+=`<circle cx="${x}" cy="${y}" r="4" fill="${COLS[s]}" fill-opacity=".75"/>`}
+let ax='';[0,1000,2000,3000].forEach(v=>{const x=pl+v/3600*(W-pl-14);ax+=`<line x1="${x}" x2="${x}" y1="12" y2="${H-pb}" stroke="#2a2f38"/><text x="${x}" y="${H-10}" text-anchor="middle">${v?'−₹'+v/1000+'k':'₹0'}</text>`});
+[-.5,0,.5,1].forEach(v=>{const y=12+(1-(v+.6)/1.6)*(H-pb-12);ax+=`<line x1="${pl}" x2="${W-14}" y1="${y}" y2="${y}" stroke="${v===0?'#3a414d':'#2a2f38'}"/><text x="${pl-8}" y="${y+4}" text-anchor="end">${Math.round(v*100)}%</text>`});
+document.getElementById('mfe').innerHTML=`<svg width="${W}" height="${H}">${ax}${pts}<text x="${W-14}" y="${H-pb-6}" text-anchor="end">worst point against you →</text><text x="${pl+6}" y="22">share of the best point kept</text></svg>`;
+
+/* capital chart (illustrative) */
+const days=120;const f=[],a=[],f2=[];let fv=500000,av=520000,f2v=150000;for(let i=0;i<days;i++){if(i===20)fv+=200000;if(i===55)av+=100000;if(i===70)fv-=40000;fv+= (rnd()-.45)*5000;av+=(rnd()-.46)*4200;f2v+=(rnd()-.5)*1500;f.push(fv);a.push(av);f2.push(f2v)}
+const cc=lineSVG({w:780,h:250,series:[{d:f,c:'#3987e5'},{d:a,c:'#199e70'},{d:f2,c:'#c98500'}],lo:0,fmt:v=>(v/100000).toFixed(1)+'L',xt:[[0,'Jun'],[22,'Jul'],[44,'Aug'],[66,'Sep'],[88,'Oct'],[110,'Nov']]});
+let ev=cc.svg.replace('</svg>',`<text x="${cc.x(20)}" y="${cc.y(f[20])-10}" text-anchor="middle" style="fill:#4cc072">▲</text><text x="${cc.x(55)}" y="${cc.y(a[55])-10}" text-anchor="middle" style="fill:#4cc072">▲</text><text x="${cc.x(70)}" y="${cc.y(f[70])+18}" text-anchor="middle" style="fill:#f07079">▼</text></svg>`);
+document.getElementById('capchart').innerHTML=ev;
+</script>
+</body>
+</html>
