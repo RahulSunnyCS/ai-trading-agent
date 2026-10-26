@@ -33,8 +33,10 @@ const CHARGE_COLS = [
 const TOLERANCE = 0.05;
 
 // Row labels look like "NSEFNO-NCL" / "NSECASH-NCL" — exchange, segment and
-// clearing corporation run together.
-const SEGMENT_LABEL = /\b((?:NSE|BSE|MSEI|MSE|MCX|NCDEX|ICEX)[A-Z& ]*-\s*[A-Z]+)/gi;
+// clearing corporation run together. Notes until 25 Aug 2025 print "NSE FNO" /
+// "NSE CAP" instead: exchange and segment, no clearing corporation.
+const SEGMENT_LABEL =
+  /\b((?:NSE|BSE|MSEI|MSE|MCX|NCDEX|ICEX)(?:[A-Z& ]*-\s*[A-Z]+|\s+(?:FNO|F&O|CAP|CASH|CDS|COM|SLB)\b))/gi;
 
 // IMAP SUBJECT is a substring match: this finds every note for the account, whatever its date.
 function searchSubject(accountId) {
@@ -55,8 +57,11 @@ function round2(n) {
   return n.toDecimalPlaces(2).toNumber();
 }
 
+// The table's header starts "Name Of Exchange/CC & Segment"; until 25 Aug 2025 it started
+// "Exchange Pay in/Payout Obligation" (the columns are the same, in the same order).
 function obligationBlock(text) {
-  const start = text.search(/Name\s*Of\s*Exchange\s*\/\s*CC/i);
+  let start = text.search(/Name\s*Of\s*Exchange\s*\/\s*CC/i);
+  if (start === -1) start = text.search(/Exchange\s*Pay\s*in\s*\/\s*Payout/i);
   if (start === -1) return null;
   const rest = text.slice(start);
   const endMatch = rest.match(/By\s+Client\s+Net\s+Payable/i);

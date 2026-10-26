@@ -2,7 +2,7 @@ const { label, notesByDay, parseArgs } = require('../run');
 
 describe('parseArgs()', () => {
   test('defaults to the 10-session window', () => {
-    expect(parseArgs([])).toEqual({ dryRun: false, day: null, sessions: 10 });
+    expect(parseArgs([])).toEqual({ dryRun: false, day: null, sessions: 10, from: null, to: null });
   });
 
   test('reads --dry-run, --day and --sessions', () => {
@@ -10,12 +10,17 @@ describe('parseArgs()', () => {
       dryRun: true,
       day: '2026-10-23',
       sessions: 20,
+      from: null,
+      to: null,
     });
+    expect(parseArgs(['--from', '2025-04-01', '--to', '2026-10-23']).from).toBe('2025-04-01');
   });
 
   test('refuses what it does not know', () => {
     expect(() => parseArgs(['--sheet'])).toThrow(/unknown argument/);
     expect(() => parseArgs(['--day', '23-10-2026'])).toThrow(/YYYY-MM-DD/);
+    expect(() => parseArgs(['--from', '2025-04-01'])).toThrow(/go together/);
+    expect(() => parseArgs(['--from', '2026-01-01', '--to', '2025-01-01'])).toThrow(/from first/);
   });
 });
 

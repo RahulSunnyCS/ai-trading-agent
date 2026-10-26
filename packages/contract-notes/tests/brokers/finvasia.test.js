@@ -147,3 +147,48 @@ describe('finvasia.searchSubject() / noteDay()', () => {
     ).toBeNull();
   });
 });
+
+describe('finvasia.extract() — the layout used until 25 Aug 2025', () => {
+  // The obligation table as pdf-parse reads a note of 18 Jul 2025 (amounts kept, no client data):
+  // the header starts "Exchange Pay in/Payout" and the rows are labelled "NSE FNO" / "NSE CAP".
+  const oldLayout = `Exchange  Total
+ExchangePay in/Payout 
+Obligation
+Security 
+Transaction 
+Tax
+Taxable Value 
+of Supply
+IGST @18%SEBI Turnover 
+Fee
+Exchange 
+Clearing 
+Charges
+Stamp DutyTransaction 
+Charges
+IPF
+ Charges
+Final NetBrokerage
+NSE CAP 38.00 1.17
+    0.21
+ 0.04 0.00 1.13
+ 37942.88
+ 37982.30 0.00 0.00 0.04
+NSE FNO 159.00 259.88
+   46.77
+ 0.31 5.00 109.58
+ 3423.57
+ 3745.75 0.00 150.00 1.52
+By Client Net Payable(-)/Receivable(+)
+ 41366.4500
+Obligation Detail`;
+
+  test('reads the F&O row and drops the cash row', () => {
+    const r = extract(oldLayout);
+    expect(r.error).toBeUndefined();
+    expect(r.payin_payout_obligation).toBe(3745.75);
+    expect(r.net_brokerage).toBe(150);
+    expect(r.other_charges).toBe(172.18); // 3745.75 − 3423.57 − 150
+    expect(r.skipped_segments).toEqual(['NSE CAP (equity)']);
+  });
+});

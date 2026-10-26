@@ -62,4 +62,11 @@ function sessionsBack(last, n) {
   return out;
 }
 
-module.exports = { isTradingDay, addDays, istNow, lastSession, sessionsBack };
+/** The trading days from `from` to `to`, both included, oldest first. */
+function sessionsBetween(from, to) {
+  const out = [];
+  for (let d = from; d <= to; d = addDays(d, 1)) if (isTradingDay(d)) out.push(d);
+  return out;
+}
+
+module.exports = { isTradingDay, addDays, istNow, lastSession, sessionsBack, sessionsBetween };

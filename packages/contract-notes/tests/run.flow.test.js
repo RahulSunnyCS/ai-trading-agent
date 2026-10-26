@@ -187,3 +187,13 @@ test('an unreachable mailbox closes nothing for its accounts', async () => {
   expect(errors.join('\n')).toMatch(/connection refused/);
   expect(errors.join('\n')).not.toMatch(/no contract note/);
 }, 30000);
+
+test('history (--from/--to) reads by date, closes the range and leaves the bookmark alone', async () => {
+  mail = [finvasia(201, '2026-09-21', 300), finvasia(202, '2026-09-24', 400)];
+  expect(await main(['--from', '2026-09-21', '--to', '2026-09-25'], deps(MON_NIGHT))).toBe(0);
+  expect(line('2026-09-21').status).toBe('note');
+  expect(line('2026-09-22').status).toBe('no_trade');
+  expect(line('2026-09-24').status).toBe('note');
+  expect(line('2026-09-25')).toBeUndefined(); // after the newest note: still open
+  expect(readCursors(root())).toEqual({});
+});
