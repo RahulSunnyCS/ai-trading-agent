@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the hosted dashboard cannot deploy at all until this lands; friends see Momentum through it |
-| **Status** | Done (Phases 1–2); Phase 3 waits |
+| **Status** | In progress (Phases 1–2 done; Phase 3 waits) |
 | **Type** | chore |
 | **Area** | dashboard / infra |
 | **Created** | 2026-10-24 |
