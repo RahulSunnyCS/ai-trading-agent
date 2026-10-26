@@ -47,14 +47,42 @@ List C (Adaptive) on Core-298, three core strategies a day. The expiring-index r
 - **Not tested, a lead only:** keeping the evening picks when the open lands within a small distance of
   a band edge. It would affect about 3% of days; it was registered as *will not run*.
 
+## Two-year view (addendum, owner request)
+
+Same test from 2024-11-08 (the 22nd stored session) instead of 2025-01-10. The 63-session rule is
+relaxed to 21 for the first 42 days, labelled *short history*: a live list could not pick them
+under its registered rule, so they are noisier and not forward evidence.
+
+| Universe | Days | Picks differ | Predicted / actual, ₹ a day | Mean difference, 90% interval | Registered reading |
+|---|---|---|---|---|---|
+| Core-298 (Adaptive Classic) | 473 | 14 (97.0% same) | 785.3 / 766.9 | −18.4 [−73.4, +32.8] | open helps: rejected; prediction good enough: yes |
+| + T1 variants (Adaptive Tuned, in-sample) | 473 | 15 (96.8% same) | 1,490.6 / 1,410.2 | −80.4 [−160.1, −10.0] | open helps: rejected; good enough: not shown (lower end passes −₹150) |
+
+Mean difference per half-year (days, changed days), the open minus the prediction:
+
+| Half-year | Core-298 | + T1 |
+|---|---|---|
+| 2024 H2 (35 days, short history) | −₹265 (2) | −₹320 (2) |
+| 2025 H1 (122) | +₹70 (4) | −₹76 (4) |
+| 2025 H2 (125) | −₹77 (4) | +₹3 (4) |
+| 2026 H1 (119) | +₹25 (2) | −₹119 (3) |
+| 2026 H2 so far (72) | −₹18 (2) | −₹51 (2) |
+
+- **The open never wins.** In both universes the pooled difference is zero or negative, and no
+  half-year is clearly positive for both. The short-history stretch drives most of the Core move
+  (−₹221 a day over 42 days with 2 changed days; the registered stretch alone is +₹1.3).
+- **T1 leans negative.** The open does worse than the evening picks in four of five half-years. 15
+  changed days carry it, so it is a lean, not a finding.
+- **Before 2024-11-08 there is nothing to test:** the rotation store begins on 2024-10-09 and a
+  ranking needs history.
+
 ## Correction
 
 The first run (2026-10-26) took the previous *stored* day as the "previous session". One day, 2026-09-25, follows a September data gap, so its prediction used a close 10 days old. The script now requires the true previous trading day and drops a day whose stored history stops short (1 day dropped). Both results are in the item's Log; the verdicts did not change.
 
 ## Open
 
-Nothing blocking. A longer window would need the lake's VIX close before 2025-01, which the
-rotation store does not cover.
+Nothing blocking. The rotation store begins on 2024-10-09, so two years is the longest window.
 
 [bl122]: ../../../backlog/BL-122-expiring-index-only-rule.md
 [bl165]: ../../../backlog/BL-165-evening-prediction-vs-0916-pick.md

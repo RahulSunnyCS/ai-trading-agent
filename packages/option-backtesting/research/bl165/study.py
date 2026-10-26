@@ -55,19 +55,39 @@ def previous_session(day: date, holidays: dict) -> date:
     return d
 
 
+def by_half(rows: list[dict]) -> dict:
+    """Mean difference, days and changed days per calendar half-year (descriptive)."""
+    groups: dict[str, list[dict]] = {}
+    for r in rows:
+        groups.setdefault(f"{r['day'][:4]} H{1 if int(r['day'][5:7]) <= 6 else 2}", []).append(r)
+    return {
+        k: {
+            "days": len(v),
+            "changed": sum(not x["same_set"] for x in v),
+            "diff_mean": float(np.mean([x["net_act"] - x["net_pred"] for x in v])),
+            "pred_mean": float(np.mean([x["net_pred"] for x in v])),
+            "act_mean": float(np.mean([x["net_act"] for x in v])),
+        }
+        for k, v in sorted(groups.items())
+    }
+
+
 def summarise(diff: np.ndarray) -> dict:
     mean, lo, hi = readout.block_bootstrap_mean(diff, RESAMPLES, BLOCK, SEED, LEVEL)
     return {"n": int(diff.size), "mean": mean, "lower": lo, "upper": hi}
 
 
-def run(universe: str) -> dict:
+def run(universe: str, min_history: int = 63) -> dict:
     root = data_dir()
     names = list(variants.variant_names())
     if universe == "t1":
         names += [n for n in variants.track_names("t1") if n not in names]
     rec = daylog.reconstruction(root, names)
     results = daylog._Results(root)
-    days = [d for d in rec.days_available() if d >= FIRST]
+    # the registered rule needs 63 sessions of history; BL-165's addendum relaxes it to 21
+    days = [d for i, d in enumerate(rec.days) if i >= min_history and d.weekday() < 5]
+    if min_history == 63:
+        days = [d for d in days if d >= FIRST]
     holidays = daylog.holiday_names()
     rows, dropped = [], {"no_vix_close": 0, "no_result": 0, "history_not_current": 0}
     for day in days:
@@ -151,6 +171,9 @@ def run(universe: str) -> dict:
             "0.5_to_1": arm((gap >= 0.5) & (gap <= 1.0)),
             "over_1": arm(gap > 1.0),
         },
+        "by_half_year": by_half(rows),
+        "short_history": arm(np.array([r["day"] < FIRST.isoformat() for r in rows])),
+        "registered_stretch": arm(np.array([r["day"] >= FIRST.isoformat() for r in rows])),
         "within_margin": bool(
             summarise(diff)["lower"] >= -MARGIN and summarise(diff)["upper"] <= MARGIN
         ),
@@ -179,9 +202,14 @@ def forward_check(core: dict) -> dict:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="research/bl165/results/study.json")
+    ap.add_argument("--two-year", action="store_true", help="BL-165 addendum: 21-session minimum")
     args = ap.parse_args()
-    out = {"core": run("core"), "t1": run("t1")}
-    out["forward"] = forward_check(out["core"])  # a broken check must fail the run, not hide
+    if args.two_year:
+        args.out = "research/bl165/results/study_2y.json"
+    hist = 21 if args.two_year else 63
+    out = {"core": run("core", hist), "t1": run("t1", hist)}
+    if not args.two_year:
+        out["forward"] = forward_check(out["core"])  # a broken check must fail the run, not hide
     import pathlib
 
     path = pathlib.Path(args.out)
@@ -215,6 +243,19 @@ if __name__ == "__main__":
             "within margin",
             r["within_margin"],
         )
-        for name in ("all_days", "changed_days", "unchanged_days"):
-            print("  ", name, r[name])
+        for name in (
+            "all_days",
+            "changed_days",
+            "unchanged_days",
+            "short_history",
+            "registered_stretch",
+        ):
+            print("  ", name, r.get(name))
+        print(
+            "   by half-year",
+            {
+                k: (v["days"], v["changed"], round(v["diff_mean"], 1))
+                for k, v in r["by_half_year"].items()
+            },
+        )
         print("   by_gap", r["by_gap"])
