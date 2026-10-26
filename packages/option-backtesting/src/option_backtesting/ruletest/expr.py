@@ -58,7 +58,11 @@ Operators (a list of arguments, or a mapping with the named parameters)
                                            a clock time
     prior_median prior_mean {x, sessions}  of x at the same stamp over the previous sessions
     prev_at {x, clock}                     the previous session's x at that clock stamp,
-                                           constant over the session (BL-164)
+                                           constant over the session (BL-164); like
+                                           prev_close, "previous" is the frame's previous
+                                           row, so a session the frame dropped (strict_open:
+                                           the Muhurat sessions, three Angel One days in
+                                           2026-09) is skipped over
     prev_agg {x, how: max | min}           the previous session's highest / lowest x over its
                                            375 stamps, constant over the session (BL-164)
 
