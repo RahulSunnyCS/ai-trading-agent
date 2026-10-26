@@ -253,8 +253,9 @@ Not in the note, worth attaching:
    (`Algos` from the live capture, `Capital` from a dated setting).
 2. ~~The Angel One margin-interest e-mail~~ — found (Design → Brokers). Still open: do other
    debits arrive by e-mail (DP charges, AMC), or only on the ledger?
-3. The Zerodha Kite note's PDF password, added to `BROKER_ACCOUNTS_JSON` as a third account
-   with `"broker": "kite"` (the e-mail itself is found; Design → Brokers).
+3. ~~The Zerodha Kite note's PDF password~~ — added to `BROKER_ACCOUNTS_JSON` as
+   `"broker": "kite"` on 2026-10-26 and checked: 444 notes under the client ID, the newest
+   decrypts with `qpdf` and parses (5 pages, obligation lines present).
 4. The one-time sheet import reads the Finvasia block's columns by header, not position: the
    committed xlsx labels L and M "Final Net" then "Total Charge", the reverse of the old
    writer's order, so the live tab's headers decide.
