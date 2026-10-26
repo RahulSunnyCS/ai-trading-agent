@@ -95,7 +95,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
-| [BL-165](BL-165-evening-prediction-vs-0916-pick.md) | Evening prediction against the 09:16 pick: does the open change the return? | Done: the prediction names the same picks on 97% of days and earns the same (Core-298 −₹1 a day, interval ±₹48; T1 in-sample −₹65 on 14 days); the open adds nothing measurable | 2026-10-26 |
+| [BL-165](BL-165-evening-prediction-vs-0916-pick.md) | Evening prediction against the 09:16 pick: does the open change the return? | Done: the prediction names the same picks on 97% of days and earns the same (Core-298 +₹1 a day, interval −₹45 to +₹50; T1 in-sample −₹62 on 13 days); the open adds nothing measurable | 2026-10-26 |
 | [BL-078](BL-078-angel-one-data-source.md) | Angel One SmartAPI as a second 1-minute data source: what it can and cannot give versus the Fyers files | Done: go as a backup, not a replacement; shipped as BL-079 (Angel One fallback in `obt daily`, VIX) | 2026-10-24 |
 | [BL-087](BL-087-momentum-all-fridays-split.md) | Momentum: backtest and follow a config split across every rebalance Friday | Done: all-Fridays backtest and groups of sleeves; live migration applied, 43 of 43 journalled for the weeks of 16 and 23 Oct (38 sleeves) | 2026-10-24 |
 | [BL-015](BL-015-research-gate.md) | Research gate: pre-register every experiment, log every override | Done: Phase 0 pre-registration in the template and `_EXPERIMENT.md`, the `override:` rule in CLAUDE.md; every research item since BL-104 starts from it | 2026-10-24 |
