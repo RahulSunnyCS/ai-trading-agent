@@ -12,20 +12,28 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import date
+from datetime import date, timedelta
 
 import numpy as np
 
 from option_backtesting.fyers.daily import data_dir
 from option_backtesting.rotation import attrs as attrs_mod
-from option_backtesting.rotation import daylog, journal, pick, readout, score, store, variants
+from option_backtesting.rotation import (
+    daylog,
+    journal,
+    lot_plans,
+    pick,
+    readout,
+    score,
+    store,
+    variants,
+)
 
 FIRST = date(2025, 1, 10)
 SEED = 20261026
 RESAMPLES = 2000
 BLOCK = 5
 LEVEL = 0.90
-COST_PER_TRADE = 20 * 1.18 * 2  # lot_plans' estimate, per n_trades of a stored result
 MARGIN = 150.0  # the pre-registered "good enough" band, rupees a day
 
 
@@ -35,8 +43,16 @@ def net_of(names: list[str], day: date, results: daylog._Results) -> float | Non
         row = results.row(name, day)
         if row is None or row["n_trades"] is None:
             return None
-        total += row["gross"] - COST_PER_TRADE * row["n_trades"]
+        total += row["gross"] - lot_plans.brokerage(row["n_trades"])
     return total
+
+
+def previous_session(day: date, holidays: dict) -> date:
+    """The last exchange session before `day` (weekends and listed holidays skipped)."""
+    d = day - timedelta(days=1)
+    while not daylog.is_trading_day(d, holidays):
+        d -= timedelta(days=1)
+    return d
 
 
 def summarise(diff: np.ndarray) -> dict:
@@ -52,12 +68,18 @@ def run(universe: str) -> dict:
     rec = daylog.reconstruction(root, names)
     results = daylog._Results(root)
     days = [d for d in rec.days_available() if d >= FIRST]
-    rows, dropped = [], {"no_vix_close": 0, "no_result": 0}
+    holidays = daylog.holiday_names()
+    rows, dropped = [], {"no_vix_close": 0, "no_result": 0, "history_not_current": 0}
     for day in days:
         i = rec.days.index(day)
         if i == 0:
             continue
-        prev = rec.days[i - 1]
+        prev = previous_session(day, holidays)
+        if rec.days[i - 1] != prev:
+            # the stored history stops short of the previous session (a data gap): the 09:16
+            # job would refuse to pick, and the evening message could not have been made
+            dropped["history_not_current"] += 1
+            continue
         a = rec.attrs[day]
         vix_open = float(a["vix_open"])
         vix_prev = attrs_mod.vix_close_from_lake(root, prev)
@@ -137,12 +159,11 @@ def run(universe: str) -> dict:
     return out
 
 
-def forward_check() -> dict:
+def forward_check(core: dict) -> dict:
     """The live journal's recorded list-C core picks against what this script calls 'actual'."""
     root = data_dir()
     entries = journal.read(store.journal_path(root, None))
     by_day = {e["day"]: e for e in entries}
-    core = run("core")
     mine = {r["day"]: r for r in core["rows"]}
     checked = []
     for day, e in sorted(by_day.items()):
@@ -160,10 +181,7 @@ if __name__ == "__main__":
     ap.add_argument("--out", default="research/bl165/results/study.json")
     args = ap.parse_args()
     out = {"core": run("core"), "t1": run("t1")}
-    try:
-        out["forward"] = forward_check()
-    except Exception as error:  # the journal layout is not part of the pre-registration
-        out["forward"] = {"error": f"{type(error).__name__}: {error}"}
+    out["forward"] = forward_check(out["core"])  # a broken check must fail the run, not hide
     import pathlib
 
     path = pathlib.Path(args.out)
