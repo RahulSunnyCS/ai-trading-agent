@@ -1,6 +1,6 @@
 # Options: rotation ranking (DRB and lists A / B / C / REF)
 
-**Status:** Tested · **Last updated:** 2026-10-22
+**Status:** Tested · **Last updated:** 2026-10-26
 
 ## What it is
 
@@ -43,6 +43,7 @@ per lot-day is above zero and its drawdown per lot is no worse.
 | BL-071 B | **Hold-out** P3, NIFTY 2022-04 → 2024-10, 618 days | Recent edge **fails** (−₹2,47,680, interval wholly negative); no-recent best each year; rows keeping the fits beat random P90 | [BL-071][bl071] |
 | BL-072 / 073 / 074 | Blends, recency grid, family-band recent | Blend candidate killed by hold-out; recent 10% + 126-day lookback and own 0 / family 10 are above chance in all three periods | [BL-072][bl072], [BL-073][bl073], [BL-074][bl074] |
 | BL-075 | 100-cell map × 3 periods; switches; shuffles | 19 of 100 cells above chance everywhere, none robust; no switch adopted (Buy off: 0 of 19 improve, 6 fall below chance); 3 of top 10 real, list A among them; no cell reaches 0.85 | [BL-075][bl075] |
+| BL-167 | ITM2 Dir added to the Adaptive universe (Core-298; Core-298 + T1), in-sample, 431 days | **No gain**: Core −₹57 a day (interval −235 to +118), T1 −₹74 (−258 to +108); Core drawdown 25% shallower, T1's 11% deeper; ITM2 replaces 75–78% of Core's ITM1 picks and 50–58% of its ATM picks | [BL-167][bl167] |
 | BL-080 | Wider closest-premium families; Dir ITM1 | Extra premiums harmful; Dir ITM1 useful → 298 universe; 58 of 100 cells above chance in all periods | [BL-080][bl080] |
 | BL-100 | Pools restricted to the BL-099 families, on P3 | **Planned, not run** | [BL-100][bl100] |
 | BL-106 | The lists over a first-year-selected candidate pool (New-536, registered; New-556 with NIFTY ITM sets, exploratory) vs the 298, test year 2025-10-09 → 2026-10-09, gross | **No list won** on New-536: every interval straddles zero (about ±₹200 a day). Adaptive ₹393 on Core-298 vs ₹292 on New-536 and ₹324 on New-556; New-556's drawdown was shallower (−8.6k vs −10.1k) in one path, descriptive only. The lists were fitted inside the test year, which favours Core-298 | [BL-106][bl106] |
@@ -107,3 +108,4 @@ per lot-day is above zero and its drawdown per lot is no worse.
 [bl133]: ../../../backlog/BL-133-fourth-lot-on-normal-days.md
 [bl134]: ../../../backlog/BL-134-two-strategy-book.md
 [bl154]: ../../../backlog/BL-154-adaptive-fit-shrinkage.md
+[bl167]: ../../../backlog/BL-167-itm2-in-adaptive-and-t1.md
