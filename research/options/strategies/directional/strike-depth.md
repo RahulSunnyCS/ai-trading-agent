@@ -37,9 +37,14 @@ ITM1, ₹3,000 overall stop, 21% leg stop, one re-entry at cost, exit 15:28
 - **Net keeps rising with the stop** up to ₹10,000 for ITM3 (hold-out SENSEX 304 at ₹3,000 to 355;
   NIFTY 241 to 293), with deeper drawdowns. That is in-sample and is a lead, not a finding; it
   matches the earlier finding that the ₹3,000 stop costs more than it saves ([overall stop](mtm-sl.md)).
-- **Caveats:** four comparisons with no multiplicity correction; the fit-year intervals all include
-  zero; the engine fills with no spread, so deeper in-the-money options look better than they would
-  trade; ATM and ITM1 carry settings tuned for them; one hold-out year.
+- **Surviving four tests.** At a 97.5% interval (Bonferroni for the four comparisons) the SENSEX
+  hold-out gains stay above zero: ITM2 +₹54 (+13 to +98), ITM3 +₹78 (+3 to +154), the latter only
+  just. NIFTY stays inconclusive (+36: −41 to +119; +44: −68 to +165).
+- **Caveats:** the fit-year intervals all include zero; the engine fills with no spread, and nothing
+  was checked about the zero-volume minutes it forward-fills on thin deep strikes, so ITM2 and ITM3 may
+  look better than they would trade; ATM and ITM1 carry settings tuned for them; one hold-out year.
+  Stop rates are shares of strategy-days pooled over the 25 start times, not the share of days a
+  basket hits its stop (late starts rarely reach it, so the day-level rate is higher).
 
 ## Not yet tested
 

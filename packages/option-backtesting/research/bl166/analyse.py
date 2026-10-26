@@ -82,7 +82,7 @@ def max_drawdown(series: dict[date, float]) -> float:
     return float((peak - cum).max()) if cum.size else float("nan")
 
 
-def compare(data, idx, fam_a, stop_a, fam_b, stop_b, period) -> dict:
+def compare(data, idx, fam_a, stop_a, fam_b, stop_b, period, level=LEVEL) -> dict:
     a, b = (
         daily_series(data, idx, fam_a, stop_a, period),
         daily_series(data, idx, fam_b, stop_b, period),
@@ -91,7 +91,7 @@ def compare(data, idx, fam_a, stop_a, fam_b, stop_b, period) -> dict:
     diff = np.array([a[d] - b[d] for d in days])
     if diff.size == 0:
         return {"n": 0}
-    mean, lo, hi = readout.block_bootstrap_mean(diff, RESAMPLES, BLOCK, SEED, LEVEL)
+    mean, lo, hi = readout.block_bootstrap_mean(diff, RESAMPLES, BLOCK, SEED, level)
     return {"n": int(diff.size), "mean": mean, "lower": lo, "upper": hi,
             "a_mean": float(np.mean([a[d] for d in days])), "b_mean": float(np.mean([b[d] for d in days])),
             "a_dd": max_drawdown({d: a[d] for d in days}), "b_dd": max_drawdown({d: b[d] for d in days})}  # fmt: skip
@@ -114,9 +114,31 @@ def slots_beating(data, idx, k, stop, period) -> tuple[int, int]:
     return int(wins), total
 
 
+def book_context() -> dict:
+    """Context only (BL-166 Phase 0): the Core and T1 books' recorded core picks stopped by the
+    overall stop. Tiny samples; counts, not rates to lean on."""
+    from option_backtesting.fyers.daily import data_dir
+    from option_backtesting.rotation import daylog
+
+    root, out = data_dir(), {}
+    for label, track in (("core", None), ("t1", "t1")):
+        log = daylog.build_log(root, date(2026, 10, 12), date(2026, 12, 31), source="recorded",
+                               track=track, lots_per=1)  # fmt: skip
+        picks = [p for r in log["rows"] if r["source"] == "recorded" and r["status"] in ("scored", "late")
+                 for p in r["lists"]["C"]["picks"] if p["role"] == "core"]  # fmt: skip
+
+        def hit(p):
+            return (p["result"].get("stopped_by") or "").lower().startswith("overall sl")
+
+        dirs = [p for p in picks if p["kind"] == "dir"]
+        out[label] = {"picks": len(picks), "stopped": sum(map(hit, picks)),
+                      "dir_picks": len(dirs), "dir_stopped": sum(map(hit, dirs))}  # fmt: skip
+    return out
+
+
 def main() -> None:
     data = load()
-    out: dict = {"variants": len(data), "indices": {}}
+    out: dict = {"variants": len(data), "indices": {}, "book_context": book_context()}
     for idx in ("N", "S"):
         block: dict = {"stop_rates": {}, "no_trade_share": {}, "matched": {}, "primary": {},
                        "secondary_same_stop": {}, "grid_net": {}}  # fmt: skip
@@ -146,6 +168,9 @@ def main() -> None:
                 p: compare(data, idx, f"ditm{k}", matched, "ditm1", 3000, p)
                 for p in ("fit", "hold", "all")
             }
+            res["hold_975"] = compare(
+                data, idx, f"ditm{k}", matched, "ditm1", 3000, "hold", 0.975
+            )  # review: 4 tests
             hold, fit = res["hold"], res["fit"]
             verdict = "inconclusive"
             if hold.get("n"):
