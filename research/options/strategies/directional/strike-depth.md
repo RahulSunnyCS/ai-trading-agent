@@ -57,9 +57,13 @@ BL-166 stop of ₹4,000):
 | Mean difference a day, 90% interval | −57 (−235 to +118) | −74 (−258 to +108) |
 | Maximum drawdown, base → with ITM2 | 42,326 → 31,849 | 25,887 → 28,840 |
 | ITM2 share of core picks | 20.3% | 13.6% |
-| Base ITM1 picks replaced | 77.5% | 49.7% |
-| Base ATM picks replaced | 58.0% | 40.5% |
-| Base Widesl picks replaced | 5.1% | 5.1% |
+| Base ITM1 picks dropped | 77.5% | 49.7% |
+| Base ATM picks dropped | 58.0% | 40.5% |
+| Base Widesl picks dropped | 5.1% | 5.1% |
+
+"Dropped" is the share of the base universe's picks that are no longer picked once ITM2 joins; what
+enters is counted apart. In Core, 308 picks leave (220 ITM1, 40 ATM, 48 Widesl) and 308 enter (263
+ITM2, 37 Widesl, 7 ITM1, 1 ATM); in T1, 224 leave and 224 enter (176 ITM2, 39 Widesl, 9 ITM1).
 
 ITM2 mostly takes ITM1's slots and does not earn more for it: no gain in either universe by the
 registered rule. The Core drawdown is shallower and T1's deeper. In-sample (weights and the stop were

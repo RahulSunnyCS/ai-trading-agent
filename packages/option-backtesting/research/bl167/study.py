@@ -68,6 +68,8 @@ def composition(base_rows: list[dict], arm_rows: list[dict]) -> dict:
         for p in set(a["picks"]) - set(b["picks"]):
             added[family_of(p)] = added.get(family_of(p), 0) + 1
     base_n, arm_n = count(base_rows), count(arm_rows)
+    # three core picks a day, so what leaves must equal what enters
+    assert sum(dropped.values()) == sum(added.values()), (dropped, added)
     return {
         "base_picks": base_n, "arm_picks": arm_n, "dropped": dropped, "added": added,
         "replaced_share": {f: dropped.get(f, 0) / base_n[f] for f in base_n},
@@ -160,7 +162,8 @@ def study(universe: str, check: bool) -> dict:
     rec = daylog.reconstruction(root, names)
     results = daylog._Results(root)
     holidays = daylog.holiday_names()
-    base = (names := list(rec.cols), rec.values, {})
+    names = list(rec.cols)
+    base = (names, rec.values, {})
     arms = {"base": base}
     for stop in (3000, 4000):
         add, vals, rows = itm2_columns(stop, rec.days)
