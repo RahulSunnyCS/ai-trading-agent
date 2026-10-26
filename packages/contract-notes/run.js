@@ -9,6 +9,7 @@ const pdfParse = require('pdf-parse');
 const { getBroker, isSupported, loadBrokerAccounts } = require('./brokers');
 const { addDays, istNow, lastSession, sessionsBack, sessionsBetween } = require('./calendar');
 const { connect, decryptWithQpdf, hasQpdf, searchNotes } = require('./fetchMail');
+const { READERS, readLedger, writeEvent } = require('./ledger');
 const { closeWithoutNotes, failedLine, key, noteLine, openPairs } = require('./record');
 const {
   acquireLock,
@@ -354,6 +355,60 @@ async function main(argv, deps = {}) {
           d.log(
             `read  ${label(acc)}: ${messages.filter((m) => isNew(m.uid)).length} new message(s)${!byDate && bookmark != null ? ` after #${bookmark}` : ` since ${addDays(window[0], -1)}`}`,
           );
+        }
+
+        // The ledger e-mails (money in and out, collateral interest, margin warnings) of this
+        // mailbox's brokers: one bookmark per kind of e-mail, the same reading rules as notes.
+        for (const reader of READERS) {
+          const accs = mine.filter((a) => a.broker === reader.broker);
+          if (!accs.length) continue;
+          // These e-mails do not name the account: with two of one broker in a mailbox, unknown.
+          const acc = accs.length === 1 ? accs[0] : null;
+          const who = acc ? label(acc) : `${reader.broker} (account unknown)`;
+          const cursorKey = `${mailbox.email}|ledger/${reader.kind}`;
+          const cursor = cursors[cursorKey] ?? {};
+          const bookmark =
+            cursor.uidvalidity === conn.uidvalidity && Number.isInteger(cursor.last_uid)
+              ? cursor.last_uid
+              : null;
+          let messages;
+          try {
+            messages = await d.searchNotes(conn.imap, reader.subject, {
+              sinceDay: addDays(window[0], -1),
+              beforeDay: history ? lateNotes(window[window.length - 1]) : undefined,
+              afterUid: byDate ? null : bookmark,
+              overlapSince: byDate ? undefined : addDays(window[window.length - 1], -OVERLAP_DAYS),
+            });
+          } catch (err) {
+            problems.push(`${who} ${reader.kind}: mailbox search failed: ${err.message}`);
+            continue;
+          }
+          const isNew = (uid) => byDate || bookmark == null || uid > bookmark;
+          const { events, unread } = readLedger(reader, messages, acc?.accountId ?? null);
+          for (const msg of unread.filter((m) => isNew(m.uid))) {
+            problems.push(
+              `${who}: a "${reader.subject}" e-mail could not be read (${msg.received?.slice(0, 10)}); has its wording changed?`,
+            );
+          }
+          let stored = 0;
+          for (const event of events) {
+            if (opts.day && event.day !== opts.day) continue;
+            if (history && (event.day < window[0] || event.day > window[window.length - 1]))
+              continue;
+            if (acc?.from && event.day < acc.from) continue;
+            if (opts.dryRun || writeEvent(root, event)) stored += 1;
+          }
+          if (stored) d.log(`ledger ${who}: ${stored} ${reader.kind} event(s)`);
+          if (!byDate) {
+            const newest = messages.reduce((m, msg) => Math.max(m, msg.uid ?? 0), 0);
+            const last = Math.max(bookmark ?? 0, newest);
+            cursors[cursorKey] = {
+              ...cursor,
+              uidvalidity: conn.uidvalidity,
+              ...(last ? { last_uid: last } : {}),
+              checked_at: at,
+            };
+          }
         }
       } finally {
         conn.imap.end();

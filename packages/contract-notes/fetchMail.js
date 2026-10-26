@@ -103,6 +103,21 @@ function findAllMail(boxes, prefix = '') {
   return null;
 }
 
+/** A mail's body as plain text: its text part, or its HTML with tags dropped and ₹ decoded. */
+function bodyText(mail) {
+  const raw =
+    mail.text ||
+    (mail.html || '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<br\s*\/?>|<\/(p|div|tr|td|li)>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ');
+  return raw
+    .replace(/&#x20B9;|&#8377;/gi, '₹')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/[ \t]+/g, ' ');
+}
+
 /** IMAP's SINCE takes a date, not a time: 'YYYY-MM-DD' → '23-Oct-2026'. */
 function imapDate(day) {
   const [y, m, d] = day.split('-').map(Number);
@@ -172,6 +187,9 @@ function search(imap, subjectText, range, touch) {
               uid,
               subject: mail.subject || '',
               received: mail.date ? mail.date.toISOString() : null,
+              messageId: mail.messageId || null,
+              from: mail.from?.value?.[0]?.address || '',
+              text: bodyText(mail),
               attachments: (mail.attachments || [])
                 .filter((a) => a.filename?.toLowerCase().endsWith('.pdf'))
                 .map((a) => ({ filename: a.filename, content: a.content })),
@@ -187,4 +205,4 @@ function search(imap, subjectText, range, touch) {
   });
 }
 
-module.exports = { decryptWithQpdf, hasQpdf, connect, searchNotes, imapDate };
+module.exports = { decryptWithQpdf, hasQpdf, connect, searchNotes, imapDate, bodyText };

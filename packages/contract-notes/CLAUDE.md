@@ -72,6 +72,7 @@ it too). It must be one line, single-quoted: a pretty-printed value reads as `[`
 |---|---|
 | `days/<day>.jsonl` | One line per broker account for the session: `status` `note` (an F&O broker's with `fno`, the sheet's five figures; a `kite` line with `eq` — obligation, each charge, total charges, final net — and `trades`, every fill; `skipped_segments`, the note's sha256, file, subject, received time, and `superseded` hashes when `--day` chose between notes), `no_trade`, `no_note` or `failed` (with `reason`) |
 | `raw/<broker>/<account>/<day>.pdf` | The note as mailed (encrypted), and `<day>.decrypted.pdf` |
+| `ledger/<day>.jsonl` | The brokers' ledger e-mails, one event per message (`ledger.js`): `deposit`, `withdrawal`, `collateral_interest` (amount, shortfall; on the session it is for), `margin_warning` (utilisation %, time, margin available and used), `settlement` (Finvasia's quarterly; its e-mail has no amount). `account` is null when a mailbox has two accounts of the broker (the e-mails do not name one) |
 | `manual/<day>.json` | The inputs the sheet had typed by hand: `algos`, `capital_total`, `source` (`sheet`, later the page or the 15:50 reading) |
 | `reconcile/` | `sheet-vs-notes-<day>.md`, each reconciliation report |
 | `cursor.json` | Per `<mailbox>\|<broker>/<account>`: `uidvalidity`, `last_uid`, `checked_at` — how far that account's mail has been read — and `quiet_since`, the day a quiet spell began |
@@ -117,6 +118,15 @@ cross-checks.
 - **Column-order guard**: `obligation − itemised charges` must equal the note's own final net,
   or the row is refused, so a changed PDF layout fails loudly instead of storing a wrong figure.
 - `skipped_segments` lists the non-F&O rows dropped.
+
+## Ledger e-mails
+
+After the notes, each mailbox reads its brokers' ledger e-mails (`ledger.js` `READERS`: subject,
+sender domain and a reader per kind), with the same bookmark-plus-3-days rule, one bookmark per
+kind (`<mailbox>|ledger/<kind>` in `cursor.json`). An e-mail from the right sender that its
+reader cannot understand is reported once (its wording changed), never skipped. Angel One's
+margin warning has two wordings (Sep 2026: "as on 2026-09-09 12:45:58"; Oct 2026 on: "as on
+22-Oct-2026, 10:05:58 AM"); both are read.
 
 ## Zerodha (`kite`): equity, for Momentum
 
