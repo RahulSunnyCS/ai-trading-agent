@@ -84,6 +84,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-152](BL-152-margin-check-without-algotest.md) | Margin check: a free-margin read that does not need AlgoTest or Shoonya's login, the need estimate checked against what the broker blocks, then switched on (`MARGIN_CHECK`) | P2 | Planned | improvement | broker-login |
 | [BL-164](BL-164-gap-and-go-williams-chain.md) | NIFTY gap-and-go 10% opening-range band → Williams back-up chain, 150-point ITM weekly buys, exactly as published (3 tests through the rule tester; POC) | P2 | In progress | research | options |
 | [BL-166](BL-166-directional-itm2-itm3-with-matched-stop.md) | Directional ITM2 and ITM3, with the overall stop widened to match ITM1's stop rate (NIFTY and SENSEX, two-year proof of concept) | P2 | In progress | research | options |
+| [BL-167](BL-167-itm2-in-adaptive-and-t1.md) | ITM2 added to the Adaptive ranking universe (Core and T1): return, drawdown and which ITM1 / ATM picks it replaces | P2 | In progress | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
