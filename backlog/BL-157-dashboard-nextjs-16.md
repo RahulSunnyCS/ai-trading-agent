@@ -184,3 +184,28 @@ Answered by the owner on 2026-10-26:
   60 s per first page). Proxy timeout: a stub API that answers after 45 s came back 200 in 45 s
   through `/api/momentum/meta` under `next dev` and under `next start` (production build with a
   throwaway `DASHBOARD_PASSWORD`: 401 without it, 200 with it).
+- 2026-10-26 — Phase 1 merged (#327, reviewed: no blocking findings; the reviewer also ran
+  `cf:build` on the branch). OpenNext's build runs the package's `build` script, so `--webpack`
+  reaches the Worker build with no OpenNext config; the Next 16 webpack build still emits edge
+  middleware, which OpenNext bundles into `.open-next/middleware/handler.mjs`. Next did not need a
+  `tsconfig.json` change (task 3 expected one). Review notes, not fixed here: `next dev` rewrites
+  the tracked `next-env.d.ts` to `.next/dev/types` (written into `apps/dashboard/CLAUDE.md`), and
+  `cf-build.mjs`'s reason for refusing to build while `next dev` runs no longer holds in 16
+  (`.next/dev` is kept by `next build`); reword or drop that guard in Phase 3.
+- 2026-10-26 — Phase 2 done, on `main` at f6c38149. `cf:build` (Node 20, bun 1.3): Next 16.4.3
+  (webpack), cloudflare 1.20.13, aws 4.1.12; the support check and the no-env-bundled check pass;
+  no tracked file changed. `wrangler dev` needs Node 22 (the deploy job's version; this laptop's
+  default is 20, so it ran with fnm's 22.23.3). Built with `MOMENTUM_DIRECT_API_URL` = the running
+  Momentum API on :8765 and `OBT_DIRECT_API_URL` = a local header-echo stub, to see what reaches
+  upstream. Results:
+  - Access mode (the live `wrangler.jsonc` vars): `/`, `/login`, `/api/*` all 403 without a
+    token, and 403 with a forged `Cf-Access-Jwt-Assertion`.
+  - Password mode (Access vars blanked, a throwaway `DASHBOARD_PASSWORD`): a page without a
+    session redirects to `/login?next=…` (302) and `/api/*` answers 401; a wrong password
+    redirects to `?error=invalid`; the right one sets `ata_session` and redirects to `next`; the
+    page and `/api/momentum/meta` (real JSON from :8765) then load; Basic auth on `/api/*` works;
+    `/logout` clears the session (back to 401); repeated wrong passwords lock the client out
+    (429, even for the right password).
+  - Upstream: the echo stub got `cf-access-client-id` / `-secret` with the Worker's values, not
+    the spoofed ones the client sent, and no `Authorization` header.
+  - No password and no Access vars: every path 503.
