@@ -77,6 +77,7 @@ Full procedure and rollback: `docs/algotest-execution.md` → Runbook.
 | 2.7 | Archive `trade-analytics` and `algo-automation` | owner | **Archive, not delete** — the old Actions artifacts and run history live there. Only after both cutovers run clean. |
 | 2.8 | `realised-pnl.schema.json` contract emitted by contract-notes | claude | The typed hand-off that lets realised P&L be ingested as a benchmark series. Prerequisite for 3.3. |
 | 2.9 | `packages/contract-notes`: CJS → ESM | claude | Last package on CommonJS. Cosmetic until it blocks something — low priority within P2. |
+| 2.10 | Contract notes in the repo — [BL-168](backlog/BL-168-contract-notes-trade-book.md) | claude | **Started 2026-10-26.** Store under `TRADING_DATA_ROOT/contract-notes/`, a laptop scheduler job (00:00 + 07:30), no sheet writing (`trade-analytics` keeps the sheet). Phase 2 (UI design) first, then Phase 1 (store and job), which replaces 2.1–2.6. Discretionary journal: [BL-169](backlog/BL-169-discretionary-trade-journal.md). |
 
 ---
 

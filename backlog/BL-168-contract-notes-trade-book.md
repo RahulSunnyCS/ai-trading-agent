@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — the only record of real money the project measures itself against; unblocks BL-093 and BL-026 |
-| **Status** | Planned |
+| **Status** | In progress (Phase 2, UI design, first; then Phase 1) |
 | **Type** | feature |
 | **Area** | contract-notes / scheduler / trading-data / dashboard |
 | **Created** | 2026-10-26 |
-| **Depends on** | BL-012 (the scheduler, installed); the `trade-analytics` secrets copied into the repo-root `.env` (owner) |
-| **TODO.md row** | — (filled in when started) |
+| **Depends on** | BL-012 (the scheduler, installed); `BROKER_ACCOUNTS_JSON` in the repo-root `.env` (done 2026-10-26) |
+| **TODO.md row** | 2.10 |
 
 ## Context
 
@@ -42,8 +42,10 @@ rows it drops.
   every trade row, the note's identifiers, and the PDF itself. History from 1 Apr 2025 is in it
   (the sheet's rows at least; the trades wherever the e-mail still exists).
 - The dashboard has a **Trade book** page with what the sheet shows today (cumulative net,
-  drawdown, monthly and FY returns, charges, per-account split, the day table) and what it
-  cannot (charges by kind, net per contract, missing-note days).
+  drawdown, monthly and FY returns, charges, per-account split, the day table, and every ratio
+  the sheet tracks, by the sheet's own formulas) and what it cannot (charges by kind, trades
+  by source, round trips with their best and worst point, day context, money in and out,
+  missing-note days), designed and approved as mockups before it is built.
 - The store is in the monthly backup. The sheet stays a second, independent copy until the
   owner archives `trade-analytics` (TODO §2.7), on the page's evidence, not this item's.
 
@@ -56,6 +58,10 @@ rows it drops.
   `updateSheet.js`, `checkDates.js` and `sheetStartColumn` leave the package with Phase 1.
 - Hiding the page from the friends: the owner chose visible to all (2026-10-26); revisit if a
   second person starts using the hosted dashboard for it.
+- Tagging discretionary trades, the algo-override account and behaviour patterns: BL-169,
+  which reads this item's trades by source.
+- Acting on any slice of the analytics: they are descriptive. A pattern worth acting on is
+  pre-registered and tested on later days under the research gate (CLAUDE.md).
 
 ## Design
 
@@ -135,14 +141,47 @@ is a second source (`fetch` by its subject, a small extractor), recorded as
 is for, so the day's net is the account's net and not only the note's. Its sibling **"Margin
 Shortfall Intimation"** is a utilisation warning with no amount and is not a charge.
 
-**API and page.** `obt-api` serves `GET /legwise/contract-notes/summary|days|months|day/{day}`
-from the JSONL (DuckDB `read_json`, read-only, no catalog), proxied at
+**Ledger e-mails.** Besides the notes and the interest e-mail, the mailboxes carry the money
+moving in and out, needed so a deposit never reads as profit: "Funds added successfully",
+"Instant payout request processed", "Quarterly Fund Settlement" (and the Finvasia / Zerodha
+equivalents once seen), recorded per account as `funds: [{kind: 'deposit' | 'withdrawal' |
+'settlement', amount, at}]`; and "Margin Shortfall Intimation" (79 so far: utilisation % and
+time), recorded as `margin_events: [{at, utilisation_pct}]`.
+
+**Analytics** (`packages/option-backtesting/src/option_backtesting/realised/`, pure functions
+over the store and the lake, read-only; computed on read, nothing stored that can be
+recomputed):
+- **Source of every fill** — `adaptive-core`, `t1`, `own-algo` (the owner's AlgoTest /
+  Quantiply strategies), `manual`: joined from the live capture (BL-141 already tells the
+  tool's strategies from the discretionary ones per platform) and the uploaders' ledgers; a
+  fill that matches no platform strategy is `manual`. Before 2026-10-19 (no live capture) the
+  source is `unknown`.
+- **Round trips** — each contract's fills paired FIFO per account and day: entry and exit time,
+  holding minutes, lots, premium, P&L, charges, days to expiry, strike distance from ATM at
+  entry (spot from the lake).
+- **Best and worst point** — for each round trip, the contract's 1-minute bars between entry
+  and exit: how far it went against the position (MAE) and in its favour (MFE). Only where the
+  lake holds the contract's bars (the collected indices; not stock options); otherwise blank.
+- **Day context** — VIX at open, gap, day range, IV percentile, expiry day, event day (RBI,
+  budget), all from the lake and the reference data.
+- **Return on money in the account** — capital from the 15:50 reading, deposits and
+  withdrawals taken out (time-weighted), so the % never counts a deposit.
+- **The sheet's ratios, by its own formulas** (read from the committed copy, 2026-10-26):
+  50-day average profit (T), 100-day average profit (U), 100-day average charge (V),
+  charge / profit = V ÷ U (W), profit / capital = U × 10 000 ÷ 100-day average capital, in bps
+  a day (Z); cumulative (R) and drawdown from peak (S); the summary block: net, max drawdown
+  and its % of capital, longest run of sessions below the peak, win days %, average win and
+  loss day, average day, profit % of capital; the monthly tab's gain, % of capital, 3-month
+  average %, and the FY rows. Every one also per account.
+- **F&O turnover** for the year (sum of absolute round-trip P&L) with charges as expenses, for
+  the owner's CA; a figure, not tax advice.
+
+**API and page.** `obt-api` serves `GET /legwise/contract-notes/summary|days|months|day/{day}|
+ratios|trips` from the JSONL (DuckDB `read_json`, read-only, no catalog), proxied at
 `/api/backtest/legwise/contract-notes/*` like the rotation routes (under `/legwise/` because
-the dashboard's direct rewrite covers `/legwise/:path*` and nothing else). The dashboard gets a top-level **Trade book** page on the analytics
-page pattern: headline strip (FY net, month net, last day, charge/profit ratio, max drawdown,
-capital and bps), hero chart (cumulative net with drawdown shading), widgets: monthly table (the
-second tab), per-account blocks, charges by kind, the day table, days with no note, and the
-manual-input editor. Guide page in the same change.
+the dashboard's direct rewrite covers `/legwise/:path*` and nothing else). The page is built
+from the mockups Phase 2 has the owner approve; they follow the analytics page pattern
+(`apps/dashboard/CLAUDE.md`) and the dashboard's tokens. Guide page in the same change.
 
 **Backup.** `tdata backup` copies `lake/`, `raw/` and the catalog; add `contract-notes/` (and
 `rotation/`, which the same gap leaves out today). Its skip rule is "same size at the
@@ -185,6 +224,18 @@ Not in the note, worth attaching:
 10. **Zerodha Kite's notes** — every transaction booked to Momentum (the account trades nothing
    else), giving Momentum's realised buys and sells beside its paper journal.
 
+Derived, no input from the owner (owner: "let's do all", 2026-10-26; Design → Analytics):
+
+11. **Source of every fill** — the tool's lists, the owner's own algos, or manual.
+12. **Round trips** — fills paired into trades with time, holding, premium, P&L and charges.
+13. **Best and worst point of each trade** (MFE / MAE) from the lake's 1-minute bars.
+14. **Day context** — VIX, gap, range, IV percentile, expiry and event days.
+15. **Money in and out** and **margin pressure**, from the ledger e-mails.
+16. **F&O turnover** for the tax year.
+
+Needing a tap from the owner, in BL-169: why a manual trade was taken, the algo overrides'
+account, behaviour patterns.
+
 ## Plan
 
 ### Phase 1 — Store and the laptop job (replaces TODO §2.1–2.6)
@@ -205,10 +256,24 @@ Not in the note, worth attaching:
   sheet row `trade-analytics` wrote for the same day; a second run on the same day writes
   nothing; a laptop asleep at 00:00 and 07:30 catches up on wake.
 
-### Phase 2 — Richer extraction and history
+### Phase 2 — UI design (its own phase, owner 2026-10-26; done before Phase 1)
+- **Tasks:** mockups of every screen with the dashboard's tokens (Quant Studio, IBM Plex,
+  dark), the analytics page pattern, and the sheet's real daily rows (1 Apr 2025 → 26 May
+  2026, the committed copy) where a figure exists; illustrative figures marked as such:
+  the page map; the Trade book (run bar, headline strip, hero, ratios, summary block, monthly
+  and FY, accounts, charges by kind, day table); the day detail; trades (round trips by
+  source, best / worst point, day context); money in and out and margin pressure; Momentum
+  (Kite lots); the manual-input editor; empty and open-day states.
+- **Deliverables:** `backlog/assets/BL-168/` — the HTML mockup and one PNG per screen,
+  embedded in this item under **Mockups** (the BL-049 precedent).
+- **Done when:** the owner approves the mockups (a Log line); changes asked for are made
+  first.
+
+### Phase 3 — Richer extraction, ledger e-mails and history
 - **Tasks:** both extractors emit the itemised charges, segment rows, trade rows and note
-  identifiers (the obligation cross-check stays a hard error); the Angel One margin-interest
-  e-mail and the `kite` plugin (a sample of each from the owner first); the one-time import of
+  identifiers (the obligation cross-check stays a hard error); the Angel One interest e-mail,
+  the ledger e-mails (funds, payouts, settlements, margin shortfall) and the `kite` plugin;
+  the one-time import of
   the sheet's rows since 1 Apr 2025 as `source: 'sheet'` (five figures and the manual inputs)
   from an `.xlsx` the owner downloads (`contract-notes import-sheet <file>`; no Google
   credentials); a Gmail backfill by date range (`--from --to`) that re-parses the notes still
@@ -224,20 +289,30 @@ Not in the note, worth attaching:
   its obligation within the note's tolerance; every `email` day's five figures equal the sheet
   row's or the difference is listed and explained in the report.
 
-### Phase 3 — Trade book page
-- **Tasks:** the `obt-api` routes and Fastify proxy; the page (headline strip, hero, widgets
-  above), the manual-input editor, the Guide page and `registry.ts` entry; visible to everyone
-  on the dashboard (owner, 2026-10-26).
+### Phase 4 — Analytics
+- **Tasks:** `realised/` (Design → Analytics): the sources, round trips, MFE / MAE, day
+  context, return on money in the account, the sheet's ratios and summary, turnover; the
+  `ratios` and `trips` routes; the 15:50 `contract-notes-capital` step.
+- **Deliverables:** the module and its tests (the sheet's formulas pinned against the
+  committed copy's own values: the T, U, V, W, Z columns and the summary block of row 290 on).
+- **Done when:** every ratio equals the sheet's for the same days (to the rupee / 0.1), each
+  round trip's P&L sums to its day's obligation, and a fill's source matches the live capture
+  on every day since 2026-10-19.
+
+### Phase 5 — Trade book page
+- **Tasks:** the `obt-api` routes and Fastify proxy; the page as approved in Phase 2, the
+  manual-input editor, the Guide page and `registry.ts` entry; visible to everyone on the
+  dashboard (owner, 2026-10-26).
 - **Deliverables:** the page behind the dashboard login; `formatInr`/`formatPct` only;
   tokens, no hex.
-- **Done when:** the page's FY, monthly and drawdown figures equal the sheet's for the same
-  days, and a day with no note shows as such.
+- **Done when:** the page matches the approved mockups; its FY, monthly, drawdown and ratio
+  figures equal the sheet's for the same days; a day with no note shows as such.
 
-### Phase 4 — Backup and the sheet's future
+### Phase 6 — Backup and the sheet's future
 - **Tasks:** `tdata backup` copies `contract-notes/` and `rotation/`; the monthly job's report
   counts them; after a month of the page, the owner decides whether to archive
   `trade-analytics` (TODO §2.7) and let the sheet stop. BL-093 and BL-026 are unblocked at
-  Phase 2.
+  Phase 3.
 - **Done when:** a backup run copies the new folders, and the decision is in the Log.
 
 ## Risks
@@ -308,3 +383,9 @@ record from them.
   516 (2024-07-12 → 2026-10-23). Zerodha's notes are in mailbox 1 (444). The Angel One
   collateral-interest e-mail and its formula identified (Design → Brokers). Open questions 2
   and 3 updated.
+- 2026-10-26 — started. Owner: capture everything proposed ("let's do all") and make the UI
+  design its own phase. Added the ledger e-mails, the Analytics design (sources, round trips,
+  MFE / MAE, day context, return on money in the account, the sheet's ratios by its own
+  formulas, turnover); phases now 1 store and job, 2 UI design (first), 3 extraction and
+  history, 4 analytics, 5 page, 6 backup. Tagging, overrides and behaviour split into BL-169.
+  TODO 2.10.
