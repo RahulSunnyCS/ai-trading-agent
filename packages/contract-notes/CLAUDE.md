@@ -22,7 +22,7 @@ node run.js --dry-run       # read and parse, write nothing (not even the bookma
 node run.js --day D         # read session D again by date for every account, replacing its lines
 node run.js --sessions N    # a wider window, e.g. after a long trip
 node run.js --from D --to D # history by date (bookmark untouched; a stored note is never written over)
-node reconcile.js <sheet.csv> [--import-manual]   # the owner's Google Sheet (CSV export) against the notes
+node reconcile.js <sheet.csv> [--import-manual] [--out DIR]   # the owner's Google Sheet (CSV export) against the notes
 bun run test                # Jest
 ```
 
@@ -39,6 +39,9 @@ it too). It must be one line, single-quoted: a pretty-printed value reads as `[`
   the search but carries no note anyone in the mailbox can read, a mailbox that will not log in,
   an account newly quiet); the scheduler alerts with the job's `fixHint`. Mail, PDF reading and
   the clock are injectable (`main(argv, deps)`), which `tests/run.flow.test.js` uses.
+- One run at a time: `run.js` holds `run.lock` (the pid) in the store for its whole run, so a
+  history run by hand cannot overlap the nightly job; a lock left by a dead process is taken
+  over. Only the nightly run writes `cursor.json`; `--day` and history leave it alone.
 - `store.js` — the files. `storeRoot()` refuses a root on an unmounted `/Volumes/<name>` (like
   `trading_data.db.check_mounted`). `writeLine` replaces one account's line in
   `days/<day>.jsonl` atomically; `saveRaw` keeps `raw/<broker>/<account>/<day>.pdf` (and the

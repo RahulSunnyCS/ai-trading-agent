@@ -68,3 +68,17 @@ describe('raw notes and the bookmark', () => {
     expect(readCursors(dir)['m|finvasia/A'].last_uid).toBe(42);
   });
 });
+
+describe('acquireLock()', () => {
+  const { acquireLock } = require('../store');
+  test('one holder at a time; a dead holder is taken over; release frees it', () => {
+    const release = acquireLock(dir);
+    fs.writeFileSync(path.join(dir, 'run.lock'), '1'); // pid 1 is alive (launchd/init)
+    expect(() => acquireLock(dir)).toThrow(/another contract-notes run \(pid 1\)/);
+    fs.writeFileSync(path.join(dir, 'run.lock'), '999999'); // no such process
+    const again = acquireLock(dir);
+    again();
+    expect(fs.existsSync(path.join(dir, 'run.lock'))).toBe(false);
+    release();
+  });
+});

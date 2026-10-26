@@ -31,11 +31,13 @@ function deps(now, accounts = [account('finvasia', 'FA1')]) {
       if (!reachable) throw new Error('connection refused');
       return { imap: { end() {} }, uidvalidity: '7' };
     },
-    searchNotes: async (_imap, _subject, { afterUid, overlapSince }) =>
-      mail.filter(
-        (m) =>
-          afterUid == null || m.uid > afterUid || String(m.received).slice(0, 10) >= overlapSince,
-      ),
+    searchNotes: async (_imap, _subject, { sinceDay, beforeDay, afterUid, overlapSince }) =>
+      mail.filter((m) => {
+        const got = String(m.received).slice(0, 10);
+        if (afterUid != null) return m.uid > afterUid || got >= overlapSince;
+        return got >= sinceDay && (!beforeDay || got < beforeDay);
+      }),
+    lock: () => () => {},
     readNote: async (file) => {
       const body = fs.readFileSync(file, 'utf8');
       if (body === 'bad') return { error: 'parse failed' };
@@ -196,4 +198,42 @@ test('history (--from/--to) reads by date, closes the range and leaves the bookm
   expect(line('2026-09-24').status).toBe('note');
   expect(line('2026-09-25')).toBeUndefined(); // after the newest note: still open
   expect(readCursors(root())).toEqual({});
+});
+
+test('history never writes over a stored note, nor re-alerts one --day replaced', async () => {
+  mail = [
+    finvasia(101, '2026-10-22', 500, '2026-10-22T15:00:00Z'),
+    finvasia(102, '2026-10-22', 450, '2026-10-22T18:00:00Z'), // a revised note
+  ];
+  expect(await main(['--day', '2026-10-22'], deps(MON_NIGHT))).toBe(0);
+  expect(line('2026-10-22').fno.payin_payout_obligation).toBe(450);
+  expect(await main(['--from', '2026-10-20', '--to', '2026-10-23'], deps(MON_NIGHT))).toBe(0);
+  expect(line('2026-10-22').fno.payin_payout_obligation).toBe(450);
+});
+
+test('--day reads mail of any later date (a revised note weeks on)', async () => {
+  mail = [finvasia(101, '2026-10-01', 500, '2026-10-20T10:00:00Z')];
+  expect(await main(['--day', '2026-10-01'], deps(MON_NIGHT))).toBe(0);
+  expect(line('2026-10-01').status).toBe('note');
+});
+
+test('the nightly run stores a late note for a day before its window', async () => {
+  mail = [finvasia(101, '2026-09-01', 500, '2026-10-26T10:00:00Z')];
+  expect(await main([], deps(MON_NIGHT))).toBe(1); // the quiet alert: no note in the window
+  expect(line('2026-09-01').status).toBe('note');
+});
+
+test('history and --day leave the bookmarks as they were', async () => {
+  mail = [finvasia(101, '2026-10-26', 700)];
+  await main([], deps(MON_NIGHT));
+  const before = readCursors(root());
+  mail.push(finvasia(102, '2026-10-23', 600, '2026-10-23T15:00:00Z'));
+  await main(['--from', '2026-10-21', '--to', '2026-10-23'], deps(MON_NIGHT));
+  expect(readCursors(root())).toEqual(before);
+});
+
+test('a range with no trading day is refused before any mail is read', async () => {
+  await expect(
+    main(['--from', '2026-10-24', '--to', '2026-10-25'], deps(MON_NIGHT)),
+  ).rejects.toThrow(/no trading day/);
 });

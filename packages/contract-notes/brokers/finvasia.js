@@ -35,8 +35,10 @@ const TOLERANCE = 0.05;
 // Row labels look like "NSEFNO-NCL" / "NSECASH-NCL" — exchange, segment and
 // clearing corporation run together. Notes until 25 Aug 2025 print "NSE FNO" /
 // "NSE CAP" instead: exchange and segment, no clearing corporation.
+// Any word after the exchange counts as a segment, so an unknown one reaches the hard error in
+// segments.js instead of being skipped as text.
 const SEGMENT_LABEL =
-  /\b((?:NSE|BSE|MSEI|MSE|MCX|NCDEX|ICEX)(?:[A-Z& ]*-\s*[A-Z]+|\s+(?:FNO|F&O|CAP|CASH|CDS|COM|SLB)\b))/gi;
+  /\b((?:NSE|BSE|MSEI|MSE|MCX|NCDEX|ICEX)(?:[A-Z& ]*-\s*[A-Z]+|\s+[A-Z][A-Z&]{1,7}\b))/g;
 
 // IMAP SUBJECT is a substring match: this finds every note for the account, whatever its date.
 function searchSubject(accountId) {
@@ -181,12 +183,14 @@ function extract(text) {
 
   // Taxable value of supply = brokerage + transaction + SEBI + clearing + IPF.
   // A mismatch means the brokerage cell is probably not where we think it is.
-  if (
+  // The older layout's taxable value leaves IPF out; either form is accepted.
+  const ipf = kept.reduce((sum, r) => sum.plus(r.amounts[COL.IPF]), new Decimal(0));
+  const off = (v) =>
     taxable
-      .minus(taxableComponents)
+      .minus(v)
       .abs()
-      .greaterThan(TOLERANCE * kept.length)
-  ) {
+      .greaterThan(TOLERANCE * kept.length);
+  if (off(taxableComponents) && off(taxableComponents.minus(ipf))) {
     logger.warn('Finvasia brokerage cross-check failed against taxable value of supply', {
       taxable: taxable.toFixed(2),
       components: taxableComponents.toFixed(2),

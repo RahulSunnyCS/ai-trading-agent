@@ -130,19 +130,22 @@ function searchNotes(imap, subjectText, { sinceDay, beforeDay, afterUid, overlap
   }
   let timer;
   let touch;
+  let settled = false;
   const idle = new Promise((_, reject) => {
     touch = () => {
       clearTimeout(timer);
-      timer = setTimeout(
-        () => reject(imap.lastError || new Error('the mailbox stopped answering')),
-        IDLE_TIMEOUT_MS,
-      );
+      if (settled) return;
+      timer = setTimeout(() => {
+        settled = true;
+        reject(imap.lastError || new Error('the mailbox stopped answering'));
+      }, IDLE_TIMEOUT_MS);
     };
     touch();
   });
-  return Promise.race([search(imap, subjectText, range, () => touch()), idle]).finally(() =>
-    clearTimeout(timer),
-  );
+  return Promise.race([search(imap, subjectText, range, () => touch()), idle]).finally(() => {
+    settled = true;
+    clearTimeout(timer);
+  });
 }
 
 function search(imap, subjectText, range, touch) {

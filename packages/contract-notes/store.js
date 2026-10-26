@@ -127,7 +127,40 @@ function writeCursors(root, cursors) {
   fs.renameSync(tmp, file);
 }
 
+/**
+ * One contract-notes run at a time over the store (`run.lock`, holding the pid). A lock left by
+ * a process that is gone is taken over. Returns the release function.
+ */
+function acquireLock(root) {
+  fs.mkdirSync(root, { recursive: true });
+  const file = path.join(root, 'run.lock');
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      fs.writeFileSync(file, String(process.pid), { flag: 'wx' });
+      return () => fs.rmSync(file, { force: true });
+    } catch (err) {
+      if (err.code !== 'EEXIST') throw err;
+      const pid = Number(fs.readFileSync(file, 'utf8'));
+      let alive = false;
+      try {
+        process.kill(pid, 0);
+        alive = true;
+      } catch (e) {
+        alive = e.code === 'EPERM'; // it exists, owned by someone else; ESRCH: gone, take over
+      }
+      if (alive && pid !== process.pid) {
+        throw new Error(
+          `another contract-notes run (pid ${pid}) is using the store; try again when it ends`,
+        );
+      }
+      fs.rmSync(file, { force: true });
+    }
+  }
+  throw new Error('could not take the store lock');
+}
+
 module.exports = {
+  acquireLock,
   storeRoot,
   readDay,
   writeLine,

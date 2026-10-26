@@ -11,6 +11,7 @@ const { addDays, istNow, lastSession, sessionsBack, sessionsBetween } = require(
 const { connect, decryptWithQpdf, hasQpdf, searchNotes } = require('./fetchMail');
 const { closeWithoutNotes, failedLine, key, noteLine, openPairs } = require('./record');
 const {
+  acquireLock,
   readCursors,
   readDay,
   readStatus,
@@ -140,6 +141,7 @@ async function main(argv, deps = {}) {
     searchNotes,
     hasQpdf,
     readNote,
+    lock: acquireLock,
     env: process.env,
     now: () => new Date(),
     log: (line) => console.log(line),
@@ -161,6 +163,9 @@ async function main(argv, deps = {}) {
     : history
       ? sessionsBetween(opts.from, opts.to)
       : sessionsBack(lastSession(now), opts.sessions);
+  if (!window.length) throw new Error(`no trading day from ${opts.from} to ${opts.to}`);
+  // One run at a time over the store: a history run must not overlap the nightly job.
+  const release = d.lock(root);
   // A session's note can arrive days later (Angel One's after midnight, a revised note).
   const lateNotes = (day) => addDays(day, 5);
   const status = readStatus(root, window);
@@ -224,7 +229,9 @@ async function main(argv, deps = {}) {
               getBroker(acc.broker).searchSubject(acc.accountId),
               {
                 sinceDay: addDays(window[0], -1),
-                beforeDay: byDate ? lateNotes(window[window.length - 1]) : undefined,
+                // History stops a few days after its range; --day reads to now (a revised note
+                // can come weeks later).
+                beforeDay: history ? lateNotes(window[window.length - 1]) : undefined,
                 afterUid: byDate ? null : bookmark,
                 overlapSince: byDate
                   ? undefined
@@ -248,7 +255,8 @@ async function main(argv, deps = {}) {
           }
 
           for (const [day, found] of [...byDay].sort(([a], [b]) => a.localeCompare(b))) {
-            if (day < window[0] || day > window[window.length - 1]) continue;
+            // Reading by date keeps to its range; the nightly run stores a late note for any day.
+            if (byDate && (day < window[0] || day > window[window.length - 1])) continue;
             const existing =
               status.get(key(day, acc.broker, acc.accountId)) ??
               readDay(root, day).find(
@@ -257,7 +265,8 @@ async function main(argv, deps = {}) {
             const stored = existing?.status === 'note' ? existing.note?.sha256 : null;
             let notes = found;
             if (!opts.day && stored) {
-              const others = found.filter((n) => n.sha256 !== stored);
+              const replaced = new Set(existing.superseded ?? []);
+              const others = found.filter((n) => n.sha256 !== stored && !replaced.has(n.sha256));
               for (const n of others.filter((o) => isNew(o.uid))) {
                 problems.push(
                   `${label(acc)} ${day}: a second, different note arrived (${hideId(n.attachment, acc)}); the stored one is kept — compare them, then \`node run.js --day ${day}\` takes the newest`,
@@ -393,9 +402,11 @@ async function main(argv, deps = {}) {
         }
       }
     }
-    if (!opts.dryRun) writeCursors(root, cursors);
+    // Only the nightly run owns the bookmarks: --day and history never write them back.
+    if (!opts.dryRun && !byDate) writeCursors(root, cursors);
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });
+    release();
   }
 
   if (problems.length) {
