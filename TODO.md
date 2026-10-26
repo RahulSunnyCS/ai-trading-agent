@@ -888,5 +888,5 @@ is stuck on the 2026-10-18 build. Owner (2026-10-26): upgrade, not the unsupport
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.46.1 | Phase 1: `next` 16.4.x + `@opennextjs/cloudflare` 1.20.13, `--webpack` on every dev/build call, React stays 18 | claude | **Done 2026-10-26** (#327): build, typecheck and 1,980 unit tests pass; e2e matches Next 15; the 180 s proxy timeout holds under `next dev` and `next start` |
-| 3.46.2 | Phase 2: Worker preview against the local APIs, then the `main` → `release` promotion | claude | **Preview done 2026-10-26** (Access and password gates, rewrites, upstream token, 503 all pass); promotion to `release` next |
+| 3.46.2 | Phase 2: Worker preview against the local APIs, then the `main` → `release` promotion | claude | **Done 2026-10-26**: preview passed (#328); #329 promoted, deploy run 40268605293 green, `dashboard.codifie.dev` on Next 16.4.3 behind Access |
 | 3.46.3 | Phase 3: React 19, `proxy.ts`, Turbopack | — | Waits (owner 2026-10-26) |
