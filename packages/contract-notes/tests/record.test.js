@@ -123,3 +123,22 @@ describe('closeWithoutNotes()', () => {
     expect(lines).toEqual([]);
   });
 });
+
+describe('noteLine() for an equity note', () => {
+  test('keeps eq and trades, and has no fno block', () => {
+    const line = noteLine({
+      day: '2026-10-23',
+      broker: 'kite',
+      account: 'BZ1',
+      extracted: {
+        eq: { payin_payout_obligation: -100, charges: {}, total_charges: 1, final_net: -101 },
+        trades: [{ symbol: 'ALPHA', side: 'buy', qty: 1, price: 100, value: 100 }],
+      },
+      note: { sha256: 'x' },
+      at: AT,
+    });
+    expect(line.fno).toBeUndefined();
+    expect(line.eq.final_net).toBe(-101);
+    expect(line.trades).toHaveLength(1);
+  });
+});

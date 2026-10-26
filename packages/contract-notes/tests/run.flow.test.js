@@ -237,3 +237,28 @@ test('a range with no trading day is refused before any mail is read', async () 
     main(['--from', '2026-10-24', '--to', '2026-10-25'], deps(MON_NIGHT)),
   ).rejects.toThrow(/no trading day/);
 });
+
+test('a Zerodha account: nothing before its start day, and no quiet alert', async () => {
+  const kite = (uid, day, value) => {
+    const [y, m, d] = day.split('-');
+    return {
+      uid,
+      subject: 'Combined Equity Contract Note for BZ1',
+      received: `${day}T15:00:00Z`,
+      attachments: [
+        { filename: `${d}-${m}-${y}-contract-notes_BZ1.pdf`, content: Buffer.from(String(value)) },
+      ],
+    };
+  };
+  mail = [kite(101, '2026-10-14', 900)]; // before Momentum's start: not Momentum's
+  const deps1 = deps(MON_NIGHT, [account('kite', 'BZ1')]);
+  deps1.readNote = async () => ({
+    extracted: {
+      eq: { payin_payout_obligation: -900, charges: {}, total_charges: 1, final_net: -901 },
+      trades: [],
+    },
+  });
+  expect(await main([], deps1)).toBe(0); // quiet, but no alert for this broker
+  expect(line('2026-10-14', 'BZ1')).toBeUndefined();
+  expect(line('2026-10-12', 'BZ1')).toBeUndefined(); // no session before the start day is judged
+});

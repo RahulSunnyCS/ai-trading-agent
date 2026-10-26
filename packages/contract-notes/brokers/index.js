@@ -1,10 +1,11 @@
 const finvasia = require('./finvasia');
 const angelone = require('./angelone');
+const kite = require('./kite');
 
 // A plugin exports searchSubject(accountId), noteDay({ subject, filename, accountId }) and
-// extract(text). An account whose broker has no plugin yet (`kite` until BL-168 Phase 3) is
-// skipped by the run with a notice, not refused, so it can sit in BROKER_ACCOUNTS_JSON early.
-const BROKERS = { finvasia, angelone };
+// extract(text). An account whose broker has no plugin yet is skipped by the run with a notice,
+// not refused, so it can sit in BROKER_ACCOUNTS_JSON early. `kite` reads equity (Momentum).
+const BROKERS = { finvasia, angelone, kite };
 
 function getBroker(name) {
   const b = BROKERS[name];

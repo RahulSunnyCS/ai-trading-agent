@@ -24,24 +24,24 @@ function fnoBlock(extracted) {
 }
 
 function noteLine({ day, broker, account, extracted, note, at }) {
-  return {
-    schema: SCHEMA,
-    day,
-    broker,
-    account,
-    status: 'note',
-    source: 'email',
-    fno: fnoBlock(extracted),
-    skipped_segments: extracted.skipped_segments ?? [],
-    note: {
-      sha256: note.sha256,
-      file: note.file,
-      subject: note.subject,
-      received: note.received,
-      attachment: note.attachment,
-    },
-    recorded_at: at,
+  const line = { schema: SCHEMA, day, broker, account, status: 'note', source: 'email' };
+  if (extracted.eq) {
+    // An equity note (Zerodha, Momentum): its own figures and trade rows, no F&O block.
+    line.eq = extracted.eq;
+    line.trades = extracted.trades ?? [];
+  } else {
+    line.fno = fnoBlock(extracted);
+    line.skipped_segments = extracted.skipped_segments ?? [];
+  }
+  line.note = {
+    sha256: note.sha256,
+    file: note.file,
+    subject: note.subject,
+    received: note.received,
+    attachment: note.attachment,
   };
+  line.recorded_at = at;
+  return line;
 }
 
 function closedLine({ day, broker, account, status, reason, at }) {
@@ -63,7 +63,7 @@ const key = (day, broker, account) => `${day}|${broker}/${account}`;
 function openPairs(sessions, accounts, status) {
   const open = [];
   for (const acc of accounts) {
-    for (const day of sessions) {
+    for (const day of sessions.filter((d) => !acc.from || d >= acc.from)) {
       const line = status.get(key(day, acc.broker, acc.accountId));
       if (!line || !CLOSED.has(line.status)) open.push({ day, ...acc });
     }
@@ -82,10 +82,13 @@ function openPairs(sessions, accounts, status) {
  * `quiet` lists those quiet accounts (whether or not this call closed a session for them); the
  * caller keeps when each quiet spell began, so it alerts on that day only.
  */
-function closeWithoutNotes(sessions, accounts, status, at) {
+function closeWithoutNotes(allSessions, accounts, status, at) {
   const lines = [];
   const quiet = [];
   for (const acc of accounts) {
+    // An account read only from a start day (`from`) has no sessions before it.
+    const sessions = allSessions.filter((d) => !acc.from || d >= acc.from);
+    if (!sessions.length) continue;
     const get = (day) => status.get(key(day, acc.broker, acc.accountId));
     const noteDays = sessions.filter((d) => get(d)?.status === 'note');
     const failed = sessions.some((d) => get(d)?.status === 'failed');

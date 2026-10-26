@@ -22,7 +22,8 @@ const {
 } = require('./store');
 const { withRetry } = require('./utils/retry');
 
-// The contract-notes run (BL-168). For each broker account it reads the mail after its
+// The contract-notes run (BL-168): the F&O brokers' notes and the Momentum account's equity
+// notes (Zerodha). For each broker account it reads the mail after its
 // bookmark (cursor.json: the newest message read, per mailbox and account), keeps every note's
 // PDF, reads its F&O figures and stores the session's line under
 // TRADING_DATA_ROOT/contract-notes/. Then it closes the sessions of the window that can have no
@@ -37,6 +38,13 @@ const { withRetry } = require('./utils/retry');
 //                               bookmark untouched; a stored note is never written over
 
 const SESSIONS = 10;
+// Accounts read only from a day on, unless BROKER_ACCOUNTS_JSON gives the account its own
+// `from`: the Zerodha account's notes are Momentum's from its start (16 Oct 2026); earlier ones
+// are the owner's other trades.
+const DEFAULT_FROM = { kite: '2026-10-16' };
+// Brokers that trade too seldom for "no note in the window" to mean anything: Momentum trades on
+// Fridays and not every week.
+const NO_QUIET_ALERT = new Set(['kite']);
 // Each search also takes the mail of the last few days, whatever the bookmark: a note Gmail
 // indexed late is still found, and a recent note that failed is tried again. Stored notes are
 // skipped by hash. Days, not message numbers: one mailbox gets few mails, another thousands.
@@ -192,6 +200,7 @@ async function main(argv, deps = {}) {
   try {
     for (const mailbox of config) {
       const mine = mailbox.accounts.filter((acc) => {
+        acc.from ??= DEFAULT_FROM[acc.broker];
         if (isSupported(acc.broker)) return true;
         d.log(`skip  ${label(acc)}: no reader for "${acc.broker}" yet (BL-168 Phase 3)`);
         return false;
@@ -257,6 +266,7 @@ async function main(argv, deps = {}) {
           for (const [day, found] of [...byDay].sort(([a], [b]) => a.localeCompare(b))) {
             // Reading by date keeps to its range; the nightly run stores a late note for any day.
             if (byDate && (day < window[0] || day > window[window.length - 1])) continue;
+            if (acc.from && day < acc.from) continue; // before the account's start day
             const existing =
               status.get(key(day, acc.broker, acc.accountId)) ??
               readDay(root, day).find(
@@ -325,8 +335,9 @@ async function main(argv, deps = {}) {
             if (superseded.length) line.superseded = superseded.map((n) => n.sha256);
             write(line);
             const was = existing && existing.status !== 'note' ? ` (was ${existing.status})` : '';
+            const fig = line.fno ?? line.eq;
             d.log(
-              `note  ${day} ${label(acc)}: final net ${line.fno.final_net}, obligation ${line.fno.payin_payout_obligation}, charges ${line.fno.total_charges}${was}`,
+              `note  ${day} ${label(acc)}: final net ${fig.final_net}, obligation ${fig.payin_payout_obligation}, charges ${fig.total_charges}${line.eq ? ` (equity, ${line.trades.length} trades)` : ''}${was}`,
             );
           }
 
@@ -365,7 +376,7 @@ async function main(argv, deps = {}) {
         for (const acc of mailbox.accounts.filter((a) => judged.includes(a))) {
           const cursorKey = `${mailbox.email}|${acc.broker}/${acc.accountId}`;
           const cursor = cursors[cursorKey] ?? {};
-          if (quiet.includes(acc)) {
+          if (quiet.includes(acc) && !NO_QUIET_ALERT.has(acc.broker)) {
             cursor.quiet_since ??= today;
             if (cursor.quiet_since === today) {
               problems.push(
