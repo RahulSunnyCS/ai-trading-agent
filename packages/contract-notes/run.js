@@ -325,8 +325,9 @@ async function main(argv, deps = {}) {
             if (superseded.length) line.superseded = superseded.map((n) => n.sha256);
             write(line);
             const was = existing && existing.status !== 'note' ? ` (was ${existing.status})` : '';
+            const fig = line.fno ?? line.eq;
             d.log(
-              `note  ${day} ${label(acc)}: final net ${line.fno.final_net}, obligation ${line.fno.payin_payout_obligation}, charges ${line.fno.total_charges}${was}`,
+              `note  ${day} ${label(acc)}: final net ${fig.final_net}, obligation ${fig.payin_payout_obligation}, charges ${fig.total_charges}${line.eq ? ` (equity, ${line.trades.length} trades)` : ''}${was}`,
             );
           }
 

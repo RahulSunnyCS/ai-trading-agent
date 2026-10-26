@@ -5,7 +5,8 @@ Guidance for coding agents working in `packages/contract-notes`.
 ## What this package does
 
 Reads the brokers' daily contract notes from Gmail and stores each session's realised F&O
-figures under `TRADING_DATA_ROOT/contract-notes/` (BL-168). It runs on the laptop from the
+figures (Finvasia, Angel One) and the Momentum account's equity notes (Zerodha, `kite`) under
+`TRADING_DATA_ROOT/contract-notes/` (BL-168). It runs on the laptop from the
 scheduler (`apps/scheduler`: `contract-notes` every day 00:00, `contract-notes-retry` 07:30).
 It never writes the Google Sheet: the standalone `trade-analytics` repo keeps filling the
 owner's "Trade Book" sheet on its own cron until the owner archives it (TODO §2.7). The two
@@ -69,7 +70,7 @@ it too). It must be one line, single-quoted: a pretty-printed value reads as `[`
 
 | Path | What |
 |---|---|
-| `days/<day>.jsonl` | One line per broker account for the session: `status` `note` (with `fno`, the sheet's five figures, `skipped_segments`, the note's sha256, file, subject, received time, and `superseded` hashes when `--day` chose between notes), `no_trade`, `no_note` or `failed` (with `reason`) |
+| `days/<day>.jsonl` | One line per broker account for the session: `status` `note` (an F&O broker's with `fno`, the sheet's five figures; a `kite` line with `eq` — obligation, each charge, total charges, final net — and `trades`, every fill; `skipped_segments`, the note's sha256, file, subject, received time, and `superseded` hashes when `--day` chose between notes), `no_trade`, `no_note` or `failed` (with `reason`) |
 | `raw/<broker>/<account>/<day>.pdf` | The note as mailed (encrypted), and `<day>.decrypted.pdf` |
 | `manual/<day>.json` | The inputs the sheet had typed by hand: `algos`, `capital_total`, `source` (`sheet`, later the page or the 15:50 reading) |
 | `reconcile/` | `sheet-vs-notes-<day>.md`, each reconciliation report |
@@ -115,6 +116,16 @@ cross-checks.
 - **Column-order guard**: `obligation − itemised charges` must equal the note's own final net,
   or the row is refused, so a changed PDF layout fails loudly instead of storing a wrong figure.
 - `skipped_segments` lists the non-F&O rows dropped.
+
+## Zerodha (`kite`): equity, for Momentum
+
+The Momentum account trades nothing else, so its notes are read for the cash segment: the
+totals block (Cash, F&O and Net total columns; a payable amount in brackets, a footnote digit
+after "(₹)" on some rows, a receipt printed unbracketed) and Annexure A's trade rows, whose cells
+pdf-parse runs together (order no, times, trade no, `SYMBOL-SERIES/ISIN`, B/S, exchange,
+quantity glued to brokerage — split where quantity × rate = total —, rate, total). Two checks
+refuse a note: obligation − charges ≠ the note's net, or the trades not summing to the
+obligation. An F&O figure on that account is refused too.
 
 ## Adding a broker
 

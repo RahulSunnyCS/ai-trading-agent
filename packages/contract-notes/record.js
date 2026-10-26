@@ -24,24 +24,24 @@ function fnoBlock(extracted) {
 }
 
 function noteLine({ day, broker, account, extracted, note, at }) {
-  return {
-    schema: SCHEMA,
-    day,
-    broker,
-    account,
-    status: 'note',
-    source: 'email',
-    fno: fnoBlock(extracted),
-    skipped_segments: extracted.skipped_segments ?? [],
-    note: {
-      sha256: note.sha256,
-      file: note.file,
-      subject: note.subject,
-      received: note.received,
-      attachment: note.attachment,
-    },
-    recorded_at: at,
+  const line = { schema: SCHEMA, day, broker, account, status: 'note', source: 'email' };
+  if (extracted.eq) {
+    // An equity note (Zerodha, Momentum): its own figures and trade rows, no F&O block.
+    line.eq = extracted.eq;
+    line.trades = extracted.trades ?? [];
+  } else {
+    line.fno = fnoBlock(extracted);
+    line.skipped_segments = extracted.skipped_segments ?? [];
+  }
+  line.note = {
+    sha256: note.sha256,
+    file: note.file,
+    subject: note.subject,
+    received: note.received,
+    attachment: note.attachment,
   };
+  line.recorded_at = at;
+  return line;
 }
 
 function closedLine({ day, broker, account, status, reason, at }) {

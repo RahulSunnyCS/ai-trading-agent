@@ -46,14 +46,15 @@ describe('loadBrokerAccounts()', () => {
         emailPassword: 'pw',
         accounts: [
           { broker: 'finvasia', accountId: 'X1', pdfPassword: 'pw' },
-          { broker: 'kite', accountId: 'BZ1', pdfPassword: 'pw2' },
+          { broker: 'icici', accountId: 'IC1', pdfPassword: 'pw2' },
         ],
       },
     ];
     process.env.BROKER_ACCOUNTS_JSON = JSON.stringify(config);
     expect(loadBrokerAccounts()[0].accounts).toHaveLength(2);
     expect(isSupported('finvasia')).toBe(true);
-    expect(isSupported('kite')).toBe(false);
+    expect(isSupported('kite')).toBe(true);
+    expect(isSupported('icici')).toBe(false);
   });
 
   test('never echoes the config, which holds the passwords', () => {
