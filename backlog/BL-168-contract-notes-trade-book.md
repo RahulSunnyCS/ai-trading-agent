@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the only record of real money the project measures itself against; unblocks BL-093 and BL-026 |
-| **Status** | In progress (Phase 2, UI design, first; then Phase 1) |
+| **Status** | In progress (Phase 2 done; Phase 1 next) |
 | **Type** | feature |
 | **Area** | contract-notes / scheduler / trading-data / dashboard |
 | **Created** | 2026-10-26 |
@@ -315,7 +315,7 @@ account, behaviour patterns.
   Phase 3.
 - **Done when:** a backup run copies the new folders, and the decision is in the Log.
 
-## Mockups (Phase 2, drafted 2026-10-26, awaiting the owner's approval)
+## Mockups (Phase 2, approved by the owner 2026-10-26)
 
 The source is [`assets/BL-168/trade-book-mockup.html`](assets/BL-168/trade-book-mockup.html):
 the dashboard's dark tokens and IBM Plex, the analytics page pattern. Screens 2 and 3 are the
@@ -409,5 +409,5 @@ record from them.
   TODO 2.10.
 - 2026-10-26 — Phase 2: eight mockups drafted (Mockups above), rendered with headless Chromium
   from one HTML file; the first screen and the ratios use the sheet's real FY 2025-26 rows
-  (net ₹2,80,565, max drawdown −₹83,335, the sheet's own −83,335). Waiting for the owner's
-  approval or changes.
+  (net ₹2,80,565, max drawdown −₹83,335, the sheet's own −83,335).
+- 2026-10-26 — Phase 2 done: the owner approved the mockups as drawn. Phase 5 builds from them.
