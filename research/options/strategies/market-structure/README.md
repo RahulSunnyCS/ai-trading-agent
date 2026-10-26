@@ -13,15 +13,15 @@ through the latest swing low (high), a −30% premium stop, or 15:15.
 ## What we know in one paragraph
 
 It does not pay. Over 2024-10-09 to 2026-10-08, after charges, 399 trades made +₹27 a trade (t 0.20), 30% of
-them winners, and it loses at 0.5% slippage. It fires on most days, so the structure filter selects little,
-and the entry is badly timed: the same trade at any random later minute did better on every one of 200 draws.
-The locked 2022 to 2024 period was not opened.
+them winners, and it loses at 0.5% slippage. It fires on most days, so the structure filter selects little.
+Entering at the break beats the same trade at a random later minute (every draw, mean −₹165), as in the other
+breakout studies, but that is not enough to make money. The locked 2022 to 2024 period was not opened.
 
 ## Variables
 
 | Variable | Status | One-line takeaway |
 |---|---|---|
-| [Structure and the swing break](structure-break.md) | Tested (killed) | 5-minute fractal swings, break of the last swing: +₹27 a trade, t 0.20, worse than random later entries |
+| [Structure and the swing break](structure-break.md) | Tested (killed) | 5-minute fractal swings, break of the last swing: +₹27 a trade, t 0.20 |
 
 ## Reproduce
 

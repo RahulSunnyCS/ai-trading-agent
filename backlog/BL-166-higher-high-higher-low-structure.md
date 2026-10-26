@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner's idea (2026-10-25); one registered test; the repo's prior is against intraday option buying (BL-152, BL-164), so the value is a clean verdict |
-| **Status** | Done — killed (2026-10-25): +₹27 a trade, t 0.20; the break is worse than a random later minute; confirmation never opened |
+| **Status** | Done — killed (2026-10-25): +₹27 a trade, t 0.20; confirmation never opened |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-25 |
@@ -103,14 +103,18 @@ the locked 2022–24 period.
 
 | Trades | Win rate | Net / trade | t | Median | Without best 3 | Random-time pct (draws' mean) | 0.5% slip | 1% slip |
 |---|---|---|---|---|---|---|---|---|
-| 399 | 30% | +₹27 | 0.20 | −₹642 | −₹132 | **0.00** (+₹287) | −₹46 | −₹118 |
+| 399 | 30% | +₹27 | 0.20 | −₹642 | −₹132 | 0.00 as run (+₹287); **1.00 against later minutes** (−₹165), see the correction below | −₹46 | −₹118 |
 
 - It fires on most sessions (399 of 489), so structure on 5-minute bars is not selective.
-- The entry is the worst moment of the move: every one of the 200 random-time draws (the same trade
-  entered at a random later minute where the structure exit had not yet triggered) did better than the
-  break itself (their mean +₹287 a trade). Buying the close through the latest swing high buys the
-  extreme of the pullback-prone move; BL-152's and BL-164's breaks were the opposite (better than
-  later minutes, percentile 1.00).
+- **Correction (code review, 2026-10-26).** The tester's random-time control draws from the whole
+  09:41–14:01 grid, not only minutes after the event, and with no `control_when` a minute qualifies
+  wherever the exit does not hold; before a swing low exists the exit is NaN, so early minutes with no
+  structure, traded on the side the later break revealed, were controls. That is not what Phase 0
+  registered ("a random later minute"). Recomputed from the cached simulations
+  (`research/bl166/after_event.py`, descriptive): against minutes **before** the event the draws average
+  +₹812 (event percentile 0.00), against minutes **after** it −₹165 (percentile **1.00**). So, as in
+  BL-152 and BL-164, the break is a better entry than a later minute; the trade still does not pay
+  (t 0.20), and the verdict is unchanged.
 - Description only, not findings: up side +₹191 (195), down −₹129 (204); expiry days +₹518 (80), other
   days −₹96 (319); half-years +₹275 / +₹221 / −₹105 / −₹41 / −₹164, fading from 2025H2. Expiry days
   looked best in BL-164 too, and failed BL-165's bar on unseen data.
@@ -137,5 +141,11 @@ the locked 2022–24 period.
   session (0 mismatches); 20 events (it fires on most days); strikes ATM at entry, the −30% backstop hit
   three times, structure exits read as the trade's exit time. Next: the learning-period test.
 - 2026-10-25 — **killed** (one ledger test): +₹27 a trade, t 0.20, 30% winners, below every random-time
-  draw; numbers under Result. Confirmation not opened. Findings:
+  draw as run (but see the 2026-10-26 correction); numbers under Result. Confirmation not opened. Findings:
   `research/options/strategies/market-structure/`. Closed.
+- 2026-10-26 — code review of PR #325: the random-time control included minutes before each event
+  (the tester's grid covers the whole window), against the registered "random later minute".
+  Recomputed against later minutes only: event percentile 1.00 (draws −₹165), not 0.00; Result and
+  the findings page corrected. Verdict unchanged (t 0.20). The tester itself still draws pre-event
+  minutes for rules with only an `exit_when`; a fix there would touch every rule test, so it is left
+  as a follow-up.

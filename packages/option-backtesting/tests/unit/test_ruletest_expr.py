@@ -150,6 +150,20 @@ def test_swing_is_known_only_from_its_confirming_bar():
         E.parse({"swing": {"kind": "mid"}})
 
 
+def test_swing_lows_back_one_and_no_carry_across_sessions():
+    fr = frame(2)
+    fr.H[:] = 200.0
+    fr.L[:] = 100.0
+    lows = [100, 99, 97, 99, 100, 98, 95, 98, 99, 100]  # 5-minute bar lows of session 0
+    for k, v in enumerate(lows):
+        fr.L[0, 5 * k + 1] = v
+    latest = E.evaluate(E.parse({"swing": {"kind": "low"}}), fr)
+    before = E.evaluate(E.parse({"swing": {"kind": "low", "back": 1}}), fr)
+    assert np.isnan(latest[0, :24]).all() and (latest[0, 24:44] == 97).all()
+    assert (latest[0, 44:] == 95).all() and (before[0, 44:] == 97).all()
+    assert np.isnan(latest[1]).all() and np.isnan(before[1]).all()  # session 1 has no swing
+
+
 def test_prior_median_uses_earlier_sessions_only():
     fr = frame(30)
     med = E.evaluate(E.parse({"prior_median": {"x": "close", "sessions": 5}}), fr)

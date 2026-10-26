@@ -24,9 +24,10 @@ None.
 
 - 399 trades in 489 sessions; 30% winners; median −₹642; −₹132 a trade without the best three; −₹46 at
   0.5% slippage.
-- Random-time percentile 0.00: entering at a random later minute, while the structure exit had not
-  triggered, averaged +₹287. Buying the break of the swing high buys the top of the move; the opening-range
-  and five-minute breaks (BL-152, BL-164) were the other way round.
+- Against the same trade at a random later minute the break wins on every draw (later minutes average
+  −₹165; `research/bl166/after_event.py`). The tester's own figure (percentile 0.00, draws +₹287) mixed in
+  minutes before the event, traded on the side the later break revealed, so it is not used (BL-166 Log,
+  2026-10-26).
 - Description only: up side +₹191, down −₹129; expiry days +₹518 (80 trades), other days −₹96; the
   half-years fade from +₹275 to −₹164.
 
