@@ -273,7 +273,8 @@ account, behaviour patterns.
 - **Tasks:** both extractors emit the itemised charges, segment rows, trade rows and note
   identifiers (the obligation cross-check stays a hard error); the Angel One interest e-mail,
   the ledger e-mails (funds, payouts, settlements, margin shortfall) and the `kite` plugin;
-  the one-time import of
+  the one-time import (two rows in the committed copy are both dated 20 May 25: summed as one
+  session and listed in the import's report) of
   the sheet's rows since 1 Apr 2025 as `source: 'sheet'` (five figures and the manual inputs)
   from an `.xlsx` the owner downloads (`contract-notes import-sheet <file>`; no Google
   credentials); a Gmail backfill by date range (`--from --to`) that re-parses the notes still
@@ -318,9 +319,13 @@ account, behaviour patterns.
 ## Mockups (Phase 2, approved by the owner 2026-10-26)
 
 The source is [`assets/BL-168/trade-book-mockup.html`](assets/BL-168/trade-book-mockup.html):
-the dashboard's dark tokens and IBM Plex, the analytics page pattern. Screens 2 and 3 are the
-sheet's real daily rows (FY 2025-26, from the committed copy) computed with the sheet's
-formulas; every other figure is illustrative and marked so on the screen.
+the dashboard's dark tokens and IBM Plex, the analytics page pattern. Real figures (the sheet's
+daily rows from the committed copy, computed with the sheet's formulas): screen 2 (FY 2025-26),
+screen 3's ratios (every row to 26 May 2026) and summary (FY 2025-26), the algo fees on screen 3,
+and screen 4's net, charges, to-date and drawdown columns and the 27 Mar day's net, charges and
+algos. Everything else is illustrative, and each such card says so. With a target-pace benchmark
+only profit and return have a benchmark figure; the other tiles say "no target figure" (a
+benchmark that is a series — last FY, Adaptive paper, NIFTY — compares every tile).
 
 | Screen | Mockup |
 |---|---|
@@ -411,3 +416,8 @@ record from them.
   from one HTML file; the first screen and the ratios use the sheet's real FY 2025-26 rows
   (net ₹2,80,565, max drawdown −₹83,335, the sheet's own −83,335).
 - 2026-10-26 — Phase 2 done: the owner approved the mockups as drawn. Phase 5 builds from them.
+- 2026-10-26 — review of PR #334 fixed in the mockups (no change to the approved design): every
+  illustrative card marked, the real figures listed above; the 27 Mar day consistent between
+  its row and the drawer (14 algos, ₹200 algo fees from the sheet); each headline tile says how
+  it compares with the picked benchmark; trade P&L labelled gross; the sheet's real algo fees
+  (₹34,523); round axis ticks; weekdays and expiries corrected; green kept for profit only.

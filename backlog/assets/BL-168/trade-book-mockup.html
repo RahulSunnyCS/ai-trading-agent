@@ -45,7 +45,8 @@ body{margin:0;background:#0b0c0e;color:var(--foreground);font:14px/1.45 Plex,sys
 .kpi .l{font-size:12px;color:var(--faint);display:flex;gap:6px;align-items:center}
 .kpi .v{font-family:PlexMono,monospace;font-size:26px;font-weight:500;margin-top:2px;letter-spacing:-.5px}
 .kpi .b{font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:6px;align-items:center}
-.badge{font-family:PlexMono,monospace;font-size:11.5px;padding:1px 6px;border-radius:5px;background:rgba(76,192,114,.15);color:var(--positive)}
+.badge{font-family:PlexMono,monospace;font-size:11.5px;padding:1px 6px;border-radius:5px;background:var(--surface-2);color:var(--foreground)}
+.badge.p{background:rgba(76,192,114,.15);color:var(--positive)}
 .badge.n{background:rgba(240,112,121,.15);color:var(--negative)}
 .badge.w{background:rgba(224,162,74,.15);color:var(--warning)}
 .badge.i{background:rgba(108,182,255,.13);color:var(--info)}
@@ -128,7 +129,7 @@ svg text{font-family:PlexMono,monospace;font-size:11px;fill:var(--faint)}
 <div class="main">
   <div class="grid" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)">
     <div class="card">
-      <h3>Ratios<span class="badge g">sheet formulas</span><span class="act"><span class="chip">Per account <i class="ti ti-toggle-left"></i></span></span></h3>
+      <h3>Ratios<span class="badge g">sheet formulas · every row to 26 May 26</span><span class="act"><span class="chip">Per account <i class="ti ti-toggle-left"></i></span></span></h3>
       <div class="d">Rolling over the last 50 or 100 sessions, the same columns as your sheet (T, U, V, W, Z).</div>
       <div id="ratioSeg" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
       <div style="display:flex;gap:14px;align-items:baseline"><span id="ratioNow" class="mono" style="font-size:22px;font-weight:500"></span><span id="ratioSub" class="fnt" style="font-size:12px"></span></div>
@@ -153,15 +154,15 @@ svg text{font-family:PlexMono,monospace;font-size:11px;fill:var(--faint)}
       <div class="d">Each account's net, capital and return; the 50:50 rule applies to Finvasia's capital.</div>
       <table>
         <tr><th>Account</th><th class="r">Net</th><th class="r">Capital</th><th class="r">Return</th><th class="r">Charge/profit</th></tr>
-        <tr><td>Finvasia · FA··14</td><td class="r num pos">₹1,84,520</td><td class="r num">₹6,00,000</td><td class="r num">30.8%</td><td class="r num">52.4%</td></tr>
-        <tr><td>Angel One · R5··20</td><td class="r num pos">₹1,14,320</td><td class="r num">₹6,00,000</td><td class="r num">19.1%</td><td class="r num">61.9%</td></tr>
-        <tr><td>Finvasia 2 · FA··08</td><td class="r num pos">₹23,448</td><td class="r num fnt">—</td><td class="r num fnt">—</td><td class="r num">48.0%</td></tr>
-        <tr><td class="mut">Algo fees (AlgoTest)</td><td class="r num neg">−₹41,723</td><td></td><td></td><td></td></tr>
+        <tr><td>Finvasia · FA··14</td><td class="r num pos">₹1,80,400</td><td class="r num">₹6,00,000</td><td class="r num">30.1%</td><td class="r num">52.4%</td></tr>
+        <tr><td>Angel One · R5··20</td><td class="r num pos">₹1,11,250</td><td class="r num">₹6,00,000</td><td class="r num">18.5%</td><td class="r num">61.9%</td></tr>
+        <tr><td>Finvasia 2 · FA··08</td><td class="r num pos">₹23,438</td><td class="r num fnt">—</td><td class="r num fnt">—</td><td class="r num">48.0%</td></tr>
+        <tr><td class="mut">Algo fees (AlgoTest, from the sheet)</td><td class="r num neg">−₹34,523</td><td></td><td></td><td></td></tr>
       </table>
       <div class="lbl" style="margin-top:14px">Charges by kind · FY 2025-26</div>
-      <div class="bar"><span style="flex:41;background:var(--s1)"></span><span style="flex:22;background:var(--s2)"></span><span style="flex:13;background:var(--s3)"></span><span style="flex:9;background:var(--s4)"></span><span style="flex:12;background:var(--accent)"></span><span style="flex:3;background:var(--muted)"></span></div>
+      <div class="bar"><span style="flex:38;background:var(--s1)"></span><span style="flex:20;background:var(--s2)"></span><span style="flex:12;background:var(--s3)"></span><span style="flex:8;background:var(--s4)"></span><span style="flex:20;background:var(--accent)"></span><span style="flex:2;background:var(--muted)"></span></div>
       <div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin-top:8px">
-        <span><span class="sw" style="background:var(--s1)"></span>Brokerage 41%</span><span><span class="sw" style="background:var(--s2)"></span>STT 22%</span><span><span class="sw" style="background:var(--s3)"></span>Exchange 13%</span><span><span class="sw" style="background:var(--s4)"></span>GST 9%</span><span><span class="sw" style="background:var(--accent)"></span>Algo fees 12%</span><span><span class="sw" style="background:var(--muted)"></span>Collateral interest 3%</span></div>
+        <span><span class="sw" style="background:var(--s1)"></span>Brokerage 38%</span><span><span class="sw" style="background:var(--s2)"></span>STT 20%</span><span><span class="sw" style="background:var(--s3)"></span>Exchange 12%</span><span><span class="sw" style="background:var(--s4)"></span>GST 8%</span><span><span class="sw" style="background:var(--accent)"></span>Algo fees 20%</span><span><span class="sw" style="background:var(--muted)"></span>Collateral interest 2%</span></div>
     </div>
   </div>
 </div>
@@ -174,31 +175,31 @@ svg text{font-family:PlexMono,monospace;font-size:11px;fill:var(--faint)}
 <div class="main">
   <div class="grid" style="grid-template-columns:minmax(0,1fr);padding-right:600px">
     <div class="card">
-      <h3>Days<span class="act"><span class="chip">Show open and no-note days <i class="ti ti-toggle-right pos"></i></span><span class="chip"><i class="ti ti-download"></i>CSV</span></span></h3>
+      <h3>Days<span class="badge g">net, charges, to date, drawdown real · notes, algos, sources illustrative</span><span class="act"><span class="chip">Show open and no-note days <i class="ti ti-toggle-right"></i></span><span class="chip"><i class="ti ti-download"></i>CSV</span></span></h3>
       <div class="d">One row per session; an open day is a note not received yet, never a zero.</div>
       <table id="days"></table>
     </div>
   </div>
   <aside class="drawer">
-    <div class="hd"><i class="ti ti-file-invoice mut"></i><b>Fri 27 Mar 2026</b><span class="badge">3 notes</span><span class="sp"></span><span class="chip"><i class="ti ti-chevron-left"></i></span><span class="chip"><i class="ti ti-chevron-right"></i></span><span class="chip"><i class="ti ti-x"></i></span></div>
+    <div class="hd"><i class="ti ti-file-invoice mut"></i><b>Fri 27 Mar 2026</b><span class="badge">3 notes</span><span class="badge g">net and charges real · split illustrative</span><span class="sp"></span><span class="chip"><i class="ti ti-chevron-left"></i></span><span class="chip"><i class="ti ti-chevron-right"></i></span><span class="chip"><i class="ti ti-x"></i></span></div>
     <div class="bd">
-      <div style="display:flex;gap:20px"><div><div class="lbl">Net</div><div class="mono pos" style="font-size:22px">₹7,754</div></div><div><div class="lbl">Charges</div><div class="mono" style="font-size:22px">₹547</div></div><div><div class="lbl">Fills</div><div class="mono" style="font-size:22px">24</div></div><div><div class="lbl">Context</div><div style="font-size:12.5px;margin-top:5px">VIX 14.2 · gap +0.4% · 2 DTE</div></div></div>
+      <div style="display:flex;gap:20px"><div><div class="lbl">Net</div><div class="mono pos" style="font-size:22px">₹7,754</div></div><div><div class="lbl">Charges</div><div class="mono" style="font-size:22px">₹547</div></div><div><div class="lbl">Fills</div><div class="mono" style="font-size:22px">24</div></div><div><div class="lbl">Context</div><div style="font-size:12.5px;margin-top:5px">VIX 14.2 · gap +0.4% · SENSEX 4 DTE</div></div></div>
       <div><div class="lbl">Accounts</div><table>
         <tr><th>Account · segment</th><th class="r">Obligation</th><th class="r">Charges</th><th class="r">Net</th><th></th></tr>
         <tr><td>Finvasia · NSEFNO</td><td class="r num">₹5,600</td><td class="r num">₹210</td><td class="r num pos">₹5,390</td><td><i class="ti ti-file-type-pdf mut"></i></td></tr>
         <tr><td>Angel One · BSE-FUTURES</td><td class="r num">₹2,500</td><td class="r num">₹240</td><td class="r num pos">₹2,260</td><td><i class="ti ti-file-type-pdf mut"></i></td></tr>
         <tr><td>Finvasia 2 · NSEFNO</td><td class="r num">₹201</td><td class="r num">₹97</td><td class="r num pos">₹104</td><td><i class="ti ti-file-type-pdf mut"></i></td></tr>
         <tr><td class="mut">Finvasia 2 · NSECAP (cash, not counted)</td><td class="r num fnt">₹11,200</td><td class="r num fnt">₹21</td><td class="r num fnt">—</td><td></td></tr></table></div>
-      <div><div class="lbl">Charges</div><div class="bar" style="height:8px"><span style="flex:150;background:var(--s1)"></span><span style="flex:112;background:var(--s2)"></span><span style="flex:68;background:var(--s3)"></span><span style="flex:40;background:var(--s4)"></span><span style="flex:138;background:var(--accent)"></span><span style="flex:34;background:var(--muted)"></span></div>
-      <div class="mono" style="font-size:12px;color:var(--muted);margin-top:6px">Brokerage ₹150 · STT ₹112 · exchange ₹68 · GST ₹40 · SEBI ₹1 · stamp ₹4 · algo fees ₹138 · collateral interest ₹34</div></div>
+      <div><div class="lbl">Charges</div><div class="bar" style="height:8px"><span style="flex:120;background:var(--s1)"></span><span style="flex:98;background:var(--s2)"></span><span style="flex:58;background:var(--s3)"></span><span style="flex:34;background:var(--s4)"></span><span style="flex:200;background:var(--accent)"></span><span style="flex:32;background:var(--muted)"></span></div>
+      <div class="mono" style="font-size:12px;color:var(--muted);margin-top:6px">Brokerage ₹120 · STT ₹98 · exchange ₹58 · GST ₹34 · SEBI ₹1 · stamp ₹4 · algo fees ₹200 (14 algos) · collateral interest ₹32</div></div>
       <div><div class="lbl">Fills, paired into trades</div><table>
-        <tr><th>Time</th><th>Contract</th><th>Source</th><th class="r">Lots</th><th class="r">In → out</th><th class="r">P&amp;L</th></tr>
+        <tr><th>Time</th><th>Contract</th><th>Source</th><th class="r">Lots</th><th class="r">In → out</th><th class="r">Gross P&amp;L</th></tr>
         <tr><td class="num">09:17–15:15</td><td>SENSEX 2 Apr 76400 CE</td><td><span class="src c">Core</span></td><td class="r num">2</td><td class="r num">212.4 → 118.0</td><td class="r num pos">₹3,776</td></tr>
         <tr><td class="num">09:17–15:15</td><td>SENSEX 2 Apr 76400 PE</td><td><span class="src c">Core</span></td><td class="r num">2</td><td class="r num">198.1 → 171.6</td><td class="r num pos">₹1,060</td></tr>
-        <tr><td class="num">09:24–11:02</td><td>NIFTY 30 Mar 22600 PE</td><td><span class="src t">T1</span></td><td class="r num">1</td><td class="r num">84.0 → 96.3</td><td class="r num neg">−₹799</td></tr>
-        <tr><td class="num">13:41–14:20</td><td>NIFTY 30 Mar 22700 CE</td><td><span class="src m">Manual</span></td><td class="r num">2</td><td class="r num">61.2 → 88.9</td><td class="r num pos">₹3,601</td></tr>
+        <tr><td class="num">09:24–11:02</td><td>NIFTY 7 Apr 22600 PE</td><td><span class="src t">T1</span></td><td class="r num">1</td><td class="r num">84.0 → 96.3</td><td class="r num neg">−₹799</td></tr>
+        <tr><td class="num">13:41–14:20</td><td>NIFTY 7 Apr 22700 CE</td><td><span class="src m">Manual</span></td><td class="r num">2</td><td class="r num">61.2 → 88.9</td><td class="r num pos">₹3,601</td></tr>
         <tr><td colspan="6" class="fnt">… 8 more trades</td></tr></table></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="chip"><span class="k">Algos</span>9 · from live capture</span><span class="chip"><span class="k">Capital</span>₹6L · ₹6L · read 15:50</span><span class="btn"><i class="ti ti-pencil"></i>Edit inputs</span><span class="btn"><i class="ti ti-file-type-pdf"></i>Open notes</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="chip"><span class="k">Algos</span>14 · from the sheet</span><span class="chip"><span class="k">Capital</span>₹6L · ₹6L · read 15:50</span><span class="btn"><i class="ti ti-pencil"></i>Edit inputs</span><span class="btn"><i class="ti ti-file-type-pdf"></i>Open notes</span></div>
     </div>
   </aside>
 </div>
@@ -237,15 +238,15 @@ svg text{font-family:PlexMono,monospace;font-size:11px;fill:var(--faint)}
     </div>
   </div>
   <div class="grid"><div class="card">
-    <h3>Round trips<span class="act"><span class="chip"><i class="ti ti-download"></i>CSV</span></span></h3>
+    <h3>Round trips<span class="badge g">illustrative</span><span class="act"><span class="chip"><i class="ti ti-download"></i>CSV</span></span></h3>
     <div class="d">Fills paired per contract, account and day.</div>
     <table>
-      <tr><th>Day</th><th>Time</th><th>Contract</th><th>Source</th><th class="r">DTE</th><th class="r">From ATM</th><th class="r">Lots</th><th class="r">Held</th><th class="r">Worst</th><th class="r">Best</th><th class="r">Charges</th><th class="r">P&amp;L</th></tr>
-      <tr><td>Fri 23 Oct</td><td class="num">09:17</td><td>SENSEX 27 Oct 81400 CE</td><td><span class="src c">Core</span></td><td class="r num">2</td><td class="r num">ATM</td><td class="r num">2</td><td class="r num">5h 58m</td><td class="r num neg">−₹1,240</td><td class="r num pos">₹4,410</td><td class="r num">₹214</td><td class="r num pos">₹3,776</td></tr>
-      <tr><td>Fri 23 Oct</td><td class="num">09:24</td><td>NIFTY 28 Oct 25700 PE</td><td><span class="src t">T1</span></td><td class="r num">3</td><td class="r num">−1</td><td class="r num">1</td><td class="r num">1h 38m</td><td class="r num neg">−₹1,105</td><td class="r num pos">₹260</td><td class="r num">₹96</td><td class="r num neg">−₹799</td></tr>
-      <tr><td>Fri 23 Oct</td><td class="num">13:41</td><td>NIFTY 28 Oct 25800 CE</td><td><span class="src m">Manual</span></td><td class="r num">3</td><td class="r num">+1</td><td class="r num">2</td><td class="r num">39m</td><td class="r num neg">−₹410</td><td class="r num pos">₹4,020</td><td class="r num">₹118</td><td class="r num pos">₹3,601</td></tr>
-      <tr><td>Thu 22 Oct</td><td class="num">09:17</td><td>SENSEX 27 Oct 81200 PE</td><td><span class="src o">Own algo</span></td><td class="r num">3</td><td class="r num">ATM</td><td class="r num">1</td><td class="r num">6h 1m</td><td class="r num neg">−₹2,880</td><td class="r num pos">₹640</td><td class="r num">₹107</td><td class="r num neg">−₹2,214</td></tr>
-      <tr><td>Thu 22 Oct</td><td class="num">10:05</td><td>BANKNIFTY 28 Oct 57000 CE</td><td><span class="src m">Manual</span></td><td class="r num">4</td><td class="r num">+2</td><td class="r num">1</td><td class="r num">22m</td><td class="r num neg">−₹1,650</td><td class="r num pos">₹300</td><td class="r num">₹94</td><td class="r num neg">−₹1,744</td></tr>
+      <tr><th>Day</th><th>Time</th><th>Contract</th><th>Source</th><th class="r">DTE</th><th class="r">From ATM</th><th class="r">Lots</th><th class="r">Held</th><th class="r">Worst</th><th class="r">Best</th><th class="r">Charges</th><th class="r">Gross P&amp;L</th></tr>
+      <tr><td>Fri 23 Oct</td><td class="num">09:17</td><td>SENSEX 29 Oct 81400 CE</td><td><span class="src c">Core</span></td><td class="r num">4</td><td class="r num">ATM</td><td class="r num">2</td><td class="r num">5h 58m</td><td class="r num neg">−₹1,240</td><td class="r num pos">₹4,410</td><td class="r num">₹214</td><td class="r num pos">₹3,776</td></tr>
+      <tr><td>Fri 23 Oct</td><td class="num">09:24</td><td>NIFTY 27 Oct 25700 PE</td><td><span class="src t">T1</span></td><td class="r num">2</td><td class="r num">−1</td><td class="r num">1</td><td class="r num">1h 38m</td><td class="r num neg">−₹1,105</td><td class="r num pos">₹260</td><td class="r num">₹96</td><td class="r num neg">−₹799</td></tr>
+      <tr><td>Fri 23 Oct</td><td class="num">13:41</td><td>NIFTY 27 Oct 25800 CE</td><td><span class="src m">Manual</span></td><td class="r num">2</td><td class="r num">+1</td><td class="r num">2</td><td class="r num">39m</td><td class="r num neg">−₹410</td><td class="r num pos">₹4,020</td><td class="r num">₹118</td><td class="r num pos">₹3,601</td></tr>
+      <tr><td>Thu 22 Oct</td><td class="num">09:17</td><td>SENSEX 29 Oct 81200 PE</td><td><span class="src o">Own algo</span></td><td class="r num">5</td><td class="r num">ATM</td><td class="r num">1</td><td class="r num">6h 1m</td><td class="r num neg">−₹2,880</td><td class="r num pos">₹640</td><td class="r num">₹107</td><td class="r num neg">−₹2,214</td></tr>
+      <tr><td>Thu 22 Oct</td><td class="num">10:05</td><td>BANKNIFTY 27 Oct 57000 CE</td><td><span class="src m">Manual</span></td><td class="r num">3</td><td class="r num">+2</td><td class="r num">1</td><td class="r num">22m</td><td class="r num neg">−₹1,650</td><td class="r num pos">₹300</td><td class="r num">₹94</td><td class="r num neg">−₹1,560</td></tr>
     </table>
   </div></div>
 </div>
@@ -261,7 +262,7 @@ svg text{font-family:PlexMono,monospace;font-size:11px;fill:var(--faint)}
     <span class="chip on"><span class="k">Year</span>FY 2026-27</span><span class="chip on"><span class="k">Accounts</span>All 3</span><span class="sp"></span><span class="btn"><i class="ti ti-adjustments"></i>Settings</span>
   </div>
   <div class="grid" style="grid-template-columns:repeat(4,minmax(0,1fr))">
-    <div class="card"><div class="lbl">Return on money in the account</div><div class="mono pos" style="font-size:24px">10.6%</div><div class="fnt" style="font-size:12px">time-weighted; deposits taken out</div></div>
+    <div class="card"><div class="lbl">Return on money in the account <span class="badge g">illustrative</span></div><div class="mono pos" style="font-size:24px">10.6%</div><div class="fnt" style="font-size:12px">time-weighted; deposits taken out</div></div>
     <div class="card"><div class="lbl">Money in · out</div><div class="mono" style="font-size:24px">₹3,00,000 · ₹40,000</div><div class="fnt" style="font-size:12px">2 deposits, 1 settlement</div></div>
     <div class="card"><div class="lbl">Collateral interest (Angel One)</div><div class="mono neg" style="font-size:24px">−₹6,812</div><div class="fnt" style="font-size:12px">115 days · avg ₹59 · posted 1st and 16th</div></div>
     <div class="card"><div class="lbl">Margin above 95%</div><div class="mono warn" style="font-size:24px">23 days</div><div class="fnt" style="font-size:12px">from Margin Shortfall Intimation</div></div>
@@ -269,14 +270,14 @@ svg text{font-family:PlexMono,monospace;font-size:11px;fill:var(--faint)}
   <div class="grid" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)">
     <div class="card"><h3>Capital per account<span class="badge g">illustrative</span></h3><div class="d">Usable margin read at 15:50 for the next session; Finvasia counts collateral at 50:50, Angel One in full.</div><div id="capchart"></div>
       <div class="legend"><span><span class="sw" style="background:var(--s1)"></span>Finvasia</span><span><span class="sw" style="background:var(--s3)"></span>Angel One</span><span><span class="sw" style="background:var(--s4)"></span>Finvasia 2</span><span>▲ deposit ▼ withdrawal</span></div></div>
-    <div class="card"><h3>Ledger events</h3><div class="d">From the brokers' e-mails; a deposit is never profit.</div>
+    <div class="card"><h3>Ledger events<span class="badge g">illustrative</span></h3><div class="d">From the brokers' e-mails; a deposit is never profit.</div>
       <table><tr><th>Day</th><th>Account</th><th>Event</th><th class="r">Amount</th></tr>
       <tr><td>Thu 22 Oct</td><td>Angel One</td><td><span class="badge w">margin 97.9%</span> 10:05</td><td class="r num fnt">—</td></tr>
       <tr><td>Fri 16 Oct</td><td>Angel One</td><td>Interest posted (1–15 Oct)</td><td class="r num neg">−₹812</td></tr>
       <tr><td>Mon 5 Oct</td><td>Finvasia</td><td>Quarterly fund settlement</td><td class="r num neg">−₹40,000</td></tr>
       <tr><td>Thu 1 Oct</td><td>Angel One</td><td>Funds added</td><td class="r num pos">₹1,00,000</td></tr>
       <tr><td>Wed 16 Sep</td><td>Angel One</td><td>Interest posted (1–15 Sep)</td><td class="r num neg">−₹1,046</td></tr>
-      <tr><td>Mon 1 Sep</td><td>Finvasia</td><td>Funds added</td><td class="r num pos">₹2,00,000</td></tr></table></div>
+      <tr><td>Tue 1 Sep</td><td>Finvasia</td><td>Funds added</td><td class="r num pos">₹2,00,000</td></tr></table></div>
   </div>
 </div>
 </section>
@@ -295,7 +296,7 @@ svg text{font-family:PlexMono,monospace;font-size:11px;fill:var(--faint)}
     <div class="kpi"><div class="l">Bought · sold</div><div class="v">₹1.12L · ₹13.2k</div><div class="b">17 buys · 2 sells</div></div>
     <div class="kpi"><div class="l">Charges</div><div class="v">₹612</div><div class="b">0.49% of turnover</div></div>
     <div class="kpi"><div class="l">Fills vs the Friday plan</div><div class="v neg">−0.4%</div><div class="b"><span class="badge n">−₹450</span> slippage on value</div></div>
-    <div class="bench">Every Kite transaction is booked to Momentum: that account trades nothing else.</div>
+    <div class="bench"><span class="badge g">illustrative</span><div style="margin-top:6px">Every Kite transaction is booked to Momentum: that account trades nothing else.</div></div>
   </div>
   <div class="grid"><div class="card"><h3>Lots<span class="badge g">illustrative</span></h3><div class="d">One row per weekly lot and Friday; the planned order beside what the note shows.</div>
     <table><tr><th>Lot</th><th>Friday</th><th>What happened</th><th class="r">Planned</th><th class="r">Filled</th><th class="r">Gap</th><th class="r">Charges</th><th class="r">Realised</th></tr>
@@ -312,14 +313,14 @@ svg text{font-family:PlexMono,monospace;font-size:11px;fill:var(--faint)}
 <div class="main">
   <div class="banner"><i class="ti ti-alert-triangle warn"></i><span><b>Angel One's note for Fri 23 Oct has not arrived.</b> <span class="mut">The day stays open and every figure above leaves it out; the 07:30 run looks again. Open days older than 10 sessions alert on Telegram.</span></span><span class="sp"></span><span class="btn">Mark as no trade</span></div>
   <div class="grid" style="grid-template-columns:minmax(0,1.25fr) 460px minmax(0,.75fr)">
-    <div class="card"><h3>Day rows by state</h3><div class="d">How the day table shows each case.</div>
+    <div class="card"><h3>Day rows by state<span class="badge g">illustrative</span></h3><div class="d">How the day table shows each case.</div>
       <table><tr><th>Day</th><th class="r">Net</th><th>State</th></tr>
       <tr><td>Fri 23 Oct</td><td class="r num pos">₹7,410</td><td><span class="badge">2 of 3 notes</span> <span class="badge w">Angel One open</span></td></tr>
       <tr><td>Thu 22 Oct</td><td class="r num neg">−₹4,120</td><td><span class="badge">3 notes</span></td></tr>
       <tr><td>Wed 21 Oct</td><td class="r num pos">₹12,880</td><td><span class="badge">2 notes</span> <span class="badge g">Finvasia 2 no trade</span></td></tr>
       <tr><td>Mon 19 Oct</td><td class="r num fnt">—</td><td><span class="badge n">parse failed</span> <span class="mut" style="font-size:12px">new segment label</span></td></tr>
-      <tr><td>Sat 1 Nov (Muhurat)</td><td class="r num pos">₹540</td><td><span class="badge i">special session</span></td></tr>
-      <tr><td>Mon 1 Apr 25</td><td class="r num pos">₹6,095</td><td><span class="badge g">from sheet</span> <span class="mut" style="font-size:12px">no e-mail kept</span></td></tr></table></div>
+      <tr><td>Sun 8 Nov (Muhurat)</td><td class="r num pos">₹540</td><td><span class="badge i">special session</span></td></tr>
+      <tr><td>Wed 2 Apr 25</td><td class="r num pos">₹6,095</td><td><span class="badge g">from sheet</span> <span class="mut" style="font-size:12px">no e-mail kept</span></td></tr></table></div>
     <div class="card" style="border-color:var(--border-strong);box-shadow:0 18px 50px rgba(0,0,0,.5)"><h3>Inputs for Fri 23 Oct<span class="act"><i class="ti ti-x mut"></i></span></h3><div class="d">The two columns your sheet asked you to type; pre-filled where the repo can read them.</div>
       <div class="lbl">Algo trades taken</div><div style="display:flex;gap:8px;align-items:center"><div class="field" style="width:90px">9</div><span class="badge i">from live capture</span><span class="fnt" style="font-size:12px">algo fees ₹138</span></div>
       <div class="lbl" style="margin-top:12px">Capital, per account (morning)</div>
@@ -351,7 +352,7 @@ function lineSVG(o){
   const all=o.series.flatMap(s=>s.d.filter(v=>v!=null));
   let lo=Math.min(0,...all),hi=Math.max(...all);if(o.lo!=null)lo=o.lo;const pad=(hi-lo)*.06;hi+=pad;lo-=lo<0?pad:0;
   const n=o.series[0].d.length,x=i=>pl+i*iw/(n-1),y=v=>pt+(hi-v)*ih/(hi-lo);
-  let g='';const ticks=5;for(let k=0;k<=ticks;k++){const v=lo+(hi-lo)*k/ticks;g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="#2a2f38"/><text x="${pl-8}" y="${y(v)+4}" text-anchor="end">${o.fmt(v)}</text>`}
+  let g='';const raw=(hi-lo)/5,mag=Math.pow(10,Math.floor(Math.log10(raw))),step=[1,2,2.5,5,10].map(m=>m*mag).find(m=>m>=raw);for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step){g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="#2a2f38"/><text x="${pl-8}" y="${y(v)+4}" text-anchor="end">${o.fmt(v)}</text>`}
   if(lo<0)g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(0)}" y2="${y(0)}" stroke="#3a414d"/>`;
   (o.xt||[]).forEach(([i,t])=>{g+=`<text x="${x(i)}" y="${H-8}" text-anchor="middle">${t}</text>`});
   o.series.forEach(s=>{let d='',area='',started=false,first=0;s.d.forEach((v,i)=>{if(v==null){started=false;return}d+=(started?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1);if(!started)first=i;started=true});
@@ -384,16 +385,16 @@ fP.forEach((p,i)=>{if(p!=null){cum+=p;if(p>0){w++;sw+=p}else if(p<0){l++;sl+=p}b
 const tc=fC.reduce((a,b)=>a+b,0),n=fP.length,target=fP.map((_,i)=>CAP*0.24*(i+1)/n);
 const roc=cum*100/CAP;
 document.getElementById('strip').innerHTML=[
- ['Net profit',inr(cum),'pos',`<span class="badge">${(roc).toFixed(1)}% of ₹12L</span>`],
+ ['Net profit',inr(cum),'pos',`<span class="badge n">${inr(cum-CAP*0.24)}</span> target ${inr(CAP*0.24)}`],
  ['Return vs target',roc.toFixed(1)+'%','',`<span class="badge n">${(roc-24).toFixed(1)}pp</span> target 24.0%`],
- ['Max drawdown',inr(mdd),'neg',`${(mdd*100/CAP).toFixed(1)}% · ${longest} sessions below peak`],
- ['Charges / profit',(tc*100/cum).toFixed(0)+'%','',`<span class="badge w">${inr(tc)}</span> charges`],
- ['Win days',Math.round(w*100/(w+l))+'%','',`${w} won · ${l} lost`]
+ ['Max drawdown',inr(mdd),'neg',`${(mdd*100/CAP).toFixed(1)}% · <span class="fnt">no target figure</span>`],
+ ['Charges / net profit',(tc*100/cum).toFixed(0)+'%','',`${inr(tc)} · <span class="fnt">no target figure</span>`],
+ ['Win days',Math.round(w*100/(w+l))+'%','',`${w} won · ${l} lost · <span class="fnt">no target figure</span>`]
 ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v ${k[2]}">${k[1]}</div><div class="b">${k[3]}</div></div>`).join('')+
-`<div class="bench"><div class="lbl">Compare with</div><span class="chip on">Target pace 24% <i class="ti ti-chevron-down"></i></span><div style="margin-top:8px;line-height:1.5">Other choices: last FY · Adaptive paper (from 19 Oct) · NIFTY</div></div>`;
-document.getElementById('secline').innerHTML=`Avg day <b>${inr(cum/(w+l))}</b> · avg win <b>${inr(sw/w)}</b> · avg loss <b>${inr(sl/l)}</b> · best <b>${inr(best)}</b> · worst <b>${inr(worst)}</b> · 100-day avg profit <b>${inr(fP.slice(-100).filter(v=>v!=null).reduce((a,b)=>a+b,0)/fP.slice(-100).filter(v=>v!=null).length)}</b> · profit/capital <b>${(fP.slice(-100).filter(v=>v!=null).reduce((a,b)=>a+b,0)/fP.slice(-100).filter(v=>v!=null).length*10000/CAP).toFixed(1)} bps/day</b> · sessions <b>${n}</b> · collateral interest <b>₹6,812</b> · <span style="color:var(--primary)">All metrics</span>`;
+`<div class="bench"><div class="lbl">Compare with</div><span class="chip on">Target pace 24% <i class="ti ti-chevron-down"></i></span><div style="margin-top:8px;line-height:1.5">A target pace has a figure for profit and return only, and says so on the other tiles. Last FY, Adaptive paper (from 19 Oct) and NIFTY compare every tile.</div></div>`;
+document.getElementById('secline').innerHTML=`Avg day <b>${inr(cum/(w+l))}</b> · avg win <b>${inr(sw/w)}</b> · avg loss <b>${inr(sl/l)}</b> · best <b>${inr(best)}</b> · worst <b>${inr(worst)}</b> · 100-day avg profit to 31 Mar <b>${inr(fP.slice(-100).filter(v=>v!=null).reduce((a,b)=>a+b,0)/fP.slice(-100).filter(v=>v!=null).length)}</b> · profit/capital <b>${(fP.slice(-100).filter(v=>v!=null).reduce((a,b)=>a+b,0)/fP.slice(-100).filter(v=>v!=null).length*10000/CAP).toFixed(0)} bps/day</b> · sessions <b>${n}</b> · <span style="color:var(--primary)">All metrics</span>`;
 const HW=1340,mark=IDX.length-60;
-const hero=lineSVG({w:HW,h:430,series:[{d:CUM,c:'#3987e5',fill:'rgba(57,135,229,.10)'},{d:target,c:'#9aa1ac',wd:1.5,dash:true}],fmt:v=>(v/100000).toFixed(1)+'L',xt:monthTicks(fL),mark:[mark,CUM[mark]]});
+const hero=lineSVG({w:HW,h:430,series:[{d:CUM,c:'#3987e5',fill:'rgba(57,135,229,.10)'},{d:target,c:'#9aa1ac',wd:1.5,dash:true}],fmt:v=>(v/100000).toFixed(1).replace(/\.0$/,'')+'L',xt:monthTicks(fL),mark:[mark,CUM[mark]]});
 document.getElementById('hero').innerHTML=hero.svg;
 const tt=document.getElementById('tt');tt.style.display='block';tt.style.left=(hero.x(mark)+20-80)+'px';tt.style.top=(hero.y(CUM[mark])+6+40+30)+'px';
 tt.innerHTML=`<div class="mono" style="font-weight:500">${fL[mark]}</div><div>Day <span class="mono ${fP[mark]<0?'neg':'pos'}">${inr(fP[mark])}</span> · to date <span class="mono">${inr(CUM[mark])}</span></div><div class="fnt">Drawdown <span class="mono">${inr(DD[mark])}</span> · click for the day</div>`;
@@ -402,14 +403,14 @@ tt.innerHTML=`<div class="mono" style="font-weight:500">${fL[mark]}</div><div>Da
 const avg=(a,i,k)=>{let s=0,c=0;for(let j=Math.max(0,i-k+1);j<=i;j++)if(a[j]!=null){s+=a[j];c++}return i+1<k?null:(c?s/c:null)};
 const A50=P.map((_,i)=>avg(P,i,50)),A100=P.map((_,i)=>avg(P,i,100)),C100=C.map((_,i)=>avg(C,i,100));
 const RT=A100.map((p,i)=>p==null?null:C100[i]*100/p),BPS=A100.map(p=>p==null?null:p*10000/CAP);
-const MET=[['50-day avg profit',A50,inr,'T: average daily profit over the last 50 sessions.'],['100-day avg profit',A100,inr,'U: the same over 100 sessions.'],['100-day avg charge',C100,inr,'V: average daily charges, algo fees included, over 100 sessions.'],['Charge / profit',RT,v=>v.toFixed(1)+'%','W: V ÷ U. Lower is better.'],['Profit / capital',BPS,v=>v.toFixed(1)+' bps','Z: U in basis points of capital a day; 10 bps a day is about 25% a year.']];
+const MET=[['50-day avg profit',A50,inr,'T: average daily profit over the last 50 sessions.'],['100-day avg profit',A100,inr,'U: the same over 100 sessions.'],['100-day avg charge',C100,inr,'V: average daily charges, algo fees included, over 100 sessions.'],['Charge / profit (W)',RT,v=>v.toFixed(1)+'%','W: V ÷ U, charges per rupee of net profit. Lower is better.'],['Profit / capital',BPS,v=>v.toFixed(0)+' bps','Z: U in basis points of capital a day; 10 bps a day is about 25% a year.']];
 const seg=document.getElementById('ratioSeg');
 function pick(k){const m=MET[k];[...seg.children].forEach((b,i)=>b.className='chip'+(i===k?' on':''));
  const r=lineSVG({w:780,h:230,series:[{d:m[1],c:'#3987e5',fill:'rgba(57,135,229,.10)'}],fmt:v=>k===3?v.toFixed(0)+'%':k===4?v.toFixed(0):(Math.abs(v)>=1000?(v/1000).toFixed(1)+'k':v.toFixed(0)),xt:monthTicks(L).filter((_,j)=>j%2===0)});
  document.getElementById('ratio').innerHTML=r.svg;const last=m[1][m[1].length-1],v=m[1].filter(x=>x!=null);
  document.getElementById('ratioNow').textContent=m[2](last);document.getElementById('ratioSub').textContent='on 26 May 26 · range '+m[2](Math.min(...v))+' to '+m[2](Math.max(...v));document.getElementById('ratioDef').textContent=m[3]}
 MET.forEach((m,i)=>{const b=document.createElement('span');b.textContent=m[0];b.className='chip';b.style.cursor='pointer';b.onclick=()=>pick(i);seg.appendChild(b)});pick(3);
-document.getElementById('summary').innerHTML=[['Net profit',inr(cum),'pos',roc.toFixed(1)+'% of capital'],['Max drawdown',inr(mdd),'neg',(mdd*100/CAP).toFixed(1)+'% of capital'],['Longest drawdown',longest+' sessions','','below the running peak'],['Win days',Math.round(w*100/(w+l))+'%','',w+' won · '+l+' lost'],['Avg win day',inr(sw/w),'pos','profit on a winning day'],['Avg loss day',inr(sl/l),'neg','loss on a losing day'],['Avg day',inr(cum/(w+l)),'','net per traded day'],['Charges',inr(tc),'',(tc*100/(cum+tc)).toFixed(0)+'% of gross']]
+document.getElementById('summary').innerHTML=[['Net profit',inr(cum),'pos',roc.toFixed(1)+'% of capital'],['Max drawdown',inr(mdd),'neg',(mdd*100/CAP).toFixed(1)+'% of capital'],['Longest drawdown',longest+' sessions','','below the running peak'],['Win days',Math.round(w*100/(w+l))+'%','',w+' won · '+l+' lost'],['Avg win day',inr(sw/w),'pos','profit on a winning day'],['Avg loss day',inr(sl/l),'neg','loss on a losing day'],['Avg day',inr(cum/(w+l)),'','net per traded day'],['Charges',inr(tc),'',(tc*100/(cum+tc)).toFixed(0)+'% of profit before charges']]
  .map(s=>`<div style="background:var(--surface-2);border-radius:8px;padding:9px 11px"><div class="lbl" style="margin:0">${s[0]}</div><div class="mono ${s[2]}" style="font-size:18px;font-weight:500">${s[1]}</div><div class="fnt" style="font-size:11.5px">${s[3]}</div></div>`).join('');
 
 /* monthly + FY (real) */
@@ -423,7 +424,7 @@ document.getElementById('fy').innerHTML=`<tr><th>Year</th><th class="r">Profit</
 /* days (real net and charges; accounts illustrative) */
 const last=IDX.slice(-14).reverse();
 document.getElementById('days').innerHTML=`<tr><th>Day</th><th>Notes</th><th class="r">Net</th><th class="r">Charges</th><th class="r">Algos</th><th class="r">To date</th><th class="r">Drawdown</th><th>Sources</th></tr>`+last.map((i,k)=>{const j=IDX.indexOf(i);const p=P[i];const d=new Date(2000+ +L[i].split(' ')[2],MON.indexOf(L[i].split(' ')[1]),+L[i].split(' ')[0]);const wd=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
- const sel=L[i]==='27 Mar 26';return `<tr class="${sel?'sel':''}"><td>${wd} ${L[i]}</td><td>${k===3?'<span class="badge">2</span> <span class="badge g">F2 no trade</span>':'<span class="badge">3</span>'}</td><td class="r num ${p<0?'neg':'pos'}">${inr(p)}</td><td class="r num">${inr(C[i])}</td><td class="r num">${8+(k%3)}</td><td class="r num">${inr(CUM[j])}</td><td class="r num ${DD[j]<0?'neg':'fnt'}">${DD[j]<0?inr(DD[j]):'—'}</td><td><span class="src c">Core</span> <span class="src o">Own</span>${k%3===0?' <span class="src m">Manual</span>':''}</td></tr>`}).join('');
+ const sel=L[i]==='27 Mar 26';return `<tr class="${sel?'sel':''}"><td>${wd} ${L[i]}</td><td>${k===3?'<span class="badge">2</span> <span class="badge g">F2 no trade</span>':'<span class="badge">3</span>'}</td><td class="r num ${p<0?'neg':'pos'}">${inr(p)}</td><td class="r num">${inr(C[i])}</td><td class="r num">${sel?14:8+(k%3)}</td><td class="r num">${inr(CUM[j])}</td><td class="r num ${DD[j]<0?'neg':'fnt'}">${DD[j]<0?inr(DD[j]):'—'}</td><td>${sel?'<span class="src c">Core</span> <span class="src t">T1</span> <span class="src m">Manual</span>':'<span class="src c">Core</span> <span class="src o">Own</span>'+(k%3===0?' <span class="src m">Manual</span>':'')}</td></tr>`}).join('');
 
 /* trades: source cards + scatter (illustrative) */
 document.getElementById('srcCards').innerHTML=[['Adaptive Core','c','₹38,420','218 trades · 61% won · avg ₹176'],['T1','t','₹12,960','104 trades · 57% won · avg ₹125'],['Own algos','o','₹41,180','286 trades · 59% won · avg ₹144'],['Manual','m','−₹4,310','37 trades · 41% won · avg −₹116']]
