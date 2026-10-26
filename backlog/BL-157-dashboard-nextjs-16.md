@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the hosted dashboard cannot deploy at all until this lands; friends see Momentum through it |
-| **Status** | In progress |
+| **Status** | Done (Phases 1–2); Phase 3 waits |
 | **Type** | chore |
 | **Area** | dashboard / infra |
 | **Created** | 2026-10-24 |
@@ -209,3 +209,8 @@ Answered by the owner on 2026-10-26:
   - Upstream: the echo stub got `cf-access-client-id` / `-secret` with the Worker's values, not
     the spoofed ones the client sent, and no `Authorization` header.
   - No password and no Access vars: every path 503.
+- 2026-10-26 — promoted (#329, `main` at f6c38149). `deploy-dashboard.yml` run 40268605293
+  succeeded: OpenNext built Next.js 16.4.3 (webpack) with cloudflare 1.20.13 and deployed
+  `ata-dashboard`. `dashboard.codifie.dev` answers with the Cloudflare Access sign-in redirect, as
+  before; the signed-in page was not opened from here. Phases 1–2 done; Phase 3 (React 19,
+  `proxy.ts`, Turbopack, the cf-build dev-server guard) waits for the owner.
