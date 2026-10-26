@@ -83,7 +83,6 @@ Sorted by priority (P0 first), then ID.
 | [BL-151](BL-151-monthly-trending-theme-scout.md) | Monthly trending-theme scout (an agent reads Reddit, news and, if affordable, X) and a starting date for every Broad theme, so a theme cannot be used before it became one | P2 | Idea | feature + research | momentum + scheduler |
 | [BL-152](BL-152-margin-check-without-algotest.md) | Margin check: a free-margin read that does not need AlgoTest or Shoonya's login, the need estimate checked against what the broker blocks, then switched on (`MARGIN_CHECK`) | P2 | Planned | improvement | broker-login |
 | [BL-164](BL-164-gap-and-go-williams-chain.md) | NIFTY gap-and-go 10% opening-range band → Williams back-up chain, 150-point ITM weekly buys, exactly as published (3 tests through the rule tester; POC) | P2 | In progress | research | options |
-| [BL-165](BL-165-evening-prediction-vs-0916-pick.md) | Evening prediction against the 09:16 pick: does the open change the return? | P2 | In progress | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
@@ -96,6 +95,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-165](BL-165-evening-prediction-vs-0916-pick.md) | Evening prediction against the 09:16 pick: does the open change the return? | Done: the prediction names the same picks on 97% of days and earns the same (Core-298 −₹1 a day, interval ±₹48; T1 in-sample −₹65 on 14 days); the open adds nothing measurable | 2026-10-26 |
 | [BL-078](BL-078-angel-one-data-source.md) | Angel One SmartAPI as a second 1-minute data source: what it can and cannot give versus the Fyers files | Done: go as a backup, not a replacement; shipped as BL-079 (Angel One fallback in `obt daily`, VIX) | 2026-10-24 |
 | [BL-087](BL-087-momentum-all-fridays-split.md) | Momentum: backtest and follow a config split across every rebalance Friday | Done: all-Fridays backtest and groups of sleeves; live migration applied, 43 of 43 journalled for the weeks of 16 and 23 Oct (38 sleeves) | 2026-10-24 |
 | [BL-015](BL-015-research-gate.md) | Research gate: pre-register every experiment, log every override | Done: Phase 0 pre-registration in the template and `_EXPERIMENT.md`, the `override:` rule in CLAUDE.md; every research item since BL-104 starts from it | 2026-10-24 |

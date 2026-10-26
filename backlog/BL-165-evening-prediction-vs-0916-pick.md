@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — decides whether the evening upload (16:40) is enough or the 09:18 top-up earns its place |
-| **Status** | In progress |
+| **Status** | Done |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-26 |
@@ -99,3 +99,4 @@ None blocking.
 ## Log
 
 - 2026-10-26 — created from the owner's question; Phase 0 written and committed before any run.
+- 2026-10-26 — run (`packages/option-backtesting/research/bl165/study.py`, output `results/study.json`, git-ignored). Window 2025-01-10 → 2026-10-23, 432 days, none dropped (every day had a lake VIX close and every pick a stored result). **Core-298:** the band differs on 3.5% of days, the three picks on 13 days (97.0% identical); predicted ₹880.9 a day, actual ₹879.8; primary mean difference **−₹1.1**, 90% interval **−₹47.9 to +₹47.9**; halves 2025 −₹4.4 [−74.4, +65.4], 2026 +₹3.0 [−52.1, +65.7]; on the 13 changed days predicted −₹619 and actual −₹655 a day; by gap: 428 days under 0.5 points (−₹4.9), 2 between 0.5 and 1 (−₹525), 2 over 1 (+₹1,331). **Verdict by the registered rules:** the open helps — rejected (interval includes zero, halves differ in sign); the prediction is good enough — yes (interval inside ±₹150, 97% identical picks). **T1 universe (in-sample):** 14 changed days (96.8% identical); predicted ₹1,574.8, actual ₹1,509.9; mean **−₹64.9**, interval **−₹129.2 to −₹5.7**; halves −₹37.5 [−121.2, +49.4] and −₹99.2 [−201.7, −22.3]; changed days predicted +₹1,716 and actual −₹288 a day. The open helps — rejected; good enough — yes by the margin rule, with the caution that 14 days carry it. **Forward subset (9 recorded days):** prediction and actual picks are the same set on all 9; the reconstructed actual equals the journal entry on 7, the two mismatches are 19 and 22 October (BL-122 expiry days, rule not applied here). Page: `research/options/common/evening-prediction-vs-0916.md`.
