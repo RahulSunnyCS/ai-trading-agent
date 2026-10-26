@@ -7,7 +7,7 @@
 | **Type** | feature |
 | **Area** | options / dashboard |
 | **Created** | 2026-10-11 |
-| **Depends on** | BL-058 Phase 4 (the Daily log and its placement record, built 2026-10-11), BL-063 (the charge model, as arithmetic only), the contract-notes cutover from `trade-analytics` (TODO §2.1–2.6) |
+| **Depends on** | BL-058 Phase 4 (the Daily log and its placement record, built 2026-10-11), BL-063 (the charge model, as arithmetic only), BL-168 Phase 2 (the contract notes in the repo, with the trade rows) |
 | **TODO.md row** | — (filled in when started) |
 
 ## Context

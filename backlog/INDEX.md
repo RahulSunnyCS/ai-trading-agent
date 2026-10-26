@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-25
+Last updated: 2026-10-26
 
 ## Open
 
@@ -55,6 +55,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-141](BL-141-live-vs-backtest-slippage-discretionary.md) | Live vs backtest: a 15:40 capture of each platform's per-strategy P&L, slippage vs the paper result (signed, in the owner's 16:00 Telegram), discretionary trades tracked apart | P1 | In progress | feature | broker-login + options |
 | [BL-143](BL-143-trade-monitoring-and-safety.md) | Trade monitoring and safety: wake schedule, 09:25 deploy check, −₹5k/−₹8k loss alerts, Telegram stop button (switch off + square off, confirm tap), margin check, Fyers reminder | P1 | In progress | feature | broker-login + scheduler |
 | [BL-150](BL-150-friday-3pm-orders-kite-basket.md) | Friday 15:00 Momentum orders, one tap into a pre-filled Kite basket (the owner places the order in Kite; this repo places none) | P1 | Planned | feature | momentum + scheduler |
+| [BL-168](BL-168-contract-notes-trade-book.md) | Contract notes in the repo: the Gmail → PDF → sheet job as a scheduler job, a store under `TRADING_DATA_ROOT` (trades, itemised charges, the PDFs, Angel One's margin interest, Kite's notes for Momentum), a Trade book page, the monthly backup; retires the Actions cutover | P1 | Planned | feature | contract-notes / scheduler / trading-data / dashboard |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |

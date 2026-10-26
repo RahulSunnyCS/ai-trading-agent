@@ -7,7 +7,7 @@
 | **Type** | feature |
 | **Area** | options, contract-notes |
 | **Created** | 2026-10-06 |
-| **Depends on** | TODO §2 (contract-notes cutover, owner steps 2.1–2.6), BL-009 Phase 1 (engine vs AlgoTest) |
+| **Depends on** | BL-168 Phase 2 (the contract notes in the repo, with the trade rows), BL-009 Phase 1 (engine vs AlgoTest) |
 | **TODO.md row** | — (filled in when started) |
 
 ## Context
