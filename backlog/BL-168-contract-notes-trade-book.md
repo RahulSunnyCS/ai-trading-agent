@@ -34,24 +34,26 @@ rows it drops.
 
 ## Goal
 
-- The daily pipeline runs as a scheduler job on the laptop, writes the day's figures to a store
-  under `TRADING_DATA_ROOT` first, and mirrors them to the Google Sheet as today. The
-  `trade-analytics` cron and the two Actions workflows here are retired; no `row_tracker.json`.
+- The daily pipeline runs as a scheduler job on the laptop and writes the day's figures to a
+  store under `TRADING_DATA_ROOT`. **This repo never touches the Google Sheet** (owner,
+  2026-10-26): `trade-analytics` keeps filling it as today, on its own, for as long as the
+  owner wants the sheet; the two Actions workflows here and `row_tracker.json` are deleted.
 - The store holds, per broker account and day: the sheet's five figures, every charge itemised,
   every trade row, the note's identifiers, and the PDF itself. History from 1 Apr 2025 is in it
   (the sheet's rows at least; the trades wherever the e-mail still exists).
 - The dashboard has a **Trade book** page with what the sheet shows today (cumulative net,
   drawdown, monthly and FY returns, charges, per-account split, the day table) and what it
   cannot (charges by kind, net per contract, missing-note days).
-- The store is in the monthly backup, and the sheet remains a second copy for as long as the
-  owner wants it.
+- The store is in the monthly backup. The sheet stays a second, independent copy until the
+  owner archives `trade-analytics` (TODO §2.7), on the page's evidence, not this item's.
 
 ## Out of scope
 
 - Any order, square-off or broker API login: the e-mail is the only source.
 - The paper-vs-real reconciliation itself (BL-093) and realised-vs-backtest (BL-026): this item
   gives them their data.
-- Changing what the Google Sheet's hand-entered and formula columns compute.
+- Writing the Google Sheet, or changing what its hand-entered and formula columns compute:
+  `updateSheet.js`, `checkDates.js` and `sheetStartColumn` leave the package with Phase 1.
 - Hiding the page from the friends: the owner chose visible to all (2026-10-26); revisit if a
   second person starts using the hosted dashboard for it.
 
@@ -70,44 +72,55 @@ a join the files cannot give):
   fno: {payin_payout_obligation, net_brokerage, other_charges, total_charges, final_net},
   trades: [{order_no, trade_no, time, exchange, segment, symbol, underlying, expiry, strike,
   kind: 'CE' | 'PE' | 'FUT' | 'EQ', side, qty, price, brokerage}], account_charges: [...],
-  cross_checks: {note_total_net, matched: true}, sheet: {written_at, row} | null}`.
-  The `fno` block is exactly what the sheet gets, so the two never disagree.
+  cross_checks: {note_total_net, matched: true}}`.
+  The `fno` block is what the sheet's five columns hold, so the page and the sheet can be
+  compared figure for figure.
 - `manual/<day>.json` — the hand-entered inputs the sheet carries today (`algos`, `capital`),
-  written by the page (BL-140-style POST) or imported from the sheet; `algo_charges` is the
+  written by the page (BL-140-style POST) or imported once from the sheet; `algo_charges` is the
   sheet's formula, computed, not typed.
 - **What "done" means.** A day is closed for an account when its note is stored (`note`), or
   as `no_trade` when a later session's note for that account has arrived and this day's has
   not (the broker issues a note only for a day with trades — Kite will be `no_trade` on most
   days), or when the owner marks it so. Until then it is **open** and every run re-scans it,
   for up to 10 trading days back; an open day older than that alerts. Done is read from
-  `days/`, not from a sheet read or an artifact; the sheet mirror has its own marker (below).
+  `days/`, not from a sheet read or an artifact.
 
 **Job — `contract-notes`** in `apps/scheduler/src/jobs.ts`: **every day** 00:00 (`everyDay`,
 not `tradingDays`: a session's notes arrive its evening, so the run after midnight takes it and
 Saturday's run takes Friday) with `contract-notes-retry` at 07:30 for the days still open
 (owner, 2026-10-26), `catchUpHours: 24`, one `group`, retries 1. Steps (argv, in
-`packages/contract-notes`): for every open trading day (above) — `fetch` → `parse` → `store`,
-then `sheet` for every stored day whose `sheet` marker is null. A note not in the mailbox yet
-leaves the day open; a parse failure alerts with the `fixHint` and leaves it open, as the
-Actions loop did. The sheet step finds the next row by reading column C (the dates; the
-`row_tracker.json` shortcut is gone), refuses to write a date that is already there, and sets
-the marker only after the write succeeds, so a failed sheet write is retried next run and never
-duplicated. Needs `qpdf` from Homebrew (installed: 12.4.1) and Node 20: the runner's `jobPath`
-already puts fnm's Node first (`env.ts`), so the shell's nvm v16 default is not what jobs see
-(the package stays Node/CommonJS; TODO §2.9 is unchanged). Secrets (`BROKER_ACCOUNTS_JSON`,
-`GOOGLE_CREDENTIALS`, `GOOGLE_SHEET_ID`, `SHEET_GID`, `SHEET_NAME`) go into the repo-root
-`.env` — the keys are there, empty, as of 2026-10-26. The package does not import
+`packages/contract-notes`): for every open trading day (above) — `fetch` → `parse` → `store`.
+A note not in the mailbox yet leaves the day open; a parse failure alerts with the `fixHint`
+and leaves it open, as the Actions loop did. No sheet step. Needs `qpdf` from Homebrew
+(installed: 12.4.1) and Node 20: the runner's `jobPath` already puts fnm's Node first
+(`env.ts`), so the shell's nvm v16 default is not what jobs see (the package stays
+Node/CommonJS; TODO §2.9 is unchanged). The one secret is `BROKER_ACCOUNTS_JSON` in the
+repo-root `.env` (the key is there, empty, as of 2026-10-26; its `sheetStartColumn` fields are
+ignored and may be left out); the `GOOGLE_*` / `SHEET_*` keys are not needed and are removed
+from `.env`. The package does not import
 `@trading/notify`; the scheduler's alert path does, so `alerts.ts` registers the Gmail and PDF
 passwords from `BROKER_ACCOUNTS_JSON` with `registerSecret` before any failure alert can quote
 a log line.
 
 **Brokers.** Finvasia and Angel One as today, plus a `kite` plugin for Zerodha (owner,
 2026-10-26): its note is read daily, and every transaction in it is booked to Momentum, since
-that account trades nothing else. Angel One also debits outside the contract note — a daily
-interest of about ₹80 on the non-cash part of the margin — which arrives as its own e-mail;
-that e-mail is a second source (`fetch` by its subject, a small extractor), recorded as
-`account_charges: [{kind: 'margin_interest', amount}]` on the day, so the day's net is the
-account's net and not only the note's.
+that account trades nothing else. The e-mails, as seen in the mailboxes on 2026-10-26:
+
+| Broker | Subject | From | Attachment |
+|---|---|---|---|
+| Finvasia | `Combined Contract Note for <client> dd-mm-yyyy` | Shoonya | the note PDF |
+| Angel One | `Contract Note - Equity Segment` | `@angeltrade.in` | `CN_<client>_ddmmyyyy.pdf` |
+| Zerodha | `Combined Equity Contract Note for <client> - <Month> <d>` | `@reportsmailer.zerodha.net` | `dd-mm-yyyy-contract-notes_<client>.pdf` |
+
+Angel One also debits outside the contract note: **"Interest on collateral used against your
+derivative trade"** (from `@angelone.in`, HTML body, no attachment, one per session, 115 so
+far): *"An interest of ₹ 57.78 will be charged for the collateral margin used on 2026-10-23.
+The cash collateral shortfall was ₹ 218710.96."*, by the stated formula
+`(shortfall − 50000) × 0.0342%` a day, posted to the ledger on the 1st and 16th. That e-mail
+is a second source (`fetch` by its subject, a small extractor), recorded as
+`account_charges: [{kind: 'collateral_interest', amount, shortfall, for_day}]` on the day it
+is for, so the day's net is the account's net and not only the note's. Its sibling **"Margin
+Shortfall Intimation"** is a utilisation warning with no amount and is not a charge.
 
 **API and page.** `obt-api` serves `GET /legwise/contract-notes/summary|days|months|day/{day}`
 from the JSONL (DuckDB `read_json`, read-only, no catalog), proxied at
@@ -122,7 +135,8 @@ manual-input editor. Guide page in the same change.
 `rotation/`, which the same gap leaves out today). Its skip rule is "same size at the
 destination", right for immutable lake files and wrong for these: `days/` lines are rewritten
 when a sheet day is upgraded to e-mail, `manual/` when edited, `rotation/` nightly. The new
-folders compare size **and** mtime. The sheet mirror is the off-laptop copy.
+folders compare size **and** mtime. The sheet, filled by `trade-analytics`, is an independent
+off-laptop copy of the five figures for as long as that cron runs.
 
 ## Additional data to collect (the answer to "what else")
 
@@ -162,32 +176,34 @@ Not in the note, worth attaching:
 
 ### Phase 1 — Store and the laptop job (replaces TODO §2.1–2.6)
 - **Tasks:** `store.js` writing `days/<day>.jsonl` and the PDFs; open-day scanning and the
-  `no_trade` rule from the store; `sheet` reads the stored `fno` block, finds the row from
-  column C and sets the marker; the two scheduler jobs with their `fixHint`; `qpdf` checked at
-  start; secrets into `.env` (and `.env.example` with placeholders) and the scheduler's secret
-  registry; remove `contract-notes-daily.yml`, `contract-notes-row-tracker.yml` and
-  `row_tracker.json` from this repo; stop the `trade-analytics` cron (owner merges its waiting
-  branch) the same day the job is installed. TODO §2.1–2.6 are replaced by this phase; §2.7
-  (archive the old repos) stays and follows Phase 1; §2.8's typed hand-off is the `days/` line.
+  `no_trade` rule from the store; the two scheduler jobs with their `fixHint`; `qpdf` checked
+  at start; `BROKER_ACCOUNTS_JSON` into `.env` (and `.env.example` with a placeholder) and the
+  scheduler's secret registry; remove `updateSheet.js`, `checkDates.js` (its date helpers move
+  to `store.js`), the `googleapis` / `google-*` dependencies, `contract-notes-daily.yml`,
+  `contract-notes-row-tracker.yml` and `row_tracker.json` from this repo. `trade-analytics`
+  is **not** touched: its cron keeps the sheet. TODO §2.1–2.6 are replaced by this phase; §2.7
+  (archive the old repos) stays, for the owner, once the page has replaced the sheet; §2.8's
+  typed hand-off is the `days/` line.
 - **Deliverables:** the jobs, their tests (Jest for the package, Vitest for the scheduler
-  entries), `technical.md` and TODO §2 rewritten, the package `CLAUDE.md` and the runbook
-  rewritten with the new rollback (Risks).
-- **Done when:** one real overnight run writes a day to the store and the same five figures to
-  the sheet's next row, nothing overwritten; a second run on the same day writes nothing; a
-  laptop asleep at 00:00 and 07:30 catches up on wake; a sheet write made to fail once is
-  retried and written once.
+  entries), `technical.md` and TODO §2 rewritten, the package `CLAUDE.md` rewritten, the
+  runbook's cutover section replaced by two lines (this repo stores, `trade-analytics` keeps
+  the sheet; nothing to roll back).
+- **Done when:** one real overnight run writes a day to the store whose `fno` block equals the
+  sheet row `trade-analytics` wrote for the same day; a second run on the same day writes
+  nothing; a laptop asleep at 00:00 and 07:30 catches up on wake.
 
 ### Phase 2 — Richer extraction and history
 - **Tasks:** both extractors emit the itemised charges, segment rows, trade rows and note
   identifiers (the obligation cross-check stays a hard error); the Angel One margin-interest
   e-mail and the `kite` plugin (a sample of each from the owner first); the one-time import of
-  the sheet's rows since 1 Apr 2025 as `source: 'sheet'` (five figures and the manual inputs);
-  a Gmail backfill by date range (`--from --to`) that re-parses the notes still in the mailbox
-  and upgrades a `sheet` day to `email`. The owner wants the record recomputed from the notes
-  (2026-10-26), so the e-mail figures win: an `email` line replaces the `sheet` line, and every
-  difference from the sheet's five figures is listed in the backfill report, where each one
-  must be explained (an extractor fix, a sheet edit made by hand, a note the sheet row missed)
-  before the phase is called done. The sheet itself is not rewritten by the backfill.
+  the sheet's rows since 1 Apr 2025 as `source: 'sheet'` (five figures and the manual inputs)
+  from an `.xlsx` the owner downloads (`contract-notes import-sheet <file>`; no Google
+  credentials); a Gmail backfill by date range (`--from --to`) that re-parses the notes still
+  in the mailbox and upgrades a `sheet` day to `email`. The owner wants the record recomputed
+  from the notes (2026-10-26), so the e-mail figures win: an `email` line replaces the `sheet`
+  line, and every difference from the sheet's five figures is listed in the backfill report,
+  where each one must be explained (an extractor fix, a sheet edit made by hand, a note the
+  sheet row missed) before the phase is called done.
 - **Deliverables:** extractor tests on the sample PDFs and the fixtures; `contract-notes
   backfill`; `contract-notes retention` (a read-only IMAP look: oldest and newest note per
   account, the brokers' other e-mail subjects), run first once the `.env` has the credentials.
@@ -206,26 +222,26 @@ Not in the note, worth attaching:
 
 ### Phase 4 — Backup and the sheet's future
 - **Tasks:** `tdata backup` copies `contract-notes/` and `rotation/`; the monthly job's report
-  counts them; decide with the owner whether the sheet mirror stays, becomes read-only, or is
-  retired once the page has done a month's work. BL-093 and BL-026 are unblocked at Phase 2.
+  counts them; after a month of the page, the owner decides whether to archive
+  `trade-analytics` (TODO §2.7) and let the sheet stop. BL-093 and BL-026 are unblocked at
+  Phase 2.
 - **Done when:** a backup run copies the new folders, and the decision is in the Log.
 
 ## Risks
 
-- **Two writers on the sheet** while the `trade-analytics` cron still runs: the job must not be
-  installed until that cron is off (Phase 1's last step, same day). **Rollback** is no longer
-  the runbook's as written (that one relies on this repo's row-tracker workflow, which Phase 1
-  deletes, and `trade-analytics`'s own tracker would lag the rows the laptop wrote, so a
-  re-enabled cron would duplicate them): uninstall the two jobs, run `trade-analytics`'s
-  **Update Last Updated Row** workflow with the last row the laptop wrote, then re-enable its
-  cron. The runbook gets this text in Phase 1.
+- **The sheet and the store drift** — two pipelines read the same mailbox and parse the same
+  PDFs, but only this one will get extractor fixes. A difference on a day is found by the
+  page's "vs sheet" check after the one-time import, and later by eye; the sheet is the one
+  that is wrong once the store's figure reconciles with the note. Nothing to roll back: the
+  sheet never depends on this repo.
 - **The laptop is asleep at 00:00 or 07:30** — the catch-up covers it; a note that has not
   arrived leaves the day open, never recorded as zeros; `no_trade` is set only by the rule
   above.
 - **A new segment label or PDF layout** fails the day (by design); the alert names the file so
   the extractor can be fixed and the day re-run from `raw/`.
-- **Gmail retention** — the history backfill may stop short of 1 Apr 2025; the sheet import
-  covers the five figures regardless.
+- **Gmail retention** — checked 2026-10-26: every account's notes go back before 1 Apr 2025
+  (Finvasia from Jul / Sep 2024, Angel One from Jun 2024), so the backfill can cover the whole
+  sheet; the sheet import stays as the cross-check.
 - **Secrets on the laptop** — Gmail app passwords and PDF passwords join the `.env` that already
   holds broker TOTP seeds; nothing new in kind, but the notify registry must cover them.
 
@@ -235,20 +251,21 @@ Not in the note, worth attaching:
    day's AlgoTest deploys?), whether the `algo charges` formula (`(Algos-3)*12.5+62.5`, rounded
    up) is still the platform's fee, and whether they should be typed on the page or pre-filled
    (`Algos` from the live capture, `Capital` from a dated setting).
-2. The Angel One margin-interest e-mail: its subject line and one sample, and whether other
-   debits arrive the same way (DP charges, AMC).
-3. A Zerodha Kite contract-note sample (subject and PDF password in `BROKER_ACCOUNTS_JSON`,
-   not in chat).
-4. `sheetStartColumn` in `BROKER_ACCOUNTS_JSON` still matches the live tab (Finvasia at I,
-   Angel One at D), **and the column order within each block**: the committed xlsx labels
-   Finvasia's L and M "Final Net" then "Total Charge", the reverse of `updateSheet.js`'s
-   order. Checked against the live tab at the first run, before the sheet is written.
+2. ~~The Angel One margin-interest e-mail~~ — found (Design → Brokers). Still open: do other
+   debits arrive by e-mail (DP charges, AMC), or only on the ledger?
+3. The Zerodha Kite note's PDF password, added to `BROKER_ACCOUNTS_JSON` as a third account
+   with `"broker": "kite"` (the e-mail itself is found; Design → Brokers).
+4. The one-time sheet import reads the Finvasia block's columns by header, not position: the
+   committed xlsx labels L and M "Final Net" then "Total Charge", the reverse of the old
+   writer's order, so the live tab's headers decide.
 
-Answered 2026-10-26 (owner): the sheet stays as the mirror; the Trade book is visible to
-everyone on the dashboard (only the owner uses it today); Kite's notes are read too, every
-transaction booked to Momentum; the job runs at 00:00 with a 07:30 retry; two dedicated
-mailboxes carry the broker e-mails; nobody else reads the sheet; `trade-analytics`'s cron is
-still running; if Gmail still holds the notes, recompute the whole record from them.
+Answered 2026-10-26 (owner): this repo does not write the sheet — it stores only, and
+`trade-analytics` keeps the sheet (revised the same day from "keep the sheet as the mirror");
+the Trade book is visible to everyone on the dashboard (only the owner uses it today); Kite's
+notes are read too, every transaction booked to Momentum; the job runs at 00:00 with a 07:30
+retry; two dedicated mailboxes carry the broker e-mails; nobody else reads the sheet;
+`trade-analytics`'s cron is still running; if Gmail still holds the notes, recompute the whole
+record from them.
 
 ## Log
 
@@ -265,3 +282,14 @@ still running; if Gmail still holds the notes, recompute the whole record from t
   re-scanned and the `no_trade` rule; the sheet marker and column-C row lookup; the backup's
   size-only skip; e-mail figures win over the sheet in the backfill; `algo charges` is a
   formula; the rollback rewritten; BL-093 and BL-026 now depend on this item.
+- 2026-10-26 — owner: the repo should not care about the sheet. Sheet writing, the
+  `GOOGLE_*` / `SHEET_*` keys, `sheetStartColumn` and the rollback removed; `trade-analytics`
+  keeps the sheet untouched until the owner archives it; the history import reads a
+  downloaded `.xlsx`.
+- 2026-10-26 — `.env` filled by the owner (`BROKER_ACCOUNTS_JSON` re-folded to one line: it
+  had been pasted pretty-printed, which the parsers read as 2 characters). Read-only IMAP
+  check with Node 20 and the package's TLS options: mailbox 1 — Finvasia 109 notes
+  (2024-09-04 → 2026-09-21), Angel One 238 (2024-06-14 → 2026-10-24); mailbox 2 — Finvasia
+  516 (2024-07-12 → 2026-10-23). Zerodha's notes are in mailbox 1 (444). The Angel One
+  collateral-interest e-mail and its formula identified (Design → Brokers). Open questions 2
+  and 3 updated.
