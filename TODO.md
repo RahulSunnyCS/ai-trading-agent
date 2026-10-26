@@ -887,6 +887,6 @@ is stuck on the 2026-10-18 build. Owner (2026-10-26): upgrade, not the unsupport
 
 | # | Task | Owner | State |
 |---|---|---|---|
-| 3.46.1 | Phase 1: `next` 16.4.x + `@opennextjs/cloudflare` 1.20.13, `--webpack` on every dev/build call, React stays 18 | claude | **Built 2026-10-26** (PR open): build, typecheck and 1,980 unit tests pass; e2e matches Next 15; the 180 s proxy timeout holds under `next dev` and `next start` |
-| 3.46.2 | Phase 2: Worker preview against the local APIs, then the `main` → `release` promotion | claude | Next (owner: go straight on to `release` if the checks pass) |
+| 3.46.1 | Phase 1: `next` 16.4.x + `@opennextjs/cloudflare` 1.20.13, `--webpack` on every dev/build call, React stays 18 | claude | **Done 2026-10-26** (#327): build, typecheck and 1,980 unit tests pass; e2e matches Next 15; the 180 s proxy timeout holds under `next dev` and `next start` |
+| 3.46.2 | Phase 2: Worker preview against the local APIs, then the `main` → `release` promotion | claude | **Preview done 2026-10-26** (Access and password gates, rewrites, upstream token, 503 all pass); promotion to `release` next |
 | 3.46.3 | Phase 3: React 19, `proxy.ts`, Turbopack | — | Waits (owner 2026-10-26) |
