@@ -879,3 +879,14 @@ are replaced by better ones. First rule: a break of a rolling 60-bar NIFTY range
 |---|---|---|---|
 | 3.41.1 | Phase 0 and Amendment 1 (rolling rule, long and short-premium arms, 2019-2021 confirmation period) pre-registered before any run | claude | **Done 2026-10-18.** Nothing run |
 | 3.41.2 | Phase 1: event study on periods A and B (event counts first, then placebo and trades) | claude | **Next** |
+
+### 3.46 Dashboard on Next.js 16 — [BL-157](backlog/BL-157-dashboard-nextjs-16.md)
+
+OpenNext refuses Next.js 15 since 2026-10-21, so every `release` deploy fails and `dashboard.codifie.dev`
+is stuck on the 2026-10-18 build. Owner (2026-10-26): upgrade, not the unsupported-version flag.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.46.1 | Phase 1: `next` 16.4.x + `@opennextjs/cloudflare` 1.20.13, `--webpack` on every dev/build call, React stays 18 | claude | **Built 2026-10-26** (PR open): build, typecheck and 1,980 unit tests pass; e2e matches Next 15; the 180 s proxy timeout holds under `next dev` and `next start` |
+| 3.46.2 | Phase 2: Worker preview against the local APIs, then the `main` → `release` promotion | claude | Next (owner: go straight on to `release` if the checks pass) |
+| 3.46.3 | Phase 3: React 19, `proxy.ts`, Turbopack | — | Waits (owner 2026-10-26) |

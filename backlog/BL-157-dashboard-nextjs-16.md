@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P0 — the hosted dashboard cannot deploy at all until this lands; friends see Momentum through it |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | chore |
 | **Area** | dashboard / infra |
 | **Created** | 2026-10-24 |
 | **Depends on** | none |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.46 |
 
 ## Context
 
@@ -150,9 +150,15 @@ the login gate and the API rewrites behaving as before.
 
 ## Open questions
 
-- Should Phase 3's React 19 bump follow straight after, or wait?
-- Is `cf:preview` against the real tunnel hostnames fine to run from the laptop (it needs the
-  Access service token in the shell), or should Phase 2 use the local APIs?
+Answered by the owner on 2026-10-26:
+
+- **After Phase 1 merges:** go straight on to Phase 2 and promote `main` to `release` if the
+  preview checks pass; stop and report if one fails.
+- **Phase 2 preview backends:** the local APIs (127.0.0.1), not the tunnel hostnames. This checks
+  the login gate and the rewrites, not the tunnel path.
+- **React 19 (Phase 3):** waits.
+- **Phase 1's local checks:** the worktree's dashboard on a spare port against the APIs already
+  running on :8765 / :8000; nothing of the owner's is restarted.
 
 ## Log
 
@@ -163,3 +169,18 @@ the login gate and the API rewrites behaving as before.
   Node server, not the Worker); the e2e step names its address and the spec that fails by design;
   `--webpack` goes on dev-stack's `dev` branch only; the cut-off is 2026-10-21; Next 16's
   `.next/dev/types` and `next-env.d.ts` rewrites named.
+- 2026-10-26 — started; owner answers recorded above; TODO 3.46.
+- 2026-10-26 — Phase 1 built: `next` 16.4.3, `@opennextjs/cloudflare` 1.20.13 (`@opennextjs/aws`
+  4.1.12), React 18 kept. `--webpack` on the `dev` / `build` scripts and on dev-stack's `next dev`
+  and `next build`. `agentRules: false` in `next.config.ts`: `next dev` otherwise appends its own
+  rules to `apps/dashboard/AGENTS.md`, which only points at CLAUDE.md. `next-env.d.ts` is Next 16's
+  form (side-effect imports of `.next/types/*`); typecheck passes with and without a built `.next`.
+  Build warnings, both Phase 3 items: React 18 is deprecated in 16, and `middleware` should become
+  `proxy`. `experimental.proxyTimeout` is accepted. Checks: build, typecheck, 140 files / 1,980
+  unit tests. E2E on a spare port (5191) against the running APIs, with `personalities-api.spec.ts`
+  left out: 39 of 41 pass, and the same two Live-view tests (128, 165: `getByText('NIFTY spot')`
+  matches two elements) fail on `main` under Next 15 too, so they are stale tests, not this change.
+  A first cold run showed five more failures, which pass once the dev server has compiled (about
+  60 s per first page). Proxy timeout: a stub API that answers after 45 s came back 200 in 45 s
+  through `/api/momentum/meta` under `next dev` and under `next start` (production build with a
+  throwaway `DASHBOARD_PASSWORD`: 401 without it, 200 with it).
