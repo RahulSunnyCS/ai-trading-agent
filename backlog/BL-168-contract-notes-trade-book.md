@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the only record of real money the project measures itself against; unblocks BL-093 and BL-026 |
-| **Status** | In progress (Phase 2 done; Phase 1 next) |
+| **Status** | In progress (Phases 1 and 2 done; Phase 3 next) |
 | **Type** | feature |
 | **Area** | contract-notes / scheduler / trading-data / dashboard |
 | **Created** | 2026-10-26 |
@@ -273,6 +273,8 @@ account, behaviour patterns.
 - **Tasks:** both extractors emit the itemised charges, segment rows, trade rows and note
   identifiers (the obligation cross-check stays a hard error); the Angel One interest e-mail,
   the ledger e-mails (funds, payouts, settlements, margin shortfall) and the `kite` plugin;
+  Finvasia's older note layout (its notes to about 25 Aug 2025 have no "Obligation Detail"
+  table the extractor finds — seen on a test run, 2026-10-26) for the history backfill;
   the one-time import (two rows in the committed copy are both dated 20 May 25: summed as one
   session and listed in the import's report) of
   the sheet's rows since 1 Apr 2025 as `source: 'sheet'` (five figures and the manual inputs)
@@ -421,3 +423,14 @@ record from them.
   its row and the drawer (14 algos, ₹200 algo fees from the sheet); each headline tile says how
   it compares with the picked benchmark; trade P&L labelled gross; the sheet's real algo fees
   (₹34,523); round axis ticks; weekdays and expiries corrected; green kept for profit only.
+- 2026-10-26 — Phase 1 done (PR #335, review fixes included): `node run.js` and the scheduler
+  jobs `contract-notes` 00:00 / `contract-notes-retry` 07:30; per-account mail bookmark (the
+  owner's suggestion: read only mail after the last message read, plus the last 3 days for a
+  note Gmail indexed late); `failed` lines keep a session open; the quiet-account alert kept in
+  `cursor.json`. Real runs: 18 notes stored for 12–26 Oct across Finvasia (mailbox 2) and Angel
+  One; the mailbox-1 Finvasia account has had no note since 21 Sep and is reported quiet; Kite
+  skipped until Phase 3. A test run of an earlier fix (a UID-count overlap) pulled a year of
+  history into the store; that store was moved aside to
+  `TRADING_DATA_ROOT/contract-notes.discarded-2026-10-26` (safe to delete) and rebuilt. Not done:
+  the jobs start only after the owner restarts the scheduler; the stored figures are checked
+  against the sheet's rows in Phase 3's import.
