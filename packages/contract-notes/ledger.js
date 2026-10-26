@@ -112,7 +112,12 @@ function readLedger(reader, messages, account) {
   const events = [];
   const unread = [];
   for (const msg of messages) {
-    if (!String(msg.from ?? '').toLowerCase().endsWith(reader.from)) continue;
+    if (
+      !String(msg.from ?? '')
+        .toLowerCase()
+        .endsWith(reader.from)
+    )
+      continue;
     const fields = reader.read(msg.text || '');
     if (!fields) {
       unread.push(msg);
