@@ -16,10 +16,31 @@ export function telegramSink(env: Record<string, string>, type?: string): AlertS
   const botToken = env.TELEGRAM_BOT_TOKEN?.trim();
   const chatId = env.TELEGRAM_CHAT_ID?.trim();
   if (botToken) registerSecret(botToken);
+  registerContractNoteSecrets(env.BROKER_ACCOUNTS_JSON);
   const config: TelegramConfig | null = botToken && chatId ? { botToken, chatId } : null;
   return async (text) => {
     await sendText(config, text, type);
   };
+}
+
+/**
+ * The contract-notes run's mailbox and PDF passwords (BL-168), so no alert can carry one. A value
+ * that does not parse is the run's own error to report; nothing to register.
+ */
+export function registerContractNoteSecrets(raw: string | undefined): void {
+  if (!raw) return;
+  try {
+    const config = JSON.parse(raw) as Array<{
+      emailPassword?: string;
+      accounts?: Array<{ pdfPassword?: string }>;
+    }>;
+    for (const mailbox of config) {
+      registerSecret(mailbox.emailPassword);
+      for (const account of mailbox.accounts ?? []) registerSecret(account.pdfPassword);
+    }
+  } catch {
+    // not JSON: run.js says so
+  }
 }
 
 /** Exit codes the runner itself produces: the job never got to report anything. */

@@ -1,4 +1,4 @@
-const { extract, subject } = require('../../brokers/finvasia');
+const { extract, searchSubject, noteDay } = require('../../brokers/finvasia');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -130,10 +130,20 @@ describe('finvasia.extract() segment filtering', () => {
   });
 });
 
-describe('finvasia.subject()', () => {
-  test('includes accountId and formatted date', () => {
-    const result = subject('FA1234', new Date('2025-04-30'));
-    expect(result).toContain('FA1234');
-    expect(result).toContain('30-04-2025');
+describe('finvasia.searchSubject() / noteDay()', () => {
+  test('searches every note of the account, whatever its date', () => {
+    expect(searchSubject('FA1234')).toBe('Combined Contract Note for FA1234');
+  });
+
+  test('reads the session from the subject', () => {
+    expect(
+      noteDay({ subject: 'Combined Contract Note for FA1234 30-04-2025', accountId: 'FA1234' }),
+    ).toBe('2025-04-30');
+  });
+
+  test("ignores another account's subject", () => {
+    expect(
+      noteDay({ subject: 'Combined Contract Note for FA9999 30-04-2025', accountId: 'FA1234' }),
+    ).toBeNull();
   });
 });

@@ -4,8 +4,9 @@ module.exports = {
   collectCoverageFrom: [
     'brokers/**/*.js',
     'utils/**/*.js',
-    'checkDates.js',
-    'updateSheet.js',
-    'parser.js',
+    'calendar.js',
+    'store.js',
+    'record.js',
+    'run.js',
   ],
 };

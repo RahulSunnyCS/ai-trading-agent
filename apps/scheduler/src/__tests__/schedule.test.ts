@@ -174,8 +174,9 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('has 36 jobs', () => {
-    expect(JOBS).toHaveLength(36); // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor
+  it('has 38 jobs', () => {
+    // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor; BL-168: + contract-notes, contract-notes-retry
+    expect(JOBS).toHaveLength(38);
   });
 });
 
@@ -222,6 +223,25 @@ describe('live capture (BL-141)', () => {
     for (const id of ['live-capture', 'live-capture-retry']) {
       expect(job(id)?.group).toBe('quantiply');
     }
+  });
+});
+
+describe('contract notes (BL-168)', () => {
+  const job = (id: string) => JOBS.find((j) => j.id === id);
+
+  it('runs every day, Saturday included, at 00:00 and again at 07:30', () => {
+    expect(job('contract-notes')?.schedule.at).toBe('00:00');
+    expect(job('contract-notes-retry')?.schedule.at).toBe('07:30');
+    for (const id of ['contract-notes', 'contract-notes-retry']) {
+      expect(job(id)?.schedule.on('2026-10-24')).toBe(true); // a Saturday
+      expect(job(id)?.steps).toEqual([['node', 'run.js']]);
+      expect(job(id)?.cwd).toBe('packages/contract-notes');
+      expect(job(id)?.group).toBe('contract-notes');
+    }
+  });
+
+  it('a 00:00 run missed while asleep still runs before the 07:30 one', () => {
+    expect(job('contract-notes')?.catchUpHours).toBeGreaterThanOrEqual(7);
   });
 });
 

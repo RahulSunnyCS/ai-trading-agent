@@ -35,15 +35,17 @@ const ROW_LINE = new RegExp(
   `^\\s*([A-Za-z][A-Za-z0-9&()/. -]*?)\\s*((?:-?\\d+(?:,\\d{3})*\\.\\d{2}){${COLUMN_COUNT}})\\s*$`,
 );
 
-function subject() {
+// The subject carries neither the account nor the date; the attachment's name carries both.
+function searchSubject() {
   return 'Contract Note - Equity Segment';
 }
 
-function bodyFilter(date) {
-  const dd = String(date.getDate()).padStart(2, '0');
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const yyyy = date.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
+// "CN_R59799620_23102026.pdf" → '2026-10-23' (null if another account's, or another file).
+function noteDay({ filename, accountId }) {
+  const m = new RegExp(`^CN_${accountId}_(\\d{2})(\\d{2})(\\d{4})\\.pdf$`, 'i').exec(
+    filename || '',
+  );
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
 }
 
 function obligationBlock(text) {
@@ -197,4 +199,4 @@ function extract(text) {
   };
 }
 
-module.exports = { subject, bodyFilter, extract };
+module.exports = { searchSubject, noteDay, extract };
