@@ -1,0 +1,49 @@
+# Directional: strike depth (ITM2 and ITM3) and the overall stop
+
+**Status:** Tested · **Last updated:** 2026-10-26
+
+## What it is
+
+How deep in the money the Directional pair sits: ITM1 (live and in the rotation), ITM2 or ITM3 (one
+more or two more strikes), with the overall MTM stop either left at the live ₹3,000 or widened until
+the stop fires about as often as it does for ITM1 and ATM. Set by `legs[].strike: { strike_type:
+ITMn }` and `overall.stop_loss_inr`. ITM2 and ITM3 are not in the rotation.
+
+## Live value
+
+ITM1, ₹3,000 overall stop, 21% leg stop, one re-entry at cost, exit 15:28
+([strike page](strike-premium.md)). The rotation carries ATM and ITM1 only.
+
+## Tested
+
+| Item | Values tried | Data / period | Verdict | Evidence |
+|---|---|---|---|---|
+| BL-166 | ITM2, ITM3 x overall stop {3,000, 4,000, 5,000, 6,000, 8,000, 10,000}; 25 start times; NIFTY and SENSEX; against ITM1 at ₹3,000 | 2024-10-09 → 2026-10-23; stop matched on the fit year, judged on the hold-out year from 2025-10-09; net after charges, 1 lot | **POC passes on SENSEX** (ITM2 +₹54, ITM3 +₹78 per slot-day, intervals above zero); **NIFTY inconclusive** (+₹36 and +₹44, intervals include zero) | [BL-166][bl166] |
+
+## What we know
+
+- **Deeper strikes stop out only a little more often.** Share of variant-days the ₹3,000 overall stop
+  fired, fit year / hold-out: NIFTY ATM 9.5% / 9.8%, ITM1 13.7% / 14.5%, ITM2 15.9% / 17.0%, ITM3 16.6% /
+  18.2%; SENSEX ATM 8.7% / 8.3%, ITM1 10.5% / 10.9%, ITM2 12.4% / 13.5%, ITM3 13.6% / 15.1%. Not 30 to
+  40%.
+- **A ₹4,000 stop brings ITM2 and ITM3 back inside ITM1's rate** on both indices (NIFTY 10.6% to
+  11.9%, SENSEX 7.0% to 9.5%), chosen on the fit year by the registered rule.
+- **SENSEX: both pass.** ITM2 at ₹4,000 minus ITM1 at ₹3,000: +₹54 a slot-day on the hold-out
+  (90% interval +22 to +86); ITM3: +₹78 (+25 to +136). Drawdown on the hold-out is smaller than
+  ITM1's (6,255 and 5,925 against 7,873). At the common ₹3,000 stop the gain is similar (+32 and
+  +49), so on SENSEX it is mostly the depth, not the wider stop.
+- **NIFTY: no clear gain.** +₹36 (−21 to +98) for ITM2 and +₹44 (−39 to +133) for ITM3 on the
+  hold-out, slightly negative on the fit year, and a deeper drawdown (9,852 and 11,132 against 8,608).
+- **Net keeps rising with the stop** up to ₹10,000 for ITM3 (hold-out SENSEX 304 at ₹3,000 to 355;
+  NIFTY 241 to 293), with deeper drawdowns. That is in-sample and is a lead, not a finding; it
+  matches the earlier finding that the ₹3,000 stop costs more than it saves ([overall stop](mtm-sl.md)).
+- **Caveats:** four comparisons with no multiplicity correction; the fit-year intervals all include
+  zero; the engine fills with no spread, so deeper in-the-money options look better than they would
+  trade; ATM and ITM1 carry settings tuned for them; one hold-out year.
+
+## Not yet tested
+
+- Larger time frames (NIFTY 2022 → 2024 on the imported data), ITM4 and deeper, and putting ITM2 or
+  ITM3 into the rotation's ranking: the next step if the owner wants it.
+
+[bl166]: ../../../../backlog/BL-166-directional-itm2-itm3-with-matched-stop.md

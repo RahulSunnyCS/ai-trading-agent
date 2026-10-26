@@ -49,7 +49,7 @@ After charges, band leaders by strike ([BL-096 post-charge][bl096pc]):
 
 ## Not yet tested
 
-- ITM2 (BL-080: "will not run"), OTM, or a closest-premium Dir.
+- OTM, or a closest-premium Dir. (ITM2 and ITM3 were run in [BL-166](strike-depth.md), 2026-10-26.)
 - Live ITM1 vs base ATM at 09:24 head to head, after charges, on the NIFTY 2022–24 days.
 
 ## Related
