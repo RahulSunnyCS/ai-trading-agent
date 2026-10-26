@@ -80,33 +80,39 @@ def load_frame(
 
 def nearest_expiry(root: Path, underlying: str, day: date) -> date | None:
     """The nearest listed expiry on or after `day`, as the simulator picks the traded one
-    (`legwise.market.load_day` + `pick_expiry(day, "weekly")`): the day's Fyers symbol master when
-    there is one, else the expiries in that day's option file. None without an option file."""
-    import pyarrow.parquet as pq
+    (`legwise.market.listed_expiries`, the list `load_day` gives `pick_expiry(day, "weekly")`).
+    None without an option file. On a vendor day whose file lacks its current weekly this is a
+    later (even long-dated) contract, and the simulator trades that one too."""
+    from ..legwise.market import listed_expiries
+
+    listed = listed_expiries(root, underlying, day)
+    upcoming = [e for e in listed or [] if e >= day]
+    return upcoming[0] if upcoming else None
+
+
+#: the expiry_day file's format; a day is rebuilt when its files' stamp changes (a repaired day)
+EXPIRY_VERSION = 2
+
+
+def _files_stamp(root: Path, underlying: str, day: date) -> int:
+    """A stamp of the files `nearest_expiry` reads for the day (their sizes and mtimes)."""
     from trading_data import lake
 
-    opt_path = lake.bars_1m_path(root, "option", underlying, day)
-    if not opt_path.exists():
-        return None
-    listed: set[date] = set()
-    symbols_path = lake.symbol_master_path(root, "fyers", day)
-    if symbols_path.exists():
-        table = pq.read_table(symbols_path, columns=["underlying", "option_type", "expiry"])
-        listed = {
-            s["expiry"]
-            for s in table.to_pylist()
-            if s["underlying"] == underlying and s["option_type"] != "FUT"
-        }
-    if not listed:
-        listed = set(pq.read_table(opt_path, columns=["expiry"]).column("expiry").to_pylist())
-    upcoming = sorted(e for e in listed if e >= day)
-    return upcoming[0] if upcoming else None
+    stamp = 0
+    for path in (
+        lake.bars_1m_path(root, "option", underlying, day),
+        lake.symbol_master_path(root, "fyers", day),
+    ):
+        if path.exists():
+            st = path.stat()
+            stamp = (stamp * 1_000_003 + st.st_size * 31 + st.st_mtime_ns) % (1 << 62)
+    return stamp
 
 
 class ExpiryDayLoader:
     """`expiry_day`: per session, is it its own nearest weekly expiry (BL-165). Cached under
-    TRADING_DATA_ROOT/ruletest/features/; a session without an option file reads False and is
-    looked for again next run."""
+    TRADING_DATA_ROOT/ruletest/features/ with a stamp of the day's files, so a repaired day is
+    worked out again; a session without an option file reads False and is not saved."""
 
     def __init__(self, root: Path, underlying: str, frame: E.Frame):
         self.root, self.underlying, self.frame = root, underlying, frame
@@ -116,29 +122,40 @@ class ExpiryDayLoader:
         if self._values is not None:
             return self._values
         path = store.features_dir(self.root) / f"expiry_day_{self.underlying}.npz"
-        known: dict[str, bool] = {}
+        known: dict[str, tuple[bool, int]] = {}
         if path.exists():
             with np.load(path, allow_pickle=False) as z:
-                known = dict(zip(z["days"].tolist(), z["data"].astype(bool).tolist(), strict=True))
+                if "version" in z.files and int(z["version"]) == EXPIRY_VERSION:
+                    known = {
+                        d: (bool(v), int(st))
+                        for d, v, st in zip(z["days"].tolist(), z["data"], z["stamp"], strict=True)
+                    }
         out = np.zeros(self.frame.n, dtype=bool)
-        added = 0
+        changed = False
         for i, d in enumerate(self.frame.days):
-            if d not in known:
-                day = date.fromisoformat(d)
-                if day < OPTIONS_FROM:
-                    known[d] = False
-                else:
-                    expiry = nearest_expiry(self.root, self.underlying, day)
-                    if expiry is None:
-                        continue  # no option file (yet): False this run, not saved
-                    known[d] = expiry == day
-                added += 1
-            out[i] = known[d]
-        if added:
+            day = date.fromisoformat(d)
+            if day < OPTIONS_FROM:
+                continue
+            stamp = _files_stamp(self.root, self.underlying, day)
+            if d not in known or known[d][1] != stamp:
+                expiry = nearest_expiry(self.root, self.underlying, day)
+                if expiry is None:
+                    known.pop(d, None)
+                    continue  # no option file (yet): False this run, not saved
+                known[d] = (expiry == day, stamp)
+                changed = True
+            out[i] = known[d][0]
+        if changed:
             days = sorted(known)
             path.parent.mkdir(parents=True, exist_ok=True)
             tmp = path.with_suffix(".tmp.npz")
-            np.savez_compressed(tmp, days=np.array(days), data=np.array([known[d] for d in days]))
+            np.savez_compressed(
+                tmp,
+                days=np.array(days),
+                data=np.array([known[d][0] for d in days]),
+                stamp=np.array([known[d][1] for d in days], dtype=np.int64),
+                version=np.array(EXPIRY_VERSION),
+            )
             tmp.replace(path)
         self._values = out
         return out
