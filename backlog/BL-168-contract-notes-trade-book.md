@@ -75,9 +75,19 @@ a join the files cannot give):
   cross_checks: {note_total_net, matched: true}}`.
   The `fno` block is what the sheet's five columns hold, so the page and the sheet can be
   compared figure for figure.
-- `manual/<day>.json` — the hand-entered inputs the sheet carries today (`algos`, `capital`),
-  written by the page (BL-140-style POST) or imported once from the sheet; `algo_charges` is the
-  sheet's formula, computed, not typed.
+- `manual/<day>.json` — the inputs the sheet carries today by hand, written by the page
+  (BL-140-style POST) or imported once from the sheet (owner, 2026-10-26):
+  - `algos` — the number of algo trades taken that day (AlgoTest executions); `algo_charges`
+    is AlgoTest's fee for them, the sheet's formula, computed, not typed. From 2026-10-19 the
+    page pre-fills `algos` from the day's live capture (`rotation/live/<day>.jsonl`, every
+    strategy that ran) and the owner corrects it.
+  - `capital` — the margin available that morning, **per account**, because the brokers count
+    collateral differently: Finvasia applies the 50:50 rule (usable = min(total, 2 × cash):
+    ₹1 lakh cash + ₹2 lakh non-cash = ₹2 lakh usable), Angel One lets the whole ₹3 lakh be used
+    and charges the collateral interest above for the cash shortfall. The 09:05 margin check
+    (BL-143, `MARGIN_CHECK=on`) already reads both — Finvasia's from AlgoTest `GET /brokers`,
+    Angel One's from `obt angel funds` — so it writes `capital` per account to `manual/` as a
+    side effect, and the page shows it; a day it did not run is typed.
 - **What "done" means.** A day is closed for an account when its note is stored (`note`), or
   as `no_trade` when a later session's note for that account has arrived and this day's has
   not (the broker issues a note only for a day with trades — Kite will be `no_trade` on most
@@ -247,10 +257,10 @@ Not in the note, worth attaching:
 
 ## Open questions
 
-1. The sheet's hand-typed columns `Algos` (N) and `Capital` (X): what `Algos` counts (the
-   day's AlgoTest deploys?), whether the `algo charges` formula (`(Algos-3)*12.5+62.5`, rounded
-   up) is still the platform's fee, and whether they should be typed on the page or pre-filled
-   (`Algos` from the live capture, `Capital` from a dated setting).
+1. ~~The sheet's hand-typed columns `Algos` and `Capital`~~ — answered 2026-10-26 (Design →
+   Store, `manual/`): `Algos` is the number of algo trades taken, `algo charges` their
+   per-algo fee, `Capital` the morning's usable margin, which differs by broker (Finvasia's
+   50:50 cash rule; Angel One uses all collateral and charges interest on the cash shortfall).
 2. ~~The Angel One margin-interest e-mail~~ — found (Design → Brokers). Still open: do other
    debits arrive by e-mail (DP charges, AMC), or only on the ledger?
 3. ~~The Zerodha Kite note's PDF password~~ — added to `BROKER_ACCOUNTS_JSON` as
