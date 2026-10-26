@@ -70,12 +70,12 @@ Cloudflare Access signs people in instead and the middleware only verifies its s
 (`lib/cfAccess.ts`). Runbook:
 `docs/remote-dashboard.md`.
 
-**Next.js 16 (BL-157):** every `next dev` / `next build` passes `--webpack` (the `?raw` rule above
-is webpack-only; Next 16 defaults to Turbopack), `next start` takes no such flag, and
-`agentRules: false` stops `next dev` appending to `AGENTS.md`. `next dev` builds into `.next/dev`
-and rewrites the tracked `next-env.d.ts` to import `./.next/dev/types/*`; dev-stack restores it
-only after a build, so after `bun run start` restore it (`git checkout -- next-env.d.ts`) rather
-than committing it. `middleware.ts` still runs (the build warns that `proxy` replaces it).
+**Next.js 16 (BL-157; the `--webpack` rule is in technical.md's Frontend row):** `next start`
+takes no `--webpack`, and `agentRules: false` stops `next dev` appending to `AGENTS.md`. `next dev`
+builds into `.next/dev` and rewrites the tracked `next-env.d.ts` to import `./.next/dev/types/*`;
+dev-stack puts it back only after a `start:prod` build, so after `bun run start` restore it
+(`git checkout -- next-env.d.ts`) rather than committing it. `middleware.ts` still runs (the build
+warns that `proxy` replaces it).
 
 ## Analytics page pattern
 
