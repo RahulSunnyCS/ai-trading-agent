@@ -52,8 +52,9 @@ function hasQpdf() {
 }
 
 /**
- * One read-only connection to a Gmail mailbox, opened on All Mail so an archived or labelled
- * note is still found. Never marks anything read.
+ * One read-only connection to a Gmail mailbox, opened on All Mail (found by its \\All flag
+ * when the account's language renames "[Gmail]/All Mail") so an archived or labelled note is
+ * still found. Never marks anything read.
  */
 function connect(mailbox) {
   return new Promise((resolve, reject) => {
@@ -67,16 +68,39 @@ function connect(mailbox) {
       connTimeout: 30000,
       authTimeout: 30000,
     });
-    imap.once('error', reject);
+    const fail = (err) => {
+      imap.end();
+      reject(err);
+    };
+    // A listener for the whole connection: an 'error' with none attached would crash the run.
+    imap.on('error', (err) => {
+      imap.lastError = err;
+      reject(err);
+    });
     imap.once('ready', () => {
-      imap.openBox('[Gmail]/All Mail', true, (err, box) =>
-        err
-          ? reject(err)
-          : resolve({ imap, uidvalidity: String(box.uidvalidity), uidnext: box.uidnext }),
-      );
+      const opened = (err, box) =>
+        err ? fail(err) : resolve({ imap, uidvalidity: String(box.uidvalidity) });
+      imap.openBox('[Gmail]/All Mail', true, (err, box) => {
+        if (!err) return opened(null, box);
+        imap.getBoxes((listErr, boxes) => {
+          const all = listErr ? null : findAllMail(boxes);
+          if (!all) return fail(err);
+          imap.openBox(all, true, opened);
+        });
+      });
     });
     imap.connect();
   });
+}
+
+function findAllMail(boxes, prefix = '') {
+  for (const [name, box] of Object.entries(boxes || {})) {
+    const full = prefix + name;
+    if ((box.attribs || []).includes('\\All')) return full;
+    const inner = findAllMail(box.children, full + (box.delimiter || '/'));
+    if (inner) return inner;
+  }
+  return null;
 }
 
 /** IMAP's SINCE takes a date, not a time: 'YYYY-MM-DD' → '23-Oct-2026'. */
@@ -88,17 +112,38 @@ function imapDate(day) {
 
 /**
  * Every message whose subject contains `subjectText` and that is newer than the bookmark
- * (`afterUid`: Gmail's message numbers only grow within one UIDVALIDITY) or, with no bookmark,
- * received on or after `sinceDay`. With its PDF attachments:
+ * (`afterUid`: Gmail's message numbers only grow within one UIDVALIDITY) or received on or after
+ * `overlapSince` (a few days back, for a note Gmail indexed late or one that failed); with no
+ * bookmark, every one received on or after `sinceDay`. With its PDF attachments:
  * [{ uid, subject, received, attachments: [{ filename, content }] }], oldest first.
  */
-function searchNotes(imap, subjectText, { sinceDay, afterUid }) {
-  const range = afterUid != null ? ['UID', `${afterUid + 1}:*`] : ['SINCE', imapDate(sinceDay)];
+const SEARCH_TIMEOUT_MS = 120000;
+
+function searchNotes(imap, subjectText, { sinceDay, afterUid, overlapSince }) {
+  let range = ['SINCE', imapDate(sinceDay)];
+  if (afterUid != null) {
+    range = ['UID', `${afterUid + 1}:*`];
+    if (overlapSince) range = ['OR', range, ['SINCE', imapDate(overlapSince)]];
+  }
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(imap.lastError || new Error('the mailbox stopped answering')),
+      SEARCH_TIMEOUT_MS,
+    );
+  });
+  return Promise.race([search(imap, subjectText, range), timeout]).finally(() =>
+    clearTimeout(timer),
+  );
+}
+
+function search(imap, subjectText, range) {
   return new Promise((resolve, reject) => {
     imap.search([range, ['SUBJECT', subjectText]], (err, found) => {
       if (err) return reject(err);
-      // "n:*" always matches the newest message, even when it is older than n.
-      const uids = (found || []).filter((u) => afterUid == null || u > afterUid);
+      // "n:*" also matches the newest message when it is older than n: harmless, a stored note
+      // is skipped by its hash and alerts are raised only for messages past the bookmark.
+      const uids = found || [];
       if (!uids.length) return resolve([]);
       const parses = [];
       const f = imap.fetch(uids, { bodies: '' });

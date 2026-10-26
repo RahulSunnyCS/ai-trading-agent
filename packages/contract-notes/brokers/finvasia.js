@@ -2,6 +2,8 @@ const Decimal = require('decimal.js');
 const { parseAmounts, splitBySegment } = require('./segments');
 const logger = require('../utils/logger');
 
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // Order in which pdf-parse emits the "Obligation Detail" cells for each
 // exchange/segment row. It follows the PDF's draw order, which is not the
 // printed header order — the arithmetic check below guards against drift.
@@ -42,14 +44,13 @@ function searchSubject(accountId) {
 // "Combined Contract Note for FA1234 23-10-2026" → '2026-10-23' (null if not this account's).
 function noteDay({ subject, accountId }) {
   const m = new RegExp(
-    `Combined Contract Note for ${accountId}\\s+(\\d{2})-(\\d{2})-(\\d{4})`,
+    `Combined Contract Note for ${escapeRegExp(accountId)}\\s+(\\d{2})-(\\d{2})-(\\d{4})`,
   ).exec(subject || '');
   return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
 }
 
 // n is a Decimal (all money math in this file stays in Decimal until this
-// boundary); returns a plain number, since that is what daily_summary.json
-// and the Sheets API expect.
+// boundary); returns a plain number, since that is what the stored line holds.
 function round2(n) {
   return n.toDecimalPlaces(2).toNumber();
 }

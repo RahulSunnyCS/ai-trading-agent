@@ -132,6 +132,12 @@ describe('angelone.searchSubject() / noteDay()', () => {
     );
   });
 
+  test('accepts a revised note named with a suffix', () => {
+    expect(noteDay({ filename: 'CN_R59799620_23102026_1.pdf', accountId: 'R59799620' })).toBe(
+      '2026-10-23',
+    );
+  });
+
   test("ignores another account's note and other files", () => {
     expect(noteDay({ filename: 'CN_R11111111_23102026.pdf', accountId: 'R59799620' })).toBeNull();
     expect(noteDay({ filename: 'ledger.pdf', accountId: 'R59799620' })).toBeNull();

@@ -1,4 +1,4 @@
-const { getBroker, isSupported, loadBrokerAccounts, secretsOf } = require('../../brokers');
+const { getBroker, isSupported, loadBrokerAccounts } = require('../../brokers');
 
 describe('getBroker()', () => {
   test('returns finvasia broker', () => {
@@ -66,17 +66,6 @@ describe('loadBrokerAccounts()', () => {
 
   test('a pretty-printed value read as one line says so', () => {
     expect(() => loadBrokerAccounts('[')).toThrow(/1 characters; it must be on one line/);
-  });
-
-  test('secretsOf lists every password', () => {
-    const config = [
-      {
-        email: 'x@x.com',
-        emailPassword: 'mail-pw',
-        accounts: [{ broker: 'finvasia', accountId: 'X1', pdfPassword: 'pdf-pw' }],
-      },
-    ];
-    expect(secretsOf(config)).toEqual(['mail-pw', 'pdf-pw']);
   });
 
   test('parses valid config successfully', () => {

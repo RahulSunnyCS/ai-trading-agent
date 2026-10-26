@@ -33,8 +33,10 @@ it too). It must be one line, single-quoted: a pretty-printed value reads as `[`
   account, the mail after its bookmark (or, with none, since the window's first session), every
   note's PDF kept, decrypted with `qpdf`, read by the broker plugin, stored as the session's
   line. Then `record.closeWithoutNotes` closes what can have no note. Exit 1 with a list of
-  problems (a note that does not parse, two different notes for one session, a mailbox that
-  will not log in, an account newly quiet); the scheduler alerts with the job's `fixHint`.
+  problems (a note that does not read, two different notes for one session, mail that matched
+  the search but carries no note anyone in the mailbox can read, a mailbox that will not log in,
+  an account newly quiet); the scheduler alerts with the job's `fixHint`. Mail, PDF reading and
+  the clock are injectable (`main(argv, deps)`), which `tests/run.flow.test.js` uses.
 - `store.js` — the files. `storeRoot()` refuses a root on an unmounted `/Volumes/<name>` (like
   `trading_data.db.check_mounted`). `writeLine` replaces one account's line in
   `days/<day>.jsonl` atomically; `saveRaw` keeps `raw/<broker>/<account>/<day>.pdf` (and the
@@ -56,23 +58,30 @@ it too). It must be one line, single-quoted: a pretty-printed value reads as `[`
 
 | Path | What |
 |---|---|
-| `days/<day>.jsonl` | One line per broker account for the session: `status` `note` (with `fno`, the sheet's five figures, `skipped_segments`, the note's sha256, file, subject, received time), `no_trade` or `no_note` (with `reason`) |
+| `days/<day>.jsonl` | One line per broker account for the session: `status` `note` (with `fno`, the sheet's five figures, `skipped_segments`, the note's sha256, file, subject, received time, and `superseded` hashes when `--day` chose between notes), `no_trade`, `no_note` or `failed` (with `reason`) |
 | `raw/<broker>/<account>/<day>.pdf` | The note as mailed (encrypted), and `<day>.decrypted.pdf` |
-| `cursor.json` | Per `<mailbox>\|<broker>/<account>`: `uidvalidity`, `last_uid`, `checked_at` — how far that account's mail has been read |
+| `cursor.json` | Per `<mailbox>\|<broker>/<account>`: `uidvalidity`, `last_uid`, `checked_at` — how far that account's mail has been read — and `quiet_since`, the day a quiet spell began |
 
 **When a session is done for an account** (`record.js`): a note is stored; or `no_trade`,
-because a later session's note for the account arrived and this one's did not (brokers mail a
-note only for a day with trades); or `no_note`, the oldest session of the window when the
-account has had no note in the whole window (an account not trading lately). `no_note` is
-reported once per quiet spell, not daily. A note that arrives later for a session closed as
-`no_trade` or `no_note` replaces that line.
+because a later session's note for the account arrived and this one has no line (brokers mail
+a note only for a day with trades); or `no_note`, the oldest session of the window when the
+account has had no note in the whole window (an account not trading lately). A `failed` line
+(a note that does not read, two different notes) keeps its session open and is never closed as
+`no_trade`; it alerts every run until `node run.js --day D` stores the note (with two notes,
+`--day` takes the newest received and keeps the others' PDFs). A quiet spell alerts on every
+run of the day it begins (so a successful retry cannot swallow the alert), then not until a
+note has arrived. A note that arrives later for a session closed as `no_trade` or `no_note`
+replaces that line. Sessions of an account whose mailbox could not be read are not judged.
 
-**The bookmark.** Gmail's message numbers (UIDs) only grow within one UIDVALIDITY, so a run
-asks only for UIDs after `last_uid`; with none matching it still moves the bookmark to the
-mailbox's newest UID. A changed UIDVALIDITY drops the bookmark and the run reads the window by
-date. The bookmark moves only when everything the account's search returned was stored, so a
-note that fails is read again (and alerts again) until fixed; after a fix, `node run.js --day D`.
-A second, different note for a stored session is reported, never written over.
+**The bookmark.** Gmail's message numbers (UIDs) only grow within one UIDVALIDITY. A run asks
+for UIDs after `last_uid`, or mail received in the 3 days before the last session
+(`OVERLAP_DAYS`): a note Gmail indexed late is still found, a recent failed note is tried again,
+and notes already stored are skipped by hash. (A count of UIDs would not do: one mailbox gets a
+few mails a day, another thousands.) The bookmark
+then moves to the newest UID the search returned; alerts about a message (a second note, mail
+with no readable note) are raised only for messages past the old bookmark, so each fires once.
+With no bookmark, or a changed UIDVALIDITY, the run reads the window by date. A second,
+different note for a stored session is reported, never written over.
 
 ## F&O-only extraction
 

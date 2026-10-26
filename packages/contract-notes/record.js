@@ -49,8 +49,9 @@ function closedLine({ day, broker, account, status, reason, at }) {
 }
 
 // A line with any of these statuses closes the session for its account. 'no_note' is the
-// quiet close for an account with no note at all in the window (one not trading lately); it
-// is reported once, when an account first goes quiet.
+// quiet close for an account with no note at all in the window (one not trading lately).
+// A 'failed' line (a note that could not be read, or two different notes for the session)
+// keeps the session open and is never closed as 'no_trade': its note exists.
 const CLOSED = new Set(['note', 'no_trade', 'no_note']);
 
 const key = (day, broker, account) => `${day}|${broker}/${account}`;
@@ -73,23 +74,24 @@ function openPairs(sessions, accounts, status) {
 /**
  * Lines that close sessions without a note. A broker sends a note only for a day with trades,
  * so:
- * - a session before the account's newest stored note, with no note of its own, had no trade
+ * - a session before the account's newest stored note, with no line of its own, had no trade
  *   (`no_trade`): the later note proves the mailbox is current for that account;
- * - the oldest session of the window, still open with no note anywhere in the window, is
- *   `no_note`: the account has been quiet for the whole window. Leaving it open would re-scan
- *   it forever. `newlyQuiet` lists the accounts whose session before the window
- *   (`previousSession`, its line in `status` too) was not already `no_note`, so the caller
- *   alerts once per quiet spell, not every day.
+ * - the oldest session of the window, with no note and no failed note anywhere in the window,
+ *   is `no_note`: the account has been quiet for the whole window. Leaving it open would keep
+ *   it waiting for ever.
+ * `quiet` lists those quiet accounts (whether or not this call closed a session for them); the
+ * caller keeps when each quiet spell began, so it alerts on that day only.
  */
-function closeWithoutNotes(sessions, accounts, status, at, previousSession) {
+function closeWithoutNotes(sessions, accounts, status, at) {
   const lines = [];
-  const newlyQuiet = [];
+  const quiet = [];
   for (const acc of accounts) {
     const get = (day) => status.get(key(day, acc.broker, acc.accountId));
     const noteDays = sessions.filter((d) => get(d)?.status === 'note');
+    const failed = sessions.some((d) => get(d)?.status === 'failed');
     const newest = noteDays[noteDays.length - 1];
     for (const day of sessions) {
-      if (CLOSED.has(get(day)?.status)) continue;
+      if (get(day)) continue; // closed, or failed and waiting for a fix
       if (newest && day < newest) {
         lines.push(
           closedLine({
@@ -103,8 +105,10 @@ function closeWithoutNotes(sessions, accounts, status, at, previousSession) {
         );
       }
     }
+    if (newest || failed) continue;
+    quiet.push(acc);
     const oldest = sessions[0];
-    if (!newest && oldest && !CLOSED.has(get(oldest)?.status)) {
+    if (oldest && !get(oldest)) {
       lines.push(
         closedLine({
           day: oldest,
@@ -115,10 +119,22 @@ function closeWithoutNotes(sessions, accounts, status, at, previousSession) {
           at,
         }),
       );
-      if (get(previousSession)?.status !== 'no_note') newlyQuiet.push(acc);
     }
   }
-  return { lines, newlyQuiet };
+  return { lines, quiet };
 }
 
-module.exports = { fnoBlock, noteLine, closedLine, openPairs, closeWithoutNotes, key, CLOSED };
+function failedLine({ day, broker, account, reason, at }) {
+  return { ...closedLine({ day, broker, account, status: 'failed', reason, at }) };
+}
+
+module.exports = {
+  fnoBlock,
+  noteLine,
+  closedLine,
+  failedLine,
+  openPairs,
+  closeWithoutNotes,
+  key,
+  CLOSED,
+};

@@ -49,9 +49,4 @@ function loadBrokerAccounts(raw = process.env.BROKER_ACCOUNTS_JSON) {
   return config;
 }
 
-/** Every password in the config, for a secret registry that redacts them from any output. */
-function secretsOf(config) {
-  return config.flatMap((mb) => [mb.emailPassword, ...mb.accounts.map((a) => a.pdfPassword)]);
-}
-
-module.exports = { BROKERS, getBroker, isSupported, loadBrokerAccounts, secretsOf };
+module.exports = { BROKERS, getBroker, isSupported, loadBrokerAccounts };

@@ -2,6 +2,8 @@ const Decimal = require('decimal.js');
 const { isTotalRow, parseAmounts, splitBySegment } = require('./segments');
 const logger = require('../utils/logger');
 
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // Column order of the "Obligation Details" table, one row per exchange/segment.
 const COL = {
   OBLIGATION: 0, // Pay In/Pay Out Obligation (already net of brokerage)
@@ -42,9 +44,11 @@ function searchSubject() {
 
 // "CN_R59799620_23102026.pdf" → '2026-10-23' (null if another account's, or another file).
 function noteDay({ filename, accountId }) {
-  const m = new RegExp(`^CN_${accountId}_(\\d{2})(\\d{2})(\\d{4})\\.pdf$`, 'i').exec(
-    filename || '',
-  );
+  // A revised note may come as CN_<id>_<ddmmyyyy>_1.pdf.
+  const m = new RegExp(
+    `^CN_${escapeRegExp(accountId)}_(\\d{2})(\\d{2})(\\d{4})(?:_\\d+)?\\.pdf$`,
+    'i',
+  ).exec(filename || '');
   return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
 }
 
@@ -65,8 +69,7 @@ function segmentBrokerage(a) {
 }
 
 // n is a Decimal (all money math in this file stays in Decimal until this
-// boundary); returns a plain number, since that is what daily_summary.json
-// and the Sheets API expect.
+// boundary); returns a plain number, since that is what the stored line holds.
 function round2(n) {
   return n.toDecimalPlaces(2).toNumber();
 }

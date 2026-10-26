@@ -29,7 +29,7 @@ describe('notesByDay()', () => {
   });
 
   test('groups notes by session and drops the same note mailed twice', () => {
-    const byDay = notesByDay(
+    const { byDay } = notesByDay(
       [msg(1, '23-10-2026', 'a'), msg(2, '23-10-2026', 'a'), msg(3, '22-10-2026', 'b')],
       acc,
     );
@@ -38,7 +38,7 @@ describe('notesByDay()', () => {
   });
 
   test('keeps two different notes for one session apart, for the run to refuse', () => {
-    const byDay = notesByDay([msg(1, '23-10-2026', 'a'), msg(2, '23-10-2026', 'b')], acc);
+    const { byDay } = notesByDay([msg(1, '23-10-2026', 'a'), msg(2, '23-10-2026', 'b')], acc);
     expect(byDay.get('2026-10-23')).toHaveLength(2);
   });
 
@@ -47,7 +47,9 @@ describe('notesByDay()', () => {
       ...msg(1, '23-10-2026', 'a'),
       subject: 'Combined Contract Note for FA9 23-10-2026',
     };
-    expect(notesByDay([other], acc).size).toBe(0);
+    const { byDay, unread } = notesByDay([other], acc);
+    expect(byDay.size).toBe(0);
+    expect(unread).toHaveLength(1); // nobody in this mailbox claims it: reported
   });
 });
 

@@ -69,46 +69,43 @@ describe('openPairs()', () => {
 
 describe('closeWithoutNotes()', () => {
   test('a session before the newest note, with none of its own, had no trade', () => {
-    const { lines, newlyQuiet } = closeWithoutNotes(
-      S,
-      [ACC],
-      statusOf([['2026-10-23', 'note']]),
-      AT,
-      '2026-10-20',
-    );
+    const { lines, quiet } = closeWithoutNotes(S, [ACC], statusOf([['2026-10-23', 'note']]), AT);
     expect(lines.map((l) => [l.day, l.status])).toEqual([
       ['2026-10-21', 'no_trade'],
       ['2026-10-22', 'no_trade'],
     ]);
-    expect(newlyQuiet).toEqual([]);
+    expect(quiet).toEqual([]);
   });
 
   test('sessions after the newest note stay open: their notes may still come', () => {
-    const { lines } = closeWithoutNotes(
-      S,
-      [ACC],
-      statusOf([['2026-10-23', 'note']]),
-      AT,
-      '2026-10-20',
-    );
+    const { lines } = closeWithoutNotes(S, [ACC], statusOf([['2026-10-23', 'note']]), AT);
     expect(lines.some((l) => l.day === '2026-10-26')).toBe(false);
   });
 
-  test('no note in the whole window closes the oldest session and reports the account once', () => {
-    const first = closeWithoutNotes(S, [ACC], statusOf([]), AT, '2026-10-20');
-    expect(first.lines.map((l) => [l.day, l.status])).toEqual([['2026-10-21', 'no_note']]);
-    expect(first.newlyQuiet).toHaveLength(1);
-
-    // Next day, the session before the window is already no_note: no second report.
-    const next = closeWithoutNotes(
-      ['2026-10-22', '2026-10-23', '2026-10-26', '2026-10-27'],
+  test('a failed note keeps its session open, never no_trade', () => {
+    const { lines, quiet } = closeWithoutNotes(
+      S,
       [ACC],
-      statusOf([['2026-10-21', 'no_note']]),
+      statusOf([
+        ['2026-10-21', 'failed'],
+        ['2026-10-23', 'note'],
+      ]),
       AT,
-      '2026-10-21',
     );
-    expect(next.lines.map((l) => [l.day, l.status])).toEqual([['2026-10-22', 'no_note']]);
-    expect(next.newlyQuiet).toEqual([]);
+    expect(lines.map((l) => [l.day, l.status])).toEqual([['2026-10-22', 'no_trade']]);
+    expect(quiet).toEqual([]);
+  });
+
+  test('no note in the whole window closes the oldest session and lists the account as quiet', () => {
+    const { lines, quiet } = closeWithoutNotes(S, [ACC], statusOf([]), AT);
+    expect(lines.map((l) => [l.day, l.status])).toEqual([['2026-10-21', 'no_note']]);
+    expect(quiet).toEqual([ACC]);
+  });
+
+  test('an account with only a failed note is not quiet', () => {
+    const { lines, quiet } = closeWithoutNotes(S, [ACC], statusOf([['2026-10-22', 'failed']]), AT);
+    expect(lines).toEqual([]);
+    expect(quiet).toEqual([]);
   });
 
   test('closed sessions are left alone', () => {
@@ -122,7 +119,6 @@ describe('closeWithoutNotes()', () => {
         ['2026-10-26', 'note'],
       ]),
       AT,
-      '2026-10-20',
     );
     expect(lines).toEqual([]);
   });
