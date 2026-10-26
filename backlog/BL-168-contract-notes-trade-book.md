@@ -315,6 +315,24 @@ account, behaviour patterns.
   Phase 3.
 - **Done when:** a backup run copies the new folders, and the decision is in the Log.
 
+## Mockups (Phase 2, drafted 2026-10-26, awaiting the owner's approval)
+
+The source is [`assets/BL-168/trade-book-mockup.html`](assets/BL-168/trade-book-mockup.html):
+the dashboard's dark tokens and IBM Plex, the analytics page pattern. Screens 2 and 3 are the
+sheet's real daily rows (FY 2025-26, from the committed copy) computed with the sheet's
+formulas; every other figure is illustrative and marked so on the screen.
+
+| Screen | Mockup |
+|---|---|
+| 1 · Page map: the four views (F&O, Trades, Money, Momentum), the day drawer, the inputs dialog, the states | ![page map](assets/BL-168/1-page-map.png) |
+| 2 · First screen: run bar, headline strip against a benchmark (target pace, last FY, Adaptive paper, NIFTY), hero chart with the follow tooltip | ![first screen](assets/BL-168/2-first-screen.png) |
+| 3 · Widgets: the sheet's ratios (T, U, V, W, Z) in one chart with a switch, the summary block, monthly and FY, by account, charges by kind | ![widgets](assets/BL-168/3-widgets.png) |
+| 4 · Days and the day drawer: accounts and segments, every charge, fills paired into trades by source, the manual inputs, the PDFs | ![day detail](assets/BL-168/4-day-detail.png) |
+| 5 · Trades: results by source, best and worst point of each trade, results by day context, round trips | ![trades](assets/BL-168/5-trades.png) |
+| 6 · Money: return on money in the account, deposits and withdrawals, collateral interest, margin pressure, capital per account | ![money](assets/BL-168/6-money.png) |
+| 7 · Momentum: Kite's notes booked to the weekly lots, planned against filled | ![momentum](assets/BL-168/7-momentum.png) |
+| 8 · States and inputs: a late note, day rows by state, the inputs dialog, a new year with no data | ![states](assets/BL-168/8-states-and-inputs.png) |
+
 ## Risks
 
 - **The sheet and the store drift** — two pipelines read the same mailbox and parse the same
@@ -389,3 +407,7 @@ record from them.
   formulas, turnover); phases now 1 store and job, 2 UI design (first), 3 extraction and
   history, 4 analytics, 5 page, 6 backup. Tagging, overrides and behaviour split into BL-169.
   TODO 2.10.
+- 2026-10-26 — Phase 2: eight mockups drafted (Mockups above), rendered with headless Chromium
+  from one HTML file; the first screen and the ratios use the sheet's real FY 2025-26 rows
+  (net ₹2,80,565, max drawdown −₹83,335, the sheet's own −83,335). Waiting for the owner's
+  approval or changes.
