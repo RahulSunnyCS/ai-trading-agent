@@ -84,10 +84,13 @@ a join the files cannot give):
   - `capital` — the margin available that morning, **per account**, because the brokers count
     collateral differently: Finvasia applies the 50:50 rule (usable = min(total, 2 × cash):
     ₹1 lakh cash + ₹2 lakh non-cash = ₹2 lakh usable), Angel One lets the whole ₹3 lakh be used
-    and charges the collateral interest above for the cash shortfall. The 09:05 margin check
-    (BL-143, `MARGIN_CHECK=on`) already reads both — Finvasia's from AlgoTest `GET /brokers`,
-    Angel One's from `obt angel funds` — so it writes `capital` per account to `manual/` as a
-    side effect, and the page shows it; a day it did not run is typed.
+    and charges the collateral interest above for the cash shortfall. Read **post-market**
+    (owner, 2026-10-26): a `contract-notes-capital` step at 15:50 on trading days, after the
+    square-offs and the live capture, reads both accounts the way the 09:05 margin check does
+    (Finvasia from AlgoTest `GET /brokers`, Angel One from `obt angel funds`, read-only, under
+    the same login guards) and writes the figure to `manual/` as the **next session's**
+    `capital` per account (and the day's `closing_funds`); the page shows it; a session whose
+    read did not happen is typed.
 - **What "done" means.** A day is closed for an account when its note is stored (`note`), or
   as `no_trade` when a later session's note for that account has arrived and this day's has
   not (the broker issues a note only for a day with trades — Kite will be `no_trade` on most
@@ -260,7 +263,8 @@ Not in the note, worth attaching:
 1. ~~The sheet's hand-typed columns `Algos` and `Capital`~~ — answered 2026-10-26 (Design →
    Store, `manual/`): `Algos` is the number of algo trades taken, `algo charges` their
    per-algo fee, `Capital` the morning's usable margin, which differs by broker (Finvasia's
-   50:50 cash rule; Angel One uses all collateral and charges interest on the cash shortfall).
+   50:50 cash rule; Angel One uses all collateral and charges interest on the cash shortfall),
+   read post-market the session before.
 2. ~~The Angel One margin-interest e-mail~~ — found (Design → Brokers). Still open: do other
    debits arrive by e-mail (DP charges, AMC), or only on the ledger?
 3. ~~The Zerodha Kite note's PDF password~~ — added to `BROKER_ACCOUNTS_JSON` as
