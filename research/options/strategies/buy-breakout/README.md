@@ -1,6 +1,6 @@
 # Buy (range breakout)
 
-**Last updated:** 2026-10-14
+**Last updated:** 2026-10-24
 
 ## Definition
 
@@ -70,8 +70,8 @@ in-sample; [BL-090][bl090]). So the open question is Buy as a basket hedge, not 
 
 BL-097 Phase 2 changed one setting at a time on all 48 rotation Buy files, fit 2024-10-09 →
 2025-10-08, holdout 2025-10-09 → 2026-10-09, 488 common sessions, ₹20 an order plus STT, exchange,
-SEBI/IPFT, stamp and GST, no slippage ([BL-097][bl097]). It is a screen: Phase 3 (interactions, the
-pass rule) has not run, so no row has a verdict.
+SEBI/IPFT, stamp and GST, no slippage ([BL-097][bl097]). It is a screen: its Phase 3 (interactions, the
+pass rule) went to BL-104's full grid, whose results are not on this page yet, so no row has a verdict.
 
 The tables compare each variant with the baseline on the same file and give the mean over the valid
 files. They were computed for these pages from `research/bl097/results/buy_sweep_postcharge.csv`

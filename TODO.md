@@ -435,14 +435,14 @@ collector is forward-only".
 | 3.10.15 | Fix NIFTY's pre-Sep-2025 expiry weekday in `expiry_calendar.csv` | claude | **Done 2026-10-07** (BL-034 Phase 2): replaced for history by `expiries_observed.csv` — every expiry the six indices' options actually had, from the lake (2024-10 on), plus three the lake has no contracts for; days-to-expiry now reads it, so Options Lab emits DTE from 2024-10. The weekday rule still answers outside that span. `holidays.csv` audited against the lake in the same change (8 missing closures added, 3 wrong rows fixed) |
 | 3.10.16 | Calibrate the day-anatomy thresholds on the backfilled history | claude | **Open, blocked on 3.10.11** (`obt fyers history`). `QUIET_RANGE_OVER_IMPLIED=0.6` and `TREND_STRENGTH=2.5` are first guesses. Use the Market regimes tab's label-mix table: one state dominating a segment means the threshold is wrong, not the market. Keep `TREND_STRENGTH` length-normalised (3.10.10) |
 | 3.10.17 | Frozen leg-wise characterization suite | claude | **Done 2026-10-03.** Thirty exact-output scenarios: four production strategies × six individual Fyers days, four full-window runs, and two three-day sub-windows. Frozen Parquet inputs and relevant reference tables are SHA-256 pinned; snapshots include the complete trade ledger, daily/aggregate P&L, MTM extrema and MTM-curve hashes. `scripts/update-legwise-goldens.py` is check-only by default and requires explicit `--accept-results`; a calculation correction must be reviewed and accompanied by a focused correctness test rather than blindly accepting snapshots. |
-| 3.10.23 | Directional parameter sweep — [BL-096](backlog/BL-096-directional-parameter-sweep.md) | claude | **Parameter sweep and shortlist diagnostics complete 2026-10-12:** 15,000 primary rows plus 4,400 exploratory secondary rows across 100 Directional files and 488 common sessions. Exact CVaR, Ulcer Index, expectancy, profit factor, MTM-stop, leg-SL, re-entry and CE/PE diagnostics are available for the 1,200-row decision shortlist. Results are pre-cost; a cost-adjusted pass remains before final closure. |
-| 3.10.24 | Buy parameter sweep — [BL-097](backlog/BL-097-buy-parameter-sweep.md) | claude | **Phase 2 complete 2026-10-12:** 2,304 rows (2,258 valid) across 48 variants with post-charge accounting; qualified report generated. Phase 3 interactions/robustness pending. |
-| 3.10.25 | Widesl parameter sweep — [BL-098](backlog/BL-098-widesl-parameter-sweep.md) | claude | **Phase 2 complete 2026-10-12:** 4,950 rows (4,920 valid) across 33 variants with post-charge accounting; qualified report generated. Phase 3 interactions/robustness pending. |
-| 3.10.26 | Full-factorial parameter sweep — [BL-104](backlog/BL-104-full-parameter-sweep.md) | claude | **Stages 1–3 and the 2022–24 advisory run done 2026-10-15.** One band passes all eight rules (Buy SENSEX 09:17–10:02); Widesl SENSEX 12:17–14:02 passes with a regime flag; three Dir SENSEX sets are blocked by re-entry parity and pending the owner's `override:`; Widesl NIFTY 12:17–14:02 rejected by the owner (no stop). Open: finalists' correlation, Buy ₹1-per-fill, bootstrap vs BL-099, forward test, pool POC (owner go), `override:` lines for the tail gate and the Buy 60 % cap. |
+| 3.10.23 | Directional parameter sweep — [BL-096](backlog/BL-096-directional-parameter-sweep.md) | claude | **Done 2026-10-24.** Primary 15k and secondary 4.4k sweeps, diagnostics, and the after-charge grid and shortlist (`primary_diagnostics_charged.csv`); Phase 3 superseded by BL-104 (3.10.26). Not carried: Dir MTM above ₹4,000 (new pre-registration needed) and the 15:20-below-15:10 exit oddity |
+| 3.10.24 | Buy parameter sweep — [BL-097](backlog/BL-097-buy-parameter-sweep.md) | claude | **Done 2026-10-24.** Phase 2 one-factor screen after charges (2,304 rows, qualified report); Phase 3 superseded by BL-104 (3.10.26). Not carried: the ₹100 premium, gap and valid-until, trailing-percent rows, trail × exit |
+| 3.10.25 | Widesl parameter sweep — [BL-098](backlog/BL-098-widesl-parameter-sweep.md) | claude | **Done 2026-10-24.** Phase 2 one-factor screen after charges (4,950 rows, qualified and index reports); Phase 3 superseded by BL-104 (3.10.26) |
+| 3.10.26 | Full-factorial parameter sweep — [BL-104](backlog/BL-104-full-parameter-sweep.md) | claude | **Stages 1–3 and the 2022–24 advisory run done 2026-10-15.** One band passes all eight rules (Buy SENSEX 09:17–10:02); Widesl SENSEX 12:17–14:02 passes with a regime flag; three Dir SENSEX sets are blocked by re-entry parity and pending the owner's `override:`; Widesl NIFTY 12:17–14:02 rejected by the owner (no stop). Open: finalists' correlation, Buy ₹1-per-fill, bootstrap vs BL-099, forward test, `override:` lines for the tail gate and the Buy 60 % cap. |
 | 3.10.27 | Directional trade management (profit lock / trail, roll, restart) — [BL-105](backlog/BL-105-dir-trade-management-tests.md) | claude | **Done 2026-10-15.** Lock / trail / restart (0 of 228) and roll (0 of 336) all fail the registered rule; engine `roll` merged (PR 229) and available, unused. One unregistered SENSEX morning-restart lead noted for a possible new item. |
 | 3.10.28 | Picker POC over a candidate pool — [BL-106](backlog/BL-106-pool-picker-poc.md) | claude | **Done 2026-10-15.** No list beat its Core-298 version on the registered pool New-536 (all intervals straddle zero). New-556 (exploratory, with the NIFTY ITM sets) had a shallower drawdown in one path with no interval, at a return within the noise; the lists were fitted inside the test year, which favours Core-298. Needs forward days to separate ([BL-112](backlog/BL-112-group-leaders-shadow.md)). |
 | 3.10.29 | T1 parallel track — [BL-113](backlog/BL-113-t1-parallel-track.md) | claude | **In progress 2026-10-16.** Built and backfilled; first forward entry Mon 2026-10-19 09:16 (Adaptive only, own journal, private Telegram labelled T1 TRACK); supersedes BL-112's Group Leaders track; read-out at 60 forward days vs the live Adaptive. |
-| 3.10.30 | Expiring-index rule for Adaptive — [BL-122](backlog/BL-122-expiring-index-only-rule.md) | claude | **Built 2026-10-18 (owner decision, override of BL-111 H3's "adopt nothing").** From Mon 2026-10-19 09:16, on a day exactly one index expires, list C (live and T1) takes only that index's strategies: a filter of the unrestricted ranking, Widesl minimum kept, Buy kept only if on that index. Entries record `expiry_only` and the unfiltered picks; A / B / REF and every earlier day unchanged. Kill switch `ROTATION_EXPIRY_ONLY_FROM=off`. Open: check the first NIFTY and SENSEX rule days. |
+| 3.10.30 | Expiring-index rule for Adaptive — [BL-122](backlog/BL-122-expiring-index-only-rule.md) | claude | **Done 2026-10-24.** Built 2026-10-18 (owner override of BL-111 H3). First rule days Mon 2026-10-19 (NIFTY) and Thu 2026-10-22 (SENSEX) recorded live and T1 with `expiry_only` and the unfiltered picks; both journals verify intact; re-score `same_picks` on both days |
 | 3.10.31 | Rotation Telegram messages redone — [BL-125](backlog/BL-125-rotation-telegram-v2.md) | claude | **Built 2026-10-18 (owner request).** 09:16: one message, Adaptive then T1 labelled testing phase, strategies shown as self-explaining labels with their settings; T1 never delays Adaptive. Evening: a short message at 16:00 (new job `options-rotation-result`) with both results and tomorrow's strategies in full; the T1 update moved into the 15:45 evening chain. Picks, scoring and journal unchanged. Open: restart the scheduler after merge (it reads `jobs.ts` at start); read the first days' messages. |
 | 3.10.32 | Lot plans tracked forward — [BL-135](backlog/BL-135-rotation-lot-plans-forward.md) | claude | **In progress 2026-10-18 (owner request).** Phase 0 registered before the 2026-10-19 09:16 entry: As picked, Dir Boost and Duo per book (Core, T1) from the journals and stored one-lot results, brokerage included; read-out at 60 forward scored days. Read-only; changes no pick. |
 | 3.10.33 | Desk screens and strategy tester — [BL-120](backlog/BL-120-desk-screens-and-strategy-tester.md) | claude | **In progress 2026-10-18.** Phase 0 answers recorded (Live tab + Options Lab placement, confirmation locked by default, chat route before the page text box, frozen Live-group tabs hidden in Phase 3). Phase 1 built 2026-10-18 (rule spec and grammar, event detection, simulation cache, placebo / random-time / charges, store and ledger, `obt rule`, `/legwise/rules/*`): reproduces BL-083's four triggers' firings and T1 / T4 → Dir event rows to the rupee; a two-year test runs in under a minute. 2026-10-20: the grammar gained Supertrend, Bollinger bands, a rule `exit_when` and a premium-% -of-spot strike (no test run). Next: Phase 2 (MCP tool). |
@@ -451,6 +451,11 @@ collector is forward-only".
 | 3.10.36 | Breakout support from Bank Nifty, Nifty IT and Reliance — [BL-153](backlog/BL-153-breakout-support-from-bank-it-reliance.md) | claude | **Done 2026-10-22: killed.** Two of three beyond their own level made no reliable difference in the four reference variants. |
 | 3.10.37 | "Days like today" for Adaptive's late picks — [BL-022](backlog/BL-022-analog-day-search.md) | claude | **Done 2026-10-22: killed at the gate.** Phase 0 registered before any run (owner's choices: 10:30 / 11:00 / 12:00, skip or heatmap swap, recent period decides). The 20 nearest earlier sessions' rest-of-day range ranks today's at Spearman 0.38–0.44, below BL-110's opening-range rule (0.49–0.52) and the VIX-implied move (0.43–0.45), at every check time and with both distances (Holm p ≥ 0.92; same order in 2022–24 and on SENSEX). The skip / swap replay was not run, as registered. The "20 days like today" view (Phase 4) is open as a look-only tool. |
 | 3.10.38 | Stop size by the morning — [BL-155](backlog/BL-155-stop-by-morning-type.md) | claude | **Done 2026-10-22: killed at step 1.** Phase 0 registered before any run (owner idea: wide stop after a quiet morning, tight after a wide one). On the heatmap's NIFTY ATM straddles 11:15–14:45, 2025-01 → 2026-10, the rule made +₹40 per lot-day net against +₹32–35 for fixed 60 / 80 / 100 % and the reversed rule; every 90% lower bound is below zero, and the rule is below shuffled labels. The real-Widesl step was not run, as registered. Lead, not adopted: after a quiet morning the widest stop is best on NIFTY in both periods. |
+| 3.10.39 | Adaptive: shrink the 09:16 fits by sample size, plus opening labels — [BL-154](backlog/BL-154-adaptive-fit-shrinkage.md) | claude | **Done 2026-10-22: killed.** Phase 0 registered before any run (owner: P1 decides, shrink toward the variant's own mean, k = 10). Replay of list C over Core-298, 431 days, parity with `score_history` on every day. On P1, shrinkage −₹24 per lot-day [−116, +75], 1 of 20 shuffles above it, drawdown 21% deeper; the gap / previous-range labels −₹20 [−91, +48]. Shrinkage is wholly negative on P2 (−₹172) and on the whole span (−₹71). Today's fits beat all 20 label shuffles on P2 and the whole span. Nothing live changes. |
+| 3.10.40 | Leg and overall MTM stop: tick or candle close — [BL-156](backlog/BL-156-mtm-stop-tick-vs-candle-close.md) | claude | **Done 2026-10-23.** Tick model calibrated on the 23 Oct live stop (13:45, −₹2,550 vs −₹2,554.50); paper reproduced exactly. T1, 431 days, four combinations: leg tick + MTM close (paper) +₹1,526 / day; leg tick + MTM tick (live) +₹1,470; leg close + MTM close +₹1,112; leg close + MTM tick +₹1,021. **Candle-close leg stops are significantly worse** (−₹432 / day main effect, every half-year; Dir −₹220 a pick). The MTM rule is not significant (+₹56 [−18, +153]). Keep leg stops on tick; the MTM candle close is optional (AlgoTest only). (3.10.39 left for BL-154.) |
+| 3.10.41 | Eight out-of-the-box POC reads (VRP, skew, PCR, overnight, post-event, condor margin, ratio spread, skip calendar) — [BL-159](backlog/BL-159-eight-poc-reads.md) | claude | **Done 2026-10-23: no lead survives.** The overnight straddle's t 2.15 is the 09:15–09:24 premium fall; nothing else reached \|t\| 2. |
+| 3.10.42 | Overnight short straddle into expiry morning, hedged, NIFTY + SENSEX — [BL-160](backlog/BL-160-overnight-straddle-into-expiry.md) | claude | **Done 2026-10-23: failed.** −₹34 a night (t −0.29) on NIFTY 2022–24; hedges cut the tail but take the return. |
+| 3.10.43 | NIFTY gap-and-go band → Williams back-up chain, 150-point ITM buys (POC) — [BL-164](backlog/BL-164-gap-and-go-williams-chain.md) | claude | **In progress 2026-10-25.** Phase 1: `prev_at` / `prev_agg` / `ever` in the rule grammar, `trail_peak` and `stop_on: close` in the legwise engine. Nothing run. |
 
 ### 3.11 Local research database (`packages/trading-data`)
 
@@ -516,7 +521,7 @@ while the parity gaps below remain open. Do not create a competing frontend pack
 | 3.12.16 | Momentum Scores redesign — [BL-049](backlog/BL-049-momentum-scores-redesign.md) | claude | **Done 2026-10-08** (#124, #126, #127, #128). `Sectors | Stocks` switch (Sectors default) with the URL-driven sector page and stock drawer; 1–10 score strips over 1w–52w, Broad's rank and its weekly change, the market strip and movers; the rotation map of the 24 parent groups (themes table-only, minimum stocks adjustable, default 5); saved views of the Stocks list, circuit locks over 52 weeks in the drawer and the "How to read the strip" card. Owner answers and the full record are in the item's Log. Builds on the Analytics page pattern (`apps/dashboard/CLAUDE.md`). |
 | 3.12.17 | Momentum "This week" and Journal redesign — [BL-051](backlog/BL-051-momentum-this-week-and-journal.md) | claude | **In progress** (started 2026-10-08). Phase 1 done (#133, #135): favourite status (Watching / Paper / Invested, Paper + Invested at most 8), groups (the Phase 6 ensemble, created live as the headline), the headline Telegram sends, Saved runs. Phase 2 done (#137): the This week page. Phase 5 done (#148; alerts: `GET /api/alerts` from the checks the Telegram jobs use, the bell in the top bar and a once-a-day pop-up on every tab, remembered per browser; kinds: split to classify, headline data not ready, journal entry missing, unreviewed Check / Not reproducible change, live-money rule). Phase 3 in progress: Your orders (paper ₹1 lakh / Fyers holdings read-only), the exact week-ahead decision for delay-1 strategies, the Fri 14:15 `momentum-orders` job (#143); Friday live scores on the Scores page. Deferred until a delay-0 favourite is followed: delay-0 live estimates and "Since your 14:15 orders". Phases 4 and 6 remain: Fyers basket and fills, Journal. |
 | 3.12.18 | Momentum Saved runs redesign — [BL-052](backlog/BL-052-momentum-saved-runs-redesign.md) | claude | **Done 2026-10-08** (#132, #134, #136, #138, #139, Phase 3 PR). One strategy per normalised set of settings; every run's data and code fingerprints and the append-only why-it-moved log (Telegram for a favourite's Not reproducible); the merge, applied to the live catalog; the strategies page and drawer; the findings card. Follow-ups in the item's Log. |
-| 3.12.19 | Momentum on all rebalance Fridays — [BL-087](backlog/BL-087-momentum-all-fridays-split.md) | claude | **Built 2026-10-09, awaiting merge and the live migration.** Opt-in "All Fridays" backtest (`split_fridays`: every offset, capital / K, equal capital each April; Friday luck card); favouriting such a run follows it as one group of sleeves, one per Friday; `mbt saved split-fridays [--apply]` moves today's 10 every-2+-weeks favourites the same way (dry run by default, **not applied to the live catalog**); This week names the sleeve that trades; the Rebalance preview takes a group. Measured: median worst fall -27.6% split vs -31.1% on a typical single Friday. |
+| 3.12.19 | Momentum on all rebalance Fridays — [BL-087](backlog/BL-087-momentum-all-fridays-split.md) | claude | **Done 2026-10-24.** All-Fridays backtest, groups of sleeves and `mbt saved split-fridays` merged (#152); the live migration is applied: the weeks of Fri 2026-10-16 and 2026-10-23 each have 43 of 43 journal entries, 38 of them sleeves from 10 groups |
 
 ---
 
@@ -538,6 +543,7 @@ where each phase stands. No momentum CAGR is a "result" until Phases 1–3 pass.
 | 3.13.8 | Momentum filter POC — [BL-050](backlog/BL-050-momentum-filter-poc.md) | claude | **Done 2026-10-09 (phases 0-3): no survivor.** Screen passes V1/V2/T1/R1; the engine test on the frozen ensemble passes none (PBO 0.72, dCAGR within +/-0.4 pts); hold-out unread; Phase 4 not applicable |
 | 3.13.9 | Check of the followed strategy (Four Sectors Monthly, No Tilt, all Fridays) under the real trade's assumptions (addendum 6) | claude | **Done 2026-10-22: verdict MIXED.** About 26% a year after tags, tax and Monday-open fills (25.5% on the delay-0 supplement; 44.9% as ranked), about 9 points over Mom30 TRI; fails the medium drawdown basket (-32.8%) and the bad-year rule (FY2024 -22.5 points); plateau, alpha and placebo pass. `packages/momentum-backtesting/docs/bl010-four-sectors-check-2026-10-22.md`. **Open:** owner decides size and rules; E13 Monday-fill option in the engine |
 | 3.13.9 | voladj follows the selected lookbacks — [BL-086](backlog/BL-086-voladj-follows-lookbacks.md) | claude | **Done 2026-10-09: killed, all three skip rules** (-7.5 to -12.0 pts a year after tax on FY2018-22, 0-1 of 10 better). Keep today's score. Found: its 'skip-month' widens the window (30/56 weeks to the latest close) instead of skipping; relabel or fix is an owner decision |
+| 3.13.10 | Favourites × score × signal delay — [BL-161](backlog/BL-161-favourites-score-and-friday-fill.md) (written as BL-056) | claude | **Done 2026-10-09: score killed, delay matters.** 84 runs on the 14 favourite configs (11 voladj): rank-sum improves Martin on 1 of 11, Blend on 2 (median Martin -2.08 / -1.20, max DD 6.9 / 5.7 pts deeper); signal delay 0 vs 1 moves single configs by -7.1 to +6.9 pts of CAGR (median \|Δ\| 3.4, no fixed direction). No favourite changed. `search_spaces/bl161_summary.json`, `scripts/bl161_report.py`. Ported to `main` 2026-10-24 under the new number |
 
 ### 3.14 Momentum result integrity — [BL-001](backlog/BL-001-momentum-result-integrity.md)
 
@@ -573,7 +579,7 @@ The plan and the owner's decisions live in the backlog item; this table only tra
 
 | # | Task | Owner | State |
 |---|---|---|---|
-| 3.17.1 | Phase 1: pre-registration in the backlog template + `_EXPERIMENT.md` | claude | **Built 2026-10-06.** Closes when the next research item is created from it |
+| 3.17.1 | Phase 1: pre-registration in the backlog template + `_EXPERIMENT.md` | claude | **Done 2026-10-24.** BL-104 and the research items since were created from the template's Phase 0 |
 | 3.17.2 | Phase 2: research-gate rule in root `CLAUDE.md` (`override: <reason>`) | claude | **Done 2026-10-06** |
 
 ### 3.18 Faster Momentum backtests — [BL-005](backlog/BL-005-faster-momentum-backtests.md)
@@ -679,6 +685,8 @@ should be re-entered; P2 + P3 first, P1 once the rule is frozen.
 | 3.26.4 | Stage 2: true vs false tops over 32 parameters; rule R1 through the trading test | claude | **Done 2026-10-11.** IV change separates; R1 does not pass |
 | 3.26.5 | Time gates: no re-entry before 13:30 / 14:00 / 14:30 / 14:50, and gating every entry (F) | claude | **Done 2026-10-11 as an unregistered look (13 variants).** F1450 meets the screening bar on P2 + P3 (NIFTY 2025 +₹241 vs comparator, t 2.45); a lead, not a result. Owner's `override:` line owed in the BL-091 Log |
 | 3.26.6 | Owner decision: register R3 or F1450 (counting all 31 arms tried, with a causal comparator) as one question for the held-back year, or close | owner | **Open** |
+| 3.26.7 | [BL-123](backlog/BL-123-late-straddle-giveback-widesl.md): the owner's late-day rule (after 14:30, a held rise from the day's low then a 15-point give-back starts a Widesl, ₹1,000 stop), pre-registered; rule as first stated inconclusive by construction (4 / 8 / 7 events), day's-low reading run on NIFTY P2 + P3 pooled | claude | **Run 2026-10-18: inconclusive** (36 events, +₹151 per Widesl, +₹126 over a causal placebo, t 0.94). P1 unread. **Parked by the owner 2026-10-18** (renumbered from BL-120) |
+| 3.26.8 | [BL-124](backlog/BL-124-opening-straddle-break-long-straddle.md): the owner's opening-straddle break rule (after 09:30, the 09:17–09:30 high broken and 10 points up buys a long straddle, 25% leg stops, trail 3:2), two readings, NIFTY P2 and P3 | claude | **Done 2026-10-18: killed.** Both readings lose in both periods (−₹292 to −₹596 per straddle) and are no better than the same straddle on ordinary days. P1 unread. Parked by the owner (renumbered from BL-121) |
 
 ### 3.27 Portfolio MTM stop on the Rotation page — [BL-095](backlog/BL-095-portfolio-mtm-stop-in-rotation.md)
 
@@ -737,6 +745,44 @@ Owner (2026-10-19): build the deploy function ready, off by default; it may neve
 |---|---|---|---|
 | 3.31.1 | The /live page and the Setup Execution sheet, read from the screen | claude | **Done 2026-10-19** (`docs/algotest-execution.md` §7); what Activate asks is still unseen |
 | 3.31.2 | Deployer `packages/broker-login/src/strategy-deploy.ts` + `deploy-plan.ts` (8 tests), jobs `algotest-deploy` 09:16 and `algotest-deploy-check` 15:35 | claude | **Built 2026-10-19**, off until `ALGOTEST_DEPLOY=on`; the first `--apply` must be watched by the owner |
+
+### 3.42 T1 on range-bound days — [BL-144](backlog/BL-144-t1-range-bound-days.md)
+
+Owner (2026-10-21): a year of daily results for 3 x Widesl, the base, Core and T1 with day and 7-day ranges, and a
+study of whether T1 moves to wider stops on range-bound days. Pre-registered 2026-10-21 before any run.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.42.1 | Pre-registration committed | claude | **Done 2026-10-21** |
+| 3.42.2 | The table (CSV) and the study, verdicts against the registered rules, findings page | claude | **Done 2026-10-21.** H1 not met (+10.0 pp vs +15 pp), H2 met; `research/options/common/t1-range-bound-days.md` |
+
+### 3.43 T1 robustness, regime lag and opening range — [BL-145](backlog/BL-145-t1-robustness-lag-opening-range.md)
+
+Owner (2026-10-21): follow-ups to BL-144 (breadth, lag after a regime change, opening-range gate). Pre-registered before any run.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.43.1 | Pre-registration committed | claude | **Done 2026-10-21** |
+| 3.43.2 | Run Q2-Q4 (Q4 learning, then one confirmation run), findings page | claude | **Done 2026-10-21.** Broad; no lag; gate works but thin; `research/options/common/t1-robustness-and-lag.md` |
+
+### 3.44 Special days — [BL-146](backlog/BL-146-special-days.md)
+
+Owner (2026-10-21): behaviour on Budget, election-result, RBI-policy and high-premium days; anything to add to T1.
+Pre-registered before any run.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.44.1 | Pre-registration committed | claude | **Done 2026-10-21** |
+| 3.44.2 | Run the event table and E1-E3, findings page | claude | **Done 2026-10-21.** E1 met, E2 met, E3 no change; `research/options/common/special-days.md` |
+
+### 3.45 Directional early exit at 14:55 — [BL-147](backlog/BL-147-directional-early-exit.md)
+
+Owner (2026-10-21): would closing the directional strategies at 14:55 help against a late recovery. Pre-registered before any run.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.45.1 | Pre-registration committed | claude | **Done 2026-10-21** |
+| 3.45.2 | Rerun every Dir variant at 14:55, populations A and B, the owner's pattern, findings page | claude | **Done 2026-10-21.** The 14:55 exit hurts; `research/options/common/directional-early-exit.md` |
 
 ## Reference — where detail lives
 
@@ -811,3 +857,36 @@ the backtest, report the slippage signed at 16:00 (owner only), and track the tr
 | 3.36.2 | Phase 2: `live-capture` 15:40 + `live-capture-retry` 15:55 (`src/live-capture.ts`), the day file, back-fill of missed days (no delete gate: both platforms keep the results) | claude | **Built 2026-10-20**, run by hand for 14, 15 and 19 Oct into scratch files; needs the scheduler restart (new jobs) |
 | 3.36.3 | Phase 3: `obt rotation live-compare` and the lines in the owner's 16:00 message | claude | **Built 2026-10-20**; the Rotation page's Live vs paper card (live, paper, gap, discretionary, running chart, by shape) **built 2026-10-22**. Reconciling a week against the contract notes is the owner's |
 | 3.36.4 | Phase 4: slippage per shape into the backtests (research, pre-register first) | — | After 20 forward days |
+
+### 3.37 Momentum at Monday's open — [BL-158](backlog/BL-158-momentum-monday-open-fill.md)
+
+Owner (2026-10-24): test the followed Four Sectors group at Monday's open (signal delay 0) against how it
+is followed now; switch only if the pre-registered test passes, then realign every Kite lot at once.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.37.1 | Phase 0: pre-registration (`search_spaces/bl158_criteria.json`) | claude→owner | **Done 2026-10-24**, approved by the owner and committed before the run |
+| 3.37.2 | Phase 1: run the rolling-window test, record pass or kill | claude | **Done 2026-10-24: killed.** Fails 3 of 5 rules (wins CAGR and Sharpe in 5 of 28 windows; median drawdown 3.34 pts deeper; worst 11.26 pts deeper); passes median CAGR +1.12 and after tax +1.28 |
+| 3.37.3 | Phase 2: switch the followed strategy, Friday-evening orders for Monday AMOs, realign the lots (only on a pass) | — | Dropped: Phase 1 killed it |
+| 3.37.4 | Phase 3: 13-week forward read-out (only if switched) | — | Dropped: not switched |
+
+### 3.41 Rule agents — [BL-119](backlog/BL-119-rule-agents-paper-and-retrospection.md)
+
+Owner (2026-10-18): agents that follow rules he gives, trade them as paper trades, retrospect each evening, and
+are replaced by better ones. First rule: a break of a rolling 60-bar NIFTY range after a consolidation.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.41.1 | Phase 0 and Amendment 1 (rolling rule, long and short-premium arms, 2019-2021 confirmation period) pre-registered before any run | claude | **Done 2026-10-18.** Nothing run |
+| 3.41.2 | Phase 1: event study on periods A and B (event counts first, then placebo and trades) | claude | **Next** |
+
+### 3.46 Dashboard on Next.js 16 — [BL-157](backlog/BL-157-dashboard-nextjs-16.md)
+
+OpenNext refuses Next.js 15 since 2026-10-21, so every `release` deploy fails and `dashboard.codifie.dev`
+is stuck on the 2026-10-18 build. Owner (2026-10-26): upgrade, not the unsupported-version flag.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.46.1 | Phase 1: `next` 16.4.x + `@opennextjs/cloudflare` 1.20.13, `--webpack` on every dev/build call, React stays 18 | claude | **Built 2026-10-26** (PR open): build, typecheck and 1,980 unit tests pass; e2e matches Next 15; the 180 s proxy timeout holds under `next dev` and `next start` |
+| 3.46.2 | Phase 2: Worker preview against the local APIs, then the `main` → `release` promotion | claude | Next (owner: go straight on to `release` if the checks pass) |
+| 3.46.3 | Phase 3: React 19, `proxy.ts`, Turbopack | — | Waits (owner 2026-10-26) |

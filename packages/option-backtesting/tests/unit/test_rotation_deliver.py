@@ -4,6 +4,7 @@ result deliverable."""
 
 from __future__ import annotations
 
+import json
 import time as clock
 from datetime import date, datetime, time
 
@@ -604,3 +605,31 @@ def test_result_soft_fail_alerts_and_exits_zero(monkeypatch):
     monkeypatch.setattr(deliver, "send_result", boom)
     soft = CliRunner().invoke(rotation_app, ["result", "--day", "2026-10-20", "--soft-fail"])
     assert soft.exit_code == 0 and len(alerts) == 2
+
+
+def test_the_evening_keeps_its_tentative_lists_and_the_morning_compares_with_them(evening):
+    _t1_ready(evening)
+    assert _send(evening, Sent()) == 0
+    saved = rotation_result.read_tentative("2026-10-21", evening)
+    assert saved["adaptive"]["core"] == LIVE_CORE and saved["t1"]["core"] == T1_CORE
+    assert saved["adaptive"]["sent_on"] == DAY.isoformat()
+    # a print-only run keeps nothing
+    rotation_result.tentative_path("2026-10-21", evening).unlink()
+    assert _send(evening, Sent(), telegram=False) == 0
+    assert rotation_result.read_tentative("2026-10-21", evening) == {}
+
+
+def test_the_morning_says_whether_each_list_changed_since_the_evening(tmp_path):
+    previous = {
+        "adaptive": {"day": DAY.isoformat(), "sent_on": "2026-10-19", "core": LIVE_CORE, "buy": []},
+        "t1": {"day": DAY.isoformat(), "sent_on": "2026-10-19", "core": T1_CORE[:2], "buy": []},
+    }
+    path = rotation_result.tentative_path(DAY.isoformat(), tmp_path)
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(previous))
+    sent = Sent()
+    assert _run(Recorder(), sent, root=tmp_path) == 0
+    private, group = sent.to(None)[0], sent.to("-456")[0]
+    assert "✅ No change from yesterday's list" in group
+    assert "🔄 Changed from yesterday's list: ➕ 13:17  N_widesl_p150" in private
+    assert "🔄" not in group

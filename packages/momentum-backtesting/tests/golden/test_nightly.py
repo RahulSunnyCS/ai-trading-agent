@@ -27,8 +27,10 @@ pytestmark = pytest.mark.skipif(
 
 #: (scenario, setting) -> why putting it back changes nothing in that scenario.
 LOCKS_IDLE = (
-    "no circuit lock changes a fill in this scenario; only broad_gates_loosened_and_tilted has a "
-    "result that depends on the setting: finding F3"
+    "no circuit lock falls on a name the Broad ranking ranks that week, so no fill can change; no "
+    "golden scenario's result depends on broad_respect_circuits (finding F3), so "
+    "test_broad_parity's test_respect_circuits_hands_the_engine_masks_for_the_fill_session pins "
+    "the wiring instead"
 )
 INERT: dict[tuple[str, str], str] = {
     ("etf_filter_taxed_itemised", "cost_pct"): "the itemised cost model prices every fill from "
@@ -37,6 +39,10 @@ INERT: dict[tuple[str, str], str] = {
     "take tax (api.py `_run_broad` docstring; saved_identity.IGNORED_FIELDS)",
     (
         "broad_default",
+        "broad_respect_circuits",
+    ): LOCKS_IDLE,
+    (
+        "broad_monday_open",
         "broad_respect_circuits",
     ): LOCKS_IDLE,
     (

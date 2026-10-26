@@ -157,7 +157,7 @@ A_ROWS = [("N_p100_1202", -460.0), ("N_ditm1_0917", 1200.0), ("N_wide_1117", 500
 T1_ROWS = [("N_ditm1-t1s36_0947", -280.0), ("N_p150-t1s11_0917", -30.0)]
 
 
-def _next(day=date(2026, 10, 21), core=None, buy=(), options=None, expiry_only=None):
+def _next(day=date(2026, 10, 21), core=None, buy=(), options=None, expiry_only=None, dte=None):
     return tomorrow.NextPicks(
         day,
         day.strftime("%a"),
@@ -165,6 +165,7 @@ def _next(day=date(2026, 10, 21), core=None, buy=(), options=None, expiry_only=N
         list(buy),
         options,
         expiry_only,
+        dte,
     )
 
 
@@ -187,7 +188,7 @@ def test_the_evening_message_for_a_normal_day():
    09:17  N_widesl_p150   −₹30
    09:47  N_dir_ITM1     −₹280
 
-➡️ Wed 21 Oct
+➡️ Wed 21 Oct (Tentative)
 
 🎯 Adaptive
 1️⃣ 09:17  N_dir_ITM1
@@ -228,7 +229,7 @@ def test_tomorrow_being_a_rule_day_is_one_short_line():
     text = messages.render_result(
         date(2026, 10, 16), (10.0, A_ROWS[:1]), None, _next(date(2026, 10, 19), expiry_only="NIFTY")
     )
-    assert "➡️ Mon 19 Oct\n⚡ NIFTY only\n\n🎯 Adaptive\n1️⃣" in text
+    assert "➡️ Mon 19 Oct (Tentative)\n⚡ NIFTY only\n\n🎯 Adaptive\n1️⃣" in text
     assert "Expiry day" not in text
     plain = messages.render_result(date(2026, 10, 16), (10.0, A_ROWS[:1]), None, _next())
     assert "only" not in plain.replace("Adaptive", "")
@@ -256,4 +257,80 @@ def test_the_t1_followup_is_a_message_of_its_own():
     text = rotation_result.render_t1_followup(done, _next(core=T1_CORE))
     assert text.startswith("📊 Tue 20 Oct · T1 result\n1 lot per strategy, after costs\n\n🧪 T1 ")
     assert "Adaptive" not in text.split("➡️")[0]
-    assert "➡️ Wed 21 Oct\n\n🧪 T1\n1️⃣ 09:17  N_widesl_p150" in text
+    assert "➡️ Wed 21 Oct (Tentative)\n\n🧪 T1\n1️⃣ 09:17  N_widesl_p150" in text
+
+
+# -- DTE, (Tentative) and the morning's change line (2026-10-23) ------------------------------
+
+DTE = {"NIFTY": "2", "SENSEX": "4"}
+
+
+def test_the_evening_next_day_is_tentative_and_adaptive_says_its_dte():
+    text = messages.render_result(date(2026, 10, 20), (1240.0, A_ROWS), None, _next(dte=DTE))
+    assert "➡️ Wed 21 Oct (Tentative)\n\n🎯 Adaptive · NIFTY 2 DTE · SENSEX 4 DTE\n1️⃣" in text
+    assert messages.dte_text({"NIFTY": "7+", "SENSEX": "unknown"}) == "NIFTY 7+ DTE"
+    assert messages.dte_text(None) == ""
+
+
+def _previous(core, day="2026-10-20", sent_on="2026-10-19", buy=()):
+    return {"day": day, "sent_on": sent_on, "core": list(core), "buy": list(buy)}
+
+
+def test_the_morning_says_no_change_when_the_picks_are_last_evenings():
+    live = _entry(dte=DTE)
+    t1 = _entry(core=T1_CORE, track="t1", hash="aaaaaaaa22222222", dte=DTE)
+    previous = {
+        "adaptive": _previous(["N_wide_1117", "N_p100_1202", "N_ditm1_0917"]),
+        "t1": _previous(T1_CORE),
+    }
+    private, group = messages.render_morning(live, None, t1, previous=previous)
+    head = "🎯 ADAPTIVE · Tue 20 Oct · NIFTY 2 DTE · SENSEX 4 DTE\n✅ No change from yesterday's list\n\n1️⃣"
+    assert private.startswith(head) and group.startswith(head)
+    assert "🧪 T1 · TESTING PHASE · not traded\n✅ No change from yesterday's list\n\n" in private
+
+
+def test_the_morning_names_what_changed():
+    previous = {"adaptive": _previous(["N_wide_1117", "N_p100_1202", "N_dir_0932"])}
+    _, group = messages.render_morning(_entry(), None, None, previous=previous)
+    assert (
+        "🎯 ADAPTIVE · Tue 20 Oct\n🔄 Changed from yesterday's list: ➖ 09:32  N_dir_ATM"
+        " · ➕ 09:17  N_dir_ITM1\n\n1️⃣"
+    ) in group
+
+
+def test_a_monday_names_the_friday_and_an_old_list_is_ignored():
+    monday = _entry(day="2026-10-26")
+    core = monday["lists"]["C"]["core"]
+    fri = {"adaptive": _previous(core, day="2026-10-26", sent_on="2026-10-23")}
+    _, group = messages.render_morning(monday, None, None, previous=fri)
+    assert "✅ No change from Fri's list" in group
+    stale = {"adaptive": _previous(core, day="2026-10-23", sent_on="2026-10-22")}
+    _, group = messages.render_morning(monday, None, None, previous=stale)
+    assert "change" not in group.lower()
+
+
+def test_the_tentative_lists_are_kept_and_the_t1_followup_adds_to_them(tmp_path):
+    sent_on = date(2026, 10, 20)
+    rotation_result.save_tentative(sent_on, _next(dte=DTE), "🧪 T1 · not ready", tmp_path)
+    doc = rotation_result.read_tentative("2026-10-21", tmp_path)
+    assert doc == {
+        "adaptive": {
+            "day": "2026-10-21",
+            "sent_on": "2026-10-20",
+            "core": ["N_wide_1117", "N_ditm1_0917", "N_p100_1202"],
+            "buy": [],
+        }
+    }
+    rotation_result.save_tentative(sent_on, None, _next(core=T1_CORE), tmp_path)
+    doc = rotation_result.read_tentative(date(2026, 10, 21), tmp_path)
+    assert doc["t1"]["core"] == T1_CORE and doc["adaptive"]["core"][0] == "N_wide_1117"
+    assert rotation_result.read_tentative("2026-10-22", tmp_path) == {}
+
+
+def test_a_malformed_evening_list_only_leaves_the_line_out():
+    for bad in (
+        {"adaptive": "oops"},
+        {"adaptive": {"day": "2026-10-20", "sent_on": "not-a-date", "core": 5}},
+    ):
+        _, group = messages.render_morning(_entry(), None, None, previous=bad)
+        assert group.startswith("🎯 ADAPTIVE · Tue 20 Oct\n\n1️⃣")

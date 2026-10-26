@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fcntl
+import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -128,6 +129,51 @@ def mark_sent(result: DailyResult, root: Path | None = None, kind: str = "") -> 
     path = sent_marker(result, root, kind)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f"{kind or 'owner'}: sent\n")
+
+
+def tentative_path(day: date | str, root: Path | None = None) -> Path:
+    """The lists the evening message sent for session `day` (its "(Tentative)" section)."""
+    return _notifications_dir(root) / f"{day}.tentative.json"
+
+
+def _picks_doc(picks, sent_on: date) -> dict | None:
+    if picks is None or isinstance(picks, str):  # a note: no list was sent
+        return None
+    return {
+        "day": picks.day.isoformat(),
+        "sent_on": sent_on.isoformat(),
+        "core": list(picks.core),
+        "buy": list(picks.buy),
+    }
+
+
+def save_tentative(sent_on: date, adaptive=None, t1=None, root: Path | None = None) -> None:
+    """Keep what the evening message listed for the next session, so the 09:16 message can say
+    whether its picks changed. A list given as None keeps the one already saved (the T1 follow-up
+    adds T1 to Adaptive's). Never raises: the morning line is only left out."""
+    first = adaptive if adaptive is not None and not isinstance(adaptive, str) else t1
+    if first is None or isinstance(first, str):
+        return
+    try:
+        path = tentative_path(first.day.isoformat(), root)
+        doc = read_tentative(first.day, root)
+        for key, picks in (("adaptive", adaptive), ("t1", t1)):
+            part = _picks_doc(picks, sent_on)
+            if part is not None:
+                doc[key] = part
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(doc, indent=2) + "\n")
+    except Exception:  # noqa: BLE001 - the message is already out; only the morning line is lost
+        pass
+
+
+def read_tentative(day: date | str, root: Path | None = None) -> dict:
+    """{'adaptive': {...}, 't1': {...}} as `save_tentative` kept them; {} when there is none."""
+    try:
+        doc = json.loads(tentative_path(str(day), root).read_text())
+    except Exception:  # noqa: BLE001 - no data root, no file, a torn file: the line is left out
+        return {}
+    return doc if isinstance(doc, dict) else {}
 
 
 @contextmanager

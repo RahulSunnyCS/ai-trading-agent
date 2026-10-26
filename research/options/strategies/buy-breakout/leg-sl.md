@@ -1,6 +1,6 @@
 # Buy: leg stop
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Descriptive · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -18,6 +18,7 @@ rises. The stop is checked on 1-minute bars; a gap through it fills at the bar's
 |---|---|---|---|---|
 | BL-097 | 15%, 20%, 30%, 35%, 40% (base 25%) | 48 files, fit 2024-10 → 2025-10, holdout 2025-10 → 2026-10, after charges | Screen only; 20% and 15% reach top-three lists | [BL-097][bl097], [report][bl097q] |
 | BL-070 | Overall stop removed (leg stop kept) | 2024-10 → 2026-10, before charges | Buy's ₹2,000 overall stop fired on about 1 day (NIFTY) and 0 (SENSEX) per variant; the leg stop acts first | [BL-070][bl070] |
+| BL-156 Amendment 1 | Leg stop checked on every tick (the engine: bar high / low) vs at the 1-minute close (exit at that close), crossed with the MTM rule | T1's Adaptive picks, 2025-01-10 → 2026-10-22, 1 lot, after brokerage | **Tick is better**: candle-close leg stops cost −₹432 a day on the book (−₹591 to −₹272), in every half-year; Buy: −₹197 a pick (52 picks, descriptive) | [BL-156][bl156] |
 
 Change against the baseline on the same file, ₹, mean over files ([how to read](README.md#how-to-read-the-bl-097-tables-on-these-pages)):
 
@@ -46,7 +47,7 @@ Charges hardly move (a leg stop does not add trades); the gross and net changes 
 
 ## Not yet tested
 
-- BL-097 Phase 3: leg stop × overall stop, and the reserved trailing-percent rows.
+- BL-097 Phase 3: leg stop × overall stop (now BL-104); the reserved trailing-percent rows (not carried).
 
 ## Related
 
@@ -56,3 +57,4 @@ Charges hardly move (a leg stop does not add trades); the gross and net changes 
 [bl070]: ../../../../backlog/BL-070-drb-without-per-strategy-stops.md
 [bl097]: ../../../../backlog/BL-097-buy-parameter-sweep.md
 [bl097q]: ../../../../backlog/BL-097-buy-qualified-list-post-charge.md
+[bl156]: ../../../../backlog/BL-156-mtm-stop-tick-vs-candle-close.md

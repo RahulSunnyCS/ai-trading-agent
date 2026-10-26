@@ -205,3 +205,17 @@ BL-036 Phase 2 review: a Monday-open request now decides the live week on its Fr
 | Scenario | CAGR | Max drawdown |
 |---|---|---|
 | broad_monday_open | 16.91% -> 16.91% | -27.81% -> -27.81% |
+
+## 2026-10-24 (on top of `46b2d72b`)
+
+Result.weights is sorted by week (pandas 3's from_dict ordered rows by first appearance of each name), so the circuit card walks the holding periods and the last week in date order. Only the circuit_exposure section of the seven Broad scenarios moves (episodes, positions, lc/uc lists and escapes); equity, CAGR, drawdown and every other section are unchanged.
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_default | 18.67% -> 18.67% | -26.72% -> -26.72% |
+| broad_monday_open | 16.91% -> 16.91% | -27.81% -> -27.81% |
+| broad_category_mode_off | 36.99% -> 36.99% | -28.58% -> -28.58% |
+| broad_one_category_three_picks_four_weekly | 32.13% -> 32.13% | -35.20% -> -35.20% |
+| broad_eight_categories_one_pick | 26.32% -> 26.32% | -27.29% -> -27.29% |
+| broad_gates_loosened_and_tilted | 9.34% -> 9.34% | -27.78% -> -27.78% |
+| broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 13.94% | -18.09% -> -18.09% |

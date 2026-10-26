@@ -271,7 +271,12 @@ export function StockDrawer({
               ) : null}
             </span>
           </div>
-          <History key={stock.symbol} symbol={stock.symbol} lookbacks={lookbacks} zone={zone} />
+          <History
+            key={`history-${stock.symbol}`}
+            symbol={stock.symbol}
+            lookbacks={lookbacks}
+            zone={zone}
+          />
           <section aria-label="Figures" className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
             <Stat
               label="13-week return"
@@ -302,7 +307,7 @@ export function StockDrawer({
               value={place ? `${place.place} of ${place.of}` : EMPTY}
             />
           </section>
-          <CircuitLocks key={stock.symbol} symbol={stock.symbol} />
+          <CircuitLocks key={`circuits-${stock.symbol}`} symbol={stock.symbol} />
         </div>
       ) : null}
     </Drawer>

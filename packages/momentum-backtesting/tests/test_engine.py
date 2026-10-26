@@ -1124,3 +1124,23 @@ def test_a_flat_trade_is_not_a_win_whatever_the_last_bit_of_its_float_is():
     wins, losses = analysis.split_wins_losses(returns)
     assert list(wins) == [0.05]
     assert len(losses) == 4
+
+
+def test_weights_index_is_in_date_order_when_names_first_appear_out_of_order():
+    # pandas 3's from_dict orders rows by when each column first appears: this toy gives
+    # [1, 3, 2, 4]. Everything that reads weights.iloc[-1] or walks the rows relies on dates.
+    # Here A is held first, then B, then C: the columns' first appearance is not the date order.
+    toy = {1: {"a": 1.0}, 2: {"b": 1.0}, 3: {"a": 0.5, "c": 0.5}, 4: {"c": 1.0}}
+    assert list(pd.DataFrame.from_dict(toy, orient="index").sort_index().index) == [1, 2, 3, 4]
+
+    prices = frame(
+        A=path((3, 0.03), (26, 0.0)),
+        B=path((3, 0.0), (3, 0.04), (23, 0.0)),
+        C=path((6, 0.0), (3, 0.05), (20, 0.0)),
+        Nifty_50=path((29, -0.01)),
+    )
+    result = run_backtest(prices, includes(prices), cfg(top_n=1, exit_rank=1))
+    assert len(result.weights) > 20
+    assert result.weights.index.is_monotonic_increasing
+    assert result.weights.index.is_unique
+    assert result.weights.index.name == "week"

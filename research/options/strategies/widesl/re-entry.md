@@ -1,6 +1,6 @@
 # Widesl: re-entry
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Descriptive · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -33,7 +33,7 @@ no re-entry) at ₹5,697 and drawdown −₹32,996.
 
 ## Not yet tested
 
-- Re-entry together with a different leg stop (BL-098 Phase 3, if a candidate needs it).
+- Re-entry together with a different leg stop (BL-098 Phase 3, now BL-104, if a candidate needs it).
 - Engine/AlgoTest parity for some re-entry details is incomplete ([BL-098][bl098] risks).
 
 ## Related

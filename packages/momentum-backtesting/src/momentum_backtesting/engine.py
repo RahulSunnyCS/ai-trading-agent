@@ -1057,7 +1057,9 @@ def run_backtest(
     trades = pd.DataFrame(sim.trade_rows)
     if not trades.empty:
         trades["week"] = pd.to_datetime(trades["week"])
-    weights = pd.DataFrame.from_dict(outcome.weights, orient="index").fillna(0.0)
+    # from_dict orders rows by when each column first appears, not by date (pandas 3), and the
+    # circuit card and the weekly signal read the first and last rows.
+    weights = pd.DataFrame.from_dict(outcome.weights, orient="index").sort_index().fillna(0.0)
     weights.index.name = "week"
     return Result(
         config=config,

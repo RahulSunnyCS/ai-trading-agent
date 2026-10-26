@@ -1,6 +1,6 @@
 # Momentum research: strategies and parameters
 
-**Last updated:** 2026-10-14
+**Last updated:** 2026-10-24
 
 A durable record of every parameter the momentum lab uses: its shipped default and where that
 default lives, what it does, why it is set that way, and the evidence. One page per variable
@@ -33,7 +33,7 @@ Pages tested on one strategy only live in that strategy's folder.
 | [Benchmarks](common/benchmarks.md) | all | Descriptive | Nifty 50; Nifty 50 TRI and Nifty200 Momentum 30 TRI lines | ETF +13.2 / +8.7 a year over them, Broad +19.1 / +14.6; ETF mode is not inflated by dividends |
 | [Lookbacks, weights, tie-break](common/lookbacks.md) | all | Tested | 1 / 4 / 13 / 26 / 52 weeks, equal weights | Keep equal weights: the 1-week window helps on ETFs |
 | [Skip-month](common/skip-month.md) | all | Tested | no skip (ranksum); `voladj` "skip" on | Skipping loses on ETFs; the `voladj` skip does not actually skip, and fixing it loses on Broad |
-| [Score](common/score.md) | all | Tested | `ranksum` | `voladj` a tax-efficient ETF candidate only; lookback-following `voladj` and residual momentum killed; grouped tilt wins on ETFs, pending |
+| [Score](common/score.md) | all | Tested | `ranksum` | `voladj` a tax-efficient ETF candidate only; lookback-following `voladj`, residual momentum and swapping the favourites to rank-sum or Blend killed; grouped tilt wins on ETFs, pending |
 | [Top N and exit rank](common/top-n-exit-rank.md) | ETF, Custom Index, Stock | Tested | 5 / 10 (Custom Index 8 / 16) | 10 is the sweet spot; ETF top 3 wins most but concentrates |
 | [Portfolio rule and entry](common/portfolio-entry.md) | all | Tested | `buffer`, `wait` | Do not flip to `make_room`: the earlier win was a gapped-engine artefact |
 | [Caps, band, price ceiling, minimum trade](common/caps.md) | all | Tested | 35% (Broad 15%, 30% per category), 5-point band, Rs 20,000 ceiling | A risk/return dial, not free money |
@@ -41,7 +41,7 @@ Pages tested on one strategy only live in that strategy's folder.
 | [Sizing and exposure overlays](common/sizing.md) | ETF, Broad | Tested | all off | Every rule gives up return; vol targeting and the ETF blend are risk dials |
 | [Costs](common/costs.md) | all | Descriptive | flat 0.10% per side | Itemised costs take 0.7 (ETF) and 2.3 (Broad) points; the edge survives |
 | [Tax and the tax hold](common/tax.md) | all | Tested | off | Tax takes 4.9 points (ETF) and 8-9 (Broad); the tax hold is neutral on ETF and never fires in Broad |
-| [Execution: delay, fill, track](common/execution.md) | all | Tested | delay 0, Friday close, ETF track live | Friday close is right for ETFs; a one-week delay wins on Broad; Monday-open fill option still to build |
+| [Execution: delay, fill, track](common/execution.md) | all | Tested | delay 0, Friday close, ETF track live | Friday close is right for ETFs; a one-week delay wins on Broad, but moves single configs by a median 3.4 pts either way (BL-161); a Monday-open fill is built (BL-036 Phase 2) and was killed against the followed group (BL-158) |
 | [Cadence, phase, tranches](common/cadence.md) | all | Tested | weekly | Weekly for ETFs; every 2 or 4 weeks wins on Broad; slower than 4 loses after tax; split across Fridays to remove luck |
 | [Reversal sleeve](common/reversal-sleeve.md) | Stock pool, ETF | Tested | not used | A slightly better cash substitute, not alpha |
 | [Sector relative strength](strategies/etf-rotation/sector-rs.md) | ETF | Not tested | — | BL-088 idea; waiting on the post's exact rule |
@@ -157,7 +157,8 @@ frozen strategy made far less on the unseen 2012-2016 years.
   [BL-085](../../backlog/BL-085-momentum-improvement-levers.md) ·
   [BL-086](../../backlog/BL-086-voladj-follows-lookbacks.md) ·
   [BL-087](../../backlog/BL-087-momentum-all-fridays-split.md) ·
-  [BL-088](../../backlog/BL-088-own-history-sector-relative-strength.md)
+  [BL-088](../../backlog/BL-088-own-history-sector-relative-strength.md) ·
+  [BL-161](../../backlog/BL-161-favourites-score-and-friday-fill.md)
 - Criteria and results: [`packages/momentum-backtesting/search_spaces/`](../../packages/momentum-backtesting/search_spaces/)
 - Write-ups: [`evaluation-review.md`](../../packages/momentum-backtesting/docs/evaluation-review.md),
   [`bl085-levers-2026-10-09.md`](../../packages/momentum-backtesting/docs/bl085-levers-2026-10-09.md),

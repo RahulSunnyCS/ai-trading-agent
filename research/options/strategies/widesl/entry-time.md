@@ -1,6 +1,6 @@
 # Widesl: entry time
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-10-24
 
 ## What it is
 
@@ -23,6 +23,7 @@ times for each family.
 | BL-062 | Whole-day rotation (all families) | same year, before charges | Lots starting 12:02 or later made ₹470 a lot against ₹251 for morning starts; rests on late fills | [BL-062][bl062] |
 | BL-083 | Entry at the minute a pivot, VIX-turn, straddle or RSI trigger fires (10:30–14:00) | explore 2024-10 → 2026-10 both indices; confirm NIFTY 2022-01 → 2024-10 | **No lead** for Widesl; the VIX-turn entry loses (−₹215 explore, −₹139 confirm) | [BL-083][bl083] |
 | BL-098 | Best configuration per band, all families | holdout 2025-10-09 → 2026-10-09, **after charges** | Descriptive ranking (below) | [BL-098 report][bl098q] |
+| BL-145 Q4 | NIFTY OTM1 entering 09:47 (`N_wide_0947`), split by the opening range 09:15 to 09:44 on quiet-week days (R7 lowest third) | learning 2025-10-20 → 2026-10-19 (80 days), confirmation 2024-10-09 → 2025-10-17 (46); gross per lot-day, no charges | Low-OR days beat high-OR days: +1,446 [+426, +2,578] (46 vs 7 days), confirmed thinly +723 [−92, +1,879] (22 vs 5 days); the registered rule is met | [BL-145][bl145] |
 
 Average ₹ per day per lot, mean of the start-time means, before charges ([BL-059][bl059]):
 
@@ -42,12 +43,16 @@ After charges, the band leaders earn (₹ per day, [BL-098 report][bl098q]): NIF
   between the two halves is −0.45 (NIFTY) and −0.01 (SENSEX).
 - SENSEX OTM2 is weakest in the morning, before charges; its closest-premium ₹250 version is stronger in
   the afternoon (see [strike-premium](strike-premium.md)).
-- After charges Widesl margins are thin in every band. One holdout year; Phase 3 of BL-098 is pending.
+- After charges Widesl margins are thin in every band. One holdout year; BL-098 Phase 3 went to BL-104, whose results are not on this page yet.
 - Late starts rely on 1-minute fills with no spread. All Widesl and Dir curves jump at 14:47 (NIFTY
   ₹268 a day) and fall back at 15:02; a spot check did not explain it (BL-059). A ₹100–₹300 extra cost
   per late lot takes the BL-062 rotation from ₹3.36 lakh to ₹3.05–2.43 lakh (rough, not registered).
 - Widesl is a short-volatility shape: triggers that mark more movement hurt it. After the VIX turn it
   was stopped out 27% of the time against 15% on placebo days (BL-083).
+
+- Waiting for the opening range before a 09:47 entry (BL-145 Q4): in quiet weeks the Widesl made +162 per
+  lot-day when the opening range was in the lowest third and −1,284 when in the highest, but only 7 days were
+  in the highest (5 in the year before), and the cuts are whole-window. A lead, gross and before charges.
 
 ## Not yet tested
 
@@ -67,4 +72,5 @@ After charges, the band leaders earn (₹ per day, [BL-098 report][bl098q]): NIF
 [bl059]: ../../../../backlog/BL-059-whole-day-start-time-curve.md
 [bl062]: ../../../../backlog/BL-062-whole-day-rotation.md
 [bl083]: ../../../../backlog/BL-083-event-triggered-intraday-entries.md
+[bl145]: ../../../../backlog/BL-145-t1-robustness-lag-opening-range.md
 [bl098q]: ../../../../backlog/BL-098-widesl-qualified-list-post-charge.md

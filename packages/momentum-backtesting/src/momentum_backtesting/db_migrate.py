@@ -41,6 +41,7 @@ not a data loss).
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -98,6 +99,8 @@ class MigrationReport:
     stock_membership_weekly: int = 0
     stock_weekly_series: int = 0
     total_market_membership: int = 0
+    # Why the momentum_prices replace was refused (it then kept the stored rows), else None.
+    momentum_prices_refused: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -243,8 +246,67 @@ def migrate_stock_bars(
 # ---------------------------------------------------------------------------
 
 
-def import_momentum_prices(con: duckdb.DuckDBPyConnection, data_dir: Path = DATA_DIR) -> int:
+class PriceShrinkError(RuntimeError):
+    """`data/` holds less price history than `momentum_prices` already does."""
+
+
+# A stored series may lose a few rows (a premium day dropped as a unit mismatch, an unfinished
+# week trimmed): it may lose SHRINK_SHARE of its rows, or SHRINK_ROWS if that is more, but the
+# flat SHRINK_ROWS never exceeds SHRINK_ROWS_CAP of a short series (5 of 14 premium rows is 36%).
+# More than that is refused, and so is vanishing or starting more than SHRINK_START later (older
+# history lost, whatever the count).
+SHRINK_ROWS = 5
+SHRINK_ROWS_CAP = 0.10
+SHRINK_SHARE = 0.02
+SHRINK_START = pd.Timedelta(days=7)
+
+
+def shrink_allowance(count: int) -> float:
+    """How many of a stored series' `count` rows a replace may lose without being refused."""
+    return max(SHRINK_SHARE * count, min(SHRINK_ROWS, SHRINK_ROWS_CAP * count))
+
+
+def check_price_shrink(con: duckdb.DuckDBPyConnection, rows: list) -> None:
+    """Refuse a wholesale replace that would drop or gut a stored series. On 2026-10-18 a
+    `mbt fetch --no-fyers` left weekly_closes.csv without the broker-sourced columns; the next
+    replace from that folder emptied them in the database too, and every Broad favourite then
+    failed on an all-NaN Nifty 50 benchmark."""
+    stored = con.execute(
+        "SELECT instrument, kind, count(*), min(date) FROM momentum_prices GROUP BY 1, 2"
+    ).fetchall()
+    new = Counter((instrument, kind) for instrument, kind, *_ in rows)
+    first: dict[tuple[str, str], pd.Timestamp] = {}
+    for instrument, kind, day, *_ in rows:
+        key = (instrument, kind)
+        first[key] = min(first.get(key, day), day)
+    shrunk = []
+    for instrument, kind, count, start in stored:
+        key = (instrument, kind)
+        now, lost = new[key], count - new[key]
+        if now == 0 or lost > shrink_allowance(count):
+            shrunk.append(f"{instrument} ({kind}) {count} -> {now} rows")
+        elif first[key] > pd.Timestamp(start) + SHRINK_START:
+            shrunk.append(f"{instrument} ({kind}) starts {first[key].date()}, stored from {start}")
+    if shrunk:
+        raise PriceShrinkError(
+            "refusing to replace momentum_prices: data/ has less history than the database "
+            f"for {len(shrunk)} series: "
+            + "; ".join(sorted(shrunk)[:12])
+            + ("; ..." if len(shrunk) > 12 else "")
+            + ". Repair data/ (`local_store.pull_dir` rebuilds it from the database), or pass "
+            "allow_shrink (`mbt local migrate --allow-price-shrink`) if the loss is intended "
+            "(e.g. an instrument removed from universe.csv)."
+        )
+
+
+def import_momentum_prices(
+    con: duckdb.DuckDBPyConnection, data_dir: Path = DATA_DIR, allow_shrink: bool = False
+) -> int:
+    """Replace `momentum_prices` with every price in `data_dir`, after `check_price_shrink`
+    (skipped with `allow_shrink`)."""
     rows = list(store.rows_from_dir(data_dir))
+    if not allow_shrink:
+        check_price_shrink(con, rows)
     con.execute("DELETE FROM momentum_prices")
     _bulk_insert(
         con,
@@ -426,7 +488,16 @@ def migrate(
     root: Path,
     data_dir: Path = DATA_DIR,
     curated_dir: Path = CURATED_DIR,
+    allow_price_shrink: bool = False,
 ) -> MigrationReport:
+    # A refused price replace keeps the stored rows and is reported, never raised here: the
+    # stock tables below do not depend on data/'s ETF series, and the 19:30 stock sync must not
+    # leave them a week behind because of them. The caller fails on `momentum_prices_refused`.
+    refused = None
+    try:
+        n_prices = import_momentum_prices(con, data_dir, allow_shrink=allow_price_shrink)
+    except PriceShrinkError as error:
+        n_prices, refused = 0, str(error)
     n_companies, n_aliases, n_membership = import_curated(con, curated_dir)
     n_category = import_category_membership(
         con, data_dir / "categories" / "category_membership.csv"
@@ -438,7 +509,6 @@ def migrate(
     n_symbols, n_bars, n_years = migrate_stock_bars(
         con, root, data_dir / "stocks" / "daily.parquet", curated_dir
     )
-    n_prices = import_momentum_prices(con, data_dir)
     n_stock_prices, n_stock_membership, n_extra = import_stock_weekly(con, data_dir / "stocks")
     return MigrationReport(
         companies=n_companies,
@@ -454,4 +524,5 @@ def migrate(
         stock_membership_weekly=n_stock_membership,
         stock_weekly_series=n_extra,
         total_market_membership=n_total_market,
+        momentum_prices_refused=refused,
     )

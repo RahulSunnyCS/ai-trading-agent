@@ -288,6 +288,8 @@ class NextPicks:
     options: dict[str, str | None] | None
     #: the index Adaptive is restricted to on that session (BL-122), or None
     expiry_only: str | None
+    #: {'NIFTY': '2', 'SENSEX': '4'}: weekdays to each index's expiry on that session
+    dte: dict[str, str] | None = None
 
 
 def next_session_picks(
@@ -314,4 +316,5 @@ def next_session_picks(
         list(buy),
         (expected.next_best or {}).get(key),
         expected.expiry_only,
+        {"NIFTY": labels["dte_n"], "SENSEX": labels["dte_s"]},
     )

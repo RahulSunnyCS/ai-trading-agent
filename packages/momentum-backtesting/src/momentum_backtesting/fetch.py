@@ -19,6 +19,13 @@ Besides the weekly signal table, fetch also keeps what trade_prices.py needs to 
   data/intraday/<kind>/<name>.csv  the 10:00 price per day (`--intraday` only; Fyers only)
 `etf_source` is `NSE:<ETF>-EQ` (Fyers, Yahoo `<ETF>.NS` as fallback) or `SAME` when the
 signal series already is what you'd hold (Gold, Silver, the liquid fund).
+
+A series this run does not fetch (skipped by `--no-fyers` or a source that cannot serve it,
+failed, no data, or a history shorter than the stored one) keeps what `data/` already holds:
+its daily file is left alone and its stored weekly and premium columns are carried into the
+new tables. Only a series removed from universe.csv leaves weekly_closes.csv. On 2026-10-18 a
+`mbt fetch --no-fyers` rewrote weekly_closes.csv with the public series alone and dropped the
+22 broker-sourced columns (every Nifty index, Gold, Gilt).
 """
 
 import csv
@@ -43,6 +50,9 @@ from .sources import (
 
 ETF_SAME = "SAME"
 MAX_PREMIUM = 0.5  # |price/NAV - 1| beyond this is a unit mismatch, not a real premium
+# A fetched daily series that starts more than this after the stored one has lost history
+# (e.g. its NSE backfill failed): the stored file is kept instead.
+START_TOLERANCE = pd.Timedelta(days=7)
 
 
 @dataclass(frozen=True)
@@ -114,6 +124,33 @@ def _write(frame: pd.DataFrame | pd.Series, path) -> None:
     frame.to_csv(path, index_label="date")
 
 
+def read_stored(path) -> pd.DataFrame | None:
+    """A stored data/ CSV (date index), or None when there is none."""
+    if not path.exists():
+        return None
+    return pd.read_csv(path, index_col=0, parse_dates=True).sort_index()
+
+
+def _starts_later(new: pd.Series | pd.DataFrame, stored) -> bool:
+    """Whether `new` lost history `stored` has (starts more than START_TOLERANCE later)."""
+    return (
+        stored is not None
+        and len(stored.dropna(how="all")) > 0
+        and (new.index[0] > stored.dropna(how="all").index[0] + START_TOLERANCE)
+    )
+
+
+def _keep_stored(
+    new: pd.DataFrame, stored: pd.DataFrame | None, names: list[str]
+) -> tuple[pd.DataFrame, list[str]]:
+    """`new` plus the stored column of each of `names` it lacks (a series this run did not
+    fetch), in `names` order. Returns (table, names whose stored column was kept)."""
+    kept = [n for n in names if n not in new and stored is not None and n in stored]
+    parts = [new] + [stored[n].dropna() for n in kept]
+    table = pd.concat(parts, axis=1, sort=True) if kept else new
+    return table[[n for n in names if n in table]], kept
+
+
 def _signal_daily(inst: Instrument, start: date, end: date, creds) -> pd.DataFrame | None:
     """Daily open/close of the ranked series (open missing where the source has none).
     None for the silver splice, which is weekly - handled by the caller."""
@@ -166,9 +203,15 @@ def fetch_etfs(
     signal: dict[str, pd.DataFrame],
     log: Callable[[str], None] = print,
     intraday: bool = False,
+    held_back: dict[str, str] | None = None,
 ) -> pd.DataFrame:
-    """Fetch the traded ETFs (and, with an amfi_code, their NAV). Returns daily premiums."""
+    """Fetch the traded ETFs (and, with an amfi_code, their NAV). Returns daily premiums.
+
+    An ETF whose fetched history starts later than the stored file keeps the stored ETF file and
+    premium (named in `held_back` when given). A premium keeps every stored day the NAV overlap
+    lacks, so a fetch never leaves fewer premium rows than the database push accepts."""
     premiums: dict[str, pd.Series] = {}
+    stored_premiums = read_stored(DATA_DIR / "etf_premium.csv")
     for inst in load_universe():
         if not inst.has_etf or inst.name not in signal:
             continue
@@ -184,6 +227,16 @@ def fetch_etfs(
             continue
         factors = split_factors(raw["close"], signal[inst.name]["close"])
         adjusted = raw.mul(factors, axis=0)
+        stored_etf = read_stored(DATA_DIR / "daily_etf" / f"{inst.name}.csv")
+        if _starts_later(adjusted, stored_etf):
+            reason = (
+                f"fetched history starts {adjusted.index[0].date()}, stored starts "
+                f"{stored_etf.dropna(how='all').index[0].date()}: kept the stored ETF and premium"
+            )
+            if held_back is not None:
+                held_back[inst.name] = reason
+            log(f"  {inst.trade_etf:<12} ETF SHORTER: {reason}")
+            continue
         _write(adjusted, DATA_DIR / "daily_etf" / f"{inst.name}.csv")
         extra = ""
         splits = factors[factors.ne(factors.shift(-1))].iloc[:-1]
@@ -195,7 +248,17 @@ def fetch_etfs(
                 nav = amfi_nav(inst.amfi_code, start, adjust=False)
                 premium = (raw["close"] / nav.reindex(raw.index) - 1).dropna()
                 bad = premium.abs() > MAX_PREMIUM
-                premiums[inst.name] = premium[~bad]
+                good = premium[~bad]
+                stored = stored_premiums.get(inst.name) if stored_premiums is not None else None
+                if stored is not None:
+                    # Days the NAV overlap does not cover (older history, or the newest days
+                    # before the NAV is published). A day dropped as a unit mismatch is not one.
+                    keep = stored.dropna()
+                    keep = keep[~keep.index.isin(premium.index)]
+                    if len(keep):
+                        good = pd.concat([good, keep]).sort_index()
+                        extra += f"  ({len(keep)} stored premium days the NAV lacks kept)"
+                premiums[inst.name] = good
                 last = premium[~bad].iloc[-1] if (~bad).any() else float("nan")
                 extra += f"  premium now {last:+.2%}"
                 if bad.any():
@@ -246,8 +309,10 @@ def fetch_all(
     columns: dict[str, pd.Series] = {}
     signal: dict[str, pd.DataFrame] = {}
     failures: dict[str, str] = {}
+    universe = load_universe()
+    stored_weekly = read_stored(DATA_DIR / "weekly_closes.csv")
 
-    for inst in load_universe():
+    for inst in universe:
         source = inst.price_source
         try:
             if source.startswith("NSE:") and not fyers.serves(creds, source):
@@ -273,6 +338,14 @@ def fetch_all(
                     log(f"  {inst.name:<24} {creds.source} failed ({error}): public source")
             if daily is None:  # silver
                 prices, labels = silver_weekly(start)
+                stored = stored_weekly.get(inst.name) if stored_weekly is not None else None
+                if _starts_later(prices, stored):
+                    failures[inst.name] = (
+                        f"fetched history starts {prices.index[0].date()}, stored starts "
+                        f"{stored.dropna().index[0].date()}: kept the stored history"
+                    )
+                    log(f"  {inst.name:<24} SHORTER: {failures[inst.name]}")
+                    continue
                 pd.DataFrame({"close": prices, "source": labels}).to_csv(
                     daily_dir / "Silver (weekly).csv", index_label="week_ending"
                 )
@@ -310,6 +383,17 @@ def fetch_all(
             failures[inst.name] = "no data returned"
             log(f"  {inst.name:<24} no data returned")
             continue
+        stored = read_stored(daily_dir / f"{inst.name}.csv")
+        if _starts_later(daily, stored):
+            failures[inst.name] = (
+                f"fetched history starts {daily.index[0].date()}, stored starts "
+                f"{stored.dropna(how='all').index[0].date()}: kept the stored history"
+            )
+            log(f"  {inst.name:<24} SHORTER: {failures[inst.name]}{extra}")
+            continue
+        if stored is not None and len(stored) and stored.index[-1] > daily.index[-1]:
+            # Days the source does not have yet (e.g. ETF-implied closes a refresh stored).
+            daily = pd.concat([daily, stored[stored.index > daily.index[-1]]])
         _write(daily, daily_dir / f"{inst.name}.csv")
         signal[inst.name] = daily
         columns[inst.name] = weekly(daily["close"])
@@ -321,7 +405,18 @@ def fetch_all(
                 extra += f"  (10:00 prices failed: {error})"
         log(f"  {inst.name:<24} {len(daily):>4} days  from {daily.index[0].date()}{extra}")
 
-    table = pd.DataFrame(columns).sort_index()
+    names = [inst.name for inst in universe]
+    table, kept = _keep_stored(pd.DataFrame(columns), stored_weekly, names)
+    if kept:
+        log(f"\nnot fetched this run, stored weekly history kept: {', '.join(kept)}")
+    dropped = [c for c in (stored_weekly if stored_weekly is not None else []) if c not in table]
+    if dropped:
+        log(
+            f"\nno longer in universe.csv, left out of weekly_closes.csv: {', '.join(dropped)}. "
+            "The weekly job's database push refuses that loss: run "
+            "`mbt local migrate --allow-price-shrink` once to accept it."
+        )
+    table = table.sort_index()
     table = table[table.index >= pd.Timestamp(start)]
     if len(table) and table.index[-1].date() > end:
         table = table.iloc[:-1]  # current week isn't finished yet
@@ -336,12 +431,25 @@ def fetch_all(
     )
     for name, error in failures.items():
         coverage.loc[name, "error"] = error
+    for name in kept:
+        coverage.loc[name, "kept"] = "stored history (not fetched this run)"
     coverage.index.name = "index"
 
     premiums = pd.DataFrame()
     if etfs:
         log("\nETFs (what you'd actually trade):")
-        premiums = fetch_etfs(start, end, creds, signal, log, intraday)
+        held_back: dict[str, str] = {}
+        premiums = fetch_etfs(start, end, creds, signal, log, intraday, held_back)
+        for name, reason in held_back.items():
+            if name in coverage.index:
+                coverage.loc[name, "etf_kept"] = reason
+        premiums, _ = _keep_stored(
+            premiums,
+            read_stored(DATA_DIR / "etf_premium.csv"),
+            [i.name for i in universe if i.amfi_code],
+        )
+        premiums = premiums.sort_index()
+        premiums.index.name = "date"
         premiums.to_csv(DATA_DIR / "etf_premium.csv")
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
