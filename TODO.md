@@ -77,6 +77,7 @@ Full procedure and rollback: `docs/algotest-execution.md` → Runbook.
 | 2.7 | Archive `trade-analytics` and `algo-automation` | owner | **Archive, not delete** — the old Actions artifacts and run history live there. Only after both cutovers run clean. |
 | 2.8 | `realised-pnl.schema.json` contract emitted by contract-notes | claude | The typed hand-off that lets realised P&L be ingested as a benchmark series. Prerequisite for 3.3. |
 | 2.9 | `packages/contract-notes`: CJS → ESM | claude | Last package on CommonJS. Cosmetic until it blocks something — low priority within P2. |
+| 2.10 | Contract notes in the repo — [BL-168](backlog/BL-168-contract-notes-trade-book.md) | claude | **Started 2026-10-26.** Store under `TRADING_DATA_ROOT/contract-notes/`, a laptop scheduler job (00:00 + 07:30), no sheet writing (`trade-analytics` keeps the sheet). Phase 2 (UI design) first, then Phase 1 (store and job), which replaces 2.1–2.6. Discretionary journal: [BL-169](backlog/BL-169-discretionary-trade-journal.md). |
 
 ---
 
@@ -881,3 +882,14 @@ are replaced by better ones. First rule: a break of a rolling 60-bar NIFTY range
 |---|---|---|---|
 | 3.41.1 | Phase 0 and Amendment 1 (rolling rule, long and short-premium arms, 2019-2021 confirmation period) pre-registered before any run | claude | **Done 2026-10-18.** Nothing run |
 | 3.41.2 | Phase 1: event study on periods A and B (event counts first, then placebo and trades) | claude | **Next** |
+
+### 3.46 Dashboard on Next.js 16 — [BL-157](backlog/BL-157-dashboard-nextjs-16.md)
+
+OpenNext refuses Next.js 15 since 2026-10-21, so every `release` deploy fails and `dashboard.codifie.dev`
+is stuck on the 2026-10-18 build. Owner (2026-10-26): upgrade, not the unsupported-version flag.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.46.1 | Phase 1: `next` 16.4.x + `@opennextjs/cloudflare` 1.20.13, `--webpack` on every dev/build call, React stays 18 | claude | **Done 2026-10-26** (#327): build, typecheck and 1,980 unit tests pass; e2e matches Next 15; the 180 s proxy timeout holds under `next dev` and `next start` |
+| 3.46.2 | Phase 2: Worker preview against the local APIs, then the `main` → `release` promotion | claude | **Done 2026-10-26**: preview passed (#328); #329 promoted, deploy run 40268605293 green, `dashboard.codifie.dev` on Next 16.4.3 behind Access |
+| 3.46.3 | Phase 3: React 19, `proxy.ts`, Turbopack | — | Waits (owner 2026-10-26) |

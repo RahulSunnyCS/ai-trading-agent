@@ -23,6 +23,9 @@ const SECURITY_HEADERS = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Next 16's `next dev` otherwise appends its own rules to AGENTS.md, which here only points
+  // at CLAUDE.md (one fact, one file).
+  agentRules: false,
   async headers() {
     return [{ source: '/:path*', headers: SECURITY_HEADERS }];
   },
