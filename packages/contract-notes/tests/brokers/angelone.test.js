@@ -1,4 +1,4 @@
-const { extract, subject, bodyFilter } = require('../../brokers/angelone');
+const { extract, searchSubject, noteDay } = require('../../brokers/angelone');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -121,19 +121,26 @@ describe('angelone.extract() segment filtering', () => {
   });
 });
 
-describe('angelone.subject()', () => {
-  test('returns fixed contract note subject', () => {
-    expect(subject()).toBe('Contract Note - Equity Segment');
-  });
-});
-
-describe('angelone.bodyFilter()', () => {
-  test('formats date as DD/MM/YYYY', () => {
-    expect(bodyFilter(new Date('2025-04-30'))).toBe('30/04/2025');
+describe('angelone.searchSubject() / noteDay()', () => {
+  test('searches the fixed contract-note subject', () => {
+    expect(searchSubject('R59799620')).toBe('Contract Note - Equity Segment');
   });
 
-  test('pads single-digit day and month', () => {
-    expect(bodyFilter(new Date('2025-01-05'))).toBe('05/01/2025');
+  test('reads the session from the attachment name', () => {
+    expect(noteDay({ filename: 'CN_R59799620_23102026.pdf', accountId: 'R59799620' })).toBe(
+      '2026-10-23',
+    );
+  });
+
+  test('accepts a revised note named with a suffix', () => {
+    expect(noteDay({ filename: 'CN_R59799620_23102026_1.pdf', accountId: 'R59799620' })).toBe(
+      '2026-10-23',
+    );
+  });
+
+  test("ignores another account's note and other files", () => {
+    expect(noteDay({ filename: 'CN_R11111111_23102026.pdf', accountId: 'R59799620' })).toBeNull();
+    expect(noteDay({ filename: 'ledger.pdf', accountId: 'R59799620' })).toBeNull();
   });
 });
 

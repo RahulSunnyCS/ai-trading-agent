@@ -1,220 +1,116 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for coding agents working in `packages/contract-notes`.
 
-## Related Systems
+## What this package does
 
-This package was merged into the `ai-trading-agent` monorepo from the
-standalone `RahulSunnyCS/trade-analytics` repo via `git subtree` (history
-preserved) on 2026-09-19. The merge is not yet a cutover:
+Reads the brokers' daily contract notes from Gmail and stores each session's realised F&O
+figures under `TRADING_DATA_ROOT/contract-notes/` (BL-168). It runs on the laptop from the
+scheduler (`apps/scheduler`: `contract-notes` every day 00:00, `contract-notes-retry` 07:30).
+It never writes the Google Sheet: the standalone `trade-analytics` repo keeps filling the
+owner's "Trade Book" sheet on its own cron until the owner archives it (TODO §2.7). The two
+read the same mailboxes and never touch each other's output.
 
-- **`trade-analytics` (standalone repo)** still owns the live daily cron
-  and is the version actually running in production right now.
-- **This package** (`packages/contract-notes`) is where new work should
-  land, but its own schedule (`.github/workflows/contract-notes-daily.yml`
-  in this repo) is disabled pending cutover — see
-  `docs/algotest-execution.md` in this repo's root for the full cutover
-  plan, checklist, and rollback.
-
-Until cutover completes, treat this as two copies of the same pipeline: a
-fix made only here will not reach production, and `trade-analytics` will
-eventually be archived once the cutover checklist is done.
-
-Its sibling package in this monorepo is `packages/broker-login` (merged
-from the standalone `algo-automation` repo the same way, same cutover
-status) — see that package's own `CLAUDE.md`.
+Node 20, CommonJS, Jest. Needs the `qpdf` binary (Homebrew on the laptop; the scheduler's job
+PATH has `/opt/homebrew/bin` and fnm's Node 20).
 
 ## Commands
 
 ```bash
-npm install          # Install dependencies (also installs qpdf system dep via CI: sudo apt-get install -y qpdf)
-
-npm run fetch        # Fetch contract note PDFs from Gmail via IMAP → saves to data/
-npm run parse        # Parse decrypted PDFs in data/ → writes daily_summary.json
-npm run sheet        # Update Google Sheet from daily_summary.json
-npm run check-dates  # Detect date gaps in the sheet → writes gap_dates.txt
-
-npm start            # Run the full pipeline: fetch → check-dates → parse → sheet
+node run.js                 # every account's new mail since its bookmark; window = last 10 sessions
+node run.js --dry-run       # read and parse, write nothing (not even the bookmark)
+node run.js --day D         # read session D again by date for every account, replacing its lines
+node run.js --sessions N    # a wider window, e.g. after a long trip
+bun run test                # Jest
 ```
 
-To process a specific date instead of yesterday:
-```bash
-TARGET_DATE=2025-04-30 npm run fetch
-TARGET_DATE=2025-04-30 npm run parse
-TARGET_DATE=2025-04-30 npm run sheet
-```
+`BROKER_ACCOUNTS_JSON` comes from the repo-root `.env` (`run.js` loads it; the scheduler passes
+it too). It must be one line, single-quoted: a pretty-printed value reads as `[` and fails.
 
-## Architecture
+## Layout
 
-This is a Node.js automation pipeline that processes daily equity/FNO contract notes from multiple brokers (currently **Finvasia / Shoonya** and **Angel One**) and records P&L summaries into a Google Sheet. It runs on a daily GitHub Actions schedule.
+- `run.js` — the run. Per mailbox, one read-only IMAP connection on `[Gmail]/All Mail`; per
+  account, the mail after its bookmark (or, with none, since the window's first session), every
+  note's PDF kept, decrypted with `qpdf`, read by the broker plugin, stored as the session's
+  line. Then `record.closeWithoutNotes` closes what can have no note. Exit 1 with a list of
+  problems (a note that does not read, two different notes for one session, mail that matched
+  the search but carries no note anyone in the mailbox can read, a mailbox that will not log in,
+  an account newly quiet); the scheduler alerts with the job's `fixHint`. Mail, PDF reading and
+  the clock are injectable (`main(argv, deps)`), which `tests/run.flow.test.js` uses.
+- `store.js` — the files. `storeRoot()` refuses a root on an unmounted `/Volumes/<name>` (like
+  `trading_data.db.check_mounted`). `writeLine` replaces one account's line in
+  `days/<day>.jsonl` atomically; `saveRaw` keeps `raw/<broker>/<account>/<day>.pdf` (and the
+  run writes `<day>.decrypted.pdf` beside it); `cursor.json` holds the bookmarks.
+- `record.js` — pure rules. `fnoBlock` (the sheet's five figures, Decimal until the boundary),
+  `noteLine`, `openPairs`, `closeWithoutNotes`.
+- `calendar.js` — trading days from `packages/option-backtesting`'s `holidays.csv` (the file
+  `packages/market-reference` reads, by relative path, so the three never disagree);
+  `lastSession()`: today after 16:00 IST on a trading day, else the previous session.
+- `fetchMail.js` — `connect`, `searchNotes` (by UID after a bookmark, or by date), and
+  `decryptWithQpdf` (qpdf exit 3 = repaired with warnings, kept).
+- `brokers/` — one plugin per broker: `searchSubject(accountId)`, `noteDay({ subject,
+  filename, accountId })` and `extract(text)`. `brokers/index.js` is the registry and the
+  config loader (it never echoes the config: passwords).
 
-### Pipeline Flow
+## The store
 
-```
-Gmail (IMAP) → fetchMail.js → data/*.pdf (encrypted)
-                             ↓ qpdf decrypt
-                           data/*_decrypted.pdf
-                             ↓
-                          parser.js → daily_summary.json
-                             ↓
-                        updateSheet.js → Google Sheet row
-```
+`TRADING_DATA_ROOT/contract-notes/`:
 
-**`brokers/`** — Per-broker plugins. Each plugin exports `subject(accountId, date)` (the IMAP `SUBJECT` search string for that broker's contract-note emails) and `extract(text)` (returns `{ payin_payout_obligation, net_brokerage, other_charges, skipped_segments }` from decrypted PDF text; `total_charges` and `final_net` are derived later by `updateSheet.js`). `brokers/index.js` is the registry plus the `BROKER_ACCOUNTS_JSON` config loader and the filename helpers (`makeFileName` / `parseFileName`). `brokers/segments.js` holds the shared exchange-segment classifier — see **F&O-only extraction** below.
-
-**`fetchMail.js`** — Loads `BROKER_ACCOUNTS_JSON`, opens **one IMAP connection per email**, then iterates the broker accounts inside that mailbox. For each account it runs the broker-specific subject search, saves attachments as `<safeEmail>__<broker>__<accountId>__<originalName>.pdf`, and decrypts via the system `qpdf` binary using `pdfPassword` from the same account entry.
-
-**`parser.js`** — Reads all `*_decrypted.pdf` files from `data/`, parses the embedded `<broker>` and `<accountId>` from the filename, dispatches to the broker plugin's `extract`, and writes `daily_summary.json` with per-account and total values.
-
-**`checkDates.js`** — Reads `row_tracker.json` for the last-updated sheet row, fetches the date in column C of that row from the Google Sheet, and writes `gap_dates.txt` listing all missing trading dates plus tomorrow. The CI workflow loops over this file to backfill gaps. Broker-agnostic.
-
-**`updateSheet.js`** — Reads `daily_summary.json`, resolves the next empty row via `row_tracker.json` (falling back to the sheet itself), inserts a new row, copies all formulas from the previous row via `PASTE_FORMULA`, then overwrites columns A–C (serial / day / date) and a 5-column block per account at the `sheetStartColumn` declared in `BROKER_ACCOUNTS_JSON`. The 5 columns are: `payin_payout_obligation`, `net_brokerage`, `other_charges`, `total_charges` (= brokerage + other_charges), `final_net`.
-
-**`row_tracker.json`** — Persisted between CI runs as a GitHub Actions artifact named `row-tracker`. It stores `{ "lastUpdatedRow": N }` to avoid a live sheet read on every run.
-
-### Config: `BROKER_ACCOUNTS_JSON`
-
-A single env var holds a JSON array of mailboxes. Each mailbox has one Gmail login and one or more broker accounts attached to it (1 email → N accounts → 1 broker per account):
-
-```json
-[
-  {
-    "email": "user1@gmail.com",
-    "emailPassword": "gmail-app-password-1",
-    "accounts": [
-      { "broker": "finvasia", "accountId": "FA1234", "pdfPassword": "pdf-pwd-1", "sheetStartColumn": "D" },
-      { "broker": "angelone",  "accountId": "R59799620", "pdfPassword": "pdf-pwd-2", "sheetStartColumn": "I" }
-    ]
-  },
-  {
-    "email": "user2@gmail.com",
-    "emailPassword": "gmail-app-password-2",
-    "accounts": [
-      { "broker": "finvasia", "accountId": "FA9999", "pdfPassword": "pdf-pwd-3", "sheetStartColumn": "N" }
-    ]
-  }
-]
-```
-
-`sheetStartColumn` is the leftmost Google Sheet column for that account's daily values. Each account writes a contiguous 5-column block at that position:
-
-| Offset | Column (e.g. start = `D`) | Value |
-|---|---|---|
-| 0 | `D` | `payin_payout_obligation` |
-| 1 | `E` | `net_brokerage` |
-| 2 | `F` | `other_charges` |
-| 3 | `G` | `total_charges` (= `net_brokerage + other_charges`, computed by `updateSheet.js`) |
-| 4 | `H` | `final_net` (= `payin_payout_obligation - total_charges`, computed by `updateSheet.js`) |
-
-Columns A–C are reserved for serial number / day name / formatted date. Pick `sheetStartColumn` for each account so the per-account 5-column blocks don't overlap; gaps between blocks (and any cells with formulas) are preserved from the previous row via `PASTE_FORMULA`.
-
-### F&O-only extraction
-
-The analytics track **equity derivatives (F&O) only**. A contract note is per-day, not per-segment: if an equity/cash trade is taken on the same day, the broker adds its row to the same note and folds it into the note's own totals. Reading those totals would mix equity P&L, brokerage and charges into the F&O numbers.
-
-Both extractors therefore parse the **obligation table row by row** (one row per exchange/segment — Finvasia prints `NSEFNO-NCL` and `NSECAP-NCL`, Angel One `BSE-FUTURES` and `NSE-CASH`), classify each label via `brokers/segments.js`, and aggregate the F&O rows only. Broker-reported grand totals (`TOTAL(NET)`, `Total Brokerage = …`) are never used as values, only as cross-checks, because they span every segment.
-
-- **Brokerage per segment** is derived from the row's own *taxable value of supply*, which both brokers define as `brokerage + exchange transaction charges + SEBI turnover fees + IPF charges` (Finvasia also prints brokerage in the row directly).
-- **Unknown segment labels** (`classifySegment` returns `"unknown"`) are a hard error rather than a guess — silently keeping or dropping an unrecognised segment would corrupt the day's P&L. Add the label to the patterns in `brokers/segments.js` when a new segment shows up.
-- **Notes with no F&O row at all** (a pure equity day) extract as zeros rather than an error, so a cash-only contract note contributes nothing instead of failing the run.
-- **Column-order guard**: each extractor verifies that `obligation − itemised charges` equals the note's own final-net cell, and refuses the row if it does not. This catches a change in the PDF layout instead of writing a wrong number to the sheet. Only the F&O rows are held to the expected cell count — an odd-shaped cash row is logged and ignored.
-- **A failed extract fails the whole date.** `parser.js` exits non-zero if *any* PDF fails, and writes no `daily_summary.json`. `updateSheet.js` fills a missing account with zeros, so a partial summary would record a real trading day as flat for that broker and advance the row tracker past it, putting the date beyond reach. The CI loop leaves it as a gap instead.
-- `skipped_segments` lists the non-F&O rows that were dropped; `parser.js` logs it per account.
-
-### Adding a New Broker
-
-1. Create `brokers/<name>.js` exporting `subject(accountId, date)` and `extract(text)`. Use `finvasia.js` and `angelone.js` as templates, including the segment filtering described above.
-2. Register it in `brokers/index.js` by adding it to the `BROKERS` map.
-3. Reference it in `BROKER_ACCOUNTS_JSON` with `"broker": "<name>"`.
-
-The rest of the pipeline (`fetchMail.js`, `parser.js`, `updateSheet.js`, `checkDates.js`, `row_tracker.json`) needs no changes.
-
-### Components
-
-`components/PaginatedPreview.tsx` is a standalone React component (Next.js `"use client"`) that renders HTML content paginated via `window.Paged.Previewer` (Paged.js). It is not wired into the Node.js pipeline — it appears to be a UI component for a separate front-end that previews paginated documents. It uses stable DOM refs to avoid re-mounts, debounces re-renders, and guards against concurrent pagination runs.
-
-### Required Environment Variables
-
-| Variable | Description |
+| Path | What |
 |---|---|
-| `BROKER_ACCOUNTS_JSON` | JSON array of mailboxes, each with `email`, `emailPassword`, and `accounts[]` (each account has `broker`, `accountId`, `pdfPassword`). See **Config** section above. |
-| `GOOGLE_CREDENTIALS` | Base64-encoded Google service account JSON |
-| `GOOGLE_SHEET_ID` | Google Sheet ID from URL |
-| `SHEET_GID` | Numeric GID of the target tab |
-| `SHEET_NAME` | Name of the target tab |
+| `days/<day>.jsonl` | One line per broker account for the session: `status` `note` (with `fno`, the sheet's five figures, `skipped_segments`, the note's sha256, file, subject, received time, and `superseded` hashes when `--day` chose between notes), `no_trade`, `no_note` or `failed` (with `reason`) |
+| `raw/<broker>/<account>/<day>.pdf` | The note as mailed (encrypted), and `<day>.decrypted.pdf` |
+| `cursor.json` | Per `<mailbox>\|<broker>/<account>`: `uidvalidity`, `last_uid`, `checked_at` — how far that account's mail has been read — and `quiet_since`, the day a quiet spell began |
 
-`TARGET_DATE` (optional) overrides the default of yesterday (`YYYY-MM-DD` format).
+**When a session is done for an account** (`record.js`): a note is stored; or `no_trade`,
+because a later session's note for the account arrived and this one has no line (brokers mail
+a note only for a day with trades); or `no_note`, the oldest session of the window when the
+account has had no note in the whole window (an account not trading lately). A `failed` line
+(a note that does not read, two different notes) keeps its session open and is never closed as
+`no_trade`; it alerts every run until `node run.js --day D` stores the note (with two notes,
+`--day` takes the newest received and keeps the others' PDFs). A quiet spell alerts on every
+run of the day it begins (so a successful retry cannot swallow the alert), then not until a
+note has arrived. A note that arrives later for a session closed as `no_trade` or `no_note`
+replaces that line. Sessions of an account whose mailbox could not be read are not judged.
 
-### CI Workflows
+**The bookmark.** Gmail's message numbers (UIDs) only grow within one UIDVALIDITY. A run asks
+for UIDs after `last_uid`, or mail received in the 3 days before the last session
+(`OVERLAP_DAYS`): a note Gmail indexed late is still found, a recent failed note is tried again,
+and notes already stored are skipped by hash. (A count of UIDs would not do: one mailbox gets a
+few mails a day, another thousands.) The bookmark
+then moves to the newest UID the search returned; alerts about a message (a second note, mail
+with no readable note) are raised only for messages past the old bookmark, so each fires once.
+With no bookmark, or a changed UIDVALIDITY, the run reads the window by date. A second,
+different note for a stored session is reported, never written over.
 
-`.github/workflows/` contains two workflows:
-- **Daily Trading Data Processing** — runs at 00:01 UTC daily; downloads the `row-tracker` artifact, calls `check-dates`, loops over `gap_dates.txt` processing each missing date, uploads the updated artifact.
-- **Update Last Updated Row** — manual `workflow_dispatch` to correct `lastUpdatedRow` in the artifact when the sheet is manually edited.
+## F&O-only extraction
 
----
+The analytics track **equity derivatives (F&O) only**. A contract note is per day, not per
+segment: an equity trade the same day adds its row to the same note and its totals. So both
+extractors parse the **obligation table row by row** (Finvasia prints `NSEFNO-NCL` and
+`NSECAP-NCL`, Angel One `BSE-FUTURES` and `NSE-CASH`), classify each label with
+`brokers/segments.js`, and add up the F&O rows only. A broker's grand totals are used only as
+cross-checks.
 
-## Setup
+- **Brokerage per segment** comes from the row's own *taxable value of supply* (brokerage +
+  exchange transaction + SEBI + IPF, by both brokers' definition; Finvasia also prints it).
+- **An unknown segment label** is a hard error, never a guess: add it to `segments.js`.
+- **A note with no F&O row** (a cash-only day) reads as zeros.
+- **Column-order guard**: `obligation − itemised charges` must equal the note's own final net,
+  or the row is refused, so a changed PDF layout fails loudly instead of storing a wrong figure.
+- `skipped_segments` lists the non-F&O rows dropped.
 
-### Helpful Links
+## Adding a broker
 
-- **How to Create Google Service Account and Get Credentials:**  
-  [Guide: Creating Service Account and Enabling Google Sheets API](https://cloud.google.com/iam/docs/creating-managing-service-account-keys)
+1. `brokers/<name>.js` exporting `searchSubject`, `noteDay` and `extract` (copy `finvasia.js`
+   or `angelone.js`, segment filtering included).
+2. Add it to `BROKERS` in `brokers/index.js`.
+3. Accounts with `"broker": "<name>"` in `BROKER_ACCOUNTS_JSON` are read from the next run.
+   Until a plugin exists the run skips such an account with a notice (Zerodha `kite` until
+   BL-168 Phase 3).
 
-- **How to Get Google Sheet ID and GID:**
+## Not wired
 
-  - **Sheet ID**: It's the long string in the URL between `/d/` and `/edit`.  
-    Example: `https://docs.google.com/spreadsheets/d/your_google_sheet_id/edit#gid=0`
-  - **GID**: It’s the value after `gid=` in the URL.
-
-- **Base64 Encode your Credentials:**
-  You can encode your service account JSON file using:
-  ```bash
-  base64 service-account.json
-  ```
-
----
-
-### Example `.env` (Generic)
-
-```env
-BROKER_ACCOUNTS_JSON=[{"email":"user1@gmail.com","emailPassword":"yourpassword1","accounts":[{"broker":"finvasia","accountId":"accountid1","pdfPassword":"pdfpwd1","sheetStartColumn":"D"}]},{"email":"user2@gmail.com","emailPassword":"yourpassword2","accounts":[{"broker":"angelone","accountId":"accountid2","pdfPassword":"pdfpwd2","sheetStartColumn":"I"}]}]
-GOOGLE_CREDENTIALS=your_base64_encoded_service_account_json
-GOOGLE_SHEET_ID=your_google_sheet_id_here
-SHEET_GID=your_sheet_gid_here
-SHEET_NAME=your_sheet_name_here
-```
-
----
-
-### Adding Environment Variables to GitHub Actions
-
-To use this project with **GitHub Actions**, make sure you add the environment variables as **GitHub Secrets**:
-
-#### Steps:
-
-1. Go to your GitHub repository.
-2. Navigate to **Settings** → **Secrets and variables** → **Actions**.
-3. Click **"New repository secret"**.
-4. Add each of the following as separate secrets:
-
-| GitHub Secret Name     | Corresponds to .env Variable |
-| ---------------------- | ---------------------------- |
-| `BROKER_ACCOUNTS_JSON` | `BROKER_ACCOUNTS_JSON`       |
-| `GOOGLE_CREDENTIALS`   | `GOOGLE_CREDENTIALS`         |
-| `GOOGLE_SHEET_ID`      | `GOOGLE_SHEET_ID`            |
-| `SHEET_GID`            | `SHEET_GID`                  |
-| `SHEET_NAME`           | `SHEET_NAME`                 |
-
-#### Notes:
-
-- Make sure your GitHub Actions workflow is configured to load these secrets using the `secrets` context.
-- You can access the secrets in your workflow like this:
-
-```yaml
-env:
-  BROKER_ACCOUNTS_JSON: ${{ secrets.BROKER_ACCOUNTS_JSON }}
-  GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-  GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
-  SHEET_GID: ${{ secrets.SHEET_GID }}
-  SHEET_NAME: ${{ secrets.SHEET_NAME }}
-```
+`components/PaginatedPreview.tsx` and `styles/` came with the `trade-analytics` merge and are
+not used by the pipeline. The two sample PDFs and the two `.xlsx` files are reference copies
+(the committed sheet copy holds the formulas BL-168 Phase 4 reproduces).

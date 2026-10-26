@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { alertMissed, alertResult, telegramSink } from '../alerts.js';
+import { redact } from '@trading/notify';
+import { alertMissed, alertResult, registerContractNoteSecrets, telegramSink } from '../alerts.js';
 import { History } from '../history.js';
 import type { Job } from '../jobs.js';
 import { decide, skippedToday, startLoop } from '../loop.js';
@@ -120,6 +121,19 @@ describe('decide', () => {
   it('ignores slots from before the scheduler was first started', () => {
     const firstStart = istAt('2026-10-06', '10:00');
     expect(decide(job, istAt('2026-10-06', '10:30'), history, firstStart).kind).toBe('idle');
+  });
+});
+
+describe('contract-notes secrets (BL-168)', () => {
+  it('registers every mailbox and PDF password for redaction, and ignores a broken value', () => {
+    registerContractNoteSecrets(
+      JSON.stringify([
+        { emailPassword: 'mail-pass-123', accounts: [{ pdfPassword: 'pdf-pass-456' }] },
+      ]),
+    );
+    expect(redact('a mail-pass-123 b pdf-pass-456')).toBe('a ***REDACTED*** b ***REDACTED***');
+    expect(() => registerContractNoteSecrets('[{')).not.toThrow();
+    expect(() => registerContractNoteSecrets(undefined)).not.toThrow();
   });
 });
 

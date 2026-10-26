@@ -1,5 +1,11 @@
 import { CHECK_JOBS } from './checks/index.js';
-import { type Schedule, firstWeekdayOfMonth, onWeekdays, tradingDays } from './schedule.js';
+import {
+  type Schedule,
+  everyDay,
+  firstWeekdayOfMonth,
+  onWeekdays,
+  tradingDays,
+} from './schedule.js';
 
 /**
  * Every recurring job, in one place (BL-012). Adding a job means adding an
@@ -51,8 +57,9 @@ export interface Job {
    * runs after the upload before it, retries included. (The group does not space their logins:
    * the next job starts the moment one ends. `quantiply-session.ts` does, with a file stamp of
    * the last TOTP window each account typed a code from.)
+   * `contract-notes` = the two contract-notes runs, which write the same store and bookmark.
    */
-  group?: 'catalog' | 'quantiply';
+  group?: 'catalog' | 'quantiply' | 'contract-notes';
   /**
    * Where it can run: `home` needs a residential IP (NSE, niftyindices),
    * `gui` a desktop session for a headed browser, `postgres` the local DB.
@@ -87,6 +94,9 @@ const MOMENTUM = 'packages/momentum-backtesting';
 const OPTIONS = 'packages/option-backtesting';
 const TRADING_DATA = 'packages/trading-data';
 const BROKER_LOGIN = 'packages/broker-login';
+const CONTRACT_NOTES = 'packages/contract-notes';
+const CONTRACT_NOTES_FIX =
+  'cd packages/contract-notes && node run.js --dry-run  (the log names the account, session and PDF; after a fix, node run.js --day <day>)';
 const FRIDAY = onWeekdays(5);
 
 const BASE_JOBS: Job[] = [
@@ -725,6 +735,36 @@ const BASE_JOBS: Job[] = [
     retryDelayMinutes: 0,
     catchUpHours: 3,
     fixHint: 'bun run --filter @ata/scheduler jobs run morning-summary',
+  },
+  {
+    id: 'contract-notes',
+    description:
+      "Read the brokers' contract notes (BL-168): each account's new mail since its bookmark, the PDF kept and its F&O figures stored under TRADING_DATA_ROOT/contract-notes/; sessions that can have no note are closed (no trade / no note). Never writes the Google Sheet (trade-analytics keeps it)",
+    // Every day, not trading days: a session's notes arrive its evening (Angel One's after
+    // midnight), so Saturday's run takes Friday.
+    schedule: { at: '00:00', on: everyDay, label: 'every day 00:00' },
+    steps: [['node', 'run.js']],
+    cwd: CONTRACT_NOTES,
+    timeoutMinutes: 15,
+    retries: 1,
+    retryDelayMinutes: 20,
+    catchUpHours: 24,
+    group: 'contract-notes',
+    fixHint: CONTRACT_NOTES_FIX,
+  },
+  {
+    id: 'contract-notes-retry',
+    description:
+      'The 00:00 contract-notes run again, for notes that arrived after it (BL-168); reads only mail newer than the bookmark, so with nothing new it is a few seconds',
+    schedule: { at: '07:30', on: everyDay, label: 'every day 07:30' },
+    steps: [['node', 'run.js']],
+    cwd: CONTRACT_NOTES,
+    timeoutMinutes: 15,
+    retries: 1,
+    retryDelayMinutes: 20,
+    catchUpHours: 12,
+    group: 'contract-notes',
+    fixHint: CONTRACT_NOTES_FIX,
   },
 ];
 

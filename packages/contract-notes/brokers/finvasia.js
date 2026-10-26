@@ -2,6 +2,8 @@ const Decimal = require('decimal.js');
 const { parseAmounts, splitBySegment } = require('./segments');
 const logger = require('../utils/logger');
 
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // Order in which pdf-parse emits the "Obligation Detail" cells for each
 // exchange/segment row. It follows the PDF's draw order, which is not the
 // printed header order — the arithmetic check below guards against drift.
@@ -34,16 +36,21 @@ const TOLERANCE = 0.05;
 // clearing corporation run together.
 const SEGMENT_LABEL = /\b((?:NSE|BSE|MSEI|MSE|MCX|NCDEX|ICEX)[A-Z& ]*-\s*[A-Z]+)/gi;
 
-function subject(accountId, date) {
-  const dd = String(date.getDate()).padStart(2, '0');
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const yyyy = date.getFullYear();
-  return `Combined Contract Note for ${accountId} ${dd}-${mm}-${yyyy}`;
+// IMAP SUBJECT is a substring match: this finds every note for the account, whatever its date.
+function searchSubject(accountId) {
+  return `Combined Contract Note for ${accountId}`;
+}
+
+// "Combined Contract Note for FA1234 23-10-2026" → '2026-10-23' (null if not this account's).
+function noteDay({ subject, accountId }) {
+  const m = new RegExp(
+    `Combined Contract Note for ${escapeRegExp(accountId)}\\s+(\\d{2})-(\\d{2})-(\\d{4})`,
+  ).exec(subject || '');
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
 }
 
 // n is a Decimal (all money math in this file stays in Decimal until this
-// boundary); returns a plain number, since that is what daily_summary.json
-// and the Sheets API expect.
+// boundary); returns a plain number, since that is what the stored line holds.
 function round2(n) {
   return n.toDecimalPlaces(2).toNumber();
 }
@@ -194,4 +201,4 @@ function extract(text) {
   };
 }
 
-module.exports = { subject, extract };
+module.exports = { searchSubject, noteDay, extract };
