@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the only record of real money the project measures itself against; unblocks BL-093 and BL-026 |
-| **Status** | In progress (Phase 2, UI design, first; then Phase 1) |
+| **Status** | In progress (Phase 2 done; Phase 1 next) |
 | **Type** | feature |
 | **Area** | contract-notes / scheduler / trading-data / dashboard |
 | **Created** | 2026-10-26 |
@@ -273,7 +273,8 @@ account, behaviour patterns.
 - **Tasks:** both extractors emit the itemised charges, segment rows, trade rows and note
   identifiers (the obligation cross-check stays a hard error); the Angel One interest e-mail,
   the ledger e-mails (funds, payouts, settlements, margin shortfall) and the `kite` plugin;
-  the one-time import of
+  the one-time import (two rows in the committed copy are both dated 20 May 25: summed as one
+  session and listed in the import's report) of
   the sheet's rows since 1 Apr 2025 as `source: 'sheet'` (five figures and the manual inputs)
   from an `.xlsx` the owner downloads (`contract-notes import-sheet <file>`; no Google
   credentials); a Gmail backfill by date range (`--from --to`) that re-parses the notes still
@@ -314,6 +315,28 @@ account, behaviour patterns.
   `trade-analytics` (TODO §2.7) and let the sheet stop. BL-093 and BL-026 are unblocked at
   Phase 3.
 - **Done when:** a backup run copies the new folders, and the decision is in the Log.
+
+## Mockups (Phase 2, approved by the owner 2026-10-26)
+
+The source is [`assets/BL-168/trade-book-mockup.html`](assets/BL-168/trade-book-mockup.html):
+the dashboard's dark tokens and IBM Plex, the analytics page pattern. Real figures (the sheet's
+daily rows from the committed copy, computed with the sheet's formulas): screen 2 (FY 2025-26),
+screen 3's ratios (every row to 26 May 2026) and summary (FY 2025-26), the algo fees on screen 3,
+and screen 4's net, charges, to-date and drawdown columns and the 27 Mar day's net, charges and
+algos. Everything else is illustrative, and each such card says so. With a target-pace benchmark
+only profit and return have a benchmark figure; the other tiles say "no target figure" (a
+benchmark that is a series — last FY, Adaptive paper, NIFTY — compares every tile).
+
+| Screen | Mockup |
+|---|---|
+| 1 · Page map: the four views (F&O, Trades, Money, Momentum), the day drawer, the inputs dialog, the states | ![page map](assets/BL-168/1-page-map.png) |
+| 2 · First screen: run bar, headline strip against a benchmark (target pace, last FY, Adaptive paper, NIFTY), hero chart with the follow tooltip | ![first screen](assets/BL-168/2-first-screen.png) |
+| 3 · Widgets: the sheet's ratios (T, U, V, W, Z) in one chart with a switch, the summary block, monthly and FY, by account, charges by kind | ![widgets](assets/BL-168/3-widgets.png) |
+| 4 · Days and the day drawer: accounts and segments, every charge, fills paired into trades by source, the manual inputs, the PDFs | ![day detail](assets/BL-168/4-day-detail.png) |
+| 5 · Trades: results by source, best and worst point of each trade, results by day context, round trips | ![trades](assets/BL-168/5-trades.png) |
+| 6 · Money: return on money in the account, deposits and withdrawals, collateral interest, margin pressure, capital per account | ![money](assets/BL-168/6-money.png) |
+| 7 · Momentum: Kite's notes booked to the weekly lots, planned against filled | ![momentum](assets/BL-168/7-momentum.png) |
+| 8 · States and inputs: a late note, day rows by state, the inputs dialog, a new year with no data | ![states](assets/BL-168/8-states-and-inputs.png) |
 
 ## Risks
 
@@ -389,3 +412,12 @@ record from them.
   formulas, turnover); phases now 1 store and job, 2 UI design (first), 3 extraction and
   history, 4 analytics, 5 page, 6 backup. Tagging, overrides and behaviour split into BL-169.
   TODO 2.10.
+- 2026-10-26 — Phase 2: eight mockups drafted (Mockups above), rendered with headless Chromium
+  from one HTML file; the first screen and the ratios use the sheet's real FY 2025-26 rows
+  (net ₹2,80,565, max drawdown −₹83,335, the sheet's own −83,335).
+- 2026-10-26 — Phase 2 done: the owner approved the mockups as drawn. Phase 5 builds from them.
+- 2026-10-26 — review of PR #334 fixed in the mockups (no change to the approved design): every
+  illustrative card marked, the real figures listed above; the 27 Mar day consistent between
+  its row and the drawer (14 algos, ₹200 algo fees from the sheet); each headline tile says how
+  it compares with the picked benchmark; trade P&L labelled gross; the sheet's real algo fees
+  (₹34,523); round axis ticks; weekdays and expiries corrected; green kept for profit only.
