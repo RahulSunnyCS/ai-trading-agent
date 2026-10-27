@@ -327,6 +327,27 @@ export function formatDay(
   return options.weekday ? `${_utcWeekday.format(date)} ${text}` : text;
 }
 
+const _utcDayMonth = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC',
+  day: 'numeric',
+  month: 'short',
+});
+
+/**
+ * A zone-less calendar day without its year, for tight rows: "23 Oct", or "Fri 23 Oct" with
+ * `weekday`. Like formatDay it never shifts the day.
+ */
+export function formatDayShort(
+  day: string | null | undefined,
+  options: { weekday?: boolean } = {},
+): string {
+  if (!day) return EMPTY;
+  const date = new Date(`${day.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return EMPTY;
+  const text = _utcDayMonth.format(date);
+  return options.weekday ? `${_utcWeekday.format(date)} ${text}` : text;
+}
+
 /** How long ago an instant was: "just now", "42s ago", "5 min ago", "3 h ago", "2 d ago". */
 export function formatRelative(value: Instant, now: Date | number = Date.now()): string {
   const date = toDate(value);

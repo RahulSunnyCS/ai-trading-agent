@@ -9,6 +9,7 @@
  *   /momentum/{backtest|scores|saved|week|rebalance|journal} (old /momentum/weekly redirects)
  *   /momentum/backtest/{etf|stock|custom_index|broad}
  *   /momentum/scores/{stocks|sectors}
+ *   /tradebook/{fno|trades|money|momentum}
  *   /coverage/{backfill|replay}
  *   /brokerLogins  /billing  /settings
  *   /guide/{start|momentum|optionslab|operations|glossary}/<page>
@@ -93,6 +94,10 @@ export const MOMENTUM_SECTIONS = [
   'journal',
 ] as const;
 export type MomentumSection = (typeof MOMENTUM_SECTIONS)[number];
+
+/** The Trade book's views (BL-168), in display order. Must match its nav item's children. */
+export const TRADE_BOOK_SECTIONS = ['fno', 'trades', 'money', 'momentum'] as const;
+export type TradeBookSection = (typeof TRADE_BOOK_SECTIONS)[number];
 
 export const MOMENTUM_DATASETS = ['etf', 'stock', 'custom_index', 'broad'] as const;
 export type MomentumDatasetId = (typeof MOMENTUM_DATASETS)[number];
@@ -192,9 +197,11 @@ export function oneOf<T extends string>(
 /**
  * A page laid out on the Analytics page pattern (apps/dashboard/CLAUDE.md): the navigation
  * shrinks to an icon rail and the page takes the full width, so its hero chart can too.
- * Momentum's Backtest section, the section `/momentum` opens on, is the first.
+ * Momentum's Backtest section, the section `/momentum` opens on, is the first; every view of the
+ * Trade book is one too.
  */
 export function isAnalyticsPage(tab: Tab | null, rest: readonly string[] = []): boolean {
+  if (tab === 'tradebook') return true;
   return tab === 'momentum' && (oneOf(MOMENTUM_SECTIONS, rest[0]) ?? 'backtest') === 'backtest';
 }
 

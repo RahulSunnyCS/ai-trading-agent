@@ -17,6 +17,7 @@ import { PnlView } from './components/PnlView';
 import { PricingPage } from './components/PricingPage';
 import { RegimeView } from './components/RegimeView';
 import { SettingsView } from './components/SettingsView';
+import { TradeBookView } from './components/TradeBookView';
 import { TradesView } from './components/TradesView';
 import { GuideLink } from './components/guide/GuideLink';
 import { GuideView } from './components/guide/GuideView';
@@ -55,6 +56,7 @@ const SUBTITLES: Record<Tab, string> = {
   optionslab:
     'Build, backtest and track option strategies: leg-wise on 1-minute Fyers data, or the YAML engine',
   momentum: 'Weekly rotation research across ETFs, stocks and categories',
+  tradebook: "The real P&L from the brokers' contract notes: F&O, trades, money and Momentum",
   brokerLogins: 'Connect and manage the market-data brokers used across the dashboard',
   pricing: 'Your credits, payment mode and plans',
   settings: 'Choose which tabs appear and arrange their navigation priority',
@@ -87,6 +89,8 @@ function renderView(
       return <OptionsLabView />;
     case 'momentum':
       return <MomentumBacktestingView />;
+    case 'tradebook':
+      return <TradeBookView />;
     case 'brokerLogins':
       return <BrokerLoginsView />;
     case 'pricing':

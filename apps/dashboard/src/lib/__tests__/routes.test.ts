@@ -244,6 +244,8 @@ describe('isAnalyticsPage', () => {
     ['momentum', ['scores'], false],
     ['momentum', ['saved'], false],
     ['optionslab', [], false],
+    ['tradebook', [], true],
+    ['tradebook', ['money'], true],
     [null, [], false],
   ] as const)('%s %j -> %s', (tab, rest, expected) => {
     expect(isAnalyticsPage(tab, rest)).toBe(expected);

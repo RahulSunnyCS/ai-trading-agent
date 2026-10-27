@@ -14,7 +14,11 @@ import { useThemeStore } from '../store/theme';
 export const CHART_HEIGHT = 300;
 
 /** Create/resize/theme a Lightweight chart; returns a ref to the live chart. */
-export function useChart(container: RefObject<HTMLDivElement>, withLeftScale: boolean) {
+export function useChart(
+  container: RefObject<HTMLDivElement>,
+  withLeftScale: boolean,
+  height: number = CHART_HEIGHT,
+) {
   const chartRef = useRef<IChartApi | null>(null);
   const [ready, setReady] = useState(false);
   const theme = useThemeStore((s) => s.theme);
@@ -24,7 +28,7 @@ export function useChart(container: RefObject<HTMLDivElement>, withLeftScale: bo
     if (el === null) return;
     const chart = createChart(el, {
       width: el.clientWidth,
-      height: CHART_HEIGHT,
+      height,
       layout: { background: { color: 'transparent' } },
       leftPriceScale: { visible: withLeftScale },
       timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 2 },
@@ -41,7 +45,7 @@ export function useChart(container: RefObject<HTMLDivElement>, withLeftScale: bo
       setReady(false);
       chart.remove();
     };
-  }, [container, withLeftScale]);
+  }, [container, withLeftScale, height]);
 
   useEffect(() => {
     const chart = chartRef.current;

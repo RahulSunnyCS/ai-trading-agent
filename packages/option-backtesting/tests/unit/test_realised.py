@@ -72,6 +72,17 @@ def test_a_day_adds_the_accounts_and_takes_off_the_algo_fees(tmp_path):
     assert row.capital == Decimal(500000)
 
 
+def test_summary_note_charges_leave_out_the_algo_fees_of_a_day_with_no_note(tmp_path):
+    _write(tmp_path, "2026-04-01", [_note("2026-04-01", "A1", 1000, 20)])
+    _manual(tmp_path, "2026-04-01", algos=4)  # fee 75
+    _write(tmp_path, "2026-04-02", [_none("2026-04-02", "A1")])
+    _manual(tmp_path, "2026-04-02", algos=10)  # fee 150, no note: not in charges
+    s = ratios.summary(ratios.daily(store.load(tmp_path)))
+    assert s["algo_fees"] == 225
+    assert s["charges"] == 95  # 20 + 75: a day without a note has no charges
+    assert s["note_charges"] == 20  # not charges - algo_fees (-130)
+
+
 def test_a_day_with_no_note_has_no_profit_and_the_averages_skip_it(tmp_path):
     start = date(2026, 1, 1)
     for i in range(100):
