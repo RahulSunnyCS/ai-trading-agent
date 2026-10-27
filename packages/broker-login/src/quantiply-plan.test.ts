@@ -204,6 +204,9 @@ test('top-up flags an enabled algo that 09:16 dropped: it would trade real money
   assert.deepEqual(p.notToday, [`${P}B`]);
   assert.equal(needsAttentionQ(p), true);
   assert.match(summaryQ(p, 'topup').join('\n'), /ENABLED but no longer today's pick.*WILL TRADE/);
+  // BL-172: with the tool's own switch-on in charge, the 09:21 run turns it off: a note, no alarm
+  assert.equal(needsAttentionQ(p, true), false);
+  assert.match(summaryQ(p, 'topup', true).join('\n'), /09:21 switch-on turns it off/);
 });
 
 test('a pick with an unconfirmed setting is never created, and is reported', () => {

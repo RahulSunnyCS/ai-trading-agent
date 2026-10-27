@@ -341,7 +341,7 @@ export function brokerOutcome(i: {
   };
 }
 
-export function summaryQ(p: QPlan, mode: Mode): string[] {
+export function summaryQ(p: QPlan, mode: Mode, deploysItself = false): string[] {
   const lines: string[] = [];
   const algo = (a: QAlgo) => `${a.name} (${a.day}${a.enabled ? ', enabled' : ''}, ${a.status})`;
   if (p.keep.length) lines.push(`ready: ${p.keep.join(', ')}`);
@@ -361,7 +361,9 @@ export function summaryQ(p: QPlan, mode: Mode): string[] {
     );
   if (p.enabledNotToday.length) {
     lines.push(
-      `⚠️ ENABLED but no longer today's pick, it WILL TRADE unless you disable it: ${p.enabledNotToday.join(', ')}`,
+      deploysItself
+        ? `enabled, no longer today's pick: the 09:21 switch-on turns it off if it has not started: ${p.enabledNotToday.join(', ')}`
+        : `⚠️ ENABLED but no longer today's pick, it WILL TRADE unless you disable it: ${p.enabledNotToday.join(', ')}`,
     );
   }
   if (mode === 'topup' && p.notToday.length) lines.push(`not today: ${p.notToday.join(', ')}`);
@@ -370,13 +372,15 @@ export function summaryQ(p: QPlan, mode: Mode): string[] {
 }
 
 /** Anything kept, skipped or changed against the plan's intent: the owner should look. */
-export function needsAttentionQ(p: QPlan): boolean {
+export function needsAttentionQ(p: QPlan, deploysItself = false): boolean {
+  // BL-172: with the tool's own switch-on in charge (QUANTIPLY_DEPLOY and Automated deployment
+  // on), an enabled algo 09:16 dropped is the 09:21 run's to switch off, not the owner's.
   return (
     p.heldBack.length +
       p.conflicts.length +
       p.changed.length +
       p.unconfirmed.length +
-      p.enabledNotToday.length >
+      (deploysItself ? 0 : p.enabledNotToday.length) >
     0
   );
 }

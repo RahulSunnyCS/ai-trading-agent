@@ -6,6 +6,7 @@ import { sendText } from '@trading/notify';
 import {
   describeSource,
   effectiveRow,
+  quantiplyDeploy,
   readAutomation,
   uploadBooks,
 } from './automation-settings.js';
@@ -129,9 +130,14 @@ async function main(): Promise<number> {
   let decidedBy = '';
   /** the account row's platform multiplier (BL-140 Phase 4); a manual --dir / --latest run is at 1 */
   let multiplier = 1;
+  /** BL-172: the tool's own switch-on is in charge of this account (it turns a dropped pick off) */
+  let deploysItself = false;
   if (values['from-settings']) {
     const automation = readAutomation();
     decidedBy = describeSource(automation);
+    deploysItself =
+      quantiplyDeploy(automation, broker).ok &&
+      process.env.QUANTIPLY_DEPLOY?.trim().toLowerCase() === 'on';
     multiplier = effectiveRow(automation, 'quantiply', broker).multiplier;
     const books = uploadBooks(automation, 'quantiply', broker);
     if (!books.length) {
@@ -257,6 +263,8 @@ async function main(): Promise<number> {
   let attention = false;
   let loginRefused = false;
   let printed = 0; // lines already on the console (the plan), so the end prints only the rest
+  /** the plan creates an algo: a 09:16 top-up reports only then (or on a failure), BL-172 */
+  let created = false;
 
   try {
     // The browser is only for the login: the token is taken and the browser closed before any call.
@@ -277,7 +285,8 @@ async function main(): Promise<number> {
       ledger,
       algos,
     );
-    lines.push(...summaryQ(p, mode));
+    lines.push(...summaryQ(p, mode, deploysItself));
+    created = p.create.length > 0;
     printed = lines.length;
     console.log(`${label}${values.apply ? '' : ' (dry run)'}\n${lines.join('\n')}`);
     if (!values.apply) return 0;
@@ -545,7 +554,7 @@ async function main(): Promise<number> {
       if (w) forBroker.push({ w, id: a.id });
     }
     await setBrokers(forBroker);
-    if (needsAttentionQ(p)) {
+    if (needsAttentionQ(p, deploysItself)) {
       failed = true;
       attention = true;
     }
@@ -565,7 +574,9 @@ async function main(): Promise<number> {
     );
   }
 
-  if (values.apply) {
+  // BL-172: the 09:16 top-up is quiet on a day 09:16 changed nothing (the owner's choice); the
+  // evening always reports.
+  if (values.apply && (mode === 'evening' || failed || created)) {
     const head = failed ? `⚠️ ${label}: check Quantiply` : `✅ ${label}`;
     await sendText(telegram, redact([head, ...lines].join('\n')), 'broker.quantiply').catch(
       () => undefined,

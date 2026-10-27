@@ -612,7 +612,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'quantiply-topup',
     description:
-      "After the 09:16 pick, create on each Quantiply account any recorded pick of its list (dashboard settings, BL-140) that last night's upload does not have (BL-139); deletes nothing and names the algos that are not today's. Does nothing until QUANTIPLY_UPLOAD=on",
+      "After the 09:16 pick, create on each Quantiply account any pick of its list (dashboard settings, BL-140) that last night's upload does not have (BL-139), under the owner's 09:17 rule (BL-172: the evening's 09:17 strategy stays, a new 09:17 pick is not made, the rest is chosen again by the 09:16 score); deletes nothing and names the algos that are not today's. Does nothing until QUANTIPLY_UPLOAD=on",
     // 09:19, not 09:18: a minute clear of the pick's own Angel One work, so two logins never type
     // codes from one TOTP window. A changed 09:17 pick is too late either way. Not caught up.
     schedule: { at: '09:19', on: tradingDays, label: 'trading days 09:19' },
@@ -626,6 +626,7 @@ const BASE_JOBS: Job[] = [
         'rotation',
         'quantiply-export',
         '--from-settings',
+        '--morning-rule',
       ],
       // Both accounts always run (a failed step would stop the next); the job fails if either did.
       ['/bin/sh', '-c', quantiplyUploads('topup')],
