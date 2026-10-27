@@ -315,7 +315,14 @@ async function main(): Promise<number> {
   const report = fatal ? `${body}\n${fatalLabel}: ${fatal}` : body;
 
   console.log(`\n${report}`);
-  await sendText(config.telegram, report, 'broker.algotest');
+  // BL-173: on the Mac (local-login.ts) a clean login is said in the 08:10 message instead; a
+  // failure is still sent at once. GitHub's backup runs always report.
+  const anyFail =
+    fatal !== null ||
+    [...(results ?? []), quantiply, quantiplyShoonya].some((r) => r?.status === 'FAIL');
+  if (anyFail || process.env.LOGIN_QUIET_SUCCESS !== '1') {
+    await sendText(config.telegram, report, 'broker.algotest');
+  }
 
   // BL-172: the Mac's runner (local-login.ts) reads the outcome to decide what GitHub tries again.
   const resultFile = process.env.LOGIN_RESULT_FILE;

@@ -7,6 +7,7 @@ import {
   type QWanted,
   brokerBefore,
   brokerOutcome,
+  differsFromTentative,
   istWeekday,
   needsAttentionQ,
   ownedIds,
@@ -506,4 +507,18 @@ test('Shoonya subscription: the extra algos for the next session (BL-172)', () =
     207,
   );
   assert.equal(previewNet({ data: { lineItems: [] } }), null);
+});
+
+test('the evening upload differs from the 16:00 tentative list only on another core set (BL-173)', () => {
+  const tentative = {
+    adaptive: { core: ['N_ditm1_0947', 'S_p320_1302', 'S_p250_1302'], buy: [] },
+    t1: { core: ['S_ditm1-t1s44_0917'], buy: [] },
+  };
+  assert.equal(
+    differsFromTentative(tentative, 'core', ['S_p250_1302', 'N_ditm1_0947', 'S_p320_1302']),
+    false,
+  );
+  assert.equal(differsFromTentative(tentative, 'core', ['N_ditm1_0947', 'S_p320_1302']), true);
+  assert.equal(differsFromTentative(tentative, 't1', ['N_dir_0932']), true);
+  assert.equal(differsFromTentative(null, 'core', ['x']), false);
 });

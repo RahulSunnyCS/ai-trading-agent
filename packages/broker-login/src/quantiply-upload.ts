@@ -22,6 +22,7 @@ import {
   type QWanted,
   brokerBefore,
   brokerOutcome,
+  differsFromTentative,
   istWeekday,
   needsAttentionQ,
   parseQLedger,
@@ -276,6 +277,9 @@ async function main(): Promise<number> {
   let printed = 0; // lines already on the console (the plan), so the end prints only the rest
   /** the plan creates an algo: a 09:16 top-up reports only then (or on a failure), BL-172 */
   let created = false;
+  /** BL-173: the evening reports only a failure, credits spent, or picks unlike the 16:00 list */
+  let spent = false;
+  let differs = false;
 
   try {
     // The browser is only for the login: the token is taken and the browser closed before any call.
@@ -299,6 +303,17 @@ async function main(): Promise<number> {
     );
     lines.push(...summaryQ(p, mode, deploysItself));
     created = p.create.length > 0;
+    if (mode === 'evening' && dataRoot) {
+      const tentative = await readJson<unknown>(
+        join(dataRoot, 'rotation', 'result-notifications', `${manifest.day}.tentative.json`),
+      ).catch(() => null);
+      differs = differsFromTentative(
+        tentative,
+        manifest.book,
+        manifest.strategies.filter((s) => !s.addon).map((s) => s.variant),
+      );
+      if (differs) lines.push('⚠️ not the list the 16:00 message gave for tomorrow');
+    }
     printed = lines.length;
     console.log(`${label}${values.apply ? '' : ' (dry run)'}\n${lines.join('\n')}`);
     if (!values.apply) return 0;
@@ -622,6 +637,7 @@ async function main(): Promise<number> {
                 `⚠️ subscription set to ${need} a day but reads back ${back.totalAlgosPerDay}: check Subscription`,
               );
             } else {
+              if (net > 0) spent = true;
               lines.push(
                 `subscription: ${sub.totalAlgosPerDay} → ${need} algos a day (${net >= 0 ? `${net} credits` : `${-net} credits back`}; balance was ${balance})`,
               );
@@ -656,11 +672,21 @@ async function main(): Promise<number> {
 
   // BL-172: the 09:16 top-up is quiet on a day 09:16 changed nothing (the owner's choice); the
   // evening always reports.
-  if (values.apply && (mode === 'evening' || failed || created)) {
-    const head = failed ? `⚠️ ${label}: check Quantiply` : `✅ ${label}`;
-    await sendText(telegram, redact([head, ...lines].join('\n')), 'broker.quantiply').catch(
-      () => undefined,
-    );
+  // BL-173: the evening only on a failure, credits spent or a list unlike the 16:00 one; under
+  // the job (`REPORT_FILE`) both accounts' reports go into one file, sent as one message.
+  const worth = mode === 'evening' ? failed || spent || differs : failed || created;
+  if (values.apply && worth) {
+    const head = failed || differs ? `⚠️ ${label}: check Quantiply` : `✅ ${label}`;
+    const text = redact([head, ...lines].join('\n'));
+    const file = process.env.REPORT_FILE?.trim();
+    const filed =
+      file !== undefined &&
+      file !== '' &&
+      (await appendFile(file, `${JSON.stringify({ text })}\n`, 'utf8').then(
+        () => true,
+        () => false,
+      ));
+    if (!filed) await sendText(telegram, text, 'broker.quantiply').catch(() => undefined);
   }
   console.log(lines.slice(printed).join('\n'));
   if (loginRefused) return EXIT_NO_RETRY;

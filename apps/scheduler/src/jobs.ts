@@ -811,10 +811,14 @@ function quantiplyUploads(mode: 'evening' | 'topup'): string {
   // Shoonya's paid subscription to the next session's algo count (`--subscription`; Angel One's
   // Quantiply is free, so the flag does nothing there).
   const all = mode === 'evening' ? ' --delete-all --subscription' : '';
-  return quantiplyBoth(
+  const both = quantiplyBoth(
     (broker) =>
       `node_modules/.bin/tsx src/quantiply-upload.ts --broker ${broker} --from-settings --mode ${mode}${all} --apply`,
   );
+  if (mode !== 'evening') return both;
+  // BL-173: the evening's reports (failures, credits spent, a list unlike the 16:00 one) as one
+  // message for both accounts, none when neither has anything to say; the exit stays theirs.
+  return `F=$(mktemp -t quantiply-evening) && export REPORT_FILE="$F"; (${both}); code=$?; node_modules/.bin/tsx src/morning-report.ts "$F" --evening; exit $code`;
 }
 
 /** BL-139 Phase 4: one account's enable or disable run (it reads the settings itself). */

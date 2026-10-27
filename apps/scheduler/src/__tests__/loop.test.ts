@@ -3,7 +3,13 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { redact } from '@trading/notify';
-import { alertMissed, alertResult, registerContractNoteSecrets, telegramSink } from '../alerts.js';
+import {
+  alertMissed,
+  alertMissedAll,
+  alertResult,
+  registerContractNoteSecrets,
+  telegramSink,
+} from '../alerts.js';
 import { History } from '../history.js';
 import type { Job } from '../jobs.js';
 import { decide, skippedToday, startLoop } from '../loop.js';
@@ -154,6 +160,26 @@ describe('alerts', () => {
     logPath: '/tmp/x.log',
     error: 'exit 1',
     ...over,
+  });
+
+  it('BL-173: many missed slots in one pass are one message; each alert carries its type', async () => {
+    const types: (string | undefined)[] = [];
+    const typed = async (text: string, type?: string) => {
+      sent.push(text);
+      types.push(type);
+    };
+    const slot = new Date('2026-10-28T02:30:00Z');
+    await alertMissedAll(typed, [
+      { job, slot },
+      { job: { ...job, id: 'other' }, slot },
+    ]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toContain('2 jobs were missed');
+    expect(sent[0]).toContain('• other');
+    await alertMissedAll(typed, []);
+    expect(sent).toHaveLength(1);
+    await alertResult(typed, job, result({}), history);
+    expect(types).toEqual(['scheduler.missed', 'scheduler.failure']);
   });
 
   it('alerts at once on a failure, with the fix', async () => {

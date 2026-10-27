@@ -891,6 +891,15 @@ each evening delete the finished algos and set Shoonya's subscription to the nex
 | 3.47.4 | Phase 7 and the evening delete-all | claude | **Built 2026-10-28**; first live evening 28 Oct 16:45 |
 | 3.47.5 | Phases 1-3: login on the Mac, GitHub backup, credential reminder | claude | **Built 2026-10-28** (first live 08:02 on 28 Oct) |
 
+### 3.48 Fewer Telegram messages — [BL-173](backlog/BL-173-fewer-telegram-messages.md)
+
+Owner (2026-10-28): only send what needs knowing; success reports only where they matter.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.48.1 | Levels per type (on / failures only / off), every message typed, the alerts card | claude | **Built 2026-10-28** |
+| 3.48.2 | The eleven approved changes (one 08:10 message, quiet summary, failures-only defaults, batched missed) | claude | **Built 2026-10-28**; first quiet day 28 Oct |
+
 ### 3.46 Dashboard on Next.js 16 — [BL-157](backlog/BL-157-dashboard-nextjs-16.md)
 
 OpenNext refuses Next.js 15 since 2026-10-21, so every `release` deploy fails and `dashboard.codifie.dev`

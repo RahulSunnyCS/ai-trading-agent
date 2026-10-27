@@ -43,16 +43,36 @@ Echo = Callable[[str], None]
 SendText = Callable[..., bool]
 
 
-def send_text(text: str, severity: str = "info", chat_id: str | None = None) -> bool:
+def send_text(
+    text: str, severity: str = "info", chat_id: str | None = None, kind: str | None = None
+) -> bool:
     """One plain-text Telegram message (no icon or source line: the layout is the message's own),
-    through the repo's notify path. Returns whether it was delivered."""
+    through the repo's notify path. Returns whether it was delivered. `kind` is its type on the
+    Telegram alerts page (BL-173)."""
     from ..notify import Notification, send
 
     delivered, _ = send(
-        Notification(source="options-rotation", severity=severity, title="", body=text, plain=True),
+        Notification(
+            source="options-rotation",
+            severity=severity,
+            title="",
+            body=text,
+            plain=True,
+            type=kind,
+        ),
         chat_id=chat_id,
     )
     return delivered
+
+
+def send_pick_text(text: str, severity: str = "info", chat_id: str | None = None) -> bool:
+    """The 09:16 pick's messages, typed `options.pick` (BL-173)."""
+    return send_text(text, severity, chat_id, kind="options.pick")
+
+
+def send_result_text(text: str, severity: str = "info", chat_id: str | None = None) -> bool:
+    """The 16:00 result's messages, typed `options.result` (BL-173)."""
+    return send_text(text, severity, chat_id, kind="options.result")
 
 
 def send_alert(title: str, body: str) -> None:
@@ -113,7 +133,7 @@ def pick_and_send(
     echo: Echo = print,
     err: Echo | None = None,
     record_fn: Callable[..., PickResult] | None = None,
-    send: SendText = send_text,
+    send: SendText = send_pick_text,
     alert: Callable[[str, str], None] = send_alert,
     catch_up: Callable[..., tuple[int, int]] | None = None,
     root: Path | None = None,
@@ -316,7 +336,7 @@ def send_result(
     echo: Echo = print,
     err: Echo = _stderr,
     now_fn: Callable[[], datetime] = lambda: datetime.now(IST),
-    send: SendText = send_text,
+    send: SendText = send_result_text,
     alert: Callable[[str, str], None] = send_alert,
     root: Path | None = None,
 ) -> int:
