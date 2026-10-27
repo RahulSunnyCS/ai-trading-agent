@@ -92,6 +92,28 @@ def test_crosses_and_first():
     assert first[2] and not first[4] and first.sum() <= 1 + 0  # only the first stamp in the session
 
 
+def test_prev_at_prev_agg_and_ever():
+    fr = frame(10)
+    at = E.evaluate(E.parse({"prev_at": {"x": "close", "clock": "15:15"}}), fr)
+    assert np.isnan(at[0]).all()
+    assert (at[4] == fr.C[3, E.clock_to_stamp("15:15")]).all()
+    hi = E.evaluate(E.parse({"prev_agg": {"x": "close", "how": "max"}}), fr)
+    lo = E.evaluate(E.parse({"prev_agg": {"x": "close", "how": "min"}}), fr)
+    assert (
+        np.isnan(hi[0]).all() and (hi[4] == fr.C[3].max()).all() and (lo[4] == fr.C[3].min()).all()
+    )
+    when = {"ge": ["minute", 100]}
+    ever = run({"ever": {"all": [when, {"lt": ["minute", 102]}]}}, fr)
+    assert not ever[:, :100].any() and ever[:, 100:].all()
+    assert E.describe(E.parse({"prev_agg": {"x": "close", "how": "min"}})) == (
+        "the previous session's lowest close"
+    )
+    with pytest.raises(E.RuleError, match="expected max or min"):
+        E.parse({"prev_agg": {"x": "close", "how": "mean"}})
+    with pytest.raises(E.RuleError, match="missing 'how'"):
+        E.parse({"prev_agg": {"x": "close"}})
+
+
 def test_prior_median_uses_earlier_sessions_only():
     fr = frame(30)
     med = E.evaluate(E.parse({"prior_median": {"x": "close", "sessions": 5}}), fr)
@@ -187,6 +209,15 @@ CAUSAL_RULES = [
     # stamp before it must not see the strike (09:20 is before the cut, so it is known there)
     {"gt": [{"straddle": {"at": "12:00"}}, "close"]},
     {"gt": [{"straddle": {"at": "09:20"}}, "close"]},
+    # BL-164: the previous session's value at a clock, its extremes, and "held at some stamp"
+    {"gt": ["close", {"prev_at": {"x": "close", "clock": "15:15"}}]},
+    {
+        "lt": [
+            {"prev_agg": {"x": "close", "how": "min"}},
+            {"prev_agg": {"x": "close", "how": "max"}},
+        ]
+    },
+    {"ever": {"gt": ["close", {"add": ["session_open", 5]}]}},
 ]
 
 

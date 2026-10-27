@@ -21,6 +21,8 @@ ignoring it.
           strike: { strike_type: OTM1 }        # or { closest_premium: 60 }
           stop_loss: { percent: 115 }          # or { points: 30 }
           trail_sl: { points: [15, 10] }       # every 15 pts in favour, move SL 10
+          # bought legs (BL-164): trail_peak: { activate_percent: 105, exit_percent: 80 }
+          # stop_on: close                     # judge stops / target / trails on the close
           reentry_on_sl: { mode: cost, count: 1 }
           range_breakout: { until: "09:45", side: high, source: instrument }
           # optional: gap_percent: 2 (trigger 2% beyond the range edge), valid_until: "11:00"
@@ -111,6 +113,15 @@ class TrailSL(_Model):
         return entry_price * x / 100, entry_price * y / 100
 
 
+class TrailPeak(_Model):
+    """A peak trail for a bought leg (BL-164): once the premium has been above
+    `activate_percent` of the entry price, the leg exits when it falls to `exit_percent` of its
+    highest price since entry. Off unless set; independent of `stop_loss` / `trail_sl`."""
+
+    activate_percent: float = Field(gt=100, allow_inf_nan=False)
+    exit_percent: float = Field(gt=0, lt=100, allow_inf_nan=False)
+
+
 class ReEntry(_Model):
     #: asap — re-select the strike by the leg's own criteria and enter at the
     #: next minute; cost — same contract, re-enter when its price returns to
@@ -189,6 +200,12 @@ class Leg(_Model):
     stop_loss: Amount | None = None
     target: Amount | None = None
     trail_sl: TrailSL | None = None
+    #: BL-164: a peak trail (bought legs only), see TrailPeak
+    trail_peak: TrailPeak | None = None
+    #: BL-164: what the leg's stop, target and trails are judged on. tick — each bar's high / low,
+    #: filled at the level (or the open through a gap), the engine's default; close — the bar's
+    #: close only, filled at that close (an intrabar spike past the level does not count)
+    stop_on: Literal["tick", "close"] = "tick"
     reentry_on_sl: ReEntry | None = None
     reentry_on_target: ReEntry | None = None
     range_breakout: RangeBreakout | None = None
@@ -196,11 +213,15 @@ class Leg(_Model):
 
     @model_serializer(mode="wrap")
     def _omit_roll_when_unset(self, handler):
-        """Leave `roll` out of the dump while unset: `store.spec_hash` is the hash of this dump,
-        and adding the field must not give every saved strategy a new version (BL-105)."""
+        """Leave `roll`, `trail_peak` and `stop_on` out of the dump while at their defaults:
+        `store.spec_hash` is the hash of this dump, and adding a field must not give every saved
+        strategy a new version (BL-105, BL-164)."""
         data = handler(self)
-        if data.get("roll") is None:
-            data.pop("roll", None)
+        for key in ("roll", "trail_peak"):
+            if data.get(key) is None:
+                data.pop(key, None)
+        if data.get("stop_on") == "tick":
+            data.pop("stop_on", None)
         return data
 
     @model_validator(mode="after")
@@ -211,6 +232,8 @@ class Leg(_Model):
             raise ValueError(f"leg {self.id!r}: reentry_on_sl needs a stop_loss")
         if self.reentry_on_target is not None and self.target is None:
             raise ValueError(f"leg {self.id!r}: reentry_on_target needs a target")
+        if self.trail_peak is not None and self.position != "buy":
+            raise ValueError(f"leg {self.id!r}: trail_peak is for bought legs")
         if self.roll is not None:
             if self.position != "sell":
                 raise ValueError(f"leg {self.id!r}: roll is for sold legs (a decayed premium)")
