@@ -51,17 +51,19 @@ The screen is one page, in the order you read it:
   Fixed base, one row each) with the registered verdict under it, the cumulative chart, and the
   latest baskets of both Adaptive books. Before the first scored day it shows a short note instead
   of reserving a large empty chart area.
-- **What happened** — the recorded or reconstructed day log. Below it, *Drawdowns and selection
+- **What happened** — the recorded or reconstructed day log, with what the live book made against
+  paper on each recorded day. Below it, *Drawdowns and selection
   drift* opens the risk review for the list.
-- **Lot plans** — the same morning picks traded three ways (As picked, Dir Boost, Duo), followed
-  from 19 Oct 2026 for Core and T1. See [Rotation: lot plans](guide:optionslab/rotation-lot-plans).
 - **Live vs paper** — what AlgoTest and Quantiply actually made on each captured day against the
   backtest for the same picks, the gap running day by day, and by shape. See
   [Rotation: live vs paper](guide:optionslab/rotation-live).
 - **Is the rule still working?** — optional diagnostics, each closed until you open it: why a pick
   was selected, the family pulse, rank correlation, and what market the forward days tested.
-- **Experiments** — *Ideas being watched*: the unregistered candidates and trigger studies, each
-  against what it replaced.
+- **Experiments** — *Lot plans · from 19 Oct*: the same morning picks traded three ways (As
+  picked, Dir Boost, Duo) for Core and T1, judged at 60 forward days (see
+  [Rotation: lot plans](guide:optionslab/rotation-lot-plans)); and *Ideas being watched*: the
+  unregistered candidates and trigger studies, each against what it replaced. Each loads when
+  opened.
 
 A link with the old `?rotationView=` in it still opens this page; the setting no longer does
 anything.

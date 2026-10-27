@@ -10,9 +10,10 @@ missing journal entry, a saved result that moved, a live-money rule) and pops up
 
 ## Overview
 
-The landing screen. One card per daily question: is the market open, is the Fyers login valid,
-did this week's momentum signal go out, did last evening's options run succeed. Each card links
-to the screen with the detail. [Open](app:/overview) · [Guide](guide:operations/overview)
+The landing screen, a morning board: today's rotation entry and the last session's paper and live
+result, this week's Momentum trade and rules, the trade book so far, jobs that failed in the last
+24 hours, the broker logins and the data's health. Each card links to the screen with the detail.
+[Open](app:/overview) · [Guide](guide:operations/overview)
 
 ## Options Lab
 
@@ -31,6 +32,9 @@ build and test) and an Advanced group at the end.
 
 The evening run's status and its **Run** button are at the top of Today.
 
+[Live](app:/live), below Options Lab in the sidebar, shows spot, VIX and two straddles minute by
+minute; a replay of a collected day until live capture exists. [Guide](guide:operations/live)
+
 ## Momentum
 
 | Screen | What it is for |
@@ -48,18 +52,19 @@ The evening run's status and its **Run** button are at the top of Today.
   figures and ratios, every trade by source, money in and out, and the Zerodha notes behind Momentum.
   [Guide](guide:operations/trade-book)
 
-## Data
+## Operations
 
-- [Live](app:/live) — spot, VIX and two straddles, minute by minute; a replay of a collected day until live capture exists.
-  [Guide](guide:operations/live)
-- [Coverage](app:/coverage) — historical candle backfill for the paused live engine.
-  [Guide](guide:operations/coverage)
 - [Jobs](app:/jobs) — every scheduled job, when it runs, how its last run went.
   [Guide](guide:operations/jobs)
-
-## Account
-
-- [Broker logins](app:/brokerLogins) — the daily Fyers market-data login and the Angel One connection check.
+- [Broker logins](app:/brokerLogins) — the daily Fyers market-data login, the Angel One connection check and the Kite login.
   [Guide](guide:operations/broker-logins)
-- [Settings](app:/settings) — appearance, defaults, which tabs show, Telegram alerts.
+- [Settings](app:/settings) — appearance, defaults, which tabs show, the daily automation, Telegram alerts.
   [Guide](guide:operations/settings)
+- The Guide — these pages.
+
+## Archived engine
+
+Hidden by default ([Settings](app:/settings) › Navigation shows it): Trades, P&L, Personalities,
+Regimes and Billing belong to the paused paper-trading engine, and
+[Coverage](guide:operations/coverage) fetches candles for it. They need that engine's server and
+are not covered in this Guide beyond Coverage.

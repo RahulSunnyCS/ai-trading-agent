@@ -121,8 +121,9 @@ describe('RotationDailyLog', () => {
     // 13 Oct: Adaptive's own per lot-day ((1200 - 450 + 300) / 3 = +350), not Steady's
     const row = within(table).getByText('13 Oct 2026').closest('tr') as HTMLElement;
     expect(row.textContent).toMatch(/\+₹350/);
-    // one placement dot, for the one list shown
-    expect(within(row).getByText('Not marked')).toBeTruthy();
+    // the hand-marked Placed dots are gone: the live column says what traded
+    expect(within(row).queryByText('Not marked')).toBeNull();
+    expect(header).toContain('Live − paper');
     // no "Lists disagree" filter and no list switch with one list
     expect(screen.queryByRole('radio', { name: 'Lists disagree' })).toBeNull();
     expect(screen.queryByRole('radiogroup', { name: /List the calendar is shaded by/ })).toBeNull();

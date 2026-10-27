@@ -8,7 +8,7 @@ Personal preferences for this browser, what the daily automation does on AlgoTes
 |---|---|
 | Appearance | Light or dark theme, and density (how compact tables and cards are). |
 | Defaults | The landing tab, the Momentum dataset that opens first, and the default backtest period. |
-| Navigation | Show, hide and reorder sidebar tabs. Settings and this Guide cannot be hidden. |
+| Navigation | Show, hide and reorder sidebar tabs, section by section. Settings and this Guide cannot be hidden. The last section, **Archived engine** (Trades, P&L, Personalities, Regimes, Coverage, Billing), starts hidden; show any of them here. **Reset** puts the default back, archive hidden. |
 | Browser alerts | A warning in the dashboard before the Fyers token expires. |
 | Automation | What the daily jobs do (below). |
 | Telegram alerts | One switch per message type: broker logins, the momentum preview/final/journal, live-money rules status and problems, the options evening summary and problems, the morning summary, the trade monitor's margin check, deploy check and loss warning, the weekly digest and the backup. Scheduler failures, missed runs and the -₹8,000 loss alert always send. |
@@ -16,7 +16,12 @@ Personal preferences for this browser, what the daily automation does on AlgoTes
 | About | What the dashboard is connected to. **Developer mode** shows each screen's list of unfinished work next to its title. |
 
 > [!TIP]
-> If you never use the paused Live screens, hide them under Navigation to keep the sidebar short.
+> The Archived engine holds the paused paper-trading engine's screens and the two that read its
+> server (Coverage, Billing). They are kept, not developed, and fail with an error while that
+> server is not running. A hidden archived screen still opens by its link (for example `/trades`),
+> and the sidebar then shows it while you are on it. The sidebar's other sections are Overview,
+> Options Lab (with Live, the replay of a collected day), Momentum, Trade book and Operations
+> (Jobs, Broker logins, Settings and this Guide).
 
 ## Automation
 
