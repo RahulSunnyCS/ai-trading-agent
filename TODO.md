@@ -877,6 +877,20 @@ are replaced by better ones. First rule: a break of a rolling 60-bar NIFTY range
 | 3.41.1 | Phase 0 and Amendment 1 (rolling rule, long and short-premium arms, 2019-2021 confirmation period) pre-registered before any run | claude | **Done 2026-10-18.** Nothing run |
 | 3.41.2 | Phase 1: event study on periods A and B (event counts first, then placebo and trades) | claude | **Next** |
 
+### 3.47 The morning on the Mac — [BL-172](backlog/BL-172-broker-login-on-the-mac.md)
+
+Owner (2026-10-27/28): log in from the Mac with GitHub as the backup; at 08:00 keep Quantiply's MTM SL at
+the list's stop and switch on last evening's algos; the 09:16 pick changes only what starts after 09:17;
+each evening delete the finished algos and set Shoonya's subscription to the next session's count.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.47.1 | PR 347: morning login and AlgoTest deploy follow the settings (review findings fixed) | claude | In progress |
+| 3.47.2 | Phases 5-6 and the 08:00 messages: MTM SL check, enable at 08:00 | claude | Next |
+| 3.47.3 | Phase 4: the 09:16 re-choice and its message | claude | Next |
+| 3.47.4 | Phase 7 and the evening delete-all | claude | Next |
+| 3.47.5 | Phases 1-3: login on the Mac, GitHub backup, credential reminder | claude | Next |
+
 ### 3.46 Dashboard on Next.js 16 — [BL-157](backlog/BL-157-dashboard-nextjs-16.md)
 
 OpenNext refuses Next.js 15 since 2026-10-21, so every `release` deploy fails and `dashboard.codifie.dev`

@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — the morning logins put the real-money accounts online; two copies of the credentials already cost two refused Shoonya logins (26 and 27 Oct) |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | improvement |
 | **Area** | broker-login / scheduler |
 | **Created** | 2026-10-27 |
 | **Depends on** | BL-140 (settings), PR 347 (ONLY=none leaves AlgoTest out) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.47 |
 
 ## Context
 
@@ -209,21 +209,30 @@ set to that.
 - **Playwright on the Mac.** The uploaders already run Chromium there, so the browsers are installed;
   keep the package's Playwright version and the workflow's container tag in step (as today).
 
-## Open questions
+## Answers (owner, 2026-10-28, before the overnight build)
 
-- **09:16 pairing:** when several picks change, which dropped pick does each added one replace?
-  Proposed: the same variant family and index first, else the closest entry time. And an added 09:17
-  pick with no dropped partner (the list grew): skip it?
-- **Taking the old one off at 09:2x:** switch it off and let the evening run delete it (proposed:
-  deleting a not-yet-run algo is a new kind of delete), or delete it at once?
-- Where the ₹8,000 / ₹9,000 live: a field per Quantiply row in Settings › Automation (one place, the
-  morning job reads it), or follow the Rotation page's portfolio-stop defaults?
-- When to switch `QUANTIPLY_DEPLOY=on`: with Phase 6 merged, or after one supervised morning?
-
-- Phases 1 and 2 in one change (no window where a local success and a late GitHub cron both log in), or
-  Phase 1 with the crons switched off until Phase 2?
-- Should the fallback dispatch also cover the AlgoTest broker logins when an AlgoTest row turns back
-  on, or Quantiply only?
+1. **The 09:16 change (supersedes Phase 4's pairing).** If the change is to a 09:17 strategy, nothing
+   is done about it: the evening's 09:17 strategy runs, and a new 09:17 pick is not added. For the rest,
+   the day's list is re-chosen with the 09:16 pick's own rule (`score.select`: the top `N_CORE` = 3
+   Widesl/Dir by the 09:16 composite, at least `MIN_WIDE_N` = 2 Widesl, "2 Widesl and 1 directional"),
+   with the evening's 09:17 strategy kept in and no new 09:17 pick allowed; the highest scorers stay and
+   every other strategy of the list is switched off. The Buy add-on follows the 09:16 pick unless it
+   enters at 09:17.
+2. **Replaced strategies** are switched off in the morning. The **evening deletes every finished,
+   switched-off algo on the account**, the owner's own included (not only the tool's ledger ids). An
+   enabled or running algo is never deleted.
+3. The ₹8,000 / ₹9,000 live in Settings › Automation: an MTM SL field on each Quantiply row.
+4. Phases 1 and 2 ship together. The fallback dispatch covers AlgoTest and Quantiply, never after a
+   refused password, PIN or TOTP.
+5. The subscription is raised and lowered by the tool, raised only when the credits on hand cover it
+   (else Telegram says so).
+6. The subscription count is exactly the tool's need for the next session (3, or 4 with an add-on); the
+   owner adds any of their own by hand.
+7. **Merge overnight**; the owner checks at about 09:21.
+8. Telegram: at 08:00, once the logins are done, one message "login OK" or what failed, per account,
+   and one "switched on" message naming the algos enabled (and the MTM SL check). At 09:16, a message
+   only when a change was made, saying what changed; none when nothing changed.
+9. Everything else as recommended: PR 347's findings fixed and merged; no AlgoTest /live repair.
 
 ## Log
 
@@ -240,3 +249,4 @@ set to that.
   (Phase 7). Read back: Value plan, 5 a day, term to 21 Nov. Owner: it is charged daily and lowering it
   returns credits, so it is set each evening to the next session's count. The owner set 3 (Value plan (3),
   415 credits back); the change's call found.
+- 2026-10-28 — Started (overnight build, merged as it goes). Answers recorded above; TODO 3.47.
