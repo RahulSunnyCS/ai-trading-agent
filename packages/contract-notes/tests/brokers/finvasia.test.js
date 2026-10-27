@@ -20,6 +20,12 @@ const equityOnlyText = fs.readFileSync(
 );
 
 describe('finvasia.extract()', () => {
+  test("the sample note's fills add up to its obligation", () => {
+    const result = extract(sampleText);
+    expect(result.trades_check).toBe('fills');
+    expect(result.trades.every((t) => t.time)).toBe(true);
+  });
+
   test('extracts all three fields from valid PDF text', () => {
     const result = extract(sampleText);
     expect(result.error).toBeUndefined();
