@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the only record of real money the project measures itself against; unblocks BL-093 and BL-026 |
-| **Status** | In progress (Phases 1 and 2 done; Phase 3 under way; Phase 6 backup built) |
+| **Status** | In progress (Phases 1, 2 and 4 done; Phase 3 built, its sheet differences wait for the owner; Phase 6 built, done after a real backup run; Phase 5, the page, in review) |
 | **Type** | feature |
 | **Area** | contract-notes / scheduler / trading-data / dashboard |
 | **Created** | 2026-10-26 |
@@ -442,3 +442,27 @@ record from them.
   deleted mid-run is counted, never fatal; the backup waits up to 10 min for a contract-notes
   run's `run.lock`; `raw/**/*.decrypted.pdf` stays off the exFAT disk. Phase 6 is done once a
   real backup run (the next 1st-Sunday job or a manual one) shows the new folders' lines.
+- 2026-10-27 — Phase 3 built (PRs #336, #338, #341):
+  - History by date from 1 Apr 2025, including Finvasia's older note layout.
+  - `reconcile.js`, which compares the owner's sheet (a CSV export) with the notes.
+  - Zerodha (Kite) equity notes, booked to Momentum from 2026-10-16.
+  - The ledger e-mails: deposits, payouts, collateral interest, margin warnings (both wordings) and settlements.
+  - Itemised charges and the trades on every F&O note: the annexure's timed fills, else the summary, else `unmatched`.
+  - `--reparse` rebuilds the lines from the kept PDFs and keeps any figure that would change unless `--accept-figures`.
+  - Every store write is now flushed to disk: a day file had been found with a zero-filled tail, and it was re-read from Gmail.
+  - Not done: the owner explains the differences the reconciliation lists (the "done when").
+  - Follow-up: some older Angel One trade layouts still read as `unmatched`.
+- 2026-10-27 — real data removed from the public repo (PR #340): the two sample contract notes,
+  the Trade Book workbooks and six text fixtures made from real notes are replaced with invented
+  ones. The mockup's figures are invented, and so are the tests'. Private copies are in the store
+  under `contract-notes/reference/`. The files remain in git history (removing them needs a
+  history rewrite: the owner's call).
+- 2026-10-27 — Phase 4 done (PR #343, review fixes included): `option_backtesting/realised/`.
+  - The sheet's columns by its own formulas. Checked against the sheet's own daily figures, they reproduce its T, U, V, W and Z columns on 85–99% of rows. The sheet's Profit is obligation − brokerage − other − algo fees, exactly as computed here; the days that differ are the data differences the reconciliation lists.
+  - Round trips that carry overnight and split through zero.
+  - Sources from the live capture's fills.
+  - MAE/MFE and day context from the lake.
+  - The 15:50 `contract-notes-capital` job: Angel One's closing funds, which become the next session's capital. Finvasia's capital is typed.
+  - The `/legwise/contract-notes/*` API, and `obt realised`.
+  - Left for later: IV percentile (a VIX percentile for now) and event days.
+
