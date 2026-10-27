@@ -266,3 +266,5 @@ set to that.
   - Phase 3: `local-login.ts` keeps per-name digests of the eight broker credentials GitHub has as secrets
     (`<state>/broker-login/credentials.json`, 0600, never a value) and Telegrams once, with the copy command, when
     one changes in `.env`. The first run only records them.
+- 2026-10-28 — Owner: one "switched on" message, not one per account. The 08:10 job now collects both accounts'
+  reports in one file (`MORNING_REPORT_FILE`) and `morning-report.ts` sends them together.
