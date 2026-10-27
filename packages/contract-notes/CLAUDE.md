@@ -5,7 +5,8 @@ Guidance for coding agents working in `packages/contract-notes`.
 ## What this package does
 
 Reads the brokers' daily contract notes from Gmail and stores each session's realised F&O
-figures under `TRADING_DATA_ROOT/contract-notes/` (BL-168). It runs on the laptop from the
+figures (Finvasia, Angel One) and the Momentum account's equity notes (Zerodha, `kite`) under
+`TRADING_DATA_ROOT/contract-notes/` (BL-168). It runs on the laptop from the
 scheduler (`apps/scheduler`: `contract-notes` every day 00:00, `contract-notes-retry` 07:30).
 It never writes the Google Sheet: the standalone `trade-analytics` repo keeps filling the
 owner's "Trade Book" sheet on its own cron until the owner archives it (TODO §2.7). The two
@@ -69,7 +70,7 @@ it too). It must be one line, single-quoted: a pretty-printed value reads as `[`
 
 | Path | What |
 |---|---|
-| `days/<day>.jsonl` | One line per broker account for the session: `status` `note` (with `fno`, the sheet's five figures, `skipped_segments`, the note's sha256, file, subject, received time, and `superseded` hashes when `--day` chose between notes), `no_trade`, `no_note` or `failed` (with `reason`) |
+| `days/<day>.jsonl` | One line per broker account for the session: `status` `note` (an F&O broker's with `fno`, the sheet's five figures; a `kite` line with `eq` — obligation, each charge, total charges, final net — and `trades`, every fill; `skipped_segments`, the note's sha256, file, subject, received time, and `superseded` hashes when `--day` chose between notes), `no_trade`, `no_note` or `failed` (with `reason`) |
 | `raw/<broker>/<account>/<day>.pdf` | The note as mailed (encrypted), and `<day>.decrypted.pdf` |
 | `manual/<day>.json` | The inputs the sheet had typed by hand: `algos`, `capital_total`, `source` (`sheet`, later the page or the 15:50 reading) |
 | `reconcile/` | `sheet-vs-notes-<day>.md`, each reconciliation report |
@@ -96,9 +97,10 @@ with no readable note) are raised only for messages past the old bookmark, so ea
 With no bookmark, or a changed UIDVALIDITY, the run reads the window by date. A second,
 different note for a stored session is reported, never written over.
 
-## F&O-only extraction
+## F&O-only extraction (Finvasia, Angel One)
 
-The analytics track **equity derivatives (F&O) only**. A contract note is per day, not per
+For the F&O brokers the analytics track **equity derivatives (F&O) only** (the Zerodha account is
+the exception: it is read for equity, below). A contract note is per day, not per
 segment: an equity trade the same day adds its row to the same note and its totals. So both
 extractors parse the **obligation table row by row** (Finvasia prints `NSEFNO-NCL` and
 `NSECAP-NCL`, Angel One `BSE-FUTURES` and `NSE-CASH`), classify each label with
@@ -116,14 +118,28 @@ cross-checks.
   or the row is refused, so a changed PDF layout fails loudly instead of storing a wrong figure.
 - `skipped_segments` lists the non-F&O rows dropped.
 
+## Zerodha (`kite`): equity, for Momentum
+
+The Momentum account trades nothing else, so its notes are read for the cash segment: the
+totals block (Cash, F&O and Net total columns; a payable amount in brackets, a footnote digit
+after "(₹)" on some rows, a receipt printed unbracketed) and Annexure A's trade rows, whose cells
+pdf-parse runs together (order no, times, trade no, `SYMBOL-SERIES/ISIN`, B/S, exchange,
+quantity glued to brokerage — split where quantity × rate = total —, rate, total). Two checks
+refuse a note: obligation − charges ≠ the note's net, or the trades not summing to the
+obligation. An F&O figure on that account is refused too.
+
 ## Adding a broker
 
 1. `brokers/<name>.js` exporting `searchSubject`, `noteDay` and `extract` (copy `finvasia.js`
    or `angelone.js`, segment filtering included).
 2. Add it to `BROKERS` in `brokers/index.js`.
 3. Accounts with `"broker": "<name>"` in `BROKER_ACCOUNTS_JSON` are read from the next run.
-   Until a plugin exists the run skips such an account with a notice (Zerodha `kite` until
-   BL-168 Phase 3).
+   Until a plugin exists the run skips such an account with a notice.
+
+An account may carry `"from": "YYYY-MM-DD"`: notes before that day are not stored and its
+sessions before it are not judged. `kite` defaults to 2026-10-16, Momentum's start
+(`DEFAULT_FROM` in `run.js`); earlier Zerodha notes are the owner's other trades. `kite` also
+raises no quiet-account alert (`NO_QUIET_ALERT`): Momentum trades on Fridays, not every week.
 
 ## Not wired
 

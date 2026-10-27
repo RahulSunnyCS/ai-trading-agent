@@ -739,7 +739,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'contract-notes',
     description:
-      "Read the brokers' contract notes (BL-168): each account's new mail since its bookmark, the PDF kept and its F&O figures stored under TRADING_DATA_ROOT/contract-notes/; sessions that can have no note are closed (no trade / no note). Never writes the Google Sheet (trade-analytics keeps it)",
+      "Read the brokers' contract notes (BL-168): each account's new mail since its bookmark, the PDF kept and its figures stored under TRADING_DATA_ROOT/contract-notes/ (F&O for Finvasia and Angel One, equity for the Momentum account on Zerodha); sessions that can have no note are closed (no trade / no note). Never writes the Google Sheet (trade-analytics keeps it)",
     // Every day, not trading days: a session's notes arrive its evening (Angel One's after
     // midnight), so Saturday's run takes Friday.
     schedule: { at: '00:00', on: everyDay, label: 'every day 00:00' },
