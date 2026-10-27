@@ -28,6 +28,7 @@ import {
   useRotationOverview,
   useRotationSummary,
 } from '../../hooks/useRotation';
+import { useRotationPlan } from '../../hooks/useRotationPlan';
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { formatDay, formatIstTime, istToday } from '../../lib/format';
 import {
@@ -85,6 +86,7 @@ import { RotationBaskets } from './rotation/RotationBaskets';
 import { type BookLine, RotationBooks } from './rotation/RotationBooks';
 import { RotationHealthStrip } from './rotation/RotationHealth';
 import { RotationHero } from './rotation/RotationHero';
+import { PlanPickLine, RotationTomorrow, recordedSession } from './rotation/RotationPlan';
 import { RotationReadoutChip } from './rotation/RotationReadout';
 import { RotationVerdict } from './rotation/RotationVerdict';
 
@@ -115,6 +117,9 @@ function stopStatus(
 
 export function RotationPanel() {
   const overview = useRotationOverview();
+  // Each pick's settings and upload state, and the next session's tentative list.
+  const planRes = useRotationPlan();
+  const plan = planRes.data;
   const summary = useRotationSummary(ONE_LOT);
   const tuned = useRotationSummary(TUNED);
   const [focus, setFocus] = useState<RotationListKey>(DEFAULT_LIST);
@@ -286,6 +291,7 @@ export function RotationPanel() {
   ]);
 
   const reload = () => {
+    planRes.refetch();
     overview.refetch();
     summary.refetch();
     tuned.refetch();
@@ -300,6 +306,16 @@ export function RotationPanel() {
 
   const entryDay = overview.data?.baskets.entry?.day ?? null;
   const tunedBaskets = t?.baskets;
+  const coreSession = recordedSession(plan, entryDay);
+  const tunedSession = recordedSession(plan, tunedBaskets?.entry?.day ?? null);
+  const coreDetail =
+    plan && coreSession
+      ? (name: string) => <PlanPickLine plan={plan} session={coreSession} book="core" name={name} />
+      : undefined;
+  const tunedDetail =
+    plan && tunedSession
+      ? (name: string) => <PlanPickLine plan={plan} session={tunedSession} book="t1" name={name} />
+      : undefined;
 
   return (
     <div className="space-y-4">
@@ -464,6 +480,7 @@ export function RotationPanel() {
                   specs={overview.data.lists}
                   firstEntryDay={overview.data.first_entry_day}
                   title={ADAPTIVE_CARD.classic.name}
+                  {...(coreDetail ? { detail: coreDetail } : {})}
                 />
                 {tunedBaskets?.entry ? (
                   <RotationBaskets
@@ -471,9 +488,20 @@ export function RotationPanel() {
                     specs={overview.data.lists}
                     firstEntryDay={overview.data.first_entry_day}
                     title={ADAPTIVE_CARD.tuned.name}
+                    {...(tunedDetail ? { detail: tunedDetail } : {})}
                   />
                 ) : null}
               </div>
+              {plan ? (
+                <div className="mt-4">
+                  <RotationTomorrow plan={plan} />
+                </div>
+              ) : null}
+              {planRes.error ? (
+                <p className="mt-3 text-xs text-negative">
+                  Where the picks are uploaded could not be read: {planRes.error}
+                </p>
+              ) : null}
             </Card>
           ) : null}
         </>

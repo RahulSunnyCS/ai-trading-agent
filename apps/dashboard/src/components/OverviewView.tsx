@@ -27,6 +27,7 @@ import { useMomentumAlerts } from '../hooks/useMomentumAlerts';
 import { useNow } from '../hooks/useNow';
 import { usePolledResource } from '../hooks/usePolledResource';
 import { ROTATION_PAGE_LOTS, useRotationOverview, useRotationSummary } from '../hooks/useRotation';
+import { useRotationPlan } from '../hooks/useRotationPlan';
 import { useRunLog, useSchedulerJobs } from '../hooks/useSchedulerJobs';
 import { useTodayIst } from '../hooks/useTodayIst';
 import { useTradeBookDays, useTradeBookSummary } from '../hooks/useTradeBook';
@@ -54,6 +55,7 @@ import {
   latestPaperDay,
   liveForDay,
   momentumHeadline,
+  nextSessionLine,
   readoutProgress,
   rulesLine,
   tradeBookOverview,
@@ -212,6 +214,8 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 function RotationCard() {
   const overview = useRotationOverview();
   const summary = useRotationSummary({ lots: ROTATION_PAGE_LOTS });
+  // The next session's tentative picks against what each account holds (the evening upload).
+  const plan = useRotationPlan();
   // The capture lands at 15:40 (and its retry by 16:30): re-read it as the paper day moves on.
   const live = usePolledResource<RotationLiveResponse>(ROTATION_LIVE_URL, {
     intervalMs: LIVE_POLL_MS,
@@ -231,6 +235,7 @@ function RotationCard() {
     const liveResult = paper && live.data ? liveForDay(live.data, paper.day) : null;
     const liveReason = live.loading ? 'loading' : 'live results unavailable';
     const progress = readoutProgress(summary.data);
+    const nextLine = nextSessionLine(plan.data);
     body = (
       <>
         {entry ? <Line line={entry} /> : null}
@@ -260,6 +265,7 @@ function RotationCard() {
         ) : summary.data ? (
           <PlainState>No forward day has been scored yet.</PlainState>
         ) : null}
+        {nextLine ? <Line line={nextLine} /> : null}
         {progress ? (
           <Row label={`Day ${formatInt(progress.day)} of ${formatInt(progress.of)}`}>
             <span className="text-muted">

@@ -128,6 +128,19 @@ time, the strategy and its composite score. "Widesl min" marks a day where the r
 higher-ranked Dir pick. The line under the basket says what changed since the entry before, which
 is the work list for re-setting AlgoTest by hand.
 
+Under each pick, its settings in words (stop loss, trail, re-entry, overall stop, as the 09:16
+message gives them) and one chip per account that Settings › Automation has uploading that book:
+*on* (*was on* for a past session: switched on, by the tool or by hand), *uploaded* (uploaded,
+not switched on), *not uploaded* (the uploader's ledger has no upload of it for that session),
+or *no ledger* when the account's ledger cannot be read. The chips come from the uploaders' own
+ledgers; nothing here asks AlgoTest or Quantiply.
+
+**Next session, tentative.** Under the baskets: the next session's list as the 16:00 message sent
+it (worked out from the evening's VIX close; the 09:16 entry confirms or changes it), each pick
+with its settings and the same chips, so the evening upload can be checked here. A line names any
+algo an account holds for that weekday that nobody picked (it trades only if switched on), and a
+pause set in Settings › Automation is said.
+
 **Family pulse.** Under *Is the rule still working?* › *Why these picks…*: the twelve strategy-kind by start-band cells
 the ranking pools, with their recent gross per lot-day, the rank the ranking gives each, and where
 Adaptive's picks fall. See [the Family pulse](guide:optionslab/rotation-pulse).

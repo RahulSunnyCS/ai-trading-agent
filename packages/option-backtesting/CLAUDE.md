@@ -302,6 +302,13 @@ Otherwise:
   SL limit 1, a 3 s exit delay). One algo per weekday, so a body carries the session's weekday only. A trail in points
   is `PER_POSITION_POINT` (confirmed by the owner's `test1`). `Export.unconfirmed` lists any mapping never seen
   saved, which the uploader refuses; none is left. Anything else that is set raises `Unmappable`.
+- `rotation/plan.py` + `api/rotation_plan_routes.py` — the Today page's baskets with what the platforms hold
+  (dashboard review, 2026-10-28; `GET /legwise/rotation/plan`, read-only): each Adaptive book's picks for the
+  latest recorded session and the next session's tentative list (`result.read_tentative`), with `labels.label`
+  settings, and per account Settings › Automation has uploading, `uploaded` / `enabled` / `held` / `extra`
+  replayed from the broker-login ledgers (`rotation/quantiply/ledger[-<broker>].jsonl` and
+  `deploy-ledger[-<broker>].jsonl`, `rotation/algotest/ledger.jsonl`); a 15:40 `disable` counts as having been
+  on; a missing ledger is an `error`, never "nothing uploaded".
 - `rotation/live_compare.py` — BL-141: the 15:40 capture's day file (`rotation/live/<day>.jsonl`, written by
   `packages/broker-login/src/live-capture.ts`) beside the stored paper results (`store.result_path`, so T1 variants
   too): per variant, list and platform + broker, live per lot (copies' multipliers added up) minus paper per lot

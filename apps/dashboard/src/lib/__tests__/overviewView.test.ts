@@ -18,6 +18,7 @@ import {
   latestPaperDay,
   liveForDay,
   momentumHeadline,
+  nextSessionLine,
   readoutProgress,
   rulesLine,
   tradeBookOverview,
@@ -371,5 +372,57 @@ describe('Logins', () => {
     } as AngelStatus;
     expect(angelLine(failed, NOW)).toMatchObject({ tone: 'bad', detail: 'bad PIN' });
     expect(angelLine(null, NOW).text).toBe('status unavailable');
+  });
+});
+
+describe('nextSessionLine', () => {
+  const account = (book: 'core' | 't1', uploaded: string[]) => ({
+    platform: 'quantiply' as const,
+    broker: book === 'core' ? 'angelone' : 'finvasia',
+    label: book === 'core' ? 'Quantiply · Angel One' : 'Quantiply · Shoonya',
+    book,
+    state: {
+      '2026-10-28': { uploaded, enabled: [], held: uploaded, deploys_known: true },
+    },
+  });
+  const pick = (name: string) => ({
+    name,
+    role: 'core' as const,
+    start: null,
+    head: name,
+    params: '',
+  });
+  const plan = (accounts: unknown[]) =>
+    ({
+      sessions: [
+        {
+          day: '2026-10-28',
+          kind: 'tentative',
+          books: { core: [pick('A'), pick('B')], t1: [pick('C')] },
+        },
+      ],
+      accounts,
+      settings: null,
+      paused_until: null,
+    }) as never;
+
+  it('counts each account’s uploaded picks and warns when one is missing', () => {
+    const ok = nextSessionLine(plan([account('core', ['A', 'B']), account('t1', ['C'])]));
+    expect(ok?.tone).toBe('ok');
+    expect(ok?.text).toBe('uploaded 2/2 Quantiply · Angel One, 1/1 Quantiply · Shoonya');
+    expect(nextSessionLine(plan([account('core', ['A'])]))?.tone).toBe('warn');
+  });
+
+  it('is nothing without a tentative list or an uploading account', () => {
+    expect(nextSessionLine(null)).toBeNull();
+    expect(nextSessionLine(plan([]))).toBeNull();
+  });
+
+  it('says an unreadable ledger, never counts it as nothing uploaded', () => {
+    const line = nextSessionLine(
+      plan([{ ...account('core', []), state: { error: 'no upload ledger' } }]),
+    );
+    expect(line?.text).toBe('uploaded Quantiply · Angel One not known');
+    expect(line?.tone).toBe('neutral');
   });
 });
