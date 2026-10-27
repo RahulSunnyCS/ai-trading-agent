@@ -489,6 +489,19 @@ export function TradeBookTrades({
                               (yearData.coverage.unmatched ?? 0) + (yearData.coverage.none ?? 0),
                             )}
                           </span>
+                          {yearData.coverage.before_trades_from ? (
+                            <>
+                              {' '}
+                              · left out:{' '}
+                              <span className="metric text-foreground">
+                                {formatInt(yearData.coverage.before_trades_from)}
+                              </span>{' '}
+                              Angel One notes before{' '}
+                              {formatDay(yearData.trades_from?.angelone ?? '')} (older layouts;
+                              their days still count in the totals, their trades and turnover do
+                              not)
+                            </>
+                          ) : null}
                         </p>
                       </div>
                     );

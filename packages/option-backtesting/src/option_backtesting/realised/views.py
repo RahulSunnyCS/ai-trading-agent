@@ -69,7 +69,10 @@ def summary(root: Path, *, start=None, end=None, account=None) -> dict:
 def days(root: Path, *, start=None, end=None, account=None) -> dict:
     book = store.load(root)
     rows = ratios.daily(book, account=account, start=start, end=end)
-    return {"days": [r.as_dict() for r in rows], "problems": book.problems}
+    return {
+        "days": [r.as_dict() | {"events": context.events(r.day)} for r in rows],
+        "problems": book.problems,
+    }
 
 
 def months(root: Path, *, start=None, end=None, account=None) -> dict:
@@ -101,6 +104,7 @@ def trip_rows(root: Path, *, start=None, end=None, account=None, extremes=False)
         "by_source": by_source,
         "turnover": trips.turnover(ts),
         "coverage": trips.coverage(book, start=start, end=end),
+        "trades_from": {b: d.isoformat() for b, d in trips.TRADES_FROM.items()},
     }
 
 

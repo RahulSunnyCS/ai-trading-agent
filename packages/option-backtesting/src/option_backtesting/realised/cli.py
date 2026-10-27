@@ -58,6 +58,10 @@ def summary(start: str = FROM, end: str = TO, account: str = ACCOUNT, as_json: b
         f"max drawdown {_inr(s['max_drawdown'])} · win days {s['win_pct']}%"
     )
     typer.echo(
+        f"beside it: collateral interest {_inr(s['interest'])} · other debits "
+        f"{_inr(s['other_debits'])} (estimated) · net after both {_inr(s['net_after_debits'])}"
+    )
+    typer.echo(
         f"50-day avg {_inr(r.get('avg_profit_50'))} · "
         f"100-day avg {_inr(r.get('avg_profit_100'))} · "
         f"100-day charge {_inr(r.get('avg_charges_100'))} · "

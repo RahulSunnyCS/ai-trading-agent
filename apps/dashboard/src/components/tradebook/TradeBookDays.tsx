@@ -18,6 +18,9 @@ import { Button } from '../ui/Button';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { Inr, SourceBadge, Toggle } from './parts';
 
+/** Short names for the day's market events (`realised/events.csv`). */
+const EVENT_LABELS: Record<string, string> = { RBI_POLICY: 'RBI', UNION_BUDGET: 'Budget' };
+
 const FIRST_ROWS = 60;
 
 export function TradeBookDays({
@@ -121,7 +124,14 @@ export function TradeBookDays({
                 onClick={() => onOpen(r.day)}
                 className="whitespace-nowrap"
               >
-                <Td dense>{formatDay(r.day, { weekday: true })}</Td>
+                <Td dense>
+                  {formatDay(r.day, { weekday: true })}
+                  {(r.events ?? []).map((e) => (
+                    <span key={e.event} title={e.description} className="ml-1.5">
+                      <Badge tone="info">{EVENT_LABELS[e.event] ?? e.event}</Badge>
+                    </span>
+                  ))}
+                </Td>
                 <Td dense>
                   <Badge tone={state.kind === 'open' ? 'warning' : 'neutral'}>{state.label}</Badge>
                 </Td>

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the only record of real money the project measures itself against; unblocks BL-093 and BL-026 |
-| **Status** | In progress (Phases 1, 2 and 4 done; Phase 3 built, its sheet differences wait for the owner; Phase 6 built, done after a real backup run; Phase 5 page built (PR #345), in review) |
+| **Status** | In progress (Phases 1–5 done; Phase 3's sheet differences moved to BL-170, the owner's review; Phase 6 built, done after a real backup run) |
 | **Type** | feature |
 | **Area** | contract-notes / scheduler / trading-data / dashboard |
 | **Created** | 2026-10-26 |
@@ -289,7 +289,7 @@ account, behaviour patterns.
 - **Done when:** every day since 1 Apr 2025 is in the store; every `email` day's trades sum to
   its obligation within the note's tolerance; every difference from the sheet is listed in the
   report and explained by the owner (an extractor fix, a sheet edit made by hand, a note the
-  sheet row missed).
+  sheet row missed). The explaining moved to BL-170 on 2026-10-27 (the owner's review).
 
 ### Phase 4 — Analytics
 - **Tasks:** `realised/` (Design → Analytics): the sources, round trips, MFE / MAE, day
@@ -363,8 +363,9 @@ benchmark that is a series — last FY, Adaptive paper, NIFTY — compares every
    per-algo fee, `Capital` the morning's usable margin, which differs by broker (Finvasia's
    50:50 cash rule; Angel One uses all collateral and charges interest on the cash shortfall),
    read post-market the session before.
-2. ~~The Angel One margin-interest e-mail~~ — found (Design → Brokers). Still open: do other
-   debits arrive by e-mail (DP charges, AMC), or only on the ledger?
+2. ~~The Angel One margin-interest e-mail~~ — found (Design → Brokers). Other debits (DP
+   charges, AMC): answered 2026-10-27 — assume ₹1,000 per F&O broker a year, shown as an
+   estimate beside the figures (`ratios.OTHER_DEBITS_PER_BROKER_YEAR`).
 3. ~~The Zerodha Kite note's PDF password~~ — added to `BROKER_ACCOUNTS_JSON` as
    `"broker": "kite"` on 2026-10-26 and checked: 444 notes under the client ID, the newest
    decrypts with `qpdf` and parses (5 pages, obligation lines present).
@@ -475,3 +476,20 @@ record from them.
   plan-vs-filled lots, the per-account "note not arrived" banner, PDFs and Algos from the live
   capture. Phase 5 is done once the owner checks its FY, monthly, drawdown and ratio figures
   against the sheet.
+- 2026-10-27 — owner's follow-ups (PR on `bl168/followups`):
+  - The sheet differences moved to BL-170, which the owner reviews; Phases 3 and 5 are done
+    without them (Phase 5's check of its figures against the sheet is the same review).
+  - Finvasia's capital typed by the owner from 2026-10-27 (in the store); reading it
+    automatically is BL-171.
+  - Other debits: an estimate of ₹1,000 per F&O broker a year, accrued per calendar day from each
+    broker's first line, beside the figures with the interest (`other_debits`,
+    `net_after_debits`), never inside the sheet's columns.
+  - Angel One's trips start on 2026-02-02 (`trips.TRADES_FROM`): every Angel One note from then
+    on reads its trades; 49 earlier ones (older layouts, many with no trades read) are counted
+    apart as `before_trades_from`. Day figures still use every note. Turnover by FY therefore
+    leaves out Angel One before that day.
+  - Day context: each index's 7-day ATM IV at 15:00 and its one-year percentile (`tdata
+    derived`'s `iv_daily`), and event days (RBI policy decisions, Union Budgets) from
+    `realised/events.csv`, taken from RBI's published meeting schedules; the frozen engine's
+    `event_calendar` seed has October 2025 as the 8th, but the decision was on the 1st. The
+    Days table marks RBI / Budget days.

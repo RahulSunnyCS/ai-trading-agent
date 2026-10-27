@@ -181,6 +181,26 @@ def test_a_weekend_deposit_counts_on_the_next_session(tmp_path):
     assert [float(r.deposits) for r in rows] == [0, 5000]
 
 
+def test_other_debits_accrue_per_broker_and_calendar_day(tmp_path):
+    _write(tmp_path, "2026-04-01", [_note("2026-04-01", "A1", 100)])
+    _write(tmp_path, "2026-04-06", [_note("2026-04-06", "A1", 100)])  # Wed -> Mon: 5 days
+    angel = _note("2026-04-07", "B1", 100) | {"broker": "angelone"}
+    _write(tmp_path, "2026-04-07", [_note("2026-04-07", "A1", 100), angel])
+    book = store.load(tmp_path)
+    rows = ratios.daily(book)
+    per_day = Decimal(1000) / 365
+    assert [r.other_debits for r in rows] == [
+        per_day.quantize(Decimal("0.01")),
+        (per_day * 5).quantize(Decimal("0.01")),
+        (per_day * 2).quantize(Decimal("0.01")),  # Finvasia's day and Angel One's first
+    ]
+    s = ratios.summary(rows)
+    assert s["net"] == 400.0  # never inside the sheet's figures
+    assert s["net_after_debits"] == pytest.approx(400 - float(sum(r.other_debits for r in rows)))
+    one = ratios.daily(book, account="angelone/B1")
+    assert [r.other_debits for r in one] == [per_day.quantize(Decimal("0.01"))]
+
+
 def test_months_and_financial_years(tmp_path):
     for d, net in [("2026-03-31", 100), ("2026-04-01", 200), ("2026-05-04", -50)]:
         _write(tmp_path, d, [_note(d, "A1", net, 0)])
@@ -351,6 +371,22 @@ def test_unmatched_trades_give_no_trips(tmp_path):
     assert trips.trips(_book(tmp_path, {"2026-04-01": [line]})) == []
 
 
+def test_angel_one_trips_start_where_its_notes_read(tmp_path):
+    fills = [_fill("sell", 75, 3000, "09:20:00"), _fill("buy", 75, -2000, "10:00:00")]
+
+    def angel(day):
+        line = _note(day, "B1", 990, 10, trades=fills, trades_check="fills")
+        return line | {"broker": "angelone"}
+
+    before = trips.TRADES_FROM["angelone"] - timedelta(days=1)
+    book = _book(tmp_path, {str(before): [angel(str(before))], "2026-02-02": [angel("2026-02-02")]})
+    (t,) = trips.trips(book)
+    assert t.day == date(2026, 2, 2)
+    assert trips.coverage(book) == {"before_trades_from": 1, "fills": 1}
+    # the day figures still read every note
+    assert [r.net for r in ratios.daily(book)] == [Decimal("990"), Decimal("990")]
+
+
 def test_weekdays_between_skips_the_weekend():
     assert trips.weekdays_between(date(2026, 10, 23), date(2026, 10, 27)) == 2  # Fri -> Tue
     assert trips.weekdays_between(date(2026, 10, 27), date(2026, 10, 27)) == 0
@@ -458,6 +494,21 @@ def test_a_fill_labels_one_trip_and_a_failed_section_is_never_manual(tmp_path):
         path.read_text() + json.dumps({"kind": "section", "broker": "finvasia", "ok": False}) + "\n"
     )
     assert sources.source_of(tmp_path, _trip(strike=22500.0))["source"] == "unattributed"
+
+
+def test_day_context_lists_events_and_reads_the_iv_percentile(tmp_path, monkeypatch):
+    from option_backtesting.realised import context
+
+    assert [e["event"] for e in context.events(date(2026, 2, 1))] == ["UNION_BUDGET"]
+    assert context.events(date(2026, 2, 2)) == []
+    monkeypatch.setattr(context, "_index_bars", lambda root, name, day: [(None, 100, 110, 95, 105)])
+    monkeypatch.setattr(context, "_index_days", lambda root, name: [])
+    rows = {"NIFTY": {"iv_7d_1500": 0.123, "iv_7d_pct_1y": 0.84}}
+    monkeypatch.setattr(context.derived, "iv_for_day", lambda root, u, day: rows.get(u))
+    out = context.day_context(tmp_path, date(2026, 10, 7))
+    assert out["events"][0]["event"] == "RBI_POLICY"
+    assert (out["indices"]["NIFTY"]["iv_7d"], out["indices"]["NIFTY"]["iv_pct"]) == (12.3, 84.0)
+    assert out["indices"]["SENSEX"]["iv_pct"] is None  # not built: blank, never zero
 
 
 def test_symbols_parse_weekly_and_monthly():

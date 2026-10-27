@@ -71,6 +71,8 @@ function day(d: string, profit: number | null, extra: Partial<TradeBookDay> = {}
     interest: 0,
     deposits: 0,
     withdrawals: 0,
+    other_debits: 0,
+    events: [],
     cumulative: 0,
     drawdown: 0,
     avg_profit_50: null,
@@ -94,6 +96,8 @@ function summary(extra: Partial<TradeBookSummaryBlock> = {}): TradeBookSummaryBl
     note_charges: 2_500,
     algo_fees: 500,
     interest: 200,
+    other_debits: 0,
+    net_after_debits: 9_800,
     charge_profit_pct: 30,
     max_drawdown: -4_000,
     max_drawdown_pct: -4,
@@ -367,16 +371,23 @@ describe('months', () => {
 });
 
 describe('charges by kind', () => {
-  it('splits the year into note charges, algo fees and interest', () => {
+  it('splits the year into note charges, algo fees, interest and the debits estimate', () => {
     // A day with algos and no note has its fee in algo_fees but not in charges: the notes'
     // part is the API's note_charges, not charges − algo fees (2,350 here).
     const parts = yearChargeParts(
-      summary({ charges: 2_850, note_charges: 2_500, algo_fees: 500, interest: 200 }),
+      summary({
+        charges: 2_850,
+        note_charges: 2_500,
+        algo_fees: 500,
+        interest: 200,
+        other_debits: 1_000,
+      }),
     );
     expect(parts.map((p) => [p.key, p.amount])).toEqual([
       ['notes', 2_500],
       ['algo', 500],
       ['interest', 200],
+      ['debits', 1_000],
     ]);
   });
 
@@ -414,7 +425,7 @@ describe('charges by kind', () => {
         },
       ],
       manual: { algos: 4 },
-      context: { day: '2026-10-21', vix_open: null, vix_pct: null, indices: {} },
+      context: { day: '2026-10-21', vix_open: null, vix_pct: null, indices: {}, events: [] },
     } as TradeBookDayDetail;
     expect(dayChargeParts(detail).map((p) => [p.key, p.amount])).toEqual([
       ['brokerage', 30],
