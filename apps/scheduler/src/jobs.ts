@@ -664,7 +664,7 @@ const BASE_JOBS: Job[] = [
       [
         '/bin/sh',
         '-c',
-        `F=$(mktemp -t quantiply-morning) && export MORNING_REPORT_FILE="$F"; (${quantiplyBoth((b) => quantiplyDeploy(b, 'enable', true))}); code=$?; node_modules/.bin/tsx src/morning-report.ts "$F"; exit $code`,
+        `F=$(mktemp -t quantiply-morning) && export MORNING_REPORT_FILE="$F"; (${quantiplyBoth((b) => quantiplyDeploy(b, 'enable', true))}); code=$?; node_modules/.bin/tsx src/morning-report.ts "$F" 2; exit $code`,
       ],
     ],
     cwd: BROKER_LOGIN,

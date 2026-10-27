@@ -26,6 +26,12 @@ describe('one morning switch-on message (BL-172)', () => {
     assert.match(msg, /^⚠️ Quantiply morning switch-on 2026-10-28: check Quantiply/);
   });
 
+  it('an account that did not report is said', () => {
+    const msg = combineReports(line('✅ Quantiply · Angel One ...'), '2026-10-28', 2);
+    assert.match(msg, /^⚠️/);
+    assert.match(msg, /1 account\(s\) did not report/);
+  });
+
   it('no report at all is said, never silence', () => {
     assert.match(combineReports(null, '2026-10-28'), /no account reported/);
     assert.match(combineReports('not json\n', '2026-10-28'), /no account reported/);

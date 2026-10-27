@@ -3,7 +3,7 @@
  * account's run adds its report as a JSON line `{text}` to `MORNING_REPORT_FILE`
  * (`quantiply-deploy.ts`'s `deliver`); `morning-report.ts` sends this.
  */
-export function combineReports(fileText: string | null, day: string): string {
+export function combineReports(fileText: string | null, day: string, expected = 0): string {
   const blocks: string[] = [];
   for (const line of (fileText ?? '').split('\n')) {
     if (!line.trim()) continue;
@@ -16,6 +16,12 @@ export function combineReports(fileText: string | null, day: string): string {
   }
   if (!blocks.length) {
     return `⚠️ Quantiply morning switch-on ${day}: no account reported. Open the job log (quantiply-deploy) and Quantiply before 09:17.`;
+  }
+  // every account's run reports, also when held or crashed; one missing was killed (a timeout)
+  if (blocks.length < expected) {
+    blocks.push(
+      `⚠️ ${expected - blocks.length} account(s) did not report (stopped?): check Quantiply before 09:17`,
+    );
   }
   const warn = blocks.some((b) => b.startsWith('⚠️'));
   const head = warn
