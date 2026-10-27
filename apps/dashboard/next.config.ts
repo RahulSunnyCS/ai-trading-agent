@@ -3,8 +3,8 @@ import type { NextConfig } from 'next';
 /**
  * Browser calls remain same-origin. In local development Next forwards REST
  * calls to Fastify; production can set DASHBOARD_API_URL to its private API
- * origin. WebSocket upgrades use NEXT_PUBLIC_WS_URL instead (see
- * useLiveTicks), because Next rewrites only cover HTTP requests.
+ * origin. (Next rewrites cover HTTP only; the dashboard opens no WebSocket since the frozen
+ * server's tick socket client was removed.)
  */
 const apiOrigin = process.env.DASHBOARD_API_URL ?? 'http://localhost:3000';
 const momentumDirectOrigin = process.env.MOMENTUM_DIRECT_API_URL ?? 'http://127.0.0.1:8765';
