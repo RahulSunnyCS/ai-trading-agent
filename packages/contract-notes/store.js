@@ -59,10 +59,35 @@ function readDay(root, day) {
   return text
     .split('\n')
     .filter((l) => l.trim())
-    .map((l) => JSON.parse(l));
+    .map((l, i) => {
+      try {
+        return JSON.parse(l);
+      } catch {
+        throw new Error(
+          `days/${day}.jsonl line ${i + 1} is damaged: move the line aside, then node run.js --day ${day}`,
+        );
+      }
+    });
 }
 
 const lineKey = (l) => `${l.broker}/${l.account}`;
+
+/**
+ * Write `content` to `file` atomically and durably: a temporary file, flushed to disk, then
+ * renamed. Without the flush a laptop that sleeps or loses the disk image right after a rename
+ * can keep the new name over zero-filled blocks (seen once, a day file in Oct 2026).
+ */
+function writeDurable(file, content) {
+  const tmp = `${file}.${process.pid}.tmp`;
+  const fd = fs.openSync(tmp, 'w');
+  try {
+    fs.writeSync(fd, content);
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+  fs.renameSync(tmp, file);
+}
 
 /**
  * Put `line` into its day's file, replacing the line for the same broker account. Written to a
@@ -74,9 +99,7 @@ function writeLine(root, line) {
   const lines = readDay(root, line.day).filter((l) => lineKey(l) !== lineKey(line));
   lines.push(line);
   lines.sort((a, b) => lineKey(a).localeCompare(lineKey(b)));
-  const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, `${lines.map((l) => JSON.stringify(l)).join('\n')}\n`);
-  fs.renameSync(tmp, file);
+  writeDurable(file, `${lines.map((l) => JSON.stringify(l)).join('\n')}\n`);
 }
 
 /** Map of `broker/account` -> line, over the given days. */
@@ -97,7 +120,7 @@ function saveRaw(root, broker, account, day, content) {
   const dir = rawDir(root, broker, account);
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `${day}.pdf`);
-  fs.writeFileSync(file, content);
+  writeDurable(file, content);
   return { file, sha256: crypto.createHash('sha256').update(content).digest('hex') };
 }
 
@@ -121,10 +144,7 @@ function readCursors(root) {
 
 function writeCursors(root, cursors) {
   fs.mkdirSync(root, { recursive: true });
-  const file = cursorFile(root);
-  const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, `${JSON.stringify(cursors, null, 2)}\n`);
-  fs.renameSync(tmp, file);
+  writeDurable(cursorFile(root), `${JSON.stringify(cursors, null, 2)}\n`);
 }
 
 /**
@@ -170,4 +190,5 @@ module.exports = {
   dayFile,
   readCursors,
   writeCursors,
+  writeDurable,
 };

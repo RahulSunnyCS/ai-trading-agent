@@ -23,6 +23,7 @@ node run.js --dry-run       # read and parse, write nothing (not even the bookma
 node run.js --day D         # read session D again by date for every account, replacing its lines
 node run.js --sessions N    # a wider window, e.g. after a long trip
 node run.js --from D --to D # history by date (bookmark untouched; a stored note is never written over)
+node run.js --reparse --from D --to D [--accept-figures]   # rebuild stored lines from the kept PDFs (no mail), after an extractor improves; a line whose figures would change is kept and reported unless --accept-figures
 node reconcile.js <sheet.csv> [--import-manual] [--out DIR]   # the owner's Google Sheet (CSV export) against the notes
 bun run test                # Jest
 ```
@@ -72,6 +73,7 @@ it too). It must be one line, single-quoted: a pretty-printed value reads as `[`
 |---|---|
 | `days/<day>.jsonl` | One line per broker account for the session: `status` `note` (an F&O broker's with `fno`, the sheet's five figures; a `kite` line with `eq` — obligation, each charge, total charges, final net — and `trades`, every fill; `skipped_segments`, the note's sha256, file, subject, received time, and `superseded` hashes when `--day` chose between notes), `no_trade`, `no_note` or `failed` (with `reason`) |
 | `raw/<broker>/<account>/<day>.pdf` | The note as mailed (encrypted), and `<day>.decrypted.pdf` |
+| `ledger/<day>.jsonl` | The brokers' ledger e-mails, one event per message (`ledger.js`): `deposit`, `withdrawal`, `collateral_interest` (amount, shortfall; on the session it is for), `margin_warning` (utilisation %, time, margin available and used), `settlement` (Finvasia's quarterly; its e-mail has no amount). `account` is null when a mailbox has two accounts of the broker (the e-mails do not name one) |
 | `manual/<day>.json` | The inputs the sheet had typed by hand: `algos`, `capital_total`, `source` (`sheet`, later the page or the 15:50 reading) |
 | `reconcile/` | `sheet-vs-notes-<day>.md`, each reconciliation report |
 | `cursor.json` | Per `<mailbox>\|<broker>/<account>`: `uidvalidity`, `last_uid`, `checked_at` — how far that account's mail has been read — and `quiet_since`, the day a quiet spell began |
@@ -117,6 +119,35 @@ cross-checks.
 - **Column-order guard**: `obligation − itemised charges` must equal the note's own final net,
   or the row is refused, so a changed PDF layout fails loudly instead of storing a wrong figure.
 - `skipped_segments` lists the non-F&O rows dropped.
+
+## Charges and trades on an F&O line
+
+Each F&O note's line also carries `charges` (brokerage, STT, GST, exchange, clearing, SEBI, stamp,
+IPF, other — summed over the F&O rows) and `trades` with `trades_check`
+(`brokers/fnoTrades.js`): the annexure's fills (contract, side, quantity, price, brokerage per
+unit, net total, order and trade time) when they add up to the note's obligation (`fills`), else
+the trade summary's rows per contract and side (`summary`), else what was read, marked
+`unmatched` with `trades_unread` (rows not read) and a warning — a layout not read yet (some of
+Angel One's older notes). A note never fails over its trades (`trades_error` if a reader throws).
+The annexures print totals unsigned; a buy is stored negative. A glued `<qty><rate>` cell is split
+where the rate agrees with the printed rate after brokerage and quantity × rate is the total
+within the rate's rounding (Angel One prints the WAP of several fills to 2 decimals).
+
+`charges` add up differently by broker: on Angel One they equal `fno.total_charges`; on Finvasia
+they are `total_charges` plus brokerage, which Finvasia's obligation already holds. Sum
+`fno.total_charges` for a day's charges, never `charges`.
+
+## Ledger e-mails
+
+After the notes, each mailbox reads its brokers' ledger e-mails (`ledger.js` `READERS`: subject,
+sender domain and a reader per kind), with the same bookmark-plus-3-days rule, one bookmark per
+broker and kind (`<mailbox>|ledger/<broker>/<kind>` in `cursor.json`). An e-mail from the right
+sender that its reader cannot understand is reported once (its wording changed) and the bookmark
+moves past it: after fixing its reader, `node run.js --from D --to D` stores it. An e-mail with the
+subject from another sender is reported once too (a broker that changed its sending domain).
+Angel One's margin warning has two wordings (Sep 2026: "as on YYYY-MM-DD HH:MM:SS"; Oct 2026 on:
+"as on DD-Mon-YYYY, HH:MM:SS AM"); both are read and the time stored as 24-hour. Finvasia's
+settlement e-mail carries no amount (`amount: null`).
 
 ## Zerodha (`kite`): equity, for Momentum
 

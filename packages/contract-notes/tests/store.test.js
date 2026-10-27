@@ -49,6 +49,14 @@ describe('day lines', () => {
     expect(fs.readdirSync(path.join(dir, 'days'))).toEqual(['2026-10-23.jsonl']); // no temp file left
   });
 
+  test('a damaged line names its file and the way to repair it', () => {
+    writeLine(dir, line('A', 'note'));
+    fs.appendFileSync(path.join(dir, 'days', '2026-10-23.jsonl'), '{"day":"2026-10\u0000\u0000\n');
+    expect(() => readDay(dir, '2026-10-23')).toThrow(
+      /days\/2026-10-23\.jsonl line 2 is damaged.*--day 2026-10-23/,
+    );
+  });
+
   test('readStatus keys lines by day and account', () => {
     writeLine(dir, line('A', 'note'));
     expect(readStatus(dir, ['2026-10-23']).get('2026-10-23|finvasia/A').status).toBe('note');

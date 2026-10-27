@@ -2,7 +2,15 @@ const { label, notesByDay, parseArgs } = require('../run');
 
 describe('parseArgs()', () => {
   test('defaults to the 10-session window', () => {
-    expect(parseArgs([])).toEqual({ dryRun: false, day: null, sessions: 10, from: null, to: null });
+    expect(parseArgs([])).toEqual({
+      dryRun: false,
+      day: null,
+      sessions: 10,
+      from: null,
+      to: null,
+      reparse: false,
+      acceptFigures: false,
+    });
   });
 
   test('reads --dry-run, --day and --sessions', () => {
@@ -12,8 +20,11 @@ describe('parseArgs()', () => {
       sessions: 20,
       from: null,
       to: null,
+      reparse: false,
+      acceptFigures: false,
     });
     expect(parseArgs(['--from', '2025-04-01', '--to', '2026-10-23']).from).toBe('2025-04-01');
+    expect(() => parseArgs(['--reparse'])).toThrow(/--reparse takes/);
   });
 
   test('refuses what it does not know', () => {

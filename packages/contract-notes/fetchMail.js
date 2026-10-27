@@ -103,6 +103,22 @@ function findAllMail(boxes, prefix = '') {
   return null;
 }
 
+/** A mail's body as plain text: its text part, or its HTML with tags dropped and ₹ decoded. */
+function bodyText(mail) {
+  const raw =
+    mail.text ||
+    (mail.html || '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<br\s*\/?>|<\/(p|div|tr|td|li)>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ');
+  return raw
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(Number.parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/[ \t]+/g, ' ');
+}
+
 /** IMAP's SINCE takes a date, not a time: 'YYYY-MM-DD' → '23-Oct-2026'. */
 function imapDate(day) {
   const [y, m, d] = day.split('-').map(Number);
@@ -121,7 +137,11 @@ function imapDate(day) {
 // (a year of notes for a history run) is never cut off.
 const IDLE_TIMEOUT_MS = 120000;
 
-function searchNotes(imap, subjectText, { sinceDay, beforeDay, afterUid, overlapSince }) {
+function searchNotes(
+  imap,
+  subjectText,
+  { sinceDay, beforeDay, afterUid, overlapSince, withText = false },
+) {
   let range = ['SINCE', imapDate(sinceDay)];
   if (beforeDay) range = [range, ['BEFORE', imapDate(beforeDay)]];
   if (afterUid != null) {
@@ -142,13 +162,15 @@ function searchNotes(imap, subjectText, { sinceDay, beforeDay, afterUid, overlap
     };
     touch();
   });
-  return Promise.race([search(imap, subjectText, range, () => touch()), idle]).finally(() => {
-    settled = true;
-    clearTimeout(timer);
-  });
+  return Promise.race([search(imap, subjectText, range, () => touch(), withText), idle]).finally(
+    () => {
+      settled = true;
+      clearTimeout(timer);
+    },
+  );
 }
 
-function search(imap, subjectText, range, touch) {
+function search(imap, subjectText, range, touch, withText) {
   return new Promise((resolve, reject) => {
     const criteria = Array.isArray(range[0]) ? [...range] : [range];
     imap.search([...criteria, ['SUBJECT', subjectText]], (err, found) => {
@@ -172,6 +194,10 @@ function search(imap, subjectText, range, touch) {
               uid,
               subject: mail.subject || '',
               received: mail.date ? mail.date.toISOString() : null,
+              messageId: mail.messageId || null,
+              from: mail.from?.value?.[0]?.address || '',
+              // Only the ledger readers need the body; notes are read from their PDFs.
+              text: withText ? bodyText(mail) : '',
               attachments: (mail.attachments || [])
                 .filter((a) => a.filename?.toLowerCase().endsWith('.pdf'))
                 .map((a) => ({ filename: a.filename, content: a.content })),
@@ -187,4 +213,4 @@ function search(imap, subjectText, range, touch) {
   });
 }
 
-module.exports = { decryptWithQpdf, hasQpdf, connect, searchNotes, imapDate };
+module.exports = { decryptWithQpdf, hasQpdf, connect, searchNotes, imapDate, bodyText };

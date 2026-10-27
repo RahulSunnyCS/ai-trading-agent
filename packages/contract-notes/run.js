@@ -9,6 +9,7 @@ const pdfParse = require('pdf-parse');
 const { getBroker, isSupported, loadBrokerAccounts } = require('./brokers');
 const { addDays, istNow, lastSession, sessionsBack, sessionsBetween } = require('./calendar');
 const { connect, decryptWithQpdf, hasQpdf, searchNotes } = require('./fetchMail');
+const { READERS, readLedger, readLedgerDay, writeEvent } = require('./ledger');
 const { closeWithoutNotes, failedLine, key, noteLine, openPairs } = require('./record');
 const {
   acquireLock,
@@ -18,6 +19,7 @@ const {
   saveRaw,
   storeRoot,
   writeCursors,
+  writeDurable,
   writeLine,
 } = require('./store');
 const { withRetry } = require('./utils/retry');
@@ -36,6 +38,9 @@ const { withRetry } = require('./utils/retry');
 //   node run.js --sessions N    a wider window, e.g. after a long trip
 //   node run.js --from D --to D history: every note received for sessions D..D, by date, the
 //                               bookmark untouched; a stored note is never written over
+//   node run.js --reparse --from D --to D   read the stored notes' kept PDFs again (no mail):
+//                               after an extractor improves; a line whose figures would change is
+//                               kept and reported unless --accept-figures
 
 const SESSIONS = 10;
 // Accounts read only from a day on, unless BROKER_ACCOUNTS_JSON gives the account its own
@@ -51,7 +56,15 @@ const NO_QUIET_ALERT = new Set(['kite']);
 const OVERLAP_DAYS = 3;
 
 function parseArgs(argv) {
-  const opts = { dryRun: false, day: null, sessions: SESSIONS, from: null, to: null };
+  const opts = {
+    dryRun: false,
+    day: null,
+    sessions: SESSIONS,
+    from: null,
+    to: null,
+    reparse: false,
+    acceptFigures: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--dry-run') opts.dryRun = true;
@@ -59,6 +72,8 @@ function parseArgs(argv) {
     else if (a === '--sessions') opts.sessions = Number(argv[++i]);
     else if (a === '--from') opts.from = argv[++i];
     else if (a === '--to') opts.to = argv[++i];
+    else if (a === '--reparse') opts.reparse = true;
+    else if (a === '--accept-figures') opts.acceptFigures = true;
     else throw new Error(`unknown argument ${a}`);
   }
   const isDay = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
@@ -67,6 +82,7 @@ function parseArgs(argv) {
     throw new Error('--from and --to go together, as YYYY-MM-DD, from first');
   }
   if (opts.day && opts.from) throw new Error('--day or --from/--to, not both');
+  if (opts.reparse && !opts.from) throw new Error('--reparse takes --from and --to');
   if (!Number.isInteger(opts.sessions) || opts.sessions < 1) {
     throw new Error('--sessions takes a whole number of at least 1');
   }
@@ -143,6 +159,51 @@ function notesByDay(messages, acc, siblings = []) {
   return { byDay, unread };
 }
 
+/**
+ * Read the stored notes of `window` again from their kept PDFs, with the current extractors, and
+ * rebuild their lines (the note's provenance kept). No mail is read; nothing else changes.
+ */
+async function reparse(root, window, config, d, at, dryRun, acceptFigures) {
+  const accounts = new Map(
+    config.flatMap((mb) => mb.accounts.map((a) => [`${a.broker}/${a.accountId}`, a])),
+  );
+  let done = 0;
+  const problems = [];
+  for (const day of window) {
+    for (const old of readDay(root, day)) {
+      const acc = accounts.get(`${old.broker}/${old.account}`);
+      if (old.status !== 'note' || !old.note?.file || !acc) continue;
+      const read = await d.readNote(path.join(root, old.note.file), acc);
+      if (read.error) {
+        problems.push(`${label(acc)} ${day}: ${hideId(read.error, acc)}`);
+        continue;
+      }
+      const line = noteLine({
+        day,
+        broker: old.broker,
+        account: old.account,
+        extracted: read.extracted,
+        note: old.note,
+        at,
+      });
+      if (old.superseded) line.superseded = old.superseded;
+      // A reparse is for the richer fields; the note's figures changing is news, not a refresh.
+      const figures = (l) => JSON.stringify(l.fno ?? l.eq ?? null);
+      if (figures(line) !== figures(old) && !acceptFigures) {
+        problems.push(
+          `${label(acc)} ${day}: the note's figures read differently now; kept the stored ones (--accept-figures to take the new)`,
+        );
+        continue;
+      }
+      if (!dryRun) writeLine(root, line);
+      done += 1;
+    }
+  }
+  d.log(`reparse ${window[0]} → ${window[window.length - 1]}: ${done} note(s) rebuilt`);
+  for (const p of problems) console.error(`  - ${p}`);
+  return problems.length ? 1 : 0;
+}
+
 async function main(argv, deps = {}) {
   const d = {
     connect,
@@ -174,6 +235,13 @@ async function main(argv, deps = {}) {
   if (!window.length) throw new Error(`no trading day from ${opts.from} to ${opts.to}`);
   // One run at a time over the store: a history run must not overlap the nightly job.
   const release = d.lock(root);
+  if (opts.reparse) {
+    try {
+      return await reparse(root, window, config, d, at, opts.dryRun, opts.acceptFigures);
+    } finally {
+      release();
+    }
+  }
   // A session's note can arrive days later (Angel One's after midnight, a revised note).
   const lateNotes = (day) => addDays(day, 5);
   const status = readStatus(root, window);
@@ -309,10 +377,7 @@ async function main(argv, deps = {}) {
             } else {
               file = saveRaw(root, acc.broker, acc.accountId, day, note.content).file;
               for (const old of superseded) {
-                fs.writeFileSync(
-                  file.replace(/\.pdf$/, `.${old.sha256.slice(0, 8)}.pdf`),
-                  old.content,
-                );
+                writeDurable(file.replace(/\.pdf$/, `.${old.sha256.slice(0, 8)}.pdf`), old.content);
               }
             }
             const read = await d.readNote(file, acc);
@@ -354,6 +419,92 @@ async function main(argv, deps = {}) {
           d.log(
             `read  ${label(acc)}: ${messages.filter((m) => isNew(m.uid)).length} new message(s)${!byDate && bookmark != null ? ` after #${bookmark}` : ` since ${addDays(window[0], -1)}`}`,
           );
+        }
+
+        // The ledger e-mails (money in and out, collateral interest, margin warnings) of this
+        // mailbox's brokers: one bookmark per kind of e-mail, the same reading rules as notes.
+        for (const reader of READERS) {
+          const accs = mine.filter((a) => a.broker === reader.broker);
+          if (!accs.length) continue;
+          // These e-mails do not name the account: with two of one broker in a mailbox, unknown.
+          const acc = accs.length === 1 ? accs[0] : null;
+          const who = acc ? label(acc) : `${reader.broker} (account unknown)`;
+          const cursorKey = `${mailbox.email}|ledger/${reader.broker}/${reader.kind}`;
+          // Bookmarks written before the key named the broker carry over.
+          const oldKey = `${mailbox.email}|ledger/${reader.kind}`;
+          const cursor = cursors[cursorKey] ?? cursors[oldKey] ?? {};
+          const bookmark =
+            cursor.uidvalidity === conn.uidvalidity && Number.isInteger(cursor.last_uid)
+              ? cursor.last_uid
+              : null;
+          let messages;
+          try {
+            messages = await d.searchNotes(conn.imap, reader.subject, {
+              withText: true,
+              sinceDay: addDays(window[0], -1),
+              beforeDay: history ? lateNotes(window[window.length - 1]) : undefined,
+              afterUid: byDate ? null : bookmark,
+              overlapSince: byDate ? undefined : addDays(window[window.length - 1], -OVERLAP_DAYS),
+            });
+          } catch (err) {
+            problems.push(`${who} ${reader.kind}: mailbox search failed: ${err.message}`);
+            continue;
+          }
+          const isNew = (uid) => byDate || bookmark == null || uid > bookmark;
+          // With two accounts of one broker the e-mail names neither; the earliest start day of
+          // theirs still applies.
+          const from = acc
+            ? acc.from
+            : accs.every((x) => x.from)
+              ? accs.map((x) => x.from).sort()[0]
+              : null;
+          let stored = 0;
+          try {
+            const { events, unread, foreign } = readLedger(
+              reader,
+              messages,
+              acc?.accountId ?? null,
+            );
+            for (const msg of foreign.filter((m) => isNew(m.uid))) {
+              problems.push(
+                `${who}: a "${reader.subject}" e-mail came from another sender (${/@([^>\s]+)/.exec(String(msg.from ?? ''))?.[1] ?? 'no sender'}); has the broker's sending domain changed?`,
+              );
+            }
+            for (const msg of unread.filter((m) => isNew(m.uid))) {
+              problems.push(
+                `${who}: a "${reader.subject}" e-mail could not be read (${msg.received?.slice(0, 10) ?? 'no date'}); has its wording changed?`,
+              );
+            }
+            for (const event of events) {
+              if (opts.day && event.day !== opts.day) continue;
+              if (history && (event.day < window[0] || event.day > window[window.length - 1])) {
+                continue;
+              }
+              if (from && event.day < from) continue;
+              const isStored = readLedgerDay(root, event.day).some(
+                (e) => e.message_id === event.message_id && e.kind === event.kind,
+              );
+              if (isStored) continue;
+              if (!opts.dryRun) writeEvent(root, event);
+              stored += 1;
+            }
+          } catch (err) {
+            // One bad e-mail or file must not stop the notes, the bookmarks or the alerts.
+            problems.push(`${who} ${reader.kind}: ${err.message}`);
+            continue;
+          }
+          if (stored) d.log(`ledger ${who}: ${stored} ${reader.kind} event(s)`);
+          if (!byDate) {
+            const newest = messages.reduce((m, msg) => Math.max(m, msg.uid ?? 0), 0);
+            const last = Math.max(bookmark ?? 0, newest);
+            cursors[cursorKey] = {
+              ...cursor,
+              uidvalidity: conn.uidvalidity,
+              ...(last ? { last_uid: last } : {}),
+              checked_at: at,
+            };
+            delete cursors[oldKey];
+          }
         }
       } finally {
         conn.imap.end();

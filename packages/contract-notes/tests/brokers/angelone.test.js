@@ -20,6 +20,12 @@ const equityOnlyText = fs.readFileSync(
 );
 
 describe('angelone.extract()', () => {
+  test("the sample note's trades add up to its obligation (read, not unmatched)", () => {
+    const result = extract(sampleText);
+    expect(['fills', 'summary']).toContain(result.trades_check);
+    expect(result.trades.length).toBeGreaterThan(0);
+  });
+
   test('extracts all three fields from valid PDF text', () => {
     const result = extract(sampleText);
     expect(result.error).toBeUndefined();
