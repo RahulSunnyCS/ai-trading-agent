@@ -105,6 +105,24 @@ import { istToday, sha256 } from './strategy-plan.js';
  * `deploy-ledger[-<broker>].jsonl`. The JWT is never logged.
  */
 
+/**
+ * BL-172: under the 08:10 job (`--morning` with `MORNING_REPORT_FILE` set) each account's report is
+ * added to one file and `morning-report.ts` sends them as one message; anything else, or a file
+ * that cannot be written, is sent on its own as before.
+ */
+async function deliver(text: string): Promise<void> {
+  const file = process.env.MORNING_REPORT_FILE?.trim();
+  if (file && process.argv.includes('--morning')) {
+    try {
+      await appendFile(file, `${JSON.stringify({ text: redact(text) })}\n`, 'utf8');
+      return;
+    } catch {
+      // the message still goes, on its own
+    }
+  }
+  await sendText(readTelegramConfig(), redact(text), 'broker.quantiply').catch(() => undefined);
+}
+
 /** 1: may succeed on a retry, nothing was changed blind. 3: the owner must look; never retried. */
 const EXIT_RETRY = 1;
 const EXIT_NO_RETRY = 3;
@@ -176,11 +194,7 @@ async function main(): Promise<number> {
   /** BL-172: the morning run always reports, also when it is held back before logging in. */
   const heldMorning = async (why: string) => {
     if (!values.morning || !values.apply) return;
-    await sendText(
-      readTelegramConfig(),
-      redact(`⚠️ ${site.name} morning switch-on: ${why}. Nothing switched on.`),
-      'broker.quantiply',
-    ).catch(() => undefined);
+    await deliver(`⚠️ ${site.name} morning switch-on: ${why}. Nothing switched on.`);
   };
   // Gate 1, before any login, for enable only: the .env switch. Disable is never gated.
   if (
@@ -321,13 +335,7 @@ async function main(): Promise<number> {
   if (nothingOwned && !(values.morning && mtmSl !== null)) {
     const text = `nothing the uploader created for ${session} on this account: no login, nothing to do`;
     console.log(text);
-    if (values.morning && values.apply) {
-      await sendText(
-        readTelegramConfig(),
-        redact(`⚠️ ${label}: ${text}. Nothing switched on.`),
-        'broker.quantiply',
-      ).catch(() => undefined);
-    }
+    if (values.morning && values.apply) await deliver(`⚠️ ${label}: ${text}. Nothing switched on.`);
     return 0;
   }
 
@@ -636,11 +644,7 @@ async function main(): Promise<number> {
     (apply && (changed || failed || values.morning === true)) || (mode === 'check' && failed);
   if (send) {
     const head = failed || nothingOwned ? `⚠️ ${label}: check Quantiply` : `✅ ${label}`;
-    await sendText(
-      readTelegramConfig(),
-      redact([head, ...lines].join('\n')),
-      'broker.quantiply',
-    ).catch(() => undefined);
+    await deliver([head, ...lines].join('\n'));
   }
   console.log(lines.slice(printed).join('\n'));
   // Disable: a retry may still switch off what is left on, so a retryable failure wins (the
@@ -658,9 +662,7 @@ main()
     const text = `⚠️ Quantiply deploy (${process.argv.slice(2).join(' ')}) stopped: ${describe(error)}`;
     console.error(text);
     if (process.argv.includes('--apply')) {
-      await Promise.resolve()
-        .then(() => sendText(readTelegramConfig(), redact(text), 'broker.quantiply'))
-        .catch(() => undefined);
+      await deliver(text).catch(() => undefined);
     }
     process.exit(EXIT_RETRY);
   });

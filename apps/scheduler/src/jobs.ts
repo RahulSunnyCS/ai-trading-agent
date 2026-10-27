@@ -651,14 +651,22 @@ const BASE_JOBS: Job[] = [
   {
     id: 'quantiply-deploy',
     description:
-      "08:10, after the morning login (BL-172): on each Quantiply account, keep the clientwise MTM SL at the Settings › Automation row's figure (set it only when it differs, read back on every weekday), then switch on today's algos last evening's upload made (BL-139 Phase 4): REAL MONEY on the owner's account. Only the tool's algos for today, each read back against its export and set to the account's own broker first; never a second time; confirmed by reading the list again. Always sends its Telegram report. Needs QUANTIPLY_DEPLOY=on, Automated deployment on and the account's row uploading a list",
+      "08:10, after the morning login (BL-172): on each Quantiply account, keep the clientwise MTM SL at the Settings › Automation row's figure (set it only when it differs, read back on every weekday), then switch on today's algos last evening's upload made (BL-139 Phase 4): REAL MONEY on the owner's account. Only the tool's algos for today, each read back against its export and set to the account's own broker first; never a second time; confirmed by reading the list again. Sends one Telegram message for both accounts. Needs QUANTIPLY_DEPLOY=on, Automated deployment on and the account's row uploading a list",
     // After the 08:00 login (GitHub's Quantiply logins end by about 08:03). Was 16:55 for the next
     // session until 2026-10-28 (owner: switch on in the morning). Never retried: a second attempt
     // could act on a half-finished first; the run alerts instead. Caught up until 09:05: after that
     // the 09:21 top-up switches on what is left. An account the settings leave off, or with
     // nothing uploaded for today, is not logged in (and says so).
     schedule: { at: '08:10', on: tradingDays, label: 'trading days 08:10' },
-    steps: [['/bin/sh', '-c', quantiplyBoth((b) => quantiplyDeploy(b, 'enable', true))]],
+    // Both accounts write their report to one file and the last command sends it as one message
+    // (owner, 2026-10-28); the job's exit stays the accounts' own.
+    steps: [
+      [
+        '/bin/sh',
+        '-c',
+        `F=$(mktemp -t quantiply-morning) && export MORNING_REPORT_FILE="$F"; (${quantiplyBoth((b) => quantiplyDeploy(b, 'enable', true))}); code=$?; node_modules/.bin/tsx src/morning-report.ts "$F" 2; exit $code`,
+      ],
+    ],
     cwd: BROKER_LOGIN,
     timeoutMinutes: 10,
     retries: 0,
