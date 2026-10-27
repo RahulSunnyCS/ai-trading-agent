@@ -8,10 +8,22 @@ const hasQpdf = spawnSync('qpdf', ['--version']).status === 0;
 const describeQpdf = hasQpdf ? describe : describe.skip;
 
 let tmpDir;
-const samplePdf = path.join(__dirname, '..', 'Angel One sample.pdf');
+let samplePdf;
 
 beforeAll(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'qpdf-test-'));
+  // A blank one-page PDF, written out by qpdf so it has a proper cross-reference table: no
+  // real contract note is committed (the repo is public).
+  const page = path.join(tmpDir, 'page.pdf');
+  fs.writeFileSync(
+    page,
+    '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n' +
+      '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' +
+      '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Resources<<>>>>endobj\n' +
+      'trailer<</Root 1 0 R/Size 4>>\n%%EOF\n',
+  );
+  samplePdf = path.join(tmpDir, 'blank.pdf');
+  if (hasQpdf) spawnSync('qpdf', [page, samplePdf]);
 });
 
 afterAll(() => {

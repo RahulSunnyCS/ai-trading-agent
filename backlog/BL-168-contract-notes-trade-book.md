@@ -133,8 +133,8 @@ that account trades nothing else. The e-mails, as seen in the mailboxes on 2026-
 
 Angel One also debits outside the contract note: **"Interest on collateral used against your
 derivative trade"** (from `@angelone.in`, HTML body, no attachment, one per session, 115 so
-far): *"An interest of ₹ 57.78 will be charged for the collateral margin used on 2026-10-23.
-The cash collateral shortfall was ₹ 218710.96."*, by the stated formula
+far): *"An interest of ₹ <amount> will be charged for the collateral margin used on <day>.
+The cash collateral shortfall was ₹ <shortfall>."*, by the stated formula
 `(shortfall − 50000) × 0.0342%` a day, posted to the ledger on the 1st and 16th. That e-mail
 is a second source (`fetch` by its subject, a small extractor), recorded as
 `account_charges: [{kind: 'collateral_interest', amount, shortfall, for_day}]` on the day it
@@ -284,7 +284,7 @@ account, behaviour patterns.
   sheet row, and lists each difference with a likely reason; `--import-manual` fills the
   sheet's Algos and Capital into `manual/<day>.json` (the sheet holds one capital for all
   accounts: `capital_total`; per-account capital comes from the 15:50 reading).
-- **Deliverables:** extractor tests on the sample PDFs and the fixtures; the history and
+- **Deliverables:** extractor tests on invented fixtures; the history and
   reconciliation commands; the report under `contract-notes/reconcile/`.
 - **Done when:** every day since 1 Apr 2025 is in the store; every `email` day's trades sum to
   its obligation within the note's tolerance; every difference from the sheet is listed in the
@@ -295,8 +295,9 @@ account, behaviour patterns.
 - **Tasks:** `realised/` (Design → Analytics): the sources, round trips, MFE / MAE, day
   context, return on money in the account, the sheet's ratios and summary, turnover; the
   `ratios` and `trips` routes; the 15:50 `contract-notes-capital` step.
-- **Deliverables:** the module and its tests (the sheet's formulas pinned against the
-  committed copy's own values: the T, U, V, W, Z columns and the summary block of row 290 on).
+- **Deliverables:** the module and its tests (the sheet's formulas pinned against an
+  invented fixture worked by hand; checked once against the owner's private copy of the sheet,
+  `contract-notes/reference/` in the store, never committed).
 - **Done when:** every ratio equals the sheet's for the same days (to the rupee / 0.1), each
   round trip's P&L sums to its day's obligation, and a fill's source matches the live capture
   on every day since 2026-10-19.
@@ -320,11 +321,9 @@ account, behaviour patterns.
 ## Mockups (Phase 2, approved by the owner 2026-10-26)
 
 The source is [`assets/BL-168/trade-book-mockup.html`](assets/BL-168/trade-book-mockup.html):
-the dashboard's dark tokens and IBM Plex, the analytics page pattern. Real figures (the sheet's
-daily rows from the committed copy, computed with the sheet's formulas): screen 2 (FY 2025-26),
-screen 3's ratios (every row to 26 May 2026) and summary (FY 2025-26), the algo fees on screen 3,
-and screen 4's net, charges, to-date and drawdown columns and the 27 Mar day's net, charges and
-algos. Everything else is illustrative, and each such card says so. With a target-pace benchmark
+the dashboard's dark tokens and IBM Plex, the analytics page pattern. Every figure is invented
+(a seeded random daily series, run through the sheet's formulas); the repo is public, so no
+real P&L is drawn. With a target-pace benchmark
 only profit and return have a benchmark figure; the other tiles say "no target figure" (a
 benchmark that is a series — last FY, Adaptive paper, NIFTY — compares every tile).
 
