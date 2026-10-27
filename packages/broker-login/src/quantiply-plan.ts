@@ -75,6 +75,12 @@ export interface QPlan {
   create: QWanted[];
   /** owned algos to delete, with why they are deletable */
   delete: QAlgo[];
+  /**
+   * BL-172 (owner, 2026-10-28: "delete everything, my own algos too"): algos the tool did not
+   * create, finished and switched off, deleted in the evening with `deleteOthers`. Never one that
+   * is enabled or may still run, and never one with a picked name (that is a conflict).
+   */
+  deleteOthers: QAlgo[];
   /** owned, to be deleted, but maybe running or enabled for a later day: kept and alerted */
   heldBack: QAlgo[];
   /** a wanted name on the weekday that the tool did not create */
@@ -190,6 +196,7 @@ export function planQ(
   wanted: QWanted[],
   ledger: QLedgerRow[],
   algos: QAlgo[],
+  opts: { deleteOthers?: boolean } = {},
 ): QPlan {
   const mine = ownedIds(ledger);
   const out: QPlan = {
@@ -197,6 +204,7 @@ export function planQ(
     kept: [],
     create: [],
     delete: [],
+    deleteOthers: [],
     heldBack: [],
     conflicts: [],
     notToday: [],
@@ -259,6 +267,13 @@ export function planQ(
     }
     if (deletable(a, today)) out.delete.push(a);
     else out.heldBack.push(a);
+  }
+  if (mode === 'evening' && opts.deleteOthers) {
+    for (const a of algos) {
+      if (mine.has(a.id) || handled.has(a.id) || wantedNames.has(a.name)) continue;
+      // switched off and finished only: the owner's own enabled algo is never touched
+      if (!a.enabled && FINISHED.has(a.status)) out.deleteOthers.push(a);
+    }
   }
   return out;
 }
@@ -341,12 +356,14 @@ export function brokerOutcome(i: {
   };
 }
 
-export function summaryQ(p: QPlan, mode: Mode): string[] {
+export function summaryQ(p: QPlan, mode: Mode, deploysItself = false): string[] {
   const lines: string[] = [];
   const algo = (a: QAlgo) => `${a.name} (${a.day}${a.enabled ? ', enabled' : ''}, ${a.status})`;
   if (p.keep.length) lines.push(`ready: ${p.keep.join(', ')}`);
   if (p.create.length) lines.push(`create: ${p.create.map((w) => w.name).join(', ')}`);
   if (p.delete.length) lines.push(`delete: ${p.delete.map(algo).join(', ')}`);
+  if (p.deleteOthers.length)
+    lines.push(`delete (not the tool's): ${p.deleteOthers.map(algo).join(', ')}`);
   if (p.heldBack.length)
     lines.push(`NOT deleted, may run or is enabled: ${p.heldBack.map(algo).join(', ')}`);
   if (p.conflicts.length)
@@ -361,7 +378,9 @@ export function summaryQ(p: QPlan, mode: Mode): string[] {
     );
   if (p.enabledNotToday.length) {
     lines.push(
-      `⚠️ ENABLED but no longer today's pick, it WILL TRADE unless you disable it: ${p.enabledNotToday.join(', ')}`,
+      deploysItself
+        ? `enabled, no longer today's pick: the 09:21 switch-on turns it off if it has not started: ${p.enabledNotToday.join(', ')}`
+        : `⚠️ ENABLED but no longer today's pick, it WILL TRADE unless you disable it: ${p.enabledNotToday.join(', ')}`,
     );
   }
   if (mode === 'topup' && p.notToday.length) lines.push(`not today: ${p.notToday.join(', ')}`);
@@ -370,13 +389,15 @@ export function summaryQ(p: QPlan, mode: Mode): string[] {
 }
 
 /** Anything kept, skipped or changed against the plan's intent: the owner should look. */
-export function needsAttentionQ(p: QPlan): boolean {
+export function needsAttentionQ(p: QPlan, deploysItself = false): boolean {
+  // BL-172: with the tool's own switch-on in charge (QUANTIPLY_DEPLOY and Automated deployment
+  // on), an enabled algo 09:16 dropped is the 09:21 run's to switch off, not the owner's.
   return (
     p.heldBack.length +
       p.conflicts.length +
       p.changed.length +
       p.unconfirmed.length +
-      p.enabledNotToday.length >
+      (deploysItself ? 0 : p.enabledNotToday.length) >
     0
   );
 }
@@ -462,4 +483,65 @@ export function readBackDiffs(body: Record<string, unknown>, saved: unknown): st
   const { day: _day, ...rest } = body;
   walk(rest, saved, '');
   return diffs;
+}
+
+/** BL-172 Phase 7: the paid Quantiply's (Shoonya's) subscription, as `GET /users/me` gives it. */
+export interface QSubscription {
+  id: string;
+  plan: string;
+  /** algos a day the plan includes */
+  algosPerDay: number;
+  /** algos a day bought on top */
+  additionalAlgos: number;
+  totalAlgosPerDay: number;
+}
+
+export function parseSubscription(json: unknown): QSubscription {
+  const data = ((json as { data?: unknown }).data ?? json) as { subscription?: unknown };
+  const s = data.subscription as Record<string, unknown> | undefined;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isInteger(v) ? v : Number.NaN);
+  if (!s || typeof s._id !== 'string' || typeof s.plan !== 'string')
+    throw new Error('no subscription on the account');
+  const sub = {
+    id: s._id,
+    plan: s.plan,
+    algosPerDay: num(s.algosPerDay),
+    additionalAlgos: num(s.additionalAlgos),
+    totalAlgosPerDay: num(s.totalAlgosPerDay),
+  };
+  if ([sub.algosPerDay, sub.additionalAlgos, sub.totalAlgosPerDay].some(Number.isNaN))
+    throw new Error('the subscription has no algo counts');
+  return sub;
+}
+
+/**
+ * The extra algos to buy so the account runs exactly `need` a day (the owner, 2026-10-28: the
+ * tool's own need; they add their own by hand). Null when it already does. `skip` when the tool
+ * must not ask: the web app never sends an extra of 0 (it leaves the field out), so what the server
+ * does with one is unknown.
+ */
+export function subscriptionTarget(
+  sub: QSubscription,
+  need: number,
+): { extra: number } | { skip: string } | null {
+  const extra = Math.max(0, need - sub.algosPerDay);
+  if (extra === sub.additionalAlgos) return null;
+  if (extra === 0)
+    return {
+      skip: `${need} a day is within the plan's ${sub.algosPerDay}: set no extra algos in Subscription by hand (the tool never asks for 0)`,
+    };
+  return { extra };
+}
+
+/** The credits a previewed change costs (+) or returns (-): the sum of its line items. */
+export function previewNet(json: unknown): number | null {
+  const items = ((json as { data?: { lineItems?: unknown } }).data ?? {}).lineItems;
+  if (!Array.isArray(items) || !items.length) return null;
+  let total = 0;
+  for (const it of items as Record<string, unknown>[]) {
+    const v = it.payableCredits ?? it.credits;
+    if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+    total += v;
+  }
+  return total;
 }

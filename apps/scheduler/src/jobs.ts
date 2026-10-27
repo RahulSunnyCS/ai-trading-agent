@@ -612,7 +612,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'quantiply-topup',
     description:
-      "After the 09:16 pick, create on each Quantiply account any recorded pick of its list (dashboard settings, BL-140) that last night's upload does not have (BL-139); deletes nothing and names the algos that are not today's. Does nothing until QUANTIPLY_UPLOAD=on",
+      "After the 09:16 pick, create on each Quantiply account any pick of its list (dashboard settings, BL-140) that last night's upload does not have (BL-139), under the owner's 09:17 rule (BL-172: the evening's 09:17 strategy stays, a new 09:17 pick is not made, the rest is chosen again by the 09:16 score); deletes nothing and names the algos that are not today's. Does nothing until QUANTIPLY_UPLOAD=on",
     // 09:19, not 09:18: a minute clear of the pick's own Angel One work, so two logins never type
     // codes from one TOTP window. A changed 09:17 pick is too late either way. Not caught up.
     schedule: { at: '09:19', on: tradingDays, label: 'trading days 09:19' },
@@ -626,6 +626,7 @@ const BASE_JOBS: Job[] = [
         'rotation',
         'quantiply-export',
         '--from-settings',
+        '--morning-rule',
       ],
       // Both accounts always run (a failed step would stop the next); the job fails if either did.
       ['/bin/sh', '-c', quantiplyUploads('topup')],
@@ -790,9 +791,14 @@ const BASE_JOBS: Job[] = [
 /** Every job: the ones above plus each check group's (src/checks/). */
 /** BL-140: one Quantiply upload per account, each told by the settings whether it has work. */
 function quantiplyUploads(mode: 'evening' | 'topup'): string {
+  // BL-172 (owner, 2026-10-28): the evening deletes every finished, switched-off algo on the
+  // account, the owner's own too (`--delete-all`); never an enabled or running one. And it sets
+  // Shoonya's paid subscription to the next session's algo count (`--subscription`; Angel One's
+  // Quantiply is free, so the flag does nothing there).
+  const all = mode === 'evening' ? ' --delete-all --subscription' : '';
   return quantiplyBoth(
     (broker) =>
-      `node_modules/.bin/tsx src/quantiply-upload.ts --broker ${broker} --from-settings --mode ${mode} --apply`,
+      `node_modules/.bin/tsx src/quantiply-upload.ts --broker ${broker} --from-settings --mode ${mode}${all} --apply`,
   );
 }
 

@@ -6,6 +6,7 @@ import { sendText } from '@trading/notify';
 import {
   describeSource,
   effectiveRow,
+  quantiplyDeploy,
   readAutomation,
   uploadBooks,
 } from './automation-settings.js';
@@ -15,6 +16,7 @@ import { definitelyRefused } from './quantiply-api.js';
 import { parseBrokers, parseDetail, pickBroker } from './quantiply-deploy-plan.js';
 import {
   type BrokerState,
+  FINISHED,
   type QLedgerRow,
   type QManifest,
   type QWanted,
@@ -23,9 +25,12 @@ import {
   istWeekday,
   needsAttentionQ,
   parseQLedger,
+  parseSubscription,
   planQ,
+  previewNet,
   readBackDiffs,
   sessionOver,
+  subscriptionTarget,
   summaryQ,
   weekdayOf,
   withMultiplier,
@@ -50,7 +55,12 @@ import { type Mode, istToday, sha256 } from './strategy-plan.js';
  * API (the calls its web app makes). Never enables (deploys) anything.
  *
  *   tsx src/quantiply-upload.ts [--broker angelone|finvasia] --from-settings | --latest <book> |
- *     --dir <export folder>  --mode evening|topup [--apply]
+ *     --dir <export folder>  --mode evening|topup [--delete-all] [--subscription] [--apply]
+ *
+ * BL-172: `--delete-all` (evening) also deletes the owner's own finished, switched-off algos on
+ * the account (never an enabled or running one, never a picked name). `--subscription` (evening,
+ * Shoonya only) sets the paid plan's algos a day to the next session's count: preview first, a
+ * raise only when the credits cover it, read back; 0 extra is never asked (set by hand).
  *
  * BL-140: Quantiply has one account per broker (`--broker`, default angelone: Angel One's
  * app.quantiply.angelone.in; finvasia: Shoonya's quantiply.shoonya.com), each with its own login,
@@ -92,6 +102,8 @@ async function main(): Promise<number> {
       ledger: { type: 'string' },
       broker: { type: 'string' },
       'from-settings': { type: 'boolean', default: false },
+      'delete-all': { type: 'boolean', default: false },
+      subscription: { type: 'boolean', default: false },
       apply: { type: 'boolean', default: false },
       headed: { type: 'boolean', default: false },
     },
@@ -129,9 +141,14 @@ async function main(): Promise<number> {
   let decidedBy = '';
   /** the account row's platform multiplier (BL-140 Phase 4); a manual --dir / --latest run is at 1 */
   let multiplier = 1;
+  /** BL-172: the tool's own switch-on is in charge of this account (it turns a dropped pick off) */
+  let deploysItself = false;
   if (values['from-settings']) {
     const automation = readAutomation();
     decidedBy = describeSource(automation);
+    deploysItself =
+      quantiplyDeploy(automation, broker).ok &&
+      process.env.QUANTIPLY_DEPLOY?.trim().toLowerCase() === 'on';
     multiplier = effectiveRow(automation, 'quantiply', broker).multiplier;
     const books = uploadBooks(automation, 'quantiply', broker);
     if (!books.length) {
@@ -257,6 +274,8 @@ async function main(): Promise<number> {
   let attention = false;
   let loginRefused = false;
   let printed = 0; // lines already on the console (the plan), so the end prints only the rest
+  /** the plan creates an algo: a 09:16 top-up reports only then (or on a failure), BL-172 */
+  let created = false;
 
   try {
     // The browser is only for the login: the token is taken and the browser closed before any call.
@@ -276,8 +295,10 @@ async function main(): Promise<number> {
       wanted,
       ledger,
       algos,
+      { deleteOthers: values['delete-all'] === true },
     );
-    lines.push(...summaryQ(p, mode));
+    lines.push(...summaryQ(p, mode, deploysItself));
+    created = p.create.length > 0;
     printed = lines.length;
     console.log(`${label}${values.apply ? '' : ' (dry run)'}\n${lines.join('\n')}`);
     if (!values.apply) return 0;
@@ -490,6 +511,26 @@ async function main(): Promise<number> {
       await record({ action: 'delete', id: a.id, name: a.name, sha: '', ok: true });
       lines.push(`deleted ${a.name} (${a.day})`);
     }
+    // BL-172: the owner's own finished, switched-off algos too (--delete-all). Read again first:
+    // one switched on since the list was read is left alone.
+    if (p.deleteOthers.length) {
+      const now = new Map((await api.list()).map((a) => [a.id, a]));
+      for (const a of p.deleteOthers) {
+        const fresh = now.get(a.id);
+        if (!fresh || fresh.enabled || !FINISHED.has(fresh.status)) {
+          lines.push(`not deleted (changed since): ${a.name} (${a.day})`);
+          continue;
+        }
+        try {
+          await api.remove(a.id);
+          lines.push(`deleted (not the tool's) ${a.name} (${a.day})`);
+        } catch (error) {
+          failed = true;
+          retryable = true;
+          lines.push(`❌ delete failed: ${a.name} (${a.day}) — ${describe(error)}`);
+        }
+      }
+    }
     for (const w of p.create) {
       const stuck = p.delete.some(
         (a) => a.name === w.name && a.day === manifest.weekday && notDeleted.has(a.id),
@@ -545,7 +586,55 @@ async function main(): Promise<number> {
       if (w) forBroker.push({ w, id: a.id });
     }
     await setBrokers(forBroker);
-    if (needsAttentionQ(p)) {
+    // BL-172 Phase 7: Shoonya's Quantiply is paid by algos a day, charged by the day left in the
+    // term: set it to the next session's algos (the tool's own; the owner adds theirs by hand).
+    if (values.subscription && mode === 'evening' && broker === 'finvasia') {
+      try {
+        const sub = parseSubscription(await api.me());
+        // the algos the account will hold: a pick with an unconfirmed mapping is never created
+        const need = wanted.length - p.unconfirmed.length;
+        const t = subscriptionTarget(sub, need);
+        if (t === null) lines.push(`subscription: ${sub.totalAlgosPerDay} algos a day ✓`);
+        else if ('skip' in t) lines.push(`subscription: ${t.skip}`);
+        else {
+          const body = { plan: sub.plan, additionalAlgos: t.extra };
+          const net = previewNet(await api.previewSubscription(sub.id, body));
+          const balance = await api.credits();
+          if (net === null) {
+            attention = true;
+            failed = true;
+            lines.push(
+              `⚠️ subscription NOT changed: the preview could not be read; set ${need} a day by hand`,
+            );
+          } else if (net > balance) {
+            attention = true;
+            failed = true;
+            lines.push(
+              `⚠️ subscription NOT raised to ${need} a day: it costs ${net} credits, the balance is ${balance}. Add credits, then set it by hand`,
+            );
+          } else {
+            await api.setSubscription(sub.id, body);
+            const back = parseSubscription(await api.me());
+            if (back.totalAlgosPerDay !== need) {
+              attention = true;
+              failed = true;
+              lines.push(
+                `⚠️ subscription set to ${need} a day but reads back ${back.totalAlgosPerDay}: check Subscription`,
+              );
+            } else {
+              lines.push(
+                `subscription: ${sub.totalAlgosPerDay} → ${need} algos a day (${net >= 0 ? `${net} credits` : `${-net} credits back`}; balance was ${balance})`,
+              );
+            }
+          }
+        }
+      } catch (error) {
+        attention = true;
+        failed = true;
+        lines.push(`⚠️ subscription not checked: ${describe(error)}`);
+      }
+    }
+    if (needsAttentionQ(p, deploysItself)) {
       failed = true;
       attention = true;
     }
@@ -565,7 +654,9 @@ async function main(): Promise<number> {
     );
   }
 
-  if (values.apply) {
+  // BL-172: the 09:16 top-up is quiet on a day 09:16 changed nothing (the owner's choice); the
+  // evening always reports.
+  if (values.apply && (mode === 'evening' || failed || created)) {
     const head = failed ? `⚠️ ${label}: check Quantiply` : `✅ ${label}`;
     await sendText(telegram, redact([head, ...lines].join('\n')), 'broker.quantiply').catch(
       () => undefined,
