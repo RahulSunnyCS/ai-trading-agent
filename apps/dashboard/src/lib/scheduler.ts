@@ -60,6 +60,30 @@ export function runDurationMs(run: SchedulerRun | null): number | null {
   return Number.isFinite(ms) && ms >= 0 ? ms : null;
 }
 
+/**
+ * The first sentence of a job's description, for the Jobs table's row (the whole text is in the
+ * job's panel). A sentence ends at ". ", "! " or "? " followed by a capital, a digit or a quote,
+ * outside brackets, so "the repo .env. A part…" splits after ".env." and "e.g. the" does not.
+ * A text with no such end is returned whole.
+ */
+export function firstSentence(text: string): string {
+  let depth = 0;
+  for (let i = 0; i < text.length - 2; i += 1) {
+    const ch = text[i];
+    if (ch === '(' || ch === '[') depth += 1;
+    else if ((ch === ')' || ch === ']') && depth > 0) depth -= 1;
+    else if (
+      depth === 0 &&
+      (ch === '.' || ch === '!' || ch === '?') &&
+      /\s/.test(text[i + 1] ?? '')
+    ) {
+      const next = text.slice(i + 1).trimStart()[0] ?? '';
+      if (/[A-Z0-9"'`(]/.test(next)) return text.slice(0, i + 1);
+    }
+  }
+  return text;
+}
+
 /** A job that needs the owner's laptop session (residential IP or a browser window). */
 export function needsConfirmation(job: Pick<SchedulerJob, 'needs'>): boolean {
   return job.needs.includes('home') || job.needs.includes('gui');

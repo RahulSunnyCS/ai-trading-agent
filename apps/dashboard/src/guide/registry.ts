@@ -412,7 +412,8 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     chapter: 'operations',
     slug: 'overview',
     title: 'Overview',
-    summary: 'The landing screen: one card per daily question, each linking to the detail.',
+    summary:
+      'The morning board: rotation, Momentum, the trade book, failed jobs, logins and data health, each linking to the detail.',
     kind: 'Screen',
     body: opsOverview,
     screen: { tab: 'overview' },
@@ -459,8 +460,9 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
   {
     chapter: 'operations',
     slug: 'coverage',
-    title: 'Data › Coverage',
-    summary: 'Backfill and Replay: historical candles for the paused live engine.',
+    title: 'Coverage',
+    summary:
+      'Backfill and Replay: historical candles for the paused live engine (Archived engine, hidden by default).',
     kind: 'Screen',
     body: opsCoverage,
     screen: { tab: 'coverage' },

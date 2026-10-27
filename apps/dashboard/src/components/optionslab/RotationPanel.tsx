@@ -4,18 +4,19 @@
  * The page shows the lists in `VISIBLE_LIST_KEYS`; the journal still records all four registered
  * lists (Steady A, Calendar B, Adaptive C, Baseline REF).
  *
- * One page, in reading order (BL-102): the list cards, health/read-out, the headline, chart and
- * current baskets once a forward session has been scored; then What happened (the day log),
- * Is the rule still working? and Experiments. The diagnostics sit in closed accordions that mount
- * their widget only when opened, so the page stays light. The bands do not wait for the read-out:
- * the day log loads alongside it.
+ * One page, in reading order. The first screen (dashboard review, 2026-10-28) is the run bar (focus,
+ * benchmark, the read-out's day count, the evening run), the data health line, the Books table
+ * (Adaptive Classic, Adaptive Tuned and the Fixed base, each with its own portfolio stop, and the
+ * registered verdict under it) and the cumulative chart; then the latest baskets, What happened
+ * (the day log, with the live result per day), Live vs paper, Is the rule still working? and
+ * Experiments (Lot plans and the ideas being watched). The
+ * diagnostics sit in closed accordions that mount their widget only when opened.
  *
  * Gross only: the stored costs are zero. Lists are alternative baskets and are never added up.
  * Rupee totals are at 1 lot a strategy (`lots=1`, display only: the per-lot figures, the verdict
- * and the journal's recorded 2 lots do not change). Three cards: Adaptive Classic (the live
- * journal, Core-298) with its portfolio stop, which every widget below follows; Adaptive Tuned (the
- * T1 track's journal) and the Fixed base, each with its own. Under each stop, what it changed
- * ("Without the portfolio stop"). Nothing on this page changes a list, a weight or the journal.
+ * and the journal's recorded 2 lots do not change). Adaptive Classic's portfolio stop is the one
+ * every widget below follows; Adaptive Tuned and the Fixed base have their own, on their rows only.
+ * Nothing on this page changes a list, a weight or the journal.
  */
 
 import { useMemo, useState } from 'react';
@@ -34,10 +35,9 @@ import {
   DEFAULT_BASE_SETTING,
   DEFAULT_SETTING,
   DEFAULT_T1_SETTING,
-  type PortfolioStopSetting,
   T1_STOP_KEYS,
 } from '../../lib/portfolioStop';
-import { baseCard, tunedCard } from '../../lib/rotationListCards';
+import { baseBook, listBook, vsHeader } from '../../lib/rotationBooks';
 import {
   ADAPTIVE_CARD,
   BASE_CARD,
@@ -47,7 +47,6 @@ import {
   listWithUniverse,
 } from '../../lib/rotationListNames';
 import {
-  type StopEffect,
   bookFor,
   overlayBase,
   overlaySummary,
@@ -60,9 +59,7 @@ import {
   BENCHMARK_LABEL,
   BENCHMARK_NOTE,
   type RotationBenchmark,
-  benchmarkFigures,
   verdict as buildVerdict,
-  headline,
   heroSeries,
   lotsWord,
 } from '../../lib/rotationView';
@@ -73,7 +70,6 @@ import { RefreshButton } from '../ui/RefreshButton';
 import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
-import { PortfolioStopButton } from './PortfolioStopButton';
 import { RotationDailyLog } from './RotationDailyLog';
 import { RotationDrawdowns } from './RotationDrawdowns';
 import { RotationDrift } from './RotationDrift';
@@ -86,13 +82,11 @@ import { RotationShadowScoreboard } from './RotationShadowScoreboard';
 import { EveningRunBar } from './results/EveningRunBar';
 import { ListPicker } from './rotation/ListPicker';
 import { RotationBaskets } from './rotation/RotationBaskets';
-import { RotationHeadline } from './rotation/RotationHeadline';
+import { type BookLine, RotationBooks } from './rotation/RotationBooks';
 import { RotationHealthStrip } from './rotation/RotationHealth';
 import { RotationHero } from './rotation/RotationHero';
-import { RotationListCards } from './rotation/RotationListCards';
-import { RotationReadoutBanner } from './rotation/RotationReadout';
+import { RotationReadoutChip } from './rotation/RotationReadout';
 import { RotationVerdict } from './rotation/RotationVerdict';
-import { StopEffectBlock } from './rotation/StopEffect';
 
 const BENCHMARK_OPTIONS: SegmentedOption<RotationBenchmark>[] = BENCHMARKS.map((value) => ({
   value,
@@ -106,39 +100,17 @@ const TUNED: RotationReadOptions = { lots: ROTATION_PAGE_LOTS, track: 't1' };
 /** The Fixed base as a book under its own stop, at 1 lot a strategy (2 Widesl + 1 Dir). */
 const BASE_BOOK = { lots: ROTATION_PAGE_LOTS, book: 'base' } as const;
 
-/** A card's portfolio stop: its button and the line saying what the replay did. */
-function CardStop({
-  setting,
-  onChange,
-  defaults,
-  title,
-  note,
-  effect,
-}: {
-  setting: PortfolioStopSetting;
-  onChange: (next: PortfolioStopSetting) => void;
-  defaults: PortfolioStopSetting;
-  title: string;
-  note: string | null;
-  /** What the stop changed, once its replay is in. */
-  effect: StopEffect | null;
-}) {
-  return (
-    <>
-      <PortfolioStopButton
-        setting={setting}
-        onChange={onChange}
-        defaults={defaults}
-        dialogTitle={`Portfolio stop · ${title}`}
-      />
-      {note ? (
-        <p className="text-[11px] text-muted" aria-live="polite">
-          {note}
-        </p>
-      ) : null}
-      {effect ? <StopEffectBlock effect={effect} /> : null}
-    </>
-  );
+/**
+ * A row's short stop line, only while the replay is running or failed: the full sentence goes in
+ * its tooltip, and what a stop does is explained once, in the dialog.
+ */
+function stopStatus(
+  note: string | null,
+  stopped: boolean,
+  error: string | null,
+): { text: string; detail: string } | null {
+  if (stopped || note === null) return null;
+  return { text: error ? 'replay failed' : 'replaying…', detail: note };
 }
 
 export function RotationPanel() {
@@ -165,28 +137,20 @@ export function RotationPanel() {
   const bookNow = bookFor(book.data, portfolio);
   const shown_s = useMemo(() => (s ? overlaySummary(s, bookNow) : s), [s, bookNow]);
   const stopped = shown_s !== s;
-  const skipped = unmatched(bookNow);
 
-  // Adaptive Tuned (the T1 track): its own read-out and its own stop, on its card only.
+  // Adaptive Tuned (the T1 track): its own read-out and its own stop, on its row only.
   const t = tuned.data;
   const tunedBook = useRotationPortfolioDays('recorded', {}, tunedStop, TUNED);
   const tunedBookNow = bookFor(tunedBook.data, tunedStop);
   const tunedShown = useMemo(() => (t ? overlaySummary(t, tunedBookNow) : t), [t, tunedBookNow]);
-  const tunedNote = stopNote({
-    setting: tunedStop,
-    scoredDays: t?.n_days ?? 0,
-    stopped: tunedShown !== t,
-    error: tunedBook.error,
-    skipped: unmatched(tunedBookNow),
-  });
 
-  // The Fixed base: the read-out's own base over Classic's sessions, under its own stop (card only;
-  // the headline's base benchmark stays unstopped).
-  const baseBook = useRotationPortfolioDays('recorded', {}, baseStop, BASE_BOOK);
-  const baseBookNow = bookFor(baseBook.data, baseStop);
+  // The Fixed base: the read-out's own base over Classic's sessions, under its own stop (its row
+  // only; the comparisons with the base always use the base without a stop).
+  const baseBookRes = useRotationPortfolioDays('recorded', {}, baseStop, BASE_BOOK);
+  const baseBookNow = bookFor(baseBookRes.data, baseStop);
   const baseShown = useMemo(() => (s ? overlayBase(s, baseBookNow) : s), [s, baseBookNow]);
 
-  // "Without the portfolio stop": each card's replay over that card's own scored days.
+  // What each stop changed, over that book's own scored days.
   const classicDays = useMemo(() => (s?.days ?? []).map((d) => d.day), [s]);
   const tunedDays = useMemo(() => (t?.days ?? []).map((d) => d.day), [t]);
   const classicEffect = useMemo(
@@ -203,13 +167,123 @@ export function RotationPanel() {
   );
 
   const visible = useMemo(() => new Set<RotationListKey>([...shown, focus]), [shown, focus]);
-  const figures = useMemo(
-    () => (shown_s ? headline(shown_s, focus, benchmark, readoutDays) : []),
-    [shown_s, focus, benchmark, readoutDays],
-  );
   const points = useMemo(() => (shown_s ? heroSeries(shown_s, focus) : []), [shown_s, focus]);
   const verdictFor = useMemo(() => (s ? buildVerdict(s, focus) : null), [s, focus]);
-  const bench = shown_s ? benchmarkFigures(shown_s, benchmark, focus) : null;
+
+  const lines = useMemo((): BookLine[] => {
+    if (!s) return [];
+    const tunedMessage = tuned.error
+      ? { text: `The T1 read-out could not be read: ${tuned.error}`, error: true }
+      : !t
+        ? { text: 'Reading the T1 read-out…', error: false }
+        : t.n_days === 0
+          ? {
+              text:
+                Object.values(t.pending_reasons)[0] ??
+                'No scored forward session yet: the first T1 entry is scored after the evening update.',
+              error: false,
+            }
+          : null;
+    return [
+      {
+        row: listBook('C', shown_s ?? null, s, benchmark),
+        name: ADAPTIVE_CARD.classic.name,
+        note: ADAPTIVE_CARD.classic.note,
+        focus: true,
+        stop: {
+          setting: portfolio,
+          onChange: setPortfolio,
+          defaults: DEFAULT_SETTING,
+          title: `Portfolio stop · ${ADAPTIVE_CARD.classic.name}`,
+          effect: classicEffect,
+          status: stopStatus(
+            stopNote({
+              setting: portfolio,
+              scoredDays: s.n_days,
+              stopped,
+              error: book.error,
+              skipped: unmatched(bookNow),
+            }),
+            stopped,
+            book.error,
+          ),
+        },
+      },
+      {
+        row: listBook('T1', tunedShown ?? null, t ?? null, benchmark),
+        name: ADAPTIVE_CARD.tuned.name,
+        note: ADAPTIVE_CARD.tuned.note,
+        focus: false,
+        message: tunedMessage,
+        stop: {
+          setting: tunedStop,
+          onChange: setTunedStop,
+          defaults: DEFAULT_T1_SETTING,
+          title: `Portfolio stop · ${ADAPTIVE_CARD.tuned.name}`,
+          effect: tunedEffect,
+          status: stopStatus(
+            stopNote({
+              setting: tunedStop,
+              scoredDays: t?.n_days ?? 0,
+              stopped: tunedShown !== t,
+              error: tunedBook.error,
+              skipped: unmatched(tunedBookNow),
+            }),
+            tunedShown !== t,
+            tunedBook.error,
+          ),
+        },
+      },
+      {
+        row: baseBook(baseShown ?? null),
+        name: BASE_CARD.name,
+        note: BASE_CARD.note,
+        focus: false,
+        stop: {
+          setting: baseStop,
+          onChange: setBaseStop,
+          defaults: DEFAULT_BASE_SETTING,
+          title: `Portfolio stop · ${BASE_CARD.name}`,
+          effect: baseEffect,
+          status: stopStatus(
+            stopNote({
+              setting: baseStop,
+              scoredDays: s.n_days,
+              stopped: baseShown !== s,
+              error: baseBookRes.error,
+              skipped: unmatched(baseBookNow, ['BASE']),
+            }),
+            baseShown !== s,
+            baseBookRes.error,
+          ),
+        },
+      },
+    ];
+  }, [
+    s,
+    t,
+    shown_s,
+    tunedShown,
+    baseShown,
+    benchmark,
+    tuned.error,
+    portfolio,
+    setPortfolio,
+    tunedStop,
+    setTunedStop,
+    baseStop,
+    setBaseStop,
+    classicEffect,
+    tunedEffect,
+    baseEffect,
+    stopped,
+    book.error,
+    bookNow,
+    tunedBook.error,
+    tunedBookNow,
+    baseBookRes.error,
+    baseBookNow,
+  ]);
 
   const reload = () => {
     overview.refetch();
@@ -223,6 +297,9 @@ export function RotationPanel() {
       else next.add(k);
       return next;
     });
+
+  const entryDay = overview.data?.baskets.entry?.day ?? null;
+  const tunedBaskets = t?.baskets;
 
   return (
     <div className="space-y-4">
@@ -248,7 +325,15 @@ export function RotationPanel() {
         <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted">
           Forward · gross · 1 lot per strategy
         </span>
+        <RotationReadoutChip
+          scoredDays={s ? s.n_days : null}
+          total={readoutDays}
+          firstDay={s?.first_day ?? null}
+          lastDay={s?.last_day ?? null}
+          firstEntryDay={overview.data?.first_entry_day ?? null}
+        />
         <span className="flex-1" />
+        <EveningRunBar underlying={null} onFinished={reload} compact />
         <RefreshButton
           onClick={reload}
           loading={overview.loading || summary.loading}
@@ -256,8 +341,6 @@ export function RotationPanel() {
         />
       </div>
       <p className="text-xs text-faint">{BENCHMARK_NOTE[benchmark]}</p>
-
-      <EveningRunBar underlying={null} onFinished={reload} />
 
       {overview.error && overview.data ? (
         <StateMessage
@@ -281,18 +364,9 @@ export function RotationPanel() {
           description={overview.error}
         />
       ) : overview.data ? (
-        <>
-          <RotationHealthStrip health={overview.data.health} />
-          <RotationReadoutBanner
-            scoredDays={s ? s.n_days : null}
-            total={readoutDays}
-            firstDay={s?.first_day ?? null}
-            lastDay={s?.last_day ?? null}
-            firstEntryDay={overview.data.first_entry_day}
-          />
-        </>
+        <RotationHealthStrip health={overview.data.health} />
       ) : (
-        <SkeletonRows rows={2} />
+        <SkeletonRows rows={1} />
       )}
 
       {summary.error && !s ? (
@@ -306,129 +380,31 @@ export function RotationPanel() {
       ) : (
         <>
           {s.n_days === 0 ? (
-            <>
-              {overview.data ? (
-                <Card>
-                  <CardHeader
-                    title={
-                      overview.data.baskets.entry === null
-                        ? 'Next entry'
-                        : overview.data.baskets.entry.day === istToday()
-                          ? "Today's baskets"
-                          : 'Latest recorded baskets'
-                    }
-                    description={
-                      overview.data.baskets.entry === null
-                        ? `${SEVERAL_LISTS_VISIBLE ? 'The lists' : 'The list'} to be recorded at 09:16, before the day's results are known.`
-                        : overview.data.baskets.entry.day === istToday()
-                          ? "Recorded at 09:16, before the day's results were known; scored after the evening run."
-                          : `Recorded on ${formatDay(overview.data.baskets.entry.day)}; the next entry is recorded at 09:16 on the next session.`
-                    }
-                  />
-                  <RotationBaskets
-                    baskets={overview.data.baskets}
-                    specs={overview.data.lists}
-                    firstEntryDay={overview.data.first_entry_day}
-                  />
-                </Card>
-              ) : null}
-              <Card className="py-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">
-                      No scored forward sessions yet
-                    </p>
-                    <p className="mt-0.5 text-sm text-muted">
-                      {Object.values(s.pending_reasons)[0] ??
-                        (s.late_entries.length > 0
-                          ? `${s.late_entries.length} late entr${s.late_entries.length === 1 ? 'y' : 'ies'} excluded from the forward read-out.`
-                          : 'The first entry is recorded at 09:16 and scored after the evening update.')}
-                    </p>
-                  </div>
-                  <span className="rounded-full border border-info/30 bg-info/10 px-2.5 py-1 text-xs text-info">
-                    {readoutDays} sessions to read-out
-                  </span>
+            <Card className="py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    No scored forward sessions yet
+                  </p>
+                  <p className="mt-0.5 text-sm text-muted">
+                    {Object.values(s.pending_reasons)[0] ??
+                      (s.late_entries.length > 0
+                        ? `${s.late_entries.length} late entr${s.late_entries.length === 1 ? 'y' : 'ies'} excluded from the forward read-out.`
+                        : 'The first entry is recorded at 09:16 and scored after the evening update.')}
+                  </p>
                 </div>
-              </Card>
-            </>
+                <span className="rounded-full border border-info/30 bg-info/10 px-2.5 py-1 text-xs text-info">
+                  {readoutDays} sessions to read-out
+                </span>
+              </div>
+            </Card>
           ) : (
             <>
-              <RotationListCards
-                summary={shown_s}
-                baskets={overview.data?.baskets.lists}
-                entryDay={overview.data?.baskets.entry?.day ?? null}
-                today={istToday()}
-                focus={focus}
-                onFocus={setFocus}
-                action={
-                  <CardStop
-                    setting={portfolio}
-                    onChange={setPortfolio}
-                    defaults={DEFAULT_SETTING}
-                    title={ADAPTIVE_CARD.classic.name}
-                    note={stopNote({
-                      setting: portfolio,
-                      scoredDays: s.n_days,
-                      stopped,
-                      error: book.error,
-                      skipped,
-                    })}
-                    effect={classicEffect}
-                  />
-                }
-                extra={[
-                  {
-                    card: tunedCard(tunedShown),
-                    basket: t?.baskets?.lists.C,
-                    entryDay: t?.baskets?.entry?.day ?? null,
-                    action: (
-                      <>
-                        <CardStop
-                          setting={tunedStop}
-                          onChange={setTunedStop}
-                          defaults={DEFAULT_T1_SETTING}
-                          title={ADAPTIVE_CARD.tuned.name}
-                          note={tunedNote}
-                          effect={tunedEffect}
-                        />
-                        {tuned.error ? (
-                          <p className="text-[11px] text-negative">
-                            The T1 read-out could not be read: {tuned.error}
-                          </p>
-                        ) : t && t.n_days === 0 ? (
-                          <p className="text-[11px] text-muted">
-                            {Object.values(t.pending_reasons)[0] ??
-                              'No scored forward session yet: the first T1 entry is scored after the evening update.'}
-                          </p>
-                        ) : null}
-                      </>
-                    ),
-                  },
-                  {
-                    card: baseCard(baseShown),
-                    basket: undefined,
-                    entryDay: null,
-                    action: (
-                      <CardStop
-                        setting={baseStop}
-                        onChange={setBaseStop}
-                        defaults={DEFAULT_BASE_SETTING}
-                        title={BASE_CARD.name}
-                        note={stopNote({
-                          setting: baseStop,
-                          scoredDays: s.n_days,
-                          stopped: baseShown !== s,
-                          error: baseBook.error,
-                          skipped: unmatched(baseBookNow, ['BASE']),
-                        })}
-                        effect={baseEffect}
-                      />
-                    ),
-                  },
-                ]}
+              <RotationBooks
+                lines={lines}
+                vsHeader={vsHeader(benchmark)}
+                footer={verdictFor ? <RotationVerdict verdict={verdictFor} plain /> : null}
               />
-              <RotationHeadline figures={figures} benchmarkLabel={bench?.label ?? ''} />
-              {verdictFor ? <RotationVerdict verdict={verdictFor} /> : null}
               <Card>
                 <CardHeader
                   title={
@@ -462,25 +438,44 @@ export function RotationPanel() {
                   </ul>
                 ) : null}
               </Card>
-              {overview.data ? (
-                <Card>
-                  <CardHeader
-                    title={
-                      overview.data.baskets.entry?.day === istToday()
-                        ? "Today's baskets"
-                        : 'Latest baskets'
-                    }
-                    description="What the list holds and what changed since the entry before."
-                  />
-                  <RotationBaskets
-                    baskets={overview.data.baskets}
-                    specs={overview.data.lists}
-                    firstEntryDay={overview.data.first_entry_day}
-                  />
-                </Card>
-              ) : null}
             </>
           )}
+          {overview.data ? (
+            <Card>
+              <CardHeader
+                title={
+                  overview.data.baskets.entry === null
+                    ? 'Next entry'
+                    : entryDay === istToday()
+                      ? "Today's baskets"
+                      : 'Latest baskets'
+                }
+                description={
+                  overview.data.baskets.entry === null
+                    ? `${SEVERAL_LISTS_VISIBLE ? 'The lists' : 'The list'} to be recorded at 09:16, before the day's results are known.`
+                    : entryDay === istToday()
+                      ? "Recorded at 09:16, before the day's results were known; scored after the evening run. What each list holds and what changed since the entry before."
+                      : `Recorded for ${formatDay(entryDay ?? '')}; the next entry is recorded at 09:16 on the next session. What each list holds and what changed since the entry before.`
+                }
+              />
+              <div className="grid gap-6 lg:grid-cols-2">
+                <RotationBaskets
+                  baskets={overview.data.baskets}
+                  specs={overview.data.lists}
+                  firstEntryDay={overview.data.first_entry_day}
+                  title={ADAPTIVE_CARD.classic.name}
+                />
+                {tunedBaskets?.entry ? (
+                  <RotationBaskets
+                    baskets={tunedBaskets}
+                    specs={overview.data.lists}
+                    firstEntryDay={overview.data.first_entry_day}
+                    title={ADAPTIVE_CARD.tuned.name}
+                  />
+                ) : null}
+              </div>
+            </Card>
+          ) : null}
         </>
       )}
 
@@ -502,21 +497,6 @@ export function RotationPanel() {
           <RotationDrawdowns list={focus} portfolio={portfolio} />
           <RotationDrift list={focus} />
         </Accordion>
-      </section>
-
-      <section aria-labelledby="band-lot-plans" className="space-y-3">
-        <header>
-          <h2
-            id="band-lot-plans"
-            className="text-base font-semibold tracking-tight text-foreground"
-          >
-            Lot plans
-          </h2>
-          <p className="mt-0.5 text-sm text-muted">
-            The same morning picks traded three ways, tracked forward for the live book and T1.
-          </p>
-        </header>
-        <RotationLotPlans />
       </section>
 
       <section aria-labelledby="band-live-vs-paper" className="space-y-3">
@@ -568,6 +548,13 @@ export function RotationPanel() {
         >
           Experiments
         </h2>
+        <Accordion
+          title="Lot plans · from 19 Oct"
+          description="The same morning picks traded three ways (As picked, Dir Boost, Duo), for Core and T1, judged at 60 forward days"
+          defaultOpen={false}
+        >
+          <RotationLotPlans />
+        </Accordion>
         <Accordion
           title="Ideas being watched"
           description="Unregistered candidates and trigger studies, each against what it replaced"

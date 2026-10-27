@@ -27,7 +27,7 @@ import { DataSourceBanner } from './components/shell/DataSourceBanner';
 import { Sidebar } from './components/shell/Sidebar';
 import { TokenBanner } from './components/shell/TokenBanner';
 import { Topbar } from './components/shell/Topbar';
-import { type Tab, activeNavChild, navItem, tabLabel } from './components/shell/nav';
+import { ARCHIVED_TABS, type Tab, activeNavChild, navItem, tabLabel } from './components/shell/nav';
 import { PENDING_BY_TAB } from './components/shell/pending';
 import { Toaster } from './components/ui/Toast';
 import { hydrateMomentumAlertsFromStorage } from './store/momentumAlerts';
@@ -45,8 +45,8 @@ import { hydrateThemeFromStorage } from './store/theme';
 
 /** One-line subtitle shown under each view's title in the top bar. */
 const SUBTITLES: Record<Tab, string> = {
-  overview: 'Today at a glance: market, feed, token, positions and scheduled jobs',
-  live: 'Real-time straddle, momentum, and feed status',
+  overview: 'The morning board: rotation, Momentum, the trade book, jobs, logins and data',
+  live: 'Spot, VIX and two straddles minute by minute; a replay of a collected day',
   trades: 'Simulated paper-trade log',
   personalities: 'The 10 decision engines and their configs',
   pnl: 'Realized P&L across closed paper trades',
@@ -179,7 +179,8 @@ export function App() {
             : firstVisibleTab(navigationPreferences),
         );
       }
-    } else if (navigationPreferences.hidden.includes(tab)) {
+    } else if (navigationPreferences.hidden.includes(tab) && !ARCHIVED_TABS.includes(tab)) {
+      // An archived screen is hidden from the sidebar, not disabled: its link still opens it.
       replace(firstVisibleTab(navigationPreferences));
     }
   }, [tab, navigationPreferences, replace]);
