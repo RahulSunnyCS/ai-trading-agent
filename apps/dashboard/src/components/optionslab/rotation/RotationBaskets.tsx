@@ -63,12 +63,16 @@ function Pick({ pick, highlight }: { pick: RotationPick; highlight?: boolean }) 
   );
 }
 
-function Basket({ k, basket }: { k: RotationListKey; basket: RotationBasket }) {
+function Basket({
+  k,
+  basket,
+  title,
+}: { k: RotationListKey; basket: RotationBasket; title?: string | undefined }) {
   return (
     <div className="rounded-lg border border-border bg-surface px-3 py-2">
       <div className="mb-1 flex items-center justify-between text-sm font-semibold text-foreground">
         <span>
-          {listName(k)} <span className="text-[10px] font-normal text-faint">({k})</span>
+          {title ?? listName(k)} <span className="text-[10px] font-normal text-faint">({k})</span>
         </span>
         {basket.overridden ? (
           <span
@@ -125,10 +129,13 @@ export function RotationBaskets({
   baskets,
   specs,
   firstEntryDay,
+  title,
 }: {
   baskets: Baskets;
   specs: Record<RotationListKey, RotationListSpec>;
   firstEntryDay: string;
+  /** The basket's heading instead of the list's name (Adaptive Classic, Adaptive Tuned). */
+  title?: string;
 }) {
   const e = baskets.entry;
   if (!e) {
@@ -176,7 +183,7 @@ export function RotationBaskets({
       <div className={GRID}>
         {LIST_KEYS.map((k) => {
           const b = baskets.lists[k];
-          return b ? <Basket key={k} k={k} basket={b} /> : null;
+          return b ? <Basket key={k} k={k} basket={b} title={title} /> : null;
         })}
       </div>
       <Legend />
@@ -189,7 +196,9 @@ export function RotationBaskets({
             const c = baskets.changed[k];
             return (
               <div key={k} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="w-20 shrink-0 font-medium text-foreground">{listName(k)}</span>
+                <span className="min-w-20 shrink-0 whitespace-nowrap font-medium text-foreground">
+                  {title ?? listName(k)}
+                </span>
                 {c?.removed.map((n) => (
                   <span key={`r-${n}`} className="font-mono text-negative">
                     −{n}
