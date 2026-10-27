@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   toggleStrategy: vi.fn(),
   summary: null as unknown,
   summaryError: null as string | null,
+  summaryOptions: [] as unknown[],
 }));
 
 vi.mock('../../../hooks/useFavourites', () => ({
@@ -42,18 +43,22 @@ vi.mock('../../../hooks/useLegwise', () => ({
   }),
 }));
 vi.mock('../../../hooks/useRotation', () => ({
+  ROTATION_PAGE_LOTS: 1,
   useRotationOverview: () => ({
     data: null,
     loading: false,
     error: null,
     refetch: () => undefined,
   }),
-  useRotationSummary: () => ({
-    data: mocks.summary,
-    loading: false,
-    error: mocks.summaryError,
-    refetch: () => undefined,
-  }),
+  useRotationSummary: (opts: unknown) => {
+    mocks.summaryOptions.push(opts);
+    return {
+      data: mocks.summary,
+      loading: false,
+      error: mocks.summaryError,
+      refetch: () => undefined,
+    };
+  },
 }));
 
 import { StrategiesAndBasketsPanel } from '../StrategiesAndBasketsPanel';
@@ -104,6 +109,7 @@ const result = (id: string) => ({
   best_mtm: 150,
   stopped_by: '',
   notes: [],
+  trades: [],
   current: true,
 });
 
@@ -123,11 +129,13 @@ beforeEach(() => {
   mocks.summaryError = null;
   mocks.toggleList.mockClear();
   mocks.toggleStrategy.mockClear();
+  mocks.summaryOptions = [];
   mocks.summary = {
+    n_days: 10,
     first_day: '2026-10-12',
     lists: {
       A: { total: -1200, max_drawdown: -3400 },
-      C: { total: 25025, max_drawdown: 0 },
+      C: { total: 25025, max_drawdown: -8382 },
     },
   };
   window.history.replaceState(null, '', '/optionslab/strategies');
@@ -139,6 +147,10 @@ describe('StrategiesAndBasketsPanel', () => {
     render(<StrategiesAndBasketsPanel />);
     const adaptive = screen.getByRole('region', { name: 'Adaptive basket' });
     expect(within(adaptive).getByText('+₹25,025')).toBeTruthy();
+    expect(within(adaptive).getByText(/forward days since 12 Oct 2026/)).toBeTruthy();
+    expect(within(adaptive).getByText('10')).toBeTruthy();
+    expect(within(adaptive).getByText('-₹8,382')).toBeTruthy();
+    expect(within(adaptive).getByRole('button', { name: /Open in Today/ })).toBeTruthy();
     for (const name of ['Steady', 'Calendar', 'Baseline']) {
       expect(screen.queryByRole('heading', { name })).toBeNull();
     }
@@ -151,10 +163,25 @@ describe('StrategiesAndBasketsPanel', () => {
   });
 
   it('shows a dash, never a zero, for a list with no scored days yet', () => {
-    mocks.summary = { first_day: null, lists: {} };
+    mocks.summary = { n_days: 0, first_day: null, lists: {} };
     render(<StrategiesAndBasketsPanel />);
     const adaptive = screen.getByRole('region', { name: 'Adaptive basket' });
-    expect(within(adaptive).getAllByText('—').length).toBeGreaterThan(0);
+    expect(within(adaptive).getByText('— no forward day scored yet')).toBeTruthy();
+  });
+
+  it('reads the forward figures the Today page reads, at its lots', () => {
+    // It used to ask the registered read-out (two lots, another cache key), so it sat on a cold
+    // build showing "Forward days —" while Today had ten scored days.
+    render(<StrategiesAndBasketsPanel />);
+    expect(mocks.summaryOptions[0]).toEqual({ lots: 1 });
+  });
+
+  it('says it is loading instead of showing a bare dash', () => {
+    mocks.summary = null;
+    render(<StrategiesAndBasketsPanel />);
+    const adaptive = screen.getByRole('region', { name: 'Adaptive basket' });
+    expect(within(adaptive).getByText('Reading the forward figures…')).toBeTruthy();
+    expect(within(adaptive).queryByText('—')).toBeNull();
   });
 
   it('shows every strategy with its star state', () => {
@@ -200,12 +227,33 @@ describe('StrategiesAndBasketsPanel', () => {
     );
   });
 
-  it('opens a strategy in the builder and its results in Runs', () => {
+  it('opens a strategy in the builder', () => {
     render(<StrategiesAndBasketsPanel />);
     const row = screen.getByText('nifty_widesl_917_otm1').closest('tr') as HTMLElement;
     fireEvent.click(within(row).getByRole('button', { name: /Open in builder/ }));
     expect(window.location.pathname).toBe('/optionslab/builder');
     expect(new URLSearchParams(window.location.search).get('load')).toBe('nifty_widesl_917_otm1');
+  });
+
+  it("opens a strategy's saved days in its History drawer, in the address", () => {
+    render(<StrategiesAndBasketsPanel />);
+    const row = screen.getByText('nifty_widesl_917_otm1').closest('tr') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: /History/ }));
+    expect(window.location.pathname).toBe('/optionslab/strategies');
+    expect(new URLSearchParams(window.location.search).get('strategy')).toBe(
+      'nifty_widesl_917_otm1',
+    );
+    const drawer = screen.getByRole('dialog');
+    expect(within(drawer).getByText('nifty_widesl_917_otm1 · History')).toBeTruthy();
+    expect(within(drawer).getByText('14 Oct 2026 ▸')).toBeTruthy();
+  });
+
+  it('opens the History drawer from an old Runs link', () => {
+    window.history.replaceState(null, '', '/optionslab/strategies?strategy=sensex_widesl_917_otm2');
+    render(<StrategiesAndBasketsPanel />);
+    expect(
+      within(screen.getByRole('dialog')).getByText('sensex_widesl_917_otm2 · History'),
+    ).toBeTruthy();
   });
 
   it('cannot star or correlate until the stars have loaded', () => {
@@ -266,5 +314,12 @@ describe('StrategiesAndBasketsPanel', () => {
     mocks.summaryError = 'HTTP 500';
     render(<StrategiesAndBasketsPanel />);
     expect(screen.getByText(/The forward figures could not be read \(HTTP 500\)/)).toBeTruthy();
+  });
+
+  it('still says a refresh failed when the last figures are kept', () => {
+    mocks.summaryError = 'HTTP 500';
+    render(<StrategiesAndBasketsPanel />);
+    expect(screen.getByText(/could not be refreshed \(HTTP 500\)/)).toBeTruthy();
+    expect(screen.getByText('+₹25,025')).toBeTruthy();
   });
 });

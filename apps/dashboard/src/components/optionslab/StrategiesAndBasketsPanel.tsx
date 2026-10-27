@@ -1,25 +1,27 @@
 /**
  * Options Lab › Strategies and baskets (BL-102): everything that can be traded, in one place.
  *
- *  - Baskets: the shown rotation lists (VISIBLE_LIST_KEYS; the journal still records all four),
- *    each a basket of three strategies and a
- *    Buy picked every morning, with its forward figures; the fixed base (and Baseline, while that
- *    list is shown) sit beneath as comparators.
+ *  - Baskets: one line per shown rotation list (VISIBLE_LIST_KEYS; the journal still records all
+ *    four), each a basket of three strategies and a Buy picked every morning, with its forward
+ *    figures as the Today page reads them (`lib/strategiesBasketLine.ts`) and "Open in Today";
+ *    the fixed base (and Baseline, while that list is shown) sit beneath as comparators.
  *  - Strategies: the saved leg-wise strategies (strategies/legwise/*.yaml, via
  *    GET /api/backtest/legwise/strategies) with what the evening job has saved for each one's
- *    current version. Editing, backtesting and saving happen in the Builder.
+ *    current version, and each one's History drawer (`?strategy=<id>`; it replaced the Runs page).
+ *    Editing, backtesting and saving happen in the Builder.
  *
  * A star marks a favourite; starred items are what Correlation opens on. Stars are saved on the
  * server (`useFavourites`), so they follow the owner across devices.
  */
 
-import { GitCompareArrows, LayoutDashboard, Pencil, Plus } from 'lucide-react';
+import { GitCompareArrows, History, LayoutDashboard, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { useAppRoute } from '../../hooks/useAppRoute';
 import { useFavourites } from '../../hooks/useFavourites';
 import { useLegwiseResults, useLegwiseStrategies } from '../../hooks/useLegwise';
-import { useRotationSummary } from '../../hooks/useRotation';
+import { useQueryState } from '../../hooks/useQueryState';
+import { ROTATION_PAGE_LOTS, useRotationSummary } from '../../hooks/useRotation';
 import { correlateHref } from '../../lib/favourites';
 import { formatDay, formatInr, formatInt } from '../../lib/format';
 import { type StartSpec, startToParams } from '../../lib/legwiseBuilder';
@@ -27,8 +29,9 @@ import { lastResultOf, legsSummary } from '../../lib/optionsRuns';
 import { CARD_KEYS, type CardKey } from '../../lib/rotationListCards';
 import { LIST_INFO, UNIVERSE_LABEL, isVisibleList } from '../../lib/rotationListNames';
 import { buildPath } from '../../lib/routes';
+import { type BasketLine, basketLine } from '../../lib/strategiesBasketLine';
 import type { SavedStrategy } from '../../types/legwise';
-import type { RotationListStats } from '../../types/rotation';
+import type { RotationSummary } from '../../types/rotation';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { RefreshButton } from '../ui/RefreshButton';
@@ -38,6 +41,7 @@ import { StarToggle } from '../ui/StarToggle';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { NewStrategyDialog } from './NewStrategyDialog';
+import { StrategyHistoryDrawer } from './StrategyHistoryDrawer';
 import { pnlClass } from './shared';
 
 /**
@@ -54,10 +58,11 @@ export function builderLoadHref(name: string): string {
   return `${buildPath('optionslab', 'builder')}?load=${encodeURIComponent(name)}`;
 }
 
-/** Runs reads `?strategy=<text>` to list one strategy's runs (Daily results was retired, BL-102). */
-export function resultsHref(strategyId: string): string {
-  return `${buildPath('optionslab', 'runs')}?strategy=${encodeURIComponent(strategyId)}`;
-}
+/** `?strategy=<id>` opens that strategy's History drawer (the old Runs link keeps working). */
+const HISTORY_KEY = 'strategy';
+
+/** The read-out the Today page asks for, so both pages share one response and one figure. */
+const SUMMARY_OPTIONS = { lots: ROTATION_PAGE_LOTS } as const;
 
 type Show = 'all' | 'starred';
 const SHOW_OPTIONS: SegmentedOption<Show>[] = [
@@ -76,10 +81,43 @@ const WEIGHT_TEXT: Record<(typeof WEIGHT_LABEL)[number], string> = {
   family: 'family',
 };
 
-function BasketCard({
+function BasketFigures({ line }: { line: BasketLine }) {
+  switch (line.state) {
+    case 'loading':
+      return <span className="text-muted">Reading the forward figures…</span>;
+    case 'error':
+      return (
+        <span className="text-warning" title={line.reason}>
+          — the forward figures could not be read
+        </span>
+      );
+    case 'none':
+      return <span className="text-muted">— no forward day scored yet</span>;
+    case 'missing':
+      return <span className="text-muted">— the read-out has no figures for this list</span>;
+    default:
+      return (
+        <>
+          <span>
+            <span className="metric">{formatInt(line.forwardDays)}</span> forward{' '}
+            {line.forwardDays === 1 ? 'day' : 'days'}
+            {line.firstDay ? ` since ${formatDay(line.firstDay)}` : ''}
+          </span>
+          <span className={`metric ${pnlClass(line.total)}`}>
+            {formatInr(line.total, { sign: true })}
+          </span>
+          <span>
+            max drawdown <span className="metric">{formatInr(line.maxDrawdown)}</span>
+          </span>
+        </>
+      );
+  }
+}
+
+function BasketRow({
   listKey,
-  stats,
-  firstDay,
+  summary,
+  summaryError,
   starred,
   ready,
   onStar,
@@ -87,8 +125,8 @@ function BasketCard({
   onCorrelate,
 }: {
   listKey: CardKey;
-  stats: RotationListStats | null;
-  firstDay: string | null;
+  summary: RotationSummary | null;
+  summaryError: string | null;
   starred: boolean;
   /** False until the stars have loaded: starring and correlating wait for them. */
   ready: boolean;
@@ -97,48 +135,34 @@ function BasketCard({
   onCorrelate: () => void;
 }) {
   const info = LIST_INFO[listKey];
+  const line = basketLine(summary, listKey, summaryError);
   return (
     <section
       aria-label={`${info.name} basket`}
-      className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-4"
+      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-xs"
     >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">{info.name}</h3>
-          <p className="text-xs text-muted">{info.note}</p>
-        </div>
-        <StarToggle on={starred} label={info.name} onClick={onStar} size="md" disabled={!ready} />
-      </div>
-      <dl className="space-y-1 text-xs">
-        <div className="flex justify-between gap-3">
-          <dt className="text-muted">
-            {firstDay ? `Since ${formatDay(firstDay)}` : 'Forward days'}
-          </dt>
-          <dd className={`metric ${stats ? pnlClass(stats.total) : ''}`}>
-            {stats ? formatInr(stats.total, { sign: true }) : '—'}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className="text-muted">Max drawdown</dt>
-          <dd className="metric">{stats ? formatInr(stats.max_drawdown) : '—'}</dd>
-        </div>
+      <span className="inline-flex items-center gap-1.5">
+        <StarToggle on={starred} label={info.name} onClick={onStar} disabled={!ready} />
+        <h3 className="text-sm font-semibold text-foreground" title={info.note}>
+          {info.name}
+        </h3>
+      </span>
+      <span
+        className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted"
+        title="Gross, one lot per strategy, forward days only, without a portfolio stop: the Today page's figures."
+      >
+        <BasketFigures line={line} />
         {info.weights ? (
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted">Weights</dt>
-            <dd
-              className="metric text-muted"
-              title={WEIGHT_LABEL.map((k) => `${WEIGHT_TEXT[k]} ${info.weights?.[k]}`).join(' · ')}
-            >
-              {WEIGHT_LABEL.map((k) => info.weights?.[k]).join(' · ')}
-            </dd>
-          </div>
+          <span
+            title={WEIGHT_LABEL.map((k) => `${WEIGHT_TEXT[k]} ${info.weights?.[k]}`).join(' · ')}
+          >
+            weights{' '}
+            <span className="metric">{WEIGHT_LABEL.map((k) => info.weights?.[k]).join(' · ')}</span>
+          </span>
         ) : null}
-      </dl>
-      <p className="text-[11px] text-faint">
-        Gross, two lots per strategy, forward days only, without a portfolio stop (the Rotation page
-        can apply one).
-      </p>
-      <div className="mt-auto flex flex-wrap gap-2 pt-1">
+      </span>
+      <span className="flex-1" />
+      <span className="flex flex-wrap gap-2">
         <Button size="sm" variant="secondary" onClick={onOpenToday}>
           <LayoutDashboard className="h-3.5 w-3.5" />
           Open in Today
@@ -147,7 +171,7 @@ function BasketCard({
           <GitCompareArrows className="h-3.5 w-3.5" />
           Correlate
         </Button>
-      </div>
+      </span>
     </section>
   );
 }
@@ -156,14 +180,16 @@ export function StrategiesAndBasketsPanel() {
   const { navigate } = useAppRoute();
   const strategies = useLegwiseStrategies();
   const results = useLegwiseResults();
-  const summary = useRotationSummary();
+  const summary = useRotationSummary(SUMMARY_OPTIONS);
   const favourites = useFavourites();
   const [show, setShow] = useState<Show>('all');
   const [starting, setStarting] = useState(false);
+  const [historyId, setHistoryId] = useQueryState(HISTORY_KEY);
 
   const rows: SavedStrategy[] = strategies.data ?? [];
   const saved = results.data?.results ?? [];
   const set = favourites.set;
+  const historyOf = historyId ? (rows.find((r) => r.strategy.id === historyId) ?? null) : null;
   const starredOnly = show === 'starred';
   // Stars decide what "Starred only" shows and what can be starred: until they have loaded
   // there is nothing to filter by and nothing to change.
@@ -221,9 +247,11 @@ export function StrategiesAndBasketsPanel() {
       />
 
       {favourites.warning ? <p className="text-xs text-warning">{favourites.warning}</p> : null}
-      {summary.error && !summary.data ? (
+      {summary.error ? (
         <p className="text-xs text-warning">
-          The forward figures could not be read ({summary.error}), so the baskets show dashes.
+          {summary.data
+            ? `The forward figures could not be refreshed (${summary.error}); the baskets show the last ones read.`
+            : `The forward figures could not be read (${summary.error}), so the baskets show dashes.`}
         </p>
       ) : null}
       {favourites.error && !set ? (
@@ -246,13 +274,13 @@ export function StrategiesAndBasketsPanel() {
             description="Star a basket to find it here under Starred only."
           />
         ) : (
-          <div className={BASKETS.length > 1 ? 'grid gap-3 md:grid-cols-3' : 'grid max-w-md gap-3'}>
+          <div className="space-y-2">
             {shownBaskets.map((key) => (
-              <BasketCard
+              <BasketRow
                 key={key}
                 listKey={key}
-                stats={summary.data?.lists[key] ?? null}
-                firstDay={summary.data?.first_day ?? null}
+                summary={summary.data}
+                summaryError={summary.error}
                 starred={favourites.isListStarred(key)}
                 ready={ready}
                 onStar={() => favourites.toggleList(key)}
@@ -408,11 +436,10 @@ export function StrategiesAndBasketsPanel() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            disabled={last === null}
-                            title={last === null ? 'No saved results for this version' : undefined}
-                            onClick={() => pushPath(resultsHref(row.strategy.id))}
+                            onClick={() => setHistoryId(row.strategy.id)}
                           >
-                            View results
+                            <History className="h-3.5 w-3.5" />
+                            History
                           </Button>
                         </div>
                       </Td>
@@ -424,6 +451,12 @@ export function StrategiesAndBasketsPanel() {
           </>
         )}
       </Card>
+      <StrategyHistoryDrawer
+        strategy={historyOf}
+        results={results.data?.results ?? null}
+        resultsError={results.error}
+        onClose={() => setHistoryId(null)}
+      />
     </div>
   );
 }

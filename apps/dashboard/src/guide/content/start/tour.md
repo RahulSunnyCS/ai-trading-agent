@@ -25,10 +25,9 @@ build and test) and an Advanced group at the end.
 | Explore data | [Heatmap](app:/optionslab/heatmap) | What an ATM short straddle made at each entry time and stop loss. [Guide](guide:optionslab/heatmap) |
 | Explore data | [Matrix](app:/optionslab/matrix) | Where the strategy variants make or lose money, by start time, date and condition. [Guide](guide:optionslab/rotation-matrix) |
 | Explore data | [Correlation](app:/optionslab/correlation) | Which strategies lose on the same days. [Guide](guide:optionslab/correlation) |
-| Build and test | [Strategies and baskets](app:/optionslab/strategies) | The rotation baskets and the saved strategies the evening run tests every trading day, each with its latest result; star your favourites. [Guide](guide:optionslab/strategies) |
+| Build and test | [Strategies and baskets](app:/optionslab/strategies) | The rotation baskets and the saved strategies the evening run tests every trading day, each with its latest result and its day-by-day history; star your favourites. [Guide](guide:optionslab/strategies) |
 | Build and test | [Builder](app:/optionslab/builder) | Build a strategy leg by leg, backtest it over a date range, save it. The advanced YAML engine writes strategies as text instead. [Guide](guide:optionslab/builder-form) |
-| Build and test | [Runs](app:/optionslab/runs) | Every backtest run in one list; tick two to compare. [Guide](guide:optionslab/runs) |
-| Advanced | [Regimes](app:/optionslab/regimes) | Labels each day Quiet, Chop, Trend up or Trend down, and tests whether those labels last. [Guide](guide:optionslab/regimes) |
+| Archived | [Regimes](app:/optionslab/regimes) | Not in the sidebar any more; open it by its address. Labels each day Quiet, Chop, Trend up or Trend down, and tests whether those labels last. [Guide](guide:optionslab/regimes) |
 
 The evening run's status and its **Run** button are at the top of Today.
 

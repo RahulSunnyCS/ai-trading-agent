@@ -70,7 +70,6 @@ describe('routes', () => {
     ['/optionslab/strategies', 'optionslab', ['strategies']],
     ['/optionslab/builder', 'optionslab', ['builder']],
     ['/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
-    ['/optionslab/runs', 'optionslab', ['runs']],
     ['/optionslab/regimes', 'optionslab', ['regimes']],
     ['/optionslab/correlation', 'optionslab', ['correlation']],
     ['/optionslab/rotation', 'optionslab', ['rotation']],
@@ -108,6 +107,7 @@ describe('routes', () => {
     ['/data/replay', '/coverage/replay', 'coverage', ['replay']],
     ['/optionslab/results', '/optionslab/rotation', 'optionslab', ['rotation']],
     ['/optionslab/results/', '/optionslab/rotation', 'optionslab', ['rotation']],
+    ['/optionslab/runs', '/optionslab/strategies', 'optionslab', ['strategies']],
     ['/backtest', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
     ['/backtest/', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
     ['/optionslab/yaml', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
@@ -164,7 +164,6 @@ describe('routes', () => {
       'correlation',
       'strategies',
       'builder',
-      'runs',
       'regimes',
     ]);
   });
@@ -210,7 +209,6 @@ describe('routes', () => {
     ['optionslab', ['strategies'], 'Options Lab › Strategies and baskets · AI Trading Agent'],
     ['optionslab', ['builder'], 'Options Lab › Builder · AI Trading Agent'],
     ['optionslab', ['builder', 'yaml'], 'Options Lab › Builder › YAML · AI Trading Agent'],
-    ['optionslab', ['runs'], 'Options Lab › Runs · AI Trading Agent'],
     ['optionslab', ['regimes'], 'Options Lab › Regimes · AI Trading Agent'],
     ['optionslab', ['correlation'], 'Options Lab › Correlation · AI Trading Agent'],
     ['optionslab', ['rotation'], 'Options Lab › Today · AI Trading Agent'],

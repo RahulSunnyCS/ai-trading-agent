@@ -15,7 +15,7 @@ import { Download, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { type HeatmapParams, useHeatmap, useHeatmapAvailable } from '../../hooks/useHeatmap';
-import { useQueryState } from '../../hooks/useQueryState';
+import { navigateToLink, useQueryState } from '../../hooks/useQueryState';
 import { formatDay, formatInt } from '../../lib/format';
 import {
   ALL_STOCKS,
@@ -25,6 +25,7 @@ import {
   WEEK_LABEL,
   cellClass,
   formatCell,
+  matrixFamilyStartHref,
   maxAbsOf,
   metricLabel,
   settingsChips,
@@ -50,7 +51,6 @@ import { Input, Select } from '../ui/Input';
 import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
-import { HeatmapTimeByType } from './HeatmapTimeByType';
 
 const VIEW_OPTIONS: { value: HeatmapViewKey; label: string }[] = (
   ['time_sl', 'date_time', 'date_sl'] as const
@@ -714,7 +714,29 @@ function HeatmapBody({ available }: { available: HeatmapAvailable }) {
       ) : (
         <StateMessage variant="empty" title="Pick an index or a stock" />
       )}
+      <MatrixLink href={matrixFamilyStartHref(s)} />
     </div>
+  );
+}
+
+/** The question this page used to answer in a second card now lives on the Matrix. */
+function MatrixLink({ href }: { href: string }) {
+  return (
+    <p className="text-xs text-muted">
+      Strategy types by entry time are in the{' '}
+      <a
+        href={href}
+        className="text-primary underline-offset-2 hover:underline"
+        onClick={(event) => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+          event.preventDefault();
+          navigateToLink(href);
+        }}
+      >
+        Matrix (Family × start, the same days)
+      </a>
+      .
+    </p>
   );
 }
 
@@ -743,10 +765,5 @@ function StraddleSection() {
 }
 
 export function HeatmapPanel() {
-  return (
-    <div className="space-y-5">
-      <StraddleSection />
-      <HeatmapTimeByType />
-    </div>
-  );
+  return <StraddleSection />;
 }

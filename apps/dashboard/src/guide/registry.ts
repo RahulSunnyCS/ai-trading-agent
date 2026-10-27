@@ -51,7 +51,6 @@ import optionsRotationPulse from './content/optionslab/rotation-pulse.md?raw';
 import optionsRotationRegime from './content/optionslab/rotation-regime.md?raw';
 import optionsRotationShadow from './content/optionslab/rotation-shadow.md?raw';
 import optionsRotation from './content/optionslab/rotation.md?raw';
-import optionsRuns from './content/optionslab/runs.md?raw';
 import optionsStrategies from './content/optionslab/strategies.md?raw';
 import optionsShortStraddle from './content/optionslab/walkthrough-short-straddle.md?raw';
 import startAlerts from './content/start/alerts.md?raw';
@@ -278,18 +277,10 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
   },
   {
     chapter: 'optionslab',
-    slug: 'runs',
-    title: 'Runs',
-    summary: 'Every backtest run in one list, and a side-by-side comparison of two.',
-    kind: 'Screen',
-    body: optionsRuns,
-    screen: { tab: 'optionslab', rest: ['runs'] },
-  },
-  {
-    chapter: 'optionslab',
     slug: 'regimes',
-    title: 'Regimes',
-    summary: 'Label each day Quiet, Chop or Trend, and see whether those labels persist.',
+    title: 'Regimes (archived)',
+    summary:
+      'Archived: no longer in the sidebar. Label each day Quiet, Chop or Trend, and see whether those labels persist.',
     kind: 'Screen',
     body: optionsRegimes,
     screen: { tab: 'optionslab', rest: ['regimes'] },

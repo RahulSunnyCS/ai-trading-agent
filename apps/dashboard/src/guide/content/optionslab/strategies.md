@@ -8,10 +8,12 @@ backtesting and saving happen in the [Builder](guide:optionslab/builder-form).
 ## Baskets
 
 A basket is a rotation list: every morning at 09:16 it picks three strategies and a Buy from the
-Core pool of 298 rotation variants, before the market opens. The card shows the list's name and
-what it leans on, its forward result since the first scored day (gross, two lots per strategy,
-without a portfolio stop), its largest drawdown, and its weights (own results, weekday, days to
-expiry, VIX, family).
+Core pool of 298 rotation variants, before the market opens. Its row is one line: the star, the
+list's name (hover for what it leans on), how many forward days are scored and since when, its
+result since then, its largest drawdown, its weights (own results, weekday, days to expiry, VIX,
+family), then **Open in Today** and **Correlate**. The figures are the
+[Today page](guide:optionslab/rotation)'s own: gross, one lot per strategy, forward days only,
+without a portfolio stop.
 
 | Basket | What it leans on |
 |---|---|
@@ -25,7 +27,9 @@ it is not a basket you trade.
 > Calendar and Baseline every morning; they are no longer shown here, and a star you set on one
 > earlier stays saved but opens nothing.
 
-A dash instead of a figure means the list has no scored forward day yet, not a zero.
+While the figures load the row says so. A dash is never a zero: it comes with its reason (no
+forward day scored yet, or the figures could not be read, which a line above the baskets also
+says; if a refresh fails after they were read, the last figures stay and that line says so).
 
 **Open in Today** goes to the [rotation page](guide:optionslab/rotation). **Correlate** compares the
 basket with your other starred items (with nothing else starred, with the fixed base's Widesl,
@@ -39,9 +43,19 @@ N_wide_0917).
 | Strategy | The strategy file's name, its index, and its id when that differs. Hover for the version. |
 | Legs | How many legs, what they are, and the entry and exit times. |
 | Last result | Net ₹ per lot over every saved day of this version, after costs ([net vs gross](glossary:net-gross)), with the number of up days and the last day. |
-| Actions | **Open in builder** loads it to edit or re-test; **Correlate** compares it with your other starred items (not offered while it has no saved result for its current version); **View results** opens [Runs](guide:optionslab/runs) filtered to this strategy. |
+| Actions | **Open in builder** loads it to edit or re-test; **Correlate** compares it with your other starred items (not offered while it has no saved result for its current version); **History** opens its saved days in a drawer. |
 
 **Starred only** narrows both the basket and the strategies to your favourites.
+
+## History
+
+**History** on a strategy's row opens every day the evening run has saved for it, in a drawer:
+net per lot, win rate, worst day and largest drawdown, the running total as a line, and one row
+per day (newest first) with its trades, net, worst MTM and any stop or note. Click a day for its
+trade log. When the strategy has been edited, a **Version** menu picks an older version's days;
+those are a total, not per lot, because the older version's lot count is not known. The address
+holds the open strategy (`?strategy=<id>`), so a link opens it; old links to the retired Runs page
+land here.
 
 ## Common questions
 
