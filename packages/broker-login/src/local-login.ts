@@ -61,6 +61,8 @@ async function runMain(env: LoginEnv, resultFile: string): Promise<number> {
         ...process.env,
         ...env,
         LOGIN_RESULT_FILE: resultFile,
+        // BL-173: a clean login is said in the 08:10 switch-on message, not on its own
+        LOGIN_QUIET_SUCCESS: '1',
         // never the Actions outputs: Quantiply's result then counts in the exit code
         GITHUB_OUTPUT: '',
         GITHUB_RUN_ID: '',

@@ -72,10 +72,36 @@ export function runNowError(status: number | undefined, error: string): string {
   return `Could not start the run: ${error}`;
 }
 
+/** How much of a type goes to Telegram (BL-173): everything, only its failures, or nothing. */
+export type NotificationLevel = 'all' | 'failures' | 'off';
+
 export interface NotificationRow {
   type: string;
   description: string;
   enabled: boolean;
+  /** absent from a scheduler that predates BL-173: read as `all` / `off` from `enabled` */
+  level?: NotificationLevel;
+}
+
+/** A row's level, also from a scheduler that sends only `enabled`. */
+export function levelOfRow(row: NotificationRow): NotificationLevel {
+  return row.level ?? (row.enabled ? 'all' : 'off');
+}
+
+/** `rows` with one type at `level`. */
+export function withLevel(
+  rows: readonly NotificationRow[],
+  type: string,
+  level: NotificationLevel,
+): NotificationRow[] {
+  return rows.map((row) => (row.type === type ? { ...row, level, enabled: level !== 'off' } : row));
+}
+
+/** The PUT body (BL-173): every type's level. */
+export function levelsBody(rows: readonly NotificationRow[]): {
+  levels: Record<string, NotificationLevel>;
+} {
+  return { levels: Object.fromEntries(rows.map((row) => [row.type, levelOfRow(row)])) };
 }
 
 /** The PUT body for a set of rows: every type that is switched off. */

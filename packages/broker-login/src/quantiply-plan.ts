@@ -545,3 +545,22 @@ export function previewNet(json: unknown): number | null {
   }
   return total;
 }
+
+/**
+ * BL-173: the evening upload reports only what the owner needs. Its picks differ from the list
+ * the 16:00 result message called tomorrow's ("Tentative", `rotation/result-notifications/
+ * <day>.tentative.json`, keyed `adaptive` / `t1`) when the core strategies are not the same set.
+ * No tentative list (the 16:00 message did not go): not a difference.
+ */
+export function differsFromTentative(
+  tentativeJson: unknown,
+  book: string,
+  exportCore: string[],
+): boolean {
+  const key = book === 'core' ? 'adaptive' : book;
+  const listed = (tentativeJson as Record<string, { core?: unknown }> | null)?.[key]?.core;
+  if (!Array.isArray(listed)) return false;
+  const a = new Set(listed.filter((x): x is string => typeof x === 'string'));
+  const b = new Set(exportCore);
+  return a.size !== b.size || [...a].some((x) => !b.has(x));
+}

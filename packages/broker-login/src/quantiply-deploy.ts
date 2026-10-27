@@ -110,7 +110,7 @@ import { istToday, sha256 } from './strategy-plan.js';
  * added to one file and `morning-report.ts` sends them as one message; anything else, or a file
  * that cannot be written, is sent on its own as before.
  */
-async function deliver(text: string): Promise<void> {
+async function deliver(text: string, type = 'broker.quantiply'): Promise<void> {
   const file = process.env.MORNING_REPORT_FILE?.trim();
   if (file && process.argv.includes('--morning')) {
     try {
@@ -120,7 +120,7 @@ async function deliver(text: string): Promise<void> {
       // the message still goes, on its own
     }
   }
-  await sendText(readTelegramConfig(), redact(text), 'broker.quantiply').catch(() => undefined);
+  await sendText(readTelegramConfig(), redact(text), type).catch(() => undefined);
 }
 
 /** 1: may succeed on a retry, nothing was changed blind. 3: the owner must look; never retried. */
@@ -644,7 +644,11 @@ async function main(): Promise<number> {
     (apply && (changed || failed || values.morning === true)) || (mode === 'check' && failed);
   if (send) {
     const head = failed || nothingOwned ? `⚠️ ${label}: check Quantiply` : `✅ ${label}`;
-    await deliver([head, ...lines].join('\n'));
+    // BL-173: the 15:40 switch-off has its own type, failures only by default (the owner)
+    await deliver(
+      [head, ...lines].join('\n'),
+      mode === 'disable' ? 'quantiply.switch_off' : 'broker.quantiply',
+    );
   }
   console.log(lines.slice(printed).join('\n'));
   // Disable: a retry may still switch off what is left on, so a retryable failure wins (the
