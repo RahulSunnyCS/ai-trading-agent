@@ -5,7 +5,7 @@
  *
  * Twelve cells, the ones the family-band criterion pools: {Widesl, Dir, Buy} x start band, across
  * both indices and every strike. Per cell: the mean gross per lot-day over the last 5 / 21 / 63
- * sessions with P1 and P2 for reference (each beside its sessions and variants), a rolling-21
+ * sessions with P1 for reference (each beside its sessions and variants), a rolling-21
  * sparkline with the P1 mean dashed, the rank the ranking gives the cell for the next 09:16 pick,
  * the chips of where the latest picks fall, and how often the focus list picks there.
  *
@@ -179,7 +179,7 @@ function Row({ cell, r, focus }: { cell: PulseCell; r: PulseAvailable; focus: Pu
           <span className="font-medium">{cell.kind_label}</span>{' '}
           <span className="text-muted">{bandText(cell.band_label)}</span>
         </Td>
-        <Td dense colSpan={10} className="text-xs text-muted">
+        <Td dense colSpan={9} className="text-xs text-muted">
           {cell.reason ?? 'This strategy does not exist here.'}
         </Td>
       </TRow>
@@ -211,7 +211,6 @@ function Row({ cell, r, focus }: { cell: PulseCell; r: PulseAvailable; focus: Pu
         );
       })}
       <FigureCell f={figure(cell.p1, 'P1')} />
-      <FigureCell f={figure(cell.p2, 'P2')} />
       <Td dense>
         <Sparkline cell={cell} />
       </Td>
@@ -364,11 +363,6 @@ export function RotationPulse({ focus }: { focus: PulseListKey }) {
                   tip={`${data.periods.P1.label}: the reference the cell is read against (to ${formatDay(data.periods.P1.to)}).`}
                 >
                   P1
-                </HeadWithTip>
-              </Th>
-              <Th dense align="right">
-                <HeadWithTip tip={`${data.periods.P2.label}: the second reference period.`}>
-                  P2
                 </HeadWithTip>
               </Th>
               <Th dense>

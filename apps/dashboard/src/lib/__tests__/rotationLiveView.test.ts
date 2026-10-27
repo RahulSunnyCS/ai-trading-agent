@@ -6,11 +6,12 @@ import {
   dayBadges,
   emptyState,
   groupLabel,
+  liveForLog,
   newestFirst,
   shapeThin,
   slippageText,
 } from '../rotationLiveView';
-import { day, response, running, shape } from './rotationLiveFixture';
+import { day, group, response, running, shape } from './rotationLiveFixture';
 
 describe('groupLabel', () => {
   it('names platform, broker and list, leaving out AlgoTest\'s own "all"', () => {
@@ -83,5 +84,52 @@ describe('newestFirst / shapeThin', () => {
     expect(shapeThin(shape({ variant_days: 4 }))).toBe(true);
     expect(shapeThin(shape({ variant_days: 5 }))).toBe(false);
     expect(running().points.length).toBe(1);
+  });
+});
+
+describe('liveForLog (the Daily log column)', () => {
+  const core = group({
+    platform: 'quantiply',
+    broker: 'angelone',
+    book: 'core',
+    slippage: 651,
+    variants: 3,
+    live: -6429,
+    paper: -8382,
+  });
+  const t1 = group({ book: 't1', slippage: -900, variants: 3 });
+  const data = response({
+    captured_days: ['2026-10-21', '2026-10-23'],
+    days: [
+      day({ day: '2026-10-21', groups: [core, t1] }),
+      day({ day: '2026-10-23', groups: [t1], off_slot: ['N_x_0917'] }),
+    ],
+  });
+
+  it("is the book's slippage per lot-day, never another book's", () => {
+    const l = liveForLog(data, '2026-10-21', 'core');
+    expect(l?.state).toBe('captured');
+    expect(l?.perLotDay).toBe(217);
+    expect(l?.detail).toMatch(/Quantiply · Angel One · Core: live -₹6,429, paper -₹8,382/);
+  });
+
+  it("says when the book was not compared that day, with the day's flags", () => {
+    const l = liveForLog(data, '2026-10-23', 'core');
+    expect(l?.state).toBe('captured');
+    expect(l?.perLotDay).toBeNull();
+    expect(l?.detail).toMatch(/None of this book/);
+    expect(l?.detail).toMatch(/1 off-slot/);
+  });
+
+  it('tells before, waiting and not captured apart, and is never a zero', () => {
+    expect(liveForLog(data, '2026-10-19')?.state).toBe('before');
+    expect(liveForLog(data, '2026-10-22')?.state).toBe('not_captured');
+    expect(liveForLog(data, '2026-10-26')?.state).toBe('waiting');
+    expect(liveForLog(data, '2026-10-22')?.perLotDay).toBeNull();
+    expect(liveForLog(null, '2026-10-21')).toBeNull();
+    expect(liveForLog({ rows: [] } as never, '2026-10-21')).toBeNull();
+    expect(liveForLog(response({ captured_days: [], days: [] }), '2026-10-21')?.state).toBe(
+      'before',
+    );
   });
 });

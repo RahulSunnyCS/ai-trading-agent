@@ -8,7 +8,8 @@
  * benchmark, the read-out's day count, the evening run), the data health line, the Books table
  * (Adaptive Classic, Adaptive Tuned and the Fixed base, each with its own portfolio stop, and the
  * registered verdict under it) and the cumulative chart; then the latest baskets, What happened
- * (the day log), Lot plans, Live vs paper, Is the rule still working? and Experiments. The
+ * (the day log, with the live result per day), Live vs paper, Is the rule still working? and
+ * Experiments (Lot plans and the ideas being watched). The
  * diagnostics sit in closed accordions that mount their widget only when opened.
  *
  * Gross only: the stored costs are zero. Lists are alternative baskets and are never added up.
@@ -498,21 +499,6 @@ export function RotationPanel() {
         </Accordion>
       </section>
 
-      <section aria-labelledby="band-lot-plans" className="space-y-3">
-        <header>
-          <h2
-            id="band-lot-plans"
-            className="text-base font-semibold tracking-tight text-foreground"
-          >
-            Lot plans
-          </h2>
-          <p className="mt-0.5 text-sm text-muted">
-            The same morning picks traded three ways, tracked forward for the live book and T1.
-          </p>
-        </header>
-        <RotationLotPlans />
-      </section>
-
       <section aria-labelledby="band-live-vs-paper" className="space-y-3">
         <header>
           <h2
@@ -562,6 +548,13 @@ export function RotationPanel() {
         >
           Experiments
         </h2>
+        <Accordion
+          title="Lot plans · from 19 Oct"
+          description="The same morning picks traded three ways (As picked, Dir Boost, Duo), for Core and T1, judged at 60 forward days"
+          defaultOpen={false}
+        >
+          <RotationLotPlans />
+        </Accordion>
         <Accordion
           title="Ideas being watched"
           description="Unregistered candidates and trigger studies, each against what it replaced"

@@ -2,6 +2,10 @@
  * The daily log's table: one 32 px line a day, newest first. Per list the gross per lot-day (the
  * unit lists are compared in; the day's total for the list's lots is in the tooltip). A day with
  * no figure shows why. Clicking a line opens the day.
+ *
+ * "Live − paper" (dashboard review, 2026-10-28; it replaced the hand-marked Placed dots, which were
+ * never used): the 15:40 live capture against paper for the focus book, per lot-day, both after the
+ * same estimated costs (`liveForLog`). A day before the capture, waiting or not captured says so.
  */
 
 import { useMemo, useState } from 'react';
@@ -10,17 +14,15 @@ import { cn } from '../../lib/cn';
 import { EMPTY, formatDay, formatInr, formatNumber } from '../../lib/format';
 import {
   LIST_KEYS,
-  PLACEMENT_LABEL,
   type RowFlag,
   STATUS_LABEL,
   STATUS_TONE,
-  markedText,
-  placementTally,
   rowFlags,
 } from '../../lib/rotationDailyLogView';
 import { listLabel, listName } from '../../lib/rotationListNames';
+import type { LogLive } from '../../lib/rotationLiveView';
 import { stopFlag } from '../../lib/rotationPortfolioView';
-import type { PlacementStatus, RotationListKey, RotationRow } from '../../types/rotationDailyLog';
+import type { RotationListKey, RotationRow } from '../../types/rotationDailyLog';
 import { Badge, type Tone } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
@@ -33,13 +35,6 @@ const FLAG_TONE: Record<RowFlag['tone'], Tone> = {
   warning: 'warning',
   info: 'info',
   neutral: 'neutral',
-};
-
-const PLACEMENT_DOT: Record<PlacementStatus | 'none', string> = {
-  placed: 'bg-positive',
-  changed: 'bg-warning',
-  not_placed: 'bg-negative',
-  none: 'bg-surface-2 ring-1 ring-inset ring-border',
 };
 
 function ListCell({ row, list }: { row: RotationRow; list: RotationListKey }) {
@@ -92,29 +87,30 @@ function ListCell({ row, list }: { row: RotationRow; list: RotationListKey }) {
   );
 }
 
-function PlacedCell({ row }: { row: RotationRow }) {
-  if (row.source !== 'recorded') return <span className="text-faint">{EMPTY}</span>;
-  const tally = placementTally(row);
-  const title = LIST_KEYS.filter((k) => row.lists[k] !== undefined)
-    .map((k) => {
-      const p = row.placement[k];
-      return `${listLabel(k)}: ${p ? `${PLACEMENT_LABEL[p.status]}${p.note ? ` (${p.note})` : ''}` : 'not marked'}`;
-    })
-    .join('\n');
+const LIVE_WORD: Record<Exclude<LogLive['state'], 'captured'>, string> = {
+  before: EMPTY,
+  waiting: 'waiting',
+  not_captured: 'not captured',
+};
+
+function LiveCell({ live }: { live: LogLive | null }) {
+  if (live === null) return <span className="text-faint">{EMPTY}</span>;
+  if (live.state !== 'captured') {
+    return (
+      <span
+        className={cn('text-[11px]', live.state === 'not_captured' ? 'text-warning' : 'text-faint')}
+        title={live.detail}
+      >
+        {LIVE_WORD[live.state]}
+      </span>
+    );
+  }
   return (
-    <span className="inline-flex items-center gap-1" title={`${markedText(tally)}\n${title}`}>
-      {LIST_KEYS.map((k) => (
-        <span
-          key={k}
-          aria-hidden="true"
-          className={cn(
-            'h-2.5 w-2.5 rounded-full',
-            PLACEMENT_DOT[row.placement[k]?.status ?? 'none'],
-            row.lists[k] === undefined && 'opacity-30',
-          )}
-        />
-      ))}
-      <span className="sr-only">{markedText(tally)}</span>
+    <span
+      className={cn('metric', live.perLotDay === null ? 'text-faint' : pnlClass(live.perLotDay))}
+      title={live.detail}
+    >
+      {live.perLotDay === null ? EMPTY : formatInr(live.perLotDay, { sign: true })}
     </span>
   );
 }
@@ -134,11 +130,14 @@ export function RotationDailyLogTable({
   focus,
   selectedDay,
   onOpen,
+  live,
 }: {
   rows: readonly RotationRow[];
   focus: RotationListKey;
   selectedDay: string | null;
   onOpen: (day: string) => void;
+  /** The focus book's live result for a day; absent for reconstructed days. */
+  live?: ((day: string) => LogLive | null) | undefined;
 }) {
   const [all, setAll] = useState(false);
   const newestFirst = useMemo(() => [...rows].reverse(), [rows]);
@@ -163,9 +162,11 @@ export function RotationDailyLogTable({
             </Th>
           ))}
           <Th dense>Flags</Th>
-          <Th dense align="center">
-            Placed
-          </Th>
+          {live ? (
+            <Th dense align="right" title="Live minus paper per lot-day, both after the same costs">
+              Live − paper
+            </Th>
+          ) : null}
           <Th dense>Status</Th>
         </THead>
         <tbody>
@@ -225,9 +226,11 @@ export function RotationDailyLogTable({
                     ) : null}
                   </span>
                 </Td>
-                <Td dense align="center">
-                  <PlacedCell row={row} />
-                </Td>
+                {live ? (
+                  <Td dense align="right">
+                    <LiveCell live={row.source === 'recorded' ? live(row.day) : null} />
+                  </Td>
+                ) : null}
                 <Td dense className="whitespace-nowrap">
                   <span title={row.status_detail || STATUS_LABEL[row.status]}>
                     <Badge tone={STATUS_TONE[row.status]} className="px-1.5 py-0 text-[11px]">
@@ -241,9 +244,12 @@ export function RotationDailyLogTable({
         </tbody>
       </Table>
       <p className="mt-2 text-[11px] text-faint">
-        ₹ gross per lot-day, hover for the list's total. <span className="font-semibold">W</span>:
-        the Widesl minimum replaced a top-ranked Dir. <span className="font-semibold">B</span>: a
-        Buy strategy qualified and was added.
+        ₹ gross per lot-day, hover for the list's total.{' '}
+        {live
+          ? 'Live − paper: the 15:40 capture against paper per lot-day, after the same costs; + means live did better. '
+          : ''}
+        <span className="font-semibold">W</span>: the Widesl minimum replaced a top-ranked Dir.{' '}
+        <span className="font-semibold">B</span>: a Buy strategy qualified and was added.
       </p>
       {newestFirst.length > SHOWN ? (
         <div className="mt-2 flex justify-center">
