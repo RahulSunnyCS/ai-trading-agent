@@ -1,4 +1,5 @@
 import gzip
+import os
 import threading
 import time
 from datetime import UTC, date, datetime
@@ -376,6 +377,61 @@ def test_backup_copies_new_files_only_and_always_the_catalog(root, tmp_path):
     assert (dest / catalog_path(root).name).exists()
     with pytest.raises(ValueError):
         backup(root, root / "inside")
+
+
+def test_backup_copies_rewritten_contract_notes_and_rotation_files(root, tmp_path):
+    """contract-notes/ and rotation/ are rewritten in place, often at the same size: a
+    changed mtime is enough to copy again; an unchanged file is skipped; locks and
+    temporaries never go. lake/ keeps its size-only rule."""
+    notes = root / "contract-notes"
+    day = notes / "days" / "2030-01-02.jsonl"
+    day.parent.mkdir(parents=True)
+    day.write_text('{"account":"demo-1","net":100}\n')
+    manual = notes / "manual" / "demo.json"
+    manual.parent.mkdir(parents=True)
+    manual.write_text('{"note":"invented"}\n')
+    (notes / "run.lock").write_text("12345")
+    (notes / "days" / "2030-01-03.jsonl.999.tmp").write_text("half")
+    journal = root / "rotation" / "journal.jsonl"
+    journal.parent.mkdir(parents=True)
+    journal.write_text('{"day":"2030-01-02","pick":"demo"}\n')
+    (root / "rotation" / "journal.lock").write_text("")
+    (root / "rotation" / ".store.lock").write_text("")
+    bars = lake.bars_1m_path(root, "index", "NIFTY", DAY)
+    lake.write_parquet(_index_bars(1.0), bars)
+    dest = tmp_path / "other_disk"
+
+    first = backup(root, dest)
+    assert (first.folders["contract-notes"].copied, first.folders["rotation"].copied) == (2, 1)
+    assert (dest / "contract-notes" / "days" / "2030-01-02.jsonl").exists()
+    assert not (dest / "contract-notes" / "run.lock").exists()
+    assert not (dest / "contract-notes" / "days" / "2030-01-03.jsonl.999.tmp").exists()
+    assert not (dest / "rotation" / "journal.lock").exists()
+    assert not (dest / "rotation" / ".store.lock").exists()
+
+    # Rewritten at the same size with a newer mtime (a day re-read; the nightly journal).
+    day.write_text('{"account":"demo-1","net":200}\n')
+    journal.write_text('{"day":"2030-01-02","pick":"demx"}\n')
+    later = day.stat().st_mtime + 60
+    os.utime(day, (later, later))
+    os.utime(journal, (later, later))
+    # A lake file changed at the same size stays skipped: lake files are immutable.
+    os.utime(bars, (later, later))
+
+    second = backup(root, dest)
+    assert (second.folders["contract-notes"].copied, second.folders["contract-notes"].skipped) == (
+        1,
+        1,
+    )
+    assert (second.folders["rotation"].copied, second.folders["rotation"].skipped) == (1, 0)
+    assert (second.folders["lake"].copied, second.folders["lake"].skipped) == (0, 1)
+    assert (dest / "contract-notes" / "days" / "2030-01-02.jsonl").read_text() == day.read_text()
+    assert (dest / "rotation" / "journal.jsonl").read_text() == journal.read_text()
+    # copy2 carried the mtime over, so a third run copies nothing (no catalog in this root).
+    third = backup(root, dest)
+    assert (third.copied, third.catalog_copied) == (0, False)
+    assert third.folders["contract-notes"].skipped == 2
+    assert third.folders["rotation"].skipped == 1
 
 
 def test_bar_schemas_are_the_lake_contract():

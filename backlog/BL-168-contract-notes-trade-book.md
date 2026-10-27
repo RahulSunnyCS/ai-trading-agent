@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the only record of real money the project measures itself against; unblocks BL-093 and BL-026 |
-| **Status** | In progress (Phases 1 and 2 done; Phase 3 under way) |
+| **Status** | In progress (Phases 1 and 2 done; Phase 3 under way; Phase 6 backup built) |
 | **Type** | feature |
 | **Area** | contract-notes / scheduler / trading-data / dashboard |
 | **Created** | 2026-10-26 |
@@ -433,3 +433,7 @@ record from them.
   `TRADING_DATA_ROOT/contract-notes.discarded-2026-10-26` (safe to delete) and rebuilt. Not done:
   the jobs start only after the owner restarts the scheduler; the stored figures are checked
   against the sheet's rows in Phase 3's import.
+- 2026-10-27 — Phase 6 built: tdata backup copies contract-notes/ and rotation/ (size + mtime).
+  Lock and `.tmp` files are left out; the summary (and so the monthly `backup` job's log) counts
+  copied / already-there per folder. Still open: the owner's decision on archiving
+  `trade-analytics` (TODO §2.7), after a month of the Trade book page.

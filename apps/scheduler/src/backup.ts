@@ -23,7 +23,11 @@ export function backupDestination(
     : { dest: join(homedir(), 'Downloads', 'TradingData-backup'), fallback: true };
 }
 
-/** `tdata backup --to <dest>`: lake/raw files copied only if new, the catalog every time. */
+/**
+ * `tdata backup --to <dest>`: lake/raw files copied only if new, contract-notes/ and
+ * rotation/ when new or changed, the catalog every time. Its per-folder counts land in the
+ * job's log line by line (nothing here parses them).
+ */
 export function backupJob(sink?: AlertSink): Builtin {
   return async (ctx) => {
     const { dest, fallback } = backupDestination(ctx.env);

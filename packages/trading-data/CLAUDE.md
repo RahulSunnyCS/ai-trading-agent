@@ -152,6 +152,16 @@ table instead.
   `DERIVED_VERSION` with any formula or column change.
 - **Partition values live in folder names only** (`asset=`, `underlying=`/`symbol=`,
   `date=`) — never repeat them as columns inside the Parquet.
+- **`tdata backup` has two skip rules** (`backup.py`). `lake/` and `raw/` are immutable once
+  written: a file the destination already has at the same size is skipped. `contract-notes/`
+  (BL-168) and `rotation/` are rewritten in place, often at the same size: a file is skipped only
+  when size AND mtime match (within 2 s, for exFAT/FAT destinations), and `shutil.copy2` carries
+  the mtime over so the next run skips it. Lock files (`*.lock`, e.g. contract-notes' `run.lock`)
+  and `*.tmp` are never copied there; `lake/`/`raw/` skip only `*.tmp`. The catalog is
+  CHECKPOINTed and always re-copied. Nothing is ever deleted at the destination. The summary
+  prints copied / already-there per folder; the scheduler's monthly `backup` job logs it as is.
+  A new top-level folder under the root is not backed up until it is added to `IMMUTABLE_DIRS`
+  or `MUTABLE_DIRS`.
 - Tests use `tmp_path` roots; never point a test at the real `~/TradingData`.
 
 - **Views are snapshotted when `connect()` opens**, not live. A write made through a

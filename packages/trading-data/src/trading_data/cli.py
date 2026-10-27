@@ -205,14 +205,19 @@ def derived_rebuild(
 def backup(
     to: Path = typer.Option(..., "--to", help="Destination folder on the other disk."),
 ) -> None:
-    """Copy the data root to another disk. Lake/raw files are copied only if new; the
-    catalog is always re-copied. Meant to run monthly."""
+    """Copy the data root to another disk. Lake/raw files are copied only if new;
+    contract-notes/ and rotation/ when new or changed (size or mtime); the catalog is
+    always re-copied. Lock and .tmp files are left out. Meant to run monthly."""
     root = data_root()
     report = run_backup(root, to.expanduser())
     typer.echo(
         f"backup to {to}: {report.copied} files copied ({_mb(report.bytes_copied)}), "
         f"{report.skipped} already there"
     )
+    for name, count in report.folders.items():
+        typer.echo(f"  {name}/: {count.copied} copied, {count.skipped} already there")
+    if report.catalog_copied:
+        typer.echo("  catalog: re-copied")
 
 
 @app.command()
