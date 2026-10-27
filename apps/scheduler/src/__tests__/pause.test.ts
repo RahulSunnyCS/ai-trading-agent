@@ -51,7 +51,8 @@ describe('pause (BL-140 Phase 4)', () => {
     // Friday 23 Oct 2026: tomorrow is a weekend, so the next session is Monday
     expect(sessionFor('algotest-evening', '2026-10-23')).toBe('2026-10-26');
     expect(sessionFor('quantiply-evening', '2026-10-21')).toBe('2026-10-22');
-    expect(sessionFor('quantiply-deploy', '2026-10-21')).toBe('2026-10-22');
+    // BL-172: the switch-on runs at 08:10 for today
+    expect(sessionFor('quantiply-deploy', '2026-10-21')).toBe('2026-10-21');
     expect(sessionFor('algotest-topup', '2026-10-23')).toBe('2026-10-23');
     expect(sessionFor('algotest-deploy', '2026-10-23')).toBe('2026-10-23');
   });
@@ -74,7 +75,8 @@ describe('pause (BL-140 Phase 4)', () => {
     expect(pausedReason('algotest-deploy', env, ist('2026-10-26', '09:16'))).not.toBeNull();
     // Monday's evening prepares Tuesday: runs
     expect(pausedReason('quantiply-evening', env, ist('2026-10-26', '16:45'))).toBeNull();
-    expect(pausedReason('quantiply-deploy', env, ist('2026-10-26', '16:55'))).toBeNull();
+    // Monday's 08:10 switch-on is for Monday: held
+    expect(pausedReason('quantiply-deploy', env, ist('2026-10-26', '08:10'))).not.toBeNull();
   });
 
   it('a pause ending on a day leaves the evening before the next session running', () => {

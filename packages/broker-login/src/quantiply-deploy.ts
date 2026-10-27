@@ -19,11 +19,15 @@ import {
   type AlgoDetail,
   type DeployMode,
   ENABLE_LEAD_SECONDS,
+  clientwiseBody,
+  clientwiseHolds,
+  clientwiseNow,
   defaultSession,
   enabledSessions,
   istSeconds,
   ownedForSession,
   parseBrokers,
+  parseClientwise,
   parseDeployLedger,
   parseDetail,
   pickBroker,
@@ -85,6 +89,11 @@ import { istToday, sha256 } from './strategy-plan.js';
  *   disabled, so they do not run again next week. Only finished ones, and today's only after
  *   15:30 IST unless `--emergency` (the emergency stop: today's pending entries too).
  * - check: read-only: owned algos enabled after their session.
+ * - `--morning` (BL-172, the 08:00 job): enable for today from last evening's preview export
+ *   (before the 09:16 pick exists), after keeping the account's clientwise MTM SL at the
+ *   Settings › Automation row's figure (`POST /brokers/<id>/config`, read back on every weekday;
+ *   a figure that does not read back stops the run before anything is switched on). It always
+ *   sends its Telegram report, also when there was nothing to switch on.
  * - After any change the list is read again: exactly the intended algos must have changed, and no
  *   other algo of the tool's; anything else stops the run, alerts and exits 3.
  *
@@ -132,6 +141,7 @@ async function main(): Promise<number> {
       dir: { type: 'string' },
       ledger: { type: 'string' },
       emergency: { type: 'boolean', default: false },
+      morning: { type: 'boolean', default: false },
       apply: { type: 'boolean', default: false },
       headed: { type: 'boolean', default: false },
     },
@@ -139,7 +149,7 @@ async function main(): Promise<number> {
   const mode = values.mode as DeployMode;
   if (!['enable', 'disable', 'check'].includes(mode ?? '')) {
     console.error(
-      'usage: --broker angelone|finvasia --mode enable|disable|check [--day YYYY-MM-DD] [--book core|t1 | --dir <folder>] [--emergency] [--apply]',
+      'usage: --broker angelone|finvasia --mode enable|disable|check [--day YYYY-MM-DD] [--book core|t1 | --dir <folder>] [--emergency] [--morning] [--apply]',
     );
     return 64;
   }
@@ -149,6 +159,10 @@ async function main(): Promise<number> {
   }
   if (values.emergency && mode !== 'disable') {
     console.error('--emergency is for --mode disable only');
+    return 64;
+  }
+  if (values.morning && mode !== 'enable') {
+    console.error('--morning is for --mode enable only');
     return 64;
   }
   if (values.day && !/^\d{4}-\d\d-\d\d$/.test(values.day)) {
@@ -180,6 +194,8 @@ async function main(): Promise<number> {
   let decidedBy = 'settings not read (disable never needs them)';
   /** the account row's platform multiplier the uploader applied (BL-140 Phase 4) */
   let multiplier = 1;
+  /** BL-172: the clientwise MTM SL the morning run keeps (rupees), or null to leave it */
+  let mtmSl: number | null = null;
   if (mode !== 'disable') {
     let automation: Automation;
     try {
@@ -191,6 +207,7 @@ async function main(): Promise<number> {
     gate = quantiplyDeploy(automation, broker);
     decidedBy = describeSource(automation);
     multiplier = effectiveRow(automation, 'quantiply', broker).multiplier;
+    mtmSl = effectiveRow(automation, 'quantiply', broker).mtmSl;
   }
   // Gate 2: enabling also needs the dashboard's switch and the account's row.
   if (values.apply && mode === 'enable' && !gate.ok) {
@@ -231,7 +248,7 @@ async function main(): Promise<number> {
     : defaultSession(mode, today, istSeconds(), isTradingDay);
   const session = chosen.day;
   const weekday = weekdayOf(session);
-  const label = `${site.name} ${mode}${values.emergency ? ' (EMERGENCY)' : ''} for ${session} (${weekday})`;
+  const label = `${site.name} ${values.morning ? '08:00 switch-on' : mode}${values.emergency ? ' (EMERGENCY)' : ''} for ${session} (${weekday})`;
   console.log(`${label}: session from ${chosen.why}; ${decidedBy}`);
 
   let picks: Picks | null = null;
@@ -257,11 +274,14 @@ async function main(): Promise<number> {
     }
     picks = await readPicks(resolve(dir), multiplier);
     const m = picks.manifest;
-    // The picks must be the session's: the evening's preview, or today's recorded picks.
+    // The picks must be the session's: the evening's preview, or today's recorded picks. BL-172:
+    // the 08:00 run switches on last evening's preview for today, before the 09:16 pick exists.
     const fits =
       m.day === session &&
       weekdayOf(m.day) === m.weekday &&
-      (session > today || m.source === 'recorded');
+      (session > today ||
+        m.source === 'recorded' ||
+        (values.morning === true && m.source === 'preview'));
     if (!fits) {
       console.error(
         `the export is ${m.source} for ${m.day} (${m.weekday}); the session is ${session}${session === today ? " and needs today's recorded picks" : ''}: nothing enabled`,
@@ -284,9 +304,16 @@ async function main(): Promise<number> {
           }).length
         : owned.size;
   if (!relevant) {
-    console.log(
-      `nothing the uploader created for ${session} on this account: no login, nothing to do`,
-    );
+    const text = `nothing the uploader created for ${session} on this account: no login, nothing to do`;
+    console.log(text);
+    // BL-172: the 08:00 run always reports, so a missing evening upload is never silent.
+    if (values.morning && values.apply) {
+      await sendText(
+        readTelegramConfig(),
+        redact(`⚠️ ${label}: ${text}. Nothing switched on.`),
+        'broker.quantiply',
+      ).catch(() => undefined);
+    }
     return 0;
   }
 
@@ -417,7 +444,37 @@ async function main(): Promise<number> {
       }
     } else {
       const p = picks as Picks;
-      const pb = pickBroker(parseBrokers(await api.brokers()), creds.user);
+      const brokersJson = await api.brokers();
+      const pb = pickBroker(parseBrokers(brokersJson), creds.user);
+      // BL-172: the morning run keeps the account's clientwise MTM SL before anything goes live;
+      // an algo never goes live under a wrong or unknown one.
+      if (values.morning && mtmSl !== null) {
+        const want = `₹${mtmSl.toLocaleString('en-IN')}`;
+        if ('error' in pb) {
+          attention = true;
+          lines.push(`❌ MTM SL not checked (the account's broker: ${pb.error}): nothing switched on`);
+          throw new Reported('mtm sl');
+        }
+        const days = parseClientwise(brokersJson, pb.id);
+        const body = clientwiseBody(days, mtmSl);
+        if (!body) lines.push(`MTM SL ${want} ✓`);
+        else if (!apply) lines.push(`MTM SL is ${clientwiseNow(days)}: would set ${want} (dry run)`);
+        else {
+          const was = clientwiseNow(days);
+          await api.setClientwise(pb.id, body);
+          changed = true;
+          await record({ action: 'mtm-sl', broker: pb.id, from: was, to: mtmSl, ok: true });
+          const back = parseClientwise(await api.brokers(), pb.id);
+          if (!clientwiseHolds(back, mtmSl)) {
+            attention = true;
+            lines.push(
+              `❌ MTM SL set to ${want} but reads back ${clientwiseNow(back)}: nothing switched on, check Quantiply`,
+            );
+            throw new Reported('mtm sl');
+          }
+          lines.push(`MTM SL set ${was} → ${want} (read back on every weekday)`);
+        }
+      }
       const mine = ownedForSession(ledger, session, p.sha);
       const details = new Map<string, AlgoDetail>();
       for (const a of before) {
@@ -550,7 +607,9 @@ async function main(): Promise<number> {
   const failed = retryable || attention;
   // Quiet when nothing happened: the scheduler alerts on a failure, a change always reports.
   // A dry run never messages, except a failed check (it exists to alert).
-  const send = (apply && (changed || failed)) || (mode === 'check' && failed);
+  // BL-172: the 08:00 run always reports (the owner's "switched on" message).
+  const send =
+    (apply && (changed || failed || values.morning === true)) || (mode === 'check' && failed);
   if (send) {
     const head = failed ? `⚠️ ${label}: check Quantiply` : `✅ ${label}`;
     await sendText(
