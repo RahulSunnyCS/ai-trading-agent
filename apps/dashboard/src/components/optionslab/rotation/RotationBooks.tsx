@@ -124,7 +124,13 @@ export function RotationBooks({
             ₹ / lot-day
           </Th>
           <Th dense align="right">
-            Max drawdown
+            <span className="inline-flex items-center gap-1">
+              Max DD / lot
+              <InfoTooltip
+                label="About max drawdown"
+                text="The largest fall of the running total per lot from its peak, the peak starting at zero: the unit the registered rule compares. Hover a figure for the basket's drawdown in rupees."
+              />
+            </span>
           </Th>
           <Th dense align="right">
             <span className="inline-flex items-center gap-1">
@@ -206,12 +212,12 @@ export function RotationBooks({
                     numeric
                     className="whitespace-nowrap"
                     title={
-                      r.maxDrawdownPerLot !== null
-                        ? `${money(r.maxDrawdownPerLot, false)} per lot, the unit the registered rule compares`
+                      r.maxDrawdown !== null
+                        ? `${money(r.maxDrawdown, false)} for the basket at 1 lot a strategy`
                         : undefined
                     }
                   >
-                    {money(r.maxDrawdown, false)}
+                    {money(r.maxDrawdownPerLot, false)}
                   </Td>
                   <Td dense align="right" numeric className={tone(r.vsBenchmark)}>
                     {r.id === 'BASE' ? (

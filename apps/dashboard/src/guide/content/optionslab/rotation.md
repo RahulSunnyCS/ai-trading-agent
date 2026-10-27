@@ -95,7 +95,7 @@ number of lots, so none of them moves.
 | Latest day | The book's gross on the latest scored day (hover for the day) |
 | Since … | The total since the first scored forward day, 1 lot per strategy |
 | ₹ / lot-day | Average gross per lot per day. The fair way to compare books, because a list holds 3 strategies, or 4 on a day its Buy add-on fires |
-| Max drawdown | The largest fall of the running total from its peak, the peak starting at zero (hover for the figure per lot, the unit the registered rule compares) |
+| Max DD / lot | The largest fall of the running total per lot from its peak, the peak starting at zero: the unit the registered rule compares (hover for the basket's drawdown in rupees) |
 | vs base / lot-day | The book's ₹ per lot-day minus the benchmark's, over the same days. Follows *Compare with* |
 | Beats random | Share of 1,000 random baskets of the same shape that the book's cumulative gross is above. Always on the registered basis, without a portfolio stop |
 | Portfolio stop | The book's own stop (below) and, once its replay is in, how often it fired |

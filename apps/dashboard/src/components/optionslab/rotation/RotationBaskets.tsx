@@ -196,7 +196,7 @@ export function RotationBaskets({
             const c = baskets.changed[k];
             return (
               <div key={k} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="w-20 shrink-0 font-medium text-foreground">
+                <span className="min-w-20 shrink-0 whitespace-nowrap font-medium text-foreground">
                   {title ?? listName(k)}
                 </span>
                 {c?.removed.map((n) => (

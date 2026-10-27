@@ -94,7 +94,13 @@ function LastRun({
       </span>
     );
   }
-  if (job.state !== 'idle' && job.finished) {
+  // The API's own run, unless the scheduler has run the evening since (a manual run at 11:00
+  // must not hide a failed 15:45).
+  const scheduledAt = scheduled ? (scheduled.ended_at ?? scheduled.started_at) : null;
+  const apiIsNewer =
+    job.finished !== null &&
+    (scheduledAt === null || Date.parse(job.finished) >= Date.parse(scheduledAt));
+  if (job.state !== 'idle' && job.finished && apiIsNewer) {
     return (
       <span className="inline-flex items-center gap-2">
         <Badge status={job.state === 'failed' ? 'failed' : 'completed'}>
@@ -317,11 +323,12 @@ export function EveningRunBar({
     // Fragments flow into the page's run bar (a wrapping flex row); the panel takes a line.
     return (
       <>
-        <span
-          aria-label="Evening run"
-          className="inline-flex items-center gap-2 text-xs text-muted"
-        >
-          {token && !token.ok ? tokenBadge : null}
+        <span className="inline-flex items-center gap-2 text-xs text-muted">
+          {token &&
+          now &&
+          (!token.ok || ['expired', 'expiring'].includes(tokenState(token.expires_at, now)))
+            ? tokenBadge
+            : null}
           {lastRun}
           {toggle}
           {runButton}
