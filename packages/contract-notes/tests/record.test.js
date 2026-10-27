@@ -33,9 +33,9 @@ describe('noteLine()', () => {
       broker: 'finvasia',
       account: 'FA1',
       extracted: {
-        payin_payout_obligation: 2231,
-        net_brokerage: 100,
-        other_charges: 80.6,
+        payin_payout_obligation: 1500,
+        net_brokerage: 90,
+        other_charges: 40.25,
         skipped_segments: [],
       },
       note: { sha256: 'abc', file: 'raw/x.pdf', subject: 's', received: 'r', attachment: 'a.pdf' },
@@ -43,11 +43,11 @@ describe('noteLine()', () => {
     });
     expect(line.status).toBe('note');
     expect(line.fno).toEqual({
-      payin_payout_obligation: 2231,
-      net_brokerage: 100,
-      other_charges: 80.6,
-      total_charges: 180.6,
-      final_net: 2050.4,
+      payin_payout_obligation: 1500,
+      net_brokerage: 90,
+      other_charges: 40.25,
+      total_charges: 130.25,
+      final_net: 1369.75,
     });
     expect(line.note.sha256).toBe('abc');
   });
