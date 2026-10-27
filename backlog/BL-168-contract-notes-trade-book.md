@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the only record of real money the project measures itself against; unblocks BL-093 and BL-026 |
-| **Status** | In progress (Phases 1 and 2 done; Phase 3 under way; Phase 6 backup built) |
+| **Status** | In progress (Phases 1 and 2 done; Phase 3 under way; Phase 6 backup built; Phase 5 page built, PR #345) |
 | **Type** | feature |
 | **Area** | contract-notes / scheduler / trading-data / dashboard |
 | **Created** | 2026-10-26 |
@@ -442,3 +442,12 @@ record from them.
   deleted mid-run is counted, never fatal; the backup waits up to 10 min for a contract-notes
   run's `run.lock`; `raw/**/*.decrypted.pdf` stays off the exFAT disk. Phase 6 is done once a
   real backup run (the next 1st-Sunday job or a manual one) shows the new folders' lines.
+- 2026-10-27 — Phase 5 built (PR #345, not merged): the Trade book page at `/tradebook` (F&O,
+  Trades, Money, Momentum, the day drawer and the inputs dialog) from the approved mockups, the
+  Fastify proxy for `/api/backtest/legwise/contract-notes/*` with tests, and the Guide page
+  `operations/trade-book`. The best and worst points are read a month at a time (the API's
+  31-day limit). Left out for want of API data, listed in the PR: the Adaptive paper and NIFTY
+  benchmarks, the year's charges itemised by kind, the by-day-context table, lots, Momentum's
+  plan-vs-filled lots, the per-account "note not arrived" banner, PDFs and Algos from the live
+  capture. Phase 5 is done once the owner checks its FY, monthly, drawdown and ratio figures
+  against the sheet.
