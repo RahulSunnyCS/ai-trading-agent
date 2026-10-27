@@ -124,7 +124,9 @@ describe('liveForLog (the Daily log column)', () => {
   it('tells before, waiting and not captured apart, and is never a zero', () => {
     expect(liveForLog(data, '2026-10-19')?.state).toBe('before');
     expect(liveForLog(data, '2026-10-22')?.state).toBe('not_captured');
-    expect(liveForLog(data, '2026-10-26')?.state).toBe('waiting');
+    expect(liveForLog(data, '2026-10-26', 'core', '2026-10-26')?.state).toBe('waiting');
+    // an older day after the newest capture is a gap, not waiting
+    expect(liveForLog(data, '2026-10-26', 'core', '2026-10-28')?.state).toBe('not_captured');
     expect(liveForLog(data, '2026-10-22')?.perLotDay).toBeNull();
     expect(liveForLog(null, '2026-10-21')).toBeNull();
     expect(liveForLog({ rows: [] } as never, '2026-10-21')).toBeNull();

@@ -162,14 +162,12 @@ export function RotationDailyLog({
   const log = res.data !== null && logMatches(res.data, source, range) ? res.data : null;
   // The 15:40 live capture beside the log (the same request as the Live vs paper card's): the
   // live book behind Adaptive (list C) is Core. Recorded days only; a reconstructed day never traded.
-  const liveRes = useRotationLive();
+  const showLive = source === 'recorded' && focus === 'C';
+  const liveRes = useRotationLive(showLive);
   const liveData = liveRes.data;
   const live = useMemo(
-    () =>
-      source === 'recorded' && focus === 'C'
-        ? (day: string) => liveForLog(liveData, day, 'core')
-        : undefined,
-    [source, focus, liveData],
+    () => (showLive ? (day: string) => liveForLog(liveData, day, 'core', today) : undefined),
+    [showLive, liveData, today],
   );
 
   // The stopped figures (BL-095). Only an answer to THIS source and setting is laid over the log;
