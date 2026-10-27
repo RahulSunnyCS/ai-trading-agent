@@ -273,6 +273,14 @@ Otherwise:
   tonight's VIX close standing in for the open, under the BL-122 rule for that session, for Core-298 or Core-298 plus a
   track's variants; the message lists those strategies in full. The old history tables, probabilities and likely changes
   are no longer sent (`build`/`Tomorrow` are kept, tested, unused by the message).
+- `realised/` — BL-168 Phase 4: the contract-notes store (`TRADING_DATA_ROOT/contract-notes/`, written by
+  `packages/contract-notes`) read as the owner's sheet: `store.py` (load; a damaged line is a problem, never fatal),
+  `ratios.py` (the sheet's columns O, P, Q, R, S, T, U, V, W, X, Y, Z by its own formulas, the summary block, months,
+  FY), `trips.py` (fills paired flat-to-flat per contract; the note's other charges shared by turnover so trips add up
+  to the final net; turnover), `sources.py` (the live capture's fills), `context.py` (VIX, gap, range, expiry; MAE /
+  MFE from the 1-minute lake), `capital.py` (the 15:50 Angel One reading), `views.py` (the JSON the CLI and
+  `api/contract_notes_routes.py` share). Figures are recomputed on read; only `capital` and the page's inputs write
+  `manual/<day>.json`.
 - `legwise/algtst.py` + `rotation/algtst_export.py` — BL-137: a leg-wise strategy as an AlgoTest `.algtst` (import
   format, one strategy per file) and a day's picks as files + zip (`obt rotation algotest-export`). Every mapping was read
   off an AlgoTest export in `tests/fixtures/algtst/` (a closest premium is a bare number; re-entry at cost is

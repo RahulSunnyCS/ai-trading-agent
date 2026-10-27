@@ -1,0 +1,323 @@
+"""The owner's sheet ("Trade Book") by its own formulas, from the contract-notes store.
+
+One row per session the store has a line for (the sheet's rows). Per day:
+
+- `net` — the notes' final net, added over the F&O accounts (the sheet's Final Net columns);
+- `algo_fees` — AlgoTest's fee for the day's algos, the sheet's column O:
+  `ROUNDUP((algos − 3) × 12.5 + 62.5)`, from `manual/<day>.json`; nothing with no algos typed;
+- `profit` (Q) = net − algo fees; `charges` (P) = the notes' total charges + algo fees. A day with
+  no note on any account has neither (the sheet's "N/A" rows), and the averages skip it;
+- `cumulative` (R) and `drawdown` (S) = cumulative − its running peak;
+- `avg_profit_50` (T), `avg_profit_100` (U), `avg_charges_100` (V): averages of the last 50 / 100
+  rows' figures (rows without one skipped), rounded to the rupee, blank until that many rows;
+- `charge_profit_pct` (W) = V × 100 ÷ U, one decimal;
+- `capital` (X): `capital_total` from `manual/`, else the per-broker 15:50 readings added up, else
+  the last known capital carried forward (`capital_source` says which);
+- `avg_capital_100` (Y) and `profit_capital_bps` (Z) = U × 10 000 ÷ Y, rounded.
+
+One account (`account="broker/id"`) uses that account's notes only: the day's algo fees are
+the whole book's and are left out. Collateral interest from the ledger is shown beside the
+figures (`interest`), never inside them: the sheet never had it.
+"""
+
+from __future__ import annotations
+
+import math
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass
+from datetime import date
+from decimal import Decimal
+
+from .store import Book
+
+ZERO = Decimal(0)
+
+
+def algo_fee(algos: int | None) -> Decimal:
+    """The sheet's column O: ROUNDUP((algos - 3) * 12.5 + 62.5, 0); none without algos."""
+    if not algos or algos <= 0:
+        return ZERO
+    return Decimal(math.ceil((algos - 3) * 12.5 + 62.5))
+
+
+def _dec(value: object) -> Decimal:
+    return Decimal(str(value)) if value is not None else ZERO
+
+
+@dataclass
+class DayRow:
+    day: date
+    notes: int
+    open: int
+    net: Decimal | None
+    note_charges: Decimal | None
+    algos: int | None
+    algo_fees: Decimal
+    profit: Decimal | None
+    charges: Decimal | None
+    capital: Decimal | None
+    capital_source: str | None
+    interest: Decimal
+    deposits: Decimal
+    withdrawals: Decimal
+    cumulative: Decimal = ZERO
+    drawdown: Decimal = ZERO
+    avg_profit_50: int | None = None
+    avg_profit_100: int | None = None
+    avg_charges_100: int | None = None
+    charge_profit_pct: float | None = None
+    avg_capital_100: int | None = None
+    profit_capital_bps: int | None = None
+
+    def as_dict(self) -> dict:
+        out = asdict(self)
+        out["day"] = self.day.isoformat()
+        return {k: (float(v) if isinstance(v, Decimal) else v) for k, v in out.items()}
+
+
+def _capital(manual: dict) -> Decimal | None:
+    if manual.get("capital_total") is not None:
+        return _dec(manual["capital_total"])
+    # The per-broker readings make a total only when every F&O broker has one.
+    per = manual.get("capital")
+    if isinstance(per, dict) and all(per.get(b) is not None for b in ("finvasia", "angelone")):
+        return _dec(per["finvasia"]) + _dec(per["angelone"])
+    return None
+
+
+def _ledger(events: Iterable[dict], account: str | None) -> tuple[Decimal, Decimal, Decimal]:
+    interest = deposits = withdrawals = ZERO
+    for e in events:
+        if account is not None:
+            who = f"{e.get('broker')}/{e.get('account')}"
+            if e.get("account") is not None and who != account:
+                continue
+            if e.get("account") is None and e.get("broker") != account.split("/")[0]:
+                continue
+        elif e.get("broker") not in ("finvasia", "angelone"):
+            continue
+        amount = _dec(e.get("amount"))
+        if e.get("kind") == "collateral_interest":
+            interest += amount
+        elif e.get("kind") == "deposit":
+            deposits += amount
+        elif e.get("kind") == "withdrawal":
+            withdrawals += amount
+    return interest, deposits, withdrawals
+
+
+def _mean(values: list) -> float | None:
+    vals = [v for v in values if v is not None]
+    return sum(vals) / len(vals) if vals else None
+
+
+def _round(value: float | None) -> int | None:
+    # The sheet's ROUND: half away from zero.
+    if value is None:
+        return None
+    return int(Decimal(str(value)).quantize(Decimal(1), rounding="ROUND_HALF_UP"))
+
+
+def daily(
+    book: Book,
+    *,
+    account: str | None = None,
+    start: date | None = None,
+    end: date | None = None,
+) -> list[DayRow]:
+    """The sheet's rows. The running figures (cumulative, drawdown, the 50/100-row averages)
+    start at the store's first day even when `start` is later, as the sheet's do."""
+    rows: list[DayRow] = []
+    last_capital: Decimal | None = None
+    for day in book.days:
+        if end is not None and day > end:
+            break
+        lines = book.fno_lines(day, account)
+        if account is not None and not lines:
+            continue
+        notes = [ln for ln in lines if ln.get("status") == "note" and ln.get("fno")]
+        manual = book.manual.get(day, {})
+        algos = manual.get("algos")
+        fees = algo_fee(algos) if account is None else ZERO
+        net = sum((_dec(ln["fno"].get("final_net")) for ln in notes), ZERO) if notes else None
+        note_charges = (
+            sum((_dec(ln["fno"].get("total_charges")) for ln in notes), ZERO) if notes else None
+        )
+        capital = _capital(manual) if account is None else _account_capital(manual, account)
+        source = "manual" if capital is not None else None
+        if capital is None and last_capital is not None:
+            capital, source = last_capital, "carried"
+        if capital is not None:
+            last_capital = capital
+        interest, deposits, withdrawals = _ledger(book.ledger.get(day, []), account)
+        rows.append(
+            DayRow(
+                day=day,
+                notes=len(notes),
+                open=sum(1 for ln in lines if ln.get("status") == "failed"),
+                net=net,
+                note_charges=note_charges,
+                algos=algos,
+                algo_fees=fees,
+                profit=None if net is None else net - fees,
+                charges=None if note_charges is None else note_charges + fees,
+                capital=capital,
+                capital_source=source,
+                interest=interest,
+                deposits=deposits,
+                withdrawals=withdrawals,
+            )
+        )
+    _running(rows)
+    return [r for r in rows if start is None or r.day >= start]
+
+
+def _account_capital(manual: dict, account: str) -> Decimal | None:
+    per = manual.get("capital")
+    if not isinstance(per, dict):
+        return None
+    for key in (account, account.split("/")[0]):
+        if per.get(key) is not None:
+            return _dec(per[key])
+    return None
+
+
+def _running(rows: list[DayRow]) -> None:
+    cumulative = peak = ZERO
+    profits: list[float | None] = []
+    charges: list[float | None] = []
+    capitals: list[float | None] = []
+    for r in rows:
+        if r.profit is not None:
+            cumulative += r.profit
+        peak = max(peak, cumulative)
+        r.cumulative = cumulative
+        r.drawdown = cumulative - peak
+        profits.append(None if r.profit is None else float(r.profit))
+        charges.append(None if r.charges is None else float(r.charges))
+        capitals.append(None if r.capital is None else float(r.capital))
+        n = len(profits)
+        if n >= 50:
+            r.avg_profit_50 = _round(_mean(profits[-50:]))
+        if n >= 100:
+            r.avg_profit_100 = _round(_mean(profits[-100:]))
+            r.avg_charges_100 = _round(_mean(charges[-100:]))
+            cap = _mean(capitals[-100:])
+            r.avg_capital_100 = _round(cap)
+            if r.avg_profit_100:
+                r.charge_profit_pct = round(r.avg_charges_100 * 100 / r.avg_profit_100, 1)
+            if cap:
+                r.profit_capital_bps = _round(r.avg_profit_100 * 10000 / cap)
+
+
+def _f(value: Decimal | None) -> float | None:
+    return None if value is None else float(value)
+
+
+def summary(rows: list[DayRow]) -> dict:
+    """The sheet's summary block over `rows`: net, charges, drawdown (from the rows' own peak),
+    win days, averages, and the time-weighted return on the capital of each day."""
+    traded = [r for r in rows if r.profit is not None]
+    wins = [r.profit for r in traded if r.profit > 0]
+    losses = [r.profit for r in traded if r.profit < 0]
+    net = sum((r.profit for r in traded), ZERO)
+    charges = sum((r.charges for r in rows if r.charges is not None), ZERO)
+    cumulative = peak = max_dd = ZERO
+    run = longest = 0
+    growth = Decimal(1)
+    for r in rows:
+        if r.profit is not None:
+            cumulative += r.profit
+            if r.capital:
+                growth *= 1 + r.profit / r.capital
+        peak = max(peak, cumulative)
+        dd = cumulative - peak
+        max_dd = min(max_dd, dd)
+        run = run + 1 if dd < 0 else 0
+        longest = max(longest, run)
+    caps = [r.capital for r in rows if r.capital is not None]
+    capital = sum(caps, ZERO) / len(caps) if caps else None
+    pct = (lambda v: round(float(v * 100 / capital), 2)) if capital else (lambda v: None)
+    return {
+        "first_day": rows[0].day.isoformat() if rows else None,
+        "last_day": rows[-1].day.isoformat() if rows else None,
+        "sessions": len(rows),
+        "traded_sessions": len(traded),
+        "net": float(net),
+        "charges": float(charges),
+        "algo_fees": float(sum((r.algo_fees for r in rows), ZERO)),
+        "interest": float(sum((r.interest for r in rows), ZERO)),
+        "charge_profit_pct": round(float(charges * 100 / net), 1) if net else None,
+        "max_drawdown": float(max_dd),
+        "max_drawdown_pct": pct(max_dd),
+        "longest_drawdown": longest,
+        "win_days": len(wins),
+        "loss_days": len(losses),
+        "win_pct": round(len(wins) * 100 / (len(wins) + len(losses)), 1)
+        if wins or losses
+        else None,
+        "avg_day": _f(net / len(traded)) if traded else None,
+        "avg_win": _f(sum(wins, ZERO) / len(wins)) if wins else None,
+        "avg_loss": _f(sum(losses, ZERO) / len(losses)) if losses else None,
+        "best": _f(max(wins)) if wins else None,
+        "worst": _f(min(losses)) if losses else None,
+        "capital": _f(capital),
+        "profit_pct": pct(net),
+        "time_weighted_return_pct": round(float((growth - 1) * 100), 2) if caps else None,
+        "deposits": float(sum((r.deposits for r in rows), ZERO)),
+        "withdrawals": float(sum((r.withdrawals for r in rows), ZERO)),
+    }
+
+
+def fiscal_year(day: date) -> int:
+    """The Indian financial year a day falls in, by its starting year (Apr–Mar)."""
+    return day.year if day.month >= 4 else day.year - 1
+
+
+def months(rows: list[DayRow]) -> list[dict]:
+    """The sheet's monthly tab: gain, % of the month's average capital, the 3-month average %."""
+    groups: dict[tuple[int, int], list[DayRow]] = {}
+    for r in rows:
+        groups.setdefault((r.day.year, r.day.month), []).append(r)
+    out: list[dict] = []
+    for (year, month), rs in sorted(groups.items()):
+        s = summary(rs)
+        out.append(
+            {
+                "month": f"{year}-{month:02d}",
+                "profit": s["net"],
+                "charges": s["charges"],
+                "sessions": s["sessions"],
+                "capital": s["capital"],
+                "pct": s["profit_pct"],
+            }
+        )
+    for i, m in enumerate(out):
+        last3 = [x["pct"] for x in out[max(0, i - 2) : i + 1]]
+        m["avg3_pct"] = (
+            round(sum(last3) / 3, 2) if i >= 2 and all(v is not None for v in last3) else None
+        )
+    return out
+
+
+def fiscal_years(rows: list[DayRow]) -> list[dict]:
+    """One row per financial year: profit, % of its average capital, sessions, max drawdown."""
+    groups: dict[int, list[DayRow]] = {}
+    for r in rows:
+        groups.setdefault(fiscal_year(r.day), []).append(r)
+    out = []
+    for fy, rs in sorted(groups.items()):
+        s = summary(rs)
+        out.append(
+            {
+                "fy": f"{fy}-{str(fy + 1)[2:]}",
+                "profit": s["net"],
+                "pct": s["profit_pct"],
+                "capital": s["capital"],
+                "sessions": s["sessions"],
+                "max_drawdown": s["max_drawdown"],
+                "charges": s["charges"],
+                "algo_fees": s["algo_fees"],
+            }
+        )
+    return out
