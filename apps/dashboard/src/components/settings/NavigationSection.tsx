@@ -7,7 +7,7 @@ import { cn } from '../../lib/cn';
 import { formatInt } from '../../lib/format';
 import type { NavigationPreferences } from '../../store/navigation';
 import { DEFAULT_NAVIGATION_PREFERENCES, moveTabBefore } from '../../store/navigation';
-import { NAV_GROUPS, type Tab } from '../shell/nav';
+import { NAV_GROUPS, PINNED_TABS, type Tab } from '../shell/nav';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 
@@ -58,7 +58,7 @@ export function NavigationSection({
     <Card>
       <CardHeader
         title="Navigation"
-        description={`${formatInt(visibleCount)} of ${formatInt(preferences.order.length)} optional tabs shown. Settings stays pinned so you can always restore hidden tabs. Saved in this browser only.`}
+        description={`${formatInt(visibleCount)} of ${formatInt(preferences.order.length)} optional tabs shown. Settings and the Guide stay pinned so you can always restore hidden tabs; Reset hides the Archived engine again. Saved in this browser only.`}
         actions={
           <Button
             variant="secondary"
@@ -73,16 +73,17 @@ export function NavigationSection({
       <div className="space-y-4">
         {NAV_GROUPS.map((group) => {
           const items = group.items
-            .filter((item) => item.id !== 'settings')
+            .filter((item) => !PINNED_TABS.includes(item.id))
             .sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
           if (items.length === 0) return null;
           const groupTabs = items.map((item) => item.id);
           return (
-            <div key={group.heading} className="overflow-hidden rounded-lg border border-border">
+            <div key={group.id} className="overflow-hidden rounded-lg border border-border">
               <div className="border-b border-border bg-surface-2/60 px-4 py-2.5">
                 <h3 className="text-sm font-semibold text-foreground">{group.heading}</h3>
                 <p className="mt-0.5 text-xs text-muted">
-                  Drag tabs to set their priority within this section.
+                  {group.note ? `${group.note} ` : ''}Drag tabs to set their priority within this
+                  section.
                 </p>
               </div>
               <div className="divide-y divide-border">

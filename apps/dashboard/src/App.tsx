@@ -27,7 +27,7 @@ import { DataSourceBanner } from './components/shell/DataSourceBanner';
 import { Sidebar } from './components/shell/Sidebar';
 import { TokenBanner } from './components/shell/TokenBanner';
 import { Topbar } from './components/shell/Topbar';
-import { type Tab, activeNavChild, navItem, tabLabel } from './components/shell/nav';
+import { ARCHIVED_TABS, type Tab, activeNavChild, navItem, tabLabel } from './components/shell/nav';
 import { PENDING_BY_TAB } from './components/shell/pending';
 import { Toaster } from './components/ui/Toast';
 import { hydrateMomentumAlertsFromStorage } from './store/momentumAlerts';
@@ -179,7 +179,8 @@ export function App() {
             : firstVisibleTab(navigationPreferences),
         );
       }
-    } else if (navigationPreferences.hidden.includes(tab)) {
+    } else if (navigationPreferences.hidden.includes(tab) && !ARCHIVED_TABS.includes(tab)) {
+      // An archived screen is hidden from the sidebar, not disabled: its link still opens it.
       replace(firstVisibleTab(navigationPreferences));
     }
   }, [tab, navigationPreferences, replace]);

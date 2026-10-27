@@ -13,14 +13,16 @@ when it is back.
 
 | Column | Meaning |
 |---|---|
-| Job | Its id, such as `options-daily`. |
+| Job | Its id, such as `options-daily`, and the first sentence of what it does (hover for the rest). |
 | Schedule | When it runs, in IST: "trading days 15:45", "Fri 14:40", "1st Sunday of the month 10:00". |
 | Next run, Last run | When it will run next; when it last ran and whether it succeeded. |
 | Group | Jobs in the same group never run at the same time (for example, two jobs that write the same data). |
 | Needs | What it depends on, such as the laptop or a broker login. |
 | Action | **Run now**. Some jobs ask you to confirm first. |
 
-Click a job to read the last 200 lines of its latest log.
+Click a job to read, under the table, what it does in full and the last 200 lines of its latest
+log. The [Overview](guide:operations/overview)'s Jobs card lists the jobs that failed in the last
+24 hours.
 
 ## The main jobs
 

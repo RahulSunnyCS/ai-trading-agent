@@ -1,4 +1,5 @@
 import {
+  ARCHIVED_TABS,
   CONFIGURABLE_TABS,
   NAV_GROUPS,
   type NavGroup,
@@ -10,13 +11,20 @@ const STORAGE_KEY = 'ata.navigation.v1';
 const CONFIGURABLE_IDS = CONFIGURABLE_TABS.map((item) => item.id);
 const CONFIGURABLE_SET = new Set<Tab>(CONFIGURABLE_IDS);
 
+/**
+ * The shape of the stored value. 1 (no `version` field): written before the Archived engine
+ * section; 2: written since, so its `hidden` list is the reader's own choice.
+ */
+export const NAVIGATION_VERSION = 2;
+
 export interface NavigationPreferences {
   hidden: Tab[];
   order: Tab[];
 }
 
+/** The frozen engine's tabs (the Archived engine section) start hidden. */
 export const DEFAULT_NAVIGATION_PREFERENCES: NavigationPreferences = {
-  hidden: [],
+  hidden: [...ARCHIVED_TABS],
   order: [...CONFIGURABLE_IDS],
 };
 
@@ -96,11 +104,34 @@ export function normalizeNavigationPreferences(value: unknown): NavigationPrefer
   return { hidden, order: uniqueOrder };
 }
 
+/**
+ * A stored value, brought up to NAVIGATION_VERSION and normalised.
+ *
+ * A value from before version 2 was saved while the frozen engine's tabs (now the Archived engine
+ * section) were shown by default, so a browser that kept those defaults would keep showing them.
+ * Upgrading hides them once, and puts Live (which moved into the Options Lab section) after
+ * Options Lab, where the old flat order had it before. A version-2 value is the reader's own
+ * choice since the change, so an archived tab shown there again stays shown.
+ */
+export function migrateNavigationPreferences(value: unknown): NavigationPreferences {
+  const preferences = normalizeNavigationPreferences(value);
+  const version =
+    value && typeof value === 'object' ? (value as { version?: unknown }).version : undefined;
+  if (typeof version === 'number' && version >= NAVIGATION_VERSION) return preferences;
+
+  const order: Tab[] = preferences.order.filter((id) => id !== 'live');
+  order.splice(order.indexOf('optionslab') + 1, 0, 'live');
+  return normalizeNavigationPreferences({
+    hidden: [...preferences.hidden, ...ARCHIVED_TABS],
+    order,
+  });
+}
+
 export function loadNavigationPreferences(): NavigationPreferences {
   if (typeof window === 'undefined') return DEFAULT_NAVIGATION_PREFERENCES;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? normalizeNavigationPreferences(JSON.parse(raw)) : DEFAULT_NAVIGATION_PREFERENCES;
+    return raw ? migrateNavigationPreferences(JSON.parse(raw)) : DEFAULT_NAVIGATION_PREFERENCES;
   } catch {
     return DEFAULT_NAVIGATION_PREFERENCES;
   }
@@ -110,23 +141,41 @@ export function saveNavigationPreferences(preferences: NavigationPreferences): v
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(
     STORAGE_KEY,
-    JSON.stringify(normalizeNavigationPreferences(preferences)),
+    JSON.stringify({ version: NAVIGATION_VERSION, ...normalizeNavigationPreferences(preferences) }),
   );
 }
 
-export function visibleNavigationGroups(preferences: NavigationPreferences): NavGroup[] {
+/** A tab's place in NAV_GROUPS, for the pinned tabs, which have no rank in `order`. */
+const NAV_POSITION = new Map(
+  NAV_GROUPS.flatMap((group) => group.items).map((item, index) => [item.id, index]),
+);
+
+/**
+ * The sections and tabs the sidebar draws. A hidden tab is left out unless it is `activeTab`
+ * (an archived screen opened by its link), so the reader still sees where they are. The pinned
+ * tabs (Settings, then the Guide) close their section.
+ */
+export function visibleNavigationGroups(
+  preferences: NavigationPreferences,
+  activeTab?: Tab,
+): NavGroup[] {
   const rank = new Map(preferences.order.map((id, index) => [id, index]));
   const hidden = new Set(preferences.hidden);
+  // [pinned last, then the stored rank, or for a pinned tab its place in NAV_GROUPS]
+  const key = (id: Tab): [number, number] =>
+    PINNED_TABS.includes(id)
+      ? [1, NAV_POSITION.get(id) ?? 0]
+      : [0, rank.get(id) ?? Number.MAX_SAFE_INTEGER];
   return NAV_GROUPS.map((group) => ({
     ...group,
     items: [...group.items]
-      .filter((item) => PINNED_TABS.includes(item.id) || !hidden.has(item.id))
+      .filter(
+        (item) => PINNED_TABS.includes(item.id) || !hidden.has(item.id) || item.id === activeTab,
+      )
       .sort((a, b) => {
-        if (a.id === 'settings') return 1;
-        if (b.id === 'settings') return -1;
-        return (
-          (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER)
-        );
+        const [pa, ra] = key(a.id);
+        const [pb, rb] = key(b.id);
+        return pa - pb || ra - rb;
       }),
   })).filter((group) => group.items.length > 0);
 }
