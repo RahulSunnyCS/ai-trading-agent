@@ -62,14 +62,16 @@ A warning badge on a block means its master switch holds it back.
 
 **What follows these settings:**
 
-- **The 08:00 login:**
-  - With logins off, or no block logging in, the laptop does not start the login run, and the 08:15 GitHub backstop does nothing.
-  - With neither AlgoTest block on, the run leaves AlgoTest out: it does not wait for AlgoTest's 08:15 window, Quantiply logs in at once, and the Telegram report names only Quantiply.
+- **The 08:00 login (on this Mac, 08:02):**
+  - With logins off, or no block logging in, nothing logs in, and GitHub's 08:15 backup does nothing.
+  - With neither AlgoTest block on, AlgoTest is left out: no wait for AlgoTest's 08:15 window, Quantiply logs in at once, and the Telegram report names only Quantiply.
   - Quantiply · Shoonya logs in after the AlgoTest logins (straight after Quantiply · Angel One when AlgoTest is off), when its block is on. Its result counts in the report's verdict.
-- **The evening and 09:16 uploads:** AlgoTest gets every list its blocks choose. Each Quantiply account (Angel One, Shoonya) gets its own block's list. A block with upload off is left untouched.
+  - A part that fails for a reason another machine could fix is tried again on GitHub, that part only; a refused password or PIN never is. GitHub keeps its own copy of the passwords: when you change one in `.env`, change GitHub's too.
+- **The evening upload (16:45):** AlgoTest gets every list its blocks choose. Each Quantiply account (Angel One, Shoonya) gets its own block's list. A block with upload off is left untouched. On Quantiply the evening also deletes every finished, switched-off algo on the account, **your own included**; never one that is switched on or may still run. On Shoonya (a paid plan) it then sets the Subscription's algos a day to what the next session needs (3, or 4 with an add-on): it previews the change, raises it only when your credits cover it, and reads it back. Lowering returns the unused credits. Two algos a day come with the plan, so asking for 2 or fewer is left to you.
 - **Deploying:** it also needs Automated deployment on.
   - AlgoTest deploys the day's T1 picks after 09:16, only while an AlgoTest block uploads the T1 list (and Automated uploads is on: with uploads off nothing new is in AlgoTest to deploy). A block uploading Core is not deployed by any job; a Telegram message says so. With none, the deploy and its 15:35 check do not log in to AlgoTest (the check still runs on a day the tool deployed something).
-  - Quantiply switches on each account's picks at 16:55 for the next day, and at 09:21 any that changed. It only does this for an account whose block uploads a list.
+  - Quantiply: at 08:10, after the login, each account whose block uploads a list has its MTM SL kept (above) and last evening's algos for today switched on. One message per account says so every morning.
+  - At 09:16 the real pick is recorded. It changes only what starts after 09:17: last evening's 09:17 strategy keeps running and a new 09:17 pick is not made; the rest is chosen again by the 09:16 score (2 Widesl and 1 directional, the highest scorers). At 09:19 the new strategy is created and at 09:21 it is switched on and the one it replaced switched off. You get messages only on a day something changed.
   - At 15:40 the tool's Quantiply algos are switched off again; otherwise they would run on the same weekday next week. This always runs, even with Automated deployment or `QUANTIPLY_DEPLOY` off.
   - Switching an algo off by hand after the tool switched it on is final for that day: the 09:21 run does not switch it back on.
 

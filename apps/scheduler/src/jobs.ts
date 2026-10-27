@@ -102,16 +102,23 @@ const FRIDAY = onWeekdays(5);
 const BASE_JOBS: Job[] = [
   {
     id: 'broker-login',
-    description: 'Trigger the AlgoTest broker login workflow on GitHub',
-    schedule: { at: '08:00', on: tradingDays, label: 'trading days 08:00' },
-    steps: [['node_modules/.bin/tsx', 'src/dispatch.ts']],
+    description:
+      'The morning broker login, on the Mac (BL-172): what Settings › Automation logs in (AlgoTest brokers from 08:16, Quantiply · Angel One and · Shoonya at once), credentials from the repo .env. A part that fails for a reason another machine could fix is handed to GitHub\'s "Daily broker login" (never a refused password or PIN); LOCAL_LOGIN_DONE then stops the workflow\'s cron backstops',
+    // 08:02, not 08:00: clear of angel-login-check's Angel One code (one TOTP seed, 30 s windows).
+    // In the quantiply group, so the 08:10 switch-on always starts after the login has ended
+    // (with an AlgoTest row on, the login waits for 08:16). Never retried: a second run would
+    // resend a refused PIN; local-login.ts hands what failed to GitHub instead.
+    schedule: { at: '08:02', on: tradingDays, label: 'trading days 08:02' },
+    steps: [['node_modules/.bin/tsx', 'src/local-login.ts']],
     cwd: BROKER_LOGIN,
-    timeoutMinutes: 10,
-    retries: 0, // dispatch.ts retries itself and must never dispatch twice
+    timeoutMinutes: 45,
+    retries: 0,
     retryDelayMinutes: 0,
-    catchUpHours: 7, // dispatch.ts itself refuses after 15:35
+    catchUpHours: 7, // AlgoTest refuses broker logins after 15:40; Quantiply any time
+    group: 'quantiply',
     alertsItself: true,
-    fixHint: 'Start "Daily broker login" by hand from GitHub Actions',
+    fixHint:
+      'Read the login report first (a refused PIN must not be sent again). Then start "Daily broker login" by hand from GitHub Actions, or: cd packages/broker-login && node_modules/.bin/tsx src/local-login.ts',
   },
   {
     // ONE Angel One SmartAPI login (nothing fetched): is the evening run's fallback source ready?

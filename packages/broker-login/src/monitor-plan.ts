@@ -192,6 +192,8 @@ export interface PlatformJob {
  */
 export const PLATFORM_JOBS: Record<'algotest' | 'quantiply', readonly PlatformJob[]> = {
   algotest: [
+    // BL-172: the morning login runs on the Mac and logs in to both platforms
+    { id: 'broker-login', window: 'morning' },
     { id: 'algotest-deploy', window: 'morning' },
     { id: 'algotest-topup', window: 'morning' },
     { id: 'algotest-deploy-check', window: 'evening' },
@@ -201,6 +203,7 @@ export const PLATFORM_JOBS: Record<'algotest' | 'quantiply', readonly PlatformJo
     { id: 'live-capture-retry', window: 'evening' },
   ],
   quantiply: [
+    { id: 'broker-login', window: 'morning' },
     { id: 'quantiply-topup', window: 'morning' },
     { id: 'quantiply-deploy-topup', window: 'morning' },
     { id: 'quantiply-disable', window: 'evening' },

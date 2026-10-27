@@ -80,6 +80,14 @@ npm run stop-button -- --clear-hold       # lift the stop hold (Telegram's Resum
 
 ## Source layout
 
+- `src/local-login.ts` (+ pure `src/local-login-plan.ts`) — BL-172: the scheduler's 08:02 `broker-login` job. Derives
+  `ONLY` / `QUANTIPLY_LOGIN` / `QUANTIPLY_BROKERS` from the automation settings (`loginEnv`, the GitHub variables'
+  rule), runs `main.ts` here with the repo `.env`, reads its outcome (`LOGIN_RESULT_FILE`), hands to GitHub only
+  the parts that failed for a reason another machine could fix (`fallback`: dispatch inputs `only` (`both` = both
+  brokers), `quantiply`, `quantiply_shoonya`; a refusal matching `REFUSED` never), sets the repository variable
+  `LOCAL_LOGIN_DONE` (UTC day) so the workflow's crons skip, and writes `<scheduler state>/broker-login/<IST day>.json`
+  for the 09:00 summary. Its Quantiply logins do not take `quantiply-session.ts`'s stamp yet (08:02 is clear of the
+  08:00 `angel-login-check` window; the 08:10 deployer waits for it, same scheduler group).
 - `src/main.ts` — entry point: runs Quantiply (if on) before or after the AlgoTest logins (`run-plan.ts`), waits for the AlgoTest login window, runs each broker's `login()`, sends one Telegram report for both
 - `src/brokers/{angelone,finvasia}.ts` — one file per broker, each exporting a `Broker` (see `src/brokers/types.ts`)
 - `src/selectors.ts` — every Playwright locator in the package, single-file fix on redesign

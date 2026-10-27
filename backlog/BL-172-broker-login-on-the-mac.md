@@ -250,3 +250,17 @@ set to that.
   returns credits, so it is set each evening to the next session's count. The owner set 3 (Value plan (3),
   415 credits back); the change's call found.
 - 2026-10-28 — Started (overnight build, merged as it goes). Answers recorded above; TODO 3.47.
+- 2026-10-28 (overnight) — Built:
+  - PR 349: the MTM SL field per Quantiply row (Settings › Automation); `quantiply-deploy.ts --morning` keeps the
+    clientwise MTM SL (`POST /brokers/<id>/config`, read back on every weekday) then switches on last evening's
+    algos; the `quantiply-deploy` job moved from 16:55 to 08:10. Dry run on both real accounts: MTM SL 8,000 / 9,000
+    read as set, six algos would be switched on.
+  - The 09:16 rule (`rotation/morning.py`, `quantiply-export --morning-rule` in the 09:19 top-up): replayed
+    13-27 Oct, no day changed; with a made-up evening list on 26-27 Oct the 09:16 ranking rebuilt to the recorded
+    picks and the evening's 09:17 Dir was kept with the two best Widesl. The 09:19 upload is quiet unless it creates.
+  - The evening `--delete-all` (the owner's own finished, switched-off algos too) and `--subscription` (Shoonya's
+    algos a day set to the next session's count; previewed, credits checked, read back).
+  - Phases 1-2: `local-login.ts` runs the login on the Mac at 08:02 (`broker-login` job, `quantiply` group so the
+    08:10 switch-on follows it), GitHub only for what failed for a fixable reason; `LOCAL_LOGIN_DONE` stops the
+    crons; the 09:00 summary reads the Mac's file. Run for real at 01:36 IST: both Quantiply accounts logged in.
+  - Phase 3 (the `.env` credential-change reminder) not built yet.
