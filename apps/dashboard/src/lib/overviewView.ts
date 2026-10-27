@@ -12,6 +12,7 @@ import type { FyersAuthStatus } from '../hooks/useFyersAuthStatus';
 import type { MomentumLiveRules, MomentumWeekView } from '../types/momentum';
 import type { RotationCheckState, RotationOverview, RotationSummary } from '../types/rotation';
 import type { RotationLiveResponse } from '../types/rotationLive';
+import type { PlanAccountState, RotationPlan } from '../types/rotationPlan';
 import type { TradeBookDaysResponse, TradeBookSummary } from '../types/tradeBook';
 import { type AngelStatus, REASON_LABEL, angelCardState } from './angelOne';
 import { formatDayShort, formatIstTime, formatPct, formatRelative } from './format';
@@ -421,5 +422,40 @@ export function brokerLoginLine(job: SchedulerJob | null, now: number): StatusLi
     text: `failed ${when}`,
     tone: 'bad',
     detail: run.error ?? undefined,
+  };
+}
+
+/**
+ * The next session's tentative picks against what each uploading account holds
+ * (`/legwise/rotation/plan`): "Wed 28 Oct · uploaded 3/3 Quantiply · Angel One, 3/3 Quantiply ·
+ * Shoonya". Warns when any pick is missing on an account; null with no tentative list or no
+ * account uploading. A ledger that cannot be read is said, never counted as nothing uploaded.
+ */
+export function nextSessionLine(plan: RotationPlan | null): StatusLine | null {
+  const s = plan?.sessions.find((x) => x.kind === 'tentative');
+  if (!plan || !s || plan.accounts.length === 0) return null;
+  const parts: string[] = [];
+  let missing = false;
+  let unknown = false;
+  for (const a of plan.accounts) {
+    const picks = s.books[a.book] ?? [];
+    if (picks.length === 0) continue;
+    if ('error' in a.state) {
+      unknown = true;
+      parts.push(`${a.label} not known`);
+      continue;
+    }
+    const st = (a.state as Record<string, PlanAccountState>)[s.day];
+    const have = picks.filter((p) => st?.uploaded.includes(p.name)).length;
+    if (have < picks.length) missing = true;
+    parts.push(`${have}/${picks.length} ${a.label}`);
+  }
+  if (parts.length === 0) return null;
+  return {
+    label: `${formatDayShort(s.day, { weekday: true })} (tentative)`,
+    text: `uploaded ${parts.join(', ')}`,
+    tone: missing ? 'warn' : unknown ? 'neutral' : 'ok',
+    detail:
+      'The 16:00 message’s list for the next session against the uploaders’ ledgers; the 09:16 entry confirms it and the morning top-up uploads any change.',
   };
 }
