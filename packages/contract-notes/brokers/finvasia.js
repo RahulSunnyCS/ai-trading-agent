@@ -1,6 +1,7 @@
 const Decimal = require('decimal.js');
 const { parseAmounts, splitBySegment } = require('./segments');
 const logger = require('../utils/logger');
+const { chooseTrades } = require('./fnoTrades');
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -143,6 +144,16 @@ function extract(text) {
   let itemisedCharges = new Decimal(0);
   let taxable = new Decimal(0);
   let taxableComponents = new Decimal(0);
+  const kinds = {
+    stt: COL.STT,
+    gst: COL.IGST,
+    exchange: COL.TRANSACTION,
+    clearing: COL.CLEARING,
+    sebi: COL.SEBI,
+    stamp: COL.STAMP,
+    ipf: COL.IPF,
+  };
+  const byKind = Object.fromEntries(Object.keys(kinds).map((k) => [k, new Decimal(0)]));
 
   for (const row of kept) {
     const a = row.amounts;
@@ -152,6 +163,7 @@ function extract(text) {
     obligation = obligation.plus(a[COL.OBLIGATION]);
     netAmount = netAmount.plus(a[COL.NET]);
     brokerage = brokerage.plus(a[COL.BROKERAGE]);
+    for (const [k, c] of Object.entries(kinds)) byKind[k] = byKind[k].plus(a[c].abs());
     itemisedCharges = itemisedCharges.plus(
       CHARGE_COLS.reduce((sum, c) => sum.plus(a[c]), new Decimal(0)),
     );
@@ -207,6 +219,11 @@ function extract(text) {
     // |finalNet - obligation| spans brokerage + other charges; strip brokerage to isolate other charges
     other_charges: round2(charges.abs().minus(brokerage)),
     skipped_segments: dropped,
+    charges: {
+      brokerage: round2(brokerage),
+      ...Object.fromEntries(Object.entries(byKind).map(([k, v]) => [k, round2(v)])),
+    },
+    ...chooseTrades(text, 'finvasia', obligation),
   };
 }
 
