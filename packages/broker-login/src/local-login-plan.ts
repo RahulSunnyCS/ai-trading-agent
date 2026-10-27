@@ -111,3 +111,38 @@ export function allLoggedIn(r: LoginResult): boolean {
   );
   return r.fatal === null && lines.every((x) => x.status !== 'FAIL');
 }
+
+/** The `.env` broker credentials GitHub's backup keeps its own copies of (repository secrets). */
+export const BACKUP_SECRETS = [
+  'ALGOTEST_PHONE',
+  'ALGOTEST_PASSWORD',
+  'ANGELONE_CLIENT_CODE',
+  'ANGELONE_MPIN',
+  'ANGELONE_TOTP_SECRET',
+  'SHOONYA_CLIENT_ID',
+  'SHOONYA_PASSWORD',
+  'SHOONYA_TOTP_SECRET',
+] as const;
+
+/**
+ * BL-172 Phase 3: the secrets whose `.env` value changed since the last run, from per-name
+ * digests (never the values). The first run, with nothing stored, reports nothing.
+ */
+export function changedSecrets(
+  before: Record<string, string> | null,
+  now: Record<string, string>,
+): string[] {
+  if (!before) return [];
+  return BACKUP_SECRETS.filter((k) => now[k] !== undefined && before[k] !== now[k]);
+}
+
+/** The Telegram text for changed secrets: what to copy to GitHub, without printing a value. */
+export function secretsReminder(names: string[]): string {
+  const lines = names.map(
+    (n) => `grep '^${n}=' .env | cut -d= -f2- | tr -d '\\n' | gh secret set ${n}`,
+  );
+  return [
+    `⚠️ .env changed: ${names.join(', ')}. GitHub's backup login still has the old value: update its secret, from the repo root:`,
+    ...lines,
+  ].join('\n');
+}

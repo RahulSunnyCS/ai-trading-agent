@@ -1,4 +1,5 @@
 import { execFile, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -9,11 +10,14 @@ import { describeSource, readAutomation, settingsPath } from './automation-setti
 import { readTelegramConfig } from './config.js';
 import { describe } from './diagnose.js';
 import {
+  BACKUP_SECRETS,
   type LoginEnv,
   type LoginResult,
   allLoggedIn,
+  changedSecrets,
   fallback,
   loginEnv,
+  secretsReminder,
 } from './local-login-plan.js';
 import { istToday } from './strategy-plan.js';
 
@@ -110,10 +114,41 @@ async function markDone(): Promise<string> {
   }
 }
 
+/**
+ * BL-172 Phase 3: GitHub's backup has its own copy of every broker credential (repository secrets,
+ * which cannot be read back), so a `.env` change is said once: per-name digests, never a value,
+ * kept in `<state>/broker-login/credentials.json`.
+ */
+async function remindChangedSecrets(telegram: ReturnType<typeof readTelegramConfig>) {
+  const file = join(dirname(settingsPath()), 'broker-login', 'credentials.json');
+  const now: Record<string, string> = {};
+  for (const k of BACKUP_SECRETS) {
+    const v = process.env[k]?.trim();
+    if (v) now[k] = createHash('sha256').update(`${k}=${v}`).digest('hex');
+  }
+  let before: Record<string, string> | null = null;
+  try {
+    before = JSON.parse(await readFile(file, 'utf8')) as Record<string, string>;
+  } catch {
+    before = null;
+  }
+  const changed = changedSecrets(before, now);
+  if (changed.length) {
+    await sendText(telegram, secretsReminder(changed), 'broker.algotest').catch(() => undefined);
+  }
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, `${JSON.stringify(now)}\n`, { mode: 0o600 });
+}
+
 async function main(): Promise<number> {
   const dryRun = process.argv.includes('--dry-run');
   const telegram = readTelegramConfig();
   const day = istToday();
+  if (!dryRun) {
+    await remindChangedSecrets(telegram).catch((error) =>
+      console.warn(`credential digests not checked: ${describe(error)}`),
+    );
+  }
   const statusFile = join(dirname(settingsPath()), 'broker-login', `${day}.json`);
   const status = async (body: Record<string, unknown>) => {
     if (dryRun) return;

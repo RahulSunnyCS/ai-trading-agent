@@ -263,4 +263,6 @@ set to that.
   - Phases 1-2: `local-login.ts` runs the login on the Mac at 08:02 (`broker-login` job, `quantiply` group so the
     08:10 switch-on follows it), GitHub only for what failed for a fixable reason; `LOCAL_LOGIN_DONE` stops the
     crons; the 09:00 summary reads the Mac's file. Run for real at 01:36 IST: both Quantiply accounts logged in.
-  - Phase 3 (the `.env` credential-change reminder) not built yet.
+  - Phase 3: `local-login.ts` keeps per-name digests of the eight broker credentials GitHub has as secrets
+    (`<state>/broker-login/credentials.json`, 0600, never a value) and Telegrams once, with the copy command, when
+    one changes in `.env`. The first run only records them.

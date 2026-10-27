@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { DEFAULT_AUTOMATION } from './automation-settings.js';
-import { type LoginResult, allLoggedIn, fallback, loginEnv } from './local-login-plan.js';
+import {
+  type LoginResult,
+  allLoggedIn,
+  changedSecrets,
+  fallback,
+  loginEnv,
+  secretsReminder,
+} from './local-login-plan.js';
 
 const settings = (change: (s: typeof DEFAULT_AUTOMATION) => void) => {
   const s = JSON.parse(JSON.stringify(DEFAULT_AUTOMATION)) as typeof DEFAULT_AUTOMATION;
@@ -102,5 +109,18 @@ describe('the Mac login (BL-172)', () => {
     assert.deepEqual(fallback(env, r)?.only, 'angelone');
     const both: LoginResult = { ...r, algotest: [], fatal: 'page.goto: Timeout' };
     assert.deepEqual(fallback(env, both)?.only, '');
+  });
+});
+
+describe('the GitHub secrets reminder (BL-172 Phase 3)', () => {
+  it('names only the secrets whose digest changed, and never on the first run', () => {
+    const now = { SHOONYA_PASSWORD: 'b', ANGELONE_MPIN: 'x' };
+    assert.deepEqual(changedSecrets(null, now), []);
+    assert.deepEqual(changedSecrets({ SHOONYA_PASSWORD: 'a', ANGELONE_MPIN: 'x' }, now), [
+      'SHOONYA_PASSWORD',
+    ]);
+    const text = secretsReminder(['SHOONYA_PASSWORD']);
+    assert.match(text, /gh secret set SHOONYA_PASSWORD/);
+    assert.match(text, /grep '\^SHOONYA_PASSWORD=' \.env/);
   });
 });

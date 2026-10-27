@@ -889,7 +889,7 @@ each evening delete the finished algos and set Shoonya's subscription to the nex
 | 3.47.2 | Phases 5-6 and the 08:00 messages: MTM SL check, enable at 08:00 | claude | **Done 2026-10-28** (#349): 08:10, first live run 28 Oct |
 | 3.47.3 | Phase 4: the 09:16 re-choice and its message | claude | **Built 2026-10-28**; first live change day to watch |
 | 3.47.4 | Phase 7 and the evening delete-all | claude | **Built 2026-10-28**; first live evening 28 Oct 16:45 |
-| 3.47.5 | Phases 1-3: login on the Mac, GitHub backup, credential reminder | claude | Phases 1-2 **built 2026-10-28** (first live 08:02 on 28 Oct); Phase 3 next |
+| 3.47.5 | Phases 1-3: login on the Mac, GitHub backup, credential reminder | claude | **Built 2026-10-28** (first live 08:02 on 28 Oct) |
 
 ### 3.46 Dashboard on Next.js 16 — [BL-157](backlog/BL-157-dashboard-nextjs-16.md)
 
