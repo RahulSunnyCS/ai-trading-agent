@@ -127,14 +127,16 @@ network or disk so the test needs neither. One group per file keeps parallel PRs
 - Tests use `bun test`, not vitest, because `bun:sqlite` only exists under Bun.
 - `group: 'catalog'` is for anything that writes the DuckDB catalog (`TRADING_DATA_ROOT`).
 - `group: 'quantiply'` holds the Quantiply jobs (upload, enable, disable), so an enable runs after the upload
-  before it, retries included (`quantiply-deploy` 16:55 waits for `quantiply-evening` 16:45;
+  before it, retries included (`quantiply-deploy` 08:10 waits for the 08:02 `broker-login`, BL-172;
   `quantiply-deploy-topup` 09:21 for `quantiply-topup` 09:19). It does not space their TOTP logins (the next job
   starts the moment one ends): `packages/broker-login/src/quantiply-session.ts` waits out the last window each
   account typed a code in (a file stamp), and the deployer retries a refused code once. The enables have
   `retries: 0` like `algotest-deploy`: a second attempt could act on a half-finished first. `quantiply-disable`
   is the safety net and runs whatever `QUANTIPLY_DEPLOY` and the deploy switch say.
-- `broker-login` has `retries: 0` on purpose: `dispatch.ts` retries itself and must never
-  dispatch the GitHub workflow twice.
+- `broker-login` (BL-172, 08:02) runs the login on the Mac (`packages/broker-login/src/local-login.ts`), in the
+  `quantiply` group so the 08:10 `quantiply-deploy` starts after it; `retries: 0` on purpose: a second run would
+  resend a refused PIN, and the job hands what failed to GitHub itself. The 09:00 summary reads its
+  `<state>/broker-login/<day>.json` first, GitHub's runs only when the Mac did not run or handed parts over.
 - `angel-login-check` (trading days 08:00) runs `obt angel test --scheduled`: one Angel One
   SmartAPI login through the same guard as the dashboard's Test connection and the collector
   (one login at a time, 60 s cool-down). Its single retry is 5 minutes later, past its own

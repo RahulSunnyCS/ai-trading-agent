@@ -1,4 +1,4 @@
-import { appendFile, mkdir } from 'node:fs/promises';
+import { appendFile, mkdir, writeFile } from 'node:fs/promises';
 import { istTimestamp, sendText } from '@trading/notify';
 import { type Browser, type BrowserContext, type Page, chromium } from 'playwright';
 import {
@@ -316,6 +316,15 @@ async function main(): Promise<number> {
 
   console.log(`\n${report}`);
   await sendText(config.telegram, report, 'broker.algotest');
+
+  // BL-172: the Mac's runner (local-login.ts) reads the outcome to decide what GitHub tries again.
+  const resultFile = process.env.LOGIN_RESULT_FILE;
+  if (resultFile) {
+    await writeFile(
+      resultFile,
+      JSON.stringify({ algotest: results, quantiply, quantiplyShoonya, fatal }),
+    ).catch((error) => console.error(`could not write the result: ${describe(error)}`));
+  }
 
   // In Actions, Quantiply's result goes to the workflow as a step output and its own step fails
   // the job; this step's conclusion stays AlgoTest's alone (run-plan.ts exitCode).
