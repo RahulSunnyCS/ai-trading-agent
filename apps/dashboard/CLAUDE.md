@@ -38,7 +38,7 @@ renders the shell; `lib/routes.ts` holds the path grammar, `hooks/useAppRoute.ts
 it). Paths: `/<tab>`, `/optionslab/<rotation|heatmap|matrix|correlation|regimes|strategies|builder>` (three workspaces, BL-102: Today = `rotation`, which `/optionslab` opens; Explore data; Build and test; `regimes` is archived, routed but `hidden` in the sidebar; the retired `/optionslab/results` redirects to Today and `/optionslab/runs` to Strategies, whose History drawer (`?strategy=<id>`) holds a strategy's saved days, through `PATH_ALIASES`),
 `/optionslab/builder/yaml` (the YAML engine; `/backtest` redirects there),
 `/tradebook/<fno|trades|money|momentum>` (the Trade book; `/tradebook` opens F&O), `/coverage/<backfill|replay>` (old `/backfill`, `/replay` redirect), `/jobs` (the scheduler's Jobs page, read from `/api/scheduler/*` — needs `SCHEDULER_DIRECT=1`), `/billing` (`/pricing` redirects),
-`/momentum/<backtest|scores|saved|week|rebalance|journal>` (`/momentum/weekly` redirects to `week`; This week's state is in the query: `?week=`, `?fav=`, `?panel=run`, `?review=`, `?stock=`), `/momentum/backtest/<dataset>`,
+`/momentum/<backtest|scores|saved|week|journal>` (`/momentum/weekly` and the retired `/momentum/rebalance` redirect to `week`; This week's state is in the query: `?week=`, `?fav=`, `?panel=run`, `?review=`, `?stock=`), `/momentum/backtest/<dataset>`,
 `/momentum/scores/<stocks|sectors>`, `/guide/<chapter>/<page>` (`/help` and `/docs` redirect). A new sub-tab = add its ids to `lib/routes.ts` and derive
 state from `useAppRoute().rest` — don't add another `useState` for navigation. `useAppRoute`
 moves with `window.history.pushState`/`replaceState`, never `router.push`: every path is the same

@@ -617,3 +617,79 @@ def test_the_inputs_route_refuses_bad_values(tmp_path, monkeypatch):
     assert client.get("/legwise/contract-notes/trips?extremes=true").status_code == 422
     ok = client.get("/legwise/contract-notes/trips?extremes=true&from=2026-04-01&to=2026-04-30")
     assert ok.status_code == 200
+
+
+# --- the cache ------------------------------------------------------------------------------
+
+
+def _ledger(root: Path, day: str, events: list[dict]) -> None:
+    path = root / "contract-notes" / "ledger" / f"{day}.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(json.dumps(e) + "\n" for e in events))
+
+
+def test_a_cached_book_is_the_fresh_one_and_a_repeat_reads_nothing(tmp_path, monkeypatch):
+    from option_backtesting.realised import views
+
+    store.forget()
+    _write(tmp_path, "2026-04-01", [_note("2026-04-01", "A1", 1000, 20)])
+    _write(tmp_path, "2026-04-02", [_note("2026-04-02", "A1", -400, 12)])
+    with (tmp_path / "contract-notes" / "days" / "2026-04-02.jsonl").open("a") as f:
+        f.write("not json\n")  # a damaged line: a problem, cached like the rest
+    _ledger(tmp_path, "2026-04-02", [{"kind": "deposit", "amount": 50000}])
+    _manual(tmp_path, "2026-04-01", algos=4, capital_total=500000)
+    assert store.load_cached(tmp_path) == store.load(tmp_path)
+    for view in (views.summary, views.days, views.months, views.money, views.momentum):
+        got = view(tmp_path)
+        store.forget()
+        assert got == view(tmp_path)  # a cached answer is the one from a fresh read
+    store.load_cached(tmp_path)
+    monkeypatch.setattr(store, "load", lambda root: pytest.fail("read again with nothing changed"))
+    assert store.load_cached(tmp_path) is store.load_cached(tmp_path)
+
+
+def test_a_changed_note_ledger_or_manual_file_is_read_again(tmp_path):
+    store.forget()
+    _write(tmp_path, "2026-04-01", [_note("2026-04-01", "A1", 1000, 20)])
+    assert ratios.summary(ratios.daily(store.load_cached(tmp_path)))["net"] == 1000
+    _write(tmp_path, "2026-04-01", [_note("2026-04-01", "A1", 12345, 20)])
+    assert ratios.summary(ratios.daily(store.load_cached(tmp_path)))["net"] == 12345
+    _write(tmp_path, "2026-04-02", [_note("2026-04-02", "A1", 5, 1)])  # a new file
+    assert len(store.load_cached(tmp_path).days) == 2
+    _ledger(tmp_path, "2026-04-02", [{"kind": "deposit", "amount": 1}])
+    assert store.load_cached(tmp_path).ledger[date(2026, 4, 2)][0]["amount"] == 1
+    _manual(tmp_path, "2026-04-01", algos=4)
+    assert store.load_cached(tmp_path).manual[date(2026, 4, 1)]["algos"] == 4
+    (tmp_path / "contract-notes" / "manual" / "2026-04-01.json").unlink()
+    assert date(2026, 4, 1) not in store.load_cached(tmp_path).manual
+    assert store.load_cached(tmp_path) == store.load(tmp_path)
+
+
+def test_the_routes_see_a_changed_note_or_input_at_once(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from option_backtesting.api import contract_notes_routes
+    from option_backtesting.api.app import create_app
+
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(tmp_path))
+    contract_notes_routes._clear()
+    _write(tmp_path, "2026-04-01", [_note("2026-04-01", "A1", 1000, 20)])
+    client = TestClient(create_app())
+
+    def first_day() -> dict:
+        return client.get("/legwise/contract-notes/days").json()["days"][0]
+
+    assert first_day()["net"] == 1000
+    # Inside the response cache's 20 s: a note file the nightly run rewrote is seen at once.
+    _write(tmp_path, "2026-04-01", [_note("2026-04-01", "A1", 2500, 20)])
+    assert first_day()["net"] == 2500
+    # So is an input written outside the page (the 15:50 capital reading writes manual/).
+    _manual(tmp_path, "2026-04-01", algos=4)
+    assert first_day()["algo_fees"] == 75.0
+    # And one saved through the page.
+    r = client.put("/legwise/contract-notes/inputs/2026-04-01", json={"algos": 10})
+    assert r.status_code == 200
+    assert first_day()["algo_fees"] == 150.0
+    summary = client.get("/legwise/contract-notes/summary").json()
+    contract_notes_routes._clear()
+    assert client.get("/legwise/contract-notes/summary").json() == summary

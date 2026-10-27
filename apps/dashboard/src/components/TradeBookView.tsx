@@ -52,11 +52,7 @@ import { TradeBookMomentum } from './tradebook/TradeBookMomentum';
 import { TradeBookMoney } from './tradebook/TradeBookMoney';
 import { TradeBookRatios } from './tradebook/TradeBookRatios';
 import { TradeBookTrades } from './tradebook/TradeBookTrades';
-import {
-  TradeBookAccounts,
-  TradeBookMonths,
-  TradeBookSummaryCells,
-} from './tradebook/TradeBookWidgets';
+import { TradeBookAccounts, TradeBookMonths } from './tradebook/TradeBookWidgets';
 import { LoadError, TradeBookWidget } from './tradebook/parts';
 import { Button } from './ui/Button';
 import { CopyButton } from './ui/CopyButton';
@@ -442,14 +438,6 @@ function FnoView({
           ready={painted}
         >
           {() => <TradeBookRatios rows={rows} />}
-        </TradeBookWidget>
-        <TradeBookWidget
-          title="Summary"
-          badge={fyLabel(fy)}
-          description="The block under your daily rows."
-          ready={painted}
-        >
-          {() => <TradeBookSummaryCells s={s} />}
         </TradeBookWidget>
         <TradeBookWidget
           title="Monthly returns"

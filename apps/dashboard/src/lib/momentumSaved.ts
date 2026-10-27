@@ -296,3 +296,52 @@ export function extendedSentence(figure: ExtendedFigure): string {
     figure.maxDrawdown === null ? '' : ` · ${formatPct(figure.maxDrawdown)} max DD`
   }`;
 }
+
+/** What Momentum › Backtest shows before anything is run: the headline favourite's latest saved
+ * figures, never a run of its own. */
+export interface HeadlineSaved {
+  /** The headline as Saved runs lists it. */
+  headline: SavedStrategy;
+  /** The strategy whose settings Backtest can load and run: the headline itself, or the All
+   * Fridays run a group follows. Null for a group without one (a group has no settings to run). */
+  openable: SavedStrategy | null;
+  dataset: string;
+  /** When the figures were saved (the newest member run's, for a group's blend). */
+  savedAt: string;
+  kpis: Record<string, number | null>;
+  dates: string[];
+  values: Array<number | null>;
+}
+
+export function headlineSaved(strategies: ReadonlyArray<SavedStrategy>): HeadlineSaved | null {
+  const headline = strategies.find((s) => s.active);
+  if (!headline) return null;
+  const openable = headline.group
+    ? (strategies.find((s) => s.followed_by === headline.id) ?? null)
+    : headline;
+  if (openable?.latest.dates.length) {
+    return {
+      headline,
+      openable,
+      dataset: openable.dataset,
+      savedAt: openable.latest.created_at,
+      kpis: openable.latest.kpis,
+      dates: openable.latest.dates,
+      values: openable.latest.strategy,
+    };
+  }
+  const blend = headline.group ? headline.blend : undefined;
+  if (!blend?.dates.length) return null;
+  const savedAt = (headline.members ?? [])
+    .map((member) => member.latest.created_at)
+    .reduce((a, b) => (b > a ? b : a), headline.latest.created_at);
+  return {
+    headline,
+    openable: null,
+    dataset: headline.dataset,
+    savedAt,
+    kpis: blend.kpis,
+    dates: blend.dates,
+    values: blend.strategy,
+  };
+}

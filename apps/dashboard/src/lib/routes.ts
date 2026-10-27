@@ -6,7 +6,7 @@
  *   /live  /trades  /personalities  /pnl  /regime
  *   /optionslab/{rotation|heatmap|matrix|correlation|strategies|builder|regimes}
  *   /optionslab/builder/yaml        (the builder's YAML mode; /optionslab/builder is the form)
- *   /momentum/{backtest|scores|saved|week|rebalance|journal} (old /momentum/weekly redirects)
+ *   /momentum/{backtest|scores|saved|week|journal} (old /momentum/weekly and /rebalance redirect)
  *   /momentum/backtest/{etf|stock|custom_index|broad}
  *   /momentum/scores/{stocks|sectors}
  *   /tradebook/{fno|trades|money|momentum}
@@ -84,14 +84,7 @@ export type CoverageSection = (typeof COVERAGE_SECTIONS)[number];
 /** What `/coverage` opens. */
 export const COVERAGE_DEFAULT_SECTION: CoverageSection = 'backfill';
 
-export const MOMENTUM_SECTIONS = [
-  'backtest',
-  'scores',
-  'saved',
-  'week',
-  'rebalance',
-  'journal',
-] as const;
+export const MOMENTUM_SECTIONS = ['backtest', 'scores', 'saved', 'week', 'journal'] as const;
 export type MomentumSection = (typeof MOMENTUM_SECTIONS)[number];
 
 /** The Trade book's views (BL-168), in display order. Must match its nav item's children. */
@@ -122,6 +115,8 @@ export interface ParsedRoute {
 export const PATH_ALIASES: Readonly<Record<string, string>> = {
   // Weekly signal became This week (BL-051 Phase 2).
   '/momentum/weekly': '/momentum/week',
+  // Rebalance preview was retired: Your orders on This week previews any favourite.
+  '/momentum/rebalance': '/momentum/week',
   // Pricing was renamed Billing (BL-013 Phase 8).
   '/pricing': '/billing',
   '/brokers': '/brokerLogins',

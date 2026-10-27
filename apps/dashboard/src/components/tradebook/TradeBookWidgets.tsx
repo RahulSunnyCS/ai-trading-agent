@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * The F&O view's widgets below the chart: the summary block, the monthly heat cells with the FY
- * table, and the accounts with the year's charges by kind. Every figure is the API's.
+ * The F&O view's widgets below the chart: the monthly heat cells with the FY table, and the
+ * accounts with the year's charges by kind. Every figure is the API's. (The sheet's summary block
+ * is folded into the headline and its secondary line.)
  */
 
 import { useState } from 'react';
@@ -33,99 +34,6 @@ import type {
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { ChargeBar, Inr } from './parts';
-
-function Cell({
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  tone?: 'positive' | 'negative' | undefined;
-}) {
-  return (
-    <div className="min-w-0 rounded-lg bg-surface-2 px-3 py-2.5">
-      <p className="truncate text-xs text-faint">{label}</p>
-      <p
-        className={cn(
-          'metric mt-0.5 truncate text-lg font-medium',
-          tone === 'positive' && 'text-positive',
-          tone === 'negative' && 'text-negative',
-          !tone && 'text-foreground',
-        )}
-      >
-        {value}
-      </p>
-      <p className="truncate text-xs text-muted">{sub}</p>
-    </div>
-  );
-}
-
-function signTone(v: number | null): 'positive' | 'negative' | undefined {
-  if (v === null || v === 0) return undefined;
-  return v > 0 ? 'positive' : 'negative';
-}
-
-/** The sheet's summary block over the picked year. */
-export function TradeBookSummaryCells({ s }: { s: TradeBookSummaryBlock }) {
-  const pctOf = (v: number | null) =>
-    v === null ? 'no capital typed' : `${formatPct(v, 1, { unit: 'percent' })} of capital`;
-  return (
-    <div className="grid grid-cols-2 gap-2.5">
-      <Cell
-        label="Net profit"
-        value={formatInr(s.net)}
-        sub={pctOf(s.profit_pct)}
-        tone={signTone(s.net)}
-      />
-      <Cell
-        label="Max drawdown"
-        value={formatInr(s.max_drawdown)}
-        sub={pctOf(s.max_drawdown_pct)}
-        tone={s.max_drawdown < 0 ? 'negative' : undefined}
-      />
-      <Cell
-        label="Longest drawdown"
-        value={`${formatInt(s.longest_drawdown)} sessions`}
-        sub="below the running peak"
-      />
-      <Cell
-        label="Win days"
-        value={formatPct(s.win_pct, 0, { unit: 'percent' })}
-        sub={`${s.win_days} won · ${s.loss_days} lost`}
-      />
-      <Cell
-        label="Avg win day"
-        value={formatInr(s.avg_win)}
-        sub="profit on a winning day"
-        tone={signTone(s.avg_win)}
-      />
-      <Cell
-        label="Avg loss day"
-        value={formatInr(s.avg_loss)}
-        sub="loss on a losing day"
-        tone={signTone(s.avg_loss)}
-      />
-      <Cell
-        label="Avg day"
-        value={formatInr(s.avg_day)}
-        sub={`net per traded day (${formatInt(s.traded_sessions)})`}
-        tone={signTone(s.avg_day)}
-      />
-      <Cell
-        label="Charges"
-        value={formatInr(s.charges)}
-        sub={
-          s.charge_profit_pct === null
-            ? 'no net profit to compare'
-            : `${formatPct(s.charge_profit_pct, 0, { unit: 'percent' })} of net profit`
-        }
-      />
-    </div>
-  );
-}
 
 /** The monthly tab: April to March as heat cells, % of capital or rupees, and the FY rows. */
 export function TradeBookMonths({

@@ -9,11 +9,18 @@
   `capital` (per broker).
 
 A damaged line is reported in `Book.problems`, never guessed at and never fatal.
+
+`load_cached` is `load` kept in memory against the store's file stamps (`stamp`: the name, size
+and mtime of every file `load` reads): reading the ~900 small files costs seconds on the
+external disk, a stamp about 10 ms. The cached `Book` is shared between requests: treat it as
+read-only.
 """
 
 from __future__ import annotations
 
 import json
+import os
+import threading
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -97,3 +104,49 @@ def load(root: Path) -> Book:
         except json.JSONDecodeError:
             book.problems.append(f"manual/{path.name} is damaged")
     return book
+
+
+# The folders `load` reads and the files it takes from each (its globs).
+_READ = (("days", ".jsonl"), ("ledger", ".jsonl"), ("manual", ".json"))
+_load_lock = threading.Lock()
+_loaded: dict[Path, tuple[tuple, Book]] = {}  # root -> (stamp, book), the newest per root
+
+
+def stamp(root: Path) -> tuple:
+    """(folder, name, size, mtime_ns) of every file `load` reads under `root`, in order. Any
+    change to a note, a ledger event or a manual input moves it."""
+    base = store_dir(root)
+    out = []
+    for folder, suffix in _READ:
+        try:
+            with os.scandir(base / folder) as entries:
+                for entry in entries:
+                    if entry.name.endswith(suffix):
+                        st = entry.stat()
+                        out.append((folder, entry.name, st.st_size, st.st_mtime_ns))
+        except FileNotFoundError:
+            continue
+    return tuple(sorted(out))
+
+
+def load_cached(root: Path) -> Book:
+    """`load(root)`, read again only when `stamp(root)` moved. One load at a time, so the page's
+    reads arriving together wait for one read of the store rather than each making their own.
+    The stamp is taken before the read: a file changed during it is read again next time."""
+    key = Path(root)
+    with _load_lock:
+        current = stamp(key)
+        hit = _loaded.get(key)
+        if hit is not None and hit[0] == current:
+            return hit[1]
+        book = load(key)
+        _loaded[key] = (current, book)
+        while len(_loaded) > 4:  # roots: one in use, a few in tests
+            _loaded.pop(next(iter(_loaded)))
+        return book
+
+
+def forget() -> None:
+    """Drop every cached book (after a write, so even a same-instant change is read)."""
+    with _load_lock:
+        _loaded.clear()
