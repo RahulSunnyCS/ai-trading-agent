@@ -1,6 +1,8 @@
 /**
- * "Day 18 of 60": where the forward test stands against its registered read-out, and the rule
- * that read-out will be judged by. Until then every figure on the page is descriptive.
+ * "Day 10 of 60 · 12 Oct → 27 Oct": where the forward test stands against its registered
+ * read-out, as one chip on the page's run bar (it was a full-width banner until the dashboard
+ * review of 2026-10-28). Until the read-out every figure on the page is descriptive; the tooltip
+ * gives the rule the read-out is judged by.
  */
 
 import { formatDay } from '../../../lib/format';
@@ -10,7 +12,7 @@ import { InfoTooltip } from '../../ui/InfoTooltip';
 
 const shown = LIST_KEYS.map(listName).join(', ');
 
-export function RotationReadoutBanner({
+export function RotationReadoutChip({
   scoredDays,
   total,
   firstDay,
@@ -21,39 +23,31 @@ export function RotationReadoutBanner({
   total: number;
   firstDay: string | null;
   lastDay: string | null;
-  firstEntryDay: string;
+  firstEntryDay: string | null;
 }) {
   const p = readoutProgress(scoredDays ?? 0, total);
-  const loading = scoredDays === null;
   const started = (scoredDays ?? 0) > 0;
+  const text =
+    scoredDays === null
+      ? 'Reading the read-out…'
+      : started
+        ? `Day ${p.n} of ${p.total}${firstDay && lastDay ? ` · ${formatDay(firstDay)} → ${formatDay(lastDay)}` : ''}`
+        : firstEntryDay
+          ? `Read-out starts ${formatDay(firstEntryDay)}`
+          : 'Read-out not started';
   return (
-    <section
+    <span
       aria-label="Read-out progress"
-      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-info/30 bg-info/10 px-3 py-2 text-xs"
+      className="inline-flex items-center gap-2 rounded-full border border-info/30 bg-info/10 px-2.5 py-1 text-xs text-foreground"
     >
-      <span className="font-medium text-foreground">
-        {loading
-          ? 'Reading the read-out…'
-          : started
-            ? `Day ${p.n} of ${p.total}`
-            : `Starts ${formatDay(firstEntryDay)}`}
+      <span className="h-1.5 w-12 overflow-hidden rounded-full bg-surface-2" aria-hidden="true">
+        <span className="block h-full bg-info" style={{ width: `${p.fraction * 100}%` }} />
       </span>
-      <div
-        className="h-1.5 min-w-24 flex-1 overflow-hidden rounded-full bg-surface-2"
-        aria-hidden="true"
-      >
-        <div className="h-full bg-info" style={{ width: `${p.fraction * 100}%` }} />
-      </div>
-      <span className="text-muted">
-        {p.done
-          ? 'The registered read-out can be scored now.'
-          : 'Until the read-out every figure is descriptive and changes nothing.'}
-        {started && firstDay && lastDay ? ` ${formatDay(firstDay)} to ${formatDay(lastDay)}.` : ''}
-      </span>
+      {text}
       <InfoTooltip
         label="About the read-out"
-        text={`${shown}: gross, max drawdown, and the share of random same-shape baskets it beats, with a 5-day block-bootstrap 90% interval of the list minus the fixed base. A list beats the base when that interval's lower bound is above zero and its drawdown per lot is no worse. The rule was registered before the first entry and does not change. The journal records every registered list under it, including those not shown here.`}
+        text={`${p.done ? 'The registered read-out can be scored now.' : 'Until the read-out every figure is descriptive and changes nothing.'} ${shown}: gross, max drawdown, and the share of random same-shape baskets it beats, with a 5-day block-bootstrap 90% interval of the list minus the fixed base. A list beats the base when that interval's lower bound is above zero and its drawdown per lot is no worse. The rule was registered before the first entry and does not change. The journal records every registered list under it, including those not shown here.`}
       />
-    </section>
+    </span>
   );
 }

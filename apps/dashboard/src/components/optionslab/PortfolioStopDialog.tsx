@@ -157,6 +157,12 @@ export function PortfolioStopDialog({
       <p className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted" aria-live="polite">
         {summary(draft)}
       </p>
+      <p className="text-[11px] text-faint">
+        The stop is replayed minute by minute over the scored sessions and changes what this page
+        shows: cumulative gross, ₹ per lot-day, the drawdowns and the curves. Beats random baskets,
+        the verdict and the read-out stay on the registered basis, without a stop. Nothing recorded
+        changes.
+      </p>
       {tried && issues.length > 0 ? (
         <ul className="space-y-0.5 text-xs text-negative" role="alert">
           {issues.map((i) => (

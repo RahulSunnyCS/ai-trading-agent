@@ -83,7 +83,7 @@ One 32 px line a day, newest first.
 
 ## The portfolio stop
 
-The **Portfolio stop** button on the Adaptive Classic card shows the stop this log follows and opens its pop-up.
+The **Portfolio stop** button on the Adaptive Classic row of the Books table shows the stop this log follows and opens its pop-up.
 It is the stop you trade the list under: one level on the *combined* P&L of the basket, on top of
 each strategy's own stop. The first minute the basket's mark-to-market reaches the level, every
 pick closes at that minute's close and nothing that has not entered yet enters that day.
