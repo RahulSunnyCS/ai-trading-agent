@@ -791,9 +791,14 @@ const BASE_JOBS: Job[] = [
 /** Every job: the ones above plus each check group's (src/checks/). */
 /** BL-140: one Quantiply upload per account, each told by the settings whether it has work. */
 function quantiplyUploads(mode: 'evening' | 'topup'): string {
+  // BL-172 (owner, 2026-10-28): the evening deletes every finished, switched-off algo on the
+  // account, the owner's own too (`--delete-all`); never an enabled or running one. And it sets
+  // Shoonya's paid subscription to the next session's algo count (`--subscription`; Angel One's
+  // Quantiply is free, so the flag does nothing there).
+  const all = mode === 'evening' ? ' --delete-all --subscription' : '';
   return quantiplyBoth(
     (broker) =>
-      `node_modules/.bin/tsx src/quantiply-upload.ts --broker ${broker} --from-settings --mode ${mode} --apply`,
+      `node_modules/.bin/tsx src/quantiply-upload.ts --broker ${broker} --from-settings --mode ${mode}${all} --apply`,
   );
 }
 

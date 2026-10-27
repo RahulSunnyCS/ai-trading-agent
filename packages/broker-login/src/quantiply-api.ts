@@ -192,6 +192,32 @@ export class QuantiplyApi {
     await this.call('POST', `/brokers/${encodeURIComponent(brokerId)}/config`, body);
   }
 
+  /** `GET /users/me`: the account, its `subscription` included (BL-172, Shoonya's paid plan). */
+  async me(): Promise<unknown> {
+    return this.call('GET', '/users/me');
+  }
+
+  /** `GET /credits?page=1`: the credit balance (`data.credits`) and its history. */
+  async credits(): Promise<number> {
+    const json = (await this.call('GET', '/credits?page=1')) as { data?: { credits?: unknown } };
+    const c = json.data?.credits;
+    if (typeof c !== 'number') throw new Error('credits: no balance');
+    return c;
+  }
+
+  /**
+   * `POST /subscriptions/<id>/preview-upcoming` with `{plan, additionalAlgos}`: what a change would
+   * cost or return, changing nothing (`getCheckoutPreviewEdit` in the app's subscription chunk).
+   */
+  async previewSubscription(id: string, body: Record<string, unknown>): Promise<unknown> {
+    return this.call('POST', `/subscriptions/${encodeURIComponent(id)}/preview-upcoming`, body);
+  }
+
+  /** `PUT /subscriptions/<id>` with `{plan, additionalAlgos}`: the change (`subscribePlanEdit`). */
+  async setSubscription(id: string, body: Record<string, unknown>): Promise<void> {
+    await this.call('PUT', `/subscriptions/${encodeURIComponent(id)}`, body);
+  }
+
   /** `PUT /algos/:id` with `{broker}`: the web app's "Select Client ID / Broker" (`updateBroker`). */
   async setBroker(id: string, broker: string): Promise<void> {
     await this.call('PUT', `/algos/${encodeURIComponent(id)}`, { broker });

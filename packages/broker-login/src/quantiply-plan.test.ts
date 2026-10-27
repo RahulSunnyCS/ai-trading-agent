@@ -12,9 +12,12 @@ import {
   ownedIds,
   parseDayWise,
   parseQLedger,
+  parseSubscription,
   planQ,
+  previewNet,
   readBackDiffs,
   sessionOver,
+  subscriptionTarget,
   summaryQ,
   weekdayOf,
   withMultiplier,
@@ -443,4 +446,64 @@ test('the read-back catches a multiplier Quantiply saved differently from what w
   assert.deepEqual(readBackDiffs(sent, { configurations: { multiplier: 1 } }), [
     'configurations.multiplier',
   ]);
+});
+
+test("evening --delete-all also deletes the owner's own finished, switched-off algos (BL-172)", () => {
+  const ledger = [row('create', '1', `${P}A`)];
+  const algos = [
+    algo('1', `${P}A`, 'MON', { status: 'TRADE_CLOSED' }),
+    algo('8', 'my own test', 'TUE', { status: 'TRADE_CLOSED' }),
+    algo('9', 'my own live one', 'FRI', { enabled: true, status: 'NOT_RUNNING' }),
+    algo('10', 'my running one', 'WED', { status: 'TRADE_ACTIVE' }),
+    algo('11', `${P}B`, 'WED', { status: 'NOT_RUNNING' }), // a picked name made by hand
+  ];
+  const wanted = [want(`${P}B`)];
+  const p = planQ('evening', 'WED', MON_AFTER_CLOSE, wanted, ledger, algos, { deleteOthers: true });
+  assert.deepEqual(
+    p.deleteOthers.map((a) => a.id),
+    ['8'],
+  );
+  assert.deepEqual(p.conflicts, [`${P}B`]);
+  assert.deepEqual(
+    planQ('evening', 'WED', MON_AFTER_CLOSE, wanted, ledger, algos).deleteOthers,
+    [],
+  );
+  assert.deepEqual(
+    planQ('topup', 'WED', MON_AFTER_CLOSE, wanted, ledger, algos, { deleteOthers: true })
+      .deleteOthers,
+    [],
+  );
+});
+
+test('Shoonya subscription: the extra algos for the next session (BL-172)', () => {
+  const sub = parseSubscription({
+    status: 'success',
+    data: {
+      subscription: {
+        _id: 's1',
+        plan: 'value',
+        algosPerDay: 2,
+        additionalAlgos: 1,
+        totalAlgosPerDay: 3,
+      },
+    },
+  });
+  assert.equal(sub.totalAlgosPerDay, 3);
+  assert.equal(subscriptionTarget(sub, 3), null);
+  assert.deepEqual(subscriptionTarget(sub, 4), { extra: 2 });
+  assert.match((subscriptionTarget(sub, 2) as { skip: string }).skip, /never asks for 0/);
+  assert.throws(() => parseSubscription({ data: {} }), /no subscription/);
+  // 28 Oct 01:50 IST, 3 -> 4 previewed: 623 back for the unused term, 830 for the new one
+  assert.equal(
+    previewNet({
+      data: {
+        lineItems: [
+          { payableCredits: -623, credits: -623 },
+          { payableCredits: 830, credits: 830 },
+        ],
+      },
+    }),
+    207,
+  );
+  assert.equal(previewNet({ data: { lineItems: [] } }), null);
 });
