@@ -127,6 +127,43 @@ def test_expiry_day_is_a_session_constant_and_needs_its_calendar():
         E.parse_rule({"gt": ["close", 1]}, {"expiry_day": {"gt": ["close", 1]}})
 
 
+def test_swing_is_known_only_from_its_confirming_bar():
+    fr = frame(2)
+    fr.H[:] = 100.0
+    fr.L[:] = 99.0
+    highs = [100, 101, 103, 101, 100, 102, 105, 102, 101, 100]  # 5-minute bar highs, 09:15 on
+    for k, h in enumerate(highs):
+        fr.H[0, 5 * k + 2] = h
+    latest = E.evaluate(E.parse({"swing": {"kind": "high"}}), fr)[0]
+    before = E.evaluate(E.parse({"swing": {"kind": "high", "back": 1}}), fr)[0]
+    # bar 2 (103) is confirmed when bar 4 completes, stamp 24; bar 6 (105) at stamp 44
+    assert (
+        np.isnan(latest[:24]).all() and (latest[24:44] == 103).all() and (latest[44:] == 105).all()
+    )
+    assert np.isnan(before[:44]).all() and (before[44:] == 103).all()
+    flat = E.evaluate(E.parse({"swing": {"kind": "low"}}), fr)[0]
+    assert np.isnan(flat).all()  # equal lows are never a swing (strict)
+    assert E.describe(E.parse({"swing": {"kind": "low", "back": 1}})) == (
+        "the 1 before the latest swing low (2 each side, 5-minute bars)"
+    )
+    with pytest.raises(E.RuleError, match="high or low"):
+        E.parse({"swing": {"kind": "mid"}})
+
+
+def test_swing_lows_back_one_and_no_carry_across_sessions():
+    fr = frame(2)
+    fr.H[:] = 200.0
+    fr.L[:] = 100.0
+    lows = [100, 99, 97, 99, 100, 98, 95, 98, 99, 100]  # 5-minute bar lows of session 0
+    for k, v in enumerate(lows):
+        fr.L[0, 5 * k + 1] = v
+    latest = E.evaluate(E.parse({"swing": {"kind": "low"}}), fr)
+    before = E.evaluate(E.parse({"swing": {"kind": "low", "back": 1}}), fr)
+    assert np.isnan(latest[0, :24]).all() and (latest[0, 24:44] == 97).all()
+    assert (latest[0, 44:] == 95).all() and (before[0, 44:] == 97).all()
+    assert np.isnan(latest[1]).all() and np.isnan(before[1]).all()  # session 1 has no swing
+
+
 def test_prior_median_uses_earlier_sessions_only():
     fr = frame(30)
     med = E.evaluate(E.parse({"prior_median": {"x": "close", "sessions": 5}}), fr)
@@ -232,6 +269,8 @@ CAUSAL_RULES = [
     },
     {"ever": {"gt": ["close", {"add": ["session_open", 5]}]}},
     {"all": ["expiry_day", {"gt": ["close", "open"]}]},
+    {"gt": ["close", {"swing": {"kind": "high", "back": 0, "minutes": 5, "n": 2}}]},
+    {"lt": [{"swing": {"kind": "low", "back": 1}}, {"swing": {"kind": "low", "back": 0}}]},
 ]
 
 

@@ -39,6 +39,12 @@ Leaves
                                    from then on (NaN before, and all day if it never holds)
     {min_since_first: {x, when}}   the running min / max of x from (inclusive) that first stamp;
     {max_since_first: {x, when}}   NaN before it
+    {swing: {kind: high, back: 0, minutes: 5, n: 2}}
+                                   the latest (back 0) or the one-before (back 1) confirmed swing
+                                   high / low of the session's `minutes`-minute bars: a bar whose
+                                   high (low) is strictly above (below) the n bars on each side,
+                                   known from the close of the n-th bar after it; NaN before
+                                   (BL-166). Swings do not carry across sessions
     {bar_close: 5}                 true only at the stamps where a 5-minute bar completes
                                    (j + 1 is a multiple of 5), so a rule can act on bar closes
     a name from `define:`          an earlier definition of the same rule
@@ -182,7 +188,16 @@ _PARAMETRIC: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "prev_at": (("x", "clock"), ("x", "clock")),
     "prev_agg": (("x", "how"), ("x", "how")),
 }
-_LEAF_OPS = {"clock", "straddle", "rsi", "bar_close", "supertrend", "supertrend_dir", "bollinger"}
+_LEAF_OPS = {
+    "clock",
+    "straddle",
+    "rsi",
+    "bar_close",
+    "supertrend",
+    "supertrend_dir",
+    "bollinger",
+    "swing",
+}
 _SINCE_FIRST = {"at_first", "min_since_first", "max_since_first"}
 _TRADE_OPS = {"at_entry"}
 #: the operators a trade-relative value may sit under (they work on one session's row alone)
@@ -287,6 +302,19 @@ def _parse_node(expr: Any, defs: dict[str, Node] | None, path: str) -> Node:
             "k": _float_param(body.get("k", 2), f"{here}.k", 0, 10),
             "minutes": _int_param(body.get("minutes", 5), f"{here}.minutes", 1, 125),
             "band": band,
+        }
+        return Node(op, params=params, kind="num", path=path)
+    if op == "swing":
+        if not isinstance(body, dict) or set(body) - {"kind", "back", "minutes", "n"}:
+            raise RuleError(f"{here}: write {{swing: {{kind: high, back: 0, minutes: 5, n: 2}}}}")
+        kind = body.get("kind")
+        if kind not in ("high", "low"):
+            raise RuleError(f"{here}.kind: expected high or low, got {kind!r}")
+        params = {
+            "kind": kind,
+            "back": _int_param(body.get("back", 0), f"{here}.back", 0, 5),
+            "minutes": _int_param(body.get("minutes", 5), f"{here}.minutes", 1, 125),
+            "n": _int_param(body.get("n", 2), f"{here}.n", 1, 10),
         }
         return Node(op, params=params, kind="num", path=path)
     if op in _SINCE_FIRST:
@@ -596,6 +624,34 @@ def _indicator(frame: Frame, node: Node) -> np.ndarray:
     return _on_grid(frame, m, frame._cache[key]["line" if node.op == "supertrend" else "dir"])
 
 
+def _swing(frame: Frame, node: Node) -> np.ndarray:
+    """`{swing: ...}`: per session, the back-th latest confirmed fractal swing, held from the stamp
+    its n-th following bar completes until the next swing of that kind is confirmed."""
+    p = node.params
+    m, n, back = p["minutes"], p["n"], p["back"]
+    key = ("swing", p["kind"], m, n)
+    if key not in frame._cache:
+        high, low, _close = _bars(frame, m)
+        bars = high if p["kind"] == "high" else low
+        sign = 1.0 if p["kind"] == "high" else -1.0
+        found: list[list[tuple[int, float]]] = []
+        for row in bars:
+            mine = []
+            for k in range(n, len(row) - n):
+                side = np.concatenate([row[k - n : k], row[k + 1 : k + n + 1]])
+                if not np.isnan(row[k]) and bool(np.all(sign * row[k] > sign * side)):
+                    mine.append(((k + n + 1) * m - 1, float(row[k])))
+            found.append(mine)
+        frame._cache[key] = found
+    out = _full(frame)
+    for s, mine in enumerate(frame._cache[key]):
+        for idx in range(back, len(mine)):
+            start = mine[idx][0]
+            end = mine[idx + 1][0] if idx + 1 < len(mine) else N_BARS
+            out[s, start:end] = mine[idx - back][1]
+    return out
+
+
 def _ffill(a: np.ndarray) -> np.ndarray:
     """Hold the last valid value along each row (stamps)."""
     out = a.copy()
@@ -675,6 +731,8 @@ def _evaluate(node: Node, frame: Frame, memo: dict[Node, np.ndarray]) -> np.ndar
         return _ffill(out)
     if op in ("supertrend", "supertrend_dir", "bollinger"):
         return _indicator(frame, node)
+    if op == "swing":
+        return _swing(frame, node)
     if node.trade:
         raise RuleError(f"{node.path}: at_entry / minutes_in_trade belong in exit_when only")
     args = [evaluate(a, frame, memo) for a in node.args]
@@ -849,6 +907,10 @@ def describe(node: Node, top: bool = True) -> str:
         return (
             f"the {p['band']} Bollinger band ({p['n']}, {p['k']:g}) of {p['minutes']}-minute bars"
         )
+    if op == "swing":
+        p = node.params
+        which = "latest" if p["back"] == 0 else f"{p['back']} before the latest"
+        return f"the {which} swing {p['kind']} ({p['n']} each side, {p['minutes']}-minute bars)"
     if op == "bar_close":
         return f"a {node.params['minutes']}-minute bar has just completed"
     if op == TRADE_LEAF:
