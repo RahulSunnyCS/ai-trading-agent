@@ -66,6 +66,9 @@ const RATIOS: ReadonlyArray<{
   },
 ];
 
+/** W's range is read only where U (the 100-day average profit) is at least this many rupees. */
+const W_MIN_U = 100;
+
 export function TradeBookRatios({ rows }: { rows: TradeBookDay[] }) {
   const [key, setKey] = useState<RatioKey>('charge_profit_pct');
   const ratio = RATIOS.find((r) => r.key === key) ?? (RATIOS[0] as (typeof RATIOS)[number]);
@@ -104,7 +107,21 @@ export function TradeBookRatios({ rows }: { rows: TradeBookDay[] }) {
   }, [chartRef, ready, theme, points, ratio]);
 
   const last = points.at(-1);
-  const values = points.map((p) => p.value);
+  // W divides by U: on a session where U is near zero it runs to thousands of percent either
+  // way, so its range is taken only over sessions where U is at least ₹100.
+  const values = useMemo(() => {
+    if (key !== 'charge_profit_pct') return points.map((p) => p.value);
+    const uByDay = new Map(rows.map((r) => [r.day, r.avg_profit_100]));
+    return points
+      .filter((p) => {
+        const u = uByDay.get(p.day);
+        return u != null && u >= W_MIN_U;
+      })
+      .map((p) => p.value);
+  }, [key, points, rows]);
+  const range = values.length
+    ? `range ${ratio.format(Math.min(...values))} to ${ratio.format(Math.max(...values))}`
+    : 'no session with U of ₹100 or more';
 
   return (
     <div className="space-y-2">
@@ -121,12 +138,18 @@ export function TradeBookRatios({ rows }: { rows: TradeBookDay[] }) {
         </span>
         <span className="text-xs text-faint">
           {last
-            ? `on ${formatDay(last.day)} · range ${ratio.format(Math.min(...values))} to ${ratio.format(Math.max(...values))}`
+            ? `on ${formatDay(last.day)} · ${range}`
             : 'not enough sessions yet: the window needs 50 or 100'}
         </span>
       </p>
       <div ref={box} className="w-full" style={{ height: 240 }} />
       <p className="text-xs text-faint">{ratio.definition}</p>
+      {key === 'charge_profit_pct' ? (
+        <p className="text-xs text-faint">
+          The range counts only sessions where U is at least {formatInr(W_MIN_U)}: below that, W
+          divides by almost nothing and swings to thousands of percent.
+        </p>
+      ) : null}
     </div>
   );
 }

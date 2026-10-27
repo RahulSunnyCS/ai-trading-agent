@@ -156,6 +156,12 @@ export function TradeBookHeadline({
         <span>
           worst <span className="metric text-foreground">{formatInr(summary.worst)}</span>
         </span>
+        <span title="The most sessions in a row spent below the running peak">
+          longest drawdown{' '}
+          <span className="metric text-foreground">
+            {formatInt(summary.longest_drawdown)} sessions
+          </span>
+        </span>
         <span>
           100-day avg profit{' '}
           <span className="metric text-foreground">{formatInr(ratios?.avg_profit_100)}</span>
