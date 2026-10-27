@@ -24,9 +24,9 @@ export function backupDestination(
 }
 
 /**
- * `tdata backup --to <dest>`: lake/raw files copied only if new, contract-notes/ and
- * rotation/ when new or changed, the catalog every time. Its per-folder counts land in the
- * job's log line by line (nothing here parses them).
+ * `tdata backup --to <dest>`: lake/, raw/, contract-notes/ and rotation/ files when new or
+ * changed (size or mtime), the catalog every time. Its per-folder counts land in the job's
+ * log line by line (nothing here parses them).
  */
 export function backupJob(sink?: AlertSink): Builtin {
   return async (ctx) => {

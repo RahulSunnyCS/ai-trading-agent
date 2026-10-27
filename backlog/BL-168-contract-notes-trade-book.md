@@ -437,3 +437,10 @@ record from them.
   Lock and `.tmp` files are left out; the summary (and so the monthly `backup` job's log) counts
   copied / already-there per folder. Still open: the owner's decision on archiving
   `trade-analytics` (TODO §2.7), after a month of the Trade book page.
+- 2026-10-27 — review of PR #342 fixed: every folder (lake and raw too) now compares size and
+  mtime, in 10 ms ticks (exFAT's precision) with no slack; each copy is written to a temporary,
+  fsynced, stamped from the source's pre-copy stat and renamed, and the source re-stat'ed after
+  (a file still changing after 3 tries is left unstamped, so the next run copies it); a file
+  deleted mid-run is counted, never fatal; the backup waits up to 10 min for a contract-notes
+  run's `run.lock`; `raw/**/*.decrypted.pdf` stays off the exFAT disk. Phase 6 is done once a
+  real backup run (the next 1st-Sunday job or a manual one) shows the new folders' lines.
