@@ -19,8 +19,8 @@ test('standalone momentum metadata does not crash the shell, Overview or Live', 
   page,
 }) => {
   // With MOMENTUM_DIRECT on, /api/meta can be answered by the Momentum service, whose payload
-  // has a different shape. useMeta feeds the shell (system status, token banner), Overview's
-  // feed card and the Live view; none of them may crash on it.
+  // has a different shape. useMeta feeds the shell (system status, token banner) and the Live
+  // view; none of them, nor the Overview, may crash on it.
   await page.route(
     (url) => url.pathname === '/api/meta',
     (route) => json(route, { instruments: [], defaults: {} }),

@@ -1,11 +1,15 @@
 ## What it is for
 
-**Data › Coverage** manages historical candles for the paused live engine: its two sections
+**Coverage** manages historical candles for the paused live engine: its two sections
 fetch history (Backfill) and show which ranges can be replayed through that engine (Replay).
 
 > [!NOTE]
 > Options Lab and Momentum do **not** use this screen. Their data is collected by the scheduled
-> jobs into the research database. Most readers can skip this page.
+> jobs into the research database; its health is on the [Overview](app:/overview)'s Data card and
+> the Today page. Coverage sits in the sidebar's **Archived engine** section, hidden by default
+> (show it under [Settings](guide:operations/settings) › Navigation, or open `/coverage`). It reads
+> the paused engine's server, so without that server running it shows an error. Most readers can
+> skip this page.
 
 ## Backfill
 
