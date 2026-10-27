@@ -16,6 +16,7 @@ from datetime import date, time
 from functools import lru_cache
 from pathlib import Path
 
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from .trips import Trip
@@ -37,13 +38,44 @@ def _path(root: Path, asset: str, key: str, name: str, day: date) -> Path:
     )
 
 
-@lru_cache(maxsize=64)
+def _stamp(path: Path) -> tuple[int, int] | None:
+    """(mtime, size) of a lake file: the caches below are keyed on it, so a repaired or
+    back-filled day is read again."""
+    try:
+        st = path.stat()
+    except FileNotFoundError:
+        return None
+    return st.st_mtime_ns, st.st_size
+
+
 def _index_bars(root: Path, name: str, day: date) -> list[tuple[time, float, float, float, float]]:
     path = _path(root, "index", "symbol", name, day)
-    if not path.exists():
+    return _index_bars_at(path, _stamp(path))
+
+
+@lru_cache(maxsize=256)
+def _index_bars_at(path: Path, stamp) -> list[tuple[time, float, float, float, float]]:
+    if stamp is None:
         return []
     table = pq.read_table(path, columns=["ts", "open", "high", "low", "close"]).to_pylist()
     return sorted((r["ts"].time(), r["open"], r["high"], r["low"], r["close"]) for r in table)
+
+
+def _vix_open(root: Path, day: date) -> float | None:
+    path = _path(root, "index", "symbol", VIX, day)
+    return _first_open(path, _stamp(path))
+
+
+@lru_cache(maxsize=4096)
+def _first_open(path: Path, stamp) -> float | None:
+    """A day's first bar's open, read from that bar alone (the 252-day VIX history)."""
+    if stamp is None:
+        return None
+    table = pq.read_table(path, columns=["ts", "open"])
+    if table.num_rows == 0:
+        return None
+    i = pc.index(table["ts"], pc.min(table["ts"])).as_py()
+    return table["open"][i].as_py()
 
 
 def _index_days(root: Path, name: str) -> list[date]:
@@ -77,13 +109,10 @@ def day_context(root: Path, day: date, underlyings: tuple[str, ...] = ("NIFTY", 
     vix_open = None
     vix_pct = None
     if vix_days and vix_days[-1] == day:
-        bars = _index_bars(root, VIX, day)
-        vix_open = bars[0][1] if bars else None
-        history = []
-        for d in vix_days[-VIX_LOOKBACK - 1 : -1]:
-            b = _index_bars(root, VIX, d)
-            if b:
-                history.append(b[0][1])
+        vix_open = _vix_open(root, day)
+        history = [
+            v for d in vix_days[-VIX_LOOKBACK - 1 : -1] if (v := _vix_open(root, d)) is not None
+        ]
         if vix_open is not None and history:
             vix_pct = round(sum(1 for v in history if v < vix_open) * 100 / len(history), 1)
     indices = {}
@@ -108,14 +137,23 @@ def day_context(root: Path, day: date, underlyings: tuple[str, ...] = ("NIFTY", 
     return {"day": day.isoformat(), "vix_open": vix_open, "vix_pct": vix_pct, "indices": indices}
 
 
-@lru_cache(maxsize=32)
-def _option_bars(root: Path, underlying: str, day: date):
-    path = _path(root, "option", "underlying", underlying, day)
-    if not path.exists():
-        return None
-    return pq.read_table(
-        path, columns=["ts", "high", "low", "close", "expiry", "strike", "option_type"]
+def _contract_bars(root: Path, trip: Trip) -> list[tuple[time, float, float]]:
+    """The trip's contract's 1-minute bars on its day: (minute, high, low)."""
+    path = _path(root, "option", "underlying", trip.underlying, trip.day)
+    return _contract_bars_at(path, _stamp(path), trip.expiry, trip.strike, trip.kind)
+
+
+@lru_cache(maxsize=512)
+def _contract_bars_at(path: Path, stamp, expiry, strike, kind) -> list[tuple[time, float, float]]:
+    if stamp is None or expiry is None or strike is None or kind is None:
+        return []
+    table = pq.read_table(path, columns=["ts", "high", "low", "expiry", "strike", "option_type"])
+    mask = pc.and_(
+        pc.and_(pc.equal(table["expiry"], expiry), pc.equal(table["strike"], strike)),
+        pc.equal(table["option_type"], kind),
     )
+    rows = table.filter(mask).to_pylist()
+    return sorted((time(r["ts"].hour, r["ts"].minute), r["high"], r["low"]) for r in rows)
 
 
 def _hhmm(text: str) -> time:
@@ -124,9 +162,12 @@ def _hhmm(text: str) -> time:
 
 
 def trip_extremes(root: Path, trip: Trip) -> dict:
+    """MAE / MFE for a trip opened and closed on one day with fill times. The entry price is the
+    fills' price before brokerage; the whole quantity is counted from the first entry minute."""
     blank = {"mae": None, "mfe": None, "spot_at_entry": None, "strike_from_spot": None}
     if (
         trip.status != "closed"
+        or trip.entry_day != trip.day
         or not trip.entry_time
         or not trip.exit_time
         or trip.instrument != "OPTIDX"
@@ -143,24 +184,10 @@ def trip_extremes(root: Path, trip: Trip) -> dict:
     if spot is not None and trip.strike is not None:
         out["spot_at_entry"] = spot
         out["strike_from_spot"] = round(trip.strike - spot, 2)
-    table = _option_bars(root, trip.underlying, trip.day)
-    if table is None:
+    bars = [(h, lo) for t, h, lo in _contract_bars(root, trip) if entry <= t <= exit_]
+    if not bars:
         return out
-    highs, lows = [], []
-    for r in table.to_pylist():
-        if (
-            r["expiry"] != trip.expiry
-            or r["strike"] != trip.strike
-            or r["option_type"] != trip.kind
-        ):
-            continue
-        t = r["ts"].time()
-        if entry <= time(t.hour, t.minute) <= exit_:
-            highs.append(r["high"])
-            lows.append(r["low"])
-    if not highs:
-        return out
-    hi, lo, price = max(highs), min(lows), trip.entry_price
+    hi, lo, price = max(b[0] for b in bars), min(b[1] for b in bars), trip.entry_price
     if trip.direction == "short":
         out["mae"] = round(-(hi - price) * trip.qty, 2) if hi > price else 0.0
         out["mfe"] = round((price - lo) * trip.qty, 2) if lo < price else 0.0

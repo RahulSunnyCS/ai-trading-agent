@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import threading
 import time
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Body, Query
@@ -28,6 +28,8 @@ router = APIRouter(prefix="/legwise/contract-notes")
 
 CACHE_SECONDS = 20.0  # the store changes at night, at 15:50 and when inputs are saved
 CACHE_ENTRIES = 32
+EXTREMES_MAX_DAYS = 31
+INPUT_DAYS_AHEAD = 7  # the inputs of a session up to a week ahead (the next session's capital)
 _lock = threading.Lock()
 _cache: dict[tuple, tuple[float, Any]] = {}
 
@@ -124,6 +126,14 @@ def get_trips(
 ) -> Any:
     from ..realised import views
 
+    if extremes:
+        # MAE / MFE read the lake per trip: a month at a time.
+        try:
+            s, e = _day(from_), _day(to)
+        except ValueError:
+            return _error(422, "from and to must be days as YYYY-MM-DD")
+        if s is None or e is None or (e - s).days > EXTREMES_MAX_DAYS:
+            return _error(422, f"extremes need from and to at most {EXTREMES_MAX_DAYS} days apart")
     return _read("trips", views.trip_rows, from_, to, account=account, extremes=extremes)
 
 
@@ -179,12 +189,15 @@ def put_inputs(day: str, body: dict = Body(...)) -> Any:  # noqa: B008 - FastAPI
         return _error(422, f"unknown field(s): {', '.join(sorted(unknown))}")
 
     def money(v: Any) -> bool:
-        return v is None or (isinstance(v, int | float) and 0 <= v <= 100_000_000)
+        return v is None or (
+            isinstance(v, int | float) and not isinstance(v, bool) and 0 <= v <= 100_000_000
+        )
 
-    if (
-        "algos" in body
-        and body["algos"] is not None
-        and (not isinstance(body["algos"], int) or not 0 <= body["algos"] <= 200)
+    if d > date.today() + timedelta(days=INPUT_DAYS_AHEAD):
+        return _error(422, f"inputs are for days up to {INPUT_DAYS_AHEAD} days ahead")
+    algos = body.get("algos")
+    if algos is not None and (
+        not isinstance(algos, int) or isinstance(algos, bool) or not 0 <= algos <= 200
     ):
         return _error(422, "algos must be a whole number 0-200")
     if "capital_total" in body and not money(body["capital_total"]):
@@ -206,7 +219,8 @@ def put_inputs(day: str, body: dict = Body(...)) -> Any:  # noqa: B008 - FastAPI
             if v is None:
                 m.pop(k, None)
             elif k == "capital":
-                m["capital"] = {**(m.get("capital") or {}), **v}
+                merged = {**(m.get("capital") or {}), **v}
+                m["capital"] = {b: x for b, x in merged.items() if x is not None}
             else:
                 m[k] = v
         m["source"] = "page"

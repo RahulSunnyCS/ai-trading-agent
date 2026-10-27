@@ -11,13 +11,16 @@ One row per session the store has a line for (the sheet's rows). Per day:
 - `avg_profit_50` (T), `avg_profit_100` (U), `avg_charges_100` (V): averages of the last 50 / 100
   rows' figures (rows without one skipped), rounded to the rupee, blank until that many rows;
 - `charge_profit_pct` (W) = V × 100 ÷ U, one decimal;
-- `capital` (X): `capital_total` from `manual/`, else the per-broker 15:50 readings added up, else
-  the last known capital carried forward (`capital_source` says which);
+- `capital` (X): the day's typed `capital_total` from `manual/`; else each broker's last figure
+  (typed, or the 15:50 reading written as the next session's), carried separately and added up
+  once every F&O broker has one; else the last total carried (`capital_source` says which);
 - `avg_capital_100` (Y) and `profit_capital_bps` (Z) = U × 10 000 ÷ Y, rounded.
 
 One account (`account="broker/id"`) uses that account's notes only: the day's algo fees are
 the whole book's and are left out. Collateral interest from the ledger is shown beside the
-figures (`interest`), never inside them: the sheet never had it.
+figures (`interest`), never inside them: the sheet never had it. Ledger e-mails dated a weekend
+or holiday count on the next session (those after the last session wait for the next one).
+Averages and rounding are exact decimals, half away from zero, like the sheet's ROUND.
 """
 
 from __future__ import annotations
@@ -75,14 +78,39 @@ class DayRow:
         return {k: (float(v) if isinstance(v, Decimal) else v) for k, v in out.items()}
 
 
-def _capital(manual: dict) -> Decimal | None:
-    if manual.get("capital_total") is not None:
-        return _dec(manual["capital_total"])
-    # The per-broker readings make a total only when every F&O broker has one.
-    per = manual.get("capital")
-    if isinstance(per, dict) and all(per.get(b) is not None for b in ("finvasia", "angelone")):
-        return _dec(per["finvasia"]) + _dec(per["angelone"])
-    return None
+FNO = ("finvasia", "angelone")
+
+
+class _CapitalLine:
+    """The day's capital: a typed total (`capital_total`) when there is one; else each broker's
+    last figure (typed, or Angel One's 15:50 reading), carried separately, added up once every
+    F&O broker has one; else the last total carried."""
+
+    def __init__(self, account: str | None) -> None:
+        self.account = account
+        self.per: dict[str, Decimal] = {}
+        self.last: Decimal | None = None
+
+    def day(self, manual: dict) -> tuple[Decimal | None, str | None]:
+        per = manual.get("capital") if isinstance(manual.get("capital"), dict) else {}
+        if self.account is not None:
+            for key in (self.account, self.account.split("/")[0]):
+                if per.get(key) is not None:
+                    self.last = _dec(per[key])
+                    return self.last, "manual"
+            return self.last, "carried" if self.last is not None else None
+        fresh = False
+        for broker in FNO:
+            if per.get(broker) is not None:
+                self.per[broker] = _dec(per[broker])
+                fresh = True
+        if manual.get("capital_total") is not None:
+            self.last = _dec(manual["capital_total"])
+            return self.last, "manual"
+        if fresh and all(b in self.per for b in FNO):
+            self.last = sum((self.per[b] for b in FNO), ZERO)
+            return self.last, "manual"
+        return self.last, "carried" if self.last is not None else None
 
 
 def _ledger(events: Iterable[dict], account: str | None) -> tuple[Decimal, Decimal, Decimal]:
@@ -106,16 +134,20 @@ def _ledger(events: Iterable[dict], account: str | None) -> tuple[Decimal, Decim
     return interest, deposits, withdrawals
 
 
-def _mean(values: list) -> float | None:
+def _mean(values: list) -> Decimal | None:
     vals = [v for v in values if v is not None]
-    return sum(vals) / len(vals) if vals else None
+    return sum(vals, ZERO) / len(vals) if vals else None
 
 
-def _round(value: float | None) -> int | None:
-    # The sheet's ROUND: half away from zero.
+def _round(value: Decimal | None, places: str = "1") -> Decimal | None:
+    # The sheet's ROUND: half away from zero, on exact decimals.
     if value is None:
         return None
-    return int(Decimal(str(value)).quantize(Decimal(1), rounding="ROUND_HALF_UP"))
+    return value.quantize(Decimal(places), rounding="ROUND_HALF_UP")
+
+
+def _int(value: Decimal | None) -> int | None:
+    return None if value is None else int(value)
 
 
 def daily(
@@ -128,7 +160,10 @@ def daily(
     """The sheet's rows. The running figures (cumulative, drawdown, the 50/100-row averages)
     start at the store's first day even when `start` is later, as the sheet's do."""
     rows: list[DayRow] = []
-    last_capital: Decimal | None = None
+    capital_line = _CapitalLine(account)
+    # Ledger e-mails dated a weekend or holiday count on the next session.
+    ledger_days = sorted(book.ledger)
+    li = 0
     for day in book.days:
         if end is not None and day > end:
             break
@@ -143,13 +178,12 @@ def daily(
         note_charges = (
             sum((_dec(ln["fno"].get("total_charges")) for ln in notes), ZERO) if notes else None
         )
-        capital = _capital(manual) if account is None else _account_capital(manual, account)
-        source = "manual" if capital is not None else None
-        if capital is None and last_capital is not None:
-            capital, source = last_capital, "carried"
-        if capital is not None:
-            last_capital = capital
-        interest, deposits, withdrawals = _ledger(book.ledger.get(day, []), account)
+        capital, source = capital_line.day(manual)
+        events = []
+        while li < len(ledger_days) and ledger_days[li] <= day:
+            events.extend(book.ledger[ledger_days[li]])
+            li += 1
+        interest, deposits, withdrawals = _ledger(events, account)
         rows.append(
             DayRow(
                 day=day,
@@ -172,42 +206,33 @@ def daily(
     return [r for r in rows if start is None or r.day >= start]
 
 
-def _account_capital(manual: dict, account: str) -> Decimal | None:
-    per = manual.get("capital")
-    if not isinstance(per, dict):
-        return None
-    for key in (account, account.split("/")[0]):
-        if per.get(key) is not None:
-            return _dec(per[key])
-    return None
-
-
 def _running(rows: list[DayRow]) -> None:
     cumulative = peak = ZERO
-    profits: list[float | None] = []
-    charges: list[float | None] = []
-    capitals: list[float | None] = []
+    profits: list[Decimal | None] = []
+    charges: list[Decimal | None] = []
+    capitals: list[Decimal | None] = []
     for r in rows:
         if r.profit is not None:
             cumulative += r.profit
         peak = max(peak, cumulative)
         r.cumulative = cumulative
         r.drawdown = cumulative - peak
-        profits.append(None if r.profit is None else float(r.profit))
-        charges.append(None if r.charges is None else float(r.charges))
-        capitals.append(None if r.capital is None else float(r.capital))
+        profits.append(r.profit)
+        charges.append(r.charges)
+        capitals.append(r.capital)
         n = len(profits)
         if n >= 50:
-            r.avg_profit_50 = _round(_mean(profits[-50:]))
+            r.avg_profit_50 = _int(_round(_mean(profits[-50:])))
         if n >= 100:
-            r.avg_profit_100 = _round(_mean(profits[-100:]))
-            r.avg_charges_100 = _round(_mean(charges[-100:]))
+            u = _round(_mean(profits[-100:]))
+            v = _round(_mean(charges[-100:]))
             cap = _mean(capitals[-100:])
-            r.avg_capital_100 = _round(cap)
-            if r.avg_profit_100:
-                r.charge_profit_pct = round(r.avg_charges_100 * 100 / r.avg_profit_100, 1)
-            if cap:
-                r.profit_capital_bps = _round(r.avg_profit_100 * 10000 / cap)
+            r.avg_profit_100, r.avg_charges_100 = _int(u), _int(v)
+            r.avg_capital_100 = _int(_round(cap))
+            if u and v is not None:
+                r.charge_profit_pct = float(_round(v * 100 / u, "0.1"))
+            if cap and u is not None:
+                r.profit_capital_bps = _int(_round(u * 10000 / cap))
 
 
 def _f(value: Decimal | None) -> float | None:

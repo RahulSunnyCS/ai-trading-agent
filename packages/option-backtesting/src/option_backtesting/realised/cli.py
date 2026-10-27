@@ -139,15 +139,16 @@ def day(day_: str = typer.Argument(..., metavar="DAY"), as_json: bool = JSON) ->
 def capital(
     day_: str = typer.Option(None, "--day", help="YYYY-MM-DD; default today (IST)."),
 ) -> None:
-    """15:50: Angel One's free margin into manual/<day>.json (one guarded SmartAPI login).
-    Finvasia is not read (see realised/capital.py). Exit 0 read, 1 not read."""
+    """After the close: Angel One's free margin, as the day's closing funds and the next
+    session's capital (one guarded SmartAPI login). Finvasia is not read (see
+    realised/capital.py). Exit 0 recorded, 1 not."""
     from .capital import read_angelone_capital, record_capital
 
     d = _d(day_) or datetime.now(IST).date()
     try:
         amount = read_angelone_capital()
+        nxt = record_capital(_root(), d, "angelone", amount, "SmartAPI getRMS net at the close")
     except Exception as error:  # noqa: BLE001 - every failure is one line and exit 1
-        typer.echo(f"Angel One capital not read: {str(error)[:200]}")
+        typer.echo(f"Angel One capital not recorded: {str(error)[:200]}")
         raise typer.Exit(1) from None
-    record_capital(_root(), d, "angelone", amount, "SmartAPI getRMS net at the close")
-    typer.echo(f"{d}: Angel One capital recorded")
+    typer.echo(f"{d}: Angel One closing funds recorded, and {nxt}'s capital")

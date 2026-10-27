@@ -4,6 +4,7 @@ and the `/legwise/contract-notes/*` routes so the page and the command never dis
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 from . import context, ratios, sources, store, trips
@@ -80,19 +81,21 @@ def trip_rows(root: Path, *, start=None, end=None, account=None, extremes=False)
     book = store.load(root)
     out = []
     ts = trips.trips(book, account=account, start=start, end=end)
-    for t in ts:
-        row = t.as_dict() | sources.source_of(root, t)
+    for t, src in zip(ts, sources.label(root, ts), strict=True):
+        row = t.as_dict() | src
         if extremes:
             row |= context.trip_extremes(root, t)
         out.append(row)
     by_source: dict[str, dict] = {}
-    for row in out:
+    nets: dict[str, Decimal] = {}
+    for t, row in zip(ts, out, strict=True):
         s = by_source.setdefault(row["source"], {"trips": 0, "net": 0.0, "won": 0})
-        if row["net"] is None:
+        if t.net is None:
             continue
         s["trips"] += 1
-        s["net"] = round(s["net"] + row["net"], 2)
-        s["won"] += row["net"] > 0
+        nets[row["source"]] = nets.get(row["source"], Decimal(0)) + t.net
+        s["net"] = float(nets[row["source"]])
+        s["won"] += t.net > 0
     return {
         "trips": out,
         "by_source": by_source,
@@ -105,12 +108,11 @@ def day_detail(root: Path, day: date) -> dict:
     book = store.load(root)
     lines = book.lines.get(day, [])
     rows = [r for r in ratios.daily(book, end=day) if r.day == day]
-    day_trips = []
-    for ln in book.fno_lines(day):
-        for t in trips.line_trips(day, ln):
-            day_trips.append(
-                t.as_dict() | sources.source_of(root, t) | context.trip_extremes(root, t)
-            )
+    ts = trips.day_trips(book, day)
+    day_trips = [
+        t.as_dict() | src | context.trip_extremes(root, t)
+        for t, src in zip(ts, sources.label(root, ts), strict=True)
+    ]
     return {
         "day": day.isoformat(),
         "row": rows[0].as_dict() if rows else None,
@@ -134,11 +136,11 @@ def money(root: Path, *, start=None, end=None) -> dict:
         if (start is None or d >= start) and (end is None or d <= end)
         for e in book.ledger[d]
     ]
-    totals: dict[str, float] = {}
+    totals: dict[str, Decimal] = {}
     for e in events:
         if e.get("amount") is not None:
-            totals[e["kind"]] = round(totals.get(e["kind"], 0.0) + float(e["amount"]), 2)
-    return {"events": events, "totals": totals}
+            totals[e["kind"]] = totals.get(e["kind"], Decimal(0)) + Decimal(str(e["amount"]))
+    return {"events": events, "totals": {k: float(v) for k, v in totals.items()}}
 
 
 def momentum(root: Path, *, start=None, end=None) -> dict:
