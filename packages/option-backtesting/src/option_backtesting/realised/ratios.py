@@ -23,7 +23,9 @@ or holiday count on the next session (those after the last session wait for the 
 
 `other_debits` is an estimate, not a note figure: the account debits that reach neither a note
 nor an e-mail (DP charges, AMC and the like) at ₹1,000 per F&O broker a year (owner,
-2026-10-27), accrued per calendar day from each broker's first line in the store. It is shown
+2026-10-27), accrued per calendar day from each broker's first line in the store. A row carries
+the days since the previous row, so a range starting on a Monday carries the weekend before it.
+With `account`, the rate is that account's broker's (one account per broker today). It is shown
 beside the figures with the interest, and taken off only in the summary's `net_after_debits`.
 Averages and rounding are exact decimals, half away from zero, like the sheet's ROUND.
 """

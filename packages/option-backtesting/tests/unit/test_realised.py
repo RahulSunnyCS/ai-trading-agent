@@ -387,6 +387,24 @@ def test_angel_one_trips_start_where_its_notes_read(tmp_path):
     assert [r.net for r in ratios.daily(book)] == [Decimal("990"), Decimal("990")]
 
 
+def test_a_position_held_across_trades_from_pairs_and_is_left_out(tmp_path):
+    def angel(day, fills, net):
+        line = _note(day, "B1", net, 0, trades=fills, trades_check="fills")
+        return line | {"broker": "angelone"}
+
+    sell = _fill("sell", 75, 3000, "15:00:00", expiry="2026-02-03")
+    buy = _fill("buy", 75, -2000, "09:30:00", expiry="2026-02-03")
+    book = _book(
+        tmp_path,
+        {
+            "2026-01-30": [angel("2026-01-30", [sell], 3000)],
+            "2026-02-02": [angel("2026-02-02", [buy], -2000)],
+        },
+    )
+    assert trips.trips(book) == []  # opened before 2 Feb: no trip, and no false "expired" one
+    assert trips.partial_years() == {"2025-26": ["angelone"]}
+
+
 def test_weekdays_between_skips_the_weekend():
     assert trips.weekdays_between(date(2026, 10, 23), date(2026, 10, 27)) == 2  # Fri -> Tue
     assert trips.weekdays_between(date(2026, 10, 27), date(2026, 10, 27)) == 0

@@ -547,9 +547,11 @@ export function yearChargeParts(s: TradeBookSummaryBlock): ChargePart[] {
       swatch:
         p.key === 'algo'
           ? 'bg-accent'
-          : p.key === 'interest' || p.key === 'debits'
+          : p.key === 'interest'
             ? 'bg-faint'
-            : (PART_SWATCHES[i] as string),
+            : p.key === 'debits'
+              ? 'bg-muted'
+              : (PART_SWATCHES[i] as string),
     }));
 }
 

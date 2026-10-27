@@ -92,7 +92,7 @@ Every trade, paired from the notes' fills: one contract on one account, from a f
 - **From spot** is the strike minus the index at entry, in points. **DTE** is weekdays to expiry.
 - The cards add up each source's closed trades: net, how many won, the average. The scatter puts every trade with a best and worst point at its worst point (across) and the share of its best point it kept (up).
 - **Angel One's trades start on 2 Feb 2026.** Its earlier notes came in older layouts whose trades did not all read, so they are left out of the trades, the cards and the turnover (the line under the turnover counts them). Their days still count in every day figure, total and ratio.
-- **Turnover** is always the whole year's F&O turnover, whatever the Period, for your CA (the sum of each trade's absolute P&L): a figure, not tax advice.
+- **Turnover** is the whole year's F&O turnover, whatever the Period, for your CA, except in a year marked **partial**: FY 2025-26 leaves out Angel One's trades before 2 Feb 2026 (the sum of each trade's absolute P&L): a figure, not tax advice.
 
 Filters for source, index and days to expiry sit above the cards and stay in the address.
 

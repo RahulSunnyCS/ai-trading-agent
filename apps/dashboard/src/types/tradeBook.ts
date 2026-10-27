@@ -199,6 +199,8 @@ export interface TradeBookTripsResponse {
   coverage: Record<string, number>;
   /** Per broker, the first day its notes give trips (earlier notes' trades did not all read). */
   trades_from: Record<string, string>;
+  /** Per financial year, the brokers whose trades before `trades_from` the turnover leaves out. */
+  turnover_partial: Record<string, string[]>;
 }
 
 export interface TradeBookLedgerEvent {

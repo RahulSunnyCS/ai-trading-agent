@@ -51,8 +51,8 @@ function contextText(d: TradeBookDayDetail): string {
         ? `gap ${formatPct(ix.gap_pct, 1, { unit: 'percent', sign: true })}`
         : null,
       ix.range_pct !== null ? `range ${formatPct(ix.range_pct, 1, { unit: 'percent' })}` : null,
-      ix.iv_7d !== null
-        ? `IV ${formatNumber(ix.iv_7d, 1)}${ix.iv_pct !== null ? ` (${formatInt(ix.iv_pct)} pct)` : ''}`
+      ix.iv_7d != null
+        ? `IV ${formatNumber(ix.iv_7d, 1)}${ix.iv_pct != null ? ` (${formatInt(ix.iv_pct)} pct)` : ''}`
         : null,
       ix.expiry_day ? 'expiry' : null,
     ].filter(Boolean);

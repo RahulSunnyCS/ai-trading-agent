@@ -105,6 +105,8 @@ def trip_rows(root: Path, *, start=None, end=None, account=None, extremes=False)
         "turnover": trips.turnover(ts),
         "coverage": trips.coverage(book, start=start, end=end),
         "trades_from": {b: d.isoformat() for b, d in trips.TRADES_FROM.items()},
+        # The years whose turnover leaves out a broker's trades before its `trades_from`.
+        "turnover_partial": trips.partial_years(),
     }
 
 
