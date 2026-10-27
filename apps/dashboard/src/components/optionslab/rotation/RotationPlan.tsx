@@ -89,7 +89,9 @@ export function RotationTomorrow({ plan }: { plan: RotationPlan }) {
           </div>
         ))}
       </div>
-      {plan.accounts.length === 0 ? (
+      {plan.settings?.startsWith('the automation settings cannot be read') ? (
+        <p className="text-[11px] text-negative">Upload state not shown: {plan.settings}.</p>
+      ) : plan.accounts.length === 0 ? (
         <p className="text-[11px] text-faint">
           No account uploads a list in Settings › Automation, so there is no upload state to show.
         </p>

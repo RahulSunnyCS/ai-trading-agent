@@ -117,7 +117,9 @@ def test_tentative_is_the_newest_list_after_the_recorded_day(root: Path):
 
 
 def test_quantiply_replay_per_session(root: Path):
-    st = plan.quantiply_state(root, "angelone", "core", ["2026-10-27", "2026-10-28"])
+    st = plan.quantiply_state(
+        root, "angelone", "core", ["2026-10-27", "2026-10-28"], today="2026-10-28"
+    )
     # Tuesday: deleted now, but it was uploaded for that session and switched off at 15:40
     assert st["2026-10-27"]["uploaded"] == ["N_dir_0917"]
     assert st["2026-10-27"]["held"] == []
@@ -167,3 +169,14 @@ def test_the_route(root: Path, monkeypatch):
     body = TestClient(create_app()).get("/legwise/rotation/plan").json()
     assert body["sessions"][0]["kind"] == "tentative"
     assert body["settings"] == "settings v1"
+
+
+def test_a_past_session_counts_only_its_own_uploads(root: Path):
+    """The Wednesday algo left over from 21 Oct is held now; it does not make 21 Oct's pick
+    'uploaded' unless that session created it (it did here), and a later past Wednesday that
+    created nothing reads nothing."""
+    st = plan.quantiply_state(
+        root, "angelone", "core", ["2026-10-21", "2026-10-14"], today="2026-10-28"
+    )
+    assert st["2026-10-21"]["uploaded"] == ["S_p250_1317"]
+    assert st["2026-10-14"]["uploaded"] == []

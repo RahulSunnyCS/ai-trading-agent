@@ -23,8 +23,9 @@ Ledgers (written by `packages/broker-login`):
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from . import automation_settings, journal, labels, result, store
 
@@ -34,6 +35,10 @@ BOOK_PREFIX = {"core": "Core", "t1": "T1"}
 PLATFORM_LABEL = {"algotest": "AlgoTest", "quantiply": "Quantiply"}
 BROKER_LABEL = {"finvasia": "Shoonya", "angelone": "Angel One"}
 WEEKDAYS = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+
+
+def _today() -> str:
+    return datetime.now(ZoneInfo("Asia/Kolkata")).date().isoformat()
 
 
 def _weekday(day: str) -> str:
@@ -129,7 +134,9 @@ def _strip(name: str) -> str:
     return parts[1] if len(parts) >= 2 else str(name)
 
 
-def quantiply_state(root: Path, broker: str, book: str, sessions: list[str]) -> dict:
+def quantiply_state(
+    root: Path, broker: str, book: str, sessions: list[str], today: str | None = None
+) -> dict:
     """Per session: `uploaded` (an algo of that name was created for the session, or one for its
     weekday is held now), `enabled` (switched on at some point in the session, by the deploy
     ledger: an `enable`, or the 15:40 `disable`, which only switches off algos that were on, by
@@ -151,6 +158,7 @@ def quantiply_state(root: Path, broker: str, book: str, sessions: list[str]) -> 
             created.setdefault(str(row.get("day")), set()).add(_strip(row["name"]))
         elif row.get("action") == "delete":
             live.pop(str(row.get("id")), None)
+    today = today or _today()
     out: dict = {}
     for session in sessions:
         weekday = _weekday(session)
@@ -169,7 +177,8 @@ def quantiply_state(root: Path, broker: str, book: str, sessions: list[str]) -> 
             and str(r.get("name", "")).startswith(prefix)
         }
         out[session] = {
-            "uploaded": sorted(held | created.get(session, set())),
+            # what is held now speaks for today and later; a past session only by its own creates
+            "uploaded": sorted((held if session >= today else set()) | created.get(session, set())),
             "enabled": sorted(enabled),
             "held": sorted(held),
             "deploys_known": True,
@@ -177,7 +186,7 @@ def quantiply_state(root: Path, broker: str, book: str, sessions: list[str]) -> 
     return out
 
 
-def algotest_state(root: Path, book: str, sessions: list[str]) -> dict:
+def algotest_state(root: Path, book: str, sessions: list[str], today: str | None = None) -> dict:
     """A saved AlgoTest strategy is not tied to a weekday: uploaded = uploaded for the session, or
     held now. Deploys on /live keep no ledger here, so `enabled` is not known."""
     ledger = _read_jsonl(store.rotation_dir(root) / "algotest" / "ledger.jsonl")
@@ -196,9 +205,12 @@ def algotest_state(root: Path, book: str, sessions: list[str]) -> dict:
         elif row.get("action") == "delete":
             live.pop(str(row.get("id")), None)
     held = set(live.values())
+    today = today or _today()
     return {
         session: {
-            "uploaded": sorted(held | uploaded.get(session, set())),
+            "uploaded": sorted(
+                (held if session >= today else set()) | uploaded.get(session, set())
+            ),
             "enabled": [],
             "held": sorted(held),
             "deploys_known": False,
