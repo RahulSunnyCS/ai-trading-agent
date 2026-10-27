@@ -40,6 +40,11 @@ From `src/index.ts`:
   on — a bad preferences file must never be what silences a failure alert. The
   Python `notify.py` copies read the same file with the same rules and use the
   same type strings; add a new type to `NOTIFICATION_TYPES` first.
+- BL-173 levels: `levelOf(type)`, `fileLevels()`, `DEFAULT_LEVELS`, `looksLikeFailure(text)`, type `Level`.
+  The file also holds `{"levels": {type: "all" | "failures" | "off"}}` (the scheduler writes `disabled` beside it
+  for older readers). `failures` sends only a failure: `send` reads it from `severity` (not `info`), `sendText` from
+  the text's first icon (⚠️ ❌ 🚨 💥 🔴 ⛔). A type the file does not name has its `DEFAULT_LEVELS` level, else
+  `all`. The Python copies carry the same table and rules.
 - Types: `Action`, `Notification`, `NotificationType`, `Severity`, `TelegramConfig`,
   `TgUpdate`, `TgMessage`, `TgCallbackQuery`, `UpdatesResult`.
 

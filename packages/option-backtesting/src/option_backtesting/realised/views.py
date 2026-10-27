@@ -11,7 +11,7 @@ from . import context, ratios, sources, store, trips
 
 
 def summary(root: Path, *, start=None, end=None, account=None) -> dict:
-    book = store.load(root)
+    book = store.load_cached(root)
     rows = ratios.daily(book, account=account, start=start, end=end)
     accounts = []
     for acc in book.accounts():
@@ -67,7 +67,7 @@ def summary(root: Path, *, start=None, end=None, account=None) -> dict:
 
 
 def days(root: Path, *, start=None, end=None, account=None) -> dict:
-    book = store.load(root)
+    book = store.load_cached(root)
     rows = ratios.daily(book, account=account, start=start, end=end)
     return {
         "days": [r.as_dict() | {"events": context.events(r.day)} for r in rows],
@@ -76,12 +76,12 @@ def days(root: Path, *, start=None, end=None, account=None) -> dict:
 
 
 def months(root: Path, *, start=None, end=None, account=None) -> dict:
-    book = store.load(root)
+    book = store.load_cached(root)
     return {"months": ratios.months(ratios.daily(book, account=account, start=start, end=end))}
 
 
 def trip_rows(root: Path, *, start=None, end=None, account=None, extremes=False) -> dict:
-    book = store.load(root)
+    book = store.load_cached(root)
     out = []
     ts = trips.trips(book, account=account, start=start, end=end)
     for t, src in zip(ts, sources.label(root, ts), strict=True):
@@ -111,7 +111,7 @@ def trip_rows(root: Path, *, start=None, end=None, account=None, extremes=False)
 
 
 def day_detail(root: Path, day: date) -> dict:
-    book = store.load(root)
+    book = store.load_cached(root)
     lines = book.lines.get(day, [])
     rows = [r for r in ratios.daily(book, end=day) if r.day == day]
     ts = trips.day_trips(book, day)
@@ -135,7 +135,7 @@ def day_detail(root: Path, day: date) -> dict:
 
 
 def money(root: Path, *, start=None, end=None) -> dict:
-    book = store.load(root)
+    book = store.load_cached(root)
     events = [
         e
         for d in sorted(book.ledger)
@@ -151,7 +151,7 @@ def money(root: Path, *, start=None, end=None) -> dict:
 
 def momentum(root: Path, *, start=None, end=None) -> dict:
     """The Zerodha (`kite`) notes: Momentum's real buys and sells."""
-    book = store.load(root)
+    book = store.load_cached(root)
     out = []
     for d in book.days:
         if (start and d < start) or (end and d > end):

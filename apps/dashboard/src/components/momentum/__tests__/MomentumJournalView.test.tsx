@@ -161,6 +161,24 @@ describe('MomentumJournalView', () => {
     expect(screen.getByText('Nifty Realty 60%, Gold 40%')).toBeTruthy();
   });
 
+  it('opens the expected-signals table by itself when one is missing', () => {
+    response = journal;
+    render(<MomentumJournalView />);
+    expect(screen.getByText('1 / 3 recorded')).toBeTruthy();
+    expect(screen.getByText('Missing')).toBeTruthy();
+  });
+
+  it('collapses the expected-signals table to its counter when every signal is in', () => {
+    const check = journal.check as NonNullable<MomentumJournal['check']>;
+    const recordedOnly = check.items.map((item) => ({ ...item, status: 'recorded' as const }));
+    response = { ...journal, check: { ...check, recorded: 3, items: recordedOnly } };
+    render(<MomentumJournalView />);
+    expect(screen.getByText('3 / 3 recorded')).toBeTruthy();
+    expect(screen.queryByText('Stock Weekly Core')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /what should be here/ }));
+    expect(screen.getByText('Stock Weekly Core')).toBeTruthy();
+  });
+
   it('opens an entry to show every action and its provenance', () => {
     response = journal;
     render(<MomentumJournalView />);

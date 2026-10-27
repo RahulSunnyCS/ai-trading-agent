@@ -534,6 +534,35 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
   fastify.post('/api/momentum/orders/run', async (_request, reply) => {
     await forward(reply, '/api/orders/run', { method: 'POST' });
   });
+  // "Preview for…": another favourite's orders against the same holdings, saved nowhere. A job,
+  // like the rebalance preview: a cold Broad ranking can outlast Cloudflare's ~100 s limit.
+  fastify.post(
+    '/api/momentum/orders/preview/jobs',
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
+    async (request, reply) => {
+      await forward(reply, '/api/orders/preview/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+  fastify.get(
+    '/api/momentum/orders/preview/jobs/:id',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', pattern: '^[0-9a-f]{1,32}$' } },
+          required: ['id'],
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      await forward(reply, `/api/orders/preview/jobs/${id}`);
+    },
+  );
   for (const [path, method] of [
     ['orders/settings', 'PUT'],
     ['holdings/paste', 'POST'],

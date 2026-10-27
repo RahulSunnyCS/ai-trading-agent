@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { combineReports } from './morning-report-plan.js';
+import { combineReports, loginLine } from './morning-report-plan.js';
 
 const line = (text: string) => `${JSON.stringify({ text })}\n`;
+const expect_ = (got: string | null, want: string) => assert.equal(got, want);
 
 describe('one morning switch-on message (BL-172)', () => {
   it('puts both accounts under one heading', () => {
@@ -30,6 +31,44 @@ describe('one morning switch-on message (BL-172)', () => {
     const msg = combineReports(line('✅ Quantiply · Angel One ...'), '2026-10-28', 2);
     assert.match(msg, /^⚠️/);
     assert.match(msg, /1 account\(s\) did not report/);
+  });
+
+  it('the evening upload says nothing when no account wrote anything (BL-173)', () => {
+    assert.equal(combineReports('', '2026-10-28', 0, 'Quantiply evening upload', true), null);
+    assert.match(
+      combineReports(line('⚠️ Shoonya ...'), '2026-10-28', 0, 'Quantiply evening upload', true) ??
+        '',
+      /^⚠️ Quantiply evening upload 2026-10-28/,
+    );
+  });
+
+  it('the login line: names what logged in, warns on a failure (BL-173)', () => {
+    const ok = (name: string) => ({ name, status: 'OK' });
+    expect_(
+      loginLine({
+        ok: true,
+        result: {
+          algotest: null,
+          quantiply: ok('Quantiply · Angel One'),
+          quantiplyShoonya: ok('Quantiply · Shoonya'),
+        },
+      }),
+      '✅ Logged in: Quantiply · Angel One · Quantiply · Shoonya',
+    );
+    expect_(
+      loginLine({
+        ok: false,
+        result: {
+          algotest: null,
+          quantiply: ok('Quantiply · Angel One'),
+          quantiplyShoonya: { name: 'Quantiply · Shoonya', status: 'FAIL' },
+        },
+      }),
+      '⚠️ Login failed: Quantiply · Shoonya',
+    );
+    assert.equal(loginLine(null), null);
+    assert.equal(loginLine({ ok: true, nothing: true }), null);
+    expect_(loginLine({ ok: true, github: 'u' }), "✅ Logged in by GitHub's backup");
   });
 
   it('no report at all is said, never silence', () => {

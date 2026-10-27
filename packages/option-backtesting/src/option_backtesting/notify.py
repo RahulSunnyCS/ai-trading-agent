@@ -46,7 +46,7 @@ def redact(text: str) -> str:
 
 
 def prefs_path() -> Path:
-    """Same file and override as @trading/notify's prefs.ts: `{"disabled": [type, ...]}`."""
+    """Same file and override as @trading/notify's prefs.ts (`disabled` and `levels`)."""
     override = os.environ.get("NOTIFY_PREFS_FILE", "").strip()
     if override:
         return Path(override)
@@ -69,9 +69,57 @@ def disabled_types(path: Path | None = None) -> set[str]:
     return {t for t in listed if isinstance(t, str)} if isinstance(listed, list) else set()
 
 
-def is_enabled(kind: str | None, path: Path | None = None) -> bool:
-    """An untagged message (kind None) is always sent."""
-    return kind is None or kind not in disabled_types(path)
+#: BL-173 (owner, 2026-10-28): a type's level when the preferences file says nothing about it
+#: ("all" otherwise). Same table as @trading/notify's DEFAULT_LEVELS (prefs.ts).
+DEFAULT_LEVELS = {
+    "momentum.preview": "off",
+    "momentum.journal": "failures",
+    "momentum.live_rules": "failures",
+    "options.daily": "failures",
+    "scheduler.recovered": "off",
+    "quantiply.switch_off": "failures",
+}
+
+_FAILURE_ICONS = ("⚠️", "⚠", "❌", "🚨", "💥", "🔴", "⛔")
+
+
+def looks_like_failure(text: str) -> bool:
+    """A failure, read from the text's first icon (the warning icons every sender puts first)."""
+    return text.lstrip().startswith(_FAILURE_ICONS)
+
+
+def file_levels(path: Path | None = None) -> dict[str, str]:
+    """The levels the file sets: `levels`, then `disabled` as off. Fails open."""
+    path = path or prefs_path()
+    out = dict.fromkeys(disabled_types(path), "off")
+    try:
+        levels = json.loads(path.read_text()).get("levels")
+    except (OSError, ValueError, AttributeError):
+        return out
+    if isinstance(levels, dict):
+        out.update({t: v for t, v in levels.items() if v in ("all", "failures", "off")})
+    return out
+
+
+def level_of(kind: str, path: Path | None = None) -> str:
+    return file_levels(path).get(kind) or DEFAULT_LEVELS.get(kind, "all")
+
+
+def is_enabled(
+    kind: str | None,
+    path: Path | None = None,
+    failure: bool | None = None,
+    text: str = "",
+) -> bool:
+    """An untagged message (kind None) is always sent; a `failures` type only its failures."""
+    if kind is None:
+        return True
+    level = level_of(kind, path)
+    if level == "off":
+        return False
+    if level == "failures":
+        return looks_like_failure(text) if failure is None else failure
+    return True
 
 
 @dataclass
@@ -108,8 +156,9 @@ def send(n: Notification, *, chat_id: str | None = None) -> tuple[bool, str]:
     Returns (delivered, text). An explicit chat_id overrides the default destination."""
     load_dotenv()
     text = render(n)
-    if not is_enabled(n.type):
-        print(f"\n[telegram: '{n.type}' is switched off, message below]\n{text}")
+    failure = looks_like_failure(text) if n.plain else n.severity != "info"
+    if not is_enabled(n.type, failure=failure):
+        print(f"\n[telegram: '{n.type}' is off or failures-only, message below]\n{text}")
         return False, text
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat = (chat_id if chat_id is not None else os.environ.get("TELEGRAM_CHAT_ID", "")).strip()

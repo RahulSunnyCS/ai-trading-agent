@@ -33,7 +33,7 @@ Five tiles answer "how is the year going?", each against the benchmark you pick 
 
 **Benchmarks.** A **target pace** (24% a year by default; 12, 18, 30 and 36 are offered) is capital × the rate × the share of the financial year that has passed since the year's first session (1 April, or a later first session in the store) up to the last day shown. It has a figure for net profit and return only, and the other tiles say "no target figure". **Last FY** compares every tile with the year before, up to the same calendar day, and draws last year's running net on the chart. The badge on each tile is the gap: green when it is in your favour, red when it is not.
 
-The line under the tiles has the average day, average win and loss, best and worst day, the latest 100-day average profit and profit/capital, the number of sessions, the algo fees, the collateral interest, **other debits (est.)** and the **net after both**. Other debits are the account charges no note or e-mail shows (DP charges, AMC and the like), estimated at ₹1,000 per broker a year and counted per calendar day from each broker's first note. Like the interest they sit beside the net profit, never inside it.
+The line under the tiles has the average day, average win and loss, best and worst day, the **longest drawdown** (the most sessions in a row spent below the running peak), the latest 100-day average profit and profit/capital, the number of sessions, the algo fees, the collateral interest, **other debits (est.)** and the **net after both**. Other debits are the account charges no note or e-mail shows (DP charges, AMC and the like), estimated at ₹1,000 per broker a year and counted per calendar day from each broker's first note. Like the interest they sit beside the net profit, never inside it.
 
 ## The day's figures (the sheet's columns)
 
@@ -63,11 +63,12 @@ The sheet's rolling columns, counted over the sessions with a note and running f
 - **W**, charge / profit: V × 100 ÷ U. Charges per rupee of net profit; lower is better.
 - **Z**, profit / capital: U × 10,000 ÷ the 100-day average capital, in basis points of capital a day.
 
-Each is blank until its window has 50 or 100 sessions. Averages are rounded to the rupee, as in the sheet.
+Each is blank until its window has 50 or 100 sessions. Averages are rounded to the rupee, as in the sheet. W's chart and the range beside its latest value count only sessions where U is at least ₹100 (the latest value itself is always the latest session's): when U is near zero, W divides by almost nothing and swings to thousands of percent either way, which says nothing about charges.
 
-## Summary, months and accounts
+## Months and accounts
 
-- **Summary** is the block under your sheet's daily rows: net profit and its % of capital, max drawdown, the **longest drawdown** (the most sessions in a row spent below the running peak), win days, the average winning, losing and overall day, and the charges.
+The sheet's summary block (net profit, max drawdown, the longest drawdown, win days, the average winning, losing and overall day, and the charges) is not repeated here: every figure in it is on the tiles or the line under them.
+
 - **Monthly returns** shows April to March: each month's gain as a % of that month's average capital (or in ₹), and **3m**, the average of that month's and the two before. The table below has one row per financial year; a click opens that year.
 - **By account** gives each account's net, average capital, return and charge / profit, and the year's algo fees on their own row. **Charges by kind** splits the year's charges into the notes' own charges, the algo fees, Angel One's collateral interest and the estimated other debits. The interest and the estimate are shown beside the charges, never inside the net profit: the sheet never had them.
 

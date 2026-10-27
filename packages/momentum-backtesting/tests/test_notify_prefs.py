@@ -33,9 +33,24 @@ def test_send_skips_a_switched_off_type(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(notify.urllib.request, "urlopen", lambda *a, **k: called.append(a))
     notify.send(Notification("momentum-weekly", "info", "x", type="momentum.preview"))
     assert called == []
-    assert "switched off" in capsys.readouterr().out
+    assert "is off or failures-only" in capsys.readouterr().out
 
 
 def test_warn_is_a_known_severity():
     # "warning" used to be sent from three places and raised KeyError in render().
     notify.render(Notification("momentum-journal", "warn", "x"))
+
+
+def test_failures_only_level_and_defaults(tmp_path):
+    """BL-173: a failures-only type sends a failure and holds a success; defaults apply."""
+    from momentum_backtesting.notify import is_enabled, level_of
+
+    prefs = tmp_path / "n.json"
+    prefs.write_text('{"levels": {"momentum.final": "failures"}}')
+    assert is_enabled("momentum.final", prefs, failure=True)
+    assert not is_enabled("momentum.final", prefs, failure=False)
+    assert not is_enabled("momentum.final", prefs, text="✅ fine")
+    assert is_enabled("momentum.final", prefs, text="⚠️ stale data")
+    assert level_of("momentum.preview", tmp_path / "none.json") == "off"
+    assert level_of("momentum.journal", tmp_path / "none.json") == "failures"
+    assert is_enabled(None, prefs, failure=False)
