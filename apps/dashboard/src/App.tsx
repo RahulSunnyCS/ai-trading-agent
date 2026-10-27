@@ -45,8 +45,8 @@ import { hydrateThemeFromStorage } from './store/theme';
 
 /** One-line subtitle shown under each view's title in the top bar. */
 const SUBTITLES: Record<Tab, string> = {
-  overview: 'Today at a glance: market, feed, token, positions and scheduled jobs',
-  live: 'Real-time straddle, momentum, and feed status',
+  overview: 'The morning board: rotation, Momentum, the trade book, jobs, logins and data',
+  live: 'Spot, VIX and two straddles minute by minute; a replay of a collected day',
   trades: 'Simulated paper-trade log',
   personalities: 'The 10 decision engines and their configs',
   pnl: 'Realized P&L across closed paper trades',

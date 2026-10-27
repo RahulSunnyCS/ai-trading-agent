@@ -77,30 +77,42 @@ export function latestPaperDay(
 }
 
 export interface LiveResult {
+  /** Live per lot after costs, summed over the book's accounts; null when there is none. */
   value: number | null;
-  /** Why there is no value: not captured, no live trades, the card could not be read. */
+  /** The same trades on paper, on the same basis (per lot, after the same costs). */
+  paper: number | null;
+  /** Platform + broker accounts the figure covers. */
+  accounts: number;
+  /**
+   * Why there is no value (not captured, no live trades, the capture failed), or, with a value,
+   * why it may be incomplete (an account was not read).
+   */
   reason: string | null;
 }
 
 /**
- * A book's live result on a day from the live capture: the sum over its platforms. A day not
- * captured, or with no trade of that book, is a reason, never a zero.
+ * A book's live result on a day from the live capture (the Today page's Live vs paper card),
+ * with the paper result of the same trades beside it. Both are per lot after the same costs, so
+ * they compare with each other, not with the read-out's gross figure. A day not captured, or with
+ * no trade of that book, is a reason, never a zero.
  */
 export function liveForDay(
   live: RotationLiveResponse | null,
   day: string,
   book: string = ADAPTIVE_BOOK,
 ): LiveResult {
-  if (!live || !Array.isArray(live.days))
-    return { value: null, reason: 'live results unavailable' };
+  const none = (reason: string): LiveResult => ({ value: null, paper: null, accounts: 0, reason });
+  if (!live || !Array.isArray(live.days)) return none('live results unavailable');
   const row = live.days.find((d) => d.day === day);
-  if (!row || !row.captured) return { value: null, reason: 'live not captured' };
+  if (!row || !row.captured) return none('live not captured');
+  const failed = Array.isArray(row.failed_sections) && row.failed_sections.length > 0;
   const groups = row.groups.filter((g) => g.book === book);
-  if (groups.length === 0) return { value: null, reason: 'no live trades' };
-  const value = groups.reduce((sum, g) => sum + g.live, 0);
+  if (groups.length === 0) return none(failed ? 'capture failed for an account' : 'no live trades');
   return {
-    value,
-    reason: row.failed_sections.length > 0 ? 'some accounts were not read' : null,
+    value: groups.reduce((sum, g) => sum + g.live, 0),
+    paper: groups.reduce((sum, g) => sum + g.paper, 0),
+    accounts: groups.length,
+    reason: failed ? 'an account was not read' : null,
   };
 }
 
@@ -194,8 +206,19 @@ export function rulesLine(rules: MomentumLiveRules | null): StatusLine {
   return { label: 'Rules', text: `all clear${dd}`, tone: 'ok', detail: report.title };
 }
 
-/** Kite (the Momentum money's broker): logged in today or not. */
-export function kiteLine(kite: KiteStatus | null): StatusLine {
+const IST_OFFSET_MS = 330 * 60_000;
+
+/** Friday before 14:15 IST, when the Momentum orders need today's Kite login. */
+export function beforeFridayOrders(now: number): boolean {
+  const ist = new Date(now + IST_OFFSET_MS);
+  return ist.getUTCDay() === 5 && ist.getUTCHours() * 60 + ist.getUTCMinutes() < 14 * 60 + 15;
+}
+
+/**
+ * Kite (the Momentum money's broker): logged in today or not. Its token dies at 06:00 each day
+ * and only Friday's 14:15 orders need it, so a missing login warns only on a Friday morning.
+ */
+export function kiteLine(kite: KiteStatus | null, now: number): StatusLine {
   if (!kite) return { label: 'Kite', text: 'status unavailable', tone: 'neutral' };
   if (!kite.configured) return { label: 'Kite', text: 'not configured', tone: 'neutral' };
   if (kite.connected) {
@@ -205,8 +228,15 @@ export function kiteLine(kite: KiteStatus | null): StatusLine {
       tone: 'ok',
     };
   }
+  if (kite.holdingsSource === 'kite' && beforeFridayOrders(now)) {
+    return { label: 'Kite', text: 'not logged in today · log in before 14:15', tone: 'warn' };
+  }
   return kite.holdingsSource === 'kite'
-    ? { label: 'Kite', text: 'not logged in today · log in before Fri 14:15', tone: 'warn' }
+    ? {
+        label: 'Kite',
+        text: 'not logged in today · needed for the Fri 14:15 orders',
+        tone: 'neutral',
+      }
     : { label: 'Kite', text: 'not logged in today', tone: 'neutral' };
 }
 
@@ -260,9 +290,14 @@ export const JOBS_WINDOW_MS = 24 * 60 * 60 * 1000;
 export interface JobsOverview {
   /** Jobs whose latest run failed in the window, newest first. */
   failed: SchedulerJob[];
+  /**
+   * Jobs whose latest run failed before the window and that have not run since (a Friday job
+   * that failed is still failing on Sunday), newest first.
+   */
+  failedEarlier: SchedulerJob[];
   succeeded: number;
   running: number;
-  /** Jobs with no run in the window. */
+  /** Jobs with no run in the window whose latest run did not fail (or that never ran). */
   quiet: number;
 }
 
@@ -270,21 +305,25 @@ function runTime(run: SchedulerRun): number {
   return Date.parse(run.ended_at ?? run.started_at);
 }
 
+function newestFirst(a: SchedulerJob, b: SchedulerJob): number {
+  return runTime(b.lastRun as SchedulerRun) - runTime(a.lastRun as SchedulerRun);
+}
+
 /** The scheduler's jobs split by how their latest run went in the last 24 hours. */
 export function jobsOverview(jobs: readonly SchedulerJob[], now: number): JobsOverview {
   const since = now - JOBS_WINDOW_MS;
-  const out: JobsOverview = { failed: [], succeeded: 0, running: 0, quiet: 0 };
+  const out: JobsOverview = { failed: [], failedEarlier: [], succeeded: 0, running: 0, quiet: 0 };
   for (const job of jobs) {
     const run = job.lastRun;
     const status = runStatus(run);
+    const recent = run !== null && runTime(run) >= since;
     if (status === 'running') out.running += 1;
-    else if (!run || !(runTime(run) >= since)) out.quiet += 1;
-    else if (status === 'failed') out.failed.push(job);
-    else out.succeeded += 1;
+    else if (status === 'failed') (recent ? out.failed : out.failedEarlier).push(job);
+    else if (recent) out.succeeded += 1;
+    else out.quiet += 1;
   }
-  out.failed.sort(
-    (a, b) => runTime(b.lastRun as SchedulerRun) - runTime(a.lastRun as SchedulerRun),
-  );
+  out.failed.sort(newestFirst);
+  out.failedEarlier.sort(newestFirst);
   return out;
 }
 

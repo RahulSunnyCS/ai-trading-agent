@@ -90,16 +90,48 @@ describe('Rotation today', () => {
     expect(latestPaperDay({ ...summary, days: [] })).toBeNull();
   });
 
-  it('sums the core book live and names a missing capture instead of a zero', () => {
-    expect(liveForDay(live, '2026-10-27')).toEqual({ value: -6428.5, reason: null });
-    expect(liveForDay(live, '2026-10-26')).toEqual({ value: null, reason: 'live not captured' });
+  it('sums the core book live with its paper twin, and names a missing capture', () => {
+    expect(liveForDay(live, '2026-10-27')).toEqual({
+      value: -6428.5,
+      paper: -8381.75,
+      accounts: 1,
+      reason: null,
+    });
+    expect(liveForDay(live, '2026-10-26')).toMatchObject({
+      value: null,
+      reason: 'live not captured',
+    });
     expect(liveForDay(live, '2026-10-20').value).toBeNull();
     expect(liveForDay(null, '2026-10-27').reason).toBe('live results unavailable');
+    const day = live.days[0];
     const noCore = {
       ...live,
-      days: [{ ...live.days[0], groups: [live.days[0]?.groups[1]] }],
+      days: [{ ...day, groups: [day?.groups[1]] }],
     } as unknown as RotationLiveResponse;
-    expect(liveForDay(noCore, '2026-10-27')).toEqual({ value: null, reason: 'no live trades' });
+    expect(liveForDay(noCore, '2026-10-27')).toMatchObject({
+      value: null,
+      reason: 'no live trades',
+    });
+  });
+
+  it('says when an account was not read, with or without a figure', () => {
+    const failed = [{ platform: 'algotest', broker: 'finvasia', error: 'login' }];
+    const partial = {
+      ...live,
+      days: [{ ...live.days[0], failed_sections: failed }],
+    } as unknown as RotationLiveResponse;
+    expect(liveForDay(partial, '2026-10-27')).toMatchObject({
+      value: -6428.5,
+      reason: 'an account was not read',
+    });
+    const none = {
+      ...live,
+      days: [{ ...live.days[0], failed_sections: failed, groups: [] }],
+    } as unknown as RotationLiveResponse;
+    expect(liveForDay(none, '2026-10-27')).toMatchObject({
+      value: null,
+      reason: 'capture failed for an account',
+    });
   });
 
   it('counts the read-out days and the total since the first day', () => {
@@ -169,7 +201,7 @@ describe('Momentum this week', () => {
     expect(rulesLine({ report: null, job: null })).toMatchObject({ text: 'not checked yet' });
   });
 
-  it('says whether Kite is logged in, and warns when Kite holds the money', () => {
+  it('says whether Kite is logged in, and warns only before the Friday orders', () => {
     const kite = (patch: Partial<KiteStatus>): KiteStatus => ({
       configured: true,
       connected: false,
@@ -179,14 +211,21 @@ describe('Momentum this week', () => {
       lastSnapshot: null,
       ...patch,
     });
-    expect(kiteLine(kite({})).tone).toBe('warn');
-    expect(kiteLine(kite({ holdingsSource: 'paper' })).tone).toBe('neutral');
-    expect(kiteLine(kite({ connected: true, expiresAt: '2026-10-29T06:00:00+05:30' }))).toEqual({
+    const fridayMorning = Date.parse('2026-10-30T09:00:00+05:30');
+    const fridayEvening = Date.parse('2026-10-30T15:00:00+05:30');
+    // NOW is a Wednesday: the login is not needed until Friday.
+    expect(kiteLine(kite({}), NOW).tone).toBe('neutral');
+    expect(kiteLine(kite({}), fridayMorning).tone).toBe('warn');
+    expect(kiteLine(kite({}), fridayEvening).tone).toBe('neutral');
+    expect(kiteLine(kite({ holdingsSource: 'paper' }), fridayMorning).tone).toBe('neutral');
+    expect(
+      kiteLine(kite({ connected: true, expiresAt: '2026-10-29T06:00:00+05:30' }), NOW),
+    ).toEqual({
       label: 'Kite',
       text: 'logged in until 06:00',
       tone: 'ok',
     });
-    expect(kiteLine(null).text).toBe('status unavailable');
+    expect(kiteLine(null, NOW).text).toBe('status unavailable');
   });
 });
 
@@ -263,7 +302,9 @@ describe('Jobs', () => {
     ];
     const view = jobsOverview(jobs, NOW);
     expect(view.failed.map((j) => j.id)).toEqual(['algotest-deploy-check', 'algotest-deploy']);
-    expect(view).toMatchObject({ succeeded: 1, running: 1, quiet: 2 });
+    expect(view).toMatchObject({ succeeded: 1, running: 1, quiet: 1 });
+    // Its latest run failed a day and a half ago: still broken, so still on the card.
+    expect(view.failedEarlier.map((j) => j.id)).toEqual(['old-failure']);
   });
 
   it("gives a failure's reason from its error, else from its log", () => {

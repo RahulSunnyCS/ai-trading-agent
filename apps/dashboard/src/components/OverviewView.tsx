@@ -27,8 +27,7 @@ import { useMomentumAlerts } from '../hooks/useMomentumAlerts';
 import { useNow } from '../hooks/useNow';
 import { usePolledResource } from '../hooks/usePolledResource';
 import { ROTATION_PAGE_LOTS, useRotationOverview, useRotationSummary } from '../hooks/useRotation';
-import { useRotationLive } from '../hooks/useRotationLive';
-import { useSchedulerJobs } from '../hooks/useSchedulerJobs';
+import { useRunLog, useSchedulerJobs } from '../hooks/useSchedulerJobs';
 import { useTodayIst } from '../hooks/useTodayIst';
 import { useTradeBookDays, useTradeBookSummary } from '../hooks/useTradeBook';
 import { ANGEL_STATUS_URL, type AngelStatus } from '../lib/angelOne';
@@ -60,16 +59,20 @@ import {
   tradeBookOverview,
 } from '../lib/overviewView';
 import { buildPath } from '../lib/routes';
-import { SCHEDULER_API, type SchedulerJob, type SchedulerLog } from '../lib/scheduler';
+import type { SchedulerJob } from '../lib/scheduler';
 import { fiscalYearOf, fyLabel, fyRange } from '../lib/tradeBookView';
 import type { MomentumLiveRules, MomentumWeekView } from '../types/momentum';
+import type { RotationLiveResponse } from '../types/rotationLive';
 import type { KiteStatus } from './KiteCard';
 import type { Tab } from './shell/nav';
 import { Card, CardHeader, Skeleton, StatusDot } from './ui';
 import type { Tone } from './ui';
 
 const KITE_STATUS_URL = '/api/momentum/kite/status';
+/** The Today page's Live vs paper read (hooks/useRotationLive.ts), here re-read on a timer. */
+const ROTATION_LIVE_URL = '/api/backtest/legwise/rotation/live';
 const MINUTE = 60_000;
+const LIVE_POLL_MS = 5 * MINUTE;
 
 // ---------------------------------------------------------------------------
 // Shared pieces
@@ -209,7 +212,10 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 function RotationCard() {
   const overview = useRotationOverview();
   const summary = useRotationSummary({ lots: ROTATION_PAGE_LOTS });
-  const live = useRotationLive();
+  // The capture lands at 15:40 (and its retry by 16:30): re-read it as the paper day moves on.
+  const live = usePolledResource<RotationLiveResponse>(ROTATION_LIVE_URL, {
+    intervalMs: LIVE_POLL_MS,
+  });
 
   let body: ReactNode;
   if (!summary.data && !overview.data) {
@@ -222,22 +228,35 @@ function RotationCard() {
   } else {
     const entry = entryLine(overview.data);
     const paper = latestPaperDay(summary.data);
-    const liveResult = paper
-      ? liveForDay(live.data, paper.day)
-      : { value: null, reason: 'no scored day yet' };
+    const liveResult = paper && live.data ? liveForDay(live.data, paper.day) : null;
+    const liveReason = live.loading ? 'loading' : 'live results unavailable';
     const progress = readoutProgress(summary.data);
     body = (
       <>
         {entry ? <Line line={entry} /> : null}
         {paper ? (
-          <Row label={formatDayShort(paper.day, { weekday: true })}>
-            <Inr value={paper.value} /> <span className="text-muted">paper ·</span>{' '}
-            <Inr
-              value={live.loading && !live.data ? null : liveResult.value}
-              reason={live.loading && !live.data ? 'loading' : liveResult.reason}
-            />{' '}
-            <span className="text-muted">live</span>
-          </Row>
+          <>
+            <Row label={formatDayShort(paper.day, { weekday: true })}>
+              <Inr value={paper.value} />{' '}
+              <span className="text-muted">paper, gross, one lot a strategy</span>
+            </Row>
+            <Row label="Live">
+              <Inr
+                value={liveResult?.value ?? null}
+                reason={liveResult ? liveResult.reason : liveReason}
+              />
+              {liveResult?.value !== null && liveResult?.value !== undefined ? (
+                <span className="text-muted">
+                  {' '}
+                  vs <Inr value={liveResult.paper} /> on paper, per lot after costs
+                  {liveResult.accounts > 1 ? `, ${formatInt(liveResult.accounts)} accounts` : ''}
+                  {liveResult.reason ? (
+                    <span className="text-warning"> ({liveResult.reason})</span>
+                  ) : null}
+                </span>
+              ) : null}
+            </Row>
+          </>
         ) : summary.data ? (
           <PlainState>No forward day has been scored yet.</PlainState>
         ) : null}
@@ -249,7 +268,9 @@ function RotationCard() {
             <Inr value={progress.sinceFirst} reason="no total" />
           </Row>
         ) : null}
-        <p className="mt-1 text-xs text-faint">Adaptive Classic, one lot a strategy, gross.</p>
+        <p className="mt-1 text-xs text-faint">
+          Adaptive Classic. Live is the platforms' own result; its paper twin uses the same costs.
+        </p>
         <StaleNote error={summary.error ?? overview.error} />
       </>
     );
@@ -270,7 +291,7 @@ function RotationCard() {
 // Momentum this week
 // ---------------------------------------------------------------------------
 
-function MomentumCard() {
+function MomentumCard({ now }: { now: number }) {
   const week = usePolledResource<MomentumWeekView>('/api/momentum/week', { cache: true });
   const rules = usePolledResource<MomentumLiveRules>('/api/momentum/live-rules', { cache: true });
   const kite = usePolledResource<KiteStatus>(KITE_STATUS_URL, { intervalMs: MINUTE });
@@ -305,7 +326,7 @@ function MomentumCard() {
             }
           />
         ) : null}
-        {kite.data || !kite.loading ? <Line line={kiteLine(kite.data)} /> : null}
+        {kite.data || !kite.loading ? <Line line={kiteLine(kite.data, now)} /> : null}
         {open > 0 ? (
           <Line
             line={{
@@ -419,10 +440,7 @@ function TradeBookCard() {
 function FailedJob({ job, now }: { job: SchedulerJob; now: number }) {
   const run = job.lastRun;
   const needsLog = Boolean(run && /^exit -?\d+$/.test(run.error?.trim() ?? 'exit 1'));
-  const log = usePolledResource<SchedulerLog>(`${SCHEDULER_API}/runs/${run?.id ?? 0}/log?tail=40`, {
-    cache: true,
-    enabled: needsLog,
-  });
+  const log = useRunLog(run?.id ?? 0, false, needsLog);
   const reason = failureReason(run, log.data?.text ?? null);
   return (
     <div className="flex items-baseline gap-2">
@@ -467,6 +485,16 @@ function JobsCard({ now }: { now: number }) {
         ) : (
           view.failed.map((job) => <FailedJob key={job.id} job={job} now={now} />)
         )}
+        {view.failedEarlier.length > 0 ? (
+          <Line
+            line={{
+              label: 'Still failing from earlier',
+              text: view.failedEarlier.map((job) => job.id).join(', '),
+              tone: 'bad',
+              detail: 'Their latest run failed more than 24 hours ago and they have not run since.',
+            }}
+          />
+        ) : null}
         {rest.length > 0 ? (
           <p className="text-muted">
             {view.failed.length > 0 ? 'The others: ' : ''}
@@ -527,7 +555,7 @@ function LoginsCard({ now }: { now: number }) {
           <Line
             line={
               kite.data || !kite.loading
-                ? kiteLine(kite.data)
+                ? kiteLine(kite.data, now)
                 : { label: 'Kite', text: 'checking', tone: 'neutral' }
             }
           />
@@ -598,7 +626,7 @@ export function OverviewView() {
   return (
     <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
       <RotationCard />
-      <MomentumCard />
+      <MomentumCard now={now} />
       <TradeBookCard />
       <JobsCard now={now} />
       <LoginsCard now={now} />
