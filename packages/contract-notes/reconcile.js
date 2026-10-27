@@ -6,7 +6,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env'), quiet
 const Decimal = require('decimal.js');
 const { loadBrokerAccounts } = require('./brokers');
 const { istNow } = require('./calendar');
-const { readDay, storeRoot } = require('./store');
+const { readDay, storeRoot, writeDurable } = require('./store');
 
 // The owner's Google Sheet against the stored notes (BL-168 Phase 3). Reads a CSV export of the
 // sheet's first tab (File › Download › CSV, or the Drive connector), compares each day's net per
@@ -344,9 +344,7 @@ function importManual(root, rows, at) {
     }
     if (!filled.length) continue;
     if (current) next.from_sheet = [...new Set([...(current.from_sheet ?? []), ...filled])];
-    const tmp = `${file}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`);
-    fs.renameSync(tmp, file);
+    writeDurable(file, `${JSON.stringify(next, null, 2)}\n`);
     n++;
   }
   return n;

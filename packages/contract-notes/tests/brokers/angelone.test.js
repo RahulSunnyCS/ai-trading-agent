@@ -20,6 +20,12 @@ const equityOnlyText = fs.readFileSync(
 );
 
 describe('angelone.extract()', () => {
+  test("the sample note's trades add up to its obligation (read, not unmatched)", () => {
+    const result = extract(sampleText);
+    expect(['fills', 'summary']).toContain(result.trades_check);
+    expect(result.trades.length).toBeGreaterThan(0);
+  });
+
   test('extracts all three fields from valid PDF text', () => {
     const result = extract(sampleText);
     expect(result.error).toBeUndefined();
@@ -41,16 +47,16 @@ describe('angelone.extract()', () => {
 
   test('payin - (brokerage + other_charges) equals PDF final net', () => {
     // Regression: Angel One's obligation already has brokerage deducted; payin must add it back.
-    // PDF shows Pay In/Out Obligation = -3809, Brokerage = 240, Final Net = -4005.53
+    // The note shows Pay In/Out Obligation = -1920.00, Brokerage = 120.00, Final Net = -2028.12
     const result = extract(sampleText);
     const computedFinalNet =
       result.payin_payout_obligation - (result.net_brokerage + result.other_charges);
-    expect(computedFinalNet).toBeCloseTo(-4005.53, 1);
+    expect(computedFinalNet).toBeCloseTo(-2028.12, 1);
   });
 
   test('payin_payout_obligation is raw P&L before charges (obligation + brokerage added back)', () => {
     const result = extract(sampleText);
-    expect(result.payin_payout_obligation).toBeCloseTo(-3569, 1);
+    expect(result.payin_payout_obligation).toBeCloseTo(-1800, 1);
   });
 
   test('returns error when the obligation table is not present', () => {
@@ -90,10 +96,10 @@ describe('angelone.extract() segment filtering', () => {
   });
 
   test('derives per-segment brokerage instead of the all-segment total', () => {
-    // The mixed note reports "Total Brokerage = 291.90" across both segments;
-    // only the 240.00 charged on the F&O segment may be recorded.
-    expect(mixedText).toContain('Total Brokerage = 291.90');
-    expect(extract(mixedText).net_brokerage).toBeCloseTo(240, 2);
+    // The mixed note reports "Total Brokerage = 160.00" across both segments;
+    // only the 120.00 charged on the F&O segment may be recorded.
+    expect(mixedText).toContain('Total Brokerage = 160.00');
+    expect(extract(mixedText).net_brokerage).toBeCloseTo(120, 2);
   });
 
   test('returns zeros for a note with no F&O segment', () => {
@@ -106,7 +112,7 @@ describe('angelone.extract() segment filtering', () => {
   });
 
   test('fails loudly on an unrecognised segment label', () => {
-    const result = extract(sampleText.replace(/BSE-FUTURES-3809/, 'BSE-WOMBAT-3809'));
+    const result = extract(sampleText.replace(/BSE-FUTURES-1920/, 'BSE-WOMBAT-1920'));
     expect(result.error).toMatch(/unrecognised segment: BSE-WOMBAT/);
   });
 
@@ -114,8 +120,8 @@ describe('angelone.extract() segment filtering', () => {
     // Swap the obligation and net-amount cells: the obligation/charges identity
     // must no longer hold and the extractor must refuse the row.
     const corrupted = sampleText.replace(
-      'BSE-FUTURES-3809.0099.00284.3525.5925.5944.210.142.000.000.00-4005.53',
-      'BSE-FUTURES-4005.5399.00284.3525.5925.5944.210.142.000.000.00-3809.00',
+      'BSE-FUTURES-1920.0050.00150.1013.5113.5130.000.101.000.000.00-2028.12',
+      'BSE-FUTURES-2028.1250.00150.1013.5113.5130.000.101.000.000.00-1920.00',
     );
     expect(extract(corrupted).error).toMatch(/column mismatch/);
   });
@@ -123,31 +129,31 @@ describe('angelone.extract() segment filtering', () => {
 
 describe('angelone.searchSubject() / noteDay()', () => {
   test('searches the fixed contract-note subject', () => {
-    expect(searchSubject('R59799620')).toBe('Contract Note - Equity Segment');
+    expect(searchSubject('R12345678')).toBe('Contract Note - Equity Segment');
   });
 
   test('reads the session from the attachment name', () => {
-    expect(noteDay({ filename: 'CN_R59799620_23102026.pdf', accountId: 'R59799620' })).toBe(
+    expect(noteDay({ filename: 'CN_R12345678_23102026.pdf', accountId: 'R12345678' })).toBe(
       '2026-10-23',
     );
   });
 
   test('accepts a revised note named with a suffix', () => {
-    expect(noteDay({ filename: 'CN_R59799620_23102026_1.pdf', accountId: 'R59799620' })).toBe(
+    expect(noteDay({ filename: 'CN_R12345678_23102026_1.pdf', accountId: 'R12345678' })).toBe(
       '2026-10-23',
     );
   });
 
   test("ignores another account's note and other files", () => {
-    expect(noteDay({ filename: 'CN_R11111111_23102026.pdf', accountId: 'R59799620' })).toBeNull();
-    expect(noteDay({ filename: 'ledger.pdf', accountId: 'R59799620' })).toBeNull();
+    expect(noteDay({ filename: 'CN_R11111111_23102026.pdf', accountId: 'R12345678' })).toBeNull();
+    expect(noteDay({ filename: 'ledger.pdf', accountId: 'R12345678' })).toBeNull();
   });
 });
 
 describe('angelone.extract() table integrity', () => {
   test('errors when only the all-segment summary row is present', () => {
     const onlyTotal = sampleText.replace(
-      'BSE-FUTURES-3809.0099.00284.3525.5925.5944.210.142.000.000.00-4005.53\n',
+      'BSE-FUTURES-1920.0050.00150.1013.5113.5130.000.101.000.000.00-2028.12\n',
       '',
     );
     expect(extract(onlyTotal).error).toMatch(/no per-segment rows/);

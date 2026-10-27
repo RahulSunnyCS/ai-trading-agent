@@ -1,6 +1,7 @@
 const Decimal = require('decimal.js');
 const { isTotalRow, parseAmounts, splitBySegment } = require('./segments');
 const logger = require('../utils/logger');
+const { chooseTrades } = require('./fnoTrades');
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -42,7 +43,7 @@ function searchSubject() {
   return 'Contract Note - Equity Segment';
 }
 
-// "CN_R59799620_23102026.pdf" → '2026-10-23' (null if another account's, or another file).
+// "CN_R12345678_23102026.pdf" → '2026-10-23' (null if another account's, or another file).
 function noteDay({ filename, accountId }) {
   // A revised note may come as CN_<id>_<ddmmyyyy>_1.pdf.
   const m = new RegExp(
@@ -138,11 +139,24 @@ function extract(text) {
   let netAmount = new Decimal(0);
   let brokerage = new Decimal(0);
   let itemisedCharges = new Decimal(0);
+  const kinds = {
+    stt: [COL.STT],
+    gst: [COL.CGST, COL.SGST],
+    exchange: [COL.EXCHANGE_TXN],
+    sebi: [COL.SEBI],
+    stamp: [COL.STAMP],
+    ipf: [COL.IPF],
+    other: [COL.AUCTION_OTHER],
+  };
+  const byKind = Object.fromEntries(Object.keys(kinds).map((k) => [k, new Decimal(0)]));
 
   for (const row of kept) {
     const a = row.amounts;
     if (a.some((n) => !n.isFinite())) {
       return { error: `Angel One row "${row.label}" contains a non-numeric amount` };
+    }
+    for (const [k, cols] of Object.entries(kinds)) {
+      byKind[k] = byKind[k].plus(cols.reduce((s, c) => s.plus(a[c].abs()), new Decimal(0)));
     }
     obligation = obligation.plus(a[COL.OBLIGATION]);
     netAmount = netAmount.plus(a[COL.NET]);
@@ -193,12 +207,18 @@ function extract(text) {
     logger.info('Angel One non-F&O segments excluded', { segments: dropped.join(', ') });
   }
 
+  const payin = obligation.plus(brokerage);
   return {
     // Angel One's obligation already has brokerage deducted; add it back for a consistent raw P&L
-    payin_payout_obligation: round2(obligation.plus(brokerage)),
+    payin_payout_obligation: round2(payin),
     net_brokerage: round2(brokerage),
     other_charges: round2(charges.abs()),
     skipped_segments: dropped,
+    charges: {
+      brokerage: round2(brokerage),
+      ...Object.fromEntries(Object.entries(byKind).map(([k, v]) => [k, round2(v)])),
+    },
+    ...chooseTrades(text, 'angelone', payin),
   };
 }
 

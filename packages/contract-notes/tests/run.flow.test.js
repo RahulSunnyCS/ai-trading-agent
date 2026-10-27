@@ -31,8 +31,10 @@ function deps(now, accounts = [account('finvasia', 'FA1')]) {
       if (!reachable) throw new Error('connection refused');
       return { imap: { end() {} }, uidvalidity: '7' };
     },
-    searchNotes: async (_imap, _subject, { sinceDay, beforeDay, afterUid, overlapSince }) =>
+    // Like Gmail's SUBJECT search: a substring match.
+    searchNotes: async (_imap, subject, { sinceDay, beforeDay, afterUid, overlapSince }) =>
       mail.filter((m) => {
+        if (!String(m.subject ?? '').includes(subject)) return false;
         const got = String(m.received).slice(0, 10);
         if (afterUid != null) return m.uid > afterUid || got >= overlapSince;
         return got >= sinceDay && (!beforeDay || got < beforeDay);
@@ -261,4 +263,17 @@ test('a Zerodha account: nothing before its start day, and no quiet alert', asyn
   expect(await main([], deps1)).toBe(0); // quiet, but no alert for this broker
   expect(line('2026-10-14', 'BZ1')).toBeUndefined();
   expect(line('2026-10-12', 'BZ1')).toBeUndefined(); // no session before the start day is judged
+});
+
+test('--reparse keeps a note whose figures now read differently, unless --accept-figures', async () => {
+  mail = [finvasia(101, '2026-10-26', 700)];
+  expect(await main([], deps(MON_NIGHT))).toBe(0);
+  const pdf = path.join(root(), line('2026-10-26').note.file);
+  fs.writeFileSync(pdf, '800'); // the extractor now reads another obligation
+  const args = ['--reparse', '--from', '2026-10-26', '--to', '2026-10-26'];
+  expect(await main(args, deps(MON_NIGHT))).toBe(1);
+  expect(line('2026-10-26').fno.payin_payout_obligation).toBe(700);
+  expect(errors.join('\n')).toMatch(/read differently now/);
+  expect(await main([...args, '--accept-figures'], deps(MON_NIGHT))).toBe(0);
+  expect(line('2026-10-26').fno.payin_payout_obligation).toBe(800);
 });

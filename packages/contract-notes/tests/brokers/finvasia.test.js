@@ -20,6 +20,12 @@ const equityOnlyText = fs.readFileSync(
 );
 
 describe('finvasia.extract()', () => {
+  test("the sample note's fills add up to its obligation", () => {
+    const result = extract(sampleText);
+    expect(result.trades_check).toBe('fills');
+    expect(result.trades.every((t) => t.time)).toBe(true);
+  });
+
   test('extracts all three fields from valid PDF text', () => {
     const result = extract(sampleText);
     expect(result.error).toBeUndefined();
@@ -43,16 +49,16 @@ describe('finvasia.extract()', () => {
 
   test('payin - (brokerage + other_charges) equals PDF final net', () => {
     // Regression: brokerage must not be double-counted.
-    // PDF shows Pay in/Payout Obligation = -9275.75, Brokerage = 160, Final Net = -10015.11
+    // The note shows Pay in/Payout Obligation = -3040.00, Brokerage = 40.00, Final Net = -3104.29
     const result = extract(sampleText);
     const computedFinalNet =
       result.payin_payout_obligation - (result.net_brokerage + result.other_charges);
-    expect(computedFinalNet).toBeCloseTo(-10015.11, 1);
+    expect(computedFinalNet).toBeCloseTo(-3104.29, 1);
   });
 
   test('payin_payout_obligation matches PDF obligation (brokerage not deducted from it)', () => {
     const result = extract(sampleText);
-    expect(result.payin_payout_obligation).toBeCloseTo(-9275.75, 1);
+    expect(result.payin_payout_obligation).toBeCloseTo(-3040, 1);
   });
 
   test('returns error when the obligation table is not present', () => {
@@ -93,9 +99,9 @@ describe('finvasia.extract() segment filtering', () => {
   });
 
   test('keeps only the F&O brokerage when equity is present', () => {
-    // The equity row carries 94.70 of brokerage; only the F&O 160.00 counts.
-    expect(mixedText).toContain('94.70');
-    expect(extract(mixedText).net_brokerage).toBeCloseTo(160, 2);
+    // The equity row carries 27.02 of brokerage; only the F&O 40.00 counts.
+    expect(mixedText).toContain('27.02');
+    expect(extract(mixedText).net_brokerage).toBeCloseTo(40, 2);
   });
 
   test('returns zeros for a note with no F&O segment', () => {
@@ -115,17 +121,17 @@ describe('finvasia.extract() segment filtering', () => {
   test('ignores a dropped row whose cell count is unexpected', () => {
     // Only the F&O rows are read, so an odd-shaped cash row must not fail a
     // note whose F&O side parses cleanly.
-    const shortCashRow = mixedText.replace('NSECAP-NCL 250.00 120.00', 'NSECAP-NCL 250.00');
+    const shortCashRow = mixedText.replace('NSECAP-NCL 10.00 30.00', 'NSECAP-NCL 10.00');
     const result = extract(shortCashRow);
     expect(result.error).toBeUndefined();
-    expect(result.payin_payout_obligation).toBeCloseTo(-9275.75, 2);
-    expect(result.net_brokerage).toBeCloseTo(160, 2);
+    expect(result.payin_payout_obligation).toBeCloseTo(-3040, 2);
+    expect(result.net_brokerage).toBeCloseTo(40, 2);
   });
 
   test('does not silently mis-read reordered cells', () => {
     // Swap the Final Net and Pay in/Payout Obligation cells: the charges
     // identity must no longer hold and the extractor must refuse the row.
-    const corrupted = sampleText.replace('-10015.11\n-9275.75', '-9275.75\n-10015.11');
+    const corrupted = sampleText.replace('-3104.29\n-3040.00', '-3040.00\n-3104.29');
     expect(extract(corrupted).error).toMatch(/column mismatch/);
   });
 });
@@ -149,7 +155,7 @@ describe('finvasia.searchSubject() / noteDay()', () => {
 });
 
 describe('finvasia.extract() — the layout used until 25 Aug 2025', () => {
-  // The obligation table as pdf-parse reads a note of 18 Jul 2025 (amounts kept, no client data):
+  // The obligation table's shape as pdf-parse reads a note of that period (invented figures):
   // the header starts "Exchange Pay in/Payout" and the rows are labelled "NSE FNO" / "NSE CAP".
   const oldLayout = `Exchange  Total
 ExchangePay in/Payout 
@@ -169,26 +175,26 @@ Charges
 IPF
  Charges
 Final NetBrokerage
-NSE CAP 38.00 1.17
-    0.21
- 0.04 0.00 1.13
- 37942.88
- 37982.30 0.00 0.00 0.04
-NSE FNO 159.00 259.88
-   46.77
- 0.31 5.00 109.58
- 3423.57
- 3745.75 0.00 150.00 1.52
+NSE CAP 10.00 0.55
+    0.10
+ 0.05 1.50 0.50
+ 9987.84
+ 10000.00 0.00 0.00 0.01
+NSE FNO 120.00 130.10
+   23.42
+ 0.10 2.00 30.00
+ 1823.48
+ 2000.00 0.00 100.00 1.00
 By Client Net Payable(-)/Receivable(+)
- 41366.4500
+ 11811.3200
 Obligation Detail`;
 
   test('reads the F&O row and drops the cash row', () => {
     const r = extract(oldLayout);
     expect(r.error).toBeUndefined();
-    expect(r.payin_payout_obligation).toBe(3745.75);
-    expect(r.net_brokerage).toBe(150);
-    expect(r.other_charges).toBe(172.18); // 3745.75 − 3423.57 − 150
+    expect(r.payin_payout_obligation).toBe(2000);
+    expect(r.net_brokerage).toBe(100);
+    expect(r.other_charges).toBe(76.52); // 2000.00 − 1823.48 − 100
     expect(r.skipped_segments).toEqual(['NSE CAP (equity)']);
   });
 });

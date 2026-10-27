@@ -32,6 +32,12 @@ function noteLine({ day, broker, account, extracted, note, at }) {
   } else {
     line.fno = fnoBlock(extracted);
     line.skipped_segments = extracted.skipped_segments ?? [];
+    // Itemised charges and the trades (BL-168 Phase 3e), when the extractor read them.
+    if (extracted.charges) line.charges = extracted.charges;
+    if (extracted.trades) {
+      line.trades = extracted.trades;
+      line.trades_check = extracted.trades_check;
+    }
   }
   line.note = {
     sha256: note.sha256,
