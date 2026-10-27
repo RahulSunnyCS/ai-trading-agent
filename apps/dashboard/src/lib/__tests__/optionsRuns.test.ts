@@ -4,24 +4,17 @@ import type { RunResult, RunSummary } from '../../types/backtest';
 import type { Leg, SavedResult, SavedStrategy } from '../../types/legwise';
 import {
   type LegwiseRunRow,
-  NET_UNIT_LABEL,
-  canCompare,
-  compareRuns,
-  countByKind,
   coverageRange,
   describeLeg,
-  filterRuns,
   headlineOfResult,
   headlineOfSummary,
   lastResultOf,
   legsSummary,
   legwiseRuns,
   legwiseStatsOf,
-  mergeRuns,
   runBlockedReason,
-  runMetrics,
   sessionEquity,
-  yamlRuns,
+  strategyHistory,
 } from '../optionsRuns';
 
 function summary(over: Partial<RunSummary> = {}): RunSummary {
@@ -91,39 +84,6 @@ function strategy(id: string, sha: string, lots: number): SavedStrategy {
   };
 }
 
-describe('yamlRuns', () => {
-  it('reports the registry net as a total', () => {
-    const [run] = yamlRuns([summary()]);
-    expect(run).toMatchObject({
-      key: 'yaml:abc123',
-      kind: 'yaml',
-      strategy: 'B_pyramid',
-      net: 12000,
-      netUnit: 'total',
-      days: 50,
-      winDays: 30,
-      from: '2026-06-08',
-      to: '2026-09-04',
-      current: null,
-    });
-    expect(run?.sortTime).toBe(Date.parse('2026-09-20T18:05:00+05:30'));
-    expect(run?.recordedAt).toBe('2026-09-20T12:35:00.000Z');
-  });
-
-  it('reads the timestamp forms the catalog produces', () => {
-    const at = (created_at: string) => yamlRuns([summary({ created_at })])[0]?.recordedAt;
-    expect(at('2026-09-20 12:35:00+00')).toBe('2026-09-20T12:35:00.000Z');
-    expect(at('2026-09-20 18:05:00.123456+05:30')).toBe('2026-09-20T12:35:00.123Z');
-    expect(at('2026-09-20T12:35:00Z')).toBe('2026-09-20T12:35:00.000Z');
-    expect(at('nope')).toBeNull();
-  });
-
-  it('orders a run with an unreadable timestamp by its last day', () => {
-    const [run] = yamlRuns([summary({ created_at: 'nope' })]);
-    expect(run?.sortTime).toBe(Date.parse('2026-09-04T10:00:00Z'));
-  });
-});
-
 describe('legwiseRuns', () => {
   const rows = [
     day({ day: '2026-09-24', net: 400 }),
@@ -182,123 +142,30 @@ describe('legwiseRuns', () => {
   });
 });
 
-describe('mergeRuns', () => {
-  it('lists both engines newest first', () => {
-    const merged = mergeRuns(
-      [
-        summary({ run_id: 'old', created_at: '2026-09-01T10:00:00Z' }),
-        summary({ run_id: 'new', created_at: '2026-09-30T10:00:00Z' }),
-      ],
-      [day({ day: '2026-09-23', net: 100 }), day({ day: '2026-09-24', net: 100 })],
-    );
-    expect(merged.map((r) => r.key)).toEqual(['yaml:new', 'daily:straddle@sha1', 'yaml:old']);
-  });
+describe('strategyHistory', () => {
+  const rows = [
+    day({ day: '2026-09-24', net: 400 }),
+    day({ day: '2026-09-23', net: -100 }),
+    day({ day: '2026-09-25', net: 50, strategy_sha: 'old', current: false }),
+    day({ day: '2026-09-23', net: 900, strategy_id: 'other' }),
+  ];
 
-  it('breaks a tie by key so the order is stable', () => {
-    const merged = mergeRuns(
-      [],
-      [day({ strategy_id: 'b' }), day({ strategy_id: 'a' }), day({ strategy_id: 'c' })],
-    );
-    expect(merged.map((r) => r.strategy)).toEqual(['a', 'b', 'c']);
-  });
-
-  it('never mixes units: YAML is total, a known leg-wise version is per lot', () => {
-    const merged = mergeRuns([summary()], [day({ net: 300 })], [strategy('straddle', 'sha1', 3)]);
-    expect(merged.map((r) => [r.kind, r.netUnit, r.net])).toEqual([
-      ['daily', 'per_lot', 100],
-      ['yaml', 'total', 12000],
+  it("lists only this strategy's days, the saved version first, per lot", () => {
+    const runs = strategyHistory(strategy('straddle', 'sha1', 2), rows);
+    expect(runs.map((r) => [r.key, r.netUnit, r.net, r.days])).toEqual([
+      ['daily:straddle@sha1', 'per_lot', 150, 2],
+      ['daily:straddle@old', 'total', 50, 1],
     ]);
-    expect(NET_UNIT_LABEL.per_lot).not.toBe(NET_UNIT_LABEL.total);
-  });
-});
-
-describe('filterRuns', () => {
-  const runs = mergeRuns(
-    [summary()],
-    [day(), day({ strategy_id: 'Iron_Condor' }), day({ kind: 'adhoc', run_id: 'r1' })],
-  );
-
-  it('filters by kind', () => {
-    expect(filterRuns(runs, { kind: 'all', text: '' })).toHaveLength(4);
-    expect(filterRuns(runs, { kind: 'yaml', text: '' }).map((r) => r.kind)).toEqual(['yaml']);
-    expect(filterRuns(runs, { kind: 'builder', text: '' })).toHaveLength(1);
-    expect(filterRuns(runs, { kind: 'daily', text: '' })).toHaveLength(2);
-  });
-
-  it('filters by strategy text, ignoring case and outer spaces', () => {
-    expect(filterRuns(runs, { kind: 'all', text: ' iron ' }).map((r) => r.strategy)).toEqual([
-      'Iron_Condor',
-    ]);
-    expect(filterRuns(runs, { kind: 'yaml', text: 'iron' })).toEqual([]);
-  });
-
-  it('counts by kind', () => {
-    expect(countByKind(runs)).toEqual({ all: 4, yaml: 1, builder: 1, daily: 2 });
-  });
-});
-
-describe('comparing runs', () => {
-  const a = yamlRuns([summary({ run_id: 'a', net_inr: 1000, win_days: 10, n_sessions: 20 })])[0];
-  const b = yamlRuns([summary({ run_id: 'b', net_inr: 1500, win_days: 5, n_sessions: 20 })])[0];
-  const daily = legwiseRuns(
-    [day({ net: 200 }), day({ day: '2026-09-24', net: -100 })],
-    [strategy('straddle', 'sha1', 1)],
-  )[0];
-  if (!a || !b || !daily) throw new Error('fixtures');
-
-  it('only compares two different runs of one kind', () => {
-    expect(canCompare(a, b)).toBe(true);
-    expect(canCompare(a, a)).toBe(false);
-    expect(canCompare(a, daily)).toBe(false);
-    expect(compareRuns(a, daily)).toBeNull();
-  });
-
-  it('lines YAML metrics up and marks the better side', () => {
-    const rows = compareRuns(a, b);
-    expect(rows?.map((r) => r.label)).toEqual(runMetrics(a).map((m) => m.label));
-    const net = rows?.find((r) => r.label === 'Net (total)');
-    expect(net).toMatchObject({ a: 1000, b: 1500, delta: 500, better: 'b', format: 'inr' });
-    const win = rows?.find((r) => r.label === 'Win rate');
-    expect(win).toMatchObject({ a: 0.5, b: 0.25, better: 'a', format: 'pct' });
-    // A count has no better direction; an equal value has no winner.
-    expect(rows?.find((r) => r.label === 'Sessions')).toMatchObject({ delta: 0, better: null });
-    expect(rows?.find((r) => r.label === 'Lot-days')?.better).toBeNull();
-  });
-
-  it('treats a less negative worst day as the better one', () => {
-    const worse = yamlRuns([summary({ run_id: 'w', worst_day: -9000 })])[0];
-    if (!worse) throw new Error('fixture');
-    const row = compareRuns(a, worse)?.find((r) => r.label === 'Worst day (total)');
-    expect(row).toMatchObject({ a: -4000, b: -9000, better: 'a' });
-  });
-
-  it('labels leg-wise metrics with the run unit and drops money rows across units', () => {
-    expect(runMetrics(daily).map((m) => m.label)).toContain('Net (/ lot)');
-    const totalRun = legwiseRuns([day({ strategy_id: 'x', net: 50 })])[0];
-    if (!totalRun) throw new Error('fixture');
-    expect(runMetrics(totalRun).map((m) => m.label)).toContain('Net (total)');
-    expect(compareRuns(daily, totalRun)?.map((r) => r.label)).toEqual([
-      'Days',
-      'Win rate',
-      'Profit factor',
-    ]);
-  });
-
-  it('gives a null delta when a metric is missing on one side', () => {
-    const noLosses = legwiseRuns(
-      [day({ strategy_id: 'w', net: 100 })],
-      [strategy('w', 'sha1', 1)],
-    )[0];
-    if (!noLosses) throw new Error('fixture');
-    const pf = compareRuns(daily, noLosses)?.find((r) => r.label === 'Profit factor');
-    expect(pf).toMatchObject({ a: 2, b: null, delta: null, better: null });
   });
 
   it('computes leg-wise statistics in the run unit', () => {
-    const twoLots = legwiseRuns([day({ net: 200 })], [strategy('straddle', 'sha1', 2)])[0];
-    if (!twoLots) throw new Error('fixture');
-    expect(legwiseStatsOf(twoLots)?.total).toBe(100);
-    expect(legwiseStatsOf(a)).toBeNull();
+    const [run] = strategyHistory(strategy('straddle', 'sha1', 2), [day({ net: 200 })]);
+    if (!run) throw new Error('fixture');
+    expect(legwiseStatsOf(run)?.total).toBe(100);
+  });
+
+  it('returns nothing for a strategy with no saved days', () => {
+    expect(strategyHistory(strategy('none', 'x', 1), rows)).toEqual([]);
   });
 });
 

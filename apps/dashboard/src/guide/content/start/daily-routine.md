@@ -39,7 +39,8 @@ says what runs when, and when it is worth looking.
 ## When to look
 
 - **Weekday evening:** glance at [Today](app:/optionslab/rotation) to see how the three
-  rotation lists did, and at [Runs](app:/optionslab/runs) for the saved strategies.
+  rotation lists did, and at [Strategies and baskets](app:/optionslab/strategies) for the saved
+  strategies (each one's **History** has its days).
 - **Friday afternoon:** read the momentum signal (Telegram or
   [This week](app:/momentum/week)). The walkthrough
   [Read this week's signal](guide:momentum/walkthrough-weekly-signal) covers it.

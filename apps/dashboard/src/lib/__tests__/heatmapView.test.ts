@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { HeatmapCell, HeatmapResponse } from '../../types/heatmap';
 import {
   cellClass,
+  matrixFamilyStartHref,
   maxAbsOf,
   settingsChips,
   slLabel,
@@ -157,5 +158,37 @@ describe('settingsChips', () => {
     expect(chips).toContain('% of premium');
     expect(chips).toContain('CE and PE apart');
     expect(chips).toContain('Expiry week of, 1 out');
+  });
+});
+
+describe('matrixFamilyStartHref', () => {
+  it("opens the Matrix's Family × start view on the heatmap's one day", () => {
+    const href = matrixFamilyStartHref({
+      view: 'time_sl',
+      date: '2026-10-27',
+      from: '2026-10-13',
+      to: '',
+    });
+    expect(href).toBe('/optionslab/matrix?period=custom&from=2026-10-27&to=2026-10-27');
+  });
+
+  it('carries a summed Time vs SL range and the range views as from / to', () => {
+    expect(
+      matrixFamilyStartHref({ view: 'time_sl', date: '2026-10-20', from: '', to: '2026-10-27' }),
+    ).toBe('/optionslab/matrix?period=custom&from=2026-10-20&to=2026-10-27');
+    expect(
+      matrixFamilyStartHref({
+        view: 'date_time',
+        date: '',
+        from: '2026-10-01',
+        to: '2026-10-27',
+      }),
+    ).toBe('/optionslab/matrix?period=custom&from=2026-10-01&to=2026-10-27');
+  });
+
+  it('falls back to the Matrix default when no day is known yet', () => {
+    expect(matrixFamilyStartHref({ view: 'time_sl', date: '', from: '', to: '' })).toBe(
+      '/optionslab/matrix',
+    );
   });
 });

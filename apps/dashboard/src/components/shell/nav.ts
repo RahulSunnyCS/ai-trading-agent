@@ -128,9 +128,8 @@ export const NAV_GROUPS: NavGroup[] = [
           { segment: 'correlation', label: 'Correlation', group: 'Explore data' },
           { segment: 'strategies', label: 'Strategies and baskets', group: 'Build and test' },
           { segment: 'builder', label: 'Builder', group: 'Build and test' },
-          { segment: 'runs', label: 'Runs', group: 'Build and test' },
-          // Kept, but out of the daily path (BL-102): index regimes are only known after the day.
-          { segment: 'regimes', label: 'Regimes', group: 'Advanced' },
+          // Archived: out of the sidebar (index regimes are only known after the day), still routed.
+          { segment: 'regimes', label: 'Regimes', group: 'Advanced', hidden: true },
         ],
       },
       // The replay of a collected day, read from the options API until live capture exists.

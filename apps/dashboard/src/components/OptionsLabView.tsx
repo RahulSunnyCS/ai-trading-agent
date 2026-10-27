@@ -15,9 +15,10 @@
  *   - Strategies: the saved leg-wise strategies and each one's latest saved result.
  *   - Builder: Leg grid (the leg-wise strategy builder) or YAML engine (the YAML DSL engine, which
  *     was the standalone Backtest tab; /backtest redirects to /optionslab/builder/yaml).
- *   - Runs: the YAML run registry and the leg-wise runs in one list, clickable and comparable.
- *  Advanced
+ *  Advanced (archived: routed, not in the sidebar)
  *   - Regimes: does the index come in persistent periods? (index + VIX history)
+ *  Retired: Runs. `/optionslab/runs` redirects to Strategies, where each strategy's History drawer
+ *  shows its saved days; the YAML engine lists its own registry runs.
  *  Retired: Daily results (saved `obt daily` results, trade logs). `/optionslab/results` redirects
  *  to Today, whose status bar carries the evening run and its Run button.
  *
@@ -38,7 +39,6 @@ import { HeatmapPanel } from './optionslab/HeatmapPanel';
 import { RegimesPanel } from './optionslab/RegimesPanel';
 import { RotationMatrixPanel } from './optionslab/RotationMatrixPanel';
 import { RotationPanel } from './optionslab/RotationPanel';
-import { RunsPanel } from './optionslab/RunsPanel';
 import { StrategiesAndBasketsPanel } from './optionslab/StrategiesAndBasketsPanel';
 import { StrategyBuilder } from './optionslab/StrategyBuilder';
 import { YamlBacktest } from './optionslab/yaml/YamlBacktest';
@@ -96,7 +96,6 @@ export function OptionsLabView() {
           }
         />
       )}
-      {section === 'runs' && <RunsPanel />}
       {section === 'regimes' && <RegimesPanel />}
       {section === 'correlation' && <CorrelationPanel />}
       {section === 'rotation' && <RotationPanel />}
