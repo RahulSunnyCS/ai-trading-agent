@@ -37,6 +37,8 @@
  *  GET  /api/backtest/legwise/heatmap/available  — underlyings with a straddle heatmap grid (BL-094).
  *  GET  /api/backtest/legwise/heatmap            — one view of it: time_sl | date_time | date_sl.
  *  GET  /api/backtest/legwise/rotation/overview — the Rotation page: data health, the latest baskets, the lists.
+ *  GET  /api/backtest/legwise/rotation/plan     — each Adaptive book's latest and tentative picks with
+ *                                                 their settings and upload state per account.
  *  GET  /api/backtest/legwise/rotation/summary  — the 60-day read-out: lists against REF, the base and random baskets.
  *                                                 requireAccess
  *  GET  /api/backtest/legwise/rotation/matrix       — the Strategy Matrix: one view, period (or two
@@ -948,6 +950,23 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation lot plans ---
+
+  // --- rotation plan --- the Today page's baskets: each Adaptive book's latest and tentative
+  // picks with their settings and upload state per account (rotation/plan.py, read-only). No
+  // query is forwarded.
+  fastify.get(
+    '/api/backtest/legwise/rotation/plan',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: { type: 'object', properties: {}, additionalProperties: false },
+      },
+    },
+    async (_request, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/rotation/plan');
+    },
+  );
+  // --- end rotation plan ---
 
   // --- rotation live vs paper --- the Rotation page's "Live vs paper" card (BL-141 Phase 3,
   // rotation/live_compare.py, read-only). Only `from` and `to` are forwarded, as plain days.

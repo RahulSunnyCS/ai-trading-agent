@@ -29,6 +29,9 @@ vi.mock('../../../hooks/useRotation', () => ({
     };
   },
 }));
+vi.mock('../../../hooks/useRotationPlan', () => ({
+  useRotationPlan: () => ({ data: null, loading: false, error: null, refetch: () => undefined }),
+}));
 vi.mock('../../../hooks/useRotationPortfolio', () => ({
   useRotationPortfolioDays: (...args: unknown[]) => {
     mocks.portfolioArgs.push(args[3]);
