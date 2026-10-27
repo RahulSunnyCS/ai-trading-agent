@@ -39,7 +39,8 @@ const { withRetry } = require('./utils/retry');
 //   node run.js --from D --to D history: every note received for sessions D..D, by date, the
 //                               bookmark untouched; a stored note is never written over
 //   node run.js --reparse --from D --to D   read the stored notes' kept PDFs again (no mail):
-//                               after an extractor improves; the line's figures are rebuilt
+//                               after an extractor improves; a line whose figures would change is
+//                               kept and reported unless --accept-figures
 
 const SESSIONS = 10;
 // Accounts read only from a day on, unless BROKER_ACCOUNTS_JSON gives the account its own
@@ -62,6 +63,7 @@ function parseArgs(argv) {
     from: null,
     to: null,
     reparse: false,
+    acceptFigures: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -71,6 +73,7 @@ function parseArgs(argv) {
     else if (a === '--from') opts.from = argv[++i];
     else if (a === '--to') opts.to = argv[++i];
     else if (a === '--reparse') opts.reparse = true;
+    else if (a === '--accept-figures') opts.acceptFigures = true;
     else throw new Error(`unknown argument ${a}`);
   }
   const isDay = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
@@ -160,7 +163,7 @@ function notesByDay(messages, acc, siblings = []) {
  * Read the stored notes of `window` again from their kept PDFs, with the current extractors, and
  * rebuild their lines (the note's provenance kept). No mail is read; nothing else changes.
  */
-async function reparse(root, window, config, d, at, dryRun) {
+async function reparse(root, window, config, d, at, dryRun, acceptFigures) {
   const accounts = new Map(
     config.flatMap((mb) => mb.accounts.map((a) => [`${a.broker}/${a.accountId}`, a])),
   );
@@ -184,6 +187,14 @@ async function reparse(root, window, config, d, at, dryRun) {
         at,
       });
       if (old.superseded) line.superseded = old.superseded;
+      // A reparse is for the richer fields; the note's figures changing is news, not a refresh.
+      const figures = (l) => JSON.stringify(l.fno ?? l.eq ?? null);
+      if (figures(line) !== figures(old) && !acceptFigures) {
+        problems.push(
+          `${label(acc)} ${day}: the note's figures read differently now; kept the stored ones (--accept-figures to take the new)`,
+        );
+        continue;
+      }
       if (!dryRun) writeLine(root, line);
       done += 1;
     }
@@ -226,7 +237,7 @@ async function main(argv, deps = {}) {
   const release = d.lock(root);
   if (opts.reparse) {
     try {
-      return await reparse(root, window, config, d, at, opts.dryRun);
+      return await reparse(root, window, config, d, at, opts.dryRun, opts.acceptFigures);
     } finally {
       release();
     }
@@ -418,8 +429,10 @@ async function main(argv, deps = {}) {
           // These e-mails do not name the account: with two of one broker in a mailbox, unknown.
           const acc = accs.length === 1 ? accs[0] : null;
           const who = acc ? label(acc) : `${reader.broker} (account unknown)`;
-          const cursorKey = `${mailbox.email}|ledger/${reader.kind}`;
-          const cursor = cursors[cursorKey] ?? {};
+          const cursorKey = `${mailbox.email}|ledger/${reader.broker}/${reader.kind}`;
+          // Bookmarks written before the key named the broker carry over.
+          const oldKey = `${mailbox.email}|ledger/${reader.kind}`;
+          const cursor = cursors[cursorKey] ?? cursors[oldKey] ?? {};
           const bookmark =
             cursor.uidvalidity === conn.uidvalidity && Number.isInteger(cursor.last_uid)
               ? cursor.last_uid
@@ -447,7 +460,16 @@ async function main(argv, deps = {}) {
               : null;
           let stored = 0;
           try {
-            const { events, unread } = readLedger(reader, messages, acc?.accountId ?? null);
+            const { events, unread, foreign } = readLedger(
+              reader,
+              messages,
+              acc?.accountId ?? null,
+            );
+            for (const msg of foreign.filter((m) => isNew(m.uid))) {
+              problems.push(
+                `${who}: a "${reader.subject}" e-mail came from another sender (${/@([^>\s]+)/.exec(String(msg.from ?? ''))?.[1] ?? 'no sender'}); has the broker's sending domain changed?`,
+              );
+            }
             for (const msg of unread.filter((m) => isNew(m.uid))) {
               problems.push(
                 `${who}: a "${reader.subject}" e-mail could not be read (${msg.received?.slice(0, 10) ?? 'no date'}); has its wording changed?`,
@@ -481,6 +503,7 @@ async function main(argv, deps = {}) {
               ...(last ? { last_uid: last } : {}),
               checked_at: at,
             };
+            delete cursors[oldKey];
           }
         }
       } finally {

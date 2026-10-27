@@ -14,6 +14,14 @@ const RUPEES = String.raw`(?:₹|\bRs\.?|\bINR)\s*(\d[\d,]*(?:\.\d{1,2})?)`;
 const money = (text) => new Decimal(text.replace(/,/g, '')).toDecimalPlaces(2).toNumber();
 const one = (text) => String(text).replace(/\s+/g, ' ');
 
+/** "11:12:13 PM" → '23:12:13' (both wordings store the 24-hour time). */
+function clock24(text) {
+  const m = /(\d{1,2}):(\d{2}):(\d{2})\s*([AP])M/i.exec(text);
+  if (!m) return text;
+  const h = (Number(m[1]) % 12) + (m[4].toUpperCase() === 'P' ? 12 : 0);
+  return `${String(h).padStart(2, '0')}:${m[2]}:${m[3]}`;
+}
+
 /** "14-Oct-2026" → '2026-10-14'. */
 function dmy(text) {
   const m = /(\d{1,2})[-\s]([A-Za-z]{3})[A-Za-z]*[-\s](\d{4})/.exec(text);
@@ -73,7 +81,7 @@ const READERS = [
       return {
         utilisation_pct: Number(m[1]),
         day: m[2] ? dmy(m[2]) : m[4],
-        time: m[3] ? m[3].toUpperCase() : m[5],
+        time: m[3] ? clock24(m[3]) : m[5],
         ...(available ? { margin_available: money(available[1]) } : {}),
         ...(used ? { margin_used: money(used[1]) } : {}),
       };
@@ -99,23 +107,27 @@ const READERS = [
     broker: 'finvasia',
     subject: 'Quarterly Fund Settlement',
     from: 'shoonya.com',
-    read(text) {
-      const m = new RegExp(RUPEES, 'i').exec(one(text));
-      return { amount: m ? money(m[1]) : null };
+    read() {
+      return { amount: null };
     },
   },
 ];
 
 /**
- * The events in `messages` for one reader and one account: { events, unread }. `unread` holds
- * messages from the right sender that the reader could not understand.
+ * The events in `messages` for one reader and one account: { events, unread, foreign }. `unread`
+ * holds messages from the right sender that the reader could not understand; `foreign`, messages
+ * with the subject from another sender (a broker that changed its sending domain shows up here).
  */
 function readLedger(reader, messages, account) {
   const events = [];
   const unread = [];
+  const foreign = [];
   for (const msg of messages) {
     const from = String(msg.from ?? '').toLowerCase();
-    if (!(from.endsWith(`@${reader.from}`) || from.endsWith(`.${reader.from}`))) continue;
+    if (!(from.endsWith(`@${reader.from}`) || from.endsWith(`.${reader.from}`))) {
+      foreign.push(msg);
+      continue;
+    }
     const fields = msg.received ? reader.read(msg.text || '') : null;
     // A day the reader found but could not turn into a date is not understood either.
     if (!fields || ('day' in fields && !fields.day)) {
@@ -134,7 +146,7 @@ function readLedger(reader, messages, account) {
       received: msg.received,
     });
   }
-  return { events, unread };
+  return { events, unread, foreign };
 }
 
 function ledgerFile(root, day) {

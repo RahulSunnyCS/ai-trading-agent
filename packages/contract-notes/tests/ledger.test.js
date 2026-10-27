@@ -26,6 +26,29 @@ describe('the readers', () => {
     ]);
   });
 
+  test('the subject from another sender is kept aside as foreign, never read', () => {
+    const r = readLedger(
+      reader('deposit'),
+      [mail('You have successfully added ₹500.00', 'news@example.com')],
+      'R1',
+    );
+    expect(r.events).toEqual([]);
+    expect(r.foreign).toHaveLength(1);
+  });
+
+  test('an afternoon margin warning stores the 24-hour time', () => {
+    const { events } = readLedger(
+      reader('margin_warning'),
+      [
+        mail(
+          'Your account has reached 91.00% of your available margin as on 14-Oct-2026, 01:05:09 PM.',
+        ),
+      ],
+      'R1',
+    );
+    expect(events[0]).toMatchObject({ day: '2026-10-14', time: '13:05:09' });
+  });
+
   test('collateral interest, booked on the session it is for', () => {
     const { events } = readLedger(
       reader('collateral_interest'),
@@ -53,7 +76,7 @@ describe('the readers', () => {
     expect(oct).toMatchObject({
       utilisation_pct: 90.5,
       day: '2026-10-14',
-      time: '11:12:13 AM',
+      time: '11:12:13',
       margin_available: 1000,
       margin_used: 905,
     });
@@ -136,7 +159,7 @@ describe('the review of #339', () => {
     expect(unread).toEqual([]);
   });
 
-  test('a date the reader cannot read falls back to the received day; no date at all is unread', () => {
+  test('a date the reader cannot read is unread, never filed under a bad day; no date at all is unread', () => {
     const r = reader('margin_warning');
     const ok = readLedger(
       r,
@@ -148,6 +171,7 @@ describe('the review of #339', () => {
       'R1',
     );
     expect(ok.events).toEqual([]); // not understood: reported, never filed under a bad day
+    expect(ok.unread).toHaveLength(1);
     const noDate = readLedger(
       reader('deposit'),
       [{ ...mail('added ₹1.00'), received: null }],

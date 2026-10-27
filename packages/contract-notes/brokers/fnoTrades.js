@@ -1,4 +1,5 @@
 const Decimal = require('decimal.js');
+const logger = require('../utils/logger');
 
 // The F&O notes' trade summary (BL-168 Phase 3): one row per contract and side, with the
 // quantity, the weighted average price (WAP), brokerage per unit, the WAP after brokerage and the
@@ -111,15 +112,16 @@ function angelTrades(text) {
     const [, qtyWap, brk, wapAfter, , total] = cells;
     const after = dec(wapAfter);
     const net = dec(total);
-    const [whole, frac] = qtyWap.split('.');
-    let split = null;
-    for (let k = 1; k < whole.length; k++) {
-      const qty = dec(whole.slice(0, k));
-      if (qty.times(after).minus(net.abs()).abs().lte(TOLERANCE)) {
-        split = { qty, wap: dec(`${whole.slice(k)}.${frac}`) };
-        break;
-      }
-    }
+    // The WAP (2 decimals) is the WAP after brokerage give or take the brokerage per unit; the
+    // total can miss qty × WAP by the WAP's rounding when a contract had several fills.
+    const glued = splitGlued(qtyWap, {
+      netRate: after,
+      places: 2,
+      total: net,
+      expectRate: after,
+      rateSlack: dec(brk).plus('0.01'),
+    });
+    const split = glued && { qty: glued.qty, wap: glued.rate };
     if (!split) {
       bad.push(line.trim().slice(0, 40));
       continue;
@@ -161,14 +163,24 @@ function readContract(text) {
   });
 }
 
-/** Split glued "<qty><rate>" where qty × netRate = |total| (rate has `places` decimals). */
-function splitQty(glued, netRate, total) {
+/**
+ * Split a glued "<qty><rate>" cell. The quantity has no decimals and a rate's whole part never
+ * starts with 0 (bar "0.xx"), so each split point is one candidate. The right one has the rate
+ * within `rateSlack` of `expectRate` (when given) and qty × `netRate` equal to |total| within the
+ * rounding of a rate printed to `places` decimals: half a unit of its last place per unit, plus
+ * the usual paise.
+ */
+function splitGlued(glued, { netRate, places, total, expectRate = null, rateSlack = dec(0) }) {
   const [whole, frac] = glued.split('.');
+  const half = dec(1).div(dec(10).pow(places)).div(2);
   for (let k = 1; k < whole.length; k++) {
+    const rateWhole = whole.slice(k);
+    if (rateWhole.length > 1 && rateWhole.startsWith('0')) continue;
     const qty = dec(whole.slice(0, k));
-    if (qty.times(netRate).minus(total.abs()).abs().lte(TOLERANCE)) {
-      return { qty, rate: dec(`${whole.slice(k)}.${frac}`) };
-    }
+    const rate = dec(`${rateWhole}.${frac}`);
+    if (expectRate && rate.minus(expectRate).abs().gt(rateSlack)) continue;
+    const slack = TOLERANCE.plus(qty.times(half));
+    if (qty.times(netRate).minus(total.abs()).abs().lte(slack)) return { qty, rate };
   }
   return null;
 }
@@ -203,7 +215,13 @@ function angelFills(text) {
     }
     // v: side, quantity+rate, brokerage per unit, net rate, closing rate, net total.
     const net = dec(v[6]);
-    const split = splitQty(v[2], dec(v[4]), net);
+    const split = splitGlued(v[2], {
+      netRate: dec(v[4]),
+      places: 4,
+      total: net,
+      expectRate: dec(v[4]),
+      rateSlack: dec(v[3]).plus('0.0001'),
+    });
     if (!split) {
       bad.push(lines[j].slice(0, 30));
       continue;
@@ -285,15 +303,26 @@ const netOf = (trades) => trades.reduce((s, t) => s.plus(t.net_total), new Decim
  * marked `unmatched` (a layout not read yet). A note never fails over its trades.
  */
 function chooseTrades(text, broker, obligation) {
-  const [fills, summary] =
-    broker === 'finvasia'
-      ? [finvasiaFills(text), finvasiaTrades(text)]
-      : [angelFills(text), angelTrades(text)];
-  const adds = (r) => r.trades.length > 0 && netOf(r.trades).minus(obligation).abs().lte(1);
-  if (adds(fills)) return { trades: fills.trades, trades_check: 'fills' };
-  if (adds(summary)) return { trades: summary.trades, trades_check: 'summary' };
-  const best = fills.trades.length >= summary.trades.length ? fills : summary;
-  return { trades: best.trades, trades_check: 'unmatched' };
+  try {
+    const [fills, summary] =
+      broker === 'finvasia'
+        ? [finvasiaFills(text), finvasiaTrades(text)]
+        : [angelFills(text), angelTrades(text)];
+    const adds = (r) => r.trades.length > 0 && netOf(r.trades).minus(obligation).abs().lte(1);
+    if (adds(fills)) return { trades: fills.trades, trades_check: 'fills' };
+    if (adds(summary)) return { trades: summary.trades, trades_check: 'summary' };
+    const best = fills.trades.length >= summary.trades.length ? fills : summary;
+    logger.warn('trades do not add up to the note', {
+      broker,
+      read: best.trades.length,
+      unread: best.bad.length,
+    });
+    return { trades: best.trades, trades_check: 'unmatched', trades_unread: best.bad.length };
+  } catch (err) {
+    // A row the readers did not foresee: the note's figures still stand.
+    logger.warn('trades could not be read', { broker, error: err.message });
+    return { trades: [], trades_check: 'unmatched', trades_error: err.message };
+  }
 }
 
 module.exports = {

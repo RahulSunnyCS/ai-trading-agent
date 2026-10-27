@@ -83,7 +83,7 @@ bun run --filter @ata/dashboard typecheck
 bun run --filter '*' typecheck     # packages only — NOT the root app
 (cd packages/broker-login   && bun run typecheck)
 (cd packages/contract-notes && bun run test)   # Jest; needs Node 20 on PATH
-(cd packages/contract-notes && node run.js [--dry-run] [--day D | --from D --to D | --reparse --from D --to D] [--sessions N])   # BL-168: each account's new mail since its bookmark -> TRADING_DATA_ROOT/contract-notes/ (notes, and the ledger e-mails: deposits, payouts, collateral interest, margin warnings, settlements) (scheduler `contract-notes` 00:00, `contract-notes-retry` 07:30); needs qpdf; never writes the Google Sheet. `node reconcile.js <sheet.csv> [--import-manual]` compares the owner's sheet with the notes (report under `contract-notes/reconcile/`)
+(cd packages/contract-notes && node run.js [--dry-run] [--day D | --from D --to D | --reparse --from D --to D [--accept-figures]] [--sessions N])   # BL-168: each account's new mail since its bookmark -> TRADING_DATA_ROOT/contract-notes/ (notes, and the ledger e-mails: deposits, payouts, collateral interest, margin warnings, settlements) (scheduler `contract-notes` 00:00, `contract-notes-retry` 07:30); needs qpdf; never writes the Google Sheet. `node reconcile.js <sheet.csv> [--import-manual]` compares the owner's sheet with the notes (report under `contract-notes/reconcile/`)
 
 # Scheduler service (BL-012) — apps/scheduler; see its CLAUDE.md
 bun run --filter @ata/scheduler jobs status    # every job: schedule, last run, next run

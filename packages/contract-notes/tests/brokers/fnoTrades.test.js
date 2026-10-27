@@ -51,6 +51,23 @@ test('Angel One summary row: quantity and price split where they multiply to the
   });
 });
 
+test('Angel One summary row: a WAP rounded to 2 decimals still splits (several fills)', () => {
+  // 75 sold at a true average of 40.0667 prints as 40.07; 75 × 40.07 misses 3005.00 by ₹0.25.
+  const { trades, bad } = angelTrades(
+    'OPTIDX NIFTY Oct 27 2026 22400.00  PE(BT)SELL7540.070.000040.070.003005.00',
+  );
+  expect(bad).toEqual([]);
+  expect(trades[0]).toMatchObject({ qty: 75, wap: 40.07, net_total: 3005 });
+});
+
+test('Angel One summary row: a split giving a rate with a leading 0 is never taken', () => {
+  // "75" + "0.50" and "750" + ".50" would both be read without the rule; only 750 × 0.50 = 375.
+  const { trades } = angelTrades(
+    'OPTIDX NIFTY Oct 27 2026 22400.00  PE(BT)SELL7500.500.00000.500.00375.00',
+  );
+  expect(trades[0]).toMatchObject({ qty: 750, wap: 0.5 });
+});
+
 test('Angel One annexure fill: a buy is paid even though printed unsigned', () => {
   const text = [
     '100000000000000109:30:00123456709:30:00',
