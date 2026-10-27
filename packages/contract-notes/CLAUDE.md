@@ -175,5 +175,6 @@ raises no quiet-account alert (`NO_QUIET_ALERT`): Momentum trades on Fridays, no
 ## Not wired
 
 `components/PaginatedPreview.tsx` and `styles/` came with the `trade-analytics` merge and are
-not used by the pipeline. The two sample PDFs and the two `.xlsx` files are reference copies
-(the committed sheet copy holds the formulas BL-168 Phase 4 reproduces).
+not used by the pipeline. The repo is public: no real contract note, sheet or figure is
+committed. Tests use invented figures only; the owner's sample notes and sheet copy live in the
+store, `contract-notes/reference/`.

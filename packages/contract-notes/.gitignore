@@ -1,3 +1,6 @@
 node_modules
 .env
 coverage
+# Contract notes and the owner's sheet never go into the repo (it is public)
+*.pdf
+*.xlsx

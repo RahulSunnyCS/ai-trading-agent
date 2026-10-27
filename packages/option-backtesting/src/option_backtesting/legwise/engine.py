@@ -26,6 +26,19 @@ backtest (TODO.md 3.10.7):
   (sell: the lowest low since entry; buy: the highest high) moves the SL Y
   in the same direction; it never loosens. Updated AFTER the bar's SL check,
   so a bar that sets a new extreme cannot also hit the SL it just tightened.
+- **Peak trail** (`trail_peak`, bought legs, BL-164) — once the leg's highest
+  price since entry (bar highs, updated after the bar's checks, as the trail
+  SL) is above `activate_percent` of the entry price, the leg exits at
+  `exit_percent` of that highest price (to the tick; the bar's open if it
+  gapped through), reason TRAIL. When the SL and the peak trail are both hit
+  on one bar, the higher level is the one met first. A TRAIL exit is a stop
+  exit for everything after it: square-off complete and `reentry_on_sl` act on
+  it as on an SL (AlgoTest counts a trailing-stop hit as an SL hit).
+- **Stops on the close** (`stop_on: close`, BL-164) — the SL, target, trail
+  SL and peak trail are judged on each bar's CLOSE only and fill at that
+  close; the best price is tracked from closes. A spike past a level inside
+  the bar does not count. An intrabar entry's own bar IS judged (its close is
+  after the fill). Default `tick` is everything above.
 - **Range breakout** — the range is the high/low of the leg's option (or the
   index, `source: underlying`) over [entry_time, until); the strike is chosen at
   entry_time. From `until` on, the first bar whose high exceeds the range high
@@ -162,6 +175,7 @@ class _LegRun:
     reentries_target: int = 0
     reentry_mode: str | None = None
     reentry_price: float = 0.0
+    peak: float = 0.0  # BL-164: the highest price since entry, for trail_peak
     rolls_done: int = 0  # BL-105: how many times this leg has been rolled today
     roll_pending: bool = False  # BL-105: the next entry is the roll's (consumed by _enter)
 
@@ -211,6 +225,7 @@ class _DaySim:
         self.orders += 1
         run.entry_price = price
         run.best = price
+        run.peak = price
         spec = run.spec
         stop = spec.stop_loss
         if run.roll_pending and spec.roll is not None and spec.roll.stop_loss_percent is not None:
@@ -363,6 +378,10 @@ class _DaySim:
     def _step_open(self, run: _LegRun, minute: int) -> str | None:
         """Returns "sl"/"target" if the leg exited on this bar."""
         assert run.series is not None
+        if run.spec.stop_on == "close":
+            # the entry bar's close comes after an intrabar fill, so it is judged too
+            run.fresh_intrabar = False
+            return self._step_open_on_close(run, minute)
         if run.fresh_intrabar:
             run.fresh_intrabar = False
             return None
@@ -371,24 +390,68 @@ class _DaySim:
             return None
         buy = run.spec.position == "buy"
         sl, tgt = run.sl, run.target
+        peak_stop = self._peak_stop(run, tick=True)
         sl_hit = sl is not None and (lo <= sl if buy else h >= sl)
         tgt_hit = tgt is not None and (h >= tgt if buy else lo <= tgt)
-        if sl_hit:
-            gapped = o <= sl if buy else o >= sl  # type: ignore[operator]
-            self._exit(run, minute, o if gapped else sl, "SL")  # type: ignore[arg-type]
+        trail_hit = peak_stop is not None and lo <= peak_stop
+        if sl_hit or trail_hit:
+            # on the way down a bought leg meets the higher of the two levels first
+            by_trail = trail_hit and (not sl_hit or peak_stop > sl)  # type: ignore[operator]
+            level = peak_stop if by_trail else sl
+            gapped = o <= level if buy else o >= level  # type: ignore[operator]
+            reason = "TRAIL" if by_trail else "SL"
+            self._exit(run, minute, o if gapped else level, reason)  # type: ignore[arg-type]
             return "sl"
         if tgt_hit:
             gapped = o >= tgt if buy else o <= tgt  # type: ignore[operator]
             self._exit(run, minute, o if gapped else tgt, "TARGET")  # type: ignore[arg-type]
             return "target"
+        self._update_trails(run, h, lo)
+        return None
+
+    def _step_open_on_close(self, run: _LegRun, minute: int) -> str | None:
+        """`stop_on: close` (BL-164): the stop, target and trails judged on the bar's close
+        only, an exit filled at that close."""
+        assert run.series is not None
+        close = run.series.close[minute]
+        if close is None:
+            return None
+        buy = run.spec.position == "buy"
+        sl, tgt = run.sl, run.target
+        peak_stop = self._peak_stop(run, tick=False)
+        sl_hit = sl is not None and (close <= sl if buy else close >= sl)
+        trail_hit = peak_stop is not None and close <= peak_stop
+        if sl_hit or trail_hit:
+            # named by the higher level, as on a tick bar; the fill is the close either way
+            by_trail = trail_hit and (not sl_hit or peak_stop > sl)  # type: ignore[operator]
+            self._exit(run, minute, close, "TRAIL" if by_trail else "SL")
+            return "sl"
+        if tgt is not None and (close >= tgt if buy else close <= tgt):
+            self._exit(run, minute, close, "TARGET")
+            return "target"
+        self._update_trails(run, close, close)
+        return None
+
+    def _peak_stop(self, run: _LegRun, tick: bool) -> float | None:
+        """The peak trail's exit level, once armed (BL-164); None when off or not armed yet."""
+        tp = run.spec.trail_peak
+        if tp is None or run.peak <= run.entry_price * tp.activate_percent / 100 + _EPS:
+            return None
+        level = run.peak * tp.exit_percent / 100
+        return to_tick(level) if tick else level
+
+    def _update_trails(self, run: _LegRun, high: float, low: float) -> None:
+        """After a bar's checks: the trail SL's best price and the peak trail's peak."""
+        buy = run.spec.position == "buy"
         if run.spec.trail_sl is not None:
-            run.best = max(run.best, h) if buy else min(run.best, lo)
+            run.best = max(run.best, high) if buy else min(run.best, low)
             x, y = run.spec.trail_sl.step(run.entry_price)
             moved = run.sign * (run.best - run.entry_price)
             steps = math.floor(moved / x + _EPS) if moved > 0 else 0
             trailed = to_tick(run.initial_sl + run.sign * steps * y)  # type: ignore[operator]
             run.sl = max(run.sl, trailed) if buy else min(run.sl, trailed)  # type: ignore[type-var]
-        return None
+        if run.spec.trail_peak is not None:
+            run.peak = max(run.peak, high)
 
     def _arm_reentry(self, run: _LegRun, minute: int, why: str) -> None:
         spec = run.spec.reentry_on_sl if why == "sl" else run.spec.reentry_on_target

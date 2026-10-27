@@ -43,7 +43,7 @@ function searchSubject() {
   return 'Contract Note - Equity Segment';
 }
 
-// "CN_R59799620_23102026.pdf" → '2026-10-23' (null if another account's, or another file).
+// "CN_R12345678_23102026.pdf" → '2026-10-23' (null if another account's, or another file).
 function noteDay({ filename, accountId }) {
   // A revised note may come as CN_<id>_<ddmmyyyy>_1.pdf.
   const m = new RegExp(

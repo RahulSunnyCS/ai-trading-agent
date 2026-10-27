@@ -71,6 +71,6 @@ describe('notesByDay()', () => {
 
 describe('label()', () => {
   test('never prints the whole account id', () => {
-    expect(label({ broker: 'angelone', accountId: 'R59799620' })).toBe('angelone R5··20');
+    expect(label({ broker: 'angelone', accountId: 'R12345678' })).toBe('angelone R1··78');
   });
 });

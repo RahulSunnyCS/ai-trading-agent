@@ -89,7 +89,7 @@ function MtmChart({ f }: { f: Forensics }) {
         const color =
           m.kind === 'entry'
             ? t.primary
-            : m.reason === 'SL'
+            : m.reason === 'SL' || m.reason === 'TRAIL'
               ? t.negative
               : m.reason === 'TARGET'
                 ? t.positive
