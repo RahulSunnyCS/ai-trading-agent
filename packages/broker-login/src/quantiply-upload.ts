@@ -591,7 +591,8 @@ async function main(): Promise<number> {
     if (values.subscription && mode === 'evening' && broker === 'finvasia') {
       try {
         const sub = parseSubscription(await api.me());
-        const need = wanted.length;
+        // the algos the account will hold: a pick with an unconfirmed mapping is never created
+        const need = wanted.length - p.unconfirmed.length;
         const t = subscriptionTarget(sub, need);
         if (t === null) lines.push(`subscription: ${sub.totalAlgosPerDay} algos a day ✓`);
         else if ('skip' in t) lines.push(`subscription: ${t.skip}`);

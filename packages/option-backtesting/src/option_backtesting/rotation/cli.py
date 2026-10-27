@@ -259,15 +259,14 @@ def _without_addon(picks, platform: str, book: str, settings: dict | None):
 
 def _morning(picks, book: str, folder):
     """BL-172 Phase 4: the recorded picks under the owner's 09:17 rule, against the list the
-    evening uploaded to `folder` (or, with no evening export, the evening's expected picks). With
-    no evening list at all, the recorded picks as they are. Returns (picks, manifest extra)."""
-    from . import algtst_export as ax
+    evening uploaded to `folder`. With no evening upload there (nothing of it is on the platform),
+    the recorded picks as they are. Returns (picks, manifest extra)."""
     from . import morning
     from . import quantiply_export as qx
 
-    evening = qx.evening_of(folder) or ax.preview_picks(picks.day, book)
+    evening = qx.evening_of(folder)
     if evening is None:
-        typer.echo(f"{book}: no evening list for {picks.day}: the 09:16 picks as recorded")
+        typer.echo(f"{book}: no evening upload for {picks.day}: the 09:16 picks as recorded")
         return picks, None
     m = morning.morning_list(picks.day, book, evening)
     lines = [f"added {', '.join(m.added)}"] if m.added else []

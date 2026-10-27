@@ -185,7 +185,7 @@ def morning_list(day: date, book: str, evening: DayPicks, root: Path | None = No
     recorded = recorded_picks(day, book, root)
     if recorded is None:
         raise LookupError(f"no recorded {book} entry for {day}")
-    if [*recorded.core, *recorded.buy] == [*evening.core, *evening.buy]:
+    if {*recorded.core, *recorded.buy} == {*evening.core, *evening.buy}:
         return Morning(picks=recorded, evening=evening)
     entries = journal.read(store.journal_path(root, BOOKS[book][0]))
     entry = next(e for e in entries if e.get("day") == day.isoformat())
