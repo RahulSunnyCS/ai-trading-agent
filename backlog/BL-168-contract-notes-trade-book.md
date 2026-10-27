@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the only record of real money the project measures itself against; unblocks BL-093 and BL-026 |
-| **Status** | In progress (Phases 1 and 2 done; Phase 3 under way) |
+| **Status** | In progress (Phases 1 and 2 done; Phase 3 under way; Phase 6 backup built) |
 | **Type** | feature |
 | **Area** | contract-notes / scheduler / trading-data / dashboard |
 | **Created** | 2026-10-26 |
@@ -431,3 +431,14 @@ record from them.
   `TRADING_DATA_ROOT/contract-notes.discarded-2026-10-26` (safe to delete) and rebuilt. Not done:
   the jobs start only after the owner restarts the scheduler; the stored figures are checked
   against the sheet's rows in Phase 3's import.
+- 2026-10-27 — Phase 6 built: tdata backup copies contract-notes/ and rotation/ (size + mtime).
+  Lock and `.tmp` files are left out; the summary (and so the monthly `backup` job's log) counts
+  copied / already-there per folder. Still open: the owner's decision on archiving
+  `trade-analytics` (TODO §2.7), after a month of the Trade book page.
+- 2026-10-27 — review of PR #342 fixed: every folder (lake and raw too) now compares size and
+  mtime, in 10 ms ticks (exFAT's precision) with no slack; each copy is written to a temporary,
+  fsynced, stamped from the source's pre-copy stat and renamed, and the source re-stat'ed after
+  (a file still changing after 3 tries is left unstamped, so the next run copies it); a file
+  deleted mid-run is counted, never fatal; the backup waits up to 10 min for a contract-notes
+  run's `run.lock`; `raw/**/*.decrypted.pdf` stays off the exFAT disk. Phase 6 is done once a
+  real backup run (the next 1st-Sunday job or a manual one) shows the new folders' lines.

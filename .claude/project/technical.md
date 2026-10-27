@@ -131,7 +131,7 @@ uv run obt fyers expired-options --from D --to D --underlyings NIFTY,SENSEX [--p
 uv run tdata init           # create TRADING_DATA_ROOT (~/TradingData) + catalog, load reference data
 uv run tdata status         # where it lives, rows/days per view, ingest runs, reference-CSV drift
 uv run tdata reference sql "INSERT INTO ref_lot_sizes VALUES ('NIFTY', 75, DATE '2027-01-01')"  # edit + re-export CSVs
-uv run tdata backup --to /Volumes/<disk>/TradingData   # monthly; copies only new lake/raw files
+uv run tdata backup --to /Volumes/<disk>/TradingData   # monthly (scheduler `backup`); lake/, raw/, contract-notes/ (no decrypted PDFs), rotation/ and the catalog; a file goes when its size or mtime changed (rules: packages/trading-data/CLAUDE.md)
 uv run tdata mount          # attach TRADING_DATA_IMAGE if the root's volume is not mounted (idempotent)
 uv run tdata vendor import --from "/Volumes/RAHUL'S SSD/Stock Market Data/parquet/options" --unit nifty  # BL-034: vendor options history -> lake (resumable; Fyers days never overwritten); import-index <csv> --symbol NIFTY for spot / INDIAVIX
 uv run tdata derived rebuild [--day D] [--force] [--check]  # 5-minute chain snapshots, straddle series, IV tables from the lake (BL-034 Phase 3; NIFTY+SENSEX)
