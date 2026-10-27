@@ -15,7 +15,7 @@
 The owner's realised F&O P&L lives in the Google Sheet "Trade Book 2025-26 FY" (one row per
 trading day from 1 Apr 2025: the Finvasia and Angel One blocks, plus two hand-entered columns —
 `Algos` and `Capital` — and formula columns: `algo charges` (`ROUNDUP((Algos-3)*12.5+62.5)` in
-the committed copy), `Charges`, `Profit`, `Overall`, `DD`, 50/100-day averages, charge/profit
+the owner's private copy), `Charges`, `Profit`, `Overall`, `DD`, 50/100-day averages, charge/profit
 ratio, bps on capital; a second tab with monthly and FY returns). The sheet is filled nightly by the `trade-analytics` repo's GitHub Actions cron
 (Gmail → PDF → parse → sheet). `packages/contract-notes` is the same pipeline merged here on
 2026-09-19, never cut over: TODO §2.1–2.6 planned to move the *Actions* cron, re-seed the
@@ -166,7 +166,7 @@ recomputed):
   budget), all from the lake and the reference data.
 - **Return on money in the account** — capital from the 15:50 reading, deposits and
   withdrawals taken out (time-weighted), so the % never counts a deposit.
-- **The sheet's ratios, by its own formulas** (read from the committed copy, 2026-10-26):
+- **The sheet's ratios, by its own formulas** (read from the owner's private copy of the sheet, 2026-10-26):
   50-day average profit (T), 100-day average profit (U), 100-day average charge (V),
   charge / profit = V ÷ U (W), profit / capital = U × 10 000 ÷ 100-day average capital, in bps
   a day (Z); cumulative (R) and drawdown from peak (S); the summary block: net, max drawdown
@@ -258,8 +258,8 @@ account, behaviour patterns.
 
 ### Phase 2 — UI design (its own phase, owner 2026-10-26; done before Phase 1)
 - **Tasks:** mockups of every screen with the dashboard's tokens (Quant Studio, IBM Plex,
-  dark), the analytics page pattern, and the sheet's real daily rows (1 Apr 2025 → 26 May
-  2026, the committed copy) where a figure exists; illustrative figures marked as such:
+  dark), the analytics page pattern, and invented daily figures run through the sheet's formulas (read
+  from the owner's private copy); illustrative cards marked as such:
   the page map; the Trade book (run bar, headline strip, hero, ratios, summary block, monthly
   and FY, accounts, charges by kind, day table); the day detail; trades (round trips by
   source, best / worst point, day context); money in and out and margin pressure; Momentum
@@ -413,14 +413,13 @@ record from them.
   history, 4 analytics, 5 page, 6 backup. Tagging, overrides and behaviour split into BL-169.
   TODO 2.10.
 - 2026-10-26 — Phase 2: eight mockups drafted (Mockups above), rendered with headless Chromium
-  from one HTML file; the first screen and the ratios use the sheet's real FY 2025-26 rows
-  (net ₹2,80,565, max drawdown −₹83,335, the sheet's own −83,335).
+  from one HTML file; the first screen and the ratios were then drawn from the sheet's rows
+  (since replaced by an invented series: the repo is public).
 - 2026-10-26 — Phase 2 done: the owner approved the mockups as drawn. Phase 5 builds from them.
 - 2026-10-26 — review of PR #334 fixed in the mockups (no change to the approved design): every
-  illustrative card marked, the real figures listed above; the 27 Mar day consistent between
-  its row and the drawer (14 algos, ₹200 algo fees from the sheet); each headline tile says how
-  it compares with the picked benchmark; trade P&L labelled gross; the sheet's real algo fees
-  (₹34,523); round axis ticks; weekdays and expiries corrected; green kept for profit only.
+  illustrative card marked; the 27 Mar day consistent between its row and the drawer (algo
+  count and algo fees); each headline tile says how it compares with the picked benchmark;
+  trade P&L labelled gross; the FY algo fees from the sheet's formula; round axis ticks; weekdays and expiries corrected; green kept for profit only.
 - 2026-10-26 — Phase 1 done (PR #335, review fixes included): `node run.js` and the scheduler
   jobs `contract-notes` 00:00 / `contract-notes-retry` 07:30; per-account mail bookmark (the
   owner's suggestion: read only mail after the last message read, plus the last 3 days for a
