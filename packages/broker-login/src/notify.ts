@@ -55,7 +55,11 @@ export function formatReport(
     Boolean,
   );
   const title =
-    quantiply.length === 0 ? 'AlgoTest broker login' : `Broker login: ${platforms.join(' + ')}`;
+    platforms.length === 0
+      ? 'Broker login'
+      : quantiply.length === 0
+        ? 'AlgoTest broker login'
+        : `Broker login: ${platforms.join(' + ')}`;
   const lines = [verdict, `${title}, ${istTimestamp()} IST`, ''];
 
   const sorted = [...entries].sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status]);

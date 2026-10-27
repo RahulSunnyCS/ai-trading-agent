@@ -100,6 +100,8 @@ describe('formatReport with no AlgoTest login in the settings (ONLY=none, BL-140
   it('nothing switched on says so, never a broken run', () => {
     const report = formatReport(null, null, []);
     assert.match(report, /^✅ Nothing to log in/);
+    assert.match(report, /\nBroker login, .* IST\n/);
+    assert.doesNotMatch(report, /AlgoTest/);
     assert.doesNotMatch(report, /never reached/);
   });
 });

@@ -6,6 +6,7 @@ import { sendText } from '@trading/notify';
 import { type Page, chromium } from 'playwright';
 import { BASE_URL } from './algotest.js';
 import {
+  type Automation,
   algotestMultiplierRefusal,
   describeSource,
   readAutomation,
@@ -163,9 +164,17 @@ async function main(): Promise<number> {
     console.log(`AlgoTest deploy ${held}`);
     return 0;
   }
-  // BL-140: the dashboard's "Automated deployment" master switch must be on as well.
-  if (values.apply) {
-    const automation = readAutomation();
+  // BL-140: the dashboard's "Automated deployment" master switch must be on as well. The settings
+  // are read once. A deploy fails closed when they cannot be read (readAutomation throws); the 15:35
+  // check fails open (it runs), since it only reads /live and is the safety net.
+  let automation: Automation | null = null;
+  try {
+    automation = readAutomation();
+  } catch (error) {
+    if (!values.check) throw error;
+    console.error(`automation settings unreadable (${String(error)}): the check runs anyway`);
+  }
+  if (values.apply && automation) {
     if (!automation.masters.deploy) {
       console.log(`Automated deployment is off (${describeSource(automation)}): nothing deployed`);
       return 0;
@@ -202,11 +211,11 @@ async function main(): Promise<number> {
     return 1;
   }
   // BL-140: no login at all when the settings give AlgoTest nothing of the tool's to deploy or check.
-  if (values.apply || values.check) {
-    const automation = readAutomation();
+  if ((values.apply || values.check) && automation) {
+    const uploads = uploadBooks(automation, 'algotest');
     const ledger = join(resolve(dir), '..', '..', 'deploy-ledger.jsonl');
     const nothing = nothingOnAlgotest(
-      uploadBooks(automation, 'algotest'),
+      uploads,
       manifest.book,
       values.check,
       existsSync(ledger) ? ledgerDays(await readFile(ledger, 'utf8')) : [],
@@ -214,6 +223,15 @@ async function main(): Promise<number> {
     );
     if (nothing) {
       console.log(`${nothing} (${describeSource(automation)}); AlgoTest not logged in`);
+      // An AlgoTest row uploading another list is deployed by no job: say so, never silently.
+      const other = values.apply ? uploads.filter((b) => b !== manifest.book) : [];
+      if (other.length) {
+        await sendText(
+          readTelegramConfig(),
+          `⚠️ AlgoTest: Settings › Automation uploads the ${other.map((b) => b.toUpperCase()).join(', ')} list, but the 09:16 deploy handles ${manifest.book.toUpperCase()} only: deploy those by hand on /live`,
+          'broker.algotest',
+        ).catch(() => undefined);
+      }
       return 0;
     }
   }

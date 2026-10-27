@@ -225,16 +225,17 @@ async function main(): Promise<number> {
   await mkdir(ARTIFACTS_DIR, { recursive: true }).catch(() => undefined);
 
   const tracing = process.env.TRACE === '1';
+  // ONLY=none (BL-140, from the dashboard's settings): no AlgoTest login at all, so AlgoTest is
+  // neither waited for (its 08:16 window) nor in the report.
+  const algotest = config.only !== 'none';
   const order = quantiplyOrder(
     config.quantiply && !config.quantiplyProblem,
     config.skipWindowGuard,
     istMinutesNow(),
+    algotest,
   );
   const launch = () => chromium.launch({ headless: !config.headed, slowMo: config.slowMo });
 
-  // ONLY=none (BL-140, from the dashboard's settings): no AlgoTest login at all, so AlgoTest is
-  // neither waited for (its 08:16 window) nor in the report.
-  const algotest = config.only !== 'none';
   let results: BrokerResult[] | null = algotest ? [] : null;
   // A Quantiply config problem is only its own FAIL line; the AlgoTest logins still run.
   let quantiply: BrokerResult | null = config.quantiplyProblem
@@ -247,26 +248,18 @@ async function main(): Promise<number> {
 
   try {
     try {
-      if (!algotest) {
-        if (order !== 'off') {
-          browser = await launch();
-          quantiply = await runQuantiplyIsolated(browser, config.angelone);
-        }
-      } else if (order === 'first') {
-        // Before 08:16 IST the window guard would only sleep: Quantiply uses those minutes and
-        // costs AlgoTest nothing.
+      if (order === 'now' || order === 'first') {
+        // No AlgoTest login, or before 08:16 IST while the window guard would only sleep: Quantiply
+        // uses those minutes and costs AlgoTest nothing.
         browser = await launch();
         quantiply = await runQuantiplyIsolated(browser, config.angelone);
-        await waitForLoginWindow(config);
-      } else {
-        // Without Quantiply, or once the window is open: exactly as before, and the real-money
-        // AlgoTest logins are never held up by Quantiply.
-        await waitForLoginWindow(config);
-        browser = await launch();
       }
       if (algotest) {
-        algotestStarted = true;
+        // Without Quantiply, or once the window is open, the real-money AlgoTest logins are never
+        // held up by Quantiply.
+        await waitForLoginWindow(config);
         browser ??= await launch();
+        algotestStarted = true;
         results = await runAlgotest(browser, config, tracing);
       }
     } catch (error) {
@@ -274,7 +267,7 @@ async function main(): Promise<number> {
       console.error(`\nfatal: ${fatal}`);
     }
 
-    if (order === 'last' && algotest) {
+    if (order === 'last') {
       try {
         browser ??= await launch();
         quantiply = await runQuantiplyIsolated(browser, config.angelone);

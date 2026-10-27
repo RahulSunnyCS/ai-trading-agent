@@ -22,13 +22,15 @@ export function istMinutesNow(at: Date = new Date()): number {
 }
 
 /**
+ * - `now`: no AlgoTest login in the settings (ONLY=none, BL-140): nothing to wait for, so Quantiply
+ *   logs in at once.
  * - `first`: well before AlgoTest's 08:16 window opens, while the guard would only sleep -
  *   Quantiply uses those minutes and costs AlgoTest nothing.
  * - `last`: the window is already open (a late or manual run) or the guard is skipped - the
  *   real-money AlgoTest logins go first and are never delayed by Quantiply.
  * - `off`: QUANTIPLY_LOGIN is off, or its config is broken (then it is only a FAIL line).
  */
-export type QuantiplyOrder = 'first' | 'last' | 'off';
+export type QuantiplyOrder = 'now' | 'first' | 'last' | 'off';
 
 /** Quantiply's hard time limit (quantiply.ts QUANTIPLY_TIME_LIMIT_MS), in whole minutes. */
 export const QUANTIPLY_LIMIT_MINUTES = 5;
@@ -41,8 +43,10 @@ export function quantiplyOrder(
   runQuantiply: boolean,
   skipWindowGuard: boolean,
   nowMinutes: number,
+  algotest = true,
 ): QuantiplyOrder {
   if (!runQuantiply) return 'off';
+  if (!algotest) return 'now';
   const endsInTime = nowMinutes + QUANTIPLY_LIMIT_MINUTES <= WINDOW_OPENS_MINUTES;
   return !skipWindowGuard && endsInTime ? 'first' : 'last';
 }
