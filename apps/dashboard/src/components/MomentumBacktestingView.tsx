@@ -385,7 +385,11 @@ export function MomentumBacktestingView() {
       setDatasetState(urlDataset);
     }
   }, [urlDataset, dataset]);
+  // The headline's saved figures (below) stay only until the settings are touched: after that the
+  // run bar no longer describes them.
+  const [savedCardOn, setSavedCardOn] = useState(true);
   function setDataset(next: Dataset): void {
+    setSavedCardOn(false);
     setDatasetState(next);
     if (section === 'backtest') navigate('momentum', 'backtest', next);
   }
@@ -485,9 +489,11 @@ export function MomentumBacktestingView() {
   }
 
   function onCoreChange(patch: Partial<CoreSettings>): void {
+    setSavedCardOn(false);
     setCore((current) => ({ ...current, ...patch }));
   }
   function onValueChange(key: string, value: unknown): void {
+    setSavedCardOn(false);
     setValues((current) => ({ ...current, [key]: value }));
   }
 
@@ -621,6 +627,8 @@ export function MomentumBacktestingView() {
   /** Open a saved strategy's settings in Backtest, switching dataset when it is another one.
    * `openDrawer` false loads them into the run bar's chips only. */
   function openSavedStrategy(strategy: SavedStrategy, openDrawer = true): void {
+    // Opened by the reader (not the headline's own load below): its figures are not the card's.
+    if (openDrawer) setSavedCardOn(false);
     const target = strategy.dataset as Dataset;
     const config = { ...strategy.config_full, dataset: target };
     if (target === dataset) {
@@ -665,11 +673,12 @@ export function MomentumBacktestingView() {
       VISIBLE_DATASET_IDS.has(savedHeadline.dataset as Dataset)
     ) {
       // A group has no settings to load: show its dataset, where its saved figures belong.
-      setDataset(savedHeadline.dataset as Dataset);
+      setDatasetState(savedHeadline.dataset as Dataset);
+      navigate('momentum', 'backtest', savedHeadline.dataset as Dataset);
     }
   }, [savedHeadline, meta, loading, section]);
   const showSavedHeadline =
-    openOnSaved && savedHeadline !== null && savedHeadline.dataset === dataset;
+    openOnSaved && savedCardOn && savedHeadline !== null && savedHeadline.dataset === dataset;
 
   /** "Re-run now to check": run the strategy's own settings on today's code and data. The
    * finished run is saved like any other, and its toast says whether the result moved. */
@@ -1179,6 +1188,7 @@ export function MomentumBacktestingView() {
                       variant="danger"
                       onClick={() => {
                         setConfirmReset(false);
+                        setSavedCardOn(false);
                         void loadMeta(dataset);
                       }}
                     >

@@ -34,6 +34,9 @@ export function SavedHeadlineRun({
   const kpis = saved.kpis;
   const day = formatDay(saved.savedAt.slice(0, 10));
   const isGroup = saved.openable === null;
+  // A group that follows an All Fridays run shows that run, named, not the group's blend.
+  const followed =
+    saved.openable !== null && saved.openable.id !== saved.headline.id ? saved.openable : null;
   return (
     <Card>
       <CardHeader
@@ -41,7 +44,9 @@ export function SavedHeadlineRun({
         description={
           isGroup
             ? `Showing the saved run of ${day}: the group's sleeves blended. A group is run one sleeve at a time; open Settings to run something.`
-            : `Showing the saved run of ${day}. Run to refresh.`
+            : followed
+              ? `Showing the saved run of ${day}: ${followed.name}, the All Fridays run this group follows. Run to refresh.`
+              : `Showing the saved run of ${day}. Run to refresh.`
         }
         actions={
           <span className="flex items-center gap-2">

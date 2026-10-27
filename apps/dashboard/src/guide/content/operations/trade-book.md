@@ -63,7 +63,7 @@ The sheet's rolling columns, counted over the sessions with a note and running f
 - **W**, charge / profit: V × 100 ÷ U. Charges per rupee of net profit; lower is better.
 - **Z**, profit / capital: U × 10,000 ÷ the 100-day average capital, in basis points of capital a day.
 
-Each is blank until its window has 50 or 100 sessions. Averages are rounded to the rupee, as in the sheet. The range beside W's latest value counts only sessions where U is at least ₹100: when U is near zero, W divides by almost nothing and swings to thousands of percent either way, which says nothing about charges.
+Each is blank until its window has 50 or 100 sessions. Averages are rounded to the rupee, as in the sheet. W's chart and the range beside its latest value count only sessions where U is at least ₹100 (the latest value itself is always the latest session's): when U is near zero, W divides by almost nothing and swings to thousands of percent either way, which says nothing about charges.
 
 ## Months and accounts
 

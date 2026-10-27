@@ -275,6 +275,8 @@ function LoadingBody() {
 interface OrderPreviewState {
   favourite: string | null;
   select: (favourite: string | null) => void;
+  /** Starts the picked favourite's preview again (after an error). */
+  retry: () => void;
   /** The finished preview of the picked favourite, else null. */
   result: MomentumOrderPreview | null;
   loading: boolean;
@@ -314,7 +316,9 @@ function useOrderPreview(): OrderPreviewState {
   );
   // Gate on the job asked for: the hook keeps the previous job's answer while the next loads.
   const data = current && polled.data?.id === current.id ? polled.data : null;
-  const done = data && data.status !== 'running' ? data.id : null;
+  // A job that finished, or that the service no longer knows (a restart): stop asking.
+  const done =
+    data && data.status !== 'running' ? data.id : current && polled.error ? current.id : null;
   useEffect(() => {
     if (done) setFinished(done);
   }, [done]);
@@ -330,6 +334,7 @@ function useOrderPreview(): OrderPreviewState {
   return {
     favourite,
     select,
+    retry: () => select(favourite),
     result: data?.status === 'done' ? data.result : null,
     loading: favourite !== null && !error && data?.status !== 'done',
     error,
@@ -348,6 +353,11 @@ function PreviewBody({
           title="Could not make the preview"
           description={state.error}
         />
+        <div className="mt-2 flex justify-center">
+          <Button size="sm" onClick={state.retry}>
+            Try again
+          </Button>
+        </div>
       </div>
     );
   }
@@ -371,8 +381,10 @@ function PreviewBody({
       settings={settings}
       made={
         <>
-          A preview: saved nowhere, and planned as one portfolio against all your holdings, never
-          lot by lot. Your orders for the headline are unchanged.
+          {result.holdings?.source === 'paper'
+            ? 'A preview: saved nowhere, and planned from your paper capital in cash (the paper portfolio is the headline’s). '
+            : 'A preview: saved nowhere, and planned as one portfolio against all your holdings, never lot by lot. '}
+          Your orders for the headline are unchanged.
         </>
       }
       lots={null}

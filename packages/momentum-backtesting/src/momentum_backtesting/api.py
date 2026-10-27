@@ -3547,6 +3547,10 @@ def _compute_orders(
             target_week=target_week,
             today=today,
         )
+    if preview and settings["holdings_source"] == "paper":
+        # The paper portfolio is the headline's model, which this favourite's own last-week
+        # weights are not: a preview plans it from the paper capital in cash instead.
+        start_fresh = True
     if settings["holdings_source"] == "paper":
         before = {
             k: v for k, v in signal.get("weights", {}).items() if v > 0 and k not in cash_names
@@ -4382,12 +4386,19 @@ class _PreviewJobs:
 
     MAX_KEPT = 20
 
-    def __init__(self, run: Callable[[Any], dict] | None = None) -> None:
+    def __init__(
+        self, run: Callable[[Any], dict] | None = None, *, latest_only: bool = False
+    ) -> None:
         self._lock = threading.Lock()
         self._jobs: dict[str, dict] = {}
         # What a job computes from its argument (default: a rebalance preview), looked up when the
         # job runs so a test can replace `rebalance_preview`.
         self._run = run
+        # `latest_only`: one job computes at a time, and a job a newer one was started after
+        # while it waited finishes at once as superseded (the page asks only for the newest).
+        self._latest_only = latest_only
+        self._serial = threading.Lock()
+        self._newest: str | None = None
 
     def start(self, req: Any) -> dict:
         job = {
@@ -4401,15 +4412,27 @@ class _PreviewJobs:
         }
         with self._lock:
             self._jobs[job["id"]] = job
+            self._newest = job["id"]
             for old in list(self._jobs)[: -self.MAX_KEPT]:
                 del self._jobs[old]
-        threading.Thread(target=self._execute, args=(job, req), daemon=True).start()
+        target = self._execute_latest if self._latest_only else self._execute
+        threading.Thread(target=target, args=(job, req), daemon=True).start()
         return dict(job)
 
     def get(self, job_id: str) -> dict | None:
         with self._lock:
             job = self._jobs.get(job_id)
             return dict(job) if job is not None else None
+
+    def _execute_latest(self, job: dict, req: Any) -> None:
+        with self._serial:
+            with self._lock:
+                superseded = self._newest != job["id"]
+                if superseded:
+                    job["status"], job["error"] = "failed", "Superseded by a newer preview."
+                    job["finished_at"] = datetime.now(IST).isoformat(timespec="seconds")
+            if not superseded:
+                self._execute(job, req)
 
     def _execute(self, job: dict, req: Any) -> None:
         result, error, error_status = None, None, None
@@ -4428,7 +4451,8 @@ class _PreviewJobs:
 PREVIEW_JOBS = _PreviewJobs()
 # Your orders' "Preview for…": a favourite's orders against the same holdings, saved nowhere.
 ORDER_PREVIEW_JOBS = _PreviewJobs(
-    lambda favourite_id: _compute_orders("manual", favourite=favourite_id, preview=True)
+    lambda favourite_id: _compute_orders("manual", favourite=favourite_id, preview=True),
+    latest_only=True,  # stepping through the picker never stacks Broad rankings or logins
 )
 WEEKLY_JOBS = _SingleFlightJob()
 LIVE_RULES_JOBS = _SingleFlightJob()

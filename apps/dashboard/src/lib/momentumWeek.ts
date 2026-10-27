@@ -287,7 +287,7 @@ export interface FavouriteRowView {
   /** Null when there is no run to count (blocked, or nothing recorded yet): never a zero. */
   sells: number | null;
   buys: number | null;
-  /** "3 sells · 3 buys", or "No trades this week". */
+  /** "3 sells · 3 buys", "No trades this week", or "Not recorded yet" when there is no run. */
   trades: string;
 }
 
@@ -309,8 +309,9 @@ export function favouriteRow(card: MomentumWeekCard): FavouriteRowView {
         : null,
     sells: counted ? sells : null,
     buys: counted ? buys : null,
-    trades:
-      sells || buys
+    trades: !counted
+      ? 'Not recorded yet'
+      : sells || buys
         ? [sells ? plural(sells, 'sell') : null, buys ? plural(buys, 'buy') : null]
             .filter(Boolean)
             .join(' · ')

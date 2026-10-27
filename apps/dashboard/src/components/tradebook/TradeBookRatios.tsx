@@ -75,13 +75,22 @@ export function TradeBookRatios({ rows }: { rows: TradeBookDay[] }) {
   const box = useRef<HTMLDivElement>(null);
   const { chartRef, ready, theme } = useChart(box, false, 240);
 
-  const points = useMemo(
+  const allPoints = useMemo(
     () =>
       rows.flatMap((r) => {
         const v = r[key];
-        return v === null ? [] : [{ day: r.day, value: v }];
+        return v === null ? [] : [{ day: r.day, value: v, u: r.avg_profit_100 }];
       }),
     [rows, key],
+  );
+  // W divides by U: on a session where U is near zero it runs to thousands of percent either
+  // way, so the chart and the range leave out sessions where U is under ₹100.
+  const points = useMemo(
+    () =>
+      key === 'charge_profit_pct'
+        ? allPoints.filter((p) => p.u !== null && p.u >= W_MIN_U)
+        : allPoints,
+    [allPoints, key],
   );
 
   useEffect(() => {
@@ -106,19 +115,9 @@ export function TradeBookRatios({ rows }: { rows: TradeBookDay[] }) {
     };
   }, [chartRef, ready, theme, points, ratio]);
 
-  const last = points.at(-1);
-  // W divides by U: on a session where U is near zero it runs to thousands of percent either
-  // way, so its range is taken only over sessions where U is at least ₹100.
-  const values = useMemo(() => {
-    if (key !== 'charge_profit_pct') return points.map((p) => p.value);
-    const uByDay = new Map(rows.map((r) => [r.day, r.avg_profit_100]));
-    return points
-      .filter((p) => {
-        const u = uByDay.get(p.day);
-        return u != null && u >= W_MIN_U;
-      })
-      .map((p) => p.value);
-  }, [key, points, rows]);
+  // The latest value is the latest session's, whatever its U.
+  const last = allPoints.at(-1);
+  const values = points.map((p) => p.value);
   const range = values.length
     ? `range ${ratio.format(Math.min(...values))} to ${ratio.format(Math.max(...values))}`
     : 'no session with U of ₹100 or more';
@@ -146,8 +145,9 @@ export function TradeBookRatios({ rows }: { rows: TradeBookDay[] }) {
       <p className="text-xs text-faint">{ratio.definition}</p>
       {key === 'charge_profit_pct' ? (
         <p className="text-xs text-faint">
-          The range counts only sessions where U is at least {formatInr(W_MIN_U)}: below that, W
-          divides by almost nothing and swings to thousands of percent.
+          The chart and the range show only sessions where U is at least {formatInr(W_MIN_U)}: below
+          that, W divides by almost nothing and swings to thousands of percent. The latest value is
+          the latest session&apos;s, whatever its U.
         </p>
       ) : null}
     </div>

@@ -74,8 +74,10 @@ time. Nothing here places an order: you place them in your broker yourself.
   charge per sale. Neither Kite nor Fyers charges brokerage on delivery.
 - **Preview for…** (the picker beside Settings) plans any other favourite against the same
   holdings and cash, as **one portfolio** (never lot by lot), and is marked *Preview · nothing
-  saved*. It writes nothing: no orders are kept, no lot is booked, the headline's orders and the
-  14:15 job are unchanged. It takes up to a minute when the ranking is not warm. Choose
+  saved*. On the paper portfolio (which is the headline's model) it plans from your paper capital in
+  cash instead. It writes nothing: no orders are kept, no lot is booked, the headline's orders and
+  the 14:15 job are unchanged. It takes up to a minute when the ranking is not warm; picking another
+  favourite meanwhile drops the one waiting, and **Try again** restarts one that failed. Choose
   *Headline: the orders made* to go back. Like the orders, it covers Broad favourites only for now.
 
 ## Reading a group

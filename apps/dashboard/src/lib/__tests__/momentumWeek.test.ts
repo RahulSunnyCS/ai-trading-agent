@@ -329,6 +329,7 @@ describe('favouriteRow', () => {
     expect(row({ blocked: 'Data ends 9 Oct' }).sells).toBeNull();
     expect(row({ blocked: 'Data ends 9 Oct' }).buys).toBeNull();
     expect(row({ run: null }).sells).toBeNull();
+    expect(row({ run: null }).trades).toBe('Not recorded yet');
   });
 
   it('says when no sleeve of a group rebalances', () => {
