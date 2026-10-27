@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LineChart,
   type LucideIcon,
+  NotebookText,
   Repeat,
   Settings,
   Tag,
@@ -29,6 +30,7 @@ export type Tab =
   | 'jobs'
   | 'optionslab'
   | 'momentum'
+  | 'tradebook'
   | 'brokerLogins'
   | 'pricing'
   | 'settings'
@@ -69,6 +71,7 @@ export type NavGroupId =
   | 'live'
   | 'optionslab'
   | 'momentum'
+  | 'tradebook'
   | 'data'
   | 'account'
   | 'help';
@@ -153,6 +156,25 @@ export const NAV_GROUPS: NavGroup[] = [
           { segment: 'week', label: 'This week' },
           { segment: 'rebalance', label: 'Rebalance' },
           { segment: 'journal', label: 'Journal' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'tradebook',
+    heading: 'Trade book',
+    icon: NotebookText,
+    items: [
+      {
+        id: 'tradebook',
+        label: 'Trade book',
+        icon: NotebookText,
+        // The realised book from the brokers' contract notes (BL-168): F&O opens first.
+        children: [
+          { segment: 'fno', label: 'F&O' },
+          { segment: 'trades', label: 'Trades' },
+          { segment: 'money', label: 'Money' },
+          { segment: 'momentum', label: 'Momentum' },
         ],
       },
     ],

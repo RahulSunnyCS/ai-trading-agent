@@ -33,6 +33,7 @@ import opsJobs from './content/operations/jobs.md?raw';
 import opsLive from './content/operations/live.md?raw';
 import opsOverview from './content/operations/overview.md?raw';
 import opsSettings from './content/operations/settings.md?raw';
+import opsTradeBook from './content/operations/trade-book.md?raw';
 import optionsBuilderForm from './content/optionslab/builder-form.md?raw';
 import optionsBuilderYaml from './content/optionslab/builder-yaml.md?raw';
 import optionsCorrelation from './content/optionslab/correlation.md?raw';
@@ -455,6 +456,16 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     kind: 'Screen',
     body: opsLive,
     screen: { tab: 'live' },
+  },
+  {
+    chapter: 'operations',
+    slug: 'trade-book',
+    title: 'Trade book',
+    summary:
+      "Your real P&L from the brokers' contract notes: the sheet's figures and ratios, trades by source, money in and out, and Momentum's fills.",
+    kind: 'Screen',
+    body: opsTradeBook,
+    screen: { tab: 'tradebook' },
   },
   {
     chapter: 'operations',

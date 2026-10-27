@@ -43,6 +43,12 @@ The evening run's status and its **Run** button are at the top of Today.
 | [Rebalance](app:/momentum/rebalance) | Type in what you hold; see the trades that would match the model. [Guide](guide:momentum/rebalance) |
 | [Journal](app:/momentum/journal) | The permanent record of every weekly signal as it was produced. [Guide](guide:momentum/journal) |
 
+## Trade book
+
+- [Trade book](app:/tradebook) — your real profit and loss from the brokers' contract notes: the sheet's
+  figures and ratios, every trade by source, money in and out, and the Zerodha notes behind Momentum.
+  [Guide](guide:operations/trade-book)
+
 ## Data
 
 - [Live](app:/live) — spot, VIX and two straddles, minute by minute; a replay of a collected day until live capture exists.
