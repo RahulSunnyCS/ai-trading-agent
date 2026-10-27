@@ -16,6 +16,7 @@ import {
   MULTIPLIER_MIN,
   ROWS,
   applyNowOpen,
+  defaultMtmSl,
   describeChanges,
   githubOutcome,
   heldByMaster,
@@ -220,7 +221,7 @@ export function AutomationSettingsCard() {
                           onChange={(on) =>
                             setDraft(
                               withRow(draft, key, {
-                                mtmSl: on ? (row.list === 't1' ? 9000 : 8000) : null,
+                                mtmSl: on ? (defaultMtmSl(key, row.list) ?? 8000) : null,
                               }),
                             )
                           }

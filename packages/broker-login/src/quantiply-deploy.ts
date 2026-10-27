@@ -173,6 +173,15 @@ async function main(): Promise<number> {
   const broker = parseQuantiplyBroker(values.broker);
   const site = QUANTIPLY_SITES[broker];
 
+  /** BL-172: the morning run always reports, also when it is held back before logging in. */
+  const heldMorning = async (why: string) => {
+    if (!values.morning || !values.apply) return;
+    await sendText(
+      readTelegramConfig(),
+      redact(`⚠️ ${site.name} morning switch-on: ${why}. Nothing switched on.`),
+      'broker.quantiply',
+    ).catch(() => undefined);
+  };
   // Gate 1, before any login, for enable only: the .env switch. Disable is never gated.
   if (
     values.apply &&
@@ -180,6 +189,7 @@ async function main(): Promise<number> {
     process.env.QUANTIPLY_DEPLOY?.trim().toLowerCase() !== 'on'
   ) {
     console.log(`${site.name}: QUANTIPLY_DEPLOY is not "on": nothing enabled`);
+    await heldMorning('QUANTIPLY_DEPLOY is not "on" in .env');
     return 0;
   }
   // BL-143 Phase 4: a confirmed stop holds every enable until the owner resumes (never a
@@ -187,6 +197,7 @@ async function main(): Promise<number> {
   const held = values.apply && mode === 'enable' ? stopHeld() : null;
   if (held) {
     console.log(`${site.name} enable ${held}`);
+    await heldMorning(`the stop hold is on (${held})`);
     return 0;
   }
   // The disable safety net reads nothing it does not use: no automation settings.
@@ -212,6 +223,7 @@ async function main(): Promise<number> {
   // Gate 2: enabling also needs the dashboard's switch and the account's row.
   if (values.apply && mode === 'enable' && !gate.ok) {
     console.log(`${site.name}: ${gate.why} (${decidedBy}): nothing enabled`);
+    await heldMorning(`${gate.why} (${decidedBy})`);
     return 0;
   }
   const apply = values.apply;
@@ -248,7 +260,7 @@ async function main(): Promise<number> {
     : defaultSession(mode, today, istSeconds(), isTradingDay);
   const session = chosen.day;
   const weekday = weekdayOf(session);
-  const label = `${site.name} ${values.morning ? '08:00 switch-on' : mode}${values.emergency ? ' (EMERGENCY)' : ''} for ${session} (${weekday})`;
+  const label = `${site.name} ${values.morning ? 'morning switch-on' : mode}${values.emergency ? ' (EMERGENCY)' : ''} for ${session} (${weekday})`;
   console.log(`${label}: session from ${chosen.why}; ${decidedBy}`);
 
   let picks: Picks | null = null;
@@ -303,10 +315,12 @@ async function main(): Promise<number> {
             return at === session || at < today;
           }).length
         : owned.size;
-  if (!relevant) {
+  // BL-172: the morning run still logs in to keep the MTM SL when the tool has nothing for the
+  // session (a failed evening upload): the owner's own algos may run. It says so either way.
+  const nothingOwned = !relevant;
+  if (nothingOwned && !(values.morning && mtmSl !== null)) {
     const text = `nothing the uploader created for ${session} on this account: no login, nothing to do`;
     console.log(text);
-    // BL-172: the 08:00 run always reports, so a missing evening upload is never silent.
     if (values.morning && values.apply) {
       await sendText(
         readTelegramConfig(),
@@ -333,6 +347,8 @@ async function main(): Promise<number> {
   }
 
   const lines: string[] = [];
+  if (nothingOwned)
+    lines.push(`⚠️ nothing the uploader created for ${session}: nothing to switch on`);
   let printed = 0;
   let retryable = false;
   let attention = false;
@@ -467,7 +483,12 @@ async function main(): Promise<number> {
           await api.setClientwise(pb.id, body);
           changed = true;
           await record({ action: 'mtm-sl', broker: pb.id, from: was, to: mtmSl, ok: true });
-          const back = parseClientwise(await api.brokers(), pb.id);
+          let back = parseClientwise(await api.brokers(), pb.id);
+          if (!clientwiseHolds(back, mtmSl)) {
+            // the save may land a moment after it answers: one more read before calling it failed
+            await new Promise((r) => setTimeout(r, 3_000));
+            back = parseClientwise(await api.brokers(), pb.id);
+          }
           if (!clientwiseHolds(back, mtmSl)) {
             attention = true;
             lines.push(
@@ -614,7 +635,7 @@ async function main(): Promise<number> {
   const send =
     (apply && (changed || failed || values.morning === true)) || (mode === 'check' && failed);
   if (send) {
-    const head = failed ? `⚠️ ${label}: check Quantiply` : `✅ ${label}`;
+    const head = failed || nothingOwned ? `⚠️ ${label}: check Quantiply` : `✅ ${label}`;
     await sendText(
       readTelegramConfig(),
       redact([head, ...lines].join('\n')),
