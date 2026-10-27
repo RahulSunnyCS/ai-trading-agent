@@ -432,6 +432,29 @@ The uploader (`packages/broker-login/src/quantiply-upload.ts`) logs in through A
 browser, takes this token, closes the browser and uses `GET /algos/day-wise`, `POST /algos`,
 `GET /algos/:id` (the read-back) and `DELETE /algos/:id`.
 
+**Clientwise stop-loss and target (BL-172; the owner set them by hand, read back 2026-10-28).** The
+algos page's "Clientwise P&L" card shows each broker client's `SL` and `TGT` (R59799620: SL 8,000; FA342824 on
+Shoonya's Quantiply: SL 9,000). It is the whole client account's limit, over every algo on it, the owner's own
+included, not one algo's. The web app reads it from `GET /brokers`: each broker has `configurations` keyed by
+weekday (`MON` … `SUN`), each `{stoploss, target, status, …}`, with **`stoploss` negative** (−8000) and
+`target` 0 for none; the owner's one save set all seven days alike. The dialog ("Clientwise Stoploss & Target
+settings") saves with `POST /brokers/<broker id>/config` (`clientWiseSetTarget` in the bundle), body
+`{stoploss: -Math.abs(SL), target}` plus, only when chosen, one of `trailingStoploss` / `lockProfit` /
+`trailProfit` / `lockTrailProfit` (its values) and `trailingInterval`. The call itself has not been sent by
+the tool yet; what `status` means per day is not known.
+
+**Shoonya's subscription: algos a day (BL-172; the owner changed it by hand, read back 2026-10-28).**
+Quantiply · Shoonya is paid (Quantiply · Angel One is free). `GET /users/me` carries `subscription`: `_id`,
+`plan` (`value`), `algosPerDay` (2, in the plan), `additionalAlgos`, `totalAlgosPerDay` (their sum),
+`credits` for the term, `currentPeriodStart` / `currentPeriodEnd` (epoch ms; a 30-day term), `description`
+("Value plan (3)"). `GET /subscriptions/plans` lists the plans (Value: 500 credits per 30 days, 250 per extra
+algo). A change is `PUT /subscriptions/<_id>` with `{plan, additionalAlgos}` (the app leaves out an
+`additionalAlgos` of 0: what the server does then is not known), previewed by
+`POST /subscriptions/<_id>/preview-upcoming` with the same body (both in the lazy `subscription` chunk,
+`subscribePlanEdit` / `getCheckoutPreviewEdit`). It is prorated by the days left in the term: lowering 5 → 3
+on 28 Oct 00:26 IST returned 415 credits (2 × 250 × about 24.9 / 30), and raising 4 → 5 on 27 Oct 14:50 IST
+took 218. `GET /credits?page=1` gives the balance and each debit and deposit.
+
 **Live MTM (BL-143; read from the bundle 2026-10-20).** `GET /algos/day-wise` gives each algo's `multiplier`,
 `status` and broker, but no MTM. The app's MTM column (`pnl`) comes over its socket.io connection
 (`wss-prod.quantiply.angelone.in`): one CSV string per algo update, `<algo id>,,,,<pnl>,<error flags>,,<waiting>,<waitingWT>`
