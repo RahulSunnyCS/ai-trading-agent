@@ -117,37 +117,51 @@ function imapDate(day) {
  * bookmark, every one received on or after `sinceDay`. With its PDF attachments:
  * [{ uid, subject, received, attachments: [{ filename, content }] }], oldest first.
  */
-const SEARCH_TIMEOUT_MS = 120000;
+// Gives up when the mailbox sends nothing for this long; a long download that keeps arriving
+// (a year of notes for a history run) is never cut off.
+const IDLE_TIMEOUT_MS = 120000;
 
-function searchNotes(imap, subjectText, { sinceDay, afterUid, overlapSince }) {
+function searchNotes(imap, subjectText, { sinceDay, beforeDay, afterUid, overlapSince }) {
   let range = ['SINCE', imapDate(sinceDay)];
+  if (beforeDay) range = [range, ['BEFORE', imapDate(beforeDay)]];
   if (afterUid != null) {
     range = ['UID', `${afterUid + 1}:*`];
     if (overlapSince) range = ['OR', range, ['SINCE', imapDate(overlapSince)]];
   }
   let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(
-      () => reject(imap.lastError || new Error('the mailbox stopped answering')),
-      SEARCH_TIMEOUT_MS,
-    );
+  let touch;
+  let settled = false;
+  const idle = new Promise((_, reject) => {
+    touch = () => {
+      clearTimeout(timer);
+      if (settled) return;
+      timer = setTimeout(() => {
+        settled = true;
+        reject(imap.lastError || new Error('the mailbox stopped answering'));
+      }, IDLE_TIMEOUT_MS);
+    };
+    touch();
   });
-  return Promise.race([search(imap, subjectText, range), timeout]).finally(() =>
-    clearTimeout(timer),
-  );
+  return Promise.race([search(imap, subjectText, range, () => touch()), idle]).finally(() => {
+    settled = true;
+    clearTimeout(timer);
+  });
 }
 
-function search(imap, subjectText, range) {
+function search(imap, subjectText, range, touch) {
   return new Promise((resolve, reject) => {
-    imap.search([range, ['SUBJECT', subjectText]], (err, found) => {
+    const criteria = Array.isArray(range[0]) ? [...range] : [range];
+    imap.search([...criteria, ['SUBJECT', subjectText]], (err, found) => {
       if (err) return reject(err);
       // "n:*" also matches the newest message when it is older than n: harmless, a stored note
       // is skipped by its hash and alerts are raised only for messages past the bookmark.
       const uids = found || [];
       if (!uids.length) return resolve([]);
       const parses = [];
+      touch();
       const f = imap.fetch(uids, { bodies: '' });
       f.on('message', (msg) => {
+        touch();
         let uid = null;
         msg.once('attributes', (attrs) => {
           uid = attrs.uid;

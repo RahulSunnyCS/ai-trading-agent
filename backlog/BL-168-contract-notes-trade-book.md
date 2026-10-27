@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the only record of real money the project measures itself against; unblocks BL-093 and BL-026 |
-| **Status** | In progress (Phases 1 and 2 done; Phase 3 next) |
+| **Status** | In progress (Phases 1 and 2 done; Phase 3 under way) |
 | **Type** | feature |
 | **Area** | contract-notes / scheduler / trading-data / dashboard |
 | **Created** | 2026-10-26 |
@@ -275,22 +275,21 @@ account, behaviour patterns.
   the ledger e-mails (funds, payouts, settlements, margin shortfall) and the `kite` plugin;
   Finvasia's older note layout (its notes to about 25 Aug 2025 have no "Obligation Detail"
   table the extractor finds — seen on a test run, 2026-10-26) for the history backfill;
-  the one-time import (two rows in the committed copy are both dated 20 May 25: summed as one
-  session and listed in the import's report) of
-  the sheet's rows since 1 Apr 2025 as `source: 'sheet'` (five figures and the manual inputs)
-  from an `.xlsx` the owner downloads (`contract-notes import-sheet <file>`; no Google
-  credentials); a Gmail backfill by date range (`--from --to`) that re-parses the notes still
-  in the mailbox and upgrades a `sheet` day to `email`. The owner wants the record recomputed
-  from the notes (2026-10-26), so the e-mail figures win: an `email` line replaces the `sheet`
-  line, and every difference from the sheet's five figures is listed in the backfill report,
-  where each one must be explained (an extractor fix, a sheet edit made by hand, a note the
-  sheet row missed) before the phase is called done.
-- **Deliverables:** extractor tests on the sample PDFs and the fixtures; `contract-notes
-  backfill`; `contract-notes retention` (a read-only IMAP look: oldest and newest note per
-  account, the brokers' other e-mail subjects), run first once the `.env` has the credentials.
+  the history backfill and the sheet comparison (revised 2026-10-27, PR #336): the e-mails
+  cover every account back to Jun 2024, so the store holds e-mail figures only — nothing is
+  imported from the sheet as `source: 'sheet'`. `node run.js --from D --to D` stores the
+  history by date; `node reconcile.js <sheet.csv> [--import-manual]` compares the owner's
+  sheet (a CSV export of its first tab, columns found by header; days that appear twice in
+  the sheet are added) with the notes, per day and broker, including days with a note and no
+  sheet row, and lists each difference with a likely reason; `--import-manual` fills the
+  sheet's Algos and Capital into `manual/<day>.json` (the sheet holds one capital for all
+  accounts: `capital_total`; per-account capital comes from the 15:50 reading).
+- **Deliverables:** extractor tests on the sample PDFs and the fixtures; the history and
+  reconciliation commands; the report under `contract-notes/reconcile/`.
 - **Done when:** every day since 1 Apr 2025 is in the store; every `email` day's trades sum to
-  its obligation within the note's tolerance; every `email` day's five figures equal the sheet
-  row's or the difference is listed and explained in the report.
+  its obligation within the note's tolerance; every difference from the sheet is listed in the
+  report and explained by the owner (an extractor fix, a sheet edit made by hand, a note the
+  sheet row missed).
 
 ### Phase 4 — Analytics
 - **Tasks:** `realised/` (Design → Analytics): the sources, round trips, MFE / MAE, day

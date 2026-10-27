@@ -21,6 +21,8 @@ node run.js                 # every account's new mail since its bookmark; windo
 node run.js --dry-run       # read and parse, write nothing (not even the bookmark)
 node run.js --day D         # read session D again by date for every account, replacing its lines
 node run.js --sessions N    # a wider window, e.g. after a long trip
+node run.js --from D --to D # history by date (bookmark untouched; a stored note is never written over)
+node reconcile.js <sheet.csv> [--import-manual] [--out DIR]   # the owner's Google Sheet (CSV export) against the notes
 bun run test                # Jest
 ```
 
@@ -37,6 +39,9 @@ it too). It must be one line, single-quoted: a pretty-printed value reads as `[`
   the search but carries no note anyone in the mailbox can read, a mailbox that will not log in,
   an account newly quiet); the scheduler alerts with the job's `fixHint`. Mail, PDF reading and
   the clock are injectable (`main(argv, deps)`), which `tests/run.flow.test.js` uses.
+- One run at a time: `run.js` holds `run.lock` (the pid) in the store for its whole run, so a
+  history run by hand cannot overlap the nightly job; a lock left by a dead process is taken
+  over. Only the nightly run writes `cursor.json`; `--day` and history leave it alone.
 - `store.js` — the files. `storeRoot()` refuses a root on an unmounted `/Volumes/<name>` (like
   `trading_data.db.check_mounted`). `writeLine` replaces one account's line in
   `days/<day>.jsonl` atomically; `saveRaw` keeps `raw/<broker>/<account>/<day>.pdf` (and the
@@ -46,8 +51,14 @@ it too). It must be one line, single-quoted: a pretty-printed value reads as `[`
 - `calendar.js` — trading days from `packages/option-backtesting`'s `holidays.csv` (the file
   `packages/market-reference` reads, by relative path, so the three never disagree);
   `lastSession()`: today after 16:00 IST on a trading day, else the previous session.
-- `fetchMail.js` — `connect`, `searchNotes` (by UID after a bookmark, or by date), and
-  `decryptWithQpdf` (qpdf exit 3 = repaired with warnings, kept).
+- `fetchMail.js` — `connect`, `searchNotes` (by UID after a bookmark, or by date; it gives up
+  only when the mailbox sends nothing for 2 minutes, so a year of history is never cut off),
+  and `decryptWithQpdf` (qpdf exit 3 = repaired with warnings, kept).
+- `reconcile.js` — the owner's sheet (a CSV export of its first tab) against the notes: per day
+  and broker, the sheet's net (obligation − brokerage − other, columns found by header; every
+  Finvasia account counts towards its one Finvasia block) within ₹1 of the notes' final net, or
+  a line with a likely reason. Writes `reconcile/sheet-vs-notes-<day>.md`; `--import-manual`
+  stores the sheet's Algos and Capital as `manual/<day>.json` (never over a newer value).
 - `brokers/` — one plugin per broker: `searchSubject(accountId)`, `noteDay({ subject,
   filename, accountId })` and `extract(text)`. `brokers/index.js` is the registry and the
   config loader (it never echoes the config: passwords).
@@ -60,6 +71,8 @@ it too). It must be one line, single-quoted: a pretty-printed value reads as `[`
 |---|---|
 | `days/<day>.jsonl` | One line per broker account for the session: `status` `note` (with `fno`, the sheet's five figures, `skipped_segments`, the note's sha256, file, subject, received time, and `superseded` hashes when `--day` chose between notes), `no_trade`, `no_note` or `failed` (with `reason`) |
 | `raw/<broker>/<account>/<day>.pdf` | The note as mailed (encrypted), and `<day>.decrypted.pdf` |
+| `manual/<day>.json` | The inputs the sheet had typed by hand: `algos`, `capital_total`, `source` (`sheet`, later the page or the 15:50 reading) |
+| `reconcile/` | `sheet-vs-notes-<day>.md`, each reconciliation report |
 | `cursor.json` | Per `<mailbox>\|<broker>/<account>`: `uidvalidity`, `last_uid`, `checked_at` — how far that account's mail has been read — and `quiet_since`, the day a quiet spell began |
 
 **When a session is done for an account** (`record.js`): a note is stored; or `no_trade`,
@@ -92,6 +105,9 @@ extractors parse the **obligation table row by row** (Finvasia prints `NSEFNO-NC
 `brokers/segments.js`, and add up the F&O rows only. A broker's grand totals are used only as
 cross-checks.
 
+- **Two Finvasia layouts.** Notes until 25 Aug 2025 head the table "Exchange Pay in/Payout
+  Obligation" and label rows `NSE FNO` / `NSE CAP`; later ones "Name Of Exchange/CC & Segment"
+  and `NSEFNO-NCL`. The columns and their order are the same; both are read.
 - **Brokerage per segment** comes from the row's own *taxable value of supply* (brokerage +
   exchange transaction + SEBI + IPF, by both brokers' definition; Finvasia also prints it).
 - **An unknown segment label** is a hard error, never a guess: add it to `segments.js`.

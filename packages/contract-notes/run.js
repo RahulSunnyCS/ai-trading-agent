@@ -7,10 +7,11 @@ require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env'), quiet
 
 const pdfParse = require('pdf-parse');
 const { getBroker, isSupported, loadBrokerAccounts } = require('./brokers');
-const { addDays, istNow, lastSession, sessionsBack } = require('./calendar');
+const { addDays, istNow, lastSession, sessionsBack, sessionsBetween } = require('./calendar');
 const { connect, decryptWithQpdf, hasQpdf, searchNotes } = require('./fetchMail');
 const { closeWithoutNotes, failedLine, key, noteLine, openPairs } = require('./record');
 const {
+  acquireLock,
   readCursors,
   readDay,
   readStatus,
@@ -32,6 +33,8 @@ const { withRetry } = require('./utils/retry');
 //   node run.js --day D         read session D again by date for every account; with two
 //                               different notes for D, the newest received is taken
 //   node run.js --sessions N    a wider window, e.g. after a long trip
+//   node run.js --from D --to D history: every note received for sessions D..D, by date, the
+//                               bookmark untouched; a stored note is never written over
 
 const SESSIONS = 10;
 // Each search also takes the mail of the last few days, whatever the bookmark: a note Gmail
@@ -40,15 +43,22 @@ const SESSIONS = 10;
 const OVERLAP_DAYS = 3;
 
 function parseArgs(argv) {
-  const opts = { dryRun: false, day: null, sessions: SESSIONS };
+  const opts = { dryRun: false, day: null, sessions: SESSIONS, from: null, to: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--dry-run') opts.dryRun = true;
     else if (a === '--day') opts.day = argv[++i];
     else if (a === '--sessions') opts.sessions = Number(argv[++i]);
+    else if (a === '--from') opts.from = argv[++i];
+    else if (a === '--to') opts.to = argv[++i];
     else throw new Error(`unknown argument ${a}`);
   }
-  if (opts.day && !/^\d{4}-\d{2}-\d{2}$/.test(opts.day)) throw new Error('--day takes YYYY-MM-DD');
+  const isDay = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
+  if (opts.day && !isDay(opts.day)) throw new Error('--day takes YYYY-MM-DD');
+  if ((opts.from || opts.to) && !(isDay(opts.from) && isDay(opts.to) && opts.from <= opts.to)) {
+    throw new Error('--from and --to go together, as YYYY-MM-DD, from first');
+  }
+  if (opts.day && opts.from) throw new Error('--day or --from/--to, not both');
   if (!Number.isInteger(opts.sessions) || opts.sessions < 1) {
     throw new Error('--sessions takes a whole number of at least 1');
   }
@@ -131,6 +141,7 @@ async function main(argv, deps = {}) {
     searchNotes,
     hasQpdf,
     readNote,
+    lock: acquireLock,
     env: process.env,
     now: () => new Date(),
     log: (line) => console.log(line),
@@ -144,7 +155,19 @@ async function main(argv, deps = {}) {
   const at = now.toISOString();
   const today = istNow(now).day;
 
-  const window = opts.day ? [opts.day] : sessionsBack(lastSession(now), opts.sessions);
+  // --day and --from/--to read by date and leave the bookmark alone.
+  const history = Boolean(opts.from);
+  const byDate = Boolean(opts.day) || history;
+  const window = opts.day
+    ? [opts.day]
+    : history
+      ? sessionsBetween(opts.from, opts.to)
+      : sessionsBack(lastSession(now), opts.sessions);
+  if (!window.length) throw new Error(`no trading day from ${opts.from} to ${opts.to}`);
+  // One run at a time over the store: a history run must not overlap the nightly job.
+  const release = d.lock(root);
+  // A session's note can arrive days later (Angel One's after midnight, a revised note).
+  const lateNotes = (day) => addDays(day, 5);
   const status = readStatus(root, window);
   const cursors = readCursors(root);
   const problems = [];
@@ -205,9 +228,14 @@ async function main(argv, deps = {}) {
               conn.imap,
               getBroker(acc.broker).searchSubject(acc.accountId),
               {
-                sinceDay: addDays(opts.day ?? window[0], -1),
-                afterUid: opts.day ? null : bookmark,
-                overlapSince: addDays(window[window.length - 1], -OVERLAP_DAYS),
+                sinceDay: addDays(window[0], -1),
+                // History stops a few days after its range; --day reads to now (a revised note
+                // can come weeks later).
+                beforeDay: history ? lateNotes(window[window.length - 1]) : undefined,
+                afterUid: byDate ? null : bookmark,
+                overlapSince: byDate
+                  ? undefined
+                  : addDays(window[window.length - 1], -OVERLAP_DAYS),
               },
             );
           } catch (err) {
@@ -215,7 +243,8 @@ async function main(argv, deps = {}) {
             unreachable.add(acc);
             continue;
           }
-          const isNew = (uid) => bookmark == null || uid > bookmark;
+          // Read by date (--day, history): every message counts as new.
+          const isNew = (uid) => byDate || bookmark == null || uid > bookmark;
           const siblings = mine.filter((s) => s !== acc && s.broker === acc.broker);
           const { byDay, unread } = notesByDay(messages, acc, siblings);
 
@@ -226,7 +255,8 @@ async function main(argv, deps = {}) {
           }
 
           for (const [day, found] of [...byDay].sort(([a], [b]) => a.localeCompare(b))) {
-            if (opts.day && day !== opts.day) continue;
+            // Reading by date keeps to its range; the nightly run stores a late note for any day.
+            if (byDate && (day < window[0] || day > window[window.length - 1])) continue;
             const existing =
               status.get(key(day, acc.broker, acc.accountId)) ??
               readDay(root, day).find(
@@ -235,7 +265,8 @@ async function main(argv, deps = {}) {
             const stored = existing?.status === 'note' ? existing.note?.sha256 : null;
             let notes = found;
             if (!opts.day && stored) {
-              const others = found.filter((n) => n.sha256 !== stored);
+              const replaced = new Set(existing.superseded ?? []);
+              const others = found.filter((n) => n.sha256 !== stored && !replaced.has(n.sha256));
               for (const n of others.filter((o) => isNew(o.uid))) {
                 problems.push(
                   `${label(acc)} ${day}: a second, different note arrived (${hideId(n.attachment, acc)}); the stored one is kept — compare them, then \`node run.js --day ${day}\` takes the newest`,
@@ -299,7 +330,7 @@ async function main(argv, deps = {}) {
             );
           }
 
-          if (!opts.day) {
+          if (!byDate) {
             const newest = messages.reduce((m, msg) => Math.max(m, msg.uid ?? 0), 0);
             const last = Math.max(bookmark ?? 0, newest);
             cursors[cursorKey] = {
@@ -310,7 +341,7 @@ async function main(argv, deps = {}) {
             };
           }
           d.log(
-            `read  ${label(acc)}: ${messages.filter((m) => isNew(m.uid)).length} new message(s)${bookmark != null ? ` after #${bookmark}` : ` since ${addDays(opts.day ?? window[0], -1)}`}`,
+            `read  ${label(acc)}: ${messages.filter((m) => isNew(m.uid)).length} new message(s)${!byDate && bookmark != null ? ` after #${bookmark}` : ` since ${addDays(window[0], -1)}`}`,
           );
         }
       } finally {
@@ -329,8 +360,8 @@ async function main(argv, deps = {}) {
         );
       }
       // A quiet spell alerts on the day it begins (every run that day, so a retry that
-      // succeeds cannot swallow it), and not again until a note has arrived.
-      for (const mailbox of config) {
+      // succeeds cannot swallow it), and not again until a note has arrived. Not from history.
+      for (const mailbox of history ? [] : config) {
         for (const acc of mailbox.accounts.filter((a) => judged.includes(a))) {
           const cursorKey = `${mailbox.email}|${acc.broker}/${acc.accountId}`;
           const cursor = cursors[cursorKey] ?? {};
@@ -356,13 +387,26 @@ async function main(argv, deps = {}) {
         }
       }
       const waiting = openPairs(window, accounts, status);
+      const shown = waiting.slice(0, 20).map((p) => `${p.day} ${label(p)}`);
       d.log(
-        `done: ${waiting.length} account-session(s) waiting for a note${waiting.length ? `: ${waiting.map((p) => `${p.day} ${label(p)}`).join(', ')}` : ''}`,
+        `done: ${waiting.length} account-session(s) waiting for a note${shown.length ? `: ${shown.join(', ')}${waiting.length > shown.length ? ', …' : ''}` : ''}`,
       );
+      if (history) {
+        for (const acc of accounts) {
+          const count = (st) =>
+            window.filter((day) => status.get(key(day, acc.broker, acc.accountId))?.status === st)
+              .length;
+          d.log(
+            `total ${label(acc)} ${window[0]} → ${window[window.length - 1]}: ${count('note')} notes, ${count('no_trade')} no trade, ${count('failed')} failed, ${window.length - count('note') - count('no_trade') - count('failed') - count('no_note')} open`,
+          );
+        }
+      }
     }
-    if (!opts.dryRun) writeCursors(root, cursors);
+    // Only the nightly run owns the bookmarks: --day and history never write them back.
+    if (!opts.dryRun && !byDate) writeCursors(root, cursors);
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });
+    release();
   }
 
   if (problems.length) {
