@@ -1,8 +1,8 @@
 /**
  * The one-line basket row on Options Lab › Strategies and baskets: a list's forward days, the
- * first day, its gross since then and its max drawdown, from the same read-out the Today page
- * reads (`/legwise/rotation/summary?lots=ROTATION_PAGE_LOTS`) and through the Today cards' own
- * shaping (`listCards`), so the two pages show the same figures. Pure, so it is unit-tested.
+ * first day, its gross since then and its max drawdown, read straight from the read-out the
+ * Today page reads (`/legwise/rotation/summary?lots=ROTATION_PAGE_LOTS`), so the two pages show
+ * the same figures. Pure, so it is unit-tested.
  *
  * The card used to ask the registered read-out (no `lots`), a different cache key from
  * Today's, so it waited on a cold build of the 1,000 random baskets and showed "Forward days —"
@@ -10,8 +10,7 @@
  * never a count. Every state now says what it is: loading, unreadable, nothing scored yet.
  */
 
-import type { RotationSummary } from '../types/rotation';
-import { type CardKey, listCards } from './rotationListCards';
+import type { RotationListKey, RotationSummary } from '../types/rotation';
 
 export type BasketLine =
   | { state: 'loading' }
@@ -30,18 +29,20 @@ export type BasketLine =
 
 export function basketLine(
   summary: RotationSummary | null,
-  key: CardKey,
+  key: RotationListKey,
   error: string | null,
 ): BasketLine {
   if (!summary) return error ? { state: 'error', reason: error } : { state: 'loading' };
   if (summary.n_days <= 0) return { state: 'none' };
-  const card = listCards(summary).find((c) => c.key === key);
-  if (!card || card.total === null || card.maxDrawdown === null) return { state: 'missing' };
+  const stats = summary.lists[key];
+  if (!stats || typeof stats.total !== 'number' || typeof stats.max_drawdown !== 'number') {
+    return { state: 'missing' };
+  }
   return {
     state: 'ready',
     forwardDays: summary.n_days,
     firstDay: summary.first_day,
-    total: card.total,
-    maxDrawdown: card.maxDrawdown,
+    total: stats.total,
+    maxDrawdown: stats.max_drawdown,
   };
 }

@@ -14,6 +14,7 @@ import {
   type LegwiseRunRow,
   NET_UNIT_LABEL,
   type OptionsRun,
+  RUN_KIND_LABEL,
   legwiseStatsOf,
   strategyHistory,
 } from '../../lib/optionsRuns';
@@ -36,7 +37,8 @@ function periodOf(run: OptionsRun): string {
 function versionLabel(run: OptionsRun, savedSha: string): string {
   const short = run.version ? run.version.slice(0, 7) : 'unknown';
   const which = run.version === savedSha ? 'saved version' : 'older version';
-  return `${which} ${short} · ${periodOf(run)} · ${formatInt(run.days)} ${run.days === 1 ? 'day' : 'days'}`;
+  // A builder run (once the API lists them) is told apart from the evening run's days.
+  return `${RUN_KIND_LABEL[run.kind]} · ${which} ${short} · ${periodOf(run)} · ${formatInt(run.days)} ${run.days === 1 ? 'day' : 'days'}`;
 }
 
 function DayRows({

@@ -190,6 +190,9 @@ export function StrategiesAndBasketsPanel() {
   const saved = results.data?.results ?? [];
   const set = favourites.set;
   const historyOf = historyId ? (rows.find((r) => r.strategy.id === historyId) ?? null) : null;
+  // An old Runs link carried free filter text in `?strategy=`; one that names no saved strategy
+  // is said, never silently ignored.
+  const unknownHistory = historyId !== null && strategies.data !== null && historyOf === null;
   const starredOnly = show === 'starred';
   // Stars decide what "Starred only" shows and what can be starred: until they have loaded
   // there is nothing to filter by and nothing to change.
@@ -251,7 +254,15 @@ export function StrategiesAndBasketsPanel() {
         <p className="text-xs text-warning">
           {summary.data
             ? `The forward figures could not be refreshed (${summary.error}); the baskets show the last ones read.`
-            : `The forward figures could not be read (${summary.error}), so the baskets show dashes.`}
+            : `The forward figures could not be read (${summary.error}).`}
+        </p>
+      ) : null}
+      {unknownHistory ? (
+        <p className="flex flex-wrap items-center gap-2 text-xs text-warning">
+          No saved strategy has the id “{historyId}”, so there is no history to open.
+          <Button size="sm" variant="ghost" onClick={() => setHistoryId(null)}>
+            Dismiss
+          </Button>
         </p>
       ) : null}
       {favourites.error && !set ? (

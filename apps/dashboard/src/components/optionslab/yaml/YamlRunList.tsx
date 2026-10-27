@@ -6,7 +6,7 @@
  * this engine; there is no side-by-side compare (the Runs page's compare went with it).
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useBacktestRun, useBacktestRuns } from '../../../hooks/useBacktestRuns';
 import { formatDay, formatInr, formatInt } from '../../../lib/format';
@@ -55,10 +55,13 @@ function StoredRun({ listed }: { listed: RunSummary }) {
 export function YamlRunList({ latestRunId }: { latestRunId?: string | undefined }) {
   const { runs, loading, error, refresh } = useBacktestRuns(RUN_LIMIT);
   const [openId, setOpenId] = useState<string | null>(null);
-  // A run made on this page is in the registry once it returns: list it.
+  // A run made on this page is in the registry once it returns: list it. The run already shown
+  // when the page mounts is in the mount fetch, so only a change after that refetches.
+  const seenRunId = useRef(latestRunId);
   // biome-ignore lint/correctness/useExhaustiveDependencies: refetch only when a new run lands
   useEffect(() => {
-    if (latestRunId) refresh();
+    if (latestRunId && latestRunId !== seenRunId.current) refresh();
+    seenRunId.current = latestRunId;
   }, [latestRunId]);
   const open = runs.find((run) => run.run_id === openId) ?? null;
   return (

@@ -43,6 +43,7 @@ import type {
   HeatmapUnderlying,
   HeatmapViewKey,
 } from '../../types/heatmap';
+import { isPlainClick } from '../guide/links';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { Drawer } from '../ui/Drawer';
@@ -714,10 +715,13 @@ function HeatmapBody({ available }: { available: HeatmapAvailable }) {
       ) : (
         <StateMessage variant="empty" title="Pick an index or a stock" />
       )}
-      <MatrixLink href={matrixFamilyStartHref(s)} />
+      {MATRIX_UNDERLYINGS.has(s.underlying) ? <MatrixLink href={matrixFamilyStartHref(s)} /> : null}
     </div>
   );
 }
+
+/** The Matrix holds only the rotation variants, which trade these two indices. */
+const MATRIX_UNDERLYINGS = new Set(['NIFTY', 'SENSEX']);
 
 /** The question this page used to answer in a second card now lives on the Matrix. */
 function MatrixLink({ href }: { href: string }) {
@@ -728,7 +732,7 @@ function MatrixLink({ href }: { href: string }) {
         href={href}
         className="text-primary underline-offset-2 hover:underline"
         onClick={(event) => {
-          if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+          if (!isPlainClick(event)) return;
           event.preventDefault();
           navigateToLink(href);
         }}

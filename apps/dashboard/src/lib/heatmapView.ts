@@ -7,6 +7,7 @@
 
 import type { HeatmapCell, HeatmapMetric, HeatmapResponse } from '../types/heatmap';
 import { formatDay, formatNumber, formatPct } from './format';
+import { buildPath } from './routes';
 
 export const VIEW_LABEL = {
   time_sl: 'Time vs SL',
@@ -177,7 +178,8 @@ export function matrixFamilyStartHref(s: {
   to: string;
 }): string {
   const [from, to] = s.view === 'time_sl' ? [s.date, s.to || s.date] : [s.from || s.to, s.to];
-  if (!from || !to) return '/optionslab/matrix';
+  const path = buildPath('optionslab', 'matrix');
+  if (!from || !to) return path;
   const q = new URLSearchParams({ period: 'custom', from, to });
-  return `/optionslab/matrix?${q.toString()}`;
+  return `${path}?${q.toString()}`;
 }

@@ -52,10 +52,12 @@ N_wide_0917).
 **History** on a strategy's row opens every day the evening run has saved for it, in a drawer:
 net per lot, win rate, worst day and largest drawdown, the running total as a line, and one row
 per day (newest first) with its trades, net, worst MTM and any stop or note. Click a day for its
-trade log. When the strategy has been edited, a **Version** menu picks an older version's days;
+trade log. When the strategy has been edited, a **Version** menu (each entry says Daily, the evening
+run, or Builder, and saved or older version) picks an older version's days;
 those are a total, not per lot, because the older version's lot count is not known. The address
 holds the open strategy (`?strategy=<id>`), so a link opens it; old links to the retired Runs page
-land here.
+land here. An old link whose `strategy` names no saved strategy (Runs took any filter text) says so
+above the baskets, with **Dismiss**.
 
 ## Common questions
 
@@ -68,4 +70,4 @@ day.
 the new version's results for every collected day.
 
 **Why can't I create a basket?** The rotation lists are registered rules, fixed before the forward
-test began. Their weights are shown on the card, and they are not edited here.
+test began. Their weights are shown on the basket's line, and they are not edited here.

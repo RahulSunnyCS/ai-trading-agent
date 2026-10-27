@@ -47,8 +47,9 @@ note for the expiry and lot-size wording.
 
 This page used to carry a second card, "Entry time by strategy type". It was the same table as the
 [Matrix](guide:optionslab/rotation-matrix)'s Family × start view, cell for cell, so it was removed.
-The line under the straddle table opens the [Matrix](app:/optionslab/matrix) on that view for the
-same day (or range) the heatmap shows.
+For NIFTY and SENSEX (the indices the rotation strategies trade), the line under the straddle table
+opens the [Matrix](app:/optionslab/matrix) on that view for the same day (or range) the heatmap
+shows. A day before the rotation results begin opens an empty range there.
 
 ## How to read it
 

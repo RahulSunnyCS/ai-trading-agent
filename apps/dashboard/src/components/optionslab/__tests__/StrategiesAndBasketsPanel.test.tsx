@@ -248,6 +248,15 @@ describe('StrategiesAndBasketsPanel', () => {
     expect(within(drawer).getByText('14 Oct 2026 ▸')).toBeTruthy();
   });
 
+  it('says when an old Runs link names no saved strategy, and clears it on Dismiss', () => {
+    window.history.replaceState(null, '', '/optionslab/strategies?strategy=widesl');
+    render(<StrategiesAndBasketsPanel />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByText(/No saved strategy has the id “widesl”/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(new URLSearchParams(window.location.search).get('strategy')).toBeNull();
+  });
+
   it('opens the History drawer from an old Runs link', () => {
     window.history.replaceState(null, '', '/optionslab/strategies?strategy=sensex_widesl_917_otm2');
     render(<StrategiesAndBasketsPanel />);
