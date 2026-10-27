@@ -766,6 +766,24 @@ const BASE_JOBS: Job[] = [
     group: 'contract-notes',
     fixHint: CONTRACT_NOTES_FIX,
   },
+  {
+    // BL-168 Phase 4: the Trade book's capital line. Angel One's free margin at the close, one
+    // guarded SmartAPI login (it waits behind the evening collector's, if any). Finvasia is not
+    // read: its only figure is AlgoTest's, and a 15:50 AlgoTest login would collide with the
+    // live capture; its capital is typed on the page.
+    id: 'contract-notes-capital',
+    description:
+      "Angel One's free margin at the close into the contract-notes store (BL-168), the Trade book's capital for the day",
+    schedule: { at: '15:50', on: tradingDays, label: 'trading days 15:50' },
+    steps: [['uv', 'run', 'obt', 'realised', 'capital']],
+    cwd: OPTIONS,
+    timeoutMinutes: 10,
+    retries: 1,
+    retryDelayMinutes: 15,
+    catchUpHours: 6,
+    fixHint:
+      'Check the ANGELONE_* settings in .env, then run it by hand: cd packages/option-backtesting && uv run obt realised capital',
+  },
 ];
 
 /** Every job: the ones above plus each check group's (src/checks/). */

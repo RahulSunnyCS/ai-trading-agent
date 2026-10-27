@@ -174,9 +174,9 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('has 38 jobs', () => {
-    // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor; BL-168: + contract-notes, contract-notes-retry
-    expect(JOBS).toHaveLength(38);
+  it('has 39 jobs', () => {
+    // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor; BL-168: + contract-notes, contract-notes-retry, contract-notes-capital
+    expect(JOBS).toHaveLength(39);
   });
 });
 
@@ -238,6 +238,14 @@ describe('contract notes (BL-168)', () => {
       expect(job(id)?.cwd).toBe('packages/contract-notes');
       expect(job(id)?.group).toBe('contract-notes');
     }
+  });
+
+  it('reads the capital at 15:50 on trading days only, through obt', () => {
+    expect(job('contract-notes-capital')?.schedule.at).toBe('15:50');
+    expect(job('contract-notes-capital')?.schedule.on('2026-10-24')).toBe(false); // a Saturday
+    expect(job('contract-notes-capital')?.steps).toEqual([
+      ['uv', 'run', 'obt', 'realised', 'capital'],
+    ]);
   });
 
   it('a 00:00 run missed while asleep still runs before the 07:30 one', () => {
