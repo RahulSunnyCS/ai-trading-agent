@@ -96,6 +96,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-165](BL-165-gap-and-go-leads-gap-down-and-expiry.md) | BL-164's two leads on the locked 2022–24 period: gap-and-go on gap-down days only, and on expiry days only | Killed: both positive but not significant — gap-down +₹485 a trade (t 1.01, 75 trades), expiry days +₹746 (t 1.21, 43); bar t ≥ 2.24; each mean rests on its three best trades (about zero without them) | 2026-10-25 |
 | [BL-164](BL-164-gap-and-go-williams-chain.md) | NIFTY gap-and-go 10% opening-range band → Williams back-up chain, 150-point ITM weekly buys, exactly as published (3 tests; POC) | Killed: no candidate — H1 gap-and-go +₹111 a trade (t 0.33, 147 trades, negative at 0.5% slippage), H2 Williams −₹119, the chain −₹10; entering at the first break beats a later minute, but the trade does not pay; confirmation period never opened | 2026-10-25 |
 | [BL-078](BL-078-angel-one-data-source.md) | Angel One SmartAPI as a second 1-minute data source: what it can and cannot give versus the Fyers files | Done: go as a backup, not a replacement; shipped as BL-079 (Angel One fallback in `obt daily`, VIX) | 2026-10-24 |
 | [BL-087](BL-087-momentum-all-fridays-split.md) | Momentum: backtest and follow a config split across every rebalance Friday | Done: all-Fridays backtest and groups of sleeves; live migration applied, 43 of 43 journalled for the weeks of 16 and 23 Oct (38 sleeves) | 2026-10-24 |

@@ -49,7 +49,7 @@ data. Status words and the page template: [`../README.md`](../README.md).
 | [Straddle premium exhaustion](strategies/straddle-exhaustion/README.md) | Tested on the learning periods; P1 unread | BL-091, BL-123 |
 | [ATM Widesl, SENSEX](strategies/atm-widesl-sensex/README.md) | Descriptive (side look, no item) | — |
 | [Five-minute breakout, hold, 1-minute entry (index)](strategies/breakout/README.md) | Tested (killed) | BL-152, BL-153 |
-| [Gap-and-go band → Williams back-up (NIFTY, ITM buys)](strategies/gap-and-go/README.md) | Tested (killed) | BL-164 |
+| [Gap-and-go band → Williams back-up (NIFTY, ITM buys)](strategies/gap-and-go/README.md) | Tested (killed) | BL-164, BL-165 |
 | [Overnight short straddle into expiry morning](strategies/overnight-straddle/README.md) | Tested (killed) | BL-159 read 4, BL-160 |
 | [Widesl with bought wings (iron condor)](strategies/condor/README.md) | Descriptive (screen, no lead) | BL-159 read 6 |
 | [Ratio spread](strategies/ratio-spread/README.md) | Descriptive (screen, no lead) | BL-159 read 7 |

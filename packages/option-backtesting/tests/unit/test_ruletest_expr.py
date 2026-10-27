@@ -28,6 +28,7 @@ def frame(n: int = 40, seed: int = 1) -> E.Frame:
         C=close,
         vix_close=vix,
         vix_open=vix[:, 0],
+        expiry_loader=lambda: np.arange(n) % 5 == 3,
     )
 
 
@@ -112,6 +113,18 @@ def test_prev_at_prev_agg_and_ever():
         E.parse({"prev_agg": {"x": "close", "how": "mean"}})
     with pytest.raises(E.RuleError, match="missing 'how'"):
         E.parse({"prev_agg": {"x": "close"}})
+
+
+def test_expiry_day_is_a_session_constant_and_needs_its_calendar():
+    fr = frame(10)
+    on = run("expiry_day", fr)
+    assert on.dtype == bool and on[3].all() and on[8].all() and not on[[0, 1, 2, 4]].any()
+    assert E.describe(E.parse("expiry_day")) == "today is a weekly expiry day"
+    fr.expiry_loader = None
+    with pytest.raises(E.RuleError, match="expiry calendar"):
+        run("expiry_day", fr)
+    with pytest.raises(E.RuleError, match="already taken"):
+        E.parse_rule({"gt": ["close", 1]}, {"expiry_day": {"gt": ["close", 1]}})
 
 
 def test_prior_median_uses_earlier_sessions_only():
@@ -218,6 +231,7 @@ CAUSAL_RULES = [
         ]
     },
     {"ever": {"gt": ["close", {"add": ["session_open", 5]}]}},
+    {"all": ["expiry_day", {"gt": ["close", "open"]}]},
 ]
 
 
@@ -243,6 +257,7 @@ def test_value_at_a_stamp_ignores_the_future(when):
         C=base.C.copy(),
         vix_close=base.vix_close.copy(),
         vix_open=base.vix_open.copy(),
+        expiry_loader=base.expiry_loader,
     )
     # scramble everything after (session, stamp) and every later session
     for arr in (cut.O, cut.H, cut.L, cut.C, cut.vix_close):

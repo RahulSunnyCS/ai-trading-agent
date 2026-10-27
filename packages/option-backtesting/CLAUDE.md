@@ -231,7 +231,9 @@ Otherwise:
   (its highest / lowest x over its 375 stamps; `prev_high` / `prev_low` are bar highs / lows and `prev_close` the
   15:29 close, so a close-based level needs these) and `{ever: b}` (true from b's first stamp on; with
   `not: {first: b}`, "b held at an earlier stamp"). A leg's `trail_peak` / `stop_on` (legwise, below) pass
-  through a template and read back.
+  through a template and read back. BL-165 added the leaf `expiry_day` (the session is its own nearest
+  listed weekly expiry, `frame.nearest_expiry`, the simulator's rule; built by `ExpiryDayLoader`, cached
+  under `ruletest/features/`; a frame without the loader raises).
   `scripts/ruletest-acceptance.py` must print ACCEPTANCE OK: the four BL-083 triggers, said in
   the grammar (`tests/fixtures/rules/`), fire on the same days and stamps as `research/bl083/`, and T1 and T4 with the Dir
   template reproduce its event-study rows to the rupee. A leg with its own `range_breakout` is not supported yet.
@@ -458,7 +460,7 @@ Otherwise:
   output, `t33.status` on `/legwise/anatomy`). Any other query error still raises.
 
 - `research/common/` — code two research items share, imported by module name after a `sys.path` insert of this
-  folder (`varlib`, `early_ref`, `rotparse`; BL-152 added `cscv` (the numpy CSCV / PBO, moved out of `bl104/robust.py`, which
+  folder (`varlib`, `early_ref`, `rotparse`; BL-164 added `gap_and_go_specs` (BL-164's rules, which BL-165 subsets); BL-152 added `cscv` (the numpy CSCV / PBO, moved out of `bl104/robust.py`, which
   re-exports it) and `breakout_specs` (BL-152's 192 registered rule specs, also used by BL-153)). A script never imports
   from another item's folder.
 - `research/bl104/` — BL-104, the full-factorial parameter sweep over the Widesl / Dir / Buy families:

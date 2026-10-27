@@ -451,6 +451,7 @@ collector is forward-only".
 | 3.10.41 | Eight out-of-the-box POC reads (VRP, skew, PCR, overnight, post-event, condor margin, ratio spread, skip calendar) — [BL-159](backlog/BL-159-eight-poc-reads.md) | claude | **Done 2026-10-23: no lead survives.** The overnight straddle's t 2.15 is the 09:15–09:24 premium fall; nothing else reached \|t\| 2. |
 | 3.10.42 | Overnight short straddle into expiry morning, hedged, NIFTY + SENSEX — [BL-160](backlog/BL-160-overnight-straddle-into-expiry.md) | claude | **Done 2026-10-23: failed.** −₹34 a night (t −0.29) on NIFTY 2022–24; hedges cut the tail but take the return. |
 | 3.10.43 | NIFTY gap-and-go band → Williams back-up chain, 150-point ITM buys (POC) — [BL-164](backlog/BL-164-gap-and-go-williams-chain.md) | claude | **Done 2026-10-25: killed.** No candidate: H1 +₹111 a trade (t 0.33), H2 −₹119, chain −₹10; confirmation never opened. Adds `prev_at` / `prev_agg` / `ever`, `trail_peak`, `stop_on: close`. Findings in `research/options/strategies/gap-and-go/`. |
+| 3.10.44 | BL-164's leads on 2022–24: gap-and-go on gap-down days, on expiry days — [BL-165](backlog/BL-165-gap-and-go-leads-gap-down-and-expiry.md) | claude | **Done 2026-10-25: killed.** Gap-down +₹485 a trade (t 1.01), expiry days +₹746 (t 1.21), bar 2.24; each rests on three trades. Adds `expiry_day` to the rule grammar. |
 
 ### 3.11 Local research database (`packages/trading-data`)
 

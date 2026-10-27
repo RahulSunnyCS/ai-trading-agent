@@ -265,3 +265,6 @@ hold on the locked confirmation period. Three tests, every one counted in the le
   candidate (H1 +₹111 t 0.33, H2 −₹119 t −0.35, H3 −₹10 t −0.04); numbers under Result. `run.py`
   applies steps 1–2; with no candidate there is nothing for a `judge.py` to reveal, so none was
   written. Findings: `research/options/strategies/gap-and-go/`. Closed.
+- 2026-10-25 — the owner asked to test two of the breakdowns (gap-down days, expiry days) as
+  [BL-165](BL-165-gap-and-go-leads-gap-down-and-expiry.md), on the confirmation period. Revealing it
+  for those subsets partly shows H1's own confirmation trades; H1 stays killed and is not retested.
