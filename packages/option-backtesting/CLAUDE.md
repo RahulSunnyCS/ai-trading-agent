@@ -283,7 +283,10 @@ Otherwise:
   from `iv_daily`, and event days from `realised/events.csv`, kept outside `data/reference/` so the portfolio
   cache's stamp of that folder does not change; MAE / MFE from the 1-minute lake), `capital.py` (the 15:50 Angel One reading), `views.py` (the JSON the CLI and
   `api/contract_notes_routes.py` share). Figures are recomputed on read; only `capital` and the page's inputs write
-  `manual/<day>.json`.
+  `manual/<day>.json`. Reading the store's ~900 files costs 5-7 s on the external disk, so the views use
+  `store.load_cached` (the book kept against `store.stamp`: name, size and mtime of every file `load` reads; ~5 ms)
+  and the routes' 20 s response cache is keyed on the same stamp; the inputs PUT clears both (`store.forget`).
+  The cached book is shared: never mutate it.
 - `legwise/algtst.py` + `rotation/algtst_export.py` — BL-137: a leg-wise strategy as an AlgoTest `.algtst` (import
   format, one strategy per file) and a day's picks as files + zip (`obt rotation algotest-export`). Every mapping was read
   off an AlgoTest export in `tests/fixtures/algtst/` (a closest premium is a bare number; re-entry at cost is

@@ -26,7 +26,10 @@ from fastapi.responses import JSONResponse
 
 router = APIRouter(prefix="/legwise/contract-notes")
 
-CACHE_SECONDS = 20.0  # the store changes at night, at 15:50 and when inputs are saved
+# A response is kept for 20 s and only while the store's file stamps are unchanged
+# (`realised.store.stamp`), so a new note or input is seen at once; the 20 s bound covers what the
+# stamp does not: the live capture files and the 1-minute lake the trips and day views also read.
+CACHE_SECONDS = 20.0
 CACHE_ENTRIES = 32
 EXTREMES_MAX_DAYS = 31
 INPUT_DAYS_AHEAD = 7  # the inputs of a session up to a week ahead (the next session's capital)
@@ -65,8 +68,17 @@ def _cached(key: tuple, compute):
 
 
 def _clear() -> None:
+    from ..realised import store
+
     with _lock:
         _cache.clear()
+    store.forget()
+
+
+def _stamp(root) -> tuple:
+    from ..realised import store
+
+    return store.stamp(root)
 
 
 def _read(name: str, fn, start, end, **extra) -> Any:
@@ -80,7 +92,7 @@ def _read(name: str, fn, start, end, **extra) -> Any:
         root = _root()
     except (RuntimeError, OSError, ValueError) as error:
         return _error(503, f"the data root is not available: {error}")
-    key = (name, root, s, e, tuple(sorted(extra.items())))
+    key = (name, root, _stamp(root), s, e, tuple(sorted(extra.items())))
     return _cached(key, lambda: fn(root, start=s, end=e, **extra))
 
 
@@ -169,7 +181,7 @@ def get_day(day: str) -> Any:
         root = _root()
     except (RuntimeError, OSError, ValueError) as error:
         return _error(503, f"the data root is not available: {error}")
-    return _cached(("day", root, d), lambda: views.day_detail(root, d))
+    return _cached(("day", root, _stamp(root), d), lambda: views.day_detail(root, d))
 
 
 @router.put("/inputs/{day}")
