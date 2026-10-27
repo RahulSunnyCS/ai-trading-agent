@@ -1,45 +1,25 @@
 'use client';
 
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useRef } from 'react';
-
 import { cn } from '../../../lib/cn';
-import { formatInt } from '../../../lib/format';
+import { EMPTY, formatDay, formatInt, formatPct } from '../../../lib/format';
 import { STATUS_LABEL } from '../../../lib/momentumFavourites';
-import { tradingSleeves } from '../../../lib/momentumWeek';
+import { favouriteRow } from '../../../lib/momentumWeek';
 import type { MomentumWeekCard } from '../../../types/momentum';
 import { Badge } from '../../ui/Badge';
-import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
 import { Skeleton } from '../../ui/Skeleton';
+import { THead, TRow, Table, Td, Th } from '../../ui/Table';
 
 const STATUS_TONE = { invested: 'positive', paper: 'info', watching: 'neutral' } as const;
 
-function cardSummary(card: MomentumWeekCard): string {
-  if (card.blocked) return card.blocked;
-  if (card.group && card.sleeves?.length) {
-    const trading = card.sleeves.filter((s) => s.on_cadence).length;
-    if (trading === 0) return 'No sleeve rebalances this week';
-  }
-  const trades = tradeSummary(card);
-  const sleeves = tradingSleeves(card);
-  // A group that follows every Friday trades one sleeve a week: say which.
-  return sleeves.length > 0 && sleeves.length <= 2 ? `${sleeves.join(' + ')} · ${trades}` : trades;
+/** A favourite's backtest figures, when the page already has them (a single saved run's own;
+ * a group's blend lives on Saved runs and is not fetched here). */
+export interface FavouriteKpis {
+  cagr: number | null;
+  max_drawdown: number | null;
 }
 
-function tradeSummary(card: MomentumWeekCard): string {
-  const sells = card.rows.filter((r) => ['SELL', 'TRIM'].includes(r.action)).length;
-  const buys = card.rows.filter((r) => ['BUY', 'ADD', 'TOP UP'].includes(r.action)).length;
-  if (!sells && !buys) return 'No trades this week';
-  return [
-    sells ? `${formatInt(sells)} sell${sells === 1 ? '' : 's'}` : null,
-    buys ? `${formatInt(buys)} buy${buys === 1 ? '' : 's'}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-}
-
-function FavouriteTile({
+function HeadlineCard({
   card,
   selected,
   onSelect,
@@ -48,125 +28,249 @@ function FavouriteTile({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const row = favouriteRow(card);
+  const edge = card.edge;
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
       className={cn(
-        'flex shrink-0 snap-start flex-col rounded-xl border bg-surface px-3.5 py-3 text-left transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        card.headline ? 'w-80' : 'w-60',
+        'mx-4 flex w-[calc(100%-2rem)] flex-col gap-1.5 rounded-xl border bg-surface px-3.5 py-3 text-left transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         selected ? 'border-primary bg-primary/5 ring-1 ring-inset ring-primary' : 'border-border',
       )}
     >
-      <span className="flex flex-wrap items-center gap-1.5">
+      <span className="flex min-w-0 flex-wrap items-center gap-1.5">
         {card.status ? (
           <Badge tone={STATUS_TONE[card.status]}>{STATUS_LABEL[card.status]}</Badge>
         ) : null}
-        {card.headline ? <Badge tone="primary">Headline · sent to Telegram</Badge> : null}
-      </span>
-      <span className="mt-2 truncate text-sm font-semibold text-foreground" title={card.name}>
-        {card.name}
-      </span>
-      <span className="truncate text-xs text-faint">
-        {card.group ? `group of ${card.sleeves?.length ?? 0} · ` : ''}
-        {card.dataset}
-      </span>
-      <span className="mt-2 flex justify-between gap-2 text-xs">
-        <span className="text-muted">This week</span>
-        <span
-          className={cn('truncate text-right', card.blocked ? 'text-warning' : 'text-foreground')}
-          title={cardSummary(card)}
-        >
-          {cardSummary(card)}
+        <Badge tone="primary">Headline · sent to Telegram</Badge>
+        <span className="min-w-0 truncate text-sm font-semibold text-foreground" title={card.name}>
+          {card.name}
+        </span>
+        <span className="text-xs text-faint">
+          {card.group ? `group of ${card.sleeves?.length ?? 0} · ` : ''}
+          {card.dataset}
         </span>
       </span>
-      <span className="mt-1 flex justify-between gap-2 text-xs">
-        <span className="text-muted">{card.headline ? 'Holds' : 'Same names as headline'}</span>
-        <span className="metric text-foreground">
-          {card.headline
-            ? card.blocked || !card.run
-              ? '—'
-              : `${formatInt(card.held.length)} names`
-            : card.shared_with_headline == null
-              ? '—'
-              : `${formatInt(card.shared_with_headline)} of ${formatInt(card.held.length)}`}
+      <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        {card.blocked ? (
+          <span className="text-warning">{card.blocked}</span>
+        ) : (
+          <span className="text-foreground">
+            This week {row.sleeve ? <b>{row.sleeve}</b> : null}
+            {row.sleeve ? ' · ' : ''}
+            {row.noSleeve ?? row.trades}
+          </span>
+        )}
+        <span className="text-muted">
+          Holds {card.blocked || !card.run ? EMPTY : `${formatInt(card.held.length)} names`}
         </span>
+        {edge?.sleeve ? (
+          <span className="text-muted">
+            Next sleeve: {edge.sleeve}
+            {edge.on ? ` on ${formatDay(edge.on)}` : ''}
+          </span>
+        ) : null}
       </span>
     </button>
   );
 }
 
+/** "K of N" with a bar, the names a favourite holds that the headline holds too. */
+function SharedBar({ shared, held }: { shared: number | null; held: number }) {
+  if (shared == null || held === 0) {
+    return (
+      <span className="text-faint" title="Nothing held to compare yet">
+        {EMPTY}
+      </span>
+    );
+  }
+  const share = Math.max(0, Math.min(1, shared / held));
+  return (
+    <span className="flex items-center gap-2">
+      <span className="metric w-14 shrink-0 text-xs text-foreground">
+        {formatInt(shared)} of {formatInt(held)}
+      </span>
+      <span className="h-1.5 w-20 overflow-hidden rounded-full bg-surface-2" aria-hidden="true">
+        <span
+          className="block h-full rounded-full bg-primary"
+          style={{ width: `${share * 100}%` }}
+        />
+      </span>
+    </span>
+  );
+}
+
 /**
- * Every favourite (BL-051): the headline first and larger, then the rest in a row that scrolls
- * sideways. A click shows that favourite's table below; Paper, Invested and Watching filter it.
+ * Every favourite (BL-051): the headline as its card, the rest as a dense table under it, one row
+ * each. A click shows that favourite's signals below and its orders' table, as the cards did.
  */
-export function FavouritesCarousel({
+export function Favourites({
   cards,
   selectedId,
   onSelect,
   followed,
+  kpis,
 }: {
   cards: readonly MomentumWeekCard[] | null;
   selectedId: string | null;
   onSelect: (id: string) => void;
   followed: number | null;
+  kpis: ReadonlyMap<string, FavouriteKpis>;
 }) {
-  const scroller = useRef<HTMLDivElement>(null);
-  const scroll = (direction: 1 | -1) =>
-    scroller.current?.scrollBy({ left: direction * 520, behavior: 'smooth' });
+  const headline = cards?.find((card) => card.headline) ?? null;
+  const others = (cards ?? []).filter((card) => card !== headline);
+  // CAGR and drawdown only when the page has them for at least one row (a group's are on Saved runs).
+  const showKpis = others.some((card) => kpis.has(card.id));
   return (
     <Card flush>
-      <div className="flex flex-wrap items-center gap-2 px-4 pt-3">
+      <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pt-3">
         <h2 className="text-sm font-semibold text-foreground">Favourites</h2>
         <span className="text-xs text-muted">
           {cards ? `${formatInt(cards.length)} · ` : ''}
           {followed != null ? `Paper + Invested ${followed} of 8 · ` : ''}every one journalled each
           Friday
         </span>
-        <span className="ml-auto flex gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-label="Scroll favourites left"
-            onClick={() => scroll(-1)}
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-label="Scroll favourites right"
-            onClick={() => scroll(1)}
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        </span>
       </div>
-      <div ref={scroller} className="flex snap-x gap-2.5 overflow-x-auto px-4 pb-3 pt-2">
-        {cards ? (
-          cards.length ? (
-            cards.map((card) => (
-              <FavouriteTile
-                key={card.id}
-                card={card}
-                selected={card.id === selectedId}
-                onSelect={() => onSelect(card.id)}
-              />
-            ))
-          ) : (
-            <p className="py-3 text-sm text-muted">
-              No favourites yet. Mark saved runs as favourites (Watching, Paper or Invested) on
-              Saved runs.
-            </p>
-          )
-        ) : (
-          Array.from({ length: 4 }, (_, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: fixed placeholders
-            <Skeleton key={i} className="h-32 w-60 shrink-0 rounded-xl" />
-          ))
-        )}
-      </div>
+      {!cards ? (
+        <div className="space-y-2 px-4 pb-3">
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      ) : !cards.length ? (
+        <p className="px-4 pb-3 text-sm text-muted">
+          No favourites yet. Mark saved runs as favourites (Watching, Paper or Invested) on Saved
+          runs.
+        </p>
+      ) : (
+        <>
+          {headline ? (
+            <HeadlineCard
+              card={headline}
+              selected={headline.id === selectedId}
+              onSelect={() => onSelect(headline.id)}
+            />
+          ) : null}
+          {others.length ? (
+            <div className="mt-2">
+              <Table>
+                <THead>
+                  <Th dense className="pl-4">
+                    {headline ? 'Other favourites' : 'Favourites'}
+                  </Th>
+                  <Th dense>This week</Th>
+                  <Th dense align="right">
+                    Sells
+                  </Th>
+                  <Th dense align="right">
+                    Buys
+                  </Th>
+                  <Th dense>Same names as headline</Th>
+                  {showKpis ? (
+                    <>
+                      <Th dense align="right">
+                        CAGR
+                      </Th>
+                      <Th dense align="right">
+                        Max DD
+                      </Th>
+                    </>
+                  ) : null}
+                  <Th dense className="pr-4">
+                    <span className="sr-only">Open</span>
+                  </Th>
+                </THead>
+                <tbody>
+                  {others.map((card) => (
+                    <FavouriteRow
+                      key={card.id}
+                      card={card}
+                      selected={card.id === selectedId}
+                      onSelect={() => onSelect(card.id)}
+                      kpis={showKpis ? (kpis.get(card.id) ?? null) : undefined}
+                    />
+                  ))}
+                </tbody>
+              </Table>
+            </div>
+          ) : null}
+          <div className="h-3" />
+        </>
+      )}
     </Card>
+  );
+}
+
+function FavouriteRow({
+  card,
+  selected,
+  onSelect,
+  kpis,
+}: {
+  card: MomentumWeekCard;
+  selected: boolean;
+  onSelect: () => void;
+  /** undefined: the columns are not shown; null: shown, not at hand for this row. */
+  kpis: FavouriteKpis | null | undefined;
+}) {
+  const row = favouriteRow(card);
+  const thisWeek = card.blocked ?? row.sleeve ?? row.noSleeve ?? EMPTY;
+  return (
+    <TRow onClick={onSelect} selected={selected} className="h-8">
+      <Td dense className="max-w-72 pl-4">
+        <span className="flex min-w-0 items-center gap-1.5">
+          {card.status ? (
+            <Badge tone={STATUS_TONE[card.status]}>{STATUS_LABEL[card.status]}</Badge>
+          ) : null}
+          <span className="truncate whitespace-nowrap font-semibold" title={card.name}>
+            {card.name}
+          </span>
+        </span>
+      </Td>
+      <Td
+        dense
+        className={cn(
+          'max-w-56 truncate whitespace-nowrap text-xs',
+          card.blocked ? 'text-warning' : 'text-muted',
+        )}
+        title={thisWeek === EMPTY ? 'A single strategy: no sleeves' : thisWeek}
+      >
+        {thisWeek}
+      </Td>
+      <Td dense align="right" numeric>
+        {row.sells == null ? EMPTY : formatInt(row.sells)}
+      </Td>
+      <Td dense align="right" numeric>
+        {row.buys == null ? EMPTY : formatInt(row.buys)}
+      </Td>
+      <Td dense>
+        <SharedBar shared={card.shared_with_headline} held={card.held.length} />
+      </Td>
+      {kpis !== undefined ? (
+        <>
+          <Td
+            dense
+            align="right"
+            numeric
+            title={kpis ? undefined : "A group's blended figures are on Saved runs"}
+          >
+            {kpis?.cagr == null ? EMPTY : formatPct(kpis.cagr)}
+          </Td>
+          <Td
+            dense
+            align="right"
+            numeric
+            className="text-negative"
+            title={kpis ? undefined : "A group's blended figures are on Saved runs"}
+          >
+            {kpis?.max_drawdown == null ? EMPTY : formatPct(kpis.max_drawdown)}
+          </Td>
+        </>
+      ) : null}
+      <Td dense className="whitespace-nowrap pr-4 text-xs text-faint">
+        {selected ? 'shown below' : 'orders ▸'}
+      </Td>
+    </TRow>
   );
 }

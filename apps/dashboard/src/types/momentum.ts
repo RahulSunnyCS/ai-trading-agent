@@ -554,67 +554,6 @@ export interface MomentumStockActionReview {
   }>;
 }
 
-/** One sleeve of a previewed group: its weight in the account and whether it trades this week. */
-export interface MomentumRebalanceSleeve {
-  id: string;
-  name: string;
-  /** Value since the last April reset (1 = unchanged). */
-  value: number;
-  /** Its fraction of the whole group. */
-  share: number;
-  target_pct: Record<string, number>;
-  on_cadence: boolean;
-  every: number | null;
-  next: string | null;
-}
-
-export interface MomentumRebalanceGroup {
-  id: string;
-  name: string;
-  sleeves: MomentumRebalanceSleeve[];
-}
-
-export interface MomentumRebalanceResult {
-  dataset: 'stock' | 'broad';
-  as_of: string;
-  signal_week: string;
-  price_mode: 'live' | 'last_close';
-  price_source: string;
-  /** Why a market-hours preview used stored closes instead of live prices; null otherwise. */
-  live_unavailable?: string | null;
-  portfolio_value: number;
-  first_allocation: boolean;
-  /** The Friday the portfolio starts from nothing (`mbt paper-start`), and whether this is it. */
-  paper_start?: string | null;
-  first_week?: boolean;
-  rebalance_schedule: {
-    strategy_start_date: string;
-    cadence: 'weekly' | 'every_n_weeks' | 'monthly';
-    interval_weeks: number | null;
-    effective_rebalance_offset: number | null;
-    is_rebalance_week: boolean;
-    previous_rebalance_date: string | null;
-    current_rebalance_date: string | null;
-    next_rebalance_date: string;
-  } | null;
-  /** Present when a favourite group was previewed (BL-087): its sleeves and what each holds. */
-  group?: MomentumRebalanceGroup;
-  current_pct: Record<string, number>;
-  target_pct: Record<string, number>;
-  rows: Array<{
-    asset: string;
-    symbol: string | null;
-    action: 'BUY' | 'SELL';
-    current_pct: number;
-    target_pct: number;
-    delta_pct: number;
-    ltp: number | null;
-    indicative_value: number;
-    indicative_quantity: number | null;
-  }>;
-  note: string;
-}
-
 /** GET /api/momentum/journal — the forward-signal journal (BL-024). */
 export interface MomentumJournalEntry {
   entry_id: number;
@@ -937,6 +876,22 @@ export interface MomentumOrders {
     unexplained: Array<{ symbol: string; delta: number; reason: string }>;
     booked: Array<{ sleeve_id: string; symbol: string; delta: number }>;
   };
+}
+
+/** Your orders' "Preview for…": the orders another favourite would make against the same holdings,
+ * as one portfolio (never lot by lot), saved nowhere. `error` when the favourite is not found. */
+export type MomentumOrderPreview = Pick<MomentumOrders, 'week'> &
+  Partial<Pick<MomentumOrders, 'headline' | 'kind' | 'reason' | 'holdings' | 'prices' | 'plan'>> & {
+    preview?: boolean;
+    error?: string;
+  };
+
+/** `POST /api/momentum/orders/preview/jobs` and `GET …/jobs/{id}`. */
+export interface MomentumOrderPreviewJob {
+  id: string;
+  status: 'running' | 'done' | 'failed';
+  result: MomentumOrderPreview | null;
+  error: string | null;
 }
 
 /** `GET /api/momentum/orders`. */

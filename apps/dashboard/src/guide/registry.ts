@@ -21,7 +21,6 @@ import momentumBacktestResults from './content/momentum/backtest-results.md?raw'
 import momentumBacktestSettings from './content/momentum/backtest-settings.md?raw';
 import momentumHowItWorks from './content/momentum/how-it-works.md?raw';
 import momentumJournal from './content/momentum/journal.md?raw';
-import momentumRebalance from './content/momentum/rebalance.md?raw';
 import momentumSavedRuns from './content/momentum/saved-runs.md?raw';
 import momentumScores from './content/momentum/scores.md?raw';
 import momentumThisWeek from './content/momentum/this-week.md?raw';
@@ -190,16 +189,6 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     kind: 'Screen',
     body: momentumThisWeek,
     screen: { tab: 'momentum', rest: ['week'] },
-  },
-  {
-    chapter: 'momentum',
-    slug: 'rebalance',
-    title: 'Rebalance preview',
-    summary:
-      'Compare what you actually hold with what the model holds, and see the trades to match.',
-    kind: 'Screen',
-    body: momentumRebalance,
-    screen: { tab: 'momentum', rest: ['rebalance'] },
   },
   {
     chapter: 'momentum',

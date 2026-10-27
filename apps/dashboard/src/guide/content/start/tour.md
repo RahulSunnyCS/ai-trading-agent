@@ -39,8 +39,7 @@ The evening run's status and its **Run** button are at the top of Today.
 | [Backtest](app:/momentum/backtest) | Choose a dataset (ETF Rotation or Broad Momentum), set the rules, run a ten-year backtest and read the result. [Guide](guide:momentum/backtest-settings) |
 | [Scores](app:/momentum/scores) | Today's momentum score of every stock and sector. [Guide](guide:momentum/scores) |
 | [Saved runs](app:/momentum/saved) | Every backtest you have run; mark favourites, choose which one Telegram follows. [Guide](guide:momentum/saved-runs) |
-| [This week](app:/momentum/week) | Friday's buy and sell list, and whether the data is ready for it. [Guide](guide:momentum/this-week) |
-| [Rebalance](app:/momentum/rebalance) | Type in what you hold; see the trades that would match the model. [Guide](guide:momentum/rebalance) |
+| [This week](app:/momentum/week) | Friday's buy and sell list, your orders against what you hold, and whether the data is ready for it. [Guide](guide:momentum/this-week) |
 | [Journal](app:/momentum/journal) | The permanent record of every weekly signal as it was produced. [Guide](guide:momentum/journal) |
 
 ## Trade book

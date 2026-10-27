@@ -10,6 +10,7 @@ import type {
   MomentumWeekRow,
   MomentumWeeklyStatus,
 } from '../types/momentum';
+import { formatInt } from './format';
 
 type ScheduledRun = MomentumWeeklyStatus['schedule'][number]['run'];
 
@@ -275,6 +276,46 @@ export function tradingSleeves(card: {
   return (card.sleeves ?? [])
     .filter((sleeve) => sleeve.on_cadence)
     .map((sleeve) => sleeveLabel(sleeve.name, card.name));
+}
+
+/** One favourite as This week's favourites table shows it. */
+export interface FavouriteRowView {
+  /** The sleeves trading this week ("Friday 2 of 4"), when one or two do; else null. */
+  sleeve: string | null;
+  /** A group none of whose sleeves rebalances this week says so; else null. */
+  noSleeve: string | null;
+  /** Null when there is no run to count (blocked, or nothing recorded yet): never a zero. */
+  sells: number | null;
+  buys: number | null;
+  /** "3 sells · 3 buys", or "No trades this week". */
+  trades: string;
+}
+
+const SELLS = ['SELL', 'TRIM'];
+const BUYS = ['BUY', 'ADD', 'TOP UP'];
+
+export function favouriteRow(card: MomentumWeekCard): FavouriteRowView {
+  const sleeves = tradingSleeves(card);
+  const counted = !card.blocked && card.run != null;
+  const sells = card.rows.filter((r) => SELLS.includes(r.action)).length;
+  const buys = card.rows.filter((r) => BUYS.includes(r.action)).length;
+  const plural = (n: number, word: string) => `${formatInt(n)} ${word}${n === 1 ? '' : 's'}`;
+  return {
+    // A group that follows every Friday trades one sleeve a week: say which.
+    sleeve: sleeves.length > 0 && sleeves.length <= 2 ? sleeves.join(' + ') : null,
+    noSleeve:
+      card.group && card.sleeves?.length && sleeves.length === 0
+        ? 'No sleeve rebalances this week'
+        : null,
+    sells: counted ? sells : null,
+    buys: counted ? buys : null,
+    trades:
+      sells || buys
+        ? [sells ? plural(sells, 'sell') : null, buys ? plural(buys, 'buy') : null]
+            .filter(Boolean)
+            .join(' · ')
+        : 'No trades this week',
+  };
 }
 
 /** "08c4307d (4w, ph1)" for "Phase 6 ensemble 08c4307d (4w, ph1)" inside "Phase 6 ensemble". */

@@ -820,6 +820,12 @@ class OrderSettingsBody(BaseModel):
     lot_size_rs: float | None = Field(None, ge=1_000, le=1_000_000_000)
 
 
+class OrderPreviewBody(BaseModel):
+    """Your orders' "Preview for…": the favourite (a saved-run or group id) to plan for."""
+
+    favourite: str = Field(min_length=1, max_length=64, pattern=r"^[0-9A-Za-z_-]+$")
+
+
 class PastedHoldingsBody(BaseModel):
     text: str = Field(min_length=1, max_length=20_000)
 
@@ -3451,13 +3457,22 @@ def _find_favourite(favourites: list[dict], text: str) -> tuple[dict | None, str
 
 
 def _compute_orders(
-    trigger: str = "manual", *, start_fresh: bool = False, favourite: str | None = None
+    trigger: str = "manual",
+    *,
+    start_fresh: bool = False,
+    favourite: str | None = None,
+    preview: bool = False,
 ) -> dict:
     """The headline's orders for this Friday against the owner's holdings (the paper portfolio
     until money goes in), saved to `momentum_orders`. The body of the 14:15 job and of the page's
     "Make orders now". `start_fresh` plans from nothing held (paper capital all in cash), so every
     target name is a buy: the first week of a new portfolio, not a change to last week's model.
-    `favourite` (an id or a name fragment) plans for that favourite instead of the headline."""
+    `favourite` (an id or a name fragment) plans for that favourite instead of the headline.
+
+    `preview` (Your orders' "Preview for…", never the 14:15 job) writes nothing: no orders row, no
+    lot ledger event, no pending lot. It reads the catalog read-only only, and it plans the
+    favourite as ONE portfolio against the whole holdings snapshot, never lot by lot (the lots
+    belong to the followed strategy; booking Kite's changes to them is the job's to do)."""
     from . import holdings_store, orders
     from .weekly import week_ending_on_or_before
 
@@ -3514,7 +3529,7 @@ def _compute_orders(
     # A Fyers holding's base symbol -> the strategy's name for it (SBIN, NAVINFLUOR#2, Nasdaq 100).
     name_of = {fyers.nse_symbol(symbol): name for name, symbol in symbols.items()}
     base_of = {name: fyers.nse_symbol(symbol) for name, symbol in symbols.items()}
-    if settings["holdings_source"] == "kite" and members and signal.get("_sleeves"):
+    if not preview and settings["holdings_source"] == "kite" and members and signal.get("_sleeves"):
         return _compute_lot_orders(
             payload,
             headline=headline,
@@ -3593,6 +3608,9 @@ def _compute_orders(
             "plan": plan.to_dict(),
         }
     )
+    if preview:
+        payload["preview"] = True
+        return payload
     with open_catalog() as con:
         payload["created_at"] = holdings_store.save_orders(
             con,
@@ -4364,11 +4382,14 @@ class _PreviewJobs:
 
     MAX_KEPT = 20
 
-    def __init__(self) -> None:
+    def __init__(self, run: Callable[[Any], dict] | None = None) -> None:
         self._lock = threading.Lock()
         self._jobs: dict[str, dict] = {}
+        # What a job computes from its argument (default: a rebalance preview), looked up when the
+        # job runs so a test can replace `rebalance_preview`.
+        self._run = run
 
-    def start(self, req: RebalanceRequest) -> dict:
+    def start(self, req: Any) -> dict:
         job = {
             "id": os.urandom(8).hex(),
             "status": "running",
@@ -4390,10 +4411,10 @@ class _PreviewJobs:
             job = self._jobs.get(job_id)
             return dict(job) if job is not None else None
 
-    def _execute(self, job: dict, req: RebalanceRequest) -> None:
+    def _execute(self, job: dict, req: Any) -> None:
         result, error, error_status = None, None, None
         try:
-            result = rebalance_preview(req)
+            result = self._run(req) if self._run is not None else rebalance_preview(req)
         except HTTPException as exc:  # the same refusals the synchronous route gives
             error, error_status = str(exc.detail), exc.status_code
         except Exception as exc:  # the job must always finish, or the UI spins forever
@@ -4405,6 +4426,10 @@ class _PreviewJobs:
 
 
 PREVIEW_JOBS = _PreviewJobs()
+# Your orders' "Preview for…": a favourite's orders against the same holdings, saved nowhere.
+ORDER_PREVIEW_JOBS = _PreviewJobs(
+    lambda favourite_id: _compute_orders("manual", favourite=favourite_id, preview=True)
+)
 WEEKLY_JOBS = _SingleFlightJob()
 LIVE_RULES_JOBS = _SingleFlightJob()
 ORDERS_JOBS = _SingleFlightJob()
@@ -5767,6 +5792,19 @@ def create_app() -> FastAPI:
     def orders_run() -> dict:
         job, started = ORDERS_JOBS.start(lambda: _compute_orders("manual"), {})
         return {"job": job, "started": started}
+
+    @app.post("/api/orders/preview/jobs", status_code=202)
+    def orders_preview_start(body: OrderPreviewBody) -> dict:
+        """The orders a favourite would make against the holdings Your orders reads, as one
+        portfolio. Read-only: nothing is saved (`_compute_orders(preview=True)`)."""
+        return ORDER_PREVIEW_JOBS.start(body.favourite)
+
+    @app.get("/api/orders/preview/jobs/{job_id}")
+    def orders_preview_job(job_id: str) -> dict:
+        job = ORDER_PREVIEW_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(404, "Unknown preview job (the service may have restarted).")
+        return job
 
     @app.put("/api/orders/settings")
     def orders_settings(body: OrderSettingsBody) -> dict:

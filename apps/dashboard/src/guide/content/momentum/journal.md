@@ -14,7 +14,7 @@ the 16:45 final, and the 19:30 run for stock-based favourites.
 | Part | What it shows |
 |---|---|
 | Signal week, Recorded this week | Which week is shown, and how many entries it has. |
-| Weekly check | One row per expected signal, so a missing one stands out. A check at 21:00 every Friday reports gaps on Telegram. |
+| Weekly check ("what should be here") | One row per expected signal. When every one is recorded it stays folded to its counter (**43 / 43 recorded**); click it to see the rows. When any is missing or labelled another week it opens by itself, so the gap stands out. A check at 21:00 every Friday reports gaps on Telegram. |
 | Tamper check, Chain fingerprint | Each entry includes a fingerprint of the one before it, like a chain. If any old entry were edited, removed or reordered, the check would fail. |
 | Entries | Oldest first. Click one for its full actions and holdings. "Held before" is the model portfolio before that signal's own trades; next week's entry shows the result. A **SKIP (premium)** chip is a top-ranked name an ETF favourite did not buy because its ETF traded too far above NAV; the entry keeps the premium, the limit and the reason, so the record shows what the strategy wanted and why it did not get it (see [This week](guide:momentum/this-week)). |
 

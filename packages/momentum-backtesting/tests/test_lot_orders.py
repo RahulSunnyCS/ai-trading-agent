@@ -1,6 +1,7 @@
 """BL-142 Phase 3: a favourite group followed lot by lot against the Kite holdings. The Friday run
 books what changed in Kite to a lot, then plans every lot on its own."""
 
+import time
 from datetime import datetime
 
 import pytest
@@ -425,3 +426,100 @@ def test_a_symbol_that_drops_out_of_the_strategy_data_keeps_its_shares_in_the_lo
     assert payload["ledger"]["booked"] == [] and payload["ledger"]["unexplained"] == []
     with open_catalog() as con:
         assert lots.positions(con, OWNER, gid)[ids[0]]["RATEGAIN"] == 12.0
+
+
+def _everything_stored() -> tuple[dict, dict]:
+    """Every row of every catalog table (orders, lot ledger and state, holdings, settings, rules,
+    saved runs, the forward journal, ...) and every file in the state folder (messages, paper
+    start, live rules, alerts) with its bytes."""
+    with open_catalog() as con:
+        tables = [
+            name
+            for (name,) in con.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_type = 'BASE TABLE' ORDER BY table_name"
+            ).fetchall()
+        ]
+        rows = {
+            # as text: a TIMESTAMPTZ fetched as a Python value needs pytz
+            t: sorted(map(repr, con.execute(f'SELECT COLUMNS(*)::VARCHAR FROM "{t}"').fetchall()))
+            for t in tables
+        }
+    state = this_week.state_dir()
+    files = {
+        str(path.relative_to(state)): path.read_bytes()
+        for path in sorted(state.rglob("*"))
+        if path.is_file()
+    }
+    return rows, files
+
+
+def _preview(client, favourite_id):
+    job = client.post("/api/orders/preview/jobs", json={"favourite": favourite_id})
+    assert job.status_code == 202
+    job_id = job.json()["id"]
+    for _ in range(500):
+        got = client.get(f"/api/orders/preview/jobs/{job_id}").json()
+        if got["status"] != "running":
+            return got
+        time.sleep(0.02)
+    raise AssertionError("the preview job did not finish")
+
+
+def test_a_preview_for_a_favourite_writes_nothing_and_leaves_the_friday_run_unchanged(
+    client, monkeypatch
+):
+    """Your orders' "Preview for…": on the very Friday a real run would book Kite's changes to the
+    lots, move the pending lot and save the orders, the preview stores nothing at all, and the real
+    run afterwards does exactly what it would have done without it."""
+    gid, ids = _setup(client, monkeypatch, 1, "2026-10-23")
+    with open_catalog() as con:
+        lots.append(
+            con,
+            OWNER,
+            gid,
+            [
+                {"sleeve_id": ids[0], "symbol": r["symbol"], "delta": r["quantity"], "kind": "seed"}
+                for r in LOT1
+            ],
+            "2026-10-20T12:25:13+05:30",
+        )
+        lots.set_pending(con, OWNER, gid, ids[0], "2026-10-20T12:25:13+05:30")
+    _friday(monkeypatch, 2026, 10, 23)
+    # A top-up the real run would book to lot 1, on a snapshot read today (so it moves the lot).
+    _snapshot([{**r, "quantity": r["quantity"] + 2} for r in LOT1] + OUTSIDE, 60_000.0)
+    this_week.state_dir().mkdir(parents=True, exist_ok=True)
+    (this_week.state_dir() / "weekly_messages.json").write_text('[{"title": "kept"}]')
+    before = _everything_stored()
+
+    got = _preview(client, gid)
+    assert got["status"] == "done", got["error"]
+    result = got["result"]
+    assert result["preview"] is True and "created_at" not in result
+    assert result["headline"]["id"] == gid
+    assert "lots" not in result and "ledger" not in result  # one portfolio, never lot by lot
+    assert result["holdings"]["source"] == "kite"
+    assert result["holdings"]["outside"] == ["20MICRONS"]
+    assert "ACMESOLAR" in {r["symbol"] for r in result["plan"]["rows"] if r["quantity"]}
+    assert _everything_stored() == before
+    with open_catalog() as con:
+        assert holdings_store.orders_for(con, OWNER, "2026-10-23") == []
+
+    # An unknown favourite is a reason, not an error, and still writes nothing.
+    missing = _preview(client, "nope")
+    assert missing["status"] == "done" and "No favourite matches" in missing["result"]["error"]
+    assert _everything_stored() == before
+
+    # The real Friday run afterwards books and plans exactly as it would have.
+    payload = api._compute_orders("scheduled")
+    assert {(e["sleeve_id"], e["symbol"]) for e in payload["ledger"]["booked"]} == {
+        (ids[0], r["symbol"]) for r in LOT1
+    }
+    with open_catalog() as con:
+        assert lots.pending(con, OWNER, gid) == ids[1]
+        assert len(holdings_store.orders_for(con, OWNER, "2026-10-23")) == 1
+
+
+def test_the_preview_route_refuses_a_malformed_favourite(client):
+    assert client.post("/api/orders/preview/jobs", json={"favourite": "../x"}).status_code == 422
+    assert client.get("/api/orders/preview/jobs/unknown").status_code == 404
