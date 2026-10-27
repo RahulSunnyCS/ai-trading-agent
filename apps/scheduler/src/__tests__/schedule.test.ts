@@ -243,7 +243,9 @@ describe('contract notes (BL-168)', () => {
   it('reads the capital at 15:50 on trading days only, through obt', () => {
     expect(job('contract-notes-capital')?.schedule.at).toBe('15:50');
     expect(job('contract-notes-capital')?.schedule.on('2026-10-24')).toBe(false); // a Saturday
-    expect(job('contract-notes-capital')?.steps).toEqual([['uv', 'run', 'obt', 'realised', 'capital']]);
+    expect(job('contract-notes-capital')?.steps).toEqual([
+      ['uv', 'run', 'obt', 'realised', 'capital'],
+    ]);
   });
 
   it('a 00:00 run missed while asleep still runs before the 07:30 one', () => {
