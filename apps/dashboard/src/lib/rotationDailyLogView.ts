@@ -289,35 +289,6 @@ export const PLACEMENT_LABEL: Record<PlacementStatus, string> = {
   not_placed: 'Not placed',
 };
 
-export interface PlacementTally {
-  marked: number;
-  of: number;
-  placed: number;
-  changed: number;
-  notPlaced: number;
-}
-
-/** How many of the day's shown lists the owner has marked, and how. */
-export function placementTally(row: RotationRow): PlacementTally {
-  const keys = LIST_KEYS.filter((k) => row.lists[k] !== undefined);
-  const t: PlacementTally = { marked: 0, of: keys.length, placed: 0, changed: 0, notPlaced: 0 };
-  for (const k of keys) {
-    const p = row.placement[k];
-    if (!p) continue;
-    t.marked += 1;
-    if (p.status === 'placed') t.placed += 1;
-    else if (p.status === 'changed') t.changed += 1;
-    else t.notPlaced += 1;
-  }
-  return t;
-}
-
-/** "1 of 2 lists marked"; with one list shown, "Marked" or "Not marked". */
-export function markedText(t: PlacementTally): string {
-  if (t.of === 1) return t.marked === 1 ? 'Marked' : 'Not marked';
-  return `${t.marked} of ${t.of} lists marked`;
-}
-
 /** A placement draft is valid when its status is set and a "changed" says what changed. */
 export function placementProblem(status: PlacementStatus | '', note: string): string | null {
   if (status === '') return 'Choose placed, changed or not placed.';

@@ -9,6 +9,7 @@ import { usePolledResource } from './usePolledResource';
 
 const BASE = '/api/backtest/legwise';
 
-export function useRotationLive() {
-  return usePolledResource<RotationLiveResponse>(`${BASE}/rotation/live`);
+/** `enabled: false` fetches nothing (a view that does not show live figures). */
+export function useRotationLive(enabled = true) {
+  return usePolledResource<RotationLiveResponse>(`${BASE}/rotation/live`, { enabled });
 }
