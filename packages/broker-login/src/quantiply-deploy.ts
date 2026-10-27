@@ -452,13 +452,16 @@ async function main(): Promise<number> {
         const want = `₹${mtmSl.toLocaleString('en-IN')}`;
         if ('error' in pb) {
           attention = true;
-          lines.push(`❌ MTM SL not checked (the account's broker: ${pb.error}): nothing switched on`);
+          lines.push(
+            `❌ MTM SL not checked (the account's broker: ${pb.error}): nothing switched on`,
+          );
           throw new Reported('mtm sl');
         }
         const days = parseClientwise(brokersJson, pb.id);
         const body = clientwiseBody(days, mtmSl);
         if (!body) lines.push(`MTM SL ${want} ✓`);
-        else if (!apply) lines.push(`MTM SL is ${clientwiseNow(days)}: would set ${want} (dry run)`);
+        else if (!apply)
+          lines.push(`MTM SL is ${clientwiseNow(days)}: would set ${want} (dry run)`);
         else {
           const was = clientwiseNow(days);
           await api.setClientwise(pb.id, body);
