@@ -307,8 +307,9 @@ export function TradeBookAccounts({
         <p className="mb-2 text-xs text-faint">Charges by kind</p>
         <ChargeBar parts={yearChargeParts(summary)} />
         <p className="mt-2 text-xs text-faint">
-          Collateral interest is shown beside the charges, never inside the net: the sheet never had
-          it. The notes' charges split by kind for one day are in its drawer.
+          Collateral interest and the other debits (an estimate: ₹1,000 per broker a year) are shown
+          beside the charges, never inside the net: the sheet never had them. The notes' charges
+          split by kind for one day are in its drawer.
         </p>
       </div>
     </div>

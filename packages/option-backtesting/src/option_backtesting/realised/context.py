@@ -2,7 +2,10 @@
 
 - `day_context(root, day)`: India VIX at the open and its percentile among the previous 252
   sessions' opens; per index traded (NIFTY, SENSEX, ...) the gap from the previous close, the
-  day's range as a % of the open, and whether its weekly expires that day.
+  day's range as a % of the open, whether its weekly expires that day, and its 7-day ATM IV at
+  15:00 with that IV's percentile over the last year (`tdata derived`'s `iv_daily`, read as
+  stored; blank where it is not built); and the day's events (`events.csv` beside this file:
+  RBI policy decisions and Union Budgets, from RBI's published meeting schedules).
 - `trip_extremes(root, trip)`: for a closed trip with fill times, the contract's 1-minute bars
   from its entry minute to its exit minute: the worst point against the position (MAE) and the
   best in its favour (MFE), in rupees for the trip's quantity, and the spot at entry with the
@@ -18,9 +21,11 @@ from pathlib import Path
 
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
+from trading_data import derived
 
 from .trips import Trip
 
+EVENTS = Path(__file__).resolve().parent / "events.csv"
 REFERENCE = Path(__file__).resolve().parent.parent / "data" / "reference"
 VIX = "INDIAVIX"
 VIX_LOOKBACK = 252
@@ -104,6 +109,41 @@ def _expiries() -> frozenset[tuple[str, date]]:
     return frozenset(out)
 
 
+@lru_cache(maxsize=1)
+def _events() -> dict[date, tuple[dict, ...]]:
+    out: dict[date, list[dict]] = {}
+    with EVENTS.open(encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            try:
+                d = date.fromisoformat(row["date"])
+            except (KeyError, ValueError, TypeError):
+                continue
+            out.setdefault(d, []).append(
+                {"event": row.get("event"), "description": row.get("description")}
+            )
+    return {d: tuple(v) for d, v in out.items()}
+
+
+def events(day: date) -> list[dict]:
+    """The day's market events (RBI policy decision, Union Budget), [] for an ordinary day."""
+    return list(_events().get(day, ()))
+
+
+def _iv(root: Path, name: str, day: date) -> tuple[float | None, float | None]:
+    """The index's 7-day ATM IV at 15:00 and its percentile over the last year, in percent."""
+    try:
+        row = derived.iv_for_day(root, name, day)
+    except Exception:  # a damaged or half-written derived file costs this figure only
+        return None, None
+    if not row:
+        return None, None
+
+    def pct(v):
+        return None if v is None else round(v * 100, 1)
+
+    return pct(row.get("iv_7d_1500")), pct(row.get("iv_7d_pct_1y"))
+
+
 def day_context(root: Path, day: date, underlyings: tuple[str, ...] = ("NIFTY", "SENSEX")) -> dict:
     vix_days = [d for d in _index_days(root, VIX) if d <= day]
     vix_open = None
@@ -121,6 +161,7 @@ def day_context(root: Path, day: date, underlyings: tuple[str, ...] = ("NIFTY", 
         if not bars:
             indices[name] = None
             continue
+        iv, iv_pct = _iv(root, name, day)
         earlier = [d for d in _index_days(root, name) if d < day]
         prev = _index_bars(root, name, earlier[-1]) if earlier else []
         prev_close = prev[-1][4] if prev else None
@@ -133,8 +174,16 @@ def day_context(root: Path, day: date, underlyings: tuple[str, ...] = ("NIFTY", 
             "gap_pct": round((o - prev_close) * 100 / prev_close, 2) if prev_close else None,
             "range_pct": round((hi - lo) * 100 / o, 2) if o else None,
             "expiry_day": (name, day) in _expiries(),
+            "iv_7d": iv,
+            "iv_pct": iv_pct,
         }
-    return {"day": day.isoformat(), "vix_open": vix_open, "vix_pct": vix_pct, "indices": indices}
+    return {
+        "day": day.isoformat(),
+        "vix_open": vix_open,
+        "vix_pct": vix_pct,
+        "indices": indices,
+        "events": events(day),
+    }
 
 
 def _contract_bars(root: Path, trip: Trip) -> list[tuple[time, float, float]]:

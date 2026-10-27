@@ -20,6 +20,13 @@ One account (`account="broker/id"`) uses that account's notes only: the day's al
 the whole book's and are left out. Collateral interest from the ledger is shown beside the
 figures (`interest`), never inside them: the sheet never had it. Ledger e-mails dated a weekend
 or holiday count on the next session (those after the last session wait for the next one).
+
+`other_debits` is an estimate, not a note figure: the account debits that reach neither a note
+nor an e-mail (DP charges, AMC and the like) at ₹1,000 per F&O broker a year (owner,
+2026-10-27), accrued per calendar day from each broker's first line in the store. A row carries
+the days since the previous row, so a range starting on a Monday carries the weekend before it.
+With `account`, the rate is that account's broker's (one account per broker today). It is shown
+beside the figures with the interest, and taken off only in the summary's `net_after_debits`.
 Averages and rounding are exact decimals, half away from zero, like the sheet's ROUND.
 """
 
@@ -34,6 +41,8 @@ from decimal import Decimal
 from .store import Book
 
 ZERO = Decimal(0)
+#: The owner's assumption for the debits no note or e-mail shows (2026-10-27).
+OTHER_DEBITS_PER_BROKER_YEAR = Decimal(1000)
 
 
 def algo_fee(algos: int | None) -> Decimal:
@@ -63,6 +72,7 @@ class DayRow:
     interest: Decimal
     deposits: Decimal
     withdrawals: Decimal
+    other_debits: Decimal = ZERO
     cumulative: Decimal = ZERO
     drawdown: Decimal = ZERO
     avg_profit_50: int | None = None
@@ -134,6 +144,19 @@ def _ledger(events: Iterable[dict], account: str | None) -> tuple[Decimal, Decim
     return interest, deposits, withdrawals
 
 
+def _accrued(brokers: list[str], first: dict[str, date], previous: date | None, day: date):
+    """The other-debits estimate for the calendar days since the previous row (one day for the
+    first row, and for a broker whose first line is today)."""
+    total = ZERO
+    for b in brokers:
+        if b not in first:
+            continue
+        since = previous if previous is not None and previous >= first[b] else None
+        days = (day - since).days if since is not None else 1
+        total += OTHER_DEBITS_PER_BROKER_YEAR * days / 365
+    return total.quantize(Decimal("0.01"))
+
+
 def _mean(values: list) -> Decimal | None:
     vals = [v for v in values if v is not None]
     return sum(vals, ZERO) / len(vals) if vals else None
@@ -161,15 +184,24 @@ def daily(
     start at the store's first day even when `start` is later, as the sheet's do."""
     rows: list[DayRow] = []
     capital_line = _CapitalLine(account)
+    first_line: dict[str, date] = {}  # each F&O broker's first day in the store
+    previous: date | None = None
     # Ledger e-mails dated a weekend or holiday count on the next session.
     ledger_days = sorted(book.ledger)
     li = 0
     for day in book.days:
         if end is not None and day > end:
             break
+        for ln in book.fno_lines(day):
+            first_line.setdefault(ln.get("broker"), day)
         lines = book.fno_lines(day, account)
         if account is not None and not lines:
             continue
+        brokers = (
+            [account.split("/")[0]] if account is not None else [b for b in FNO if b in first_line]
+        )
+        other_debits = _accrued(brokers, first_line, previous, day)
+        previous = day
         notes = [ln for ln in lines if ln.get("status") == "note" and ln.get("fno")]
         manual = book.manual.get(day, {})
         algos = manual.get("algos")
@@ -200,6 +232,7 @@ def daily(
                 interest=interest,
                 deposits=deposits,
                 withdrawals=withdrawals,
+                other_debits=other_debits,
             )
         )
     _running(rows)
@@ -250,6 +283,7 @@ def summary(rows: list[DayRow]) -> dict:
     # The notes' own charges, apart from the algo fees. A day with algos typed and no note has
     # its fee in `algo_fees` but not in `charges`, so charges − algo fees is not this figure.
     note_charges = sum((r.note_charges for r in rows if r.note_charges is not None), ZERO)
+    other_debits = sum((r.other_debits for r in rows), ZERO)
     cumulative = peak = max_dd = ZERO
     run = longest = 0
     growth = Decimal(1)
@@ -276,6 +310,8 @@ def summary(rows: list[DayRow]) -> dict:
         "note_charges": float(note_charges),
         "algo_fees": float(sum((r.algo_fees for r in rows), ZERO)),
         "interest": float(sum((r.interest for r in rows), ZERO)),
+        "other_debits": float(other_debits),
+        "net_after_debits": float(net - sum((r.interest for r in rows), ZERO) - other_debits),
         "charge_profit_pct": round(float(charges * 100 / net), 1) if net else None,
         "max_drawdown": float(max_dd),
         "max_drawdown_pct": pct(max_dd),
@@ -347,6 +383,9 @@ def fiscal_years(rows: list[DayRow]) -> list[dict]:
                 "max_drawdown": s["max_drawdown"],
                 "charges": s["charges"],
                 "algo_fees": s["algo_fees"],
+                "interest": s["interest"],
+                "other_debits": s["other_debits"],
+                "net_after_debits": s["net_after_debits"],
             }
         )
     return out

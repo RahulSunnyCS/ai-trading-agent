@@ -178,6 +178,14 @@ export function TradeBookHeadline({
           collateral interest{' '}
           <span className="metric text-foreground">{formatInr(summary.interest)}</span>
         </span>
+        <span title="DP, AMC and other debits no note or e-mail shows: an estimate of ₹1,000 per broker a year">
+          other debits (est.){' '}
+          <span className="metric text-foreground">{formatInr(summary.other_debits)}</span>
+        </span>
+        <span>
+          net after both{' '}
+          <span className="metric text-foreground">{formatInr(summary.net_after_debits)}</span>
+        </span>
       </div>
     </section>
   );

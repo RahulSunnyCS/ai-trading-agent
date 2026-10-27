@@ -26,6 +26,7 @@ import {
 import {
   type ScatterPoint,
   accountLabel,
+  brokerName,
   contractLabel,
   filterTrips,
   heldLabel,
@@ -38,6 +39,7 @@ import {
   tripMonths,
 } from '../../lib/tradeBookView';
 import type { TradeBookTrip } from '../../types/tradeBook';
+import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { RadioMenu } from '../ui/RadioMenu';
 import { SkeletonRows } from '../ui/Skeleton';
@@ -460,7 +462,14 @@ export function TradeBookTrades({
                           <tbody>
                             {Object.entries(yearData.turnover).map(([fy, t]) => (
                               <TRow key={fy}>
-                                <Td dense>FY {fy}</Td>
+                                <Td dense>
+                                  FY {fy}
+                                  {yearData.turnover_partial?.[fy]?.length ? (
+                                    <span className="ml-1.5">
+                                      <Badge tone="warning">partial</Badge>
+                                    </span>
+                                  ) : null}
+                                </Td>
                                 <Td dense numeric align="right">
                                   {formatInr(t.turnover)}
                                 </Td>
@@ -489,6 +498,21 @@ export function TradeBookTrades({
                               (yearData.coverage.unmatched ?? 0) + (yearData.coverage.none ?? 0),
                             )}
                           </span>
+                          {yearData.coverage.before_trades_from ? (
+                            <>
+                              {' '}
+                              · left out:{' '}
+                              <span className="metric text-foreground">
+                                {formatInt(yearData.coverage.before_trades_from)}
+                              </span>{' '}
+                              notes before{' '}
+                              {Object.entries(yearData.trades_from ?? {})
+                                .map(([b, d]) => `${brokerName(b)}'s ${formatDay(d)}`)
+                                .join(', ')}{' '}
+                              (older layouts; their days still count in the totals, their trades and
+                              turnover do not, so a year marked partial is not the whole year's)
+                            </>
+                          ) : null}
                         </p>
                       </div>
                     );

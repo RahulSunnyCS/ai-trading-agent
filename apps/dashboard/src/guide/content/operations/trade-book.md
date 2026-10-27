@@ -8,7 +8,7 @@ Nothing here is a backtest and nothing here places an order. Every figure comes 
 
 - **Contract notes.** The laptop reads each broker's notes from the mailbox after midnight (and again at 07:30) and stores them. A note gives the day's F&O figures per account: the pay-in / pay-out obligation, brokerage, the other charges, total charges and the final net.
 - **Ledger e-mails.** Deposits, payouts, quarterly fund settlements, Angel One's collateral-interest e-mail and the margin-shortfall warnings.
-- **Your inputs.** The two columns the sheet asked you to type: the number of algo trades taken that day and the capital. Angel One's capital is also read at 15:50 for the next session.
+- **Your inputs.** The two columns the sheet asked you to type: the number of algo trades taken that day and the capital. Angel One's capital is also read at 15:50 for the next session; Finvasia's stays what you type and carries forward until you change it.
 
 The chip at the top right, **Notes in through ...**, is the newest day with a stored note.
 
@@ -33,7 +33,7 @@ Five tiles answer "how is the year going?", each against the benchmark you pick 
 
 **Benchmarks.** A **target pace** (24% a year by default; 12, 18, 30 and 36 are offered) is capital × the rate × the share of the financial year that has passed since the year's first session (1 April, or a later first session in the store) up to the last day shown. It has a figure for net profit and return only, and the other tiles say "no target figure". **Last FY** compares every tile with the year before, up to the same calendar day, and draws last year's running net on the chart. The badge on each tile is the gap: green when it is in your favour, red when it is not.
 
-The line under the tiles has the average day, average win and loss, best and worst day, the latest 100-day average profit and profit/capital, the number of sessions, the algo fees and the collateral interest.
+The line under the tiles has the average day, average win and loss, best and worst day, the latest 100-day average profit and profit/capital, the number of sessions, the algo fees, the collateral interest, **other debits (est.)** and the **net after both**. Other debits are the account charges no note or e-mail shows (DP charges, AMC and the like), estimated at ₹1,000 per broker a year and counted per calendar day from each broker's first note. Like the interest they sit beside the net profit, never inside it.
 
 ## The day's figures (the sheet's columns)
 
@@ -69,13 +69,13 @@ Each is blank until its window has 50 or 100 sessions. Averages are rounded to t
 
 - **Summary** is the block under your sheet's daily rows: net profit and its % of capital, max drawdown, the **longest drawdown** (the most sessions in a row spent below the running peak), win days, the average winning, losing and overall day, and the charges.
 - **Monthly returns** shows April to March: each month's gain as a % of that month's average capital (or in ₹), and **3m**, the average of that month's and the two before. The table below has one row per financial year; a click opens that year.
-- **By account** gives each account's net, average capital, return and charge / profit, and the year's algo fees on their own row. **Charges by kind** splits the year's charges into the notes' own charges, the algo fees and Angel One's collateral interest. The interest is shown beside the charges, never inside the net profit: the sheet never had it.
+- **By account** gives each account's net, average capital, return and charge / profit, and the year's algo fees on their own row. **Charges by kind** splits the year's charges into the notes' own charges, the algo fees, Angel One's collateral interest and the estimated other debits. The interest and the estimate are shown beside the charges, never inside the net profit: the sheet never had them.
 
 ## The Days table and the day drawer
 
-One row per session, newest first, with its notes, net, charges, algos, to date, drawdown and the sources of its trades. **Show days with no note** hides the days without a note on any account (a day with a failed note always shows). **CSV** downloads the year's rows.
+One row per session, newest first, with its notes, net, charges, algos, to date, drawdown and the sources of its trades; an **RBI** or **Budget** badge marks a policy-decision or Budget day. **Show days with no note** hides the days without a note on any account (a day with a failed note always shows). **CSV** downloads the year's rows.
 
-A row opens the day in a drawer: each account's note (obligation, charges, net) or why there is none, every charge of the day by kind (brokerage, STT, exchange, GST, SEBI, stamp, the algo fees and the collateral interest), the fills paired into trades, the market that day (India VIX at the open and its percentile, each index's gap and range, and whether it was an expiry day), the ledger e-mails, and your inputs. The arrows step to the previous and next session.
+A row opens the day in a drawer: each account's note (obligation, charges, net) or why there is none, every charge of the day by kind (brokerage, STT, exchange, GST, SEBI, stamp, the algo fees and the collateral interest), the fills paired into trades, the market that day (an RBI policy decision or a Union Budget first, then India VIX at the open and its percentile, and each index's gap, range, 7-day IV at 15:00 with its percentile over the last year, and whether it was an expiry day), the ledger e-mails, and your inputs. The arrows step to the previous and next session.
 
 **Edit inputs** opens the inputs dialog: the algo trades taken (the fee is shown as you type) and the capital, as one total or per broker. Only what you change is saved; clearing a field removes it. The page re-reads the day and the year after a save.
 
@@ -91,7 +91,8 @@ Every trade, paired from the notes' fills: one contract on one account, from a f
 - **Worst** and **Best** (MAE and MFE) come from the contract's 1-minute bars between entry and exit: how far the trade went against you, and how far in your favour, in rupees for its quantity. They exist only for index options the collector stores and for notes that print fill times; otherwise they are blank.
 - **From spot** is the strike minus the index at entry, in points. **DTE** is weekdays to expiry.
 - The cards add up each source's closed trades: net, how many won, the average. The scatter puts every trade with a best and worst point at its worst point (across) and the share of its best point it kept (up).
-- **Turnover** is always the whole year's F&O turnover, whatever the Period, for your CA (the sum of each trade's absolute P&L): a figure, not tax advice.
+- **Angel One's trades start on 2 Feb 2026.** Its earlier notes came in older layouts whose trades did not all read, so they are left out of the trades, the cards and the turnover (the line under the turnover counts them). Their days still count in every day figure, total and ratio.
+- **Turnover** is the whole year's F&O turnover, whatever the Period, for your CA, except in a year marked **partial**: FY 2025-26 leaves out Angel One's trades before 2 Feb 2026 (the sum of each trade's absolute P&L): a figure, not tax advice.
 
 Filters for source, index and days to expiry sit above the cards and stay in the address.
 

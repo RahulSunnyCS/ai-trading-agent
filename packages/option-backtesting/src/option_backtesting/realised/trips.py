@@ -20,6 +20,12 @@ Per account and contract, the notes are read in session order and the position k
 A summary line has no times: per contract its sells and buys are paired with each other (or with
 a carried position first); a pair made inside one summary line has no `direction`.
 
+A broker in `TRADES_FROM` gives only the trips opened from that day: its earlier notes' trades
+did not all read (older layouts), so its trips start where every note reads (owner, 2026-10-27).
+The earlier notes are still read into the book, so a position opened before the day and closed
+after it pairs (and is left out) rather than its closing fill opening a trip of its own. The day
+figures (`ratios`) still use every note; `coverage` counts the earlier notes apart.
+
 `charges` share out what each note charged on top of its fills (its final net minus the fills'
 sum) by each trip's turnover on that note, so the trips of a day whose positions all closed add
 up to the notes' final nets.
@@ -36,6 +42,24 @@ from .store import Book
 ZERO = Decimal(0)
 READ = ("fills", "summary")
 PAISE = Decimal("0.01")
+#: The first session from which every one of the broker's notes reads its trades.
+TRADES_FROM = {"angelone": date(2026, 2, 2)}
+
+
+def _before_trades(line: dict, day: date) -> bool:
+    start = TRADES_FROM.get(line.get("broker"))
+    return start is not None and day < start
+
+
+def partial_years() -> dict[str, list[str]]:
+    """Per financial year ("2025-26"), the brokers whose trips start inside or after it."""
+    from .ratios import fiscal_year
+
+    out: dict[str, list[str]] = {}
+    for broker, start in TRADES_FROM.items():
+        fy = fiscal_year(start)
+        out.setdefault(f"{fy}-{str(fy + 1)[2:]}", []).append(broker)
+    return out
 
 
 def _dec(value: object) -> Decimal:
@@ -325,6 +349,7 @@ def trips(
         b.expire(last + timedelta(days=1))
     out = [o.trip(d, status) for o, d, status in b.done]
     out += [o.trip(last, "open") for o in b.open.values()]
+    out = [t for t in out if not _before_trades({"broker": t.broker}, t.entry_day)]
     out = [t for t in out if (start is None or t.day >= start) and (end is None or t.day <= end)]
     return sorted(out, key=lambda t: (t.day, t.entry_time or "", t.broker, t.account))
 
@@ -335,14 +360,19 @@ def day_trips(book: Book, day: date) -> list[Trip]:
 
 
 def coverage(book: Book, *, start: date | None = None, end: date | None = None) -> dict:
-    """How many F&O notes give trips (their trades add up) and how many do not."""
+    """How many F&O notes give trips (their trades add up), how many do not, and how many are
+    before their broker's `TRADES_FROM` (`before_trades_from`)."""
     counts: dict[str, int] = {}
     for day in book.days:
         if (start and day < start) or (end and day > end):
             continue
         for line in book.fno_lines(day):
             if line.get("status") == "note":
-                k = line.get("trades_check") or "none"
+                k = (
+                    "before_trades_from"
+                    if _before_trades(line, day)
+                    else line.get("trades_check") or "none"
+                )
                 counts[k] = counts.get(k, 0) + 1
     return counts
 

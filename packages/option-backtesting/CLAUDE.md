@@ -276,9 +276,12 @@ Otherwise:
 - `realised/` — BL-168 Phase 4: the contract-notes store (`TRADING_DATA_ROOT/contract-notes/`, written by
   `packages/contract-notes`) read as the owner's sheet: `store.py` (load; a damaged line is a problem, never fatal),
   `ratios.py` (the sheet's columns O, P, Q, R, S, T, U, V, W, X, Y, Z by its own formulas, the summary block, months,
-  FY), `trips.py` (fills paired flat-to-flat per contract; the note's other charges shared by turnover so trips add up
-  to the final net; turnover), `sources.py` (the live capture's fills), `context.py` (VIX, gap, range, expiry; MAE /
-  MFE from the 1-minute lake), `capital.py` (the 15:50 Angel One reading), `views.py` (the JSON the CLI and
+  FY; `other_debits`, an estimate of ₹1,000 per F&O broker a year, beside the figures, never inside them), `trips.py`
+  (fills paired flat-to-flat per contract; the note's other charges shared by turnover so trips add up
+  to the final net; turnover; a broker in `TRADES_FROM` gives trips only from that day, Angel One from 2026-02-02),
+  `sources.py` (the live capture's fills), `context.py` (VIX, gap, range, expiry, each index's 7-day IV percentile
+  from `iv_daily`, and event days from `realised/events.csv`, kept outside `data/reference/` so the portfolio
+  cache's stamp of that folder does not change; MAE / MFE from the 1-minute lake), `capital.py` (the 15:50 Angel One reading), `views.py` (the JSON the CLI and
   `api/contract_notes_routes.py` share). Figures are recomputed on read; only `capital` and the page's inputs write
   `manual/<day>.json`.
 - `legwise/algtst.py` + `rotation/algtst_export.py` — BL-137: a leg-wise strategy as an AlgoTest `.algtst` (import

@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-26
+Last updated: 2026-10-27
 
 ## Open
 
@@ -55,7 +55,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-141](BL-141-live-vs-backtest-slippage-discretionary.md) | Live vs backtest: a 15:40 capture of each platform's per-strategy P&L, slippage vs the paper result (signed, in the owner's 16:00 Telegram), discretionary trades tracked apart | P1 | In progress | feature | broker-login + options |
 | [BL-143](BL-143-trade-monitoring-and-safety.md) | Trade monitoring and safety: wake schedule, 09:25 deploy check, −₹5k/−₹8k loss alerts, Telegram stop button (switch off + square off, confirm tap), margin check, Fyers reminder | P1 | In progress | feature | broker-login + scheduler |
 | [BL-150](BL-150-friday-3pm-orders-kite-basket.md) | Friday 15:00 Momentum orders, one tap into a pre-filled Kite basket (the owner places the order in Kite; this repo places none) | P1 | Planned | feature | momentum + scheduler |
-| [BL-168](BL-168-contract-notes-trade-book.md) | Contract notes in the repo: the Gmail → PDF job as a scheduler job, a store under `TRADING_DATA_ROOT` (trades, itemised charges, the PDFs, ledger e-mails, Kite's notes for Momentum), analytics (trades by source, round trips, best / worst point, the sheet's ratios), a Trade book page designed first, the monthly backup | P1 | In progress (Phases 1, 2, 4 done; 3 built, sheet differences wait for the owner; 6 built; 5 page built (PR #345), in review) | feature | contract-notes / scheduler / trading-data / dashboard |
+| [BL-168](BL-168-contract-notes-trade-book.md) | Contract notes in the repo: the Gmail → PDF job as a scheduler job, a store under `TRADING_DATA_ROOT` (trades, itemised charges, the PDFs, ledger e-mails, Kite's notes for Momentum), analytics (trades by source, round trips, best / worst point, the sheet's ratios), a Trade book page designed first, the monthly backup | P1 | In progress (Phases 1–5 done; sheet differences → BL-170; 6 built, waits for a real backup run) | feature | contract-notes / scheduler / trading-data / dashboard |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |
@@ -84,6 +84,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-151](BL-151-monthly-trending-theme-scout.md) | Monthly trending-theme scout (an agent reads Reddit, news and, if affordable, X) and a starting date for every Broad theme, so a theme cannot be used before it became one | P2 | Idea | feature + research | momentum + scheduler |
 | [BL-152](BL-152-margin-check-without-algotest.md) | Margin check: a free-margin read that does not need AlgoTest or Shoonya's login, the need estimate checked against what the broker blocks, then switched on (`MARGIN_CHECK`) | P2 | Planned | improvement | broker-login |
 | [BL-169](BL-169-discretionary-trade-journal.md) | Discretionary trade journal: one-tap reasons for manual trades, what overriding the algos cost in rupees, behaviour patterns (descriptive only) | P2 | Planned | feature | contract-notes / scheduler / dashboard |
+| [BL-170](BL-170-sheet-vs-notes-differences.md) | Sheet against contract notes: explain the differences BL-168's reconciliation lists (owner's review; look for one systematic cause first) | P2 | Planned | chore | contract-notes |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
@@ -91,6 +92,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-048](BL-048-dormant-server-surfaces.md) | Dormant surfaces: test-only server, broken personality edit, unwritten regime tags, the YAML engine's future | P3 | Planned | chore | server |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-163](BL-163-kronos-forecast-trigger.md) | Kronos hour-ahead forecast as an intraday trigger: two fixed rules (direction → Dir, contraction → Widesl) through the rule tester, zero-shot, NIFTY, sessions after the weights were published only | P3 | Planned | research | options |
+| [BL-171](BL-171-finvasia-capital-auto.md) | Finvasia's capital read automatically for the Trade book (typed by hand meanwhile) | P3 | Idea | improvement | contract-notes / broker-login / scheduler |
 
 ## Done / Dropped
 

@@ -25,6 +25,11 @@ export interface TradeBookDay {
   interest: number;
   deposits: number;
   withdrawals: number;
+  /** Estimated account debits no note or e-mail shows (DP, AMC): ₹1,000 per F&O broker a year,
+   * accrued per calendar day. Beside the figures, never inside them. */
+  other_debits: number;
+  /** The day's market events (RBI policy decision, Union Budget). */
+  events: TradeBookEvent[];
   /** R and S: running from the store's first day. */
   cumulative: number;
   drawdown: number;
@@ -48,6 +53,10 @@ export interface TradeBookSummaryBlock {
   note_charges: number;
   algo_fees: number;
   interest: number;
+  /** Estimated (₹1,000 per F&O broker a year). */
+  other_debits: number;
+  /** net − collateral interest − other debits. */
+  net_after_debits: number;
   charge_profit_pct: number | null;
   max_drawdown: number;
   max_drawdown_pct: number | null;
@@ -87,6 +96,9 @@ export interface TradeBookFiscalYear {
   max_drawdown: number;
   charges: number;
   algo_fees: number;
+  interest: number;
+  other_debits: number;
+  net_after_debits: number;
 }
 
 export interface TradeBookAccount {
@@ -185,6 +197,10 @@ export interface TradeBookTripsResponse {
   by_source: Record<string, { trips: number; net: number; won: number }>;
   turnover: Record<string, { turnover: number; profit: number; charges: number; trips: number }>;
   coverage: Record<string, number>;
+  /** Per broker, the first day its notes give trips (earlier notes' trades did not all read). */
+  trades_from: Record<string, string>;
+  /** Per financial year, the brokers whose trades before `trades_from` the turnover leaves out. */
+  turnover_partial: Record<string, string[]>;
 }
 
 export interface TradeBookLedgerEvent {
@@ -259,6 +275,15 @@ export interface TradeBookIndexContext {
   gap_pct: number | null;
   range_pct: number | null;
   expiry_day: boolean;
+  /** 7-day ATM IV at 15:00, in percent; null where the derived tables are not built. */
+  iv_7d: number | null;
+  /** That IV's percentile over the last year, 0-100. */
+  iv_pct: number | null;
+}
+
+export interface TradeBookEvent {
+  event: 'RBI_POLICY' | 'UNION_BUDGET' | string;
+  description: string;
 }
 
 export interface TradeBookDayContext {
@@ -266,6 +291,7 @@ export interface TradeBookDayContext {
   vix_open: number | null;
   vix_pct: number | null;
   indices: Record<string, TradeBookIndexContext | null>;
+  events: TradeBookEvent[];
 }
 
 export interface TradeBookManual {

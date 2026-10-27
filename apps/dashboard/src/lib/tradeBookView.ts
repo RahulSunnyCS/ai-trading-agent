@@ -530,14 +530,15 @@ const PART_SWATCHES = [
 
 /**
  * The year's charges split as the store can split them for a range: the notes' charges, the
- * algo fees (the sheet's formula) and, shown beside them because the sheet never had it, the
- * collateral interest from the ledger.
+ * algo fees (the sheet's formula) and, shown beside them because the sheet never had them, the
+ * collateral interest from the ledger and the estimated other debits (₹1,000 per broker a year).
  */
 export function yearChargeParts(s: TradeBookSummaryBlock): ChargePart[] {
   const parts = [
     { key: 'notes', label: 'Contract-note charges', amount: s.note_charges },
     { key: 'algo', label: 'Algo fees', amount: s.algo_fees },
     { key: 'interest', label: 'Collateral interest', amount: s.interest },
+    { key: 'debits', label: 'Other debits (est.)', amount: s.other_debits ?? 0 },
   ];
   return parts
     .filter((p) => p.amount > 0)
@@ -548,7 +549,9 @@ export function yearChargeParts(s: TradeBookSummaryBlock): ChargePart[] {
           ? 'bg-accent'
           : p.key === 'interest'
             ? 'bg-faint'
-            : (PART_SWATCHES[i] as string),
+            : p.key === 'debits'
+              ? 'bg-muted'
+              : (PART_SWATCHES[i] as string),
     }));
 }
 

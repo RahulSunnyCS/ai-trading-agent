@@ -38,7 +38,7 @@ import { TradeBookInputsDialog } from './TradeBookInputsDialog';
 import { ChargeBar, Inr, Loaded, SourceBadge, Stat } from './parts';
 
 function contextText(d: TradeBookDayDetail): string {
-  const parts: string[] = [];
+  const parts: string[] = (d.context.events ?? []).map((e) => e.description);
   if (d.context.vix_open !== null) {
     parts.push(
       `VIX ${formatNumber(d.context.vix_open, 1)}${d.context.vix_pct !== null ? ` (${formatInt(d.context.vix_pct)} pct)` : ''}`,
@@ -51,6 +51,9 @@ function contextText(d: TradeBookDayDetail): string {
         ? `gap ${formatPct(ix.gap_pct, 1, { unit: 'percent', sign: true })}`
         : null,
       ix.range_pct !== null ? `range ${formatPct(ix.range_pct, 1, { unit: 'percent' })}` : null,
+      ix.iv_7d != null
+        ? `IV ${formatNumber(ix.iv_7d, 1)}${ix.iv_pct != null ? ` (${formatInt(ix.iv_pct)} pct)` : ''}`
+        : null,
       ix.expiry_day ? 'expiry' : null,
     ].filter(Boolean);
     parts.push(`${name} ${bits.join(', ')}`);
