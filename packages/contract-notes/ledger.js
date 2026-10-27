@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const Decimal = require('decimal.js');
 const { istNow } = require('./calendar');
+const { writeDurable } = require('./store');
 
 // The brokers' ledger e-mails (BL-168 Phase 3): money in and out of an account, and charges or
 // warnings that never appear on a contract note. One reader per e-mail, matched by subject and
@@ -161,9 +162,7 @@ function writeEvent(root, event) {
   if (events.some((e) => e.message_id === event.message_id && e.kind === event.kind)) return false;
   events.push(event);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, `${events.map((e) => JSON.stringify(e)).join('\n')}\n`);
-  fs.renameSync(tmp, file);
+  writeDurable(file, `${events.map((e) => JSON.stringify(e)).join('\n')}\n`);
   return true;
 }
 

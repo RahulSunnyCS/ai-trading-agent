@@ -19,6 +19,7 @@ const {
   saveRaw,
   storeRoot,
   writeCursors,
+  writeDurable,
   writeLine,
 } = require('./store');
 const { withRetry } = require('./utils/retry');
@@ -365,10 +366,7 @@ async function main(argv, deps = {}) {
             } else {
               file = saveRaw(root, acc.broker, acc.accountId, day, note.content).file;
               for (const old of superseded) {
-                fs.writeFileSync(
-                  file.replace(/\.pdf$/, `.${old.sha256.slice(0, 8)}.pdf`),
-                  old.content,
-                );
+                writeDurable(file.replace(/\.pdf$/, `.${old.sha256.slice(0, 8)}.pdf`), old.content);
               }
             }
             const read = await d.readNote(file, acc);
