@@ -134,6 +134,8 @@ const FAILED_PART: Record<ReturnType<typeof brokerLoginFailedPart>, string> = {
 interface LocalLogin {
   ok: boolean;
   nothing?: boolean;
+  /** the Mac's catch-up found GitHub's backup had already logged in: its run */
+  github?: string;
   fallback?: { parts: string[]; url: string | null } | null;
   result?: {
     algotest: { name: string; status: string; detail: string }[] | null;
@@ -153,6 +155,8 @@ export function localLoginCheck(local: LocalLogin | null): Check | null {
   const label = 'Broker login';
   if (local.nothing)
     return { ok: true, label, detail: 'nothing to log in (Settings › Automation)' };
+  if (local.ok && local.github)
+    return { ok: true, label, detail: `logged in by GitHub's backup → ${local.github}` };
   if (local.ok) return { ok: true, label, detail: 'logged in on the Mac' };
   if (local.fallback) return null;
   const r = local.result;

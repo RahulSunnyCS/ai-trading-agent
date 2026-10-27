@@ -184,6 +184,32 @@ async function main(): Promise<number> {
       return 1;
     }
   }
+  // A catch-up after the Mac slept through 08:02: GitHub's 08:15 / 08:45 backstop may already
+  // have logged in (LOCAL_LOGIN_DONE was not set). Logging in again would resend every password.
+  if (!dryRun && env !== null) {
+    try {
+      const runs = JSON.parse(
+        await gh([
+          'run',
+          'list',
+          '--workflow',
+          WORKFLOW,
+          '--created',
+          `>=${utcDay()}`,
+          '--json',
+          'conclusion,createdAt,url',
+        ]),
+      ) as { conclusion: string; createdAt: string; url: string }[];
+      const done = runs.find((r) => r.conclusion === 'success');
+      if (done) {
+        console.log(`GitHub already logged in today (${done.url}): nothing to do on the Mac`);
+        await status({ ok: true, github: done.url });
+        return 0;
+      }
+    } catch (error) {
+      console.warn(`could not ask GitHub for today's runs (${describe(error)}): logging in here`);
+    }
+  }
   if (env === null) {
     console.log(`no broker login in the settings (${source}): nothing to do`);
     if (!dryRun) {
