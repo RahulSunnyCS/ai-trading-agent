@@ -63,11 +63,11 @@ A warning badge on a block means its master switch holds it back.
 
 - **The 08:00 login:**
   - With logins off, or no block logging in, the laptop does not start the login run, and the 08:15 GitHub backstop does nothing.
-  - With neither AlgoTest block on, the run skips the AlgoTest brokers.
-  - Quantiply · Shoonya logs in after the AlgoTest logins, when its block is on.
+  - With neither AlgoTest block on, the run leaves AlgoTest out: it does not wait for AlgoTest's 08:15 window, Quantiply logs in at once, and the Telegram report names only Quantiply.
+  - Quantiply · Shoonya logs in after the AlgoTest logins (straight after Quantiply · Angel One when AlgoTest is off), when its block is on. Its result counts in the report's verdict.
 - **The evening and 09:16 uploads:** AlgoTest gets every list its blocks choose. Each Quantiply account (Angel One, Shoonya) gets its own block's list. A block with upload off is left untouched.
 - **Deploying:** it also needs Automated deployment on.
-  - AlgoTest deploys the day's T1 picks after 09:16.
+  - AlgoTest deploys the day's T1 picks after 09:16, only while an AlgoTest block uploads the T1 list. With none, the deploy and its 15:35 check do not log in to AlgoTest (the check still runs on a day the tool deployed something).
   - Quantiply switches on each account's picks at 16:55 for the next day, and at 09:21 any that changed. It only does this for an account whose block uploads a list.
   - At 15:40 the tool's Quantiply algos are switched off again; otherwise they would run on the same weekday next week. This always runs, even with Automated deployment or `QUANTIPLY_DEPLOY` off.
   - Switching an algo off by hand after the tool switched it on is final for that day: the 09:21 run does not switch it back on.

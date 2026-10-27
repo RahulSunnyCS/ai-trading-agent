@@ -19,33 +19,43 @@ const STATUS_ICON: Record<ResultStatus, string> = {
 const STATUS_RANK: Record<ResultStatus, number> = { FAIL: 0, OK: 1, SKIPPED: 2 };
 
 /**
- * `quantiply` is the Quantiply login's result line, or null/absent when QUANTIPLY_LOGIN is off -
- * then the report is exactly the AlgoTest-only one. With it, the verdict counts every login, each
- * AlgoTest line says "AlgoTest ·" so it can't be confused with Quantiply's own Angel One line, and
- * a Quantiply failure never hides the AlgoTest lines (or the other way round).
+ * `results` are the AlgoTest broker lines, or null when the settings ask for no AlgoTest login
+ * (ONLY=none, BL-140): then AlgoTest is not in the report at all. `quantiply` are the Quantiply
+ * lines that ran (Angel One, Shoonya), empty when none is switched on - then the report is exactly
+ * the AlgoTest-only one. With both, the verdict counts every login, each AlgoTest line says
+ * "AlgoTest ·" so it can't be confused with Quantiply's own Angel One line, and a failure on one
+ * platform never hides the other's lines.
  */
 export function formatReport(
-  results: BrokerResult[],
+  results: BrokerResult[] | null,
   runUrl: string | null,
-  quantiply: BrokerResult | null = null,
+  quantiply: BrokerResult[] = [],
 ): string {
-  const entries: BrokerResult[] = quantiply
-    ? [...results.map((r) => ({ ...r, name: `AlgoTest · ${r.name}` })), quantiply]
-    : results;
+  const algotest = results ?? [];
+  const both = results !== null && quantiply.length > 0;
+  const entries: BrokerResult[] = [
+    ...(both ? algotest.map((r) => ({ ...r, name: `AlgoTest · ${r.name}` })) : algotest),
+    ...quantiply,
+  ];
   const ready = entries.filter((r) => r.status === 'OK' || r.status === 'SKIPPED').length;
   const total = entries.length;
-  const noun = quantiply ? 'logins' : 'brokers';
+  const noun = quantiply.length > 0 ? 'logins' : 'brokers';
 
   let verdict: string;
-  if (results.length === 0) {
-    verdict = quantiply
+  if (results !== null && results.length === 0) {
+    verdict = both
       ? '🚨 AlgoTest login never reached the broker list'
       : '🚨 Login never reached the broker list';
-  } else if (ready === total) verdict = `✅ All ${noun} ready (${ready}/${total})`;
+  } else if (total === 0) verdict = '✅ Nothing to log in (Settings › Automation)';
+  else if (ready === total) verdict = `✅ All ${noun} ready (${ready}/${total})`;
   else if (ready === 0) verdict = `❌ All ${noun} failed (0/${total}) - check now`;
   else verdict = `⚠️ Partial (${ready}/${total}) - check now`;
 
-  const title = quantiply ? 'Broker login: AlgoTest + Quantiply' : 'AlgoTest broker login';
+  const platforms = [results !== null && 'AlgoTest', quantiply.length > 0 && 'Quantiply'].filter(
+    Boolean,
+  );
+  const title =
+    quantiply.length === 0 ? 'AlgoTest broker login' : `Broker login: ${platforms.join(' + ')}`;
   const lines = [verdict, `${title}, ${istTimestamp()} IST`, ''];
 
   const sorted = [...entries].sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status]);

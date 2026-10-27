@@ -232,7 +232,10 @@ async function main(): Promise<number> {
   );
   const launch = () => chromium.launch({ headless: !config.headed, slowMo: config.slowMo });
 
-  let results: BrokerResult[] = [];
+  // ONLY=none (BL-140, from the dashboard's settings): no AlgoTest login at all, so AlgoTest is
+  // neither waited for (its 08:16 window) nor in the report.
+  const algotest = config.only !== 'none';
+  let results: BrokerResult[] | null = algotest ? [] : null;
   // A Quantiply config problem is only its own FAIL line; the AlgoTest logins still run.
   let quantiply: BrokerResult | null = config.quantiplyProblem
     ? { name: QUANTIPLY_NAME, status: 'FAIL', detail: config.quantiplyProblem }
@@ -244,7 +247,12 @@ async function main(): Promise<number> {
 
   try {
     try {
-      if (order === 'first') {
+      if (!algotest) {
+        if (order !== 'off') {
+          browser = await launch();
+          quantiply = await runQuantiplyIsolated(browser, config.angelone);
+        }
+      } else if (order === 'first') {
         // Before 08:16 IST the window guard would only sleep: Quantiply uses those minutes and
         // costs AlgoTest nothing.
         browser = await launch();
@@ -256,19 +264,17 @@ async function main(): Promise<number> {
         await waitForLoginWindow(config);
         browser = await launch();
       }
-      algotestStarted = true;
-      // ONLY=none: no AlgoTest block logs in (BL-140, from the dashboard's settings). One SKIPPED
-      // line, never an empty list, which the report would read as "never reached the broker list".
-      results =
-        config.only === 'none'
-          ? [{ name: 'brokers', status: 'SKIPPED', detail: 'no AlgoTest login in the settings' }]
-          : await runAlgotest(browser, config, tracing);
+      if (algotest) {
+        algotestStarted = true;
+        browser ??= await launch();
+        results = await runAlgotest(browser, config, tracing);
+      }
     } catch (error) {
       fatal = describe(error);
       console.error(`\nfatal: ${fatal}`);
     }
 
-    if (order === 'last') {
+    if (order === 'last' && algotest) {
       try {
         browser ??= await launch();
         quantiply = await runQuantiplyIsolated(browser, config.angelone);
@@ -310,10 +316,8 @@ async function main(): Promise<number> {
     quantiply = { name: QUANTIPLY_NAME, status: 'FAIL', detail: 'did not run' };
   }
 
-  const shoonyaLine = quantiplyShoonya
-    ? `\n${quantiplyShoonya.status === 'OK' || quantiplyShoonya.status === 'SKIPPED' ? '✅' : '❌'} ${quantiplyShoonya.name}: ${quantiplyShoonya.detail}`
-    : '';
-  const body = formatReport(results, config.runUrl, quantiply) + shoonyaLine;
+  const quantiplyLines = [quantiply, quantiplyShoonya].filter((r): r is BrokerResult => r !== null);
+  const body = formatReport(results, config.runUrl, quantiplyLines);
   const fatalLabel = quantiply && algotestStarted ? 'fatal (AlgoTest)' : 'fatal';
   const report = fatal ? `${body}\n${fatalLabel}: ${fatal}` : body;
 
@@ -329,7 +333,7 @@ async function main(): Promise<number> {
       `quantiply=${quantiply?.status ?? 'OFF'}\nquantiply_shoonya=${quantiplyShoonya?.status ?? 'OFF'}\n`,
     ).catch((error) => console.error(`could not write the step output: ${describe(error)}`));
   }
-  return exitCode(results, quantiply, fatal, Boolean(githubOutput));
+  return exitCode(results ?? [], quantiply, fatal, Boolean(githubOutput));
 }
 
 /**

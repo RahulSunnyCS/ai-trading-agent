@@ -9,6 +9,7 @@ import {
   algotestMultiplierRefusal,
   describeSource,
   readAutomation,
+  uploadBooks,
 } from './automation-settings.js';
 import { normalizePhone, readTelegramConfig } from './config.js';
 import {
@@ -16,6 +17,7 @@ import {
   type LiveState,
   type Pick,
   istMinutes,
+  nothingOnAlgotest,
   parseLive,
   planDeploy,
   repeating,
@@ -45,6 +47,20 @@ import { visibleWithin } from './wait.js';
  */
 
 const VIEWPORT = { width: 1440, height: 900 };
+
+/** The IST days of the deploy ledger's rows (each `{at, name, ok, ...}`); a bad line is skipped. */
+function ledgerDays(text: string): string[] {
+  const days: string[] = [];
+  for (const line of text.split('\n')) {
+    try {
+      const at = (JSON.parse(line) as { at?: unknown }).at;
+      if (typeof at === 'string') days.push(istToday(new Date(at)));
+    } catch {
+      // a torn last line, or a blank one
+    }
+  }
+  return days;
+}
 
 function entryOf(doc: unknown): number {
   const s = (doc as { strategy?: { EntryIndicators?: { Value?: unknown[] } } }).strategy;
@@ -184,6 +200,22 @@ async function main(): Promise<number> {
       `the export is ${manifest.source} for ${manifest.day}, not today's recorded picks`,
     );
     return 1;
+  }
+  // BL-140: no login at all when the settings give AlgoTest nothing of the tool's to deploy or check.
+  if (values.apply || values.check) {
+    const automation = readAutomation();
+    const ledger = join(resolve(dir), '..', '..', 'deploy-ledger.jsonl');
+    const nothing = nothingOnAlgotest(
+      uploadBooks(automation, 'algotest'),
+      manifest.book,
+      values.check,
+      existsSync(ledger) ? ledgerDays(await readFile(ledger, 'utf8')) : [],
+      today,
+    );
+    if (nothing) {
+      console.log(`${nothing} (${describeSource(automation)}); AlgoTest not logged in`);
+      return 0;
+    }
   }
   const picks: Pick[] = [];
   for (const s of manifest.strategies) {

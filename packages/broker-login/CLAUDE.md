@@ -108,10 +108,14 @@ npm run stop-button -- --clear-hold       # lift the stop hold (Telegram's Resum
 - **Logins:**
   - `dispatch.ts` does not dispatch with logins off.
   - The workflow's 08:15 backstop skips on `BROKER_LOGIN_ENABLED=off`.
-  - `ONLY=none` skips the AlgoTest brokers.
+  - `ONLY=none` leaves AlgoTest out of the run: no wait for its 08:16 window (Quantiply logs in at once)
+    and no AlgoTest line or title in the report (`formatReport(null, …)`).
   - `QUANTIPLY_BROKERS` listing `finvasia` logs Quantiply · Shoonya in after the AlgoTest logins
-    (`runQuantiplyShoonyaIsolated`, one attempt, its own report line, never the exit code).
-- **Deploy:** `strategy-deploy.ts --apply` also needs the deploy master switch on;
+    (`runQuantiplyShoonyaIsolated`, one attempt, its own report line counted in the verdict, never the
+    exit code).
+- **Deploy:** `strategy-deploy.ts --apply` also needs the deploy master switch on and an AlgoTest row
+  uploading the export's book; without such a row `--apply` and `--check` stop before logging in
+  (`nothingOnAlgotest`; the check still runs when `deploy-ledger.jsonl` has a row from today);
   `quantiply-deploy.ts --mode enable --apply` needs it and the account's row uploading a list
   (`quantiplyDeploy`), and takes that row's list as its picks.
 

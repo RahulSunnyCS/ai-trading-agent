@@ -475,7 +475,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'algotest-deploy',
     description:
-      "Deploy the day's recorded T1 picks on AlgoTest's /live (BL-138), right after the 09:16 pick: 1 lot each, today only, never a pick whose entry minute has come. Built ready but OFF: does nothing until ALGOTEST_DEPLOY=on",
+      "Deploy the day's recorded T1 picks on AlgoTest's /live (BL-138), right after the 09:16 pick: 1 lot each, today only, never a pick whose entry minute has come. Built ready but OFF: does nothing until ALGOTEST_DEPLOY=on, and no AlgoTest login while no AlgoTest row in Settings › Automation uploads the T1 list (BL-140)",
     // Starts with the pick and waits (up to 120 s) for its journal entry. A 09:17 pick may still be
     // too late through the website; it is then reported, never deployed late. Not caught up.
     schedule: { at: '09:16', on: tradingDays, label: 'trading days 09:16' },
@@ -506,7 +506,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'algotest-deploy-check',
     description:
-      'At 15:35, alert if any strategy the tool deploys on AlgoTest has an execution day ticked (it would trade again on its own). Does nothing until ALGOTEST_DEPLOY=on',
+      'At 15:35, alert if any strategy the tool deploys on AlgoTest has an execution day ticked (it would trade again on its own). Does nothing until ALGOTEST_DEPLOY=on; no AlgoTest login when no AlgoTest row uploads the T1 list and the tool deployed nothing today',
     schedule: { at: '15:35', on: tradingDays, label: 'trading days 15:35' },
     steps: [['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--latest', 't1', '--check']],
     cwd: BROKER_LOGIN,
