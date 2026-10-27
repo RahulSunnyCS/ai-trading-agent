@@ -263,7 +263,9 @@ describe('Quantiply deploy jobs (BL-139 Phase 4)', () => {
   it('disable after the session, before the upload; enable after each upload', () => {
     expect(minutes('quantiply-disable')).toBeGreaterThan(15 * 60 + 28); // the last exit
     expect(minutes('quantiply-disable')).toBeLessThan(minutes('quantiply-evening'));
-    expect(minutes('quantiply-deploy')).toBeGreaterThan(minutes('quantiply-evening'));
+    // BL-172: the switch-on is in the morning, after the 08:00 login, before the first entry
+    expect(minutes('quantiply-deploy')).toBeGreaterThan(8 * 60);
+    expect(minutes('quantiply-deploy')).toBeLessThan(9 * 60 + 15);
     expect(minutes('quantiply-deploy-topup')).toBeGreaterThan(minutes('quantiply-topup'));
     // one group: a deploy waits for the upload (and its retries); logins never overlap
     for (const id of [
@@ -285,8 +287,9 @@ describe('Quantiply deploy jobs (BL-139 Phase 4)', () => {
     for (const id of ['quantiply-deploy', 'quantiply-deploy-topup']) {
       expect(job(id)?.retries).toBe(0);
       const cmd = job(id)?.steps.at(-1)?.at(-1) ?? '';
-      expect(cmd).toContain('--broker angelone --mode enable --apply');
-      expect(cmd).toContain('--broker finvasia --mode enable --apply');
+      const morning = id === 'quantiply-deploy' ? ' --morning' : '';
+      expect(cmd).toContain(`--broker angelone --mode enable${morning} --apply`);
+      expect(cmd).toContain(`--broker finvasia --mode enable${morning} --apply`);
     }
     const disable = job('quantiply-disable');
     expect(disable?.retries).toBeGreaterThan(0); // disabling again changes nothing

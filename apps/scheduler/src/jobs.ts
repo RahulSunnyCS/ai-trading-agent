@@ -643,18 +643,19 @@ const BASE_JOBS: Job[] = [
   {
     id: 'quantiply-deploy',
     description:
-      "Enable (deploy) on each Quantiply account the next session's picks the evening upload made (BL-139 Phase 4): REAL MONEY on the owner's account. Only the tool's algos for that session and weekday, each read back against its export and set to the account's own broker first; never a second time; confirmed by reading the list again. Needs QUANTIPLY_DEPLOY=on, Automated deployment on and the account's row uploading a list",
-    // After quantiply-evening (16:45; same group, so it waits for the upload and its retries).
-    // After 15:30 the session is the next trading day. Never retried: a second attempt could
-    // act on a half-finished first; the run alerts instead. An account the settings leave off,
-    // or with nothing uploaded for that session, is not logged in.
-    schedule: { at: '16:55', on: tradingDays, label: 'trading days 16:55' },
-    steps: [['/bin/sh', '-c', quantiplyBoth((b) => quantiplyDeploy(b, 'enable'))]],
+      "08:10, after the morning login (BL-172): on each Quantiply account, keep the clientwise MTM SL at the Settings › Automation row's figure (set it only when it differs, read back on every weekday), then switch on today's algos last evening's upload made (BL-139 Phase 4): REAL MONEY on the owner's account. Only the tool's algos for today, each read back against its export and set to the account's own broker first; never a second time; confirmed by reading the list again. Always sends its Telegram report. Needs QUANTIPLY_DEPLOY=on, Automated deployment on and the account's row uploading a list",
+    // After the 08:00 login (GitHub's Quantiply logins end by about 08:03). Was 16:55 for the next
+    // session until 2026-10-28 (owner: switch on in the morning). Never retried: a second attempt
+    // could act on a half-finished first; the run alerts instead. Caught up until 09:05: after that
+    // the 09:21 top-up switches on what is left. An account the settings leave off, or with
+    // nothing uploaded for today, is not logged in (and says so).
+    schedule: { at: '08:10', on: tradingDays, label: 'trading days 08:10' },
+    steps: [['/bin/sh', '-c', quantiplyBoth((b) => quantiplyDeploy(b, 'enable', true))]],
     cwd: BROKER_LOGIN,
     timeoutMinutes: 10,
     retries: 0,
     retryDelayMinutes: 0,
-    catchUpHours: 6,
+    catchUpHours: 55 / 60,
     group: 'quantiply',
     fixHint:
       'Read the alert first: an algo it enabled must not be enabled again. Then: cd packages/broker-login && node_modules/.bin/tsx src/quantiply-deploy.ts --broker angelone --mode enable  (dry run; add --apply). Undo: --mode disable --day <session> --apply',
@@ -796,8 +797,8 @@ function quantiplyUploads(mode: 'evening' | 'topup'): string {
 }
 
 /** BL-139 Phase 4: one account's enable or disable run (it reads the settings itself). */
-function quantiplyDeploy(broker: string, mode: 'enable' | 'disable'): string {
-  return `node_modules/.bin/tsx src/quantiply-deploy.ts --broker ${broker} --mode ${mode} --apply`;
+function quantiplyDeploy(broker: string, mode: 'enable' | 'disable', morning = false): string {
+  return `node_modules/.bin/tsx src/quantiply-deploy.ts --broker ${broker} --mode ${mode}${morning ? ' --morning' : ''} --apply`;
 }
 
 /** Run a command for both Quantiply accounts, Angel One then Shoonya. */

@@ -183,6 +183,15 @@ export class QuantiplyApi {
     await this.call('PUT', `/algos/${encodeURIComponent(id)}/${enabled ? 'enable' : 'disable'}`);
   }
 
+  /**
+   * `POST /brokers/<id>/config`: the web app's "Clientwise Stoploss & Target settings" save
+   * (`clientWiseSetTarget`, read from its bundle 2026-10-28): `{stoploss (negative), target, ...}`,
+   * the account's whole-day limits. BL-172's 08:00 run reads it back with `brokers()`.
+   */
+  async setClientwise(brokerId: string, body: Record<string, unknown>): Promise<void> {
+    await this.call('POST', `/brokers/${encodeURIComponent(brokerId)}/config`, body);
+  }
+
   /** `PUT /algos/:id` with `{broker}`: the web app's "Select Client ID / Broker" (`updateBroker`). */
   async setBroker(id: string, broker: string): Promise<void> {
     await this.call('PUT', `/algos/${encodeURIComponent(id)}`, { broker });

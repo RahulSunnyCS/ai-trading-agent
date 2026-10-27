@@ -205,7 +205,7 @@ export const PLATFORM_JOBS: Record<'algotest' | 'quantiply', readonly PlatformJo
     { id: 'quantiply-deploy-topup', window: 'morning' },
     { id: 'quantiply-disable', window: 'evening' },
     { id: 'quantiply-evening', window: 'evening' },
-    { id: 'quantiply-deploy', window: 'evening' },
+    { id: 'quantiply-deploy', window: 'morning' },
     { id: 'live-capture', window: 'evening' },
     { id: 'live-capture-retry', window: 'evening' },
   ],
