@@ -14,7 +14,15 @@ import { useTradeBookTrips } from '../../hooks/useTradeBook';
 import type { TradeBookRange } from '../../hooks/useTradeBook';
 import { cn } from '../../lib/cn';
 import { downloadCsv } from '../../lib/csv';
-import { EMPTY, formatDay, formatInr, formatInt, formatNumber, formatPct } from '../../lib/format';
+import {
+  EMPTY,
+  formatDay,
+  formatDayShort,
+  formatInr,
+  formatInt,
+  formatNumber,
+  formatPct,
+} from '../../lib/format';
 import {
   type ScatterPoint,
   accountLabel,
@@ -32,8 +40,9 @@ import {
 import type { TradeBookTrip } from '../../types/tradeBook';
 import { Button } from '../ui/Button';
 import { RadioMenu } from '../ui/RadioMenu';
+import { SkeletonRows } from '../ui/Skeleton';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
-import { Inr, Loaded, SourceBadge, TradeBookWidget } from './parts';
+import { Inr, LoadError, Loaded, SourceBadge, TradeBookWidget } from './parts';
 
 const DTE_OPTIONS = [
   { value: '', label: 'Any' },
@@ -198,7 +207,7 @@ function TripsTable({
                 dense
                 title={t.entry_day !== t.day ? `opened ${formatDay(t.entry_day)}` : undefined}
               >
-                {formatDay(t.day, { weekday: true }).slice(0, 10)}
+                {formatDayShort(t.day, { weekday: true })}
               </Td>
               <Td dense numeric align="right">
                 {t.entry_time?.slice(0, 5) ?? <span className="text-faint">{EMPTY}</span>}
@@ -296,7 +305,7 @@ export function TradeBookTrades({
 
   const csv = () =>
     downloadCsv(
-      fileName,
+      month ? `${fileName}-${month}` : fileName,
       [
         ['entry_day', 'Opened'],
         ['day', 'Closed'],
@@ -423,54 +432,67 @@ export function TradeBookTrades({
                   title="Turnover and coverage"
                   description="F&O turnover for the year (the sum of each trade's absolute P&L), for your CA: a figure, not tax advice; and how many notes gave trades."
                 >
-                  {() => (
-                    <div className="space-y-3 text-sm">
-                      <Table>
-                        <THead>
-                          <Th dense>Year</Th>
-                          <Th dense align="right">
-                            Turnover
-                          </Th>
-                          <Th dense align="right">
-                            P&amp;L
-                          </Th>
-                          <Th dense align="right">
-                            Trades
-                          </Th>
-                        </THead>
-                        <tbody>
-                          {Object.entries(data.turnover).map(([fy, t]) => (
-                            <TRow key={fy}>
-                              <Td dense>FY {fy}</Td>
-                              <Td dense numeric align="right">
-                                {formatInr(t.turnover)}
-                              </Td>
-                              <Td dense numeric align="right">
-                                <Inr value={t.profit} />
-                              </Td>
-                              <Td dense numeric align="right">
-                                {formatInt(t.trips)}
-                              </Td>
-                            </TRow>
-                          ))}
-                        </tbody>
-                      </Table>
-                      <p className="text-xs text-muted">
-                        Notes read as fills (with times):{' '}
-                        <span className="metric text-foreground">
-                          {formatInt(data.coverage.fills ?? 0)}
-                        </span>{' '}
-                        · as a summary (no times):{' '}
-                        <span className="metric text-foreground">
-                          {formatInt(data.coverage.summary ?? 0)}
-                        </span>{' '}
-                        · trades not adding up:{' '}
-                        <span className="metric text-foreground">
-                          {formatInt((data.coverage.unmatched ?? 0) + (data.coverage.none ?? 0))}
-                        </span>
-                      </p>
-                    </div>
-                  )}
+                  {() => {
+                    // Always the whole year's read: a picked month is not the year's turnover.
+                    const yearData = year.data;
+                    if (!yearData) {
+                      return year.error ? (
+                        <LoadError error={year.error} retry={year.refetch} />
+                      ) : (
+                        <SkeletonRows rows={3} />
+                      );
+                    }
+                    return (
+                      <div className="space-y-3 text-sm">
+                        <Table>
+                          <THead>
+                            <Th dense>Year</Th>
+                            <Th dense align="right">
+                              Turnover
+                            </Th>
+                            <Th dense align="right">
+                              P&amp;L
+                            </Th>
+                            <Th dense align="right">
+                              Trades
+                            </Th>
+                          </THead>
+                          <tbody>
+                            {Object.entries(yearData.turnover).map(([fy, t]) => (
+                              <TRow key={fy}>
+                                <Td dense>FY {fy}</Td>
+                                <Td dense numeric align="right">
+                                  {formatInr(t.turnover)}
+                                </Td>
+                                <Td dense numeric align="right">
+                                  <Inr value={t.profit} />
+                                </Td>
+                                <Td dense numeric align="right">
+                                  {formatInt(t.trips)}
+                                </Td>
+                              </TRow>
+                            ))}
+                          </tbody>
+                        </Table>
+                        <p className="text-xs text-muted">
+                          Notes read as fills (with times):{' '}
+                          <span className="metric text-foreground">
+                            {formatInt(yearData.coverage.fills ?? 0)}
+                          </span>{' '}
+                          · as a summary (no times):{' '}
+                          <span className="metric text-foreground">
+                            {formatInt(yearData.coverage.summary ?? 0)}
+                          </span>{' '}
+                          · trades not adding up:{' '}
+                          <span className="metric text-foreground">
+                            {formatInt(
+                              (yearData.coverage.unmatched ?? 0) + (yearData.coverage.none ?? 0),
+                            )}
+                          </span>
+                        </p>
+                      </div>
+                    );
+                  }}
                 </TradeBookWidget>
               </div>
               <TradeBookWidget

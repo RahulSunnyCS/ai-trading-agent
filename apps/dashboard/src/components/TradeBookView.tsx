@@ -25,9 +25,10 @@ import {
   useTradeBookSummary,
   useTradeBookTrips,
 } from '../hooks/useTradeBook';
-import { formatDay } from '../lib/format';
+import { formatDay, formatDayShort } from '../lib/format';
 import { TRADE_BOOK_SECTIONS, type TradeBookSection, buildPath, oneOf } from '../lib/routes';
 import {
+  DEFAULT_BENCHMARK_KEY,
   accountLabel,
   benchmarkKey,
   fiscalYearOf,
@@ -98,7 +99,17 @@ export function TradeBookView() {
 
   const share = typeof window === 'undefined' ? '' : window.location.href;
   const [refreshKey, setRefreshKey] = useState(0);
-  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  const refetchBook = book.refetch;
+  const refresh = useCallback(() => {
+    refetchBook();
+    setRefreshKey((k) => k + 1);
+  }, [refetchBook]);
+  // The year and account are chosen only once the store's years and accounts are known, so the
+  // first load never reads (or draws) a fallback year or all accounts and then switches.
+  const bookReady = book.data !== null || book.error !== null;
+  // A view re-mounts for another year or account: it starts from that exact read's cache or
+  // from nothing, never from the previous year's figures under the new label.
+  const viewKey = `${refreshKey}|${fy}|${account ?? ''}`;
 
   return (
     <div className="space-y-4">
@@ -137,8 +148,8 @@ export function TradeBookView() {
           {book.data?.last_note_day ? (
             <span className="hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-border-strong px-2.5 py-1 text-xs text-muted sm:inline-flex">
               <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-positive" />
-              Notes in through {formatDay(book.data.last_note_day, { weekday: true }).slice(0, 10)}{' '}
-              · {accounts.length} accounts
+              Notes in through {formatDayShort(book.data.last_note_day, { weekday: true })} ·{' '}
+              {accounts.length} accounts
             </span>
           ) : null}
           <RefreshButton onClick={refresh} loading={book.loading} />
@@ -153,9 +164,14 @@ export function TradeBookView() {
         onOpen={setDay}
       />
 
-      {section === 'fno' ? (
+      {!bookReady ? (
+        <div className="space-y-4">
+          <Skeleton className="h-28 w-full rounded-xl" />
+          <Skeleton className="h-[440px] w-full rounded-xl" />
+        </div>
+      ) : section === 'fno' ? (
         <FnoView
-          key={refreshKey}
+          key={viewKey}
           fy={fy}
           range={range}
           account={account}
@@ -171,7 +187,7 @@ export function TradeBookView() {
         />
       ) : section === 'trades' ? (
         <TradeBookTrades
-          key={refreshKey}
+          key={viewKey}
           range={range}
           account={account}
           allAccounts={accounts}
@@ -180,19 +196,18 @@ export function TradeBookView() {
         />
       ) : section === 'money' ? (
         <MoneyView
-          key={refreshKey}
+          key={viewKey}
           range={range}
           account={account}
           accounts={accounts}
           onOpenDay={setDay}
         />
       ) : (
-        <TradeBookMomentum key={refreshKey} range={range} />
+        <TradeBookMomentum key={viewKey} range={range} />
       )}
 
       <DrawerHost
         day={day}
-        range={range}
         account={account}
         accounts={accounts}
         onDay={setDay}
@@ -205,22 +220,22 @@ export function TradeBookView() {
   );
 }
 
-/** The drawer needs the year's days for previous / next; it reads them from the cached list. */
+/** The drawer needs the open day's year for previous / next (the open-days banner and a
+ * ledger row can open a day outside the picked year). */
 function DrawerHost({
   day,
-  range,
   account,
   accounts,
   onDay,
   onSaved,
 }: {
   day: string | null;
-  range: TradeBookRange;
   account: string | null;
   accounts: string[];
   onDay: (day: string | null) => void;
   onSaved: () => void;
 }) {
+  const range = useMemo(() => (day ? fyRange(fiscalYearOf(day)) : ALL_TIME), [day]);
   const days = useTradeBookDays(range, account, day !== null);
   const list = useMemo(() => (days.data?.days ?? []).map((d) => d.day), [days.data]);
   return (
@@ -272,7 +287,7 @@ function OpenDaysBanner({
         <span className="flex flex-wrap gap-1.5">
           {openDays.slice(-3).map((d) => (
             <Button key={d} size="sm" variant="secondary" onClick={() => onOpen(d)}>
-              Open {formatDay(d).slice(0, 6)}
+              Open {formatDayShort(d)}
             </Button>
           ))}
         </span>
@@ -311,7 +326,9 @@ function FnoView({
   const [painted, setPainted] = useState(false);
   const summary = useTradeBookSummary(range, account);
   const days = useTradeBookDays(range, account);
-  const months = useTradeBookMonths(range, account, painted);
+  // All time, so April and May get their 3-month average from the year before; the cells pick
+  // the year's twelve by key.
+  const months = useTradeBookMonths(ALL_TIME, account, painted);
   const allYears = useTradeBookSummary(ALL_TIME, account, painted);
   const trips = useTradeBookTrips(range, account, { enabled: painted });
 
@@ -340,10 +357,13 @@ function FnoView({
     [trips.data],
   );
 
-  if (summary.error && !summary.data) {
-    return <LoadError error={summary.error} retry={summary.refetch} />;
-  }
+  const loadError = summary.error ?? days.error;
+  const retry = () => {
+    summary.refetch();
+    days.refetch();
+  };
   if (!summary.data || !days.data) {
+    if (loadError) return <LoadError error={loadError} retry={retry} />;
     return (
       <div className="space-y-4">
         <Skeleton className="h-28 w-full rounded-xl" />
@@ -389,12 +409,15 @@ function FnoView({
 
   return (
     <div className="space-y-4">
+      {loadError ? <LoadError error={loadError} retry={retry} /> : null}
       <TradeBookHeadline
         summary={s}
         ratios={summary.data.ratios}
         tiles={tiles}
         benchmark={benchmark}
-        onBenchmark={(b) => onBench(benchmarkKey(b) === 'pace24' ? null : benchmarkKey(b))}
+        onBenchmark={(b) =>
+          onBench(benchmarkKey(b) === DEFAULT_BENCHMARK_KEY ? null : benchmarkKey(b))
+        }
         lastYearAvailable={lastYearAvailable}
         lastYearLabel={prevLabel}
       />

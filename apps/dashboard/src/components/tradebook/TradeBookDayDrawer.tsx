@@ -10,7 +10,15 @@ import { ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 import { useState } from 'react';
 
 import { useTradeBookDay } from '../../hooks/useTradeBook';
-import { EMPTY, formatDay, formatInr, formatInt, formatNumber, formatPct } from '../../lib/format';
+import {
+  EMPTY,
+  formatDay,
+  formatDayShort,
+  formatInr,
+  formatInt,
+  formatNumber,
+  formatPct,
+} from '../../lib/format';
 import {
   accountLabel,
   contractLabel,
@@ -183,9 +191,7 @@ function DayBody({
                   <TRow key={`${t.account}-${contractLabel(t)}-${i}`} className="whitespace-nowrap">
                     <Td dense numeric align="right">
                       {t.entry_day !== t.day ? (
-                        <span className="text-faint">
-                          from {formatDay(t.entry_day).slice(0, 6)}
-                        </span>
+                        <span className="text-faint">from {formatDayShort(t.entry_day)}</span>
                       ) : (
                         (tripTimes(t) ?? <span className="text-faint">no times</span>)
                       )}
@@ -289,9 +295,10 @@ export function TradeBookDayDrawer({
 }) {
   const detail = useTradeBookDay(day);
   const [editing, setEditing] = useState(false);
-  const index = day ? days.indexOf(day) : -1;
-  const prev = index > 0 ? days[index - 1] : undefined;
-  const next = index >= 0 && index < days.length - 1 ? days[index + 1] : undefined;
+  // The sessions either side, by date: a day not in the list (a weekend ledger e-mail, another
+  // account's session) still steps to its neighbours.
+  const prev = day ? days.filter((d) => d < day).at(-1) : undefined;
+  const next = day ? days.find((d) => d > day) : undefined;
   const row = detail.data?.day === day ? detail.data?.row : null;
   const state = row ? dayState(row) : null;
   return (

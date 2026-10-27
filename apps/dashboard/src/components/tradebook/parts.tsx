@@ -194,7 +194,8 @@ export function Stat({
   );
 }
 
-/** An on / off pill (the hero's panes, the Days table's filter): a pressed button. */
+/** An on / off button (the hero's panes, the Days table's filter): the dashboard's pressed
+ * `Button`, as Momentum's chart toggles are. */
 export function Toggle({
   on,
   onChange,
@@ -205,32 +206,13 @@ export function Toggle({
   children: string;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      size="sm"
+      variant={on ? 'primary' : 'secondary'}
       aria-pressed={on}
       onClick={() => onChange(!on)}
-      className={cn(
-        'inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        on
-          ? 'border-border-strong bg-surface-2 text-foreground'
-          : 'border-border text-muted hover:text-foreground',
-      )}
     >
-      <span
-        aria-hidden="true"
-        className={cn(
-          'relative h-3 w-5 rounded-full transition-colors',
-          on ? 'bg-primary' : 'bg-border-strong',
-        )}
-      >
-        <span
-          className={cn(
-            'absolute top-0.5 h-2 w-2 rounded-full bg-surface transition-all',
-            on ? 'left-2.5' : 'left-0.5',
-          )}
-        />
-      </span>
       {children}
-    </button>
+    </Button>
   );
 }

@@ -18,6 +18,9 @@ import type {
 
 export const TRADE_BOOK_API = '/api/backtest/legwise/contract-notes';
 
+/** The F&O brokers; Zerodha (`kite`) is Momentum's and kept out of the F&O figures. */
+export const FNO_BROKERS: readonly string[] = ['finvasia', 'angelone'];
+
 // ---------------------------------------------------------------------------
 // Financial years (April to March)
 // ---------------------------------------------------------------------------
@@ -212,23 +215,42 @@ export interface BookPoint {
  * nothing and keeps its place.
  */
 export function runningBook(rows: readonly TradeBookDay[]): BookPoint[] {
+  // Summed in whole paise, so a running figure never picks up a float tail (2023.6799999…).
   let toDate = 0;
   let peak = 0;
   return rows.map((r) => {
-    if (r.profit !== null) toDate += r.profit;
+    if (r.profit !== null) toDate += Math.round(r.profit * 100);
     peak = Math.max(peak, toDate);
-    return { day: r.day, profit: r.profit, toDate, drawdown: toDate - peak };
+    return { day: r.day, profit: r.profit, toDate: toDate / 100, drawdown: (toDate - peak) / 100 };
   });
 }
 
-/** The target pace's running figure for each day: capital × rate × the year's fraction. */
+/**
+ * The share of the financial year from `first` (the year's first session, or 1 April if
+ * earlier) to the end of `day`. The pace starts there, so a year whose first stored session is
+ * late in it is not measured against the months before it.
+ */
+export function paceFraction(first: string, day: string): number {
+  const { from, to } = fyRange(fiscalYearOf(day));
+  const start = first > from ? first : from;
+  const length = (dayNumber(to) - dayNumber(from)) / 86_400_000 + 1;
+  const elapsed = (dayNumber(day) - dayNumber(start)) / 86_400_000 + 1;
+  return Math.min(1, Math.max(0, elapsed / length));
+}
+
+/** The target pace's running figure for each day: capital × rate × the year passed since the
+ * first session. */
 export function targetLine(
   days: readonly string[],
   capital: number | null,
   ratePct: number,
 ): Array<{ day: string; value: number }> {
-  if (!capital) return [];
-  return days.map((day) => ({ day, value: (capital * ratePct * yearFraction(day)) / 100 }));
+  const first = days[0];
+  if (!capital || first === undefined) return [];
+  return days.map((day) => ({
+    day,
+    value: (capital * ratePct * paceFraction(first, day)) / 100,
+  }));
 }
 
 /**
@@ -263,6 +285,8 @@ export interface Benchmark {
 
 export const TARGET_RATES = [12, 18, 24, 30, 36] as const;
 export const DEFAULT_RATE = 24;
+/** The benchmark a bare URL means (`bench` absent). */
+export const DEFAULT_BENCHMARK_KEY = `pace${DEFAULT_RATE}`;
 
 /** "pace24" / "lastfy" in the URL; anything else is the default pace. */
 export function parseBenchmark(text: string | null): Benchmark {
@@ -294,6 +318,8 @@ export interface Tile {
   gap: number | null;
   /** Higher is better for this tile (drawdown is negative: closer to zero is better). */
   higherBetter: boolean;
+  /** The gap is shown without a good / bad colour. */
+  toneless?: boolean;
 }
 
 function tone(value: number | null): TileTone {
@@ -314,7 +340,7 @@ export function headlineTiles(
   benchmark: Benchmark,
   lastYear: TradeBookSummaryBlock | null,
 ): Tile[] {
-  const fraction = s.last_day ? yearFraction(s.last_day) : 0;
+  const fraction = s.last_day ? paceFraction(s.first_day ?? s.last_day, s.last_day) : 0;
   const pace = benchmark.id === 'pace';
   const targetPct = benchmark.ratePct * fraction;
   const netBench = pace
@@ -366,6 +392,9 @@ export function headlineTiles(
       bench: ly?.charge_profit_pct ?? null,
       gap: ly ? gap(s.charge_profit_pct, ly.charge_profit_pct) : null,
       higherBetter: false,
+      // With a loss in either year the ratio turns negative and a bigger loss reads smaller:
+      // no good-or-bad colour then.
+      toneless: s.net <= 0 || (ly !== null && ly.net <= 0),
     },
     {
       id: 'win',
@@ -383,7 +412,7 @@ export function headlineTiles(
 
 /** Whether a gap is good news for the reader (green) or bad (red). */
 export function gapTone(tile: Tile): TileTone {
-  if (tile.gap === null || tile.gap === 0) return 'neutral';
+  if (tile.gap === null || tile.gap === 0 || tile.toneless) return 'neutral';
   return tile.gap > 0 === tile.higherBetter ? 'positive' : 'negative';
 }
 
@@ -506,7 +535,7 @@ const PART_SWATCHES = [
  */
 export function yearChargeParts(s: TradeBookSummaryBlock): ChargePart[] {
   const parts = [
-    { key: 'notes', label: 'Contract-note charges', amount: s.charges - s.algo_fees },
+    { key: 'notes', label: 'Contract-note charges', amount: s.note_charges },
     { key: 'algo', label: 'Algo fees', amount: s.algo_fees },
     { key: 'interest', label: 'Collateral interest', amount: s.interest },
   ];
@@ -728,7 +757,9 @@ export function eventsFor(
   events: readonly TradeBookLedgerEvent[],
   account: string | null,
 ): TradeBookLedgerEvent[] {
-  if (!account) return [...events];
+  // All accounts are the F&O brokers' (as the API's day rows count them); Zerodha's e-mails
+  // belong to Momentum.
+  if (!account) return events.filter((e) => FNO_BROKERS.includes(e.broker));
   const [broker] = account.split('/');
   return events.filter((e) =>
     e.account ? `${e.broker}/${e.account}` === account : e.broker === broker,
@@ -822,8 +853,16 @@ export interface InputsDraft {
   angelone: string;
 }
 
+/** Rupees to the paisa: an imported amount with more decimals is shown and compared rounded. */
+function paise(v: number | null | undefined): number | null {
+  return v === null || v === undefined ? null : Math.round(v * 100) / 100;
+}
+
 export function inputsDraft(manual: TradeBookManual | null | undefined): InputsDraft {
-  const text = (v: number | null | undefined) => (v === null || v === undefined ? '' : String(v));
+  const text = (v: number | null | undefined) => {
+    const r = paise(v);
+    return r === null ? '' : String(r);
+  };
   return {
     algos: text(manual?.algos),
     capitalTotal: text(manual?.capital_total),
@@ -832,11 +871,12 @@ export function inputsDraft(manual: TradeBookManual | null | undefined): InputsD
   };
 }
 
-/** A typed amount: commas, spaces and ₹ ignored; '' is "none". NaN when it does not read. */
+/** A typed amount: commas, spaces and ₹ ignored, rounded to the paisa; '' is "none". NaN when
+ * it does not read. */
 function readNumber(text: string): number | null {
   const clean = text.replace(/[₹,\s]/g, '');
   if (clean === '') return null;
-  return /^\d+(\.\d{1,2})?$/.test(clean) ? Number(clean) : Number.NaN;
+  return /^\d+(\.\d+)?$/.test(clean) ? paise(Number(clean)) : Number.NaN;
 }
 
 export interface InputsCheck {
@@ -872,10 +912,12 @@ export function inputsBody(
   const fin = money('finvasia');
   const ang = money('angelone');
   if ((algos ?? null) !== (manual?.algos ?? null)) body.algos = algos;
-  if ((total ?? null) !== (manual?.capital_total ?? null)) body.capital_total = total;
+  // Compared with the stored amount rounded to the paisa, so an untouched imported figure with
+  // more decimals is not sent back.
+  if (total !== paise(manual?.capital_total)) body.capital_total = total;
   const cap: Record<string, number | null> = {};
-  if ((fin ?? null) !== (manual?.capital?.finvasia ?? null)) cap.finvasia = fin;
-  if ((ang ?? null) !== (manual?.capital?.angelone ?? null)) cap.angelone = ang;
+  if (fin !== paise(manual?.capital?.finvasia)) cap.finvasia = fin;
+  if (ang !== paise(manual?.capital?.angelone)) cap.angelone = ang;
   if (Object.keys(cap).length) body.capital = cap;
   return { body, errors, changed: Object.keys(body).length > 0 };
 }

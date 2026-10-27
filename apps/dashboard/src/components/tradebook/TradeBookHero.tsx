@@ -198,8 +198,9 @@ export function TradeBookHero({
             <span
               aria-hidden="true"
               className={cn(
-                'h-0.5 w-3',
-                benchLabel.startsWith('Last') ? 'bg-series-2' : 'bg-muted',
+                'w-3 border-t-2 border-dashed',
+                // The line: series 2 for last FY, the chart theme's text colour (--muted) for a pace.
+                benchLabel.startsWith('Last') ? 'border-series-2' : 'border-muted',
               )}
             />
             {benchLabel}

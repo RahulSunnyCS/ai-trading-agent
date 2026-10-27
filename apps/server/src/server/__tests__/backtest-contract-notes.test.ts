@@ -202,6 +202,15 @@ describe('PUT /api/backtest/legwise/contract-notes/inputs/:day', () => {
     expect(JSON.parse(String(init.body))).toEqual({ algos: 4, capital: { angelone: 5 } });
   });
 
+  it('refuses a body with nothing left to save once unknown keys are stripped', async () => {
+    server = await buildTestServer();
+    for (const body of [{ note: 'x' }, { capital: { kite: 1 } }]) {
+      const res = await put('2026-10-23', body);
+      expect(res.statusCode, JSON.stringify(body)).toBe(422);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('refuses out-of-range values and a bad day', async () => {
     server = await buildTestServer();
     for (const body of [

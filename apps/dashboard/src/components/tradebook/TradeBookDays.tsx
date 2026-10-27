@@ -81,7 +81,7 @@ export function TradeBookDays({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <Toggle on={showEmpty} onChange={setShowEmpty}>
-          Show open and no-note days
+          Show days with no note
         </Toggle>
         <Button size="sm" variant="ghost" onClick={csv} className="ml-auto">
           <Download className="h-3.5 w-3.5" aria-hidden="true" />

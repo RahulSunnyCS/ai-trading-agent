@@ -9,7 +9,15 @@ import { ExternalLink } from 'lucide-react';
 
 import { navigateToLink } from '../../hooks/useQueryState';
 import { type TradeBookRange, useTradeBookMomentum } from '../../hooks/useTradeBook';
-import { EMPTY, formatDay, formatInr, formatInt, formatNumber, formatPct } from '../../lib/format';
+import {
+  EMPTY,
+  formatDay,
+  formatDayShort,
+  formatInr,
+  formatInt,
+  formatNumber,
+  formatPct,
+} from '../../lib/format';
 import { kiteTotals } from '../../lib/tradeBookView';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -82,27 +90,35 @@ export function TradeBookMomentum({ range }: { range: TradeBookRange }) {
                     </THead>
                     <tbody>
                       {[...data.notes].reverse().flatMap((n) =>
-                        n.trades.map((tr, i) => (
-                          <TRow key={`${n.day}-${n.account}-${i}`} className="whitespace-nowrap">
-                            <Td dense>{formatDay(n.day, { weekday: true }).slice(0, 10)}</Td>
-                            <Td dense numeric align="right">
-                              {tr.time?.slice(0, 5) ?? EMPTY}
-                            </Td>
-                            <Td dense>{tr.symbol}</Td>
-                            <Td dense>
-                              <Badge tone={tr.side === 'buy' ? 'info' : 'accent'}>{tr.side}</Badge>
-                            </Td>
-                            <Td dense numeric align="right">
-                              {formatInt(tr.qty)}
-                            </Td>
-                            <Td dense numeric align="right">
-                              {formatNumber(tr.price, 2)}
-                            </Td>
-                            <Td dense numeric align="right">
-                              {formatInr(Math.abs(tr.value))}
-                            </Td>
-                          </TRow>
-                        )),
+                        // Newest first within a note too: by fill time, latest first.
+                        [...n.trades]
+                          .map((tr, i) => ({ tr, i }))
+                          .sort(
+                            (a, b) => (b.tr.time ?? '').localeCompare(a.tr.time ?? '') || b.i - a.i,
+                          )
+                          .map(({ tr, i }) => (
+                            <TRow key={`${n.day}-${n.account}-${i}`} className="whitespace-nowrap">
+                              <Td dense>{formatDayShort(n.day, { weekday: true })}</Td>
+                              <Td dense numeric align="right">
+                                {tr.time?.slice(0, 5) ?? EMPTY}
+                              </Td>
+                              <Td dense>{tr.symbol}</Td>
+                              <Td dense>
+                                <Badge tone={tr.side === 'buy' ? 'info' : 'accent'}>
+                                  {tr.side}
+                                </Badge>
+                              </Td>
+                              <Td dense numeric align="right">
+                                {formatInt(tr.qty)}
+                              </Td>
+                              <Td dense numeric align="right">
+                                {formatNumber(tr.price, 2)}
+                              </Td>
+                              <Td dense numeric align="right">
+                                {formatInr(Math.abs(tr.value))}
+                              </Td>
+                            </TRow>
+                          )),
                       )}
                     </tbody>
                   </Table>

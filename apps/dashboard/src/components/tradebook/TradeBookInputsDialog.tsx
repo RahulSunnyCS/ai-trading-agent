@@ -53,11 +53,15 @@ function Field({
         value={value}
         placeholder={placeholder ?? 'not typed'}
         aria-invalid={error ? true : undefined}
+        aria-describedby={error || note ? `${id}-note` : undefined}
         onChange={(e) => onChange(e.target.value)}
         className="metric text-right"
       />
       {error || note ? (
-        <p className={error ? 'col-span-2 text-xs text-negative' : 'col-span-2 text-xs text-faint'}>
+        <p
+          id={`${id}-note`}
+          className={error ? 'col-span-2 text-xs text-negative' : 'col-span-2 text-xs text-faint'}
+        >
           {error ?? note}
         </p>
       ) : null}

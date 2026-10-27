@@ -247,6 +247,9 @@ def summary(rows: list[DayRow]) -> dict:
     losses = [r.profit for r in traded if r.profit < 0]
     net = sum((r.profit for r in traded), ZERO)
     charges = sum((r.charges for r in rows if r.charges is not None), ZERO)
+    # The notes' own charges, apart from the algo fees. A day with algos typed and no note has
+    # its fee in `algo_fees` but not in `charges`, so charges − algo fees is not this figure.
+    note_charges = sum((r.note_charges for r in rows if r.note_charges is not None), ZERO)
     cumulative = peak = max_dd = ZERO
     run = longest = 0
     growth = Decimal(1)
@@ -270,6 +273,7 @@ def summary(rows: list[DayRow]) -> dict:
         "traded_sessions": len(traded),
         "net": float(net),
         "charges": float(charges),
+        "note_charges": float(note_charges),
         "algo_fees": float(sum((r.algo_fees for r in rows), ZERO)),
         "interest": float(sum((r.interest for r in rows), ZERO)),
         "charge_profit_pct": round(float(charges * 100 / net), 1) if net else None,

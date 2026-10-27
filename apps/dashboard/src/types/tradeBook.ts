@@ -43,6 +43,9 @@ export interface TradeBookSummaryBlock {
   traded_sessions: number;
   net: number;
   charges: number;
+  /** The notes' own charges (charges without the algo fees, and without the fee of a day that
+   * had algos but no note). */
+  note_charges: number;
   algo_fees: number;
   interest: number;
   charge_profit_pct: number | null;

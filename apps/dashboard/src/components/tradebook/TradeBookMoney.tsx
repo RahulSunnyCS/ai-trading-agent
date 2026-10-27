@@ -13,7 +13,14 @@ import { useChart } from '../../hooks/useChart';
 import { type TradeBookRange, useTradeBookMoney } from '../../hooks/useTradeBook';
 import { getChartTheme, getSeriesPalette, pickSeries } from '../../lib/chartTheme';
 import { cn } from '../../lib/cn';
-import { EMPTY, formatDay, formatInr, formatInt, formatPct } from '../../lib/format';
+import {
+  EMPTY,
+  formatDay,
+  formatDayShort,
+  formatInr,
+  formatInt,
+  formatPct,
+} from '../../lib/format';
 import {
   MARGIN_HIGH_PCT,
   accountLabel,
@@ -95,10 +102,18 @@ function CapitalChart({ rows }: { rows: TradeBookDay[] }) {
       if (chartRef.current) chartRef.current.removeSeries(line);
     };
   }, [chartRef, ready, theme, points, rows]);
-  if (!points.length) {
-    return <p className="text-xs text-faint">No capital typed or read for this period.</p>;
-  }
-  return <div ref={box} className="w-full" style={{ height: 260 }} />;
+  // The chart's box is always there: useChart creates the chart once, when the box mounts, so
+  // a box that appears only after the rows land would never get one.
+  return (
+    <div className="relative">
+      <div ref={box} className="w-full" style={{ height: 260 }} />
+      {points.length === 0 ? (
+        <p className="absolute inset-0 grid place-items-center text-xs text-faint">
+          No capital typed or read for this period.
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 export function TradeBookMoney({
@@ -190,7 +205,7 @@ export function TradeBookMoney({
                             onClick={() => onOpenDay(e.day)}
                             className="whitespace-nowrap"
                           >
-                            <Td dense>{formatDay(e.day, { weekday: true }).slice(0, 10)}</Td>
+                            <Td dense>{formatDayShort(e.day, { weekday: true })}</Td>
                             <Td dense className="text-muted">
                               {accountLabel(`${e.broker}/${e.account ?? ''}`, allAccounts)}
                             </Td>

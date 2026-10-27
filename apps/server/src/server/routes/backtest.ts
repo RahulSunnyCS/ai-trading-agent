@@ -1094,14 +1094,23 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
       const body: Record<string, unknown> = {};
       if ('algos' in b) body.algos = b.algos;
       if ('capital_total' in b) body.capital_total = b.capital_total;
+      // Ajv strips unknown keys after `minProperties` is checked, so `{note: 'x'}` or
+      // `{capital: {kite: 1}}` arrives here as nothing to save. Sending it would still stamp the
+      // day `source: page` upstream; refuse it instead (an empty `capital` is left out).
       if ('capital' in b) {
         const cap = b.capital as Record<string, unknown> | null;
-        body.capital =
+        const kept =
           cap === null
-            ? null
-            : Object.fromEntries(
-                (['finvasia', 'angelone'] as const).filter((k) => k in cap).map((k) => [k, cap[k]]),
-              );
+            ? []
+            : (['finvasia', 'angelone'] as const).filter((k) => k in cap).map((k) => [k, cap[k]]);
+        if (cap === null) body.capital = null;
+        else if (kept.length) body.capital = Object.fromEntries(kept);
+      }
+      if (Object.keys(body).length === 0) {
+        await reply
+          .status(422)
+          .send({ error: 'nothing to save: send algos, capital_total or capital' });
+        return;
       }
       await forwardToBacktestApi(reply, `/legwise/contract-notes/inputs/${day}`, {
         method: 'PUT',

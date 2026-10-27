@@ -39,6 +39,7 @@ import {
   monthLabel,
   monthRange,
   orderSources,
+  paceFraction,
   parseBenchmark,
   parseFy,
   readQuery,
@@ -90,6 +91,7 @@ function summary(extra: Partial<TradeBookSummaryBlock> = {}): TradeBookSummaryBl
     traded_sessions: 110,
     net: 10_000,
     charges: 3_000,
+    note_charges: 2_500,
     algo_fees: 500,
     interest: 200,
     charge_profit_pct: 30,
@@ -225,9 +227,27 @@ describe('running figures', () => {
   });
 
   it('draws a target pace from capital, rate and the year passed', () => {
-    const line = targetLine(['2026-03-31'], 100_000, 24);
-    expect(line).toEqual([{ day: '2026-03-31', value: 24_000 }]);
+    const line = targetLine(['2025-04-01', '2026-03-31'], 100_000, 24);
+    expect(line.at(-1)).toEqual({ day: '2026-03-31', value: 24_000 });
     expect(targetLine(['2026-03-31'], null, 24)).toEqual([]);
+    expect(targetLine([], 100_000, 24)).toEqual([]);
+  });
+
+  it("starts the pace at the year's first session", () => {
+    expect(paceFraction('2025-04-01', '2026-03-31')).toBe(1);
+    expect(paceFraction('2025-03-01', '2025-04-01')).toBeCloseTo(1 / 365, 6); // never before 1 Apr
+    const late = targetLine(['2025-10-01', '2025-10-02'], 365_000, 10);
+    expect(late[0]?.value).toBeCloseTo(100, 6); // one day of the year, not six months
+    expect(late[1]?.value).toBeCloseTo(200, 6);
+  });
+
+  it('sums the running figures in whole paise', () => {
+    const book = runningBook([
+      day('2026-04-01', 0.1),
+      day('2026-04-02', 0.2),
+      day('2026-04-03', 2023.38),
+    ]);
+    expect(book.map((b) => b.toDate)).toEqual([0.1, 0.3, 2023.68]);
   });
 
   it('lays last year on this year by calendar day', () => {
@@ -243,7 +263,13 @@ describe('running figures', () => {
 
 describe('the headline', () => {
   it('compares net and return with a target pace and gives the rest no figure', () => {
-    const s = summary({ last_day: '2026-03-31', net: 20_000, profit_pct: 20, capital: 100_000 });
+    const s = summary({
+      first_day: '2025-04-01',
+      last_day: '2026-03-31',
+      net: 20_000,
+      profit_pct: 20,
+      capital: 100_000,
+    });
     const tiles = headlineTiles(s, parseBenchmark(null), null);
     const net = tiles.find((t) => t.id === 'net');
     expect(net?.bench).toBe(24_000);
@@ -267,6 +293,21 @@ describe('the headline', () => {
     expect(dd?.gap).toBe(2_000);
     expect(gapTone(dd ?? tiles[0]!)).toBe('positive');
     expect(tiles.find((t) => t.id === 'net')?.gap).toBe(2_000);
+  });
+
+  it('gives charges / net profit no colour when either year lost money', () => {
+    const losing = summary({ net: -5_000, charge_profit_pct: -50 });
+    const ly = summary({ charge_profit_pct: 25 });
+    const charges = headlineTiles(losing, parseBenchmark('lastfy'), ly).find(
+      (t) => t.id === 'charges',
+    );
+    expect(charges?.gap).toBe(-75);
+    expect(gapTone(charges!)).toBe('neutral');
+    const lyLost = summary({ net: -1, charge_profit_pct: -10 });
+    const c2 = headlineTiles(summary(), parseBenchmark('lastfy'), lyLost).find(
+      (t) => t.id === 'charges',
+    );
+    expect(gapTone(c2!)).toBe('neutral');
   });
 
   it('reads and writes the benchmark key', () => {
@@ -327,7 +368,11 @@ describe('months', () => {
 
 describe('charges by kind', () => {
   it('splits the year into note charges, algo fees and interest', () => {
-    const parts = yearChargeParts(summary({ charges: 3_000, algo_fees: 500, interest: 200 }));
+    // A day with algos and no note has its fee in algo_fees but not in charges: the notes'
+    // part is the API's note_charges, not charges − algo fees (2,350 here).
+    const parts = yearChargeParts(
+      summary({ charges: 2_850, note_charges: 2_500, algo_fees: 500, interest: 200 }),
+    );
     expect(parts.map((p) => [p.key, p.amount])).toEqual([
       ['notes', 2_500],
       ['algo', 500],
@@ -488,10 +533,11 @@ describe('money', () => {
       kind: 'margin_warning',
       utilisation_pct: 80,
     },
+    { day: '2026-10-10', broker: 'kite', account: 'KK0003', kind: 'deposit', amount: 9_999 },
   ];
 
   it('totals the ledger', () => {
-    expect(moneyTotals(events)).toMatchObject({
+    expect(moneyTotals(eventsFor(events, null))).toMatchObject({
       deposits: 50_000,
       depositCount: 1,
       settlements: 1,
@@ -504,7 +550,7 @@ describe('money', () => {
 
   it("keeps one account's events and signs money out", () => {
     expect(eventsFor(events, 'finvasia/XX0001')).toHaveLength(1);
-    expect(eventsFor(events, null)).toHaveLength(6);
+    expect(eventsFor(events, null)).toHaveLength(6); // the Zerodha deposit is Momentum's
     expect(eventAmount(events[0]!)).toBe(50_000);
     expect(eventAmount(events[2]!)).toBe(-40);
     expect(eventAmount(events[4]!)).toBeNull();
@@ -525,6 +571,16 @@ describe('the inputs dialog', () => {
     });
     expect(next.body).toEqual({ algos: 9, capital_total: null, capital: { finvasia: 110_000 } });
     expect(next.changed).toBe(true);
+  });
+
+  it('rounds an imported amount to the paisa and does not send it back untouched', () => {
+    const manual = { capital_total: 123_456.789 };
+    const draft = inputsDraft(manual);
+    expect(draft.capitalTotal).toBe('123456.79');
+    expect(inputsBody(manual, draft)).toEqual({ body: {}, errors: {}, changed: false });
+    const typed = inputsBody(null, { ...draft, finvasia: '1000.555' });
+    expect(typed.errors).toEqual({});
+    expect(typed.body.capital).toEqual({ finvasia: 1000.56 });
   });
 
   it('refuses a bad number', () => {

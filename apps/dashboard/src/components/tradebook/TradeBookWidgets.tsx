@@ -8,7 +8,14 @@
 import { useState } from 'react';
 
 import { cn } from '../../lib/cn';
-import { EMPTY, formatDay, formatInr, formatInt, formatPct } from '../../lib/format';
+import {
+  EMPTY,
+  formatDay,
+  formatDayShort,
+  formatInr,
+  formatInt,
+  formatPct,
+} from '../../lib/format';
 import {
   accountLabel,
   fyLabel,
@@ -216,7 +223,7 @@ export function TradeBookMonths({
                 <Td>
                   FY {y.fy}
                   {isCurrent && lastDay ? (
-                    <span className="text-faint"> to {formatDay(lastDay).slice(0, 6)}</span>
+                    <span className="text-faint"> to {formatDayShort(lastDay)}</span>
                   ) : null}
                 </Td>
                 <Td numeric align="right">
