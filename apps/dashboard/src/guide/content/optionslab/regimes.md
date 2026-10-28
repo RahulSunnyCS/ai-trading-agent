@@ -1,3 +1,8 @@
+> [!NOTE]
+> Archived. This page is no longer in Options Lab's sidebar: index regimes are only known after the
+> day, so it is out of the daily path. It still works; open it at
+> [/optionslab/regimes](app:/optionslab/regimes).
+
 ## What it is for
 
 Labels each trading day by how the index moved, and tests whether those labels are useful: do

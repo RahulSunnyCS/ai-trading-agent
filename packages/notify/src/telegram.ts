@@ -83,7 +83,7 @@ export const TELEGRAM_MAX_TEXT = 4096;
 /** Structured send. Prefer this — it renders consistently across every caller. */
 export async function send(config: TelegramConfig | null, n: Notification): Promise<SendOutcome> {
   const text = redact(render(n));
-  if (!isEnabled(n.type)) {
+  if (!isEnabled(n.type, undefined, n.severity !== 'info')) {
     console.log(`\n[telegram: '${n.type}' is switched off, message below]\n${text}`);
     return 'muted';
   }
@@ -104,8 +104,8 @@ export async function sendText(
   type?: string,
 ): Promise<SendOutcome> {
   const safe = redact(text);
-  if (!isEnabled(type)) {
-    console.log(`\n[telegram: '${type}' is switched off, message below]\n${safe}`);
+  if (!isEnabled(type, undefined, undefined, safe)) {
+    console.log(`\n[telegram: '${type}' is off or failures-only, message below]\n${safe}`);
     return 'muted';
   }
   if (!config) {

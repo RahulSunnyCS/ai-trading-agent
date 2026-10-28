@@ -22,11 +22,7 @@ import { STOP_HELD_JOBS, stateDir } from './stop-hold.js';
 export const PAUSE_JOBS: readonly string[] = STOP_HELD_JOBS;
 
 /** The jobs that prepare the next trading session instead of today's. */
-const EVENING_JOBS: readonly string[] = [
-  'algotest-evening',
-  'quantiply-evening',
-  'quantiply-deploy',
-];
+const EVENING_JOBS: readonly string[] = ['algotest-evening', 'quantiply-evening'];
 
 /** Beside the scheduler's database; the same file the jobs read. */
 export function settingsFile(env: Record<string, string>): string {

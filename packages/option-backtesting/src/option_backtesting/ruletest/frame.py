@@ -74,7 +74,91 @@ def load_frame(
         days=grid.days, O=grid.O, H=grid.H, L=grid.L, C=grid.C, vix_close=vclose, vix_open=vopen
     )
     frame.straddle_loader = StraddleLoader(root, underlying, frame)
+    frame.expiry_loader = ExpiryDayLoader(root, underlying, frame)
     return frame
+
+
+def nearest_expiry(root: Path, underlying: str, day: date) -> date | None:
+    """The nearest listed expiry on or after `day`, as the simulator picks the traded one
+    (`legwise.market.listed_expiries`, the list `load_day` gives `pick_expiry(day, "weekly")`).
+    None without an option file. On a vendor day whose file lacks its current weekly this is a
+    later (even long-dated) contract, and the simulator trades that one too."""
+    from ..legwise.market import listed_expiries
+
+    listed = listed_expiries(root, underlying, day)
+    upcoming = [e for e in listed or [] if e >= day]
+    return upcoming[0] if upcoming else None
+
+
+#: the expiry_day file's format; a day is rebuilt when its files' stamp changes (a repaired day)
+EXPIRY_VERSION = 2
+
+
+def _files_stamp(root: Path, underlying: str, day: date) -> int:
+    """A stamp of the files `nearest_expiry` reads for the day (their sizes and mtimes)."""
+    from trading_data import lake
+
+    stamp = 0
+    for path in (
+        lake.bars_1m_path(root, "option", underlying, day),
+        lake.symbol_master_path(root, "fyers", day),
+    ):
+        if path.exists():
+            st = path.stat()
+            stamp = (stamp * 1_000_003 + st.st_size * 31 + st.st_mtime_ns) % (1 << 62)
+    return stamp
+
+
+class ExpiryDayLoader:
+    """`expiry_day`: per session, is it its own nearest weekly expiry (BL-165). Cached under
+    TRADING_DATA_ROOT/ruletest/features/ with a stamp of the day's files, so a repaired day is
+    worked out again; a session without an option file reads False and is not saved."""
+
+    def __init__(self, root: Path, underlying: str, frame: E.Frame):
+        self.root, self.underlying, self.frame = root, underlying, frame
+        self._values: np.ndarray | None = None
+
+    def __call__(self) -> np.ndarray:
+        if self._values is not None:
+            return self._values
+        path = store.features_dir(self.root) / f"expiry_day_{self.underlying}.npz"
+        known: dict[str, tuple[bool, int]] = {}
+        if path.exists():
+            with np.load(path, allow_pickle=False) as z:
+                if "version" in z.files and int(z["version"]) == EXPIRY_VERSION:
+                    known = {
+                        d: (bool(v), int(st))
+                        for d, v, st in zip(z["days"].tolist(), z["data"], z["stamp"], strict=True)
+                    }
+        out = np.zeros(self.frame.n, dtype=bool)
+        changed = False
+        for i, d in enumerate(self.frame.days):
+            day = date.fromisoformat(d)
+            if day < OPTIONS_FROM:
+                continue
+            stamp = _files_stamp(self.root, self.underlying, day)
+            if d not in known or known[d][1] != stamp:
+                expiry = nearest_expiry(self.root, self.underlying, day)
+                if expiry is None:
+                    known.pop(d, None)
+                    continue  # no option file (yet): False this run, not saved
+                known[d] = (expiry == day, stamp)
+                changed = True
+            out[i] = known[d][0]
+        if changed:
+            days = sorted(known)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".tmp.npz")
+            np.savez_compressed(
+                tmp,
+                days=np.array(days),
+                data=np.array([known[d][0] for d in days]),
+                stamp=np.array([known[d][1] for d in days], dtype=np.int64),
+                version=np.array(EXPIRY_VERSION),
+            )
+            tmp.replace(path)
+        self._values = out
+        return out
 
 
 class StraddleLoader:

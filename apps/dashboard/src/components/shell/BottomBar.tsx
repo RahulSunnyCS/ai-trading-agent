@@ -20,8 +20,9 @@ const ITEM =
   'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[10px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring';
 
 /**
- * How many sections get their own button. With Overview there are six sections, and six
- * buttons plus "More" do not fit a phone; the rest are reached through "More".
+ * How many sections get their own button: the five daily ones (Overview, Options Lab, Momentum,
+ * Trade book, Operations). Six buttons plus "More" do not fit a phone; the Archived engine, when
+ * shown, is reached through "More".
  */
 const MAX_SECTIONS = 5;
 

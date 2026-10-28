@@ -1,47 +1,15 @@
-const { makeFileName, parseFileName, loadBrokerAccounts, getBroker } = require('../../brokers');
-
-describe('makeFileName / parseFileName', () => {
-  test('round-trips through makeFileName → parseFileName', () => {
-    const filename = makeFileName('user@example.com', 'finvasia', 'FA1234', 'trade.pdf');
-    const result = parseFileName(filename);
-    expect(result.email).toBe('user_example_com');
-    expect(result.broker).toBe('finvasia');
-    expect(result.accountId).toBe('FA1234');
-    expect(result.originalName).toBe('trade.pdf');
-  });
-
-  test('parseFileName returns null for unrecognised format', () => {
-    expect(parseFileName('randomfile.pdf')).toBeNull();
-  });
-
-  test('parseFileName handles _decrypted suffix', () => {
-    const name = makeFileName('a@b.com', 'angelone', 'R001', 'cn.pdf').replace(
-      '.pdf',
-      '_decrypted.pdf',
-    );
-    const result = parseFileName(name);
-    expect(result).not.toBeNull();
-    expect(result.broker).toBe('angelone');
-    expect(result.accountId).toBe('R001');
-  });
-
-  test('original filename with multiple underscores is preserved', () => {
-    const filename = makeFileName('x@y.com', 'finvasia', 'ACC1', 'contract_note_2025.pdf');
-    const result = parseFileName(filename);
-    expect(result.originalName).toBe('contract_note_2025.pdf');
-  });
-});
+const { getBroker, isSupported, loadBrokerAccounts } = require('../../brokers');
 
 describe('getBroker()', () => {
   test('returns finvasia broker', () => {
     const broker = getBroker('finvasia');
-    expect(typeof broker.subject).toBe('function');
+    expect(typeof broker.searchSubject).toBe('function');
     expect(typeof broker.extract).toBe('function');
   });
 
   test('returns angelone broker', () => {
     const broker = getBroker('angelone');
-    expect(typeof broker.subject).toBe('function');
+    expect(typeof broker.searchSubject).toBe('function');
     expect(typeof broker.extract).toBe('function');
   });
 
@@ -71,16 +39,34 @@ describe('loadBrokerAccounts()', () => {
     expect(() => loadBrokerAccounts()).toThrow(/array/);
   });
 
-  test('throws when sheetStartColumn is missing', () => {
+  test('needs no sheetStartColumn, and accepts a broker with no reader yet', () => {
     const config = [
       {
         email: 'x@x.com',
         emailPassword: 'pw',
-        accounts: [{ broker: 'finvasia', accountId: 'X1', pdfPassword: 'pw' }],
+        accounts: [
+          { broker: 'finvasia', accountId: 'X1', pdfPassword: 'pw' },
+          { broker: 'icici', accountId: 'IC1', pdfPassword: 'pw2' },
+        ],
       },
     ];
     process.env.BROKER_ACCOUNTS_JSON = JSON.stringify(config);
-    expect(() => loadBrokerAccounts()).toThrow(/sheetStartColumn/);
+    expect(loadBrokerAccounts()[0].accounts).toHaveLength(2);
+    expect(isSupported('finvasia')).toBe(true);
+    expect(isSupported('kite')).toBe(true);
+    expect(isSupported('icici')).toBe(false);
+  });
+
+  test('never echoes the config, which holds the passwords', () => {
+    process.env.BROKER_ACCOUNTS_JSON = JSON.stringify([
+      { email: 'x@x.com', emailPassword: 'SECRETPW', accounts: [{ broker: 'finvasia' }] },
+    ]);
+    expect(() => loadBrokerAccounts()).toThrow(/Mailbox 1, account 1/);
+    expect(() => loadBrokerAccounts()).not.toThrow(/SECRETPW/);
+  });
+
+  test('a pretty-printed value read as one line says so', () => {
+    expect(() => loadBrokerAccounts('[')).toThrow(/1 characters; it must be on one line/);
   });
 
   test('parses valid config successfully', () => {
@@ -88,9 +74,7 @@ describe('loadBrokerAccounts()', () => {
       {
         email: 'user@gmail.com',
         emailPassword: 'pw',
-        accounts: [
-          { broker: 'finvasia', accountId: 'FA1', pdfPassword: 'pp', sheetStartColumn: 'D' },
-        ],
+        accounts: [{ broker: 'finvasia', accountId: 'FA1', pdfPassword: 'pp' }],
       },
     ];
     process.env.BROKER_ACCOUNTS_JSON = JSON.stringify(config);

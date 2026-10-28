@@ -628,3 +628,79 @@ export function summaryDisable(p: DisablePlan): { lines: string[]; attention: bo
   if (!lines.length) lines.push('nothing to disable');
   return { lines, attention: p.live.length > 0 };
 }
+
+/** Quantiply's weekday keys, as `GET /brokers` gives each account's clientwise settings. */
+export const QUANTIPLY_WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
+
+/** The trailing options the clientwise dialog can add; the app sends at most one of them. */
+const CLIENTWISE_TRAILS = ['trailingStoploss', 'lockProfit', 'trailProfit', 'lockTrailProfit'];
+
+/** One weekday's clientwise stop-loss and target, as saved: `stoploss` is negative (−8000). */
+export interface ClientwiseDay {
+  stoploss: number | null;
+  target: number | null;
+  raw: Record<string, unknown>;
+}
+
+/**
+ * BL-172: the account's clientwise settings per weekday from `GET /brokers` (`configurations`
+ * keyed `MON`…`SUN`, docs/algotest-execution.md "Clientwise stop-loss and target"), for the one
+ * broker `brokerId` (the account's own, from `pickBroker`).
+ */
+export function parseClientwise(json: unknown, brokerId: string): Record<string, ClientwiseDay> {
+  const data = (json as { data?: unknown }).data;
+  if (!Array.isArray(data)) throw new Error('brokers list: no data array');
+  const broker = (data as Record<string, unknown>[]).find(
+    (b) => String(b.id ?? b._id ?? '') === brokerId,
+  );
+  if (!broker) throw new Error('the account is not in the brokers list');
+  const configs = (broker.configurations ?? {}) as Record<string, unknown>;
+  const out: Record<string, ClientwiseDay> = {};
+  for (const day of QUANTIPLY_WEEKDAYS) {
+    const raw = (configs[day] ?? {}) as Record<string, unknown>;
+    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    out[day] = { stoploss: num(raw.stoploss), target: num(raw.target), raw };
+  }
+  return out;
+}
+
+/** Every weekday's clientwise stop-loss is −`rupees`. */
+export function clientwiseHolds(days: Record<string, ClientwiseDay>, rupees: number): boolean {
+  return QUANTIPLY_WEEKDAYS.every((d) => days[d]?.stoploss === -Math.abs(rupees));
+}
+
+/** The stop-loss as it reads now, in words: one figure, none, or "differs by weekday". */
+export function clientwiseNow(days: Record<string, ClientwiseDay>): string {
+  const values = new Set(QUANTIPLY_WEEKDAYS.map((d) => days[d]?.stoploss ?? null));
+  if (values.size > 1) return 'differs by weekday';
+  const [only] = [...values];
+  return only === null || only === undefined || only === 0
+    ? 'none'
+    : `₹${Math.abs(only).toLocaleString('en-IN')}`;
+}
+
+/**
+ * The body of `POST /brokers/<id>/config` that sets the stop-loss to `rupees` and keeps what the
+ * owner set besides it: Monday's target (0 when none) and its trailing option with the interval,
+ * as the web app's dialog would send them (it reads Monday too). Null when every weekday already
+ * holds the figure: nothing to send.
+ */
+export function clientwiseBody(
+  days: Record<string, ClientwiseDay>,
+  rupees: number,
+): Record<string, unknown> | null {
+  if (clientwiseHolds(days, rupees)) return null;
+  const mon = days.MON?.raw ?? {};
+  const body: Record<string, unknown> = {
+    stoploss: -Math.abs(rupees),
+    target: typeof mon.target === 'number' ? mon.target : 0,
+  };
+  const trail = CLIENTWISE_TRAILS.find(
+    (k) => mon[k] && typeof mon[k] === 'object' && Object.keys(mon[k] as object).length,
+  );
+  if (trail) {
+    body[trail] = mon[trail];
+    if (mon.trailingInterval !== undefined) body.trailingInterval = mon.trailingInterval;
+  }
+  return body;
+}

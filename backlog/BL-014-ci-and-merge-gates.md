@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — `main` CI failed 50 of 56 runs from 2026-09-29 to 2026-10-05; a red build stops warning about anything |
-| **Status** | In progress |
+| **Status** | Done (2026-10-28) |
 | **Type** | chore |
 | **Area** | infra |
 | **Created** | 2026-10-06 |
@@ -112,3 +112,4 @@ the failures CI catches are caught on the laptop before a push.
   `origin/main...HEAD` rather than the refs being pushed. Phase 1 (branch protection and the
   label) could not be applied from the session — the auto-mode permission check refused it, so
   it stays with the owner.
+- 2026-10-28 — Phase 1 applied with the owner's OK: branch protection on `main` requires the four CI jobs (Server, Dashboard, option-backtesting, momentum-backtesting); `strict` is **false** (owner, 2026-10-28: branches need not be up to date, so parallel PRs merge without a re-sync); `enforce_admins` false keeps the owner's docs-only pushes. The `reviewed` label already existed. All three phases done. Status `Done`.

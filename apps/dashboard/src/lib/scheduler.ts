@@ -60,6 +60,30 @@ export function runDurationMs(run: SchedulerRun | null): number | null {
   return Number.isFinite(ms) && ms >= 0 ? ms : null;
 }
 
+/**
+ * The first sentence of a job's description, for the Jobs table's row (the whole text is in the
+ * job's panel). A sentence ends at ". ", "! " or "? " followed by a capital, a digit or a quote,
+ * outside brackets, so "the repo .env. A part…" splits after ".env." and "e.g. the" does not.
+ * A text with no such end is returned whole.
+ */
+export function firstSentence(text: string): string {
+  let depth = 0;
+  for (let i = 0; i < text.length - 2; i += 1) {
+    const ch = text[i];
+    if (ch === '(' || ch === '[') depth += 1;
+    else if ((ch === ')' || ch === ']') && depth > 0) depth -= 1;
+    else if (
+      depth === 0 &&
+      (ch === '.' || ch === '!' || ch === '?') &&
+      /\s/.test(text[i + 1] ?? '')
+    ) {
+      const next = text.slice(i + 1).trimStart()[0] ?? '';
+      if (/[A-Z0-9"'`(]/.test(next)) return text.slice(0, i + 1);
+    }
+  }
+  return text;
+}
+
 /** A job that needs the owner's laptop session (residential IP or a browser window). */
 export function needsConfirmation(job: Pick<SchedulerJob, 'needs'>): boolean {
   return job.needs.includes('home') || job.needs.includes('gui');
@@ -72,10 +96,36 @@ export function runNowError(status: number | undefined, error: string): string {
   return `Could not start the run: ${error}`;
 }
 
+/** How much of a type goes to Telegram (BL-173): everything, only its failures, or nothing. */
+export type NotificationLevel = 'all' | 'failures' | 'off';
+
 export interface NotificationRow {
   type: string;
   description: string;
   enabled: boolean;
+  /** absent from a scheduler that predates BL-173: read as `all` / `off` from `enabled` */
+  level?: NotificationLevel;
+}
+
+/** A row's level, also from a scheduler that sends only `enabled`. */
+export function levelOfRow(row: NotificationRow): NotificationLevel {
+  return row.level ?? (row.enabled ? 'all' : 'off');
+}
+
+/** `rows` with one type at `level`. */
+export function withLevel(
+  rows: readonly NotificationRow[],
+  type: string,
+  level: NotificationLevel,
+): NotificationRow[] {
+  return rows.map((row) => (row.type === type ? { ...row, level, enabled: level !== 'off' } : row));
+}
+
+/** The PUT body (BL-173): every type's level. */
+export function levelsBody(rows: readonly NotificationRow[]): {
+  levels: Record<string, NotificationLevel>;
+} {
+  return { levels: Object.fromEntries(rows.map((row) => [row.type, levelOfRow(row)])) };
 }
 
 /** The PUT body for a set of rows: every type that is switched off. */

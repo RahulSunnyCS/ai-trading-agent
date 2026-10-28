@@ -251,11 +251,19 @@ class PriceShrinkError(RuntimeError):
 
 
 # A stored series may lose a few rows (a premium day dropped as a unit mismatch, an unfinished
-# week trimmed): more than SHRINK_ROWS and SHRINK_SHARE of them is refused, and so is vanishing
-# or starting more than SHRINK_START later (older history lost, whatever the count).
+# week trimmed): it may lose SHRINK_SHARE of its rows, or SHRINK_ROWS if that is more, but the
+# flat SHRINK_ROWS never exceeds SHRINK_ROWS_CAP of a short series (5 of 14 premium rows is 36%).
+# More than that is refused, and so is vanishing or starting more than SHRINK_START later (older
+# history lost, whatever the count).
 SHRINK_ROWS = 5
+SHRINK_ROWS_CAP = 0.10
 SHRINK_SHARE = 0.02
 SHRINK_START = pd.Timedelta(days=7)
+
+
+def shrink_allowance(count: int) -> float:
+    """How many of a stored series' `count` rows a replace may lose without being refused."""
+    return max(SHRINK_SHARE * count, min(SHRINK_ROWS, SHRINK_ROWS_CAP * count))
 
 
 def check_price_shrink(con: duckdb.DuckDBPyConnection, rows: list) -> None:
@@ -275,7 +283,7 @@ def check_price_shrink(con: duckdb.DuckDBPyConnection, rows: list) -> None:
     for instrument, kind, count, start in stored:
         key = (instrument, kind)
         now, lost = new[key], count - new[key]
-        if now == 0 or (lost > SHRINK_ROWS and lost > SHRINK_SHARE * count):
+        if now == 0 or lost > shrink_allowance(count):
             shrunk.append(f"{instrument} ({kind}) {count} -> {now} rows")
         elif first[key] > pd.Timestamp(start) + SHRINK_START:
             shrunk.append(f"{instrument} ({kind}) starts {first[key].date()}, stored from {start}")

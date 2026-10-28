@@ -7,6 +7,8 @@
  * Before the first entry it shows the registered lists and when they start recording.
  */
 
+import type { ReactNode } from 'react';
+
 import { formatDay, formatIstTime, formatNumber } from '../../../lib/format';
 import { SEVERAL_LISTS_VISIBLE, listName } from '../../../lib/rotationListNames';
 import { LIST_KEYS } from '../../../lib/rotationView';
@@ -33,42 +35,61 @@ function weightsLine(spec: RotationListSpec): string {
     .join(' · ');
 }
 
-function Pick({ pick, highlight }: { pick: RotationPick; highlight?: boolean }) {
+/** A line under a pick (its settings and where it is uploaded), or null. */
+export type PickDetail = (name: string) => ReactNode | null;
+
+function Pick({
+  pick,
+  highlight,
+  detail,
+}: { pick: RotationPick; highlight?: boolean; detail?: PickDetail | undefined }) {
+  const extra = detail?.(pick.name) ?? null;
   return (
-    <li
-      className={`flex h-7 items-center gap-2 rounded px-1 text-xs ${
-        highlight ? 'bg-primary/10' : ''
-      }`}
-      title={`${pick.index} · ${pick.family} · starts ${pick.start}${
-        pick.composite !== null ? ` · composite ${formatNumber(pick.composite, 3)}` : ''
-      }`}
-    >
-      <span className="w-10 shrink-0 font-mono text-faint">{pick.start}</span>
-      <span className="min-w-0 flex-1 truncate font-mono text-foreground">{pick.name}</span>
-      <span className="font-mono text-muted">
-        {pick.composite === null ? '' : formatNumber(pick.composite, 3)}
-      </span>
-      {SEVERAL_LISTS_VISIBLE ? (
-        <span
-          role="img"
-          aria-label={`held by ${pick.shared_by} of 4 lists`}
-          className="font-mono text-[10px] tracking-tighter text-faint"
-          title={`held by ${pick.shared_by} of 4 lists`}
-        >
-          {'●'.repeat(pick.shared_by)}
-          <span className="opacity-30">{'●'.repeat(4 - pick.shared_by)}</span>
+    <li className={`rounded px-1 text-xs ${highlight ? 'bg-primary/10' : ''}`}>
+      <div
+        className="flex h-7 items-center gap-2"
+        title={`${pick.index} · ${pick.family} · starts ${pick.start}${
+          pick.composite !== null ? ` · composite ${formatNumber(pick.composite, 3)}` : ''
+        }`}
+      >
+        <span className="w-10 shrink-0 font-mono text-faint">{pick.start}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-foreground">{pick.name}</span>
+        <span className="font-mono text-muted">
+          {pick.composite === null ? '' : formatNumber(pick.composite, 3)}
         </span>
-      ) : null}
+        {SEVERAL_LISTS_VISIBLE ? (
+          <span
+            role="img"
+            aria-label={`held by ${pick.shared_by} of 4 lists`}
+            className="font-mono text-[10px] tracking-tighter text-faint"
+            title={`held by ${pick.shared_by} of 4 lists`}
+          >
+            {'●'.repeat(pick.shared_by)}
+            <span className="opacity-30">{'●'.repeat(4 - pick.shared_by)}</span>
+          </span>
+        ) : null}
+      </div>
+      {extra ? <div className="pb-1 pl-12">{extra}</div> : null}
     </li>
   );
 }
 
-function Basket({ k, basket }: { k: RotationListKey; basket: RotationBasket }) {
+function Basket({
+  k,
+  basket,
+  title,
+  detail,
+}: {
+  k: RotationListKey;
+  basket: RotationBasket;
+  title?: string | undefined;
+  detail?: PickDetail | undefined;
+}) {
   return (
     <div className="rounded-lg border border-border bg-surface px-3 py-2">
       <div className="mb-1 flex items-center justify-between text-sm font-semibold text-foreground">
         <span>
-          {listName(k)} <span className="text-[10px] font-normal text-faint">({k})</span>
+          {title ?? listName(k)} <span className="text-[10px] font-normal text-faint">({k})</span>
         </span>
         {basket.overridden ? (
           <span
@@ -83,14 +104,14 @@ function Basket({ k, basket }: { k: RotationListKey; basket: RotationBasket }) {
         {[...basket.core]
           .sort((a, b) => a.start.localeCompare(b.start) || a.name.localeCompare(b.name))
           .map((p) => (
-            <Pick key={p.name} pick={p} />
+            <Pick key={p.name} pick={p} detail={detail} />
           ))}
       </ul>
       <div className="mt-1 border-t border-dashed border-border pt-1">
         {basket.buy.length > 0 ? (
           <ul>
             {basket.buy.map((p) => (
-              <Pick key={p.name} pick={p} />
+              <Pick key={p.name} pick={p} detail={detail} />
             ))}
           </ul>
         ) : (
@@ -125,10 +146,16 @@ export function RotationBaskets({
   baskets,
   specs,
   firstEntryDay,
+  title,
+  detail,
 }: {
   baskets: Baskets;
   specs: Record<RotationListKey, RotationListSpec>;
   firstEntryDay: string;
+  /** The basket's heading instead of the list's name (Adaptive Classic, Adaptive Tuned). */
+  title?: string;
+  /** A line under each pick: its settings and where it is uploaded. */
+  detail?: PickDetail;
 }) {
   const e = baskets.entry;
   if (!e) {
@@ -176,7 +203,7 @@ export function RotationBaskets({
       <div className={GRID}>
         {LIST_KEYS.map((k) => {
           const b = baskets.lists[k];
-          return b ? <Basket key={k} k={k} basket={b} /> : null;
+          return b ? <Basket key={k} k={k} basket={b} title={title} detail={detail} /> : null;
         })}
       </div>
       <Legend />
@@ -189,7 +216,9 @@ export function RotationBaskets({
             const c = baskets.changed[k];
             return (
               <div key={k} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="w-20 shrink-0 font-medium text-foreground">{listName(k)}</span>
+                <span className="min-w-20 shrink-0 whitespace-nowrap font-medium text-foreground">
+                  {title ?? listName(k)}
+                </span>
                 {c?.removed.map((n) => (
                   <span key={`r-${n}`} className="font-mono text-negative">
                     −{n}

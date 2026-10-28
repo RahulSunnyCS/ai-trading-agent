@@ -17,6 +17,7 @@ import { PnlView } from './components/PnlView';
 import { PricingPage } from './components/PricingPage';
 import { RegimeView } from './components/RegimeView';
 import { SettingsView } from './components/SettingsView';
+import { TradeBookView } from './components/TradeBookView';
 import { TradesView } from './components/TradesView';
 import { GuideLink } from './components/guide/GuideLink';
 import { GuideView } from './components/guide/GuideView';
@@ -26,7 +27,7 @@ import { DataSourceBanner } from './components/shell/DataSourceBanner';
 import { Sidebar } from './components/shell/Sidebar';
 import { TokenBanner } from './components/shell/TokenBanner';
 import { Topbar } from './components/shell/Topbar';
-import { type Tab, activeNavChild, navItem, tabLabel } from './components/shell/nav';
+import { ARCHIVED_TABS, type Tab, activeNavChild, navItem, tabLabel } from './components/shell/nav';
 import { PENDING_BY_TAB } from './components/shell/pending';
 import { Toaster } from './components/ui/Toast';
 import { hydrateMomentumAlertsFromStorage } from './store/momentumAlerts';
@@ -44,8 +45,8 @@ import { hydrateThemeFromStorage } from './store/theme';
 
 /** One-line subtitle shown under each view's title in the top bar. */
 const SUBTITLES: Record<Tab, string> = {
-  overview: 'Today at a glance: market, feed, token, positions and scheduled jobs',
-  live: 'Real-time straddle, momentum, and feed status',
+  overview: 'The morning board: rotation, Momentum, the trade book, jobs, logins and data',
+  live: 'Spot, VIX and two straddles minute by minute; a replay of a collected day',
   trades: 'Simulated paper-trade log',
   personalities: 'The 10 decision engines and their configs',
   pnl: 'Realized P&L across closed paper trades',
@@ -55,6 +56,7 @@ const SUBTITLES: Record<Tab, string> = {
   optionslab:
     'Build, backtest and track option strategies: leg-wise on 1-minute Fyers data, or the YAML engine',
   momentum: 'Weekly rotation research across ETFs, stocks and categories',
+  tradebook: "The real P&L from the brokers' contract notes: F&O, trades, money and Momentum",
   brokerLogins: 'Connect and manage the market-data brokers used across the dashboard',
   pricing: 'Your credits, payment mode and plans',
   settings: 'Choose which tabs appear and arrange their navigation priority',
@@ -87,6 +89,8 @@ function renderView(
       return <OptionsLabView />;
     case 'momentum':
       return <MomentumBacktestingView />;
+    case 'tradebook':
+      return <TradeBookView />;
     case 'brokerLogins':
       return <BrokerLoginsView />;
     case 'pricing':
@@ -175,7 +179,8 @@ export function App() {
             : firstVisibleTab(navigationPreferences),
         );
       }
-    } else if (navigationPreferences.hidden.includes(tab)) {
+    } else if (navigationPreferences.hidden.includes(tab) && !ARCHIVED_TABS.includes(tab)) {
+      // An archived screen is hidden from the sidebar, not disabled: its link still opens it.
       replace(firstVisibleTab(navigationPreferences));
     }
   }, [tab, navigationPreferences, replace]);

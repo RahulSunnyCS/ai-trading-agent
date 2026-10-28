@@ -1,17 +1,21 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, it, test } from 'node:test';
 import { DEFAULT_AUTOMATION, quantiplyDeploy } from './automation-settings.js';
 import {
   type AlgoDetail,
   ENABLE_LEAD_SECONDS,
   type EnableInput,
   UNKNOWN_BROKER,
+  clientwiseBody,
+  clientwiseHolds,
+  clientwiseNow,
   defaultSession,
   enabledSessions,
   istSeconds,
   ownedForSession,
   parseBroker,
   parseBrokers,
+  parseClientwise,
   parseDeployLedger,
   parseDetail,
   pickBroker,
@@ -553,4 +557,54 @@ test("a stop's square-off row keeps the algo off for that session, like a disabl
   const p = planEnable(wednesday({ toggled }));
   assert.deepEqual(p.leftOff, [`${P}S_ditm1_1202`]);
   assert.ok(!p.enable.some((t) => t.id === '1'));
+});
+
+describe('clientwise MTM SL (BL-172)', () => {
+  const brokers = (days: Record<string, unknown>) => ({
+    status: 'success',
+    data: [
+      { id: 'other', clientId: 'X', configurations: {} },
+      { id: 'b1', clientId: 'R1', configurations: days },
+    ],
+  });
+  const all = (sl: number, extra: Record<string, unknown> = {}) =>
+    Object.fromEntries(
+      ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((d) => [
+        d,
+        { stoploss: sl, target: 0, status: 'x', ...extra },
+      ]),
+    );
+
+  it('reads the account by its broker id, every weekday', () => {
+    const days = parseClientwise(brokers(all(-8000)), 'b1');
+    assert.equal(days.SUN?.stoploss, -8000);
+    assert.equal(clientwiseHolds(days, 8000), true);
+    assert.equal(clientwiseNow(days), '₹8,000');
+    assert.equal(clientwiseBody(days, 8000), null);
+    assert.throws(() => parseClientwise(brokers(all(-8000)), 'nope'), /not in the brokers list/);
+  });
+
+  it('a different or partly different figure is set, keeping the target and trail', () => {
+    const mixed = all(-9000, {
+      target: 5000,
+      trailingStoploss: { moveBy: 1000, trailBy: 500 },
+      trailingInterval: 'MINUTE',
+    });
+    (mixed.WED as Record<string, unknown>).stoploss = -8000;
+    const days = parseClientwise(brokers(mixed), 'b1');
+    assert.equal(clientwiseHolds(days, 9000), false);
+    assert.equal(clientwiseNow(days), 'differs by weekday');
+    assert.deepEqual(clientwiseBody(days, 9000), {
+      stoploss: -9000,
+      target: 5000,
+      trailingStoploss: { moveBy: 1000, trailBy: 500 },
+      trailingInterval: 'MINUTE',
+    });
+  });
+
+  it('none set reads as none and is sent with target 0', () => {
+    const days = parseClientwise(brokers({}), 'b1');
+    assert.equal(clientwiseNow(days), 'none');
+    assert.deepEqual(clientwiseBody(days, 8000), { stoploss: -8000, target: 0 });
+  });
 });

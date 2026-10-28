@@ -1,12 +1,13 @@
 'use client';
 
 import { Settings2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { usePolledResource } from '../../../hooks/usePolledResource';
 import { apiPost, apiPut } from '../../../lib/api';
 import { cn } from '../../../lib/cn';
 import {
+  EMPTY,
   formatDay,
   formatInr,
   formatInt,
@@ -16,6 +17,8 @@ import {
 } from '../../../lib/format';
 import type {
   MomentumLotOrders,
+  MomentumOrderPreview,
+  MomentumOrderPreviewJob,
   MomentumOrderRow,
   MomentumOrderSettings,
   MomentumOrders,
@@ -25,7 +28,7 @@ import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
 import { Drawer } from '../../ui/Drawer';
-import { NumberField, inputClass } from '../../ui/Input';
+import { NumberField, Select, inputClass } from '../../ui/Input';
 import { SegmentedControl } from '../../ui/SegmentedControl';
 import { Skeleton } from '../../ui/Skeleton';
 import { StateMessage } from '../../ui/StateMessage';
@@ -120,12 +123,26 @@ function OrderRow({ row }: { row: MomentumOrderRow }) {
   );
 }
 
+/** A favourite the "Preview for…" picker offers (This week's cards). */
+export interface OrderPreviewChoice {
+  id: string;
+  name: string;
+  headline: boolean;
+}
+
+/** What the plan table needs, from the stored orders or from a preview. */
+type PlanSource = Pick<MomentumOrders, 'kind' | 'reason'> &
+  Partial<Pick<MomentumOrders, 'plan' | 'prices' | 'holdings' | 'lots'>>;
+
 /**
  * Your orders (BL-051 Phase 3): the headline's trades in whole shares against the paper
- * portfolio (until money goes in) or the holdings read from Fyers. Made by the Friday 14:15 job,
- * or now with "Make orders". Nothing here places an order.
+ * portfolio (until money goes in) or the holdings read from Kite or Fyers. Made by the Friday 14:15
+ * job, or now with "Make orders". "Preview for…" shows another favourite's orders against the same
+ * holdings, saved nowhere. Nothing here places an order.
  */
-export function YourOrders() {
+export function YourOrders({
+  favourites = null,
+}: { favourites?: readonly OrderPreviewChoice[] | null } = {}) {
   const view = usePolledResource<MomentumOrdersView>('/api/momentum/orders', { cache: true });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const running = view.data?.job?.status === 'running';
@@ -137,9 +154,11 @@ export function YourOrders() {
   }, [running, refetch]);
 
   const latest: MomentumOrders | null = view.data?.orders.at(-1) ?? null;
-  const plan = latest?.plan ?? null;
   const settings = view.data?.settings ?? null;
-  const trades = useMemo(() => plan?.rows.filter((r) => r.quantity > 0).length ?? 0, [plan]);
+  const preview = useOrderPreview();
+  const others = useMemo(() => (favourites ?? []).filter((f) => !f.headline), [favourites]);
+  const previewing = preview.favourite !== null;
+  const previewName = others.find((f) => f.id === preview.favourite)?.name ?? null;
 
   async function makeOrders(): Promise<void> {
     const response = await apiPost('/api/momentum/orders/run', {});
@@ -151,7 +170,9 @@ export function YourOrders() {
     <Card flush>
       <div id="orders" className="flex scroll-mt-4 flex-wrap items-center gap-2 px-4 pt-3">
         <h2 className="text-base font-semibold text-foreground">Your orders</h2>
-        {latest?.headline ? (
+        {previewing ? (
+          <span className="text-xs text-muted">preview for {previewName ?? 'a favourite'}</span>
+        ) : latest?.headline ? (
           <span className="text-xs text-muted">for {latest.headline.name}</span>
         ) : null}
         {settings ? (
@@ -161,32 +182,50 @@ export function YourOrders() {
               : `Holdings from ${brokerName(settings.holdings_source)}`}
           </Badge>
         ) : null}
-        {latest && latest.kind !== 'unavailable' ? (
+        {previewing ? (
+          <Badge tone="warning">Preview · nothing saved</Badge>
+        ) : latest && latest.kind !== 'unavailable' ? (
           <Badge tone={latest.kind === 'exact' ? 'primary' : 'neutral'}>
             {latest.kind === 'exact' ? 'Exact before the close' : 'From the final data'}
           </Badge>
         ) : null}
         <span className="ml-auto flex items-center gap-1.5">
+          {others.length ? (
+            <Select
+              aria-label="Preview for"
+              className="h-8 w-56 py-0 text-xs"
+              value={preview.favourite ?? ''}
+              onChange={(event) => preview.select(event.target.value || null)}
+            >
+              <option value="">Headline: the orders made</option>
+              {others.map((f) => (
+                <option key={f.id} value={f.id}>
+                  Preview for {f.name}
+                </option>
+              ))}
+            </Select>
+          ) : null}
           <Button size="sm" variant="ghost" onClick={() => setSettingsOpen(true)}>
             <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
             Settings
           </Button>
-          <Button size="sm" onClick={() => void makeOrders()} loading={running}>
-            {running ? 'Making orders…' : 'Make orders now'}
-          </Button>
+          {previewing ? null : (
+            <Button size="sm" onClick={() => void makeOrders()} loading={running}>
+              {running ? 'Making orders…' : 'Make orders now'}
+            </Button>
+          )}
         </span>
       </div>
-      {view.data?.job?.status === 'failed' ? (
+      {!previewing && view.data?.job?.status === 'failed' ? (
         <p className="px-4 pt-2 text-xs text-negative">
           The last run failed: {view.data.job.error}
         </p>
       ) : null}
 
-      {view.loading && !view.data ? (
-        <div className="space-y-2 px-4 py-4">
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-40 w-full" />
-        </div>
+      {previewing ? (
+        <PreviewBody state={preview} settings={settings} />
+      ) : view.loading && !view.data ? (
+        <LoadingBody />
       ) : view.error && !view.data ? (
         <div className="px-4 py-4">
           <StateMessage
@@ -200,65 +239,18 @@ export function YourOrders() {
           No orders for the week of {view.data?.week}. The Friday 14:15 job makes them, or press{' '}
           <b>Make orders now</b>.
         </p>
-      ) : !plan ? (
-        <p className="px-4 py-4 text-sm text-warning">{latest.reason}</p>
       ) : (
-        <>
-          <div className="mt-2 flex flex-wrap border-y border-border">
-            <Kpi
-              label="Portfolio value"
-              value={formatInr(plan.portfolio_value)}
-              sub={`cash ${formatInr(plan.cash)} · prices: ${latest.prices}`}
-            />
-            <Kpi label="Sells" value={formatInr(plan.sells)} tone="text-negative" />
-            <Kpi label="Buys" value={formatInr(plan.buys)} tone="text-positive" />
-            <Kpi
-              label="Cash after"
-              value={formatInr(plan.cash_after)}
-              tone={plan.cash_after < 0 ? 'text-negative' : undefined}
-            />
-            <Kpi label="Charges" value={formatInr(plan.charges)} sub="STT, stamp, exchange, DP" />
-            <Kpi
-              label="Not traded"
-              value={formatInt(plan.not_traded)}
-              sub={`under ${formatInr(settings?.min_trade_rs ?? 10_000)}, or held`}
-            />
-          </div>
-          {latest.lots ? <LotsPanel orders={latest} /> : null}
-          <Table>
-            <THead>
-              <Th>Order</Th>
-              <Th>Name</Th>
-              <Th align="right">You hold</Th>
-              <Th align="right">Value</Th>
-              <Th align="right">Yours</Th>
-              <Th align="right">Model</Th>
-              <Th align="right">Drift</Th>
-              <Th align="right">Shares</Th>
-              <Th align="right">Price</Th>
-              <Th align="right">Order value</Th>
-              <Th align="right">Charges</Th>
-              <Th>Note</Th>
-            </THead>
-            <tbody>
-              {plan.rows.map((row) => (
-                <OrderRow key={`${row.lot ?? ''}-${row.symbol}`} row={row} />
-              ))}
-            </tbody>
-          </Table>
-          <p className="px-4 py-2.5 text-xs text-faint">
-            {formatInt(trades)} orders, sells first. Whole shares, rounded down; top-ups and trims
-            under {formatInr(settings?.min_trade_rs ?? 10_000)} are skipped, exits and new names
-            always go through. Made {formatIstDateTime(latest.created_at)} (
-            {latest.trigger === 'scheduled' ? 'the 14:15 job' : 'by hand'}).
-            {plan.missing_prices.length ? ` No price for ${plan.missing_prices.join(', ')}.` : ''}
-            {latest.holdings &&
-            latest.holdings.source !== 'paper' &&
-            latest.holdings.outside?.length
-              ? ` Left alone, not part of this strategy: ${latest.holdings.outside.join(', ')}.`
-              : ''}
-          </p>
-        </>
+        <PlanBody
+          orders={latest}
+          settings={settings}
+          made={
+            <>
+              Made {formatIstDateTime(latest.created_at)} (
+              {latest.trigger === 'scheduled' ? 'the 14:15 job' : 'by hand'}).
+            </>
+          }
+          lots={latest.lots ? <LotsPanel orders={latest} /> : null}
+        />
       )}
       <OrdersSettingsDrawer
         open={settingsOpen}
@@ -267,6 +259,208 @@ export function YourOrders() {
         onChanged={refetch}
       />
     </Card>
+  );
+}
+
+function LoadingBody() {
+  return (
+    <div className="space-y-2 px-4 py-4">
+      <Skeleton className="h-14 w-full" />
+      <Skeleton className="h-40 w-full" />
+    </div>
+  );
+}
+
+/** A preview's state, shown only when its job is the one asked for the favourite now picked. */
+interface OrderPreviewState {
+  favourite: string | null;
+  select: (favourite: string | null) => void;
+  /** Starts the picked favourite's preview again (after an error). */
+  retry: () => void;
+  /** The finished preview of the picked favourite, else null. */
+  result: MomentumOrderPreview | null;
+  loading: boolean;
+  error: string | null;
+}
+
+/** Starts a read-only preview job for the picked favourite and polls it while it runs. */
+function useOrderPreview(): OrderPreviewState {
+  const [favourite, setFavourite] = useState<string | null>(null);
+  const [job, setJob] = useState<{ favourite: string; id: string } | null>(null);
+  const [startError, setStartError] = useState<{ favourite: string; error: string } | null>(null);
+  const picked = useRef<string | null>(null);
+
+  const select = useCallback((next: string | null) => {
+    picked.current = next;
+    setFavourite(next);
+    setJob(null);
+    setStartError(null);
+    if (!next) return;
+    void apiPost<MomentumOrderPreviewJob>('/api/momentum/orders/preview/jobs', {
+      favourite: next,
+    }).then((started) => {
+      if (picked.current !== next) return; // another favourite was picked meanwhile
+      if (started.ok) setJob({ favourite: next, id: started.data.id });
+      else setStartError({ favourite: next, error: started.error });
+    });
+  }, []);
+
+  const current = job && job.favourite === favourite ? job : null;
+  const [finished, setFinished] = useState<string | null>(null);
+  const polled = usePolledResource<MomentumOrderPreviewJob>(
+    current ? `/api/momentum/orders/preview/jobs/${current.id}` : '',
+    // Polled only while the job runs.
+    current && finished !== current.id
+      ? { enabled: true, intervalMs: 2000 }
+      : { enabled: current !== null },
+  );
+  // Gate on the job asked for: the hook keeps the previous job's answer while the next loads.
+  const data = current && polled.data?.id === current.id ? polled.data : null;
+  // A job that finished, or that the service no longer knows (a restart): stop asking.
+  const done =
+    data && data.status !== 'running' ? data.id : current && polled.error ? current.id : null;
+  useEffect(() => {
+    if (done) setFinished(done);
+  }, [done]);
+
+  const error =
+    startError && startError.favourite === favourite
+      ? startError.error
+      : data?.status === 'failed'
+        ? (data.error ?? 'The preview failed.')
+        : current && polled.error
+          ? polled.error
+          : null;
+  return {
+    favourite,
+    select,
+    retry: () => select(favourite),
+    result: data?.status === 'done' ? data.result : null,
+    loading: favourite !== null && !error && data?.status !== 'done',
+    error,
+  };
+}
+
+function PreviewBody({
+  state,
+  settings,
+}: { state: OrderPreviewState; settings: MomentumOrderSettings | null }) {
+  if (state.error) {
+    return (
+      <div className="px-4 py-4">
+        <StateMessage
+          variant="error"
+          title="Could not make the preview"
+          description={state.error}
+        />
+        <div className="mt-2 flex justify-center">
+          <Button size="sm" onClick={state.retry}>
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  if (state.loading || !state.result) {
+    return (
+      <div className="space-y-2 px-4 py-4">
+        <p className="text-xs text-muted">
+          Planning this favourite against your holdings. A cold ranking can take a minute.
+        </p>
+        <Skeleton className="h-14 w-full" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
+  const result = state.result;
+  if (result.error) return <p className="px-4 py-4 text-sm text-warning">{result.error}</p>;
+  if (!result.kind) return <p className="px-4 py-4 text-sm text-warning">No plan came back.</p>;
+  return (
+    <PlanBody
+      orders={{ ...result, kind: result.kind, reason: result.reason ?? null }}
+      settings={settings}
+      made={
+        <>
+          {result.holdings?.source === 'paper'
+            ? 'A preview: saved nowhere, and planned from your paper capital in cash (the paper portfolio is the headline’s). '
+            : 'A preview: saved nowhere, and planned as one portfolio against all your holdings, never lot by lot. '}
+          Your orders for the headline are unchanged.
+        </>
+      }
+      lots={null}
+    />
+  );
+}
+
+/** The tiles, the orders table and the footer, for the stored orders or a preview. */
+function PlanBody({
+  orders,
+  settings,
+  made,
+  lots,
+}: {
+  orders: PlanSource;
+  settings: MomentumOrderSettings | null;
+  made: ReactNode;
+  lots: ReactNode;
+}) {
+  const plan = orders.plan ?? null;
+  const trades = plan?.rows.filter((r) => r.quantity > 0).length ?? 0;
+  if (!plan) return <p className="px-4 py-4 text-sm text-warning">{orders.reason}</p>;
+  return (
+    <>
+      <div className="mt-2 flex flex-wrap border-y border-border">
+        <Kpi
+          label="Portfolio value"
+          value={formatInr(plan.portfolio_value)}
+          sub={`cash ${formatInr(plan.cash)} · prices: ${orders.prices ?? EMPTY}`}
+        />
+        <Kpi label="Sells" value={formatInr(plan.sells)} tone="text-negative" />
+        <Kpi label="Buys" value={formatInr(plan.buys)} tone="text-positive" />
+        <Kpi
+          label="Cash after"
+          value={formatInr(plan.cash_after)}
+          tone={plan.cash_after < 0 ? 'text-negative' : undefined}
+        />
+        <Kpi label="Charges" value={formatInr(plan.charges)} sub="STT, stamp, exchange, DP" />
+        <Kpi
+          label="Not traded"
+          value={formatInt(plan.not_traded)}
+          sub={`under ${formatInr(settings?.min_trade_rs ?? 10_000)}, or held`}
+        />
+      </div>
+      {lots}
+      <Table>
+        <THead>
+          <Th>Order</Th>
+          <Th>Name</Th>
+          <Th align="right">You hold</Th>
+          <Th align="right">Value</Th>
+          <Th align="right">Yours</Th>
+          <Th align="right">Model</Th>
+          <Th align="right">Drift</Th>
+          <Th align="right">Shares</Th>
+          <Th align="right">Price</Th>
+          <Th align="right">Order value</Th>
+          <Th align="right">Charges</Th>
+          <Th>Note</Th>
+        </THead>
+        <tbody>
+          {plan.rows.map((row) => (
+            <OrderRow key={`${row.lot ?? ''}-${row.symbol}`} row={row} />
+          ))}
+        </tbody>
+      </Table>
+      <p className="px-4 py-2.5 text-xs text-faint">
+        {formatInt(trades)} orders, sells first. Whole shares, rounded down; top-ups and trims under{' '}
+        {formatInr(settings?.min_trade_rs ?? 10_000)} are skipped, exits and new names always go
+        through. {made}
+        {plan.missing_prices.length ? ` No price for ${plan.missing_prices.join(', ')}.` : ''}
+        {orders.holdings && orders.holdings.source !== 'paper' && orders.holdings.outside?.length
+          ? ` Left alone, not part of this strategy: ${orders.holdings.outside.join(', ')}.`
+          : ''}
+      </p>
+    </>
   );
 }
 

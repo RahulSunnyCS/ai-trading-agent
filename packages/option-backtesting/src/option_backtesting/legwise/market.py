@@ -152,6 +152,29 @@ def backtest_days(
     )
 
 
+def master_options(root: Path, underlying: str, day: date) -> list[dict]:
+    """The day's Fyers symbol-master rows for the underlying's options (futures left out); [] when
+    there is no master for the day (the vendor days)."""
+    symbols_path = lake.symbol_master_path(root, "fyers", day)
+    if not symbols_path.exists():
+        return []
+    symbols = pq.read_table(symbols_path).to_pylist()
+    return [s for s in symbols if s["underlying"] == underlying and s["option_type"] != "FUT"]
+
+
+def listed_expiries(root: Path, underlying: str, day: date) -> list[date] | None:
+    """The expiries `load_day` lists for the day, without loading the bars: the symbol master's,
+    else those in the day's option file (which, on a vendor day, includes long-dated contracts).
+    None without an option file."""
+    opt_path = lake.bars_1m_path(root, "option", underlying, day)
+    if not opt_path.exists():
+        return None
+    listed = {s["expiry"] for s in master_options(root, underlying, day)}
+    if not listed:
+        listed = set(pq.read_table(opt_path, columns=["expiry"]).column("expiry").to_pylist())
+    return sorted(listed)
+
+
 def load_day(root: Path, underlying: str, day: date) -> DayData:
     spot = _load_bars(lake.bars_1m_path(root, "index", underlying, day))
     opt_path = lake.bars_1m_path(root, "option", underlying, day)
@@ -173,14 +196,9 @@ def load_day(root: Path, underlying: str, day: date) -> DayData:
         _fill_series(series, minutes, cols, rows)
         chain[key] = series.forward_fill()
 
-    listed: list[date] = []
-    lot: int | None = None
-    symbols_path = lake.symbol_master_path(root, "fyers", day)
-    if symbols_path.exists():
-        symbols = pq.read_table(symbols_path).to_pylist()
-        mine = [s for s in symbols if s["underlying"] == underlying and s["option_type"] != "FUT"]
-        listed = sorted({s["expiry"] for s in mine})
-        lot = mine[0]["lot_size"] if mine else None
+    mine = master_options(root, underlying, day)
+    listed = sorted({s["expiry"] for s in mine})
+    lot = mine[0]["lot_size"] if mine else None
 
     return DayData(
         day=day,
@@ -228,9 +246,7 @@ def check_on_5m_marks(*times: str | None) -> None:
     minutes from 09:15."""
     for t in times:
         if t is not None and minute_index(t) % derived.BUCKET_MINUTES:
-            raise UnsupportedOn5m(
-                f"{t} is not on a 5-minute mark; 5-minute bars need :00, :05, …"
-            )
+            raise UnsupportedOn5m(f"{t} is not on a 5-minute mark; 5-minute bars need :00, :05, …")
 
 
 def check_strikes_on_5m(legs: list) -> None:

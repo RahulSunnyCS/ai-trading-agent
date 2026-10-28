@@ -74,7 +74,7 @@ def exit_minutes(
     cap = min(E.N_BARS, int(hh) * 60 + int(mm) - E.OPEN_MIN)  # an exit here is the template's
     # a trade-relative exit (at_entry / minutes_in_trade) is worked out per trade on its own row;
     # its other parts, and every plain exit, are evaluated once over the grid
-    memo: dict[int, np.ndarray] = {}
+    memo: dict[E.Node, np.ndarray] = {}
     truth = {
         side: None if node.trade else E.evaluate(node, frame, memo)
         for side, node in rule.exits.items()

@@ -40,11 +40,25 @@ function viewTitle(page: Page): Locator {
   return page.getByRole('banner').getByRole('heading', { level: 1 });
 }
 
+/**
+ * Show every tab, the Archived engine's included (Trades, P&L, Billing start hidden), as a reader
+ * who switched them on in Settings › Navigation would have them.
+ */
+async function showAllTabs(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'ata.navigation.v1',
+      JSON.stringify({ version: 2, hidden: [], order: [] }),
+    );
+  });
+}
+
 /** Install standard mocks for every API route the assertions depend on. */
 async function installStandardMocks(
   page: Page,
   { paymentTestMode = false }: { paymentTestMode?: boolean } = {},
 ): Promise<void> {
+  await showAllTabs(page);
   await page.route('**/api/trades', (route) => {
     void route.fulfill({
       status: 200,
@@ -163,10 +177,7 @@ test('All three wired views show an error or unavailable state when the backend 
   await page.route('**/api/**', (route) => {
     void route.abort('failed');
   });
-  // And refuse the tick socket, whichever host NEXT_PUBLIC_WS_URL points it at.
-  await page.routeWebSocket(/\/ws\/ticks$/, (ws) => {
-    void ws.close();
-  });
+  await showAllTabs(page);
 
   await page.goto('/');
 
@@ -244,23 +255,23 @@ test('Sidebar links are keyboard-focusable and activatable via Enter @non-blocke
   await page.goto('/');
   await expect(page).toHaveURL(/\/overview$/);
 
-  // Focus the Live link and Tab to the next one (Trades).
-  const liveLink = sidebarLink(page, 'Live');
-  await liveLink.focus();
-  await expect(liveLink).toBeFocused();
+  // Focus the Trades link and Tab to the next one (P&L), in the Archived engine section.
+  const tradesLink = sidebarLink(page, 'Trades');
+  await tradesLink.focus();
+  await expect(tradesLink).toBeFocused();
 
   // Press Tab to move focus to the next link.
   await page.keyboard.press('Tab');
 
-  // The Trades link should now be focused.
-  const tradesLink = sidebarLink(page, 'Trades');
-  await expect(tradesLink).toBeFocused();
+  // The P&L link should now be focused.
+  const pnlLink = sidebarLink(page, 'P&L');
+  await expect(pnlLink).toBeFocused();
 
-  // Activate the Trades link via Enter key.
+  // Activate the P&L link via Enter key.
   await page.keyboard.press('Enter');
 
-  // The Trades view should now be visible, at its own URL.
-  await expect(page).toHaveURL(/\/trades$/);
-  await expect(page.getByRole('heading', { name: 'Paper Trades' })).toBeVisible();
-  await expect(tradesLink).toHaveAttribute('aria-current', 'page');
+  // The P&L view should now be visible, at its own URL.
+  await expect(page).toHaveURL(/\/pnl$/);
+  await expect(viewTitle(page)).toHaveText('P&L');
+  await expect(pnlLink).toHaveAttribute('aria-current', 'page');
 });
