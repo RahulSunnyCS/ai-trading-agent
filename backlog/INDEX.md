@@ -17,7 +17,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-162](BL-162-wide-opening-range-dir-swap.md) | Wide opening-range days: swap not-yet-entered Widesl picks for Dir, as a forward shadow rule | P0 | Planned | research | options |
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
-| [BL-025](BL-025-live-money-rules.md) | Live-money rules for Momentum: written before the first rupee, enforced by alerts | P1 | In progress; drawdown-rule test run 2026-10-28: no candidate passes, current lines stay; re-entry wording for the owner | feature | momentum |
+| [BL-025](BL-025-live-money-rules.md) | Live-money rules for Momentum: written before the first rupee, enforced by alerts | P1 | In progress; drawdown-rule test: no candidate passes, lines stay; owner chose N (alert and review) | feature | momentum |
 | [BL-026](BL-026-realised-vs-backtest-options.md) | Options: realised P&L against the backtest of the same days | P1 | Planned | feature | options |
 | [BL-030](BL-030-choose-journal-favourites.md) | Choose the ~8 favourites to track and trade | P1 | Idea | research | momentum |
 | [BL-035](BL-035-consolidation-tightness-feature.md) | Consolidation tightness as a Momentum ranking feature (the cheap "flag") | P1 | Idea | research | momentum |
