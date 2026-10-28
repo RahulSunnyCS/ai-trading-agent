@@ -15,7 +15,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-107](BL-107-nse-fo-bhavcopy-daily.md) | Daily NSE F&O bhavcopy: official end-of-day record and a cross-check on the Fyers data | P0 | Planned | feature | options |
 | [BL-148](BL-148-fyers-mcx-expired-options-history.md) | Fyers MCX expired options history: Prime two-year 1-minute OHLCV+OI backfill into the canonical lake, then daily continuation | P0 | Planned | feature | options / trading-data |
 | [BL-162](BL-162-wide-opening-range-dir-swap.md) | Wide opening-range days: swap not-yet-entered Widesl picks for Dir, as a forward shadow rule | P0 | Planned | research | options |
-| [BL-186](BL-186-dir-stop-and-reverse.md) | Directional stop-and-reverse: on a leg stop, buy the stopped option (blanket, filtered, half size) against a plain exit, on T1's Dir picks | P0 | In progress | research | options |
+| [BL-186](BL-186-dir-stop-and-reverse.md) | Directional stop-and-reverse: on a leg stop, buy the stopped option (blanket, filtered, half size) against a plain exit, on T1's Dir picks | P0 | Done | research | options |
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
 | [BL-025](BL-025-live-money-rules.md) | Live-money rules for Momentum: written before the first rupee, enforced by alerts | P1 | In progress; drawdown-rule test: no candidate passes, lines stay; owner chose N (alert and review) | feature | momentum |

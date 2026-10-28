@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the owner's call (2026-10-28) |
-| **Status** | In progress (2026-10-28): Phase 1 built, Phase 2 running |
+| **Status** | Done (2026-10-29): killed — no filtered reversal beats the plain exit; keep the plain leg stop |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -163,6 +163,25 @@ so does its drawdown. C2's VWAP proxy and a plain TWAP give the same answer (−
 `out/sims.jsonl`, `out/picks.json` (not committed; regenerate with `run.py simulate`, about 70 minutes with one
 worker).
 
+## Hold-out (2026-07-23 → 2026-10-22), read after the verdict above
+
+56 days, 42 Dir pick-days; A3 reproduced all 178 stored pick-days. Descriptive: the verdict is the main
+period's.
+
+| Arm | Book ₹ / day | − A5, 90% interval | p | Max drawdown | Long's net a Dir pick | Reversals |
+|---|---|---|---|---|---|---|
+| A5 | +1,590 | — | | −24,293 | — | 0 |
+| C1_T30 | +1,675 | +85 [−191, +411] | 0.71 | −29,166 | +6 | 18 |
+| C2_T30 | +1,884 | +294 [−155, +816] | 0.31 | −31,654 | +350 | 45 |
+| C3_T30 | +1,293 | −297 [−677, +16] | 0.12 | −33,796 | −270 | 26 |
+
+- No arm is significant (Holm: none) and every one draws down deeper than A5, as in the main period.
+- C2 turns positive and C3 negative over these 56 days: the signs move from one period to the next, which is
+  what noise looks like. C3's long nets −₹270 a pick here; over the whole registered period (main + hold-out)
+  it is still positive (+₹71), so the first kill clause does not fire for any arm over the full period.
+- C1 held to 15:28 (the best secondary cell in the main period) is +₹342 a day here, long +₹338 a pick, with
+  a max drawdown of −₹29.3k against −₹24.3k: still deeper.
+
 ## Risks
 
 - A whipsaw costs about twice a plain stop (the stop loss, then the long's premium decay and its own stop),
@@ -231,3 +250,9 @@ None open; answered 2026-10-28 (Log).
   −₹45 [−206, +118] a day, none significant under Holm, and all three with a deeper maximum drawdown
   (−₹41.2k, −₹46.0k, −₹32.8k against −₹26.2k). The long's own net is positive (+₹104, +₹135, +₹116 a Dir
   pick), so the kill is on the second clause. Written and committed before the hold-out was read.
+- 2026-10-29 — hold-out (2026-07-23 → 2026-10-22, 56 days) read after the primary verdict was committed:
+  C1_T30 +₹85 [−191, +411], C2_T30 +₹294 [−155, +816], C3_T30 −₹297 [−677, +16] a day against A5; none
+  significant, all with a deeper drawdown. The verdict stands: **killed**. Keep the plain leg stop (with
+  RE COST); no live work follows. If the idea is ever revived, the descriptive lead is C1 held to the exit
+  (main +₹231 [−28, +491], hold-out +₹342), which needs its own pre-registration and a drawdown answer. Item
+  closed; findings in `research/options/strategies/directional/stop-and-reverse.md`.
