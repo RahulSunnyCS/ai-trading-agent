@@ -364,7 +364,8 @@ needs a registration of its own with one level fixed in advance and a forward tr
   3000, lock at 0, then 1:1"):** a lock-and-trail (arm, lock, step) at (2,000, 0), (3,000, 0) and
   (4,000, 0), each 1:1 in ₹100 steps: once the MTM has reached *arm*, the exit level starts at *lock* and
   rises ₹100 for every further ₹100 the peak MTM makes (the portfolio stop's `locktrail:A,B,100,100`).
-  Nineteen overlays in all.
+  Nineteen overlays in all. The lock of ₹0 is run as ₹1 (breakeven): the portfolio stop's parser reads
+  a 0 as no lock (found at the dry run, before any overlay was read).
 - **Will not run:** targets or locks on the afternoon sets or the whole day, other levels or steps, a
   target by family or index.
 

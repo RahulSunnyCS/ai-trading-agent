@@ -34,6 +34,7 @@ from option_backtesting.legwise.market import backtest_days, load_day
 from option_backtesting.legwise.schema import load_legwise
 from option_backtesting.rotation import store
 from option_backtesting.rotation.lists import LISTS, WARMUP
+from option_backtesting.rotation.portfolio import apply_book, member_from_curve, parse_trail
 from option_backtesting.rotation.readout import block_bootstrap_mean, max_drawdown
 from option_backtesting.rotation.score import composite, dte_matrix, family_index, select
 from option_backtesting.rotation.variants import variant_names
@@ -80,6 +81,12 @@ class Spec:
     seed: int = 20261028
     mtm: int | None = None  # the half-day sets at this overall stop (the whole-day pool unchanged)
     mtm_halves: tuple[str, ...] = ("am", "pm")  # which halves take `mtm`; ("am",) = morning only
+    #: an overlay on the morning sets' recorded MTM paths, applied at the files' stop (E3): "tgt1500"
+    #: (close at the first bar close at or above Rs 1,500) or "lock4000-2000" (once Rs 4,000 was
+    #: reached, close at the first bar close at or below Rs 2,000) or "lt3000-0-100" (once Rs 3,000 was
+    #: reached, a lock at Rs 0 that rises Rs 100 for every further Rs 100 of peak MTM); results under
+    #: results_split_<overlay>/
+    overlay: str | None = None
     slots_all: list[str] = field(default_factory=lambda: slots("0917", "1517"))
 
     @property
@@ -88,9 +95,16 @@ class Spec:
 
     @property
     def tag(self) -> str:
+        if self.overlay:
+            return f"split_{self.overlay}"
         if not self.mtm:
             return "split"
         return f"split_mtm{self.mtm}" + ("" if self.pm_derived else "am")
+
+    @property
+    def paths_dir(self) -> Path:
+        """The morning sets' recorded MTM paths at the files' stop (one .npz a variant)."""
+        return self.here / "paths_split"
 
     @property
     def variants_dir(self) -> Path:
@@ -216,6 +230,117 @@ def run_all(spec: Spec, smoke: bool = False) -> None:
                 w.writerow(COLUMNS)
                 w.writerows(rows)
         print(f"{underlying}: done", flush=True)
+
+
+# --- recorded paths and overlays (E3) ------------------------------------------------------
+
+
+def simulate_paths(spec: Spec, underlying: str, files: dict[str, Path], hi: date = END) -> None:
+    """Simulate the given variants once more at their files' settings, keeping each day's MTM
+    series (`DayResult.mtm`, the combined MTM at every simulated bar's close, the series the engine's
+    overall stop and target are judged on) as a 375-minute path (`portfolio.member_from_curve`:
+    0 before the entry, the day's gross after the exit). One .npz a variant under paths_split/,
+    beside the row the results CSV holds."""
+    spec.paths_dir.mkdir(exist_ok=True)
+    root = data_dir()
+    ref = early_reference()
+    strategies = {n: load_legwise(p) for n, p in files.items()}
+    days, _ = backtest_days(root, underlying, START, hi)
+    rows: dict[str, list[list]] = {n: [] for n in strategies}
+    paths: dict[str, list[tuple[float, ...]]] = {n: [] for n in strategies}
+    mismatch = 0
+    t0 = time.time()
+    for i, d in enumerate(days):
+        try:
+            data = load_day(root, underlying, d)
+        except FileNotFoundError:
+            continue
+        for name, strat in strategies.items():
+            try:
+                r = simulate_day(strat, data, ref, SIZING)
+            except MissingReferenceData:
+                continue
+            orders, buy, sell = trade_values(r.trades)
+            ch = day_charges(underlying, d.isoformat(), orders, buy, sell).total
+            rows[name].append(
+                [d, round(r.gross, 2), round(ch, 2), round(r.gross - ch, 2),
+                 round(r.worst_mtm, 2), r.stopped_by or "", len(r.trades), orders]
+            )  # fmt: skip
+            path = member_from_curve(name, 1, r.mtm, r.gross).pnl
+            if r.mtm and abs(r.mtm[-1][1] - r.gross) > 1.0:
+                mismatch += 1
+            paths[name].append(path)
+        if (i + 1) % 25 == 0:
+            print(f"  {underlying} {i + 1}/{len(days)} days, {time.time() - t0:.0f} s", flush=True)
+    print(
+        f"  {underlying}: days whose last MTM differs from the gross by more than Rs 1: {mismatch}"
+    )
+    for name in strategies:
+        with open(spec.result_dir(name) / f"{name}.csv", "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(COLUMNS)
+            w.writerows(rows[name])
+        np.savez_compressed(
+            spec.paths_dir / f"{name}.npz",
+            days=np.array([r[0].isoformat() for r in rows[name]]),
+            path=np.array(paths[name], dtype=np.float32),
+        )
+
+
+def apply_overlay(path: np.ndarray, gross: float, overlay: str) -> tuple[float, str | None]:
+    """(the day's gross under the overlay, what fired or None). `tgtT`: the first minute the path is
+    at or above T, as the engine's overall target; `lockA-B`: `portfolio.apply_book` with `lock:A,B`
+    and no stop (the file's own stop is already in the path)."""
+    if overlay.startswith("tgt"):
+        level = float(overlay[3:])
+        hit = np.nonzero(path >= level)[0]
+        if len(hit) and path[hit[0]] != 0.0:
+            return float(path[hit[0]]), "target"
+        return gross, None
+    if overlay.startswith("lt"):  # lock-and-trail: ltA-B-S = locktrail:A,B,S,S (1:1 in S steps)
+        a, b, step = overlay[2:].split("-")
+        day = apply_book(
+            [member_from_curve("x", 1, [(i, float(v)) for i, v in enumerate(path)], gross)],
+            None,
+            parse_trail(f"locktrail:{a},{b},{step},{step}"),
+        )
+        return (
+            (float(day.gross_with), "locktrail") if day.stop_minute is not None else (gross, None)
+        )
+    if overlay.startswith("lock"):
+        a, b = overlay[4:].split("-")
+        day = apply_book([member_from_curve("x", 1, [(i, float(v)) for i, v in enumerate(path)], gross)],
+                         None, parse_trail(f"lock:{a},{b}"))  # fmt: skip
+        return (float(day.gross_with), "lock") if day.stop_minute is not None else (gross, None)
+    raise ValueError(f"unknown overlay {overlay!r}")
+
+
+def write_overlay(spec: Spec, names: list[str]) -> None:
+    """results_split_<overlay>/<name>.csv for the morning variants from their recorded paths; charges
+    are the base run's (the same legs close either way)."""
+    assert spec.overlay
+    spec.results_half.mkdir(exist_ok=True)
+    base = replace_overlay(spec, None)
+    for name in names:
+        z = np.load(spec.paths_dir / f"{name}.npz")
+        rows = read(base, name)
+        out = []
+        for d_iso, path in zip(z["days"], z["path"], strict=True):
+            r = rows[date.fromisoformat(str(d_iso))]
+            g, fired = apply_overlay(path, float(r["gross"]), spec.overlay)
+            ch = float(r["charges"])
+            out.append([d_iso, round(g, 2), round(ch, 2), round(g - ch, 2), r["worst_mtm"],
+                        fired or r["stopped_by"], r["n_trades"], r["orders"]])  # fmt: skip
+        with open(spec.results_half / f"{name}.csv", "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(COLUMNS)
+            w.writerows(out)
+
+
+def replace_overlay(spec: Spec, overlay: str | None) -> Spec:
+    from dataclasses import replace
+
+    return replace(spec, overlay=overlay)
 
 
 # --- analysis -------------------------------------------------------------------------------
