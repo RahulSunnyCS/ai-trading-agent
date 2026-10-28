@@ -250,10 +250,11 @@ describe('contract notes (BL-168)', () => {
     }
   });
 
-  it('a retry caught up after sleep never runs into the next 00:00 run', () => {
+  it('every retry catches up until 23:30, so a slept-through retry is not reported missed', () => {
+    // Overlap with the 00:00 run is prevented by the shared group, not by this window.
     for (const id of RETRIES) {
       const r = job(id);
-      expect(minutes(r?.schedule.at) + (r?.catchUpHours ?? 99) * 60, id).toBeLessThan(24 * 60);
+      expect(minutes(r?.schedule.at) + (r?.catchUpHours ?? 0) * 60, id).toBe(23 * 60 + 30);
     }
   });
 

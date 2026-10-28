@@ -790,9 +790,12 @@ const BASE_JOBS: Job[] = [
   // Angel One mails a session's note the next morning, and about one in four came after 07:30
   // (up to 17:10), which left the Trade book a day short until midnight. The owner added
   // 10:30 and 15:30 (2026-10-28). Before 16:00 a run never looks for that day's own note
-  // (`lastSession` in packages/contract-notes/calendar.js), so 15:30 is not too early.
-  contractNotesRetry('contract-notes-retry', '07:30', 12),
-  contractNotesRetry('contract-notes-retry-1030', '10:30', 5),
+  // (`lastSession` in packages/contract-notes/calendar.js); a 15:30 attempt retried after
+  // 16:00 lists today as waiting, as the 00:00 run does, and closes nothing wrongly.
+  // Every retry catches up until 23:30, so a laptop that slept through one sends no "missed"
+  // alert while a later retry did the same work; a repeated catch-up costs a few seconds.
+  contractNotesRetry('contract-notes-retry', '07:30', 16),
+  contractNotesRetry('contract-notes-retry-1030', '10:30', 13),
   contractNotesRetry('contract-notes-retry-1530', '15:30', 8),
   {
     // BL-168 Phase 4: the Trade book's capital line. Angel One's free margin at the close, one
