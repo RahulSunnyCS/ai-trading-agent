@@ -193,10 +193,12 @@ None for Phase 1.
   dataset); others would say `not_scored`. Full run on the live copy: 84 signal-weeks, the 42
   favourites' week of 16 Oct scored, 23 Oct waiting for 30 Oct's rows; 19 minutes.
   **Week of 16 Oct, headline group (Four Sectors Monthly, No Tilt · all Fridays):** live at
-  Friday close -8.06%, backtest as recorded -7.99% (gap -0.06 pts), today's code -9.59%,
-  Nifty200 Momentum 30 TRI -6.15%. Across the 11 groups live minus as recorded is -0.02 to
-  -0.08 pts (it pays the week's own costs, the recorded figure the next week's), which is the
-  check that the scoring reproduces the backtest; today's code differs by up to 2 pts (F6).
+  Friday close -8.03%, backtest as recorded -7.99% (gap -0.04 pts), today's code -9.59%,
+  Nifty200 Momentum 30 TRI -6.15%. Across the 11 groups live minus as recorded is 0.00 to
+  -0.05 pts (the live figure pays the week's own costs, the recorded one the next week's), which
+  is the check that the scoring reproduces the backtest; today's code differs by up to 2 pts
+  (the F6 ranking). Review (#368) found the first version drifted `holdings_before` a second
+  week, charging hold weeks about 0.04 pts of phantom costs; fixed before merge.
   The Monday-open figure for 16 Oct needs Mon 26 Oct's open, in the 30 Oct sync.
   **Done-when not met yet:** four scored weeks need 30 Oct, 6 Nov and 13 Nov's runs; the job
   scores them by itself (week of 6 Nov scored on Fri 13 Nov). Closed now on the owner's
