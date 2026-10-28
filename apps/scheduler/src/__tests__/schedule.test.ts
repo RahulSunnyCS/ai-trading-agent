@@ -174,9 +174,9 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('has 39 jobs', () => {
-    // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor; BL-168: + contract-notes, contract-notes-retry, contract-notes-capital
-    expect(JOBS).toHaveLength(39);
+  it('has 41 jobs', () => {
+    // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor; BL-168: + contract-notes, contract-notes-retry, contract-notes-capital; + contract-notes-retry-1030, -1530
+    expect(JOBS).toHaveLength(41);
   });
 });
 
@@ -229,14 +229,32 @@ describe('live capture (BL-141)', () => {
 describe('contract notes (BL-168)', () => {
   const job = (id: string) => JOBS.find((j) => j.id === id);
 
-  it('runs every day, Saturday included, at 00:00 and again at 07:30', () => {
+  const RETRIES = [
+    'contract-notes-retry',
+    'contract-notes-retry-1030',
+    'contract-notes-retry-1530',
+  ];
+  const minutes = (at = '') => {
+    const [h = 0, m = 0] = at.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  it('runs every day, Saturday included, at 00:00 and again at 07:30, 10:30 and 15:30', () => {
     expect(job('contract-notes')?.schedule.at).toBe('00:00');
-    expect(job('contract-notes-retry')?.schedule.at).toBe('07:30');
-    for (const id of ['contract-notes', 'contract-notes-retry']) {
+    expect(RETRIES.map((id) => job(id)?.schedule.at)).toEqual(['07:30', '10:30', '15:30']);
+    for (const id of ['contract-notes', ...RETRIES]) {
       expect(job(id)?.schedule.on('2026-10-24')).toBe(true); // a Saturday
       expect(job(id)?.steps).toEqual([['node', 'run.js']]);
       expect(job(id)?.cwd).toBe('packages/contract-notes');
       expect(job(id)?.group).toBe('contract-notes');
+    }
+  });
+
+  it('every retry catches up until 23:30, so a slept-through retry is not reported missed', () => {
+    // Overlap with the 00:00 run is prevented by the shared group, not by this window.
+    for (const id of RETRIES) {
+      const r = job(id);
+      expect(minutes(r?.schedule.at) + (r?.catchUpHours ?? 0) * 60, id).toBe(23 * 60 + 30);
     }
   });
 

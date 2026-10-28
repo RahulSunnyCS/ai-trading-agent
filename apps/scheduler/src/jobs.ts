@@ -97,6 +97,24 @@ const BROKER_LOGIN = 'packages/broker-login';
 const CONTRACT_NOTES = 'packages/contract-notes';
 const CONTRACT_NOTES_FIX =
   'cd packages/contract-notes && node run.js --dry-run  (the log names the account, session and PDF; after a fix, node run.js --day <day>)';
+
+/** The 00:00 contract-notes run again at `at`, every day, for notes that arrived after it. */
+function contractNotesRetry(id: string, at: string, catchUpHours: number): Job {
+  return {
+    id,
+    description: `The 00:00 contract-notes run again at ${at}, for notes that arrived after it (BL-168); reads only mail newer than the bookmark, so with nothing new it is a few seconds`,
+    schedule: { at, on: everyDay, label: `every day ${at}` },
+    steps: [['node', 'run.js']],
+    cwd: CONTRACT_NOTES,
+    timeoutMinutes: 15,
+    retries: 1,
+    retryDelayMinutes: 20,
+    catchUpHours,
+    group: 'contract-notes',
+    fixHint: CONTRACT_NOTES_FIX,
+  };
+}
+
 const FRIDAY = onWeekdays(5);
 
 const BASE_JOBS: Job[] = [
@@ -769,20 +787,16 @@ const BASE_JOBS: Job[] = [
     group: 'contract-notes',
     fixHint: CONTRACT_NOTES_FIX,
   },
-  {
-    id: 'contract-notes-retry',
-    description:
-      'The 00:00 contract-notes run again, for notes that arrived after it (BL-168); reads only mail newer than the bookmark, so with nothing new it is a few seconds',
-    schedule: { at: '07:30', on: everyDay, label: 'every day 07:30' },
-    steps: [['node', 'run.js']],
-    cwd: CONTRACT_NOTES,
-    timeoutMinutes: 15,
-    retries: 1,
-    retryDelayMinutes: 20,
-    catchUpHours: 12,
-    group: 'contract-notes',
-    fixHint: CONTRACT_NOTES_FIX,
-  },
+  // Angel One mails a session's note the next morning, and about one in four came after 07:30
+  // (up to 17:10), which left the Trade book a day short until midnight. The owner added
+  // 10:30 and 15:30 (2026-10-28). Before 16:00 a run never looks for that day's own note
+  // (`lastSession` in packages/contract-notes/calendar.js); a 15:30 attempt retried after
+  // 16:00 lists today as waiting, as the 00:00 run does, and closes nothing wrongly.
+  // Every retry catches up until 23:30, so a laptop that slept through one sends no "missed"
+  // alert while a later retry did the same work; a repeated catch-up costs a few seconds.
+  contractNotesRetry('contract-notes-retry', '07:30', 16),
+  contractNotesRetry('contract-notes-retry-1030', '10:30', 13),
+  contractNotesRetry('contract-notes-retry-1530', '15:30', 8),
   {
     // BL-168 Phase 4: the Trade book's capital line. Angel One's free margin at the close, one
     // guarded SmartAPI login (it waits behind the evening collector's, if any). Finvasia is not
