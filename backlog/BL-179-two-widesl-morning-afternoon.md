@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a direct owner question about the live picks; two fixed rules, no search |
-| **Status** | In progress (block a killed; block b pre-registered) |
+| **Status** | Done (killed: blocks a and b) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -113,7 +113,28 @@ estimated brokerage.
   `T1_daily.json`), not committed.
 
 #### Result (b)
-(after the run)
+**Kill on all four** (2026-10-28): every mean below Adaptive. Same 239 sessions, three picks a day
+on both sides, one lot each, net after estimated brokerage.
+
+| Pool | Book | Net a day | Per strategy-lot | Year | Days up | Max drawdown | Same picks as Adaptive |
+|---|---|---|---|---|---|---|---|
+| Core | Adaptive | ₹993 | ₹331 | ₹2,37,394 | 60% | −₹35,929 | — |
+| Core | G (13:00–15:30) | ₹660 | ₹220 | ₹1,57,772 | 60% | −₹43,381 | 14 days |
+| Core | N (12:00–15:30) | ₹750 | ₹250 | ₹1,79,187 | 61% | −₹38,019 | 32 days |
+| T1 | Adaptive | ₹1,674 | ₹558 | ₹4,00,100 | 68% | −₹25,672 | — |
+| T1 | G (13:00–15:30) | ₹1,318 | ₹439 | ₹3,14,959 | 68% | −₹27,248 | 19 days |
+| T1 | N (12:00–15:30) | ₹1,178 | ₹393 | ₹2,81,462 | 64% | −₹31,722 | 34 days |
+
+- Rule minus Adaptive, net a day: Core G −₹333 [−₹624, −₹69], Core N −₹244 [−₹551, +₹31],
+  T1 G −₹356 [−₹724, −₹17], T1 N −₹496 [−₹851, −₹169].
+- By Adaptive's shape: on its Directional days (204 Core, 202 T1) the rule earned ₹682 / ₹776
+  (Core G / N) against ₹1,026, and ₹1,263 / ₹1,108 (T1) against ₹1,492; on its three-Wide-SL days
+  (35, 37) ₹531 / ₹597 against ₹803, and ₹1,616 / ₹1,560 against ₹2,668.
+- Descriptive, not tested: on days with no expiry the rule was ahead on Core (₹364 G, ₹400 N
+  against ₹291 a day, 137 days) and behind on T1 (₹1,046 / ₹941 against ₹1,178); on expiry days it
+  was behind in both pools (Core NIFTY expiry ₹794 against ₹1,913).
+- Script: the session's scratchpad (`bl179/run_b.py`, `b/Core_daily.json`, `b/T1_daily.json`),
+  not committed.
 
 ## Risks
 
@@ -124,3 +145,4 @@ One year; the windows were proposed after a table of this same year.
 - 2026-10-28 — created and pre-registered at the owner's request.
 - 2026-10-28 — run; killed on both pools, both rules (Result above); `research/options/common/rotation-ranking.md` updated.
 - 2026-10-28 — block (b) pre-registered at the owner's request: Adaptive's Directional kept, Wide SL by window.
+- 2026-10-28 — block (b) run; killed on both pools, both windows (Result (b)); findings page updated.
