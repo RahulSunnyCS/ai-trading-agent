@@ -1,6 +1,6 @@
 # Momentum: sizing and exposure overlays
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-10-28
 
 ## What it is
 
@@ -35,6 +35,7 @@ searched `momentum_sizing` and the three `mass_exit_*` settings
 | TODO 3.9.23 dry run | Dispersion timing | ETF and Broad | Rejected | ETF -0.6, Broad -2.8 median |
 | [BL-085](../../../backlog/BL-085-momentum-improvement-levers.md) L5 | inverse-vol vs equal | 11 Broad strategies, after tax at Rs 5 lakh; FY2018-22, FY2023-26 | Killed | CAGR -1.4 then -0.4 pts; less pain 2 then 6 of 11; worst fall 0.4 and 0.2 pts shallower |
 | BL-085 L3 | 75% and 50% Broad with the ETF rotation | 11 Broad strategies, pre-tax from stored curves | Killed on the return floor | 75%: -5.8 pts on FY2018-22 and -1.4 on FY2023-26, smoother in 11 of 11. 50%: -11.7 and -3.0 |
+| [BL-025](../../../backlog/BL-025-live-money-rules.md) | Drawdown cut / exit with five ways back in (R1-R5) vs holding through | Four Sectors Monthly (followed), 4 sleeves + blend + 17 lot ramps, 2017-01-06 to 2026-10-23, post-F6 ranking | None passes (≤35% worst fall everywhere and ≤3 pts CAGR given up) | Only R1 (−20 cut / −30 exit, no way back) keeps falls within 35%, giving up 28.7 pts on the blend; R5 gives up 2.5 but the blend falls −36.1%. [`bl025_rules_result.json`](../../../packages/momentum-backtesting/search_spaces/bl025_rules_result.json) |
 
 BL-085 files: [`bl085_criteria.json`](../../../packages/momentum-backtesting/search_spaces/bl085_criteria.json),
 [`bl085_criteria_addendum_1.json`](../../../packages/momentum-backtesting/search_spaces/bl085_criteria_addendum_1.json),
@@ -47,6 +48,9 @@ contents left unchanged. The generated output stays in `data/search/round7_A/bl0
 
 ## What we know
 
+- A drawdown exit with no way back in caps the fall but gives up most of the return: on the
+  followed strategy it exited near the 2020 and 2022 lows (BL-025). Every way back in tried
+  lets at least one sleeve fall past 35%. Registered test, pre-tax, today's category tags.
 - Every sizing rule tried gives up return. The ones that make falls shallower (volatility
   targeting, the ETF blend) are risk dials: they buy the shallower fall with lost return.
 - Inverse-vol sizing tilts money away from the fastest movers, which is where these strategies
