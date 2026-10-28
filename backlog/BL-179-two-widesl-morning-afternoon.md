@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a direct owner question about the live picks; two fixed rules, no search |
-| **Status** | In progress (blocks a and b killed; block c pre-registered) |
+| **Status** | Done (a, b killed; c inconclusive) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -158,7 +158,30 @@ on both sides, one lot each, net after estimated brokerage.
   not committed.
 
 #### Result (c)
-(after the run)
+**Inconclusive** (2026-10-28): on the test period the hybrid was ahead of Adaptive on Core with both
+windows, but the intervals include zero. Not adopted under the rule.
+
+Test period 2025-01-10 → 2025-10-27, Core, 195 sessions (113 without an expiry), net a day, one
+lot each, after estimated brokerage:
+
+| Book | Net a day | Total | Days up | Max drawdown | Non-expiry days only |
+|---|---|---|---|---|---|
+| Adaptive | ₹741 | ₹1,44,473 | 54% | −₹42,326 | ₹372 |
+| HG (13:00–15:30) | ₹860 | ₹1,67,695 | 56% | −₹33,648 | ₹577 |
+| HN (12:00–15:30) | ₹839 | ₹1,63,657 | 56% | −₹33,648 | ₹542 |
+
+- Hybrid minus Adaptive, net a day: HG +₹119 [−₹156, +₹412], HN +₹98 [−₹166, +₹377]:
+  inconclusive both. On the non-expiry days alone the gap is +₹205 (HG) and +₹170 (HN) a day,
+  the same direction as the year the idea came from (+₹73 / +₹109).
+- The year the idea came from (2025-10-28 → 2026-10-27, decides nothing): Core HG +₹42
+  [−₹136, +₹214], HN +₹63 [−₹115, +₹235], as expected from Result (b); drawdown slightly
+  deeper (−₹39,357 / −₹40,438 against −₹35,929).
+- T1, reported only: test period HG +₹76 [−₹179, +₹339], HN +₹71 [−₹175, +₹319] (its variants
+  were chosen on this period); the idea year HG −₹76 [−₹255, +₹93], HN −₹136 [−₹303, +₹29], behind
+  on non-expiry days (₹1,046 / ₹941 against ₹1,178).
+- Reading: on Core the edge on non-expiry days appeared in both years, about +₹100 to +₹200 a
+  non-expiry day, which is a lead worth watching forward, not a finding. On T1 it does not hold.
+- Script: the session's scratchpad (`bl179/run_c.py`, `c/test/`, `c/idea/`), not committed.
 
 ## Risks
 
@@ -171,3 +194,4 @@ One year; the windows were proposed after a table of this same year.
 - 2026-10-28 — block (b) pre-registered at the owner's request: Adaptive's Directional kept, Wide SL by window.
 - 2026-10-28 — block (b) run; killed on both pools, both windows (Result (b)); findings page updated.
 - 2026-10-28 — block (c) pre-registered at the owner's request: block (b) on non-expiry days, Adaptive on expiry days, tested on 2025-01-10 → 2025-10-27.
+- 2026-10-28 — block (c) run: inconclusive on Core (ahead, intervals include zero); findings page updated.
