@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades Core and T1 with real money; BL-182 and BL-184 left a drawdown-halving and an afternoon lead that two years of seen data cannot settle, and the owner asked for the proper sweep |
-| **Status** | In progress — Phase 0 registered 2026-10-28 23:50 IST (grid SHA `675f5b0b6b174478`, parity gates passed); Stage A started the same night, pausing before 07:30 |
+| **Status** | Done 2026-10-29: the registered verdict is **FAIL** (A2, the split, loses to T1 as traded by ₹260 [−446, −85] net per margin lot-day with a drawdown three times deeper; against the sweep's own whole-day winners it is level, +₹16 [−201, +224]). The sweep's one-year selection transferred at 46 %. Leads, post-hoc: an expiry-aware book (whole-day on expiry days, afternoon-only on other days); a union universe (T1 plus the new winners) was not a registered arm |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -116,6 +116,64 @@ A parallel track `t2` like BL-113 (own folder and journal, after the live pick, 
 | dashboard Rotation page, lot plans, Settings › Automation | morning / afternoon baskets, per-half toggles |
 | scheduler | pick timing is unchanged (09:16); a second deploy window around 12:50 for afternoon sets if the platforms cannot hold a scheduled start |
 
+## Result (2026-10-29)
+
+Stage A: 80 parts, 28,800 variants × 501 days, 02:25 (five workers, three hours); Stage B scored every
+base cell under every exit × overall-stop overlay; selection on the selection year only froze 61 winners
+(of 64 cohort entries) in `research/bl185/winners_frozen_2026-10-29.json` (sha256 `c2cbce85b2327216`)
+before the test year was read. Replay on the test year 2025-10-09 → 2026-10-27 (250 days), list C's
+composite per pool on gross, three picks per pool, per margin lot-day = book ÷ 3
+(`research/bl185/out/replay_summary.md`, `diagnostics.md`; git-ignored, rebuilt by `replay.py` and
+`diagnostics.py`).
+
+| Arm | Net per margin lot-day | Gross | Net at ₹5 | Net at ₹20 | Days in profit | Max DD (net) |
+|---|---|---|---|---|---|---|
+| A0 T1 Adaptive as traded (Core-298 + T1, re-simulated with these charges) | +565 | +678 | +612 | +523 | 69 % | −8,536 |
+| A1 the sweep's whole-day winners (control) | +289 | +395 | +332 | +251 | 59 % | −16,874 |
+| A2 split: 3 morning + 3 afternoon | +305 | +494 | +385 | +234 | 58 % | −24,579 |
+| A3 afternoon-only: 3 picks | +278 | +373 | +319 | +242 | 61 % | −14,680 |
+
+| Difference | Net [90 %] | Gross [90 %] | At ₹5 | At ₹20 |
+|---|---|---|---|---|
+| **A2 − A0** | −260 [−446, −85] | −184 [−371, −10] | −227 [−413, −52] | −289 [−475, −114] |
+| **A2 − A1** | +16 [−201, +224] | +99 [−118, +307] | +53 [−164, +260] | −16 [−233, +192] |
+| A3 − A0 | −287 [−495, −93] | −305 | −293 | −281 |
+| A1 − A0 | −276 [−419, −132] | −283 | −280 | −273 |
+
+**Verdict: FAIL.** A2 does not beat A0 (its lower bound is below zero, in fact the whole interval is) and its
+drawdown is −24,579 against −8,536. Phases 5 and 6 are not run (they follow a pass). By half-year the three
+test periods read A2 − A0 −27k, −39k and +1k.
+
+What the numbers say (post-hoc diagnostics, descriptive, after the verdict):
+
+- **The re-tuning did not beat T1.** The control A1 — the same selection recipe at exit 15:28, three whole-day
+  picks — earns ₹276 [−419, −132] less than T1 as traded. Its winners are one setting per band and day type
+  picked from about 14,400 cells on one year, with looser rules than BL-104's eight (no PBO, no regime
+  concentration check, plateau over a coarse chain); T1's nine came through BL-104's full procedure and
+  Adaptive also picks from Core-298 beside them. The sweep's pool (A1, 620 variants) has no Core-298 strategies.
+- **The winners transferred at 46 %.** Selection-year net ₹290 a lot-day on average, test-year ₹133; 51 of 61
+  still positive. Expiry-day winners held about 70 % (thin, 53–54 days); **whole-day winners on other days
+  collapsed** (NIFTY wide band A +502 → −81, SENSEX wide A +255 → −100, NIFTY Dir A +220 → −65), while SENSEX
+  Dir whole-day on other days rose (+283 → +400, +224 → +391).
+- **The split is level with the whole day when tuned the same way** (A2 − A1 +16, gross +99), with a deeper
+  drawdown and, at ₹20 an order, slightly behind: the BL-182 / BL-184 conclusion again, now with
+  tuned sets and Adaptive choosing the slots.
+- **By day type (the pick's own index expiry day):** per pick, the whole-day winners earn +705 on expiry days and
+  +75 on other days; the morning pool +155 and −11; the afternoon pool +338 and +243; T1 as traded +975 and
+  +326. A morning plus an afternoon pick earns +493 on expiry days (below the whole day's +705) and +232 on
+  other days (well above its +75).
+- **The afternoon pool is the consistent part**: ₹243 a pick on other days against ₹75 whole-day, and A3
+  (afternoon-only) nearly matches A1 (+278 vs +289) with a shallower drawdown (−14,680 vs −16,874).
+
+Lead, post-hoc, from the test year itself and therefore not a result: an **expiry-aware book**, whole-day sets
+on expiry days and afternoon-only sets on other days. On these numbers it would sit near +705 and +243 per pick
+against the whole-day winners' +705 and +75, about ₹110 per margin lot-day on average. It must be registered
+before anything is run on it, and tested on the NIFTY 2022-24 days and forward, not on this year. A second lead:
+a **union universe**, T1 plus the new winners, which was not a registered arm (the item's "will not run" list
+holds "more than the registered arms"); it needs the owner's `override:` or its own item.
+
+Not adopted. The tuned half-day settings are recorded as a descriptive table in the winners file.
+
 ## Risks
 
 - **Power.** Even a good result on T may have an interval through zero; the plan says in advance what it can and cannot decide (Phase 0), and the unseen NIFTY days and the forward track carry the rest.
@@ -157,3 +215,7 @@ A parallel track `t2` like BL-113 (own folder and journal, after the live pick, 
   4 half bands and 4 whole-day bands), 61 with a winner; three found none under the gates, breadth and half-year
   rules (NIFTY wide band B morning on other days; SENSEX wide band D on other days, half and whole-day). Committed before the replay read the test year. The PBO and the DTE / VIX
   concentration checks are deferred to Phase 5, on the finalists.
+- 2026-10-29 02:55 — replay run (`research/common/two_session/replay.py`, 47 s) and post-hoc diagnostics
+  (`diagnostics.py`): **A2 FAIL** (−₹260 [−446, −85] vs T1 as traded, drawdown −24,579 vs −8,536; level with its own
+  whole-day control, +16 [−201, +224]); the one-year selection transferred at 46 %. Phases 5 and 6 not run. Leads
+  recorded in the Result: the expiry-aware book, the union universe.

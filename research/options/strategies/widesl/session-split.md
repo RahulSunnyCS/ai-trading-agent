@@ -21,6 +21,7 @@ One set a day, 09:17–15:28, in every live and rotation Widesl file.
 | Friend's study (not this repo) | NIFTY OTM1, SL 115 %, no trail, MTM ₹2,500; split 09:17–12 + 13–15:29 vs 09:17–15:29 | 2024-09-25 → 2026-10-27, 510 days, ₹40 costs a set | Split +₹82,752 after its costs (₹162 a day), days in profit 60 % vs 53 %, max DD −₹18k vs −₹40k; no interval; the edge sits in two quarters | [BL-182][bl182] Context |
 | [BL-182][bl182] Phase 1 | The same split on our engine for the study's definition, the live `N_wide_0917` and `S_wide_0917`, and the four T1 Widesl settings | 2024-10-09 → 2026-10-27, 501 days each index, **after charges** (`ruletest/charges.py`, ₹87 a set), 90 % 5-day block bootstrap, all seen data | **Killed on the registered rule.** Live NIFTY +₹39 [−107, +187] net per lot-day, live SENSEX +₹89 [−63, +241]; gross +₹123 / +₹171; max drawdown halved (₹50k → ₹23k, ₹42k → ₹27k a lot). The study's definition reconciles within 15 % (gross +₹179 [+22, +336]). T1 OTM1 settings +₹77 / +₹84 net, intervals include zero; the ₹150-premium setting −₹115 | BL-182 Result |
 | [BL-182][bl182] Phase 2 (owner override) | Adaptive (list C) picking two morning Widesl (09:17–11:47 → 12:00) and two afternoon (13:02–15:02 → 15:28) from Core's six Widesl families, against its top two whole-day Widesl from the same families | 434 pick days 2025-01-10 → 2026-10-27, after charges, per margin lot-day (book net ÷ 2), 90 % block bootstrap, seen data | **Killed on the rule.** Net +₹75 [−56, +205], gross +₹158 [+27, +288], ₹5-brokerage +₹112 [−18, +243]; drawdown −14k vs −17k; the gain entirely in T1's selection year (+178) and nil after (−1); the afternoon pair alone (+199) beats two whole-day sets (+188) | BL-182 Result (Phase 2) |
+| [BL-185][bl185] | Adaptive over a T1-style sweep of half-day sets: three morning + three afternoon picks from the Widesl and Dir winners, against the sweep's whole-day winners and T1 as traded | 250 test days, after charges, per margin lot-day | **Killed**: split − whole-day +₹16 [−201, +224], split − T1 −₹260 [−446, −85]; the afternoon pool earns +₹243 a pick on other days against +₹75 whole-day, the morning pool −₹11 | [Two-session sweep](../../common/two-session-sweep.md) |
 
 ## What we know
 
@@ -83,3 +84,4 @@ One set a day, 09:17–15:28, in every live and rotation Widesl file.
 - Script: `packages/option-backtesting/research/bl182/run.py` (outputs git-ignored; regenerate with it).
 
 [bl182]: ../../../../backlog/BL-182-widesl-split-session.md
+[bl185]: ../../../../backlog/BL-185-two-session-sweep.md
