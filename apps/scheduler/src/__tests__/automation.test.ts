@@ -415,7 +415,9 @@ describe('MTM SL per Quantiply row (BL-172)', () => {
 
 describe('Dir ×2 on non-expiry days (BL-183)', () => {
   it('settings saved before BL-183 read as off, and every default row is off', () => {
-    const old = clone(DEFAULT_SETTINGS) as unknown as { rows: Record<string, Record<string, unknown>> };
+    const old = clone(DEFAULT_SETTINGS) as unknown as {
+      rows: Record<string, Record<string, unknown>>;
+    };
     for (const row of Object.values(old.rows)) row.dirBoost = undefined;
     const filled = withDefaults(JSON.parse(JSON.stringify(old)));
     expect(Object.values(filled.rows).every((r) => r.dirBoost === false)).toBe(true);

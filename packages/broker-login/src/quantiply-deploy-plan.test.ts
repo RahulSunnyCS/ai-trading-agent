@@ -629,7 +629,14 @@ describe('the book stop on a Dir ×2 day (BL-183)', () => {
       ]),
     );
   const manifest = (dirBoost: boolean | undefined, strategies: QManifest['strategies']) =>
-    ({ day: '2026-10-29', weekday: 'THU', book: 'core', source: 'preview', strategies, dir_boost: dirBoost }) as QManifest;
+    ({
+      day: '2026-10-29',
+      weekday: 'THU',
+      book: 'core',
+      source: 'preview',
+      strategies,
+      dir_boost: dirBoost,
+    }) as QManifest;
 
   it('rises by the doubled Dir’s own per-lot stop, read from its 2-lot body', () => {
     const m = manifest(true, [entry('Core · W', 1), entry('Core · D', 2), entry('Core · W2', 1)]);
@@ -647,7 +654,10 @@ describe('the book stop on a Dir ×2 day (BL-183)', () => {
     assert.equal(bookStopExtra(manifest(false, [entry('Core · D', 1)]), b), 0);
     assert.equal(bookStopExtra(manifest(undefined, [entry('Core · D')]), b), 0);
     // the Buy add-on is never doubled, even if a manifest said so
-    assert.equal(bookStopExtra(manifest(true, [entry('Core · B', 2, true)]), bodies({ 'Core · B': -4000 })), 0);
+    assert.equal(
+      bookStopExtra(manifest(true, [entry('Core · B', 2, true)]), bodies({ 'Core · B': -4000 })),
+      0,
+    );
   });
 
   it('the top-up widens only: a stop already at or above the target is left alone', () => {
