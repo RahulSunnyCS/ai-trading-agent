@@ -77,8 +77,8 @@ A `live_rules` file the owner writes once, and a weekly check that alerts when a
 ### 2026-10-28 — Drawdown rules with a way back in (pre-registered; awaiting the owner's sign-off)
 Written before any run. **Nothing runs until the owner writes "signed off" in the Log.** The
 numbers are also in `packages/momentum-backtesting/search_spaces/bl025_rules_criteria.json`. If
-the two disagree, this block wins and the JSON is corrected in a new file. A rule here is never
-edited after a run. A changed rule is a new dated block that names this one.
+the two disagree, this block wins: before any run the JSON is corrected in place, after a run in
+a new file. A rule here is never edited after a run. A changed rule is a new dated block that names this one.
 
 - **Why.** `live_rules.toml` cuts half at −20% and exits at −30%, measured from the high since
   `paper_start`. It never says how to get back in or back to full size: `re_entry` is "only
@@ -95,8 +95,9 @@ edited after a run. A changed rule is a new dated block that names this one.
 - **Strategy and ranking.** The followed strategy (`search_spaces/bl142_followed.json`: Four
   Sectors Monthly, No Tilt · all Fridays). Its four sleeves come from `tracker.run_config` on the
   `bias.Runner` that `live_rules.paper_curves` uses: pre-tax, itemised costs, signal delay 1,
-  ₹2 lakh. Only the **post-F6 ranking** is used (BL-001, merge `778ba02e`). The window runs from
-  2017-01-06 to the last Friday in the data when the run starts, recorded with the result.
+  ₹2 lakh. Only the **post-F6 ranking** is used (BL-001, merge `778ba02e`). The window is fixed:
+  **2017-01-06 to 2026-10-23**, the weeks the descriptive look already read. Later weeks are
+  the forward data (Hold-out) and are never part of the judged window.
 - **What the rules are applied to.**
   - **Each sleeve alone** (four objects).
   - **The blend:** equal capital, reset each April (`choose.ensemble_curve`).
@@ -104,7 +105,7 @@ edited after a run. A changed rule is a new dated block that names this one.
     after another, each lot being the sleeve that trades that Friday. The result is measured as
     `live_rules.twr_index`, and the high is the high since the ramp's first Friday. There are
     18 registered first Fridays: the first Friday of each January and July, 2017 to 2025
-    (listed in the JSON). Each ramp runs to the end of the data. Approximations, the same as the
+    (listed in the JSON). Each ramp runs to 2026-10-23. Approximations, the same as the
     live check's: equal lots, no April reset, the engine's own fill convention.
 - **How the rules work (all candidates).**
   - **Sizes** are 1, ½ or 0.
@@ -124,9 +125,9 @@ edited after a run. A changed rule is a new dated block that names this one.
   |---|---|---|---|
   | **R0 Hold through** | — | — | — (the comparator) |
   | **R1 As written** | −20% | −30% | never (the logged review has no backtestable form) |
-  | **R2 Back at the high** | −20% | −30% | when the model curve closes at or above the high it was measured from (the point where the weekly check already reads all-clear) |
-  | **R3 Trend back** | −20% | −30% | the first Friday the model curve closes above its **40-week** simple moving average, after it has closed below that average at least once since the action (the conventional 10-month trend rule) |
-  | **R4 Rebound back** | −20% | −30% | when the model curve closes **20%** above its lowest weekly close since the action (a rise as large as the fall that triggered the cut) |
+  | **R2 Back at the high** | −20% | −30% | when the model curve closes at or above the high it was measured from (drawdown back to zero: the simplest completion of today's lines) |
+  | **R3 Trend back** | −20% | −30% | the first Friday the model curve closes above its **40-week** simple moving average, after it has closed below that average at least once since the action (the conventional 10-month trend rule). With fewer than 40 closes since the object's first week the average does not exist, and the condition is false |
+  | **R4 Rebound back** | −20% | −30% | when the model curve closes **20%** above its lowest weekly close since the action (the conventional 20%-from-the-low mark of a new bull market) |
   | **R5 Owner's band, trend back** | −25% | −35% | as R3 (the lines sit at the ends of the owner's stated tolerance of 25–35%, below the 40% ceiling) |
   | **N Alert and review** | alert | alert | the owner decides each time: not backtestable, never scored, but the verdict may choose it |
 
@@ -149,16 +150,20 @@ edited after a run. A changed rule is a new dated block that names this one.
     - (a) the worst fall of the money held is **≤ 35%** on each of the four sleeves, on the
       blend and on every one of the 18 lot ramps;
     - (b) it gives up **≤ 3.0 points** of CAGR against R0 on the blend, **and** ≤ 3.0 points as
-      the median over the 18 lot ramps.
+      the median over the **qualifying ramps**: those whose model curve falls 20% or more from
+      its high at some point, the same set for every candidate (fixed by R0's curve). A ramp
+      the lines never touch would add a give-up of zero and pull the median towards a pass.
+      With fewer than 3 qualifying ramps, the ramp median is reported, not judged.
   - **Kill.** Failing either condition kills the candidate for this strategy.
-  - **Why X = 3.** BL-010's criteria already treat 3 points as the smallest meaningful
-    difference (the offset-average, walk-forward and holdings-advice kills). An overlay that
-    costs less than that is within the noise the project accepts.
-  - **Several pass.** The candidate with the highest blend end wealth is named. If others are
-    within 1 point of CAGR of it, the first of them in the order R2, R4, R3, R5 (fewest
-    conditions first) is named instead.
+  - **Why X = 3.** BL-010's criteria use 2 to 3 points of CAGR as a difference that matters.
+    2 is used for the jump-scan and category-layer kills, 3 for the offset-average,
+    walk-forward and holdings-advice kills. 3 is the upper of those: an overlay is insurance,
+    and the owner accepts some cost for it. 2 is the stricter choice, open question 2b.
+  - **Several pass.** Let B be the passing candidate with the highest blend end wealth. Among the
+    passing candidates whose blend CAGR is within 1 point of B's (B included), the first in the
+    order R1, R2, R4, R3, R5 (fewest conditions first) is named. R0 is never named here (below).
   - **None pass.** The current lines stay, and the owner chooses R1 or N as the re-entry text.
-  - **R0** is the comparator and is judged by (a) like the others. If it passes (a) on its own,
+  - **R0** is the comparator and is judged by (a) only, since (b) is zero by definition. If it passes (a) on its own,
     that is reported as "dropping the lines is consistent with your limits", for the owner to
     weigh.
 - **Sample and wording.** The blend has about **three independent falls of 20% or more** in the
@@ -171,12 +176,13 @@ edited after a run. A changed rule is a new dated block that names this one.
 - **Data-snooping note.** The candidates were named after the descriptive look in the Log, so
   the dates of the past exits and the rebounds after them were already known. To keep the rules
   from being fitted to those dates, every number comes from somewhere else: standard practice
-  (a 40-week average, a rebound the size of the cut line), the owner's stated limits (25 / 35 /
-  40), or today's file (20 / 30). None was tried on the curves first. The criteria file records
-  the time it was written.
+  (a 40-week average, a 20% rise from the low), the owner's stated limits (25 / 35 /
+  40), or today's file (20 / 30). None was tried on the curves first. The commit that adds this
+  block and the criteria file is the record of when they were written.
 - **Look-ahead check.**
   - **The rule.** A decision on Friday t uses only the model curve up to and including t: the
-    high is a running maximum, the average uses the closes of weeks t−39 to t, and the low is
+    high is a running maximum, the average uses the closes of weeks t−39 to t (and is
+    undefined before 40 closes exist), and the low is
     the lowest close since the action up to t.
   - **Verified three ways:**
     1. **Prefix check.** For every Friday t of every object, the size path computed on the curve
@@ -188,8 +194,10 @@ edited after a run. A changed rule is a new dated block that names this one.
   - **Known bias, shared by every candidate.** The curves use today's curated category tags,
     which carry survivorship (BL-010 F3). They may understate the falls.
 - **Hold-out.**
-  - **None clean.** The weeks from 2026-10-16 (`paper_start`) on are the only unseen data. They
-    are too short to judge, and are reported whenever the result is refreshed.
+  - **None clean.** The weeks from 2026-10-16 (`paper_start`) to 2026-10-23 were already read
+    by the descriptive look, so they sit inside the judged window. The weeks from 2026-10-30 on
+    are the only unseen data. They are too short to judge, and are reported separately (never
+    pooled into the judged window) whenever the result is refreshed.
   - **2012-04 to 2016-12 is possible but not registered.** Stock bars, corporate-action factors
     and the point-in-time universe exist from 2011, with BL-010 addendum 5's patches. But
     BL-010 left that window spent and unread, and BL-176 may want it for the re-selection.

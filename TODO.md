@@ -638,7 +638,7 @@ The owner's numbers, written before the first rupee; nothing here trades.
 |---|---|---|---|
 | 3.22.1 | Phase 1: rules file (`live_rules.toml`): paper first; cut half at 20%, exit at 30%; review at 5 pts behind over 13 weeks | owner→claude | **Done 2026-10-07**: signed off by the owner |
 | 3.22.2 | Phase 2: weekly check after the Friday final run → Telegram alert naming the rule and its action | claude | **Built 2026-10-07** (`mbt live-rules check`, job `momentum-live-rules` Fri 21:30). Drawdown and money gate measured on the paper model portfolio; the trailing rule says "not measurable" until BL-024 Phase 2 scores the journal |
-| 3.22.3 | Drawdown-rule test: six candidates with a way back in after a cut or exit, against holding through (post-F6 ranking) | owner→claude | **Pre-registered 2026-10-28, awaiting sign-off** (BL-025 Experiments; `search_spaces/bl025_rules_criteria.json`). Nothing run |
+| 3.22.3 | Drawdown-rule test: six candidates (hold through, as written, four with a way back in after a cut or exit) against holding through, post-F6 ranking | owner→claude | **Pre-registered 2026-10-28, awaiting sign-off** (BL-025 Experiments; `search_spaces/bl025_rules_criteria.json`). Nothing run |
 
 ### 3.23 Momentum dashboard: what BL-010 changes on screen — [BL-036](backlog/BL-036-momentum-ui-from-bl010.md)
 
