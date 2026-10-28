@@ -682,8 +682,11 @@ contract, not a shared service).
 - `reference_benchmarks.py` — Nifty 50 TRI and Nifty200 Momentum 30 TRI comparison lines
   (`load_references`, `compare`), added to every backtest payload as `comparisons`. Four more
   comparison-only TRIs (Midcap 150, Smallcap 250, Midcap150 Momentum 50, Nifty500 Momentum 50;
-  `EXTRA_REFERENCES`, BL-010 Phase 5) are loaded by `load_references` but never displayed by
-  `compare`, and stay out of `ui_data._BENCHMARK_COLUMNS` (the stock dataset); `mbt stocks
+  `EXTRA_REFERENCES`, BL-010 Phase 5) are loaded by `load_references` but not in `compare`'s
+  default list (it takes `names=`), and stay out of `ui_data._BENCHMARK_COLUMNS` (the stock
+  dataset). The result chart's optional lines are the picker's indices (`benchmarks`) plus
+  `CHART_ONLY` (Nifty 500 TRI), sent as `extra_comparisons` only when it covers the run, so the
+  golden results (no Nifty 500 in the fixture) do not move (BL-036); `mbt stocks
   fetch-benchmarks` refreshes just them, `mbt stocks fetch`/`local migrate` carry them too. Use it,
   not the dataset's own `benchmark`, when judging edge: index-mode benchmarks are price-only
   (TODO 3.9.23).

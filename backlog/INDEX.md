@@ -21,7 +21,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-026](BL-026-realised-vs-backtest-options.md) | Options: realised P&L against the backtest of the same days | P1 | Planned | feature | options |
 | [BL-030](BL-030-choose-journal-favourites.md) | Choose the ~8 favourites to track and trade | P1 | Idea | research | momentum |
 | [BL-035](BL-035-consolidation-tightness-feature.md) | Consolidation tightness as a Momentum ranking feature (the cheap "flag") | P1 | Idea | research | momentum |
-| [BL-036](BL-036-momentum-ui-from-bl010.md) | Momentum dashboard: what the BL-010 review changes on screen | P1 | In progress | improvement | dashboard |
+| [BL-036](BL-036-momentum-ui-from-bl010.md) | Momentum dashboard: what the BL-010 review changes on screen | P1 | In progress; Phase 1 built (comparison lines and cadence text 2026-10-28), Phase 2 built for Broad; Phase 2b (Stock, Custom Index) and Phase 3 open | improvement | dashboard |
 | [BL-038](BL-038-monthly-expiry-stock-options-collection.md) | Collect every F&O stock's options on its monthly expiry day, from Fyers, from October 2026 | P1 | Planned | feature | options |
 | [BL-040](BL-040-fill-the-vendor-gap-from-algotest.md) | Fill the vendor gap (26 Aug – 24 Sep 2026) from AlgoTest, for every index and stock (on hold: owner asks the vendor first) | P1 | Planned | feature | trading-data |
 | [BL-044](BL-044-local-service-auth-and-network-hardening.md) | Local-service auth and network hardening: Host/Origin guards, OAuth state bound to the browser, an internal token, tunnel checks | P1 | Planned | improvement | cross-cutting |
