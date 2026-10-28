@@ -481,3 +481,6 @@ the two would be tested together, not chosen between on this data.
 - 2026-10-28 — E3 addition (owner, after the nineteen were read: "For widesl, lock at 0 when profit at 1500, and then
   1:1"): a twentieth overlay, lock-and-trail armed at ₹1,500 (breakeven ₹1, 1:1 in ₹100 steps), registered
   before its run; read as the others, descriptive.
+- 2026-10-28 — E3 addition (owner, after the nineteen were read: "For widesl, lock at 0 when profit at 1500, and then
+  1:1"): a twentieth overlay, lock-and-trail armed at ₹1,500 (breakeven ₹1, 1:1 in ₹100 steps), registered
+  before its run; read as the others, descriptive.
