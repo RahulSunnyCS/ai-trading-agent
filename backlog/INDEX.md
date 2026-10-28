@@ -11,7 +11,6 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Priority | Status | Type | Area |
 |---|---|---|---|---|---|
-| [BL-001](BL-001-momentum-result-integrity.md) | Momentum result integrity: goldens, parameter coverage, drift alerts | P0 | In progress | improvement | momentum |
 | [BL-024](BL-024-forward-signal-journal.md) | Forward-signal journal: record every weekly signal from now on | P0 | In progress | feature | momentum |
 | [BL-089](BL-089-backlog-tracks-and-github-board.md) | Backlog restructure: research / product / platform tracks, a generated index and `DONE.md`, one issue per item and a GitHub Projects board with a "Needs me" view | P0 | Ready | chore | cross-cutting |
 | [BL-107](BL-107-nse-fo-bhavcopy-daily.md) | Daily NSE F&O bhavcopy: official end-of-day record and a cross-check on the Fyers data | P0 | Planned | feature | options |
@@ -83,6 +82,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-169](BL-169-discretionary-trade-journal.md) | Discretionary trade journal: one-tap reasons for manual trades, what overriding the algos cost in rupees, behaviour patterns (descriptive only) | P2 | Planned | feature | contract-notes / scheduler / dashboard |
 | [BL-170](BL-170-sheet-vs-notes-differences.md) | Sheet against contract notes: explain the differences BL-168's reconciliation lists (owner's review; look for one systematic cause first) | P2 | Planned | chore | contract-notes |
 | [BL-175](BL-175-options-lake-2014-2024.md) | Options history lake: load the 2014–2024 expiry-week history (BL-034 Phase 5) | P2 | Planned | feature | trading-data |
+| [BL-177](BL-177-momentum-favourite-pinned-rerun.md) | Momentum: re-run each favourite with its end pinned to the history check's anchor (data changed, result same / changed) | P2 | Planned | improvement | momentum |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
@@ -97,6 +97,7 @@ Sorted by priority (P0 first), then ID.
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
 | [BL-142](BL-142-momentum-kite-weekly-lots.md) | Momentum on Zerodha Kite: weekly ₹50k lots read from Kite each Friday, each rebalanced on its own calendar with free cash; LIQUIDBEES and SGBs excluded | Done: Kite read-only, lot ledger, per-lot Friday orders, This week's Lots panel; free-cash cap deferred, Broad premium rule → BL-136 | 2026-10-28 |
+| [BL-001](BL-001-momentum-result-integrity.md) | Momentum result integrity: goldens, parameter coverage, drift alerts | Done: goldens, coverage, look-ahead and always-true checks; F1/F6/F7 fixed (F6 merged `778ba02e`); weekly restated-history check `momentum-history`; pinned favourite re-run → BL-177; F3/F4 deferred | 2026-10-28 |
 | [BL-157](BL-157-dashboard-nextjs-16.md) | Dashboard on Next.js 16: OpenNext refuses Next 15 since 2026-10-21 (two years past its release), so the hosted dashboard cannot deploy | Done: Next 16.4.3 deployed 26 Oct (#327, #329); React 19 (#363), Turbopack builds and no cf-build dev-server guard (#364); `middleware.ts` kept (OpenNext's Node proxy is experimental) | 2026-10-28 |
 | [BL-012](BL-012-scheduler-service.md) | Scheduler service: one home for every recurring ingestion and maintenance job (laptop now, hostable later) | Done: installed under launchd, 44 jobs; last checks Y3/Y4/S3 added; D5/D6 dropped (frozen engine), D4 done by BL-168, no container needed | 2026-10-28 |
 | [BL-058](BL-058-options-rotation-forward-journal-and-ui.md) | Options rotation: forward paper journal and the Options Lab screens it needs | Done: journal live since 12 Oct, rotation view built; day-60 read-out → BL-174, paper vs real → BL-093 | 2026-10-28 |

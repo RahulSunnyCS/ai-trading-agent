@@ -155,16 +155,27 @@ def render(n: Notification, now: datetime | None = None) -> str:
 
 def send(n: Notification) -> str:
     """Sends (or, without TELEGRAM_* configured, prints) the message. Returns the text."""
+    return _send(n)[0]
+
+
+def deliver(n: Notification) -> bool:
+    """`send`, saying whether Telegram took the message. False when it was switched off, Telegram
+    is not configured or the request failed. For a job whose message IS its alert, so that an
+    undelivered one can fail the job instead of passing silently."""
+    return _send(n)[1]
+
+
+def _send(n: Notification) -> tuple[str, bool]:
     text = render(n)
     failure = looks_like_failure(text) if getattr(n, "plain", False) else n.severity != "info"
     if not is_enabled(n.type, failure=failure):
         print(f"\n[telegram: '{n.type}' is off or failures-only, message below]\n{text}")
-        return text
+        return text, False
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
     if not (token and chat):
         print(f"\n[telegram not configured, message below]\n{text}")
-        return text
+        return text, False
     body = json.dumps({"chat_id": chat, "text": text, "disable_web_page_preview": True})
     request = urllib.request.Request(
         f"https://api.telegram.org/bot{token}/sendMessage",
@@ -175,7 +186,8 @@ def send(n: Notification) -> str:
         urllib.request.urlopen(request, timeout=15).read()
     except Exception as error:  # never let a notification failure break the job
         print(f"  telegram send failed: {redact(str(error))}")
-    return text
+        return text, False
+    return text, True
 
 
 def run_url() -> str | None:
