@@ -1,6 +1,6 @@
 # Widesl: entry time
 
-**Status:** Tested · **Last updated:** 2026-10-24
+**Status:** Tested · **Last updated:** 2026-10-28
 
 ## What it is
 
@@ -24,6 +24,7 @@ times for each family.
 | BL-083 | Entry at the minute a pivot, VIX-turn, straddle or RSI trigger fires (10:30–14:00) | explore 2024-10 → 2026-10 both indices; confirm NIFTY 2022-01 → 2024-10 | **No lead** for Widesl; the VIX-turn entry loses (−₹215 explore, −₹139 confirm) | [BL-083][bl083] |
 | BL-098 | Best configuration per band, all families | holdout 2025-10-09 → 2026-10-09, **after charges** | Descriptive ranking (below) | [BL-098 report][bl098q] |
 | BL-145 Q4 | NIFTY OTM1 entering 09:47 (`N_wide_0947`), split by the opening range 09:15 to 09:44 on quiet-week days (R7 lowest third) | learning 2025-10-20 → 2026-10-19 (80 days), confirmation 2024-10-09 → 2025-10-17 (46); gross per lot-day, no charges | Low-OR days beat high-OR days: +1,446 [+426, +2,578] (46 vs 7 days), confirmed thinly +723 [−92, +1,879] (22 vs 5 days); the registered rule is met | [BL-145][bl145] |
+| [BL-182][bl182] | A 13:00 entry (exit 15:28) as the afternoon half of a two-set day, beside the 09:17 whole day | 2024-10-09 → 2026-10-27, 501 days, after charges, seen data | A 13:00–15:28 set alone earns +138 (NIFTY OTM1) / +83 (SENSEX OTM2) net a day, stopped a third as often as a whole-day set; T1's OTM1 settings +187 / +232. Not adopted as part of the split (interval includes zero) | [Session split](session-split.md) |
 
 Average ₹ per day per lot, mean of the start-time means, before charges ([BL-059][bl059]):
 
@@ -74,3 +75,4 @@ After charges, the band leaders earn (₹ per day, [BL-098 report][bl098q]): NIF
 [bl083]: ../../../../backlog/BL-083-event-triggered-intraday-entries.md
 [bl145]: ../../../../backlog/BL-145-t1-robustness-lag-opening-range.md
 [bl098q]: ../../../../backlog/BL-098-widesl-qualified-list-post-charge.md
+[bl182]: ../../../../backlog/BL-182-widesl-split-session.md

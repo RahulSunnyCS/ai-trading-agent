@@ -1,6 +1,6 @@
 # Directional: entry time
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-10-28
 
 ## What it is
 
@@ -21,6 +21,7 @@ from 09:17 to 15:17, exit 15:28. BL-083 also tested entry at the minute an intra
 | BL-059 | NIFTY and SENSEX ATM, 24 times 09:17–15:02 | 2025-09-01 → 2026-10-08, before charges | Descriptive: positive almost everywhere; best slot does not repeat between halves | [BL-059][bl059] |
 | BL-083 | Entry at the minute a trigger fires (10:30–14:00) | explore 2024-10 → 2026-10 both indices; confirm NIFTY 2022-01 → 2024-10 | **No lead** under the registered bar; two leads under the owner's rule (below) that fail in 2022–24 | [BL-083][bl083] |
 | BL-096 | Best configuration per band and per start time, ATM and ITM1 | holdout 2025-10-09 → 2026-10-09, before and **after charges** | Descriptive ranking | [post-charge list][bl096pc], [pre-charge list][bl096q] |
+| [BL-184][bl184] | A 13:02–15:02 entry (exit 15:28) as the afternoon half of a two-set day, Adaptive's top one, beside its whole-day pick | 434 pick days 2025-01-10 → 2026-10-27, after charges, seen data | The afternoon Dir alone earns +276 net a day (DD −16,944) against the whole-day pick's +326 (DD −26,486); as part of the split not adopted (interval through zero, drawdown deeper) | [Session split](session-split.md) |
 
 Average ₹ per day per lot, mean of the start-time means, before charges ([BL-059][bl059]):
 
@@ -66,4 +67,5 @@ On the charged shortlist, entries from 13:00 net ₹1–76 a day ([BL-096][bl096
 [bl083]: ../../../../backlog/BL-083-event-triggered-intraday-entries.md
 [bl096]: ../../../../backlog/BL-096-directional-parameter-sweep.md
 [bl096q]: ../../../../backlog/BL-096-directional-qualified-list.md
+[bl184]: ../../../../backlog/BL-184-directional-split-session.md
 [bl096pc]: ../../../../backlog/BL-096-directional-qualified-list-post-charge.md

@@ -63,7 +63,8 @@ rules. Figures from the tail-gated second selection and the Buy 60 % day-stop cu
 | [Overall MTM stop](mtm-sl.md) | Tested | Before charges the ₹2,500 stop costs money except on SENSEX OTM2, where it cuts the drawdown |
 | [Trail](trail.md) | Descriptive | Only one trail row (NIFTY ₹80, [5,5]%) reached a top-four list |
 | [Re-entry](re-entry.md) | Descriptive | Re-entry rows rank only on SENSEX ₹250 mornings, with a deeper drawdown |
-| [Exit time](exit-time.md) | Descriptive | No earlier exit made a top-four list; 15:28 stays |
+| [Exit time](exit-time.md) | Tested | No earlier exit made a top-four list; a 12:00 exit as half of a two-set day killed on the rule (BL-182); 15:28 stays |
+| [Session split](session-split.md) | Tested | Two sets a day (09:17–12:00, 13:00–15:28) earn ₹120–180 more gross with half the drawdown, but after charges the net interval includes zero, fixed files and Adaptive two-plus-two alike; killed on the rule (BL-182); the afternoon pair alone is a lead |
 | [Days to expiry](days-to-expiry.md) | Descriptive | NIFTY falls steadily away from expiry (₹616 → −₹52 a day); SENSEX has no gradient; at the edge of noise, one year |
 | [India VIX](vix.md) | Tested | Weak at VIX 18+ in one year; VIX-based rules and intraday VIX states failed |
 | [Weekday](weekday.md) | Descriptive | Same split as days to expiry within one expiry regime |
