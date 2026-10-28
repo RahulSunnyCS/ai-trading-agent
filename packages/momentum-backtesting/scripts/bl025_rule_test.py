@@ -254,13 +254,16 @@ def score(objs: dict, cands: list[dr.Candidate], cash: pd.Series, capital: float
         reference = dr.simulate(model, cash, r0_sizes, book, capital)
         for cand in cands:
             sizes, actions = dr.decide(model, cand)
-            for variant, path in (("main", sizes), ("late", dr.delayed(sizes, LATE_WEEKS))):
+            late = (
+                dr.delayed(sizes, LATE_WEEKS),
+                dr.delayed_actions(actions, len(sizes), LATE_WEEKS),
+            )
+            for variant, (path, acts) in (("main", (sizes, actions)), ("late", late)):
                 money = dr.simulate(model, cash, path, book, capital)
                 full[variant][cand.key][name] = dr.measures(
                     model,
                     money,
-                    path,
-                    actions,
+                    acts,
                     reference,
                     fall_depth=FALL_DEPTH,
                     exit_window_weeks=EXIT_WINDOW_WEEKS,

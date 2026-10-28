@@ -276,3 +276,10 @@ def test_judge_ramp_median_not_judged_below_three_qualifying():
     row = out["candidates"]["R2_back_at_the_high"]
     assert row["ramp_median_judged"] is False and row["verdict"] == "pass"
     assert out["r0_passes_a"] is True
+
+
+def test_delay_of_zero_and_late_actions():
+    sizes = np.array([1.0, 0.5, 0.5, 0.0])
+    assert np.array_equal(dr.delayed(sizes, 0), sizes)
+    acts = [dr.Action(1, "cut", 1.0, 0.5), dr.Action(3, "exit", 0.5, 0.0)]
+    assert dr.delayed_actions(acts, len(sizes)) == [dr.Action(2, "cut", 1.0, 0.5)]

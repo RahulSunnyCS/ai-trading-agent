@@ -202,10 +202,17 @@ def decide(curve: np.ndarray | pd.Series, cand: Candidate) -> tuple[np.ndarray, 
 
 def delayed(sizes: np.ndarray, weeks: int = 1) -> np.ndarray:
     """The reported-only variant: every action `weeks` later (the owner acts a week late)."""
+    if weeks <= 0:
+        return sizes.copy()
     out = np.empty_like(sizes)
     out[:weeks] = FULL
     out[weeks:] = sizes[:-weeks]
     return out
+
+
+def delayed_actions(actions: list[Action], n: int, weeks: int = 1) -> list[Action]:
+    """The actions of `delayed(sizes, weeks)`: each one `weeks` later, dropped past the curve."""
+    return [Action(a.i + weeks, a.kind, a.before, a.after) for a in actions if a.i + weeks < n]
 
 
 def prefix_check(curve: np.ndarray | pd.Series, cand: Candidate) -> list[int]:
@@ -495,7 +502,6 @@ def _weeks(a: pd.Timestamp, b: pd.Timestamp) -> int:
 def measures(
     model: pd.Series,
     money: Money,
-    sizes: np.ndarray,
     actions: list[Action],
     reference: Money,
     *,
@@ -613,7 +619,9 @@ def judge(scores: dict, criteria: dict, qualifying: list[str]) -> dict:
             "blend_give_up_pts": blend_give,
             "ramp_median_give_up_pts": median,
             "ramp_median_judged": judged_median,
-            "worst_ramp_fall": min(m["worst_fall"] for o, m in objects.items() if "ramp" in o),
+            "worst_ramp_fall": min(
+                (m["worst_fall"] for o, m in objects.items() if "ramp" in o), default=math.nan
+            ),
         }
         if cand.startswith("R0"):
             row["b_give_up_ok"] = None  # zero by definition: R0 is judged by (a) only

@@ -329,7 +329,7 @@ a new file. A rule here is never edited after a run. A changed rule is a new dat
   9. The one-week-late variant is the same decisions, each size change one week later.
 - 2026-10-28 — **drawdown-rule test run** (`scripts/bl025_rule_test.py` at `c98cf399`, criteria
   sha1 `c7825eab`; result `search_spaces/bl025_rules_result.json`). Window 2017-01-06 to
-  2026-10-23, post-F6 ranking, four sleeves, the blend and 17 qualifying lot ramps. Look-ahead
+  2026-10-23, post-F6 ranking, four sleeves, the blend and 18 lot ramps (17 of them qualify for the CAGR median). Look-ahead
   check 1 (prefix) found 0 differences for every candidate and object; no hold-out week exists yet.
   **No candidate passes; the current lines stay.**
 
@@ -345,7 +345,10 @@ a new file. A rule here is never edited after a run. A changed rule is a new dat
   Reading it: only R1 keeps every worst fall within 35%, and it does so by sitting in cash after
   the 2020 and 2022 exits (giving up 26 to 44 points across the ramps, except the newest). Every
   way back in that keeps most of the return lets at least one sleeve fall past 35%. The one-week-late
-  variant (reported, not judged) changes no verdict. Known bias: the curves use today's category
+  variant (reported, not judged) changes no verdict. Found in review after the run: the stored
+  late variant's per-fall action detail (weeks from a cut or exit to the low, returns to full)
+  uses the on-time actions, so it is dated a week early; its money, falls and verdicts are right.
+  Fixed in the code for any rerun; the result file is left as written. Known bias: the curves use today's category
   tags (BL-010 F3), which may understate the falls on both sides alike. Per the registration the
   current lines stay and the re-entry text is the owner's choice (open question 3). Re-run unchanged
   on BL-176's pick if it changes the followed strategy.
