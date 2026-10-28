@@ -179,18 +179,31 @@ def build_symbol_segments(
     return segments, boundary_names, non_terminal_names
 
 
-def _forward_filled(frame: pd.DataFrame, columns: Iterable[str]) -> pd.DataFrame:
+def _forward_filled(
+    frame: pd.DataFrame, columns: Iterable[str], *, tail_only: bool = False
+) -> pd.DataFrame:
     """`frame` with each of `columns` forward-filled, every other column untouched, in the same
     column order. Done in one step: replacing hundreds of columns one at a time
     (`frame[col] = frame[col].ffill()`) splits pandas' internal storage into one block per
     column, and the next column added to such a frame raises 'DataFrame is highly fragmented'
-    (BL-005). Here the filled columns are one new block, put back in their original places."""
+    (BL-005). Here the filled columns are one new block, put back in their original places.
+
+    `tail_only` (BL-001 F6) fills only the weeks AFTER a column's own last real value and leaves
+    gaps inside its history empty, as for a column that never ends. Filling the inside too made a
+    gap's treatment depend on whether the stock is missing the frame's newest week, which a run
+    stopped at a past date cannot know."""
     wanted = set(columns)
     stale = [c for c in frame.columns if c in wanted]
     if not stale:
         return frame
     kept = frame.drop(columns=stale)
-    return pd.concat([kept, frame[stale].ffill()], axis=1)[list(frame.columns)]
+    block = frame[stale]
+    filled = block.ffill()
+    if tail_only:
+        # True while a real value still lies ahead (or here): those weeks keep what they had.
+        real_ahead = block.notna().iloc[::-1].cummax().iloc[::-1]
+        filled = block.where(real_ahead, filled)
+    return pd.concat([kept, filled], axis=1)[list(frame.columns)]
 
 
 def build_stock_weekly_prices(
@@ -202,6 +215,7 @@ def build_stock_weekly_prices(
     series_breaks: str = "verified",
     carry_forward_stopped_segments: bool = True,
     return_raw_weekly: bool = False,
+    fill_internal_gaps: bool = True,
 ) -> (
     tuple[pd.DataFrame, pd.DataFrame, dict[str, pd.Timestamp]]
     | tuple[pd.DataFrame, pd.DataFrame, dict[str, pd.Timestamp], pd.DataFrame]
@@ -288,6 +302,14 @@ def build_stock_weekly_prices(
     flagged in this task's final report for explicit review. Pass
     `carry_forward_stopped_segments=False` to see the raw (NaN-corrupting)
     behaviour instead.
+
+    **`fill_internal_gaps` (default True, the behaviour above; Broad passes False, BL-001 F6)**:
+    the fill above covers a stale column's WHOLE length, gaps inside its history included, so a
+    suspension in 2013 was filled if the stock is missing the frame's newest week today and left
+    empty if it is not. That made a backtest at a past date depend on data after it. With False,
+    only the weeks after a column's own last real value are filled; a gap inside its history stays
+    empty, exactly as for a column that never ends. Broad values its positions on a forward-filled
+    copy of the frame, so a held stock in a gap still has a price.
     """
     daily = load_daily_prices(symbols, stocks_data_dir=stocks_data_dir)
     if daily.empty:
@@ -375,7 +397,7 @@ def build_stock_weekly_prices(
     stale_columns_to_fill = set(non_terminal_columns) | set(stale_columns)
 
     if carry_forward_stopped_segments:
-        frame = _forward_filled(frame, stale_columns_to_fill)
+        frame = _forward_filled(frame, stale_columns_to_fill, tail_only=not fill_internal_gaps)
 
     if events.empty:
         events_out = pd.DataFrame(columns=list(EVENT_COLUMNS))
@@ -390,6 +412,8 @@ def build_stock_weekly_prices(
     if return_raw_weekly:
         raw_frame = pd.DataFrame(raw_weekly_columns).reindex(frame.index)
         if carry_forward_stopped_segments:
-            raw_frame = _forward_filled(raw_frame, stale_columns_to_fill)
+            raw_frame = _forward_filled(
+                raw_frame, stale_columns_to_fill, tail_only=not fill_internal_gaps
+            )
         return frame, events_out, stale_columns, raw_frame
     return frame, events_out, stale_columns

@@ -85,7 +85,12 @@ def _comparable(value: Any) -> Any:
     if isinstance(value, dict):
         return {k: _comparable(v) for k, v in value.items() if k not in NOT_COMPARED}
     if isinstance(value, list):
-        return [_comparable(v) for v in value]
+        items = [_comparable(v) for v in value]
+        # A week's holdings are listed by weight, and equal weights tie-break on float noise:
+        # list them by name instead (as tests/golden/harness.py does).
+        if items and all(isinstance(i, dict) and set(i) == {"asset", "share"} for i in items):
+            items.sort(key=lambda i: str(i["asset"]))
+        return items
     return value
 
 
