@@ -888,13 +888,18 @@ export type MomentumLotsView =
       week: string;
       paper_start: string | null;
       holdings_source: 'paper' | 'fyers' | 'kite';
-      snapshot: { synced_at: string; cash: number | null } | null;
+      /** The latest Kite snapshot; `today`: read today (IST). */
+      snapshot: { synced_at: string; cash: number | null; today: boolean } | null;
       pending: string | null;
-      close_day: string | null;
+      /** The oldest and newest close the values use; null when nothing is priced. */
+      close_days: [string, string] | null;
       lots: MomentumLot[];
+      /** Sum of the lots' priced holdings; `unpriced` holdings are left out of it. */
       total_value: number;
+      unpriced: number;
       /** Kite's latest snapshot minus the ledger, per symbol, as `mbt lots show` lists it, with
-       * what the last orders told each lot to trade (signed shares). */
+       * what the last Friday orders told each lot to trade (signed shares). A symbol those orders
+       * name with no difference in Kite is listed with `delta` 0 (not traded in Kite yet). */
       not_in_a_lot: Array<
         Omit<MomentumLotHolding, 'shares'> & {
           delta: number;

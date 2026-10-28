@@ -142,7 +142,13 @@ type PlanSource = Pick<MomentumOrders, 'kind' | 'reason'> &
  */
 export function YourOrders({
   favourites = null,
-}: { favourites?: readonly OrderPreviewChoice[] | null } = {}) {
+  onChanged,
+}: {
+  favourites?: readonly OrderPreviewChoice[] | null;
+  /** Called when the orders, the holdings snapshot or the settings shown here change (the
+   * Lots panel reads the ledger again). */
+  onChanged?: () => void;
+} = {}) {
   const view = usePolledResource<MomentumOrdersView>('/api/momentum/orders', { cache: true });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const running = view.data?.job?.status === 'running';
@@ -155,6 +161,16 @@ export function YourOrders({
 
   const latest: MomentumOrders | null = view.data?.orders.at(-1) ?? null;
   const settings = view.data?.settings ?? null;
+  const stamp = view.data
+    ? `${latest?.created_at ?? ''}|${view.data.holdings?.synced_at ?? ''}|${settings?.holdings_source ?? ''}`
+    : null;
+  const lastStamp = useRef<string | null>(null);
+  useEffect(() => {
+    if (stamp === null) return;
+    const before = lastStamp.current;
+    lastStamp.current = stamp;
+    if (before !== null && before !== stamp) onChanged?.();
+  }, [stamp, onChanged]);
   const preview = useOrderPreview();
   const others = useMemo(() => (favourites ?? []).filter((f) => !f.headline), [favourites]);
   const previewing = preview.favourite !== null;

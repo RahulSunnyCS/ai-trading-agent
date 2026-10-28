@@ -228,41 +228,41 @@ def save_orders(
     return created_at
 
 
-def latest_orders(
-    con: duckdb.DuckDBPyConnection, who: str, favourite_id: str
-) -> dict[str, Any] | None:
-    """The newest set of orders made for `favourite_id`, whatever the week, or None."""
-    row = con.execute(
-        "SELECT created_at, trigger, favourite_id, holdings_source, payload FROM momentum_orders "
-        "WHERE owner = ? AND favourite_id = ? ORDER BY created_at DESC LIMIT 1",
-        [who, favourite_id],
-    ).fetchone()
-    if row is None:
-        return None
-    created_at, trigger, fav, source, payload = row
+_ORDER_COLUMNS = "created_at, trigger, favourite_id, holdings_source, payload"
+
+
+def _order_row(row: tuple) -> dict[str, Any]:
+    created_at, trigger, favourite_id, source, payload = row
     return {
         "created_at": created_at,
         "trigger": trigger,
-        "favourite_id": fav,
+        "favourite_id": favourite_id,
         "holdings_source": source,
         **json.loads(payload),
     }
 
 
+def latest_orders(
+    con: duckdb.DuckDBPyConnection, who: str, favourite_id: str, *, on_friday: bool = False
+) -> dict[str, Any] | None:
+    """The newest set of orders made for `favourite_id`, whatever the week, or None.
+    `on_friday`: only orders made on their own Friday (the 14:15 job, or a run by hand that
+    day), the only runs that move the lot ledger's pending lot; a run by hand earlier in the
+    week plans the coming Friday and changes nothing in the ledger."""
+    friday = " AND left(created_at, 10) = CAST(week AS VARCHAR)" if on_friday else ""
+    row = con.execute(
+        f"SELECT {_ORDER_COLUMNS} FROM momentum_orders "
+        f"WHERE owner = ? AND favourite_id = ?{friday} ORDER BY created_at DESC LIMIT 1",
+        [who, favourite_id],
+    ).fetchone()
+    return _order_row(row) if row else None
+
+
 def orders_for(con: duckdb.DuckDBPyConnection, who: str, week: str) -> list[dict[str, Any]]:
     """Every set of orders made for `week`, oldest first."""
     rows = con.execute(
-        "SELECT created_at, trigger, favourite_id, holdings_source, payload FROM momentum_orders "
+        f"SELECT {_ORDER_COLUMNS} FROM momentum_orders "
         "WHERE owner = ? AND week = ? ORDER BY created_at",
         [who, week],
     ).fetchall()
-    return [
-        {
-            "created_at": created_at,
-            "trigger": trigger,
-            "favourite_id": favourite_id,
-            "holdings_source": source,
-            **json.loads(payload),
-        }
-        for created_at, trigger, favourite_id, source, payload in rows
-    ]
+    return [_order_row(row) for row in rows]

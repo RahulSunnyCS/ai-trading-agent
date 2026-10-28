@@ -62,9 +62,18 @@ export function plannedGap(
   planned: Array<{ lot: string; shares: number }>,
 ): string | null {
   if (!planned.length) return null;
+  if (Math.abs(delta) < 1e-6) return 'not traded in Kite yet';
   const gap = delta - planned.reduce((sum, p) => sum + p.shares, 0);
   if (Math.abs(gap) < 1e-6) return null;
   return `${formatInt(Math.abs(gap))} ${gap > 0 ? 'more' : 'fewer'} than the orders said`;
+}
+
+/** "the close of Fri 23 Oct", or the range when the names' last closes differ. */
+export function closeDaysText(days: [string, string] | null): string {
+  if (!days) return 'no stored close';
+  const [first, last] = days;
+  if (first === last) return `the close of ${formatDayShort(last, { weekday: true })}`;
+  return `each name's last close (${formatDayShort(first, { weekday: true })} to ${formatDayShort(last, { weekday: true })})`;
 }
 
 /** The value of what Kite holds beyond the lots (priced rows only) and how many rows had no

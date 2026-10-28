@@ -3902,15 +3902,20 @@ def _lot_orders_message(payload: dict, title: str) -> Notification:
     )
 
 
+class NotALotGroup(ValueError):
+    """The headline favourite is not a group of sleeves, so it has no lots."""
+
+
 def _headline_group() -> tuple[dict, list[dict]]:
-    """The headline favourite and its sleeves; raises ValueError when it is not a group."""
+    """The headline favourite and its sleeves; raises NotALotGroup (a ValueError) when it is
+    not a group."""
     with read_catalog() as con:
         favourites = runs_store.list_favorites(con, include_groups=True)
         groups = {g["id"]: g for g in runs_store.list_groups(con)}
     headline = next((f for f in favourites if f["active"]), None)
     members = groups.get(headline["id"], {}).get("members", []) if headline else []
     if not headline or not members:
-        raise ValueError("The headline favourite is not a group of sleeves.")
+        raise NotALotGroup("The headline favourite is not a group of sleeves.")
     return headline, members
 
 
@@ -4014,6 +4019,22 @@ def lots_status() -> dict:
         pending = lots.pending(con, who, headline["id"])
         snapshot = holdings_store.latest_holdings(con, who, ("kite",))
         rules = holdings_store.rules(con, who)
+    return _lots_status_from(headline, members, labels, ledger, pending, snapshot, rules)
+
+
+def _lots_status_from(
+    headline: dict,
+    members: list[dict],
+    labels: dict[str, str],
+    ledger: dict[str, dict[str, float]],
+    pending: str | None,
+    snapshot: dict | None,
+    rules: dict[str, str],
+) -> dict:
+    """`lots_status`'s answer from what it read: shared with `lots_view`, so the Lots panel and
+    `mbt lots show` cannot disagree."""
+    from . import holdings_store
+
     kite_qty = {
         r["symbol"]: float(r["quantity"])
         for r in (snapshot or {}).get("rows", [])
@@ -4094,12 +4115,14 @@ def _last_rebalance(req: BacktestRequest, friday: pd.Timestamp, start: str | Non
 
 def lots_view() -> dict:
     """Momentum › This week's Lots panel (BL-142 Phase 4). The ledger exactly as `mbt lots show`
-    gives it (`lots_status`), with each lot's value at the last stored daily close, its last and
-    next rebalance Friday, whether it is due this Friday, what the last orders told it, and Kite
-    minus the lots beside what those orders told each lot to trade.
+    gives it (`_lots_status_from`, on the same reads), with each lot's value at the last stored
+    daily close, its last and next rebalance Friday, whether it is due this Friday, what the last
+    Friday orders said for it, and Kite minus the lots beside what those orders told each lot to
+    trade (a planned trade Kite does not show yet is listed too).
 
-    Read-only: it opens the catalog read-only, never reads Kite, never asks for a quote and never
-    books a share (only the Friday orders run and `mbt lots seed|assign` write the ledger)."""
+    Read-only: one read-only catalog read (plus the stock closes), never Kite, never a quote, never
+    a booking (only the Friday orders run and `mbt lots seed|assign` write the ledger). Not
+    available when the headline is not a group, or no lot is recorded for it yet."""
     from . import holdings_store, lots
     from .weekly import week_ending_on_or_before
 
@@ -4109,22 +4132,38 @@ def lots_view() -> dict:
     week = journal_week_string(friday)
     try:
         headline, members = _headline_group()
-        status = lots_status()
         with read_catalog() as con:
+            recorded = lots.has_ledger(con, who, headline["id"])
             settings = holdings_store.settings(con, who)
+            ledger = lots.positions(con, who, headline["id"])
             pending_id, planned = lots.pending_state(con, who, headline["id"])
             has_history = lots.funded(con, who, headline["id"])
-            last_orders = holdings_store.latest_orders(con, who, headline["id"])
+            last_orders = holdings_store.latest_orders(con, who, headline["id"], on_friday=True)
             snapshot = holdings_store.latest_holdings(con, who, ("kite",))
-    except ValueError as error:  # the headline is not a group of sleeves
+            rules = holdings_store.rules(con, who)
+    except NotALotGroup as error:
         return {"available": False, "reason": str(error), "week": week}
     except (FileNotFoundError, duckdb.CatalogException):  # no catalog / tables yet
         return {"available": False, "reason": "No lot ledger yet.", "week": week}
+    if not recorded:
+        reason = "No lots are recorded for the headline yet (mbt lots seed)."
+        return {"available": False, "reason": reason, "week": week}
+    labels = lot_labels(members, friday)
+    status = _lots_status_from(headline, members, labels, ledger, pending_id, snapshot, rules)
     start = this_week.paper_start()
-    symbols = sorted(
-        {s for lot in status["lots"].values() for s in lot["holds"]} | set(status["not_in_a_lot"])
+    # Every symbol the planned trades name, too: a buy the orders said but Kite does not show yet
+    # has no difference from the ledger and would otherwise not be listed.
+    planned_symbols = {
+        s for shares in planned.values() for s, q in shares.items() if abs(q) > lots.EPS
+    }
+    beyond_symbols = sorted(set(status["not_in_a_lot"]) | planned_symbols)
+    held_symbols = {s for lot in status["lots"].values() for s in lot["holds"]}
+    closes = (
+        db_read.latest_symbol_closes_from_db_or_none(
+            sorted(held_symbols | set(beyond_symbols)), today
+        )
+        or {}
     )
-    closes = db_read.latest_symbol_closes_from_db_or_none(symbols, today) or {}
     by_id = {m["id"]: m for m in members}
     label_of = {entry["id"]: label for label, entry in status["lots"].items()}
     told = {lot["id"]: lot for lot in (last_orders or {}).get("lots") or []}
@@ -4171,8 +4210,8 @@ def lots_view() -> dict:
             }
         )
     beyond = []
-    for symbol, delta in status["not_in_a_lot"].items():
-        row = priced(symbol, delta)
+    for symbol in beyond_symbols:
+        row = priced(symbol, status["not_in_a_lot"].get(symbol, 0.0))
         row["delta"] = row.pop("shares")
         row["planned"] = [
             {"lot": label_of.get(sid, sid), "shares": shares[symbol]}
@@ -4180,8 +4219,11 @@ def lots_view() -> dict:
             if abs(shares.get(symbol, 0.0)) > lots.EPS
         ]
         beyond.append(row)
-    days = sorted({r["close_day"] for lot in out for r in lot["holds"] if r["close_day"]})
-    same_snapshot = snapshot and snapshot["synced_at"] == status["snapshot"]
+    days = sorted(
+        {r["close_day"] for lot in out for r in lot["holds"] if r["close_day"]}
+        | {r["close_day"] for r in beyond if r["close_day"]}
+    )
+    synced_at = status["snapshot"]
     return {
         "available": True,
         "group": status["group"],
@@ -4190,14 +4232,19 @@ def lots_view() -> dict:
         "paper_start": start,
         "holdings_source": settings["holdings_source"],
         "snapshot": (
-            {"synced_at": status["snapshot"], "cash": snapshot["cash"] if same_snapshot else None}
-            if status["snapshot"]
+            {
+                "synced_at": synced_at,
+                "cash": (snapshot or {}).get("cash"),
+                "today": str(synced_at)[:10] == today.isoformat(),
+            }
+            if synced_at
             else None
         ),
         "pending": status["pending"],
-        "close_day": days[-1] if days else None,
+        "close_days": [days[0], days[-1]] if days else None,
         "lots": out,
         "total_value": round(sum(lot["value"] for lot in out), 2),
+        "unpriced": sum(len(lot["unpriced"]) for lot in out),
         "not_in_a_lot": beyond,
         "last_orders": (
             {

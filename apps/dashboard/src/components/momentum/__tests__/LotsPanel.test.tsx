@@ -7,11 +7,19 @@ import type { MomentumLot, MomentumLotsView } from '../../../types/momentum';
 const calls: string[] = [];
 let response: MomentumLotsView | null = null;
 let error: string | null = null;
+let refetches = 0;
 
 vi.mock('../../../hooks/usePolledResource', () => ({
   usePolledResource: (url: string) => {
     calls.push(url);
-    return { data: response, loading: false, error, refetch: () => {} };
+    return {
+      data: response,
+      loading: false,
+      error,
+      refetch: () => {
+        refetches += 1;
+      },
+    };
   },
 }));
 
@@ -22,6 +30,7 @@ afterEach(() => {
   calls.length = 0;
   response = null;
   error = null;
+  refetches = 0;
 });
 
 function lot(over: Partial<MomentumLot>): MomentumLot {
@@ -50,9 +59,9 @@ const LIVE: MomentumLotsView = {
   week: '2026-10-30',
   paper_start: '2026-10-16',
   holdings_source: 'kite',
-  snapshot: { synced_at: '2026-10-28T08:51:01+05:30', cash: 500 },
+  snapshot: { synced_at: '2026-10-28T08:51:01+05:30', cash: 500, today: true },
   pending: 'Lot 2',
-  close_day: '2026-10-23',
+  close_days: ['2026-10-23', '2026-10-23'],
   lots: [
     lot({
       id: 'l1',
@@ -92,6 +101,7 @@ const LIVE: MomentumLotsView = {
     }),
   ],
   total_value: 34435.4,
+  unpriced: 0,
   not_in_a_lot: [
     {
       symbol: 'ACMESOLAR',
@@ -108,6 +118,14 @@ const LIVE: MomentumLotsView = {
       close_day: '2026-10-23',
       value: 14068,
       planned: [{ lot: 'Lot 2', shares: 1 }],
+    },
+    {
+      symbol: 'NAZARA',
+      delta: 0,
+      close: 402.15,
+      close_day: '2026-10-23',
+      value: 0,
+      planned: [{ lot: 'Lot 2', shares: 24 }],
     },
   ],
   last_orders: {
@@ -158,6 +176,37 @@ describe('LotsPanel', () => {
       within(row('GRWRHITECH')).getByText('Lot 2: buy 1 · 1 more than the orders said'),
     ).toBeTruthy();
     expect(within(row('ACMESOLAR')).getByText('+30')).toBeTruthy();
+  });
+
+  it('lists a trade the orders named that Kite does not show yet', () => {
+    response = LIVE;
+    render(<LotsPanel />);
+    const nazara = within(row('NAZARA'));
+    expect(nazara.getByText('0')).toBeTruthy();
+    expect(nazara.getByText('Lot 2: buy 24 · not traded in Kite yet')).toBeTruthy();
+  });
+
+  it('heads the due column with the Friday and says when the page shows another week', () => {
+    response = LIVE;
+    render(<LotsPanel shownWeek="2026-10-16" />);
+    expect(screen.getByText('Fri 30 Oct', { selector: 'th' })).toBeTruthy();
+    expect(
+      screen.getByText(/as they stand now, for Fri 30 Oct, not the week of Fri 16 Oct/),
+    ).toBeTruthy();
+  });
+
+  it('marks a Kite snapshot that was not read today', () => {
+    response = { ...LIVE, snapshot: { ...LIVE.snapshot!, today: false } };
+    render(<LotsPanel />);
+    expect(screen.getByText(/Kite · last read/)).toBeTruthy();
+  });
+
+  it('reads the ledger again when Your orders change', () => {
+    response = LIVE;
+    const { rerender } = render(<LotsPanel ordersVersion={0} />);
+    expect(refetches).toBe(0);
+    rerender(<LotsPanel ordersVersion={1} />);
+    expect(refetches).toBe(1);
   });
 
   it('is left out when the headline is not followed lot by lot', () => {

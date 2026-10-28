@@ -541,10 +541,13 @@ contract, not a shared service).
   on purpose, e.g. a swap for a premium-blocked name). `api._compute_lot_orders` is the Kite +
   group path of `_compute_orders` (the group's per-sleeve signals ride in `signal["_sleeves"]`,
   never saved); `api.seed_lots` / `lots_status` / `assign_lot` back `mbt lots`. `api.lots_view`
-  (`GET /api/lots`, Phase 4) is This week's Lots panel: `lots_status` plus each lot's value at the
-  last stored close (`db_read.latest_symbol_closes_from_db_or_none`, never a quote), its calendar
-  (`_rebalance_info`, `_last_rebalance` from the paper start), the last stored orders' line per lot
-  (`holdings_store.latest_orders`) and the pending plan beside Kite minus the lots; read-only.
+  (`GET /api/lots`, Phase 4) is This week's Lots panel: `lots_status`'s answer (both go through
+  `_lots_status_from`; the view reads everything once) plus each lot's value at the last stored
+  close (`db_read.latest_symbol_closes_from_db_or_none`, never a quote), its calendar
+  (`_rebalance_info`, `_last_rebalance` from the paper start), the last orders made on their own
+  Friday per lot (`holdings_store.latest_orders(on_friday=True)`: a midweek run by hand never moves
+  the pending lot, so it is not shown) and the pending plan beside Kite minus the lots, a planned
+  name with no difference included at 0; read-only, and unavailable until a lot is recorded.
   Tests: `tests/test_lots.py`, `tests/test_lot_orders.py`.
 - `alerts.py` (BL-051 Phase 5) — `GET /api/alerts`: what needs a person, for the dashboard's bell
   and once-a-day pop-up. One pure function per kind over the data its Telegram job already reads:

@@ -1,10 +1,11 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
+
 import { usePolledResource } from '../../../hooks/usePolledResource';
 import { cn } from '../../../lib/cn';
 import {
   EMPTY,
-  formatDay,
   formatDayShort,
   formatInr,
   formatInt,
@@ -12,6 +13,7 @@ import {
 } from '../../../lib/format';
 import {
   beyondValue,
+  closeDaysText,
   holdsText,
   lastOrdersText,
   lotState,
@@ -35,9 +37,23 @@ type LotsView = Extract<MomentumLotsView, { available: true }>;
  * orders said for it. Below, what Kite holds beyond the lots, beside what those orders told each
  * lot to buy. The same ledger as `mbt lots show`; read-only (nothing here reads Kite or books a
  * share). Left out when the headline is not followed lot by lot.
+ *
+ * Always about now: the ledger and this coming Friday, whatever week the page shows
+ * (`shownWeek`, said when it differs). `ordersVersion` changes when Your orders made or reloaded
+ * orders, or its settings changed: the panel then reads the ledger again.
  */
-export function LotsPanel() {
+export function LotsPanel({
+  shownWeek = null,
+  ordersVersion = 0,
+}: { shownWeek?: string | null; ordersVersion?: number } = {}) {
   const lots = usePolledResource<MomentumLotsView>('/api/momentum/lots', { cache: true });
+  const refetch = lots.refetch;
+  const seen = useRef(ordersVersion);
+  useEffect(() => {
+    if (seen.current === ordersVersion) return;
+    seen.current = ordersVersion;
+    refetch();
+  }, [ordersVersion, refetch]);
   const view = lots.data;
   if (view && !view.available) return null;
   return (
@@ -46,7 +62,10 @@ export function LotsPanel() {
         <h2 className="text-base font-semibold text-foreground">Your lots</h2>
         {view ? <span className="text-xs text-muted">for {view.group}</span> : null}
         {view?.snapshot ? (
-          <Badge tone="positive">Kite · read {formatIstDateTime(view.snapshot.synced_at)}</Badge>
+          <Badge tone={view.snapshot.today ? 'positive' : 'warning'}>
+            Kite · {view.snapshot.today ? 'read' : 'last read'}{' '}
+            {formatIstDateTime(view.snapshot.synced_at)}
+          </Badge>
         ) : view ? (
           <Badge tone="warning">No Kite snapshot yet</Badge>
         ) : null}
@@ -73,20 +92,26 @@ export function LotsPanel() {
           </div>
         )
       ) : (
-        <LotsBody view={view} />
+        <LotsBody view={view} shownWeek={shownWeek} />
       )}
     </Card>
   );
 }
 
-function LotsBody({ view }: { view: LotsView }) {
+function LotsBody({ view, shownWeek }: { view: LotsView; shownWeek: string | null }) {
   const beyond = beyondValue(view);
+  const friday = formatDayShort(view.week, { weekday: true });
   return (
     <>
+      {shownWeek && shownWeek !== view.week ? (
+        <p className="px-4 pt-1 text-xs text-warning">
+          The lots are as they stand now, for {friday}, not the week of{' '}
+          {formatDayShort(shownWeek, { weekday: true })} shown above.
+        </p>
+      ) : null}
       <p className="px-4 pt-1 text-xs text-muted">
-        One lot per sleeve; only the lot due on a Friday trades. Values at the close of{' '}
-        {formatDay(view.close_day, { weekday: true })}. Free cash on Kite{' '}
-        {formatInr(view.snapshot?.cash)}
+        One lot per sleeve; only the lot due on a Friday trades. Values at{' '}
+        {closeDaysText(view.close_days)}. Free cash on Kite {formatInr(view.snapshot?.cash)}
         {view.holdings_source !== 'kite'
           ? '. Your orders read another holdings source, so they are not planned lot by lot.'
           : '.'}
@@ -94,7 +119,7 @@ function LotsBody({ view }: { view: LotsView }) {
       <Table className="mt-2">
         <THead>
           <Th>Lot</Th>
-          <Th>This Friday</Th>
+          <Th>{friday}</Th>
           <Th>Holds</Th>
           <Th align="right">Value</Th>
           <Th>Last rebalance</Th>
@@ -111,6 +136,11 @@ function LotsBody({ view }: { view: LotsView }) {
             </Td>
             <Td align="right" numeric className="font-semibold">
               {formatInr(view.total_value)}
+              {view.unpriced ? (
+                <span className="ml-1 text-xs font-normal text-warning">
+                  +{formatInt(view.unpriced)} unpriced
+                </span>
+              ) : null}
             </Td>
             <Td colSpan={3} className="text-xs text-faint">
               {view.last_orders
@@ -131,7 +161,8 @@ function LotsBody({ view }: { view: LotsView }) {
             Friday orders run books them to the lots its last orders named, the rest to the lot
             those orders were for{view.pending ? ` (${view.pending})` : ''} when it may hold the
             name; anything it cannot place stays here until you run{' '}
-            <span className="font-mono">mbt lots assign SYMBOL --lot N</span>.
+            <span className="font-mono">mbt lots assign SYMBOL --lot N</span>. A row at 0 is a trade
+            the last Friday orders named that Kite does not show yet.
           </p>
           <Table className="mt-2">
             <THead>
@@ -147,7 +178,9 @@ function LotsBody({ view }: { view: LotsView }) {
                   <TRow key={row.symbol}>
                     <Td className="font-semibold text-foreground">{row.symbol}</Td>
                     <Td align="right" numeric>
-                      {`${row.delta > 0 ? '+' : '−'}${formatInt(Math.abs(row.delta))}`}
+                      {row.delta === 0
+                        ? '0'
+                        : `${row.delta > 0 ? '+' : '−'}${formatInt(Math.abs(row.delta))}`}
                     </Td>
                     <Td align="right" numeric>
                       {formatInr(row.value)}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useAppRoute } from '../../../hooks/useAppRoute';
 import type { MomentumWeeklyJobState } from '../../../hooks/useMomentumWeeklyJob';
@@ -77,6 +77,9 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
   const favourites = usePolledResource<MomentumSavedRun[]>('/api/momentum/favorite-strategies', {
     cache: true,
   });
+  // Bumped when Your orders changed, so the Lots panel reads the ledger again.
+  const [ordersVersion, setOrdersVersion] = useState(0);
+  const onOrdersChanged = useCallback(() => setOrdersVersion((n) => n + 1), []);
   // The Scores payload (~300 KB) only when a card holds scored stocks; see ScoresFetcher.
   const [scoresData, setScoresData] = useState<MomentumScores | null>(null);
 
@@ -236,8 +239,8 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
       {card && card.dataset !== 'etf' && !scoresData ? (
         <ScoresFetcher onData={setScoresData} />
       ) : null}
-      <LotsPanel />
-      <YourOrders favourites={cards} />
+      <LotsPanel shownWeek={shown} ordersVersion={ordersVersion} />
+      <YourOrders favourites={cards} onChanged={onOrdersChanged} />
 
       <RunByHandDrawer open={panel === 'run'} onClose={() => setPanel(null)} weekly={weekly} />
       <ClassifySplitDrawer

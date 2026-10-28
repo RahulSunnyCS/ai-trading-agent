@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import type { MomentumLot } from '../../types/momentum';
-import { holdsText, lastOrdersText, lotState, plannedGap, plannedText } from '../momentumLots';
+import {
+  closeDaysText,
+  holdsText,
+  lastOrdersText,
+  lotState,
+  plannedGap,
+  plannedText,
+} from '../momentumLots';
 
 function lot(over: Partial<MomentumLot> = {}): MomentumLot {
   return {
@@ -71,5 +78,13 @@ describe('planned', () => {
     expect(plannedGap(2, [{ lot: 'Lot 2', shares: 1 }])).toBe('1 more than the orders said');
     expect(plannedGap(1, [{ lot: 'Lot 2', shares: 3 }])).toBe('2 fewer than the orders said');
     expect(plannedGap(5, [])).toBeNull();
+    expect(plannedGap(0, [{ lot: 'Lot 2', shares: 30 }])).toBe('not traded in Kite yet');
+  });
+  it('says which close the values are at', () => {
+    expect(closeDaysText(['2026-10-23', '2026-10-23'])).toBe('the close of Fri 23 Oct');
+    expect(closeDaysText(['2026-10-16', '2026-10-23'])).toBe(
+      "each name's last close (Fri 16 Oct to Fri 23 Oct)",
+    );
+    expect(closeDaysText(null)).toBe('no stored close');
   });
 });
