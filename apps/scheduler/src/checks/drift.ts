@@ -157,14 +157,18 @@ const COL_OPTION = 16;
 /** Upcoming rule expiries a WEEKLY underlying must have listed (MONTHLY_LAST: one). */
 const WEEKLY_EXPECTED = 3;
 
-/** Underlying -> expiry day (IST) -> listed strikes, options only. */
-export function masterOptions(csv: string): Map<string, Map<string, number[]>> {
+/** Underlying -> expiry day (IST) -> listed strikes, options only; `only` keeps those names. */
+export function masterOptions(
+  csv: string,
+  only?: ReadonlySet<string>,
+): Map<string, Map<string, number[]>> {
   const out = new Map<string, Map<string, number[]>>();
   for (const line of lines(csv)) {
     const cells = line.split(',');
     const type = cells[COL_OPTION]?.trim();
     if (type !== 'CE' && type !== 'PE') continue;
     const underlying = cells[COL_UNDERLYING]?.trim();
+    if (only && !only.has(underlying ?? '')) continue;
     const epoch = Number(cells[COL_EXPIRY]);
     const strike = Number(cells[COL_STRIKE]);
     if (!underlying || !(epoch > 0) || !Number.isFinite(strike)) continue;
@@ -262,19 +266,38 @@ function ruleDateFor(day: string, rule: ExpiryRule): string {
 
 /** The rule's next expiries after `today`, holiday-shifted, within years the holiday list covers. */
 export function expectedExpiries(
-  rule: ExpiryRule,
+  ruleOn: (day: string) => ExpiryRule | undefined,
   today: string,
   holidays: Set<string>,
   covered: (day: string) => boolean,
 ): string[] {
-  const want = rule.cadence === 'MONTHLY_LAST' ? 1 : WEEKLY_EXPECTED;
+  const first = ruleOn(addDays(today, 1));
+  if (!first) return [];
+  const want = first.cadence === 'MONTHLY_LAST' ? 1 : WEEKLY_EXPECTED;
   const out: string[] = [];
   let probe = addDays(today, 1);
   for (let guard = 0; out.length < want && guard < 12; guard++) {
-    const ruleDay = ruleDateFor(probe, rule);
+    // The rule in force on the expiry itself: a row that takes effect between `probe` and the
+    // rule date it gives (a circular recorded ahead of time) decides that week.
+    const probeRule = ruleOn(probe);
+    if (!probeRule) break;
+    let rule = probeRule;
+    let ruleDay = ruleDateFor(probe, rule);
+    const onDay = ruleOn(ruleDay);
+    if (onDay && onDay !== rule) {
+      const alt = ruleDateFor(probe, onDay);
+      if (ruleOn(alt) !== onDay) {
+        // The new rule's first date in this stretch falls before it takes effect: start
+        // again from its effective date.
+        probe = onDay.effective;
+        continue;
+      }
+      rule = onDay;
+      ruleDay = alt;
+    }
     if (!covered(ruleDay)) break;
     const due = shiftedBack(ruleDay, holidays);
-    if (due > today) out.push(due);
+    if (due > today && !out.includes(due)) out.push(due);
     probe = rule.cadence === 'MONTHLY_LAST' ? nextMonthStart(probe) : addDays(ruleDay, 1);
   }
   return out;
@@ -291,7 +314,8 @@ export function modalStep(strikes: number[]): number | null {
   let best: number | null = null;
   let bestCount = 0;
   for (const [gap, n] of counts) {
-    if (n > bestCount) {
+    // On a tie the finer gap wins: wider gaps are the far strikes listed sparsely.
+    if (n > bestCount || (n === bestCount && best !== null && gap < best)) {
       best = gap;
       bestCount = n;
     }
@@ -304,10 +328,14 @@ export async function checkExpiryCalendar(
   today: string,
   readers: CalendarReaders,
 ): Promise<CheckResult> {
+  const rules = parseExpiryRules(readers.readFile(`${REFERENCE_DIR}/expiry_calendar.csv`));
+  const steps = parseSteps(readers.readFile(`${REFERENCE_DIR}/strike_step.csv`));
+  // Only the indexes the CSVs name: the masters also list ~180 stock-option underlyings.
+  const wanted = new Set([...rules, ...steps].map((r) => r.underlying));
   let listed: Map<string, Map<string, number[]>>;
   try {
     const [nse, bse] = await Promise.all([fetcher(FYERS_NSE_FO_URL), fetcher(FYERS_BSE_FO_URL)]);
-    listed = masterOptions(`${nse}\n${bse}`);
+    listed = masterOptions(`${nse}\n${bse}`, wanted);
   } catch (error) {
     return { ok: false, detail: `could not reach the Fyers symbol master: ${String(error)}` };
   }
@@ -320,7 +348,6 @@ export async function checkExpiryCalendar(
   const years = new Set(holidayDays.map((d) => d.slice(0, 4)));
   const covered = (day: string) => years.has(day.slice(0, 4));
 
-  const rules = parseExpiryRules(readers.readFile(`${REFERENCE_DIR}/expiry_calendar.csv`));
   const problems: string[] = [];
   const rulesFine: string[] = [];
   for (const underlying of [...new Set(rules.map((r) => r.underlying))].sort()) {
@@ -337,7 +364,8 @@ export async function checkExpiryCalendar(
       return shiftedBack(ruleDateFor(e, r), holidays) !== e;
     });
     const listedSet = new Set(expiries);
-    const missing = expectedExpiries(rule, today, holidays, covered).filter(
+    const ruleOn = (day: string) => inForce(rules, underlying, day);
+    const missing = expectedExpiries(ruleOn, today, holidays, covered).filter(
       (d) => !listedSet.has(d),
     );
     if (off.length > 0) {
@@ -354,7 +382,6 @@ export async function checkExpiryCalendar(
     if (off.length === 0 && missing.length === 0) rulesFine.push(underlying);
   }
 
-  const steps = parseSteps(readers.readFile(`${REFERENCE_DIR}/strike_step.csv`));
   const stepsFine: string[] = [];
   for (const underlying of [...new Set(steps.map((s) => s.underlying))].sort()) {
     const mine = inForce(steps, underlying, today);

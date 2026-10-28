@@ -19,7 +19,7 @@ membership, holidays/RBI/margin upkeep, stock-data baseline age and review queue
 the yearly credential reminder, and from 2026-10-28 the expiry calendar and strike steps (Y4),
 `BLOCKED_DATES` (Y3) and the Total Market universe refresh (S3)), the Saturday health digest, the
 dashboard Jobs page and the Telegram-alerts card in Settings, and `docs/mac-mini.md`. Later items
-added their own jobs (BL-137–143, BL-168, BL-172): 44 jobs in the registry; 231 scheduler tests.
+added their own jobs (BL-137–143, BL-168, BL-172): 44 jobs in the registry; 235 scheduler tests.
 
 **Installed:** `com.ai-trading-agent.scheduler` runs under launchd (`KeepAlive`), from the main
 checkout. Postgres :5433 (Homebrew) runs and holds only `broker_tokens`; no scheduler job needs it.
@@ -320,8 +320,9 @@ PR 5 the single launchd cut-over · then one PR per later job, check group and d
   symbol masters must follow `expiry_calendar.csv`'s rule, holiday shifts included, the rule's next
   three weeklies or next monthly must be listed, and the nearest expiry's strike gap must equal
   `strike_step.csv`; years without holiday rows are not judged), `check-blocked-dates` (Y3,
-  trading days 08:35: `.env`'s list must parse, name no closed day from today, and from 1 Dec hold
-  next year's days; unset passes) and `universe-refresh-reminder` (S3, trading days 08:40:
+  trading days 08:35: `.env`'s list must parse as real days, must not be all past, and from 1 Dec
+  must hold next year's days; listed closed days are noted, not failed, since a weekend Budget
+  session is legitimate; unset passes) and `universe-refresh-reminder` (S3, trading days 08:40:
   `total_market_membership.csv` and `category_membership.csv` rewritten since the last 1 Apr / 1 Oct
   and holding this year's rows). On today's data S3 is due (files from 28–29 Sep, before the Sep
   review) and Y3/Y4 pass. D5 and D6 dropped, D4 done by BL-168, Phase 5's container not needed (see

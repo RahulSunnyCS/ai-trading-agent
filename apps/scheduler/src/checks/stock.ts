@@ -127,6 +127,9 @@ export function reviewQueueCheck(read: DeadlinesReader = readDeadlines): Builtin
  * September. From 1 Apr and 1 Oct the file must have been rewritten since, and from 1 Jan it
  * must hold the new year's rows. The files carry no fetch date, so "refreshed" is the file's
  * modification day (IST); a copy that resets it can only hide a due refresh, never invent one.
+ * Momentum reads the catalog copy first (`category_membership`, filled from these CSVs by
+ * `mbt local migrate`); this check sees only the CSVs, so the fix hint runs the import in the
+ * same command line rather than leaving it as a separate step to forget.
  */
 export const UNIVERSE_FILES = [
   { file: 'total_market_membership.csv', label: 'Total Market universe' },

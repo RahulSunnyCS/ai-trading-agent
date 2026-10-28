@@ -122,8 +122,8 @@ export function firstTradingDayOfMonth(day: string): boolean {
  * BL-012 inventory Y3: `BLOCKED_DATES` in the repo `.env`, a JSON array of days the frozen
  * personality engine refuses to enter on (`apps/server/src/signals/personality-filter.ts`).
  * It is edited by hand once a year. The check cannot say which days belong in it; it says when
- * the list is broken (the engine then silently ignores all of it), names days that cannot be
- * meant (a weekend or an NSE holiday from today on), and from 1 Dec asks for next year's.
+ * the list is broken (the engine then silently ignores all of it) or holds an impossible day,
+ * notes listed days the calendar has closed, and from 1 Dec asks for next year's.
  * Unset or empty passes: the engine then blocks nothing, which is a choice, not drift.
  */
 export function checkBlockedDates(
@@ -149,11 +149,17 @@ export function checkBlockedDates(
       detail: 'BLOCKED_DATES is not a JSON array, so the engine ignores the whole list',
     };
   }
-  const bad = parsed.filter((v) => typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v));
+  // A real calendar day only: '2027-02-30' has the right shape but never matches a day.
+  const realDay = (v: unknown): boolean =>
+    typeof v === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(v) &&
+    !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) &&
+    new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
+  const bad = parsed.filter((v) => !realDay(v));
   if (bad.length > 0) {
     return {
       ok: false,
-      detail: `BLOCKED_DATES has ${bad.length} entr${bad.length === 1 ? 'y' : 'ies'} that are not 'YYYY-MM-DD' (${bad
+      detail: `BLOCKED_DATES has ${bad.length} entr${bad.length === 1 ? 'y' : 'ies'} that are not real 'YYYY-MM-DD' days (${bad
         .slice(0, 3)
         .map((v) => JSON.stringify(v))
         .join(', ')}), which never match a day`,
@@ -164,26 +170,26 @@ export function checkBlockedDates(
   if (last === undefined) {
     return { ok: true, detail: 'BLOCKED_DATES is empty (the engine blocks no date)' };
   }
-  const problems: string[] = [];
+  // A day the calendar says is closed is only noted: a weekend Budget special session is a
+  // real reason to block a weekend day, and the check cannot tell one from a stale date.
   const closed = dates.filter((d) => d >= today && !isTradingDay(d));
-  if (closed.length > 0) {
-    problems.push(`BLOCKED_DATES lists days the market is closed: ${closed.join(', ')}`);
-  }
+  const note =
+    closed.length > 0 ? `; listed days the calendar has closed: ${closed.join(', ')}` : '';
   const next = Number(today.slice(0, 4)) + 1;
   if (last < today) {
-    problems.push(`every BLOCKED_DATES day is in the past (last ${last})`);
-  } else if (today.slice(5, 7) === '12' && !dates.some((d) => d.startsWith(`${next}-`))) {
-    problems.push(`BLOCKED_DATES has no ${next} days (last ${last})`);
+    return { ok: false, detail: `every BLOCKED_DATES day is in the past (last ${last})${note}` };
   }
-  if (problems.length > 0) return { ok: false, detail: problems.join('; ') };
+  if (today.slice(5, 7) === '12' && !dates.some((d) => d.startsWith(`${next}-`))) {
+    return { ok: false, detail: `BLOCKED_DATES has no ${next} days (last ${last})${note}` };
+  }
   return {
     ok: true,
-    detail: `BLOCKED_DATES: ${dates.filter((d) => d >= today).length} day(s) ahead, last ${last}`,
+    detail: `BLOCKED_DATES: ${dates.filter((d) => d >= today).length} day(s) ahead, last ${last}${note}`,
   };
 }
 
 const BLOCKED_DATES_FIX =
-  'Edit BLOCKED_DATES in the repo-root .env: a one-line JSON array of the days the frozen engine must not trade, e.g. ["2027-01-26"], from the NSE holiday and expiry calendars and the RBI MPC dates; or delete the line while the frozen engine stays off. The scheduler reads .env at start, so restart it afterwards';
+  'Edit BLOCKED_DATES in the repo-root .env: a one-line JSON array of the days the frozen engine must not trade, e.g. ["2027-02-01","2027-02-05"], from the NSE holiday and expiry calendars and the RBI MPC dates; or delete the line while the frozen engine stays off. The scheduler reads .env at start, so restart it afterwards';
 
 const HOLIDAY_FIX =
   "Add the dates from NSE's holiday circular: cd packages/trading-data && uv run tdata reference sql \"INSERT INTO ref_holidays VALUES (DATE 'YYYY-MM-DD', 'Name')\" (one per holiday). For RBI dates add a new apps/server/src/db/migrations/NNN_*.sql inserting into event_calendar (event_type RBI_POLICY), then bun run migrate";

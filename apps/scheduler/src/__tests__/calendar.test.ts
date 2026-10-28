@@ -125,12 +125,19 @@ describe('checkBlockedDates (Y3)', () => {
     expect(r.ok).toBe(false);
     expect(r.detail).toContain('"29/10/2026"');
   });
-  it('names upcoming days the market is closed, not past ones', () => {
+  it('fails on impossible days of the right shape', () => {
+    for (const day of ['2027-13-45', '2027-02-30', '2027-00-10']) {
+      const r = checkBlockedDates('2026-10-28', list('2026-11-26', day));
+      expect(r.ok).toBe(false);
+      expect(r.detail).toContain(day);
+    }
+  });
+  it('notes upcoming closed days without failing (a weekend Budget session is legitimate)', () => {
     const r = checkBlockedDates(
       '2026-10-28',
       list('2026-10-02', '2026-11-10', '2026-11-14', '2026-11-26'),
     );
-    expect(r.ok).toBe(false);
+    expect(r.ok).toBe(true);
     expect(r.detail).toContain('closed: 2026-11-10, 2026-11-14');
     expect(r.detail).not.toContain('2026-10-02');
   });

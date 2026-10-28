@@ -236,15 +236,53 @@ describe('expiry calendar check (Y4)', () => {
     const covered = () => true;
     const holidays = new Set(['2026-11-10']);
     const weekly = { underlying: 'NIFTY', cadence: 'WEEKLY', weekday: 1, effective: '2018-01-01' };
-    expect(expectedExpiries(weekly, today, holidays, covered)).toEqual([
+    expect(expectedExpiries(() => weekly, today, holidays, covered)).toEqual([
       '2026-11-03',
       '2026-11-09',
       '2026-11-17',
     ]);
     const monthly = { ...weekly, cadence: 'MONTHLY_LAST' };
     // October's last Tuesday (27th) is past, so November's.
-    expect(expectedExpiries(monthly, today, holidays, covered)).toEqual(['2026-11-24']);
-    expect(expectedExpiries(monthly, '2026-10-26', holidays, covered)).toEqual(['2026-10-27']);
+    expect(expectedExpiries(() => monthly, today, holidays, covered)).toEqual(['2026-11-24']);
+    expect(expectedExpiries(() => monthly, '2026-10-26', holidays, covered)).toEqual([
+      '2026-10-27',
+    ]);
+  });
+
+  it('expects the new weekday from a rule row recorded ahead of its effective date', () => {
+    const covered = () => true;
+    const tue = { underlying: 'NIFTY', cadence: 'WEEKLY', weekday: 1, effective: '2018-01-01' };
+    const ruleFrom = (effective: string) => {
+      const thu = { ...tue, weekday: 3, effective };
+      return (day: string) => (day >= effective ? thu : tue);
+    };
+    expect(expectedExpiries(ruleFrom('2026-11-04'), today, new Set(), covered)).toEqual([
+      '2026-11-03',
+      '2026-11-05',
+      '2026-11-12',
+    ]);
+    // Effective on a Sunday: Tue 3 and 10 Nov, then Thu 19 Nov.
+    expect(expectedExpiries(ruleFrom('2026-11-15'), today, new Set(), covered)).toEqual([
+      '2026-11-03',
+      '2026-11-10',
+      '2026-11-19',
+    ]);
+  });
+
+  it('passes a correct listing when a weekday change is recorded ahead', async () => {
+    const listing = ['2026-11-03', '2026-11-05', '2026-11-12', '2026-11-19']
+      .map((d) => chain('NIFTY', d, 50))
+      .join('\n');
+    const r = await checkExpiryCalendar(
+      masters(listing),
+      today,
+      readers('NIFTY,WEEKLY,1,2018-01-01\nNIFTY,WEEKLY,3,2026-11-04\n'),
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it('breaks a strike-gap tie towards the finer gap', () => {
+    expect(modalStep([0, 100, 150, 250, 300])).toBe(50);
   });
 
   it('passes on the real reference CSVs', async () => {
