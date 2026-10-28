@@ -581,7 +581,7 @@ contract, not a shared service).
   detector freeze from the owner's gallery labels) is committed. `quality.py` grades each base
   0-1 from its own geometry (addendum 1); the blend shapes use state score x quality. `tests/test_patterns.py` pins the
   no-look-ahead property (detections up to a cut are identical with and without later bars).
-- `audit/` — `mbt audit bundle|replay|study|outside` (BL-010 Phase 2). `bundle.py` writes a
+- `audit/` — `mbt audit bundle|replay|study|outside|lookahead|lookahead-requests` (BL-010 Phase 2). `request_lookahead.py` is the whole-request cut-off test (saved favourites through the real API; uses `truncate.py`; compares kpis, series, trades, rotations, yearly, open positions and the companion at 1e-9, ignoring price levels). `verify.py` (`mbt verify history`, BL-001 Phase 4) is the restated-history detector: per-instrument-per-year row counts and hashes up to an anchor Friday, baseline in the state dir, nothing accepted without `--accept --reason`. `bundle.py` writes a
   run's orders and the backtest's claims; `replay.py` rebuilds the result from the orders and
   the lake's raw bars and compares. `replay.py`, `studies.py` and `outside.py` must never import
   from the rest of the package (a test enforces it): shared code would hide a shared mistake.
