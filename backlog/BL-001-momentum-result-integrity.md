@@ -458,8 +458,10 @@ favourite with the end pinned to its last accepted anchor and names the instrume
   does not re-run any strategy (so it says what changed, not whether a result moved).
 - 2026-10-25 — owner: "fix F6" (rank over the week's point-in-time members and gate only, forward-fill only the stale tail, re-accept the goldens, re-measure). Done on `fix/momentum-f6-point-in-time-ranking`: `engine.compute_ranks(cross_section=)`, `broad.cross_section_mask`, tilt ranking and live preview use it; Broad frame fills only the tail. Cut-off check 24 of 24 identical (it first found the stock tilt still ranking the whole frame). Eight Broad goldens accepted (-3.44 to +0.35 points). Live re-measure of every favourite in the doc: the followed strategy loses 7.9 points of headline CAGR and 6 of drawdown depth, its lot 1 trades differently this Friday. F8 (cost-sized cap overshoot) logged. Not merged: the owner decides when, because the next Friday's orders change.
 - 2026-10-28 — F6 merged (owner): PRs #318, #319, #322, merge commit `778ba02e`. On the merge's
-  live re-measure the followed strategy's backtest (Four Sectors Monthly, No Tilt · all Fridays) went
-  from 43.2% to 35.3% CAGR, and the blend's worst fall from -27.0% to -34.8%, in April 2020. The search
+  live re-measure the followed strategy's backtest (Four Sectors Monthly, No Tilt · all Fridays: the
+  four sleeves blended at equal capital, reset each April, as the group shows it) went from 43.2% to
+  35.3% CAGR, and the blend's worst fall from -27.0% to -34.8%, in April 2020. (The F6 row's 42.93% to
+  35.03% and -30.8 to -36.9 are the means of the four sleeves' own figures, a different measure.) The search
   re-run on the fixed ranking is BL-176; the live-rules drawdown thresholds are BL-025's to revisit.
 - 2026-10-28 — owner: Phase 4 = the history check only. `mbt verify history` now exits 0 on a change
   once its Telegram is delivered (the message is the alert) and is scheduled as `momentum-history`, Fri 22:00 IST; the first baseline
