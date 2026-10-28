@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner trades both books with real money (3 lots each, ₹8.5 lakh per account) |
-| **Status** | Done — informative: the Dir is the best home for the fourth lot in both books (Core and, by Amendment 1, T1), but the edge over an even spread rests on a few days; no Widesl placement beats it. Amendment 2 (book stop, expiry rule): "always the Dir" is the best pick to double, at least as good as "the top score" (clearly better only in Core's last year) and better than "the top Widesl" |
+| **Status** | Done — informative: the Dir is the best home for the fourth lot in both books (Core and, by Amendment 1, T1), but the edge over an even spread rests on a few days; no Widesl placement beats it. Amendment 2 (book stop, expiry rule): "always the Dir" is the best pick to double, at least as good as "the top score" (clearly better only in Core's last year) and better than "the top Widesl". Amendment 3: on expiry days 3 lots of the expiring index beat 4 lots of the other index |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -308,3 +308,39 @@ lots spread evenly; nothing live changes.
     from its first to its last move, so re-entry strategies overstate it. The MTM SL is now read from the file the
     replay runs (`portfolio.strategy_file`), raising if unreadable; results unchanged.
 - 2026-10-28 — Amendment 3 registered before any run: on a one-index expiry day, 3 lots of the expiring index vs 4 of the other.
+- 2026-10-28 — **Amendment 3 run as registered** (`research/bl133/fourth_lot_a3.py`; `fourth_lot_a3_2026-10-28.json`).
+  Every expiry day in the window is a one-index day (181; none left out); E3 reproduces Amendment 2's B3 on them
+  exactly. Net per expiry day after brokerage, book stop. "NIFTY-expiry days" = O3 / O4 trade SENSEX, and vice versa.
+
+  | Book, window | Arm | Net / expiry day | vs E3 (90 %) | Max DD | Worst day | Losing days | R/DD | NIFTY-expiry days | SENSEX-expiry days |
+  |---|---|---|---|---|---|---|---|---|---|
+  | Core, 21 months | **E3 (3 expiring)** | **+2,068** | | −21,702 | −9,323 | 34 % | **23.8** | +1,757 | +2,382 |
+  | | O3 (3 other) | +554 | −1,513 [−2,262, −712] | −42,320 | −9,981 | 41 % | 3.3 | +574 | +534 |
+  | | O4 (4 other, Dir ×2) | +894 | −1,174 [−2,051, −277] | −59,928 | −12,971 | 40 % | 3.7 | +881 | +906 |
+  | | U3 (unrestricted) | +1,725 | −342 [−606, −75] | −29,033 | −9,323 | 38 % | 14.9 | +1,449 | +2,005 |
+  | Core, last year | **E3** | **+2,470** | | −19,537 | −9,221 | 29 % | **31.6** | +2,579 | +2,360 |
+  | | O3 | +931 | −1,539 [−2,531, −573] | −18,322 | −9,317 | 38 % | 12.7 | +1,553 | +309 |
+  | | O4 | +1,362 | −1,108 [−2,160, −131] | −27,524 | −12,367 | 38 % | 12.4 | +2,215 | +510 |
+  | | U3 | +2,167 | −303 [−569, −47] | −20,414 | −9,221 | 32 % | 26.5 | +2,329 | +2,005 |
+  | T1, 21 months | **E3** | **+2,928** | | −25,721 | −10,249 | 30 % | **28.5** | +2,768 | +3,089 |
+  | | O3 | +1,017 | −1,910 [−2,722, −1,099] | −23,275 | −10,822 | 32 % | 10.9 | +1,171 | +863 |
+  | | O4 | +1,534 | −1,394 [−2,348, −463] | −37,789 | −14,310 | 36 % | 10.1 | +1,729 | +1,337 |
+  | | U3 | +2,546 | −382 [−613, −166] | −26,774 | −10,249 | 32 % | 23.8 | +2,641 | +2,449 |
+  | T1, last year | **E3** | **+3,015** | | −17,482 | −10,249 | 27 % | **43.1** | +3,750 | +2,280 |
+  | | O3 | +1,421 | −1,593 [−2,714, −561] | −22,607 | −10,117 | 28 % | 15.7 | +2,517 | +325 |
+  | | O4 | +2,192 | −823 [−2,113, +371] | −25,465 | −13,719 | 31 % | 21.5 | +3,653 | +731 |
+  | | U3 | +2,712 | −302 [−625, −44] | −17,041 | −10,249 | 30 % | 39.8 | +3,570 | +1,855 |
+
+  **Whole book** (the arm on expiry days + D×2 on non-expiry days), net / day, max DD, R/DD: Core 21 months E3 +1,317,
+  −41,321, 8.0; O4 +820, −63,175, 3.2; U3 +1,172, −47,476, 6.2. Core last year E3 +1,559, −34,713, 11.2; O4 +1,087,
+  −49,948, 5.4. T1 21 months E3 +2,000, −36,145, 13.8; O4 +1,410, −67,110, 5.3; U3 +1,838, −36,145, 12.7. T1 last
+  year E3 +2,288, −29,362, 19.5; O4 +1,937, −33,949, 14.3.
+
+  **Read under the rule (descriptive, in-sample).** 3 lots of the expiring index beat 4 lots of the other index in
+  both books and both windows (O4 − E3 below zero except T1's last year, −823 [−2,113, +371]), with a shallower
+  drawdown and worst day; the whole book loses ₹350–600 a day and its drawdown deepens by ₹5k–31k with O4. The only
+  close case is a NIFTY-expiry day traded as 4 SENSEX lots in the last year (Core +2,215 vs +2,579, T1 +3,653 vs
+  +3,750); a SENSEX-expiry day traded as 4 NIFTY lots earns a fraction of E3 (+510 / +731 vs +2,360 / +2,280). The
+  expiry-day edge is the expiring index's own (O3 earns a quarter to a half of E3). Side result: the expiring-index
+  rule (BL-122) beats the unrestricted picks in every cell (U3 − E3 −₹300 to −₹380, intervals below zero), the same
+  days BL-122 was chosen on, so not new evidence.

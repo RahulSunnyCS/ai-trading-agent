@@ -1,0 +1,767 @@
+{
+ "core_298": {
+  "two_years": {
+   "days": 181,
+   "both_expiry_days_left_out": 0,
+   "E3": {
+    "per_day": 2067.698618784531,
+    "annualised": 516924.65469613275,
+    "max_drawdown": -21701.5,
+    "worst_day": -9323.400000000001,
+    "worst_week": -20238.550000000003,
+    "longest_drawdown_days": 22,
+    "worst_5pct_mean": -8833.483333333332,
+    "loss_day_share": 0.3370165745856354,
+    "return_over_drawdown": 23.819766131195205,
+    "drawdown_per_lot": -7233.833333333333,
+    "book_stop_days": 12,
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 91,
+      "per_day": 1756.5873626373627,
+      "vs_E3": 0.0,
+      "loss_day_share": 0.38461538461538464
+     },
+     "SENSEX": {
+      "days": 90,
+      "per_day": 2382.2666666666664,
+      "vs_E3": 0.0,
+      "loss_day_share": 0.28888888888888886
+     }
+    }
+   },
+   "O3": {
+    "per_day": 554.2892265193373,
+    "annualised": 138572.30662983432,
+    "max_drawdown": -42320.000000000015,
+    "worst_day": -9981.2,
+    "worst_week": -18492.350000000006,
+    "longest_drawdown_days": 52,
+    "worst_5pct_mean": -8843.15,
+    "loss_day_share": 0.4088397790055249,
+    "return_over_drawdown": 3.274392878776802,
+    "drawdown_per_lot": -14106.666666666672,
+    "book_stop_days": 8,
+    "vs_E3": {
+     "mean": -1513.4093922651932,
+     "ci90": [
+      -2262.4944889502763,
+      -712.1011878453036
+     ],
+     "reading": "below zero"
+    },
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 91,
+      "per_day": 574.3494505494508,
+      "vs_E3": -1182.2379120879118,
+      "loss_day_share": 0.42857142857142855
+     },
+     "SENSEX": {
+      "days": 90,
+      "per_day": 534.0061111111112,
+      "vs_E3": -1848.2605555555551,
+      "loss_day_share": 0.3888888888888889
+     }
+    }
+   },
+   "O4": {
+    "per_day": 893.6825966850831,
+    "annualised": 223420.64917127078,
+    "max_drawdown": -59927.94999999998,
+    "worst_day": -12971.350000000002,
+    "worst_week": -32670.950000000015,
+    "longest_drawdown_days": 51,
+    "worst_5pct_mean": -11960.422222222222,
+    "loss_day_share": 0.40331491712707185,
+    "return_over_drawdown": 3.728154378237047,
+    "drawdown_per_lot": -14981.987499999996,
+    "book_stop_days": 8,
+    "vs_E3": {
+     "mean": -1174.0160220994476,
+     "ci90": [
+      -2051.310621546961,
+      -276.59493093922646
+     ],
+     "reading": "below zero"
+    },
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 91,
+      "per_day": 881.1934065934068,
+      "vs_E3": -875.393956043956,
+      "loss_day_share": 0.4175824175824176
+     },
+     "SENSEX": {
+      "days": 90,
+      "per_day": 906.3105555555555,
+      "vs_E3": -1475.9561111111109,
+      "loss_day_share": 0.3888888888888889
+     }
+    }
+   },
+   "U3": {
+    "per_day": 1725.2099447513813,
+    "annualised": 431302.4861878453,
+    "max_drawdown": -29033.19999999994,
+    "worst_day": -9323.400000000001,
+    "worst_week": -23451.449999999997,
+    "longest_drawdown_days": 45,
+    "worst_5pct_mean": -8702.055555555555,
+    "loss_day_share": 0.3812154696132597,
+    "return_over_drawdown": 14.855492546045431,
+    "drawdown_per_lot": -9677.733333333314,
+    "book_stop_days": 9,
+    "vs_E3": {
+     "mean": -342.48867403314915,
+     "ci90": [
+      -606.3177209944752,
+      -75.1237430939225
+     ],
+     "reading": "below zero"
+    },
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 91,
+      "per_day": 1448.530769230769,
+      "vs_E3": -308.0565934065935,
+      "loss_day_share": 0.43956043956043955
+     },
+     "SENSEX": {
+      "days": 90,
+      "per_day": 2004.9633333333334,
+      "vs_E3": -377.3033333333332,
+      "loss_day_share": 0.32222222222222224
+     }
+    }
+   },
+   "whole_book_with_Dx2_normal_days": {
+    "E3": {
+     "per_day": 1316.7142523364485,
+     "annualised": 329178.56308411213,
+     "max_drawdown": -41321.350000000006,
+     "worst_day": -12233.650000000001,
+     "worst_week": -28483.999999999996,
+     "longest_drawdown_days": 39,
+     "worst_5pct_mean": -10483.735714285714,
+     "loss_day_share": 0.37616822429906543,
+     "return_over_drawdown": 7.9663070805797025,
+     "drawdown_per_lot": -11551.624951012413,
+     "book_stop_days": 0
+    },
+    "O3": {
+     "per_day": 676.697663551402,
+     "annualised": 169174.4158878505,
+     "max_drawdown": -68499.6,
+     "worst_day": -12233.650000000001,
+     "worst_week": -33104.00000000001,
+     "longest_drawdown_days": 71,
+     "worst_5pct_mean": -10508.907142857142,
+     "loss_day_share": 0.40654205607476634,
+     "return_over_drawdown": 2.4697139236995618,
+     "drawdown_per_lot": -19149.46361854997,
+     "book_stop_days": 0
+    },
+    "O4": {
+     "per_day": 820.2261682242992,
+     "annualised": 205056.5420560748,
+     "max_drawdown": -63174.90000000001,
+     "worst_day": -12971.350000000002,
+     "worst_week": -41734.65000000001,
+     "longest_drawdown_days": 68,
+     "worst_5pct_mean": -11647.397619047619,
+     "loss_day_share": 0.40420560747663553,
+     "return_over_drawdown": 3.245854636193722,
+     "drawdown_per_lot": -15793.725000000002,
+     "book_stop_days": 0
+    },
+    "U3": {
+     "per_day": 1171.8767523364486,
+     "annualised": 292969.18808411213,
+     "max_drawdown": -47475.95,
+     "worst_day": -12233.650000000001,
+     "worst_week": -34638.6,
+     "longest_drawdown_days": 43,
+     "worst_5pct_mean": -10448.257142857141,
+     "loss_day_share": 0.39485981308411217,
+     "return_over_drawdown": 6.170896803204826,
+     "drawdown_per_lot": -13272.179359895492,
+     "book_stop_days": 0
+    }
+   }
+  },
+  "last_year": {
+   "days": 104,
+   "both_expiry_days_left_out": null,
+   "E3": {
+    "per_day": 2469.785576923077,
+    "annualised": 617446.3942307692,
+    "max_drawdown": -19536.649999999994,
+    "worst_day": -9220.85,
+    "worst_week": -12696.850000000002,
+    "longest_drawdown_days": 15,
+    "worst_5pct_mean": -8543.710000000001,
+    "loss_day_share": 0.28846153846153844,
+    "return_over_drawdown": 31.604517367653585,
+    "drawdown_per_lot": -6512.216666666664,
+    "book_stop_days": 4,
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 52,
+      "per_day": 2579.440384615385,
+      "vs_E3": 0.0,
+      "loss_day_share": 0.28846153846153844
+     },
+     "SENSEX": {
+      "days": 52,
+      "per_day": 2360.1307692307696,
+      "vs_E3": 0.0,
+      "loss_day_share": 0.28846153846153844
+     }
+    }
+   },
+   "O3": {
+    "per_day": 930.8879807692309,
+    "annualised": 232721.99519230772,
+    "max_drawdown": -18322.35,
+    "worst_day": -9317.2,
+    "worst_week": -18322.350000000002,
+    "longest_drawdown_days": 28,
+    "worst_5pct_mean": -8233.929999999998,
+    "loss_day_share": 0.375,
+    "return_over_drawdown": 12.701536385469534,
+    "drawdown_per_lot": -6107.45,
+    "book_stop_days": 3,
+    "vs_E3": {
+     "mean": -1538.8975961538463,
+     "ci90": [
+      -2530.620048076923,
+      -573.3103605769232
+     ],
+     "reading": "below zero"
+    },
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 52,
+      "per_day": 1552.865384615385,
+      "vs_E3": -1026.575,
+      "loss_day_share": 0.34615384615384615
+     },
+     "SENSEX": {
+      "days": 52,
+      "per_day": 308.9105769230772,
+      "vs_E3": -2051.2201923076927,
+      "loss_day_share": 0.40384615384615385
+     }
+    }
+   },
+   "O4": {
+    "per_day": 1362.1826923076924,
+    "annualised": 340545.6730769231,
+    "max_drawdown": -27523.699999999983,
+    "worst_day": -12367.2,
+    "worst_week": -22234.899999999998,
+    "longest_drawdown_days": 22,
+    "worst_5pct_mean": -11153.03,
+    "loss_day_share": 0.375,
+    "return_over_drawdown": 12.3728159032733,
+    "drawdown_per_lot": -6880.924999999996,
+    "book_stop_days": 3,
+    "vs_E3": {
+     "mean": -1107.6028846153845,
+     "ci90": [
+      -2160.141634615385,
+      -130.85098557692265
+     ],
+     "reading": "below zero"
+    },
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 52,
+      "per_day": 2214.6576923076927,
+      "vs_E3": -364.78269230769234,
+      "loss_day_share": 0.3269230769230769
+     },
+     "SENSEX": {
+      "days": 52,
+      "per_day": 509.7076923076924,
+      "vs_E3": -1850.423076923077,
+      "loss_day_share": 0.4230769230769231
+     }
+    }
+   },
+   "U3": {
+    "per_day": 2166.750961538462,
+    "annualised": 541687.7403846155,
+    "max_drawdown": -20413.89999999998,
+    "worst_day": -9220.85,
+    "worst_week": -11615.800000000001,
+    "longest_drawdown_days": 16,
+    "worst_5pct_mean": -8045.12,
+    "loss_day_share": 0.3173076923076923,
+    "return_over_drawdown": 26.53524022281955,
+    "drawdown_per_lot": -6804.633333333327,
+    "book_stop_days": 3,
+    "vs_E3": {
+     "mean": -303.03461538461545,
+     "ci90": [
+      -568.9650480769233,
+      -46.996177884615435
+     ],
+     "reading": "below zero"
+    },
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 52,
+      "per_day": 2328.6807692307693,
+      "vs_E3": -250.75961538461559,
+      "loss_day_share": 0.3269230769230769
+     },
+     "SENSEX": {
+      "days": 52,
+      "per_day": 2004.8211538461537,
+      "vs_E3": -355.3096153846153,
+      "loss_day_share": 0.3076923076923077
+     }
+    }
+   },
+   "whole_book_with_Dx2_normal_days": {
+    "E3": {
+     "per_day": 1558.9907786885246,
+     "annualised": 389747.69467213115,
+     "max_drawdown": -34712.600000000035,
+     "worst_day": -12115.900000000005,
+     "worst_week": -20749.250000000007,
+     "longest_drawdown_days": 39,
+     "worst_5pct_mean": -9615.108333333334,
+     "loss_day_share": 0.3483606557377049,
+     "return_over_drawdown": 11.227845066982328,
+     "drawdown_per_lot": -9713.15871559634,
+     "book_stop_days": 0
+    },
+    "O3": {
+     "per_day": 903.067213114754,
+     "annualised": 225766.80327868852,
+     "max_drawdown": -52409.200000000026,
+     "worst_day": -12115.900000000005,
+     "worst_week": -33053.65,
+     "longest_drawdown_days": 71,
+     "worst_5pct_mean": -9515.716666666665,
+     "loss_day_share": 0.38524590163934425,
+     "return_over_drawdown": 4.307770454017394,
+     "drawdown_per_lot": -14664.95963302753,
+     "book_stop_days": 0
+    },
+    "O4": {
+     "per_day": 1086.8977459016394,
+     "annualised": 271724.43647540984,
+     "max_drawdown": -49948.34999999998,
+     "worst_day": -12367.2,
+     "worst_week": -32631.000000000004,
+     "longest_drawdown_days": 68,
+     "worst_5pct_mean": -10844.424999999997,
+     "loss_day_share": 0.38524590163934425,
+     "return_over_drawdown": 5.4401083614455725,
+     "drawdown_per_lot": -12487.087499999994,
+     "book_stop_days": 0
+    },
+    "U3": {
+     "per_day": 1429.8284836065575,
+     "annualised": 357457.1209016394,
+     "max_drawdown": -37000.350000000035,
+     "worst_day": -12115.900000000005,
+     "worst_week": -28160.250000000007,
+     "longest_drawdown_days": 43,
+     "worst_5pct_mean": -9521.254166666668,
+     "loss_day_share": 0.36065573770491804,
+     "return_over_drawdown": 9.66091188060759,
+     "drawdown_per_lot": -10353.308944954138,
+     "book_stop_days": 0
+    }
+   }
+  }
+ },
+ "t1": {
+  "two_years": {
+   "days": 181,
+   "both_expiry_days_left_out": 0,
+   "E3": {
+    "per_day": 2927.682320441989,
+    "annualised": 731920.5801104972,
+    "max_drawdown": -25720.70000000001,
+    "worst_day": -10249.4,
+    "worst_week": -21205.35,
+    "longest_drawdown_days": 34,
+    "worst_5pct_mean": -9743.866666666665,
+    "loss_day_share": 0.2983425414364641,
+    "return_over_drawdown": 28.456479804612506,
+    "drawdown_per_lot": -8573.566666666671,
+    "book_stop_days": 8,
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 91,
+      "per_day": 2768.1681318681317,
+      "vs_E3": 0.0,
+      "loss_day_share": 0.34065934065934067
+     },
+     "SENSEX": {
+      "days": 90,
+      "per_day": 3088.968888888889,
+      "vs_E3": 0.0,
+      "loss_day_share": 0.25555555555555554
+     }
+    }
+   },
+   "O3": {
+    "per_day": 1017.4361878453043,
+    "annualised": 254359.04696132606,
+    "max_drawdown": -23275.34999999999,
+    "worst_day": -10821.650000000001,
+    "worst_week": -21175.4,
+    "longest_drawdown_days": 23,
+    "worst_5pct_mean": -9626.344444444445,
+    "loss_day_share": 0.32044198895027626,
+    "return_over_drawdown": 10.928258735586196,
+    "drawdown_per_lot": -7758.449999999997,
+    "book_stop_days": 8,
+    "vs_E3": {
+     "mean": -1910.2461325966847,
+     "ci90": [
+      -2721.5363535911597,
+      -1098.7740883977897
+     ],
+     "reading": "below zero"
+    },
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 91,
+      "per_day": 1170.571428571429,
+      "vs_E3": -1597.5967032967028,
+      "loss_day_share": 0.31868131868131866
+     },
+     "SENSEX": {
+      "days": 90,
+      "per_day": 862.5994444444448,
+      "vs_E3": -2226.369444444444,
+      "loss_day_share": 0.32222222222222224
+     }
+    }
+   },
+   "O4": {
+    "per_day": 1533.9524861878454,
+    "annualised": 383488.12154696137,
+    "max_drawdown": -37788.69999999999,
+    "worst_day": -14310.000000000005,
+    "worst_week": -33800.05,
+    "longest_drawdown_days": 23,
+    "worst_5pct_mean": -12803.150000000001,
+    "loss_day_share": 0.35911602209944754,
+    "return_over_drawdown": 10.148222128492419,
+    "drawdown_per_lot": -9447.174999999997,
+    "book_stop_days": 7,
+    "vs_E3": {
+     "mean": -1393.7298342541433,
+     "ci90": [
+      -2348.4878038674033,
+      -463.383453038674
+     ],
+     "reading": "below zero"
+    },
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 91,
+      "per_day": 1729.0879120879124,
+      "vs_E3": -1039.0802197802193,
+      "loss_day_share": 0.31868131868131866
+     },
+     "SENSEX": {
+      "days": 90,
+      "per_day": 1336.6488888888891,
+      "vs_E3": -1752.32,
+      "loss_day_share": 0.4
+     }
+    }
+   },
+   "U3": {
+    "per_day": 2545.7049723756904,
+    "annualised": 636426.2430939226,
+    "max_drawdown": -26774.300000000017,
+    "worst_day": -10249.4,
+    "worst_week": -22171.399999999998,
+    "longest_drawdown_days": 35,
+    "worst_5pct_mean": -9698.961111111108,
+    "loss_day_share": 0.32044198895027626,
+    "return_over_drawdown": 23.770042282857897,
+    "drawdown_per_lot": -8924.766666666672,
+    "book_stop_days": 8,
+    "vs_E3": {
+     "mean": -381.9773480662983,
+     "ci90": [
+      -612.8368784530386,
+      -166.05559392265184
+     ],
+     "reading": "below zero"
+    },
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 91,
+      "per_day": 2641.1587912087907,
+      "vs_E3": -127.00934065934067,
+      "loss_day_share": 0.3516483516483517
+     },
+     "SENSEX": {
+      "days": 90,
+      "per_day": 2449.190555555556,
+      "vs_E3": -639.7783333333332,
+      "loss_day_share": 0.28888888888888886
+     }
+    }
+   },
+   "whole_book_with_Dx2_normal_days": {
+    "E3": {
+     "per_day": 1999.8544392523363,
+     "annualised": 499963.60981308407,
+     "max_drawdown": -36144.79999999998,
+     "worst_day": -14312.049999999997,
+     "worst_week": -26617.99999999999,
+     "longest_drawdown_days": 27,
+     "worst_5pct_mean": -11173.999999999998,
+     "loss_day_share": 0.338785046728972,
+     "return_over_drawdown": 13.832241700412904,
+     "drawdown_per_lot": -10104.490137165247,
+     "book_stop_days": 0
+    },
+    "O3": {
+     "per_day": 1192.0167056074768,
+     "annualised": 298004.17640186916,
+     "max_drawdown": -55397.4,
+     "worst_day": -14312.049999999997,
+     "worst_week": -33777.4,
+     "longest_drawdown_days": 37,
+     "worst_5pct_mean": -11153.138095238093,
+     "loss_day_share": 0.34813084112149534,
+     "return_over_drawdown": 5.379389220466469,
+     "drawdown_per_lot": -15486.667015022862,
+     "book_stop_days": 0
+    },
+    "O4": {
+     "per_day": 1410.4500000000003,
+     "annualised": 352612.50000000006,
+     "max_drawdown": -67110.05,
+     "worst_day": -14312.049999999997,
+     "worst_week": -41173.05,
+     "longest_drawdown_days": 37,
+     "worst_5pct_mean": -12443.559523809523,
+     "loss_day_share": 0.3644859813084112,
+     "return_over_drawdown": 5.25424284440259,
+     "drawdown_per_lot": -16777.5125,
+     "book_stop_days": 0
+    },
+    "U3": {
+     "per_day": 1838.3172897196264,
+     "annualised": 459579.3224299066,
+     "max_drawdown": -36144.79999999998,
+     "worst_day": -14312.049999999997,
+     "worst_week": -26617.99999999999,
+     "longest_drawdown_days": 28,
+     "worst_5pct_mean": -11154.75476190476,
+     "loss_day_share": 0.34813084112149534,
+     "return_over_drawdown": 12.714949935534484,
+     "drawdown_per_lot": -10104.490137165247,
+     "book_stop_days": 0
+    }
+   }
+  },
+  "last_year": {
+   "days": 104,
+   "both_expiry_days_left_out": null,
+   "E3": {
+    "per_day": 3014.762019230769,
+    "annualised": 753690.5048076923,
+    "max_drawdown": -17481.6,
+    "worst_day": -10249.4,
+    "worst_week": -16953.850000000002,
+    "longest_drawdown_days": 10,
+    "worst_5pct_mean": -9317.069999999998,
+    "loss_day_share": 0.2692307692307692,
+    "return_over_drawdown": 43.113359464104676,
+    "drawdown_per_lot": -5827.2,
+    "book_stop_days": 4,
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 52,
+      "per_day": 3749.793269230769,
+      "vs_E3": 0.0,
+      "loss_day_share": 0.2692307692307692
+     },
+     "SENSEX": {
+      "days": 52,
+      "per_day": 2279.730769230769,
+      "vs_E3": 0.0,
+      "loss_day_share": 0.2692307692307692
+     }
+    }
+   },
+   "O3": {
+    "per_day": 1421.322596153846,
+    "annualised": 355330.6490384615,
+    "max_drawdown": -22606.59999999999,
+    "worst_day": -10117.399999999994,
+    "worst_week": -16023.799999999992,
+    "longest_drawdown_days": 10,
+    "worst_5pct_mean": -8955.89,
+    "loss_day_share": 0.27884615384615385,
+    "return_over_drawdown": 15.71800487638396,
+    "drawdown_per_lot": -7535.53333333333,
+    "book_stop_days": 3,
+    "vs_E3": {
+     "mean": -1593.4394230769233,
+     "ci90": [
+      -2714.399206730769,
+      -561.3225480769233
+     ],
+     "reading": "below zero"
+    },
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 52,
+      "per_day": 2517.307692307693,
+      "vs_E3": -1232.4855769230767,
+      "loss_day_share": 0.19230769230769232
+     },
+     "SENSEX": {
+      "days": 52,
+      "per_day": 325.3375000000002,
+      "vs_E3": -1954.3932692307694,
+      "loss_day_share": 0.36538461538461536
+     }
+    }
+   },
+   "O4": {
+    "per_day": 2192.1466346153848,
+    "annualised": 548036.6586538462,
+    "max_drawdown": -25464.94999999999,
+    "worst_day": -13718.850000000002,
+    "worst_week": -18580.299999999992,
+    "longest_drawdown_days": 9,
+    "worst_5pct_mean": -11944.23,
+    "loss_day_share": 0.3076923076923077,
+    "return_over_drawdown": 21.521214793425727,
+    "drawdown_per_lot": -6366.237499999997,
+    "book_stop_days": 2,
+    "vs_E3": {
+     "mean": -822.6153846153845,
+     "ci90": [
+      -2113.2725961538463,
+      371.3594471153848
+     ],
+     "reading": "includes zero"
+    },
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 52,
+      "per_day": 3653.261538461539,
+      "vs_E3": -96.53173076923045,
+      "loss_day_share": 0.19230769230769232
+     },
+     "SENSEX": {
+      "days": 52,
+      "per_day": 731.0317307692308,
+      "vs_E3": -1548.6990384615385,
+      "loss_day_share": 0.4230769230769231
+     }
+    }
+   },
+   "U3": {
+    "per_day": 2712.4326923076924,
+    "annualised": 678108.1730769231,
+    "max_drawdown": -17040.849999999977,
+    "worst_day": -10249.4,
+    "worst_week": -17040.85,
+    "longest_drawdown_days": 11,
+    "worst_5pct_mean": -9236.24,
+    "loss_day_share": 0.2980769230769231,
+    "return_over_drawdown": 39.79309559540305,
+    "drawdown_per_lot": -5680.283333333326,
+    "book_stop_days": 4,
+    "vs_E3": {
+     "mean": -302.3293269230769,
+     "ci90": [
+      -624.8205528846154,
+      -43.68841346153849
+     ],
+     "reading": "below zero"
+    },
+    "by_expiring_index": {
+     "NIFTY": {
+      "days": 52,
+      "per_day": 3569.829807692307,
+      "vs_E3": -179.96346153846167,
+      "loss_day_share": 0.28846153846153844
+     },
+     "SENSEX": {
+      "days": 52,
+      "per_day": 1855.0355769230773,
+      "vs_E3": -424.6951923076922,
+      "loss_day_share": 0.3076923076923077
+     }
+    }
+   },
+   "whole_book_with_Dx2_normal_days": {
+    "E3": {
+     "per_day": 2287.964549180328,
+     "annualised": 571991.137295082,
+     "max_drawdown": -29361.849999999977,
+     "worst_day": -14312.049999999997,
+     "worst_week": -21579.09999999999,
+     "longest_drawdown_days": 23,
+     "worst_5pct_mean": -10576.9,
+     "loss_day_share": 0.30327868852459017,
+     "return_over_drawdown": 19.48075946492072,
+     "drawdown_per_lot": -8215.93050458715,
+     "book_stop_days": 0
+    },
+    "O3": {
+     "per_day": 1608.7936475409838,
+     "annualised": 402198.41188524594,
+     "max_drawdown": -37849.45000000004,
+     "worst_day": -14312.049999999997,
+     "worst_week": -26818.649999999994,
+     "longest_drawdown_days": 32,
+     "worst_5pct_mean": -10324.6625,
+     "loss_day_share": 0.3073770491803279,
+     "return_over_drawdown": 10.626268331118299,
+     "drawdown_per_lot": -10590.901146789003,
+     "book_stop_days": 0
+    },
+    "O4": {
+     "per_day": 1937.3415983606556,
+     "annualised": 484335.3995901639,
+     "max_drawdown": -33949.20000000001,
+     "worst_day": -14312.049999999997,
+     "worst_week": -33066.149999999994,
+     "longest_drawdown_days": 27,
+     "worst_5pct_mean": -11487.320833333333,
+     "loss_day_share": 0.319672131147541,
+     "return_over_drawdown": 14.266474602940974,
+     "drawdown_per_lot": -8487.300000000003,
+     "book_stop_days": 0
+    },
+    "U3": {
+     "per_day": 2159.102868852459,
+     "annualised": 539775.7172131147,
+     "max_drawdown": -30629.90000000008,
+     "worst_day": -14312.049999999997,
+     "worst_week": -21579.09999999999,
+     "longest_drawdown_days": 23,
+     "worst_5pct_mean": -10543.220833333333,
+     "loss_day_share": 0.3155737704918033,
+     "return_over_drawdown": 17.62250994006227,
+     "drawdown_per_lot": -8570.751834862409,
+     "book_stop_days": 0
+    }
+   }
+  }
+ },
+ "note": "net after brokerage under the book stop; one-index expiry days only; whole book adds Amendment 2's Dx2 on non-expiry days"
+}
