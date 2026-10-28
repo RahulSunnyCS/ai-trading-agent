@@ -495,6 +495,11 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     },
   );
 
+  // BL-024 Phases 2-3: the forward score and the real Kite fills (read-only).
+  fastify.get('/api/momentum/journal/forward', async (_request, reply) => {
+    await forward(reply, '/api/journal/forward');
+  });
+
   // BL-051: This week — every favourite's signal for one week, from the journal.
   fastify.get(
     '/api/momentum/week',
@@ -534,6 +539,35 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
   fastify.post('/api/momentum/orders/run', async (_request, reply) => {
     await forward(reply, '/api/orders/run', { method: 'POST' });
   });
+  // "Preview for…": another favourite's orders against the same holdings, saved nowhere. A job,
+  // like the rebalance preview: a cold Broad ranking can outlast Cloudflare's ~100 s limit.
+  fastify.post(
+    '/api/momentum/orders/preview/jobs',
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
+    async (request, reply) => {
+      await forward(reply, '/api/orders/preview/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+  fastify.get(
+    '/api/momentum/orders/preview/jobs/:id',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', pattern: '^[0-9a-f]{1,32}$' } },
+          required: ['id'],
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      await forward(reply, `/api/orders/preview/jobs/${id}`);
+    },
+  );
   for (const [path, method] of [
     ['orders/settings', 'PUT'],
     ['holdings/paste', 'POST'],
@@ -555,6 +589,10 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
   }
   fastify.post('/api/momentum/holdings/sync', async (_request, reply) => {
     await forward(reply, '/api/holdings/sync', { method: 'POST' });
+  });
+  // BL-142 Phase 4: This week's Lots panel — the lot ledger, read-only (no Kite read, no booking).
+  fastify.get('/api/momentum/lots', async (_request, reply) => {
+    await forward(reply, '/api/lots');
   });
 
   // BL-142: the Kite connection (read-only). Login returns Kite's login URL as JSON; the login

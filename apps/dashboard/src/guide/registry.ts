@@ -21,7 +21,6 @@ import momentumBacktestResults from './content/momentum/backtest-results.md?raw'
 import momentumBacktestSettings from './content/momentum/backtest-settings.md?raw';
 import momentumHowItWorks from './content/momentum/how-it-works.md?raw';
 import momentumJournal from './content/momentum/journal.md?raw';
-import momentumRebalance from './content/momentum/rebalance.md?raw';
 import momentumSavedRuns from './content/momentum/saved-runs.md?raw';
 import momentumScores from './content/momentum/scores.md?raw';
 import momentumThisWeek from './content/momentum/this-week.md?raw';
@@ -33,6 +32,7 @@ import opsJobs from './content/operations/jobs.md?raw';
 import opsLive from './content/operations/live.md?raw';
 import opsOverview from './content/operations/overview.md?raw';
 import opsSettings from './content/operations/settings.md?raw';
+import opsTradeBook from './content/operations/trade-book.md?raw';
 import optionsBuilderForm from './content/optionslab/builder-form.md?raw';
 import optionsBuilderYaml from './content/optionslab/builder-yaml.md?raw';
 import optionsCorrelation from './content/optionslab/correlation.md?raw';
@@ -50,7 +50,6 @@ import optionsRotationPulse from './content/optionslab/rotation-pulse.md?raw';
 import optionsRotationRegime from './content/optionslab/rotation-regime.md?raw';
 import optionsRotationShadow from './content/optionslab/rotation-shadow.md?raw';
 import optionsRotation from './content/optionslab/rotation.md?raw';
-import optionsRuns from './content/optionslab/runs.md?raw';
 import optionsStrategies from './content/optionslab/strategies.md?raw';
 import optionsShortStraddle from './content/optionslab/walkthrough-short-straddle.md?raw';
 import startAlerts from './content/start/alerts.md?raw';
@@ -192,16 +191,6 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
   },
   {
     chapter: 'momentum',
-    slug: 'rebalance',
-    title: 'Rebalance preview',
-    summary:
-      'Compare what you actually hold with what the model holds, and see the trades to match.',
-    kind: 'Screen',
-    body: momentumRebalance,
-    screen: { tab: 'momentum', rest: ['rebalance'] },
-  },
-  {
-    chapter: 'momentum',
     slug: 'journal',
     title: 'Journal',
     summary: 'The permanent, tamper-checked record of every weekly signal as it was sent.',
@@ -277,18 +266,10 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
   },
   {
     chapter: 'optionslab',
-    slug: 'runs',
-    title: 'Runs',
-    summary: 'Every backtest run in one list, and a side-by-side comparison of two.',
-    kind: 'Screen',
-    body: optionsRuns,
-    screen: { tab: 'optionslab', rest: ['runs'] },
-  },
-  {
-    chapter: 'optionslab',
     slug: 'regimes',
-    title: 'Regimes',
-    summary: 'Label each day Quiet, Chop or Trend, and see whether those labels persist.',
+    title: 'Regimes (archived)',
+    summary:
+      'Archived: no longer in the sidebar. Label each day Quiet, Chop or Trend, and see whether those labels persist.',
     kind: 'Screen',
     body: optionsRegimes,
     screen: { tab: 'optionslab', rest: ['regimes'] },
@@ -422,7 +403,8 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     chapter: 'operations',
     slug: 'overview',
     title: 'Overview',
-    summary: 'The landing screen: one card per daily question, each linking to the detail.',
+    summary:
+      'The morning board: rotation, Momentum, the trade book, failed jobs, logins and data health, each linking to the detail.',
     kind: 'Screen',
     body: opsOverview,
     screen: { tab: 'overview' },
@@ -458,9 +440,20 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
   },
   {
     chapter: 'operations',
+    slug: 'trade-book',
+    title: 'Trade book',
+    summary:
+      "Your real P&L from the brokers' contract notes: the sheet's figures and ratios, trades by source, money in and out, and Momentum's fills.",
+    kind: 'Screen',
+    body: opsTradeBook,
+    screen: { tab: 'tradebook' },
+  },
+  {
+    chapter: 'operations',
     slug: 'coverage',
-    title: 'Data › Coverage',
-    summary: 'Backfill and Replay: historical candles for the paused live engine.',
+    title: 'Coverage',
+    summary:
+      'Backfill and Replay: historical candles for the paused live engine (Archived engine, hidden by default).',
     kind: 'Screen',
     body: opsCoverage,
     screen: { tab: 'coverage' },

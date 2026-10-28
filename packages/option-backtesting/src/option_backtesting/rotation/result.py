@@ -90,9 +90,13 @@ def calculate(day: date, root: Path | None = None, track: str | None = None) -> 
 # and a late T1 result can still be delivered on its own:
 #
 #   <day>-<hash16>.sent        the result message reached the owner
-#   <day>-<hash16>.group.sent  its Adaptive-only copy reached the friends' group
+#   <day>-<hash16>.group.sent  its copy reached the friends' group
 #   <day>-<hash16>.t1.sent     T1 is settled: its result went out (inside the main message or as
 #                              its own follow-up), or the day has no T1 entry and never will
+#   <day>-<hash16>.group-t1-owed.sent  the group's copy went without T1's result, so the group is
+#                              owed T1's follow-up (a group copy sent before 2026-10-28 had no T1
+#                              part and writes no such marker, so it is owed nothing)
+#   <day>-<hash16>.group-t1.sent       the group's T1 is settled, as `.t1.sent` is the owner's
 #
 # Each destination has its own marker, so a failure on the group never makes a retry send the
 # owner's chat the same message again.
@@ -101,7 +105,13 @@ def calculate(day: date, root: Path | None = None, track: str | None = None) -> 
 # no T1 part). Such a marker is recognised by its text and still covers every piece, so a day marked
 # under the old scheme is never sent again in part (no group copy, no T1 follow-up).
 
-MARKER_KINDS = {"": ".sent", "group": ".group.sent", "t1": ".t1.sent"}
+MARKER_KINDS = {
+    "": ".sent",
+    "group": ".group.sent",
+    "t1": ".t1.sent",
+    "group-t1-owed": ".group-t1-owed.sent",
+    "group-t1": ".group-t1.sent",
+}
 LEGACY_MARKER_TEXT = "sent to the configured Telegram destinations\n"
 
 
@@ -213,5 +223,5 @@ def render(
 def render_t1_followup(t1: DailyResult, tomorrow_t1=None) -> str:
     """T1's result as a message of its own, for when it was not ready for the main message."""
     return messages.render_result(
-        t1.day, None, _total_and_rows(t1), None, tomorrow_t1, heading="T1 result"
+        t1.day, None, _total_and_rows(t1), None, tomorrow_t1, heading="Tuned Adaptive result"
     )

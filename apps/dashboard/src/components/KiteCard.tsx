@@ -3,10 +3,11 @@
  * Momentum money; this repo only reads it (holdings and free cash for Your orders), never trades.
  *
  * Kite's token dies at 06:00 IST each day, so the owner logs in on a Friday before the 14:15
- * orders (a 13:30 Telegram reminder says so when it is missing). Log in opens Kite's own page;
- * Kite sends the browser back to the Momentum API on this laptop
- * (http://127.0.0.1:8765/api/kite/callback), which keeps today's token and, when Kite is the
- * holdings source, reads the holdings at once. So the login works only on the laptop.
+ * orders and on a Monday before the open (Telegram reminders at Fri 13:30 and Mon 08:45 say so
+ * when it is missing). Log in opens Kite's own page; Kite sends the browser back to the hosted
+ * dashboard's /api/momentum/kite/callback, which the dashboard forwards through the tunnel to the
+ * Momentum API on the laptop. That keeps today's token and, when Kite is the holdings source,
+ * reads the holdings at once. So the login works from a phone too.
  */
 
 import { AlertCircle, CheckCircle2, ExternalLink, LogIn } from 'lucide-react';
@@ -105,8 +106,8 @@ export function KiteCard() {
             <Badge tone="neutral">Not configured</Badge>
             <p className="text-sm text-muted">
               Set <Code>KITE_API_KEY</Code> and <Code>KITE_API_SECRET</Code> in the repo{' '}
-              <Code>.env</Code>. The Kite app&apos;s redirect URL is{' '}
-              <Code>http://127.0.0.1:8765/api/kite/callback</Code>.
+              <Code>.env</Code>. The Kite app&apos;s redirect URL is the hosted dashboard&apos;s{' '}
+              <Code>/api/momentum/kite/callback</Code>.
             </p>
           </>
         )}
@@ -140,8 +141,8 @@ export function KiteCard() {
               Not logged in today
             </Badge>
             <p className="text-sm text-muted">
-              Kite logins last until 06:00 IST. Log in on this laptop before Friday&apos;s 14:15
-              orders.
+              Kite logins last until 06:00 IST. Log in before Friday&apos;s 14:15 orders and
+              Monday&apos;s open.
             </p>
           </>
         )}

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the dashboard still shows one number per Broad run without saying how much to trust it; raised from P2 on 2026-10-10 because it now carries BL-029 (the universe choice) |
-| **Status** | In progress (Phase 1 tasks 1–2 and the extended-tags companion built; tasks 3–4 next PR) |
+| **Status** | In progress (Phase 1 built: tasks 1–4 and the extended-tags companion; Phase 2 built for Broad; open: Phase 2b, Stock and Custom Index Monday fills, and Phase 3) |
 | **Type** | improvement |
 | **Area** | dashboard, momentum |
 | **Created** | 2026-10-07 |
@@ -191,3 +191,31 @@ option with a clear message until this is built.
   default follows BL-010's pre-registered result, and the before/after figures above are descriptive
   only, so no new Phase 0 or `_EXPERIMENT.md` block applies.
 - 2026-10-22 — Phase 2 built for Broad (owner chose Broad, Stock and Custom Index; Stock and Custom Index become Phase 2b, see above). Friday close default, toggle, `fill_companion` chip.
+- 2026-10-28 — Phase 1 tasks 3 and 4 built (branch `feat/bl-036-comparison-lines-cadence`).
+  **Task 3, comparison lines.** Since the benchmark picker (2026-10-07) every result already carries
+  Midcap 150 and Smallcap 250 (`benchmarks`), and the chart already offered every picker index but
+  the picked one as a "+ name" line, all off. What was missing: Nifty 500 TRI, and the defaults.
+  `reference_benchmarks.compare` takes `names=` (default the two `REFERENCES`, so `comparisons` keeps
+  its two lines); `CHART_ONLY = (Nifty 500 TRI,)` is sent as `extra_comparisons`, only when it
+  covers the run, so the frozen results (the fixture has no Nifty 500) do not move: the golden
+  check passes unchanged. The dashboard (`lib/momentumBenchmark.ts::comparisonLines`) draws Nifty200
+  Momentum 30 and Midcap 150 from the start (open question 2's recommendation; when one of them is
+  the picked benchmark it is the benchmark line instead), the rest one click away; the chart keeps
+  the reader's flips, so a line that becomes a comparison when the picker changes starts at its own
+  default. Nifty 500 is a chart line only, not added to the picker (the picker's menu is the owner's,
+  2026-10-07).
+  **Task 4, cadence on screen.** Already delivered before this PR: the `explain` line ("Not a
+  rebalance week (every 4 weeks, phase 3 of 4; next …)") on the weekly signal (Weekly run drawer),
+  on This week's cards (BL-051) and on the result's Signals section; the Rebalance view was retired
+  for Your orders' preview (BL-051), so there is no Rebalance view to add it to. Built here, as
+  dashboard text only (no server wording moved, so no journal row or golden changes):
+  `lib/momentumCadence.ts` mirrors `engine.cadence_weeks` / `analysis.rebalance_weeks` (checked
+  against the Python on four dates and the frozen `broad_one_category_three_picks_four_weekly`
+  explain line); the result's Signals line adds "Next rebalance Friday: …" on a rebalance week of a
+  slower cadence (an off week's server line already names it); the "Which Fridays" ⓘ now gives the
+  rule (weeks since Friday 1 Jan 2016, divided by the interval, leave phase − 1) and the cadence
+  chip in the run bar carries it as its tooltip. Not done: "next rebalance" on This week's cards on a
+  rebalance week (BL-051's components; a group card already names the next sleeve's Friday).
+  **What remains of the item:** Phase 2b (Monday fills for Stock and Custom Index) and Phase 3 (no
+  subject while BL-010 closed without paper tracking; its Journal task, `target_weights` and the Broad
+  fingerprint per entry, could stand alone if wanted).

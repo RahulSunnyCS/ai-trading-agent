@@ -1,5 +1,7 @@
 ## What it is for
 
+The card is under *Experiments* on the Rotation page, closed until you open it.
+
 Each morning Adaptive picks three strategies, and today each book trades them at one lot each. Two
 other ways of spreading the lots looked better in research, but they were chosen after looking at
 those same past days, so the research figures prove nothing. This card follows all three on new

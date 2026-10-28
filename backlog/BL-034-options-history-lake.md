@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — owner wants it started next (2026-10-06); it is the data every options backtest (BL-009, BL-022, BL-026) runs on, and without it the engine has six sessions of history |
-| **Status** | In progress (Phase 1 done 2026-10-07; Phase 2 next) |
+| **Status** | Done (2026-10-28): Phases 0–4 done; Phase 5 (2014–2024) moved to [BL-175](BL-175-options-lake-2014-2024.md) |
 | **Type** | feature |
 | **Area** | trading-data (+ options, infra) |
 | **Created** | 2026-10-06 |
@@ -314,3 +314,4 @@ Still open for Phase 3:
 - 2026-10-07 — **Phase 4 done**: evening top-up (futures x2, day verdict, derived tables, Data section
   in the summary, `options-derived` catch-up job). Remaining: Phase 5 (2014-2024, later) and the
   owner-gated scheduler install.
+- 2026-10-28 — closed by the owner (asked 2026-10-28): Phases 0–4 done (the Status line's "Phase 2 next" was stale since 2026-10-07); the scheduler is installed and running. Phase 5 split out as [BL-175](BL-175-options-lake-2014-2024.md). The Phase 3 open questions (slippage model, BANKNIFTY derived tables) were settled by later work or go with BL-175. Status `Done`.

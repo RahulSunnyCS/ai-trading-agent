@@ -3,13 +3,13 @@
     TRADING_DATA_ROOT=/Volumes/TradingData uv run python research/bl167/study.py [--check]
 
 The rotation's own reconstruction (`daylog.reconstruction`) supplies the stored history; the 50 ITM2
-Dir variants (25 start times x NIFTY and SENSEX, from research/bl166/results) are appended as
+Dir variants (25 start times x NIFTY and SENSEX, from research/bl181/results) are appended as
 extra columns named `<N|S>_ditm2_<HHMM>`, and the ranking (`pick.score_history`, the function the
 09:16 job calls) picks list C's three core strategies from the extended universe for every day with
 63 earlier sessions. ITM2 is classed as a Dir variant (`score.is_dir` is widened for this run only,
 as production would), so the Widesl minimum and the family-band criterion treat it like ITM1.
 Nothing in the repo's ranking code or stored results is changed. Arms: the baseline universe, plus
-ITM2 at the common 3,000 stop, plus ITM2 at BL-166's matched 4,000 stop. Outcome: net after charges,
+ITM2 at the common 3,000 stop, plus ITM2 at BL-181's matched 4,000 stop. Outcome: net after charges,
 1 lot a strategy. Every metric is the one fixed in BL-167 Phase 0.
 """
 
@@ -27,7 +27,7 @@ from option_backtesting.fyers.daily import data_dir
 from option_backtesting.rotation import daylog, lot_plans, pick, readout, score, variants
 
 HERE = pathlib.Path(__file__).parent
-BL166 = HERE.parent / "bl166" / "results"
+BL181 = HERE.parent / "bl181" / "results"
 SEED, RESAMPLES, BLOCK, LEVEL = 20261026, 2000, 5, 0.90
 SLOTS = [
     s
@@ -89,7 +89,7 @@ def itm2_columns(stop: int, days: list[date]) -> tuple[list[str], np.ndarray, di
     for letter in ("N", "S"):
         for slot in SLOTS:
             name = f"{letter}_ditm2_{slot}"
-            src = BL166 / f"{letter}_ditm2_s{stop}_{slot}.csv"
+            src = BL181 / f"{letter}_ditm2_s{stop}_{slot}.csv"
             with src.open() as f:
                 by_day = {date.fromisoformat(r["day"]): r for r in csv.DictReader(f)}
             col = []

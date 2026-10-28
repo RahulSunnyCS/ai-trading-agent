@@ -116,7 +116,10 @@ export function quantiplyConfig(env: NodeJS.ProcessEnv): { line: boolean; proble
 export function loadConfig(): Config {
   if (existsSync('.env')) process.loadEnvFile('.env');
 
-  const only = process.env.ONLY?.trim() || null;
+  // `both` (BL-172: the Mac's fallback dispatch asking for both AlgoTest brokers, since a blank
+  // dispatch input means "the repository variable") is the same as blank.
+  const rawOnly = process.env.ONLY?.trim();
+  const only = rawOnly === 'both' ? null : rawOnly || null;
   // `none` (BL-140: no AlgoTest block logs in, set from the dashboard) skips the AlgoTest logins.
   if (only && only !== 'none' && !(only in BROKER_SECRET_KEYS)) {
     throw new Error(`ONLY=${only} matched no broker (expected: angelone, finvasia, none)`);
@@ -131,10 +134,17 @@ export function loadConfig(): Config {
       : only
         ? [only as keyof typeof BROKER_SECRET_KEYS]
         : (Object.keys(BROKER_SECRET_KEYS) as (keyof typeof BROKER_SECRET_KEYS)[]);
-  const quantiplyShoonya = (process.env.QUANTIPLY_BROKERS ?? '')
-    .split(',')
-    .map((b) => b.trim().toLowerCase())
-    .includes('finvasia');
+  // BL-172: a dispatch's quantiply_shoonya input (on / off) wins over the repository variable.
+  const shoonyaInput = process.env.QUANTIPLY_SHOONYA_INPUT?.trim().toLowerCase();
+  const quantiplyShoonya =
+    shoonyaInput === 'on'
+      ? true
+      : shoonyaInput === 'off'
+        ? false
+        : (process.env.QUANTIPLY_BROKERS ?? '')
+            .split(',')
+            .map((b) => b.trim().toLowerCase())
+            .includes('finvasia');
 
   const required: readonly SecretKey[] = [
     ...ALWAYS_REQUIRED,

@@ -14,7 +14,7 @@ rupees per lot. The peak starts at zero, as in the read-out. The dashed line is 
 the same days, drawn from its own peak of zero; it breaks where the base has no result. Shaded and
 numbered stretches are the falls of at least the chosen size.
 
-With a **portfolio stop** applied (the Adaptive Classic card's stop button, ₹8,000 by default), the
+With a **portfolio stop** applied (the Adaptive Classic row's stop button, ₹8,000 by default), the
 same days are also replayed through it, at 1 lot a strategy, and drawn as a second line. Three figures sit above the chart: the worst fall
 without the stop, the worst fall with it, and on how many days the stop closed the book. The
 episode table and the drivers stay on the registered figures; only the chart, those three figures

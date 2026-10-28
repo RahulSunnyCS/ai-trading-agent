@@ -29,6 +29,9 @@ SECRET_ENV = (
     "FYERS_PIN",
     "FYERS_TOTP_SECRET",
     "FYERS_CLIENT_ID",
+    "KITE_API_SECRET",
+    "KITE_PASSWORD",
+    "KITE_TOTP_SECRET",
 )
 _registry: set[str] = set()
 
@@ -49,7 +52,7 @@ def _env_secrets() -> set[str]:
 
 
 def prefs_path() -> Path:
-    """Same file and override as @trading/notify's prefs.ts: `{"disabled": [type, ...]}`."""
+    """Same file and override as @trading/notify's prefs.ts (`disabled` and `levels`)."""
     override = os.environ.get("NOTIFY_PREFS_FILE", "").strip()
     if override:
         return Path(override)
@@ -72,9 +75,57 @@ def disabled_types(path: Path | None = None) -> set[str]:
     return {t for t in listed if isinstance(t, str)} if isinstance(listed, list) else set()
 
 
-def is_enabled(kind: str | None, path: Path | None = None) -> bool:
-    """An untagged message (kind None) is always sent."""
-    return kind is None or kind not in disabled_types(path)
+#: BL-173 (owner, 2026-10-28): a type's level when the preferences file says nothing about it
+#: ("all" otherwise). Same table as @trading/notify's DEFAULT_LEVELS (prefs.ts).
+DEFAULT_LEVELS = {
+    "momentum.preview": "off",
+    "momentum.journal": "failures",
+    "momentum.live_rules": "failures",
+    "options.daily": "failures",
+    "scheduler.recovered": "off",
+    "quantiply.switch_off": "failures",
+}
+
+_FAILURE_ICONS = ("⚠️", "⚠", "❌", "🚨", "💥", "🔴", "⛔")
+
+
+def looks_like_failure(text: str) -> bool:
+    """A failure, read from the text's first icon (the warning icons every sender puts first)."""
+    return text.lstrip().startswith(_FAILURE_ICONS)
+
+
+def file_levels(path: Path | None = None) -> dict[str, str]:
+    """The levels the file sets: `levels`, then `disabled` as off. Fails open."""
+    path = path or prefs_path()
+    out = dict.fromkeys(disabled_types(path), "off")
+    try:
+        levels = json.loads(path.read_text()).get("levels")
+    except (OSError, ValueError, AttributeError):
+        return out
+    if isinstance(levels, dict):
+        out.update({t: v for t, v in levels.items() if v in ("all", "failures", "off")})
+    return out
+
+
+def level_of(kind: str, path: Path | None = None) -> str:
+    return file_levels(path).get(kind) or DEFAULT_LEVELS.get(kind, "all")
+
+
+def is_enabled(
+    kind: str | None,
+    path: Path | None = None,
+    failure: bool | None = None,
+    text: str = "",
+) -> bool:
+    """An untagged message (kind None) is always sent; a `failures` type only its failures."""
+    if kind is None:
+        return True
+    level = level_of(kind, path)
+    if level == "off":
+        return False
+    if level == "failures":
+        return looks_like_failure(text) if failure is None else failure
+    return True
 
 
 @dataclass
@@ -107,15 +158,27 @@ def render(n: Notification, now: datetime | None = None) -> str:
 
 def send(n: Notification) -> str:
     """Sends (or, without TELEGRAM_* configured, prints) the message. Returns the text."""
+    return _send(n)[0]
+
+
+def deliver(n: Notification) -> bool:
+    """`send`, saying whether Telegram took the message. False when it was switched off, Telegram
+    is not configured or the request failed. For a job whose message IS its alert, so that an
+    undelivered one can fail the job instead of passing silently."""
+    return _send(n)[1]
+
+
+def _send(n: Notification) -> tuple[str, bool]:
     text = render(n)
-    if not is_enabled(n.type):
-        print(f"\n[telegram: '{n.type}' is switched off, message below]\n{text}")
-        return text
+    failure = looks_like_failure(text) if getattr(n, "plain", False) else n.severity != "info"
+    if not is_enabled(n.type, failure=failure):
+        print(f"\n[telegram: '{n.type}' is off or failures-only, message below]\n{text}")
+        return text, False
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
     if not (token and chat):
         print(f"\n[telegram not configured, message below]\n{text}")
-        return text
+        return text, False
     body = json.dumps({"chat_id": chat, "text": text, "disable_web_page_preview": True})
     request = urllib.request.Request(
         f"https://api.telegram.org/bot{token}/sendMessage",
@@ -126,7 +189,8 @@ def send(n: Notification) -> str:
         urllib.request.urlopen(request, timeout=15).read()
     except Exception as error:  # never let a notification failure break the job
         print(f"  telegram send failed: {redact(str(error))}")
-    return text
+        return text, False
+    return text, True
 
 
 def run_url() -> str | None:

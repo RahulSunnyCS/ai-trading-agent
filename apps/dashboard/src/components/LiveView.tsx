@@ -16,8 +16,8 @@
  *    straddle moving is not the reader's P&L.
  *  - Index and day live in the URL query (`ix`, `d`), so a copied link shows the same session.
  *
- * It does not use the old tick socket (`hooks/useLiveTicks.ts`): that needs the frozen server's
- * Redis stream, which does not run here.
+ * It does not use the frozen server's tick socket (/ws/ticks): that needs its Redis stream,
+ * which does not run here (the dashboard's client for it was removed with the Overview's Feed card).
  */
 
 import { Info } from 'lucide-react';

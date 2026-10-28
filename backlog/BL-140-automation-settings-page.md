@@ -143,6 +143,12 @@ Shoonya's own hosts:
 
 ## Log
 
+- 2026-10-27 — Owner: the morning logins should follow the settings and log in to only what they need. Settings v6
+  had no AlgoTest block on, yet the 08:00 run still waited 15 minutes for AlgoTest's window and reported
+  "AlgoTest + Quantiply · All logins ready (2/2)" while Quantiply · Shoonya had failed, and the 09:16
+  `algotest-deploy` and 15:35 check logged in to AlgoTest (both failed reading /live; nothing deployed). Now
+  `ONLY=none` leaves AlgoTest out of the run and the report, Quantiply · Shoonya counts in the verdict, and the
+  AlgoTest deployer and its check stop before logging in when no AlgoTest row uploads the export's list.
 - 2026-10-22 — **PR 4 (platform multiplier) — left OPEN for the owner's review, not merged** (Claude's call: the one
   piece that can change an order's size; never sent live above 1). Quantiply: `withMultiplier` sets
   `configurations.multiplier` on the export's text at upload; the ledger sha is of that text, the deployer applies the

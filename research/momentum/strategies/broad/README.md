@@ -1,5 +1,7 @@
 # Broad Momentum (stock funnel)
 
+> **Caveat, 2026-10-25 (BL-001 F6):** every Broad figure on these pages was measured with a ranking whose cross-section included stocks that were not members that week, so a past week's ranks depended on later data. Fixed and merged on 2026-10-28 (PRs #318, #319, #322, merge commit `778ba02e`): on live data the followed strategy's headline CAGR fell from 42.9% to 35.0% and most favourites lost 3.5 to 10 points; see `packages/momentum-backtesting/docs/lookahead-requests-2026-10-24.md`. The pages have not been re-measured; the search is re-run on the fixed ranking under [BL-176](../../../../backlog/BL-176-momentum-search-on-f6-ranking.md).
+
 **Last updated:** 2026-10-14
 
 ## What it is

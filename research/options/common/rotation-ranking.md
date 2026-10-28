@@ -1,6 +1,6 @@
 # Options: rotation ranking (DRB and lists A / B / C / REF)
 
-**Status:** Tested · **Last updated:** 2026-10-26
+**Status:** Tested · **Last updated:** 2026-10-28
 
 ## What it is
 
@@ -52,6 +52,7 @@ per lot-day is above zero and its drawdown per lot is no worse.
 | BL-133 | A fourth lot on non-expiry days (3 on expiry days): Core's Dir at two lots or an added Dir; T1's top / lowest Widesl at two lots, an added Widesl, or (owner override) its Dir at two lots; against the same size spread evenly | Core Dir ×2 beat the even spread (after brokerage +₹149 [+14, +279] two years, +₹230 [+90, +379] last year) but the top 10 days carry 68 % of it; no T1 Widesl placement beat it (lowest Widesl ×2 −₹95 / −₹105, an added Widesl −₹129 / −₹194); T1's Dir ×2 (owner override) +₹98 [−20, +215] / +₹150 [+27, +270], two-thirds of it from 5 days. In-sample | [BL-133][bl133] |
 | BL-134 | Two strategies a day: top Widesl ×2 + Dir (×2 normal days, ×1 expiry) vs three picks with the Dir doubled | T1 worse (−₹254 [−486, −30] / −₹330 [−621, −55] net per day); Core inconclusive (−₹152 [−392, +62] / +₹128 [−87, +337]); its −70k drawdown is one early stretch (2025-01 → 2025-05), outside which P is slightly ahead. The ~₹100/day brokerage saved does not pay for the dropped Widesl | [BL-134][bl134] |
 | BL-154 | Adaptive's weekday / DTE / VIX fits shrunk toward the variant's own window mean by n/(n+10); plus opening-gap and previous-day-range bands (÷ ATR, terciles) at weight 10 from weekday; P1 decides, 20 label shuffles | **Killed**: on P1 shrinkage −₹24 per lot-day [−116, +75], 1 of 20 shuffles above it, drawdown 21% deeper; labels −₹20 [−91, +48]. Out of P1 shrinkage is wholly negative (P2 −₹172 [−321, −38], whole span −₹71 [−146, −1]); the more weight on the plain mean, the worse. Today's fits beat all 20 label shuffles on P2 and the whole span (17 of 20 on P1). Gross, 431 days 2025-01 → 2026-10 | [BL-154][bl154] |
+| BL-090 | A cap in `select`: no two core picks above trailing 63-day Pearson 0.5 / 0.6 / 0.7, lists A / B / C / REF, on BL-075's P1 / P2 / P3 (248 variants, P3 NIFTY only); pass = drawdown 10% shallower with net at most 5% lower in 2 of 3 periods | **Killed** for all 12 cells (best: 1 period). Drawdown is often shallower but net falls; in P2 every cap loses 28%–105% of net. Before charges, lists in-sample | [BL-090][bl090] |
 | BL-167 | ITM2 Dir added to the Adaptive universe (Core-298; Core-298 + T1), in-sample, 431 days | **No gain**: Core −₹57 a day (interval −235 to +118), T1 −₹74 (−258 to +108); Core drawdown 25% shallower, T1's 11% deeper; 75–78% of Core's ITM1 picks and 51–58% of its ATM picks are dropped (ITM2 enters in their place) | [BL-167][bl167] |
 
 ## What we know
@@ -75,7 +76,7 @@ per lot-day is above zero and its drawdown per lot is no worse.
 ## Not yet tested
 
 - The forward read-out after 60 trading days from 2026-10-12 (the only unseen test).
-- BL-100 on P3; BL-090's correlation cap ([correlation](correlation.md)).
+- BL-100 on P3.
 
 ## Related
 
@@ -108,4 +109,5 @@ per lot-day is above zero and its drawdown per lot is no worse.
 [bl133]: ../../../backlog/BL-133-fourth-lot-on-normal-days.md
 [bl134]: ../../../backlog/BL-134-two-strategy-book.md
 [bl154]: ../../../backlog/BL-154-adaptive-fit-shrinkage.md
+[bl090]: ../../../backlog/BL-090-strategy-correlation-and-diverse-baskets.md
 [bl167]: ../../../backlog/BL-167-itm2-in-adaptive-and-t1.md

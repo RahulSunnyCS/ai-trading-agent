@@ -1,6 +1,9 @@
 const Decimal = require('decimal.js');
 const { isTotalRow, parseAmounts, splitBySegment } = require('./segments');
 const logger = require('../utils/logger');
+const { chooseTrades } = require('./fnoTrades');
+
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Column order of the "Obligation Details" table, one row per exchange/segment.
 const COL = {
@@ -35,15 +38,19 @@ const ROW_LINE = new RegExp(
   `^\\s*([A-Za-z][A-Za-z0-9&()/. -]*?)\\s*((?:-?\\d+(?:,\\d{3})*\\.\\d{2}){${COLUMN_COUNT}})\\s*$`,
 );
 
-function subject() {
+// The subject carries neither the account nor the date; the attachment's name carries both.
+function searchSubject() {
   return 'Contract Note - Equity Segment';
 }
 
-function bodyFilter(date) {
-  const dd = String(date.getDate()).padStart(2, '0');
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const yyyy = date.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
+// "CN_R12345678_23102026.pdf" → '2026-10-23' (null if another account's, or another file).
+function noteDay({ filename, accountId }) {
+  // A revised note may come as CN_<id>_<ddmmyyyy>_1.pdf.
+  const m = new RegExp(
+    `^CN_${escapeRegExp(accountId)}_(\\d{2})(\\d{2})(\\d{4})(?:_\\d+)?\\.pdf$`,
+    'i',
+  ).exec(filename || '');
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
 }
 
 function obligationBlock(text) {
@@ -63,8 +70,7 @@ function segmentBrokerage(a) {
 }
 
 // n is a Decimal (all money math in this file stays in Decimal until this
-// boundary); returns a plain number, since that is what daily_summary.json
-// and the Sheets API expect.
+// boundary); returns a plain number, since that is what the stored line holds.
 function round2(n) {
   return n.toDecimalPlaces(2).toNumber();
 }
@@ -133,11 +139,24 @@ function extract(text) {
   let netAmount = new Decimal(0);
   let brokerage = new Decimal(0);
   let itemisedCharges = new Decimal(0);
+  const kinds = {
+    stt: [COL.STT],
+    gst: [COL.CGST, COL.SGST],
+    exchange: [COL.EXCHANGE_TXN],
+    sebi: [COL.SEBI],
+    stamp: [COL.STAMP],
+    ipf: [COL.IPF],
+    other: [COL.AUCTION_OTHER],
+  };
+  const byKind = Object.fromEntries(Object.keys(kinds).map((k) => [k, new Decimal(0)]));
 
   for (const row of kept) {
     const a = row.amounts;
     if (a.some((n) => !n.isFinite())) {
       return { error: `Angel One row "${row.label}" contains a non-numeric amount` };
+    }
+    for (const [k, cols] of Object.entries(kinds)) {
+      byKind[k] = byKind[k].plus(cols.reduce((s, c) => s.plus(a[c].abs()), new Decimal(0)));
     }
     obligation = obligation.plus(a[COL.OBLIGATION]);
     netAmount = netAmount.plus(a[COL.NET]);
@@ -188,13 +207,19 @@ function extract(text) {
     logger.info('Angel One non-F&O segments excluded', { segments: dropped.join(', ') });
   }
 
+  const payin = obligation.plus(brokerage);
   return {
     // Angel One's obligation already has brokerage deducted; add it back for a consistent raw P&L
-    payin_payout_obligation: round2(obligation.plus(brokerage)),
+    payin_payout_obligation: round2(payin),
     net_brokerage: round2(brokerage),
     other_charges: round2(charges.abs()),
     skipped_segments: dropped,
+    charges: {
+      brokerage: round2(brokerage),
+      ...Object.fromEntries(Object.entries(byKind).map(([k, v]) => [k, round2(v)])),
+    },
+    ...chooseTrades(text, 'angelone', payin),
   };
 }
 
-module.exports = { subject, bodyFilter, extract };
+module.exports = { searchSubject, noteDay, extract };

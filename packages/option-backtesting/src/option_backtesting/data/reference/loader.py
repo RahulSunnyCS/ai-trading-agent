@@ -199,9 +199,7 @@ class ReferenceData:
     def risk_free_rate(self, as_of: date, name: str = "RBI_REPO") -> float:
         """Annual risk-free rate in force on `as_of`, as a fraction (0.0525 for 5.25%), for
         implied volatility. rates.csv: the RBI repo rate from each MPC decision date."""
-        return (
-            _most_recent_as_of(self._rates, as_of, label="rates", underlying=name).rate_pct / 100
-        )
+        return _most_recent_as_of(self._rates, as_of, label="rates", underlying=name).rate_pct / 100
 
     def strike_step(self, underlying: str, as_of: date) -> float:
         return _most_recent_as_of(

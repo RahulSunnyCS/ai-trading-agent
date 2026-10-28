@@ -1,11 +1,15 @@
 import gzip
+import os
+import shutil
 import threading
 import time
 from datetime import UTC, date, datetime
+from pathlib import Path
 
 import pyarrow as pa
 import pytest
 
+from trading_data import backup as backup_module
 from trading_data import lake, reference
 from trading_data.backup import backup
 from trading_data.db import FIXED_SCHEMA_VIEWS, LAKE_VIEWS, _migrations, catalog_path, connect
@@ -376,6 +380,208 @@ def test_backup_copies_new_files_only_and_always_the_catalog(root, tmp_path):
     assert (dest / catalog_path(root).name).exists()
     with pytest.raises(ValueError):
         backup(root, root / "inside")
+
+
+def _no_run(pid):
+    return False
+
+
+def test_backup_copies_files_whose_size_or_mtime_changed(root, tmp_path):
+    """Every folder (lake included) is compared on size AND mtime: a same-size rewrite
+    is copied again, an unchanged file is skipped; locks and temporaries never go."""
+    notes = root / "contract-notes"
+    day = notes / "days" / "2030-01-02.jsonl"
+    day.parent.mkdir(parents=True)
+    day.write_text('{"account":"demo-1","net":100}\n')
+    manual = notes / "manual" / "demo.json"
+    manual.parent.mkdir(parents=True)
+    manual.write_text('{"note":"invented"}\n')
+    (notes / "run.lock").write_text("12345")
+    (notes / "days" / "2030-01-03.jsonl.999.tmp").write_text("half")
+    journal = root / "rotation" / "journal.jsonl"
+    journal.parent.mkdir(parents=True)
+    journal.write_text('{"day":"2030-01-02","pick":"demo"}\n')
+    (root / "rotation" / "journal.lock").write_text("")
+    (root / "rotation" / ".store.lock").write_text("")
+    bars = lake.bars_1m_path(root, "index", "NIFTY", DAY)
+    lake.write_parquet(_index_bars(1.0), bars)
+    dest = tmp_path / "other_disk"
+
+    first = backup(root, dest, alive=_no_run)
+    assert (first.folders["contract-notes"].copied, first.folders["rotation"].copied) == (2, 1)
+    assert first.folders["lake"].copied == 1
+    copy = dest / "contract-notes" / "days" / "2030-01-02.jsonl"
+    assert copy.stat().st_mtime_ns == day.stat().st_mtime_ns  # stamped from the source
+    assert not (dest / "contract-notes" / "run.lock").exists()
+    assert not (dest / "contract-notes" / "days" / "2030-01-03.jsonl.999.tmp").exists()
+    assert not (dest / "rotation" / "journal.lock").exists()
+    assert not (dest / "rotation" / ".store.lock").exists()
+    assert not list(dest.rglob("*.tmp"))
+
+    # Rewritten at the same size with a newer mtime (a day re-read; the nightly journal;
+    # a lake day rewritten by a repair).
+    day.write_text('{"account":"demo-1","net":200}\n')
+    journal.write_text('{"day":"2030-01-02","pick":"demx"}\n')
+    later = day.stat().st_mtime + 60
+    for path in (day, journal, bars):
+        os.utime(path, (later, later))
+
+    second = backup(root, dest, alive=_no_run)
+    cn = second.folders["contract-notes"]
+    assert (cn.copied, cn.skipped) == (1, 1)
+    assert (second.folders["rotation"].copied, second.folders["rotation"].skipped) == (1, 0)
+    assert (second.folders["lake"].copied, second.folders["lake"].skipped) == (1, 0)
+    assert copy.read_text() == day.read_text()
+    assert (dest / "rotation" / "journal.jsonl").read_text() == journal.read_text()
+    # The mtime was carried over, so a third run copies nothing (no catalog in this root).
+    third = backup(root, dest, alive=_no_run)
+    assert (third.copied, third.catalog_copied) == (0, False)
+    assert third.folders["contract-notes"].skipped == 2
+    assert third.folders["rotation"].skipped == 1
+    assert third.folders["lake"].skipped == 1
+
+
+def test_backup_leaves_out_decrypted_contract_note_pdfs(root, tmp_path):
+    folder = root / "contract-notes" / "raw" / "demobroker" / "DEMO1"
+    folder.mkdir(parents=True)
+    (folder / "2030-01-02.pdf").write_bytes(b"%PDF-encrypted-demo")
+    (folder / "2030-01-02.decrypted.pdf").write_bytes(b"%PDF-plain-demo")
+    dest = tmp_path / "other_disk"
+    report = backup(root, dest, alive=_no_run)
+    out = dest / "contract-notes" / "raw" / "demobroker" / "DEMO1"
+    assert (out / "2030-01-02.pdf").exists()
+    assert not (out / "2030-01-02.decrypted.pdf").exists()
+    assert report.folders["contract-notes"].copied == 1
+
+
+def test_backup_recopies_a_file_replaced_during_the_copy(root, tmp_path, monkeypatch):
+    """A writer's tmp + rename lands between reading the bytes and stamping the mtime:
+    the re-stat sees it and copies again, so the copy never holds old bytes under the
+    new mtime."""
+    cursor = root / "contract-notes" / "cursor.json"
+    cursor.parent.mkdir(parents=True)
+    cursor.write_text('{"uid": 100}\n')
+    real = shutil.copyfile
+    raced = []
+
+    def racing(src, dst, *args, **kwargs):
+        out = real(src, dst, *args, **kwargs)
+        if Path(src) == cursor and not raced:
+            raced.append(1)
+            cursor.write_text('{"uid": 101}\n')
+            bumped = cursor.stat().st_mtime + 5
+            os.utime(cursor, (bumped, bumped))
+        return out
+
+    monkeypatch.setattr("trading_data.backup.shutil.copyfile", racing)
+    dest = tmp_path / "other_disk"
+    report = backup(root, dest, alive=_no_run)
+    count = report.folders["contract-notes"]
+    assert (count.copied, count.changed) == (1, 0)
+    copy = dest / "contract-notes" / "cursor.json"
+    assert copy.read_text() == '{"uid": 101}\n'
+    assert copy.stat().st_mtime_ns == cursor.stat().st_mtime_ns
+
+
+def test_backup_flags_a_file_that_keeps_changing_and_copies_it_next_run(
+    root, tmp_path, monkeypatch
+):
+    journal = root / "rotation" / "journal.jsonl"
+    journal.parent.mkdir(parents=True)
+    journal.write_text("line-0\n")
+    real = shutil.copyfile
+    writes = []
+
+    def always_racing(src, dst, *args, **kwargs):
+        out = real(src, dst, *args, **kwargs)
+        if Path(src) == journal:
+            writes.append(1)
+            journal.write_text(f"line-{len(writes)}\n")
+            bumped = journal.stat().st_mtime + 10 * len(writes)
+            os.utime(journal, (bumped, bumped))
+        return out
+
+    monkeypatch.setattr("trading_data.backup.shutil.copyfile", always_racing)
+    dest = tmp_path / "other_disk"
+    report = backup(root, dest, alive=_no_run)
+    assert len(writes) == backup_module.MAX_TRIES
+    assert (report.folders["rotation"].copied, report.folders["rotation"].changed) == (0, 1)
+    assert report.changed == 1
+    copy = dest / "rotation" / "journal.jsonl"
+    assert copy.stat().st_mtime_ns != journal.stat().st_mtime_ns  # left unstamped
+
+    monkeypatch.undo()
+    again = backup(root, dest, alive=_no_run)
+    assert (again.folders["rotation"].copied, again.folders["rotation"].changed) == (1, 0)
+    assert copy.read_text() == journal.read_text()
+
+
+def test_backup_counts_a_vanished_file_and_still_copies_the_catalog(root, tmp_path, monkeypatch):
+    """rotation's AlgoTest / Quantiply exports delete the previous export's files; one
+    going mid-run is counted, never fatal."""
+    with connect(root):
+        pass
+    export = root / "rotation" / "algotest" / "2030-01-02" / "t1" / "demo.algtst"
+    export.parent.mkdir(parents=True)
+    export.write_text("invented export")
+    (root / "rotation" / "journal.jsonl").write_text("demo\n")
+    real = shutil.copyfile
+
+    def deleting(src, dst, *args, **kwargs):
+        if Path(src) == export:
+            export.unlink()
+        return real(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr("trading_data.backup.shutil.copyfile", deleting)
+    dest = tmp_path / "other_disk"
+    report = backup(root, dest, alive=_no_run)
+    rotation = report.folders["rotation"]
+    assert (rotation.copied, rotation.vanished) == (1, 1)
+    assert report.vanished == 1
+    assert report.catalog_copied
+    assert (dest / catalog_path(root).name).exists()
+    assert not list(dest.rglob("*.tmp"))
+
+
+def _cursor_and_lock(root):
+    notes = root / "contract-notes"
+    notes.mkdir(parents=True)
+    (notes / "cursor.json").write_text("{}\n")
+    (notes / "run.lock").write_text("4242")
+
+
+def test_backup_waits_while_a_contract_notes_run_holds_its_lock(root, tmp_path):
+    _cursor_and_lock(root)
+    now = [0.0]
+    checks = []
+
+    def alive(pid):
+        checks.append(pid)
+        return len(checks) < 3  # the run ends after two polls
+
+    def sleep(seconds):
+        now[0] += seconds
+
+    report = backup(root, tmp_path / "other_disk", sleep=sleep, clock=lambda: now[0], alive=alive)
+    assert checks == [4242, 4242, 4242]
+    assert now[0] == 2 * backup_module.LOCK_POLL_S
+    assert len(report.notes) == 1 and "waited" in report.notes[0]
+    assert report.folders["contract-notes"].copied == 1
+
+
+def test_backup_goes_on_after_the_wait_and_says_so(root, tmp_path):
+    _cursor_and_lock(root)
+    now = [0.0]
+
+    def sleep(seconds):
+        now[0] += seconds
+
+    report = backup(
+        root, tmp_path / "other_disk", sleep=sleep, clock=lambda: now[0], alive=lambda pid: True
+    )
+    assert now[0] >= backup_module.LOCK_WAIT_S
+    assert len(report.notes) == 1 and "copied anyway" in report.notes[0]
+    assert report.folders["contract-notes"].copied == 1
 
 
 def test_bar_schemas_are_the_lake_contract():

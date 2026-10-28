@@ -25,6 +25,18 @@ export interface Row {
   multiplier: number;
   /** include the Buy add-on picks (default yes) */
   addon: boolean;
+  /** Quantiply only (BL-172): the clientwise MTM SL in rupees the 08:00 job keeps; null = leave it */
+  mtmSl: number | null;
+}
+
+/**
+ * A snapshot written before BL-172 has no MTM SL: the list's portfolio stop on a Quantiply row
+ * (T1 ₹9,000, Core ₹8,000, the owner's choice of 2026-10-28), none on AlgoTest. The scheduler's
+ * `defaultMtmSl` is the same rule.
+ */
+export function defaultMtmSl(platform: Platform, list: Row['list']): number | null {
+  if (platform !== 'quantiply') return null;
+  return list === 't1' ? 9000 : list === 'core' ? 8000 : null;
 }
 
 export interface Automation {
@@ -41,10 +53,38 @@ export const DEFAULT_AUTOMATION: Automation = {
   version: 0,
   masters: { logins: true, uploads: true, deploy: false },
   rows: {
-    'algotest.finvasia': { login: true, list: 't1', upload: true, multiplier: 1, addon: true },
-    'algotest.angelone': { login: false, list: 'none', upload: false, multiplier: 1, addon: true },
-    'quantiply.angelone': { login: true, list: 'core', upload: true, multiplier: 1, addon: true },
-    'quantiply.finvasia': { login: false, list: 'none', upload: false, multiplier: 1, addon: true },
+    'algotest.finvasia': {
+      login: true,
+      list: 't1',
+      upload: true,
+      multiplier: 1,
+      addon: true,
+      mtmSl: null,
+    },
+    'algotest.angelone': {
+      login: false,
+      list: 'none',
+      upload: false,
+      multiplier: 1,
+      addon: true,
+      mtmSl: null,
+    },
+    'quantiply.angelone': {
+      login: true,
+      list: 'core',
+      upload: true,
+      multiplier: 1,
+      addon: true,
+      mtmSl: 8000,
+    },
+    'quantiply.finvasia': {
+      login: false,
+      list: 'none',
+      upload: false,
+      multiplier: 1,
+      addon: true,
+      mtmSl: null,
+    },
   },
   pause: { until: null },
   source: 'default',
@@ -87,7 +127,15 @@ export function readAutomation(path: string = settingsPath()): Automation {
       if (typeof addon !== 'boolean') {
         throw new Error(`${path}: row ${p}.${b} has addon ${JSON.stringify(row.addon)}`);
       }
-      rows[`${p}.${b}`] = { ...(row as Row), multiplier, addon };
+      // BL-172: missing = the list's stop; anything else must be null or whole rupees 500-100,000.
+      const mtmSl = row.mtmSl === undefined ? defaultMtmSl(p, row.list as Row['list']) : row.mtmSl;
+      if (
+        mtmSl !== null &&
+        !(Number.isInteger(mtmSl) && mtmSl >= 500 && mtmSl <= 100_000 && p === 'quantiply')
+      ) {
+        throw new Error(`${path}: row ${p}.${b} has mtmSl ${JSON.stringify(row.mtmSl)}`);
+      }
+      rows[`${p}.${b}`] = { ...(row as Row), multiplier, addon, mtmSl };
     }
   }
   const until = (raw.pause as { until?: unknown } | undefined)?.until ?? null;
@@ -118,6 +166,7 @@ export function effectiveRow(a: Automation, platform: Platform, broker: Broker):
     upload: a.masters.uploads && row.upload && row.list !== 'none',
     multiplier: row.multiplier,
     addon: row.addon,
+    mtmSl: row.mtmSl,
   };
 }
 

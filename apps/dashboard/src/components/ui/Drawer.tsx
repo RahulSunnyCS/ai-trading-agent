@@ -24,6 +24,7 @@ export function Drawer({
   bodyRef,
   onKeyDown,
   footer,
+  size = 'md',
   children,
 }: {
   open: boolean;
@@ -39,6 +40,8 @@ export function Drawer({
   bodyRef?: Ref<HTMLDivElement>;
   onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void;
   footer?: ReactNode;
+  /** 'lg' for a drawer of tables (the Trade book's day). */
+  size?: 'md' | 'lg';
   children: ReactNode;
 }) {
   // The drawer is opened by a button that is not a Radix trigger, so Radix has nowhere to send
@@ -68,7 +71,8 @@ export function Drawer({
             }
           }}
           className={cn(
-            'fixed inset-y-0 z-50 flex w-full max-w-[30rem] flex-col border-border-strong bg-surface shadow-elevated focus:outline-none data-[state=open]:animate-fade-in',
+            'fixed inset-y-0 z-50 flex w-full flex-col border-border-strong bg-surface shadow-elevated focus:outline-none data-[state=open]:animate-fade-in',
+            size === 'lg' ? 'max-w-[38rem]' : 'max-w-[30rem]',
             side === 'right' ? 'right-0 border-l' : 'left-0 border-r',
           )}
         >

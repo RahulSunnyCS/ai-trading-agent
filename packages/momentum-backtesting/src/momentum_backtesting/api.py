@@ -34,7 +34,6 @@ from . import (
     kite,
     levers,
     metrics,
-    notify,
     rebalance,
     reference_benchmarks,
     runs_store,
@@ -322,6 +321,7 @@ class _Data:
             Config(lookbacks=tuple(lookbacks)),
             tilt=tilt,
             screen_top_pct=screen_top_pct,
+            cross_section=ranking.cross_section(),
         )
         with self._lock:
             levers.tilt_cache_put(
@@ -818,6 +818,12 @@ class OrderSettingsBody(BaseModel):
     holdings_source: Literal["paper", "fyers", "kite"] | None = None
     paper_capital_rs: float | None = Field(None, ge=1_000, le=1_000_000_000)
     lot_size_rs: float | None = Field(None, ge=1_000, le=1_000_000_000)
+
+
+class OrderPreviewBody(BaseModel):
+    """Your orders' "Preview for…": the favourite (a saved-run or group id) to plan for."""
+
+    favourite: str = Field(min_length=1, max_length=64, pattern=r"^[0-9A-Za-z_-]+$")
 
 
 class PastedHoldingsBody(BaseModel):
@@ -3451,13 +3457,22 @@ def _find_favourite(favourites: list[dict], text: str) -> tuple[dict | None, str
 
 
 def _compute_orders(
-    trigger: str = "manual", *, start_fresh: bool = False, favourite: str | None = None
+    trigger: str = "manual",
+    *,
+    start_fresh: bool = False,
+    favourite: str | None = None,
+    preview: bool = False,
 ) -> dict:
     """The headline's orders for this Friday against the owner's holdings (the paper portfolio
     until money goes in), saved to `momentum_orders`. The body of the 14:15 job and of the page's
     "Make orders now". `start_fresh` plans from nothing held (paper capital all in cash), so every
     target name is a buy: the first week of a new portfolio, not a change to last week's model.
-    `favourite` (an id or a name fragment) plans for that favourite instead of the headline."""
+    `favourite` (an id or a name fragment) plans for that favourite instead of the headline.
+
+    `preview` (Your orders' "Preview for…", never the 14:15 job) writes nothing: no orders row, no
+    lot ledger event, no pending lot. It reads the catalog read-only only, and it plans the
+    favourite as ONE portfolio against the whole holdings snapshot, never lot by lot (the lots
+    belong to the followed strategy; booking Kite's changes to them is the job's to do)."""
     from . import holdings_store, orders
     from .weekly import week_ending_on_or_before
 
@@ -3514,7 +3529,7 @@ def _compute_orders(
     # A Fyers holding's base symbol -> the strategy's name for it (SBIN, NAVINFLUOR#2, Nasdaq 100).
     name_of = {fyers.nse_symbol(symbol): name for name, symbol in symbols.items()}
     base_of = {name: fyers.nse_symbol(symbol) for name, symbol in symbols.items()}
-    if settings["holdings_source"] == "kite" and members and signal.get("_sleeves"):
+    if not preview and settings["holdings_source"] == "kite" and members and signal.get("_sleeves"):
         return _compute_lot_orders(
             payload,
             headline=headline,
@@ -3532,6 +3547,10 @@ def _compute_orders(
             target_week=target_week,
             today=today,
         )
+    if preview and settings["holdings_source"] == "paper":
+        # The paper portfolio is the headline's model, which this favourite's own last-week
+        # weights are not: a preview plans it from the paper capital in cash instead.
+        start_fresh = True
     if settings["holdings_source"] == "paper":
         before = {
             k: v for k, v in signal.get("weights", {}).items() if v > 0 and k not in cash_names
@@ -3593,6 +3612,9 @@ def _compute_orders(
             "plan": plan.to_dict(),
         }
     )
+    if preview:
+        payload["preview"] = True
+        return payload
     with open_catalog() as con:
         payload["created_at"] = holdings_store.save_orders(
             con,
@@ -3879,15 +3901,20 @@ def _lot_orders_message(payload: dict, title: str) -> Notification:
     )
 
 
+class NotALotGroup(ValueError):
+    """The headline favourite is not a group of sleeves, so it has no lots."""
+
+
 def _headline_group() -> tuple[dict, list[dict]]:
-    """The headline favourite and its sleeves; raises ValueError when it is not a group."""
+    """The headline favourite and its sleeves; raises NotALotGroup (a ValueError) when it is
+    not a group."""
     with read_catalog() as con:
         favourites = runs_store.list_favorites(con, include_groups=True)
         groups = {g["id"]: g for g in runs_store.list_groups(con)}
     headline = next((f for f in favourites if f["active"]), None)
     members = groups.get(headline["id"], {}).get("members", []) if headline else []
     if not headline or not members:
-        raise ValueError("The headline favourite is not a group of sleeves.")
+        raise NotALotGroup("The headline favourite is not a group of sleeves.")
     return headline, members
 
 
@@ -3991,6 +4018,22 @@ def lots_status() -> dict:
         pending = lots.pending(con, who, headline["id"])
         snapshot = holdings_store.latest_holdings(con, who, ("kite",))
         rules = holdings_store.rules(con, who)
+    return _lots_status_from(headline, members, labels, ledger, pending, snapshot, rules)
+
+
+def _lots_status_from(
+    headline: dict,
+    members: list[dict],
+    labels: dict[str, str],
+    ledger: dict[str, dict[str, float]],
+    pending: str | None,
+    snapshot: dict | None,
+    rules: dict[str, str],
+) -> dict:
+    """`lots_status`'s answer from what it read: shared with `lots_view`, so the Lots panel and
+    `mbt lots show` cannot disagree."""
+    from . import holdings_store
+
     kite_qty = {
         r["symbol"]: float(r["quantity"])
         for r in (snapshot or {}).get("rows", [])
@@ -4053,6 +4096,170 @@ def assign_lot(symbol: str, lot: str, shares: float | None = None) -> dict:
             (snapshot or {}).get("synced_at") or datetime.now(IST).isoformat(timespec="seconds"),
         )
     return {"lot": labels[sleeve_id], "symbol": symbol, "delta": delta}
+
+
+def _last_rebalance(req: BacktestRequest, friday: pd.Timestamp, start: str | None) -> str | None:
+    """The newest Friday before `friday` on this sleeve's calendar, from the paper start on (a
+    calendar Friday before any money went in rebalanced nothing); None when there is none yet."""
+    if not start:
+        return None
+    first = pd.Timestamp(start).normalize()
+    week = pd.Timestamp(friday).normalize() - pd.Timedelta(days=7)
+    while week >= first:
+        if _rebalance_info(req, week)["on_cadence"]:
+            return week.strftime("%Y-%m-%d")
+        week -= pd.Timedelta(days=7)
+    return None
+
+
+def lots_view() -> dict:
+    """Momentum › This week's Lots panel (BL-142 Phase 4). The ledger exactly as `mbt lots show`
+    gives it (`_lots_status_from`, on the same reads), with each lot's value at the last stored
+    daily close, its last and next rebalance Friday, whether it is due this Friday, what the last
+    Friday orders said for it, and Kite minus the lots beside what those orders told each lot to
+    trade (a planned trade Kite does not show yet is listed too).
+
+    Read-only: one read-only catalog read (plus the stock closes), never Kite, never a quote, never
+    a booking (only the Friday orders run and `mbt lots seed|assign` write the ledger). Not
+    available when the headline is not a group, or no lot is recorded for it yet."""
+    from . import holdings_store, lots
+    from .weekly import week_ending_on_or_before
+
+    who = holdings_store.owner()
+    today = datetime.now(IST).date()
+    friday = pd.Timestamp(week_ending_on_or_before(today + timedelta(days=6)))
+    week = journal_week_string(friday)
+    try:
+        headline, members = _headline_group()
+        with read_catalog() as con:
+            recorded = lots.has_ledger(con, who, headline["id"])
+            settings = holdings_store.settings(con, who)
+            ledger = lots.positions(con, who, headline["id"])
+            pending_id, planned = lots.pending_state(con, who, headline["id"])
+            has_history = lots.funded(con, who, headline["id"])
+            last_orders = holdings_store.latest_orders(con, who, headline["id"], on_friday=True)
+            snapshot = holdings_store.latest_holdings(con, who, ("kite",))
+            rules = holdings_store.rules(con, who)
+    except NotALotGroup as error:
+        return {"available": False, "reason": str(error), "week": week}
+    except (FileNotFoundError, duckdb.CatalogException):  # no catalog / tables yet
+        return {"available": False, "reason": "No lot ledger yet.", "week": week}
+    if not recorded:
+        reason = "No lots are recorded for the headline yet (mbt lots seed)."
+        return {"available": False, "reason": reason, "week": week}
+    labels = lot_labels(members, friday)
+    status = _lots_status_from(headline, members, labels, ledger, pending_id, snapshot, rules)
+    start = this_week.paper_start()
+    # Every symbol the planned trades name, too: a buy the orders said but Kite does not show yet
+    # has no difference from the ledger and would otherwise not be listed.
+    planned_symbols = {
+        s for shares in planned.values() for s, q in shares.items() if abs(q) > lots.EPS
+    }
+    beyond_symbols = sorted(set(status["not_in_a_lot"]) | planned_symbols)
+    held_symbols = {s for lot in status["lots"].values() for s in lot["holds"]}
+    closes = (
+        db_read.latest_symbol_closes_from_db_or_none(
+            sorted(held_symbols | set(beyond_symbols)), today
+        )
+        or {}
+    )
+    by_id = {m["id"]: m for m in members}
+    label_of = {entry["id"]: label for label, entry in status["lots"].items()}
+    told = {lot["id"]: lot for lot in (last_orders or {}).get("lots") or []}
+
+    def priced(symbol: str, shares: float) -> dict:
+        close = closes.get(symbol)
+        return {
+            "symbol": symbol,
+            "shares": shares,
+            "close": close[0] if close else None,
+            "close_day": close[1].isoformat() if close else None,
+            "value": round(shares * close[0], 2) if close else None,
+        }
+
+    out = []
+    for label, entry in status["lots"].items():
+        member = by_id[entry["id"]]
+        req = BacktestRequest.model_validate(member["config"])
+        info = _rebalance_info(req, friday)
+        rows = [priced(s, q) for s, q in sorted(entry["holds"].items())]
+        ordered = told.get(entry["id"])
+        out.append(
+            {
+                "id": entry["id"],
+                "label": label,
+                "sleeve": member["name"],
+                "holds": rows,
+                "value": round(sum(r["value"] for r in rows if r["value"] is not None), 2),
+                "unpriced": [r["symbol"] for r in rows if r["value"] is None],
+                "funded": entry["id"] in has_history,
+                "due": bool(info["on_cadence"]),
+                "next": week if info["on_cadence"] else info["next"],
+                "last": _last_rebalance(req, friday, start),
+                "pending": entry["id"] == pending_id,
+                "last_orders": (
+                    {
+                        "status": ordered["status"],
+                        "budget": ordered.get("budget"),
+                        "next": ordered.get("next"),
+                    }
+                    if ordered
+                    else None
+                ),
+            }
+        )
+    beyond = []
+    for symbol in beyond_symbols:
+        row = priced(symbol, status["not_in_a_lot"].get(symbol, 0.0))
+        row["delta"] = row.pop("shares")
+        row["planned"] = [
+            {"lot": label_of.get(sid, sid), "shares": shares[symbol]}
+            for sid, shares in planned.items()
+            if abs(shares.get(symbol, 0.0)) > lots.EPS
+        ]
+        beyond.append(row)
+    days = sorted(
+        {r["close_day"] for lot in out for r in lot["holds"] if r["close_day"]}
+        | {r["close_day"] for r in beyond if r["close_day"]}
+    )
+    synced_at = status["snapshot"]
+    return {
+        "available": True,
+        "group": status["group"],
+        "group_id": headline["id"],
+        "week": week,
+        "paper_start": start,
+        "holdings_source": settings["holdings_source"],
+        "snapshot": (
+            {
+                "synced_at": synced_at,
+                "cash": (snapshot or {}).get("cash"),
+                "today": str(synced_at)[:10] == today.isoformat(),
+            }
+            if synced_at
+            else None
+        ),
+        "pending": status["pending"],
+        "close_days": [days[0], days[-1]] if days else None,
+        "lots": out,
+        "total_value": round(sum(lot["value"] for lot in out), 2),
+        "unpriced": sum(len(lot["unpriced"]) for lot in out),
+        "not_in_a_lot": beyond,
+        "not_in_a_lot_value": round(sum(r["value"] for r in beyond if r["value"] is not None), 2),
+        "not_in_a_lot_unpriced": sum(1 for r in beyond if r["value"] is None),
+        "last_orders": (
+            {
+                "week": last_orders.get("week"),
+                "created_at": last_orders.get("created_at"),
+                "trigger": last_orders.get("trigger"),
+                "free_cash": last_orders.get("free_cash"),
+                "deposit_needed": last_orders.get("deposit_needed"),
+                "lot_size": last_orders.get("lot_size"),
+            }
+            if last_orders and last_orders.get("lots")
+            else None
+        ),
+    }
 
 
 def _orders_message(payload: dict) -> Notification:
@@ -4155,6 +4362,19 @@ def _journal_line(journal: dict) -> str | None:
     )
 
 
+def _forward_score_line(run: str) -> str | None:
+    """BL-024 Phase 2: the headline's newest scored week, one line in its Friday message (never a
+    message of its own, BL-173). Final runs only; a failure is a line saying so, never a raise."""
+    if run != "final":
+        return None
+    from . import forward_run
+
+    try:
+        return forward_run.headline_line()
+    except Exception as error:
+        return f"Forward score could not be computed: {type(error).__name__}: {error}"
+
+
 def _execute_weekly_run(body: WeeklyRunBody) -> dict:
     """Evaluate every favourite and send the active one; the body of a weekly job."""
     from . import notify
@@ -4226,6 +4446,9 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
         if body.send and in_scope:
             if journal_line:
                 active_result.notification.body += f"\n\n{journal_line}"
+            score_line = _forward_score_line(body.run)
+            if score_line:
+                active_result.notification.body += f"\n{score_line}"
             notify.send(active_result.notification)
             sent_main = True
     elif in_scope:
@@ -4364,11 +4587,21 @@ class _PreviewJobs:
 
     MAX_KEPT = 20
 
-    def __init__(self) -> None:
+    def __init__(
+        self, run: Callable[[Any], dict] | None = None, *, latest_only: bool = False
+    ) -> None:
         self._lock = threading.Lock()
         self._jobs: dict[str, dict] = {}
+        # What a job computes from its argument (default: a rebalance preview), looked up when the
+        # job runs so a test can replace `rebalance_preview`.
+        self._run = run
+        # `latest_only`: one job computes at a time, and a job a newer one was started after
+        # while it waited finishes at once as superseded (the page asks only for the newest).
+        self._latest_only = latest_only
+        self._serial = threading.Lock()
+        self._newest: str | None = None
 
-    def start(self, req: RebalanceRequest) -> dict:
+    def start(self, req: Any) -> dict:
         job = {
             "id": os.urandom(8).hex(),
             "status": "running",
@@ -4380,9 +4613,11 @@ class _PreviewJobs:
         }
         with self._lock:
             self._jobs[job["id"]] = job
+            self._newest = job["id"]
             for old in list(self._jobs)[: -self.MAX_KEPT]:
                 del self._jobs[old]
-        threading.Thread(target=self._execute, args=(job, req), daemon=True).start()
+        target = self._execute_latest if self._latest_only else self._execute
+        threading.Thread(target=target, args=(job, req), daemon=True).start()
         return dict(job)
 
     def get(self, job_id: str) -> dict | None:
@@ -4390,10 +4625,20 @@ class _PreviewJobs:
             job = self._jobs.get(job_id)
             return dict(job) if job is not None else None
 
-    def _execute(self, job: dict, req: RebalanceRequest) -> None:
+    def _execute_latest(self, job: dict, req: Any) -> None:
+        with self._serial:
+            with self._lock:
+                superseded = self._newest != job["id"]
+                if superseded:
+                    job["status"], job["error"] = "failed", "Superseded by a newer preview."
+                    job["finished_at"] = datetime.now(IST).isoformat(timespec="seconds")
+            if not superseded:
+                self._execute(job, req)
+
+    def _execute(self, job: dict, req: Any) -> None:
         result, error, error_status = None, None, None
         try:
-            result = rebalance_preview(req)
+            result = self._run(req) if self._run is not None else rebalance_preview(req)
         except HTTPException as exc:  # the same refusals the synchronous route gives
             error, error_status = str(exc.detail), exc.status_code
         except Exception as exc:  # the job must always finish, or the UI spins forever
@@ -4405,6 +4650,11 @@ class _PreviewJobs:
 
 
 PREVIEW_JOBS = _PreviewJobs()
+# Your orders' "Preview for…": a favourite's orders against the same holdings, saved nowhere.
+ORDER_PREVIEW_JOBS = _PreviewJobs(
+    lambda favourite_id: _compute_orders("manual", favourite=favourite_id, preview=True),
+    latest_only=True,  # stepping through the picker never stacks Broad rankings or logins
+)
 WEEKLY_JOBS = _SingleFlightJob()
 LIVE_RULES_JOBS = _SingleFlightJob()
 ORDERS_JOBS = _SingleFlightJob()
@@ -5236,7 +5486,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/kite/callback")
     def kite_callback(state: str = "", request_token: str = "", status: str = "") -> HTMLResponse:
-        from . import holdings_store, holdings_sync
+        from . import kite_login
 
         now = datetime.now(IST)
         with _LOCAL_OAUTH_LOCK:
@@ -5247,20 +5497,10 @@ def create_app() -> FastAPI:
             raise HTTPException(400, "Kite did not complete the login.")
         load_repo_env()
         try:
-            creds = kite.exchange_request_token(request_token)
+            # Keeps the token and, when Kite is the holdings source, reads the holdings at once.
+            note = kite_login.finish_login(request_token)
         except (kite.KiteCredentialsError, RuntimeError) as error:
             raise HTTPException(502, str(error)) from None
-        kite.save_token(creds)
-        # Read the holdings at once when Kite is the holdings source, so the page has them.
-        note = "Kite connected."
-        try:
-            with open_catalog() as con:
-                source = holdings_store.settings(con, holdings_store.owner())["holdings_source"]
-            if source == "kite":
-                snapshot = holdings_sync.sync("kite")
-                note += f" Holdings read: {len(snapshot.get('rows', []))} names."
-        except Exception as error:  # noqa: BLE001 - the login worked; the read is best effort
-            note += f" Holdings not read: {notify.redact(str(error))}"
         return HTMLResponse(
             "<!doctype html><title>Kite connected</title>"
             f"<p>{html.escape(note)} You can return to the dashboard.</p>"
@@ -5763,10 +6003,29 @@ def create_app() -> FastAPI:
         except (FileNotFoundError, duckdb.CatalogException):  # no catalog / tables yet
             return empty
 
+    @app.get("/api/lots")
+    def lots_panel() -> dict:
+        """This week's Lots panel (BL-142 Phase 4): the lot ledger with values and calendars.
+        Read-only: no Kite read, no quote, no booking (`lots_view`)."""
+        return lots_view()
+
     @app.post("/api/orders/run", status_code=202)
     def orders_run() -> dict:
         job, started = ORDERS_JOBS.start(lambda: _compute_orders("manual"), {})
         return {"job": job, "started": started}
+
+    @app.post("/api/orders/preview/jobs", status_code=202)
+    def orders_preview_start(body: OrderPreviewBody) -> dict:
+        """The orders a favourite would make against the holdings Your orders reads, as one
+        portfolio. Read-only: nothing is saved (`_compute_orders(preview=True)`)."""
+        return ORDER_PREVIEW_JOBS.start(body.favourite)
+
+    @app.get("/api/orders/preview/jobs/{job_id}")
+    def orders_preview_job(job_id: str) -> dict:
+        job = ORDER_PREVIEW_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(404, "Unknown preview job (the service may have restarted).")
+        return job
 
     @app.put("/api/orders/settings")
     def orders_settings(body: OrderSettingsBody) -> dict:
@@ -5818,6 +6077,13 @@ def create_app() -> FastAPI:
             who = holdings_store.owner()
             holdings_store.set_rule(con, who, body.symbol.upper(), body.treatment)
             return holdings_store.rules(con, who)
+
+    @app.get("/api/journal/forward")
+    def forward_journal_score() -> dict:
+        """BL-024 Phases 2-3: the stored forward score and the real fills reconciled, live."""
+        from . import forward_run
+
+        return forward_run.view()
 
     @app.get("/api/journal")
     def forward_journal_view(week: str | None = None) -> dict:

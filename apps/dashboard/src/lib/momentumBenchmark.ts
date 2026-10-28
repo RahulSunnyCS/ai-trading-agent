@@ -133,6 +133,53 @@ export function resolveBenchmark(result: MomentumResult, picked: string): Benchm
   };
 }
 
+/**
+ * The comparison lines the hero chart draws from the start (BL-036, the BL-010 bar): the momentum
+ * index and the Midcap 150. The others are one click away. The picked benchmark is always drawn
+ * as the benchmark line, so it is never also a comparison.
+ */
+export const DEFAULT_COMPARISON_LINES: readonly string[] = [
+  'Nifty200 Momentum 30 TRI',
+  'Nifty Midcap 150 TRI',
+];
+
+export interface ComparisonLine {
+  /** For display and the chart's toggle key: "Nifty Midcap 150". */
+  name: string;
+  series: Array<number | null>;
+  /** Drawn until the reader switches it off. */
+  defaultOn: boolean;
+}
+
+/**
+ * The optional lines on the hero chart: every usable picker index other than the one picked, in
+ * the picker's order, then the chart-only extras (`extra_comparisons`: Nifty 500 TRI). A line
+ * whose curve does not match the run's weeks is left out, as the picker leaves it out.
+ */
+export function comparisonLines(result: MomentumResult, pickedName: string): ComparisonLine[] {
+  const lines: ComparisonLine[] = [];
+  const seen = new Set<string>([pickedName]);
+  for (const choice of result.benchmarks ?? []) {
+    if (seen.has(choice.name) || !choice.available || unusable(result, choice) !== null) continue;
+    seen.add(choice.name);
+    lines.push({
+      name: benchmarkLabel(choice.name),
+      series: choice.series,
+      defaultOn: DEFAULT_COMPARISON_LINES.includes(choice.name),
+    });
+  }
+  for (const extra of result.extra_comparisons ?? []) {
+    if (seen.has(extra.name) || extra.series.length !== result.series.dates.length) continue;
+    seen.add(extra.name);
+    lines.push({
+      name: benchmarkLabel(extra.name),
+      series: extra.series,
+      defaultOn: DEFAULT_COMPARISON_LINES.includes(extra.name),
+    });
+  }
+  return lines;
+}
+
 /** Share of 52-week windows in which the strategy was ahead of the benchmark; null with none. */
 export function aheadShare(excess: ReadonlyArray<number | null>): number | null {
   const known = excess.filter((value): value is number => value !== null);

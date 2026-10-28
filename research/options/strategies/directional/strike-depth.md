@@ -18,8 +18,8 @@ ITM1, ₹3,000 overall stop, 21% leg stop, one re-entry at cost, exit 15:28
 
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
-| BL-167 | ITM2 (at BL-166's ₹4,000 stop; ₹3,000 control) added to the Adaptive ranking universe, Core-298 and T1, list C | 2025-01-10 → 2026-10-23, 431 sessions; net after charges, 1 lot per pick; in-sample | **No gain** in either universe (Core −₹57 a day, T1 −₹74; intervals include zero; Core's 2025 half −₹217, wholly below zero) | [BL-167][bl167] |
-| BL-166 | ITM2, ITM3 x overall stop {3,000, 4,000, 5,000, 6,000, 8,000, 10,000}; 25 start times; NIFTY and SENSEX; against ITM1 at ₹3,000 | 2024-10-09 → 2026-10-23; stop matched on the fit year, judged on the hold-out year from 2025-10-09; net after charges, 1 lot | **POC passes on SENSEX** (ITM2 +₹54, ITM3 +₹78 per slot-day, intervals above zero); **NIFTY inconclusive** (+₹36 and +₹44, intervals include zero) | [BL-166][bl166] |
+| BL-167 | ITM2 (at BL-181's ₹4,000 stop; ₹3,000 control) added to the Adaptive ranking universe, Core-298 and T1, list C | 2025-01-10 → 2026-10-23, 431 sessions; net after charges, 1 lot per pick; in-sample | **No gain** in either universe (Core −₹57 a day, T1 −₹74; intervals include zero; Core's 2025 half −₹217, wholly below zero) | [BL-167][bl167] |
+| BL-181 | ITM2, ITM3 x overall stop {3,000, 4,000, 5,000, 6,000, 8,000, 10,000}; 25 start times; NIFTY and SENSEX; against ITM1 at ₹3,000 | 2024-10-09 → 2026-10-23; stop matched on the fit year, judged on the hold-out year from 2025-10-09; net after brokerage only (no STT or exchange fees), 1 lot | **POC passes on SENSEX** (ITM2 +₹54, ITM3 +₹78 per slot-day, intervals above zero); **NIFTY inconclusive** (+₹36 and +₹44, intervals include zero) | [BL-181][bl181] |
 
 ## What we know
 
@@ -41,6 +41,10 @@ ITM1, ₹3,000 overall stop, 21% leg stop, one re-entry at cost, exit 15:28
 - **Surviving four tests.** At a 97.5% interval (Bonferroni for the four comparisons) the SENSEX
   hold-out gains stay above zero: ITM2 +₹54 (+13 to +98), ITM3 +₹78 (+3 to +154), the latter only
   just. NIFTY stays inconclusive (+36: −41 to +119; +44: −68 to +165).
+- **Only brokerage was charged.** STT and the exchange fee grow with the premium sold, which favours the
+  deeper strikes. Under the BL-063 charge model (a sample: 3 slots, every third hold-out day) the extra
+  statutory charge against ITM1 is about ₹6 (ITM2) and ₹11 (ITM3) a slot-day on SENSEX and ₹10 and ₹21
+  on NIFTY. The 90% verdicts stand; SENSEX ITM3 no longer clears zero at 97.5% (lower bound about −₹8).
 - **Caveats:** the fit-year intervals all include zero; the engine fills with no spread, and nothing
   was checked about the zero-volume minutes it forward-fills on thin deep strikes, so ITM2 and ITM3 may
   look better than they would trade; ATM and ITM1 carry settings tuned for them; one hold-out year.
@@ -50,7 +54,7 @@ ITM1, ₹3,000 overall stop, 21% leg stop, one re-entry at cost, exit 15:28
 ## In the Adaptive ranking (BL-167, in-sample)
 
 Adding the 50 ITM2 variants to the ranking universe (431 sessions from 2025-01-10, list C, ITM2 at the
-BL-166 stop of ₹4,000):
+BL-181 stop of ₹4,000):
 
 | | Adaptive Classic (Core-298) | Adaptive Tuned (T1) |
 |---|---|---|
@@ -76,5 +80,5 @@ chosen on this history, no spread), so the forward journal is the only clean tes
   rotation's ranking (ITM2 was tried there in BL-167: no gain). A forward shadow of the ITM2 variants is
   the only clean test of BL-167.
 
-[bl166]: ../../../../backlog/BL-166-directional-itm2-itm3-with-matched-stop.md
+[bl181]: ../../../../backlog/BL-181-directional-itm2-itm3-with-matched-stop.md
 [bl167]: ../../../../backlog/BL-167-itm2-in-adaptive-and-t1.md

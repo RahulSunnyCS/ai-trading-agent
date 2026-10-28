@@ -11,8 +11,10 @@ from fastapi.testclient import TestClient
 from momentum_backtesting import api, metrics, reference_benchmarks
 from momentum_backtesting.fetch import load_universe
 from momentum_backtesting.reference_benchmarks import (
+    CHART_ONLY,
     NIFTY50_TRI,
     NIFTY200_MOMENTUM30_TRI,
+    NIFTY500_TRI,
     NIFTY_NEXT50_TRI,
     PICKER,
     aligned,
@@ -79,7 +81,9 @@ def test_compare_reports_the_cagr_edge_and_the_back_calculated_note():
     assert out[NIFTY200_MOMENTUM30_TRI]["note"].startswith("Back-calculated")
 
 
-def test_every_etf_backtest_payload_carries_the_comparisons(tmp_path, monkeypatch):
+def _etf_backtest(tmp_path, monkeypatch, nifty500=False) -> dict:
+    """An ETF backtest through the real API on random prices, with the two core TRIs (and, with
+    `nifty500`, a Nifty 500 TRI column) in the benchmarks CSV."""
     weeks = pd.date_range("2016-01-01", periods=180, freq="W-FRI")
     rng = np.random.default_rng(7)
     prices = pd.DataFrame(
@@ -93,12 +97,51 @@ def test_every_etf_backtest_payload_carries_the_comparisons(tmp_path, monkeypatc
     prices.index.name = "week_ending"
     prices.to_csv(tmp_path / "weekly_closes.csv")
     _write_csv(tmp_path, weeks, prices["Nifty 50"] * 1.01, prices["Nifty Bank"])
+    if nifty500:
+        path = tmp_path / "stocks" / "benchmarks_weekly.csv"
+        frame = pd.read_csv(path, index_col=0)
+        frame["nifty500_tri"] = (prices["Nifty 50"] * 1.3).to_numpy()
+        frame.to_csv(path)
     monkeypatch.setattr(api, "DATA_DIR", tmp_path)
     monkeypatch.setattr(api, "DATA", api._Data())
     client = TestClient(api.create_app())
 
     universe = [i.name for i in load_universe() if i.include == "core"]
-    body = client.post("/api/backtest", json={"universe": universe, "start": "2017-01-06"}).json()
+    return client.post("/api/backtest", json={"universe": universe, "start": "2017-01-06"}).json()
+
+
+def test_compare_takes_another_list_of_indices():
+    weeks = pd.date_range("2019-01-04", periods=60, freq="W-FRI")
+    equity = pd.Series(1.005 ** np.arange(60), index=weeks)
+    level = pd.Series(100 * 1.002 ** np.arange(60), index=weeks)
+    refs = pd.DataFrame({NIFTY50_TRI: level, NIFTY500_TRI: level * 2})
+
+    assert [c["name"] for c in compare(equity, refs)] == [NIFTY50_TRI]
+    extra = compare(equity, refs, names=CHART_ONLY)
+    assert [c["name"] for c in extra] == [NIFTY500_TRI]
+    assert extra[0]["curve"].iloc[0] == 1.0 and extra[0]["note"] is None
+    # Not offered by the picker, which reaches the chart on its own (`benchmarks`).
+    assert not set(CHART_ONLY) & set(PICKER)
+
+
+def test_a_payload_with_nifty_500_data_carries_it_as_an_extra_comparison(tmp_path, monkeypatch):
+    body = _etf_backtest(tmp_path, monkeypatch, nifty500=True)
+
+    # The default list keeps its two lines; Nifty 500 comes on its own key.
+    assert [c["name"] for c in body["comparisons"]] == [NIFTY50_TRI, NIFTY200_MOMENTUM30_TRI]
+    (line,) = body["extra_comparisons"]
+    assert line["name"] == NIFTY500_TRI
+    assert len(line["series"]) == len(body["series"]["dates"])
+    assert line["series"][0] == pytest.approx(100_000)
+    assert line["excess_cagr"] == pytest.approx(body["kpis"]["cagr"] - line["cagr"])
+    assert NIFTY500_TRI not in [b["name"] for b in body["benchmarks"]]
+    json.dumps(body, allow_nan=False)
+
+
+def test_every_etf_backtest_payload_carries_the_comparisons(tmp_path, monkeypatch):
+    body = _etf_backtest(tmp_path, monkeypatch)
+    # No Nifty 500 data: no extra key at all, so such a result is exactly what it was.
+    assert "extra_comparisons" not in body
     names = [c["name"] for c in body["comparisons"]]
     assert names == [NIFTY50_TRI, NIFTY200_MOMENTUM30_TRI]
     first = body["comparisons"][0]

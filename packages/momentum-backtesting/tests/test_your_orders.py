@@ -217,6 +217,53 @@ def test_a_favourite_name_that_matches_two_groups_is_refused_not_guessed(client,
     assert api._find_favourite(favourites, "nothing")[1] == "No favourite matches 'nothing'."
 
 
+def test_a_paper_preview_plans_from_cash_and_saves_nothing(client, monkeypatch):
+    """The paper portfolio is the headline's model: a preview of another favourite never starts
+    from that favourite's own last-week weights, which would show a switch as costing nothing."""
+    run = _headline(client)
+    signal = {
+        "week": "2026-10-09",
+        "weights": {"AAA": 0.5, "BBB": 0.5},
+        "target_weights": {"AAA": 0.5, "CCC#2": 0.5},
+        "rows": [],
+        "sleeves": [],
+    }
+    monkeypatch.setattr(api, "_orders_signal", lambda *a: (signal, "exact", None, ["ranking"]))
+    _strategy(monkeypatch, {"AAA": 100.0, "BBB": 50.0, "CCC#2": 250.0})
+    payload = api._compute_orders("manual", favourite=run["id"], preview=True)
+    rows = {r["symbol"]: (r["action"], r["quantity"]) for r in payload["plan"]["rows"]}
+    assert payload["preview"] is True and payload["holdings"]["fresh"] is True
+    assert rows["AAA"] == ("BUY", 500) and rows["CCC#2"] == ("BUY", 200) and "BBB" not in rows
+    assert client.get("/api/orders", params={"week": payload["week"]}).json()["orders"] == []
+
+
+def test_order_previews_run_one_at_a_time_and_skip_the_superseded():
+    import threading
+    import time
+
+    release = threading.Event()
+    ran: list[str] = []
+
+    def work(name: str) -> dict:
+        ran.append(name)
+        release.wait(5)
+        return {"name": name}
+
+    jobs = api._PreviewJobs(work, latest_only=True)
+    first = jobs.start("a")
+    time.sleep(0.1)  # "a" is computing
+    second, third = jobs.start("b"), jobs.start("c")
+    release.set()
+    for _ in range(200):
+        if all(jobs.get(j["id"])["status"] != "running" for j in (first, second, third)):
+            break
+        time.sleep(0.02)
+    assert jobs.get(first["id"])["result"] == {"name": "a"}
+    assert jobs.get(second["id"])["error"] == "Superseded by a newer preview."
+    assert jobs.get(third["id"])["result"] == {"name": "c"}
+    assert ran == ["a", "c"]
+
+
 def test_fresh_needs_the_paper_source(client, monkeypatch):
     _headline(client)
     client.put("/api/orders/settings", json={"holdings_source": "fyers"})

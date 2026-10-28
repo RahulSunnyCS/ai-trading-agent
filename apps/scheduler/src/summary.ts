@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { readdirSync, statfsSync } from 'node:fs';
+import { readFileSync, readdirSync, statfsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { isTradingDay } from '@trading/market-reference';
@@ -9,6 +9,7 @@ import { JOBS } from './jobs.js';
 import { pauseNotice } from './pause.js';
 import type { Builtin, BuiltinContext } from './runner.js';
 import { addDays, formatIst, istAt, istDay, previousDue } from './schedule.js';
+import { stateDir } from './stop-hold.js';
 
 /** One line of the summary: ok, or a problem with what to do about it. */
 export interface Check {
@@ -129,11 +130,75 @@ const FAILED_PART: Record<ReturnType<typeof brokerLoginFailedPart>, string> = {
   unknown: 'failure',
 };
 
+/** A line of the Mac's login outcome (`<state>/broker-login/<day>.json`, BL-172), or null. */
+interface LocalLogin {
+  ok: boolean;
+  nothing?: boolean;
+  /** the Mac's catch-up found GitHub's backup had already logged in: its run */
+  github?: string;
+  fallback?: { parts: string[]; url: string | null } | null;
+  result?: {
+    algotest: { name: string; status: string; detail: string }[] | null;
+    quantiply: { name: string; status: string; detail: string } | null;
+    quantiplyShoonya: { name: string; status: string; detail: string } | null;
+    fatal: string | null;
+  } | null;
+  /** Kite's unattended login on Fridays and Mondays (owner, 2026-10-28) */
+  kite?: { name: string; status: string; detail: string };
+}
+
+/** Kite's line of the Mac's login file: null when it did not run (not a Friday or Monday, or off). */
+export function kiteLoginCheck(local: LocalLogin | null): Check | null {
+  const kite = local?.kite;
+  if (!kite || kite.status === 'SKIPPED') return null;
+  return kite.status === 'FAIL'
+    ? { ok: false, label: 'Kite login', detail: `${kite.detail} → Broker logins › Kite` }
+    : { ok: true, label: 'Kite login', detail: kite.detail };
+}
+
+/**
+ * BL-172: the morning login runs on the Mac. Its own file answers, unless it handed parts to
+ * GitHub (then the GitHub run does). Null when the Mac did not run it today (off, or an older
+ * scheduler): the GitHub check below answers then.
+ */
+export function localLoginCheck(local: LocalLogin | null): Check | null {
+  if (local === null) return null;
+  const label = 'Broker login';
+  if (local.nothing)
+    return { ok: true, label, detail: 'nothing to log in (Settings › Automation)' };
+  if (local.ok && local.github)
+    return { ok: true, label, detail: `logged in by GitHub's backup → ${local.github}` };
+  if (local.ok) return { ok: true, label, detail: 'logged in on the Mac' };
+  if (local.fallback) return null;
+  const r = local.result;
+  const failed = r
+    ? [...(r.algotest ?? []), r.quantiply, r.quantiplyShoonya]
+        .filter((x) => x && x.status === 'FAIL')
+        .map((x) => `${x?.name}: ${x?.detail}`)
+    : [];
+  return {
+    ok: false,
+    label,
+    detail: `failed on the Mac, not handed to GitHub (a refusal): ${failed.join('; ') || r?.fatal || 'see the login report'}`,
+  };
+}
+
+function readLocalLogin(ctx: BuiltinContext): LocalLogin | null {
+  try {
+    const path = join(stateDir(ctx.env), 'broker-login', `${istDay(ctx.now())}.json`);
+    return JSON.parse(readFileSync(path, 'utf8')) as LocalLogin;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Did today's broker login workflow (dispatched at 08:00) succeed? It logs the brokers in to
  * AlgoTest and, with QUANTIPLY_LOGIN on, logs in to Quantiply too; a failure says which part.
  */
 function algotestCheck(ctx: BuiltinContext): Check {
+  const local = localLoginCheck(readLocalLogin(ctx));
+  if (local) return local;
   const label = 'Broker login';
   const raw = capture(
     'gh',
@@ -367,6 +432,7 @@ export type SystemChecks = (ctx: BuiltinContext) => Check[];
 
 const systemChecks: SystemChecks = (ctx) => [
   algotestCheck(ctx),
+  ...[kiteLoginCheck(readLocalLogin(ctx))].filter((c): c is Check => c !== null),
   fyersCheck(ctx),
   optionsDataCheck(ctx),
   checkoutCheck(ctx),
@@ -386,6 +452,13 @@ export function morningSummary(sink?: AlertSink, system: SystemChecks = systemCh
     ];
     const { text } = formatSummary(istDay(ctx.now()), checks);
     ctx.log(text);
+    // BL-173 (owner, 2026-10-28): only when something needs a look (a failed check, or a pause
+    // that makes the day quiet on purpose); on a clean day the 08:10 message is the confirmation.
+    const worth = checks.some((c) => !c.ok) || pauseChecks(ctx).length > 0;
+    if (!worth) {
+      ctx.log('every check passed: no message (BL-173)');
+      return { code: 0, error: null };
+    }
     await (sink ?? telegramSink(ctx.env, 'scheduler.morning'))(text);
     return { code: 0, error: null };
   };

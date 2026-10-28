@@ -14,6 +14,7 @@ import {
   RUN_STATUS_LABEL,
   SCHEDULER_API,
   type SchedulerJob,
+  firstSentence,
   needsConfirmation,
   runDurationMs,
   runNowError,
@@ -36,6 +37,15 @@ import {
   toast,
 } from './ui';
 
+/** The job's whole description; the table's row shows only its first sentence. */
+function JobDescription({ job }: { job: SchedulerJob }) {
+  return (
+    <p aria-label={`What ${job.id} does`} className="text-sm text-muted">
+      {job.description}
+    </p>
+  );
+}
+
 function LogPanel({ job, runId }: { job: SchedulerJob; runId: number }) {
   const running = runStatus(job.lastRun) === 'running';
   const log = useRunLog(runId, running);
@@ -46,6 +56,7 @@ function LogPanel({ job, runId }: { job: SchedulerJob; runId: number }) {
         description={`Run #${runId}, last 200 lines`}
         actions={<RefreshButton onClick={log.refetch} loading={log.loading} />}
       />
+      <JobDescription job={job} />
       {log.error && !log.data ? (
         <StateMessage variant="error" title="No log available" description={log.error} />
       ) : (
@@ -118,7 +129,7 @@ export function JobsView() {
         <div className="px-5 pt-5">
           <CardHeader
             title="Scheduled jobs"
-            description="Times are IST. Click a job to read its latest log."
+            description="Times are IST. Click a job to read what it does in full and its latest log."
             actions={<RefreshButton onClick={refetch} loading={loading} />}
           />
         </div>
@@ -152,7 +163,9 @@ export function JobsView() {
                   >
                     <Td>
                       <div className="font-medium">{job.id}</div>
-                      <div className="max-w-xs text-xs text-muted">{job.description}</div>
+                      <div className="max-w-xs text-xs text-muted" title={job.description}>
+                        {firstSentence(job.description)}
+                      </div>
                     </Td>
                     <Td className="whitespace-nowrap text-muted">{job.schedule}</Td>
                     <Td className="whitespace-nowrap">{formatIstDateTimeShort(job.nextRun)}</Td>
@@ -209,7 +222,10 @@ export function JobsView() {
         focus.lastRun ? (
           <LogPanel key={focus.lastRun.id} job={focus} runId={focus.lastRun.id} />
         ) : (
-          <StateMessage variant="empty" title={`${focus.id} has not run yet`} />
+          <Card className="space-y-3">
+            <JobDescription job={focus} />
+            <StateMessage variant="empty" title={`${focus.id} has not run yet`} />
+          </Card>
         )
       ) : null}
       <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />

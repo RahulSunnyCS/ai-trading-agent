@@ -3,12 +3,18 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { MomentumJournal, MomentumJournalEntry } from '../../../types/momentum';
+import type { ForwardView } from '../../../types/momentumForward';
 
 const calls: string[] = [];
 let response: MomentumJournal | null = null;
 
+const forward: ForwardView | null = null;
+
 vi.mock('../../../hooks/usePolledResource', () => ({
   usePolledResource: (url: string) => {
+    if (url.includes('/journal/forward')) {
+      return { data: forward, loading: false, error: null, refetch: () => {} };
+    }
     calls.push(url);
     return { data: response, loading: false, error: null, refetch: () => {} };
   },
@@ -159,6 +165,24 @@ describe('MomentumJournalView', () => {
     // A gate's skip (BL-136) is part of the record: shown with the trades.
     expect(screen.getByText('SKIP (premium) Nasdaq 100')).toBeTruthy();
     expect(screen.getByText('Nifty Realty 60%, Gold 40%')).toBeTruthy();
+  });
+
+  it('opens the expected-signals table by itself when one is missing', () => {
+    response = journal;
+    render(<MomentumJournalView />);
+    expect(screen.getByText('1 / 3 recorded')).toBeTruthy();
+    expect(screen.getByText('Missing')).toBeTruthy();
+  });
+
+  it('collapses the expected-signals table to its counter when every signal is in', () => {
+    const check = journal.check as NonNullable<MomentumJournal['check']>;
+    const recordedOnly = check.items.map((item) => ({ ...item, status: 'recorded' as const }));
+    response = { ...journal, check: { ...check, recorded: 3, items: recordedOnly } };
+    render(<MomentumJournalView />);
+    expect(screen.getByText('3 / 3 recorded')).toBeTruthy();
+    expect(screen.queryByText('Stock Weekly Core')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /what should be here/ }));
+    expect(screen.getByText('Stock Weekly Core')).toBeTruthy();
   });
 
   it('opens an entry to show every action and its provenance', () => {

@@ -260,6 +260,9 @@ export interface MomentumResult {
   benchmark_name: string;
   kpis: Record<string, number | string | null>;
   comparisons?: MomentumComparison[];
+  /** Comparison lines the chart offers that the picker does not (Nifty 500 TRI; BL-036). Present
+   * only when one covers the run. */
+  extra_comparisons?: MomentumComparison[];
   /** The headline picker's five indices; absent on results computed before 2026-10-07. */
   benchmarks?: MomentumBenchmarkChoice[];
   series: MomentumSeries;
@@ -554,67 +557,6 @@ export interface MomentumStockActionReview {
   }>;
 }
 
-/** One sleeve of a previewed group: its weight in the account and whether it trades this week. */
-export interface MomentumRebalanceSleeve {
-  id: string;
-  name: string;
-  /** Value since the last April reset (1 = unchanged). */
-  value: number;
-  /** Its fraction of the whole group. */
-  share: number;
-  target_pct: Record<string, number>;
-  on_cadence: boolean;
-  every: number | null;
-  next: string | null;
-}
-
-export interface MomentumRebalanceGroup {
-  id: string;
-  name: string;
-  sleeves: MomentumRebalanceSleeve[];
-}
-
-export interface MomentumRebalanceResult {
-  dataset: 'stock' | 'broad';
-  as_of: string;
-  signal_week: string;
-  price_mode: 'live' | 'last_close';
-  price_source: string;
-  /** Why a market-hours preview used stored closes instead of live prices; null otherwise. */
-  live_unavailable?: string | null;
-  portfolio_value: number;
-  first_allocation: boolean;
-  /** The Friday the portfolio starts from nothing (`mbt paper-start`), and whether this is it. */
-  paper_start?: string | null;
-  first_week?: boolean;
-  rebalance_schedule: {
-    strategy_start_date: string;
-    cadence: 'weekly' | 'every_n_weeks' | 'monthly';
-    interval_weeks: number | null;
-    effective_rebalance_offset: number | null;
-    is_rebalance_week: boolean;
-    previous_rebalance_date: string | null;
-    current_rebalance_date: string | null;
-    next_rebalance_date: string;
-  } | null;
-  /** Present when a favourite group was previewed (BL-087): its sleeves and what each holds. */
-  group?: MomentumRebalanceGroup;
-  current_pct: Record<string, number>;
-  target_pct: Record<string, number>;
-  rows: Array<{
-    asset: string;
-    symbol: string | null;
-    action: 'BUY' | 'SELL';
-    current_pct: number;
-    target_pct: number;
-    delta_pct: number;
-    ltp: number | null;
-    indicative_value: number;
-    indicative_quantity: number | null;
-  }>;
-  note: string;
-}
-
 /** GET /api/momentum/journal — the forward-signal journal (BL-024). */
 export interface MomentumJournalEntry {
   entry_id: number;
@@ -901,6 +843,86 @@ export interface MomentumLotOrders {
   plan: MomentumOrderPlan | null;
 }
 
+/** A holding booked to a lot (or Kite beyond the lots), valued at its last stored close. */
+export interface MomentumLotHolding {
+  symbol: string;
+  shares: number;
+  /** null: no stored close for the symbol; the value is then unknown, never zero. */
+  close: number | null;
+  close_day: string | null;
+  value: number | null;
+}
+
+/** One lot on This week's Lots panel (BL-142 Phase 4, `GET /api/momentum/lots`). */
+export interface MomentumLot {
+  id: string;
+  label: string;
+  /** The sleeve's saved name ("… · Friday 4 of 4"; the page's Lot number is from the paper start). */
+  sleeve: string;
+  holds: MomentumLotHolding[];
+  /** Sum of the priced holdings. */
+  value: number;
+  unpriced: string[];
+  /** Has the ledger ever booked a share to it? */
+  funded: boolean;
+  /** Rebalances on this page's Friday (`week`). */
+  due: boolean;
+  /** Its next rebalance Friday: `week` itself when due. */
+  next: string | null;
+  /** Its newest calendar Friday before `week` from the paper start on; null before its first. */
+  last: string | null;
+  /** The lot the last Friday run's orders were for: Kite's next changes are booked to it. */
+  pending: boolean;
+  /** What the last stored orders said for this lot (the Friday Telegram's line). */
+  last_orders: {
+    status: MomentumLotOrders['status'];
+    budget: number | null;
+    next: string | null;
+  } | null;
+}
+
+export type MomentumLotsView =
+  | { available: false; reason: string; week: string }
+  | {
+      available: true;
+      group: string;
+      group_id: string;
+      /** The Friday this page is about (today on a Friday, else the coming one). */
+      week: string;
+      paper_start: string | null;
+      holdings_source: 'paper' | 'fyers' | 'kite';
+      /** The latest Kite snapshot; `today`: read today (IST). */
+      snapshot: { synced_at: string; cash: number | null; today: boolean } | null;
+      pending: string | null;
+      /** The oldest and newest close the values use; null when nothing is priced. */
+      close_days: [string, string] | null;
+      lots: MomentumLot[];
+      /** Sum of the lots' priced holdings; `unpriced` holdings are left out of it. */
+      total_value: number;
+      unpriced: number;
+      /** Kite's latest snapshot minus the ledger, per symbol, as `mbt lots show` lists it, with
+       * what the last Friday orders told each lot to trade (signed shares). A symbol those orders
+       * name with no difference in Kite is listed with `delta` 0 (not traded in Kite yet). */
+      not_in_a_lot: Array<
+        Omit<MomentumLotHolding, 'shares'> & {
+          delta: number;
+          planned: Array<{ lot: string; shares: number }>;
+        }
+      >;
+      /** The priced rows' value, summed on the server (money is never summed in the browser),
+       * and how many rows had no close. */
+      not_in_a_lot_value: number;
+      not_in_a_lot_unpriced: number;
+      last_orders: {
+        week: string;
+        created_at: string;
+        trigger: 'scheduled' | 'manual';
+        free_cash: number | null;
+        deposit_needed: number | null;
+        lot_size: number | null;
+      } | null;
+    };
+
 /** One set of orders for a week, as `momentum_orders` keeps it. */
 export interface MomentumOrders {
   created_at: string;
@@ -937,6 +959,22 @@ export interface MomentumOrders {
     unexplained: Array<{ symbol: string; delta: number; reason: string }>;
     booked: Array<{ sleeve_id: string; symbol: string; delta: number }>;
   };
+}
+
+/** Your orders' "Preview for…": the orders another favourite would make against the same holdings,
+ * as one portfolio (never lot by lot), saved nowhere. `error` when the favourite is not found. */
+export type MomentumOrderPreview = Pick<MomentumOrders, 'week'> &
+  Partial<Pick<MomentumOrders, 'headline' | 'kind' | 'reason' | 'holdings' | 'prices' | 'plan'>> & {
+    preview?: boolean;
+    error?: string;
+  };
+
+/** `POST /api/momentum/orders/preview/jobs` and `GET …/jobs/{id}`. */
+export interface MomentumOrderPreviewJob {
+  id: string;
+  status: 'running' | 'done' | 'failed';
+  result: MomentumOrderPreview | null;
+  error: string | null;
 }
 
 /** `GET /api/momentum/orders`. */

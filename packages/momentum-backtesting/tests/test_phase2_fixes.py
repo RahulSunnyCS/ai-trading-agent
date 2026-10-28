@@ -35,28 +35,32 @@ def test_e10_weeks_before_listing_and_after_the_last_session_are_not_a_halt(smal
 
 
 def test_e11_a_series_that_has_ended_leaves_the_pool_at_once():
-    weeks = pd.date_range("2021-01-01", periods=30, freq="W-FRI")
+    # The first quarter-end is weeks[12] (2020-12-25). Before it there is no pool at all
+    # (2026-10-24: deciding those weeks from it would read later ranks). OLD's last real week is
+    # weeks[17].
+    weeks = pd.date_range("2020-10-02", periods=30, freq="W-FRI")
     frame = pd.DataFrame(
         {"OLD": [100.0 + i for i in range(30)], "NEW": [50.0 + i for i in range(30)]}, index=weeks
     )
-    frame.loc[weeks[12:], "OLD"] = frame.at[weeks[11], "OLD"]  # carried forward after it ended
+    frame.loc[weeks[18:], "OLD"] = frame.at[weeks[17], "OLD"]  # carried forward after it ended
     universe = broad.StockUniverseFrame(
         frame=frame,
         weeks=list(weeks),
         column_to_base_symbol={"OLD": "OLD", "NEW": "NEW"},
         stock_membership=pd.DataFrame(True, index=weeks, columns=frame.columns),
         events=pd.DataFrame(),
-        stale_columns={"OLD": weeks[11]},
+        stale_columns={"OLD": weeks[17]},
         missing_symbols=[],
     )
     full = frame.assign(**dict.fromkeys(broad.ATOMIC_NAMES, float("nan")))
     ranks = pd.DataFrame({"OLD": 1.0, "NEW": 2.0}, index=weeks).reindex(columns=full.columns)
     base = broad.UniverseBase(universe, full, None, list(weeks), ranks)
     ranking = broad.finish_universe_ranking(base, pool_top_n=2, pool_exit_rank=2)
-    assert ranking.pool_membership.loc[weeks[:12], "OLD"].all()
-    assert not ranking.pool_membership.loc[weeks[12:], "OLD"].any()
-    assert ranking.stock_pool_ranks.loc[weeks[12:], "OLD"].isna().all()
-    assert ranking.pool_membership["NEW"].all()
+    assert not ranking.pool_membership.loc[weeks[:12]].any().any()
+    assert ranking.pool_membership.loc[weeks[12:18], "OLD"].all()
+    assert not ranking.pool_membership.loc[weeks[18:], "OLD"].any()
+    assert ranking.stock_pool_ranks.loc[weeks[18:], "OLD"].isna().all()
+    assert ranking.pool_membership.loc[weeks[12:], "NEW"].all()
 
 
 def test_e12_selling_everything_at_the_end_pays_one_depository_charge_per_stock():
