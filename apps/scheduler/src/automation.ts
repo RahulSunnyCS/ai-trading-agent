@@ -15,7 +15,8 @@ import { jobPath } from './env.js';
  * - One row per platform + broker (AlgoTest / Quantiply × Shoonya (Finvasia) / Angel One):
  *   log in at 08:00, which list it gets (none, Core = Adaptive Classic, T1 = Adaptive Tuned),
  *   upload it, the platform multiplier it runs at (BL-140 Phase 4, 1-10, default 1) and whether
- *   it includes the Buy add-on (default yes).
+ *   it includes the Buy add-on (default yes), and (BL-183) whether the picked Dir trades 2 lots on a
+ *   non-expiry day (default no).
  * - A pause (BL-140 Phase 4): no uploads or deploys for any session up to and including a day.
  *
  * Every Save is a new version in the scheduler's SQLite (`automation_settings`); nothing is
@@ -62,6 +63,8 @@ export interface Row {
   multiplier: number;
   /** include the Buy add-on picks */
   addon: boolean;
+  /** BL-183: the picked Dir at 2 lots (its MTM SL doubled) on a non-expiry day */
+  dirBoost: boolean;
   /** Quantiply only: the clientwise MTM SL (rupees) the 08:00 job keeps the account at; null = leave it */
   mtmSl: number | null;
 }
@@ -109,6 +112,7 @@ export const DEFAULT_SETTINGS: AutomationSettings = {
       upload: true,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: null,
     },
     'algotest.angelone': {
@@ -117,6 +121,7 @@ export const DEFAULT_SETTINGS: AutomationSettings = {
       upload: false,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: null,
     },
     'quantiply.angelone': {
@@ -125,6 +130,7 @@ export const DEFAULT_SETTINGS: AutomationSettings = {
       upload: true,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: 8000,
     },
     'quantiply.finvasia': {
@@ -133,6 +139,7 @@ export const DEFAULT_SETTINGS: AutomationSettings = {
       upload: false,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: null,
     },
   },
@@ -150,7 +157,7 @@ function isRealDay(value: string): boolean {
 
 /**
  * Settings saved before Phase 4 have no multiplier, add-on or pause: they mean 1, yes and none,
- * exactly what the jobs did. Anything present is kept as it is (and validated on a Save).
+ * exactly what the jobs did; settings before BL-183 have no `dirBoost`: off. Anything present is kept as it is (and validated on a Save).
  */
 export function withDefaults(settings: AutomationSettings): AutomationSettings {
   const partial = settings as unknown as {
@@ -166,6 +173,7 @@ export function withDefaults(settings: AutomationSettings): AutomationSettings {
           ...r,
           multiplier: r.multiplier ?? 1,
           addon: r.addon ?? true,
+          dirBoost: r.dirBoost ?? false,
           mtmSl: r.mtmSl === undefined ? defaultMtmSl(k, r.list) : r.mtmSl,
         },
       ]),
@@ -204,7 +212,7 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
         continue;
       }
       for (const k of Object.keys(row))
-        if (!['login', 'list', 'upload', 'multiplier', 'addon', 'mtmSl'].includes(k))
+        if (!['login', 'list', 'upload', 'multiplier', 'addon', 'dirBoost', 'mtmSl'].includes(k))
           errors.push(`${key}: unknown field ${k}`);
       if (typeof row.login !== 'boolean') errors.push(`${key}.login must be true or false`);
       if (typeof row.upload !== 'boolean') errors.push(`${key}.upload must be true or false`);
@@ -226,6 +234,7 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
           `${key}.multiplier must be a whole number from ${MULTIPLIER_MIN} to ${MULTIPLIER_MAX}`,
         );
       if (typeof row.addon !== 'boolean') errors.push(`${key}.addon must be true or false`);
+      if (typeof row.dirBoost !== 'boolean') errors.push(`${key}.dirBoost must be true or false`);
       if (key.startsWith('algotest.')) {
         if (row.mtmSl !== null)
           errors.push(`${key}.mtmSl must be null (AlgoTest has none the tool sets)`);
@@ -269,6 +278,7 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
               upload: r.upload,
               multiplier: r.multiplier,
               addon: r.addon,
+              dirBoost: r.dirBoost,
               mtmSl: r.mtmSl,
             },
           ];
@@ -288,6 +298,7 @@ export function effective(settings: AutomationSettings, key: RowKey): Row {
     upload: settings.masters.uploads && row.upload && row.list !== 'none',
     multiplier: row.multiplier,
     addon: row.addon,
+    dirBoost: row.dirBoost,
     mtmSl: row.mtmSl,
   };
 }

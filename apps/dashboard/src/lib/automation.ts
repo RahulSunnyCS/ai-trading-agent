@@ -39,6 +39,8 @@ export interface Row {
   multiplier: number;
   /** include the Buy add-on picks */
   addon: boolean;
+  /** BL-183: the picked Dir at 2 lots (its MTM SL doubled) on a non-expiry day */
+  dirBoost: boolean;
   /** Quantiply only: the clientwise MTM SL (rupees) kept each morning at 08:00; null = leave it */
   mtmSl: number | null;
 }
@@ -78,7 +80,7 @@ export interface AutomationView {
 
 /**
  * Settings from a scheduler that predates the multiplier, add-on and pause have none of them:
- * 1, yes and no pause, what the jobs did. Applied to everything read, so the page never meets a
+ * 1, yes and no pause, what the jobs did; before BL-183 no Dir ×2 (off). Applied to everything read, so the page never meets a
  * missing field.
  */
 export function withDefaults(settings: AutomationSettings): AutomationSettings {
@@ -89,6 +91,7 @@ export function withDefaults(settings: AutomationSettings): AutomationSettings {
         ...row,
         multiplier: row.multiplier ?? 1,
         addon: row.addon ?? true,
+        dirBoost: row.dirBoost ?? false,
         mtmSl: row.mtmSl === undefined ? defaultMtmSl(key as RowKey, row.list) : row.mtmSl,
       },
     ]),
@@ -179,6 +182,8 @@ export function describeChanges(before: AutomationSettings, after: AutomationSet
       lines.push(`${rowLabel(key)} multiplier: ${a.multiplier} → ${b.multiplier}`);
     if (a.addon !== b.addon)
       lines.push(`${rowLabel(key)} Buy add-on: ${onOff(a.addon)} → ${onOff(b.addon)}`);
+    if (a.dirBoost !== b.dirBoost)
+      lines.push(`${rowLabel(key)} Dir ×2: ${onOff(a.dirBoost)} → ${onOff(b.dirBoost)}`);
     if (a.mtmSl !== b.mtmSl)
       lines.push(`${rowLabel(key)} MTM SL: ${mtmSlText(a.mtmSl)} → ${mtmSlText(b.mtmSl)}`);
   }

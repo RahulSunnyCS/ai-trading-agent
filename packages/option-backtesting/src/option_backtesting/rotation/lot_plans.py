@@ -42,6 +42,7 @@ from ..fyers.daily import data_dir
 from . import journal, pick, store
 from .dte import entry_basis, entry_labels, recorded_labels
 from .lists import WARMUP
+from .live_lots import dir_pick, is_expiry
 from .readout import block_bootstrap_mean, max_drawdown
 from .score import vix_band
 from .variants import is_dir, is_wide, track_names, variant_names
@@ -84,22 +85,12 @@ class LotPlanError(ValueError):
 # --- the plans (pure) ---------------------------------------------------------------------------
 
 
-def is_expiry(labels: dict[str, str]) -> bool:
-    """True when NIFTY or SENSEX expires today ({'NIFTY': '0', ...} on the weekday basis)."""
-    return str(labels.get("NIFTY")) == "0" or str(labels.get("SENSEX")) == "0"
-
-
 def w1(core: list[str], composite: dict[str, float]) -> str | None:
     """The core Widesl pick with the higher recorded composite (ties by name)."""
     wide = [n for n in core if is_wide(n)]
     if not wide:
         return None
     return min(wide, key=lambda n: (-float(composite.get(n, -math.inf)), n))
-
-
-def dir_pick(core: list[str]) -> str | None:
-    """The core Dir pick (Dir ATM or Dir ITM1), or None on a three-Widesl day."""
-    return next((n for n in core if is_dir(n)), None)
 
 
 def needs_runner_up(core: list[str], expiry: bool) -> dict[str, bool]:

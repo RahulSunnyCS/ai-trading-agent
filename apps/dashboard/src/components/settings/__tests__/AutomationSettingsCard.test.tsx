@@ -28,6 +28,7 @@ const SETTINGS: AutomationSettings = {
       upload: true,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: null,
     },
     'algotest.angelone': {
@@ -36,6 +37,7 @@ const SETTINGS: AutomationSettings = {
       upload: false,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: null,
     },
     'quantiply.angelone': {
@@ -44,6 +46,7 @@ const SETTINGS: AutomationSettings = {
       upload: true,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: 8000,
     },
     'quantiply.finvasia': {
@@ -52,6 +55,7 @@ const SETTINGS: AutomationSettings = {
       upload: false,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: null,
     },
   },
@@ -108,6 +112,7 @@ describe('automation helpers', () => {
       upload: false,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: null,
     });
   });
@@ -211,6 +216,25 @@ describe('AutomationSettingsCard', () => {
     expect(body.pause).toEqual({ until: '2026-10-23' });
     fireEvent.click(screen.getByRole('button', { name: 'Clear pause' }));
     expect(await screen.findByText('Pause: until 2026-10-23 → none')).toBeTruthy();
+  });
+
+  it('saves Dir ×2 on non-expiry days (BL-183) per row', async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
+      init?.method === 'PUT'
+        ? ok({ ...view(JSON.parse(String(init.body)), 1), next_session: '2026-10-29' })
+        : ok({ ...view(SETTINGS), next_session: '2026-10-29' }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    render(<AutomationSettingsCard />);
+    const toggles = await screen.findAllByLabelText('Dir ×2 on non-expiry days');
+    fireEvent.click(toggles[2] as HTMLElement); // Quantiply · Angel One
+    expect(await screen.findByText('Quantiply · Angel One Dir ×2: off → on')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
+    const body = JSON.parse(String(put?.[1]?.body)) as AutomationSettings;
+    expect(body.rows['quantiply.angelone'].dirBoost).toBe(true);
+    expect(body.rows['algotest.finvasia'].dirBoost).toBe(false);
   });
 
   it('works against a scheduler that does not send the new fields yet', async () => {
