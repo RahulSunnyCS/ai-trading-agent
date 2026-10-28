@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner trades both books with real money (3 lots each, ₹8.5 lakh per account) |
-| **Status** | Done — informative: the Dir is the best home for the fourth lot in both books (Core and, by Amendment 1, T1), but the edge over an even spread rests on a few days; no Widesl placement beats it |
+| **Status** | Done — informative: the Dir is the best home for the fourth lot in both books (Core and, by Amendment 1, T1), but the edge over an even spread rests on a few days; no Widesl placement beats it. Amendment 2 (book stop, expiry rule): "always the Dir" is the best pick to double, at least as good as "the top score" (clearly better only in Core's last year) and better than "the top Widesl". Amendment 3: on expiry days 3 lots of the expiring index beat 4 lots of the other index |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -60,6 +60,111 @@ lots spread evenly; nothing live changes.
   is added instead (as C-D2), paying its brokerage. Everything else as Phase 0 (B3, B4, windows, seed 20261025).
 - **Also reported for C-D2 and T-D2 (registered now):** the result against B4 with the 5 and the 10 best non-expiry
   days removed (date order kept), and the share of the excess those days carry.
+
+### Phase 0 — Amendment 2 (2026-10-28, owner, after every BL-133 / BL-134 result had been read)
+
+- **Owner (2026-10-28):** 3 lots on expiry days, 4 on other days; "if you double, do you double whichever pick scores
+  highest that day, or always the top Directional or always Widesl?", and add a new strategy or double one. The rule
+  of the double is the new question; the "highest-scoring pick" rule was never run. Chosen knowing BL-133's results
+  (Dir ×2 led both books; no T1 Widesl placement beat the even spread), so every reading below is descriptive.
+- **Arms, both books, the same matrix** (non-expiry days; expiry days = B3 in every arm):
+  - **R1×2:** the core pick with the highest list C composite at 2 lots, whatever its family (ties by name). New.
+  - **D×2:** the Dir pick at 2 lots (a three-Widesl day: the best unpicked Dir added). = C-D2 / T-D2, re-run.
+  - **W×2:** the higher-composite Widesl pick at 2 lots. = T-W1; new for Core (C-W1).
+  - **D+:** the best unpicked Dir added as a fourth strategy. = C-D+; new for T1.
+  - **W+:** the best unpicked Widesl added as a fourth strategy. = T-W+; new for Core.
+- **Comparators:** B3, B4 as Phase 0.
+- **Money:** gross = one-lot results × lots; brokerage = 2 orders × the stored `n_trades` × ₹20 × 1.18 once per
+  strategy placed (lots of one strategy share orders), for every arm and comparator (B4 pays B3's brokerage); net =
+  gross − brokerage. Turnover charges scale with lots and are left out alike.
+- **Measures (net):** per day; annualised (× 250); max drawdown (`readout.max_drawdown`); worst day; share of losing
+  days; return ÷ drawdown (annualised net ÷ |max drawdown|); daily mean ÷ sd × √250. Intervals (90 % circular block
+  bootstrap, 5-day blocks, 2,000 resamples, seed 20261028): arm − B3, arm − B4, and, head to head, R1×2 − D×2,
+  R1×2 − W×2 and D×2 − W×2. For R1×2: the share of non-expiry days whose top pick is a Dir, a Widesl, other; arm −
+  B4 with the 5 and 10 best days removed (date order kept) and their share of the excess.
+- **Windows:** as Phase 0 (2025-01-10 → 2026-10-16; last year 2025-10-09 → 2026-10-16). Days from 2026-10-19 belong
+  to BL-135's forward test and are not replayed here.
+- **Reading:** as Phase 0 ("earns its lot" if arm − B4 after brokerage is above zero); a doubling rule "beats"
+  another if their difference is above zero. This amendment adds 5 new arm-book cells to BL-133's 7 (12 in all, plus
+  BL-134's 2 books), so one interval clearing zero by chance is expected; nothing is adopted from it.
+- **Look-ahead check:** as Phase 0; the composite of day d is built from results before d only.
+- **Will not run:** 5+ lots, Buy, the expiry rule (BL-122), any day after 2026-10-16.
+
+### Phase 0 — Amendment 2 (2026-10-28, owner, after every BL-133 / BL-134 result had been read)
+
+- **Owner (2026-10-28):** 3 lots on expiry days, 4 on other days. If the fourth lot doubles a pick, which one:
+  "whichever pick scores highest that day, or always the top Directional, or always the top Widesl"; and doubling
+  vs adding a new strategy. The highest-score rule was never run. Chosen knowing BL-133's results (Dir ×2 led both
+  books), so every reading below is descriptive.
+- **What is traded, as the owner runs it (new to this item):**
+  - **Book stop:** each book runs under a portfolio MTM stop, ₹8,000 for Core, ₹9,000 for T1, replayed per minute
+    with `rotation/portfolio.py` (`apply_book` over `one_lot_path`, BL-095). On a 4-lot day the stop rises by the
+    extra lot's own MTM SL (`overall.stop_loss_inr` of its strategy file; ₹4,000 if it has none). A pick's MTM SL
+    is per lot on both platforms (owner), so a 2-lot pick = 2 × its one-lot path.
+  - **Expiry rule (BL-122):** on a day exactly one index expires, list C takes only that index's strategies
+    (`expiry.filter_picks`; runners-up from `expiry.filtered_runners_up`), applied on every expiry day of the window
+    as if live throughout.
+- **Arms, both books** (non-expiry days; expiry days = B3 in every arm):
+  - **R1×2:** the core pick with the highest list C composite at 2 lots, whatever its family (ties by name). New.
+  - **D×2:** the Dir pick at 2 lots (a three-Widesl day: the best unpicked Dir added). = C-D2 / T-D2.
+  - **W×2:** the higher-composite Widesl pick at 2 lots. = T-W1; new for Core.
+  - **D+ / W+:** the best unpicked Dir / Widesl added as a fourth strategy. New for T1 / Core respectively.
+  - **Comparators:** B3 (3 lots as picked, book stop ₹8k / ₹9k); B4 = B3 × 4/3 on non-expiry days (the 3-lot paths
+    and the stop scaled 4/3: a fourth lot on an average pick).
+  - Each arm with the book stop (the main reading) and without it (as BL-133).
+- **Both accounts together:** per day Core arm + T1 arm, for R1×2, D×2 and W×2, three ways: **both** (each book
+  doubles by its rule, overlap ignored); **cut** (when T1's doubled strategy is the one Core doubles, T1 doubles its
+  highest-composite other core pick instead); **skip** (on such a day T1 stays at 3 lots). Plus how often the two
+  books double the same strategy.
+- **Margin (no history of margin used exists):** per arm, the peak number of lots open at the same minute (a lot is
+  open from its path's first change to its last), and the count of non-expiry days with 4 lots open at once. The
+  owner's capacity (4 lots on non-expiry days) is taken as given.
+- **Money:** gross from the replayed paths × lots; brokerage = 2 orders × the stored `n_trades` × ₹20 × 1.18 once per
+  strategy placed (taken as stored even on a stopped day); net = gross − brokerage; turnover charges left out alike.
+- **Measures (net):** per day; annualised (× 250); max drawdown (`readout.max_drawdown`); worst day; worst 5-day
+  week; longest drawdown in days; mean of the worst 5 % of days; share of losing days; annualised net ÷ |max
+  drawdown|; drawdown per lot (÷ mean lots per day); book-stop hit days. Intervals (90 % circular block bootstrap,
+  5-day blocks, 2,000 resamples, seed 20261028): arm − B3, arm − B4, and R1×2 − D×2, R1×2 − W×2, D×2 − W×2. For R1×2:
+  the share of non-expiry days its top pick is a Dir / Widesl / other. For R1×2 and D×2: arm − B4 without the 5 and
+  10 best days, and their share.
+- **Steadiness:** arm − B3 and arm − B4 (net, book stop) per calendar quarter, per VIX band of the day's open
+  (`vix_band`) and per the day's lower days-to-expiry label, means and day counts (no intervals).
+- **Windows:** as Phase 0 (2025-01-10 → 2026-10-16; last year 2025-10-09 → 2026-10-16). Days from 2026-10-19 belong
+  to BL-135's forward test and are not replayed here.
+- **Reading:** an arm "earns its lot" if arm − B4 (net, book stop) is above zero; a doubling rule "beats" another if
+  their difference is above zero. This adds about 6 new arm-book cells to BL-133's 7 (with BL-134's), so one interval
+  clearing zero by chance is expected; nothing is adopted from it.
+- **Pass bar for going live (owner to confirm; judged forward, not here):** a 4-lot rule replaces 3 lots only if, on
+  60 forward scored days, its net per day minus As picked has a 90 % interval above zero AND its drawdown per lot is
+  no deeper than As picked's (BL-135's rule), with the book stop.
+- **Look-ahead check:** as Phase 0; day d's composite is built from results before d only; the book stop level is
+  known before the day (the strategy files' stops).
+- **Will not run:** 5+ lots, Buy, any day after 2026-10-16. **Later, owner (2026-10-28):** on a one-index expiry day,
+  4 lots when the extra lot is on the non-expiring index; run after this amendment is read.
+
+### Phase 0 — Amendment 3 (2026-10-28, owner, after Amendment 2 and today's margin reading)
+
+- **Owner (2026-10-28):** "on a Tuesday we can put either 3 Nifty or 4 Sensex strategy... how do those perform vice
+  versa in Thursday?" Angel One's margin calculator (read 2026-10-28 18:42 IST) gives ≈ ₹2.0–2.08 lakh a lot on a
+  normal day for every shape; the expiry day adds ≈ ₹59k a lot (2 % ELM on two short legs, estimated). So on a
+  one-index expiry day 3 lots of the expiring index (≈ ₹7.8 lakh) or 4 lots of the other index (≈ ₹8.2 lakh) fit
+  ₹8.54 lakh; no mix of 4 with the expiring index does.
+- **Days:** expiry days on which exactly one index expires (`expiry.expiring_index` not None), in BL-133's windows;
+  both-expiry days are left out and counted.
+- **Arms per book (list C replayed as Amendment 2, book stop ₹8k / ₹9k, brokerage as Amendment 2):**
+  - **E3:** the expiring index's picks (`expiry.filter_picks` to that index), 1 lot each. = today's rule.
+  - **O3:** the other index's picks (`filter_picks` to the other index), 1 lot each.
+  - **O4:** O3 with the Dir pick at 2 lots (no Dir: the best unpicked Dir of that index added,
+    `filtered_runners_up`); book stop + its MTM SL. Amendment 2's best rule, moved to the other index.
+  - **U3:** the unrestricted picks, 1 lot each (the rule before BL-122), for reference.
+- **Measures (net, per expiry day):** as Amendment 2 (per day, max drawdown and worst day of the expiry-day series,
+  share of losing days, return ÷ drawdown, book-stop days); O4 − E3, O3 − E3 and U3 − E3 with a 90 % circular block
+  bootstrap over the expiry days in date order (5-day blocks, 2,000 resamples, seed 20261029); means split by the
+  expiring index (NIFTY-expiry days vs SENSEX-expiry days). **Whole book:** each arm on expiry days + Amendment 2's
+  D×2 on non-expiry days (its stored rows), per day, max drawdown, worst day, R/DD, against E3 + D×2.
+- **Reading:** O4 "beats" E3 if O4 − E3 is above zero; descriptive, in-sample. The per-index split has no intervals.
+- **Look-ahead check:** as Amendment 2; which index expires is known before the day.
+- **Will not run:** mixes of both indices, 5 lots, other days.
 
 ### Phase 1 — Run
 
@@ -130,3 +235,112 @@ lots spread evenly; nothing live changes.
   on the last year it is near B3's. Core's Dir is the sturdier of the two (without its top 5 days +102 [−22, +229] / +151 [+14, +286]).
   Both say the same thing: the Dir is at least as good a home for the fourth lot as any other pick, and probably
   better, but not by a margin these days can pin down.
+- 2026-10-28 — Amendment 2 registered before any run: which pick to double (top score, Dir, Widesl) and add vs double, both books.
+- 2026-10-28 — Amendment 2 registered before any run: which pick the fourth lot doubles (top score, Dir, Widesl) or adds, with the book stop and the expiry rule, both books and both accounts together.
+- 2026-10-28 — **Amendment 2 run as registered** (`research/bl133/fourth_lot_a2.py`; `fourth_lot_a2_2026-10-28.json`;
+  428 days per book, none skipped). Net per day after brokerage, under the book stop (₹8k Core / ₹9k T1, + the extra
+  lot's MTM SL on 4-lot days), expiring-index rule applied, 3 lots on expiry days (181 of 428; 104 of 244).
+  R/DD = annualised net ÷ |max drawdown|. Differences are per day over all days, expiry days (difference 0) included:
+  per 4-lot day they are about 1.7× larger.
+
+  | Book, window | Arm | Net / day | vs 3 lots (90 %) | vs even spread B4 (90 %) | Max DD | Worst day | Worst week | R/DD | DD per lot |
+  |---|---|---|---|---|---|---|---|---|---|
+  | Core, 21 months | B3 / B4 | +1,050 / +1,168 | | | −39,764 / −49,875 | −9,323 / −11,958 | −24,620 / −30,529 | 6.6 / 5.9 | −13,255 / −13,943 |
+  | | R1×2 top score | +1,235 | +184 [+54, +317] | +67 [−27, +166] | −48,243 | −12,234 | −33,716 | 6.4 | −13,487 |
+  | | **D×2 Dir** | **+1,317** | +266 [+137, +401] | **+149 [+20, +283]** | −41,321 | −12,234 | −28,484 | **8.0** | −11,552 |
+  | | W×2 top Widesl | +1,049 | −1 [−120, +118] | −118 [−191, −46] | −52,157 | −12,878 | −28,313 | 5.0 | −14,581 |
+  | | D+ add a Dir | +1,124 | +73 [−66, +210] | −44 [−184, +100] | −45,278 | −12,099 | −28,790 | 6.2 | −12,658 |
+  | | W+ add a Widesl | +1,031 | −19 [−119, +80] | −136 [−219, −55] | −51,002 | −12,114 | −28,181 | 5.1 | −14,258 |
+  | Core, last year | B3 / B4 | +1,221 / +1,335 | | | −33,013 / −39,934 | −9,221 / −11,958 | | 9.2 / 8.4 | |
+  | | R1×2 | +1,456 | +235 [+80, +392] | +120 [−1, +243] | −42,318 | −12,116 | | 8.6 | |
+  | | **D×2** | **+1,559** | +338 [+189, +487] | **+224 [+87, +364]** | −34,713 | −12,116 | | **11.2** | |
+  | | W×2 | +1,256 | +35 [−103, +179] | −79 [−160, +10] | −42,658 | −11,843 | | 7.4 | |
+  | | D+ | +1,431 | +210 [+54, +366] | +95 [−77, +266] | −37,957 | −11,446 | | 9.4 | |
+  | | W+ | +1,185 | −36 [−168, +94] | −150 [−253, −49] | −39,877 | −11,667 | | 7.4 | |
+  | T1, 21 months | B3 / B4 | +1,689 / +1,904 | | | −25,013 / −32,094 | −10,249 / −12,850 | −18,658 / −24,978 | 16.9 / 14.8 | −8,338 / −8,972 |
+  | | R1×2 | +1,984 | +295 [+143, +439] | +81 [−28, +180] | −34,133 | −19,793 | −25,896 | 14.5 | −9,542 |
+  | | **D×2** | **+2,000** | +311 [+167, +457] | +96 [−20, +218] | −36,145 | −14,312 | −26,618 | 13.8 | −10,104 |
+  | | W×2 | +1,851 | +161 [+34, +287] | −53 [−136, +24] | −34,459 | −19,793 | −26,222 | 13.4 | −9,633 |
+  | | D+ | +1,911 | +221 [+86, +357] | +7 [−130, +143] | **−29,182** | −14,312 | −25,014 | **16.4** | **−8,158** |
+  | | W+ | +1,727 | +38 [−83, +153] | −177 [−290, −61] | −36,058 | −19,403 | −23,762 | 12.0 | −10,080 |
+  | T1, last year | B3 / B4 | +1,895 / +2,161 | | | −25,013 / −30,053 | −10,249 / −12,850 | | 18.9 / 18.0 | |
+  | | R1×2 | +2,223 | +328 [+155, +504] | +63 [−56, +169] | −33,890 | −19,793 | | 16.4 | |
+  | | **D×2** | **+2,288** | +393 [+229, +552] | **+127 [+1, +249]** | −29,362 | −14,312 | | **19.5** | |
+  | | W×2 | +2,081 | +186 [+22, +341] | −80 [−187, +19] | −31,157 | −19,793 | | 16.7 | |
+  | | D+ | +2,146 | +251 [+82, +413] | −15 [−182, +142] | −27,349 | −14,312 | | 19.6 | |
+  | | W+ | +1,895 | −0 [−154, +157] | −266 [−393, −142] | −36,058 | −19,403 | | 13.1 | |
+
+  - **Head to head (net, book stop):** Core R1×2 − D×2 −82 [−202, +28] / **−103 [−195, −17]**; D×2 − W×2 **+267
+    [+91, +447]** / **+303 [+90, +507]**. T1 R1×2 − D×2 −15 [−108, +71] / −65 [−170, +35]; D×2 − W×2 +149 [−24, +335] /
+    **+207 [+13, +402]**. The top-score pick is the Dir on 177 of 247 Core and 189 of 247 T1 non-expiry days; on the
+    others it doubles a Widesl, which is what costs it against D×2.
+  - **Book stop:** changes little. B3 net +1,050 with it vs +1,060 without (Core), drawdown −39,764 vs −42,626; it
+    fires on 25 Core and 18 T1 days in 21 months. The replay stops at a minute close, so a loss that jumps inside a
+    minute passes through it: T1's worst day (2026-09-11, R1×2 / W×2 −19,510) is the same with and without.
+  - **Few days:** D×2 − B4 without the 5 / 10 best days: Core +91 [−35, +219] (40 %) / +41 [−81, +165] (73 %); T1
+    +22 [−91, +134] (77 %) / −34 [−149, +81] (135 %). R1×2 is more concentrated (Core 71 % / 131 %, T1 89 % / 141 %).
+  - **Steadiness (D×2 − B4 per non-expiry day, 21 months):** Core positive in 6 of 8 quarters (2025Q1 −234, then +90
+    to +547; 2026Q3 +319), W×2 negative in every quarter; T1 positive in 5 of 8 (2025Q1 −163, 2025Q3 −8, 2026Q3 −26).
+    By VIX band D×2 is below the even spread at VIX 15–18 (Core −144) and 18+ (Core −325, T1 −127; 31 days), above it
+    below 15 in both books. By days to expiry: positive at 1 and 2 in both books. Not a rule; unregistered.
+  - **Margin:** on 211–235 of 247 non-expiry days all 4 lots are open at the same minute in every arm, so the 4th lot
+    needs margin for 4 concurrent lots, not a staggered 3.
+  - **Both accounts (Core + T1, 21 months / last year):** 6 lots (B3 + B3) +2,740 / +3,116 a day, drawdown −56,932,
+    worst day −18,728, R/DD 12.0 / 13.7. **D×2 in both:** +3,317 / +3,847, +577 [+323, +840] / +731 [+444, +1,019]
+    over 6 lots, drawdown −58,818 / −51,932, worst day −25,334 / −23,655, R/DD 14.1 / 18.5. Both books double the same
+    Dir on 62 of 247 non-expiry days; **cut** (T1 doubles its next pick) −56 / −44 a day against doubling in both,
+    worst day deeper (−29,136); **skip** (T1 stays at 3 lots) −47 / −40. R1×2 both +480 / +563, drawdown −61,321;
+    W×2 both +160 / +221, drawdown −72,958.
+
+  **Read under the rule (descriptive; arms chosen after BL-133 was read).** "Always the Dir" is the best doubling rule
+  in both books: it earns its lot against the even spread in Core (both windows) and in T1's last year, and beats
+  "always the top Widesl" in Core and in T1's last year. Against "whichever scores highest" it is clearly better only
+  in Core's last year; elsewhere the difference includes zero. "Whichever scores highest" sits between the two: it is the Dir
+  on about three days in four, and the days it doubles a Widesl cost it (Core last year −103 [−195, −17] against the
+  Dir). Every Widesl placement, doubled or added, is at or below the even spread. Add vs double: in Core doubling the
+  Dir beats adding one; in T1 adding a Dir earns ₹89 a day less but has the shallowest 4-lot drawdown (−29k vs −36k)
+  and the best R/DD. Across both accounts the overlap needs no rule: cutting or skipping it makes less and does not
+  lower the drawdown. Weaknesses as before: in-sample, the edge over the even spread rests on a handful of days, gross
+  paths with stored trade counts, minute-close stops.
+  - **Review (PR #379):** B4's stop is 4/3 × the book stop (₹10.7k / ₹12k) while the arms get the book stop + the
+    extra lot's MTM SL (₹10.5k–13k), so "vs B4" carries a small stop-level difference; brokerage is the stored trade
+    count even on book-stopped days (slightly against arms with more stop days); "lots open at once" counts a lot open
+    from its first to its last move, so re-entry strategies overstate it. The MTM SL is now read from the file the
+    replay runs (`portfolio.strategy_file`), raising if unreadable; results unchanged.
+- 2026-10-28 — Amendment 3 registered before any run: on a one-index expiry day, 3 lots of the expiring index vs 4 of the other.
+- 2026-10-28 — **Amendment 3 run as registered** (`research/bl133/fourth_lot_a3.py`; `fourth_lot_a3_2026-10-28.json`).
+  Every expiry day in the window is a one-index day (181; none left out); E3 reproduces Amendment 2's B3 on them
+  exactly. Net per expiry day after brokerage, book stop. "NIFTY-expiry days" = O3 / O4 trade SENSEX, and vice versa.
+
+  | Book, window | Arm | Net / expiry day | vs E3 (90 %) | Max DD | Worst day | Losing days | R/DD | NIFTY-expiry days | SENSEX-expiry days |
+  |---|---|---|---|---|---|---|---|---|---|
+  | Core, 21 months | **E3 (3 expiring)** | **+2,068** | | −21,702 | −9,323 | 34 % | **23.8** | +1,757 | +2,382 |
+  | | O3 (3 other) | +554 | −1,513 [−2,262, −712] | −42,320 | −9,981 | 41 % | 3.3 | +574 | +534 |
+  | | O4 (4 other, Dir ×2) | +894 | −1,174 [−2,051, −277] | −59,928 | −12,971 | 40 % | 3.7 | +881 | +906 |
+  | | U3 (unrestricted) | +1,725 | −342 [−606, −75] | −29,033 | −9,323 | 38 % | 14.9 | +1,449 | +2,005 |
+  | Core, last year | **E3** | **+2,470** | | −19,537 | −9,221 | 29 % | **31.6** | +2,579 | +2,360 |
+  | | O3 | +931 | −1,539 [−2,531, −573] | −18,322 | −9,317 | 38 % | 12.7 | +1,553 | +309 |
+  | | O4 | +1,362 | −1,108 [−2,160, −131] | −27,524 | −12,367 | 38 % | 12.4 | +2,215 | +510 |
+  | | U3 | +2,167 | −303 [−569, −47] | −20,414 | −9,221 | 32 % | 26.5 | +2,329 | +2,005 |
+  | T1, 21 months | **E3** | **+2,928** | | −25,721 | −10,249 | 30 % | **28.5** | +2,768 | +3,089 |
+  | | O3 | +1,017 | −1,910 [−2,722, −1,099] | −23,275 | −10,822 | 32 % | 10.9 | +1,171 | +863 |
+  | | O4 | +1,534 | −1,394 [−2,348, −463] | −37,789 | −14,310 | 36 % | 10.1 | +1,729 | +1,337 |
+  | | U3 | +2,546 | −382 [−613, −166] | −26,774 | −10,249 | 32 % | 23.8 | +2,641 | +2,449 |
+  | T1, last year | **E3** | **+3,015** | | −17,482 | −10,249 | 27 % | **43.1** | +3,750 | +2,280 |
+  | | O3 | +1,421 | −1,593 [−2,714, −561] | −22,607 | −10,117 | 28 % | 15.7 | +2,517 | +325 |
+  | | O4 | +2,192 | −823 [−2,113, +371] | −25,465 | −13,719 | 31 % | 21.5 | +3,653 | +731 |
+  | | U3 | +2,712 | −302 [−625, −44] | −17,041 | −10,249 | 30 % | 39.8 | +3,570 | +1,855 |
+
+  **Whole book** (the arm on expiry days + D×2 on non-expiry days), net / day, max DD, R/DD: Core 21 months E3 +1,317,
+  −41,321, 8.0; O4 +820, −63,175, 3.2; U3 +1,172, −47,476, 6.2. Core last year E3 +1,559, −34,713, 11.2; O4 +1,087,
+  −49,948, 5.4. T1 21 months E3 +2,000, −36,145, 13.8; O4 +1,410, −67,110, 5.3; U3 +1,838, −36,145, 12.7. T1 last
+  year E3 +2,288, −29,362, 19.5; O4 +1,937, −33,949, 14.3.
+
+  **Read under the rule (descriptive, in-sample).** 3 lots of the expiring index beat 4 lots of the other index in
+  both books and both windows (O4 − E3 below zero except T1's last year, −823 [−2,113, +371]), with a shallower
+  drawdown and worst day; the whole book loses ₹350–600 a day and its drawdown deepens by ₹5k–31k with O4. The only
+  close case is a NIFTY-expiry day traded as 4 SENSEX lots in the last year (Core +2,215 vs +2,579, T1 +3,653 vs
+  +3,750); a SENSEX-expiry day traded as 4 NIFTY lots earns a fraction of E3 (+510 / +731 vs +2,360 / +2,280). The
+  expiry-day edge is the expiring index's own (O3 earns a quarter to a half of E3). Side result: the expiring-index
+  rule (BL-122) beats the unrestricted picks in every cell (U3 − E3 −₹300 to −₹380, intervals below zero), the same
+  days BL-122 was chosen on, so not new evidence.
