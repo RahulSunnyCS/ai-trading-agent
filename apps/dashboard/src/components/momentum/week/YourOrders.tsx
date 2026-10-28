@@ -15,8 +15,8 @@ import {
   formatPct,
   formatPp,
 } from '../../../lib/format';
+import { LOT_ORDER_STATUS } from '../../../lib/momentumLots';
 import type {
-  MomentumLotOrders,
   MomentumOrderPreview,
   MomentumOrderPreviewJob,
   MomentumOrderRow,
@@ -249,7 +249,7 @@ export function YourOrders({
               {latest.trigger === 'scheduled' ? 'the 14:15 job' : 'by hand'}).
             </>
           }
-          lots={latest.lots ? <LotsPanel orders={latest} /> : null}
+          lots={latest.lots ? <LotOrders orders={latest} /> : null}
         />
       )}
       <OrdersSettingsDrawer
@@ -464,16 +464,9 @@ function PlanBody({
   );
 }
 
-const LOT_STATUS: Record<MomentumLotOrders['status'], string> = {
-  new: 'New lot: buy',
-  rebalance: 'Rebalance',
-  exit: 'Sell only',
-  'not due': 'Not due',
-};
-
 /** BL-142: the strategy followed lot by lot: what each lot does this Friday, what to add to Kite,
  * the one order per stock, and any change in Kite no lot could take. */
-function LotsPanel({ orders }: { orders: MomentumOrders }) {
+function LotOrders({ orders }: { orders: MomentumOrders }) {
   const lots = orders.lots ?? [];
   const net = Object.entries(orders.net ?? {});
   const unexplained = orders.ledger?.unexplained ?? [];
@@ -484,7 +477,7 @@ function LotsPanel({ orders }: { orders: MomentumOrders }) {
           <li key={lot.id} className="flex flex-wrap items-baseline gap-x-2">
             <span className="font-semibold text-foreground">{lot.label}</span>
             <Badge tone={lot.status === 'not due' ? 'neutral' : 'primary'}>
-              {LOT_STATUS[lot.status]}
+              {LOT_ORDER_STATUS[lot.status]}
             </Badge>
             {lot.budget != null && lot.status !== 'not due' ? (
               <span className="text-muted">{formatInr(lot.budget)}</span>

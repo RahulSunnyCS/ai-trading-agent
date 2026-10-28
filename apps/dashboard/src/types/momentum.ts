@@ -840,6 +840,77 @@ export interface MomentumLotOrders {
   plan: MomentumOrderPlan | null;
 }
 
+/** A holding booked to a lot (or Kite beyond the lots), valued at its last stored close. */
+export interface MomentumLotHolding {
+  symbol: string;
+  shares: number;
+  /** null: no stored close for the symbol; the value is then unknown, never zero. */
+  close: number | null;
+  close_day: string | null;
+  value: number | null;
+}
+
+/** One lot on This week's Lots panel (BL-142 Phase 4, `GET /api/momentum/lots`). */
+export interface MomentumLot {
+  id: string;
+  label: string;
+  /** The sleeve's saved name ("… · Friday 4 of 4"; the page's Lot number is from the paper start). */
+  sleeve: string;
+  holds: MomentumLotHolding[];
+  /** Sum of the priced holdings. */
+  value: number;
+  unpriced: string[];
+  /** Has the ledger ever booked a share to it? */
+  funded: boolean;
+  /** Rebalances on this page's Friday (`week`). */
+  due: boolean;
+  /** Its next rebalance Friday: `week` itself when due. */
+  next: string | null;
+  /** Its newest calendar Friday before `week` from the paper start on; null before its first. */
+  last: string | null;
+  /** The lot the last Friday run's orders were for: Kite's next changes are booked to it. */
+  pending: boolean;
+  /** What the last stored orders said for this lot (the Friday Telegram's line). */
+  last_orders: {
+    status: MomentumLotOrders['status'];
+    budget: number | null;
+    next: string | null;
+  } | null;
+}
+
+export type MomentumLotsView =
+  | { available: false; reason: string; week: string }
+  | {
+      available: true;
+      group: string;
+      group_id: string;
+      /** The Friday this page is about (today on a Friday, else the coming one). */
+      week: string;
+      paper_start: string | null;
+      holdings_source: 'paper' | 'fyers' | 'kite';
+      snapshot: { synced_at: string; cash: number | null } | null;
+      pending: string | null;
+      close_day: string | null;
+      lots: MomentumLot[];
+      total_value: number;
+      /** Kite's latest snapshot minus the ledger, per symbol, as `mbt lots show` lists it, with
+       * what the last orders told each lot to trade (signed shares). */
+      not_in_a_lot: Array<
+        Omit<MomentumLotHolding, 'shares'> & {
+          delta: number;
+          planned: Array<{ lot: string; shares: number }>;
+        }
+      >;
+      last_orders: {
+        week: string;
+        created_at: string;
+        trigger: 'scheduled' | 'manual';
+        free_cash: number | null;
+        deposit_needed: number | null;
+        lot_size: number | null;
+      } | null;
+    };
+
 /** One set of orders for a week, as `momentum_orders` keeps it. */
 export interface MomentumOrders {
   created_at: string;

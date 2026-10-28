@@ -540,8 +540,12 @@ contract, not a shared service).
   sleeve's signal marks SELL (never a difference from the model: the owner's real holdings differ
   on purpose, e.g. a swap for a premium-blocked name). `api._compute_lot_orders` is the Kite +
   group path of `_compute_orders` (the group's per-sleeve signals ride in `signal["_sleeves"]`,
-  never saved); `api.seed_lots` / `lots_status` / `assign_lot` back `mbt lots`. Tests:
-  `tests/test_lots.py`, `tests/test_lot_orders.py`.
+  never saved); `api.seed_lots` / `lots_status` / `assign_lot` back `mbt lots`. `api.lots_view`
+  (`GET /api/lots`, Phase 4) is This week's Lots panel: `lots_status` plus each lot's value at the
+  last stored close (`db_read.latest_symbol_closes_from_db_or_none`, never a quote), its calendar
+  (`_rebalance_info`, `_last_rebalance` from the paper start), the last stored orders' line per lot
+  (`holdings_store.latest_orders`) and the pending plan beside Kite minus the lots; read-only.
+  Tests: `tests/test_lots.py`, `tests/test_lot_orders.py`.
 - `alerts.py` (BL-051 Phase 5) — `GET /api/alerts`: what needs a person, for the dashboard's bell
   and once-a-day pop-up. One pure function per kind over the data its Telegram job already reads:
   `split` (`stock_actions.review_snapshot`), `data` (`/weekly/status` readiness, for the

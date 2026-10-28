@@ -4078,6 +4078,142 @@ def assign_lot(symbol: str, lot: str, shares: float | None = None) -> dict:
     return {"lot": labels[sleeve_id], "symbol": symbol, "delta": delta}
 
 
+def _last_rebalance(req: BacktestRequest, friday: pd.Timestamp, start: str | None) -> str | None:
+    """The newest Friday before `friday` on this sleeve's calendar, from the paper start on (a
+    calendar Friday before any money went in rebalanced nothing); None when there is none yet."""
+    if not start:
+        return None
+    first = pd.Timestamp(start).normalize()
+    week = pd.Timestamp(friday).normalize() - pd.Timedelta(days=7)
+    while week >= first:
+        if _rebalance_info(req, week)["on_cadence"]:
+            return week.strftime("%Y-%m-%d")
+        week -= pd.Timedelta(days=7)
+    return None
+
+
+def lots_view() -> dict:
+    """Momentum › This week's Lots panel (BL-142 Phase 4). The ledger exactly as `mbt lots show`
+    gives it (`lots_status`), with each lot's value at the last stored daily close, its last and
+    next rebalance Friday, whether it is due this Friday, what the last orders told it, and Kite
+    minus the lots beside what those orders told each lot to trade.
+
+    Read-only: it opens the catalog read-only, never reads Kite, never asks for a quote and never
+    books a share (only the Friday orders run and `mbt lots seed|assign` write the ledger)."""
+    from . import holdings_store, lots
+    from .weekly import week_ending_on_or_before
+
+    who = holdings_store.owner()
+    today = datetime.now(IST).date()
+    friday = pd.Timestamp(week_ending_on_or_before(today + timedelta(days=6)))
+    week = journal_week_string(friday)
+    try:
+        headline, members = _headline_group()
+        status = lots_status()
+        with read_catalog() as con:
+            settings = holdings_store.settings(con, who)
+            pending_id, planned = lots.pending_state(con, who, headline["id"])
+            has_history = lots.funded(con, who, headline["id"])
+            last_orders = holdings_store.latest_orders(con, who, headline["id"])
+            snapshot = holdings_store.latest_holdings(con, who, ("kite",))
+    except ValueError as error:  # the headline is not a group of sleeves
+        return {"available": False, "reason": str(error), "week": week}
+    except (FileNotFoundError, duckdb.CatalogException):  # no catalog / tables yet
+        return {"available": False, "reason": "No lot ledger yet.", "week": week}
+    start = this_week.paper_start()
+    symbols = sorted(
+        {s for lot in status["lots"].values() for s in lot["holds"]} | set(status["not_in_a_lot"])
+    )
+    closes = db_read.latest_symbol_closes_from_db_or_none(symbols, today) or {}
+    by_id = {m["id"]: m for m in members}
+    label_of = {entry["id"]: label for label, entry in status["lots"].items()}
+    told = {lot["id"]: lot for lot in (last_orders or {}).get("lots") or []}
+
+    def priced(symbol: str, shares: float) -> dict:
+        close = closes.get(symbol)
+        return {
+            "symbol": symbol,
+            "shares": shares,
+            "close": close[0] if close else None,
+            "close_day": close[1].isoformat() if close else None,
+            "value": round(shares * close[0], 2) if close else None,
+        }
+
+    out = []
+    for label, entry in status["lots"].items():
+        member = by_id[entry["id"]]
+        req = BacktestRequest.model_validate(member["config"])
+        info = _rebalance_info(req, friday)
+        rows = [priced(s, q) for s, q in sorted(entry["holds"].items())]
+        ordered = told.get(entry["id"])
+        out.append(
+            {
+                "id": entry["id"],
+                "label": label,
+                "sleeve": member["name"],
+                "holds": rows,
+                "value": round(sum(r["value"] for r in rows if r["value"] is not None), 2),
+                "unpriced": [r["symbol"] for r in rows if r["value"] is None],
+                "funded": entry["id"] in has_history,
+                "due": bool(info["on_cadence"]),
+                "next": week if info["on_cadence"] else info["next"],
+                "last": _last_rebalance(req, friday, start),
+                "pending": entry["id"] == pending_id,
+                "last_orders": (
+                    {
+                        "status": ordered["status"],
+                        "budget": ordered.get("budget"),
+                        "next": ordered.get("next"),
+                    }
+                    if ordered
+                    else None
+                ),
+            }
+        )
+    beyond = []
+    for symbol, delta in status["not_in_a_lot"].items():
+        row = priced(symbol, delta)
+        row["delta"] = row.pop("shares")
+        row["planned"] = [
+            {"lot": label_of.get(sid, sid), "shares": shares[symbol]}
+            for sid, shares in planned.items()
+            if abs(shares.get(symbol, 0.0)) > lots.EPS
+        ]
+        beyond.append(row)
+    days = sorted({r["close_day"] for lot in out for r in lot["holds"] if r["close_day"]})
+    same_snapshot = snapshot and snapshot["synced_at"] == status["snapshot"]
+    return {
+        "available": True,
+        "group": status["group"],
+        "group_id": headline["id"],
+        "week": week,
+        "paper_start": start,
+        "holdings_source": settings["holdings_source"],
+        "snapshot": (
+            {"synced_at": status["snapshot"], "cash": snapshot["cash"] if same_snapshot else None}
+            if status["snapshot"]
+            else None
+        ),
+        "pending": status["pending"],
+        "close_day": days[-1] if days else None,
+        "lots": out,
+        "total_value": round(sum(lot["value"] for lot in out), 2),
+        "not_in_a_lot": beyond,
+        "last_orders": (
+            {
+                "week": last_orders.get("week"),
+                "created_at": last_orders.get("created_at"),
+                "trigger": last_orders.get("trigger"),
+                "free_cash": last_orders.get("free_cash"),
+                "deposit_needed": last_orders.get("deposit_needed"),
+                "lot_size": last_orders.get("lot_size"),
+            }
+            if last_orders and last_orders.get("lots")
+            else None
+        ),
+    }
+
+
 def _orders_message(payload: dict) -> Notification:
     """The 14:15 Telegram summary of Your orders."""
     plan = payload.get("plan")
@@ -5812,6 +5948,12 @@ def create_app() -> FastAPI:
                 }
         except (FileNotFoundError, duckdb.CatalogException):  # no catalog / tables yet
             return empty
+
+    @app.get("/api/lots")
+    def lots_panel() -> dict:
+        """This week's Lots panel (BL-142 Phase 4): the lot ledger with values and calendars.
+        Read-only: no Kite read, no quote, no booking (`lots_view`)."""
+        return lots_view()
 
     @app.post("/api/orders/run", status_code=202)
     def orders_run() -> dict:

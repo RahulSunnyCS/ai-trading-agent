@@ -228,6 +228,27 @@ def save_orders(
     return created_at
 
 
+def latest_orders(
+    con: duckdb.DuckDBPyConnection, who: str, favourite_id: str
+) -> dict[str, Any] | None:
+    """The newest set of orders made for `favourite_id`, whatever the week, or None."""
+    row = con.execute(
+        "SELECT created_at, trigger, favourite_id, holdings_source, payload FROM momentum_orders "
+        "WHERE owner = ? AND favourite_id = ? ORDER BY created_at DESC LIMIT 1",
+        [who, favourite_id],
+    ).fetchone()
+    if row is None:
+        return None
+    created_at, trigger, fav, source, payload = row
+    return {
+        "created_at": created_at,
+        "trigger": trigger,
+        "favourite_id": fav,
+        "holdings_source": source,
+        **json.loads(payload),
+    }
+
+
 def orders_for(con: duckdb.DuckDBPyConnection, who: str, week: str) -> list[dict[str, Any]]:
     """Every set of orders made for `week`, oldest first."""
     rows = con.execute(
