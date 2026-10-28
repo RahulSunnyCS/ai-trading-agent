@@ -9,6 +9,7 @@ import type {
   MomentumWeekEdgeName,
   MomentumWeekMessage,
 } from '../../../types/momentum';
+import { Accordion } from '../../ui/Accordion';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
 import { Card, CardHeader } from '../../ui/Card';
@@ -152,7 +153,8 @@ export function EdgeNames({ card }: { card: MomentumWeekCard }) {
   );
 }
 
-/** The headline's message, word for word as sent (or held back). */
+/** The headline's message, word for word as sent (or held back). Collapsed to when it was sent: it
+ * repeats the orders above it, so it is opened to read it word for word or to re-send it. */
 export function TelegramMessage({
   message,
   onResend,
@@ -164,22 +166,17 @@ export function TelegramMessage({
   firstWeek?: boolean;
 }) {
   return (
-    <Card>
-      <CardHeader
-        title="Telegram message"
-        description={
-          message
-            ? `${message.sent ? 'sent' : 'not sent'} ${formatIstDateTime(message.at)} · ${message.run}`
-            : 'Nothing recorded for this week yet.'
-        }
-        actions={
-          <Button size="sm" variant="ghost" onClick={onResend}>
-            Re-send…
-          </Button>
-        }
-      />
+    <Accordion
+      defaultOpen={false}
+      title="Telegram message"
+      description={
+        message
+          ? `${message.sent ? 'sent' : 'not sent'} ${formatIstDateTime(message.at)} · ${message.run}`
+          : 'Nothing recorded for this week yet.'
+      }
+    >
       {message && firstWeek ? (
-        <p className="mb-2 text-xs text-muted">
+        <p className="text-xs text-muted">
           This is the message as it was sent: it lists the model's own changes this week (sells,
           adds, trims), not your first buys, which the cards beside it show. It is a record, so it
           is not rewritten.
@@ -192,6 +189,9 @@ export function TelegramMessage({
           {message.body}
         </pre>
       ) : null}
-    </Card>
+      <Button size="sm" variant="ghost" onClick={onResend}>
+        Re-send…
+      </Button>
+    </Accordion>
   );
 }

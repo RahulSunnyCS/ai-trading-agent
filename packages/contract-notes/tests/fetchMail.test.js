@@ -8,10 +8,27 @@ const hasQpdf = spawnSync('qpdf', ['--version']).status === 0;
 const describeQpdf = hasQpdf ? describe : describe.skip;
 
 let tmpDir;
-const samplePdf = path.join(__dirname, '..', 'Angel One sample.pdf');
+let samplePdf;
 
 beforeAll(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'qpdf-test-'));
+  // A blank one-page PDF, written out by qpdf so it has a proper cross-reference table: no
+  // real contract note is committed (the repo is public).
+  const page = path.join(tmpDir, 'page.pdf');
+  fs.writeFileSync(
+    page,
+    '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n' +
+      '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' +
+      '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Resources<<>>>>endobj\n' +
+      'trailer<</Root 1 0 R/Size 4>>\n%%EOF\n',
+  );
+  samplePdf = path.join(tmpDir, 'blank.pdf');
+  if (hasQpdf) {
+    const built = spawnSync('qpdf', [page, samplePdf]);
+    // 0 = clean, 3 = written with warnings (the hand-written source has no xref table).
+    expect([0, 3]).toContain(built.status);
+    expect(fs.existsSync(samplePdf)).toBe(true);
+  }
 });
 
 afterAll(() => {
@@ -54,14 +71,17 @@ describeQpdf('decryptWithQpdf()', () => {
     // treated as a hard failure, which aborted the whole run.
     const damaged = path.join(tmpDir, 'damaged.pdf');
     const bytes = fs.readFileSync(samplePdf);
+    // Point startxref at an offset past the end of the file.
     const at = bytes.lastIndexOf(Buffer.from('startxref'));
-    const offsetLen = String(bytes.length).length;
+    const m = /^startxref(\s+)(\d+)/.exec(bytes.subarray(at).toString('latin1'));
+    if (!m) throw new Error('blank PDF has no startxref offset');
+    const offsetStart = at + 'startxref'.length + m[1].length;
     fs.writeFileSync(
       damaged,
       Buffer.concat([
-        bytes.subarray(0, at + 10),
+        bytes.subarray(0, offsetStart),
         Buffer.from('999999999'),
-        bytes.subarray(at + 10 + offsetLen),
+        bytes.subarray(offsetStart + m[2].length),
       ]),
     );
 

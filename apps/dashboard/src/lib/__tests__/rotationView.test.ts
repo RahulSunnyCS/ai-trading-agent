@@ -5,7 +5,6 @@ import {
   BENCHMARKS,
   LIST_KEYS,
   benchmarkFigures,
-  headline,
   heroSeries,
   nearestIndex,
   niceTicks,
@@ -98,42 +97,6 @@ describe('benchmarkFigures', () => {
     const s = { ...summary(), base: null };
     expect(benchmarkFigures(s, 'base', 'C').total).toBeNull();
     expect(benchmarkFigures({ ...s, lists: {} }, 'REF', 'C').perLotDay).toBeNull();
-  });
-});
-
-describe('headline', () => {
-  it('compares per lot, and shows lots instead of a gap for totals', () => {
-    const h = headline(summary(), 'C', 'REF', 60);
-    const byId = Object.fromEntries(h.map((x) => [x.id, x]));
-    expect(byId.perLotDay?.gap).toBe(80);
-    expect(byId.perLotDay?.tone).toBe('positive');
-    // -1300 per lot against REF's -1300: not better, not worse
-    expect(byId.drawdownLot?.gap).toBe(0);
-    expect(byId.drawdownLot?.tone).toBe('default');
-    expect(byId.total?.gap).toBeNull();
-    expect(byId.total?.caption).toBe('6 lots a day here, 6 for Baseline');
-    expect(byId.sessions?.value).toBe(2);
-    expect(byId.sessions?.benchmark).toBe(60);
-  });
-
-  it('a smaller drawdown per lot is better even though the number is larger', () => {
-    const s = summary();
-    s.lists.C = stats({ max_drawdown_per_lot: -1000 });
-    const dd = headline(s, 'C', 'REF', 60).find((x) => x.id === 'drawdownLot');
-    expect(dd?.gap).toBe(300);
-    expect(dd?.tone).toBe('positive');
-  });
-
-  it('is not fooled by more lots: a bigger rupee drawdown on 8-lot days is no gap at all', () => {
-    const s = summary();
-    s.lists.C = stats({ max_drawdown: -12000, max_drawdown_per_lot: -1300, lots_per_day: 8 });
-    const h = headline(s, 'C', 'REF', 60);
-    expect(h.find((x) => x.id === 'drawdownLot')?.tone).toBe('default');
-    expect(h.some((x) => x.id === 'total' && x.gap !== null)).toBe(false);
-  });
-
-  it('is empty when the focus list has no figures yet', () => {
-    expect(headline({ ...summary(), lists: {} }, 'C', 'REF', 60)).toEqual([]);
   });
 });
 

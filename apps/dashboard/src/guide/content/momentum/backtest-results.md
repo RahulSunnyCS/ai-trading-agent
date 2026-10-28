@@ -11,6 +11,17 @@ open that setting), and the actions: reload prices, copy a shareable link, **Set
 settings open in a drawer from the right) and **Run momentum backtest**. The round arrow beside
 Run re-runs from scratch, dropping the server's caches.
 
+## Before you run anything
+
+Opened plainly (no dataset in the address, no run kept from earlier), Backtest shows the
+**headline favourite's latest saved run** instead of an empty page: its CAGR, edge over the
+benchmark, maximum drawdown, Sharpe and its equity line, with the line *Showing the saved run of
+12 Oct. Run to refresh.* Its settings are loaded into the run bar, so **Run** re-runs exactly it on
+today's data; nothing runs until you press it. When the headline is a
+[group](glossary:favourite-group), the figures are its sleeves' blend (as on
+[Saved runs](app:/momentum/saved)) and the run bar keeps the dataset's defaults, since a group has
+no single set of settings to run.
+
 ## The benchmark picker
 
 The headline card compares everything with one [benchmark](glossary:benchmark), picked on the

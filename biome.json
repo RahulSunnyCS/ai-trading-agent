@@ -35,6 +35,8 @@
       "**/.next/**",
       "**/.next-prod/**",
       "**/.open-next/**",
+      "**/.wrangler/**",
+      "**/next-env.d.ts",
       "**/.venv/**",
       "packages/momentum-backtesting/data/**",
       "packages/momentum-backtesting/tests/golden/**",

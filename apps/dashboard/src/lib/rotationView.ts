@@ -94,111 +94,11 @@ export function benchmarkFigures(
   };
 }
 
-export type HeadlineTone = 'positive' | 'negative' | 'default';
-
-export interface HeadlineFigure {
-  id: 'total' | 'perLotDay' | 'drawdownLot' | 'random' | 'sessions';
-  label: string;
-  value: number;
-  unit: 'inr' | 'pct' | 'count';
-  /** The benchmark's own figure, or null where there is none to compare. */
-  benchmark: number | null;
-  /** value - benchmark, in the figure's unit; null where the two are not comparable. */
-  gap: number | null;
-  tone: HeadlineTone;
-  hint: string;
-  /** Shown instead of a gap where a total cannot be compared: the lots behind each figure. */
-  caption?: string;
-}
-
-function toneOf(gap: number | null): HeadlineTone {
-  if (gap === null || gap === 0) return 'default';
-  return gap > 0 ? 'positive' : 'negative';
-}
-
-const lots = (v: number | null): string => (v === null ? '' : `${Math.round(v * 10) / 10}`);
-
 /** "1 lot", "2 lots": the lots a strategy behind the read-out's rupee totals (the page asks for
  * 1; the registered read-out holds 2). Unknown is the registered 2. */
 export function lotsWord(n: number | null | undefined): string {
   const v = typeof n === 'number' && n > 0 ? n : 2;
   return `${v} lot${v === 1 ? '' : 's'}`;
-}
-
-/**
- * The numbers that say whether the focus list is good, each against the benchmark. Lists hold 6
- * lots, or 8 on a Buy day, and the base 6, so a total or a drawdown in rupees is not comparable:
- * those two show the lots behind them instead of a gap, and the gap badges sit on the per-lot
- * figures, which is what the registered rule compares.
- */
-export function headline(
-  summary: RotationSummary,
-  focus: RotationListKey,
-  pick: RotationBenchmark,
-  readoutDays: number,
-): HeadlineFigure[] {
-  const f: RotationListStats | undefined = summary.lists[focus];
-  if (!f) return [];
-  const b = benchmarkFigures(summary, pick, focus);
-  const gap = (v: number, ref: number | null) => (ref === null ? null : v - ref);
-  const totalCaption =
-    b.total === null
-      ? undefined
-      : `${lots(f.lots_per_day)} lots a day here, ${lots(b.lotsPerDay)} for ${b.label}`;
-  return [
-    {
-      id: 'perLotDay',
-      label: '₹ per lot-day',
-      value: f.per_lot_day,
-      unit: 'inr',
-      benchmark: b.perLotDay,
-      gap: gap(f.per_lot_day, b.perLotDay),
-      tone: toneOf(gap(f.per_lot_day, b.perLotDay)),
-      hint: 'Average gross per lot per day: the fair way to compare a 3-strategy day with a 4-strategy Buy day, and the unit the registered rule uses.',
-    },
-    {
-      id: 'drawdownLot',
-      label: 'Max drawdown per lot',
-      value: f.max_drawdown_per_lot,
-      unit: 'inr',
-      benchmark: b.maxDrawdownPerLot,
-      gap: gap(f.max_drawdown_per_lot, b.maxDrawdownPerLot),
-      // drawdowns are negative: a larger (nearer zero) value is the better one
-      tone: toneOf(gap(f.max_drawdown_per_lot, b.maxDrawdownPerLot)),
-      hint: 'The largest fall of the cumulative gross per lot from its running peak, the peak starting at zero. Per lot so that holding more lots does not look like a worse drawdown.',
-    },
-    {
-      id: 'total',
-      label: 'Cumulative gross',
-      value: f.total,
-      unit: 'inr',
-      benchmark: b.total,
-      gap: null,
-      tone: 'default',
-      hint: `Total over the scored sessions at ${lotsWord(summary.settings?.lots_per_strategy)} per strategy (max drawdown ${Math.round(f.max_drawdown)} ₹ in rupees). Totals depend on how many lots a list held, so they are shown, not compared.`,
-      ...(totalCaption ? { caption: totalCaption } : {}),
-    },
-    {
-      id: 'random',
-      label: 'Beats random baskets',
-      value: f.beats_random_pct,
-      unit: 'pct',
-      benchmark: b.beatsRandom,
-      gap: gap(f.beats_random_pct, b.beatsRandom),
-      tone: toneOf(gap(f.beats_random_pct, b.beatsRandom)),
-      hint: 'Share of 1,000 random same-shape baskets (3 strategies, at least 2 Widesl, the list’s own Buy add-on) that this list’s cumulative gross is above.',
-    },
-    {
-      id: 'sessions',
-      label: 'Sessions scored',
-      value: summary.n_days,
-      unit: 'count',
-      benchmark: readoutDays,
-      gap: null,
-      tone: 'default',
-      hint: 'Scored forward sessions against the registered read-out point.',
-    },
-  ];
 }
 
 export interface VerdictLine {

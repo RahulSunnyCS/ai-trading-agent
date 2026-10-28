@@ -40,6 +40,10 @@ from .ruletest.cli import rule_app  # noqa: E402  (BL-120: rule strategies and t
 
 app.add_typer(rule_app, name="rule")
 
+from .realised.cli import realised_app  # noqa: E402  (BL-168: the contract notes, realised)
+
+app.add_typer(realised_app, name="realised")
+
 
 @app.callback()
 def _load_env() -> None:

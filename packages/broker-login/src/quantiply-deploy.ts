@@ -19,11 +19,15 @@ import {
   type AlgoDetail,
   type DeployMode,
   ENABLE_LEAD_SECONDS,
+  clientwiseBody,
+  clientwiseHolds,
+  clientwiseNow,
   defaultSession,
   enabledSessions,
   istSeconds,
   ownedForSession,
   parseBrokers,
+  parseClientwise,
   parseDeployLedger,
   parseDetail,
   pickBroker,
@@ -85,6 +89,11 @@ import { istToday, sha256 } from './strategy-plan.js';
  *   disabled, so they do not run again next week. Only finished ones, and today's only after
  *   15:30 IST unless `--emergency` (the emergency stop: today's pending entries too).
  * - check: read-only: owned algos enabled after their session.
+ * - `--morning` (BL-172, the 08:00 job): enable for today from last evening's preview export
+ *   (before the 09:16 pick exists), after keeping the account's clientwise MTM SL at the
+ *   Settings › Automation row's figure (`POST /brokers/<id>/config`, read back on every weekday;
+ *   a figure that does not read back stops the run before anything is switched on). It always
+ *   sends its Telegram report, also when there was nothing to switch on.
  * - After any change the list is read again: exactly the intended algos must have changed, and no
  *   other algo of the tool's; anything else stops the run, alerts and exits 3.
  *
@@ -95,6 +104,24 @@ import { istToday, sha256 } from './strategy-plan.js';
  * switch say, because switching off only ever lowers what trades. Every change is a row in
  * `deploy-ledger[-<broker>].jsonl`. The JWT is never logged.
  */
+
+/**
+ * BL-172: under the 08:10 job (`--morning` with `MORNING_REPORT_FILE` set) each account's report is
+ * added to one file and `morning-report.ts` sends them as one message; anything else, or a file
+ * that cannot be written, is sent on its own as before.
+ */
+async function deliver(text: string, type = 'broker.quantiply'): Promise<void> {
+  const file = process.env.MORNING_REPORT_FILE?.trim();
+  if (file && process.argv.includes('--morning')) {
+    try {
+      await appendFile(file, `${JSON.stringify({ text: redact(text) })}\n`, 'utf8');
+      return;
+    } catch {
+      // the message still goes, on its own
+    }
+  }
+  await sendText(readTelegramConfig(), redact(text), type).catch(() => undefined);
+}
 
 /** 1: may succeed on a retry, nothing was changed blind. 3: the owner must look; never retried. */
 const EXIT_RETRY = 1;
@@ -132,6 +159,7 @@ async function main(): Promise<number> {
       dir: { type: 'string' },
       ledger: { type: 'string' },
       emergency: { type: 'boolean', default: false },
+      morning: { type: 'boolean', default: false },
       apply: { type: 'boolean', default: false },
       headed: { type: 'boolean', default: false },
     },
@@ -139,7 +167,7 @@ async function main(): Promise<number> {
   const mode = values.mode as DeployMode;
   if (!['enable', 'disable', 'check'].includes(mode ?? '')) {
     console.error(
-      'usage: --broker angelone|finvasia --mode enable|disable|check [--day YYYY-MM-DD] [--book core|t1 | --dir <folder>] [--emergency] [--apply]',
+      'usage: --broker angelone|finvasia --mode enable|disable|check [--day YYYY-MM-DD] [--book core|t1 | --dir <folder>] [--emergency] [--morning] [--apply]',
     );
     return 64;
   }
@@ -151,6 +179,10 @@ async function main(): Promise<number> {
     console.error('--emergency is for --mode disable only');
     return 64;
   }
+  if (values.morning && mode !== 'enable') {
+    console.error('--morning is for --mode enable only');
+    return 64;
+  }
   if (values.day && !/^\d{4}-\d\d-\d\d$/.test(values.day)) {
     console.error(`--day ${values.day} is not YYYY-MM-DD`);
     return 64;
@@ -159,6 +191,11 @@ async function main(): Promise<number> {
   const broker = parseQuantiplyBroker(values.broker);
   const site = QUANTIPLY_SITES[broker];
 
+  /** BL-172: the morning run always reports, also when it is held back before logging in. */
+  const heldMorning = async (why: string) => {
+    if (!values.morning || !values.apply) return;
+    await deliver(`⚠️ ${site.name} morning switch-on: ${why}. Nothing switched on.`);
+  };
   // Gate 1, before any login, for enable only: the .env switch. Disable is never gated.
   if (
     values.apply &&
@@ -166,6 +203,7 @@ async function main(): Promise<number> {
     process.env.QUANTIPLY_DEPLOY?.trim().toLowerCase() !== 'on'
   ) {
     console.log(`${site.name}: QUANTIPLY_DEPLOY is not "on": nothing enabled`);
+    await heldMorning('QUANTIPLY_DEPLOY is not "on" in .env');
     return 0;
   }
   // BL-143 Phase 4: a confirmed stop holds every enable until the owner resumes (never a
@@ -173,6 +211,7 @@ async function main(): Promise<number> {
   const held = values.apply && mode === 'enable' ? stopHeld() : null;
   if (held) {
     console.log(`${site.name} enable ${held}`);
+    await heldMorning(`the stop hold is on (${held})`);
     return 0;
   }
   // The disable safety net reads nothing it does not use: no automation settings.
@@ -180,6 +219,8 @@ async function main(): Promise<number> {
   let decidedBy = 'settings not read (disable never needs them)';
   /** the account row's platform multiplier the uploader applied (BL-140 Phase 4) */
   let multiplier = 1;
+  /** BL-172: the clientwise MTM SL the morning run keeps (rupees), or null to leave it */
+  let mtmSl: number | null = null;
   if (mode !== 'disable') {
     let automation: Automation;
     try {
@@ -191,10 +232,12 @@ async function main(): Promise<number> {
     gate = quantiplyDeploy(automation, broker);
     decidedBy = describeSource(automation);
     multiplier = effectiveRow(automation, 'quantiply', broker).multiplier;
+    mtmSl = effectiveRow(automation, 'quantiply', broker).mtmSl;
   }
   // Gate 2: enabling also needs the dashboard's switch and the account's row.
   if (values.apply && mode === 'enable' && !gate.ok) {
     console.log(`${site.name}: ${gate.why} (${decidedBy}): nothing enabled`);
+    await heldMorning(`${gate.why} (${decidedBy})`);
     return 0;
   }
   const apply = values.apply;
@@ -231,7 +274,7 @@ async function main(): Promise<number> {
     : defaultSession(mode, today, istSeconds(), isTradingDay);
   const session = chosen.day;
   const weekday = weekdayOf(session);
-  const label = `${site.name} ${mode}${values.emergency ? ' (EMERGENCY)' : ''} for ${session} (${weekday})`;
+  const label = `${site.name} ${values.morning ? 'morning switch-on' : mode}${values.emergency ? ' (EMERGENCY)' : ''} for ${session} (${weekday})`;
   console.log(`${label}: session from ${chosen.why}; ${decidedBy}`);
 
   let picks: Picks | null = null;
@@ -257,11 +300,14 @@ async function main(): Promise<number> {
     }
     picks = await readPicks(resolve(dir), multiplier);
     const m = picks.manifest;
-    // The picks must be the session's: the evening's preview, or today's recorded picks.
+    // The picks must be the session's: the evening's preview, or today's recorded picks. BL-172:
+    // the 08:00 run switches on last evening's preview for today, before the 09:16 pick exists.
     const fits =
       m.day === session &&
       weekdayOf(m.day) === m.weekday &&
-      (session > today || m.source === 'recorded');
+      (session > today ||
+        m.source === 'recorded' ||
+        (values.morning === true && m.source === 'preview'));
     if (!fits) {
       console.error(
         `the export is ${m.source} for ${m.day} (${m.weekday}); the session is ${session}${session === today ? " and needs today's recorded picks" : ''}: nothing enabled`,
@@ -283,10 +329,13 @@ async function main(): Promise<number> {
             return at === session || at < today;
           }).length
         : owned.size;
-  if (!relevant) {
-    console.log(
-      `nothing the uploader created for ${session} on this account: no login, nothing to do`,
-    );
+  // BL-172: the morning run still logs in to keep the MTM SL when the tool has nothing for the
+  // session (a failed evening upload): the owner's own algos may run. It says so either way.
+  const nothingOwned = !relevant;
+  if (nothingOwned && !(values.morning && mtmSl !== null)) {
+    const text = `nothing the uploader created for ${session} on this account: no login, nothing to do`;
+    console.log(text);
+    if (values.morning && values.apply) await deliver(`⚠️ ${label}: ${text}. Nothing switched on.`);
     return 0;
   }
 
@@ -306,6 +355,8 @@ async function main(): Promise<number> {
   }
 
   const lines: string[] = [];
+  if (nothingOwned)
+    lines.push(`⚠️ nothing the uploader created for ${session}: nothing to switch on`);
   let printed = 0;
   let retryable = false;
   let attention = false;
@@ -417,7 +468,45 @@ async function main(): Promise<number> {
       }
     } else {
       const p = picks as Picks;
-      const pb = pickBroker(parseBrokers(await api.brokers()), creds.user);
+      const brokersJson = await api.brokers();
+      const pb = pickBroker(parseBrokers(brokersJson), creds.user);
+      // BL-172: the morning run keeps the account's clientwise MTM SL before anything goes live;
+      // an algo never goes live under a wrong or unknown one.
+      if (values.morning && mtmSl !== null) {
+        const want = `₹${mtmSl.toLocaleString('en-IN')}`;
+        if ('error' in pb) {
+          attention = true;
+          lines.push(
+            `❌ MTM SL not checked (the account's broker: ${pb.error}): nothing switched on`,
+          );
+          throw new Reported('mtm sl');
+        }
+        const days = parseClientwise(brokersJson, pb.id);
+        const body = clientwiseBody(days, mtmSl);
+        if (!body) lines.push(`MTM SL ${want} ✓`);
+        else if (!apply)
+          lines.push(`MTM SL is ${clientwiseNow(days)}: would set ${want} (dry run)`);
+        else {
+          const was = clientwiseNow(days);
+          await api.setClientwise(pb.id, body);
+          changed = true;
+          await record({ action: 'mtm-sl', broker: pb.id, from: was, to: mtmSl, ok: true });
+          let back = parseClientwise(await api.brokers(), pb.id);
+          if (!clientwiseHolds(back, mtmSl)) {
+            // the save may land a moment after it answers: one more read before calling it failed
+            await new Promise((r) => setTimeout(r, 3_000));
+            back = parseClientwise(await api.brokers(), pb.id);
+          }
+          if (!clientwiseHolds(back, mtmSl)) {
+            attention = true;
+            lines.push(
+              `❌ MTM SL set to ${want} but reads back ${clientwiseNow(back)}: nothing switched on, check Quantiply`,
+            );
+            throw new Reported('mtm sl');
+          }
+          lines.push(`MTM SL set ${was} → ${want} (read back on every weekday)`);
+        }
+      }
       const mine = ownedForSession(ledger, session, p.sha);
       const details = new Map<string, AlgoDetail>();
       for (const a of before) {
@@ -550,14 +639,16 @@ async function main(): Promise<number> {
   const failed = retryable || attention;
   // Quiet when nothing happened: the scheduler alerts on a failure, a change always reports.
   // A dry run never messages, except a failed check (it exists to alert).
-  const send = (apply && (changed || failed)) || (mode === 'check' && failed);
+  // BL-172: the 08:00 run always reports (the owner's "switched on" message).
+  const send =
+    (apply && (changed || failed || values.morning === true)) || (mode === 'check' && failed);
   if (send) {
-    const head = failed ? `⚠️ ${label}: check Quantiply` : `✅ ${label}`;
-    await sendText(
-      readTelegramConfig(),
-      redact([head, ...lines].join('\n')),
-      'broker.quantiply',
-    ).catch(() => undefined);
+    const head = failed || nothingOwned ? `⚠️ ${label}: check Quantiply` : `✅ ${label}`;
+    // BL-173: the 15:40 switch-off has its own type, failures only by default (the owner)
+    await deliver(
+      [head, ...lines].join('\n'),
+      mode === 'disable' ? 'quantiply.switch_off' : 'broker.quantiply',
+    );
   }
   console.log(lines.slice(printed).join('\n'));
   // Disable: a retry may still switch off what is left on, so a retryable failure wins (the
@@ -575,9 +666,7 @@ main()
     const text = `⚠️ Quantiply deploy (${process.argv.slice(2).join(' ')}) stopped: ${describe(error)}`;
     console.error(text);
     if (process.argv.includes('--apply')) {
-      await Promise.resolve()
-        .then(() => sendText(readTelegramConfig(), redact(text), 'broker.quantiply'))
-        .catch(() => undefined);
+      await deliver(text).catch(() => undefined);
     }
     process.exit(EXIT_RETRY);
   });

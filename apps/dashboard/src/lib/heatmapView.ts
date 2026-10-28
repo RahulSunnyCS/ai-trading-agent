@@ -7,6 +7,7 @@
 
 import type { HeatmapCell, HeatmapMetric, HeatmapResponse } from '../types/heatmap';
 import { formatDay, formatNumber, formatPct } from './format';
+import { buildPath } from './routes';
 
 export const VIEW_LABEL = {
   time_sl: 'Time vs SL',
@@ -162,4 +163,23 @@ export function settingsChips(s: {
     chips.push(`Expiry week ${s.weeks.map((w) => (w === 0 ? 'of' : `${w} out`)).join(', ')}`);
   }
   return chips;
+}
+
+/**
+ * The Matrix's Family × start view (its default view) over the heatmap's own days: one session
+ * for Time vs SL on a single date, else the range. "Which strategy type did best at which entry
+ * time" lives there, not on this page. An absent `minn` lets the Matrix ask for one day's cells
+ * unthinned (`rotationMatrixDefault.ts`); with no day at all it opens on its own default.
+ */
+export function matrixFamilyStartHref(s: {
+  view: keyof typeof VIEW_LABEL;
+  date: string;
+  from: string;
+  to: string;
+}): string {
+  const [from, to] = s.view === 'time_sl' ? [s.date, s.to || s.date] : [s.from || s.to, s.to];
+  const path = buildPath('optionslab', 'matrix');
+  if (!from || !to) return path;
+  const q = new URLSearchParams({ period: 'custom', from, to });
+  return `${path}?${q.toString()}`;
 }

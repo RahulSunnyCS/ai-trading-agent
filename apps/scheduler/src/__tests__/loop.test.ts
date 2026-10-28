@@ -2,7 +2,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { alertMissed, alertResult, telegramSink } from '../alerts.js';
+import { redact } from '@trading/notify';
+import {
+  alertMissed,
+  alertMissedAll,
+  alertResult,
+  registerContractNoteSecrets,
+  telegramSink,
+} from '../alerts.js';
 import { History } from '../history.js';
 import type { Job } from '../jobs.js';
 import { decide, skippedToday, startLoop } from '../loop.js';
@@ -123,6 +130,19 @@ describe('decide', () => {
   });
 });
 
+describe('contract-notes secrets (BL-168)', () => {
+  it('registers every mailbox and PDF password for redaction, and ignores a broken value', () => {
+    registerContractNoteSecrets(
+      JSON.stringify([
+        { emailPassword: 'mail-pass-123', accounts: [{ pdfPassword: 'pdf-pass-456' }] },
+      ]),
+    );
+    expect(redact('a mail-pass-123 b pdf-pass-456')).toBe('a ***REDACTED*** b ***REDACTED***');
+    expect(() => registerContractNoteSecrets('[{')).not.toThrow();
+    expect(() => registerContractNoteSecrets(undefined)).not.toThrow();
+  });
+});
+
 describe('alerts', () => {
   const sent: string[] = [];
   const sink = async (text: string) => {
@@ -140,6 +160,26 @@ describe('alerts', () => {
     logPath: '/tmp/x.log',
     error: 'exit 1',
     ...over,
+  });
+
+  it('BL-173: many missed slots in one pass are one message; each alert carries its type', async () => {
+    const types: (string | undefined)[] = [];
+    const typed = async (text: string, type?: string) => {
+      sent.push(text);
+      types.push(type);
+    };
+    const slot = new Date('2026-10-28T02:30:00Z');
+    await alertMissedAll(typed, [
+      { job, slot },
+      { job: { ...job, id: 'other' }, slot },
+    ]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toContain('2 jobs were missed');
+    expect(sent[0]).toContain('• other');
+    await alertMissedAll(typed, []);
+    expect(sent).toHaveLength(1);
+    await alertResult(typed, job, result({}), history);
+    expect(types).toEqual(['scheduler.missed', 'scheduler.failure']);
   });
 
   it('alerts at once on a failure, with the fix', async () => {

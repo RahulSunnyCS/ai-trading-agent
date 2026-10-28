@@ -232,13 +232,23 @@ describe('RotationPulse', () => {
   });
 
   it('a missing window is a dash, never a zero', () => {
-    hook.state.data = data();
+    const d = data();
+    d.cells = d.cells.map((c) =>
+      c.kind_label === 'Dir' ? { ...c, p1: stat(null) } : c,
+    ) as typeof d.cells;
+    hook.state.data = d;
     render(<RotationPulse focus="C" />);
     const dir = screen.getByText('Dir').closest('tr') as HTMLElement;
     const cells = within(dir).getAllByRole('cell');
-    // cell, last 5, last 21, last 63, P1, P2: P2 has no stored result
-    expect(cells[5]?.textContent).toBe('—');
-    expect(cells[5]?.getAttribute('title')).toContain('no stored result in this window');
+    // cell, last 5, last 21, last 63, P1: P1 has no stored result here
+    expect(cells[4]?.textContent).toBe('—');
+    expect(cells[4]?.getAttribute('title')).toContain('no stored result in this window');
+  });
+
+  it('has no P2 column: the Matrix a row opens carries it', () => {
+    hook.state.data = data();
+    render(<RotationPulse focus="C" />);
+    expect(screen.queryByRole('columnheader', { name: /^P2/ })).toBeNull();
   });
 
   it('labels reconstructed picks as such and never as a record', () => {

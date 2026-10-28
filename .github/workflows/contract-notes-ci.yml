@@ -1,8 +1,9 @@
 # CI for the packages/contract-notes workspace.
 #
 # ci.yml path-ignores packages/**, so without this the Jest suite covering the
-# broker PDF extractors would never run. No qpdf here: the tests work off the
-# text fixtures in tests/fixtures/, not encrypted PDFs.
+# broker PDF extractors would never run. The extractor tests work off the invented
+# text fixtures in tests/fixtures/; qpdf is installed so the decryption tests in
+# tests/fetchMail.test.js (which build their own blank PDF) run instead of skipping.
 name: Contract Notes CI
 
 on:
@@ -25,6 +26,10 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '20'
+
+      # fetchMail.js decrypts the notes with the qpdf binary.
+      - name: Install qpdf
+        run: sudo apt-get update && sudo apt-get install -y qpdf
 
       - uses: oven-sh/setup-bun@v2
         with:

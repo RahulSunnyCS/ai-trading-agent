@@ -47,11 +47,13 @@ export function dashboardService({ prod = false, port = DEFAULT_DASHBOARD_PORT }
     ports: [...new Set([port, DEFAULT_DASHBOARD_PORT, 5180, 5173])],
     targetPort: port,
     command: 'bun',
+    // `--webpack` for the Guide's `?raw` rule (next.config.ts): Next 16 builds with Turbopack by
+    // default. `next start` serves a finished build and has no such option.
     args: [
       'run',
       '--bun',
       'next',
-      prod ? 'start' : 'dev',
+      ...(prod ? ['start'] : ['dev', '--webpack']),
       '--port',
       String(port),
       '-H',
@@ -368,7 +370,7 @@ function ensureProdBuild(service, force) {
   const nextEnvFile = join(dashboardDir, 'next-env.d.ts');
   const nextEnv = existsSync(nextEnvFile) ? readFileSync(nextEnvFile, 'utf8') : null;
   const started = Date.now();
-  const result = spawnSync('bun', ['run', '--bun', 'next', 'build'], {
+  const result = spawnSync('bun', ['run', '--bun', 'next', 'build', '--webpack'], {
     cwd: dashboardDir,
     env,
     stdio: 'inherit',

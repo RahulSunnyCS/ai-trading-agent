@@ -34,7 +34,7 @@ out of every cell and named under the table, never dropped silently.
 | Column | What it says |
 |---|---|
 | Last 5, 21, 63 | The mean gross per lot-day of the cell's strategies over the last 5, 21 and 63 sessions. Beside it: sessions · variants. |
-| P1, P2 | The same mean over the two reference periods the research used, so a recent number has something to be read against. |
+| P1 | The same mean over the period the weights were chosen on, so a recent number has something to be read against. (P2 is in the Strategy Matrix, which a row opens.) |
 | Rolling 21 | The 21-session mean, drawn over up to the last 126 sessions. The dashed line is the P1 mean. Hover a point for its day. |
 | Ranking sees | The cell's rank, 1 to 12, on the family-band criterion for the next 09:16 pick. |
 | Picks | An Adaptive chip when its latest picks fall in the cell. A count shows when it picked twice there. (The journal also records Steady, Calendar and Baseline; their chips are no longer shown.) |

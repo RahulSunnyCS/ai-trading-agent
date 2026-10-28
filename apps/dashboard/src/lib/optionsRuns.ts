@@ -1,9 +1,11 @@
 /**
- * The Options Lab's Runs list and the pieces around it. Pure functions (no React, no
- * formatting to strings beyond leg descriptions) so they are unit-tested under node.
+ * Options Lab runs and the pieces around them: a saved strategy's History (Strategies and
+ * baskets) and the YAML engine's results. Pure functions (no React, no formatting to strings
+ * beyond leg descriptions) so they are unit-tested under node. The Runs page that listed both
+ * engines together was removed (2026-10-28).
  *
- * Two engines feed the list and they report money differently, so every run carries the
- * unit of its net and the two are never summed or compared with each other:
+ * The two engines report money differently, so every run carries the unit of its net and the
+ * two are never summed or compared with each other:
  *
  *  - YAML engine (GET /api/backtest/runs): one registry row per run. `net_inr` is the TOTAL
  *    over the run's sessions at whatever lot count the strategy pyramided to; the engine
@@ -98,25 +100,6 @@ function isoOrNull(ms: number | null): string | null {
   return ms === null ? null : new Date(ms).toISOString();
 }
 
-export function yamlRuns(runs: readonly RunSummary[]): OptionsRun[] {
-  return runs.map((run) => ({
-    key: `yaml:${run.run_id}`,
-    kind: 'yaml' as const,
-    strategy: run.strategy_id,
-    version: run.strategy_hash || null,
-    recordedAt: isoOrNull(instantMs(run.created_at)),
-    from: run.date_from,
-    to: run.date_to,
-    sortTime: instantMs(run.created_at) ?? dayCloseMs(run.date_to),
-    net: run.net_inr,
-    netUnit: 'total' as const,
-    days: run.n_sessions,
-    winDays: run.win_days,
-    current: null,
-    source: { engine: 'yaml' as const, run },
-  }));
-}
-
 /**
  * Leg-wise result rows grouped into runs: by `run_id` when rows carry one, otherwise one
  * run per strategy version. `strategies` supplies the lot divisor for the saved version.
@@ -166,141 +149,28 @@ export function legwiseRuns(
   return runs;
 }
 
-/** Both engines' runs in one list, newest first. */
-export function mergeRuns(
-  yaml: readonly RunSummary[],
-  legwise: readonly LegwiseRunRow[],
-  strategies: readonly SavedStrategy[] = [],
+/**
+ * One strategy's saved days, a run per version (Strategies › History, which replaced the Runs
+ * page): the saved version first, then older versions, newest last day first. Only the saved
+ * version's net is per lot; an older version's lot count is not known, so it stays a total.
+ */
+export function strategyHistory(
+  strategy: SavedStrategy,
+  results: readonly LegwiseRunRow[],
 ): OptionsRun[] {
-  return [...yamlRuns(yaml), ...legwiseRuns(legwise, strategies)].sort(
-    (a, b) => b.sortTime - a.sortTime || a.key.localeCompare(b.key),
+  const rows = results.filter((row) => row.strategy_id === strategy.strategy.id);
+  return legwiseRuns(rows, [strategy]).sort(
+    (a, b) =>
+      Number(b.version === strategy.sha) - Number(a.version === strategy.sha) ||
+      b.to.localeCompare(a.to) ||
+      a.key.localeCompare(b.key),
   );
-}
-
-export type RunKindFilter = RunKind | 'all';
-
-export function filterRuns(
-  runs: readonly OptionsRun[],
-  filter: { kind: RunKindFilter; text: string },
-): OptionsRun[] {
-  const text = filter.text.trim().toLowerCase();
-  return runs.filter(
-    (run) =>
-      (filter.kind === 'all' || run.kind === filter.kind) &&
-      (text === '' || run.strategy.toLowerCase().includes(text)),
-  );
-}
-
-/** How many runs of each kind, for the filter's labels. */
-export function countByKind(runs: readonly OptionsRun[]): Record<RunKindFilter, number> {
-  const counts: Record<RunKindFilter, number> = { all: runs.length, yaml: 0, builder: 0, daily: 0 };
-  for (const run of runs) counts[run.kind] += 1;
-  return counts;
-}
-
-// ---------------------------------------------------------------------------
-// Comparing two runs
-// ---------------------------------------------------------------------------
-
-/** Two runs compare only within one kind: across kinds the money is in different units. */
-export function canCompare(a: OptionsRun, b: OptionsRun): boolean {
-  return a.kind === b.kind && a.key !== b.key;
-}
-
-export type MetricFormat = 'inr' | 'int' | 'pct' | 'number' | 'multiple';
-
-export interface RunMetric {
-  label: string;
-  /** How the component renders the value (through lib/format.ts). */
-  format: MetricFormat;
-  value: number | null;
-  /** True when a larger value is the better one; null when neither direction is "better". */
-  higherIsBetter: boolean | null;
 }
 
 /** The leg-wise day statistics of a run, in its own unit (per lot when the divisor is known). */
 export function legwiseStatsOf(run: OptionsRun): StrategyStats | null {
   if (run.source.engine !== 'legwise') return null;
   return statsOf(run.source.rows, run.source.lots ?? 1);
-}
-
-/** A run's headline metrics, in a fixed order per engine so two runs line up row by row. */
-export function runMetrics(run: OptionsRun): RunMetric[] {
-  const unit = NET_UNIT_LABEL[run.netUnit];
-  if (run.source.engine === 'yaml') {
-    const r = run.source.run;
-    return [
-      { label: `Net (${unit})`, format: 'inr', value: r.net_inr, higherIsBetter: true },
-      { label: 'Sessions', format: 'int', value: r.n_sessions, higherIsBetter: null },
-      {
-        label: 'Win rate',
-        format: 'pct',
-        value: r.n_sessions > 0 ? r.win_days / r.n_sessions : null,
-        higherIsBetter: true,
-      },
-      { label: 'Worst day (total)', format: 'inr', value: r.worst_day, higherIsBetter: true },
-      { label: 'Net per lot-day', format: 'inr', value: r.inr_per_lot_day, higherIsBetter: true },
-      { label: 'Lot-days', format: 'number', value: r.lot_days, higherIsBetter: null },
-      {
-        label: 'Sum of peak losses (total)',
-        format: 'inr',
-        value: r.sum_peak_loss,
-        higherIsBetter: true,
-      },
-    ];
-  }
-  const s = statsOf(run.source.rows, run.source.lots ?? 1);
-  return [
-    { label: `Net (${unit})`, format: 'inr', value: s.total, higherIsBetter: true },
-    { label: 'Days', format: 'int', value: s.days, higherIsBetter: null },
-    { label: 'Win rate', format: 'pct', value: s.winRate, higherIsBetter: true },
-    { label: `Average day (${unit})`, format: 'inr', value: s.expectancy, higherIsBetter: true },
-    { label: `Best day (${unit})`, format: 'inr', value: s.best, higherIsBetter: true },
-    { label: `Worst day (${unit})`, format: 'inr', value: s.worst, higherIsBetter: true },
-    { label: `Max drawdown (${unit})`, format: 'inr', value: s.maxDrawdown, higherIsBetter: true },
-    { label: 'Profit factor', format: 'multiple', value: s.profitFactor, higherIsBetter: true },
-  ];
-}
-
-export interface ComparedMetric {
-  label: string;
-  format: MetricFormat;
-  a: number | null;
-  b: number | null;
-  /** b − a, or null when either side is missing. */
-  delta: number | null;
-  /** Which side is better on this metric, when the metric has a better direction. */
-  better: 'a' | 'b' | null;
-}
-
-/**
- * Two runs of one kind, metric by metric. Null when they cannot be compared. Labels come
- * from each run's own unit: when one leg-wise run is per lot and the other a total, the
- * money rows are dropped rather than set side by side.
- */
-export function compareRuns(a: OptionsRun, b: OptionsRun): ComparedMetric[] | null {
-  if (!canCompare(a, b)) return null;
-  const right = new Map(runMetrics(b).map((metric) => [metric.label, metric]));
-  const rows: ComparedMetric[] = [];
-  for (const left of runMetrics(a)) {
-    const other = right.get(left.label);
-    if (!other) continue;
-    const both = left.value !== null && other.value !== null;
-    const delta = both ? (other.value as number) - (left.value as number) : null;
-    let better: 'a' | 'b' | null = null;
-    if (delta !== null && delta !== 0 && left.higherIsBetter !== null) {
-      better = delta > 0 === left.higherIsBetter ? 'b' : 'a';
-    }
-    rows.push({
-      label: left.label,
-      format: left.format,
-      a: left.value,
-      b: other.value,
-      delta,
-      better,
-    });
-  }
-  return rows;
 }
 
 // ---------------------------------------------------------------------------
