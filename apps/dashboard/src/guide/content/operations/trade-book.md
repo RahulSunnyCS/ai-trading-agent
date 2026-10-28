@@ -6,7 +6,7 @@ Nothing here is a backtest and nothing here places an order. Every figure comes 
 
 ## Where the figures come from
 
-- **Contract notes.** The laptop reads each broker's notes from the mailbox after midnight (and again at 07:30) and stores them. A note gives the day's F&O figures per account: the pay-in / pay-out obligation, brokerage, the other charges, total charges and the final net.
+- **Contract notes.** The laptop reads each broker's notes from the mailbox after midnight (and again at 07:30, 10:30 and 15:30, since Angel One often mails mid-morning) and stores them. A note gives the day's F&O figures per account: the pay-in / pay-out obligation, brokerage, the other charges, total charges and the final net.
 - **Ledger e-mails.** Deposits, payouts, quarterly fund settlements, Angel One's collateral-interest e-mail and the margin-shortfall warnings.
 - **Your inputs.** The two columns the sheet asked you to type: the number of algo trades taken that day and the capital. Angel One's capital is also read at 15:50 for the next session; Finvasia's stays what you type and carries forward until you change it.
 

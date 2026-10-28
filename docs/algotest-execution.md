@@ -320,7 +320,7 @@ Local setup needs **four** toolchains: `bun`, `node@20`, `qpdf`
 
 The sheet cutover this section used to describe is retired. `packages/contract-notes` now
 stores the notes under `TRADING_DATA_ROOT/contract-notes/`, run by the laptop scheduler
-(`contract-notes` 00:00, `contract-notes-retry` 07:30), and **never writes the Google Sheet**.
+(`contract-notes` 00:00, retries at 07:30, 10:30 and 15:30), and **never writes the Google Sheet**.
 `trade-analytics` keeps its own cron and keeps filling the sheet, unchanged. Both read the same
 mailboxes read-only, so there is nothing to coordinate and nothing to roll back. This repo's
 Actions workflows for the sheet (`contract-notes-daily.yml`, `contract-notes-row-tracker.yml`)
