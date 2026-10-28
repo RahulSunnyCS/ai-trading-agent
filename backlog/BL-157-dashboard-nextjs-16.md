@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the hosted dashboard cannot deploy at all until this lands; friends see Momentum through it |
-| **Status** | In progress (Phases 1–2 done; Phase 3 under way) |
+| **Status** | Done (2026-10-28) |
 | **Type** | chore |
 | **Area** | dashboard / infra |
 | **Created** | 2026-10-24 |
@@ -259,3 +259,10 @@ Answered by the owner on 2026-10-26:
 - 2026-10-28 — cf-build dev-server guard dropped: with a Turbopack `next dev` running from the same
   folder, `cf:build` built the Worker and the dev server kept serving (it writes `.next/dev`, which
   `next build` leaves alone). The `NEXT_DIST_DIR` refusal stays. `docs/remote-dashboard.md` says so.
+- 2026-10-28 — review (#364) notes: `cf:build` hides `apps/dashboard`'s `.env` files while it runs, and
+  a running `next dev` reloads its env when they move, so for the build's length it runs without
+  them (the gate stays open in dev either way); written into `docs/remote-dashboard.md`. The `?raw`
+  rule matches `*.md` only, as `src/guide/markdown.d.ts` declares only `*.md?raw`: a new raw file
+  type needs both.
+- 2026-10-28 — closed. Phases 1–3 done; Phase 3 merged as #363 (React 19) and #364 (Turbopack, the
+  guard, the `proxy.ts` finding).

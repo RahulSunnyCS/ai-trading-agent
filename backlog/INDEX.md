@@ -17,7 +17,6 @@ Sorted by priority (P0 first), then ID.
 | [BL-107](BL-107-nse-fo-bhavcopy-daily.md) | Daily NSE F&O bhavcopy: official end-of-day record and a cross-check on the Fyers data | P0 | Planned | feature | options |
 | [BL-142](BL-142-momentum-kite-weekly-lots.md) | Momentum on Zerodha Kite: weekly ₹50k lots read from Kite each Friday, each rebalanced on its own calendar with free cash; LIQUIDBEES and SGBs excluded | P0 | In progress | feature | momentum |
 | [BL-148](BL-148-fyers-mcx-expired-options-history.md) | Fyers MCX expired options history: Prime two-year 1-minute OHLCV+OI backfill into the canonical lake, then daily continuation | P0 | Planned | feature | options / trading-data |
-| [BL-157](BL-157-dashboard-nextjs-16.md) | Dashboard on Next.js 16: OpenNext refuses Next 15 since 2026-10-21 (two years past its release), so the hosted dashboard cannot deploy | P0 | In progress (Phases 1–2 done; Phase 3 under way) | chore | dashboard / infra |
 | [BL-162](BL-162-wide-opening-range-dir-swap.md) | Wide opening-range days: swap not-yet-entered Widesl picks for Dir, as a forward shadow rule | P0 | Planned | research | options |
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
@@ -98,6 +97,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-157](BL-157-dashboard-nextjs-16.md) | Dashboard on Next.js 16: OpenNext refuses Next 15 since 2026-10-21 (two years past its release), so the hosted dashboard cannot deploy | Done: Next 16.4.3 deployed 26 Oct (#327, #329); React 19 (#363), Turbopack builds and no cf-build dev-server guard (#364); `middleware.ts` kept (OpenNext's Node proxy is experimental) | 2026-10-28 |
 | [BL-012](BL-012-scheduler-service.md) | Scheduler service: one home for every recurring ingestion and maintenance job (laptop now, hostable later) | Done: installed under launchd, 44 jobs; last checks Y3/Y4/S3 added; D5/D6 dropped (frozen engine), D4 done by BL-168, no container needed | 2026-10-28 |
 | [BL-058](BL-058-options-rotation-forward-journal-and-ui.md) | Options rotation: forward paper journal and the Options Lab screens it needs | Done: journal live since 12 Oct, rotation view built; day-60 read-out → BL-174, paper vs real → BL-093 | 2026-10-28 |
 | [BL-034](BL-034-options-history-lake.md) | Options history lake: two years of vendor 1-minute data, derived tables, daily top-up | Done: Phases 0–4; 2014–2024 history → BL-175 | 2026-10-28 |

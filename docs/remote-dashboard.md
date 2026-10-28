@@ -161,6 +161,8 @@ outright and a `.env` file is missing, rename its `.cf-build-hidden` copy back (
 OpenNext reads the build from `.next`, so `cf-build.mjs` refuses to start while `NEXT_DIST_DIR` is set. A
 running `next dev` (`bun run start`) can stay up: since Next 16 it builds into `.next/dev`, which
 `next build` leaves alone (BL-157 Phase 3 built the Worker beside one and the dev server kept serving).
+It does reload its env when the build hides `apps/dashboard`'s `.env` files, so for the build's length
+it runs without them (no password, no `UPSTREAM_ACCESS_*`), and picks them up again once they are back.
 
 ```bash
 cd apps/dashboard
