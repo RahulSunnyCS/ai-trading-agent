@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades both books with real money and wants the 4th lot from BL-133 live |
-| **Status** | In progress |
+| **Status** | Built — off until the owner turns a row on |
 | **Type** | feature |
 | **Area** | options / broker-login / scheduler / dashboard |
 | **Created** | 2026-10-28 |
@@ -81,3 +81,30 @@ right. With every toggle off nothing changes, byte for byte.
 ## Log
 
 - 2026-10-28 — Created after BL-133 Amendments 2–3; owner's decisions recorded above; TODO 3.10.46; Phase 1 begun.
+- 2026-10-28 — Phases 1–3 built (PR on `feat/bl-183-dir-double`):
+  - **Rule and settings:** `rotation/live_lots.py` (`lots_for_day`, `scaled`; `dir_pick` / `is_expiry` moved here
+    from `lot_plans`, which imports them, to keep the messages free of a circular import). `dirBoost` row field in
+    the scheduler schema, the dashboard, the Python and broker-login readers; old snapshots read as off.
+  - **Exports:** `DayPicks` carries `dte` and `lots`; both exports double the picked Dir's leg lots and overall
+    MTM SL when every row uploading the list on that platform has it on (`dir_boost_wanted`; mixed rows → 1 lot,
+    said). With it off the bodies and manifests are byte-identical to before; on, the manifest records `lots`
+    per pick, `dte` and `dir_boost`. CLI `--dir-boost/--no-dir-boost`.
+  - **Quantiply book stop:** the 08:10 run sets the row's MTM SL + Σ extra lots × the pick's per-lot stop from the
+    export (`bookStopExtra`); the 09:21 top-up only widens (`clientwiseBelow`). **T1's Dir variants mostly carry a
+    ₹4,000 stop**, so a T1 Dir ×2 day is ₹9,000 + ₹4,000 = ₹13,000 (Core ₹8,000 + ₹3,000 = ₹11,000).
+  - **Checks:** the 09:25 Quantiply check already compares leg lots with the export. No AlgoTest lot check was
+    added: AlgoTest's /live shows no leg lots, and the uploader already exports every saved strategy back and
+    compares it with the export (lots included).
+  - **Live vs paper:** copies count as multiplier × the export manifest's lots for that pick.
+  - **Messages:** 09:16 (`🔢 4 lots · Dir ×2` / `3 lots · expiry day` / `3 lots · no Dir picked`, the Dir marked
+    `· 2 lots`), the evening tentative list, and the 16:00 result's "As traded (Dir ×2, N lots)" line, for a list
+    some platform's export trades the rule on; owner and group alike. Guide pages (Settings, Rotation) and
+    `technical.md` updated.
+  - **Verified:** unit tests (Python 1,745 pass; the 16 that need the Parquet cache fail in a fresh worktree as
+    documented; broker-login 310, scheduler 245, dashboard 2,009). Dry run on the real store into a scratch folder:
+    28 Oct (non-expiry) Core `N_ditm1_0947` and T1 `S_ditm1-t1s44_0917` at 2 lots with ₹6,000 / ₹8,000 stops; the
+    29 Oct preview (SENSEX expiry) every pick 1 lot. Not run: the uploader and deployer dry runs (they log in to
+    the platforms).
+  - **To go live:** merge, restart the scheduler (`deploy/launchd/install.sh` or the scheduler restart the owner
+    uses), turn "Dir ×2 on non-expiry days" on in Settings › Automation for the rows wanted, then watch the first
+    evening upload (16:45), the 08:10 MTM SL line and the 09:25 check on the first non-expiry day.

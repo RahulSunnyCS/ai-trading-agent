@@ -21,7 +21,7 @@ premium at entry ([slippage](glossary:slippage)). A copy deployed at another tim
 as off-slot, and strategies you added by hand as [discretionary](glossary:discretionary-trade). A copy that did not trade, or whose legs were still open when read, is
 named on its own line and left out, as is a copy of the tool's whose name the capture could not read (❓). "1x
 assumed" means the platform no longer showed its multiplier (a day read late). "Live · not captured" means the 15:40 read did not happen; the next evening reads
-that day, and `obt rotation live-compare --day` shows it (the 16:00 message is not sent again).
+that day, and `obt rotation live-compare --day` shows it (the 16:00 message is not sent again). When an account's Settings › Automation row has **Dir ×2 on non-expiry days** on, that list's block adds its lots (`🔢 4 lots · Dir ×2`, or `3 lots · expiry day` / `no Dir picked`) and marks the doubled Dir `· 2 lots`; the evening's tentative list does the same, and the 16:00 result adds an "As traded" line beside the 1-lot paper figure.
 
 | Name | Key | Own recent results | Weekday | Days to expiry | VIX | Family band |
 |---|---|---|---|---|---|---|

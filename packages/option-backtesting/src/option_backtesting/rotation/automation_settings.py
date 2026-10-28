@@ -167,3 +167,12 @@ def dir_boost_mixed(settings: dict, platform: str, book: str) -> bool:
     for an account that asked for 2)."""
     rows = _uploading_rows(settings, platform, book)
     return len({bool(r.get("dirBoost", False)) for r in rows}) > 1
+
+
+def dir_boost_lists(settings: dict) -> dict[str, bool]:
+    """BL-183, for the messages: {'adaptive', 't1'} -> whether some platform's export of that list
+    trades the Dir ×2 rule (`dir_boost_wanted`), so its lines say the lots."""
+    return {
+        key: any(dir_boost_wanted(settings, p, book) for p in PLATFORMS)
+        for key, book in (("adaptive", "core"), ("t1", "t1"))
+    }

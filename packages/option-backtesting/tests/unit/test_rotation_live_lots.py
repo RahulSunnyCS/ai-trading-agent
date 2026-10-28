@@ -184,3 +184,89 @@ def test_cli_with_lots_follows_the_flag_then_the_settings(capsys):
     expiry = _with_lots(_picks(dte=NIFTY_EXPIRY), "quantiply", "core", None, True)
     assert expiry.lots == {W1: 1, DIR: 1, W2: 1}
     assert "every pick 1 lot (expiry day)" in capsys.readouterr().out
+
+
+# --- the messages -----------------------------------------------------------------------------
+
+
+def _entry(dte, core=None, track=None):
+    from option_backtesting.rotation.dte import DTE_BASIS
+
+    e = {
+        "day": "2026-10-29",
+        "weekday": "Thu",
+        "lists": {"C": {"core": core or ["N_p100_1202", "N_ditm1_0917", "N_wide_1117"], "buy": []}},
+        "hash": "f1a772478960abcd1111",
+        "recorded_at": "2026-10-29T09:16:25+05:30",
+        "before_first_entry": True,
+        "dte": dte,
+        "dte_basis": DTE_BASIS,
+    }
+    if track:
+        e["track"] = track
+    return e
+
+
+def test_the_0916_message_says_the_lots_only_for_a_list_that_trades_them():
+    from option_backtesting.rotation import messages
+
+    entry = _entry(NORMAL)
+    plain = messages.render_morning(entry, None, _entry(NORMAL, track="t1"), None)
+    assert "lots" not in plain
+    text = messages.render_morning(
+        entry, None, _entry(NORMAL, track="t1"), None, boost={"adaptive": True, "t1": False}
+    )
+    adaptive, t1 = text.split(messages.SEPARATOR)
+    assert "🔢 4 lots · Dir ×2" in adaptive
+    assert "09:17  N_dir_ITM1 · 2 lots" in adaptive
+    assert "lots" not in t1
+    expiry = messages.render_morning(
+        _entry(NIFTY_EXPIRY), None, None, None, boost={"adaptive": True}
+    )
+    assert "🔢 3 lots · expiry day" in expiry and "· 2 lots" not in expiry
+    no_dir = _entry(NORMAL, core=["N_p100_1202", "N_wide_1117", "S_wide_0947"])
+    assert "🔢 3 lots · no Dir picked" in messages.render_entry(no_dir, None, {"adaptive": True})
+
+
+def test_the_evening_result_adds_what_the_lots_made():
+    from option_backtesting.rotation import result
+
+    r = result.DailyResult(
+        date(2026, 10, 29),
+        "Thu",
+        {"C": 1500.0},
+        "f1a772478960abcd1111",
+        {"C": [("N_ditm1_0917", 1000.0), ("N_wide_1117", 700.0), ("N_p100_1202", -200.0)]},
+        None,
+        NORMAL,
+    )
+    assert result.as_traded(r) == (4, 2500.0)
+    text = result.render(r, None, boost={"adaptive": True})
+    assert "1 lot per strategy, after costs" in text
+    assert "As traded (Dir ×2, 4 lots): " in text
+    assert "As traded" not in result.render(r, None)
+    expiry = result.DailyResult(
+        r.day, "Thu", r.gains, r.entry_hash, r.strategies, None, NIFTY_EXPIRY
+    )
+    assert result.as_traded(expiry) is None
+    assert "As traded" not in result.render(expiry, None, boost={"adaptive": True})
+
+
+def test_tomorrows_tentative_list_says_the_lots():
+    from option_backtesting.rotation import messages
+    from option_backtesting.rotation.tomorrow import NextPicks
+
+    nxt = NextPicks(
+        date(2026, 10, 30),
+        "Fri",
+        ["N_ditm1_0917", "N_wide_1117", "N_p100_1202"],
+        [],
+        None,
+        None,
+        NORMAL,
+    )
+    text = messages.render_result(
+        "2026-10-29", (0.0, []), None, nxt, None, boost={"adaptive": True}
+    )
+    assert "🔢 4 lots · Dir ×2" in text and "N_dir_ITM1 · 2 lots" in text
+    assert "lots ·" not in messages.render_result("2026-10-29", (0.0, []), None, nxt, None)

@@ -145,6 +145,10 @@ def pick_and_send(
     err = err or echo
     tag = f"{track.upper()} TRACK " if track else ""
     send_live = telegram and not dry_run
+    boost = message_boost()
+
+    def text_of(r: PickResult) -> str:
+        return messages.render_entry(r.entry, r.options, boost) if any(boost.values()) else r.text
 
     def alert_if(title: str, body: str) -> None:
         if send_live:
@@ -169,9 +173,9 @@ def pick_and_send(
             return 0
         if error is not None:
             return _failed(error, day, alert_if, err)
-        echo(r.text)
+        echo(text_of(r))
         if send_live:
-            send(r.text, _severity(r.entry))  # never the friends' group
+            send(text_of(r), _severity(r.entry))  # never the friends' group
         return 0
 
     live, error, live_already = attempt(None, vix_open)
@@ -181,9 +185,9 @@ def pick_and_send(
         echo(f"already recorded: {day.isoformat()} is already in the journal")
     if not with_t1:
         if live is not None:
-            echo(live.text)
+            echo(text_of(live))
             if send_live:
-                _send_to_all(live.text, _severity(live.entry), send)
+                _send_to_all(text_of(live), _severity(live.entry), send)
         return 0
 
     # What last evening's message listed for today: each list says whether its picks changed.
@@ -210,7 +214,7 @@ def pick_and_send(
             t1_entry = t1.entry if t1 else _journal_entry(day, root, "t1")
             t1_options = t1.options if t1 else None
             text = messages.render_morning(
-                live.entry, live.options, t1_entry, t1_options, previous=previous
+                live.entry, live.options, t1_entry, t1_options, previous=previous, boost=boost
             )
             echo(text)
             if send_live:
@@ -225,7 +229,7 @@ def pick_and_send(
         )
         note = messages.T1_FOLLOWS if follows else messages.T1_NOT_RECORDED
         text = messages.render_morning(
-            live.entry, live.options, None, t1_note=note, previous=previous
+            live.entry, live.options, None, t1_note=note, previous=previous, boost=boost
         )
         echo(text)
         if send_live:
@@ -251,10 +255,22 @@ def pick_and_send(
         return 0
     if t1_error is not None:
         return _failed(t1_error, day, lambda t, b: alert_if("T1 TRACK " + t, b), err, tag="T1 ")
-    echo(t1.text)
+    echo(text_of(t1))
     if send_live:
-        _send_to_all(t1.text, _severity(t1.entry), send)
+        _send_to_all(text_of(t1), _severity(t1.entry), send)
     return 0
+
+
+def message_boost() -> dict[str, bool]:
+    """BL-183: which lists' messages say the Dir ×2 lots, from Settings › Automation. A message
+    must always go: settings that cannot be read leave the lots out, never stop it."""
+    from . import automation_settings
+
+    try:
+        settings, _ = automation_settings.read()
+    except Exception:  # noqa: BLE001
+        return {}
+    return automation_settings.dir_boost_lists(settings)
 
 
 def _severity(entry: dict) -> str:
@@ -446,8 +462,9 @@ def _send_result_locked(
             t1_part = messages.T1_RESULT_NOT_READY
         # BL-141: the day's live slippage, in the owner's copy only (never the friends' group)
         live = live_compare.owner_lines(day, root, echo)
-        private = result.render(adaptive, t1_part, next_adaptive, next_t1, live)
-        group = result.render(adaptive, t1_part, next_adaptive, next_t1)
+        boost = message_boost()
+        private = result.render(adaptive, t1_part, next_adaptive, next_t1, live, boost=boost)
+        group = result.render(adaptive, t1_part, next_adaptive, next_t1, boost=boost)
         echo(private)
         if not telegram:
             return 0
@@ -493,7 +510,7 @@ def _send_result_locked(
         echo(f"T1 result still not ready: {t1}")
     elif owed:
         next_t1 = _tomorrow_t1(day, root, echo) if with_tomorrow else None
-        text = result.render_t1_followup(t1, next_t1)
+        text = result.render_t1_followup(t1, next_t1, boost=message_boost())
         echo(text)
         for chat, marker in owed:
             if send(text, chat_id=chat):
