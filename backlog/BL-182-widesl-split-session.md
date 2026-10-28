@@ -360,8 +360,13 @@ needs a registration of its own with one level fixed in advance and a forward tr
   shallower than the plain ₹2,500 morning, over the whole span and in both periods. The owner asked for
   "the optimum number": none is chosen here; the best of sixteen on seen data is expected to look good by
   chance, and a level that helps is a lead for a registration with that one level fixed in advance.
-- **Will not run:** targets or locks on the afternoon sets or the whole day, other levels, a trailing
-  lock (`locktrail`), a target by family or index.
+- **Addition (owner, 2026-10-28, before the overlays were read: "Check lock and trail also. Like profit is
+  3000, lock at 0, then 1:1"):** a lock-and-trail (arm, lock, step) at (2,000, 0), (3,000, 0) and
+  (4,000, 0), each 1:1 in ₹100 steps: once the MTM has reached *arm*, the exit level starts at *lock* and
+  rises ₹100 for every further ₹100 the peak MTM makes (the portfolio stop's `locktrail:A,B,100,100`).
+  Nineteen overlays in all.
+- **Will not run:** targets or locks on the afternoon sets or the whole day, other levels or steps, a
+  target by family or index.
 
 ## Risks
 

@@ -198,6 +198,11 @@ fixed-file reading argues against spending that on it.
   BL-182 E3 (the recorded per-minute MTM series, every overlay applied as the engine applies an overall
   target, the ranking re-run per overlay, charges the base run's); the fixed files read are `N_dir_0917`
   and `S_dir_0917`.
+- **Addition (owner, 2026-10-28, before the overlays were read: "Check lock and trail also. Like profit is
+  3000, lock at 0, then 1:1"):** a lock-and-trail (arm, lock, step) at (2,000, 0), (3,000, 0) and
+  (4,000, 0), each 1:1 in ₹100 steps: once the MTM has reached *arm*, the exit level starts at *lock* and
+  rises ₹100 for every further ₹100 the peak MTM makes (the portfolio stop's `locktrail:A,B,100,100`).
+  Nineteen overlays in all.
 - **Will not run:** as BL-182 E3.
 
 ## Risks
