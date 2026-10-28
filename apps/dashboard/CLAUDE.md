@@ -8,7 +8,7 @@ orientation pointer rather than duplicating that.
 
 ## What this app does
 
-`@ata/dashboard` (Next.js + React 18 + Zustand + Tailwind) is the frontend: live
+`@ata/dashboard` (Next.js + React 19 + Zustand + Tailwind) is the frontend: live
 straddle/momentum charts (Lightweight Charts), active signals, per-personality
 running P&L, EOD retrospection charts, pricing/payment UI, and an "Options Lab" tab
 (`OptionsLabView.tsx` + `components/optionslab/`) — daily leg-wise option
@@ -77,7 +77,8 @@ takes no `--webpack`, and `agentRules: false` stops `next dev` appending to `AGE
 builds into `.next/dev` and rewrites the tracked `next-env.d.ts` to import `./.next/dev/types/*`;
 dev-stack puts it back only after a `start:prod` build, so after `bun run start` restore it
 (`git checkout -- next-env.d.ts`) rather than committing it. `middleware.ts` still runs (the build
-warns that `proxy` replaces it).
+warns that `proxy` replaces it). React 19: `useRef<T>(null)` is a `RefObject<T | null>`, so a hook or
+component that takes a ref types it `RefObject<T | null>`.
 
 ## Analytics page pattern
 

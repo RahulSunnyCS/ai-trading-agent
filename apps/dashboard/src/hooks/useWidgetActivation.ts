@@ -30,7 +30,7 @@ export interface WidgetActivationOptions {
  * for an `expensive` section.
  */
 export function useWidgetActivation(
-  ref: RefObject<Element>,
+  ref: RefObject<Element | null>,
   {
     prefetchAfterMs = null,
     margin = NEAR_MARGIN,

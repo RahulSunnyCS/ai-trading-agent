@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the hosted dashboard cannot deploy at all until this lands; friends see Momentum through it |
-| **Status** | In progress (Phases 1–2 done; Phase 3 waits) |
+| **Status** | In progress (Phases 1–2 done; Phase 3 under way) |
 | **Type** | chore |
 | **Area** | dashboard / infra |
 | **Created** | 2026-10-24 |
@@ -214,3 +214,18 @@ Answered by the owner on 2026-10-26:
   `ata-dashboard`. `dashboard.codifie.dev` answers with the Cloudflare Access sign-in redirect, as
   before; the signed-in page was not opened from here. Phases 1–2 done; Phase 3 (React 19,
   `proxy.ts`, Turbopack, the cf-build dev-server guard) waits for the owner.
+- 2026-10-28 — Phase 3 started (owner: "Do Phase 3 now"), each follow-up its own PR.
+- 2026-10-28 — React 19: `react` / `react-dom` 19.3.1, `@types/react` / `@types/react-dom` 19.3.0.
+  Radix (1.x/2.x), `react-markdown` 9, `zustand` 4.5 (`use-sync-external-store` 1.6),
+  `lucide-react` 1.17 and `@testing-library/react` 16.3 already accept 19 in their peer ranges, so
+  none was bumped; Lightweight Charts has no React dependency. Typecheck found only the ref change
+  (`useRef<T>(null)` is now `RefObject<T | null>`): five helper signatures widened. No global `JSX`,
+  `defaultProps`, string refs or `react-dom/test-utils` in the app; `forwardRef` still works in 19
+  and was left. The lockfile also dedupes `postcss` to Next's 8.5.23 (bun had flipped which copy it
+  hoisted, so Tailwind's nested 8.5.15 broke the Tailwind class test's types). Checks: typecheck,
+  139 files / 1,975 unit tests, `next build --webpack` (React 18's deprecation warning gone),
+  `cf:build` (Node 24) with the no-env check, and a smoke test of Overview, Options Lab › Today,
+  Momentum › This week and Backtest, Trade book › F&O, Jobs, Settings, Broker logins and the Guide
+  on a spare port (5191) against the running APIs: no React error or warning in the console; the
+  only failures are `/api/meta` and `/api/payment/*`, which go to the frozen `apps/server` (not
+  running), as before.
