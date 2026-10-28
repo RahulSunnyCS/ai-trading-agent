@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades Widesl with real money on Core and T1; a friend's study says the split earns ₹160 a day more per lot with half the drawdown |
-| **Status** | In progress — Phase 0 registered 2026-10-28, Phase 1 running |
+| **Status** | Done 2026-10-28: not adopted. The split beats the whole day on point for every live and T1 setting but one (+₹39 NIFTY, +₹89 SENSEX a day net) with the drawdown halved, but every net 90 % interval includes zero after our charges (the rule), so Phase 2 was not run |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -122,6 +122,48 @@ afternoon entries. Slippage beyond the engine's fills. Anything traded.
 
 - A parallel track like T1 (`--track`), private Telegram, 60 forward days, BL-058 pass rule.
 
+## Result (2026-10-28, Phase 1)
+
+501 NIFTY and 501 SENSEX days, 2024-10-09 → 2026-10-27; net after `ruletest/charges.py` (about ₹87 a
+day for one set, ₹171 for the split's two); per lot-day; the interval is the registered 90 % 5-day block
+bootstrap. Full tables: `research/bl182/out/summary.md` (git-ignored; `uv run python research/bl182/run.py
+--analyse-only` rebuilds it from `results/`).
+
+| Definition | Whole day net | Split net | Split − whole, net [90 %] | Split − whole, gross [90 %] | Max DD whole → split | Verdict |
+|---|---|---|---|---|---|---|
+| A study (NIFTY OTM1, no trail) | +236 | +331 | +95 [−62, +252] | +179 [+22, +336] | −43,252 → −22,685 | Reconciles: gross 323 / 502 a day vs the study's 314 / 477, both within 15 % |
+| **B live NIFTY** (`N_wide_0917`) | +239 | +278 | **+39 [−107, +187]** | +123 [−22, +271] | −50,353 → −22,807 | **FAIL**: lower bound below zero (drawdown condition met) |
+| **C live SENSEX** (`S_wide_0917`) | +260 | +348 | **+89 [−63, +241]** | +171 [+21, +323] | −41,554 → −27,379 | **FAIL**: lower bound below zero (drawdown condition met) |
+| D `N_wide-t1s4` (SL 150, RE ×1, MTM 4,000) | +326 | +403 | +77 [−82, +237] | +162 [+3, +322] | −47,724 → −23,877 | descriptive |
+| D `N_wide-t1s8` (SL 60, MTM 3,000) | +277 | +361 | +84 [−36, +207] | +168 [+47, +292] | −49,012 → −22,468 | descriptive |
+| D `N_p150-t1s11` (₹150, SL 60) | +311 | +196 | −115 [−297, +76] | −15 [−197, +176] | −57,319 → −51,389 | descriptive: the split hurts |
+| D `S_p285-t1s22` (₹285, SL 40, RE ×1) | +312 | +343 | +31 [−104, +177] | +113 [−20, +260] | −23,749 → −22,570 | descriptive |
+
+What the numbers say:
+
+- **The friend's study reproduces.** On its own definition our engine gives the same picture: the split
+  earns about ₹180 a day more gross and halves the drawdown. The difference is charges: their ₹40 a set
+  against our ₹87, so the second set costs ₹84 a day more here and the net edge shrinks to ₹95 for the
+  study's definition and ₹39 for the live NIFTY file.
+- **Before charges the split clears zero** for the study's definition, the live SENSEX file and both T1
+  OTM1 settings (gross lower bounds +3 to +47). **After charges no net interval does.** The registered rule
+  is net, so B and C fail and the split is not adopted; Phase 2 is not run.
+- **The drawdown halving is the robust part**: every OTM1/OTM2 definition's max drawdown falls from
+  ₹41–50k to ₹22–27k per lot, because the afternoon set is stopped a third as often as the whole day (42–47
+  afternoon MTM stops vs 144–166 whole-day) and a morning stop no longer ends the day.
+- **Where the halves earn:** NIFTY's two halves are alike (+141 / +138 net for the live file); SENSEX's
+  morning carries it (+266 morning vs +83 afternoon, the whole day +260), so on SENSEX the split's gain is
+  the fresh afternoon set, not a stronger afternoon. The closest-premium ₹150 NIFTY setting loses with the
+  split (−115): its morning half earns only +53.
+- **Not uniform in time.** For the live NIFTY file the split wins 2025 H1 (+18,896) and 2026 H1 (+23,047)
+  and loses the other three half-years; SENSEX wins three of five. The study's own quarters showed the same
+  concentration.
+- All of it is seen data, as registered; the only unseen test would have been the forward track.
+
+Lead, not a finding: a cheaper broker (the study's ₹40 a set) or a 1-lot owner who values the halved
+drawdown over ₹40–90 a day of expected gain could still prefer the split; that is the owner's call, with
+an `override:` here if Phase 2 is to run anyway.
+
 ## Risks
 
 - Fills at 12:00 and 13:00 on 1-minute bars with no spread; the afternoon set's smaller premiums.
@@ -138,3 +180,8 @@ afternoon entries. Slippage beyond the engine's fills. Anything traded.
 
 - 2026-10-28 — created from the owner's discussion of the friend's study; Phase 0 registered and
   committed before any run.
+- 2026-10-28 — Phase 1 run (`research/bl182/run.py`, 21 variants × 501 days per index): A reconciles with
+  the study within 15 %; B +₹39 [−107, +187] and C +₹89 [−63, +241] net per lot-day, drawdown halved, both
+  FAIL the registered rule (lower bound not above zero after charges); D descriptive. Not adopted; Phase 2
+  not run. Findings: `research/options/strategies/widesl/session-split.md`, rows in `exit-time.md`,
+  `entry-time.md` and the Widesl README.

@@ -64,6 +64,7 @@ rules. Figures from the tail-gated second selection and the Buy 60 % day-stop cu
 | [Trail](trail.md) | Descriptive | Only one trail row (NIFTY ₹80, [5,5]%) reached a top-four list |
 | [Re-entry](re-entry.md) | Descriptive | Re-entry rows rank only on SENSEX ₹250 mornings, with a deeper drawdown |
 | [Exit time](exit-time.md) | Descriptive | No earlier exit made a top-four list; 15:28 stays |
+| [Session split](session-split.md) | Tested | Two sets a day (09:17–12:00, 13:00–15:28) earn ₹120–180 more gross with half the drawdown, but after charges the net interval includes zero; killed on the rule (BL-182) |
 | [Days to expiry](days-to-expiry.md) | Descriptive | NIFTY falls steadily away from expiry (₹616 → −₹52 a day); SENSEX has no gradient; at the edge of noise, one year |
 | [India VIX](vix.md) | Tested | Weak at VIX 18+ in one year; VIX-based rules and intraday VIX states failed |
 | [Weekday](weekday.md) | Descriptive | Same split as days to expiry within one expiry regime |
