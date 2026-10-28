@@ -28,6 +28,7 @@ import { RefreshButton } from '../../ui/RefreshButton';
 import { SkeletonRows } from '../../ui/Skeleton';
 import { StateMessage } from '../../ui/StateMessage';
 import { YamlResult } from './YamlResult';
+import { YamlRunList } from './YamlRunList';
 import { useYamlDraft } from './yamlDraft';
 
 /** Credits one run costs (apps/server consumes one `backtest_run` credit per POST /runs). */
@@ -350,9 +351,11 @@ export function YamlBacktest() {
         <YamlResult
           headline={headlineOfResult(result.data)}
           result={result.data}
-          description={`Run ${result.data.run_id} · ${formatDay(result.from)} to ${formatDay(result.to)} · also listed under Runs`}
+          description={`Run ${result.data.run_id} · ${formatDay(result.from)} to ${formatDay(result.to)} · also listed under Earlier runs`}
         />
       )}
+
+      <YamlRunList latestRunId={result?.data.run_id} />
     </div>
   );
 }

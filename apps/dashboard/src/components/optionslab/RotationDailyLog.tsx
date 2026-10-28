@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePortfolioStop } from '../../hooks/usePortfolioStop';
 import { ROTATION_PAGE_LOTS } from '../../hooks/useRotation';
 import { useRotationLog } from '../../hooks/useRotationDailyLog';
+import { useRotationLive } from '../../hooks/useRotationLive';
 import { useRotationPortfolioDays } from '../../hooks/useRotationPortfolio';
 import { cn } from '../../lib/cn';
 import { formatDay, formatInr, istToday } from '../../lib/format';
@@ -46,6 +47,7 @@ import {
   windowRange,
 } from '../../lib/rotationDailyLogView';
 import { DEFAULT_LIST, isVisibleList, listLabel, listName } from '../../lib/rotationListNames';
+import { liveForLog } from '../../lib/rotationLiveView';
 import { hasOverlay, overlayBook, unmatched } from '../../lib/rotationPortfolioView';
 import type { RotationListKey, RotationLog, RotationLogSource } from '../../types/rotationDailyLog';
 import { Badge } from '../ui/Badge';
@@ -158,6 +160,15 @@ export function RotationDailyLog({
   // `usePolledResource` keeps the previous response while a new URL loads: only an answer to THIS
   // request is shown, so reconstructed rows never sit under a Recorded label or the reverse.
   const log = res.data !== null && logMatches(res.data, source, range) ? res.data : null;
+  // The 15:40 live capture beside the log (the same request as the Live vs paper card's): the
+  // live book behind Adaptive (list C) is Core. Recorded days only; a reconstructed day never traded.
+  const showLive = source === 'recorded' && focus === 'C';
+  const liveRes = useRotationLive(showLive);
+  const liveData = liveRes.data;
+  const live = useMemo(
+    () => (showLive ? (day: string) => liveForLog(liveData, day, 'core', today) : undefined),
+    [showLive, liveData, today],
+  );
 
   // The stopped figures (BL-095). Only an answer to THIS source and setting is laid over the log;
   // until it lands the log's own figures stay, and the note below says so.
@@ -425,6 +436,7 @@ export function RotationDailyLog({
                     focus={focus}
                     selectedDay={openDay}
                     onOpen={setOpenDay}
+                    live={live}
                   />
                 )}
                 {counters ? (

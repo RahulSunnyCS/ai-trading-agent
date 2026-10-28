@@ -40,6 +40,7 @@ export const SECTION_META: Readonly<Record<OptionsLabSection, SectionMeta>> = {
     explanation:
       'How alike the strategies’ daily results are. Strategies that lose together give little protection to each other.',
   },
+  // Archived: hidden from the sidebar, still routed.
   regimes: {
     workspace: 'Advanced',
     question: 'Do quiet or trending days come in runs?',
@@ -57,10 +58,5 @@ export const SECTION_META: Readonly<Record<OptionsLabSection, SectionMeta>> = {
     question: 'How would this strategy have done?',
     explanation:
       'Build a strategy, test it over a date range on real 1-minute prices, and save it.',
-  },
-  runs: {
-    workspace: 'Build and test',
-    question: 'What have I tested, and did it get better?',
-    explanation: 'Every backtest in one list. Tick two of the same kind to compare them.',
   },
 };

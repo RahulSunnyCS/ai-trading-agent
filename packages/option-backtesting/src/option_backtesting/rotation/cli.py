@@ -257,6 +257,35 @@ def _without_addon(picks, platform: str, book: str, settings: dict | None):
     return replace(picks, buy=[])
 
 
+def _morning(picks, book: str, folder):
+    """BL-172 Phase 4: the recorded picks under the owner's 09:17 rule, against the list the
+    evening uploaded to `folder`. With no evening upload there (nothing of it is on the platform),
+    the recorded picks as they are. Returns (picks, manifest extra)."""
+    from . import morning
+    from . import quantiply_export as qx
+
+    evening = qx.evening_of(folder)
+    if evening is None:
+        typer.echo(f"{book}: no evening upload for {picks.day}: the 09:16 picks as recorded")
+        return picks, None
+    m = morning.morning_list(picks.day, book, evening)
+    lines = [f"added {', '.join(m.added)}"] if m.added else []
+    if m.removed:
+        lines.append(f"taken off {', '.join(m.removed)}")
+    lines += m.notes
+    typer.echo(f"{book} 09:16 rule: {'; '.join(lines) or 'no change'}")
+    extra = {
+        "evening": {"core": evening.core, "buy": evening.buy},
+        "morning": {
+            "added": m.added,
+            "removed": m.removed,
+            "not_made": m.not_made,
+            "notes": m.notes,
+        },
+    }
+    return m.picks, extra
+
+
 def _end_missing(missing: list[str], books: list[str]) -> None:
     """Exit 2 (the scheduler retries) only when no list could be exported. With some exported,
     exit 0 so the uploads run; the uploader refuses a list whose export is stale and says so."""
@@ -361,6 +390,15 @@ def quantiply_export(
     wait: int = typer.Option(
         0, "--wait", help="Seconds to wait for the day's recorded entry (the 09:16 job)."
     ),
+    morning_rule: bool = typer.Option(
+        False,
+        "--morning-rule",
+        help=(
+            "BL-172, the 09:19 top-up: the 09:16 pick changes only what starts after 09:17 (the "
+            "evening's 09:17 strategy stays, a new 09:17 pick is not made, the rest chosen again "
+            "by the 09:16 score)."
+        ),
+    ),
 ) -> None:
     """The day's Adaptive picks as Quantiply create bodies (BL-139; uploads nothing)."""
     from pathlib import Path
@@ -381,17 +419,20 @@ def quantiply_export(
         if picks is None:
             missing.append(b)
             continue
+        folder = (
+            Path(out) if out else store.rotation_dir() / "quantiply" / picks.day.isoformat() / b
+        )
+        extra = None
+        if morning_rule and picks.source == "recorded":
+            picks, extra = _morning(picks, b, folder)
         picks = _without_addon(picks, "quantiply", b, settings)
         try:
             built = qx.build(picks)
         except (Unmappable, FileNotFoundError) as error:
             typer.echo(f"not exported: {error}")
             raise typer.Exit(1) from error
-        folder = (
-            Path(out) if out else store.rotation_dir() / "quantiply" / picks.day.isoformat() / b
-        )
         try:
-            manifest = qx.write(picks, built, folder)
+            manifest = qx.write(picks, built, folder, extra)
         except FileExistsError as error:
             typer.echo(f"not exported: {error}")
             raise typer.Exit(1) from error

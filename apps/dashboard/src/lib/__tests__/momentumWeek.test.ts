@@ -7,6 +7,7 @@ import type {
 } from '../../types/momentum';
 import {
   countdown,
+  favouriteRow,
   groupRows,
   isSkipAction,
   istDay,
@@ -286,5 +287,55 @@ describe('tradingSleeves', () => {
   it('is empty for a favourite that is not a group, or a week nothing trades', () => {
     expect(tradingSleeves({ name: 'X' })).toEqual([]);
     expect(tradingSleeves({ name: 'G', sleeves: [sleeve('G · a', false)] })).toEqual([]);
+  });
+});
+
+describe('favouriteRow', () => {
+  const sleeve = (name: string, on_cadence: boolean) => ({
+    id: name,
+    name,
+    value: 1,
+    on_cadence,
+    every: 4,
+    next: null,
+  });
+  const base = {
+    id: 'g',
+    name: 'G',
+    group: true,
+    blocked: null,
+    run: 'final',
+    sleeves: [sleeve('G · Friday 1 of 4', false), sleeve('G · Friday 2 of 4', true)],
+    rows: [
+      { asset: 'A', action: 'SELL' },
+      { asset: 'B', action: 'TRIM' },
+      { asset: 'C', action: 'BUY' },
+      { asset: 'D', action: 'HOLD' },
+    ],
+  };
+  const row = (patch: object = {}) => favouriteRow({ ...base, ...patch } as never);
+
+  it("counts this week's sells and buys and names the sleeve that trades", () => {
+    expect(row()).toEqual({
+      sleeve: 'Friday 2 of 4',
+      noSleeve: null,
+      sells: 2,
+      buys: 1,
+      trades: '2 sells · 1 buy',
+    });
+  });
+
+  it('never counts a blocked favourite, or one with no run, as zero trades', () => {
+    expect(row({ blocked: 'Data ends 9 Oct' }).sells).toBeNull();
+    expect(row({ blocked: 'Data ends 9 Oct' }).buys).toBeNull();
+    expect(row({ run: null }).sells).toBeNull();
+    expect(row({ run: null }).trades).toBe('Not recorded yet');
+  });
+
+  it('says when no sleeve of a group rebalances', () => {
+    const quiet = row({ sleeves: [sleeve('G · Friday 1 of 4', false)], rows: [] });
+    expect(quiet.noSleeve).toBe('No sleeve rebalances this week');
+    expect(quiet.trades).toBe('No trades this week');
+    expect(quiet.sells).toBe(0);
   });
 });

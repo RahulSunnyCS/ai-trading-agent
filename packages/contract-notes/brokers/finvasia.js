@@ -1,6 +1,9 @@
 const Decimal = require('decimal.js');
 const { parseAmounts, splitBySegment } = require('./segments');
 const logger = require('../utils/logger');
+const { chooseTrades } = require('./fnoTrades');
+
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Order in which pdf-parse emits the "Obligation Detail" cells for each
 // exchange/segment row. It follows the PDF's draw order, which is not the
@@ -31,25 +34,37 @@ const CHARGE_COLS = [
 const TOLERANCE = 0.05;
 
 // Row labels look like "NSEFNO-NCL" / "NSECASH-NCL" — exchange, segment and
-// clearing corporation run together.
-const SEGMENT_LABEL = /\b((?:NSE|BSE|MSEI|MSE|MCX|NCDEX|ICEX)[A-Z& ]*-\s*[A-Z]+)/gi;
+// clearing corporation run together. Notes until 25 Aug 2025 print "NSE FNO" /
+// "NSE CAP" instead: exchange and segment, no clearing corporation.
+// Any word after the exchange counts as a segment, so an unknown one reaches the hard error in
+// segments.js instead of being skipped as text.
+const SEGMENT_LABEL =
+  /\b((?:NSE|BSE|MSEI|MSE|MCX|NCDEX|ICEX)(?:[A-Z& ]*-\s*[A-Z]+|\s+[A-Z][A-Z&]{1,7}\b))/g;
 
-function subject(accountId, date) {
-  const dd = String(date.getDate()).padStart(2, '0');
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const yyyy = date.getFullYear();
-  return `Combined Contract Note for ${accountId} ${dd}-${mm}-${yyyy}`;
+// IMAP SUBJECT is a substring match: this finds every note for the account, whatever its date.
+function searchSubject(accountId) {
+  return `Combined Contract Note for ${accountId}`;
+}
+
+// "Combined Contract Note for FA1234 23-10-2026" → '2026-10-23' (null if not this account's).
+function noteDay({ subject, accountId }) {
+  const m = new RegExp(
+    `Combined Contract Note for ${escapeRegExp(accountId)}\\s+(\\d{2})-(\\d{2})-(\\d{4})`,
+  ).exec(subject || '');
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
 }
 
 // n is a Decimal (all money math in this file stays in Decimal until this
-// boundary); returns a plain number, since that is what daily_summary.json
-// and the Sheets API expect.
+// boundary); returns a plain number, since that is what the stored line holds.
 function round2(n) {
   return n.toDecimalPlaces(2).toNumber();
 }
 
+// The table's header starts "Name Of Exchange/CC & Segment"; until 25 Aug 2025 it started
+// "Exchange Pay in/Payout Obligation" (the columns are the same, in the same order).
 function obligationBlock(text) {
-  const start = text.search(/Name\s*Of\s*Exchange\s*\/\s*CC/i);
+  let start = text.search(/Name\s*Of\s*Exchange\s*\/\s*CC/i);
+  if (start === -1) start = text.search(/Exchange\s*Pay\s*in\s*\/\s*Payout/i);
   if (start === -1) return null;
   const rest = text.slice(start);
   const endMatch = rest.match(/By\s+Client\s+Net\s+Payable/i);
@@ -129,6 +144,16 @@ function extract(text) {
   let itemisedCharges = new Decimal(0);
   let taxable = new Decimal(0);
   let taxableComponents = new Decimal(0);
+  const kinds = {
+    stt: COL.STT,
+    gst: COL.IGST,
+    exchange: COL.TRANSACTION,
+    clearing: COL.CLEARING,
+    sebi: COL.SEBI,
+    stamp: COL.STAMP,
+    ipf: COL.IPF,
+  };
+  const byKind = Object.fromEntries(Object.keys(kinds).map((k) => [k, new Decimal(0)]));
 
   for (const row of kept) {
     const a = row.amounts;
@@ -138,6 +163,7 @@ function extract(text) {
     obligation = obligation.plus(a[COL.OBLIGATION]);
     netAmount = netAmount.plus(a[COL.NET]);
     brokerage = brokerage.plus(a[COL.BROKERAGE]);
+    for (const [k, c] of Object.entries(kinds)) byKind[k] = byKind[k].plus(a[c].abs());
     itemisedCharges = itemisedCharges.plus(
       CHARGE_COLS.reduce((sum, c) => sum.plus(a[c]), new Decimal(0)),
     );
@@ -169,12 +195,14 @@ function extract(text) {
 
   // Taxable value of supply = brokerage + transaction + SEBI + clearing + IPF.
   // A mismatch means the brokerage cell is probably not where we think it is.
-  if (
+  // The older layout's taxable value leaves IPF out; either form is accepted.
+  const ipf = kept.reduce((sum, r) => sum.plus(r.amounts[COL.IPF]), new Decimal(0));
+  const off = (v) =>
     taxable
-      .minus(taxableComponents)
+      .minus(v)
       .abs()
-      .greaterThan(TOLERANCE * kept.length)
-  ) {
+      .greaterThan(TOLERANCE * kept.length);
+  if (off(taxableComponents) && off(taxableComponents.minus(ipf))) {
     logger.warn('Finvasia brokerage cross-check failed against taxable value of supply', {
       taxable: taxable.toFixed(2),
       components: taxableComponents.toFixed(2),
@@ -191,7 +219,12 @@ function extract(text) {
     // |finalNet - obligation| spans brokerage + other charges; strip brokerage to isolate other charges
     other_charges: round2(charges.abs().minus(brokerage)),
     skipped_segments: dropped,
+    charges: {
+      brokerage: round2(brokerage),
+      ...Object.fromEntries(Object.entries(byKind).map(([k, v]) => [k, round2(v)])),
+    },
+    ...chooseTrades(text, 'finvasia', obligation),
   };
 }
 
-module.exports = { subject, extract };
+module.exports = { searchSubject, noteDay, extract };

@@ -21,6 +21,15 @@ export type { SendOutcome } from './telegram.js';
 export { answerCallbackQuery, getUpdates } from './updates.js';
 export type { TgCallbackQuery, TgMessage, TgUpdate, UpdatesResult } from './updates.js';
 export { registerSecret, redact } from './secrets.js';
-export { NOTIFICATION_TYPES, disabledTypes, isEnabled, prefsPath } from './prefs.js';
-export type { NotificationType } from './prefs.js';
+export {
+  DEFAULT_LEVELS,
+  NOTIFICATION_TYPES,
+  disabledTypes,
+  fileLevels,
+  isEnabled,
+  levelOf,
+  looksLikeFailure,
+  prefsPath,
+} from './prefs.js';
+export type { Level, NotificationType } from './prefs.js';
 export type { Action, Notification, Severity, TelegramConfig } from './types.js';

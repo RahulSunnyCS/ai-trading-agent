@@ -166,6 +166,11 @@ Otherwise:
   routine, collect → `refresh_day` → run → summary/Telegram, called by both `obt daily` and the
   dashboard's `POST /legwise/daily` job; add a step here, never in one caller), `store.py` (strategies, versions and
   results in the trading-data catalog — a version is a hash of the validated spec). Separate from `engine/` on purpose — see `DECISIONS.md`.
+  Leg options off by default and left out of the dump at their defaults (no strategy gets a new version):
+  `trail_peak: {activate_percent, exit_percent}` (bought legs, BL-164: once the premium has been above
+  activate % of entry, out at exit % of its highest, reason TRAIL; with an SL on the same bar the higher
+  level wins) and `stop_on: tick | close` (BL-164: `close` judges the SL, target and both trails on the
+  bar's close and fills there). The `.algtst` and Quantiply exporters refuse both by name.
   Also `anatomy.py` (per-day, per-segment index shape — QUIET/CHOP/TREND from spot + India VIX, descriptive only: lag it a day before using it for anything actionable; `DTE_RELIABLE_FROM` guards a wrong pre-Sep-2025 expiry calendar) and `forensics.py` (one saved day re-simulated for the dashboard; `DayResult.mtm` is the per-minute curve, never persisted). `fyers/history.py` backfills index + VIX history (`obt fyers history`). `fyers/expired.py` repairs holes in the option lake from Fyers' expired-F&O API (`obt fyers expired-options`, 2026-10-21): it plans only the index sessions with no option file (`--all-days` to top up thin ones too), takes expiries and contract symbols from the API (never reconstructed), caches every contract's raw response under `raw/fyers-expired/` (reused only when it covers the requested window), merges by (instrument_id, ts) with existing rows winning, and merges a day only once every expiry it needs is cached (one partition write per day), so a stop anywhere never leaves a day with a file but short of an expiry (which `missing_only` would then skip). `client.response_state` classifies each response: `ok` / `no_data` / `permanent` (an allow-list: "invalid symbol" / "symbol not found" / "no data", on HTTP 200/400 only; cached and listed in `failed_contracts`, asked again only with `--retry-refused`) / `retryable` (everything unrecognised, network, 5xx, other 4xx; not cached; three in a row stop the run) / `blocked` (no subscription to the API, 401/403: stops) / `rate_limited` (stops). Refusals are held (run-wide, keyed by underlying and expiry; `fyers/expired.py`'s `_Fetcher`) and cached only once a later contract answers, or once a contract that answered before (`last_ok`, seeded from any cached `ok` in the plan) answers again when asked, at five in a row, at an expiry's end and at the end of the run. With nothing answered yet, a contract from the middle of the rest of the listing (nearest the money) is asked instead. If the contract asked is refused too, the run stops with none cached (`refused_streak`); with nothing to ask at all, the run ends `refused_unconfirmed` (exit 2). A transient error on that request leaves the refusals to the next run and counts toward the retry stop. A rejected token stops too (CLI exit 1; the other stops exit 2), and the days merged so far are judged and derived even when a run fails (topped-up days with `derived.rebuild(force_days=)`). Days whose expiry set may include one not yet expired (the API lists only expired ones) are listed as `days_short_of_unexpired_expiries` and held (in `pending_days`) unless `--allow-short`; ready days merge `MERGE_CHUNK_DAYS` (5) at a time, the symbol master before the partition; an undecodable listed symbol is skipped and listed. Ingest runs are recorded as source `fyers-expired`; after a repair, `obt legwise rerun` (and `obt rotation update --day D`) refresh stored results. `FyersClient(per_minute=, max_rate_limit_hits=)` is opt-in (Prime: stay under 10/s and 500/min; a second 429 raises `RateLimitedError`, because repeated per-minute breaches block the account for the day); `candles_from_response` reads an expired response's candles by `columns` name. Plan: Prime for the real run.
 - `live/session.py` + `api/live_routes.py` — the Live page's data (BL-117 Phase 3; `GET /legwise/live/days` and
   `/session?underlying=NIFTY|SENSEX&day=`, proxied at `/api/backtest/legwise/live/*`), read-only. One day on the
@@ -222,6 +227,15 @@ Otherwise:
   `expr.evaluate_trade` from `study.exit_minutes` (the rest of the exit from one grid evaluation, shared); a rule
   whose exit uses them must give `control_when`. `study.run_test(..., frame=)` takes a frame already loaded, for a
   caller testing many rules (BL-152's `research/bl152/run_grid.py`).
+  BL-164 added `{prev_at: {x, clock}}` (the previous session's x at that clock), `{prev_agg: {x, how: max|min}}`
+  (its highest / lowest x over its 375 stamps; `prev_high` / `prev_low` are bar highs / lows and `prev_close` the
+  15:29 close, so a close-based level needs these) and `{ever: b}` (true from b's first stamp on; with
+  `not: {first: b}`, "b held at an earlier stamp"). A leg's `trail_peak` / `stop_on` (legwise, below) pass
+  through a template and read back. BL-165 added the leaf `expiry_day` (the session is its own nearest
+  listed weekly expiry, `frame.nearest_expiry`, the simulator's rule; built by `ExpiryDayLoader`, cached
+  under `ruletest/features/`; a frame without the loader raises). BL-166 added `{swing: {kind: high|low,
+  back, minutes, n}}`: the session's back-th latest fractal swing of `minutes`-minute bars (strictly beyond
+  n bars each side), held from the close of the n-th bar after it; swings do not carry across sessions.
   `scripts/ruletest-acceptance.py` must print ACCEPTANCE OK: the four BL-083 triggers, said in
   the grammar (`tests/fixtures/rules/`), fire on the same days and stamps as `research/bl083/`, and T1 and T4 with the Dir
   template reproduce its event-study rows to the rupee. A leg with its own `range_breakout` is not supported yet.
@@ -259,6 +273,20 @@ Otherwise:
   tonight's VIX close standing in for the open, under the BL-122 rule for that session, for Core-298 or Core-298 plus a
   track's variants; the message lists those strategies in full. The old history tables, probabilities and likely changes
   are no longer sent (`build`/`Tomorrow` are kept, tested, unused by the message).
+- `realised/` — BL-168 Phase 4: the contract-notes store (`TRADING_DATA_ROOT/contract-notes/`, written by
+  `packages/contract-notes`) read as the owner's sheet: `store.py` (load; a damaged line is a problem, never fatal),
+  `ratios.py` (the sheet's columns O, P, Q, R, S, T, U, V, W, X, Y, Z by its own formulas, the summary block, months,
+  FY; `other_debits`, an estimate of ₹1,000 per F&O broker a year, beside the figures, never inside them), `trips.py`
+  (fills paired flat-to-flat per contract; the note's other charges shared by turnover so trips add up
+  to the final net; turnover; a broker in `TRADES_FROM` gives trips only from that day, Angel One from 2026-02-02),
+  `sources.py` (the live capture's fills), `context.py` (VIX, gap, range, expiry, each index's 7-day IV percentile
+  from `iv_daily`, and event days from `realised/events.csv`, kept outside `data/reference/` so the portfolio
+  cache's stamp of that folder does not change; MAE / MFE from the 1-minute lake), `capital.py` (the 15:50 Angel One reading), `views.py` (the JSON the CLI and
+  `api/contract_notes_routes.py` share). Figures are recomputed on read; only `capital` and the page's inputs write
+  `manual/<day>.json`. Reading the store's ~900 files costs 5-7 s on the external disk, so the views use
+  `store.load_cached` (the book kept against `store.stamp`: name, size and mtime of every file `load` reads; ~5 ms)
+  and the routes' 20 s response cache is keyed on the same stamp; the inputs PUT clears both (`store.forget`).
+  The cached book is shared: never mutate it.
 - `legwise/algtst.py` + `rotation/algtst_export.py` — BL-137: a leg-wise strategy as an AlgoTest `.algtst` (import
   format, one strategy per file) and a day's picks as files + zip (`obt rotation algotest-export`). Every mapping was read
   off an AlgoTest export in `tests/fixtures/algtst/` (a closest premium is a bare number; re-entry at cost is
@@ -274,6 +302,13 @@ Otherwise:
   SL limit 1, a 3 s exit delay). One algo per weekday, so a body carries the session's weekday only. A trail in points
   is `PER_POSITION_POINT` (confirmed by the owner's `test1`). `Export.unconfirmed` lists any mapping never seen
   saved, which the uploader refuses; none is left. Anything else that is set raises `Unmappable`.
+- `rotation/plan.py` + `api/rotation_plan_routes.py` — the Today page's baskets with what the platforms hold
+  (dashboard review, 2026-10-28; `GET /legwise/rotation/plan`, read-only): each Adaptive book's picks for the
+  latest recorded session and the next session's tentative list (`result.read_tentative`), with `labels.label`
+  settings, and per account Settings › Automation has uploading, `uploaded` / `enabled` / `held` / `extra`
+  replayed from the broker-login ledgers (`rotation/quantiply/ledger[-<broker>].jsonl` and
+  `deploy-ledger[-<broker>].jsonl`, `rotation/algotest/ledger.jsonl`); a 15:40 `disable` counts as having been
+  on; a missing ledger is an `error`, never "nothing uploaded".
 - `rotation/live_compare.py` — BL-141: the 15:40 capture's day file (`rotation/live/<day>.jsonl`, written by
   `packages/broker-login/src/live-capture.ts`) beside the stored paper results (`store.result_path`, so T1 variants
   too): per variant, list and platform + broker, live per lot (copies' multipliers added up) minus paper per lot
@@ -448,7 +483,7 @@ Otherwise:
   output, `t33.status` on `/legwise/anatomy`). Any other query error still raises.
 
 - `research/common/` — code two research items share, imported by module name after a `sys.path` insert of this
-  folder (`varlib`, `early_ref`, `rotparse`; BL-152 added `cscv` (the numpy CSCV / PBO, moved out of `bl104/robust.py`, which
+  folder (`varlib`, `early_ref`, `rotparse`; BL-164 added `gap_and_go_specs` (BL-164's rules, which BL-165 subsets); BL-152 added `cscv` (the numpy CSCV / PBO, moved out of `bl104/robust.py`, which
   re-exports it) and `breakout_specs` (BL-152's 192 registered rule specs, also used by BL-153)). A script never imports
   from another item's folder.
 - `research/bl104/` — BL-104, the full-factorial parameter sweep over the Widesl / Dir / Buy families:

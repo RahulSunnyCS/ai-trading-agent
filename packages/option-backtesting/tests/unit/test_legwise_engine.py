@@ -340,3 +340,149 @@ def test_lot_size_follows_each_legs_expiry_not_the_trading_day():
     # the default, "current" (owner's choice, like AlgoTest): today's lot on every leg
     result = simulate_day(strategy(legs), data, sizing_date=date(2026, 10, 7))
     assert {t.leg_id: t.qty for t in result.trades} == {"weekly_ce": 65, "monthly_ce": 65}
+
+
+# --- BL-164: the peak trail and stops judged on the close ------------------------------------
+
+
+def buy_leg(**extra) -> dict:
+    return {**sell_leg(**extra), "position": "buy"}
+
+
+PEAK = {"activate_percent": 105, "exit_percent": 80}
+
+
+def test_peak_trail_arms_above_its_level_and_exits_at_a_share_of_the_peak():
+    # entry 100; the 10:00 high of 110 arms it (after that bar's checks): level 88
+    data = day(
+        {(22000.0, "CE"): bars(100, {"10:00": (100, 110, 100, 108), "10:01": (108, 108, 87, 90)})}
+    )
+    [t] = simulate_day(strategy([buy_leg(trail_peak=PEAK)]), data).trades
+    assert (t.exit_price, t.exit_reason) == (88, "TRAIL")
+    assert t.exit_min == minute_index("10:01")
+
+
+def test_peak_trail_stays_off_until_the_premium_has_been_above_the_activation():
+    leg = buy_leg(trail_peak=PEAK, stop_loss={"percent": 30})
+    data = day(
+        {(22000.0, "CE"): bars(100, {"10:00": (100, 104, 100, 103), "10:01": (103, 103, 65, 68)})}
+    )
+    [t] = simulate_day(strategy([leg]), data).trades
+    assert (t.exit_price, t.exit_reason) == (70, "SL")
+
+
+def test_peak_trail_and_sl_on_one_bar_exit_at_the_higher_level_or_a_gapped_open():
+    leg = buy_leg(trail_peak=PEAK, stop_loss={"percent": 30})
+    both = day(
+        {(22000.0, "CE"): bars(100, {"10:00": (100, 110, 100, 108), "10:01": (90, 90, 60, 62)})}
+    )
+    [t] = simulate_day(strategy([leg]), both).trades
+    assert (t.exit_price, t.exit_reason) == (88, "TRAIL")
+    gapped = day(
+        {(22000.0, "CE"): bars(100, {"10:00": (100, 110, 100, 108), "10:01": (80, 80, 60, 62)})}
+    )
+    [t] = simulate_day(strategy([leg]), gapped).trades
+    assert (t.exit_price, t.exit_reason) == (80, "TRAIL")
+
+
+def test_stop_on_close_ignores_an_intrabar_spike_and_fills_at_the_close():
+    leg = buy_leg(stop_loss={"percent": 30}, stop_on="close")
+    data = day(
+        {(22000.0, "CE"): bars(100, {"10:00": (100, 100, 60, 75), "10:01": (75, 75, 68, 69)})}
+    )
+    [t] = simulate_day(strategy([leg]), data).trades
+    assert (t.exit_price, t.exit_reason) == (69, "SL")
+    assert t.exit_min == minute_index("10:01")
+
+
+def test_stop_on_close_tracks_the_peak_from_closes():
+    leg = buy_leg(trail_peak=PEAK, stop_on="close")
+    # the 10:00 high of 130 is ignored: the peak is the 110 close, so the level is 88
+    data = day(
+        {
+            (22000.0, "CE"): bars(
+                100,
+                {
+                    "10:00": (100, 130, 100, 110),
+                    "10:01": (110, 110, 85, 89),
+                    "10:02": (89, 89, 86, 87),
+                },
+            )
+        }
+    )
+    [t] = simulate_day(strategy([leg]), data).trades
+    assert (t.exit_price, t.exit_reason) == (87, "TRAIL")
+    assert t.exit_min == minute_index("10:02")
+
+
+def test_stop_on_close_applies_to_a_sold_legs_stop_and_target():
+    leg = sell_leg(stop_loss={"percent": 50}, target={"percent": 40}, stop_on="close")
+    spike = day(
+        {(22000.0, "CE"): bars(100, {"10:00": (100, 170, 100, 140), "10:01": (140, 140, 55, 58)})}
+    )
+    [t] = simulate_day(strategy([leg]), spike).trades
+    assert (t.exit_price, t.exit_reason) == (58, "TARGET")
+
+
+def test_peak_trail_and_stop_on_validate_and_stay_out_of_the_dump_when_unset():
+    with pytest.raises(ValidationError, match="bought legs"):
+        strategy([sell_leg(trail_peak=PEAK)])
+    with pytest.raises(ValidationError):
+        strategy([buy_leg(trail_peak={"activate_percent": 100, "exit_percent": 80})])
+    with pytest.raises(ValidationError):
+        strategy([buy_leg(stop_on="bar")])
+    plain = strategy([sell_leg(stop_loss={"percent": 50})]).model_dump()["legs"][0]
+    assert "trail_peak" not in plain and "stop_on" not in plain
+    set_ = strategy([buy_leg(trail_peak=PEAK, stop_on="close")]).model_dump()["legs"][0]
+    assert set_["stop_on"] == "close" and set_["trail_peak"] == PEAK
+
+
+def test_a_trail_exit_squares_off_complete_and_arms_reentry_on_sl():
+    trail = day(
+        {
+            (22000.0, "CE"): bars(
+                100, {"10:00": (100, 110, 100, 108), "10:01": (108, 108, 87, 90)}
+            ),
+            (22000.0, "PE"): bars(100, {"10:01": (100, 100, 99, 95)}),
+        }
+    )
+    pe = {**buy_leg(), "id": "pe", "option_type": "PE"}
+    legs = [buy_leg(trail_peak=PEAK), pe]
+    done = simulate_day(strategy(legs, square_off="complete"), trail)
+    by_leg = {t.leg_id: t for t in done.trades}
+    assert by_leg["ce"].exit_reason == "TRAIL"
+    assert (by_leg["pe"].exit_reason, by_leg["pe"].exit_min) == (
+        "SQUARE_OFF",
+        minute_index("10:01"),
+    )
+    again = buy_leg(
+        trail_peak=PEAK, stop_loss={"percent": 30}, reentry_on_sl={"mode": "asap", "count": 1}
+    )
+    trades = simulate_day(strategy([again]), trail).trades
+    assert [t.exit_reason for t in trades] == ["TRAIL", "EXIT_TIME"]
+
+
+def test_stop_on_close_judges_an_intrabar_entry_s_own_bar():
+    leg = buy_leg(
+        stop_loss={"percent": 30},
+        stop_on="close",
+        range_breakout={"until": "09:30", "side": "high", "source": "instrument"},
+    )
+    # range high 100 (flat); the 10:00 bar breaks it (fill 100) and closes at 60, below the 70 stop
+    data = day({(22000.0, "CE"): bars(100, {"10:00": (100, 105, 55, 60)})})
+    [t] = simulate_day(strategy([leg]), data).trades
+    assert (t.entry_min, t.exit_min, t.exit_price, t.exit_reason) == (
+        minute_index("10:00"),
+        minute_index("10:00"),
+        60,
+        "SL",
+    )
+
+
+def test_stop_on_close_names_the_higher_level_when_both_are_crossed():
+    leg = buy_leg(trail_peak=PEAK, stop_loss={"percent": 30}, stop_on="close")
+    data = day(
+        {(22000.0, "CE"): bars(100, {"10:00": (100, 110, 100, 110), "10:01": (100, 100, 60, 65)})}
+    )
+    [t] = simulate_day(strategy([leg]), data).trades
+    assert (t.exit_price, t.exit_reason) == (65, "TRAIL")

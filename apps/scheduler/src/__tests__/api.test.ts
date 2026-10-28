@@ -173,10 +173,22 @@ describe('GET /runs/:id/log', () => {
 });
 
 describe('notifications', () => {
-  it('lists every type enabled when there is no prefs file', async () => {
-    const body = (await (await get('/notifications')).json()) as Array<{ enabled: boolean }>;
+  it('lists every type at its default level when there is no prefs file (BL-173)', async () => {
+    const body = (await (await get('/notifications')).json()) as Array<{
+      type: string;
+      enabled: boolean;
+      level: string;
+    }>;
     expect(body).toHaveLength(Object.keys(NOTIFICATION_TYPES).length);
-    expect(body.every((n) => n.enabled)).toBe(true);
+    expect(body.find((n) => n.type === 'momentum.preview')).toMatchObject({
+      enabled: false,
+      level: 'off',
+    });
+    expect(body.find((n) => n.type === 'options.daily')?.level).toBe('failures');
+    expect(body.find((n) => n.type === 'momentum.final')).toMatchObject({
+      enabled: true,
+      level: 'all',
+    });
   });
 
   it('writes the prefs file and reflects it', async () => {
@@ -185,6 +197,7 @@ describe('notifications', () => {
     });
     expect(res.status).toBe(200);
     expect(JSON.parse(readFileSync(prefsFile, 'utf8'))).toEqual({
+      levels: { 'momentum.preview': 'off', 'broker.fyers': 'off' },
       disabled: ['broker.fyers', 'momentum.preview'],
     });
     const body = (await (await get('/notifications')).json()) as Array<{
@@ -193,6 +206,19 @@ describe('notifications', () => {
     }>;
     expect(body.find((n) => n.type === 'momentum.preview')?.enabled).toBe(false);
     expect(body.find((n) => n.type === 'options.daily')?.enabled).toBe(true);
+  });
+
+  it('saves levels (BL-173), and refuses a bad level', async () => {
+    const res = await send('PUT', '/notifications', {
+      levels: { 'broker.quantiply': 'failures', 'options.daily': 'all' },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Array<{ type: string; level: string }>;
+    expect(body.find((n) => n.type === 'broker.quantiply')?.level).toBe('failures');
+    expect(body.find((n) => n.type === 'options.daily')?.level).toBe('all');
+    expect(
+      (await send('PUT', '/notifications', { levels: { 'broker.quantiply': 'loud' } })).status,
+    ).toBe(400);
   });
 
   it('rejects unknown types and bad bodies without writing', async () => {

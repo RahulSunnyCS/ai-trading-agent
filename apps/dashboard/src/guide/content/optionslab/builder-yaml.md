@@ -15,6 +15,7 @@ Most people never need it: use the [Leg grid](guide:optionslab/builder-form).
 | Presets | Example strategies. Loading one replaces the editor's text. |
 | Strategy editor | The YAML text, checked as you type. Errors point at the line. |
 | Run | Runs the strategy over the cached days. |
+| Earlier runs | The engine's last 25 runs, newest first: strategy and version, period, net (the run's total) and sessions. Click one for its headline figures; the registry keeps no per-session rows, so its chart and tables are not shown. |
 
 ## Reading the results
 

@@ -33,7 +33,7 @@ import type {
 import { StateMessage } from '../../ui/StateMessage';
 import { toast } from '../../ui/Toast';
 import { StockDrawer } from '../scores/StockDrawer';
-import { FavouritesCarousel } from './FavouritesCarousel';
+import { type FavouriteKpis, Favourites } from './Favourites';
 import { FridayTimeline } from './FridayTimeline';
 import { RulesStrip } from './RulesStrip';
 import { EdgeNames, NeedsAttention, SincePreview, TelegramMessage } from './SidePanels';
@@ -132,6 +132,16 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
     return map;
   }, [scoresData]);
   const headlineFavourite = favourites.data?.find((run) => run.active);
+  // A single saved run's own CAGR and drawdown, already in the favourites response; a group's
+  // blend is on Saved runs and is not fetched here.
+  const kpis = useMemo(() => {
+    const map = new Map<string, FavouriteKpis>();
+    for (const run of favourites.data ?? []) {
+      if (run.group || run.kpis.cagr == null) continue;
+      map.set(run.id, { cagr: run.kpis.cagr ?? null, max_drawdown: run.kpis.max_drawdown ?? null });
+    }
+    return map;
+  }, [favourites.data]);
   const zone = useMemo(() => buyZoneFrom(headlineFavourite), [headlineFavourite]);
   const order = useMemo(
     () =>
@@ -192,11 +202,12 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
       {view.error && !view.data ? (
         <StateMessage variant="error" title="Could not load this week" description={view.error} />
       ) : null}
-      <FavouritesCarousel
+      <Favourites
         cards={cards}
         selectedId={card?.id ?? null}
         onSelect={(id) => setFavId(cards?.find((c) => c.headline)?.id === id ? null : id)}
         followed={favourites.data ? followedCount(favourites.data) : null}
+        kpis={kpis}
       />
       {card ? (
         <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -223,7 +234,7 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
       {card && card.dataset !== 'etf' && !scoresData ? (
         <ScoresFetcher onData={setScoresData} />
       ) : null}
-      <YourOrders />
+      <YourOrders favourites={cards} />
 
       <RunByHandDrawer open={panel === 'run'} onClose={() => setPanel(null)} weekly={weekly} />
       <ClassifySplitDrawer

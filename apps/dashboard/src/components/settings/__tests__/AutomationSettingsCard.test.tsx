@@ -22,10 +22,38 @@ import { AutomationSettingsCard } from '../AutomationSettingsCard';
 const SETTINGS: AutomationSettings = {
   masters: { logins: true, uploads: true, deploy: false },
   rows: {
-    'algotest.finvasia': { login: true, list: 't1', upload: true, multiplier: 1, addon: true },
-    'algotest.angelone': { login: false, list: 'none', upload: false, multiplier: 1, addon: true },
-    'quantiply.angelone': { login: true, list: 'core', upload: true, multiplier: 1, addon: true },
-    'quantiply.finvasia': { login: false, list: 'none', upload: false, multiplier: 1, addon: true },
+    'algotest.finvasia': {
+      login: true,
+      list: 't1',
+      upload: true,
+      multiplier: 1,
+      addon: true,
+      mtmSl: null,
+    },
+    'algotest.angelone': {
+      login: false,
+      list: 'none',
+      upload: false,
+      multiplier: 1,
+      addon: true,
+      mtmSl: null,
+    },
+    'quantiply.angelone': {
+      login: true,
+      list: 'core',
+      upload: true,
+      multiplier: 1,
+      addon: true,
+      mtmSl: 8000,
+    },
+    'quantiply.finvasia': {
+      login: false,
+      list: 'none',
+      upload: false,
+      multiplier: 1,
+      addon: true,
+      mtmSl: null,
+    },
   },
   pause: { until: null },
 };
@@ -80,6 +108,7 @@ describe('automation helpers', () => {
       upload: false,
       multiplier: 1,
       addon: true,
+      mtmSl: null,
     });
   });
 
@@ -99,6 +128,32 @@ describe('automation helpers', () => {
       text: 'GitHub backstop partly updated: logins off: not yet',
       failed: true,
     });
+  });
+});
+
+describe('MTM SL (BL-172)', () => {
+  it('describes a change in rupees, and off as not managed', () => {
+    const after = withRow(
+      withRow(SETTINGS, 'quantiply.angelone', { mtmSl: 7500 }),
+      'quantiply.finvasia',
+      { mtmSl: 9000 },
+    );
+    expect(describeChanges(SETTINGS, after)).toEqual([
+      'Quantiply · Angel One MTM SL: ₹8,000 → ₹7,500',
+      'Quantiply · Shoonya MTM SL: not managed → ₹9,000',
+    ]);
+  });
+
+  it('settings from an older scheduler read as the list stop on Quantiply rows only', () => {
+    const old = structuredClone(SETTINGS) as unknown as {
+      rows: Record<string, Record<string, unknown>>;
+    };
+    for (const row of Object.values(old.rows)) row.mtmSl = undefined;
+    (old.rows['quantiply.finvasia'] as Record<string, unknown>).list = 't1';
+    const read = withDefaults(old as unknown as AutomationSettings);
+    expect(read.rows['quantiply.angelone'].mtmSl).toBe(8000);
+    expect(read.rows['quantiply.finvasia'].mtmSl).toBe(9000);
+    expect(read.rows['algotest.finvasia'].mtmSl).toBeNull();
   });
 });
 
@@ -170,7 +225,8 @@ describe('AutomationSettingsCard', () => {
       vi.fn(async () => ok(view(old as unknown as AutomationSettings))),
     );
     render(<AutomationSettingsCard />);
-    expect(await screen.findAllByRole('spinbutton')).toHaveLength(4);
+    // four multipliers, and the MTM SL of the one Quantiply row with a list (BL-172 default)
+    expect(await screen.findAllByRole('spinbutton')).toHaveLength(5);
     expect(screen.queryByRole('button', { name: /Skip next session/ })).toBeNull();
     expect(screen.queryByText(/unsaved change/)).toBeNull();
   });

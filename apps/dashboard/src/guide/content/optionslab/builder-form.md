@@ -104,6 +104,6 @@ panel also shows the difference from the saved version's stored results over the
 
 ## What it does not tell you
 
-Whether the strategy suits the kind of market coming next. Use
-[Runs](guide:optionslab/runs) and [Regimes](guide:optionslab/regimes) to see *which* days it made
-and lost money on.
+Whether the strategy suits the kind of market coming next. Once it is saved, its **History** on
+[Strategies and baskets](guide:optionslab/strategies) shows *which* days it made and lost money on;
+the archived [Regimes](guide:optionslab/regimes) page labels what kind of days those were.

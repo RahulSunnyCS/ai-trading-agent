@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --port 5173",
-    "build": "next build",
+    "dev": "next dev --webpack --port 5173",
+    "build": "next build --webpack",
     "start": "next start --port 5173",
     "cf:build": "node scripts/cf-build.mjs",
     "cf:preview": "node scripts/cf-build.mjs && wrangler dev",
@@ -22,7 +22,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "lightweight-charts": "^4.2.0",
     "lucide-react": "^1.17.0",
-    "next": "^15.5.0",
+    "next": "^16.4.1",
     "plotly.js-basic-dist-min": "^4.1.1",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
@@ -31,7 +31,7 @@
     "zustand": "^4.5.0"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "^1.20.9",
+    "@opennextjs/cloudflare": "^1.20.13",
     "@playwright/test": "^1.59.1",
     "@testing-library/react": "^16.0.0",
     "@types/node": "^20.0.0",

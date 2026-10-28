@@ -1,3 +1,5 @@
+import { formatInr } from './format';
+
 /**
  * Shapes, labels and small rules for the automation settings (BL-140), served by the
  * scheduler at `/api/scheduler/settings/automation` (apps/scheduler/src/automation.ts holds the
@@ -15,6 +17,20 @@ export type RowKey =
 export const MULTIPLIER_MIN = 1;
 export const MULTIPLIER_MAX = 10;
 
+/** The Quantiply clientwise MTM SL a row may ask for (BL-172): whole rupees in this range. */
+export const MTM_SL_MIN = 500;
+export const MTM_SL_MAX = 100_000;
+
+/**
+ * What a row's MTM SL reads as when the scheduler predates the field: the list's portfolio stop on
+ * a Quantiply row (Adaptive Tuned ₹9,000, Adaptive Classic ₹8,000), none on AlgoTest. Same rule as
+ * the scheduler's `defaultMtmSl`.
+ */
+export function defaultMtmSl(key: RowKey, list: List | undefined): number | null {
+  if (!key.startsWith('quantiply.')) return null;
+  return list === 't1' ? 9000 : list === 'core' ? 8000 : null;
+}
+
 export interface Row {
   login: boolean;
   list: List;
@@ -23,6 +39,8 @@ export interface Row {
   multiplier: number;
   /** include the Buy add-on picks */
   addon: boolean;
+  /** Quantiply only: the clientwise MTM SL (rupees) kept each morning at 08:00; null = leave it */
+  mtmSl: number | null;
 }
 
 export interface Pause {
@@ -67,7 +85,12 @@ export function withDefaults(settings: AutomationSettings): AutomationSettings {
   const rows = Object.fromEntries(
     Object.entries(settings.rows).map(([key, row]) => [
       key,
-      { ...row, multiplier: row.multiplier ?? 1, addon: row.addon ?? true },
+      {
+        ...row,
+        multiplier: row.multiplier ?? 1,
+        addon: row.addon ?? true,
+        mtmSl: row.mtmSl === undefined ? defaultMtmSl(key as RowKey, row.list) : row.mtmSl,
+      },
     ]),
   ) as Record<RowKey, Row>;
   return { ...settings, rows, pause: { until: settings.pause?.until ?? null } };
@@ -156,6 +179,8 @@ export function describeChanges(before: AutomationSettings, after: AutomationSet
       lines.push(`${rowLabel(key)} multiplier: ${a.multiplier} → ${b.multiplier}`);
     if (a.addon !== b.addon)
       lines.push(`${rowLabel(key)} Buy add-on: ${onOff(a.addon)} → ${onOff(b.addon)}`);
+    if (a.mtmSl !== b.mtmSl)
+      lines.push(`${rowLabel(key)} MTM SL: ${mtmSlText(a.mtmSl)} → ${mtmSlText(b.mtmSl)}`);
   }
   if (before.pause.until !== after.pause.until) {
     lines.push(
@@ -163,6 +188,10 @@ export function describeChanges(before: AutomationSettings, after: AutomationSet
     );
   }
   return lines;
+}
+
+function mtmSlText(value: number | null): string {
+  return value === null ? 'not managed' : formatInr(value);
 }
 
 /** Why a row will not do what it says: its master switch is off. Null when nothing is held back. */

@@ -503,6 +503,11 @@ contract, not a shared service).
   NEXT week on a flat stand-in row. `tests/test_broad_parity.py` pins that the week-ahead decision
   buys and fully sells exactly what the full backtest did; trims and top-ups read the week's own
   prices and are not pinned. Broad only for now; delay-0 strategies get no orders before 19:30.
+  `_compute_orders(favourite=, preview=True)` (Your orders' "Preview for…", `POST
+  /api/orders/preview/jobs` + `GET .../jobs/{id}`, a `_PreviewJobs`) plans another favourite as one
+  portfolio against the same snapshot and writes nothing: no orders row, no lot event, no pending
+  lot (`tests/test_lot_orders.py` compares every catalog table and state file before and after).
+  The dashboard's Rebalance preview page was retired for it; `/api/rebalance-preview*` remains.
 - `kite.py` + `holdings_sync.py` (BL-142 Phase 1) — Zerodha Kite, read-only: the Momentum money
   is on Kite. `kite.py` calls only `/session/token`, `/portfolio/holdings` (quantity + T1),
   `/user/margins/equity` (`net` = free cash) and `/user/profile`; no order endpoint. The token
