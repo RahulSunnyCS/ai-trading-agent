@@ -1,6 +1,6 @@
 # Directional: strike depth (ITM2 and ITM3) and the overall stop
 
-**Status:** Tested · **Last updated:** 2026-10-26
+**Status:** Tested · **Last updated:** 2026-10-28
 
 ## What it is
 
@@ -18,6 +18,7 @@ ITM1, ₹3,000 overall stop, 21% leg stop, one re-entry at cost, exit 15:28
 
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
+| BL-167 | ITM2 (at BL-181's ₹4,000 stop; ₹3,000 control) added to the Adaptive ranking universe, Core-298 and T1, list C | 2025-01-10 → 2026-10-23, 431 sessions; net after charges, 1 lot per pick; in-sample | **No gain** in either universe (Core −₹57 a day, T1 −₹74; intervals include zero; Core's 2025 half −₹217, wholly below zero) | [BL-167][bl167] |
 | BL-181 | ITM2, ITM3 x overall stop {3,000, 4,000, 5,000, 6,000, 8,000, 10,000}; 25 start times; NIFTY and SENSEX; against ITM1 at ₹3,000 | 2024-10-09 → 2026-10-23; stop matched on the fit year, judged on the hold-out year from 2025-10-09; net after brokerage only (no STT or exchange fees), 1 lot | **POC passes on SENSEX** (ITM2 +₹54, ITM3 +₹78 per slot-day, intervals above zero); **NIFTY inconclusive** (+₹36 and +₹44, intervals include zero) | [BL-181][bl181] |
 
 ## What we know
@@ -50,9 +51,34 @@ ITM1, ₹3,000 overall stop, 21% leg stop, one re-entry at cost, exit 15:28
   Stop rates are shares of strategy-days pooled over the 25 start times, not the share of days a
   basket hits its stop (late starts rarely reach it, so the day-level rate is higher).
 
+## In the Adaptive ranking (BL-167, in-sample)
+
+Adding the 50 ITM2 variants to the ranking universe (431 sessions from 2025-01-10, list C, ITM2 at the
+BL-181 stop of ₹4,000):
+
+| | Adaptive Classic (Core-298) | Adaptive Tuned (T1) |
+|---|---|---|
+| Net, base → with ITM2 (₹, 1 lot, 3 picks) | 379,202 → 354,613 | 653,498 → 621,694 |
+| Mean difference a day, 90% interval | −57 (−235 to +118) | −74 (−258 to +108) |
+| Maximum drawdown, base → with ITM2 | 42,326 → 31,849 | 25,887 → 28,840 |
+| ITM2 share of core picks | 20.3% | 13.6% |
+| Base ITM1 picks dropped | 77.5% | 49.7% |
+| Base ATM picks dropped | 58.0% | 40.5% |
+| Base Widesl picks dropped | 5.1% | 5.1% |
+
+"Dropped" is the share of the base universe's picks that are no longer picked once ITM2 joins; what
+enters is counted apart. In Core, 308 picks leave (220 ITM1, 40 ATM, 48 Widesl) and 308 enter (263
+ITM2, 37 Widesl, 7 ITM1, 1 ATM); in T1, 224 leave and 224 enter (176 ITM2, 39 Widesl, 9 ITM1).
+
+ITM2 mostly takes ITM1's slots and does not earn more for it: no gain in either universe by the
+registered rule. In Core's 2025 half it did worse: −₹217 a day (−434 to −11). The Core drawdown is shallower and T1's deeper. In-sample (weights and the stop were
+chosen on this history, no spread), so the forward journal is the only clean test.
+
 ## Not yet tested
 
-- Larger time frames (NIFTY 2022 → 2024 on the imported data), ITM4 and deeper, and putting ITM2 or
-  ITM3 into the rotation's ranking: the next step if the owner wants it.
+- Larger time frames (NIFTY 2022 → 2024 on the imported data), ITM4 and deeper, and ITM3 in the
+  rotation's ranking (ITM2 was tried there in BL-167: no gain). A forward shadow of the ITM2 variants is
+  the only clean test of BL-167.
 
 [bl181]: ../../../../backlog/BL-181-directional-itm2-itm3-with-matched-stop.md
+[bl167]: ../../../../backlog/BL-167-itm2-in-adaptive-and-t1.md
