@@ -25,3 +25,7 @@ out_*.csv
 # BL-097 resumable sweep parts (multi-MB each; regenerate with run_family_sweep.py)
 checkpoints/
 results_smoke/
+
+# BL-185 (paths live under TRADING_DATA_ROOT/research/bl185; nothing of them here)
+bl185/logs/
+*.npz

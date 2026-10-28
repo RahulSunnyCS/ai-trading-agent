@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades Core and T1 with real money; BL-182 and BL-184 left a drawdown-halving and an afternoon lead that two years of seen data cannot settle, and the owner asked for the proper sweep |
-| **Status** | Planned (2026-10-28) — Phase 0 below is a draft; it becomes the registration when committed with its grid SHA, before any run |
+| **Status** | In progress — Phase 0 registered 2026-10-28 23:50 IST (grid SHA `675f5b0b6b174478`, parity gates passed); Stage A started the same night, pausing before 07:30 |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -49,7 +49,7 @@ Any change to a live file, list, pick or journal; Buy; CE/PE-asymmetric legs and
 
 ## Plan
 
-### Phase 0 — Pre-register (DRAFT; committed with its grid SHA before Stage A, then frozen)
+### Phase 0 — Pre-register (registered 2026-10-28 23:50 IST, grid SHA `675f5b0b6b174478`, before Stage A; frozen)
 
 - **Hypothesis:** Adaptive choosing, each morning at 09:16, the best **half-day sets** for the morning and for the afternoon from a sweep-tuned universe earns more per margin lot-day after charges than T1 Adaptive as traded, and than the same sweep's whole-day winners, with a max drawdown no deeper, on a year the selection never saw.
 - **Universe and data:** NIFTY and SENSEX weekly options from the lake, usable days from `data_quality`, weekends excluded, the legwise engine at its default trigger-level fills (BL-156), sizing `current` at 2026-10-12, charges from `ruletest/charges.py` (₹13 an order) with ₹5 and ₹20 reported. Windows: **selection S = 2024-10-09 → 2025-10-08**; **test T = 2025-10-09 → 2026-10-27**; **advisory NIFTY 2022-01-03 → 2024-10-08** (the vendor days, for finalists, run once, as BL-104 did; SENSEX has none).
@@ -126,7 +126,7 @@ A parallel track `t2` like BL-113 (own folder and journal, after the live pick, 
 - **Platform support** for half-day sets and any lock or trail is unverified; `not_deployable` keeps it out of a finalist until it is.
 - **Machine.** 8 GB of RAM and a laptop that also runs the scheduler and the 08:02 login: the run is capped at 6 workers and must not collide with the morning jobs.
 
-## Open questions (defaults below are what the plan assumes; the owner changes any before Phase 0 is committed)
+## Open questions (the owner, 2026-10-28 23:30: "build now and run complete as much as possible. Pause at 7:30 am"; every default below stands)
 
 1. Morning exits {11:30, 12:00, 12:30, 13:00}; afternoon exit 15:28 only. *(default)*
 2. The ten-strike ladder (ITM3 → OTM3 plus three premiums) for **both** cohorts. *(default)*
@@ -138,4 +138,15 @@ A parallel track `t2` like BL-113 (own folder and journal, after the live pick, 
 
 - 2026-10-28 — created from the owner's request ("a proper research ... a sweep through everything, like we have
   done for adaptive tune ... now we have two entry times and two exit times"), after BL-182 / BL-184; Phase 0
-  drafted, not yet registered.
+  drafted.
+- 2026-10-28 23:50 — owner: build now, run as much as possible, pause at 07:30. **Phase 0 registered** with grid
+  SHA `675f5b0b6b174478` (`research/common/two_session/grid.py`: 720 cells per cohort-slot, 14,400 variants per
+  index). Parity gates (`parity.py`, 60 days × 6 cells × 2 indices × 7 settings = 4,080 variant-days): gross
+  equal to the rupee once two things were fixed before Stage A — the engine fills an exit at the exit minute's
+  `price_at`, the previous minute's close (BL-009), so an exit overlay ends at the path's value at x − 1, and
+  paths are stored as exact paise, float32 having fired a target a minute early on three days; charges
+  reconstructed from the recorded trades within ₹10 (worst ₹8.13; the gate was registered at ₹5 and widened
+  to ₹10 before Stage A, since a trade still open at an overlay exit is valued at its entry, which moves only
+  the exchange fee and stamp). Lock and lock-trail overlays equal `portfolio.apply_book` on 1,440 checks.
+  Paths go to `TRADING_DATA_ROOT/research/bl185/paths/` (int32 paise, about 11 GB an index); the internal disk
+  has 31 GB free. Stage A: 6 workers, `nice`, `caffeinate`, no new part claimed after 07:00.
