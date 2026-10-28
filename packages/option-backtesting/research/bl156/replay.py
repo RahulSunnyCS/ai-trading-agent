@@ -17,26 +17,20 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
+import adaptive_picks  # noqa: E402
 import rules as R  # noqa: E402
+from adaptive_picks import strategy_path  # noqa: E402, F401  (replay4 uses P.strategy_path)
 
 from option_backtesting.data.reference.loader import default_reference_data
 from option_backtesting.fyers.daily import data_dir
 from option_backtesting.legwise.market import load_day
 from option_backtesting.legwise.schema import load_legwise
-from option_backtesting.rotation import journal, store
-from option_backtesting.rotation.lists import SIZING_DATE, WARMUP
-from option_backtesting.rotation.pick import History, score_history
-from option_backtesting.rotation.variants import (
-    STRATEGIES_DIR,
-    TRACK_DIRS,
-    track_names,
-    track_of,
-    variant_names,
-)
+from option_backtesting.rotation import store
+from option_backtesting.rotation.lists import SIZING_DATE
 
 OUT = Path(__file__).parent / "out"
 START, END = date(2025, 1, 10), date(2026, 10, 22)
-JOURNAL_FROM = {"t1": date(2026, 10, 19), "core": date(2026, 10, 12)}
 BROKERAGE_ORDER = 20.0 * 1.18
 VARIANTS = {  # name -> (rule, overshoot)
     "close": ("close", 0.0),
@@ -49,44 +43,8 @@ VARIANTS = {  # name -> (rule, overshoot)
 BLOCK, RESAMPLES, SEED = 5, 2000, 20261023
 
 
-def strategy_path(name: str) -> Path:
-    track = track_of(name)
-    return (TRACK_DIRS[track] if track else STRATEGIES_DIR) / f"{name}.yaml"
-
-
 def picks_for(book: str, root: Path, until: date | None = None) -> dict[date, list[str]]:
-    names = variant_names() + (track_names("t1") if book == "t1" else [])
-    m = store.load_matrix(names, root)
-    attrs = store.read_days(root, "weekdays")
-    keep = [i for i, d in enumerate(m.days) if d in attrs and (until is None or d <= until)]
-    days = [m.days[i] for i in keep]
-    values = m.values[keep]
-    recorded = {
-        date.fromisoformat(e["day"]): e["lists"]["C"]
-        for e in journal.read(store.journal_path(root, "t1" if book == "t1" else None))
-    }
-    out = {}
-    for i, d in enumerate(days):
-        if not (START <= d <= END) or i < WARMUP:
-            continue
-        if d >= JOURNAL_FROM[book] and d in recorded:
-            c = recorded[d]
-        else:
-            a = attrs[d]
-            hist = History(
-                days[:i],
-                list(m.names),
-                values[:i],
-                [attrs[x]["weekday"] for x in days[:i]],
-                [attrs[x]["vix_band"] for x in days[:i]],
-                [attrs[x]["dte_n"] for x in days[:i]],
-                [attrs[x]["dte_s"] for x in days[:i]],
-                "",
-            )
-            vix = float(a["vix_open"]) if a.get("vix_open") not in (None, "") else None
-            c = score_history(hist, d, vix, {"dte_n": a["dte_n"], "dte_s": a["dte_s"]})["C"]
-        out[d] = list(c["core"]) + list(c.get("buy") or [])
-    return out
+    return adaptive_picks.picks_for(book, root, START, END, until)
 
 
 _STRATS: dict = {}

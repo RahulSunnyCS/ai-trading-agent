@@ -498,7 +498,7 @@ Otherwise:
   output, `t33.status` on `/legwise/anatomy`). Any other query error still raises.
 
 - `research/common/` — code two research items share, imported by module name after a `sys.path` insert of this
-  folder (`varlib`, `early_ref`, `rotparse`; BL-164 added `gap_and_go_specs` (BL-164's rules, which BL-165 subsets); BL-152 added `cscv` (the numpy CSCV / PBO, moved out of `bl104/robust.py`, which
+  folder (`varlib`, `early_ref`, `rotparse`; BL-164 added `gap_and_go_specs` (BL-164's rules, which BL-165 subsets); BL-186 added `adaptive_picks` (Adaptive's picks per book, recorded or reconstructed, moved out of `bl156/replay.py`); BL-152 added `cscv` (the numpy CSCV / PBO, moved out of `bl104/robust.py`, which
   re-exports it) and `breakout_specs` (BL-152's 192 registered rule specs, also used by BL-153)). A script never imports
   from another item's folder.
 - `research/bl104/` — BL-104, the full-factorial parameter sweep over the Widesl / Dir / Buy families:
