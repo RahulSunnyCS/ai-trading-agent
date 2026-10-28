@@ -117,3 +117,32 @@ def test_the_cli_writes_the_outcome_and_exits_1_on_a_failure(monkeypatch, env):
         "detail": "timed out",
         "name": "Kite",
     }
+
+
+class FakePage:
+    """Just enough of a Playwright page for `_wait_for`: the visible message, polled."""
+
+    def __init__(self, messages):
+        self.messages = list(messages)
+
+    def eval_on_selector_all(self, selector, script):
+        return [self.messages.pop(0)] if len(self.messages) > 1 else self.messages[:1]
+
+    def wait_for_timeout(self, ms):
+        pass
+
+
+def test_the_second_code_is_not_failed_by_the_first_ones_message():
+    captured = {}
+    page = FakePage(["Invalid TOTP", "Invalid TOTP", ""])
+
+    def done():
+        if not page.messages or page.messages == [""]:
+            captured["token"] = "RT"
+        return False
+
+    kite_login._wait_for(page, done, captured, wait_s=5, stale="Invalid TOTP")
+    assert captured == {"token": "RT"}
+    with pytest.raises(kite_login.KiteLoginError) as refused:
+        kite_login._wait_for(FakePage(["Invalid TOTP"]), lambda: False, {}, wait_s=5)
+    assert refused.value.kind == "totp"

@@ -157,11 +157,17 @@ def _stop_on_human_check(page) -> None:
         raise KiteLoginError("Kite asked for a human check: log in by hand today", "human")
 
 
+SCREENSHOTS_KEPT = 10
+
+
 def _screenshot(page) -> str:
     try:
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         path = LOG_DIR / f"{datetime.now():%Y-%m-%d-%H%M%S}.png"
         page.screenshot(path=str(path))
+        # They show the user ID: keep only the newest few.
+        for old in sorted(LOG_DIR.glob("*.png"))[:-SCREENSHOTS_KEPT]:
+            old.unlink(missing_ok=True)
         return str(path)
     except Exception:  # noqa: BLE001 - a diagnostic only
         return ""
@@ -222,18 +228,29 @@ def _totp_field(page):
     ).first
 
 
+TOTP_WORDING = re.compile(r"totp|authenticator|app code", re.I)
+
+
 def _on_totp_step(page) -> bool:
-    return page.locator("input#password:visible").count() == 0 and _totp_field(page).count() > 0
+    """The password form has gone and Kite asks for the code: a numeric or one-time-code field,
+    or a text field on a page that says TOTP (never the first form's user-ID box mid-render)."""
+    if page.locator("input#password:visible").count() > 0 or _totp_field(page).count() == 0:
+        return False
+    numeric = page.locator(
+        "input[type=number]:visible, input[autocomplete='one-time-code']:visible"
+    ).count()
+    return numeric > 0 or bool(TOTP_WORDING.search(page.locator("body").inner_text(timeout=5_000)))
 
 
-def _wait_for(page, done, captured: dict, wait_s: float) -> None:
-    """Poll until `done()` or the redirect was captured; raise on a Kite message or a check."""
+def _wait_for(page, done, captured: dict, wait_s: float, stale: str = "") -> None:
+    """Poll until `done()` or the redirect was captured; raise on a Kite message or a check.
+    `stale` is a message already answered (the first code's refusal), not a new one."""
     deadline = time.monotonic() + wait_s
     while time.monotonic() < deadline:
         if captured.get("token") or done():
             return
         message = _page_message(page)
-        if message:
+        if message and message != stale:
             kind = classify(message)
             if kind != "other":
                 raise KiteLoginError(f"Kite: {message}", kind)
@@ -248,6 +265,7 @@ def _enter_totp(page, secret: str, captured: dict, wait_s: float) -> None:
     if captured.get("token"):
         return
     _stop_on_human_check(page)
+    stale = ""
     for attempt in (1, 2):
         code = _fresh_code(secret) if attempt == 1 else _next_window_code(secret)
         field.fill(code)
@@ -255,9 +273,10 @@ def _enter_totp(page, secret: str, captured: dict, wait_s: float) -> None:
         if submit.count():
             submit.first.click()  # Kite usually submits a full code by itself
         try:
-            _wait_for(page, lambda: False, captured, wait_s)
+            _wait_for(page, lambda: False, captured, wait_s, stale)
         except KiteLoginError as error:
             if error.kind == "totp" and attempt == 1:
+                stale = _page_message(page)  # still shown while the second code is checked
                 continue
             if "authorize" in page.url.lower() or page.get_by_text("Authorize").count():
                 raise KiteLoginError(
