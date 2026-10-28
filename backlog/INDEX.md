@@ -43,6 +43,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-173](BL-173-fewer-telegram-messages.md) | Fewer Telegram messages: one morning confirmation, the pick, the result and failures; a "failures only" level per type | P1 | In progress | improvement | notify |
 | [BL-174](BL-174-rotation-day-60-readout.md) | Options rotation: the registered read-out at 60 trading days of the forward journal (due ~early Jan 2027) | P1 | Planned | research | options |
 | [BL-176](BL-176-momentum-search-on-f6-ranking.md) | Momentum: re-run the strategy search on the F6-fixed (point-in-time) ranking | P1 | Planned | research | momentum |
+| [BL-184](BL-184-directional-split-session.md) | Directional split session: Adaptive's one Dir 09:17–13:00 plus one 13:02–15:28 against its one whole-day Dir (BL-182's method on the Dir, owner's request) | P1 | In progress (Phase 0 registered 2026-10-28) | research | options |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |
