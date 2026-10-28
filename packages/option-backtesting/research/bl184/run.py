@@ -35,7 +35,7 @@ def main() -> None:
         sr.run_all(SPEC, smoke)
     if smoke:
         return
-    text = sr.analyse(SPEC)
+    text, _ = sr.analyse(SPEC)
     fixed = [sr.fixed_split(SPEC, fam, "0917", "1302") for fam in ("N_dir", "S_dir")]
     extra = "\nFixed files, descriptive:\n" + "\n".join(f"- {line}" for line in fixed) + "\n"
     (SPEC.out / f"{SPEC.tag}_summary.md").write_text(text + extra)

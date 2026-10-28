@@ -132,6 +132,25 @@ What the numbers say:
 Not adopted. No forward track. Leads kept on the findings page: the afternoon-only Dir (as the afternoon-
 only Widesl in BL-182) and the fixed NIFTY Dir split.
 
+## Experiments
+
+### E1 — the morning Dir's overall stop, ₹500 → ₹4,000 (registered 2026-10-28, before the run)
+
+- **Override:** `override: owner, 2026-10-28 — "... in directional, we can go with 500, 1000, 1500, 2000,
+  2500, 3000, 3500, 4000 ... Do only morning now"`: a sweep over stop levels, listed under "will not run".
+- **Change:** only the morning Dir sets (09:17–12:47 → 13:00) carry `overall.stop_loss_inr` at each of
+  ₹500, 1,000, 1,500, 2,000, 2,500, 3,500 and 4,000 in turn (₹3,000 is the files' own, the Phase 0 run);
+  the afternoon sets and the whole-day comparator keep ₹3,000 (`research/bl184/stops.py`).
+- **Read, descriptive (no pass rule):** as BL-182 E2 — per level, Adaptive's morning Dir alone (net per
+  margin lot-day, gross, days in profit, max drawdown, stops hit), the split with it against the
+  comparator, and the fixed `N_dir_0917` / `S_dir_0917` morning half alone. A level "helps" if the
+  morning book's net rises AND its drawdown is shallower than at ₹3,000, over the whole span and in both
+  periods. Nothing adopted; a lead at most, and with eight levels the best one is expected to look good
+  by chance.
+- **Not now (owner: "maybe"):** a trailing overall MTM stop on the morning sets; the engine's `overall`
+  has no trail (see BL-182 E2).
+- **Will not run:** stops on the afternoon sets, other levels, a stop by family or index.
+
 ## Risks
 
 - A 13:00 exit on a 21 % stop shape: the morning set's re-entry has less time to recover; the afternoon
@@ -149,3 +168,5 @@ only Widesl in BL-182) and the fixed NIFTY Dir split.
 - 2026-10-28 — run (`research/bl184/run.py` over `research/common/split_replay.py`): +₹31 [−214, +251] net per
   margin lot-day, drawdown deeper, FAIL; fixed `N_dir_0917` split +₹203 [+58, +348] descriptive. Closed,
   not adopted.
+- 2026-10-28 — E1 registered (owner override: the morning Dir's overall stop at eight levels ₹500 → ₹4,000,
+  descriptive) before its run.

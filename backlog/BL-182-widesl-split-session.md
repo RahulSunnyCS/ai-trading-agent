@@ -271,6 +271,29 @@ a ₹2,000 stop is hit more often in the afternoon's smaller premiums. Nothing m
 new registration. Full table: `research/bl182/out/phase2_mtm2000_summary.md` (git-ignored).
 
 
+### E2 — the morning sets' overall stop, ₹500 → ₹4,000 (registered 2026-10-28, before the run)
+
+- **Override:** `override: owner, 2026-10-28 — "what if we put some stop losses? ... only for morning and
+  tell me any difference ... 500 750 1000 1250 1500 1750 2000 ... then 3000 4000 ... Do only morning
+  now"`: a sweep over stop levels, listed under "will not run".
+- **Change:** only the morning sets (09:17–11:47 → 12:00) carry `overall.stop_loss_inr` at each of
+  ₹500, 750, 1,000, 1,250, 1,500, 1,750, 2,000, 3,000 and 4,000 in turn (the files' own ₹2,500 is the
+  Phase 2 run); the afternoon sets and the whole-day comparator keep their files' ₹2,500. Each level is a
+  full Phase 2 replay (`split_replay.Spec(mtm=level, mtm_halves=("am",))`, `research/bl182/stops.py`).
+- **Read, descriptive (no pass rule; nine looks at the same seen days):** per level, Adaptive's morning
+  book alone (net per margin lot-day, gross, days in profit, max drawdown, how often the stop is hit),
+  the split with that morning against the comparator (mean and interval), and the fixed `N_wide_0917` /
+  `S_wide_0917` morning half alone. A level "helps" if the morning book's net rises AND its drawdown is
+  shallower than at ₹2,500, over the whole span and in both periods. Nothing is adopted from this; a
+  level that helps is a lead for a registration of its own, and with nine levels the best one is
+  expected to look good by chance.
+- **Not now (owner: "maybe"):** a trailing overall MTM stop on the morning sets. The leg-wise engine's
+  `overall` has `stop_loss_inr` and `target_inr` only (`legwise/schema.py`); a trailing or profit-locking
+  overall stop would be an engine addition, registered on its own.
+- **Will not run:** stops on the afternoon sets, other levels, a stop by family or index.
+
+## Risks
+
 - Fills at 12:00 and 13:00 on 1-minute bars with no spread; the afternoon set's smaller premiums.
 - Two MTM budgets a day (₹5,000 at ₹2,500 a set) even if the drawdown reads shallower.
 - The edge in the study sits in two quarters; a bootstrap over 500 days can still pass on them.
@@ -323,3 +346,5 @@ new registration. Full table: `research/bl182/out/phase2_mtm2000_summary.md` (gi
 - 2026-10-28 — E1 registered (owner override: the split's sets at a ₹2,000 overall stop) before its run.
 - 2026-10-28 — E1 run: Adaptive two-plus-two at ₹2,000 sets +₹82 [−61, +224], drawdown now deeper than the
   comparator's, FAIL; the fixed live files at ₹2,000 +₹1 (NIFTY) / +₹37 (SENSEX). Item closed: not adopted.
+- 2026-10-28 — E2 registered (owner override: the morning sets' overall stop at nine levels ₹500 → ₹4,000,
+  descriptive) before its run.

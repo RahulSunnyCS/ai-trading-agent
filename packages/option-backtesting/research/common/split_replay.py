@@ -78,12 +78,19 @@ class Spec:
     margin_lots: int  # per margin lot-day = book net / this
     title: str
     seed: int = 20261028
-    mtm: int | None = None  # every half-day set at this overall stop (the whole-day pool unchanged)
+    mtm: int | None = None  # the half-day sets at this overall stop (the whole-day pool unchanged)
+    mtm_halves: tuple[str, ...] = ("am", "pm")  # which halves take `mtm`; ("am",) = morning only
     slots_all: list[str] = field(default_factory=lambda: slots("0917", "1517"))
 
     @property
+    def pm_derived(self) -> bool:
+        return bool(self.mtm) and "pm" in self.mtm_halves
+
+    @property
     def tag(self) -> str:
-        return f"split_mtm{self.mtm}" if self.mtm else "split"
+        if not self.mtm:
+            return "split"
+        return f"split_mtm{self.mtm}" + ("" if self.pm_derived else "am")
 
     @property
     def variants_dir(self) -> Path:
@@ -105,7 +112,7 @@ class Spec:
         return self.results_half if ("-am_" in name or "-pm_" in name) else self.results_all
 
     def pools(self) -> dict[str, list[str]]:
-        pm = "-pm" if self.mtm else ""
+        pm = "-pm" if self.pm_derived else ""
         return {
             "am": [f"{f}-am_{s}" for f in self.families for s in self.slots_am],
             "pm": [f"{f}{pm}_{s}" for f in self.families for s in self.slots_pm],
@@ -163,7 +170,7 @@ def make_variants(spec: Spec) -> dict[str, tuple[str, Path]]:
         if half == "am":
             doc["strategy"]["exit_time"] = spec.am_exit
             note.append(f"the exit moved to {spec.am_exit}")
-        if spec.mtm:
+        if spec.mtm and half in spec.mtm_halves:
             doc["strategy"]["overall"]["stop_loss_inr"] = float(spec.mtm)
             note.append(f"overall stop {spec.mtm}")
         path = spec.variants_dir / f"{fam}-{half}_{s}.yaml"
@@ -179,7 +186,7 @@ def make_variants(spec: Spec) -> dict[str, tuple[str, Path]]:
             files[f"{fam}_{s}"] = (underlying, ROTATION / f"{fam}_{s}.yaml")
         for s in spec.slots_am:
             derive(fam, s, "am", underlying)
-        if spec.mtm:
+        if spec.pm_derived:
             for s in spec.slots_pm:
                 derive(fam, s, "pm", underlying)
     return files
@@ -333,7 +340,7 @@ def analyse(spec: Spec) -> str:
         f"{spec.margin_lots}. Net after `ruletest/charges.py` (₹13 an order); net5 = Shoonya ₹5 an order, "
         f"reported only. Interval: 90 % circular 5-day block bootstrap, 2,000 resamples, seed {spec.seed}."
         + (
-            f" Half-day sets at a ₹{spec.mtm:,} overall stop (the whole-day pool unchanged)."
+            f" {' and '.join(spec.mtm_halves)} sets at a ₹{spec.mtm:,} overall stop (the whole-day pool unchanged)."
             if spec.mtm
             else ""
         )
@@ -429,14 +436,43 @@ def analyse(spec: Spec) -> str:
                         diff["net"][j], " ".join(picks["am"][j]), " ".join(picks["pm"][j]), " ".join(picks["all"][j])])  # fmt: skip
     text = "\n".join(L) + "\n"
     (spec.out / f"{spec.tag}_summary.md").write_text(text)
-    return text
+    stops_hit = {
+        key: sum(
+            1 for j, d in enumerate(pick_days) for n in picks[key][j] if rows[n][d]["stopped_by"]
+        )
+        / max(len(pick_days), 1)
+        for key in ("am", "pm", "all")
+    }
+    stats = {
+        "pick_days": len(pick_days),
+        "per_lot": {b: {s: float(v.mean()) for s, v in d.items()} for b, d in per_lot.items()},
+        "in_profit": {b: float((per_lot[b]["net"] > 0).mean()) for b in per_lot},
+        "dd": dd,
+        "diff": {s: boot[s] for s in boot},
+        "stops_hit_per_day": stops_hit,  # picks stopped by the overall stop, per pick day
+    }
+    return text, stats
+
+
+def fixed_half(spec: Spec, family: str, am_entry: str) -> dict:
+    """Descriptive: one family's `am_entry` morning half alone: net / gross per day, drawdown, days
+    in profit, share of days the overall stop was hit."""
+    am = read(spec, f"{family}-am_{am_entry}")
+    days = sorted(am)
+    n = np.array([float(am[d]["net"]) for d in days])
+    g = np.array([float(am[d]["gross"]) for d in days])
+    return {
+        "days": len(days), "net": float(n.mean()), "gross": float(g.mean()), "dd": max_drawdown(n),
+        "in_profit": float((n > 0).mean()),
+        "stopped": sum(1 for d in days if am[d]["stopped_by"]) / max(len(days), 1),
+    }  # fmt: skip
 
 
 def fixed_split(spec: Spec, family: str, am_entry: str, pm_entry: str) -> str:
     """Descriptive: one family's `am_entry` Core file split at the morning exit plus its `pm_entry`
     Core file (both from the pools' results) against the family's whole-day `am_entry` file."""
     am = read(spec, f"{family}-am_{am_entry}")
-    pm = read(spec, f"{family}{'-pm' if spec.mtm else ''}_{pm_entry}")
+    pm = read(spec, f"{family}{'-pm' if spec.pm_derived else ''}_{pm_entry}")
     whole = read(spec, f"{family}_{am_entry}")
     days = sorted(set(am) & set(pm) & set(whole))
     sn = np.array([float(am[d]["net"]) + float(pm[d]["net"]) for d in days])
