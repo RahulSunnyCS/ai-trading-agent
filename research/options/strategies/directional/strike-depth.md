@@ -1,6 +1,6 @@
 # Directional: strike depth (ITM2 and ITM3) and the overall stop
 
-**Status:** Tested · **Last updated:** 2026-10-26
+**Status:** Tested · **Last updated:** 2026-10-28
 
 ## What it is
 
@@ -18,6 +18,7 @@ ITM1, ₹3,000 overall stop, 21% leg stop, one re-entry at cost, exit 15:28
 
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
+| BL-167 | ITM2 (at BL-166's ₹4,000 stop; ₹3,000 control) added to the Adaptive ranking universe, Core-298 and T1, list C | 2025-01-10 → 2026-10-23, 431 sessions; net after charges, 1 lot per pick; in-sample | **No gain** in either universe (Core −₹57 a day, T1 −₹74; intervals include zero; Core's 2025 half −₹217, wholly below zero) | [BL-167][bl167] |
 | BL-166 | ITM2, ITM3 x overall stop {3,000, 4,000, 5,000, 6,000, 8,000, 10,000}; 25 start times; NIFTY and SENSEX; against ITM1 at ₹3,000 | 2024-10-09 → 2026-10-23; stop matched on the fit year, judged on the hold-out year from 2025-10-09; net after charges, 1 lot | **POC passes on SENSEX** (ITM2 +₹54, ITM3 +₹78 per slot-day, intervals above zero); **NIFTY inconclusive** (+₹36 and +₹44, intervals include zero) | [BL-166][bl166] |
 
 ## What we know
@@ -66,13 +67,14 @@ enters is counted apart. In Core, 308 picks leave (220 ITM1, 40 ATM, 48 Widesl) 
 ITM2, 37 Widesl, 7 ITM1, 1 ATM); in T1, 224 leave and 224 enter (176 ITM2, 39 Widesl, 9 ITM1).
 
 ITM2 mostly takes ITM1's slots and does not earn more for it: no gain in either universe by the
-registered rule. The Core drawdown is shallower and T1's deeper. In-sample (weights and the stop were
+registered rule. In Core's 2025 half it did worse: −₹217 a day (−434 to −11). The Core drawdown is shallower and T1's deeper. In-sample (weights and the stop were
 chosen on this history, no spread), so the forward journal is the only clean test.
 
 ## Not yet tested
 
-- Larger time frames (NIFTY 2022 → 2024 on the imported data), ITM4 and deeper, and putting ITM2 or
-  ITM3 into the rotation's ranking: the next step if the owner wants it.
+- Larger time frames (NIFTY 2022 → 2024 on the imported data), ITM4 and deeper, and ITM3 in the
+  rotation's ranking (ITM2 was tried there in BL-167: no gain). A forward shadow of the ITM2 variants is
+  the only clean test of BL-167.
 
 [bl166]: ../../../../backlog/BL-166-directional-itm2-itm3-with-matched-stop.md
 [bl167]: ../../../../backlog/BL-167-itm2-in-adaptive-and-t1.md
