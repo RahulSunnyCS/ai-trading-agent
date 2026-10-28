@@ -6,12 +6,12 @@ import { addDays, istDay, tradingDays } from '../schedule.js';
 import { type CheckResult, checkBuiltin, checkJob } from './types.js';
 
 /**
- * Calendar upkeep (BL-012 inventory Y1, Y2, M3). Reference data that is edited by hand
+ * Calendar upkeep (BL-012 inventory Y1, Y2, Y3, M3). Reference data that is edited by hand
  * and goes quietly wrong when nobody remembers to extend it. Alert only: these checks
  * read the files, they never edit them.
  */
 
-const REFERENCE_DIR = 'packages/option-backtesting/src/option_backtesting/data/reference';
+export const REFERENCE_DIR = 'packages/option-backtesting/src/option_backtesting/data/reference';
 const MIGRATIONS_DIR = 'apps/server/src/db/migrations';
 
 /** The RBI MPC calendar must run at least this far ahead. */
@@ -118,6 +118,73 @@ export function firstTradingDayOfMonth(day: string): boolean {
   return true;
 }
 
+/**
+ * BL-012 inventory Y3: `BLOCKED_DATES` in the repo `.env`, a JSON array of days the frozen
+ * personality engine refuses to enter on (`apps/server/src/signals/personality-filter.ts`).
+ * It is edited by hand once a year. The check cannot say which days belong in it; it says when
+ * the list is broken (the engine then silently ignores all of it), names days that cannot be
+ * meant (a weekend or an NSE holiday from today on), and from 1 Dec asks for next year's.
+ * Unset or empty passes: the engine then blocks nothing, which is a choice, not drift.
+ */
+export function checkBlockedDates(
+  today: string,
+  raw: string | undefined,
+  isTradingDay: (day: string) => boolean = tradingDays,
+): CheckResult {
+  if (raw === undefined || raw.trim() === '') {
+    return { ok: true, detail: 'BLOCKED_DATES is not set (the engine blocks no date)' };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return {
+      ok: false,
+      detail: 'BLOCKED_DATES is not valid JSON, so the engine ignores the whole list',
+    };
+  }
+  if (!Array.isArray(parsed)) {
+    return {
+      ok: false,
+      detail: 'BLOCKED_DATES is not a JSON array, so the engine ignores the whole list',
+    };
+  }
+  const bad = parsed.filter((v) => typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v));
+  if (bad.length > 0) {
+    return {
+      ok: false,
+      detail: `BLOCKED_DATES has ${bad.length} entr${bad.length === 1 ? 'y' : 'ies'} that are not 'YYYY-MM-DD' (${bad
+        .slice(0, 3)
+        .map((v) => JSON.stringify(v))
+        .join(', ')}), which never match a day`,
+    };
+  }
+  const dates = (parsed as string[]).slice().sort();
+  const last = dates[dates.length - 1];
+  if (last === undefined) {
+    return { ok: true, detail: 'BLOCKED_DATES is empty (the engine blocks no date)' };
+  }
+  const problems: string[] = [];
+  const closed = dates.filter((d) => d >= today && !isTradingDay(d));
+  if (closed.length > 0) {
+    problems.push(`BLOCKED_DATES lists days the market is closed: ${closed.join(', ')}`);
+  }
+  const next = Number(today.slice(0, 4)) + 1;
+  if (last < today) {
+    problems.push(`every BLOCKED_DATES day is in the past (last ${last})`);
+  } else if (today.slice(5, 7) === '12' && !dates.some((d) => d.startsWith(`${next}-`))) {
+    problems.push(`BLOCKED_DATES has no ${next} days (last ${last})`);
+  }
+  if (problems.length > 0) return { ok: false, detail: problems.join('; ') };
+  return {
+    ok: true,
+    detail: `BLOCKED_DATES: ${dates.filter((d) => d >= today).length} day(s) ahead, last ${last}`,
+  };
+}
+
+const BLOCKED_DATES_FIX =
+  'Edit BLOCKED_DATES in the repo-root .env: a one-line JSON array of the days the frozen engine must not trade, e.g. ["2027-01-26"], from the NSE holiday and expiry calendars and the RBI MPC dates; or delete the line while the frozen engine stays off. The scheduler reads .env at start, so restart it afterwards';
+
 const HOLIDAY_FIX =
   "Add the dates from NSE's holiday circular: cd packages/trading-data && uv run tdata reference sql \"INSERT INTO ref_holidays VALUES (DATE 'YYYY-MM-DD', 'Name')\" (one per holiday). For RBI dates add a new apps/server/src/db/migrations/NNN_*.sql inserting into event_calendar (event_type RBI_POLICY), then bun run migrate";
 const MARGIN_FIX =
@@ -143,6 +210,13 @@ export const jobs: Job[] = [
     builtin: 'margin-reminder',
     fixHint: MARGIN_FIX,
   }),
+  checkJob({
+    id: 'check-blocked-dates',
+    description: "Check .env's BLOCKED_DATES parses and has next year's days from 1 Dec (Y3)",
+    schedule: { at: '08:35', on: tradingDays, label: 'trading days 08:35' },
+    builtin: 'check-blocked-dates',
+    fixHint: BLOCKED_DATES_FIX,
+  }),
 ];
 
 export const builtins: Record<string, Builtin> = {
@@ -151,5 +225,8 @@ export const builtins: Record<string, Builtin> = {
   ),
   'margin-reminder': checkBuiltin((ctx) =>
     checkMargin(istDay(ctx.now()), diskReaders(ctx.repoRoot)),
+  ),
+  'check-blocked-dates': checkBuiltin((ctx) =>
+    checkBlockedDates(istDay(ctx.now()), ctx.env.BLOCKED_DATES),
   ),
 };

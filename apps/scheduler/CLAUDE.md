@@ -4,11 +4,12 @@ Guidance for coding agents working in `apps/scheduler` (`@ata/scheduler`).
 
 ## What this app does
 
-One home for every recurring job (BL-012): broker logins, the Friday momentum runs and,
-in later PRs, the evening options collection, backups and maintenance checks. It replaces
-the one-plist-per-job launchd setup. Every run is recorded, and missed or failed runs
-raise a Telegram alert at once. launchd only keeps this process alive
-(`deploy/launchd/jobs/com.ai-trading-agent.scheduler.plist`); jobs run from the main
+One home for every recurring job (BL-012, done 2026-10-28): broker logins, the Friday momentum
+runs, the evening options collection, contract notes, the AlgoTest/Quantiply jobs, backups and
+the alert-only maintenance checks. It replaced the one-plist-per-job launchd setup. Every run is
+recorded, and missed or failed runs raise a Telegram alert at once. launchd only keeps this
+process alive (`deploy/launchd/jobs/com.ai-trading-agent.scheduler.plist`, installed and running
+as `com.ai-trading-agent.scheduler`); jobs run from the main
 checkout's working tree, so its checked-out branch is the code that runs (the morning
 summary flags anything but `main`).
 
@@ -121,6 +122,15 @@ export `jobs` (use `checkJob({...})` from `checks/types.ts` for the shared defau
 detail as its error, so the normal failure alert goes out with the job's `fixHint`; the job runs
 daily, so an unfixed problem repeats at most once a day. Inject anything that touches the
 network or disk so the test needs neither. One group per file keeps parallel PRs from clashing.
+
+What each file holds (BL-012 inventory numbers): `drift` S1 Nifty 50 list, S2 lot sizes, Y4
+`check-expiry-calendar` (the Fyers NSE + BSE masters' listed option expiries against
+`expiry_calendar.csv`, holiday shifts from `holidays.csv`, years with no holiday rows skipped,
+and the nearest expiry's commonest strike gap against `strike_step.csv`); `calendar` Y1
+holidays, Y2 RBI dates, M3 margin, Y3 `check-blocked-dates` (`.env`'s `BLOCKED_DATES` from
+`ctx.env`); `stock` M2, W3, S3 `universe-refresh-reminder` (the category CSVs' modification
+day against the last 1 Apr / 1 Oct, and this year's rows; `MOMENTUM_DATA_DIR` honoured);
+`credentials`; `digest`.
 
 ## Gotchas
 
