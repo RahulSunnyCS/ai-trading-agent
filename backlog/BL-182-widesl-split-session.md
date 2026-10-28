@@ -246,7 +246,21 @@ What the numbers say:
 Not adopted. Phase 3 (a forward track) is not opened on this result. The one lead worth keeping is the
 afternoon-only Widesl pair, which would need its own pre-registration.
 
-## Risks
+## Experiments
+
+### E1 — the split's sets at a ₹2,000 overall stop (registered 2026-10-28, before the run)
+
+- **Override:** `override: owner, 2026-10-28 — "for split lets put SL as 2k only"`: Phase 0 lists other
+  stops under "will not run"; the owner asks for this one after reading Phase 2.
+- **Change:** every morning and afternoon set carries `overall.stop_loss_inr: 2000` instead of its file's
+  ₹2,500 (two sets, ₹4,000 a day at most); the whole-day comparator keeps ₹2,500. Nothing else moves.
+- **Runs:** (a) Phase 2 again with the ₹2,000 half-day pools (`phase2.py --mtm 2000`: the 120 half-day
+  variants re-simulated, the whole-day pool reused), same ranking, measure and interval; (b) the Phase 1
+  fixed files `N_wide_0917` and `S_wide_0917` split at ₹2,000 against their stored whole-day results.
+- **Rule:** the Phase 2 pass rule, read on (a). (b) is descriptive. This is a second look at the same seen
+  days after a failed first look: a pass here is a lead for a forward track, never a result.
+- **Will not run:** other stop levels, a stop on one half only, re-entry after the stop.
+
 
 - Fills at 12:00 and 13:00 on 1-minute bars with no spread; the afternoon set's smaller premiums.
 - Two MTM budgets a day (₹5,000 at ₹2,500 a set) even if the drawdown reads shallower.
@@ -297,3 +311,4 @@ afternoon-only Widesl pair, which would need its own pre-registration.
   shallower; the gain entirely in the first year with both indices. **FAIL** on the registered rule; not
   adopted; Phase 3 not opened. Interim NIFTY-only read (before SENSEX finished): +₹65 [−58, +187], gain in
   the second year instead.
+- 2026-10-28 — E1 registered (owner override: the split's sets at a ₹2,000 overall stop) before its run.
