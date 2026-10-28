@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner trades both books with real money (3 lots each, ₹8.5 lakh per account) |
-| **Status** | Done — informative: the Dir is the best home for the fourth lot in both books (Core and, by Amendment 1, T1), but the edge over an even spread rests on a few days; no Widesl placement beats it |
+| **Status** | Done — informative: the Dir is the best home for the fourth lot in both books (Core and, by Amendment 1, T1), but the edge over an even spread rests on a few days; no Widesl placement beats it. Amendment 2 (book stop, expiry rule): "always the Dir" beats "the top score" and "the top Widesl" as the pick to double |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -213,3 +213,66 @@ lots spread evenly; nothing live changes.
   better, but not by a margin these days can pin down.
 - 2026-10-28 — Amendment 2 registered before any run: which pick to double (top score, Dir, Widesl) and add vs double, both books.
 - 2026-10-28 — Amendment 2 registered before any run: which pick the fourth lot doubles (top score, Dir, Widesl) or adds, with the book stop and the expiry rule, both books and both accounts together.
+- 2026-10-28 — **Amendment 2 run as registered** (`research/bl133/fourth_lot_a2.py`; `fourth_lot_a2_2026-10-28.json`;
+  428 days per book, none skipped). Net per day after brokerage, under the book stop (₹8k Core / ₹9k T1, + the extra
+  lot's MTM SL on 4-lot days), expiring-index rule applied, 3 lots on expiry days (181 of 428; 104 of 244).
+  R/DD = annualised net ÷ |max drawdown|.
+
+  | Book, window | Arm | Net / day | vs 3 lots (90 %) | vs even spread B4 (90 %) | Max DD | Worst day | Worst week | R/DD | DD per lot |
+  |---|---|---|---|---|---|---|---|---|---|
+  | Core, 21 months | B3 / B4 | +1,050 / +1,168 | | | −39,764 / −49,875 | −9,323 / −11,958 | −24,620 / −30,529 | 6.6 / 5.9 | −13,255 / −13,943 |
+  | | R1×2 top score | +1,235 | +184 [+54, +317] | +67 [−27, +166] | −48,243 | −12,234 | −33,716 | 6.4 | −13,487 |
+  | | **D×2 Dir** | **+1,317** | +266 [+137, +401] | **+149 [+20, +283]** | −41,321 | −12,234 | −28,484 | **8.0** | −11,552 |
+  | | W×2 top Widesl | +1,049 | −1 [−120, +118] | −118 [−191, −46] | −52,157 | −12,878 | −28,313 | 5.0 | −14,581 |
+  | | D+ add a Dir | +1,124 | +73 [−66, +210] | −44 [−184, +100] | −45,278 | −12,099 | −28,790 | 6.2 | −12,658 |
+  | | W+ add a Widesl | +1,031 | −19 [−119, +80] | −136 [−219, −55] | −51,002 | −12,114 | −28,181 | 5.1 | −14,258 |
+  | Core, last year | B3 / B4 | +1,221 / +1,335 | | | −33,013 / −39,934 | −9,221 / −11,958 | | 9.2 / 8.4 | |
+  | | R1×2 | +1,456 | +235 [+80, +392] | +120 [−1, +243] | −42,318 | −12,116 | | 8.6 | |
+  | | **D×2** | **+1,559** | +338 [+189, +487] | **+224 [+87, +364]** | −34,713 | −12,116 | | **11.2** | |
+  | | W×2 | +1,256 | +35 [−103, +179] | −79 [−160, +10] | −42,658 | −11,843 | | 7.4 | |
+  | | D+ | +1,431 | +210 [+54, +366] | +95 [−77, +266] | −37,957 | −11,446 | | 9.4 | |
+  | | W+ | +1,185 | −36 [−168, +94] | −150 [−253, −49] | −39,877 | −11,667 | | 7.4 | |
+  | T1, 21 months | B3 / B4 | +1,689 / +1,904 | | | −25,013 / −32,094 | −10,249 / −12,850 | −18,658 / −24,978 | 16.9 / 14.8 | −8,338 / −8,972 |
+  | | R1×2 | +1,984 | +295 [+143, +439] | +81 [−28, +180] | −34,133 | −19,793 | −25,896 | 14.5 | −9,542 |
+  | | **D×2** | **+2,000** | +311 [+167, +457] | +96 [−20, +218] | −36,145 | −14,312 | −26,618 | 13.8 | −10,104 |
+  | | W×2 | +1,851 | +161 [+34, +287] | −53 [−136, +24] | −34,459 | −19,793 | −26,222 | 13.4 | −9,633 |
+  | | D+ | +1,911 | +221 [+86, +357] | +7 [−130, +143] | **−29,182** | −14,312 | −25,014 | **16.4** | **−8,158** |
+  | | W+ | +1,727 | +38 [−83, +153] | −177 [−290, −61] | −36,058 | −19,403 | −23,762 | 12.0 | −10,080 |
+  | T1, last year | B3 / B4 | +1,895 / +2,161 | | | −25,013 / −30,053 | −10,249 / −12,850 | | 18.9 / 18.0 | |
+  | | R1×2 | +2,223 | +328 [+155, +504] | +63 [−56, +169] | −33,890 | −19,793 | | 16.4 | |
+  | | **D×2** | **+2,288** | +393 [+229, +552] | **+127 [+1, +249]** | −29,362 | −14,312 | | **19.5** | |
+  | | W×2 | +2,081 | +186 [+22, +341] | −80 [−187, +19] | −31,157 | −19,793 | | 16.7 | |
+  | | D+ | +2,146 | +251 [+82, +413] | −15 [−182, +142] | −27,349 | −14,312 | | 19.6 | |
+  | | W+ | +1,895 | −0 [−154, +157] | −266 [−393, −142] | −36,058 | −19,403 | | 13.1 | |
+
+  - **Head to head (net, book stop):** Core R1×2 − D×2 −82 [−202, +28] / **−103 [−195, −17]**; D×2 − W×2 **+267
+    [+91, +447]** / **+303 [+90, +507]**. T1 R1×2 − D×2 −15 [−108, +71] / −65 [−170, +35]; D×2 − W×2 +149 [−24, +335] /
+    **+207 [+13, +402]**. The top-score pick is the Dir on 177 of 247 Core and 189 of 247 T1 non-expiry days; on the
+    others it doubles a Widesl, which is what costs it against D×2.
+  - **Book stop:** changes little. B3 net +1,050 with it vs +1,060 without (Core), drawdown −39,764 vs −42,626; it
+    fires on 25 Core and 18 T1 days in 21 months. The replay stops at a minute close, so a loss that jumps inside a
+    minute passes through it: T1's worst day (2026-09-11, R1×2 / W×2 −19,510) is the same with and without.
+  - **Few days:** D×2 − B4 without the 5 / 10 best days: Core +91 [−35, +219] (40 %) / +41 [−81, +165] (73 %); T1
+    +22 [−91, +134] (77 %) / −34 [−149, +81] (135 %). R1×2 is more concentrated (Core 71 % / 131 %, T1 89 % / 141 %).
+  - **Steadiness (D×2 − B4 per non-expiry day, 21 months):** Core positive in 6 of 8 quarters (2025Q1 −234, then +90
+    to +547; 2026Q3 +319), W×2 negative in every quarter; T1 positive in 5 of 8 (2025Q1 −163, 2025Q3 −8, 2026Q3 −26).
+    By VIX band D×2 is below the even spread at VIX 15–18 (Core −144) and 18+ (Core −325, T1 −127; 31 days), above it
+    below 15 in both books. By days to expiry: positive at 1 and 2 in both books. Not a rule; unregistered.
+  - **Margin:** on 211–235 of 247 non-expiry days all 4 lots are open at the same minute in every arm, so the 4th lot
+    needs margin for 4 concurrent lots, not a staggered 3.
+  - **Both accounts (Core + T1, 21 months / last year):** 6 lots (B3 + B3) +2,740 / +3,116 a day, drawdown −56,932,
+    worst day −18,728, R/DD 12.0 / 13.7. **D×2 in both:** +3,317 / +3,847, +577 [+323, +840] / +731 [+444, +1,019]
+    over 6 lots, drawdown −58,818 / −51,932, worst day −25,334 / −23,655, R/DD 14.1 / 18.5. Both books double the same
+    Dir on 62 of 247 non-expiry days; **cut** (T1 doubles its next pick) −56 / −44 a day against doubling in both,
+    worst day deeper (−29,136); **skip** (T1 stays at 3 lots) −47 / −40. R1×2 both +480 / +563, drawdown −61,321;
+    W×2 both +160 / +221, drawdown −72,958.
+
+  **Read under the rule (descriptive; arms chosen after BL-133 was read).** "Always the Dir" is the best doubling rule
+  in both books: it earns its lot against the even spread in Core (both windows) and in T1's last year, and beats
+  "always the top Widesl" in Core and in T1's last year. "Whichever scores highest" sits between the two: it is the Dir
+  on about three days in four, and the days it doubles a Widesl cost it (Core last year −103 [−195, −17] against the
+  Dir). Every Widesl placement, doubled or added, is at or below the even spread. Add vs double: in Core doubling the
+  Dir beats adding one; in T1 adding a Dir earns ₹89 a day less but has the shallowest 4-lot drawdown (−29k vs −36k)
+  and the best R/DD. Across both accounts the overlap needs no rule: cutting or skipping it makes less and does not
+  lower the drawdown. Weaknesses as before: in-sample, the edge over the even spread rests on a handful of days, gross
+  paths with stored trade counts, minute-close stops.
