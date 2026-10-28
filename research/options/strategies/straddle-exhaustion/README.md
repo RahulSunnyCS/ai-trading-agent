@@ -1,6 +1,6 @@
 # Straddle premium exhaustion
 
-**Status:** Tested (learning periods only; the one-time P1 test is unread) · **Last updated:** 2026-10-18
+**Status:** Tested (learning periods only; closed 2026-10-28 as a lead, not a result; P1 unread) · **Last updated:** 2026-10-28
 
 ## What it is
 
@@ -33,15 +33,17 @@ so a forward shadow (trigger T5 in the nightly scoring) is the only unseen test.
 | 1a | 18 arms (Widesl × 3 stops × 5 re-entry rules; Dir D1 × 3) | **No arm passes** the screening bar; in 2025 every arm did worse after a held spike than on non-spike days (NIFTY −₹166 to −₹1,259 per spike) | [BL-091][bl091] |
 | 1b | Dir D2 at a level rejection or break | **No arm passes** (NIFTY 2025 −₹716 to −₹840 vs comparator) | [BL-091][bl091] |
 | 2 | 32 parameters to tell a true top from a pause | One separates for NIFTY (5-minute change of the ATM IV approximation, AUC 0.627 / 0.603); rule R1 built from it **does not pass** (2025: −₹1,234 vs comparator, t −3.6) | [BL-091][bl091] |
-| Time gates | 13 extra arms: no re-entry before 13:30 / 14:00 / 14:30 / 14:50 (G), or no entry at all before the gate (F) | **Post-hoc lead:** F1450 meets the screening bar (NIFTY 2025 +₹241 vs comparator, t 2.45; 2022–24 +₹160; +₹195 at ₹20 an order; SENSEX +₹349, t 2.46) | [BL-091][bl091] |
+| Time gates | 13 extra arms: no re-entry before 13:30 / 14:00 / 14:30 / 14:50 (G), or no entry at all before the gate (F); run without the owner's `override:` (a gate breach), so **descriptive only** | **Post-hoc lead:** F1450 meets the screening bar (NIFTY 2025 +₹241 vs comparator, t 2.45; 2022–24 +₹160; +₹195 at ₹20 an order; SENSEX +₹349, t 2.46) | [BL-091][bl091] |
 | Late give-back (BL-123) | After 14:30, the straddle up 20 (SENSEX 50) from the day's low, held 5 minutes, then down 15 from its high: Widesl with a ₹1,000 stop. Causal placebo and random-minute comparators | **Inconclusive** on NIFTY P2 + P3 pooled (36 events, +₹151 per Widesl after ₹20 an order, +₹126 over the placebo, t 0.94, above the random-minute P95, a test that favours short trades, so weak evidence); SENSEX P2 18 events reported only; the rule as first stated (rise measured from 14:30) fired on 4 / 8 / 7 tradable days and was inconclusive by construction | [BL-123][bl123] |
 
 ## What we know
 
+- **Verdict (BL-091 closed 2026-10-28):** a lead, not a result. No registered arm passed, and nothing here
+  is carried into a strategy.
 - No registered arm passed. F1450 (every Widesl entry on a spike day at or after 14:50) cleared the bar,
   but it is one of **31 Stage 1 arms tried** (18 registered + 13 time gates), run after Stage 1a on the
-  owner's chat request without the `override:` line the research gate requires. It is a lead for a
-  registered P1 test, not a result.
+  owner's chat request without the `override:` line the research gate requires; no `override:` was ever
+  written, so the time-gate figures are descriptive only. It is a lead, not a result.
 - On spike days, waiting before re-entering helps: re-entering at once made +₹372 per spike (NIFTY
   2025) against +₹846 with no re-entry before 13:30 (R3), and gates roughly halve the average losing
   spike.
@@ -60,8 +62,8 @@ so a forward shadow (trigger T5 in the nightly scoring) is the only unseen test.
 
 ## Not yet tested
 
-- P1, once, for a frozen arm (owner to choose: R3, F1450, or close the idea). Any P1 registration must
-  count all 31 arms.
+- P1, once, for a frozen arm. BL-091 closed without registering one (2026-10-28); a new item would have to
+  register R3 or F1450 with a causal comparator and count all 31 arms tried. P1 stays unread.
 - Expiry-day spikes on their own; SENSEX below VIX 13 (1–4 spikes, inconclusive).
 
 ## Related

@@ -3,11 +3,11 @@
 | | |
 |---|---|
 | **Priority** | P1 — BL-115 found the stock's own numbers say little; the sector choice decides most of a Broad portfolio |
-| **Status** | Phase 2 development passed (top-sector weight 2x, after tax); the one check on 2023-2026 is not run yet |
+| **Status** | Phase 2 development passed (top-sector weight 2x, after tax); the one check on 2023-2026 is not run yet and waits on BL-176 (owner, 2026-10-28) |
 | **Type** | research |
 | **Area** | momentum |
 | **Created** | 2026-10-17 |
-| **Depends on** | BL-115 (trades, outcome definition, the owner's average-weekly score) |
+| **Depends on** | BL-115 (trades, outcome definition, the owner's average-weekly score); the 2023–2026 check waits on [BL-176](BL-176-momentum-search-on-f6-ranking.md) |
 | **TODO.md row** | — |
 
 ## Context
@@ -189,3 +189,6 @@ score against beating Nifty 500, on 2017-2022.
 - 2026-10-17 — created; Phase 0 pre-registration committed and pushed before any sector score was computed (371911fa).
 - 2026-10-17 — Phase 2 pre-registered (a8d124f2) and run on 2017-2022: development passes (+0.86 pts median after tax, 8 of 11, falls within 2 pts in 11 of 11). Confirmation not run.
 - 2026-10-17 — Phase 1: H1 passes (+13.4 pts, 9 of 9 groups), H2 killed. Found that a stock tilt lets lingering sectors buy; BL-115's Trio pick-order table corrected.
+- 2026-10-28 — Owner (asked in chat, 2026-10-28): hold the 2023–2026 confirmation window until BL-176 (the
+  momentum search re-run on the F6-fixed ranking) is done. Not run; the window stays unread. Status
+  unchanged (in progress).

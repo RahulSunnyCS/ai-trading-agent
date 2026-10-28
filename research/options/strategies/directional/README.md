@@ -1,6 +1,6 @@
 # Directional ("Dir")
 
-**Last updated:** 2026-10-26
+**Last updated:** 2026-10-28
 
 ## Definition
 
@@ -32,6 +32,24 @@ not the Buy (range-breakout) family.
 - SENSEX Dir keeps the NIFTY rupee stops (₹3,000). SENSEX's lot (20) is much smaller than NIFTY's, so the rupee
   stops bind less often on SENSEX and its rupee results are not comparable with NIFTY's ([BL-056][bl056]).
 
+## Full-factorial sweep (BL-104)
+
+Registered grid ([BL-104][bl104], closed 2026-10-28): every combination of strike, leg stop, trail, MTM
+stop and re-entry at seven entry slots, NIFTY and SENSEX, 2024-10-09 → 2026-10-09 (488 sessions,
+after charges, ₹ per lot-day). The whole window is the fit, so every figure is **in-sample**; there was no
+forward test. The template (today's rotation file) stays unless a band's winner passes all eight registered
+rules. Figures from the tail-gated second selection and the Buy 60 % day-stop cut were never registered
+(no owner `override:`) and are descriptive only.
+
+- No Dir band passed all eight rules. Every SENSEX winner leans on RE COST ×2, which rule 8 blocks while
+  AlgoTest re-entry parity is open (BL-009); the three SENSEX rows that reached the last table (09:17–10:02
+  ATM, 10:17–12:02 ITM2, 12:17–14:02 ITM1; ₹258–₹495 against ₹127–₹287) come from the tail-gated selection,
+  so they are descriptive only.
+- NIFTY advisory run on 2022-01 → 2024-10: the winners flip sign in three of four bands (−100, −48, −8; +4
+  late), consistent with their failing the bootstrap in-sample.
+- Breadth (rule 4) failed for NIFTY 12:17–14:02 and 14:17–15:02 and SENSEX 14:17–15:02. At 0.5 % slippage per
+  fill the SENSEX 09:17–10:02 edge shrinks to ₹5 per lot-day.
+
 ## Variables
 
 | Variable | Status | One-line takeaway |
@@ -61,3 +79,4 @@ not the Buy (range-breakout) family.
 [bl056]: ../../../../backlog/BL-056-weekday-dte-vix-breakdown.md
 [bl058]: ../../../../backlog/BL-058-options-rotation-forward-journal-and-ui.md
 [bl096]: ../../../../backlog/BL-096-directional-parameter-sweep.md
+[bl104]: ../../../../backlog/BL-104-full-parameter-sweep.md

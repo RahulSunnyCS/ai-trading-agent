@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades the Core picks with real money every day and sets them up on Quantiply by hand |
-| **Status** | In progress: Phases 1–3 merged (#266), and the live upload is tested. It waits for `QUANTIPLY_UPLOAD=on`. Phase 4 (enable / disable over the API) is built but off until `QUANTIPLY_DEPLOY=on`; its first `--apply` is the owner's. Follow-ups from the #266 review are in #268 |
+| **Status** | Done (2026-10-28): export, uploader and enable / disable merged (#266, #268, #273); in daily use with `QUANTIPLY_UPLOAD` / `QUANTIPLY_DEPLOY` on and the 08:10 enable (BL-172); Phase 1 task 5 (terms and compliance) never recorded |
 | **Type** | feature |
 | **Area** | options + broker-login |
 | **Created** | 2026-10-19 |
@@ -184,6 +184,13 @@ its weekday every week until it is switched off.
 
 ## Log
 
+- 2026-10-28 — **Closed** (owner, asked in chat, 2026-10-28). Delivered: Phase 1 (Quantiply's own API
+  captured, `docs/algotest-execution.md`), Phase 2 (`obt rotation quantiply-export`), Phase 3 (the uploader,
+  `quantiply-evening` 16:45 and `quantiply-topup` 09:19) and Phase 4 (enable / disable, `quantiply-disable`
+  15:40), merged in #266, #268 and #273, and extended to T1 and Shoonya by BL-140. In daily use with
+  `QUANTIPLY_UPLOAD` and `QUANTIPLY_DEPLOY` on and the 08:10 enable of BL-172. **Gap, not decided:** Phase 1
+  task 5, the check of Angel One's and Quantiply's terms and the owner's decision on calling the API this way,
+  was never written down (still open from the #266 review). Nothing is recorded for it here. Status `Done`.
 - 2026-10-20 — Re-review of #273: three low findings fixed. (A) A kept copy that the deploy ledger shows enabled
   for a later session belongs to that session, so an evening disable or check treats it like the fresh copies.
   (B) Disable reads no automation settings and skips an unreadable deploy ledger or line. (D) An enable that

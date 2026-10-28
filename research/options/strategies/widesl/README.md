@@ -1,6 +1,6 @@
 # Widesl (short wide strangle)
 
-**Last updated:** 2026-10-14
+**Last updated:** 2026-10-28
 
 ## Definition
 
@@ -32,6 +32,27 @@ three ways.
 - The fixed base the journal is judged against holds 2 × `N_wide_0917` (the live NIFTY OTM1 file) plus
   1 × Dir ATM 09:24, 2 lots each ([BL-058][bl058]).
 
+## Full-factorial sweep (BL-104)
+
+Registered grid ([BL-104][bl104], closed 2026-10-28): every combination of strike, leg stop, trail, MTM
+stop and re-entry at seven entry slots, NIFTY and SENSEX, 2024-10-09 → 2026-10-09 (488 sessions,
+after charges, ₹ per lot-day). The whole window is the fit, so every figure is **in-sample**; there was no
+forward test. The template (today's rotation file) stays unless a band's winner passes all eight registered
+rules. Figures from the tail-gated second selection and the Buy 60 % day-stop cut were never registered
+(no owner `override:`) and are descriptive only.
+
+| Band | Winner (return-only selection) | Winner | Template | Verdict |
+|---|---|---:|---:|---|
+| NIFTY 12:17–14:02 | ATM, SL 150 %, no trail, no MTM stop, RE cost ×1 | 308 | 124 | Regime flag (rule 7); rejected by the owner (no real stop) |
+| SENSEX 12:17–14:02 | ₹320 premium, SL 40 %, trail 25/15, MTM ₹4,000, RE cost ×1 | 242 | 76 | Passes all but rule 7 (regime flag); not adopted |
+
+- No Widesl band passed all eight rules. Breadth over the 25 slots (rule 4) failed for NIFTY 10:17–12:02 and
+  14:17–15:02 and SENSEX 14:17–15:02.
+- Wide-stop NIFTY winners have much worse worst days than the template (−₹16.6k against −₹4.5k at 09:17),
+  though smaller drawdowns.
+- NIFTY advisory run on 2022-01 → 2024-10 (681 days, not like-for-like): the return-only winners keep their
+  sign in all four bands (+46, +26, +34, +28 over the template). SENSEX has no usable data before 2024-09.
+
 ## Variables
 
 | Variable | Status | One-line takeaway |
@@ -58,3 +79,4 @@ three ways.
 
 [bl058]: ../../../../backlog/BL-058-options-rotation-forward-journal-and-ui.md
 [bl098q]: ../../../../backlog/BL-098-widesl-qualified-list-post-charge.md
+[bl104]: ../../../../backlog/BL-104-full-parameter-sweep.md

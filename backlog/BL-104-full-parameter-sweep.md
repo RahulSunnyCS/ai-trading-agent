@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner's "proper sweep over every parameter" before any of these families gets real money |
-| **Status** | In progress: Stages 1–3 done except the finalists' correlation, the Buy ₹1-per-fill check and the bootstrap against the BL-099 picks; Phase 4 advisory run done, forward test not started; the pool POC ran as BL-106 (Done 2026-10-15, no list won); owner `override:` owed for the post-hoc tail gate and the Buy 60 % day-stop cap |
+| **Status** | Done (2026-10-28) on the advisory result: Stages 1–3 and the 2022–24 advisory run done; no forward test of the finalists (T1 / BL-113 and the BL-106 pool carry the forward evidence); finalists' correlation, Buy ₹1-per-fill and the bootstrap vs BL-099 not run; the tail gate and the Buy 60 % day-stop cap never registered (descriptive only) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-14 |
@@ -318,3 +318,15 @@ Every number reproducible from `packages/option-backtesting/research/bl104/`.
   band) tested out-of-sample: pool re-selected on 2024-10 → 2025-10 only, Steady / Calendar / Adaptive
   replayed on 2025-10 → 2026-10 against the same lists over the 298 universe. To be registered as its
   own item before any run.
+- 2026-10-28 — **Closed on the advisory result** (owner, asked in chat, 2026-10-28). Delivered: Phase 0's
+  registered grid (SHA `6a1078bb4fe68786`), Stage 1 (63,426 cells), Stage 2 (plateaus), Stage 3 (25-slot
+  breadth, slippage, CSCV) and the NIFTY 2022-01 → 2024-10 advisory run. Under the registered rules one band
+  passes all eight (Buy SENSEX 09:17–10:02, in-sample). **No forward test:** Phase 4's
+  `strategies/sweep_finalists/` nightly rerun and 60-day read-out are not started; the forward evidence comes
+  from the T1 track (BL-113) and the BL-106 pool instead. **Not run** (no Log entry shows them): the
+  correlation among finalists, the Buy ₹1-per-fill sensitivity and the bootstrap against the BL-099 picks.
+  **Never registered:** the post-hoc tail gate (worst day and worst five days against 1.5 × the template,
+  2026-10-15) and the Buy 60 % day-stop cap (loosening the registered 30 %). The owner did not write an
+  `override:` for either, and none is written here on the owner's behalf; the tail-gated selection, its
+  Stage 2 and advisory figures, the three Dir SENSEX tail rows and the 60 % cut (`shortlists/`, the
+  `results/pool_probe/` re-score) are descriptive only. Status `Done`.
