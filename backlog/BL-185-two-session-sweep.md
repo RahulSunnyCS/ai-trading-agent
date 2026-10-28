@@ -150,3 +150,10 @@ A parallel track `t2` like BL-113 (own folder and journal, after the live pick, 
   the exchange fee and stamp). Lock and lock-trail overlays equal `portfolio.apply_book` on 1,440 checks.
   Paths go to `TRADING_DATA_ROOT/research/bl185/paths/` (int32 paise, about 11 GB an index); the internal disk
   has 31 GB free. Stage A: 6 workers, `nice`, `caffeinate`, no new part claimed after 07:00.
+- 2026-10-29 02:40 — **Stage A finished** (all 80 parts, 02:25; five workers, about 3 hours: the pace doubled once A0
+  finished). Stage B scored every part (one part file was corrupted by two scorers writing at once, rescored; writes
+  are atomic now). **Winners selected on the selection year only and frozen** in
+  `research/bl185/winners_frozen_2026-10-29.json` (sha256 `c2cbce85b2327216`): 80 cohort entries, 77 with a winner (NIFTY
+  wide band B morning other-day, SENSEX wide afternoon band D other-day and its whole-day twin found none under the
+  gates, breadth and half-year rules). Committed before the replay read the test year. The PBO and the DTE / VIX
+  concentration checks are deferred to Phase 5, on the finalists.

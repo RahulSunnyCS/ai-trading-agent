@@ -176,16 +176,23 @@ def main() -> None:
     )
     L.append("")
     arms = {
-        "A0 T1 Adaptive as traded": [("A0", None)],
-        "A1 whole-day winners (control)": [("A1", None)],
-        "A2 split: 3 morning + 3 afternoon": [("AM", None), ("PM", None)],
-        "A3 afternoon-only: 3 picks": [("PM", None)],
+        "A0 T1 Adaptive as traded": ["A0"],
+        "A1 whole-day winners (control)": ["A1"],
+        "A2 split: 3 morning + 3 afternoon": ["AM", "PM"],
+        "A3 afternoon-only: 3 picks": ["PM"],
     }
+    arms = {k: v for k, v in arms.items() if all(p in reps for p in v)}
+    missing_arms = [k for k in ("A0", "A1", "AM", "PM") if k not in reps]
+    if missing_arms:
+        L.append(
+            f"**Incomplete: no pool for {', '.join(missing_arms)} (a cohort or a comparator did not finish); the arms that need it are not reported.**"
+        )
+        L.append("")
     daily = {}
     for name, parts_ in arms.items():
-        g = sum(book(pools[k], reps[k], 0, test) for k, _ in parts_) / N_PICK
-        n = sum(book(pools[k], reps[k], 1, test) for k, _ in parts_) / N_PICK
-        o = sum(book(pools[k], reps[k], 2, test) for k, _ in parts_) / N_PICK
+        g = sum(book(pools[k], reps[k], 0, test) for k in parts_) / N_PICK
+        n = sum(book(pools[k], reps[k], 1, test) for k in parts_) / N_PICK
+        o = sum(book(pools[k], reps[k], 2, test) for k in parts_) / N_PICK
         daily[name] = {
             "gross": g,
             "net": n,
@@ -202,31 +209,35 @@ def main() -> None:
         )
     L.append("")
     keys = list(daily)
-    a0n, a1n, a2n, a3n = (daily[k] for k in keys)
     verdicts = {}
-    for label, x, y in (
-        ("A2 − A0", a2n, a0n),
-        ("A2 − A1", a2n, a1n),
-        ("A3 − A0", a3n, a0n),
-        ("A1 − A0", a1n, a0n),
-    ):
-        row = []
-        for f in ("net", "gross", "net5", "net20"):
-            m, lo, hi = block_bootstrap_mean(x[f] - y[f], seed=SEED)
-            row.append((m, lo, hi))
+    pairs = (
+        ("A2 − A0", "A2 split: 3 morning + 3 afternoon", "A0 T1 Adaptive as traded"),
+        ("A2 − A1", "A2 split: 3 morning + 3 afternoon", "A1 whole-day winners (control)"),
+        ("A3 − A0", "A3 afternoon-only: 3 picks", "A0 T1 Adaptive as traded"),
+        ("A1 − A0", "A1 whole-day winners (control)", "A0 T1 Adaptive as traded"),
+    )
+    for label, xk, yk in pairs:
+        if xk not in daily or yk not in daily:
+            continue
+        x, y = daily[xk], daily[yk]
+        row = [
+            block_bootstrap_mean(x[f] - y[f], seed=SEED) for f in ("net", "gross", "net5", "net20")
+        ]
         verdicts[label] = row
         L.append(
             f"**{label}** per margin lot-day: net {fmt(row[0][0])} [{fmt(row[0][1])}, {fmt(row[0][2])}]; gross {fmt(row[1][0])} [{fmt(row[1][1])}, {fmt(row[1][2])}]; ₹5 {fmt(row[2][0])} [{fmt(row[2][1])}, {fmt(row[2][2])}]; ₹20 {fmt(row[3][0])} [{fmt(row[3][1])}, {fmt(row[3][2])}]."
         )
-    dd2, dd0 = max_drawdown(a2n["net"]), max_drawdown(a0n["net"])
-    passed = verdicts["A2 − A0"][0][1] > 0 and verdicts["A2 − A1"][0][1] > 0 and dd2 >= dd0
+    if "A2 − A0" in verdicts and "A2 − A1" in verdicts:
+        dd2 = max_drawdown(daily["A2 split: 3 morning + 3 afternoon"]["net"])
+        dd0 = max_drawdown(daily["A0 T1 Adaptive as traded"]["net"])
+        passed = verdicts["A2 − A0"][0][1] > 0 and verdicts["A2 − A1"][0][1] > 0 and dd2 >= dd0
+        L.append("")
+        L.append(
+            f"A2 max drawdown {fmt(dd2)} vs A0 {fmt(dd0)}. **Verdict (A2 passes if both lower bounds are above zero and its drawdown is no deeper): {'PASS' if passed else 'FAIL'}**"
+        )
     L.append("")
-    L.append(
-        f"A2 max drawdown {fmt(dd2)} vs A0 {fmt(dd0)}. **Verdict (A2 passes if both lower bounds are above zero and its drawdown is no deeper): {'PASS' if passed else 'FAIL'}**"
-    )
-    L.append("")
-    L.append("| Half-year | Test days | A0 net | A1 net | A2 net | A3 net |")
-    L.append("|---|---|---|---|---|---|")
+    L.append("| Half-year | Test days | " + " | ".join(k.split()[0] + " net" for k in keys) + " |")
+    L.append("|---|---|" + "---|" * len(keys))
     hy = np.array([f"{d.year} H{1 if d.month <= 6 else 2}" for d in test])
     for h in sorted(set(hy)):
         m = hy == h
