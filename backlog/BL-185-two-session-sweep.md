@@ -128,7 +128,7 @@ composite per pool on gross, three picks per pool, per margin lot-day = book ÷ 
 
 | Arm | Net per margin lot-day | Gross | Net at ₹5 | Net at ₹20 | Days in profit | Max DD (net) |
 |---|---|---|---|---|---|---|
-| A0 T1 Adaptive as traded (Core-298 + T1, re-simulated with these charges) | +565 | +678 | +612 | +523 | 69 % | −8,536 |
+| A0 T1 Adaptive, re-simulated (Core-298 + T1, three core picks, no Buy add-on, no expiry-only rule) | +565 | +678 | +612 | +523 | 69 % | −8,536 |
 | A1 the sweep's whole-day winners (control) | +289 | +395 | +332 | +251 | 59 % | −16,874 |
 | A2 split: 3 morning + 3 afternoon | +305 | +494 | +385 | +234 | 58 % | −24,579 |
 | A3 afternoon-only: 3 picks | +278 | +373 | +319 | +242 | 61 % | −14,680 |
@@ -140,7 +140,7 @@ composite per pool on gross, three picks per pool, per margin lot-day = book ÷ 
 | A3 − A0 | −287 [−495, −93] | −305 | −293 | −281 |
 | A1 − A0 | −276 [−419, −132] | −283 | −280 | −273 |
 
-**Verdict: FAIL.** A2 does not beat A0 (its lower bound is below zero, in fact the whole interval is) and its
+**Verdict: FAIL.** (A0 is T1 Adaptive replayed from Core-298 + T1 with these charges, three core picks, without the Buy add-on and without BL-122's expiry-only rule: a close relative of the live book, not the live book itself; its +₹678 gross reads against BL-113's +₹640 with the add-on.) A2 does not beat A0 (its lower bound is below zero, in fact the whole interval is) and its
 drawdown is −24,579 against −8,536. Phases 5 and 6 are not run (they follow a pass). By half-year the three
 test periods read A2 − A0 −27k, −39k and +1k.
 
@@ -219,3 +219,19 @@ Not adopted. The tuned half-day settings are recorded as a descriptive table in 
   (`diagnostics.py`): **A2 FAIL** (−₹260 [−446, −85] vs T1 as traded, drawdown −24,579 vs −8,536; level with its own
   whole-day control, +16 [−201, +224]); the one-year selection transferred at 46 %. Phases 5 and 6 not run. Leads
   recorded in the Result: the expiry-aware book, the union universe.
+- 2026-10-29 03:20 — **code review of PR 383** (ten findings). Disclosed, not rerun (the test year has been read, so
+  a second selection pass needs an `override:`): (1) the band score in `select.py` averages the robust Martin over
+  the slots where a cell passes (`nanmean`), where Phase 0's wording was "the mean robust score over the band's
+  slots"; the breadth rule (≥ 70 % of slots valid) still applied, but the score favours cells that fail on their
+  weak slots, which may account for part of the 46 % transfer; a dense-score re-selection is a candidate for the
+  follow-up registration. (2) A0 is a re-simulation, not the live book (above). Fixed: the paths root follows
+  `TRADING_DATA_ROOT`; trades over `MAX_TRADES` raise instead of truncating (none ever exceeded six); dropped
+  variant-days are counted and recorded in a part's DONE; unit tests for the grid counts and SHA, the overlays, the
+  lock rule against `portfolio.apply_book`, the chains and the vectorised charges
+  (`tests/unit/test_bl185_two_session.py`); a dead no-op removed. Not changed: the shared modules' fixed
+  `research/bl185` folder, the duplicated stop / charge code (guarded by two parity scripts), the magic indexes in
+  `parity.py`.
+- 2026-10-29 03:25 — incident, no effect on results: a smoke run of `run_grid.py` without a scratch path overwrote
+  the first three cells of two real parts (NIFTY wide 09:17, SENSEX Dir 13:02) with 4-day test files. They were
+  re-simulated over the full window; the Stage B scores recomputed from them equal the original scoring exactly
+  (maximum difference 0.0), and `--smoke` now uses a scratch folder.

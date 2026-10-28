@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 import time
 from datetime import date, datetime
 from pathlib import Path
@@ -47,6 +48,7 @@ def run_part(
     if days_cap:
         days = days[:days_cap]
     rec = {n: Recorder() for n in strategies}
+    dropped = dict.fromkeys(strategies, 0)
     out = part_dir(u, co, slot)
     t0 = time.time()
     for i, d in enumerate(days):
@@ -58,6 +60,7 @@ def run_part(
             try:
                 r = simulate_day(strat, data, ref, SIZING)
             except MissingReferenceData:
+                dropped[name] += 1
                 continue
             orders, buy, sell = trade_values(r.trades)
             rec[name].add(d, r, day_charges(u, d.isoformat(), orders, buy, sell).total, orders)
@@ -67,8 +70,16 @@ def run_part(
             )
     for name, r in rec.items():
         r.save(out / f"{name}.npz")
+    lost = sum(dropped.values())
+    if (
+        lost
+    ):  # day lists would differ between variants and Stage B would stop on this part: say so now
+        print(
+            f"  {u} {co} {slot}: variant-days dropped for missing reference data: {lost}",
+            flush=True,
+        )
     (out / "DONE").write_text(
-        f"{len(days)} days {len(strategies)} variants {time.time() - t0:.0f} s\n"
+        f"{len(days)} days {len(strategies)} variants {time.time() - t0:.0f} s dropped {lost}\n"
     )
 
 
@@ -110,6 +121,8 @@ def main() -> None:
     not_after = args[args.index("--not-after") + 1] if "--not-after" in args else None
     only = args[args.index("--only") + 1].split(",") if "--only" in args else None
     if "--smoke" in args:
+        global PATHS_ROOT
+        PATHS_ROOT = Path(tempfile.mkdtemp(prefix="bl185-smoke-"))  # never the real parts
         run_part("NIFTY", "W", "0917", days_cap=4, cells_cap=3)
         run_part("SENSEX", "D", "1302", days_cap=4, cells_cap=3)
         print("smoke ok", sorted(p.name for p in PATHS_ROOT.iterdir()))

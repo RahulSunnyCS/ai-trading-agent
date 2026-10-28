@@ -9,11 +9,12 @@ from pathlib import Path
 
 import numpy as np
 
+from option_backtesting.fyers.daily import data_dir
 from option_backtesting.legwise.engine import DayResult
 from option_backtesting.legwise.market import N_MINUTES
 from option_backtesting.rotation.portfolio import member_from_curve
 
-PATHS_ROOT = Path(os.environ.get("BL185_PATHS", "/Volumes/TradingData/research/bl185/paths"))
+PATHS_ROOT = Path(os.environ.get("BL185_PATHS") or data_dir() / "research" / "bl185" / "paths")
 MAX_TRADES = 8
 #: events columns: entry_min, exit_min (-1 = open at the full run's end), side (+1 sold, -1 bought),
 #: qty, entry_price, exit_price (nan if open)
@@ -33,8 +34,12 @@ def to_paise(path: np.ndarray) -> np.ndarray:
 
 
 def events_of(r: DayResult) -> np.ndarray:
+    if (
+        len(r.trades) > MAX_TRADES
+    ):  # never truncate silently: charges and turnover come from these events
+        raise ValueError(f"{len(r.trades)} trades in a day, more than MAX_TRADES = {MAX_TRADES}")
     ev = np.full((MAX_TRADES, EV_COLS), np.nan, dtype=np.float32)
-    for i, t in enumerate(r.trades[:MAX_TRADES]):
+    for i, t in enumerate(r.trades):
         ev[i] = [t.entry_min, -1 if t.exit_min is None else t.exit_min, 1 if t.position == "sell" else -1,
                  t.qty, t.entry_price, np.nan if t.exit_price is None else t.exit_price]  # fmt: skip
     return ev

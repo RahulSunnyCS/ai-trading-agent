@@ -17,7 +17,6 @@ sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
 import grid  # noqa: E402
 import replay as rp  # noqa: E402
-import stage_b as sb  # noqa: E402
 
 from option_backtesting.fyers.daily import data_dir  # noqa: E402
 from option_backtesting.rotation import store  # noqa: E402
@@ -43,8 +42,6 @@ def transfer(winners: list[dict], attrs: dict) -> list[str]:
             if ser is None:
                 continue
             for d, (_, net, _, _) in ser.rows.items():
-                if d < sb.S_END or d < rp.T_START:
-                    pass
                 if (
                     d >= rp.T_START
                     and d in attrs

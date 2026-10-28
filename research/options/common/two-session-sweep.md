@@ -19,7 +19,7 @@ None: the live and T1 sets are whole-day (09:17 to 15:28 entries, 15:28 exit).
 
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
-| [BL-185][bl185] | 28,800 base variants (360 cells × 20 slots × 2 cohorts × 2 indices); × 12 overall stops × exits 11:30 / 12:00 / 12:30 / 13:00 / 15:28 on the paths; 61 winners selected on 2024-10-09 → 2025-10-08; Adaptive (list C), three picks per pool: T1 as traded (A0), whole-day winners (A1), split three morning + three afternoon (A2), afternoon-only (A3) | selection 251 days, test 250 days (2025-10-09 → 2026-10-27), after charges, per margin lot-day | **A2 fails**: vs A0 −₹260 [−446, −85] net, drawdown −24,579 vs −8,536; vs A1 +₹16 [−201, +224]; A1 − A0 −₹276 [−419, −132] | BL-185 Result |
+| [BL-185][bl185] | 28,800 base variants (360 cells × 20 slots × 2 cohorts × 2 indices); × 12 overall stops × exits 11:30 / 12:00 / 12:30 / 13:00 / 15:28 on the paths; 61 winners selected on 2024-10-09 → 2025-10-08; Adaptive (list C), three picks per pool: T1 Adaptive re-simulated (A0, three core picks, no Buy add-on, no expiry-only rule), whole-day winners (A1), split three morning + three afternoon (A2), afternoon-only (A3) | selection 251 days, test 250 days (2025-10-09 → 2026-10-27), after charges, per margin lot-day | **A2 fails**: vs A0 −₹260 [−446, −85] net, drawdown −24,579 vs −8,536 (A0 is a close relative of the live book, not the live book); vs A1 +₹16 [−201, +224]; A1 − A0 −₹276 [−419, −132] | BL-185 Result |
 
 ## What we know
 
