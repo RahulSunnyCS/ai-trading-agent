@@ -229,3 +229,33 @@ Answered by the owner on 2026-10-26:
   on a spare port (5191) against the running APIs: no React error or warning in the console; the
   only failures are `/api/meta` and `/api/payment/*`, which go to the frozen `apps/server` (not
   running), as before.
+- 2026-10-28 — React 19 merged (#363).
+- 2026-10-28 — `proxy.ts`: kept `middleware.ts`, no PR. Next 16's `proxy.ts` runs on the Node.js
+  runtime only. `@opennextjs/cloudflare` 1.20.13 does build a Node middleware (`useNodeMiddleware`,
+  `bundle-node-middleware.js`), but its own source calls that path experimental and "not supported
+  by the OpenNext maintainers" (it re-bundles Next's internal compiled middleware, which can change
+  between Next versions), and every build warns "Use at your own risk". Tried on a throwaway branch
+  (`middleware.ts` renamed, export `proxy`): `cf:build` passed with that warning (the Node handler is
+  0.8 MB) and `wrangler dev` passed every gate check (password, Basic, lock-out, logout, CSRF 403,
+  Access 403, no-password 503). It works today, but the login gate is the one security boundary
+  of the hosted dashboard, and the edge `middleware.ts` is the path OpenNext supports. Revisit when
+  OpenNext declares Node middleware supported, or when a Next release drops `middleware.ts`: the
+  switch is the file rename, the export name and the two test imports.
+- 2026-10-28 — Turbopack: the Guide's `?raw` rule moved to `turbopack.rules`
+  (`'*.md'` + `condition: { query: /raw/ }` + `type: 'raw'`); the `webpack()` hook and every
+  `--webpack` (package `dev` / `build`, dev-stack's `next dev` and `next build`) are gone. CI's
+  Dashboard job and OpenNext both run the package's `build` script, so they follow. Build times on
+  this laptop (Node 20, bun 1.3, clean `.next`, two runs each): `next build` 31.3 s / 31.0 s on
+  webpack (compile 12.1–12.4 s) against 17.1 s / 16.8 s on Turbopack (compile 5.3–5.4 s; the
+  ~10 s TypeScript step is the same); `cf:build` 37 s against 25 s; the first page of `next dev`
+  17.4 s against 4.8 s. The Markdown is in the built chunks as a string. OpenNext built the
+  Turbopack output (Next 16.4.3 (Turbopack), "OpenNext build complete", the no-env check passed),
+  and `wrangler dev` (port 8788; 8787 was held by an earlier session's preview) passed every
+  password-mode gate check, served the Guide's text in the page and its chunk, and Momentum and
+  Options Lab APIs through the rewrites against the running APIs. `start:prod`'s build
+  (`NEXT_DIST_DIR=.next-prod`, under `bun --bun`) built with Turbopack and `next start` passed the
+  gate checks. A smoke test of every main screen under Turbopack `next dev` logged no console error
+  beyond the frozen `apps/server` calls.
+- 2026-10-28 — cf-build dev-server guard dropped: with a Turbopack `next dev` running from the same
+  folder, `cf:build` built the Worker and the dev server kept serving (it writes `.next/dev`, which
+  `next build` leaves alone). The `NEXT_DIST_DIR` refusal stays. `docs/remote-dashboard.md` says so.

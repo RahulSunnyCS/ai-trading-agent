@@ -35,10 +35,10 @@ const nextConfig: NextConfig = {
   // 30s rewrite-proxy timeout would drop it as a 500. Matches the Fastify proxy's 180s.
   experimental: { proxyTimeout: 180_000 },
   // The Guide's pages are Markdown files imported as strings (`import body from './x.md?raw'`,
-  // BL-041). Vitest understands `?raw` natively; webpack needs this one rule.
-  webpack(config) {
-    config.module.rules.push({ resourceQuery: /raw/, type: 'asset/source' });
-    return config;
+  // BL-041). Vitest understands `?raw` natively; Turbopack (Next 16's bundler for `next dev`
+  // and `next build`) needs this one rule.
+  turbopack: {
+    rules: { '*.md': { condition: { query: /raw/ }, type: 'raw' } },
   },
   async rewrites() {
     return [

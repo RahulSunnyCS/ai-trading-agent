@@ -12,7 +12,7 @@
 | Message Queue / Event Bus | Redis 7 Streams — topics: `market.ticks`, `straddle.values`, `signals.generated` |
 | Background Jobs | BullMQ (Redis-backed) — EOD retrospection batch |
 | Cache | Redis 7 — sub-ms reads for price cache and personality state |
-| Frontend | Next.js 16 (webpack, not Turbopack: every `next dev` / `next build` passes `--webpack` for the Guide's `?raw` rule; BL-157) + React 19 (BL-157 Phase 3) + Zustand (state) + Tailwind CSS 3.x + Lightweight Charts. The in-app Guide renders Markdown with `react-markdown` + `remark-gfm` (pages in `apps/dashboard/src/guide/content`, imported `?raw`) |
+| Frontend | Next.js 16 on Turbopack, its default bundler for `next dev` and `next build` (the Guide's `?raw` rule is under `turbopack.rules` in `next.config.ts`; the OpenNext Worker build is Turbopack too; BL-157) + React 19 (BL-157 Phase 3) + Zustand (state) + Tailwind CSS 3.x + Lightweight Charts. The in-app Guide renders Markdown with `react-markdown` + `remark-gfm` (pages in `apps/dashboard/src/guide/content`, imported `?raw`) |
 | Testing | Vitest (unit + integration) + Playwright (E2E) |
 | Market Data | Fyers WebSocket via `fyers-api-v3` SDK (untyped — TypeScript shim in `apps/server/src/types/`) |
 | Paper Trading | Quantiply API (paper trade execution tracking) |

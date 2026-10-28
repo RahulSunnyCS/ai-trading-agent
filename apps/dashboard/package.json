@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --webpack --port 5173",
-    "build": "next build --webpack",
+    "dev": "next dev --port 5173",
+    "build": "next build",
     "start": "next start --port 5173",
     "cf:build": "node scripts/cf-build.mjs",
     "cf:preview": "node scripts/cf-build.mjs && wrangler dev",
