@@ -15,7 +15,7 @@ captured.
 ## Live value
 
 Not used. Live and rotation Dir files close a stopped leg and re-sell it once at cost (`reentry_on_sl: { mode:
-cost, count: 1 }`, [re-entry](re-entry.md)).
+cost, count: 1 }`, [re-entry](re-entry.md)); T1's own Dir settings re-sell it twice (`count: 2`).
 
 ## Tested
 
