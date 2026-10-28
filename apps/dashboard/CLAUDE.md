@@ -47,7 +47,7 @@ state lost, every view refetches). Next keeps `usePathname` and back/forward in 
 
 **Guide (BL-041):** the in-app docs for people who know basic options and momentum but not this tool.
 Pages are Markdown in `src/guide/content/<chapter>/<page>.md`, imported as strings (`?raw`; the one
-webpack rule is in `next.config.ts`) and listed in `src/guide/registry.ts`, which also drives the
+Turbopack rule is in `next.config.ts`) and listed in `src/guide/registry.ts`, which also drives the
 index, previous/next, search and the "How this works" link in the top bar (`GuideLink`, looked up
 by tab and sub-section). Terms live in `src/guide/glossary.ts`. In a page, `[x](app:/path)` opens a
 screen, `[x](guide:chapter/page)` another page, `[x](glossary:id)` a hover definition, and
@@ -72,12 +72,16 @@ Cloudflare Access signs people in instead and the middleware only verifies its s
 (`lib/cfAccess.ts`). Runbook:
 `docs/remote-dashboard.md`.
 
-**Next.js 16 (BL-157; the `--webpack` rule is in technical.md's Frontend row):** `next start`
-takes no `--webpack`, and `agentRules: false` stops `next dev` appending to `AGENTS.md`. `next dev`
+**Next.js 16 (BL-157; the bundler is in technical.md's Frontend row):** a webpack-only option
+(a `webpack()` hook in `next.config.ts`) makes Turbopack refuse to build, so a loader goes under
+`turbopack.rules`. `agentRules: false` stops `next dev` appending to `AGENTS.md`. `next dev`
 builds into `.next/dev` and rewrites the tracked `next-env.d.ts` to import `./.next/dev/types/*`;
 dev-stack puts it back only after a `start:prod` build, so after `bun run start` restore it
-(`git checkout -- next-env.d.ts`) rather than committing it. `middleware.ts` still runs (the build
-warns that `proxy` replaces it). React 19: `useRef<T>(null)` is a `RefObject<T | null>`, so a hook or
+(`git checkout -- next-env.d.ts`) rather than committing it. Because `next build` leaves
+`.next/dev` alone, `cf:build` runs beside a running `next dev`. `middleware.ts` stays (the build
+warns that `proxy` replaces it): `proxy.ts` runs on Node.js only, and OpenNext's Cloudflare
+adapter runs a Node proxy only on an experimental path its maintainers do not support (BL-157
+Log, 2026-10-28). React 19: `useRef<T>(null)` is a `RefObject<T | null>`, so a hook or
 component that takes a ref types it `RefObject<T | null>`.
 
 ## Analytics page pattern
