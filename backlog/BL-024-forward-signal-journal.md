@@ -165,3 +165,68 @@ None for Phase 1.
   `_execute_weekly_run`, `mbt journal show|verify`, 14 tests. Dry run on a copy of the real
   catalog recorded all 12 favourites, a rerun recorded nothing, verify passed. Awaiting the
   first Friday (2026-10-09) to close Phase 1.
+- 2026-10-28 — Phases 1 / 1b closed, checked read-only on a copy of the live catalog. **9 Oct**
+  was recorded (14 Broad finals at 19:30, the benchmark level on 11 Oct; the 21:00 check said 14
+  of 15, the benchmark missing at the time), but the live chain was **reset on 12 Oct**: its 29
+  rows (2 Oct dry-run rows 1-14, 9 Oct rows 15-29) are kept in
+  `TRADING_DATA_ROOT/backups/momentum_forward_journal-2026-10-12-before-reset.parquet`, and no
+  Log, commit or memory records why. The live chain starts at entry 1 on **16 Oct** (43 of 43:
+  42 favourites incl. 38 BL-087 sleeves, plus the benchmark) and **23 Oct** (43 of 43, recorded
+  Sat 24 Oct 10:31 after the Friday runs met an unmounted volume); `mbt journal verify` passes on
+  86 entries, head `017129dfd58f3eb8`. The 9 Oct rows are not scored: they belong to the old
+  chain (different config ids after the BL-087 split), and joining chains would weaken the tamper
+  evidence.
+- 2026-10-28 — owner: "Phase 2 + 3 from Kite". Research gate: this is forward measurement of
+  signals recorded before their week, not a new search or backtest comparison, so no
+  pre-registration applies; nothing is selected or tuned on these scores.
+- 2026-10-28 — **Phase 2 built.** `forward_score.py` (pure), `forward_run.py` (wiring),
+  `mbt journal score`, scheduler `momentum-journal-score` Fri 20:30, the Forward score card on
+  Momentum › Journal (`GET /api/journal/forward`), one line in the headline's 19:30 message (no
+  new message, BL-173). Choices: the start portfolio is the signal's `target_weights` (the
+  engine's own post-trade portfolio, recorded since the Phase 6 parity work), checked against
+  next week's `holdings_before` (BUY held, SELL gone); costs are the engine's `buy_cost` /
+  `sell_cost` (pinned equal by a test) on the move from `holdings_before` drifted to W; pre-tax
+  like the favourites. **F6 honesty:** the backtest is shown twice, *as recorded* (the
+  `sleeve_value` of the two rows, i.e. the code that produced them; omitted when the rows sit on
+  different sides of the F6 merge `778ba02e` or an April reset) and *today's code* (the same
+  settings re-run now, point-in-time ranking). Only Broad is scored (the only journalled
+  dataset); others would say `not_scored`. Full run on the live copy: 84 signal-weeks, the 42
+  favourites' week of 16 Oct scored, 23 Oct waiting for 30 Oct's rows; 19 minutes.
+  **Week of 16 Oct, headline group (Four Sectors Monthly, No Tilt · all Fridays):** live at
+  Friday close -8.06%, backtest as recorded -7.99% (gap -0.06 pts), today's code -9.59%,
+  Nifty200 Momentum 30 TRI -6.15%. Across the 11 groups live minus as recorded is -0.02 to
+  -0.08 pts (it pays the week's own costs, the recorded figure the next week's), which is the
+  check that the scoring reproduces the backtest; today's code differs by up to 2 pts (F6).
+  The Monday-open figure for 16 Oct needs Mon 26 Oct's open, in the 30 Oct sync.
+  **Done-when not met yet:** four scored weeks need 30 Oct, 6 Nov and 13 Nov's runs; the job
+  scores them by itself (week of 6 Nov scored on Fri 13 Nov). Closed now on the owner's
+  instruction; the check lands on the scheduler.
+- 2026-10-28 — **Phase 3 built** (`forward_fills.py`): the Kite contract notes read as files,
+  fills booked to lots FIFO against the lot ledger, then the pending plan; each lot's due week
+  reconciled against its journal row and the 14:15 orders. Two rebalances reconciled:
+
+  | Lot / week | Name | Signal | Orders | Done | Fill vs Fri close | vs Mon open | vs orders |
+  |---|---|---|---|---|---|---|---|
+  | Lot 1, 16 Oct (new, ₹50,000; bought Mon 19 Oct) | CUPID | BUY 25% | — | 28 @ 345.25, +12 on 22 Oct | -239 bps | -239 bps | — |
+  | | NAZARA | BUY 25% | — | 24 @ 410.15, +9 on 22 Oct | -191 bps | -204 bps | — |
+  | | RATEGAIN | BUY 25% | — | 12 @ 794.25, +4 on 21 Oct | -398 bps | -393 bps | — |
+  | | Nasdaq 100 | BUY 25% | — | missed (premium gate) | | | |
+  | | GRWRHITECH | not in signal | — | extra: 1 @ 6,998 ("replaces Nasdaq 100 (premium)") | +40 bps | +40 bps | — |
+  | Lot 2, 23 Oct (new, ₹52,987; bought Fri 23 Oct 14:28) | ACMESOLAR | not in final | 35 @ 373.60 | 35 @ 373.00 | +31 bps | n/a | -16 bps |
+  | | CUPID | BUY 29% | 42 @ 310.45 | 42 @ 309.60 | +103 bps | n/a | -27 bps |
+  | | GRWRHITECH | BUY 24% | 1 @ 7,059 | 1 @ 7,065.50 | +45 bps | n/a | +9 bps |
+  | | NAZARA | BUY 24% | 33 @ 400.70 | 33 @ 401.53 | -15 bps | n/a | +21 bps |
+  | | THELEELA | BUY 24% | — | missed | | | |
+
+  Charges: Lot 1 ₹54.13 on the notes vs ₹55.51 at the model's rates; Lot 2 ₹55.49 vs ₹55.19.
+  Lot 1's first-day fills came in ₹796 under Friday's close (Monday fell); Lot 2's ₹23 under the
+  orders' prices. Findings: (1) the 14:15 orders and the 19:30 final disagree for Lot 2
+  (ACMESOLAR in the orders, THELEELA in the final), so the trade followed the orders, not the
+  journalled final: the orders' week-ahead decision on 16 Oct's stored ranks and the final on the
+  data the 19:30 sync rewrote differ; (2) Lot 1 was under-funded on the day (₹36,039 of
+  strategy names plus 20MICRONS, sold 21 Oct, outside the lots) and topped up 21-22 Oct; (3) a
+  second GRWRHITECH (14:33, ₹7,119.50) is booked to no lot yet; Lot 2's shares are matched
+  through the 14:15 plan until the 30 Oct run books them.
+- 2026-10-28 — **Done.** Follow-ups for the owner, not new items: the live-rules trailing rule
+  and the money gate (BL-025) do not read the score or the fills yet; the 14:15-orders-vs-final
+  disagreement deserves a look before more lots go in.
