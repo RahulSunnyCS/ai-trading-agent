@@ -48,8 +48,14 @@ One set a day, 09:17–15:28, in every live and rotation Widesl file.
 - A tighter stop on the two sets makes it worse (BL-182 E1, owner override): at ₹2,000 a set the Adaptive
   split reads +₹82 [−61, +224] with a drawdown now deeper than the whole-day book's, and the fixed live
   files +₹1 (NIFTY) / +₹37 (SENSEX) a day; the afternoon's smaller premiums hit a ₹2,000 stop more often.
-- Not adopted after both phases and E1. The afternoon-only Widesl pair is a lead that would need its own
-  pre-registration.
+- The morning set wants a looser overall stop, not a tighter one (BL-182 E2, a nine-level sweep on seen
+  data): below ₹2,500 every level earns less (the stop hit on 41–99 % of pick-days); at ₹3,000 / ₹4,000
+  Adaptive's morning book earns +140 / +168 a day against +64, higher in every half-year, and the split
+  then clears zero (+151 [+13, +287], +178 [+34, +319]) with a drawdown shallower than the comparator's;
+  the morning book's own drawdown deepens, and the fixed 09:17 files barely move. A lead for a
+  registration with one level fixed in advance.
+- Not adopted after both phases, E1 and E2. Leads: the afternoon-only Widesl pair; the split with a
+  ₹3,000–4,000 morning stop.
 
 ## Not yet tested
 
@@ -57,6 +63,8 @@ One set a day, 09:17–15:28, in every live and rotation Widesl file.
   morning's result; skipping 12:00–13:00 only on some days to expiry. All registered as "will not run"
   in BL-182 Phase 0.
 - An afternoon-only Widesl book (two 13:02–15:02 picks, no morning set) as a rule of its own.
+- The split with the morning set's overall stop at ₹3,000 or ₹4,000, one level fixed in advance, as a
+  registered comparison and then a forward track (BL-182 E2's lead).
 - Any unseen days: Phase 1 is on seen data; a forward track (Phase 3) is the only test.
 
 ## Related

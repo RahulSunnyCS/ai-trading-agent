@@ -35,6 +35,10 @@ One set a day, 09:17–15:28 (the rotation files) or 09:24–15:28 (the owner's 
   deeper drawdown; SENSEX's fixed split triples the drawdown. Descriptive; a registration of its own
   would be needed.
 - Adaptive takes ITM1 70–80 % of the time in every pool.
+- No overall stop fixes the morning Dir (BL-184 E1, eight levels ₹500–4,000 on seen data): ₹1,500 reads
+  +186 a day with the drawdown halved, but ₹1,000 (+93) and ₹2,000 (+80) sit at the files' +81 and the
+  fixed `N_dir` 09:17 morning half at ₹1,500 earns +16 with an −85k drawdown; no level makes the split's
+  interval clear zero.
 
 ## Not yet tested
 

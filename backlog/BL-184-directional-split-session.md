@@ -151,6 +151,40 @@ only Widesl in BL-182) and the fixed NIFTY Dir split.
   has no trail (see BL-182 E2).
 - **Will not run:** stops on the afternoon sets, other levels, a stop by family or index.
 
+**Result (2026-10-28):** one level, ₹1,500, meets the registered "helps" definition on its face, and its
+neighbours say it is noise. Adaptive's morning Dir (one pick, per margin lot-day, 434 pick days; the split
+row is that morning plus the unchanged afternoon against the ₹3,000 whole-day comparator); full table
+`research/bl184/out/morning_stops_summary.md` (git-ignored; `uv run python research/bl184/stops.py
+--analyse-only` rebuilds it).
+
+| Morning stop | AM net | AM gross | AM days in profit | AM max DD | AM stop hit / day | Split − comparator net [90 %] | Split max DD |
+|---|---|---|---|---|---|---|---|
+| ₹500 | +47 | +148 | 37 % | −17,744 | 0.60 | −3 [−221, +207] | −22,198 |
+| ₹1,000 | +93 | +202 | 47 % | −22,103 | 0.44 | +43 [−180, +255] | −24,192 |
+| ₹1,500 | +186 | +299 | 53 % | −20,659 | 0.29 | +136 [−84, +344] | −21,127 |
+| ₹2,000 | +80 | +197 | 53 % | −37,762 | 0.25 | +30 [−191, +246] | −23,954 |
+| ₹2,500 | +57 | +175 | 55 % | −38,336 | 0.21 | +7 [−220, +217] | −26,590 |
+| **₹3,000 (the files)** | +81 | +201 | 57 % | −42,574 | 0.15 | +31 [−214, +251] | −31,740 |
+| ₹3,500 | +93 | +213 | 58 % | −35,148 | 0.10 | +43 [−193, +262] | −39,227 |
+| ₹4,000 | +128 | +249 | 58 % | −29,210 | 0.06 | +78 [−151, +285] | −27,228 |
+
+- **₹1,500 is a spike, not a plateau.** It earns +186 a day with the drawdown halved (−20,659) and is
+  higher than ₹3,000 in three of four half-years (2025 H1 52.7k vs 36.4k, 2025 H2 16.0k vs 7.4k, 2026 H1
+  +0.9k vs −22.7k, 2026 H2 11.2k vs 14.2k), so it meets the letter of "helps" over the span. But ₹1,000
+  earns +93 and ₹2,000 +80, both near the files' +81: a stop that worked for a reason would carry its
+  neighbours with it. Its gain is one avoided half-year (2026 H1).
+- **The fixed 09:17 file says the opposite:** `N_dir`'s morning half at ₹1,500 earns +16 a day with a
+  −85,420 drawdown (at ₹3,000: +88, −53,310); `S_dir`'s +240 against +252. Adaptive's +186 at ₹1,500 is in
+  which slots it picks, not in the stop.
+- **No level makes the split pass:** every interval includes zero; ₹500 is negative. Loosening to ₹4,000
+  raises the morning Dir to +128 with a shallower drawdown (−29,210) but 2026 H1 is still −13.1k.
+- A 21 % leg stop with one re-entry already caps most mornings; the overall stop is hit on 15 % of
+  pick-days at ₹3,000 and the levels mostly reshuffle which bad mornings are cut.
+
+Reading: nothing here changes the Dir split's verdict. The ₹1,500 result is recorded as what a nine-way
+sweep on seen data produces; it would need its own registration with the level fixed in advance, and the
+fixed-file reading argues against spending that on it.
+
 ## Risks
 
 - A 13:00 exit on a 21 % stop shape: the morning set's re-entry has less time to recover; the afternoon
@@ -170,3 +204,6 @@ only Widesl in BL-182) and the fixed NIFTY Dir split.
   not adopted.
 - 2026-10-28 — E1 registered (owner override: the morning Dir's overall stop at eight levels ₹500 → ₹4,000,
   descriptive) before its run.
+- 2026-10-28 — E1 run (`research/bl184/stops.py`, eight levels): ₹1,500 meets "helps" on its face (+186, drawdown
+  halved) but its neighbours (₹1,000 +93, ₹2,000 +80) and the fixed `N_dir` file (+16, −85k) say noise; no level makes
+  the split pass. Nothing changes.

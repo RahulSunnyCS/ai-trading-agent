@@ -1,6 +1,6 @@
 # Widesl: overall MTM stop
 
-**Status:** Tested · **Last updated:** 2026-10-23
+**Status:** Tested · **Last updated:** 2026-10-28
 
 ## What it is
 
@@ -16,6 +16,7 @@ the end of the 1-minute bar, so on fast days the realised loss overshoots the le
 
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
+| [BL-182][bl182] E2 | ₹500, 750, 1,000, 1,250, 1,500, 1,750, 2,000, 3,000, 4,000 on a **morning-only** set (09:17–11:47 → 12:00), Adaptive's two picks, the files' ₹2,500 as the base | 434 pick days 2025-01-10 → 2026-10-27, after charges, seen data, descriptive sweep | Tighter stops earn less (hit on 41–99 % of pick-days); ₹3,000 / ₹4,000 earn +140 / +168 a day against +64, in every half-year, with a deeper morning drawdown; the fixed 09:17 files barely move. A lead: a morning set needs a looser stop than a whole-day one | [Session split](session-split.md) |
 | BL-070 | ₹2,500 vs no overall stop (leg stops kept), all 150 Widesl variants | 2025-09-01 → 2026-10-08, 1 lot, before charges | **Keep only for SENSEX OTM2**; elsewhere the stop costs more than it saves | [BL-070][bl070] |
 | BL-098 Phase 2 | none, ₹1,000, ₹1,500, ₹2,000, ₹2,500, ₹3,000, ₹3,500, ₹4,000 | holdout 2025-10-09 → 2026-10-09, **after charges** | Descriptive ranking; Phase 3 pending | [BL-098 report][bl098q] |
 | BL-156 | Overall stop checked at each 1-minute candle close (the engine) vs on every tick (live; modelled from each minute's high / low, calibrated on the 23 Oct live stop) | T1's and Core's Adaptive picks, 2025-01-10 → 2026-10-22, 1 lot, after brokerage | **No meaningful difference**: close +₹56 / day on T1, 90% [−17, +144]; Core +₹38 [−35, +130] | [BL-156][bl156] |
@@ -68,3 +69,4 @@ baseline ₹13,883 in the afternoon.
 [bl066]: ../../../../backlog/BL-066-drb-6w3l2-daily-stop.md
 [bl070]: ../../../../backlog/BL-070-drb-without-per-strategy-stops.md
 [bl098q]: ../../../../backlog/BL-098-widesl-qualified-list-post-charge.md
+[bl182]: ../../../../backlog/BL-182-widesl-split-session.md

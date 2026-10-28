@@ -1,6 +1,6 @@
 # Directional: overall MTM stop
 
-**Status:** Tested · **Last updated:** 2026-10-26
+**Status:** Tested · **Last updated:** 2026-10-28
 
 ## What it is
 
@@ -17,6 +17,7 @@ rupees with a much smaller lot, so it binds less often there ([BL-056][bl056]).
 
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
+| [BL-184][bl184] E1 | ₹500, 1,000, 1,500, 2,000, 2,500, 3,500, 4,000 on a **morning-only** Dir (09:17–12:47 → 13:00), Adaptive's one pick, the files' ₹3,000 as the base | 434 pick days 2025-01-10 → 2026-10-27, after charges, seen data, descriptive sweep | ₹1,500 reads +186 a day with the drawdown halved but its neighbours (₹1,000 +93, ₹2,000 +80) sit at the files' +81 and the fixed `N_dir` file at ₹1,500 earns +16 with an −85k drawdown; noise, no level helps | [Session split](session-split.md) |
 | BL-070 | ₹3,000 vs no overall stop, all 50 Dir ATM variants (leg stops and re-entry kept) | 2025-09-01 → 2026-10-08, 1 lot, before charges | **Costs more than it saves** on both indices | [BL-070][bl070] |
 | BL-096 | ₹2,000, ₹2,500, ₹3,000, ₹3,500, ₹4,000 × leg stop × exit, ATM and ITM1 | holdout 2025-10-09 → 2026-10-09, before and **after charges** | Descriptive: net rises with the stop up to ₹4,000, the grid edge | [BL-096][bl096] |
 | BL-156 | Overall stop checked at each 1-minute candle close (the engine) vs on every tick (live; modelled from each minute's high / low, calibrated on the 23 Oct live stop) | T1's and Core's Adaptive picks (every family together), 2025-01-10 → 2026-10-22, 1 lot, after brokerage | **No meaningful difference** on the whole book: close +₹56 / day on T1, 90% [−17, +144]; Core +₹38 [−35, +130]; not split by family | [BL-156][bl156] |
@@ -63,3 +64,4 @@ On the days it fired, the unstopped strategy lost less (NIFTY −₹77,634 → �
 [bl096pc]: ../../../../backlog/BL-096-directional-qualified-list-post-charge.md
 [bl156]: ../../../../backlog/BL-156-mtm-stop-tick-vs-candle-close.md
 [bl181]: ../../../../backlog/BL-181-directional-itm2-itm3-with-matched-stop.md
+[bl184]: ../../../../backlog/BL-184-directional-split-session.md

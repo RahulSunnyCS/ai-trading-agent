@@ -292,6 +292,46 @@ new registration. Full table: `research/bl182/out/phase2_mtm2000_summary.md` (gi
   overall stop would be an engine addition, registered on its own.
 - **Will not run:** stops on the afternoon sets, other levels, a stop by family or index.
 
+**Result (2026-10-28):** the morning Widesl wants a *looser* stop, not a tighter one; no level "helps" by
+the registered definition because the morning book's drawdown deepens as its earnings rise. Adaptive's
+morning book (two picks, per margin lot-day, 434 pick days; the split row is that morning plus the
+unchanged afternoon against the ₹2,500 whole-day comparator); full table
+`research/bl182/out/morning_stops_summary.md` (git-ignored; `uv run python research/bl182/stops.py
+--analyse-only` rebuilds it).
+
+| Morning stop | AM net | AM gross | AM days in profit | AM max DD | AM stop hit / day | Split − comparator net [90 %] | Split max DD |
+|---|---|---|---|---|---|---|---|
+| ₹500 | +46 | +131 | 46 % | −10,591 | 0.99 | +57 [−97, +207] | −21,754 |
+| ₹750 | +37 | +122 | 49 % | −13,842 | 0.86 | +47 [−91, +190] | −20,452 |
+| ₹1,000 | +39 | +124 | 54 % | −14,737 | 0.74 | +50 [−91, +181] | −16,928 |
+| ₹1,250 | +53 | +138 | 55 % | −18,989 | 0.61 | +64 [−80, +203] | −19,388 |
+| ₹1,500 | +75 | +160 | 56 % | −14,185 | 0.52 | +86 [−65, +232] | −15,818 |
+| ₹1,750 | +61 | +145 | 57 % | −16,222 | 0.46 | +71 [−65, +201] | −16,940 |
+| ₹2,000 | +75 | +160 | 57 % | −16,448 | 0.41 | +86 [−56, +224] | −18,112 |
+| **₹2,500 (the files)** | +64 | +149 | 60 % | −16,609 | 0.30 | +75 [−56, +205] | −13,978 |
+| ₹3,000 | +140 | +225 | 61 % | −17,048 | 0.20 | +151 [+13, +287] | −15,370 |
+| ₹4,000 | +168 | +253 | 62 % | −21,872 | 0.09 | +178 [+34, +319] | −15,729 |
+
+- **Tighter stops hurt.** Every level below ₹2,500 earns less than the files' stop (₹37–75 against ₹64)
+  because the stop is hit on 41–99 % of pick-days (the Widesl's morning gamma); only ₹500 cuts the
+  drawdown, at 46 % days in profit.
+- **Looser stops earn more, in every half-year.** The morning book's net rises monotonically from ₹2,500
+  to ₹3,000 to ₹4,000 (+64 → +140 → +168) and does so in each of the four half-years (2025 H1 3.3k →
+  18.9k → 21.0k; 2025 H2 9.8k → 13.0k → 21.4k; 2026 H1 9.5k → 20.4k → 20.8k; 2026 H2 5.2k → 8.4k → 9.7k),
+  while the stop is hit on 20 % and 9 % of pick-days instead of 30 %. The morning book's drawdown deepens
+  (−17,048 and −21,872 against −16,609), so by the registered definition neither level "helps".
+- **The split with a ₹3,000 or ₹4,000 morning stop clears zero on the whole span** (+151 [+13, +287], +178
+  [+34, +319]) with a shallower drawdown than the comparator's −16,987: it would have passed Phase 2's
+  rule. But it is one of nine levels read on seen data, and the gain is still mostly the first year
+  (₹4,000: +334 [+111, +562] in T1's selection year, +64 [−115, +242] after; the same sign in both).
+- The fixed 09:17 files barely move with the stop (`N_wide` morning half +141 → +149 → +165; `S_wide` +266
+  → +265 → +257), so most of Adaptive's morning gain at the looser stops is in which slots it picks.
+
+Reading: the ₹2,500 overall stop, right for a whole-day set, is too tight for a set that is closed at
+12:00 with the day's gamma still in it. A morning Widesl stop of ₹3,000–4,000 is a lead: the one thing in
+this item that moved in the same direction at every level and in every half-year. It is not adopted; it
+needs a registration of its own with one level fixed in advance and a forward track.
+
 ## Risks
 
 - Fills at 12:00 and 13:00 on 1-minute bars with no spread; the afternoon set's smaller premiums.
@@ -348,3 +388,6 @@ new registration. Full table: `research/bl182/out/phase2_mtm2000_summary.md` (gi
   comparator's, FAIL; the fixed live files at ₹2,000 +₹1 (NIFTY) / +₹37 (SENSEX). Item closed: not adopted.
 - 2026-10-28 — E2 registered (owner override: the morning sets' overall stop at nine levels ₹500 → ₹4,000,
   descriptive) before its run.
+- 2026-10-28 — E2 run (`research/bl182/stops.py`, nine levels): tighter morning stops hurt; ₹3,000 / ₹4,000 raise
+  the morning book to +140 / +168 (every half-year) and the split clears zero (+151 [+13, +287], +178 [+34, +319]);
+  the morning drawdown deepens, so no level "helps" by the registered definition. Lead for its own registration.
