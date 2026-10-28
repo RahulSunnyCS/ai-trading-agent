@@ -410,9 +410,12 @@ favourite with the end pinned to its last accepted anchor and names the instrume
   newest week are never inside it). The baseline is `history_baseline.json` in the Momentum state
   folder (`data/`), every event appended to `history_baseline_log.jsonl`. A clean check whose anchor is
   more than 28 days behind moves it forward; a change is never accepted without `--accept --reason`.
-- **Exit codes:** a change exits 0 (its own Telegram, with `--send`, is the alert; the same rule as
-  `mbt live-rules check` on a breach), so the scheduler does not alert twice; exit 1 only when the
-  check cannot run, which is also sent. Tests in `tests/test_verify.py`.
+- **Exit codes:** a change exits 0 once its own Telegram is delivered (`notify.deliver`; the message
+  is the alert, the same rule as `mbt live-rules check` on a breach), so the scheduler does not alert
+  twice. A change that reached nobody (no `--send`, Telegram off or unreachable) exits 1, as does a
+  check that cannot run (also sent). A missing baseline file is refused while the log shows an earlier
+  one (re-recording it would accept every change since); a baseline recorded under `--send` is
+  messaged. Tests in `tests/test_verify.py` (from the PR #365 review).
 - **Scheduled:** job `momentum-history`, Fri 22:00 IST (after the 19:30 stock sync's two-hour window
   and the 21:00 / 21:30 checks), `catalog` group, `alertsItself`, one retry 10 minutes later.
   Replaces the plan's "appended to the 19:30 LaunchAgent": the per-job plists are gone (BL-012).
@@ -459,6 +462,6 @@ favourite with the end pinned to its last accepted anchor and names the instrume
   from 43.2% to 35.3% CAGR, and the blend's worst fall from -27.0% to -34.8%, in April 2020. The search
   re-run on the fixed ranking is BL-176; the live-rules drawdown thresholds are BL-025's to revisit.
 - 2026-10-28 — owner: Phase 4 = the history check only. `mbt verify history` now exits 0 on a change
-  (its Telegram is the alert) and is scheduled as `momentum-history`, Fri 22:00 IST; the first baseline
+  once its Telegram is delivered (the message is the alert) and is scheduled as `momentum-history`, Fri 22:00 IST; the first baseline
   is written once from the main checkout after the merge (owner-approved). The pinned favourite re-run
   is BL-177 (P2). F3 and F4 stay deferred (owner, 2026-10-22). Status `Done`.

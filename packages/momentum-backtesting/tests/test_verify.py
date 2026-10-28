@@ -255,21 +255,23 @@ def test_the_log_line_is_written_before_the_baseline_moves(root, tmp_path, monke
 
 @pytest.fixture
 def command(monkeypatch):
-    """Runs `mbt verify history` with `verify.run` faked; returns (result, Telegram messages)."""
+    """Runs `mbt verify history` with `verify.run` faked; returns (result, Telegram messages).
+    `delivered` is what Telegram answers (`notify.deliver`)."""
     from typer.testing import CliRunner
 
     from momentum_backtesting import cli, notify
 
     sent: list[notify.Notification] = []
-    monkeypatch.setattr(notify, "send", lambda n: sent.append(n) or "")
 
-    def invoke(outcome, *args, error=None):
+    def invoke(outcome, *args, error=None, delivered=True):
         def fake_run(*_a, **_k):
             if error is not None:
                 raise error
             return outcome
 
         monkeypatch.setattr(verify, "run", fake_run)
+        monkeypatch.setattr(notify, "send", lambda n: sent.append(n) or "")
+        monkeypatch.setattr(notify, "deliver", lambda n: sent.append(n) is None and delivered)
         return CliRunner().invoke(cli.app, ["verify", "history", *args]), sent
 
     return invoke
@@ -280,16 +282,22 @@ def _changed():
     return verify.Outcome("changed", date(2026, 10, 9), verify.Diff(changed=[moved]))
 
 
-def test_a_change_with_send_exits_0_because_the_message_is_the_alert(command):
+def test_a_change_whose_message_is_delivered_exits_0_because_the_message_is_the_alert(command):
     result, sent = command(_changed(), "--send")
     assert result.exit_code == 0, result.output
     assert len(sent) == 1 and sent[0].severity == "warn" and sent[0].type == "momentum.problem"
     assert "price:NIFTY|weekly" in sent[0].body
 
 
-def test_a_change_without_send_is_printed_and_exits_0(command):
+def test_a_change_whose_message_did_not_get_through_exits_1(command):
+    result, sent = command(_changed(), "--send", delivered=False)
+    assert result.exit_code == 1 and len(sent) == 1
+    assert "no Telegram message was delivered" in result.output
+
+
+def test_a_change_without_send_reaches_nobody_so_it_exits_1(command):
     result, sent = command(_changed())
-    assert result.exit_code == 0 and sent == []
+    assert result.exit_code == 1 and sent == []
     assert "Restated history" in result.output and "price:NIFTY|weekly" in result.output
 
 
@@ -298,8 +306,53 @@ def test_a_clean_check_sends_nothing(command):
     assert result.exit_code == 0 and sent == []
 
 
+def test_a_baseline_recorded_by_a_sending_run_is_reported(command):
+    result, sent = command(verify.Outcome("new_baseline", date(2026, 10, 9)), "--send")
+    assert result.exit_code == 0
+    assert len(sent) == 1 and "baseline recorded" in sent[0].title
+
+
 def test_a_check_that_cannot_run_exits_1_and_says_so(command):
     result, sent = command(None, "--send", error=ValueError("catalog locked"))
     assert result.exit_code == 1
     assert len(sent) == 1 and sent[0].severity == "error" and "could not run" in sent[0].title
     assert "catalog locked" in sent[0].body
+
+
+def test_a_lost_baseline_is_refused_not_silently_recorded_again(root, tmp_path):
+    state = _state(tmp_path)
+    verify.run(state, TODAY, root=root, bars=False)
+    verify.baseline_path(state).unlink()
+    with pytest.raises(ValueError, match="missing"):
+        verify.run(state, TODAY, root=root, bars=False)
+    assert not verify.baseline_path(state).exists()
+    out = verify.run(
+        state, TODAY, root=root, accept=True, reason="restored after a wipe", bars=False
+    )
+    assert out.status == "new_baseline"
+    log = [json.loads(x) for x in (state / verify.LOG_FILE).read_text().splitlines()]
+    assert [e["event"] for e in log] == ["new_baseline", "new_baseline"]
+    assert log[1]["reason"] == "restored after a wipe"
+
+
+def test_deliver_says_whether_telegram_took_the_message(monkeypatch):
+    from momentum_backtesting import notify
+
+    message = notify.Notification("x", "warn", "t", "b", type=None)
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    assert notify.deliver(message) is False  # not configured
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "token-1234")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "42")
+
+    def refuse(*_a, **_k):
+        raise OSError("network down")
+
+    monkeypatch.setattr(notify.urllib.request, "urlopen", refuse)
+    assert notify.deliver(message) is False
+
+    class Ok:
+        def read(self):
+            return b"{}"
+
+    monkeypatch.setattr(notify.urllib.request, "urlopen", lambda *_a, **_k: Ok())
+    assert notify.deliver(message) is True

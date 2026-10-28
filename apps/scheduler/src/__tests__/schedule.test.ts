@@ -184,24 +184,28 @@ describe('Angel One login check', () => {
 
 describe('momentum history check (BL-001 Phase 4)', () => {
   const job = JOBS.find((j) => j.id === 'momentum-history');
-  const minutes = (at = '') => {
-    const [h = 0, m = 0] = at.split(':').map(Number);
-    return h * 60 + m;
-  };
+  const friday = '2026-10-30';
 
   it('runs mbt verify history --send on Fridays, after the 19:30 stock sync has had its time', () => {
     const ingest = JOBS.find((j) => j.id === 'momentum-stock-ingest');
     expect(job?.steps).toEqual([['uv', 'run', 'mbt', 'verify', 'history', '--send']]);
     expect(job?.cwd).toBe('packages/momentum-backtesting');
-    expect(job?.schedule.on('2026-10-30')).toBe(true); // Friday
+    expect(job?.schedule.on(friday)).toBe(true);
     expect(job?.schedule.on('2026-10-29')).toBe(false); // Thursday
-    expect(minutes(job?.schedule.at)).toBeGreaterThanOrEqual(
-      minutes(ingest?.schedule.at) + (ingest?.timeoutMinutes ?? 0),
-    );
+    const ingestEnd =
+      istAt(friday, ingest?.schedule.at ?? '').getTime() + (ingest?.timeoutMinutes ?? 0) * 60_000;
+    expect(istAt(friday, job?.schedule.at ?? '').getTime()).toBeGreaterThanOrEqual(ingestEnd);
   });
 
-  it('is in the catalog group and sends its own alerts, so the scheduler never repeats one', () => {
+  it('shares the catalog group with every Friday momentum job that can still run at its slot', () => {
+    // Read-only, but DuckDB will not open the catalog read-only while another process writes:
+    // the group is what keeps it apart from the stock sync and the 21:00 / 21:30 checks.
     expect(job?.group).toBe('catalog');
+    for (const id of ['momentum-stock-ingest', 'momentum-journal-check', 'momentum-live-rules'])
+      expect(JOBS.find((j) => j.id === id)?.group).toBe('catalog');
+  });
+
+  it('sends its own alerts, so the scheduler never repeats one', () => {
     expect(job?.alertsItself).toBe(true);
   });
 });

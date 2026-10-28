@@ -305,8 +305,9 @@ const BASE_JOBS: Job[] = [
     retryDelayMinutes: 10,
     catchUpHours: 48,
     group: 'catalog',
-    // A restated history is its own Telegram and exits 0; a check that cannot run sends its
-    // own message and exits 1.
+    // A restated history is its own Telegram and exits 0 once Telegram took it; an undelivered
+    // one exits 1 (retried, red on the Jobs page), and a check that cannot run sends its own
+    // message and exits 1.
     alertsItself: true,
     fixHint: 'cd packages/momentum-backtesting && uv run mbt verify history --send',
   },
