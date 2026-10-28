@@ -260,6 +260,9 @@ export interface MomentumResult {
   benchmark_name: string;
   kpis: Record<string, number | string | null>;
   comparisons?: MomentumComparison[];
+  /** Comparison lines the chart offers that the picker does not (Nifty 500 TRI; BL-036). Present
+   * only when one covers the run. */
+  extra_comparisons?: MomentumComparison[];
   /** The headline picker's five indices; absent on results computed before 2026-10-07. */
   benchmarks?: MomentumBenchmarkChoice[];
   series: MomentumSeries;

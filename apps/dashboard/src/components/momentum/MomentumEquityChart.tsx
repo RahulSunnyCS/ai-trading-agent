@@ -22,6 +22,7 @@ import {
 } from '../../lib/chartTheme';
 import { cn } from '../../lib/cn';
 import { EMPTY, formatDay, formatInr, formatInt, formatPct } from '../../lib/format';
+import type { ComparisonLine } from '../../lib/momentumBenchmark';
 import {
   EQUITY_RANGES,
   type EquityRange,
@@ -49,12 +50,7 @@ import {
 import { type PlotlyBasic, loadPlotly } from '../../lib/plotly';
 import { useMomentumViewStore } from '../../store/momentumView';
 import { useThemeStore } from '../../store/theme';
-import type {
-  MomentumComparison,
-  MomentumRotation,
-  MomentumSavedRun,
-  MomentumSeries,
-} from '../../types/momentum';
+import type { MomentumRotation, MomentumSavedRun, MomentumSeries } from '../../types/momentum';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { SegmentedControl } from '../ui/SegmentedControl';
@@ -750,7 +746,8 @@ function WeekChanges({
  * 52-week-edge panes are off by default (the Drawdowns widget below the chart has the numbers).
  *
  * `series` already carries the picked benchmark (`withBenchmark`); `comparisons` are the other
- * indices, offered as "+ name" chips and drawn only once added.
+ * indices (`comparisonLines`), offered as chips in the legend: Nifty 200 Momentum 30 and Midcap
+ * 150 drawn from the start, the rest "+ name" until added.
  */
 export function MomentumEquityChart({
   series,
@@ -766,7 +763,7 @@ export function MomentumEquityChart({
   benchmarkName: string;
   rotations: MomentumRotation[];
   overlays?: MomentumSavedRun[];
-  comparisons?: Array<Pick<MomentumComparison, 'name' | 'series'>>;
+  comparisons?: ComparisonLine[];
   flashKey?: number | null;
   /** A Broad Momentum result: its rotation markers show only at a year or less. */
   broad?: boolean;
@@ -787,8 +784,16 @@ export function MomentumEquityChart({
   const [zoom, setZoom] = useState<{ key: string; from: string; to: string } | null>(null);
   /** Default lines switched off, by key. The liquid fund starts off. */
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set([CASH_KEY]));
-  /** Optional lines (the other indices) the reader has added, by key. */
-  const [added, setAdded] = useState<ReadonlySet<string>>(() => new Set());
+  /** Optional lines (the other indices) the reader has switched from their default, by key: an
+   * off-by-default line added, or a default line (Nifty 200 Momentum 30, Midcap 150) taken off.
+   * Kept as flips so a line that becomes a comparison when the picker changes starts at its own
+   * default. */
+  const [flipped, setFlipped] = useState<ReadonlySet<string>>(() => new Set());
+  const defaultOn = useMemo(
+    () =>
+      new Set(comparisons.filter((line) => line.defaultOn).map((line) => comparisonKey(line.name))),
+    [comparisons],
+  );
   const boxRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   /** The last mouse position over the plot (client coordinates); null once it leaves. */
@@ -802,8 +807,9 @@ export function MomentumEquityChart({
   const totalHeight = drawdownOpen ? plotHeight + RISK_PANES_PX : plotHeight;
 
   const isHidden = useCallback(
-    (key: string): boolean => (key.startsWith('comparison:') ? !added.has(key) : hidden.has(key)),
-    [added, hidden],
+    (key: string): boolean =>
+      key.startsWith('comparison:') ? defaultOn.has(key) === flipped.has(key) : hidden.has(key),
+    [defaultOn, flipped, hidden],
   );
 
   function toggleTrace(key: string): void {
@@ -813,7 +819,7 @@ export function MomentumEquityChart({
       else next.add(key);
       return next;
     };
-    if (key.startsWith('comparison:')) setAdded(flip);
+    if (key.startsWith('comparison:')) setFlipped(flip);
     else setHidden(flip);
   }
 

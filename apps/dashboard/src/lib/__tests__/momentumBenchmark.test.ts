@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import type { MomentumResult, MomentumSeries } from '../../types/momentum';
 import {
   DEFAULT_BENCHMARK,
+  DEFAULT_COMPARISON_LINES,
   aheadShare,
   benchmarkLabel,
   benchmarkOptions,
   changeBetween,
+  comparisonLines,
   drawdownSeries,
   edgeAgainst,
   resolveBenchmark,
@@ -295,5 +297,69 @@ describe('derived series', () => {
       { peak: 6, trough: 7, recovered: null, depth: expect.closeTo(-5 / 130) },
     ]);
     expect(changeBetween(values, 3, 4)).toBeCloseTo(-0.5);
+  });
+});
+
+describe('comparisonLines', () => {
+  const midcap = { ...mom, name: 'Nifty Midcap 150 TRI', series: [100, 101, 102, 103, 104] };
+  const smallcap = { ...mom, name: 'Nifty Smallcap 250 TRI', series: [100, 99, 98, 97, 96] };
+  const nifty50 = { ...mom, name: 'Nifty 50 TRI' };
+  const next50 = { name: 'Nifty Next 50 TRI', available: false as const, reason: 'No data' };
+  const nifty500 = {
+    name: 'Nifty 500 TRI',
+    cagr: 0.12,
+    excess_cagr: 0.1,
+    max_drawdown: -0.2,
+    note: null,
+    series: [100, 102, 104, 106, 108],
+  };
+  const full = result({
+    benchmarks: [mom, nifty50, next50, midcap, smallcap],
+    extra_comparisons: [nifty500],
+  });
+
+  it('offers every usable index but the picked one, then Nifty 500, with two on by default', () => {
+    expect(
+      comparisonLines(full, 'Nifty 50 TRI').map((line) => [line.name, line.defaultOn]),
+    ).toEqual([
+      ['Nifty 200 Momentum 30', true],
+      ['Nifty Midcap 150', true],
+      ['Nifty Smallcap 250', false],
+      ['Nifty 500', false],
+    ]);
+  });
+
+  it('never repeats the picked benchmark as a comparison', () => {
+    const lines = comparisonLines(full, DEFAULT_BENCHMARK);
+    expect(lines.map((line) => line.name)).not.toContain('Nifty 200 Momentum 30');
+    expect(lines.filter((line) => line.defaultOn).map((line) => line.name)).toEqual([
+      'Nifty Midcap 150',
+    ]);
+  });
+
+  it("treats the run's own benchmark (a fallback pick) as no picker index", () => {
+    expect(comparisonLines(full, 'Nifty 50').map((line) => line.name)).toEqual([
+      'Nifty 200 Momentum 30',
+      'Nifty 50',
+      'Nifty Midcap 150',
+      'Nifty Smallcap 250',
+      'Nifty 500',
+    ]);
+  });
+
+  it("leaves out a line whose curve does not match the run's weeks", () => {
+    const short = result({
+      benchmarks: [{ ...midcap, series: [100, 101] }],
+      extra_comparisons: [{ ...nifty500, series: [100] }],
+    });
+    expect(comparisonLines(short, DEFAULT_BENCHMARK)).toEqual([]);
+  });
+
+  it('is empty for a result from before the picker, with no extras', () => {
+    expect(comparisonLines(result(), 'Nifty 50')).toEqual([]);
+  });
+
+  it('turns on the momentum index and Midcap 150 only', () => {
+    expect(DEFAULT_COMPARISON_LINES).toEqual(['Nifty200 Momentum 30 TRI', 'Nifty Midcap 150 TRI']);
   });
 });
