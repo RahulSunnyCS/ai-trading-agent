@@ -40,6 +40,10 @@ def test_rules_file_holds_the_owners_numbers():
     assert RULES["money_gate"]["must_beat"] == "Nifty200 Momentum 30 TRI"
     for key in ("cut_half_action", "exit_action"):
         assert RULES["drawdown"][key]
+        # BL-025 (owner, 2026-10-28): N, alert and review. A line asks for a logged decision,
+        # it never prescribes the trade on its own.
+        assert RULES["drawdown"][key].startswith("Review now and decide")
+        assert "Log the decision" in RULES["drawdown"][key]
     assert RULES["trailing"]["review_action"] and RULES["money_gate"]["confirm_action"]
 
 

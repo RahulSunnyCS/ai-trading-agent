@@ -174,12 +174,38 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('has 46 jobs', () => {
+  it('has 49 jobs', () => {
     // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor; BL-168: + contract-notes, contract-notes-retry, contract-notes-capital; + contract-notes-retry-1030, -1530
     // BL-012: + check-expiry-calendar (Y4), check-blocked-dates (Y3), universe-refresh-reminder (S3)
     // BL-024: + momentum-journal-score
     // BL-001 Phase 4: + momentum-history
-    expect(JOBS).toHaveLength(46);
+    // phone login: + fyers-login-reminder, fyers-login-recheck, kite-login-reminder-monday
+    expect(JOBS).toHaveLength(49);
+  });
+});
+
+describe('login reminders (phone login)', () => {
+  const byId = (id: string) => JOBS.find((j) => j.id === id);
+  it('reminds about Fyers at 08:05 and 15:30 on trading days, never retried', () => {
+    for (const [id, at, when] of [
+      ['fyers-login-reminder', '08:05', 'morning'],
+      ['fyers-login-recheck', '15:30', 'evening'],
+    ] as const) {
+      const job = byId(id);
+      expect(job?.schedule.at).toBe(at);
+      expect(job?.steps).toEqual([['uv', 'run', 'mbt', 'token-remind', '--send', '--when', when]]);
+      expect(job?.retries).toBe(0);
+      expect(job?.schedule.on('2026-10-28')).toBe(true); // a Wednesday
+      expect(job?.schedule.on('2026-10-31')).toBe(false); // a Saturday
+    }
+  });
+  it('reminds about Kite on trading Mondays at 08:45 with the Monday wording', () => {
+    const job = byId('kite-login-reminder-monday');
+    expect(job?.schedule.at).toBe('08:45');
+    expect(job?.steps[0]).toContain('monday');
+    expect(job?.schedule.on('2026-10-26')).toBe(true); // a Monday
+    expect(job?.schedule.on('2026-10-30')).toBe(false); // a Friday
+    expect(byId('kite-login-reminder')?.schedule.on('2026-10-30')).toBe(true);
   });
 });
 

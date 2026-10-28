@@ -160,9 +160,9 @@ def test_result_goes_to_private_chat_and_group(telegram, evening_store):
         assert "➡️ Wed 14 Oct" in text
         assert "Steady" not in text and "Calendar" not in text and "Baseline" not in text
         assert "parse_mode" not in request
-    # the owner's message says T1 was not recorded; the group's has no T1 at all
-    assert "🧪 T1 · not recorded today" in telegram[0]["text"]
-    assert "🧪" not in telegram[1]["text"]
+    # both say T1 was not recorded (the group gets the owner's message, with no live lines here)
+    assert "🧪 Tuned Adaptive (In Testing phase) · not recorded today" in telegram[0]["text"]
+    assert telegram[1]["text"] == telegram[0]["text"]
 
 
 def test_result_is_not_sent_twice(telegram, evening_store):

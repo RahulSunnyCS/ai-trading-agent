@@ -4,13 +4,13 @@ The text itself is `messages.py`; this module decides when it is sent. Nothing h
 picked, scored or journaled: it calls `pick.record` and `result.calculate` exactly as before and
 only chooses how their output reaches Telegram.
 
-Morning (`pick_and_send`): Adaptive is recorded first and is never held back by T1. The friends'
-group gets its copy (Adaptive alone) the moment the entry is written. T1 is recorded right after
-(reusing the live entry's VIX read); the owner's message carries both when T1 is in by
+Morning (`pick_and_send`): Adaptive is recorded first and is never held back by T1. T1 is
+recorded right after (reusing the live entry's VIX read); the message carries both when T1 is in by
 `t1_deadline` (09:16:50 IST, or 20 s after Adaptive's entry when that is sooner or the run is
-later). Otherwise the owner gets Adaptive with T1 marked "not recorded today", a T1 failure alerts
-as before, and if T1 records later (after a catch-up of its results, or the job's retry) it
-follows as a message of its own.
+later). Otherwise it goes with Adaptive and T1 marked "not recorded today" (or "follows"), a T1
+failure alerts the owner, and if T1 records later (after a catch-up of its results, or the job's
+retry) it follows as a message of its own. The owner and the friends' group get every one of these
+messages alike; alerts stay private.
 
 Evening (`send_result`): one message for both lists plus tomorrow's strategies, under a per-day
 lock. See `send_result` for the sent-marker design.
@@ -183,16 +183,11 @@ def pick_and_send(
         if live is not None:
             echo(live.text)
             if send_live:
-                _send_to_all(live.text, live.text, _severity(live.entry), send)
+                _send_to_all(live.text, _severity(live.entry), send)
         return 0
 
     # What last evening's message listed for today: each list says whether its picks changed.
     previous = result.read_tentative(day, root)
-    # The group's copy is Adaptive alone: it never waits for T1.
-    group_id = group_chat_id()
-    if live is not None and send_live and group_id:
-        _, group = messages.render_morning(live.entry, live.options, None, previous=previous)
-        send(group, _severity(live.entry), chat_id=group_id)
 
     # T1 next, sharing the live entry's VIX read: one poll, one value.
     entry = live.entry if live else _journal_entry(day, root, None)
@@ -210,16 +205,16 @@ def pick_and_send(
         in_time = False
 
     if live is not None:
-        # The owner's message: Adaptive, with T1 beside it when it is in, whatever happens next.
+        # The message: Adaptive, with T1 beside it when it is in, whatever happens next.
         if in_time and (t1 is not None or t1_already):
             t1_entry = t1.entry if t1 else _journal_entry(day, root, "t1")
             t1_options = t1.options if t1 else None
-            private, _ = messages.render_morning(
+            text = messages.render_morning(
                 live.entry, live.options, t1_entry, t1_options, previous=previous
             )
-            echo(private)
+            echo(text)
             if send_live:
-                send(private, _severity(live.entry))
+                _send_to_all(text, _severity(live.entry), send)
             pool.shutdown(wait=False)
             return 0
         # Honest about why T1 is missing: still being recorded (slow, or its results are about to
@@ -229,12 +224,12 @@ def pick_and_send(
             t1_error is not None and _needs_catch_up(t1_error, "t1") and not dry_run
         )
         note = messages.T1_FOLLOWS if follows else messages.T1_NOT_RECORDED
-        private, _ = messages.render_morning(
+        text = messages.render_morning(
             live.entry, live.options, None, t1_note=note, previous=previous
         )
-        echo(private)
+        echo(text)
         if send_live:
-            send(private, _severity(live.entry))
+            _send_to_all(text, _severity(live.entry), send)
 
     # T1 did not make the message. If it records (after a catch-up of its results, or on a retry)
     # it follows as a message of its own; if it fails the owner is alerted and the job retries.
@@ -258,7 +253,7 @@ def pick_and_send(
         return _failed(t1_error, day, lambda t, b: alert_if("T1 TRACK " + t, b), err, tag="T1 ")
     echo(t1.text)
     if send_live:
-        send(t1.text, _severity(t1.entry))  # T1 is private to the owner
+        _send_to_all(t1.text, _severity(t1.entry), send)
     return 0
 
 
@@ -266,11 +261,12 @@ def _severity(entry: dict) -> str:
     return "info" if entry.get("before_first_entry") else "warn"
 
 
-def _send_to_all(private: str, group: str, severity: str, send: SendText) -> bool:
-    ok = send(private, severity)
+def _send_to_all(text: str, severity: str, send: SendText) -> bool:
+    """The owner's chat, then the friends' group when one is configured."""
+    ok = send(text, severity)
     group_id = group_chat_id()
     if group_id:
-        ok = send(group, severity, chat_id=group_id) and ok
+        ok = send(text, severity, chat_id=group_id) and ok
     return ok
 
 
@@ -349,17 +345,19 @@ def send_result(
       scored): the message goes out now saying so, and T1 is settled;
     - the entry exists but its strategies are not all scored yet: until `wait_until` (IST) nothing
       is sent and the exit code is 2, so the scheduler's retry runs again in a few minutes. At or
-      after it the message goes out with `🧪 T1 · result not ready`, and T1 stays unsettled so the
-      next run (a retry, the 21:00 catch-up job, or by hand) sends T1's result as a message of its
-      own once it is there;
+      after it the message goes out with `messages.T1_RESULT_NOT_READY`, and T1 stays unsettled so
+      the next run (a retry, the 21:00 catch-up job, or by hand) sends T1's result as a message of
+      its own once it is there;
     - T1 cannot be read at all (an error): the message goes out now with the same note, and T1
       stays unsettled.
 
-    Sent markers (`result.sent_marker`) are per destination and per piece, so a retry never sends
-    the owner's chat the same message twice, a failed group copy is retried alone, and a late T1
-    result is still delivered. Deciding, sending and marking happen under `result.sending_lock`,
-    so two overlapping runs cannot both send. The owner's message goes first; the group copy is
-    sent and retried on its own, so a group that fails never holds back the owner's T1 follow-up.
+    The friends' group gets the same message without the owner's live-vs-paper lines, and a late T1
+    result follows to it as it does to the owner. Sent markers (`result.sent_marker`) are per
+    destination and per piece, so a retry never sends the owner's chat the same message twice, a
+    failed group copy is retried alone, and a late T1 result is still delivered. Deciding, sending
+    and marking happen under `result.sending_lock`, so two overlapping runs cannot both send. The
+    owner's message goes first; the group copy is sent and retried on its own, so a group that
+    fails never holds back the owner's T1 follow-up.
 
     `not_before` (IST): earlier than it, send nothing and exit 0, because the 16:00 job sends. The
     evening run ends with `result --not-before 16:00`, so a run that only completes on a late retry
@@ -436,6 +434,7 @@ def _send_result_locked(
     ok = True
     owner_out = done()  # the owner's message is (or, below, becomes) out
     t1_settled = done("t1")
+    group_t1_owed = bool(group_id) and done("group-t1-owed") and not done("group-t1")
     if owner_needed or group_needed:
         next_adaptive = _tomorrow_adaptive(day, root, echo) if with_tomorrow else None
         next_t1 = _tomorrow_t1(day, root, echo) if next_adaptive is not None else None
@@ -448,7 +447,7 @@ def _send_result_locked(
         # BL-141: the day's live slippage, in the owner's copy only (never the friends' group)
         live = live_compare.owner_lines(day, root, echo)
         private = result.render(adaptive, t1_part, next_adaptive, next_t1, live)
-        group = result.render(adaptive, None, next_adaptive, None)
+        group = result.render(adaptive, t1_part, next_adaptive, next_t1)
         echo(private)
         if not telegram:
             return 0
@@ -474,26 +473,36 @@ def _send_result_locked(
         if group_needed:
             if send(group, chat_id=group_id):
                 result.mark_sent(adaptive, root, "group")
+                # settled like the owner's T1; otherwise the group is owed T1's follow-up
+                group_t1_owed = kind not in ("ready", "none")
+                result.mark_sent(adaptive, root, "group-t1-owed" if group_t1_owed else "group-t1")
             else:
                 ok = False
                 err("the group copy was not delivered; the next run retries it alone")
 
-    # 3. the T1 result the owner is still owed, once the owner's message is out
+    # 3. the T1 result each chat is still owed, once that chat's main message is out
+    owed = []
     if owner_out and not t1_settled:
-        if kind == "none":
-            result.mark_sent(adaptive, root, "t1")
-        elif kind in ("pending", "error"):
-            echo(f"T1 result still not ready: {t1}")
-        else:
-            next_t1 = _tomorrow_t1(day, root, echo) if with_tomorrow else None
-            text = result.render_t1_followup(t1, next_t1)
-            echo(text)
-            if send(text):
-                result.mark_sent(adaptive, root, "t1")
-                result.save_tentative(day, None, next_t1, root)
+        owed.append((None, "t1"))
+    if group_t1_owed:
+        owed.append((group_id, "group-t1"))
+    if owed and kind == "none":
+        for _, marker in owed:
+            result.mark_sent(adaptive, root, marker)
+    elif owed and kind in ("pending", "error"):
+        echo(f"T1 result still not ready: {t1}")
+    elif owed:
+        next_t1 = _tomorrow_t1(day, root, echo) if with_tomorrow else None
+        text = result.render_t1_followup(t1, next_t1)
+        echo(text)
+        for chat, marker in owed:
+            if send(text, chat_id=chat):
+                result.mark_sent(adaptive, root, marker)
+                if chat is None:
+                    result.save_tentative(day, None, next_t1, root)
             else:
                 ok = False
-                err("Telegram delivery of the T1 result failed; it is not marked sent")
+                err(f"Telegram delivery of the T1 result failed ({marker}); it is not marked sent")
     elif not (owner_needed or group_needed):
         echo("already sent to Telegram")
     return 0 if ok else 2

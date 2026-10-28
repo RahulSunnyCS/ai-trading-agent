@@ -43,7 +43,7 @@ export function MomentumSettingsChips({
           key={chip.id}
           type="button"
           onClick={() => onOpenSection(chip.section)}
-          title="Open this setting"
+          title={chip.title ? `${chip.title} Click to open this setting.` : 'Open this setting'}
           className="whitespace-nowrap rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-muted transition-colors hover:border-border-strong hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {chip.label}

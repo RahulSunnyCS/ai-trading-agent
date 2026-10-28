@@ -99,6 +99,55 @@ def token_verdict(source: str, has_expiry: bool, probe: str) -> str | None:
     return None
 
 
+FYERS_REMINDERS = {
+    # when -> why the token is needed now
+    "morning": "The 09:16 pick and the evening collection read Fyers first (Angel One without it).",
+    "evening": "The evening collection at 15:45 reads Fyers first (Angel One without it).",
+}
+
+
+@app.command("token-remind")
+def token_remind(
+    send: bool = typer.Option(False, help="Send the reminder to Telegram when a login is needed."),
+    when: str = typer.Option("morning", help="morning (08:05) | evening (15:30): the wording."),
+) -> None:
+    """Trading days 08:05 and 15:30 (scheduler jobs `fyers-login-reminder`, `fyers-login-recheck`):
+    when there is no Fyers token Fyers accepts, remind the owner to log in, with a link to the
+    hosted Broker logins page (DASHBOARD_PUBLIC_URL). Silent when the token is good. Always exits 0:
+    the reminder is the alert."""
+    from . import login_nudge, notify
+
+    if when not in FYERS_REMINDERS:
+        raise typer.BadParameter(f"--when must be one of {', '.join(FYERS_REMINDERS)}")
+    load_repo_env()
+    try:
+        creds = fyers.resolve_credentials()
+        verdict = token_verdict(
+            creds.source, creds.expires_at is not None, fyers.probe_token(creds)
+        )
+    except fyers.FyersCredentialsError as error:
+        verdict = str(error)
+    if verdict is None:
+        typer.echo("Fyers: token accepted, nothing to remind")
+        return
+    how, link = login_nudge.how_to_log_in(
+        "On the laptop: dashboard > Broker logins > Fyers > Log in (or run: mbt login)."
+    )
+    body = f"{verdict.rstrip('.')}.\n{FYERS_REMINDERS[when]}\n{how}"
+    typer.echo(f"Fyers login needed. {body}")
+    if send:
+        notify.send(
+            notify.Notification(
+                "fyers-login-reminder",
+                "action_required",
+                "Log in to Fyers",
+                body,
+                run_url=link,
+                type="broker.fyers",
+            )
+        )
+
+
 @app.command()
 def fetch(
     no_fyers: bool = typer.Option(False, help="Only pull the public sources (cash, silver)."),
@@ -1994,16 +2043,33 @@ def kite_sync_cmd() -> None:
     )
 
 
+KITE_REMINDERS = {
+    # when -> (title, why)
+    "friday": (
+        "Log in to Kite before 14:15",
+        "Your orders at 14:15 read your Kite holdings and free cash.",
+    ),
+    "monday": (
+        "Log in to Kite before the open",
+        "Kite is read only while you are logged in (holdings and free cash, for Your orders).",
+    ),
+}
+
+
 @kite_app.command("remind")
 def kite_remind_cmd(
     send: bool = typer.Option(False, help="Send the reminder to Telegram when a login is needed."),
+    when: str = typer.Option("friday", help="friday (13:30) | monday (08:45): the wording."),
 ) -> None:
-    """Fri 13:30 (scheduler job `kite-login-reminder`): when Kite is the holdings source and today
-    has no valid Kite login, remind the owner to log in before the 14:15 orders. Always exits 0."""
-    from . import holdings_store, kite, notify
+    """Fri 13:30 and Mon 08:45 (scheduler jobs `kite-login-reminder`, `kite-login-reminder-monday`):
+    when Kite is the holdings source and today has no valid Kite login, remind the owner to log in,
+    with a link to the hosted Broker logins page (DASHBOARD_PUBLIC_URL). Always exits 0."""
+    from . import holdings_store, kite, login_nudge, notify
     from .config import load_repo_env
     from .db_read import open_catalog
 
+    if when not in KITE_REMINDERS:
+        raise typer.BadParameter(f"--when must be one of {', '.join(KITE_REMINDERS)}")
     load_repo_env()
     with open_catalog() as con:
         source = holdings_store.settings(con, holdings_store.owner())["holdings_source"]
@@ -2020,21 +2086,23 @@ def kite_remind_cmd(
     if alive:
         typer.echo("Kite: logged in, nothing to remind")
         return
-    body = (
-        "Your orders at 14:15 read your Kite holdings and free cash.\n"
-        "On the laptop: dashboard > Broker logins > Kite > Log in "
-        "(or run: mbt kite login)."
+    title, why = KITE_REMINDERS[when]
+    how, link = login_nudge.how_to_log_in(
+        "On the laptop: dashboard > Broker logins > Kite > Log in (or run: mbt kite login)."
     )
+    body = f"{why}\n{how}"
     if not kite.configured():
         body = "KITE_API_KEY / KITE_API_SECRET are missing from .env, so Kite cannot be read."
+        link = None
     typer.echo(f"Kite login needed. {body}")
     if send:
         notify.send(
             notify.Notification(
                 "kite-login-reminder",
                 "action_required",
-                "Log in to Kite before 14:15",
+                title,
                 body,
+                run_url=link,
                 type="broker.kite",
             )
         )
