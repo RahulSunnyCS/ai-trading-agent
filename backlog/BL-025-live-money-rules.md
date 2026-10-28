@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — becomes P0 the week real money goes into the strategy |
-| **Status** | In progress (Phase 2); drawdown-rule test pre-registration drafted, awaiting sign-off |
+| **Status** | In progress (Phase 2); drawdown-rule test signed off 2026-10-28, running |
 | **Type** | feature |
 | **Area** | momentum |
 | **Created** | 2026-10-06 |
@@ -60,7 +60,7 @@ A `live_rules` file the owner writes once, and a weekly check that alerts when a
        pause or stop).
 1. ~~Friends and the rules?~~ **Shown for information only** (owner delegated to the recommendation, 2026-10-06): friends see the owner's rules as an
    example, and each friend's own money is their decision; the alerts go to the owner only.
-2. **Drawdown-rule test (block under Experiments, drafted 2026-10-28), for the owner:**
+2. **Drawdown-rule test (block under Experiments, drafted 2026-10-28). Answered by the owner 2026-10-28: a signed off as written; b X = 3 points; c do not wait for BL-176; d not asked separately, so the block stands as registered (2012–2016 not read here, left to BL-176).**
    - **a. Sign-off.** Do the six candidates, the lot ramps and the pass / kill rule stand as
      written? Nothing runs before "signed off" is in the Log.
    - **b. X = 3 points**, the CAGR a candidate may give up against holding through. 3 is the
@@ -294,3 +294,4 @@ a new file. A rule here is never edited after a run. A changed rule is a new dat
     pass rule (≤ 35% worst fall of money held everywhere, ≤ 3 points of CAGR given up) and the
     look-ahead checks. **Nothing has run. It awaits the owner's sign-off** (open question 2).
     The strategy itself was chosen on the pre-F6 ranking; BL-176 re-runs that search.
+- 2026-10-28 — **signed off** by the owner (asked in chat): the Experiments block "Drawdown rules with a way back in" and `search_spaces/bl025_rules_criteria.json` stand as written at merge `a4045e3f`, with X = 3 points; run now, without waiting for BL-176. Nothing had run before this entry.
