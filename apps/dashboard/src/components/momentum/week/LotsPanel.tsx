@@ -12,7 +12,6 @@ import {
   formatIstDateTime,
 } from '../../../lib/format';
 import {
-  beyondValue,
   closeDaysText,
   holdsText,
   lastOrdersText,
@@ -39,8 +38,9 @@ type LotsView = Extract<MomentumLotsView, { available: true }>;
  * share). Left out when the headline is not followed lot by lot.
  *
  * Always about now: the ledger and this coming Friday, whatever week the page shows
- * (`shownWeek`, said when it differs). `ordersVersion` changes when Your orders made or reloaded
- * orders, or its settings changed: the panel then reads the ledger again.
+ * (`shownWeek`: the `?week=` the reader picked, said when it differs). `ordersVersion`
+ * changes when Your orders made or reloaded orders, or its settings changed: the panel then
+ * reads the ledger again.
  */
 export function LotsPanel({
   shownWeek = null,
@@ -99,7 +99,6 @@ export function LotsPanel({
 }
 
 function LotsBody({ view, shownWeek }: { view: LotsView; shownWeek: string | null }) {
-  const beyond = beyondValue(view);
   const friday = formatDayShort(view.week, { weekday: true });
   return (
     <>
@@ -156,11 +155,13 @@ function LotsBody({ view, shownWeek }: { view: LotsView; shownWeek: string | nul
         <div className="border-t border-border px-4 py-3">
           <h3 className="text-sm font-semibold text-foreground">Kite minus the lots</h3>
           <p className="mt-0.5 text-xs text-muted">
-            Shares Kite holds that no lot has booked yet ({formatInr(beyond.value)}
-            {beyond.unpriced ? `, ${formatInt(beyond.unpriced)} without a close` : ''}). The next
-            Friday orders run books them to the lots its last orders named, the rest to the lot
-            those orders were for{view.pending ? ` (${view.pending})` : ''} when it may hold the
-            name; anything it cannot place stays here until you run{' '}
+            Shares Kite holds that no lot has booked yet ({formatInr(view.not_in_a_lot_value)}
+            {view.not_in_a_lot_unpriced
+              ? `, ${formatInt(view.not_in_a_lot_unpriced)} without a close`
+              : ''}
+            ). The next Friday orders run books them to the lots its last orders named, the rest to
+            the lot those orders were for{view.pending ? ` (${view.pending})` : ''} when it may hold
+            the name; anything it cannot place stays here until you run{' '}
             <span className="font-mono">mbt lots assign SYMBOL --lot N</span>. A row at 0 is a trade
             the last Friday orders named that Kite does not show yet.
           </p>

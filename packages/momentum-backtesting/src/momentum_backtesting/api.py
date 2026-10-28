@@ -4246,6 +4246,8 @@ def lots_view() -> dict:
         "total_value": round(sum(lot["value"] for lot in out), 2),
         "unpriced": sum(len(lot["unpriced"]) for lot in out),
         "not_in_a_lot": beyond,
+        "not_in_a_lot_value": round(sum(r["value"] for r in beyond if r["value"] is not None), 2),
+        "not_in_a_lot_unpriced": sum(1 for r in beyond if r["value"] is None),
         "last_orders": (
             {
                 "week": last_orders.get("week"),

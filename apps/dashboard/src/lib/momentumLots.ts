@@ -3,7 +3,7 @@
  * (`GET /api/momentum/lots`). Every figure is the server's; this file only chooses the words and
  * the tone, so the panel says the same as `mbt lots show` and the Friday Telegram.
  */
-import type { MomentumLot, MomentumLotOrders, MomentumLotsView } from '../types/momentum';
+import type { MomentumLot, MomentumLotOrders } from '../types/momentum';
 import { formatDayShort, formatInr, formatInt } from './format';
 
 /** The Friday orders' word for a lot (the Telegram's "NEW lot", "rebalance", …). */
@@ -74,19 +74,4 @@ export function closeDaysText(days: [string, string] | null): string {
   const [first, last] = days;
   if (first === last) return `the close of ${formatDayShort(last, { weekday: true })}`;
   return `each name's last close (${formatDayShort(first, { weekday: true })} to ${formatDayShort(last, { weekday: true })})`;
-}
-
-/** The value of what Kite holds beyond the lots (priced rows only) and how many rows had no
- * close: an unpriced row is counted, never read as zero. */
-export function beyondValue(view: Extract<MomentumLotsView, { available: true }>): {
-  value: number;
-  unpriced: number;
-} {
-  let value = 0;
-  let unpriced = 0;
-  for (const row of view.not_in_a_lot) {
-    if (row.value == null) unpriced += 1;
-    else value += row.value;
-  }
-  return { value, unpriced };
 }

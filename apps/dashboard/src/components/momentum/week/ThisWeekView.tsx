@@ -239,7 +239,7 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
       {card && card.dataset !== 'etf' && !scoresData ? (
         <ScoresFetcher onData={setScoresData} />
       ) : null}
-      <LotsPanel shownWeek={shown} ordersVersion={ordersVersion} />
+      <LotsPanel shownWeek={week} ordersVersion={ordersVersion} />
       <YourOrders favourites={cards} onChanged={onOrdersChanged} />
 
       <RunByHandDrawer open={panel === 'run'} onClose={() => setPanel(null)} weekly={weekly} />

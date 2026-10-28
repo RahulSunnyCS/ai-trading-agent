@@ -619,6 +619,10 @@ def test_the_lots_panel_shows_the_ledger_its_calendars_and_kite_beyond_it_withou
     }
     assert beyond["CUPID"]["value"] == 36 * PRICES["CUPID"]
     assert beyond["20MICRONS"]["value"] is None  # no stored close: unpriced, never a zero
+    assert (
+        view["not_in_a_lot_value"] == round(sum(PRICES[s] * q for s, q in bought.items()), 2)
+        and view["not_in_a_lot_unpriced"] == 1
+    )
 
 
 def test_the_lots_panel_says_why_when_the_headline_is_not_followed_lot_by_lot(client, monkeypatch):

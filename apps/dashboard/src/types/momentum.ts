@@ -906,6 +906,10 @@ export type MomentumLotsView =
           planned: Array<{ lot: string; shares: number }>;
         }
       >;
+      /** The priced rows' value, summed on the server (money is never summed in the browser),
+       * and how many rows had no close. */
+      not_in_a_lot_value: number;
+      not_in_a_lot_unpriced: number;
       last_orders: {
         week: string;
         created_at: string;

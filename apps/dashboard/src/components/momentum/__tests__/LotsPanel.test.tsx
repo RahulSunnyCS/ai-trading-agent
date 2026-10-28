@@ -128,6 +128,8 @@ const LIVE: MomentumLotsView = {
       planned: [{ lot: 'Lot 2', shares: 24 }],
     },
   ],
+  not_in_a_lot_value: 25223.5,
+  not_in_a_lot_unpriced: 0,
   last_orders: {
     week: '2026-10-23',
     created_at: '2026-10-23T14:25:44+05:30',
