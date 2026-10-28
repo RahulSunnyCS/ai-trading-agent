@@ -89,14 +89,20 @@ def test_quantiply_body_carries_two_lots_and_a_doubled_mtm_sl():
     assert by[W1] == one[W1]
 
 
-def test_algotest_strategy_carries_two_lots_and_a_doubled_overall_sl():
+def test_algotest_strategy_carries_two_lots_and_keeps_the_one_lot_overall_sl():
+    """AlgoTest scales the overall MTM SL by the leg lots itself (owner, 2026-10-28), so the export
+    keeps ₹3,000 with 2-lot legs (AlgoTest applies ₹6,000)."""
     picks = _picks(lots={W1: 1, DIR: 2, W2: 1})
     by = {v: json.loads(e.text()) for v, e in ax.build(picks)}
     one = {v: json.loads(e.text()) for v, e in ax.build(_picks())}
     lots = [c["Value"] for c in _walk(by[DIR], "LotConfig")]
     assert lots and set(lots) == {2}
     assert by[W1] == one[W1]
-    assert json.dumps(by[DIR]).count("6000") >= 1 and "6000" not in json.dumps(one[DIR])
+    assert list(_walk(by[DIR], "OverallSL")) == list(_walk(one[DIR], "OverallSL"))
+    assert "6000" not in json.dumps(by[DIR]) and "3000" in json.dumps(by[DIR])
+    spec = load_legwise(strategy_path(DIR))
+    kept = live_lots.scaled(spec, 2, overall_per_lot=True)
+    assert kept.overall == spec.overall and [leg.lots for leg in kept.legs] == [2, 2]
 
 
 def test_off_the_exports_and_manifests_are_exactly_as_before(tmp_path):

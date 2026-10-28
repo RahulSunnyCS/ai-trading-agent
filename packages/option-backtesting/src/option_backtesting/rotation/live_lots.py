@@ -57,15 +57,20 @@ def summary(core: list[str], dte: dict[str, str] | None) -> str:
     return "Dir ×2" if dir_pick(core) is not None else "no Dir picked"
 
 
-def scaled(spec: LegwiseStrategy, lots: int) -> LegwiseStrategy:
-    """`spec` traded at `lots` times its own size: every leg's lots and the overall rupee stop and
-    target multiplied (a strategy's MTM SL is per lot: ₹3,000 at 1 lot is ₹6,000 at 2). Leg
+def scaled(spec: LegwiseStrategy, lots: int, overall_per_lot: bool = False) -> LegwiseStrategy:
+    """`spec` traded at `lots` times its own size: every leg's lots multiplied, and the overall
+    rupee stop and target too, since a strategy's MTM SL is per lot (₹3,000 at 1 lot is ₹6,000 at
+    2). `overall_per_lot` keeps them at the 1-lot figure for a platform that scales them by the leg
+    lots itself (AlgoTest, owner 2026-10-28; Quantiply takes the rupee figure as written). Leg
     stops, targets and trails are in points or percent of the premium, so they stay as they are.
     1 returns `spec` itself, so a 1-lot export is exactly what it was."""
     if lots == 1:
         return spec
     if lots < 1:
         raise ValueError(f"lots must be at least 1, not {lots}")
+    legs = [leg.model_copy(update={"lots": leg.lots * lots}) for leg in spec.legs]
+    if overall_per_lot:
+        return spec.model_copy(update={"legs": legs})
     overall = spec.overall.model_copy(
         update={
             k: (None if v is None else v * lots)
@@ -75,7 +80,6 @@ def scaled(spec: LegwiseStrategy, lots: int) -> LegwiseStrategy:
             )
         }
     )
-    legs = [leg.model_copy(update={"lots": leg.lots * lots}) for leg in spec.legs]
     return spec.model_copy(update={"legs": legs, "overall": overall})
 
 

@@ -99,7 +99,8 @@ def build(picks: DayPicks) -> list[tuple[str, Export]]:
     for variant, addon in [(v, False) for v in picks.core] + [(v, True) for v in picks.buy]:
         spec = load_legwise(strategy_path(variant))
         if not addon:
-            spec = live_lots.scaled(spec, picks.lots_of(variant))
+            # AlgoTest scales the overall MTM SL by the leg lots itself: keep the 1-lot figure
+            spec = live_lots.scaled(spec, picks.lots_of(variant), overall_per_lot=True)
         out.append((variant, to_algtst(spec, strategy_name(picks.book, variant, addon))))
     return out
 

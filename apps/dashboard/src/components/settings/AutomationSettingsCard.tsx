@@ -262,7 +262,7 @@ export function AutomationSettingsCard() {
                     />
                     <SettingSwitch
                       label="Dir ×2 on non-expiry days"
-                      description="On a day neither index expires, the picked Dir is uploaded at 2 lots with its MTM SL doubled (4 lots in all); on expiry days, and when no Dir is picked, every pick stays at 1 lot. On Quantiply the morning job raises the MTM SL above by the Dir's own stop on those days."
+                      description="On a day neither index expires, the picked Dir is uploaded at 2 lots and its MTM SL doubles (4 lots in all); on expiry days, and when no Dir is picked, every pick stays at 1 lot. On Quantiply the morning job raises the MTM SL above by the Dir's own stop on those days."
                       checked={row.dirBoost}
                       disabled={saving}
                       onChange={(dirBoost) => setDraft(withRow(draft, key, { dirBoost }))}

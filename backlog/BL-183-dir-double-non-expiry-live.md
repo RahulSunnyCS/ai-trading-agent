@@ -33,7 +33,8 @@ Today every pick is 1 lot: the strategy YAMLs say `lots: 1`, and the only scalin
   Core, ₹9k → ₹12k T1 for a ₹3,000 Dir). AlgoTest has no tool-set book stop; that stays by hand.
 - **Switch:** one toggle per Settings › Automation row ("Dir ×2 on non-expiry days"), off until the owner turns it
   on.
-- A strategy's MTM SL is per lot, so a 2-lot Dir carries twice its rupee stop (₹3,000 → ₹6,000).
+- A strategy's MTM SL is per lot, so a 2-lot Dir carries twice its rupee stop (₹3,000 → ₹6,000): Quantiply is sent
+  ₹6,000; AlgoTest scales the overall stop by the leg lots itself, so it is sent the 1-lot ₹3,000.
 
 ## Goal
 
@@ -119,3 +120,8 @@ right. With every toggle off nothing changes, byte for byte.
   Guide page landed in different commits of the same PR. **Open, the owner to confirm:** whether AlgoTest scales
   a strategy's overall MTM SL by its leg lots itself. The export sends LotConfig 2 with ₹6,000; if AlgoTest
   doubles it again the stop is ₹12,000. Until confirmed, leave Dir ×2 off on AlgoTest rows (the Guide says so).
+- 2026-10-28 — **Owner answered the open question:** "AlgoTest scales the strategy's MTM SL by the leg lots
+  itself". The AlgoTest export now keeps the 1-lot overall MTM SL with 2-lot legs (`scaled(...,
+  overall_per_lot=True)`; T1's `S_ditm1-t1s44_0917` on 28 Oct: LotConfig 2, OverallSL ₹4,000, AlgoTest applies
+  ₹8,000). Quantiply still gets the doubled rupee figure (the owner sets ₹6,000 there for 2 lots). AlgoTest rows
+  may now be switched on like the others.
