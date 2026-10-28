@@ -1,6 +1,6 @@
 # Directional ("Dir")
 
-**Last updated:** 2026-10-15
+**Last updated:** 2026-10-26
 
 ## Definition
 
@@ -38,6 +38,7 @@ not the Buy (range-breakout) family.
 |---|---|---|
 | [Entry time](entry-time.md) | Tested | Positive at every start time before charges; after charges 11:00–13:00 is best and afternoons are near breakeven |
 | [Strike (ATM vs ITM1)](strike-premium.md) | Tested | ITM1 beats ATM every year on both indices before charges and helps the rotation; post-charge band leaders are mostly ATM |
+| [Strike depth (ITM2, ITM3) and stop](strike-depth.md) | Tested | ITM2 and ITM3 stop out only 2–4 points more often than ITM1; at a ₹4,000 stop they beat ITM1 on SENSEX over the hold-out year (+₹54 and +₹78 a slot-day), not clearly on NIFTY; a proof of concept, one year held out |
 | [Leg stop](leg-sl.md) | Descriptive | The live 21% is the weakest of the shortlisted cells; 25–30% did better after charges |
 | [Overall MTM stop](mtm-sl.md) | Tested | The ₹3,000 stop costs more than it saves; net rises with the stop up to ₹4,000, the grid edge |
 | [Trail](trail.md) | Descriptive | Helps only with a 30% leg stop; mixed elsewhere |
