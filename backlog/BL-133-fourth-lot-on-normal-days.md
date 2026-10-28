@@ -142,6 +142,30 @@ lots spread evenly; nothing live changes.
 - **Will not run:** 5+ lots, Buy, any day after 2026-10-16. **Later, owner (2026-10-28):** on a one-index expiry day,
   4 lots when the extra lot is on the non-expiring index; run after this amendment is read.
 
+### Phase 0 — Amendment 3 (2026-10-28, owner, after Amendment 2 and today's margin reading)
+
+- **Owner (2026-10-28):** "on a Tuesday we can put either 3 Nifty or 4 Sensex strategy... how do those perform vice
+  versa in Thursday?" Angel One's margin calculator (read 2026-10-28 18:42 IST) gives ≈ ₹2.0–2.08 lakh a lot on a
+  normal day for every shape; the expiry day adds ≈ ₹59k a lot (2 % ELM on two short legs, estimated). So on a
+  one-index expiry day 3 lots of the expiring index (≈ ₹7.8 lakh) or 4 lots of the other index (≈ ₹8.2 lakh) fit
+  ₹8.54 lakh; no mix of 4 with the expiring index does.
+- **Days:** expiry days on which exactly one index expires (`expiry.expiring_index` not None), in BL-133's windows;
+  both-expiry days are left out and counted.
+- **Arms per book (list C replayed as Amendment 2, book stop ₹8k / ₹9k, brokerage as Amendment 2):**
+  - **E3:** the expiring index's picks (`expiry.filter_picks` to that index), 1 lot each. = today's rule.
+  - **O3:** the other index's picks (`filter_picks` to the other index), 1 lot each.
+  - **O4:** O3 with the Dir pick at 2 lots (no Dir: the best unpicked Dir of that index added,
+    `filtered_runners_up`); book stop + its MTM SL. Amendment 2's best rule, moved to the other index.
+  - **U3:** the unrestricted picks, 1 lot each (the rule before BL-122), for reference.
+- **Measures (net, per expiry day):** as Amendment 2 (per day, max drawdown and worst day of the expiry-day series,
+  share of losing days, return ÷ drawdown, book-stop days); O4 − E3, O3 − E3 and U3 − E3 with a 90 % circular block
+  bootstrap over the expiry days in date order (5-day blocks, 2,000 resamples, seed 20261029); means split by the
+  expiring index (NIFTY-expiry days vs SENSEX-expiry days). **Whole book:** each arm on expiry days + Amendment 2's
+  D×2 on non-expiry days (its stored rows), per day, max drawdown, worst day, R/DD, against E3 + D×2.
+- **Reading:** O4 "beats" E3 if O4 − E3 is above zero; descriptive, in-sample. The per-index split has no intervals.
+- **Look-ahead check:** as Amendment 2; which index expires is known before the day.
+- **Will not run:** mixes of both indices, 5 lots, other days.
+
 ### Phase 1 — Run
 
 - **Tasks:** `packages/option-backtesting/research/bl133/fourth_lot.py`; JSON; Log.
@@ -283,3 +307,4 @@ lots spread evenly; nothing live changes.
     count even on book-stopped days (slightly against arms with more stop days); "lots open at once" counts a lot open
     from its first to its last move, so re-entry strategies overstate it. The MTM SL is now read from the file the
     replay runs (`portfolio.strategy_file`), raising if unreadable; results unchanged.
+- 2026-10-28 — Amendment 3 registered before any run: on a one-index expiry day, 3 lots of the expiring index vs 4 of the other.
