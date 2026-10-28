@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — becomes P0 the week real money goes into the strategy |
-| **Status** | In progress (Phase 2); drawdown-rule test run 2026-10-28: no candidate passes, today's lines stay; re-entry wording is the owner's choice (open question 3) |
+| **Status** | In progress (Phase 2); drawdown-rule test run 2026-10-28: no candidate passes, the lines stay; owner chose N (alert and review) |
 | **Type** | feature |
 | **Area** | momentum |
 | **Created** | 2026-10-06 |
@@ -71,7 +71,7 @@ A `live_rules` file the owner writes once, and a weekly check that alerts when a
    - **d. 2012–2016.** Leave it to BL-176 (recommended), or allow BL-025 one read of it now
      (`override: <reason>`). If BL-176 runs the followed strategy there, the registered rules
      can then be applied once to that same curve.
-3. **Re-entry wording after the rule test (open, the owner's).** No candidate passed, so the cut
+3. ~~Re-entry wording after the rule test~~ **Answered by the owner 2026-10-28: N, alert and review.** No candidate passed, so the cut
    at −20% and the exit at −30% stay. The owner picks the text that follows an exit: **R1 as
    written** (no way back in except a logged review; it gave up about 29 points of CAGR in the
    test, because it exited near the 2020 and 2022 lows and never returned) or **N, alert and
@@ -352,3 +352,7 @@ a new file. A rule here is never edited after a run. A changed rule is a new dat
   tags (BL-010 F3), which may understate the falls on both sides alike. Per the registration the
   current lines stay and the re-entry text is the owner's choice (open question 3). Re-run unchanged
   on BL-176's pick if it changes the followed strategy.
+- 2026-10-28 — **owner chose N, alert and review** (open question 3, asked in chat). The −20% and
+  −30% lines and their alerts are unchanged; what follows each is now a decision the owner makes
+  and logs here, not a prescribed trade. `live_rules.toml`'s `cut_half_action`, `exit_action` and
+  `re_entry` reworded to say so; `tests/test_live_rules.py` pins the wording. No number changed.
