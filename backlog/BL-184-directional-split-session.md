@@ -207,3 +207,9 @@ fixed-file reading argues against spending that on it.
 - 2026-10-28 — E1 run (`research/bl184/stops.py`, eight levels): ₹1,500 meets "helps" on its face (+186, drawdown
   halved) but its neighbours (₹1,000 +93, ₹2,000 +80) and the fixed `N_dir` file (+16, −85k) say noise; no level makes
   the split pass. Nothing changes.
+- 2026-10-28 — post-hoc read (owner's question), net per pick (one lot) by the pick's own index's expiry day,
+  descriptive: the whole-day Dir earns +624 on expiry days and +171 on other days; the afternoon Dir +599 /
+  +117; the morning Dir **−47 on expiry days** and +141 on other days at ₹3,000 (+212 / +62 at ₹4,000, the
+  stop firing on expiry mornings; +5 / +125 at ₹1,500). So the split is worse on expiry days (+552 against
+  +624) and better on other days (+258 against +171). A split only on non-expiry days would be a new,
+  data-mined rule; a lead, not run.

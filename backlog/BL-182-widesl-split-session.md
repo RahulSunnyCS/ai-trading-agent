@@ -391,3 +391,9 @@ needs a registration of its own with one level fixed in advance and a forward tr
 - 2026-10-28 — E2 run (`research/bl182/stops.py`, nine levels): tighter morning stops hurt; ₹3,000 / ₹4,000 raise
   the morning book to +140 / +168 (every half-year) and the split clears zero (+151 [+13, +287], +178 [+34, +319]);
   the morning drawdown deepens, so no level "helps" by the registered definition. Lead for its own registration.
+- 2026-10-28 — post-hoc read (owner's question), net per pick (one lot) by the pick's own index's expiry day,
+  descriptive: whole-day picks earn +511 on expiry days and **+10 on other days**; the afternoon picks +387 /
+  +100; the morning picks +134 / +31 at ₹2,500 and +175 / +73 at ₹3,000. So the split's gain is all on
+  non-expiry days (morning + afternoon +131 a pair against +10 whole-day; +173 with a ₹3,000 morning
+  stop), and on expiry days the two are level (+521 against +511). A split only on non-expiry days would be
+  a new, data-mined rule; recorded as a lead, not run.
