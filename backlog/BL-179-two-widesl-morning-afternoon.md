@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a direct owner question about the live picks; two fixed rules, no search |
-| **Status** | In progress |
+| **Status** | Done (killed) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -62,7 +62,31 @@ Changing the live pick. Other windows, other ranks, a third strategy, lots other
   rankings. Each needs a new block, or `override: <reason>` in the Log.
 
 #### Result
-(after the run)
+**Kill on all four** (2026-10-28). 239 sessions, 2025-10-28 → 2026-10-27, one lot each, net after
+estimated brokerage.
+
+| Pool | Book | Picks | Net a day | Per strategy-lot | Year | Days up | Max drawdown |
+|---|---|---|---|---|---|---|---|
+| Core | Adaptive | 3 | ₹993 | ₹331 | ₹2,37,394 | 60% | −₹35,929 |
+| Core | G (13:00–15:30) | 2 | ₹200 | ₹100 | ₹47,881 | 58% | −₹42,366 |
+| Core | N (12:00–15:30) | 2 | ₹295 | ₹147 | ₹70,499 | 60% | −₹40,360 |
+| T1 | Adaptive | 3 | ₹1,674 | ₹558 | ₹4,00,100 | 68% | −₹25,672 |
+| T1 | G (13:00–15:30) | 2 | ₹620 | ₹310 | ₹1,48,288 | 62% | −₹27,073 |
+| T1 | N (12:00–15:30) | 2 | ₹488 | ₹244 | ₹1,16,606 | 61% | −₹28,627 |
+
+- Rule minus Adaptive, per strategy-lot a day: Core G −₹231 [−₹357, −₹112], Core N −₹184 [−₹320,
+  −₹53], T1 G −₹248 [−₹388, −₹114], T1 N −₹314 [−₹454, −₹177]. All four intervals wholly
+  below zero.
+- The legs: Core morning ₹58, afternoon ₹142 (G) / ₹237 (N); T1 morning ₹333, afternoon ₹287 (G)
+  / ₹155 (N), per pick a day. The break helps T1 (+₹133 a day for G) and hurts Core (−₹95).
+- Why, descriptive: Adaptive's money comes partly from strategies the two rules leave out. Its
+  Directional picks are 204 of 717 (Core) and 202 of 717 (T1) and bring 39% and 35% of its total
+  (₹480 and ₹633 a pick in 09:30–12:00). Its 09:17 Wide SL bring 12% in both pools. And Adaptive
+  takes a Wide SL from a window only when one ranks near the top overall: its own 13:00–15:30
+  Wide SL picks averaged ₹532 (Core) and ₹1,026 (T1) a pick, against ₹142 and ₹287 when the best
+  afternoon Wide SL is taken every day.
+- Script and per-day picks: the session's scratchpad (`bl179/run.py`, `Core_daily.json`,
+  `T1_daily.json`), not committed.
 
 ## Risks
 
@@ -71,3 +95,4 @@ One year; the windows were proposed after a table of this same year.
 ## Log
 
 - 2026-10-28 — created and pre-registered at the owner's request.
+- 2026-10-28 — run; killed on both pools, both rules (Result above); `research/options/common/rotation-ranking.md` updated.

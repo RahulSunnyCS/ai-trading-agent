@@ -84,7 +84,6 @@ Sorted by priority (P0 first), then ID.
 | [BL-170](BL-170-sheet-vs-notes-differences.md) | Sheet against contract notes: explain the differences BL-168's reconciliation lists (owner's review; look for one systematic cause first) | P2 | Planned | chore | contract-notes |
 | [BL-175](BL-175-options-lake-2014-2024.md) | Options history lake: load the 2014–2024 expiry-week history (BL-034 Phase 5) | P2 | Planned | feature | trading-data |
 | [BL-177](BL-177-momentum-favourite-pinned-rerun.md) | Momentum: re-run each favourite with its end pinned to the history check's anchor (data changed, result same / changed) | P2 | Planned | improvement | momentum |
-| [BL-179](BL-179-two-widesl-morning-afternoon.md) | Rotation: two Wide SL a day, the top morning (09:30–12:00) and top afternoon (13:00 or 12:00–15:30) pick, vs Adaptive, on Core and T1 | P2 | In progress | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
@@ -98,6 +97,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-179](BL-179-two-widesl-morning-afternoon.md) | Rotation: two Wide SL a day, the top morning (09:30–12:00) and top afternoon (13:00 or 12:00–15:30) pick, vs Adaptive, on Core and T1 | Killed: per strategy-lot Core −₹231 / −₹184, T1 −₹248 / −₹314 a day vs Adaptive (with / without the break), every interval below zero; it drops Adaptive's Dir and 09:17 picks | 2026-10-28 |
 | [BL-178](BL-178-three-day-ranker-vs-adaptive.md) | Rotation: rank by the last two sessions and last week's same weekday (a third each) vs Adaptive, on Core and T1 | Killed: Core −₹214 a day [−632, +208], T1 −₹853 [−1,324, −376] vs Adaptive, net, 239 days to 2026-10-27; drawdowns about twice as deep | 2026-10-28 |
 | [BL-001](BL-001-momentum-result-integrity.md) | Momentum result integrity: goldens, parameter coverage, drift alerts | Done: goldens, coverage, look-ahead and always-true checks; F1/F6/F7 fixed (F6 merged `778ba02e`); weekly restated-history check `momentum-history`; pinned favourite re-run → BL-177; F3/F4 deferred | 2026-10-28 |
 | [BL-157](BL-157-dashboard-nextjs-16.md) | Dashboard on Next.js 16: OpenNext refuses Next 15 since 2026-10-21 (two years past its release), so the hosted dashboard cannot deploy | Done: Next 16.4.3 deployed 26 Oct (#327, #329); React 19 (#363), Turbopack builds and no cf-build dev-server guard (#364); `middleware.ts` kept (OpenNext's Node proxy is experimental) | 2026-10-28 |
