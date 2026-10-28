@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-25
+Last updated: 2026-10-27
 
 ## Open
 
@@ -22,7 +22,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-107](BL-107-nse-fo-bhavcopy-daily.md) | Daily NSE F&O bhavcopy: official end-of-day record and a cross-check on the Fyers data | P0 | Planned | feature | options |
 | [BL-142](BL-142-momentum-kite-weekly-lots.md) | Momentum on Zerodha Kite: weekly ₹50k lots read from Kite each Friday, each rebalanced on its own calendar with free cash; LIQUIDBEES and SGBs excluded | P0 | In progress | feature | momentum |
 | [BL-148](BL-148-fyers-mcx-expired-options-history.md) | Fyers MCX expired options history: Prime two-year 1-minute OHLCV+OI backfill into the canonical lake, then daily continuation | P0 | Planned | feature | options / trading-data |
-| [BL-157](BL-157-dashboard-nextjs-16.md) | Dashboard on Next.js 16: OpenNext refuses Next 15 since 2026-10-21 (two years past its release), so the hosted dashboard cannot deploy | P0 | In progress | chore | dashboard / infra |
+| [BL-157](BL-157-dashboard-nextjs-16.md) | Dashboard on Next.js 16: OpenNext refuses Next 15 since 2026-10-21 (two years past its release), so the hosted dashboard cannot deploy | P0 | In progress (Phases 1–2 done; Phase 3 waits) | chore | dashboard / infra |
 | [BL-162](BL-162-wide-opening-range-dir-swap.md) | Wide opening-range days: swap not-yet-entered Widesl picks for Dir, as a forward shadow rule | P0 | Planned | research | options |
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
@@ -55,6 +55,9 @@ Sorted by priority (P0 first), then ID.
 | [BL-141](BL-141-live-vs-backtest-slippage-discretionary.md) | Live vs backtest: a 15:40 capture of each platform's per-strategy P&L, slippage vs the paper result (signed, in the owner's 16:00 Telegram), discretionary trades tracked apart | P1 | In progress | feature | broker-login + options |
 | [BL-143](BL-143-trade-monitoring-and-safety.md) | Trade monitoring and safety: wake schedule, 09:25 deploy check, −₹5k/−₹8k loss alerts, Telegram stop button (switch off + square off, confirm tap), margin check, Fyers reminder | P1 | In progress | feature | broker-login + scheduler |
 | [BL-150](BL-150-friday-3pm-orders-kite-basket.md) | Friday 15:00 Momentum orders, one tap into a pre-filled Kite basket (the owner places the order in Kite; this repo places none) | P1 | Planned | feature | momentum + scheduler |
+| [BL-168](BL-168-contract-notes-trade-book.md) | Contract notes in the repo: the Gmail → PDF job as a scheduler job, a store under `TRADING_DATA_ROOT` (trades, itemised charges, the PDFs, ledger e-mails, Kite's notes for Momentum), analytics (trades by source, round trips, best / worst point, the sheet's ratios), a Trade book page designed first, the monthly backup | P1 | In progress (Phases 1–5 done; sheet differences → BL-170; 6 built, waits for a real backup run) | feature | contract-notes / scheduler / trading-data / dashboard |
+| [BL-172](BL-172-broker-login-on-the-mac.md) | The morning on the Mac: login, Quantiply MTM SL (T1 ₹9,000, Core ₹8,000) and enable at 08:00 through the shared locks; Shoonya's subscription set each evening to the next session's algos; the 09:16 pick changes only strategies after 09:17; GitHub only as the backup | P1 | In progress | improvement | broker-login |
+| [BL-173](BL-173-fewer-telegram-messages.md) | Fewer Telegram messages: one morning confirmation, the pick, the result and failures; a "failures only" level per type | P1 | In progress | improvement | notify |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |
@@ -82,7 +85,8 @@ Sorted by priority (P0 first), then ID.
 | [BL-149](BL-149-fyers-greeks-validation.md) | Fyers' Greeks: do we need them? Validate our own IV and Greeks against the expired-F&O API on a pre-registered sample, and say what MCX must derive | P2 | Planned | research | options / trading-data |
 | [BL-151](BL-151-monthly-trending-theme-scout.md) | Monthly trending-theme scout (an agent reads Reddit, news and, if affordable, X) and a starting date for every Broad theme, so a theme cannot be used before it became one | P2 | Idea | feature + research | momentum + scheduler |
 | [BL-152](BL-152-margin-check-without-algotest.md) | Margin check: a free-margin read that does not need AlgoTest or Shoonya's login, the need estimate checked against what the broker blocks, then switched on (`MARGIN_CHECK`) | P2 | Planned | improvement | broker-login |
-| [BL-164](BL-164-gap-and-go-williams-chain.md) | NIFTY gap-and-go 10% opening-range band → Williams back-up chain, 150-point ITM weekly buys, exactly as published (3 tests through the rule tester; POC) | P2 | In progress | research | options |
+| [BL-169](BL-169-discretionary-trade-journal.md) | Discretionary trade journal: one-tap reasons for manual trades, what overriding the algos cost in rupees, behaviour patterns (descriptive only) | P2 | Planned | feature | contract-notes / scheduler / dashboard |
+| [BL-170](BL-170-sheet-vs-notes-differences.md) | Sheet against contract notes: explain the differences BL-168's reconciliation lists (owner's review; look for one systematic cause first) | P2 | Planned | chore | contract-notes |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
@@ -90,11 +94,15 @@ Sorted by priority (P0 first), then ID.
 | [BL-048](BL-048-dormant-server-surfaces.md) | Dormant surfaces: test-only server, broken personality edit, unwritten regime tags, the YAML engine's future | P3 | Planned | chore | server |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-163](BL-163-kronos-forecast-trigger.md) | Kronos hour-ahead forecast as an intraday trigger: two fixed rules (direction → Dir, contraction → Widesl) through the rule tester, zero-shot, NIFTY, sessions after the weights were published only | P3 | Planned | research | options |
+| [BL-171](BL-171-finvasia-capital-auto.md) | Finvasia's capital read automatically for the Trade book (typed by hand meanwhile) | P3 | Idea | improvement | contract-notes / broker-login / scheduler |
 
 ## Done / Dropped
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-166](BL-166-higher-high-higher-low-structure.md) | Higher-high / higher-low structure on 5-minute NIFTY swings: buy the weekly ATM on the break of the last swing, exit on the structure break | Killed: +₹27 a trade (t 0.20, 399 trades, 30% winners), negative at 0.5% slippage; confirmation never opened | 2026-10-25 |
+| [BL-165](BL-165-gap-and-go-leads-gap-down-and-expiry.md) | BL-164's two leads on the locked 2022–24 period: gap-and-go on gap-down days only, and on expiry days only | Killed: both positive but not significant — gap-down +₹485 a trade (t 1.01, 75 trades), expiry days +₹746 (t 1.21, 43); bar t ≥ 2.24; each mean rests on its three best trades (about zero without them) | 2026-10-25 |
+| [BL-164](BL-164-gap-and-go-williams-chain.md) | NIFTY gap-and-go 10% opening-range band → Williams back-up chain, 150-point ITM weekly buys, exactly as published (3 tests; POC) | Killed: no candidate — H1 gap-and-go +₹111 a trade (t 0.33, 147 trades, negative at 0.5% slippage), H2 Williams −₹119, the chain −₹10; entering at the first break beats a later minute, but the trade does not pay; confirmation period never opened | 2026-10-25 |
 | [BL-078](BL-078-angel-one-data-source.md) | Angel One SmartAPI as a second 1-minute data source: what it can and cannot give versus the Fyers files | Done: go as a backup, not a replacement; shipped as BL-079 (Angel One fallback in `obt daily`, VIX) | 2026-10-24 |
 | [BL-087](BL-087-momentum-all-fridays-split.md) | Momentum: backtest and follow a config split across every rebalance Friday | Done: all-Fridays backtest and groups of sleeves; live migration applied, 43 of 43 journalled for the weeks of 16 and 23 Oct (38 sleeves) | 2026-10-24 |
 | [BL-015](BL-015-research-gate.md) | Research gate: pre-register every experiment, log every override | Done: Phase 0 pre-registration in the template and `_EXPERIMENT.md`, the `override:` rule in CLAUDE.md; every research item since BL-104 starts from it | 2026-10-24 |

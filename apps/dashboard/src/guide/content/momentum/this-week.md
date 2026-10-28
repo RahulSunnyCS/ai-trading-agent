@@ -18,13 +18,13 @@ Open this page to read the week, to run something by hand, or to classify a poss
 | Friday timeline | Each scheduled step: done (with the time it ran), done late (the laptop was asleep), still to come with a countdown, due now, or missed. **Run by hand** opens a drawer with the manual run, the data status (and **Refresh stock data**) and the schedule. **Week before** / **Week after** step through the weeks the journal holds. |
 | Needs attention | Only shown when something needs you: a [possible split](glossary:corporate-action) to classify, a dataset not ready when it should be, or a journal entry still missing after the 21:00 check. The same items also reach you from any screen as [alerts](guide:start/alerts). |
 | Live-money rules | The last [rules check](guide:momentum/journal): weeks of paper tracking against the money gate, drawdown against your cut and exit lines, paper against the backtest, and the benchmark. **Check now** re-runs it here without sending anything. |
-| Favourites | Every favourite with its [status](glossary:favourite-status): the [headline](glossary:headline) first and larger, then the rest, scrolling sideways. Each shows this week's trades and how many names it shares with the headline. Click one to show its table below. |
+| Favourites | Every favourite with its [status](glossary:favourite-status). The [headline](glossary:headline) is a card at the top: this week's sleeve and trades, how many names it holds, and which sleeve trades next. The others are a table under it, one row each: name, the sleeve that trades this week, how many sells and buys, and how many of its names the headline holds too (**K of N**, with a bar). CAGR and Max DD columns appear only for a favourite that is a single saved run; a group's blended figures are on [Saved runs](app:/momentum/saved). A dash means there is nothing to count (blocked, or no run yet), never zero. Click the card or a row to show that favourite's table below. |
 | The favourite's table | Sell, Buy, Not bought and Hold, each by rank: the 1–10 score strip from Scores, the rank and how it moved since last week, the room left before the exit rank (when the strategy has a single exit rank), and the name's share after the trades. A [group](glossary:favourite-group) shows its sleeves first: the ones that trade this week, and when the others next do. Click a scored stock for its drawer. |
 | Not bought | An ETF Rotation favourite's top-ranked name that was **not** bought because its ETF traded too far above its NAV at the last NAV published before that Friday (normally Thursday's; Friday's own NAV comes out after the close): over 2% for an Indian ETF, over 5% for Nasdaq 100 and Hang Seng. The row says the premium and the limit; the next-best name within the exit rank took its slot. A name already held is never sold for its premium, and a top-up of a held name is only flagged. On a week that buys nothing anyway the name keeps its Wait and shows the same note. The model portfolio still counts the buy, so next week the name can show as held: whether this gate belongs inside the backtest is still being researched. **Broad Momentum and Custom Index favourites are not gated yet**, although they rank Nasdaq 100 and Hang Seng too: their signal still says Buy at any premium, so check the premium yourself before placing it. |
 | Since the 14:40 preview | ETF favourites: what the final changed against the preview, so you know whether a trade made on the preview still stands. |
 | Names at the edge | The weakest names held and the strongest not held, by rank: next rebalance's likely trades. For a group, in the sleeve that trades next. |
-| Telegram message | The headline's message for the week, word for word, and whether it was sent. **Re-send…** opens Run by hand, where a final run can be sent again after you confirm. |
-| Your orders | The headline's trades in whole shares, against your paper portfolio (until money goes in) or your holdings read from Kite or Fyers. See below. |
+| Telegram message | Folded to one line: whether the headline's message was sent, when, and which run (*sent 16 Oct 20:01 · final*). Click it for the message word for word and **Re-send…**, which opens Run by hand, where a final run can be sent again after you confirm. |
+| Your orders | The headline's trades in whole shares, against your paper portfolio (until money goes in) or your holdings read from Kite or Fyers. **Preview for…** shows another favourite's orders against the same holdings. See below. |
 
 ## Your orders
 
@@ -72,6 +72,13 @@ time. Nothing here places an order: you place them in your broker yourself.
   possible split still to classify is held, never traded.
 - **Charges** are estimated with the backtest's rates: STT, stamp duty, exchange fees and the DP
   charge per sale. Neither Kite nor Fyers charges brokerage on delivery.
+- **Preview for…** (the picker beside Settings) plans any other favourite against the same
+  holdings and cash, as **one portfolio** (never lot by lot), and is marked *Preview · nothing
+  saved*. On the paper portfolio (which is the headline's model) it plans from your paper capital in
+  cash instead. It writes nothing: no orders are kept, no lot is booked, the headline's orders and
+  the 14:15 job are unchanged. It takes up to a minute when the ranking is not warm; picking another
+  favourite meanwhile drops the one waiting, and **Try again** restarts one that failed. Choose
+  *Headline: the orders made* to go back. Like the orders, it covers Broad favourites only for now.
 
 ## Reading a group
 
@@ -120,6 +127,6 @@ their signal at 19:30, after the day's stock data is in.
 
 ## What it does not tell you
 
-Tax on what you sell, or whether a price has moved since the orders were made. For a strategy
-that is not the headline, [Rebalance](guide:momentum/rebalance) still compares any holdings with
-its target.
+Tax on what you sell, or whether a price has moved since the orders were made. For a favourite
+that is not the headline, **Preview for…** under Your orders compares your holdings with its
+target.

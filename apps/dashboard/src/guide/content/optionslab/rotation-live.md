@@ -29,7 +29,7 @@ not a zero).
 |---|---|
 | **Totals** | Per platform and list: the days compared, live and paper added up, and the slippage. The last row is your own (discretionary) trades. |
 | **Chart** | Cumulative slippage, one line per platform and list. Falling means live keeps doing worse than paper. |
-| **Daily table** | Each captured day, newest first, per list, with flags. |
+| **Day by day** | Each captured day, newest first, per platform and list, with flags. Closed until you open it; Adaptive Classic's figure per day is also a column of the Daily log. |
 | **Slippage by shape** | The gap added up by platform, side (sell or buy) and entry time band. A shape with few days is marked *thin*. |
 
 ## Flags on a day

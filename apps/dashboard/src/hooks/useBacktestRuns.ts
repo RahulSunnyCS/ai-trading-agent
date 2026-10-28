@@ -1,6 +1,6 @@
 /**
  * useBacktestRuns — fetches GET /api/backtest/runs on mount: the YAML engine's run
- * registry, listed in Options Lab › Runs. Built on usePolledResource.
+ * registry, listed under Builder › YAML's Earlier runs. Built on usePolledResource.
  *
  * useBacktestRun — GET /api/backtest/runs/:id, one stored run. The registry keeps a run's
  * headline figures only (the same shape as a list row): no per-session rows.

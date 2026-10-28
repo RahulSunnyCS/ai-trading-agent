@@ -174,8 +174,9 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('has 36 jobs', () => {
-    expect(JOBS).toHaveLength(36); // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor
+  it('has 39 jobs', () => {
+    // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor; BL-168: + contract-notes, contract-notes-retry, contract-notes-capital
+    expect(JOBS).toHaveLength(39);
   });
 });
 
@@ -225,6 +226,33 @@ describe('live capture (BL-141)', () => {
   });
 });
 
+describe('contract notes (BL-168)', () => {
+  const job = (id: string) => JOBS.find((j) => j.id === id);
+
+  it('runs every day, Saturday included, at 00:00 and again at 07:30', () => {
+    expect(job('contract-notes')?.schedule.at).toBe('00:00');
+    expect(job('contract-notes-retry')?.schedule.at).toBe('07:30');
+    for (const id of ['contract-notes', 'contract-notes-retry']) {
+      expect(job(id)?.schedule.on('2026-10-24')).toBe(true); // a Saturday
+      expect(job(id)?.steps).toEqual([['node', 'run.js']]);
+      expect(job(id)?.cwd).toBe('packages/contract-notes');
+      expect(job(id)?.group).toBe('contract-notes');
+    }
+  });
+
+  it('reads the capital at 15:50 on trading days only, through obt', () => {
+    expect(job('contract-notes-capital')?.schedule.at).toBe('15:50');
+    expect(job('contract-notes-capital')?.schedule.on('2026-10-24')).toBe(false); // a Saturday
+    expect(job('contract-notes-capital')?.steps).toEqual([
+      ['uv', 'run', 'obt', 'realised', 'capital'],
+    ]);
+  });
+
+  it('a 00:00 run missed while asleep still runs before the 07:30 one', () => {
+    expect(job('contract-notes')?.catchUpHours).toBeGreaterThanOrEqual(7);
+  });
+});
+
 describe('Quantiply deploy jobs (BL-139 Phase 4)', () => {
   const job = (id: string) => JOBS.find((j) => j.id === id);
   const minutes = (id: string) => {
@@ -235,7 +263,9 @@ describe('Quantiply deploy jobs (BL-139 Phase 4)', () => {
   it('disable after the session, before the upload; enable after each upload', () => {
     expect(minutes('quantiply-disable')).toBeGreaterThan(15 * 60 + 28); // the last exit
     expect(minutes('quantiply-disable')).toBeLessThan(minutes('quantiply-evening'));
-    expect(minutes('quantiply-deploy')).toBeGreaterThan(minutes('quantiply-evening'));
+    // BL-172: the switch-on is in the morning, after the 08:00 login, before the first entry
+    expect(minutes('quantiply-deploy')).toBeGreaterThan(8 * 60);
+    expect(minutes('quantiply-deploy')).toBeLessThan(9 * 60 + 15);
     expect(minutes('quantiply-deploy-topup')).toBeGreaterThan(minutes('quantiply-topup'));
     // one group: a deploy waits for the upload (and its retries); logins never overlap
     for (const id of [
@@ -257,8 +287,9 @@ describe('Quantiply deploy jobs (BL-139 Phase 4)', () => {
     for (const id of ['quantiply-deploy', 'quantiply-deploy-topup']) {
       expect(job(id)?.retries).toBe(0);
       const cmd = job(id)?.steps.at(-1)?.at(-1) ?? '';
-      expect(cmd).toContain('--broker angelone --mode enable --apply');
-      expect(cmd).toContain('--broker finvasia --mode enable --apply');
+      const morning = id === 'quantiply-deploy' ? ' --morning' : '';
+      expect(cmd).toContain(`--broker angelone --mode enable${morning} --apply`);
+      expect(cmd).toContain(`--broker finvasia --mode enable${morning} --apply`);
     }
     const disable = job('quantiply-disable');
     expect(disable?.retries).toBeGreaterThan(0); // disabling again changes nothing

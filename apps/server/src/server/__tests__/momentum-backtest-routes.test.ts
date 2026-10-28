@@ -461,6 +461,16 @@ describe('momentum backtest proxy routes', () => {
         'http://127.0.0.1:8765/api/orders?week=2026-10-09',
       ],
       ['POST', '/api/momentum/orders/run', 'http://127.0.0.1:8765/api/orders/run'],
+      [
+        'POST',
+        '/api/momentum/orders/preview/jobs',
+        'http://127.0.0.1:8765/api/orders/preview/jobs',
+      ],
+      [
+        'GET',
+        '/api/momentum/orders/preview/jobs/abc123',
+        'http://127.0.0.1:8765/api/orders/preview/jobs/abc123',
+      ],
       ['PUT', '/api/momentum/orders/settings', 'http://127.0.0.1:8765/api/orders/settings'],
       ['POST', '/api/momentum/holdings/sync', 'http://127.0.0.1:8765/api/holdings/sync'],
       ['POST', '/api/momentum/holdings/paste', 'http://127.0.0.1:8765/api/holdings/paste'],

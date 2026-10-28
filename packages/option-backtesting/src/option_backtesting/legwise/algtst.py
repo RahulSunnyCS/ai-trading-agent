@@ -15,11 +15,12 @@ the owner built by hand on 2026-10-19 to settle the rest:
   "Value": {"Type": "None", "Value": 0}}`; there is no separate range-breakout key;
 - a buy leg is `PositionType.Buy`, a trail in points `TrailStopLossType.Points`.
 
-Anything else that is set (a target, a points stop, re-entry asap or on target, roll, a range
-breakout on the index or side low or with a gap or valid-until, next-weekly or monthly expiry,
-complete square-off, `no_reentry_after`, an overall target, historical lot sizing) raises
-`Unmappable` naming the field: never dropped, never guessed. `execution.slippage_pct` and
-`cost_per_order_inr` are the engine's own assumptions and are not exported.
+Anything else that is set (a target, a points stop, re-entry asap or on target, roll, a peak
+trail, a stop judged on the close, a range breakout on the index or side low or with a gap or
+valid-until, next-weekly or monthly expiry, complete square-off, `no_reentry_after`, an overall
+target, historical lot sizing) raises `Unmappable` naming the field: never dropped, never guessed.
+`execution.slippage_pct` and `cost_per_order_inr` are the engine's own assumptions and are not
+exported.
 
 Leg ids are derived from the strategy and leg ids, so a strategy always exports to the same bytes.
 Integral numbers are written as integers, as AlgoTest writes them (`"Value": 115`)."""
@@ -101,6 +102,10 @@ def _leg(spec: LegwiseStrategy, leg: Leg) -> dict:
         raise _refuse(where, "reentry_on_target")
     if leg.roll is not None:
         raise _refuse(where, "roll")
+    if leg.trail_peak is not None:
+        raise _refuse(where, "trail_peak")
+    if leg.stop_on != "tick":
+        raise _refuse(where, f"stop_on: {leg.stop_on}")
 
     if leg.strike.strike_type is not None:
         entry_type = "EntryType.EntryByStrikeType"

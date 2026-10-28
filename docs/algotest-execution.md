@@ -9,7 +9,7 @@ cutover runbook. They were always read together, so they are one file now.
 
 - [Plan, API contract and decision log](#plan)
 - [Pending actions → moved to /TODO.md](#pending)
-- [Runbook — contract-notes cutover](#runbook)
+- [Runbook — contract notes (no cutover since BL-168) and the broker-login handover](#runbook)
 
 ---
 
@@ -314,40 +314,24 @@ Local setup needs **four** toolchains: `bun`, `node@20`, `qpdf`
 
 <a id="runbook"></a>
 
-## Runbook — moving the contract-notes pipeline to the monorepo
+## Runbook — contract notes, and the broker-login handover
 
-The daily contract-note pipeline now exists in two places: the original
-`trade-analytics` repo and `packages/contract-notes` here. Exactly one of them
-may hold the schedule. Two live copies would process the same gap dates on the
-same night, writing duplicate rows to the Google Sheet and advancing
-`row_tracker.json` past dates that then become unreachable.
+### Contract notes: no cutover (BL-168, 2026-10-26)
 
-**Current state: safe, but on one safeguard instead of two.** The monorepo
-copy has its `schedule:` block commented out. It used to *also* sit on a
-non-default branch, and GitHub only fires `schedule` triggers from a
-repository's default branch — but as of 2026-09-20 everything lives on
-`main`, so that second layer is gone. The commented-out `schedule:` is now
-the only thing preventing two live copies. `trade-analytics` still owns the
-cron and keeps running unchanged.
+The sheet cutover this section used to describe is retired. `packages/contract-notes` now
+stores the notes under `TRADING_DATA_ROOT/contract-notes/`, run by the laptop scheduler
+(`contract-notes` 00:00, `contract-notes-retry` 07:30), and **never writes the Google Sheet**.
+`trade-analytics` keeps its own cron and keeps filling the sheet, unchanged. Both read the same
+mailboxes read-only, so there is nothing to coordinate and nothing to roll back. This repo's
+Actions workflows for the sheet (`contract-notes-daily.yml`, `contract-notes-row-tracker.yml`)
+and the `row-tracker` artifact are gone; `contract-notes-ci.yml` still runs the Jest suite.
+Archiving `trade-analytics` (TODO §2.7) is the owner's call once the Trade book page has
+replaced the sheet.
 
-**Consequence:** uncommenting `schedule:` here takes effect immediately, with
-no merge step standing between the edit and a live cron. Do not uncomment it
-until the step that says to.
+### The broker-login secrets
 
----
-
-### Prerequisite — recreate the secrets
-
-**Repository secrets do not migrate.** Nothing below works until these exist on
-`RahulSunnyCS/ai-trading-agent`. Values come from the corresponding repo's
-Settings → Secrets and variables → Actions.
-
-From **trade-analytics** (5) — needed by `contract-notes-daily.yml`:
-
-```
-BROKER_ACCOUNTS_JSON   GOOGLE_CREDENTIALS   GOOGLE_SHEET_ID
-SHEET_GID              SHEET_NAME
-```
+**Repository secrets do not migrate.** Values come from `algo-automation`'s Settings →
+Secrets and variables → Actions.
 
 From **algo-automation** (10) — needed by `daily-broker-login.yml`:
 
@@ -361,63 +345,6 @@ TELEGRAM_BOT_TOKEN      TELEGRAM_CHAT_ID
 Recommended: put the broker-login ten in a GitHub **Environment** with required
 reviewers rather than plain repository secrets, so credentials that can move
 real money are not in the same scope as everything else.
-
----
-
-### Cutover
-
-Do these in order. Steps 2 and 3 are the ones that touch the sheet.
-Progress is tracked in [`/TODO.md`](../TODO.md) → Priority 2, not here — this
-is the *procedure*, not the checklist.
-
-**1. Stop the old cron.** Merge the `claude/stock-trading-monorepo-plan-k4zs5t`
-branch of `trade-analytics` into its `main`. That branch comments out the
-schedule and leaves `workflow_dispatch` intact. Confirm on the Actions tab
-that "Daily Trading Data Processing" no longer shows a scheduled run.
-
-From here until step 4, **no copy is running on a schedule.** That is
-intentional and safe: `checkDates.js` detects missed dates and the next run
-backfills them. Do not leave it in this state for more than a few days.
-
-**2. Seed the row-tracker.** The `row-tracker` Actions artifact is scoped to
-`trade-analytics` and does **not** migrate. In this repo, run
-**Daily Trading Data Processing** via `workflow_dispatch`.
-
-With no artifact present, `updateSheet.js` falls back to reading the sheet
-for the next empty row. This is the one genuinely risky moment.
-
-**3. Verify before trusting it.** Open the run log and the sheet together:
-- Which row did it write? Is it the row immediately after the last real
-  trading day, with no gap and nothing overwritten?
-- Do the per-account 5-column blocks line up with `sheetStartColumn` in
-  `BROKER_ACCOUNTS_JSON`?
-- Did the run upload a fresh `row-tracker` artifact?
-
-If any answer is wrong, go to **Rollback** — do not proceed.
-
-**4. Re-enable the schedule here.** Uncomment the `schedule:` block in
-`.github/workflows/contract-notes-daily.yml` and push to `main`. It is live
-from that moment — there is no longer a branch boundary in between, so do
-this only once step 3 has checked out.
-
-**5. Watch one real overnight run** before considering the migration done.
-
-**6. Only then** archive `trade-analytics` and `algo-automation`. Keep them
-archived, not deleted — the old Actions artifacts and run history live there.
-
----
-
-### Rollback
-
-The old pipeline is untouched and complete.
-
-1. Uncomment the `schedule:` block in `trade-analytics/.github/workflows/daily-cron-job.yml` on `main`.
-2. Keep the monorepo copy disabled.
-3. If a bad row was written, fix the sheet by hand, then correct the tracker with
-   the **Update Last Updated Row** workflow.
-
-Note that `contract-notes-row-tracker.yml` **cannot bootstrap a missing artifact**
-— it exits 1 when none exists. Step 2 is the only way to create the first one.
 
 ---
 
@@ -504,6 +431,29 @@ has been sent yet: the first `--apply` is the owner's.
 The uploader (`packages/broker-login/src/quantiply-upload.ts`) logs in through Angel One in a
 browser, takes this token, closes the browser and uses `GET /algos/day-wise`, `POST /algos`,
 `GET /algos/:id` (the read-back) and `DELETE /algos/:id`.
+
+**Clientwise stop-loss and target (BL-172; the owner set them by hand, read back 2026-10-28).** The
+algos page's "Clientwise P&L" card shows each broker client's `SL` and `TGT` (R59799620: SL 8,000; FA342824 on
+Shoonya's Quantiply: SL 9,000). It is the whole client account's limit, over every algo on it, the owner's own
+included, not one algo's. The web app reads it from `GET /brokers`: each broker has `configurations` keyed by
+weekday (`MON` … `SUN`), each `{stoploss, target, status, …}`, with **`stoploss` negative** (−8000) and
+`target` 0 for none; the owner's one save set all seven days alike. The dialog ("Clientwise Stoploss & Target
+settings") saves with `POST /brokers/<broker id>/config` (`clientWiseSetTarget` in the bundle), body
+`{stoploss: -Math.abs(SL), target}` plus, only when chosen, one of `trailingStoploss` / `lockProfit` /
+`trailProfit` / `lockTrailProfit` (its values) and `trailingInterval`. The call itself has not been sent by
+the tool yet; what `status` means per day is not known.
+
+**Shoonya's subscription: algos a day (BL-172; the owner changed it by hand, read back 2026-10-28).**
+Quantiply · Shoonya is paid (Quantiply · Angel One is free). `GET /users/me` carries `subscription`: `_id`,
+`plan` (`value`), `algosPerDay` (2, in the plan), `additionalAlgos`, `totalAlgosPerDay` (their sum),
+`credits` for the term, `currentPeriodStart` / `currentPeriodEnd` (epoch ms; a 30-day term), `description`
+("Value plan (3)"). `GET /subscriptions/plans` lists the plans (Value: 500 credits per 30 days, 250 per extra
+algo). A change is `PUT /subscriptions/<_id>` with `{plan, additionalAlgos}` (the app leaves out an
+`additionalAlgos` of 0: what the server does then is not known), previewed by
+`POST /subscriptions/<_id>/preview-upcoming` with the same body (both in the lazy `subscription` chunk,
+`subscribePlanEdit` / `getCheckoutPreviewEdit`). It is prorated by the days left in the term: lowering 5 → 3
+on 28 Oct 00:26 IST returned 415 credits (2 × 250 × about 24.9 / 30), and raising 4 → 5 on 27 Oct 14:50 IST
+took 218. `GET /credits?page=1` gives the balance and each debit and deposit.
 
 **Live MTM (BL-143; read from the bundle 2026-10-20).** `GET /algos/day-wise` gives each algo's `multiplier`,
 `status` and broker, but no MTM. The app's MTM column (`pnl`) comes over its socket.io connection

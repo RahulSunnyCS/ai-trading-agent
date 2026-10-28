@@ -38,6 +38,20 @@ export type RowKey = `${Platform}.${Broker}`;
 export const MULTIPLIER_MIN = 1;
 export const MULTIPLIER_MAX = 10;
 
+/** The Quantiply clientwise MTM SL a row may ask for (BL-172): whole rupees in this range. */
+export const MTM_SL_MIN = 500;
+export const MTM_SL_MAX = 100_000;
+
+/**
+ * The MTM SL a row reads as when its settings predate the field (BL-172): the list's portfolio
+ * stop on the Rotation page (Adaptive Tuned ₹9,000, Adaptive Classic ₹8,000) on a Quantiply row,
+ * the owner's choice of 2026-10-28; none on AlgoTest, where the tool never sets one.
+ */
+export function defaultMtmSl(key: string, list: List | undefined): number | null {
+  if (!key.startsWith('quantiply.')) return null;
+  return list === 't1' ? 9000 : list === 'core' ? 8000 : null;
+}
+
 export interface Row {
   /** log this broker in on this platform at 08:00 */
   login: boolean;
@@ -48,6 +62,8 @@ export interface Row {
   multiplier: number;
   /** include the Buy add-on picks */
   addon: boolean;
+  /** Quantiply only: the clientwise MTM SL (rupees) the 08:00 job keeps the account at; null = leave it */
+  mtmSl: number | null;
 }
 
 export interface Pause {
@@ -87,10 +103,38 @@ export const ROW_KEYS: RowKey[] = PLATFORMS.flatMap((p) =>
 export const DEFAULT_SETTINGS: AutomationSettings = {
   masters: { logins: true, uploads: true, deploy: false },
   rows: {
-    'algotest.finvasia': { login: true, list: 't1', upload: true, multiplier: 1, addon: true },
-    'algotest.angelone': { login: false, list: 'none', upload: false, multiplier: 1, addon: true },
-    'quantiply.angelone': { login: true, list: 'core', upload: true, multiplier: 1, addon: true },
-    'quantiply.finvasia': { login: false, list: 'none', upload: false, multiplier: 1, addon: true },
+    'algotest.finvasia': {
+      login: true,
+      list: 't1',
+      upload: true,
+      multiplier: 1,
+      addon: true,
+      mtmSl: null,
+    },
+    'algotest.angelone': {
+      login: false,
+      list: 'none',
+      upload: false,
+      multiplier: 1,
+      addon: true,
+      mtmSl: null,
+    },
+    'quantiply.angelone': {
+      login: true,
+      list: 'core',
+      upload: true,
+      multiplier: 1,
+      addon: true,
+      mtmSl: 8000,
+    },
+    'quantiply.finvasia': {
+      login: false,
+      list: 'none',
+      upload: false,
+      multiplier: 1,
+      addon: true,
+      mtmSl: null,
+    },
   },
   pause: { until: null },
 };
@@ -118,7 +162,12 @@ export function withDefaults(settings: AutomationSettings): AutomationSettings {
     rows: Object.fromEntries(
       Object.entries(partial.rows).map(([k, r]) => [
         k,
-        { ...r, multiplier: r.multiplier ?? 1, addon: r.addon ?? true },
+        {
+          ...r,
+          multiplier: r.multiplier ?? 1,
+          addon: r.addon ?? true,
+          mtmSl: r.mtmSl === undefined ? defaultMtmSl(k, r.list) : r.mtmSl,
+        },
       ]),
     ) as Record<RowKey, Row>,
     pause: { until: partial.pause?.until ?? null },
@@ -155,7 +204,7 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
         continue;
       }
       for (const k of Object.keys(row))
-        if (!['login', 'list', 'upload', 'multiplier', 'addon'].includes(k))
+        if (!['login', 'list', 'upload', 'multiplier', 'addon', 'mtmSl'].includes(k))
           errors.push(`${key}: unknown field ${k}`);
       if (typeof row.login !== 'boolean') errors.push(`${key}.login must be true or false`);
       if (typeof row.upload !== 'boolean') errors.push(`${key}.upload must be true or false`);
@@ -177,6 +226,22 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
           `${key}.multiplier must be a whole number from ${MULTIPLIER_MIN} to ${MULTIPLIER_MAX}`,
         );
       if (typeof row.addon !== 'boolean') errors.push(`${key}.addon must be true or false`);
+      if (key.startsWith('algotest.')) {
+        if (row.mtmSl !== null)
+          errors.push(`${key}.mtmSl must be null (AlgoTest has none the tool sets)`);
+      } else if (
+        row.mtmSl !== null &&
+        !(
+          typeof row.mtmSl === 'number' &&
+          Number.isInteger(row.mtmSl) &&
+          row.mtmSl >= MTM_SL_MIN &&
+          row.mtmSl <= MTM_SL_MAX
+        )
+      ) {
+        errors.push(
+          `${key}.mtmSl must be null or whole rupees from ${MTM_SL_MIN} to ${MTM_SL_MAX}`,
+        );
+      }
     }
   }
   const pause = value.pause;
@@ -204,6 +269,7 @@ export function validate(value: unknown): { settings: AutomationSettings } | { e
               upload: r.upload,
               multiplier: r.multiplier,
               addon: r.addon,
+              mtmSl: r.mtmSl,
             },
           ];
         }),
@@ -222,6 +288,7 @@ export function effective(settings: AutomationSettings, key: RowKey): Row {
     upload: settings.masters.uploads && row.upload && row.list !== 'none',
     multiplier: row.multiplier,
     addon: row.addon,
+    mtmSl: row.mtmSl,
   };
 }
 

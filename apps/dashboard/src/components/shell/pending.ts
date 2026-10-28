@@ -65,6 +65,11 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
     'Verify every migrated dataset against real Python backtest results',
     'Finish Custom Index inner trade details before declaring Momentum UI parity',
   ],
+  tradebook: [
+    'Compare the FY, monthly, drawdown and ratio figures with the sheet for the same days',
+    'Say which account a still-awaited note belongs to (needs the API to list awaited notes)',
+    'Pre-fill Algos from the live capture; open the stored note PDFs from the day drawer',
+  ],
   brokerLogins: [],
   pricing: [
     'Show the access pass and its expiry (needs a server endpoint exposing checkAccess)',

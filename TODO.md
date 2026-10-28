@@ -52,7 +52,7 @@ One takes, so a holiday refusal may read differently per broker.
 | 1.7 | Selector-drift canary | claude | A scheduled run that asserts the AlgoTest login selectors still resolve, so drift is caught before 08:15 on a trading day rather than during it. Case + cost: `docs/roadmap.md` → Ideas #4. |
 | 1.8 | Laptop scheduler — [BL-011](backlog/BL-011-laptop-scheduler.md) | claude | **Done 2026-10-06.** launchd job `com.ai-trading-agent.broker-login` (`deploy/launchd/`) runs `packages/broker-login/src/dispatch.ts` at 08:00 IST Mon–Fri, triggering `daily-broker-login.yml` via `gh` and alerting on Telegram if it can't. Verified: `workflow_dispatch` runs at 08:00 IST on 5 and 6 Oct, both green. The GitHub cron stays as a backstop. Remaining scheduling work is [BL-012](backlog/BL-012-scheduler-service.md). |
 | 1.9 | Fyers login: blank page, wrong token expiry, unattended login | claude | **Done 2026-10-06.** (1) The dashboard's Login opened a blank page in the standalone research stack: with `DATABASE_URL` set the Python `/api/auth/fyers/start` redirected to `FYERS_REDIRECT_URI`'s host, which was the dashboard itself, which forwarded back — an endless loop. A `handoff=1` marker now breaks it, and the local callback also writes `broker_tokens`. (2) The UI said hours remained on a token Fyers had already reset: expiry was now+24h, but Fyers kills every token at 06:00 IST. One rule (`fyersTokenExpiry` / `fyers.token_expiry`) now sets it at login, clamps stored rows on read, and both status endpoints probe Fyers so a revoked token shows Expired. (3) New launchd job `com.ai-trading-agent.fyers-login` (08:05 IST) runs headless Fyers login and stores the token — separate from the AlgoTest login. **Superseded 2026-10-10:** Fyers added a human check to its login page and disabled its refresh-token API, so this job was removed (BL-076, BL-079). **Owner:** put `FYERS_CLIENT_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET` in `.env`, run `deploy/launchd/install.sh`, restart `bun run start:backend`. |
-| 1.10 | Scheduler service — [BL-012](backlog/BL-012-scheduler-service.md) | claude→owner | **Built and merged 2026-10-07; not yet installed.** `apps/scheduler` runs 18 jobs (the logins, 09:00 morning summary, Friday momentum, `obt daily` 16:15, monthly backup, the alert-only checks, the Saturday digest) with run history, catch-up after sleep and immediate Telegram alerts, a loopback API, and dashboard Jobs + Telegram-alerts pages. **Owner:** run `deploy/launchd/install.sh` (before 07:55 on a trading day), the `pmset` wake command, and decide whether Postgres :5433 should run (the 08:05 Fyers token store needs it). **Left (BL-012 §Remaining):** regime-tag job (needs Postgres), EOD-retrospection check, S3/Y3/Y4 reminders, contract-notes cutover, home-runner mode if a host is chosen. |
+| 1.10 | Scheduler service — [BL-012](backlog/BL-012-scheduler-service.md) | claude→owner | **Built and merged 2026-10-07; not yet installed.** `apps/scheduler` runs 18 jobs (the logins, 09:00 morning summary, Friday momentum, `obt daily` 16:15, monthly backup, the alert-only checks, the Saturday digest) with run history, catch-up after sleep and immediate Telegram alerts, a loopback API, and dashboard Jobs + Telegram-alerts pages. **Owner:** run `deploy/launchd/install.sh` (before 07:55 on a trading day), the `pmset` wake command, and decide whether Postgres :5433 should run (the 08:05 Fyers token store needs it). **Left (BL-012 §Remaining):** regime-tag job (needs Postgres), EOD-retrospection check, S3/Y3/Y4 reminders, home-runner mode if a host is chosen. |
 | 1.11 | Fyers unattended login through the refresh-token grant — [BL-076](backlog/BL-076-fyers-refresh-token-login.md) | claude | **Dropped 2026-10-10.** The Phase 1 spike showed Fyers has disabled the refresh-token API (`code -16`, "to comply with SEBI regulations"), and its login page has a human check, so no unattended login is possible. Replaced by [BL-077](backlog/BL-077-fyers-daily-login-reminder.md) (a daily reminder, a dashboard banner and a truthful 08:05 job). The uncommitted refresh-token storage code is to be reverted. |
 | 1.12 | Daily collector: Fyers when logged in, Angel One otherwise — [BL-079](backlog/BL-079-collector-fyers-or-angel-source.md) | claude | **Built 2026-10-10; confirm on the first evening without a Fyers login.** The 08:05 Fyers login job is removed; `obt daily` will collect from Fyers when its token is valid, otherwise from Angel One (REST login, no human check), flag index gaps instead of filling them, and Momentum gets Angel One as a backup price source. Phases 1, 2, 2b, 3 and 5 built (2026-10-10): `obt angel fetch`, the Fyers-then-Angel One fallback in `obt daily`, the repair from Fyers, the Source section in Telegram and the dashboard banner; Phase 4 built 2026-10-10: Momentum prices come from Fyers, else Angel One (`angelone.resolve_prices`), else the public sources; the weekly Telegram data line names the source. Open: list the 52 Nifty 50 history days where Angel One differs from the stored file by more than 0.5 points (BL-079 Phase 4 log). |
 
@@ -60,23 +60,18 @@ One takes, so a holiday refusal may read differently per broker.
 
 ## Priority 2 — Trading analytics (contract notes), live in the monorepo
 
-The daily job turning broker contract-note emails into realised F&O P&L in the
-Google Sheet. **The `trade-analytics` repo still owns the live cron** — this
-repo's copy is disabled. Step 2.4 is the one that can damage the sheet.
-
-Full procedure and rollback: `docs/algotest-execution.md` → Runbook.
+The daily job turning broker contract-note emails into realised F&O P&L. Since BL-168
+(2026-10-26) it stores the notes under `TRADING_DATA_ROOT/contract-notes/` from the laptop
+scheduler and never writes the Google Sheet; the `trade-analytics` repo keeps its own cron and
+the sheet. Details: `docs/algotest-execution.md` → Runbook.
 
 | # | Task | Who | Notes |
 |---|---|---|---|
-| 2.1 | Create the 5 `trade-analytics` secrets here | owner | `BROKER_ACCOUNTS_JSON`, `GOOGLE_CREDENTIALS`, `GOOGLE_SHEET_ID`, `SHEET_GID`, `SHEET_NAME`. |
-| 2.2 | Merge `claude/stock-trading-monorepo-plan-k4zs5t` → `main` in `trade-analytics` | owner | Commit is pushed and waiting. Comments out its cron, keeps `workflow_dispatch` as the rollback. |
-| 2.3 | Dispatch "Daily Trading Data Processing" here once | owner | Reseeds the `row-tracker` artifact, which is scoped to the old repo and does not migrate. |
-| 2.4 | Check the row it wrote against the sheet | owner | Right after the last real trading day, nothing overwritten, columns aligned to `sheetStartColumn`. With no artifact, `updateSheet.js` falls back to reading the sheet — this is the only moment that fallback is unverified. |
-| 2.5 | Uncomment `schedule:` in `contract-notes-daily.yml` and push | owner | Goes live on push. Until then the commented-out `schedule:` is the **only** thing stopping two copies writing the same Google Sheet — the non-default-branch safeguard is gone now that everything is on `main`. |
-| 2.6 | Watch one real overnight run | owner | Before calling the cutover done. |
-| 2.7 | Archive `trade-analytics` and `algo-automation` | owner | **Archive, not delete** — the old Actions artifacts and run history live there. Only after both cutovers run clean. |
-| 2.8 | `realised-pnl.schema.json` contract emitted by contract-notes | claude | The typed hand-off that lets realised P&L be ingested as a benchmark series. Prerequisite for 3.3. |
+| 2.1–2.6 | The Actions cutover (secrets, row tracker, enabling `contract-notes-daily.yml`) | — | **Superseded 2026-10-26 by BL-168 Phase 1** (2.10): no sheet writing here, so no cutover; the two sheet workflows are deleted. |
+| 2.7 | Archive `trade-analytics` and `algo-automation` | owner | **Archive, not delete** — the old Actions artifacts and run history live there. `trade-analytics` once the Trade book page (BL-168 Phase 5) has replaced the sheet. |
+| 2.8 | `realised-pnl.schema.json` contract emitted by contract-notes | claude | The typed hand-off that lets realised P&L be ingested as a benchmark series. Prerequisite for 3.3. BL-168's `days/<day>.jsonl` line is that hand-off; the schema file follows once Phase 3 fixes its fields. |
 | 2.9 | `packages/contract-notes`: CJS → ESM | claude | Last package on CommonJS. Cosmetic until it blocks something — low priority within P2. |
+| 2.10 | Contract notes in the repo — [BL-168](backlog/BL-168-contract-notes-trade-book.md) | claude→owner | **Phases 1–5 done; Phase 6 built (2026-10-27).** The store under `TRADING_DATA_ROOT/contract-notes/` holds every note since 1 Apr 2025 (Finvasia, Angel One; Kite for Momentum from 16 Oct), the ledger e-mails and each note's charges and trades; `obt realised` and `/legwise/contract-notes/*` compute the sheet's ratios, round trips (Angel One's from 2 Feb 2026), sources, MAE/MFE, day context (VIX, IV percentile, RBI / Budget days) and an other-debits estimate; the Trade book page is at `/tradebook`; the 15:50 `contract-notes-capital` job reads Angel One's capital (Finvasia's is typed; automatic: BL-171); `tdata backup` copies the store. Owner: explain the sheet differences (BL-170); one real backup run closes Phase 6; after a month of the page, decide on archiving `trade-analytics` (2.7). |
 
 ---
 
@@ -455,7 +450,9 @@ collector is forward-only".
 | 3.10.40 | Leg and overall MTM stop: tick or candle close — [BL-156](backlog/BL-156-mtm-stop-tick-vs-candle-close.md) | claude | **Done 2026-10-23.** Tick model calibrated on the 23 Oct live stop (13:45, −₹2,550 vs −₹2,554.50); paper reproduced exactly. T1, 431 days, four combinations: leg tick + MTM close (paper) +₹1,526 / day; leg tick + MTM tick (live) +₹1,470; leg close + MTM close +₹1,112; leg close + MTM tick +₹1,021. **Candle-close leg stops are significantly worse** (−₹432 / day main effect, every half-year; Dir −₹220 a pick). The MTM rule is not significant (+₹56 [−18, +153]). Keep leg stops on tick; the MTM candle close is optional (AlgoTest only). (3.10.39 left for BL-154.) |
 | 3.10.41 | Eight out-of-the-box POC reads (VRP, skew, PCR, overnight, post-event, condor margin, ratio spread, skip calendar) — [BL-159](backlog/BL-159-eight-poc-reads.md) | claude | **Done 2026-10-23: no lead survives.** The overnight straddle's t 2.15 is the 09:15–09:24 premium fall; nothing else reached \|t\| 2. |
 | 3.10.42 | Overnight short straddle into expiry morning, hedged, NIFTY + SENSEX — [BL-160](backlog/BL-160-overnight-straddle-into-expiry.md) | claude | **Done 2026-10-23: failed.** −₹34 a night (t −0.29) on NIFTY 2022–24; hedges cut the tail but take the return. |
-| 3.10.43 | NIFTY gap-and-go band → Williams back-up chain, 150-point ITM buys (POC) — [BL-164](backlog/BL-164-gap-and-go-williams-chain.md) | claude | **In progress 2026-10-25.** Phase 1: `prev_at` / `prev_agg` / `ever` in the rule grammar, `trail_peak` and `stop_on: close` in the legwise engine. Nothing run. |
+| 3.10.43 | NIFTY gap-and-go band → Williams back-up chain, 150-point ITM buys (POC) — [BL-164](backlog/BL-164-gap-and-go-williams-chain.md) | claude | **Done 2026-10-25: killed.** No candidate: H1 +₹111 a trade (t 0.33), H2 −₹119, chain −₹10; confirmation never opened. Adds `prev_at` / `prev_agg` / `ever`, `trail_peak`, `stop_on: close`. Findings in `research/options/strategies/gap-and-go/`. |
+| 3.10.44 | BL-164's leads on 2022–24: gap-and-go on gap-down days, on expiry days — [BL-165](backlog/BL-165-gap-and-go-leads-gap-down-and-expiry.md) | claude | **Done 2026-10-25: killed.** Gap-down +₹485 a trade (t 1.01), expiry days +₹746 (t 1.21), bar 2.24; each rests on three trades. Adds `expiry_day` to the rule grammar. |
+| 3.10.45 | Higher-high / higher-low structure, 5-minute NIFTY swings, ATM buys — [BL-166](backlog/BL-166-higher-high-higher-low-structure.md) | claude | **Done 2026-10-25: killed.** +₹27 a trade (t 0.20, 399 trades); the break beats later minutes but does not pay. Adds `swing` to the rule grammar. |
 
 ### 3.11 Local research database (`packages/trading-data`)
 
@@ -880,6 +877,29 @@ are replaced by better ones. First rule: a break of a rolling 60-bar NIFTY range
 | 3.41.1 | Phase 0 and Amendment 1 (rolling rule, long and short-premium arms, 2019-2021 confirmation period) pre-registered before any run | claude | **Done 2026-10-18.** Nothing run |
 | 3.41.2 | Phase 1: event study on periods A and B (event counts first, then placebo and trades) | claude | **Next** |
 
+### 3.47 The morning on the Mac — [BL-172](backlog/BL-172-broker-login-on-the-mac.md)
+
+Owner (2026-10-27/28): log in from the Mac with GitHub as the backup; at 08:00 keep Quantiply's MTM SL at
+the list's stop and switch on last evening's algos; the 09:16 pick changes only what starts after 09:17;
+each evening delete the finished algos and set Shoonya's subscription to the next session's count.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.47.1 | PR 347: morning login and AlgoTest deploy follow the settings (review findings fixed) | claude | **Done 2026-10-28** (#347) |
+| 3.47.2 | Phases 5-6 and the 08:00 messages: MTM SL check, enable at 08:00 | claude | **Done 2026-10-28** (#349): 08:10, first live run 28 Oct |
+| 3.47.3 | Phase 4: the 09:16 re-choice and its message | claude | **Built 2026-10-28**; first live change day to watch |
+| 3.47.4 | Phase 7 and the evening delete-all | claude | **Built 2026-10-28**; first live evening 28 Oct 16:45 |
+| 3.47.5 | Phases 1-3: login on the Mac, GitHub backup, credential reminder | claude | **Built 2026-10-28** (first live 08:02 on 28 Oct) |
+
+### 3.48 Fewer Telegram messages — [BL-173](backlog/BL-173-fewer-telegram-messages.md)
+
+Owner (2026-10-28): only send what needs knowing; success reports only where they matter.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.48.1 | Levels per type (on / failures only / off), every message typed, the alerts card | claude | **Built 2026-10-28** |
+| 3.48.2 | The eleven approved changes (one 08:10 message, quiet summary, failures-only defaults, batched missed) | claude | **Built 2026-10-28**; first quiet day 28 Oct |
+
 ### 3.46 Dashboard on Next.js 16 — [BL-157](backlog/BL-157-dashboard-nextjs-16.md)
 
 OpenNext refuses Next.js 15 since 2026-10-21, so every `release` deploy fails and `dashboard.codifie.dev`
@@ -887,6 +907,6 @@ is stuck on the 2026-10-18 build. Owner (2026-10-26): upgrade, not the unsupport
 
 | # | Task | Owner | State |
 |---|---|---|---|
-| 3.46.1 | Phase 1: `next` 16.4.x + `@opennextjs/cloudflare` 1.20.13, `--webpack` on every dev/build call, React stays 18 | claude | **Built 2026-10-26** (PR open): build, typecheck and 1,980 unit tests pass; e2e matches Next 15; the 180 s proxy timeout holds under `next dev` and `next start` |
-| 3.46.2 | Phase 2: Worker preview against the local APIs, then the `main` → `release` promotion | claude | Next (owner: go straight on to `release` if the checks pass) |
+| 3.46.1 | Phase 1: `next` 16.4.x + `@opennextjs/cloudflare` 1.20.13, `--webpack` on every dev/build call, React stays 18 | claude | **Done 2026-10-26** (#327): build, typecheck and 1,980 unit tests pass; e2e matches Next 15; the 180 s proxy timeout holds under `next dev` and `next start` |
+| 3.46.2 | Phase 2: Worker preview against the local APIs, then the `main` → `release` promotion | claude | **Done 2026-10-26**: preview passed (#328); #329 promoted, deploy run 40268605293 green, `dashboard.codifie.dev` on Next 16.4.3 behind Access |
 | 3.46.3 | Phase 3: React 19, `proxy.ts`, Turbopack | — | Waits (owner 2026-10-26) |

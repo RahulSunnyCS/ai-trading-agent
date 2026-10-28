@@ -39,7 +39,9 @@ export function Modal({
         <Dialog.Content
           {...(description ? {} : { 'aria-describedby': undefined })}
           className={cn(
-            'fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2',
+            // Centred by margins, not a translate: the fade-in animation's transform (fill: both)
+            // would replace a translate and leave the dialog off centre.
+            'fixed inset-0 z-50 m-auto h-fit max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-md overflow-y-auto',
             'rounded-xl border border-border-strong bg-surface shadow-elevated focus:outline-none data-[state=open]:animate-fade-in',
             className,
           )}

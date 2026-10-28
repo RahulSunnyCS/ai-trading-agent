@@ -40,7 +40,8 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
   - `012_momentum_orders.sql`: `momentum_holdings`, `momentum_holding_rules`,
     `momentum_owner_settings`, `momentum_orders` — Momentum's "Your orders" (BL-051 Phase 3).
     Shipped first as `011_momentum_orders`, so it is idempotent (see Migrations below)
-- `lake/` — immutable Parquet price data, read through TEMP views (`bars_1m_option`,
+- `lake/` — Parquet price data (written once per day file; a few are rewritten in place, see
+  the backup rule below), read through TEMP views (`bars_1m_option`,
   `bars_1m_index`, `bars_1m_stock` (shares' 1-minute bars, BL-153), `bars_1m_future`,
   `symbol_master`, `bars_1d_stock`). One file per
   (asset, name, trading day); `lake.BAR_SCHEMA` / `lake.OPT_SCHEMA` are the one definition
@@ -152,6 +153,26 @@ table instead.
   `DERIVED_VERSION` with any formula or column change.
 - **Partition values live in folder names only** (`asset=`, `underlying=`/`symbol=`,
   `date=`) — never repeat them as columns inside the Parquet.
+- **`tdata backup` copies a file when its size or mtime differs at the destination**
+  (`backup.py`), for `lake/`, `raw/`, `contract-notes/` (BL-168) and `rotation/` alike. Most lake
+  and raw files never change, but some are rewritten in place (the yearly `bars_1d` file,
+  `lake/derived/`, a Fyers repair of a day), and contract-notes/rotation files are rewritten at
+  the same size all the time. mtimes are compared in 10 ms ticks: the backup SSD is exFAT, which
+  truncates mtimes to 10 ms; no wider slack, so a same-size rewrite is never hidden. Each copy
+  goes to `<target>.<pid>.tmp`, is fsynced (F_FULLFSYNC on macOS), stamped with the source's
+  mtime from the stat taken BEFORE the copy, renamed onto the target, and the folder fsynced:
+  on a bare exFAT disk an unplug must never leave a full-size target with the right mtime and
+  bad blocks, which every later run would trust. The source is stat'ed again after the copy; if
+  it moved (a tmp + rename, an append to the rotation journal) it is copied again, up to 3 tries,
+  then left with an mtime no source has ("changed during backup", copied next run). A source
+  deleted mid-run counts as "vanished"; the run goes on. Never copied: `*.lock`, `*.tmp`, and
+  `contract-notes/raw/**/*.decrypted.pdf` (rebuilt from the encrypted note and its password; the
+  exFAT disk and the `~/Downloads` fallback have no permissions to keep them private). Before
+  `contract-notes/` it waits up to 10 minutes while `run.lock` names a live pid, then goes on and
+  says so. The catalog is CHECKPOINTed and always re-copied. Nothing is deleted at the
+  destination. The summary prints copied / already there / changed / vanished per folder; the
+  scheduler's monthly `backup` job logs it as is. A new top-level folder is not backed up until it
+  is added to `FOLDERS`.
 - Tests use `tmp_path` roots; never point a test at the real `~/TradingData`.
 
 - **Views are snapshotted when `connect()` opens**, not live. A write made through a

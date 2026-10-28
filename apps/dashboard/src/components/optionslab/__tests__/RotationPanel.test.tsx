@@ -29,6 +29,9 @@ vi.mock('../../../hooks/useRotation', () => ({
     };
   },
 }));
+vi.mock('../../../hooks/useRotationPlan', () => ({
+  useRotationPlan: () => ({ data: null, loading: false, error: null, refetch: () => undefined }),
+}));
 vi.mock('../../../hooks/useRotationPortfolio', () => ({
   useRotationPortfolioDays: (...args: unknown[]) => {
     mocks.portfolioArgs.push(args[3]);
@@ -60,11 +63,10 @@ vi.mock('../RotationShadowScoreboard', () => ({ RotationShadowScoreboard: stub('
 vi.mock('../results/EveningRunBar', () => ({ EveningRunBar: stub('EveningRun') }));
 vi.mock('../PortfolioStopButton', () => ({ PortfolioStopButton: () => null }));
 vi.mock('../rotation/RotationBaskets', () => ({ RotationBaskets: () => null }));
-vi.mock('../rotation/RotationHeadline', () => ({ RotationHeadline: () => null }));
 vi.mock('../rotation/RotationHealth', () => ({ RotationHealthStrip: () => null }));
 vi.mock('../rotation/RotationHero', () => ({ RotationHero: () => null }));
-vi.mock('../rotation/RotationReadout', () => ({ RotationReadoutBanner: () => null }));
-vi.mock('../rotation/RotationVerdict', () => ({ RotationVerdict: () => null }));
+vi.mock('../rotation/RotationReadout', () => ({ RotationReadoutChip: stub('ReadoutChip') }));
+vi.mock('../rotation/RotationVerdict', () => ({ RotationVerdict: stub('Verdict') }));
 
 import { RotationPanel } from '../RotationPanel';
 
@@ -132,17 +134,32 @@ describe('RotationPanel as one page', () => {
     expect(screen.getByTestId('EveningRun')).toBeTruthy();
   });
 
-  it('opens on the Adaptive Classic, Adaptive Tuned and Fixed base cards, then the log', () => {
+  it('opens on one Books table (Classic, Tuned, Fixed base) with the verdict, then the log', () => {
     render(<RotationPanel />);
-    expect(screen.getByRole('region', { name: 'Adaptive Classic list' })).toBeTruthy();
-    expect(screen.getByRole('region', { name: 'Adaptive Tuned list' })).toBeTruthy();
-    const base = screen.getByRole('region', { name: 'Fixed base list' });
-    expect(base.textContent).not.toMatch(/Against the fixed base/);
+    const books = screen.getByRole('region', { name: 'Books' });
+    const rows = Array.from(books.querySelectorAll('tbody tr')).map((r) => r.textContent ?? '');
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toMatch(/^Adaptive Classic/);
+    expect(rows[1]).toMatch(/^Adaptive Tuned/);
+    expect(rows[2]).toMatch(/^Fixed base/);
+    expect(rows[2]).toMatch(/the base/);
     for (const name of ['Steady', 'Calendar', 'Baseline']) {
-      expect(screen.queryByRole('region', { name: `${name} list` })).toBeNull();
+      expect(books.textContent).not.toMatch(name);
     }
+    expect(screen.getByTestId('Verdict')).toBeTruthy();
+    expect(screen.getByTestId('ReadoutChip')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Headline' })).toBeNull();
     expect(screen.getByRole('heading', { name: 'What happened' })).toBeTruthy();
     expect(screen.getByTestId('DailyLog')).toBeTruthy();
+  });
+
+  it('shows the per-lot-day gap against the picked benchmark', () => {
+    render(<RotationPanel />);
+    const books = screen.getByRole('region', { name: 'Books' });
+    // Classic 10 per lot-day minus the base's 5.
+    const cells = books.querySelectorAll('tbody tr')[0]?.querySelectorAll('td') ?? [];
+    expect(cells[5]?.textContent).toBe('+₹5');
+    expect(books.textContent).toMatch(/vs base \/ lot-day/);
   });
 
   it('reads both books at 1 lot, Tuned from the T1 track, each with its own stop', () => {

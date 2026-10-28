@@ -175,3 +175,24 @@ export function parseLive(text: string): LiveState {
     rows,
   };
 }
+
+/**
+ * BL-140: why the deployer has nothing to do on AlgoTest, decided before it logs in, or null when
+ * it must go on. A deploy needs an AlgoTest row in Settings › Automation that uploads the book (the
+ * tool's strategies get into AlgoTest only through such a row). The 15:35 check is the safety net,
+ * so it still runs when the deploy ledger has a row from today (a deploy before the owner switched
+ * the row off); the earlier days' deploys were checked on their own days.
+ */
+export function nothingOnAlgotest(
+  uploads: readonly string[],
+  book: string,
+  check: boolean,
+  ledgerDays: readonly string[],
+  today: string,
+): string | null {
+  if (uploads.includes(book)) return null;
+  const why = `no AlgoTest row in Settings › Automation uploads the ${book.toUpperCase()} list`;
+  if (!check) return `${why}: nothing to deploy`;
+  if (ledgerDays.includes(today)) return null;
+  return `${why} and the tool deployed nothing today: nothing to check`;
+}

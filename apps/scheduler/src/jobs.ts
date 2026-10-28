@@ -1,5 +1,11 @@
 import { CHECK_JOBS } from './checks/index.js';
-import { type Schedule, firstWeekdayOfMonth, onWeekdays, tradingDays } from './schedule.js';
+import {
+  type Schedule,
+  everyDay,
+  firstWeekdayOfMonth,
+  onWeekdays,
+  tradingDays,
+} from './schedule.js';
 
 /**
  * Every recurring job, in one place (BL-012). Adding a job means adding an
@@ -51,8 +57,9 @@ export interface Job {
    * runs after the upload before it, retries included. (The group does not space their logins:
    * the next job starts the moment one ends. `quantiply-session.ts` does, with a file stamp of
    * the last TOTP window each account typed a code from.)
+   * `contract-notes` = the two contract-notes runs, which write the same store and bookmark.
    */
-  group?: 'catalog' | 'quantiply';
+  group?: 'catalog' | 'quantiply' | 'contract-notes';
   /**
    * Where it can run: `home` needs a residential IP (NSE, niftyindices),
    * `gui` a desktop session for a headed browser, `postgres` the local DB.
@@ -87,21 +94,31 @@ const MOMENTUM = 'packages/momentum-backtesting';
 const OPTIONS = 'packages/option-backtesting';
 const TRADING_DATA = 'packages/trading-data';
 const BROKER_LOGIN = 'packages/broker-login';
+const CONTRACT_NOTES = 'packages/contract-notes';
+const CONTRACT_NOTES_FIX =
+  'cd packages/contract-notes && node run.js --dry-run  (the log names the account, session and PDF; after a fix, node run.js --day <day>)';
 const FRIDAY = onWeekdays(5);
 
 const BASE_JOBS: Job[] = [
   {
     id: 'broker-login',
-    description: 'Trigger the AlgoTest broker login workflow on GitHub',
-    schedule: { at: '08:00', on: tradingDays, label: 'trading days 08:00' },
-    steps: [['node_modules/.bin/tsx', 'src/dispatch.ts']],
+    description:
+      'The morning broker login, on the Mac (BL-172): what Settings › Automation logs in (AlgoTest brokers from 08:16, Quantiply · Angel One and · Shoonya at once), credentials from the repo .env. A part that fails for a reason another machine could fix is handed to GitHub\'s "Daily broker login" (never a refused password or PIN); LOCAL_LOGIN_DONE then stops the workflow\'s cron backstops',
+    // 08:02, not 08:00: clear of angel-login-check's Angel One code (one TOTP seed, 30 s windows).
+    // In the quantiply group, so the 08:10 switch-on always starts after the login has ended
+    // (with an AlgoTest row on, the login waits for 08:16). Never retried: a second run would
+    // resend a refused PIN; local-login.ts hands what failed to GitHub instead.
+    schedule: { at: '08:02', on: tradingDays, label: 'trading days 08:02' },
+    steps: [['node_modules/.bin/tsx', 'src/local-login.ts']],
     cwd: BROKER_LOGIN,
-    timeoutMinutes: 10,
-    retries: 0, // dispatch.ts retries itself and must never dispatch twice
+    timeoutMinutes: 45,
+    retries: 0,
     retryDelayMinutes: 0,
-    catchUpHours: 7, // dispatch.ts itself refuses after 15:35
+    catchUpHours: 7, // AlgoTest refuses broker logins after 15:40; Quantiply any time
+    group: 'quantiply',
     alertsItself: true,
-    fixHint: 'Start "Daily broker login" by hand from GitHub Actions',
+    fixHint:
+      'Read the login report first (a refused PIN must not be sent again). Then start "Daily broker login" by hand from GitHub Actions, or: cd packages/broker-login && node_modules/.bin/tsx src/local-login.ts',
   },
   {
     // ONE Angel One SmartAPI login (nothing fetched): is the evening run's fallback source ready?
@@ -465,7 +482,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'algotest-deploy',
     description:
-      "Deploy the day's recorded T1 picks on AlgoTest's /live (BL-138), right after the 09:16 pick: 1 lot each, today only, never a pick whose entry minute has come. Built ready but OFF: does nothing until ALGOTEST_DEPLOY=on",
+      "Deploy the day's recorded T1 picks on AlgoTest's /live (BL-138), right after the 09:16 pick: 1 lot each, today only, never a pick whose entry minute has come. Built ready but OFF: does nothing until ALGOTEST_DEPLOY=on, and no AlgoTest login while no AlgoTest row in Settings › Automation uploads the T1 list (BL-140)",
     // Starts with the pick and waits (up to 120 s) for its journal entry. A 09:17 pick may still be
     // too late through the website; it is then reported, never deployed late. Not caught up.
     schedule: { at: '09:16', on: tradingDays, label: 'trading days 09:16' },
@@ -496,7 +513,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'algotest-deploy-check',
     description:
-      'At 15:35, alert if any strategy the tool deploys on AlgoTest has an execution day ticked (it would trade again on its own). Does nothing until ALGOTEST_DEPLOY=on',
+      'At 15:35, alert if any strategy the tool deploys on AlgoTest has an execution day ticked (it would trade again on its own). Does nothing until ALGOTEST_DEPLOY=on; no AlgoTest login when no AlgoTest row uploads the T1 list and the tool deployed nothing today',
     schedule: { at: '15:35', on: tradingDays, label: 'trading days 15:35' },
     steps: [['node_modules/.bin/tsx', 'src/strategy-deploy.ts', '--latest', 't1', '--check']],
     cwd: BROKER_LOGIN,
@@ -602,7 +619,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'quantiply-topup',
     description:
-      "After the 09:16 pick, create on each Quantiply account any recorded pick of its list (dashboard settings, BL-140) that last night's upload does not have (BL-139); deletes nothing and names the algos that are not today's. Does nothing until QUANTIPLY_UPLOAD=on",
+      "After the 09:16 pick, create on each Quantiply account any pick of its list (dashboard settings, BL-140) that last night's upload does not have (BL-139), under the owner's 09:17 rule (BL-172: the evening's 09:17 strategy stays, a new 09:17 pick is not made, the rest is chosen again by the 09:16 score); deletes nothing and names the algos that are not today's. Does nothing until QUANTIPLY_UPLOAD=on",
     // 09:19, not 09:18: a minute clear of the pick's own Angel One work, so two logins never type
     // codes from one TOTP window. A changed 09:17 pick is too late either way. Not caught up.
     schedule: { at: '09:19', on: tradingDays, label: 'trading days 09:19' },
@@ -616,6 +633,7 @@ const BASE_JOBS: Job[] = [
         'rotation',
         'quantiply-export',
         '--from-settings',
+        '--morning-rule',
       ],
       // Both accounts always run (a failed step would stop the next); the job fails if either did.
       ['/bin/sh', '-c', quantiplyUploads('topup')],
@@ -633,18 +651,27 @@ const BASE_JOBS: Job[] = [
   {
     id: 'quantiply-deploy',
     description:
-      "Enable (deploy) on each Quantiply account the next session's picks the evening upload made (BL-139 Phase 4): REAL MONEY on the owner's account. Only the tool's algos for that session and weekday, each read back against its export and set to the account's own broker first; never a second time; confirmed by reading the list again. Needs QUANTIPLY_DEPLOY=on, Automated deployment on and the account's row uploading a list",
-    // After quantiply-evening (16:45; same group, so it waits for the upload and its retries).
-    // After 15:30 the session is the next trading day. Never retried: a second attempt could
-    // act on a half-finished first; the run alerts instead. An account the settings leave off,
-    // or with nothing uploaded for that session, is not logged in.
-    schedule: { at: '16:55', on: tradingDays, label: 'trading days 16:55' },
-    steps: [['/bin/sh', '-c', quantiplyBoth((b) => quantiplyDeploy(b, 'enable'))]],
+      "08:10, after the morning login (BL-172): on each Quantiply account, keep the clientwise MTM SL at the Settings › Automation row's figure (set it only when it differs, read back on every weekday), then switch on today's algos last evening's upload made (BL-139 Phase 4): REAL MONEY on the owner's account. Only the tool's algos for today, each read back against its export and set to the account's own broker first; never a second time; confirmed by reading the list again. Sends one Telegram message for both accounts. Needs QUANTIPLY_DEPLOY=on, Automated deployment on and the account's row uploading a list",
+    // After the 08:00 login (GitHub's Quantiply logins end by about 08:03). Was 16:55 for the next
+    // session until 2026-10-28 (owner: switch on in the morning). Never retried: a second attempt
+    // could act on a half-finished first; the run alerts instead. Caught up until 09:05: after that
+    // the 09:21 top-up switches on what is left. An account the settings leave off, or with
+    // nothing uploaded for today, is not logged in (and says so).
+    schedule: { at: '08:10', on: tradingDays, label: 'trading days 08:10' },
+    // Both accounts write their report to one file and the last command sends it as one message
+    // (owner, 2026-10-28); the job's exit stays the accounts' own.
+    steps: [
+      [
+        '/bin/sh',
+        '-c',
+        `F=$(mktemp -t quantiply-morning) && export MORNING_REPORT_FILE="$F"; (${quantiplyBoth((b) => quantiplyDeploy(b, 'enable', true))}); code=$?; node_modules/.bin/tsx src/morning-report.ts "$F" 2; exit $code`,
+      ],
+    ],
     cwd: BROKER_LOGIN,
     timeoutMinutes: 10,
     retries: 0,
     retryDelayMinutes: 0,
-    catchUpHours: 6,
+    catchUpHours: 55 / 60,
     group: 'quantiply',
     fixHint:
       'Read the alert first: an algo it enabled must not be enabled again. Then: cd packages/broker-login && node_modules/.bin/tsx src/quantiply-deploy.ts --broker angelone --mode enable  (dry run; add --apply). Undo: --mode disable --day <session> --apply',
@@ -726,20 +753,77 @@ const BASE_JOBS: Job[] = [
     catchUpHours: 3,
     fixHint: 'bun run --filter @ata/scheduler jobs run morning-summary',
   },
+  {
+    id: 'contract-notes',
+    description:
+      "Read the brokers' contract notes (BL-168): each account's new mail since its bookmark, the PDF kept and its figures stored under TRADING_DATA_ROOT/contract-notes/ (F&O for Finvasia and Angel One, equity for the Momentum account on Zerodha); sessions that can have no note are closed (no trade / no note). Never writes the Google Sheet (trade-analytics keeps it)",
+    // Every day, not trading days: a session's notes arrive its evening (Angel One's after
+    // midnight), so Saturday's run takes Friday.
+    schedule: { at: '00:00', on: everyDay, label: 'every day 00:00' },
+    steps: [['node', 'run.js']],
+    cwd: CONTRACT_NOTES,
+    timeoutMinutes: 15,
+    retries: 1,
+    retryDelayMinutes: 20,
+    catchUpHours: 24,
+    group: 'contract-notes',
+    fixHint: CONTRACT_NOTES_FIX,
+  },
+  {
+    id: 'contract-notes-retry',
+    description:
+      'The 00:00 contract-notes run again, for notes that arrived after it (BL-168); reads only mail newer than the bookmark, so with nothing new it is a few seconds',
+    schedule: { at: '07:30', on: everyDay, label: 'every day 07:30' },
+    steps: [['node', 'run.js']],
+    cwd: CONTRACT_NOTES,
+    timeoutMinutes: 15,
+    retries: 1,
+    retryDelayMinutes: 20,
+    catchUpHours: 12,
+    group: 'contract-notes',
+    fixHint: CONTRACT_NOTES_FIX,
+  },
+  {
+    // BL-168 Phase 4: the Trade book's capital line. Angel One's free margin at the close, one
+    // guarded SmartAPI login (it waits behind the evening collector's, if any). Finvasia is not
+    // read: its only figure is AlgoTest's, and a 15:50 AlgoTest login would collide with the
+    // live capture; its capital is typed on the page.
+    id: 'contract-notes-capital',
+    description:
+      "Angel One's free margin at the close into the contract-notes store (BL-168), the Trade book's capital for the day",
+    schedule: { at: '15:50', on: tradingDays, label: 'trading days 15:50' },
+    steps: [['uv', 'run', 'obt', 'realised', 'capital']],
+    cwd: OPTIONS,
+    timeoutMinutes: 10,
+    retries: 1,
+    retryDelayMinutes: 15,
+    catchUpHours: 6,
+    fixHint:
+      'Check the ANGELONE_* settings in .env, then run it by hand: cd packages/option-backtesting && uv run obt realised capital',
+  },
 ];
 
 /** Every job: the ones above plus each check group's (src/checks/). */
 /** BL-140: one Quantiply upload per account, each told by the settings whether it has work. */
 function quantiplyUploads(mode: 'evening' | 'topup'): string {
-  return quantiplyBoth(
+  // BL-172 (owner, 2026-10-28): the evening deletes every finished, switched-off algo on the
+  // account, the owner's own too (`--delete-all`); never an enabled or running one. And it sets
+  // Shoonya's paid subscription to the next session's algo count (`--subscription`; Angel One's
+  // Quantiply is free, so the flag does nothing there).
+  const all = mode === 'evening' ? ' --delete-all --subscription' : '';
+  const both = quantiplyBoth(
     (broker) =>
-      `node_modules/.bin/tsx src/quantiply-upload.ts --broker ${broker} --from-settings --mode ${mode} --apply`,
+      `node_modules/.bin/tsx src/quantiply-upload.ts --broker ${broker} --from-settings --mode ${mode}${all} --apply`,
   );
+  if (mode !== 'evening') return both;
+  // BL-173: the evening's reports (failures, credits spent, a list unlike the 16:00 one) as one
+  // message for both accounts, none when neither has anything to say; the exit stays theirs.
+  return `F=$(mktemp -t quantiply-evening) && export REPORT_FILE="$F"; (${both}); code=$?; node_modules/.bin/tsx src/morning-report.ts "$F" --evening; exit $code`;
 }
 
 /** BL-139 Phase 4: one account's enable or disable run (it reads the settings itself). */
-function quantiplyDeploy(broker: string, mode: 'enable' | 'disable'): string {
-  return `node_modules/.bin/tsx src/quantiply-deploy.ts --broker ${broker} --mode ${mode} --apply`;
+function quantiplyDeploy(broker: string, mode: 'enable' | 'disable', morning = false): string {
+  return `node_modules/.bin/tsx src/quantiply-deploy.ts --broker ${broker} --mode ${mode}${morning ? ' --morning' : ''} --apply`;
 }
 
 /** Run a command for both Quantiply accounts, Angel One then Shoonya. */

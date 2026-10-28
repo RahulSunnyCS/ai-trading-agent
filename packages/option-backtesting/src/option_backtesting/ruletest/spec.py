@@ -359,6 +359,14 @@ def _leg_words(leg: dict[str, Any]) -> str:
         bits.append(
             f"stop {stop['percent']:g}%" if "percent" in stop else f"stop {stop['points']:g} points"
         )
+    peak = leg.get("trail_peak")
+    if peak:
+        bits.append(
+            f"once above {peak['activate_percent']:g}% of entry, out at "
+            f"{peak['exit_percent']:g}% of its highest"
+        )
+    if leg.get("stop_on") == "close":
+        bits.append("stops judged on the 1-minute close")
     return ", ".join(bits)
 
 

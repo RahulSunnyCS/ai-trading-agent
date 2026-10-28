@@ -102,8 +102,8 @@ describe('guide routing helpers', () => {
   });
 
   it('recognises an exact page path', () => {
-    const { page, exact } = resolveGuidePage(['optionslab', 'runs']);
-    expect(page.slug).toBe('runs');
+    const { page, exact } = resolveGuidePage(['optionslab', 'strategies']);
+    expect(page.slug).toBe('strategies');
     expect(exact).toBe(true);
   });
 

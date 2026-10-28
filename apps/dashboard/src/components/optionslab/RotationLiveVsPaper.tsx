@@ -247,7 +247,18 @@ export function RotationLiveVsPaper() {
               <CumulativeLines lines={lines} />
             </>
           )}
-          {d.days.length > 0 ? <DailyRows days={d.days} /> : null}
+          {d.days.length > 0 ? (
+            <details className="group">
+              <summary className="cursor-pointer text-xs font-medium text-muted hover:text-foreground">
+                Day by day, every platform and list ({d.days.length}{' '}
+                {d.days.length === 1 ? 'day' : 'days'}). Adaptive Classic's live result per day is
+                also in the Daily log.
+              </summary>
+              <div className="mt-2">
+                <DailyRows days={d.days} />
+              </div>
+            </details>
+          ) : null}
           {d.shapes.length > 0 ? (
             <div className="space-y-1">
               <h3 className="text-xs font-medium text-muted">Slippage by shape</h3>

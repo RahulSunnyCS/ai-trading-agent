@@ -27,6 +27,7 @@ import {
 
 import { useAppRoute } from '../hooks/useAppRoute';
 import { useMomentumWeeklyJob } from '../hooks/useMomentumWeeklyJob';
+import { usePolledResource } from '../hooks/usePolledResource';
 import { apiGet } from '../lib/api';
 import { cn } from '../lib/cn';
 import { formatDuration, formatPct, formatPp } from '../lib/format';
@@ -45,7 +46,7 @@ import {
   modifiedSections,
 } from '../lib/momentumConfig';
 import { usualDuration } from '../lib/momentumDurations';
-import { asSavedRun } from '../lib/momentumSaved';
+import { asSavedRun, headlineSaved } from '../lib/momentumSaved';
 import { MOMENTUM_DATASETS, MOMENTUM_SECTIONS, type MomentumSection, oneOf } from '../lib/routes';
 import { type MomentumRun, hydrateMomentumRuns, useMomentumRunsStore } from '../store/momentumRuns';
 import { hydrateMomentumViewFromStorage, useMomentumViewStore } from '../store/momentumView';
@@ -54,11 +55,15 @@ import {
   getDefaultDateRangeYears,
   getDefaultMomentumDataset,
 } from '../store/settings';
-import type { MomentumResult, MomentumSavedRun, SavedStrategy } from '../types/momentum';
+import type {
+  MomentumResult,
+  MomentumSavedRun,
+  SavedStrategiesResponse,
+  SavedStrategy,
+} from '../types/momentum';
 import { MomentumEquityChart } from './momentum/MomentumEquityChart';
 import { MomentumHeadline } from './momentum/MomentumHeadline';
 import { MomentumJournalView } from './momentum/MomentumJournalView';
-import { MomentumRebalanceView } from './momentum/MomentumRebalanceView';
 import type { MomentumRunInfo } from './momentum/MomentumResultDetails';
 import { MomentumResultWidgets } from './momentum/MomentumResultWidgets';
 import { MomentumResultsSkeleton, MomentumRunBanner } from './momentum/MomentumRunProgress';
@@ -74,7 +79,9 @@ import {
 import { MomentumSettingsSkeleton } from './momentum/MomentumSkeletons';
 import { MomentumRunBar } from './momentum/backtest/MomentumRunBar';
 import { MomentumSettingsChips } from './momentum/backtest/MomentumSettingsChips';
+import { SavedHeadlineRun } from './momentum/backtest/SavedHeadlineRun';
 import {
+  SAVED_STRATEGIES_URL,
   SavedStrategiesView,
   useSavedStrategiesSummary,
 } from './momentum/saved/SavedStrategiesView';
@@ -111,11 +118,6 @@ const SECTIONS: Array<{ id: MomentumSection; label: string; description: string 
     label: 'This week',
     description:
       "Friday's signal for every favourite, the steps of the day, your live-money rules and what needs you.",
-  },
-  {
-    id: 'rebalance',
-    label: 'Rebalance preview',
-    description: 'Compare your holdings with a live model target.',
   },
   {
     id: 'journal',
@@ -383,7 +385,11 @@ export function MomentumBacktestingView() {
       setDatasetState(urlDataset);
     }
   }, [urlDataset, dataset]);
+  // The headline's saved figures (below) stay only until the settings are touched: after that the
+  // run bar no longer describes them.
+  const [savedCardOn, setSavedCardOn] = useState(true);
   function setDataset(next: Dataset): void {
+    setSavedCardOn(false);
     setDatasetState(next);
     if (section === 'backtest') navigate('momentum', 'backtest', next);
   }
@@ -483,9 +489,11 @@ export function MomentumBacktestingView() {
   }
 
   function onCoreChange(patch: Partial<CoreSettings>): void {
+    setSavedCardOn(false);
     setCore((current) => ({ ...current, ...patch }));
   }
   function onValueChange(key: string, value: unknown): void {
+    setSavedCardOn(false);
     setValues((current) => ({ ...current, [key]: value }));
   }
 
@@ -587,7 +595,7 @@ export function MomentumBacktestingView() {
     savedSummary.refetch();
   }, [savedKey]);
 
-  function loadSettings(run: MomentumSavedRun): void {
+  function loadSettings(run: MomentumSavedRun, openDrawer = true): void {
     const config = run.config;
     setCore({
       selected: Array.isArray(config.universe)
@@ -613,23 +621,64 @@ export function MomentumBacktestingView() {
       ),
     );
     setSection('backtest');
-    setDrawerOpen(true);
+    if (openDrawer) setDrawerOpen(true);
   }
 
-  /** Open a saved strategy's settings in Backtest, switching dataset when it is another one. */
-  function openSavedStrategy(strategy: SavedStrategy): void {
+  /** Open a saved strategy's settings in Backtest, switching dataset when it is another one.
+   * `openDrawer` false loads them into the run bar's chips only. */
+  function openSavedStrategy(strategy: SavedStrategy, openDrawer = true): void {
+    // Opened by the reader (not the headline's own load below): its figures are not the card's.
+    if (openDrawer) setSavedCardOn(false);
     const target = strategy.dataset as Dataset;
     const config = { ...strategy.config_full, dataset: target };
     if (target === dataset) {
-      loadSettings({ ...asSavedRun(strategy, strategy.name), config });
+      loadSettings({ ...asSavedRun(strategy, strategy.name), config }, openDrawer);
       return;
     }
     // The dataset effect loads the target's meta and seeds the form with this config.
     mountSeedRef.current = config;
     setDatasetState(target);
     navigate('momentum', 'backtest', target);
-    setDrawerOpen(true);
+    if (openDrawer) setDrawerOpen(true);
   }
+
+  // Before anything is run, and only when the URL asks for nothing else (no dataset in the path,
+  // no run kept from earlier), Backtest opens on the headline favourite's latest saved run: its
+  // settings in the run bar and its saved figures, never a run of its own.
+  // Decided the first time Backtest itself is shown (this view hosts every Momentum page).
+  const openOnSavedRef = useRef<boolean | null>(null);
+  if (openOnSavedRef.current === null && section === 'backtest') {
+    openOnSavedRef.current = urlDataset === null && runs.length === 0;
+  }
+  const openOnSaved = openOnSavedRef.current === true;
+  const savedStrategies = usePolledResource<SavedStrategiesResponse>(SAVED_STRATEGIES_URL, {
+    cache: true,
+    enabled: openOnSaved,
+  });
+  const savedHeadline = useMemo(
+    () => (savedStrategies.data ? headlineSaved(savedStrategies.data.strategies) : null),
+    [savedStrategies.data],
+  );
+  const savedApplied = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: applied once, when the list and the dataset's settings are in
+  useEffect(() => {
+    if (!openOnSaved || savedApplied.current || !savedHeadline || !meta || loading) return;
+    // Never pull the reader back to Backtest from a page they moved on to meanwhile.
+    if (section !== 'backtest') return;
+    savedApplied.current = true;
+    if (runs.length > 0) return;
+    if (savedHeadline.openable) openSavedStrategy(savedHeadline.openable, false);
+    else if (
+      savedHeadline.dataset !== dataset &&
+      VISIBLE_DATASET_IDS.has(savedHeadline.dataset as Dataset)
+    ) {
+      // A group has no settings to load: show its dataset, where its saved figures belong.
+      setDatasetState(savedHeadline.dataset as Dataset);
+      navigate('momentum', 'backtest', savedHeadline.dataset as Dataset);
+    }
+  }, [savedHeadline, meta, loading, section]);
+  const showSavedHeadline =
+    openOnSaved && savedCardOn && savedHeadline !== null && savedHeadline.dataset === dataset;
 
   /** "Re-run now to check": run the strategy's own settings on today's code and data. The
    * finished run is saved like any other, and its toast says whether the result moved. */
@@ -988,8 +1037,6 @@ export function MomentumBacktestingView() {
           <ThisWeekView weekly={weekly} />
         ) : section === 'journal' ? (
           <MomentumJournalView />
-        ) : section === 'rebalance' ? (
-          <MomentumRebalanceView currentBroadConfig={dataset === 'broad' ? currentConfig : null} />
         ) : section === 'saved' ? (
           <SavedStrategiesView
             onOpenInBacktest={openSavedStrategy}
@@ -1141,6 +1188,7 @@ export function MomentumBacktestingView() {
                       variant="danger"
                       onClick={() => {
                         setConfirmReset(false);
+                        setSavedCardOn(false);
                         void loadMeta(dataset);
                       }}
                     >
@@ -1254,7 +1302,15 @@ export function MomentumBacktestingView() {
 
             {running && !result ? <MomentumResultsSkeleton /> : null}
 
-            {!running && !result && !activeRun && meta && !loading ? (
+            {!running &&
+            !result &&
+            !activeRun &&
+            meta &&
+            !loading &&
+            showSavedHeadline &&
+            savedHeadline ? (
+              <SavedHeadlineRun saved={savedHeadline} onSettings={() => setDrawerOpen(true)} />
+            ) : !running && !result && !activeRun && meta && !loading ? (
               <StateMessage
                 variant="empty"
                 title="No results yet"

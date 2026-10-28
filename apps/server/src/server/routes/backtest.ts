@@ -37,6 +37,8 @@
  *  GET  /api/backtest/legwise/heatmap/available  — underlyings with a straddle heatmap grid (BL-094).
  *  GET  /api/backtest/legwise/heatmap            — one view of it: time_sl | date_time | date_sl.
  *  GET  /api/backtest/legwise/rotation/overview — the Rotation page: data health, the latest baskets, the lists.
+ *  GET  /api/backtest/legwise/rotation/plan     — each Adaptive book's latest and tentative picks with
+ *                                                 their settings and upload state per account.
  *  GET  /api/backtest/legwise/rotation/summary  — the 60-day read-out: lists against REF, the base and random baskets.
  *                                                 requireAccess
  *  GET  /api/backtest/legwise/rotation/matrix       — the Strategy Matrix: one view, period (or two
@@ -77,6 +79,19 @@
  *  POST /api/backtest/legwise/angel/test        — start ONE SmartAPI login (no body): 202 at once,
  *                                                 the login runs in the background upstream; the
  *                                                 guard's 409 / 429 pass through. requireAccess
+ *  GET  /api/backtest/legwise/contract-notes/summary — the Trade book's headline, the sheet's ratios,
+ *                                                 FY rows and accounts (BL-168, realised/views.py)
+ *  GET  /api/backtest/legwise/contract-notes/days    — one row per session (the sheet's rows)
+ *  GET  /api/backtest/legwise/contract-notes/months  — the monthly tab
+ *  GET  /api/backtest/legwise/contract-notes/trips   — round trips with their source (extremes=1 adds
+ *                                                 the best and worst point)
+ *  GET  /api/backtest/legwise/contract-notes/money   — ledger events (deposits, interest, margin)
+ *  GET  /api/backtest/legwise/contract-notes/momentum — the Zerodha notes' trades
+ *  GET  /api/backtest/legwise/contract-notes/day/:day — one session in full
+ *  PUT  /api/backtest/legwise/contract-notes/inputs/:day — the owner's Algos and Capital for a day;
+ *                                                 the body is rebuilt from validated fields.
+ *                                                 All requireAccess; from / to / day are plain days,
+ *                                                 account is `broker/id`, nothing else is forwarded
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
  *  GET  /api/backtest/legwise/daily             — that run's state/log. requireAccess
@@ -936,6 +951,23 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
   );
   // --- end rotation lot plans ---
 
+  // --- rotation plan --- the Today page's baskets: each Adaptive book's latest and tentative
+  // picks with their settings and upload state per account (rotation/plan.py, read-only). No
+  // query is forwarded.
+  fastify.get(
+    '/api/backtest/legwise/rotation/plan',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: { type: 'object', properties: {}, additionalProperties: false },
+      },
+    },
+    async (_request, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/rotation/plan');
+    },
+  );
+  // --- end rotation plan ---
+
   // --- rotation live vs paper --- the Rotation page's "Live vs paper" card (BL-141 Phase 3,
   // rotation/live_compare.py, read-only). Only `from` and `to` are forwarded, as plain days.
   fastify.get(
@@ -962,6 +994,151 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation live vs paper ---
+
+  // --- contract notes --- the Trade book page (BL-168, realised/views.py over the contract-notes
+  // store, read-only except PUT /inputs). `from` / `to` / `day` are plain days and `account` is
+  // `broker/id`; nothing else is forwarded. The PUT's upstream body is rebuilt from the validated
+  // fields, so an unknown key never reaches the Python service.
+  const CN_DAY = '^\\d{4}-\\d{2}-\\d{2}$';
+  const CN_RANGE = {
+    from: { type: 'string', pattern: '^(\\d{4}-\\d{2}-\\d{2})?$' },
+    to: { type: 'string', pattern: '^(\\d{4}-\\d{2}-\\d{2})?$' },
+  } as const;
+  const CN_ACCOUNT = {
+    account: { type: 'string', pattern: '^((finvasia|angelone)/[A-Za-z0-9_-]{1,40})?$' },
+  } as const;
+  const CN_READS: ReadonlyArray<{ name: string; account: boolean; extremes?: boolean }> = [
+    { name: 'summary', account: true },
+    { name: 'days', account: true },
+    { name: 'months', account: true },
+    { name: 'trips', account: true, extremes: true },
+    { name: 'money', account: false },
+    { name: 'momentum', account: false },
+  ];
+  for (const read of CN_READS) {
+    const keys = ['from', 'to', ...(read.account ? ['account'] : [])];
+    if (read.extremes) keys.push('extremes');
+    fastify.get(
+      `/api/backtest/legwise/contract-notes/${read.name}`,
+      {
+        preHandler: requireAccess,
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: {
+              ...CN_RANGE,
+              ...(read.account ? CN_ACCOUNT : {}),
+              ...(read.extremes ? { extremes: { type: 'string', enum: ['0', '1'] } } : {}),
+            },
+            additionalProperties: false,
+          },
+        },
+      },
+      async (request, reply) => {
+        const q = request.query as Record<string, unknown>;
+        await forwardToBacktestApi(
+          reply,
+          `/legwise/contract-notes/${read.name}${upstreamQuery(q, keys)}`,
+        );
+      },
+    );
+  }
+
+  fastify.get(
+    '/api/backtest/legwise/contract-notes/day/:day',
+    {
+      preHandler: requireAccess,
+      schema: {
+        params: {
+          type: 'object',
+          properties: { day: { type: 'string', pattern: CN_DAY } },
+          required: ['day'],
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { day } = request.params as { day: string };
+      await forwardToBacktestApi(reply, `/legwise/contract-notes/day/${day}`);
+    },
+  );
+
+  const CN_RUPEES = { type: ['number', 'null'], minimum: 0, maximum: 100_000_000 } as const;
+  fastify.put(
+    '/api/backtest/legwise/contract-notes/inputs/:day',
+    {
+      preHandler: requireAccess,
+      // Ajv coerces `true` to 1 for an integer field; a boolean is refused before it can be.
+      preValidation: async (request, reply) => {
+        const b = request.body as Record<string, unknown> | null;
+        const cap = b?.capital as Record<string, unknown> | null | undefined;
+        const values = [
+          b?.algos,
+          b?.capital_total,
+          ...(cap && typeof cap === 'object' ? Object.values(cap) : []),
+        ];
+        if (values.some((v) => typeof v === 'boolean')) {
+          await reply
+            .status(400)
+            .send({ error: 'algos and capital must be numbers, not true / false' });
+        }
+      },
+      bodyLimit: 4 * 1024,
+      schema: {
+        params: {
+          type: 'object',
+          properties: { day: { type: 'string', pattern: CN_DAY } },
+          required: ['day'],
+          additionalProperties: false,
+        },
+        body: {
+          type: 'object',
+          properties: {
+            algos: { type: ['integer', 'null'], minimum: 0, maximum: 200 },
+            capital_total: CN_RUPEES,
+            capital: {
+              type: ['object', 'null'],
+              properties: { finvasia: CN_RUPEES, angelone: CN_RUPEES },
+              additionalProperties: false,
+            },
+          },
+          additionalProperties: false,
+          minProperties: 1,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { day } = request.params as { day: string };
+      const b = request.body as Record<string, unknown>;
+      const body: Record<string, unknown> = {};
+      if ('algos' in b) body.algos = b.algos;
+      if ('capital_total' in b) body.capital_total = b.capital_total;
+      // Ajv strips unknown keys after `minProperties` is checked, so `{note: 'x'}` or
+      // `{capital: {kite: 1}}` arrives here as nothing to save. Sending it would still stamp the
+      // day `source: page` upstream; refuse it instead (an empty `capital` is left out).
+      if ('capital' in b) {
+        const cap = b.capital as Record<string, unknown> | null;
+        const kept =
+          cap === null
+            ? []
+            : (['finvasia', 'angelone'] as const).filter((k) => k in cap).map((k) => [k, cap[k]]);
+        if (cap === null) body.capital = null;
+        else if (kept.length) body.capital = Object.fromEntries(kept);
+      }
+      if (Object.keys(body).length === 0) {
+        await reply
+          .status(422)
+          .send({ error: 'nothing to save: send algos, capital_total or capital' });
+        return;
+      }
+      await forwardToBacktestApi(reply, `/legwise/contract-notes/inputs/${day}`, {
+        method: 'PUT',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(body),
+      });
+    },
+  );
+  // --- end contract notes ---
 
   // --- rotation portfolio stop --- BL-095: what a list's basket did under a portfolio MTM stop
   // (rotation/portfolio.py, read-only). `stop` is rupees (empty, 0 or below = none) and `trail`
