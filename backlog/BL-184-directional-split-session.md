@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades the Dir with real money on Core and T1; BL-182's method applied to it at the owner's request |
-| **Status** | In progress — Phase 0 registered 2026-10-28, run the same day |
+| **Status** | Done 2026-10-28: not adopted. Adaptive's one morning + one afternoon Dir against its one whole-day Dir: +₹31 [−214, +251] net per margin lot-day, drawdown deeper (−31,740 vs −26,486), the gain in T1's selection year only (+255) and negative after (−133); FAIL on both conditions. Descriptive lead: the fixed NIFTY `N_dir_0917` split reads +₹203 [+58, +348] |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -85,6 +85,53 @@ targets, T1's Dir setting, a conditional afternoon entry. Anything traded.
   and rows in the Directional README, `exit-time.md`, `entry-time.md` and the options matrix.
 - **Done when:** the rule has its verdict and the pages are updated.
 
+## Result (2026-10-28)
+
+434 pick days 2025-01-10 → 2026-10-27; pools of 60 morning (exit 13:00), 36 afternoon and 100 whole-day
+variants; one pick each. The 100 whole-day re-simulations match the stored rotation results on all 50,100
+variant-days. Full table: `research/bl184/out/split_summary.md` (git-ignored; `uv run python
+research/bl184/run.py --analyse-only` rebuilds it).
+
+| Book | Net / margin lot-day | Gross | Net at ₹5 an order | Days in profit | Max DD (net) |
+|---|---|---|---|---|---|
+| One whole-day Dir (comparator) | +326 | +451 | +379 | 58 % | −26,486 |
+| One morning Dir alone (09:17–12:47 → 13:00) | +81 | +201 | +131 | 57 % | −42,574 |
+| One afternoon Dir alone (13:02–15:02 → 15:28) | +276 | +387 | +324 | 60 % | −16,944 |
+| Split: one morning + one afternoon | +357 | +588 | +455 | 58 % | −31,740 |
+
+Split − comparator per margin lot-day: **net +31 [−214, +251]**; gross +137 [−106, +356]; at ₹5 an order
++76 [−168, +295]. Max drawdown −31,740 vs −26,486. **FAIL on both conditions.**
+
+| Period | Pick days | Split | Comparator | Difference [90 %] |
+|---|---|---|---|---|
+| T1 selection year (to 2025-10-08) | 184 | +513 | +258 | +255 [−88, +595] |
+| The year after | 250 | +242 | +376 | −133 [−460, +201] |
+
+Fixed files, descriptive (the 09:17 Core file split at 13:00 plus the 13:02 file, against the 09:17 whole
+day, 501 days): `N_dir` whole +141 → split +343 net a day, **+203 [+58, +348]** (gross +309 [+165, +453]),
+max drawdown −44,390 → −46,750; `S_dir` whole +322 → split +420, +98 [−56, +265], max drawdown −18,590 →
+−55,766.
+
+What the numbers say:
+
+- **With Adaptive picking, the split is a wash with a deeper drawdown.** The Dir split's interval is twice
+  as wide as the Widesl's (±230 against ±130): a 21 % stop shape with re-entry is far noisier across a
+  day boundary, and the morning Dir alone is poor (+81 net, −42,574 drawdown, the morning's move stopping
+  it before its re-entry can earn). The afternoon Dir alone (+276, −16,944) is nearly the whole-day's
+  earnings at two-thirds of its drawdown.
+- **The gain is in one year and reverses in the other:** +255 in T1's selection year, −133 after, with
+  2026 H1 the split's worst half (−23,531 against the whole day). The same instability BL-182 found.
+- **The fixed NIFTY file is the one positive reading** (+203 net, lower bound +58), but it is not the
+  registered comparison, its drawdown is deeper, and SENSEX's fixed split triples the drawdown. A lead for
+  a registration of its own, not a result.
+- Adaptive takes the ITM1 Dir 70–80 % of the time in every pool; the whole-day pick spreads over more
+  slots than the halves do.
+- Core Adaptive as traded makes ₹394 gross per lot-day; the whole-day Dir comparator ₹451, the split ₹588
+  gross, which the charges and the drawdown take back.
+
+Not adopted. No forward track. Leads kept on the findings page: the afternoon-only Dir (as the afternoon-
+only Widesl in BL-182) and the fixed NIFTY Dir split.
+
 ## Risks
 
 - A 13:00 exit on a 21 % stop shape: the morning set's re-entry has less time to recover; the afternoon
@@ -99,3 +146,6 @@ targets, T1's Dir setting, a conditional afternoon entry. Anything traded.
 
 - 2026-10-28 — created at the owner's request after BL-182; Phase 0 registered and committed before any
   run.
+- 2026-10-28 — run (`research/bl184/run.py` over `research/common/split_replay.py`): +₹31 [−214, +251] net per
+  margin lot-day, drawdown deeper, FAIL; fixed `N_dir_0917` split +₹203 [+58, +348] descriptive. Closed,
+  not adopted.

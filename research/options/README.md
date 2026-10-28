@@ -16,7 +16,7 @@ data. Status words and the page template: [`../README.md`](../README.md).
 | Trail | [D](strategies/widesl/trail.md) | [D](strategies/directional/trail.md) | [D](strategies/buy-breakout/trail.md) |
 | Re-entry | [D](strategies/widesl/re-entry.md) | [D](strategies/directional/re-entry.md) | [D](strategies/buy-breakout/re-entry.md) |
 | Exit time | [T](strategies/widesl/exit-time.md) | [T](strategies/directional/exit-time.md) | [D](strategies/buy-breakout/exit-time.md) |
-| Session split (two sets a day) | [T](strategies/widesl/session-split.md) | — | — |
+| Session split (two sets a day) | [T](strategies/widesl/session-split.md) | [T](strategies/directional/session-split.md) | — |
 | Days to expiry | [D](strategies/widesl/days-to-expiry.md) | [D](strategies/directional/days-to-expiry.md) | [D](strategies/buy-breakout/days-to-expiry.md) |
 | VIX | [T](strategies/widesl/vix.md) | [T](strategies/directional/vix.md) | [D](strategies/buy-breakout/vix.md) |
 | Weekday | [D](strategies/widesl/weekday.md) | [D](strategies/directional/weekday.md) | [D](strategies/buy-breakout/weekday.md) |
