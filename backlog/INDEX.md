@@ -12,7 +12,6 @@ Sorted by priority (P0 first), then ID.
 | ID | Title | Priority | Status | Type | Area |
 |---|---|---|---|---|---|
 | [BL-001](BL-001-momentum-result-integrity.md) | Momentum result integrity: goldens, parameter coverage, drift alerts | P0 | In progress | improvement | momentum |
-| [BL-024](BL-024-forward-signal-journal.md) | Forward-signal journal: record every weekly signal from now on | P0 | In progress | feature | momentum |
 | [BL-089](BL-089-backlog-tracks-and-github-board.md) | Backlog restructure: research / product / platform tracks, a generated index and `DONE.md`, one issue per item and a GitHub Projects board with a "Needs me" view | P0 | Ready | chore | cross-cutting |
 | [BL-107](BL-107-nse-fo-bhavcopy-daily.md) | Daily NSE F&O bhavcopy: official end-of-day record and a cross-check on the Fyers data | P0 | Planned | feature | options |
 | [BL-142](BL-142-momentum-kite-weekly-lots.md) | Momentum on Zerodha Kite: weekly ₹50k lots read from Kite each Friday, each rebalanced on its own calendar with free cash; LIQUIDBEES and SGBs excluded | P0 | In progress | feature | momentum |
@@ -97,6 +96,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-024](BL-024-forward-signal-journal.md) | Forward-signal journal: record every weekly signal from now on | Done: every Friday recorded since 9 Oct (chain reset 12 Oct, backup kept); Phase 2 score (`mbt journal score`, Fri 20:30 job, Journal page, one Telegram line) and Phase 3 Kite fills (16 and 23 Oct lots reconciled). One week scored at close; the four-week check lands on the scheduler (~13 Nov) | 2026-10-28 |
 | [BL-157](BL-157-dashboard-nextjs-16.md) | Dashboard on Next.js 16: OpenNext refuses Next 15 since 2026-10-21 (two years past its release), so the hosted dashboard cannot deploy | Done: Next 16.4.3 deployed 26 Oct (#327, #329); React 19 (#363), Turbopack builds and no cf-build dev-server guard (#364); `middleware.ts` kept (OpenNext's Node proxy is experimental) | 2026-10-28 |
 | [BL-012](BL-012-scheduler-service.md) | Scheduler service: one home for every recurring ingestion and maintenance job (laptop now, hostable later) | Done: installed under launchd, 44 jobs; last checks Y3/Y4/S3 added; D5/D6 dropped (frozen engine), D4 done by BL-168, no container needed | 2026-10-28 |
 | [BL-058](BL-058-options-rotation-forward-journal-and-ui.md) | Options rotation: forward paper journal and the Options Lab screens it needs | Done: journal live since 12 Oct, rotation view built; day-60 read-out → BL-174, paper vs real → BL-093 | 2026-10-28 |

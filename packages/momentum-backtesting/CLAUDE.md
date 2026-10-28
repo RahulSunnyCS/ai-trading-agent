@@ -86,8 +86,8 @@ a Fyers access token (see the precedence order in root `technical.md`'s Environm
 Variables table) — that connection is unrelated and still live.
 
 The weekly job (`mbt weekly`) itself runs from the repo's scheduler (`apps/scheduler`,
-BL-012 — four jobs: Friday 14:40 preview, 16:45 final, 19:30 stock-data ingest, 21:00
-forward-journal check IST), replacing first the retired `.github/workflows/momentum-weekly.yml`
+BL-012 — Friday 14:40 preview, 16:45 final, 19:30 stock-data ingest, 20:30 forward-journal
+score, 21:00 forward-journal check IST), replacing first the retired `.github/workflows/momentum-weekly.yml`
 and then the per-job launchd plists. The scheduler passes the repo root `.env` to each run
 and still writes `data/launchd-weekly-<run>.log`, which `GET /api/weekly/status` reads. The CLI's `weekly()` command is a thin wrapper around
 `api._execute_weekly_run` (the same function the API route calls) — there is exactly one
@@ -257,6 +257,32 @@ benchmark level should be in under this week; a favourite whose signal is labell
 week is reported as "wrong week", not missing. The dashboard's **Momentum › Journal** page
 (`MomentumJournalView.tsx`, `GET /api/journal` → Fastify `/api/momentum/journal`) shows the
 same check, the chain status and every entry by week.
+
+**Forward score and real fills (BL-024 Phases 2-3, 2026-10-28).** `forward_score.py` is pure:
+`select` picks the scored row per (config, run, week) — the latest recorded before the fill
+(preview: W 15:30 IST; final: the Monday 09:15 after W); later rows are corrections, a week with
+none before is `late`. `score_item` checks the signal's BUYs are in next week's `holdings_before`
+and its SELLs gone (`mismatch` otherwise, never scored), then values `target_weights` W -> W+1 at
+Friday closes (ideal) and Monday opens (`monday_fills`, achievable) after `trade_cost` — the
+engine's own `_Sim.buy_cost` / `sell_cost` called on a stand-in (`_CostSim`), pinned equal by
+`test_forward_score.py` — from `holdings_before` drifted to W. The backtest is shown twice: *as
+recorded* (`sleeve_value` of W+1's row over W's: omitted across an April reset or when the two
+rows' commits sit on different sides of the BL-001 F6 merge, `ranking_version` via `git
+merge-base --is-ancestor`) and *now* (`backtest_week` on today's `_run_broad`: value before W's
+trades to before W+1's, so it carries W's costs like the live figure). Groups combine members by
+`sleeve_value`. Only Broad has price tables (`forward_run.prices_for`); other datasets are
+`not_scored`. `forward_fills.py` reads the Kite contract notes as files
+(`TRADING_DATA_ROOT/contract-notes/days/*.jsonl`, `broker: kite`; never `option-backtesting`'s
+`realised/`), books fills to lots FIFO per symbol against the ledger's events then the pending
+plan (`momentum_lot_state.planned`, `NOT_BOOKED`), and reconciles each due week of a lot
+(`rebalance.on_cadence` from the paper start; a lot with nothing booked before it is new, bought
+from cash) against its journal row and that Friday's 14:15 orders: first-day fills against raw
+Friday close / next open / the orders' price in bps, later fills counted as top-ups, charges from
+the note shared by value against the engine's rates without slippage. `forward_run.py` wires both
+to the data (lazy `api` import; the catalog open only for the reads): `mbt journal score` stores
+`forward_scores.json` (state dir), `GET /api/journal/forward` serves it with the fills computed
+live, and `api._forward_score_line` adds `forward_run.headline_line()` to the headline's final
+message (a failure is a line saying so).
 
 **Gotcha found live, not by a test:** `stocks_fetch`/`local_migrate` are Typer commands whose
 parameters default to `typer.Option(...)` sentinel objects — Typer only resolves those into
@@ -476,9 +502,10 @@ contract, not a shared service).
   Friday, and `live_rules.twr_index` makes the time-weighted index the drawdown is measured on, so a
   new lot never lifts the peak; without that key, the BL-010 frozen ensemble rebased at
   `paper_start`, `tracker.run_config`); the
-  trailing rule needs the journal-scored live series (BL-024 Phase 2, not built) and says "not
-  measurable" until then; stage `live` is reported as blocked until real fills are recorded
-  (BL-024 Phase 3). A breach is sent untagged (never switchable); the routine status is the
+  trailing rule needs a journal-scored live series and says "not measurable" until then (BL-024
+  Phase 2 scores the journal since 2026-10-28, `forward_scores.json`, but the rule does not read it
+  yet); stage `live` is reported as blocked until real fills are recorded (BL-024 Phase 3 reconciles
+  the Kite fills, not yet read by this check either). A breach is sent untagged (never switchable); the routine status is the
   `momentum.live_rules` type. Exit 0 on a breach, 1 only when the check cannot run or the data is
   stale. Scheduler job `momentum-live-rules`, Fri 21:30 IST.
 - `this_week.py` (BL-051) — Momentum › This week's data: `week_view` builds one card per

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — time-critical: every Friday not recorded is out-of-sample evidence lost for good, and real money is planned |
-| **Status** | In progress (Phase 1) |
+| **Status** | Done (2026-10-28) |
 | **Type** | feature |
 | **Area** | momentum (+ trading-data) |
 | **Created** | 2026-10-06 |
@@ -64,7 +64,9 @@ benchmark.
    the Friday Telegram message, so Telegram's timestamp is an outside witness of what was recorded
    and when.
 5. **Start:** clean on Friday 2026-10-09; no backfill of 2026-10-02.
-6. **Real fills (Phase 3):** waits until real money is in.
+6. **Real fills (Phase 3):** waits until real money is in. Superseded 2026-10-28 (owner): "Phase 2 +
+   3 from Kite" — the Momentum money has been on Zerodha Kite since 2026-10-19 (BL-142), so the
+   fills come from the Kite contract notes and the lot ledger, with no manual entry.
 
 ## Plan
 

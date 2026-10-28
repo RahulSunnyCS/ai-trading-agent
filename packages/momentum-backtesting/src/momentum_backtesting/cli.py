@@ -2248,6 +2248,81 @@ def journal_check(
         raise typer.Exit(1)
 
 
+@journal_app.command("score")
+def journal_score(
+    rerun: bool = typer.Option(
+        True, help="Also run each scored config on today's code for the 'backtest now' figure."
+    ),
+    save: bool = typer.Option(True, help="Store the result for the Journal page."),
+    as_json: bool = typer.Option(False, "--json", help="Print the stored JSON."),
+) -> None:
+    """BL-024 Phases 2-3: score every journalled signal against the week after it (live at
+    Friday close and Monday open, after the backtest's costs, beside the backtest), and reconcile
+    the real Kite fills against each lot's signal. Read-only on the journal, ledger and catalog;
+    writes only forward_scores.json in the state dir. Sends nothing (the line goes in the headline's
+    Friday message). Scheduled Fridays 20:30 IST (momentum-journal-score)."""
+    from . import forward_run, forward_score, this_week
+
+    result = forward_run.compute_score(rerun=rerun)
+    try:
+        result["fills"] = forward_run.compute_fills()
+    except Exception as error:  # the score still stands without the fills
+        result["fills"] = None
+        result["fills_error"] = f"{type(error).__name__}: {error}"
+    if save:
+        path = forward_score.save(result, this_week.state_dir())
+        typer.echo(f"saved {path}")
+    if as_json:
+        typer.echo(json.dumps(result, indent=1, default=str))
+        return
+    counts: dict[str, int] = {}
+    for item in result["items"]:
+        counts[item["status"]] = counts.get(item["status"], 0) + 1
+    typer.echo(
+        f"{len(result['items'])} signal-weeks: "
+        + ", ".join(f"{n} {status}" for status, n in sorted(counts.items()))
+        + f". Scored weeks: {', '.join(result['scored_weeks']) or 'none yet'}."
+    )
+    for group in result["groups"]:
+        if group["status"] != "scored":
+            continue
+        typer.echo(
+            f"  {group['week']} {group['name']}: live {_signed_pct(group['live']['ideal'])} "
+            f"(Fri close), {_signed_pct(group['live']['achievable'])} (Mon open); backtest "
+            f"{_signed_pct(group['backtest']['recorded'])} as recorded, "
+            f"{_signed_pct(group['backtest']['now'])} on today's code"
+        )
+    for item in result["items"]:
+        if item["status"] == "mismatch":
+            typer.echo(f"  MISMATCH {item['week']} {item['name']}: {'; '.join(item['mismatches'])}")
+    fills = result.get("fills") or {}
+    for group in fills.get("groups", []):
+        for rebalance in group["rebalances"]:
+            done = [r for r in rebalance["rows"] if r["status"] == "done"]
+            other = [
+                f"{r['symbol']} {r['status']}"
+                for r in rebalance["rows"]
+                if r["status"] not in ("done", "held")
+            ]
+            typer.echo(
+                f"  fills {rebalance['week']} {rebalance['lot']}: {len(done)} done"
+                + (f"; {', '.join(other)}" if other else "")
+                + f"; charges ₹{rebalance['totals']['real_charges']:,.2f} (model "
+                f"₹{rebalance['totals']['model_charges']:,.2f}); first-day fills vs Friday close "
+                + (
+                    "n/a"
+                    if rebalance["totals"]["slippage_close_rs"] is None
+                    else f"₹{rebalance['totals']['slippage_close_rs']:+,.0f}"
+                )
+            )
+    if result.get("fills_error"):
+        typer.echo(f"  fills FAILED: {result['fills_error']}")
+
+
+def _signed_pct(value: float | None) -> str:
+    return "n/a" if value is None else f"{value * 100:+.2f}%"
+
+
 @journal_app.command("verify")
 def journal_verify() -> None:
     """Check that no entry was changed, removed or reordered since it was recorded."""

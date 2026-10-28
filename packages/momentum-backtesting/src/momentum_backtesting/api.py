@@ -4178,6 +4178,19 @@ def _journal_line(journal: dict) -> str | None:
     )
 
 
+def _forward_score_line(run: str) -> str | None:
+    """BL-024 Phase 2: the headline's newest scored week, one line in its Friday message (never a
+    message of its own, BL-173). Final runs only; a failure is a line saying so, never a raise."""
+    if run != "final":
+        return None
+    from . import forward_run
+
+    try:
+        return forward_run.headline_line()
+    except Exception as error:
+        return f"Forward score could not be computed: {type(error).__name__}: {error}"
+
+
 def _execute_weekly_run(body: WeeklyRunBody) -> dict:
     """Evaluate every favourite and send the active one; the body of a weekly job."""
     from . import notify
@@ -4249,6 +4262,9 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
         if body.send and in_scope:
             if journal_line:
                 active_result.notification.body += f"\n\n{journal_line}"
+            score_line = _forward_score_line(body.run)
+            if score_line:
+                active_result.notification.body += f"\n{score_line}"
             notify.send(active_result.notification)
             sent_main = True
     elif in_scope:
@@ -5881,6 +5897,13 @@ def create_app() -> FastAPI:
             who = holdings_store.owner()
             holdings_store.set_rule(con, who, body.symbol.upper(), body.treatment)
             return holdings_store.rules(con, who)
+
+    @app.get("/api/journal/forward")
+    def forward_journal_score() -> dict:
+        """BL-024 Phases 2-3: the stored forward score and the real fills reconciled, live."""
+        from . import forward_run
+
+        return forward_run.view()
 
     @app.get("/api/journal")
     def forward_journal_view(week: str | None = None) -> dict:
