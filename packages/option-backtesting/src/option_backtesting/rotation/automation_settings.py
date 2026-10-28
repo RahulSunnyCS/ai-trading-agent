@@ -27,6 +27,7 @@ DEFAULT = {
             "upload": True,
             "multiplier": 1,
             "addon": True,
+            "dirBoost": False,
         },
         "algotest.angelone": {
             "login": False,
@@ -34,6 +35,7 @@ DEFAULT = {
             "upload": False,
             "multiplier": 1,
             "addon": True,
+            "dirBoost": False,
         },
         "quantiply.angelone": {
             "login": True,
@@ -41,6 +43,7 @@ DEFAULT = {
             "upload": True,
             "multiplier": 1,
             "addon": True,
+            "dirBoost": False,
         },
         "quantiply.finvasia": {
             "login": False,
@@ -48,6 +51,7 @@ DEFAULT = {
             "upload": False,
             "multiplier": 1,
             "addon": True,
+            "dirBoost": False,
         },
     },
     "pause": {"until": None},
@@ -89,7 +93,10 @@ def read(path: Path | None = None) -> tuple[dict, str]:
             addon = row.get("addon", True)
             if not isinstance(addon, bool):
                 raise ValueError(f"{path}: row {p}.{b} has addon {row.get('addon')!r}")
-            row["multiplier"], row["addon"] = multiplier, addon
+            dir_boost = row.get("dirBoost", False)  # settings before BL-183: off
+            if not isinstance(dir_boost, bool):
+                raise ValueError(f"{path}: row {p}.{b} has dirBoost {row.get('dirBoost')!r}")
+            row["multiplier"], row["addon"], row["dirBoost"] = multiplier, addon, dir_boost
     pause = data.get("pause") or {}
     until = pause.get("until") if isinstance(pause, dict) else "?"
     if until is not None and not (isinstance(until, str) and _DAY.fullmatch(until)):
@@ -142,3 +149,39 @@ def addon_mixed(settings: dict, platform: str, book: str) -> bool:
     for an account that asked to leave it out)."""
     rows = _uploading_rows(settings, platform, book)
     return len({bool(r.get("addon", True)) for r in rows}) > 1
+
+
+def dir_boost_wanted(settings: dict, platform: str, book: str) -> bool:
+    """Whether the `platform` export of `book` trades the picked Dir at 2 lots on a non-expiry day
+    (BL-183): only when every row that uploads that list has it on. One export serves every
+    account of a platform, so while any account that shares the list wants 1 lot, it stays 1 lot
+    (the safe way round: a doubled order is the one that can be wrong in rupees)."""
+    rows = _uploading_rows(settings, platform, book)
+    if not settings["masters"].get("uploads") or not rows:
+        return False
+    return all(r.get("dirBoost", False) for r in rows)
+
+
+def dir_boost_mixed(settings: dict, platform: str, book: str) -> bool:
+    """Whether the rows that upload this list disagree about Dir ×2 (so the export stays at 1 lot
+    for an account that asked for 2)."""
+    rows = _uploading_rows(settings, platform, book)
+    return len({bool(r.get("dirBoost", False)) for r in rows}) > 1
+
+
+def dir_boost_lists(settings: dict, uploads_on: dict[str, bool] | None = None) -> dict[str, bool]:
+    """BL-183, for the messages: {'adaptive', 't1'} -> whether some platform's export of that list
+    trades the Dir ×2 rule (`dir_boost_wanted`) and reaches that platform (`uploads_on`, by
+    platform: its `.env` upload switch; unset = every platform), so its lines say the lots."""
+    on = uploads_on if uploads_on is not None else {p: True for p in PLATFORMS}
+    return {
+        key: any(on.get(p, False) and dir_boost_wanted(settings, p, book) for p in PLATFORMS)
+        for key, book in (("adaptive", "core"), ("t1", "t1"))
+    }
+
+
+def env_uploads_on(env: dict[str, str] | None = None) -> dict[str, bool]:
+    """The `.env` hard switches that let each platform's uploader change anything:
+    ALGOTEST_UPLOAD / QUANTIPLY_UPLOAD = on."""
+    env = os.environ if env is None else env
+    return {p: str(env.get(f"{p.upper()}_UPLOAD", "")).strip().lower() == "on" for p in PLATFORMS}

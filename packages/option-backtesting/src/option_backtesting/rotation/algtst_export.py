@@ -21,7 +21,8 @@ from pathlib import Path
 
 from ..legwise.algtst import Export, to_algtst
 from ..legwise.schema import load_legwise
-from . import journal, store
+from . import journal, live_lots, store
+from .live_lots import manifest_block, manifest_field
 from .variants import strategy_path
 
 #: book -> (journal track, AlgoTest name prefix)
@@ -38,6 +39,14 @@ class DayPicks:
     source: str  # "recorded" | "preview" | "given"
     core: list[str]
     buy: list[str]
+    #: BL-183: {'NIFTY': .., 'SENSEX': ..} days to expiry on the weekday basis, when known
+    dte: dict[str, str] | None = None
+    #: BL-183: lots per core pick (`live_lots.lots_for_day`) when the Dir ×2 rule was asked for;
+    #: None = every pick 1 lot and the manifest as before
+    lots: dict[str, int] | None = None
+
+    def lots_of(self, variant: str) -> int:
+        return (self.lots or {}).get(variant, 1)
 
 
 def strategy_name(book: str, variant: str, addon: bool = False) -> str:
@@ -61,8 +70,17 @@ def recorded_picks(day: date, book: str, root: Path | None = None) -> DayPicks |
     entry = next((e for e in entries if e.get("day") == day.isoformat()), None)
     if entry is None:
         return None
+    from .dte import entry_labels
+
     block = entry["lists"][LIST_KEY]
-    return DayPicks(day, book, "recorded", list(block["core"]), list(block.get("buy") or []))
+    return DayPicks(
+        day,
+        book,
+        "recorded",
+        list(block["core"]),
+        list(block.get("buy") or []),
+        dte=entry_labels(entry),
+    )
 
 
 def preview_picks(day: date, book: str, root: Path | None = None) -> DayPicks | None:
@@ -71,7 +89,7 @@ def preview_picks(day: date, book: str, root: Path | None = None) -> DayPicks | 
     picks = next_session_picks(_previous_session(day), root, track=BOOKS[book][0])
     if picks is None or picks.day != day:
         return None
-    return DayPicks(day, book, "preview", list(picks.core), list(picks.buy))
+    return DayPicks(day, book, "preview", list(picks.core), list(picks.buy), dte=picks.dte)
 
 
 def build(picks: DayPicks) -> list[tuple[str, Export]]:
@@ -80,6 +98,9 @@ def build(picks: DayPicks) -> list[tuple[str, Export]]:
     out = []
     for variant, addon in [(v, False) for v in picks.core] + [(v, True) for v in picks.buy]:
         spec = load_legwise(strategy_path(variant))
+        if not addon:
+            # AlgoTest scales the overall MTM SL by the leg lots itself: keep the 1-lot figure
+            spec = live_lots.scaled(spec, picks.lots_of(variant), overall_per_lot=True)
         out.append((variant, to_algtst(spec, strategy_name(picks.book, variant, addon))))
     return out
 
@@ -115,9 +136,11 @@ def write(picks: DayPicks, exports: list[tuple[str, Export]], out: Path) -> Path
                 "name": export.name,
                 "addon": variant in picks.buy,
                 "file": f"{variant}.algtst",
+                **manifest_field(picks, variant, variant in picks.buy),
             }
             for variant, export in exports
         ],
+        **manifest_block(picks),
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     zip_path = out / f"{picks.day.isoformat()}-{picks.book}.zip"

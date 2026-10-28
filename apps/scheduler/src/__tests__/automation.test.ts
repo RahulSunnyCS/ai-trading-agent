@@ -85,6 +85,7 @@ describe('effective and the GitHub variables', () => {
       upload: false,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: 8000,
     });
     const { vars, withheld } = githubVariables(s);
@@ -236,6 +237,7 @@ describe('API /settings/automation', () => {
       upload: true,
       multiplier: 1,
       addon: true,
+      dirBoost: false,
       mtmSl: 8000,
     });
     expect(body.github.QUANTIPLY_LOGIN).toBe('on');
@@ -408,5 +410,37 @@ describe('MTM SL per Quantiply row (BL-172)', () => {
     const ok = structuredClone(DEFAULT_SETTINGS);
     ok.rows['quantiply.angelone'].mtmSl = null;
     expect('settings' in validate(ok)).toBe(true);
+  });
+});
+
+describe('Dir ×2 on non-expiry days (BL-183)', () => {
+  it('settings saved before BL-183 read as off, and every default row is off', () => {
+    const old = clone(DEFAULT_SETTINGS) as unknown as {
+      rows: Record<string, Record<string, unknown>>;
+    };
+    for (const row of Object.values(old.rows)) row.dirBoost = undefined;
+    const filled = withDefaults(JSON.parse(JSON.stringify(old)));
+    expect(Object.values(filled.rows).every((r) => r.dirBoost === false)).toBe(true);
+    expect(Object.values(DEFAULT_SETTINGS.rows).every((r) => r.dirBoost === false)).toBe(true);
+  });
+
+  it('a save must say it, as true or false', () => {
+    for (const bad of [undefined, 'yes', 1, null]) {
+      const s = clone(DEFAULT_SETTINGS) as unknown as {
+        rows: Record<string, Record<string, unknown>>;
+      };
+      (s.rows['quantiply.angelone'] as Record<string, unknown>).dirBoost = bad;
+      const checked = validate(JSON.parse(JSON.stringify(s)));
+      expect('errors' in checked && checked.errors.join()).toContain('quantiply.angelone.dirBoost');
+    }
+  });
+
+  it('reaches the jobs through effective', () => {
+    const s = clone(DEFAULT_SETTINGS);
+    s.rows['quantiply.angelone'].dirBoost = true;
+    const checked = validate(s);
+    if (!('settings' in checked)) throw new Error(checked.errors.join());
+    expect(effective(checked.settings, 'quantiply.angelone').dirBoost).toBe(true);
+    expect(effective(checked.settings, 'algotest.finvasia').dirBoost).toBe(false);
   });
 });

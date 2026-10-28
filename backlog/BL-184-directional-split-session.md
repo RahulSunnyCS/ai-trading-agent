@@ -8,7 +8,7 @@
 | **Area** | options |
 | **Created** | 2026-10-28 |
 | **Depends on** | BL-182 (the method, the shared replay in `research/common/split_replay.py`), BL-058 (the Core files and stored results) |
-| **TODO.md row** | §3.10.47 |
+| **TODO.md row** | §3.10.48 |
 
 ## Context
 

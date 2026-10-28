@@ -257,6 +257,32 @@ def _without_addon(picks, platform: str, book: str, settings: dict | None):
     return replace(picks, buy=[])
 
 
+def _with_lots(picks, platform: str, book: str, settings: dict | None, flag: bool | None):
+    """BL-183: the day's lots for this export. `--dir-boost` / `--no-dir-boost` decide a hand run;
+    under --from-settings the rows that upload this list do (`dir_boost_wanted`: all of them on).
+    When it is off the picks are returned untouched, so the export is exactly what it was."""
+    from dataclasses import replace
+
+    from . import automation_settings, live_lots
+
+    if flag is None:
+        if settings is None:
+            return picks
+        flag = automation_settings.dir_boost_wanted(settings, platform, book)
+        if not flag and automation_settings.dir_boost_mixed(settings, platform, book):
+            typer.echo(
+                f"{platform} {book}: Dir ×2 OFF: one export serves every account and another "
+                "account uploading this list has it off, so every pick stays at 1 lot"
+            )
+    if not flag:
+        return picks
+    lots = live_lots.lots_for_day(picks.core, picks.dte)
+    why = live_lots.summary(picks.core, picks.dte) if picks.dte else "days to expiry not known"
+    doubled = [f"{v} at {n} lots" for v, n in lots.items() if n > 1]
+    typer.echo(f"{platform} {book}: Dir ×2 on: {', '.join(doubled) or f'every pick 1 lot ({why})'}")
+    return replace(picks, lots=lots)
+
+
 def _morning(picks, book: str, folder):
     """BL-172 Phase 4: the recorded picks under the owner's 09:17 rule, against the list the
     evening uploaded to `folder`. With no evening upload there (nothing of it is on the platform),
@@ -283,7 +309,9 @@ def _morning(picks, book: str, folder):
             "notes": m.notes,
         },
     }
-    return m.picks, extra
+    from dataclasses import replace
+
+    return replace(m.picks, dte=picks.dte), extra
 
 
 def _end_missing(missing: list[str], books: list[str]) -> None:
@@ -305,6 +333,11 @@ def _settings_books(platform: str) -> tuple[list[str], dict]:
     typer.echo(f"{platform}: {', '.join(books) or 'nothing to upload'} ({source})")
     return books, settings
 
+
+_DIR_BOOST_HELP = (
+    "BL-183: the picked Dir at 2 lots (its MTM SL doubled) on a non-expiry day. Default: off, or "
+    "under --from-settings what Settings › Automation says (every row uploading the list on)."
+)
 
 _FROM_SETTINGS_HELP = (
     "Export every list the dashboard's Settings › Automation uploads to this platform "
@@ -332,6 +365,7 @@ def algotest_export(
     wait: int = typer.Option(
         0, "--wait", help="Seconds to wait for the day's recorded entry (the 09:16 jobs)."
     ),
+    dir_boost: bool | None = typer.Option(None, "--dir-boost/--no-dir-boost", help=_DIR_BOOST_HELP),
 ) -> None:
     """The day's Adaptive picks as AlgoTest .algtst files plus a zip (BL-137; uploads nothing)."""
     from pathlib import Path
@@ -353,6 +387,7 @@ def algotest_export(
             missing.append(b)
             continue
         picks = _without_addon(picks, "algotest", b, settings)
+        picks = _with_lots(picks, "algotest", b, settings, dir_boost)
         try:
             exports = ax.build(picks)
         except (Unmappable, FileNotFoundError) as error:
@@ -390,6 +425,7 @@ def quantiply_export(
     wait: int = typer.Option(
         0, "--wait", help="Seconds to wait for the day's recorded entry (the 09:16 job)."
     ),
+    dir_boost: bool | None = typer.Option(None, "--dir-boost/--no-dir-boost", help=_DIR_BOOST_HELP),
     morning_rule: bool = typer.Option(
         False,
         "--morning-rule",
@@ -426,6 +462,7 @@ def quantiply_export(
         if morning_rule and picks.source == "recorded":
             picks, extra = _morning(picks, b, folder)
         picks = _without_addon(picks, "quantiply", b, settings)
+        picks = _with_lots(picks, "quantiply", b, settings, dir_boost)
         try:
             built = qx.build(picks)
         except (Unmappable, FileNotFoundError) as error:

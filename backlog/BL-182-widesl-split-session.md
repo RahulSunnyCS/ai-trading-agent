@@ -8,7 +8,7 @@
 | **Area** | options |
 | **Created** | 2026-10-28 |
 | **Depends on** | BL-058 (the Core-298 files and stored results), BL-113 (the T1 settings), BL-063 (the charge model, `ruletest/charges.py`) |
-| **TODO.md row** | §3.10.46 |
+| **TODO.md row** | §3.10.47 |
 
 ## Context
 
