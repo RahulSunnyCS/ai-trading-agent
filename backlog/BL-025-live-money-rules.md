@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — becomes P0 the week real money goes into the strategy |
-| **Status** | In progress (Phase 2); drawdown-rule test signed off 2026-10-28, running |
+| **Status** | In progress (Phase 2); drawdown-rule test run 2026-10-28: no candidate passes, today's lines stay; re-entry wording is the owner's choice (open question 3) |
 | **Type** | feature |
 | **Area** | momentum |
 | **Created** | 2026-10-06 |
@@ -71,6 +71,11 @@ A `live_rules` file the owner writes once, and a weekly check that alerts when a
    - **d. 2012–2016.** Leave it to BL-176 (recommended), or allow BL-025 one read of it now
      (`override: <reason>`). If BL-176 runs the followed strategy there, the registered rules
      can then be applied once to that same curve.
+3. **Re-entry wording after the rule test (open, the owner's).** No candidate passed, so the cut
+   at −20% and the exit at −30% stay. The owner picks the text that follows an exit: **R1 as
+   written** (no way back in except a logged review; it gave up about 29 points of CAGR in the
+   test, because it exited near the 2020 and 2022 lows and never returned) or **N, alert and
+   review** (the alerts fire at the same lines and the owner decides each time; not scorable).
 
 ## Experiments
 
@@ -322,3 +327,25 @@ a new file. A rule here is never edited after a run. A changed rule is a new dat
      owns the weeks from its peak to the next fall's peak. The log-wealth gap to R0 that builds
      up there is its share of the CAGR given up.
   9. The one-week-late variant is the same decisions, each size change one week later.
+- 2026-10-28 — **drawdown-rule test run** (`scripts/bl025_rule_test.py` at `c98cf399`, criteria
+  sha1 `c7825eab`; result `search_spaces/bl025_rules_result.json`). Window 2017-01-06 to
+  2026-10-23, post-F6 ranking, four sleeves, the blend and 17 qualifying lot ramps. Look-ahead
+  check 1 (prefix) found 0 differences for every candidate and object; no hold-out week exists yet.
+  **No candidate passes; the current lines stay.**
+
+  | Candidate | Blend CAGR | Blend worst fall | Worst fall anywhere | CAGR given up (blend / ramp median) | (a) ≤35% everywhere | (b) ≤3 pts | Verdict |
+  |---|---|---|---|---|---|---|---|
+  | R0 hold through | 35.5% | −34.8% | −38.4% | 0 / 0 | fails (3 sleeves, 1 ramp) | — | kill |
+  | R1 as written | 6.8% | −23.5% | −30.9% | 28.7 / 30.3 | passes | fails | kill |
+  | R2 back at the high | 27.2% | −26.1% | −35.3% | 8.3 / 7.0 | fails (sleeve 2) | fails | kill |
+  | R3 back above the 40-week average | 31.0% | −33.2% | −41.3% | 4.5 / 3.3 | fails (2 sleeves, 1 ramp) | fails | kill |
+  | R4 back on a 20% rebound | 31.0% | −34.4% | −38.8% | 4.5 / 4.0 | fails (2 sleeves, 1 ramp) | fails | kill |
+  | R5 −25 / −35 with R3's way back | 33.0% | −36.1% | −37.8% | 2.5 / 1.5 | fails (blend, 3 sleeves, 4 ramps) | passes | kill |
+
+  Reading it: only R1 keeps every worst fall within 35%, and it does so by sitting in cash after
+  the 2020 and 2022 exits (giving up 26 to 44 points across the ramps, except the newest). Every
+  way back in that keeps most of the return lets at least one sleeve fall past 35%. The one-week-late
+  variant (reported, not judged) changes no verdict. Known bias: the curves use today's category
+  tags (BL-010 F3), which may understate the falls on both sides alike. Per the registration the
+  current lines stay and the re-entry text is the owner's choice (open question 3). Re-run unchanged
+  on BL-176's pick if it changes the followed strategy.
