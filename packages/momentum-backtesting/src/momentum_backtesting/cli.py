@@ -2051,7 +2051,7 @@ KITE_REMINDERS = {
     ),
     "monday": (
         "Log in to Kite before the open",
-        "Kite holdings, free cash and Monday's fills are read from Kite today.",
+        "Kite is read only while you are logged in (holdings and free cash, for Your orders).",
     ),
 }
 

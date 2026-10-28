@@ -243,15 +243,19 @@ function pipeOutput(stream, label, destination) {
   });
 }
 
-/** `launchctl kickstart -k`: launchd stops its copy and starts it again; wait for the port. */
-async function restartAgent(service) {
-  const { target } = launchdAgent(service);
+/**
+ * `launchctl kickstart -k`: launchd stops its copy and starts it again. Ready once a listener
+ * that was not there before holds the port (the old one may still be shutting down).
+ */
+async function restartAgent(service, target) {
+  const before = new Set(listeners(service.targetPort));
   const result = spawnSync('launchctl', ['kickstart', '-k', target], { encoding: 'utf8' });
   if (result.status !== 0) {
     throw new Error(`launchctl kickstart -k ${target} failed: ${result.stderr.trim()}`);
   }
   for (let attempt = 0; attempt < 240; attempt++) {
-    if (listeners(service.targetPort).some((pid) => belongsToService(processInfo(pid), service))) {
+    const fresh = listeners(service.targetPort).filter((pid) => !before.has(pid));
+    if (fresh.some((pid) => belongsToService(processInfo(pid), service))) {
       console.log(`[${service.label}] ready on http://localhost:${service.targetPort} (launchd)`);
       return;
     }
@@ -443,6 +447,8 @@ async function run() {
   services.dashboard = dashboardService({ prod, port });
   const selected = serviceIds(mode).map((id) => services[id]);
   const prodDashboard = prod && mode !== 'stop' && selected.includes(services.dashboard);
+  // Looked up once, so every decision in this run sees the same launchd state.
+  const agents = new Map(selected.map((service) => [service, launchdAgent(service)]));
   if (prodDashboard) {
     console.log(`[Dashboard] DASHBOARD_PASSWORD found in ${requirePassword()}`);
   }
@@ -451,7 +457,7 @@ async function run() {
     for (const service of selected) {
       const foreignPid = foreignTargetListener(service);
       if (foreignPid) {
-        const agent = launchdAgent(service);
+        const agent = agents.get(service);
         const hint = agent
           ? ` It is the always-on ${service.label} of another checkout; to run this one, first: launchctl bootout ${agent.target}`
           : '';
@@ -465,7 +471,7 @@ async function run() {
   if (!dryRun && mode !== 'stop' && selected.includes(services.options)) ensureOptionsCache();
   // A service launchd keeps up for this checkout is restarted through launchd, never stopped
   // here: launchd would start it again and the two copies would fight over the port.
-  const kept = selected.filter((service) => launchdAgent(service)?.ours);
+  const kept = selected.filter((service) => agents.get(service)?.ours);
   for (const service of selected) {
     if (kept.includes(service)) {
       const verb = mode === 'stop' ? 'leaving' : dryRun ? 'would restart' : 'restarting';
@@ -475,7 +481,7 @@ async function run() {
     await stopService(service, dryRun);
   }
   if (dryRun || mode === 'stop') return;
-  for (const service of kept) await restartAgent(service);
+  for (const service of kept) await restartAgent(service, agents.get(service).target);
   const started = selected.filter((service) => !kept.includes(service));
   if (prodDashboard) ensureProdBuild(services.dashboard, rebuild);
   const children = [];
@@ -526,6 +532,9 @@ async function run() {
       );
     } else {
       console.log('\nBoth research APIs are ready. Press Ctrl+C to stop them.');
+    }
+    for (const service of kept) {
+      console.log(`(${service.label} is kept by launchd: Ctrl+C leaves it running.)`);
     }
   } catch (error) {
     console.error(error.message);

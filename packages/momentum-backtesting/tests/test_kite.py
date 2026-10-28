@@ -22,6 +22,9 @@ from momentum_backtesting.db_read import open_catalog
 def kite_env(monkeypatch, tmp_path):
     monkeypatch.setenv("KITE_API_KEY", "key123")
     monkeypatch.setenv("KITE_API_SECRET", "secret456")
+    # The repo .env may name the hosted dashboard; without this a reminder would probe the
+    # real API port and cloudflared.
+    monkeypatch.setenv("DASHBOARD_PUBLIC_URL", "")
     monkeypatch.setattr(kite, "TOKEN_CACHE", tmp_path / ".kite_token.json")
 
 

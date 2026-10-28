@@ -143,8 +143,7 @@ function fyersReminder(
     timeoutMinutes: 5,
     retries: 0,
     retryDelayMinutes: 0,
-    catchUpHours,
-    group: 'catalog',
+    catchUpHours, // no group: it never opens the catalog, so nothing should queue it
     fixHint:
       'Dashboard › Broker logins › Fyers › Log in (or: cd packages/momentum-backtesting && uv run mbt login)',
   };
