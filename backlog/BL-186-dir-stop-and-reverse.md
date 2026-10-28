@@ -105,6 +105,64 @@ edited after a run: a new, dated rule supersedes it with a logged reason, and bo
   commit as the result.
 - **Done when:** the registered verdict is written, with the hold-out read last.
 
+## Result, main period (2026-10-29): killed — no reversal arm beats the plain exit
+
+T1's Adaptive picks, 1 lot a pick, **2025-01-10 → 2026-07-22**: 375 days, 321 Dir pick-days (108 days with a
+Dir pick on its own index's expiry). Net after ₹20 + GST an order. The A3 cell (each file as it is) reproduced
+all 1,167 stored pick-day results of the period (0 mismatches; 1,345 of 1,345 with the hold-out). Leg stops on
+tick, the overall stop at each bar's close (the engine).
+
+**Primary comparisons** (each arm with the 30-minute time stop, the T1 book's mean daily net minus A5's; Holm
+over the three at α 0.10):
+
+| Arm | Book ₹ / day | − A5, 90% interval | p | Holm | Max drawdown | Long's net a Dir pick | Verdict |
+|---|---|---|---|---|---|---|---|
+| A5 (plain exit, ₹5,000) | +1,543 | — | | | −26,213 | — | comparator |
+| A3 (plain exit, files' own stop) | +1,519 | −24 [−84, +33] | 0.57 | | −25,806 | — | reported |
+| **C1** opening-range break | +1,588 | **+45 [−123, +226]** | 0.64 | no | −41,238 | **+104** | **killed** |
+| **C2** VWAP side | +1,390 | **−153 [−393, +88]** | 0.30 | no | −46,036 | **+135** | **killed** |
+| **C3** IV rising | +1,498 | **−45 [−206, +118]** | 0.64 | no | −32,763 | **+116** | **killed** |
+
+**Verdict under the registered rule: kill.** The long's own net is positive in all three arms, but none beats
+A5 on net a day (no interval clears zero, none passes Holm) and every one has a deeper maximum drawdown
+(−₹32.8k to −₹46.0k against −₹26.2k). D (the same three at half size) is no better: −25, −220 and −114 a
+day against A5.
+
+Read with (main period; A5: +1,543 a day, CVaR −9,816, Ulcer 8,014, stop rate 3.7%):
+
+| Cell | ₹ / day | Worst day | CVaR 95 | Ulcer | Stop rate | Reversals | Long's net a reversal | Long wins |
+|---|---|---|---|---|---|---|---|---|
+| C1_T30 | +1,588 | −14,396 | −10,273 | 9,671 | 6.2% | 145 | +230 | 46% |
+| C2_T30 | +1,390 | −14,441 | −10,236 | 12,089 | 12.1% | 374 | +116 | 44% |
+| C3_T30 | +1,498 | −14,160 | −9,474 | 9,130 | 8.1% | 173 | +216 | 43% |
+| B_T30 (blanket) | +1,373 | −14,441 | −10,200 | 11,548 | 12.5% | 441 | +124 | 43% |
+
+Secondary lines for the primary arms (− A5, ₹ / day, 90% interval):
+
+| Arm | + BL-063 statutory charges | 1% slippage on the buy | Expiry days excluded |
+|---|---|---|---|
+| C1_T30 | +42 [−137, +216] | +10 [−162, +187] | +43 [−142, +252] |
+| C2_T30 | −157 [−392, +88] | −239 [−475, −2] | −236 [−450, −28] |
+| C3_T30 | −47 [−206, +113] | −84 [−246, +68] | −23 [−154, +116] |
+
+**Where the money goes** (descriptive): the long itself earns (+₹89 to +₹145 a day across C1, C2, C3 and B
+at 30 minutes), but the rest of the Dir book loses more: −₹44 (C1), −₹268 (C2), −₹144 (C3), −₹315 (B) a day.
+Two things cost it: the reversed leg is no longer re-sold by RE COST, which today recovers many stops, and the
+long's loss on a whipsaw (its 30% stop) pushes the book into the ₹5,000 stop, closing the surviving short leg
+early (2025-06-03, `S_ditm1_0947`: +₹3,873 with a plain exit, −₹5,858 under C1).
+
+**Secondary cells** (each against A5; none is a finding): no blanket (B) cell is positive (−170 to −302 a
+day). The best is **C1 held to 15:28, +₹231 [−28, +491], p 0.17** (long +₹305 a Dir pick, max drawdown
+−₹50.0k); C1's net rises with how long the long is held (T20 −7, T30 +45, T45 +53, trail +91, hold +231), and
+so does its drawdown. C2's VWAP proxy and a plain TWAP give the same answer (−153 and −158). By half-year
+(₹ / day, A5 → C1_T30): 2025H1 1,921 → 1,787; 2025H2 1,104 → 1,217; 2026H1 1,470 → 1,481; 2026H2 (16 days)
+2,791 → 3,849.
+
+**Evidence:** `packages/option-backtesting/research/bl186/`: `sar.py` (the arms and filters), `run.py`
+(`simulate`, `report --period main|holdout`), `test_filters.py` (look-ahead, 66 cases); `out/main.json`,
+`out/sims.jsonl`, `out/picks.json` (not committed; regenerate with `run.py simulate`, about 70 minutes with one
+worker).
+
 ## Risks
 
 - A whipsaw costs about twice a plain stop (the stop loss, then the long's premium decay and its own stop),
@@ -168,3 +226,8 @@ None open; answered 2026-10-28 (Log).
     pick-days whose overall MTM stop fired; CVaR = the mean of the worst 5% of days; Ulcer = the RMS of the
     rupee underwater curve (BL-096's definitions).
   - T1 only (the item's universe); Core is not run.
+- 2026-10-29 — Phase 2 main period (2025-01-10 → 2026-07-22) run with one worker and read. **Primary verdict:
+  kill.** C1, C2 and C3 with the 30-minute time stop against A5: +₹45 [−123, +226], −₹153 [−393, +88] and
+  −₹45 [−206, +118] a day, none significant under Holm, and all three with a deeper maximum drawdown
+  (−₹41.2k, −₹46.0k, −₹32.8k against −₹26.2k). The long's own net is positive (+₹104, +₹135, +₹116 a Dir
+  pick), so the kill is on the second clause. Written and committed before the hold-out was read.
