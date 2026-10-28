@@ -39,6 +39,12 @@ One set a day, 09:17–15:28 (the rotation files) or 09:24–15:28 (the owner's 
   +186 a day with the drawdown halved, but ₹1,000 (+93) and ₹2,000 (+80) sit at the files' +81 and the
   fixed `N_dir` 09:17 morning half at ₹1,500 earns +16 with an −85k drawdown; no level makes the split's
   interval clear zero.
+- A profit lock does move the morning Dir (BL-184 E2, nineteen target / lock / lock-trail overlays on the
+  recorded MTM paths): targets are noise, but six of eight locks and lock-trails beat the plain morning's
+  net and all eight its drawdown, and the fixed `N_dir` / `S_dir` 09:17 files agree (+83–130 against +88,
+  +261–332 against +252). The ₹3,000 → ₹2,000 lock reads +131 / −35,146 against +81 / −42,574 and helps in
+  both periods; the second year stays near zero for every overlay; no overlay makes the split pass. The
+  lead is a lock on a morning-closed Dir only: BL-105 already found locks change nothing on the whole day.
 
 ## Not yet tested
 

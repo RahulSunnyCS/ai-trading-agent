@@ -54,8 +54,13 @@ One set a day, 09:17–15:28, in every live and rotation Widesl file.
   then clears zero (+151 [+13, +287], +178 [+34, +319]) with a drawdown shallower than the comparator's;
   the morning book's own drawdown deepens, and the fixed 09:17 files barely move. A lead for a
   registration with one level fixed in advance.
-- Not adopted after both phases, E1 and E2. Leads: the afternoon-only Widesl pair; the split with a
-  ₹3,000–4,000 morning stop.
+- Profit targets hurt the morning set at every level, ₹500 to ₹4,000 (BL-182 E3, on the engine's
+  recorded MTM paths): a morning Widesl earns by decay, and a target takes the good days off the top.
+  Profit locks are neutral to mildly helpful; a lock-and-trail armed at ₹3,000 with a breakeven lock
+  that rises 1:1 reads +91 a day with a −13,836 drawdown against the plain +64 / −16,609, helping in
+  the first period and tying in the second, while the fixed 09:17 files do not gain. A lead.
+- Not adopted after both phases, E1, E2 and E3. Leads: the afternoon-only Widesl pair; the split with a
+  ₹3,000–4,000 morning stop; the ₹3,000 lock-and-trail on the morning set.
 
 ## Not yet tested
 

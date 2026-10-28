@@ -206,6 +206,47 @@ fixed-file reading argues against spending that on it.
   a 0 as no lock (found at the dry run, before any overlay was read).
 - **Will not run:** as BL-182 E3.
 
+**Result (2026-10-28):** the profit-lock family is the first thing in BL-184 that moves Adaptive's
+morning Dir and the fixed 09:17 files the same way. Adaptive's morning Dir (one pick, per margin lot-day,
+434 pick days; the paths' last MTM equals the gross on every day); full table
+`research/bl184/out/morning_overlays_summary.md` (git-ignored; `uv run python research/bl184/overlays.py
+--analyse-only` rebuilds it).
+
+| Morning overlay | AM net | AM max DD | Fired / day | Split − comparator net [90 %] | `N_dir` / `S_dir` 09:17 AM net |
+|---|---|---|---|---|---|
+| plain (₹3,000 stop) | +81 | −42,574 | 0.15 | +31 [−214, +251] | +88 / +252 |
+| target ₹500 … ₹2,500 | −25 to +109 | −20,347 to −47,672 | 0.29–0.82 | −75 to +59 | −90 to +54 / +52 to +261 |
+| target ₹3,000 | +148 | −30,959 | 0.27 | +98 [−142, +329] | +53 / +273 |
+| target ₹4,000 | +101 | −40,562 | 0.19 | +51 [−184, +275] | +66 / +218 |
+| lock at ₹2,000 → ₹1,000 | +60 | −42,852 | 0.23 | +10 [−232, +228] | +83 / +332 |
+| lock at ₹3,000 → ₹1,500 | +92 | −27,066 | 0.19 | +42 [−191, +257] | +107 / +314 |
+| **lock at ₹3,000 → ₹2,000** | **+131** | **−35,146** | 0.18 | +81 [−158, +296] | +117 / +303 |
+| lock at ₹4,000 → ₹2,000 | +48 | −44,971 | 0.17 | −2 [−240, +222] | +105 / +261 |
+| lock at ₹4,000 → ₹3,000 | +95 | −33,470 | 0.16 | +45 [−185, +264] | +88 / +261 |
+| **lock-trail at ₹2,000, breakeven then 1:1** | **+112** | **−31,680** | 0.22 | +62 [−180, +277] | +130 / +311 |
+| lock-trail at ₹3,000, breakeven then 1:1 | +104 | −36,422 | 0.17 | +54 [−180, +270] | +113 / +293 |
+| lock-trail at ₹4,000, breakeven then 1:1 | +84 | −47,348 | 0.16 | +34 [−199, +254] | +112 / +275 |
+
+- **Targets are noise**, as the stops were: ₹3,000 reads +148 but ₹2,000 reads +24 and ₹2,500 +79; the
+  fixed `N_dir` file loses under every target below ₹4,000.
+- **Locks and lock-trails move everything the same way.** Six of eight beat the plain morning's net, all
+  eight have a shallower drawdown, and the fixed files agree: `N_dir` +83 to +130 against +88 (six of
+  eight better), `S_dir` +261 to +332 against +252 (all better). The ₹3,000 → ₹2,000 lock meets the
+  "helps" definition in both periods (T1's selection year +265 / −13,252 against +179 / −28,052; after
+  +32 / −35,146 against +9 / −42,574); the ₹2,000 lock-trail does in the first year (+271 / −14,893) and
+  ties in the second (−6 against +9, drawdown −31,680 against −42,574).
+- **The second year is still near zero** for every overlay (−14 to +42 a day): a lock saves the first
+  year's bad mornings; it does not make the morning Dir earn afterwards.
+- **No overlay makes the split pass**: every interval includes zero. Nineteen overlays on seen data.
+
+Reading: the Dir split stays not adopted. The lead is narrower than it looks: BL-105 already tested a
+target, a lock at half and a lock-and-trail on the **whole-day** Dir (₹2,000 / 3,000 / 4,000, seven
+slots, both indices) and found targets lose and locks change nothing after charges (−15 to +5 a
+lot-day). What is new here is that a lock helps a Dir that is *closed at 13:00*, where the morning's
+move otherwise leaves the stop as the only exit. A registration of that one setting (a morning-only
+Dir, lock at ₹3,000 → ₹2,000 or the ₹2,000 breakeven lock-trail) is the thing to write, if the morning
+Dir is ever wanted on its own; nothing here reopens BL-105's whole-day verdict.
+
 ## Risks
 
 - A 13:00 exit on a 21 % stop shape: the morning set's re-entry has less time to recover; the afternoon
@@ -236,3 +277,7 @@ fixed-file reading argues against spending that on it.
   data-mined rule; a lead, not run.
 - 2026-10-28 — E2 registered (owner override: profit targets at eleven levels and five profit locks on the
   morning Dir, on the recorded MTM paths, descriptive) before its run.
+- 2026-10-28 — E2 run (`research/bl184/overlays.py`, nineteen overlays): targets noise; the lock / lock-trail family
+  beats the plain morning on net (six of eight) and drawdown (all), on the fixed files too; ₹3,000 → ₹2,000 lock helps in
+  both periods; no overlay makes the split pass. BL-105 already killed locks on the whole-day Dir; the lead is a lock on a
+  morning-closed Dir only, its own registration.

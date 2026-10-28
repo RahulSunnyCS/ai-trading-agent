@@ -369,6 +369,45 @@ needs a registration of its own with one level fixed in advance and a forward tr
 - **Will not run:** targets or locks on the afternoon sets or the whole day, other levels or steps, a
   target by family or index.
 
+**Result (2026-10-28):** profit targets hurt the morning Widesl at every level; profit locks are neutral
+to mildly helpful, and the lock-and-trail armed at ₹3,000 is the one overlay that never hurts.
+Adaptive's morning book (two picks, per margin lot-day, 434 pick days; the morning paths' last MTM
+equals the day's gross on every day, so the overlays are exact); full table
+`research/bl182/out/morning_overlays_summary.md` (git-ignored; `uv run python research/bl182/overlays.py
+--analyse-only` rebuilds it).
+
+| Morning overlay | AM net | AM max DD | Fired / day | Split − comparator net [90 %] | `N_wide` / `S_wide` 09:17 AM net |
+|---|---|---|---|---|---|
+| plain (₹2,500 stop) | +64 | −16,609 | 0.30 | +75 [−56, +205] | +141 / +266 |
+| target ₹500 … ₹2,250 | −42 to +34 | −17,778 to −31,976 | 0.44–1.46 | −31 to +45 | −125 to −6 / −12 to +99 |
+| target ₹2,500 / 3,000 / 4,000 | +26 / +44 / +45 | −19,921 / −14,512 / −17,607 | 0.41 / 0.39 / 0.34 | +37 / +54 / +55 | +1 / +27 / +76 ; +96 / +145 / +202 |
+| lock at ₹2,000 → ₹1,000 | +54 | −18,577 | 0.34 | +64 [−73, +199] | +105 / +222 |
+| lock at ₹3,000 → ₹1,500 | +82 | −14,902 | 0.30 | +93 [−51, +236] | +125 / +259 |
+| lock at ₹3,000 → ₹2,000 | +64 | −20,197 | 0.32 | +75 [−69, +221] | +108 / +253 |
+| lock at ₹4,000 → ₹2,000 | +61 | −15,112 | 0.30 | +72 [−69, +210] | +134 / +256 |
+| lock at ₹4,000 → ₹3,000 | +64 | −17,901 | 0.30 | +75 [−63, +208] | +124 / +243 |
+| lock-trail at ₹2,000, breakeven then 1:1 | +69 | −18,137 | 0.33 | +80 [−61, +219] | +121 / +226 |
+| **lock-trail at ₹3,000, breakeven then 1:1** | **+91** | **−13,836** | 0.29 | +101 [−43, +241] | +122 / +255 |
+| lock-trail at ₹4,000, breakeven then 1:1 | +80 | −15,426 | 0.30 | +91 [−45, +226] | +139 / +268 |
+
+- **Targets cut the winners.** A morning Widesl earns by decay to 12:00; every target takes the good
+  days off the top and keeps the bad ones whole. Below ₹2,250 the morning book loses money or near it,
+  and the fixed 09:17 files turn negative on NIFTY.
+- **Locks and lock-trails help where the plain morning was poor.** By period, the plain morning earned
+  +17 a day in T1's selection year and +99 after; the lock-trail armed at ₹3,000 earned +79 and +99
+  (drawdown −12,303 / −11,653 against −15,288 / −11,970), so it meets the "helps" definition except for a
+  tie in the second year's net; the ₹3,000 → ₹1,500 lock +76 / +87; the ₹4,000 lock-trail +54 / +99.
+  All three fire on about 30 % of pick-days, as the plain stop does: they replace losing exits, they do
+  not add many.
+- **The fixed files do not gain:** `N_wide` 09:17's morning half reads +122–139 under the locks against
+  +141 plain, `S_wide` +243–268 against +266. The gain is in Adaptive's picks on its bad days, about ₹20–30
+  a margin lot-day, not in the shape.
+- Nineteen overlays on seen data; the one that stands out does so by not hurting anywhere.
+
+Reading: no target on a morning Widesl. A lock-and-trail armed at ₹3,000 with a breakeven lock is a lead
+worth one registration with that setting fixed, alongside the looser ₹3,000–4,000 morning stop from E2;
+the two would be tested together, not chosen between on this data.
+
 ## Risks
 
 - Fills at 12:00 and 13:00 on 1-minute bars with no spread; the afternoon set's smaller premiums.
@@ -436,3 +475,6 @@ needs a registration of its own with one level fixed in advance and a forward tr
   a new, data-mined rule; recorded as a lead, not run.
 - 2026-10-28 — E3 registered (owner override: profit targets at eleven levels and five profit locks on the
   morning sets, on the recorded MTM paths, descriptive) before its run.
+- 2026-10-28 — E3 run (`research/bl182/overlays.py`, nineteen overlays on the recorded paths): targets hurt at every
+  level; the lock-trail armed at ₹3,000 (breakeven, 1:1) reads +91 / −13,836 against the plain +64 / −16,609 and
+  never hurts by period; the fixed files do not gain. Lead for a registration with the setting fixed.
