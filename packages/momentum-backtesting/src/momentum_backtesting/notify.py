@@ -29,6 +29,9 @@ SECRET_ENV = (
     "FYERS_PIN",
     "FYERS_TOTP_SECRET",
     "FYERS_CLIENT_ID",
+    "KITE_API_SECRET",
+    "KITE_PASSWORD",
+    "KITE_TOTP_SECRET",
 )
 _registry: set[str] = set()
 

@@ -551,6 +551,9 @@ contract, not a shared service).
   overrides it); Your orders counts a Kite snapshot's free cash, which is `net` minus pledged
   collateral, never below 0. `mbt kite remind --send` is the Fri
   13:30 `kite-login-reminder` job (`--when monday`: the Mon 08:45 `kite-login-reminder-monday`).
+  `kite_login.py` (`mbt kite auto-login`, owner 2026-10-28, off until `KITE_AUTO_LOGIN=on`) logs
+  in unattended on Kite's own page, Fridays and Mondays from the 08:02 `broker-login` job;
+  `finish_login` (exchange, save, holdings read) is shared with `/api/kite/callback`.
   `login_nudge.py` gives it and `mbt token-remind` (the 08:05 / 15:30 Fyers reminders) the link to
   the hosted Broker logins page (`DASHBOARD_PUBLIC_URL`) and the phone-login blockers (API port,
   `cloudflared`). The lot ledger and per-sleeve orders are BL-142 Phases 2–3.
