@@ -1,5 +1,6 @@
 import { CHECK_JOBS } from './checks/index.js';
 import {
+  type DayRule,
   type Schedule,
   everyDay,
   firstWeekdayOfMonth,
@@ -116,6 +117,37 @@ function contractNotesRetry(id: string, at: string, catchUpHours: number): Job {
 }
 
 const FRIDAY = onWeekdays(5);
+/** Mondays that are trading days: nothing reads Kite on a Monday holiday. */
+const TRADING_MONDAY: DayRule = (day) => tradingDays(day) && onWeekdays(1)(day);
+
+/**
+ * The Fyers login reminder (`mbt token-remind`): silent when Fyers accepts today's token, else one
+ * Telegram message with a link to the hosted Broker logins page, so the owner logs in from a phone.
+ * Fyers has no unattended login (its page has a human check; the refresh-token grant is off).
+ */
+function fyersReminder(
+  id: string,
+  at: string,
+  when: 'morning' | 'evening',
+  catchUpHours: number,
+): Job {
+  return {
+    id,
+    description:
+      when === 'morning'
+        ? 'Fyers: remind to log in (link to the hosted Broker logins page) before the 09:16 pick'
+        : 'Fyers: remind again before the evening collection if still not logged in',
+    schedule: { at, on: tradingDays, label: `trading days ${at}` },
+    steps: [['uv', 'run', 'mbt', 'token-remind', '--send', '--when', when]],
+    cwd: MOMENTUM,
+    timeoutMinutes: 5,
+    retries: 0,
+    retryDelayMinutes: 0,
+    catchUpHours, // no group: it never opens the catalog, so nothing should queue it
+    fixHint:
+      'Dashboard › Broker logins › Fyers › Log in (or: cd packages/momentum-backtesting && uv run mbt login)',
+  };
+}
 
 const BASE_JOBS: Job[] = [
   {
@@ -163,10 +195,13 @@ const BASE_JOBS: Job[] = [
     fixHint:
       'Check the ANGELONE_* settings in .env, then Broker logins › Angel One › Test connection (or: cd packages/option-backtesting && uv run obt angel test)',
   },
+  fyersReminder('fyers-login-reminder', '08:05', 'morning', 1), // after ~09:05 the pick is near
+  fyersReminder('fyers-login-recheck', '15:30', 'evening', 0.25), // the collection starts 15:45
   {
     // BL-142: the 14:15 orders read the Kite holdings and free cash, and a Kite token dies at
     // 06:00. When Kite is the holdings source and today has no valid login, Telegram the owner
-    // to log in (Broker logins › Kite). Says nothing when the login is fine or Kite is not used.
+    // to log in, with a link to the hosted Broker logins page (a phone login works). Says nothing
+    // when the login is fine or Kite is not used.
     id: 'kite-login-reminder',
     description: 'Kite: remind to log in before the 14:15 orders',
     schedule: { at: '13:30', on: FRIDAY, label: 'Fri 13:30' },
@@ -176,6 +211,20 @@ const BASE_JOBS: Job[] = [
     retries: 0,
     retryDelayMinutes: 0,
     catchUpHours: 0.5, // after ~14:00 a reminder comes too late for 14:15
+    group: 'catalog',
+    fixHint: 'cd packages/momentum-backtesting && uv run mbt kite login',
+  },
+  {
+    // The same on a trading Monday, before the open: Kite's holdings, free cash and fills.
+    id: 'kite-login-reminder-monday',
+    description: 'Kite: remind to log in before the Monday open',
+    schedule: { at: '08:45', on: TRADING_MONDAY, label: 'trading Mondays 08:45' },
+    steps: [['uv', 'run', 'mbt', 'kite', 'remind', '--send', '--when', 'monday']],
+    cwd: MOMENTUM,
+    timeoutMinutes: 5,
+    retries: 0,
+    retryDelayMinutes: 0,
+    catchUpHours: 0.5,
     group: 'catalog',
     fixHint: 'cd packages/momentum-backtesting && uv run mbt kite login',
   },

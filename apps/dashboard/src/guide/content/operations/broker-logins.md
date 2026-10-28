@@ -8,8 +8,23 @@ connects the Zerodha account that holds the Momentum money.
 ## Why it expires every day
 
 A Fyers token dies at **06:00 IST** the next morning, whenever you logged in. Fyers put a
-human-verification check on its login page, so no scheduled job can log in for you: use **Log in
-again** once a trading day, any time before the evening data collection.
+human-verification check on its login page, and its "refresh token" way of renewing a login is
+switched off under SEBI's rule of one two-step login a day, so no scheduled job can log in for you:
+use **Log in again** once a trading day, any time before the evening data collection.
+
+## Logging in from your phone
+
+You do not need the laptop. At **08:05** on trading days a job (`fyers-login-reminder`, see
+[Jobs](app:/jobs)) checks whether Fyers accepts today's token; if not, it sends a Telegram message
+with a link to this screen on the hosted dashboard. Open it on your phone, tap **Log in again**,
+tick Fyers' human check yourself, enter your TOTP and PIN, and you are done: Fyers sends the
+browser back to the hosted dashboard, which passes the login to the laptop. At **15:30** a second
+job (`fyers-login-recheck`) asks again if you still have not logged in, before the evening
+collection. Each says nothing when the login is fine.
+
+A phone login needs the laptop awake with two things running: the Momentum service and the
+Cloudflare tunnel. Both are kept running all the time (see the launchd notes in the repository).
+When either is down, the reminder says so; log in on the laptop instead.
 
 ## When you did not log in
 
@@ -71,23 +86,25 @@ fails. A failed 08:00 check sends a Telegram alert.
 Kite (Zerodha) holds the Momentum money. This tool reads two things from it, never trading:
 your holdings and your free cash, for Momentum's [Your orders](app:/momentum/week). It is set up
 with `KITE_API_KEY` and `KITE_API_SECRET` in the `.env` file. The Kite app's redirect URL is
-`http://127.0.0.1:8765/api/kite/callback`.
+the hosted dashboard's `/api/momentum/kite/callback`, so a login works from your phone.
 
 | What you see | Meaning |
 |---|---|
 | Not configured | The two settings are missing from `.env`. |
 | Connected | Today's login is valid, until 06:00 IST tomorrow. The account ID is shown. |
-| Not logged in today | Log in before Friday's 14:15 orders. |
+| Not logged in today | Log in before Friday's 14:15 orders, or before Monday's open. |
 
 **Login with Kite** opens Kite's own login page in a new tab. After you log in, Kite sends the
-browser back to the Momentum service on the laptop, which keeps the token (in a private file,
-never shown) and, when Kite is the holdings source, reads your holdings straight away. Because
-the way back is to the laptop, log in from the laptop, not from your phone.
+browser back to the hosted dashboard, which passes the login to the Momentum service on the laptop.
+That service keeps the token (in a private file, never shown) and, when Kite is the holdings source,
+reads your holdings straight away. It works from your phone, with the same two things running on
+the laptop as for Fyers.
 
 The card's last line shows the last read: how many holdings, the free cash, and what was left
-out as options margin (LIQUIDBEES and gold bonds). A **13:30 Friday** job (`kite-login-reminder`,
-see [Jobs](app:/jobs)) sends a Telegram reminder when Kite is the holdings source and you have
-not logged in that day; it says nothing otherwise.
+out as options margin (LIQUIDBEES and gold bonds). A **13:30 Friday** job (`kite-login-reminder`)
+and an **08:45 Monday** job (`kite-login-reminder-monday`, trading Mondays; see [Jobs](app:/jobs))
+send a Telegram reminder, with a link to this screen, when Kite is the holdings source and you
+have not logged in that day; they say nothing otherwise.
 
 ## AlgoTest logins
 

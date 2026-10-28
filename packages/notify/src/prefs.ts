@@ -12,8 +12,8 @@ import { join } from 'node:path';
  */
 export const NOTIFICATION_TYPES = {
   'broker.algotest': 'AlgoTest broker login report and failures',
-  'broker.fyers': 'Fyers login failures',
-  'broker.kite': 'Kite: the Friday 13:30 login reminder (BL-142)',
+  'broker.fyers': 'Fyers: the 08:05 and 15:30 login reminders, and login failures',
+  'broker.kite': 'Kite: the Friday 13:30 and Monday 08:45 login reminders (BL-142)',
   'broker.quantiply': 'Quantiply: the Core picks created or deleted, and failures (BL-139)',
   'momentum.preview': 'Momentum weekly preview (Fri 14:40)',
   'momentum.final': 'Momentum weekly final signal / rebalance (Fri 16:45)',
