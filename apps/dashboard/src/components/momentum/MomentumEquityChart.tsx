@@ -142,7 +142,7 @@ function signTone(value: number | null | undefined): string {
  * change it) and the legend row under it. Kept between the minimum and maximum, re-measured on
  * resize and for each new result.
  */
-function usePlotHeight(plotRef: RefObject<HTMLElement>, measureKey: unknown): number {
+function usePlotHeight(plotRef: RefObject<HTMLElement | null>, measureKey: unknown): number {
   const [height, setHeight] = useState(PLOT_HEIGHT_FALLBACK);
   // biome-ignore lint/correctness/useExhaustiveDependencies: measureKey is the trigger (a new result)
   useEffect(() => {
@@ -313,7 +313,7 @@ function WeekTooltip({
   values,
   pinned,
 }: {
-  innerRef: RefObject<HTMLDivElement>;
+  innerRef: RefObject<HTMLDivElement | null>;
   day: string;
   rotation: MomentumRotation | undefined;
   values: WeekValue[];
