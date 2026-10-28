@@ -64,6 +64,8 @@ export interface LoginStatus {
     quantiply: { name: string; status: string } | null;
     quantiplyShoonya: { name: string; status: string } | null;
   } | null;
+  /** Kite's unattended login on Fridays and Mondays (`KITE_AUTO_LOGIN=on`) */
+  kite?: { name: string; status: string };
 }
 
 /**
@@ -71,16 +73,26 @@ export interface LoginStatus {
  * failure). Null when the Mac did not run it today, or there was nothing to log in.
  */
 export function loginLine(status: LoginStatus | null): string | null {
-  if (!status || status.nothing) return null;
-  if (status.github) return "✅ Logged in by GitHub's backup";
+  if (!status) return null;
+  const kite = status.kite && status.kite.status !== 'SKIPPED' ? [status.kite] : [];
+  if (status.nothing || status.github) {
+    // no broker login of the Mac's to report: Kite's own, when it ran, is the line
+    const kiteOk = kite.every((x) => x.status !== 'FAIL');
+    if (!kiteOk) return '⚠️ Login failed: Kite';
+    if (status.github) return `✅ Logged in by GitHub's backup${kite.length ? ' · Kite' : ''}`;
+    return kite.length ? '✅ Logged in: Kite' : null;
+  }
   const r = status.result;
-  const lines = r
-    ? [
-        ...(r.algotest ?? []).map((x) => ({ ...x, name: `AlgoTest · ${x.name}` })),
-        r.quantiply,
-        r.quantiplyShoonya,
-      ].filter((x): x is { name: string; status: string } => !!x)
-    : [];
+  const lines = [
+    ...(r
+      ? [
+          ...(r.algotest ?? []).map((x) => ({ ...x, name: `AlgoTest · ${x.name}` })),
+          r.quantiply,
+          r.quantiplyShoonya,
+        ]
+      : []),
+    ...kite,
+  ].filter((x): x is { name: string; status: string } => !!x);
   const failed = lines.filter((x) => x.status === 'FAIL').map((x) => x.name);
   if (!status.ok || failed.length) {
     return `⚠️ Login failed: ${failed.join(', ') || 'see the 08:02 login report'}`;

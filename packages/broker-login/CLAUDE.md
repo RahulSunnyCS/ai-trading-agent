@@ -87,7 +87,10 @@ npm run stop-button -- --clear-hold       # lift the stop hold (Telegram's Resum
   brokers), `quantiply`, `quantiply_shoonya`; a refusal matching `REFUSED` never), sets the repository variable
   `LOCAL_LOGIN_DONE` (UTC day) so the workflow's crons skip, and writes `<scheduler state>/broker-login/<IST day>.json`
   for the 09:00 summary. Its Quantiply logins do not take `quantiply-session.ts`'s stamp yet (08:02 is clear of the
-  08:00 `angel-login-check` window; the 08:10 deployer waits for it, same scheduler group).
+  08:00 `angel-login-check` window; the 08:10 deployer waits for it, same scheduler group). On Fridays and Mondays
+  with `KITE_AUTO_LOGIN=on` (`kiteDue`) it also runs `uv run --directory ../momentum-backtesting mbt kite auto-login`
+  beside `main.ts` (owner, 2026-10-28): its outcome is the status file's `kite` (the 08:10 `loginLine` and the 09:00
+  summary's Kite line), a failure is alerted at once, and Kite is never handed to GitHub.
 - `src/morning-report.ts` (+ pure `src/morning-report-plan.ts`) — BL-172: the 08:10 `quantiply-deploy` job sets
   `MORNING_REPORT_FILE`; each account's `quantiply-deploy.ts --morning` run adds its report there (`deliver`) and this
   sends them as one Telegram message (a warning heading if either account needs a look; "no account reported" if

@@ -71,6 +71,29 @@ describe('one morning switch-on message (BL-172)', () => {
     expect_(loginLine({ ok: true, github: 'u' }), "✅ Logged in by GitHub's backup");
   });
 
+  it("Kite's Friday and Monday login joins the line (owner, 2026-10-28)", () => {
+    const kiteOk = { name: 'Kite', status: 'OK' };
+    const kiteFail = { name: 'Kite', status: 'FAIL' };
+    const quantiply = { name: 'Quantiply · Angel One', status: 'OK' };
+    const result = { algotest: null, quantiply, quantiplyShoonya: null };
+    expect_(
+      loginLine({ ok: true, result, kite: kiteOk }),
+      '✅ Logged in: Quantiply · Angel One · Kite',
+    );
+    expect_(loginLine({ ok: true, result, kite: kiteFail }), '⚠️ Login failed: Kite');
+    expect_(loginLine({ ok: true, nothing: true, kite: kiteOk }), '✅ Logged in: Kite');
+    expect_(loginLine({ ok: true, nothing: true, kite: kiteFail }), '⚠️ Login failed: Kite');
+    expect_(
+      loginLine({ ok: true, github: 'u', kite: kiteOk }),
+      "✅ Logged in by GitHub's backup · Kite",
+    );
+    // switched off: not mentioned
+    assert.equal(
+      loginLine({ ok: true, nothing: true, kite: { name: 'Kite', status: 'SKIPPED' } }),
+      null,
+    );
+  });
+
   it('no report at all is said, never silence', () => {
     assert.match(combineReports(null, '2026-10-28'), /no account reported/);
     assert.match(combineReports('not json\n', '2026-10-28'), /no account reported/);

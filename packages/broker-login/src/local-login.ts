@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { istTimestamp, sendText } from '@trading/notify';
 import { describeSource, readAutomation, settingsPath } from './automation-settings.js';
+import type { BrokerResult } from './brokers/types.js';
 import { readTelegramConfig } from './config.js';
 import { describe } from './diagnose.js';
 import {
@@ -16,9 +17,12 @@ import {
   allLoggedIn,
   changedSecrets,
   fallback,
+  kiteDue,
+  kiteResult,
   loginEnv,
   secretsReminder,
 } from './local-login-plan.js';
+import { registerSecret } from './secrets.js';
 import { istToday } from './strategy-plan.js';
 
 /**
@@ -36,6 +40,9 @@ import { istToday } from './strategy-plan.js';
  * 4. Sets the repository variable `LOCAL_LOGIN_DONE` to today (UTC, as the workflow reads dates) so
  *    the workflow's cron backstops skip: the Mac ran, and anything left is the backup run's.
  * 5. Writes `<scheduler state>/broker-login/<IST day>.json`, which the 09:00 summary reads.
+ * 6. On Fridays and Mondays with `KITE_AUTO_LOGIN=on` (owner, 2026-10-28), logs in to Kite at the
+ *    same time (`mbt kite auto-login`), its line in the same file and the 08:10 message. A failure
+ *    is alerted at once; Kite is never handed to GitHub (no Kite secrets there).
  *
  *   tsx src/local-login.ts [--dry-run]
  */
@@ -77,6 +84,64 @@ async function runMain(env: LoginEnv, resultFile: string): Promise<number> {
       clearTimeout(timer);
       resolve(1);
     });
+  });
+}
+
+const KITE_LIMIT_MS = 5 * 60_000;
+
+/** `mbt kite auto-login` in the Momentum package; its outcome, or a FAIL line when it gave none. */
+async function runKite(): Promise<BrokerResult> {
+  const out = join(tmpdir(), `kite-login-${process.pid}.json`);
+  const code = await new Promise<number>((resolve) => {
+    const child = spawn(
+      'uv',
+      [
+        'run',
+        '--directory',
+        '../momentum-backtesting',
+        'mbt',
+        'kite',
+        'auto-login',
+        '--json-out',
+        out,
+      ],
+      { stdio: 'inherit', env: process.env },
+    );
+    const timer = setTimeout(() => child.kill('SIGTERM'), KITE_LIMIT_MS);
+    child.on('exit', (c) => {
+      clearTimeout(timer);
+      resolve(c ?? 1);
+    });
+    child.on('error', () => {
+      clearTimeout(timer);
+      resolve(1);
+    });
+  });
+  const result = kiteResult(await readFile(out, 'utf8').catch(() => null));
+  await rm(out, { force: true });
+  return result ?? { name: 'Kite', status: 'FAIL', detail: `no outcome (exit ${code}, stopped?)` };
+}
+
+/** Starts the Kite login when it is due; a failure is alerted as soon as it is known. */
+function startKite(day: string, dryRun: boolean): Promise<BrokerResult | null> {
+  if (!kiteDue(day, process.env)) return Promise.resolve(null);
+  if (dryRun) {
+    console.log('Kite: would log in (KITE_AUTO_LOGIN=on, a Friday or Monday)');
+    return Promise.resolve(null);
+  }
+  for (const key of ['KITE_PASSWORD', 'KITE_TOTP_SECRET', 'KITE_API_SECRET']) {
+    const value = process.env[key]?.trim();
+    if (value) registerSecret(value);
+  }
+  return runKite().then(async (kite) => {
+    if (kite.status === 'FAIL') {
+      await sendText(
+        readTelegramConfig(),
+        `🚨 Kite login failed: ${kite.detail}\nLog in from Broker logins › Kite (the reminder follows before Kite is read).`,
+        'broker.kite',
+      ).catch(() => undefined);
+    }
+    return kite;
   });
 }
 
@@ -144,8 +209,19 @@ async function remindChangedSecrets(telegram: ReturnType<typeof readTelegramConf
 
 async function main(): Promise<number> {
   const dryRun = process.argv.includes('--dry-run');
-  const telegram = readTelegramConfig();
   const day = istToday();
+  const kite = startKite(day, dryRun);
+  const code = await loginBrokers(dryRun, day, kite);
+  await kite; // never exit under a running Kite login
+  return code;
+}
+
+async function loginBrokers(
+  dryRun: boolean,
+  day: string,
+  kitePending: Promise<BrokerResult | null>,
+): Promise<number> {
+  const telegram = readTelegramConfig();
   if (!dryRun) {
     await remindChangedSecrets(telegram).catch((error) =>
       console.warn(`credential digests not checked: ${describe(error)}`),
@@ -154,10 +230,11 @@ async function main(): Promise<number> {
   const statusFile = join(dirname(settingsPath()), 'broker-login', `${day}.json`);
   const status = async (body: Record<string, unknown>) => {
     if (dryRun) return;
+    const kite = await kitePending;
     await mkdir(dirname(statusFile), { recursive: true });
     await writeFile(
       statusFile,
-      `${JSON.stringify({ day, at: new Date().toISOString(), ...body })}\n`,
+      `${JSON.stringify({ day, at: new Date().toISOString(), ...body, ...(kite ? { kite } : {}) })}\n`,
     );
   };
 

@@ -24,3 +24,4 @@ out_*.csv
 
 # BL-097 resumable sweep parts (multi-MB each; regenerate with run_family_sweep.py)
 checkpoints/
+results_smoke/

@@ -43,6 +43,7 @@ per lot-day is above zero and its drawdown per lot is no worse.
 | BL-071 B | **Hold-out** P3, NIFTY 2022-04 → 2024-10, 618 days | Recent edge **fails** (−₹2,47,680, interval wholly negative); no-recent best each year; rows keeping the fits beat random P90 | [BL-071][bl071] |
 | BL-072 / 073 / 074 | Blends, recency grid, family-band recent | Blend candidate killed by hold-out; recent 10% + 126-day lookback and own 0 / family 10 are above chance in all three periods | [BL-072][bl072], [BL-073][bl073], [BL-074][bl074] |
 | BL-075 | 100-cell map × 3 periods; switches; shuffles | 19 of 100 cells above chance everywhere, none robust; no switch adopted (Buy off: 0 of 19 improve, 6 fall below chance); 3 of top 10 real, list A among them; no cell reaches 0.85 | [BL-075][bl075] |
+| BL-180 | Evening prediction (previous VIX close) against the 09:16 pick (real open), list C | The open adds nothing: +₹1 a day, 90% interval −₹45 to +₹50; the picks differ on 12 of 431 days | [BL-180][bl180] |
 | BL-080 | Wider closest-premium families; Dir ITM1 | Extra premiums harmful; Dir ITM1 useful → 298 universe; 58 of 100 cells above chance in all periods | [BL-080][bl080] |
 | BL-100 | Pools restricted to the BL-099 families, on P3 | **Planned, not run** | [BL-100][bl100] |
 | BL-106 | The lists over a first-year-selected candidate pool (New-536, registered; New-556 with NIFTY ITM sets, exploratory) vs the 298, test year 2025-10-09 → 2026-10-09, gross | **No list won** on New-536: every interval straddles zero (about ±₹200 a day). Adaptive ₹393 on Core-298 vs ₹292 on New-536 and ₹324 on New-556; New-556's drawdown was shallower (−8.6k vs −10.1k) in one path, descriptive only. The lists were fitted inside the test year, which favours Core-298 | [BL-106][bl106] |
@@ -108,4 +109,5 @@ per lot-day is above zero and its drawdown per lot is no worse.
 [bl133]: ../../../backlog/BL-133-fourth-lot-on-normal-days.md
 [bl134]: ../../../backlog/BL-134-two-strategy-book.md
 [bl154]: ../../../backlog/BL-154-adaptive-fit-shrinkage.md
+[bl180]: ../../../backlog/BL-180-evening-prediction-vs-0916-pick.md
 [bl090]: ../../../backlog/BL-090-strategy-correlation-and-diverse-baskets.md
