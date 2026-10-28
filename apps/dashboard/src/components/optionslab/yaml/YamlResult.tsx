@@ -1,6 +1,6 @@
 /**
  * The YAML engine's result: the one component for a run that has just finished (Builder ›
- * YAML) and for a stored run opened from Runs. The registry keeps a stored run's headline
+ * YAML) and for a stored run opened from its Earlier runs list. The registry keeps a stored run's headline
  * figures only, so `result` is null there and the per-session parts say so instead.
  *
  * Every rupee figure here is a TOTAL over the run at the lots the strategy held; the only

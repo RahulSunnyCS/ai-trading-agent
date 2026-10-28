@@ -86,8 +86,8 @@ a Fyers access token (see the precedence order in root `technical.md`'s Environm
 Variables table) — that connection is unrelated and still live.
 
 The weekly job (`mbt weekly`) itself runs from the repo's scheduler (`apps/scheduler`,
-BL-012 — four jobs: Friday 14:40 preview, 16:45 final, 19:30 stock-data ingest, 21:00
-forward-journal check IST), replacing first the retired `.github/workflows/momentum-weekly.yml`
+BL-012 — Friday 14:40 preview, 16:45 final, 19:30 stock-data ingest, 20:30
+forward-journal score, 21:00 forward-journal check, 21:30 live rules and 22:00 restated-history check IST, among others), replacing first the retired `.github/workflows/momentum-weekly.yml`
 and then the per-job launchd plists. The scheduler passes the repo root `.env` to each run
 and still writes `data/launchd-weekly-<run>.log`, which `GET /api/weekly/status` reads. The CLI's `weekly()` command is a thin wrapper around
 `api._execute_weekly_run` (the same function the API route calls) — there is exactly one
@@ -258,6 +258,32 @@ week is reported as "wrong week", not missing. The dashboard's **Momentum › Jo
 (`MomentumJournalView.tsx`, `GET /api/journal` → Fastify `/api/momentum/journal`) shows the
 same check, the chain status and every entry by week.
 
+**Forward score and real fills (BL-024 Phases 2-3, 2026-10-28).** `forward_score.py` is pure:
+`select` picks the scored row per (config, run, week) — the latest recorded before the fill
+(preview: W 15:30 IST; final: the Monday 09:15 after W); later rows are corrections, a week with
+none before is `late`. `score_item` checks the signal's BUYs are in next week's `holdings_before`
+and its SELLs gone (`mismatch` otherwise, never scored), then values `target_weights` W -> W+1 at
+Friday closes (ideal) and Monday opens (`monday_fills`, achievable) after `trade_cost` — the
+engine's own `_Sim.buy_cost` / `sell_cost` called on a stand-in (`_CostSim`), pinned equal by
+`test_forward_score.py` — from `holdings_before` drifted to W. The backtest is shown twice: *as
+recorded* (`sleeve_value` of W+1's row over W's: omitted across an April reset or when the two
+rows' commits sit on different sides of the BL-001 F6 merge, `ranking_version` via `git
+merge-base --is-ancestor`) and *now* (`backtest_week` on today's `_run_broad`: value before W's
+trades to before W+1's, so it carries W's costs like the live figure). Groups combine members by
+`sleeve_value`. Only Broad has price tables (`forward_run.prices_for`); other datasets are
+`not_scored`. `forward_fills.py` reads the Kite contract notes as files
+(`TRADING_DATA_ROOT/contract-notes/days/*.jsonl`, `broker: kite`; never `option-backtesting`'s
+`realised/`), books fills to lots FIFO per symbol against the ledger's events then the pending
+plan (`momentum_lot_state.planned`, `NOT_BOOKED`), and reconciles each due week of a lot
+(`rebalance.on_cadence` from the paper start; a lot with nothing booked before it is new, bought
+from cash) against its journal row and that Friday's 14:15 orders: first-day fills against raw
+Friday close / next open / the orders' price in bps, later fills counted as top-ups, charges from
+the note shared by value against the engine's rates without slippage. `forward_run.py` wires both
+to the data (lazy `api` import; the catalog open only for the reads): `mbt journal score` stores
+`forward_scores.json` (state dir), `GET /api/journal/forward` serves it with the fills computed
+live, and `api._forward_score_line` adds `forward_run.headline_line()` to the headline's final
+message (a failure is a line saying so).
+
 **Gotcha found live, not by a test:** `stocks_fetch`/`local_migrate` are Typer commands whose
 parameters default to `typer.Option(...)` sentinel objects — Typer only resolves those into
 real values (e.g. `"2011-01-01"`) when its own CLI runner invokes the function. Calling them
@@ -383,6 +409,7 @@ contract, not a shared service).
   the stock tilt; weights never matter. `Config.voladj_lookbacks=True` (BL-086, a heavy key in the
   rank-cache key) makes it follow them; tested and killed (short lookbacks without the skip-month
   chase reversing spikes), so it stays off.
+- **Broad ranks over the week's point-in-time members (BL-001 F6, 2026-10-25):** `engine.compute_ranks(prices, config, cross_section=)` takes a week x column boolean table; `broad.cross_section_mask(stock_membership, frame)` builds it (members behind the gate, plus the atomic instruments) and `UniverseRanking.cross_section()` hands it to anything that ranks the same frame again (the stock tilt in `levers.grouped_momentum_ranks`). A new Broad ranking path must pass it, or a stock that joins the universe years later moves earlier weeks' ranks. `build_stock_weekly_prices(fill_internal_gaps=False)` (Broad only) forward-fills only after a stale column's last real price. `mbt audit lookahead-requests` is the check. `score="residual"` and Custom Index do not take it yet.
 - `categories/broad.py` — Broad Momentum's category-selection funnel
   (`compute_universe_ranking`, `compute_category_selection*`,
   `run_broad_backtest`) — a pure, no-P&L ranking layer that feeds `engine.py`
@@ -475,9 +502,10 @@ contract, not a shared service).
   Friday, and `live_rules.twr_index` makes the time-weighted index the drawdown is measured on, so a
   new lot never lifts the peak; without that key, the BL-010 frozen ensemble rebased at
   `paper_start`, `tracker.run_config`); the
-  trailing rule needs the journal-scored live series (BL-024 Phase 2, not built) and says "not
-  measurable" until then; stage `live` is reported as blocked until real fills are recorded
-  (BL-024 Phase 3). A breach is sent untagged (never switchable); the routine status is the
+  trailing rule needs a journal-scored live series and says "not measurable" until then (BL-024
+  Phase 2 scores the journal since 2026-10-28, `forward_scores.json`, but the rule does not read it
+  yet); stage `live` is reported as blocked until real fills are recorded (BL-024 Phase 3 reconciles
+  the Kite fills, not yet read by this check either). A breach is sent untagged (never switchable); the routine status is the
   `momentum.live_rules` type. Exit 0 on a breach, 1 only when the check cannot run or the data is
   stale. Scheduler job `momentum-live-rules`, Fri 21:30 IST.
 - `this_week.py` (BL-051) — Momentum › This week's data: `week_view` builds one card per
@@ -503,20 +531,32 @@ contract, not a shared service).
   NEXT week on a flat stand-in row. `tests/test_broad_parity.py` pins that the week-ahead decision
   buys and fully sells exactly what the full backtest did; trims and top-ups read the week's own
   prices and are not pinned. Broad only for now; delay-0 strategies get no orders before 19:30.
+  `_compute_orders(favourite=, preview=True)` (Your orders' "Preview for…", `POST
+  /api/orders/preview/jobs` + `GET .../jobs/{id}`, a `_PreviewJobs`) plans another favourite as one
+  portfolio against the same snapshot and writes nothing: no orders row, no lot event, no pending
+  lot (`tests/test_lot_orders.py` compares every catalog table and state file before and after).
+  The dashboard's Rebalance preview page was retired for it; `/api/rebalance-preview*` remains.
 - `kite.py` + `holdings_sync.py` (BL-142 Phase 1) — Zerodha Kite, read-only: the Momentum money
   is on Kite. `kite.py` calls only `/session/token`, `/portfolio/holdings` (quantity + T1),
   `/user/margins/equity` (`net` = free cash) and `/user/profile`; no order endpoint. The token
   (06:00 IST expiry, `fyers.token_expiry`) is cached 0600 in `data/.kite_token.json`. Login:
   `POST /api/kite/login` returns Kite's login URL (state in `redirect_params`, in memory like
   the Fyers states), Kite redirects to `GET /api/kite/callback` (the Kite app's registered
-  redirect URL `http://127.0.0.1:8765/api/kite/callback`), which stores the token and, when the
+  redirect URL is the hosted dashboard's `/api/momentum/kite/callback`, forwarded here through
+  the tunnel, so a phone login works), which stores the token and, when the
   holdings source is `kite`, reads a snapshot. `holdings_sync.sync('kite'|'fyers')` stores a
   snapshot (Kite with its free cash in `momentum_cash`, trading-data migration 013) for
   `mbt orders run`, `mbt kite sync`, the callback and `POST /api/holdings/sync`.
   `holdings_store.treatment` always leaves LIQUIDBEES and `SGB*` out as options margin (no rule
   overrides it); Your orders counts a Kite snapshot's free cash, which is `net` minus pledged
   collateral, never below 0. `mbt kite remind --send` is the Fri
-  13:30 `kite-login-reminder` job. The lot ledger and per-sleeve orders are BL-142 Phases 2–3.
+  13:30 `kite-login-reminder` job (`--when monday`: the Mon 08:45 `kite-login-reminder-monday`).
+  `kite_login.py` (`mbt kite auto-login`, owner 2026-10-28, off until `KITE_AUTO_LOGIN=on`) logs
+  in unattended on Kite's own page, Fridays and Mondays from the 08:02 `broker-login` job;
+  `finish_login` (exchange, save, holdings read) is shared with `/api/kite/callback`.
+  `login_nudge.py` gives it and `mbt token-remind` (the 08:05 / 15:30 Fyers reminders) the link to
+  the hosted Broker logins page (`DASHBOARD_PUBLIC_URL`) and the phone-login blockers (API port,
+  `cloudflared`). The lot ledger and per-sleeve orders are BL-142 Phases 2–3.
 - `lots.py` (BL-142 Phases 2-3) — the lot ledger and per-lot orders for a group followed with one
   lot per sleeve (BL-087). `momentum_lot_events` (append-only; a lot's shares are the sum of its
   deltas; trading-data migration 014) books shares to the saved-run id of a sleeve, never to the
@@ -534,8 +574,15 @@ contract, not a shared service).
   sleeve's signal marks SELL (never a difference from the model: the owner's real holdings differ
   on purpose, e.g. a swap for a premium-blocked name). `api._compute_lot_orders` is the Kite +
   group path of `_compute_orders` (the group's per-sleeve signals ride in `signal["_sleeves"]`,
-  never saved); `api.seed_lots` / `lots_status` / `assign_lot` back `mbt lots`. Tests:
-  `tests/test_lots.py`, `tests/test_lot_orders.py`.
+  never saved); `api.seed_lots` / `lots_status` / `assign_lot` back `mbt lots`. `api.lots_view`
+  (`GET /api/lots`, Phase 4) is This week's Lots panel: `lots_status`'s answer (both go through
+  `_lots_status_from`; the view reads everything once) plus each lot's value at the last stored
+  close (`db_read.latest_symbol_closes_from_db_or_none`, never a quote), its calendar
+  (`_rebalance_info`, `_last_rebalance` from the paper start), the last orders made on their own
+  Friday per lot (`holdings_store.latest_orders(on_friday=True)`: a midweek run by hand never moves
+  the pending lot, so it is not shown) and the pending plan beside Kite minus the lots, a planned
+  name with no difference included at 0; read-only, and unavailable until a lot is recorded.
+  Tests: `tests/test_lots.py`, `tests/test_lot_orders.py`.
 - `alerts.py` (BL-051 Phase 5) — `GET /api/alerts`: what needs a person, for the dashboard's bell
   and once-a-day pop-up. One pure function per kind over the data its Telegram job already reads:
   `split` (`stock_actions.review_snapshot`), `data` (`/weekly/status` readiness, for the
@@ -576,7 +623,7 @@ contract, not a shared service).
   detector freeze from the owner's gallery labels) is committed. `quality.py` grades each base
   0-1 from its own geometry (addendum 1); the blend shapes use state score x quality. `tests/test_patterns.py` pins the
   no-look-ahead property (detections up to a cut are identical with and without later bars).
-- `audit/` — `mbt audit bundle|replay|study|outside` (BL-010 Phase 2). `bundle.py` writes a
+- `audit/` — `mbt audit bundle|replay|study|outside|lookahead|lookahead-requests` (BL-010 Phase 2). `request_lookahead.py` is the whole-request cut-off test (saved favourites through the real API; uses `truncate.py`; compares kpis, series, trades, rotations, yearly, open positions and the companion at 1e-9, ignoring price levels). `verify.py` (`mbt verify history`, BL-001 Phase 4) is the restated-history detector: per-instrument-per-year row counts and hashes up to an anchor Friday, baseline in the state dir (`data/history_baseline.json`, log `history_baseline_log.jsonl`), nothing accepted without `--accept --reason`; a change exits 0 once its Telegram is delivered (`notify.deliver`: the message is the alert), 1 when it reached nobody or the check cannot run; a lost baseline file is refused while the log shows one existed; scheduler job `momentum-history`, Fri 22:00 IST. `bundle.py` writes a
   run's orders and the backtest's claims; `replay.py` rebuilds the result from the orders and
   the lake's raw bars and compares. `replay.py`, `studies.py` and `outside.py` must never import
   from the rest of the package (a test enforces it): shared code would hide a shared mistake.
@@ -642,8 +689,11 @@ contract, not a shared service).
 - `reference_benchmarks.py` — Nifty 50 TRI and Nifty200 Momentum 30 TRI comparison lines
   (`load_references`, `compare`), added to every backtest payload as `comparisons`. Four more
   comparison-only TRIs (Midcap 150, Smallcap 250, Midcap150 Momentum 50, Nifty500 Momentum 50;
-  `EXTRA_REFERENCES`, BL-010 Phase 5) are loaded by `load_references` but never displayed by
-  `compare`, and stay out of `ui_data._BENCHMARK_COLUMNS` (the stock dataset); `mbt stocks
+  `EXTRA_REFERENCES`, BL-010 Phase 5) are loaded by `load_references` but not in `compare`'s
+  default list (it takes `names=`), and stay out of `ui_data._BENCHMARK_COLUMNS` (the stock
+  dataset). The result chart's optional lines are the picker's indices (`benchmarks`) plus
+  `CHART_ONLY` (Nifty 500 TRI), sent as `extra_comparisons` only when it covers the run, so the
+  golden results (no Nifty 500 in the fixture) do not move (BL-036); `mbt stocks
   fetch-benchmarks` refreshes just them, `mbt stocks fetch`/`local migrate` carry them too. Use it,
   not the dataset's own `benchmark`, when judging edge: index-mode benchmarks are price-only
   (TODO 3.9.23).

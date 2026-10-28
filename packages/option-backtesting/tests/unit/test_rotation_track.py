@@ -85,7 +85,7 @@ def test_a_track_entry_goes_to_its_own_journal_with_adaptive_only(track_seeded):
     assert e["universe"]["variants"] == len(NAMES) + len(TRACK)
     assert not store.journal_path(root).exists()  # the live journal is untouched
     assert journal.verify(store.journal_path(root, "t1")) == []
-    assert r.text.startswith("🧪 T1 · TESTING PHASE · not traded")
+    assert r.text.startswith("🧪 Tuned Adaptive (In Testing phase)")
     # the live list still records on its own, the same morning, unaffected
     live = record(target, root, vix_open=14.2, now_fn=_at(target, 9, 16))
     assert "track" not in live.entry and set(live.entry["lists"]) == {"A", "B", "C", "REF"}

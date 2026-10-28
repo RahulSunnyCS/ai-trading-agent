@@ -174,8 +174,77 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('has 36 jobs', () => {
-    expect(JOBS).toHaveLength(36); // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor
+  it('has 49 jobs', () => {
+    // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor; BL-168: + contract-notes, contract-notes-retry, contract-notes-capital; + contract-notes-retry-1030, -1530
+    // BL-012: + check-expiry-calendar (Y4), check-blocked-dates (Y3), universe-refresh-reminder (S3)
+    // BL-024: + momentum-journal-score
+    // BL-001 Phase 4: + momentum-history
+    // phone login: + fyers-login-reminder, fyers-login-recheck, kite-login-reminder-monday
+    expect(JOBS).toHaveLength(49);
+  });
+});
+
+describe('login reminders (phone login)', () => {
+  const byId = (id: string) => JOBS.find((j) => j.id === id);
+  it('reminds about Fyers at 08:05 and 15:30 on trading days, never retried', () => {
+    for (const [id, at, when] of [
+      ['fyers-login-reminder', '08:05', 'morning'],
+      ['fyers-login-recheck', '15:30', 'evening'],
+    ] as const) {
+      const job = byId(id);
+      expect(job?.schedule.at).toBe(at);
+      expect(job?.steps).toEqual([['uv', 'run', 'mbt', 'token-remind', '--send', '--when', when]]);
+      expect(job?.retries).toBe(0);
+      expect(job?.schedule.on('2026-10-28')).toBe(true); // a Wednesday
+      expect(job?.schedule.on('2026-10-31')).toBe(false); // a Saturday
+    }
+  });
+  it('reminds about Kite on trading Mondays at 08:45 with the Monday wording', () => {
+    const job = byId('kite-login-reminder-monday');
+    expect(job?.schedule.at).toBe('08:45');
+    expect(job?.steps[0]).toContain('monday');
+    expect(job?.schedule.on('2026-10-26')).toBe(true); // a Monday
+    expect(job?.schedule.on('2026-10-30')).toBe(false); // a Friday
+    expect(byId('kite-login-reminder')?.schedule.on('2026-10-30')).toBe(true);
+  });
+});
+
+describe('forward-journal score (BL-024 Phases 2-3)', () => {
+  const job = JOBS.find((j) => j.id === 'momentum-journal-score');
+  it('runs on Fridays after the 19:30 run and before the 21:00 check, in the catalog group', () => {
+    expect(job?.schedule.at).toBe('20:30');
+    expect(job?.group).toBe('catalog');
+    expect(job?.steps).toEqual([['uv', 'run', 'mbt', 'journal', 'score']]);
+    // it sends nothing itself, so the scheduler alerts a failure
+    expect(job?.alertsItself).toBeFalsy();
+  });
+});
+
+describe('momentum history check (BL-001 Phase 4)', () => {
+  const job = JOBS.find((j) => j.id === 'momentum-history');
+  const friday = '2026-10-30';
+
+  it('runs mbt verify history --send on Fridays, after the 19:30 stock sync has had its time', () => {
+    const ingest = JOBS.find((j) => j.id === 'momentum-stock-ingest');
+    expect(job?.steps).toEqual([['uv', 'run', 'mbt', 'verify', 'history', '--send']]);
+    expect(job?.cwd).toBe('packages/momentum-backtesting');
+    expect(job?.schedule.on(friday)).toBe(true);
+    expect(job?.schedule.on('2026-10-29')).toBe(false); // Thursday
+    const ingestEnd =
+      istAt(friday, ingest?.schedule.at ?? '').getTime() + (ingest?.timeoutMinutes ?? 0) * 60_000;
+    expect(istAt(friday, job?.schedule.at ?? '').getTime()).toBeGreaterThanOrEqual(ingestEnd);
+  });
+
+  it('shares the catalog group with every Friday momentum job that can still run at its slot', () => {
+    // Read-only, but DuckDB will not open the catalog read-only while another process writes:
+    // the group is what keeps it apart from the stock sync and the 21:00 / 21:30 checks.
+    expect(job?.group).toBe('catalog');
+    for (const id of ['momentum-stock-ingest', 'momentum-journal-check', 'momentum-live-rules'])
+      expect(JOBS.find((j) => j.id === id)?.group).toBe('catalog');
+  });
+
+  it('sends its own alerts, so the scheduler never repeats one', () => {
+    expect(job?.alertsItself).toBe(true);
   });
 });
 
@@ -225,6 +294,51 @@ describe('live capture (BL-141)', () => {
   });
 });
 
+describe('contract notes (BL-168)', () => {
+  const job = (id: string) => JOBS.find((j) => j.id === id);
+
+  const RETRIES = [
+    'contract-notes-retry',
+    'contract-notes-retry-1030',
+    'contract-notes-retry-1530',
+  ];
+  const minutes = (at = '') => {
+    const [h = 0, m = 0] = at.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  it('runs every day, Saturday included, at 00:00 and again at 07:30, 10:30 and 15:30', () => {
+    expect(job('contract-notes')?.schedule.at).toBe('00:00');
+    expect(RETRIES.map((id) => job(id)?.schedule.at)).toEqual(['07:30', '10:30', '15:30']);
+    for (const id of ['contract-notes', ...RETRIES]) {
+      expect(job(id)?.schedule.on('2026-10-24')).toBe(true); // a Saturday
+      expect(job(id)?.steps).toEqual([['node', 'run.js']]);
+      expect(job(id)?.cwd).toBe('packages/contract-notes');
+      expect(job(id)?.group).toBe('contract-notes');
+    }
+  });
+
+  it('every retry catches up until 23:30, so a slept-through retry is not reported missed', () => {
+    // Overlap with the 00:00 run is prevented by the shared group, not by this window.
+    for (const id of RETRIES) {
+      const r = job(id);
+      expect(minutes(r?.schedule.at) + (r?.catchUpHours ?? 0) * 60, id).toBe(23 * 60 + 30);
+    }
+  });
+
+  it('reads the capital at 15:50 on trading days only, through obt', () => {
+    expect(job('contract-notes-capital')?.schedule.at).toBe('15:50');
+    expect(job('contract-notes-capital')?.schedule.on('2026-10-24')).toBe(false); // a Saturday
+    expect(job('contract-notes-capital')?.steps).toEqual([
+      ['uv', 'run', 'obt', 'realised', 'capital'],
+    ]);
+  });
+
+  it('a 00:00 run missed while asleep still runs before the 07:30 one', () => {
+    expect(job('contract-notes')?.catchUpHours).toBeGreaterThanOrEqual(7);
+  });
+});
+
 describe('Quantiply deploy jobs (BL-139 Phase 4)', () => {
   const job = (id: string) => JOBS.find((j) => j.id === id);
   const minutes = (id: string) => {
@@ -235,7 +349,9 @@ describe('Quantiply deploy jobs (BL-139 Phase 4)', () => {
   it('disable after the session, before the upload; enable after each upload', () => {
     expect(minutes('quantiply-disable')).toBeGreaterThan(15 * 60 + 28); // the last exit
     expect(minutes('quantiply-disable')).toBeLessThan(minutes('quantiply-evening'));
-    expect(minutes('quantiply-deploy')).toBeGreaterThan(minutes('quantiply-evening'));
+    // BL-172: the switch-on is in the morning, after the 08:00 login, before the first entry
+    expect(minutes('quantiply-deploy')).toBeGreaterThan(8 * 60);
+    expect(minutes('quantiply-deploy')).toBeLessThan(9 * 60 + 15);
     expect(minutes('quantiply-deploy-topup')).toBeGreaterThan(minutes('quantiply-topup'));
     // one group: a deploy waits for the upload (and its retries); logins never overlap
     for (const id of [
@@ -257,8 +373,9 @@ describe('Quantiply deploy jobs (BL-139 Phase 4)', () => {
     for (const id of ['quantiply-deploy', 'quantiply-deploy-topup']) {
       expect(job(id)?.retries).toBe(0);
       const cmd = job(id)?.steps.at(-1)?.at(-1) ?? '';
-      expect(cmd).toContain('--broker angelone --mode enable --apply');
-      expect(cmd).toContain('--broker finvasia --mode enable --apply');
+      const morning = id === 'quantiply-deploy' ? ' --morning' : '';
+      expect(cmd).toContain(`--broker angelone --mode enable${morning} --apply`);
+      expect(cmd).toContain(`--broker finvasia --mode enable${morning} --apply`);
     }
     const disable = job('quantiply-disable');
     expect(disable?.retries).toBeGreaterThan(0); // disabling again changes nothing

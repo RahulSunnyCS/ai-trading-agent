@@ -17,7 +17,7 @@ Three things are kept apart on this screen, and the words keep them apart:
 |---|---|---|
 | Scheduled | What the rule picked, written down before 09:17 | The journal, a chain that cannot be edited afterwards |
 | Simulated | What each pick did on the day's data | The nightly results, one lot per strategy, gross |
-| Executed | What you actually placed on AlgoTest | Your own mark, entered in the drawer |
+| Executed | What actually traded | The 15:40 live capture (the *Live − paper* column), or your own mark in the drawer |
 
 Passing an entry time does not prove a trade happened. Only the third line says so, and only
 because you wrote it.
@@ -64,7 +64,7 @@ One 32 px line a day, newest first.
 | Recorded | The time the entry was written. After 09:17 it is *late* |
 | Adaptive | Gross per lot-day of the list's basket that day. The header carries the journal key (C) in small type. Hover for the list's total in rupees and its lots. **W** marks that the Widesl minimum replaced a top-ranked Dir; **B** that a Buy strategy qualified and was added |
 | Flags | Late, VIX from Angel One or by hand, days to expiry from the calendar, a stop, and **PF stop 11:14** when the portfolio stop closed the basket (below) |
-| Placed | A dot: green placed, amber changed, red not placed, hollow not marked |
+| Live − paper | What the live book made minus paper, per lot-day, both after the same estimated costs, from the 15:40 live capture (Adaptive Classic's live book is Core). **+** means live did better. Hover for each platform's live and paper figures and the day's flags. *waiting* means the capture has not read the day yet, *not captured* a gap in the capture; a day before the capture began shows a dash. It replaced the hand-marked *Placed* dots (the drawer still takes a mark) |
 | Status | Scored, Waiting, Late or Not recorded |
 
 > [!NOTE]
@@ -83,7 +83,7 @@ One 32 px line a day, newest first.
 
 ## The portfolio stop
 
-The **Portfolio stop** button on the Adaptive Classic card shows the stop this log follows and opens its pop-up.
+The **Portfolio stop** button on the Adaptive Classic row of the Books table shows the stop this log follows and opens its pop-up.
 It is the stop you trade the list under: one level on the *combined* P&L of the basket, on top of
 each strategy's own stop. The first minute the basket's mark-to-market reaches the level, every
 pick closes at that minute's close and nothing that has not entered yet enters that day.

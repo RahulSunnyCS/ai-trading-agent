@@ -109,15 +109,17 @@ def _run(recorder, sent, alerts=None, catch_up=None, **kw):
     )
 
 
-def test_adaptive_and_t1_go_out_as_one_message_and_the_group_gets_adaptive_alone():
+def test_adaptive_and_t1_go_out_as_one_message_the_same_for_the_owner_and_the_group():
     sent, alerts, rec = Sent(), [], Recorder()
     assert _run(rec, sent, alerts) == 0
     assert len(sent.messages) == 2 and alerts == []
     private, group = sent.to(None)[0], sent.to("-456")[0]
-    assert "🎯 ADAPTIVE · Tue 20 Oct" in private and "🧪 T1 · TESTING PHASE · not traded" in private
-    assert private.index("ADAPTIVE") < private.index("━━━") < private.index("TESTING PHASE")
+    assert (
+        "🎯 ADAPTIVE · Tue 20 Oct" in private and "🧪 Tuned Adaptive (In Testing phase)" in private
+    )
+    assert private.index("ADAPTIVE") < private.index("━━━") < private.index("Tuned Adaptive")
     assert private.endswith("🔒 f1a77247 · 09:16")
-    assert "🧪" not in group and group.endswith("🔒 f1a77247 · 09:16")
+    assert group == private
     # T1 is given the live entry's VIX read: one poll, one value, the same recorded source
     live_call, t1_call = rec.calls
     assert live_call["track"] is None and t1_call["track"] == "t1"
@@ -138,7 +140,10 @@ def test_a_failed_t1_never_delays_or_loses_adaptive_and_still_alerts_the_owner()
     assert _run(rec, sent, alerts) == 2  # the job retries
     private = sent.to(None)[0]
     assert private.splitlines()[0] == "🎯 ADAPTIVE · Tue 20 Oct"
-    assert "🧪 T1 · TESTING PHASE · not recorded today" in private and len(sent.messages) == 2
+    assert (
+        "🧪 Tuned Adaptive (In Testing phase) · not recorded today" in private
+        and len(sent.messages) == 2
+    )
     assert alerts == [
         (
             "T1 TRACK Rotation pick NOT recorded for 2026-10-20",
@@ -168,10 +173,10 @@ def test_missing_t1_results_are_stored_then_t1_follows_as_its_own_message():
     assert caught == ["t1"] and alerts == []
     first, follow = sent.to(None)[0], sent.to(None)[-1]
     # Adaptive did not wait for the catch-up, and says T1 is coming rather than "not recorded"
-    assert "🧪 T1 · TESTING PHASE · follows in a separate message" in first
-    assert follow.startswith("⚠️ LATE · not a forward entry\n🧪 T1 · TESTING PHASE · not traded")
+    assert "🧪 Tuned Adaptive (In Testing phase) · follows in a separate message" in first
+    assert follow.startswith("⚠️ LATE · not a forward entry\n🧪 Tuned Adaptive (In Testing phase)")
     assert "ADAPTIVE" not in follow
-    assert len(sent.to("-456")) == 1  # the group heard about Adaptive only
+    assert sent.to("-456") == sent.to(None)  # the group hears both, as the owner does
 
 
 def _at(hh, mm, ss, micro=0):
@@ -185,10 +190,10 @@ def test_a_slow_t1_does_not_hold_adaptive_back_past_the_clock_deadline():
     assert _run(rec, sent, now_fn=_at(9, 16, 49, 900_000)) == 0
     owner = sent.to(None)
     # Adaptive first; T1 is only slow, so it says it follows (it is not "not recorded")
-    assert "🧪 T1 · TESTING PHASE · follows in a separate message" in owner[0]
+    assert "🧪 Tuned Adaptive (In Testing phase) · follows in a separate message" in owner[0]
     assert "not recorded today" not in owner[0]
-    assert owner[-1].startswith("🧪 T1 · TESTING PHASE · not traded · Tue 20 Oct")
-    assert len(sent.to("-456")) == 1
+    assert owner[-1].startswith("🧪 Tuned Adaptive (In Testing phase) · Tue 20 Oct")
+    assert sent.to("-456") == owner
 
 
 def test_the_owner_waits_for_t1_until_09_16_50_or_20_seconds_whichever_is_sooner():
@@ -201,15 +206,15 @@ def test_the_owner_waits_for_t1_until_09_16_50_or_20_seconds_whichever_is_sooner
     assert deliver.t1_deadline(at(14, 0, 0)) == at(14, 0, 20)  # a run by hand
 
 
-def test_the_group_copy_goes_out_before_t1_is_even_attempted():
+def test_the_message_waits_for_t1_then_goes_to_the_owner_first_and_the_group():
     events: list = []
     rec, sent = Recorder(events=events), Sent(events=events)
     assert _run(rec, sent) == 0
     assert events == [
         ("record", None),
-        ("send", "-456"),  # the group: Adaptive alone, at once
         ("record", "t1"),
-        ("send", None),  # the owner: Adaptive and T1 together
+        ("send", None),  # Adaptive and T1 together, the owner first
+        ("send", "-456"),
     ]
 
 
@@ -238,8 +243,9 @@ def test_a_retry_after_adaptive_was_recorded_sends_only_the_t1_message():
     rec.live_outcome = AlreadyRecorded("done")
     sent = Sent()
     assert _run(rec, sent) == 0
-    assert len(sent.messages) == 1 and sent.messages[0][0] is None
-    assert sent.messages[0][1].startswith("🧪 T1 · TESTING PHASE · not traded · Tue 20 Oct")
+    assert [c for c, _ in sent.messages] == [None, "-456"]
+    assert sent.messages[0][1].startswith("🧪 Tuned Adaptive (In Testing phase) · Tue 20 Oct")
+    assert sent.messages[1][1] == sent.messages[0][1]
 
 
 def test_a_retry_when_both_are_recorded_sends_nothing():
@@ -263,7 +269,7 @@ def test_a_track_pick_on_its_own_is_private_and_uses_the_t1_layout():
     sent = Sent()
     assert _run(rec, sent, track="t1", with_t1=False) == 0
     assert [c for c, _ in sent.messages] == [None]
-    assert sent.messages[0][1].startswith("🧪 T1 · TESTING PHASE · not traded · Tue 20 Oct")
+    assert sent.messages[0][1].startswith("🧪 Tuned Adaptive (In Testing phase) · Tue 20 Oct")
 
 
 def test_without_t1_adaptive_goes_to_the_owner_and_the_group():
@@ -324,9 +330,12 @@ def test_the_evening_message_has_both_lists_and_tomorrow_and_a_retry_sends_nothi
     sent = Sent()
     assert _send(evening, sent) == 0
     private, group = sent.to(None)[0], sent.to("-456")[0]
-    assert "🎯 Adaptive   +₹300" in private and "🧪 T1         −₹150" in private
+    assert (
+        "🎯 Adaptive   +₹300" in private
+        and "🧪 Tuned Adaptive (In Testing phase)   −₹150" in private
+    )
     assert "➡️ Wed 21 Oct" in private and private.rstrip().endswith("MTMSL4000")
-    assert "🧪" not in group and "➡️ Wed 21 Oct" in group
+    assert group == private  # no live capture here, so nothing is the owner's alone
     assert _send(evening, sent) == 0  # a retry
     assert len(sent.messages) == 2
 
@@ -341,19 +350,21 @@ def test_t1_not_ready_waits_until_the_deadline_then_goes_without_it_and_t1_follo
     assert sent.messages == []  # nothing yet: the scheduler retries in five minutes
     assert _send(evening, sent, wait_until=until, now_fn=after) == 0
     assert (
-        "🧪 T1 · result not ready" in sent.to(None)[0]
-        and "🧪 T1 · not ready" not in sent.to(None)[0]
+        "🧪 Tuned Adaptive (In Testing phase) · result not ready" in sent.to(None)[0]
+        and "🧪 Tuned Adaptive (In Testing phase) · not ready" not in sent.to(None)[0]
     )
+    assert "· result not ready" in sent.to("-456")[0]
     assert len(sent.messages) == 2
     # still not scored: a later run says so and sends nothing
     assert _send(evening, sent) == 0 and len(sent.messages) == 2
-    # the results arrive: T1 follows on its own, once, to the owner only
+    # the results arrive: T1 follows on its own, once, to the owner and then the group
     _write(evening, T1_CORE, -50.0)
     assert _send(evening, sent) == 0
-    follow = sent.messages[-1]
-    assert follow[0] is None and follow[1].startswith("📊 Tue 20 Oct · T1 result")
-    assert "Adaptive   +" not in follow[1] and "−₹150" in follow[1]
-    assert _send(evening, sent) == 0 and len(sent.messages) == 3  # and never again
+    (c1, follow), (c2, again) = sent.messages[-2:]
+    assert (c1, c2) == (None, "-456") and again == follow
+    assert follow.startswith("📊 Tue 20 Oct · Tuned Adaptive result")
+    assert "🎯" not in follow and "−₹150" in follow
+    assert _send(evening, sent) == 0 and len(sent.messages) == 4  # and never again
 
 
 def test_a_manual_run_does_not_wait(evening):
@@ -365,7 +376,7 @@ def test_a_manual_run_does_not_wait(evening):
 def test_no_t1_entry_means_the_message_says_so_and_nothing_follows(evening):
     sent = Sent()
     assert _send(evening, sent, wait_until=time(16, 25)) == 0  # no waiting for what will not come
-    assert "🧪 T1 · not recorded today" in sent.to(None)[0]
+    assert "🧪 Tuned Adaptive (In Testing phase) · not recorded today" in sent.to(None)[0]
     _t1_ready(evening)  # even if T1 shows up afterwards, Adaptive's message is not repeated
     assert _send(evening, sent) == 0
     assert len(sent.messages) == 2
@@ -421,7 +432,7 @@ def test_t1s_tomorrow_failing_alone_says_not_ready(evening, monkeypatch):
     monkeypatch.setattr(tomorrow, "next_session_picks", picks)
     sent = Sent()
     assert _send(evening, sent) == 0
-    assert sent.to(None)[0].rstrip().endswith("🧪 T1 · not ready")
+    assert sent.to(None)[0].rstrip().endswith("🧪 Tuned Adaptive (In Testing phase) · not ready")
 
 
 def test_force_resends_everything_and_no_telegram_sends_and_marks_nothing(evening):
@@ -468,7 +479,10 @@ def test_an_unreadable_t1_never_stops_adaptives_result_and_t1_follows_once_fixed
     )
     assert run == 0
     owner, group = sent.to(None)[0], sent.to("-456")[0]
-    assert "🎯 Adaptive   +₹300" in owner and "🧪 T1 · result not ready" in owner
+    assert (
+        "🎯 Adaptive   +₹300" in owner
+        and "🧪 Tuned Adaptive (In Testing phase) · result not ready" in owner
+    )
     assert "🎯 Adaptive   +₹300" in group
     assert errors and "JournalCorrupt" in errors[0]
     # the owner is told, once, why T1 is missing
@@ -477,8 +491,8 @@ def test_an_unreadable_t1_never_stops_adaptives_result_and_t1_follows_once_fixed
     # T1 stays owed: once the journal is readable again, it follows on its own
     path.write_text(good)
     assert _send(evening, sent) == 0
-    assert sent.messages[-1][1].startswith("📊 Tue 20 Oct · T1 result")
-    assert len(sent.messages) == 3
+    assert sent.messages[-1][1].startswith("📊 Tue 20 Oct · Tuned Adaptive result")
+    assert [c for c, _ in sent.messages[2:]] == [None, "-456"]
 
 
 def test_a_broken_t1_results_row_is_an_error_not_a_crash(evening, monkeypatch):
@@ -493,7 +507,7 @@ def test_a_broken_t1_results_row_is_an_error_not_a_crash(evening, monkeypatch):
     monkeypatch.setattr(store, "read_net", torn)
     sent = Sent()
     assert _send(evening, sent, err=lambda m: None) == 0
-    assert "🧪 T1 · result not ready" in sent.to(None)[0]
+    assert "🧪 Tuned Adaptive (In Testing phase) · result not ready" in sent.to(None)[0]
     done = rotation_result.calculate(DAY, evening)
     assert not rotation_result.was_sent(done, evening, "t1")
 
@@ -561,13 +575,47 @@ def test_a_group_that_keeps_failing_never_holds_back_the_owners_t1_result(evenin
     sent.fail.add("-456")
     # past the deadline: Adaptive goes to the owner without T1; the group copy fails
     assert _send(evening, sent, wait_until=time(16, 25), now_fn=_at(16, 30, 0)) == 2
-    assert "🧪 T1 · result not ready" in sent.to(None)[0]
+    assert "🧪 Tuned Adaptive (In Testing phase) · result not ready" in sent.to(None)[0]
     _write(evening, T1_CORE, -50.0)  # the T1 results arrive (the 21:00 catch-up)
     assert _send(evening, sent) == 2  # the group still fails, so the job still says so
     owner = sent.to(None)
-    assert len(owner) == 2 and owner[1].startswith("📊 Tue 20 Oct · T1 result")
+    assert len(owner) == 2 and owner[1].startswith("📊 Tue 20 Oct · Tuned Adaptive result")
     assert _send(evening, sent) == 2
     assert len(sent.to(None)) == 2  # T1 is never sent twice while the group keeps failing
+
+
+def test_a_group_t1_followup_that_fails_is_retried_alone(evening):
+    _journal(evening, T1_CORE, "t1")  # T1 recorded, results not stored yet
+    sent = Sent()
+    assert _send(evening, sent) == 0  # both chats get Adaptive with T1 not ready
+    _write(evening, T1_CORE, -50.0)
+    sent.fail.add("-456")
+    assert _send(evening, sent) == 2  # the owner has T1's result; the group's copy failed
+    sent.fail.clear()
+    assert _send(evening, sent) == 0
+    assert [c for c, _ in sent.messages] == [None, "-456", None, "-456", "-456"]
+    assert _send(evening, sent) == 0 and len(sent.messages) == 5
+
+
+def test_a_group_owed_t1_is_settled_without_a_message_when_t1_has_no_entry(evening):
+    done = rotation_result.calculate(DAY, evening)  # no T1 journal: kind "none"
+    for kind in ("", "group", "t1", "group-t1-owed"):
+        rotation_result.mark_sent(done, evening, kind)
+    sent = Sent()
+    assert _send(evening, sent) == 0 and sent.messages == []
+    assert rotation_result.was_sent(done, evening, "group-t1")
+
+
+def test_a_group_copy_sent_before_it_carried_t1_is_owed_no_followup(evening):
+    """Before 2026-10-28 the group's evening copy had no T1 part: such a day owes the group nothing."""
+    _journal(evening, T1_CORE, "t1")
+    done = rotation_result.calculate(DAY, evening)
+    rotation_result.mark_sent(done, evening)
+    rotation_result.mark_sent(done, evening, "group")
+    _write(evening, T1_CORE, -50.0)
+    sent = Sent()
+    assert _send(evening, sent) == 0
+    assert [c for c, _ in sent.messages] == [None]  # the owner's T1 follow-up only
 
 
 def test_before_not_before_the_evening_run_sends_nothing_and_after_it_sends(evening):
@@ -630,6 +678,6 @@ def test_the_morning_says_whether_each_list_changed_since_the_evening(tmp_path):
     sent = Sent()
     assert _run(Recorder(), sent, root=tmp_path) == 0
     private, group = sent.to(None)[0], sent.to("-456")[0]
-    assert "✅ No change from yesterday's list" in group
+    assert group == private
+    assert "✅ No change from yesterday's list" in private.split("━")[0]
     assert "🔄 Changed from yesterday's list: ➕ 13:17  N_widesl_p150" in private
-    assert "🔄" not in group

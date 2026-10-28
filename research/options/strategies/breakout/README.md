@@ -33,6 +33,11 @@ their own levels makes a breakout better: it does not, in any of the four refere
 | [Trade, stop and exit](trade-and-exit.md) | Tested (killed) | Selling the opposite side beats buying (+₹59 vs −₹71 / −₹16 a trade); stop and exit choices move little |
 | [Index support (Bank Nifty, Nifty IT, Reliance)](index-support.md) | Tested (killed) | Two of three beyond their own level made no reliable difference |
 
+## Related
+
+- [Gap-and-go band → Williams back-up](../gap-and-go/README.md) (BL-164): the opening range again, with the
+  gap's direction and a filled-gap stand-down, buying 150 points ITM; killed too.
+
 ## Reproduce
 
 The result files are git-ignored. `packages/option-backtesting/research/bl152/`: `specs.py` (the 192

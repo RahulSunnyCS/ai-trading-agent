@@ -1,21 +1,10 @@
-require('dotenv').config();
 const Imap = require('imap');
 const { simpleParser } = require('mailparser');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-const { loadBrokerAccounts, getBroker, makeFileName } = require('./brokers');
-const { requireEnv } = require('./utils/validate');
-const { withRetry } = require('./utils/retry');
 const logger = require('./utils/logger');
-
-const targetDate = process.env.TARGET_DATE
-  ? new Date(process.env.TARGET_DATE)
-  : new Date(Date.now() - 24 * 60 * 60 * 1000);
-const formattedDate = targetDate.toISOString().slice(0, 10);
-
-const dataDir = path.join(__dirname, 'data');
 
 // qpdf exit codes: 0 = clean, 3 = succeeded with warnings (the output file is
 // still written and readable), anything else = real failure. Treating 3 as a
@@ -24,8 +13,8 @@ const dataDir = path.join(__dirname, 'data');
 // "can't find PDF header" need very different fixes.
 const QPDF_WARNINGS = 3;
 
-function decryptWithQpdf(filePath, password) {
-  const decryptedPath = filePath.replace(/\.pdf$/i, '_decrypted.pdf');
+function decryptWithQpdf(filePath, password, outPath) {
+  const decryptedPath = outPath || filePath.replace(/\.pdf$/i, '_decrypted.pdf');
   const file = path.basename(filePath);
 
   const result = spawnSync(
@@ -48,8 +37,6 @@ function decryptWithQpdf(filePath, password) {
   if (result.status === 0 || (result.status === QPDF_WARNINGS && wroteOutput)) {
     if (result.status === QPDF_WARNINGS) {
       logger.warn('PDF decrypted with qpdf warnings', { file, warnings: stderr });
-    } else {
-      logger.info('PDF decrypted', { file: path.basename(decryptedPath) });
     }
     return { path: decryptedPath, error: null };
   }
@@ -59,195 +46,171 @@ function decryptWithQpdf(filePath, password) {
   return { path: null, error };
 }
 
-function fetchAttachmentsForSubject(imap, subjectSearch, bodyFilterStr) {
-  return new Promise((resolve, reject) => {
-    imap.search(
-      [
-        ['SINCE', formattedDate],
-        ['SUBJECT', subjectSearch],
-      ],
-      (err, results) => {
-        if (err) return reject(err);
-        if (!results || !results.length) return resolve([]);
-
-        const attachments = [];
-        const parsePromises = [];
-        const f = imap.fetch(results, { bodies: '', struct: true });
-
-        f.on('message', (msg) => {
-          msg.on('body', (stream) => {
-            parsePromises.push(
-              simpleParser(stream).then((parsed) => {
-                if (bodyFilterStr) {
-                  const bodyText = parsed.text || parsed.html || '';
-                  if (!bodyText.includes(bodyFilterStr)) return;
-                }
-                for (const att of parsed.attachments || []) {
-                  if (att.filename && att.filename.toLowerCase().endsWith('.pdf')) {
-                    attachments.push(att);
-                  }
-                }
-              }),
-            );
-          });
-        });
-
-        f.once('error', reject);
-        f.once('end', async () => {
-          try {
-            await Promise.all(parsePromises);
-            resolve(attachments);
-          } catch (parseErr) {
-            reject(parseErr);
-          }
-        });
-      },
-    );
-  });
+/** True when the qpdf binary runs (Homebrew's on the laptop). */
+function hasQpdf() {
+  return spawnSync('qpdf', ['--version']).status === 0;
 }
 
-async function processMailbox(mailbox) {
-  const result = {
-    email: mailbox.email,
-    succeeded: [],
-    failed: [],
-    errors: [],
-  };
-
-  await new Promise((resolve, reject) => {
+/**
+ * One read-only connection to a Gmail mailbox, opened on All Mail (found by its \\All flag
+ * when the account's language renames "[Gmail]/All Mail") so an archived or labelled note is
+ * still found. Never marks anything read.
+ */
+function connect(mailbox) {
+  return new Promise((resolve, reject) => {
     const imap = new Imap({
       user: mailbox.email,
       password: mailbox.emailPassword,
       host: 'imap.gmail.com',
       port: 993,
       tls: true,
-      tlsOptions: {
-        servername: 'imap.gmail.com',
-        minVersion: 'TLSv1.2',
-      },
+      tlsOptions: { servername: 'imap.gmail.com', minVersion: 'TLSv1.2' },
       connTimeout: 30000,
-      authTimeout: 15000,
+      authTimeout: 30000,
     });
-
-    imap.once('ready', () => {
-      imap.openBox('INBOX', false, async (err) => {
-        if (err) {
-          imap.end();
-          return reject(err);
-        }
-
-        for (const acc of mailbox.accounts) {
-          try {
-            const broker = getBroker(acc.broker);
-            const subjectSearch = broker.subject(acc.accountId, targetDate);
-            const bodyFilterStr = broker.bodyFilter ? broker.bodyFilter(targetDate) : null;
-            logger.info(`Searching mail`, {
-              email: mailbox.email,
-              broker: acc.broker,
-              account: acc.accountId,
-              subject: subjectSearch,
-            });
-
-            const attachments = await fetchAttachmentsForSubject(
-              imap,
-              subjectSearch,
-              bodyFilterStr,
-            );
-            if (!attachments.length) {
-              logger.info('No mail found', { broker: acc.broker, account: acc.accountId });
-              continue;
-            }
-
-            for (const att of attachments) {
-              const filename = makeFileName(mailbox.email, acc.broker, acc.accountId, att.filename);
-              const filePath = path.join(dataDir, filename);
-              try {
-                fs.writeFileSync(filePath, att.content);
-                logger.info('Attachment saved', { file: filename });
-              } catch (writeErr) {
-                logger.error('Failed to save attachment', writeErr, { file: filename });
-                result.failed.push(acc.accountId);
-                result.errors.push({ account: acc.accountId, error: writeErr.message });
-                continue;
-              }
-              const decryptResult = decryptWithQpdf(filePath, acc.pdfPassword);
-              if (decryptResult.error) {
-                result.failed.push(acc.accountId);
-                result.errors.push({ account: acc.accountId, error: decryptResult.error });
-              } else {
-                result.succeeded.push(acc.accountId);
-              }
-            }
-          } catch (accErr) {
-            logger.error(`Account processing failed`, accErr, { account: acc.accountId });
-            result.failed.push(acc.accountId);
-            result.errors.push({ account: acc.accountId, error: accErr.message });
-          }
-        }
-
-        imap.end();
-        resolve();
-      });
-    });
-
-    imap.once('error', (err) => {
-      logger.error(`IMAP error`, err, { email: mailbox.email });
+    const fail = (err) => {
+      imap.end();
+      reject(err);
+    };
+    // A listener for the whole connection: an 'error' with none attached would crash the run.
+    imap.on('error', (err) => {
+      imap.lastError = err;
       reject(err);
     });
-
+    imap.once('ready', () => {
+      const opened = (err, box) =>
+        err ? fail(err) : resolve({ imap, uidvalidity: String(box.uidvalidity) });
+      imap.openBox('[Gmail]/All Mail', true, (err, box) => {
+        if (!err) return opened(null, box);
+        imap.getBoxes((listErr, boxes) => {
+          const all = listErr ? null : findAllMail(boxes);
+          if (!all) return fail(err);
+          imap.openBox(all, true, opened);
+        });
+      });
+    });
     imap.connect();
   });
-
-  return result;
 }
 
-async function main() {
-  requireEnv(['BROKER_ACCOUNTS_JSON']);
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
-  const mailboxes = loadBrokerAccounts();
-
-  const summary = [];
-  for (const mb of mailboxes) {
-    try {
-      const result = await withRetry(() => processMailbox(mb), {
-        attempts: 3,
-        baseDelayMs: 2000,
-        retryIf: (err) => !err.message.includes('Invalid credentials'),
-        onRetry: (err, attempt, delay) =>
-          logger.warn(`IMAP retry`, {
-            email: mb.email,
-            attempt,
-            delayMs: delay,
-            error: err.message,
-          }),
-      });
-      summary.push(result);
-    } catch (err) {
-      logger.error(`Mailbox processing failed after retries`, err, { email: mb.email });
-      summary.push({
-        email: mb.email,
-        succeeded: [],
-        failed: ['all'],
-        errors: [{ error: err.message }],
-      });
-    }
+function findAllMail(boxes, prefix = '') {
+  for (const [name, box] of Object.entries(boxes || {})) {
+    const full = prefix + name;
+    if ((box.attribs || []).includes('\\All')) return full;
+    const inner = findAllMail(box.children, full + (box.delimiter || '/'));
+    if (inner) return inner;
   }
+  return null;
+}
 
-  logger.info('=== Fetch summary ===');
-  for (const s of summary) {
-    logger.info(`Mailbox result`, {
-      email: s.email,
-      succeeded: s.succeeded.join(',') || 'none',
-      failed: s.failed.join(',') || 'none',
+/** A mail's body as plain text: its text part, or its HTML with tags dropped and ₹ decoded. */
+function bodyText(mail) {
+  const raw =
+    mail.text ||
+    (mail.html || '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<br\s*\/?>|<\/(p|div|tr|td|li)>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ');
+  return raw
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(Number.parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/[ \t]+/g, ' ');
+}
+
+/** IMAP's SINCE takes a date, not a time: 'YYYY-MM-DD' → '23-Oct-2026'. */
+function imapDate(day) {
+  const [y, m, d] = day.split('-').map(Number);
+  const mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${d}-${mon[m - 1]}-${y}`;
+}
+
+/**
+ * Every message whose subject contains `subjectText` and that is newer than the bookmark
+ * (`afterUid`: Gmail's message numbers only grow within one UIDVALIDITY) or received on or after
+ * `overlapSince` (a few days back, for a note Gmail indexed late or one that failed); with no
+ * bookmark, every one received on or after `sinceDay`. With its PDF attachments:
+ * [{ uid, subject, received, attachments: [{ filename, content }] }], oldest first.
+ */
+// Gives up when the mailbox sends nothing for this long; a long download that keeps arriving
+// (a year of notes for a history run) is never cut off.
+const IDLE_TIMEOUT_MS = 120000;
+
+function searchNotes(
+  imap,
+  subjectText,
+  { sinceDay, beforeDay, afterUid, overlapSince, withText = false },
+) {
+  let range = ['SINCE', imapDate(sinceDay)];
+  if (beforeDay) range = [range, ['BEFORE', imapDate(beforeDay)]];
+  if (afterUid != null) {
+    range = ['UID', `${afterUid + 1}:*`];
+    if (overlapSince) range = ['OR', range, ['SINCE', imapDate(overlapSince)]];
+  }
+  let timer;
+  let touch;
+  let settled = false;
+  const idle = new Promise((_, reject) => {
+    touch = () => {
+      clearTimeout(timer);
+      if (settled) return;
+      timer = setTimeout(() => {
+        settled = true;
+        reject(imap.lastError || new Error('the mailbox stopped answering'));
+      }, IDLE_TIMEOUT_MS);
+    };
+    touch();
+  });
+  return Promise.race([search(imap, subjectText, range, () => touch(), withText), idle]).finally(
+    () => {
+      settled = true;
+      clearTimeout(timer);
+    },
+  );
+}
+
+function search(imap, subjectText, range, touch, withText) {
+  return new Promise((resolve, reject) => {
+    const criteria = Array.isArray(range[0]) ? [...range] : [range];
+    imap.search([...criteria, ['SUBJECT', subjectText]], (err, found) => {
+      if (err) return reject(err);
+      // "n:*" also matches the newest message when it is older than n: harmless, a stored note
+      // is skipped by its hash and alerts are raised only for messages past the bookmark.
+      const uids = found || [];
+      if (!uids.length) return resolve([]);
+      const parses = [];
+      touch();
+      const f = imap.fetch(uids, { bodies: '' });
+      f.on('message', (msg) => {
+        touch();
+        let uid = null;
+        msg.once('attributes', (attrs) => {
+          uid = attrs.uid;
+        });
+        msg.on('body', (stream) => {
+          parses.push(
+            simpleParser(stream).then((mail) => ({
+              uid,
+              subject: mail.subject || '',
+              received: mail.date ? mail.date.toISOString() : null,
+              messageId: mail.messageId || null,
+              from: mail.from?.value?.[0]?.address || '',
+              // Only the ledger readers need the body; notes are read from their PDFs.
+              text: withText ? bodyText(mail) : '',
+              attachments: (mail.attachments || [])
+                .filter((a) => a.filename?.toLowerCase().endsWith('.pdf'))
+                .map((a) => ({ filename: a.filename, content: a.content })),
+            })),
+          );
+        });
+      });
+      f.once('error', reject);
+      f.once('end', () =>
+        Promise.all(parses).then((msgs) => resolve(msgs.sort((a, b) => a.uid - b.uid)), reject),
+      );
     });
-  }
-
-  const anyFailed = summary.some((s) => s.failed.length > 0);
-  if (anyFailed) process.exit(1);
+  });
 }
 
-if (require.main === module) {
-  main();
-}
-
-module.exports = { decryptWithQpdf, main };
+module.exports = { decryptWithQpdf, hasQpdf, connect, searchNotes, imapDate, bodyText };

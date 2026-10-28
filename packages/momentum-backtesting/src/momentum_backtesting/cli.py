@@ -99,6 +99,55 @@ def token_verdict(source: str, has_expiry: bool, probe: str) -> str | None:
     return None
 
 
+FYERS_REMINDERS = {
+    # when -> why the token is needed now
+    "morning": "The 09:16 pick and the evening collection read Fyers first (Angel One without it).",
+    "evening": "The evening collection at 15:45 reads Fyers first (Angel One without it).",
+}
+
+
+@app.command("token-remind")
+def token_remind(
+    send: bool = typer.Option(False, help="Send the reminder to Telegram when a login is needed."),
+    when: str = typer.Option("morning", help="morning (08:05) | evening (15:30): the wording."),
+) -> None:
+    """Trading days 08:05 and 15:30 (scheduler jobs `fyers-login-reminder`, `fyers-login-recheck`):
+    when there is no Fyers token Fyers accepts, remind the owner to log in, with a link to the
+    hosted Broker logins page (DASHBOARD_PUBLIC_URL). Silent when the token is good. Always exits 0:
+    the reminder is the alert."""
+    from . import login_nudge, notify
+
+    if when not in FYERS_REMINDERS:
+        raise typer.BadParameter(f"--when must be one of {', '.join(FYERS_REMINDERS)}")
+    load_repo_env()
+    try:
+        creds = fyers.resolve_credentials()
+        verdict = token_verdict(
+            creds.source, creds.expires_at is not None, fyers.probe_token(creds)
+        )
+    except fyers.FyersCredentialsError as error:
+        verdict = str(error)
+    if verdict is None:
+        typer.echo("Fyers: token accepted, nothing to remind")
+        return
+    how, link = login_nudge.how_to_log_in(
+        "On the laptop: dashboard > Broker logins > Fyers > Log in (or run: mbt login)."
+    )
+    body = f"{verdict.rstrip('.')}.\n{FYERS_REMINDERS[when]}\n{how}"
+    typer.echo(f"Fyers login needed. {body}")
+    if send:
+        notify.send(
+            notify.Notification(
+                "fyers-login-reminder",
+                "action_required",
+                "Log in to Fyers",
+                body,
+                run_url=link,
+                type="broker.fyers",
+            )
+        )
+
+
 @app.command()
 def fetch(
     no_fyers: bool = typer.Option(False, help="Only pull the public sources (cash, silver)."),
@@ -1994,16 +2043,55 @@ def kite_sync_cmd() -> None:
     )
 
 
+@kite_app.command("auto-login")
+def kite_auto_login_cmd(
+    headed: bool = typer.Option(False, help="Show the browser (a manual check of the flow)."),
+    json_out: Path | None = typer.Option(None, help="Also write the outcome here as JSON."),
+) -> None:
+    """Log in to Kite unattended (owner, 2026-10-28; off until KITE_AUTO_LOGIN=on): Kite's own
+    login page with KITE_USER_ID, KITE_PASSWORD and a code from KITE_TOTP_SECRET. Run by the
+    08:02 morning login on Fridays and trading Mondays. A refused password is never retried and
+    holds later runs until the credentials change. Exit 0 = logged in, already logged in or
+    off; 1 = failed."""
+    from . import kite_login
+
+    load_repo_env()
+    outcome = kite_login.auto_login(headed=headed)
+    text = kite_login.outcome_json(outcome)
+    if json_out is not None:
+        json_out.write_text(text + "\n")
+    typer.echo(f"Kite {outcome.status}: {outcome.detail}")
+    if outcome.status == "FAIL":
+        raise typer.Exit(1)
+
+
+KITE_REMINDERS = {
+    # when -> (title, why)
+    "friday": (
+        "Log in to Kite before 14:15",
+        "Your orders at 14:15 read your Kite holdings and free cash.",
+    ),
+    "monday": (
+        "Log in to Kite before the open",
+        "Kite is read only while you are logged in (holdings and free cash, for Your orders).",
+    ),
+}
+
+
 @kite_app.command("remind")
 def kite_remind_cmd(
     send: bool = typer.Option(False, help="Send the reminder to Telegram when a login is needed."),
+    when: str = typer.Option("friday", help="friday (13:30) | monday (08:45): the wording."),
 ) -> None:
-    """Fri 13:30 (scheduler job `kite-login-reminder`): when Kite is the holdings source and today
-    has no valid Kite login, remind the owner to log in before the 14:15 orders. Always exits 0."""
-    from . import holdings_store, kite, notify
+    """Fri 13:30 and Mon 08:45 (scheduler jobs `kite-login-reminder`, `kite-login-reminder-monday`):
+    when Kite is the holdings source and today has no valid Kite login, remind the owner to log in,
+    with a link to the hosted Broker logins page (DASHBOARD_PUBLIC_URL). Always exits 0."""
+    from . import holdings_store, kite, login_nudge, notify
     from .config import load_repo_env
     from .db_read import open_catalog
 
+    if when not in KITE_REMINDERS:
+        raise typer.BadParameter(f"--when must be one of {', '.join(KITE_REMINDERS)}")
     load_repo_env()
     with open_catalog() as con:
         source = holdings_store.settings(con, holdings_store.owner())["holdings_source"]
@@ -2020,21 +2108,23 @@ def kite_remind_cmd(
     if alive:
         typer.echo("Kite: logged in, nothing to remind")
         return
-    body = (
-        "Your orders at 14:15 read your Kite holdings and free cash.\n"
-        "On the laptop: dashboard > Broker logins > Kite > Log in "
-        "(or run: mbt kite login)."
+    title, why = KITE_REMINDERS[when]
+    how, link = login_nudge.how_to_log_in(
+        "On the laptop: dashboard > Broker logins > Kite > Log in (or run: mbt kite login)."
     )
+    body = f"{why}\n{how}"
     if not kite.configured():
         body = "KITE_API_KEY / KITE_API_SECRET are missing from .env, so Kite cannot be read."
+        link = None
     typer.echo(f"Kite login needed. {body}")
     if send:
         notify.send(
             notify.Notification(
                 "kite-login-reminder",
                 "action_required",
-                "Log in to Kite before 14:15",
+                title,
                 body,
+                run_url=link,
                 type="broker.kite",
             )
         )
@@ -2248,6 +2338,81 @@ def journal_check(
         raise typer.Exit(1)
 
 
+@journal_app.command("score")
+def journal_score(
+    rerun: bool = typer.Option(
+        True, help="Also run each scored config on today's code for the 'backtest now' figure."
+    ),
+    save: bool = typer.Option(True, help="Store the result for the Journal page."),
+    as_json: bool = typer.Option(False, "--json", help="Print the stored JSON."),
+) -> None:
+    """BL-024 Phases 2-3: score every journalled signal against the week after it (live at
+    Friday close and Monday open, after the backtest's costs, beside the backtest), and reconcile
+    the real Kite fills against each lot's signal. Read-only on the journal, ledger and catalog;
+    writes only forward_scores.json in the state dir. Sends nothing (the line goes in the headline's
+    Friday message). Scheduled Fridays 20:30 IST (momentum-journal-score)."""
+    from . import forward_run, forward_score, this_week
+
+    result = forward_run.compute_score(rerun=rerun)
+    try:
+        result["fills"] = forward_run.compute_fills()
+    except Exception as error:  # the score still stands without the fills
+        result["fills"] = None
+        result["fills_error"] = f"{type(error).__name__}: {error}"
+    if save:
+        path = forward_score.save(result, this_week.state_dir())
+        typer.echo(f"saved {path}")
+    if as_json:
+        typer.echo(json.dumps(result, indent=1, default=str))
+        return
+    counts: dict[str, int] = {}
+    for item in result["items"]:
+        counts[item["status"]] = counts.get(item["status"], 0) + 1
+    typer.echo(
+        f"{len(result['items'])} signal-weeks: "
+        + ", ".join(f"{n} {status}" for status, n in sorted(counts.items()))
+        + f". Scored weeks: {', '.join(result['scored_weeks']) or 'none yet'}."
+    )
+    for group in result["groups"]:
+        if group["status"] != "scored":
+            continue
+        typer.echo(
+            f"  {group['week']} {group['name']}: live {_signed_pct(group['live']['ideal'])} "
+            f"(Fri close), {_signed_pct(group['live']['achievable'])} (Mon open); backtest "
+            f"{_signed_pct(group['backtest']['recorded'])} as recorded, "
+            f"{_signed_pct(group['backtest']['now'])} on today's code"
+        )
+    for item in result["items"]:
+        if item["status"] == "mismatch":
+            typer.echo(f"  MISMATCH {item['week']} {item['name']}: {'; '.join(item['mismatches'])}")
+    fills = result.get("fills") or {}
+    for group in fills.get("groups", []):
+        for rebalance in group["rebalances"]:
+            done = [r for r in rebalance["rows"] if r["status"] == "done"]
+            other = [
+                f"{r['symbol']} {r['status']}"
+                for r in rebalance["rows"]
+                if r["status"] not in ("done", "held")
+            ]
+            typer.echo(
+                f"  fills {rebalance['week']} {rebalance['lot']}: {len(done)} done"
+                + (f"; {', '.join(other)}" if other else "")
+                + f"; charges ₹{rebalance['totals']['real_charges']:,.2f} (model "
+                f"₹{rebalance['totals']['model_charges']:,.2f}); first-day fills vs Friday close "
+                + (
+                    "n/a"
+                    if rebalance["totals"]["slippage_close_rs"] is None
+                    else f"₹{rebalance['totals']['slippage_close_rs']:+,.0f}"
+                )
+            )
+    if result.get("fills_error"):
+        typer.echo(f"  fills FAILED: {result['fills_error']}")
+
+
+def _signed_pct(value: float | None) -> str:
+    return "n/a" if value is None else f"{value * 100:+.2f}%"
+
+
 @journal_app.command("verify")
 def journal_verify() -> None:
     """Check that no entry was changed, removed or reordered since it was recorded."""
@@ -2294,6 +2459,79 @@ def _audit_runs(bundles: list[Path]) -> dict:
             rp.replay(bundle, market),
         )
     return runs
+
+
+verify_app = typer.Typer(
+    help="Checks that the stored market data still says what it said (BL-001 Phase 4).",
+    no_args_is_help=True,
+)
+app.add_typer(verify_app, name="verify")
+
+
+@verify_app.command("history")
+def verify_history(
+    accept: bool = typer.Option(False, "--accept", help="Take the changes: re-baseline."),
+    reason: str = typer.Option(None, "--reason", help="Why (required with --accept)."),
+    send: bool = typer.Option(False, "--send", help="Send a change to Telegram (never an OK)."),
+    no_bars: bool = typer.Option(False, "--no-bars", help="Skip the stock lake (fast; tests)."),
+) -> None:
+    """Did old history change? Fingerprints every price series, stock bar and corporate action up
+    to a fixed anchor Friday and names each instrument whose history differs from the stored
+    baseline (the first run just records one). New weeks never trip it. Read-only on the shared
+    database (it writes only its baseline file in the state folder). Nothing is ever accepted
+    unasked.
+
+    Exit codes (the Friday scheduler job `momentum-history` runs it with --send and lets the
+    command alert): 0 = no change, or a change whose Telegram was delivered (the message is the
+    alert, as with a live-rules breach, so the scheduler does not alert twice); 1 = a change that
+    reached nobody (no --send, Telegram off or unreachable), or the check could not run (also
+    sent). A baseline recorded under --send is reported too: it means none was found."""
+    from datetime import datetime
+
+    from . import notify, verify
+    from .this_week import state_dir
+
+    if accept and not reason:
+        raise typer.BadParameter("--accept needs --reason")
+    try:
+        outcome = verify.run(
+            state_dir(),
+            datetime.now(notify.IST).date(),
+            accept=accept,
+            reason=reason,
+            bars=not no_bars,
+        )
+        title, body = verify.summary(outcome)
+    except Exception as error:
+        message = notify.redact(f"{type(error).__name__}: {error}")
+        typer.echo(f"history check FAILED: {message}")
+        if send:
+            notify.send(
+                notify.Notification(
+                    "momentum-history",
+                    "error",
+                    "History check could not run",
+                    f"{message}\nRerun it: mbt verify history --send",
+                    type="momentum.problem",
+                )
+            )
+        raise typer.Exit(1) from error
+    typer.echo(f"{title}\n{body}")
+    if outcome.status == "new_baseline" and send:
+        # A scheduled run normally finds a baseline: a new one means the file was missing.
+        notify.send(
+            notify.Notification("momentum-history", "warn", title, body, type="momentum.problem")
+        )
+    if outcome.status == "changed":
+        # The message is the alert (BL-001 Phase 4): delivered = exit 0. A change that reached
+        # nobody fails the run, so the scheduler retries it and the Jobs page shows it. The change
+        # stays unaccepted, so every later check repeats it until `--accept --reason`.
+        delivered = send and notify.deliver(
+            notify.Notification("momentum-history", "warn", title, body, type="momentum.problem")
+        )
+        if not delivered:
+            typer.echo("history changed and no Telegram message was delivered: exit 1")
+            raise typer.Exit(1)
 
 
 @audit_app.command("bundle")
@@ -2381,6 +2619,35 @@ def audit_lookahead(
             failures += bool(found)
             typer.echo(f"{day} {path.stem}: {'same' if not found else '; '.join(found)}")
     if failures:
+        raise typer.Exit(1)
+
+
+@audit_app.command("lookahead-requests")
+def audit_lookahead_requests(
+    favourite: list[str] = typer.Option(
+        [], "--favourite", help="A saved favourite or group by exact name (repeat for several)."
+    ),
+    frozen: Path = typer.Option(None, "--frozen", help="A Phase 6 frozen record (its configs)."),
+    first: int = typer.Option(None, help="With --frozen: only the first N configs."),
+    cut: list[str] = typer.Option(..., help="A cut date, YYYY-MM-DD (repeat for several)."),
+    out: Path = typer.Option(None, "--out", help="Where to write (default data/audit/lookahead)."),
+) -> None:
+    """Whole requests (saved favourites, frozen configs) posted to the real API twice per cut:
+    on the live database stopped at the date, and on a copy holding nothing after it. Covers
+    the `turnover_rank` universe and the followed strategy as saved, which `lookahead` and the
+    golden fixture do not. Exits 1 if any result differs. Needs disk space for one copy of the
+    database per cut date (removed afterwards); never writes to the live database."""
+    from .audit import request_lookahead as rl
+
+    requests: dict[str, dict] = {}
+    if favourite:
+        requests |= rl.requests_from_catalog(favourite)
+    if frozen is not None:
+        requests |= rl.requests_from_frozen(frozen, first=first)
+    if not requests:
+        raise typer.BadParameter("give --favourite and/or --frozen")
+    report = rl.check(requests, cut, out or DATA_DIR / "audit" / "lookahead", echo=typer.echo)
+    if any(found for per_label in report.values() for found in per_label.values()):
         raise typer.Exit(1)
 
 

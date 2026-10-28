@@ -31,7 +31,7 @@ describe('formatReport', () => {
   });
 
   it('with Quantiply counts every login and labels each platform', () => {
-    const report = formatReport([angel, finvasia], 'https://example.test/run/1', qOk);
+    const report = formatReport([angel, finvasia], 'https://example.test/run/1', [qOk]);
     assert.match(report, /\nBroker login: AlgoTest \+ Quantiply, .* IST\n/);
     assert.deepEqual(body(report), [
       '✅ All logins ready (3/3)',
@@ -45,7 +45,7 @@ describe('formatReport', () => {
   });
 
   it('a Quantiply failure is listed first and does not hide the AlgoTest lines', () => {
-    assert.deepEqual(body(formatReport([angel, finvasia], null, qFail)), [
+    assert.deepEqual(body(formatReport([angel, finvasia], null, [qFail])), [
       '⚠️ Partial (2/3) - check now',
       '',
       '❌ Quantiply · Angel One — Invalid PIN - NOT retried, check the ANGELONE_* secrets',
@@ -55,7 +55,7 @@ describe('formatReport', () => {
   });
 
   it('AlgoTest never reaching the broker list still shows the Quantiply line', () => {
-    assert.deepEqual(body(formatReport([], null, qOk)), [
+    assert.deepEqual(body(formatReport([], null, [qOk])), [
       '🚨 AlgoTest login never reached the broker list',
       '',
       '✅ Quantiply · Angel One — logged in (22s)',
@@ -65,18 +65,43 @@ describe('formatReport', () => {
   it('every login failing says so', () => {
     const fail: BrokerResult = { name: 'Angel One', status: 'FAIL', detail: 'x' };
     assert.equal(
-      body(formatReport([fail], null, qFail))[0],
+      body(formatReport([fail], null, [qFail]))[0],
       '❌ All logins failed (0/2) - check now',
     );
   });
 });
 
-it('ONLY=none (BL-140): one SKIPPED line reads as ready, never as a broken run', () => {
-  const report = formatReport(
-    [{ name: 'brokers', status: 'SKIPPED', detail: 'no AlgoTest login in the settings' }],
-    null,
-    { name: 'Quantiply · Angel One', status: 'OK', detail: 'logged in (12s)' },
-  );
-  assert.match(report, /^✅ All logins ready \(2\/2\)/);
-  assert.doesNotMatch(report, /never reached/);
+describe('formatReport with no AlgoTest login in the settings (ONLY=none, BL-140)', () => {
+  const shoonyaFail: BrokerResult = {
+    name: 'Quantiply · Shoonya',
+    status: 'FAIL',
+    detail: 'Invalid Input : Wrong Password - NOT retried',
+  };
+
+  it('names only Quantiply and has no AlgoTest line', () => {
+    const report = formatReport(null, null, [qOk]);
+    assert.match(report, /\nBroker login: Quantiply, .* IST\n/);
+    assert.deepEqual(body(report), [
+      '✅ All logins ready (1/1)',
+      '',
+      '✅ Quantiply · Angel One — logged in (22s)',
+    ]);
+  });
+
+  it('a Quantiply · Shoonya failure counts in the verdict (27 Oct said 2/2 ready)', () => {
+    assert.deepEqual(body(formatReport(null, null, [qOk, shoonyaFail])), [
+      '⚠️ Partial (1/2) - check now',
+      '',
+      '❌ Quantiply · Shoonya — Invalid Input : Wrong Password - NOT retried',
+      '✅ Quantiply · Angel One — logged in (22s)',
+    ]);
+  });
+
+  it('nothing switched on says so, never a broken run', () => {
+    const report = formatReport(null, null, []);
+    assert.match(report, /^✅ Nothing to log in/);
+    assert.match(report, /\nBroker login, .* IST\n/);
+    assert.doesNotMatch(report, /AlgoTest/);
+    assert.doesNotMatch(report, /never reached/);
+  });
 });

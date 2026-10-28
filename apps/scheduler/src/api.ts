@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, sep } from 'node:path';
-import { NOTIFICATION_TYPES, disabledTypes, prefsPath } from '@trading/notify';
+import { type Level, NOTIFICATION_TYPES, levelOf, prefsPath } from '@trading/notify';
 import {
   type GhRunner,
   ROW_KEYS,
@@ -77,10 +77,17 @@ function tail(path: string, lines: number): string {
   return all.slice(-lines).join('\n');
 }
 
-function writePrefs(path: string, disabled: string[]): void {
+/**
+ * BL-173: `levels` per type (all / failures / off) and, for readers that predate it, `disabled`
+ * (the types at off). Atomic: written beside, then renamed.
+ */
+function writePrefs(path: string, levels: Record<string, Level>): void {
   mkdirSync(dirname(path), { recursive: true });
   const tmp = `${path}.${process.pid}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify({ disabled }, null, 2)}\n`);
+  const disabled = Object.keys(levels)
+    .filter((t) => levels[t] === 'off')
+    .sort();
+  writeFileSync(tmp, `${JSON.stringify({ levels, disabled }, null, 2)}\n`);
   renameSync(tmp, path);
 }
 
@@ -177,13 +184,11 @@ export function createApi({
   }
 
   function listNotifications(): Response {
-    const off = disabledTypes(prefs());
     return json(
-      Object.entries(NOTIFICATION_TYPES).map(([type, description]) => ({
-        type,
-        description,
-        enabled: !off.has(type),
-      })),
+      Object.entries(NOTIFICATION_TYPES).map(([type, description]) => {
+        const level = levelOf(type, prefs());
+        return { type, description, enabled: level !== 'off', level };
+      }),
     );
   }
 
@@ -194,13 +199,25 @@ export function createApi({
     } catch {
       return fail(400, 'body must be JSON');
     }
+    // BL-173: `{"levels": {type: all|failures|off}}`; the older `{"disabled": [...]}` still works
+    // (every listed type off, every other type back to its default).
+    const levels = (body as { levels?: unknown } | null)?.levels;
     const disabled = (body as { disabled?: unknown } | null)?.disabled;
-    if (!Array.isArray(disabled) || !disabled.every((t) => typeof t === 'string')) {
-      return fail(400, 'body must be {"disabled": string[]}');
+    let next: Record<string, Level>;
+    if (levels && typeof levels === 'object' && !Array.isArray(levels)) {
+      const entries = Object.entries(levels as Record<string, unknown>);
+      const bad = entries.filter(([, v]) => v !== 'all' && v !== 'failures' && v !== 'off');
+      if (bad.length)
+        return fail(400, `levels must be all, failures or off: ${bad.map(([t]) => t).join(', ')}`);
+      next = Object.fromEntries(entries) as Record<string, Level>;
+    } else if (Array.isArray(disabled) && disabled.every((t) => typeof t === 'string')) {
+      next = Object.fromEntries((disabled as string[]).map((t) => [t, 'off' as Level]));
+    } else {
+      return fail(400, 'body must be {"levels": {type: level}} or {"disabled": string[]}');
     }
-    const unknown = disabled.filter((t) => !(t in NOTIFICATION_TYPES));
+    const unknown = Object.keys(next).filter((t) => !(t in NOTIFICATION_TYPES));
     if (unknown.length > 0) return fail(400, `unknown notification types: ${unknown.join(', ')}`);
-    writePrefs(prefs(), [...new Set(disabled)].sort());
+    writePrefs(prefs(), next);
     return listNotifications();
   }
 

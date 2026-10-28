@@ -11,6 +11,17 @@ open that setting), and the actions: reload prices, copy a shareable link, **Set
 settings open in a drawer from the right) and **Run momentum backtest**. The round arrow beside
 Run re-runs from scratch, dropping the server's caches.
 
+## Before you run anything
+
+Opened plainly (no dataset in the address, no run kept from earlier), Backtest shows the
+**headline favourite's latest saved run** instead of an empty page: its CAGR, edge over the
+benchmark, maximum drawdown, Sharpe and its equity line, with the line *Showing the saved run of
+12 Oct. Run to refresh.* Its settings are loaded into the run bar, so **Run** re-runs exactly it on
+today's data; nothing runs until you press it. When the headline is a
+[group](glossary:favourite-group), the figures are its sleeves' blend (as on
+[Saved runs](app:/momentum/saved)) and the run bar keeps the dataset's defaults, since a group has
+no single set of settings to run.
+
 ## The benchmark picker
 
 The headline card compares everything with one [benchmark](glossary:benchmark), picked on the
@@ -84,8 +95,14 @@ screen. Markers show the weeks it bought, sold, topped up or trimmed.
 - **Click** a week to pin its full detail in the chart's corner: everything sold (with how long
   it was held, its return and why), everything bought, and the holdings after. **← →** step to
   the previous or next rebalance; **Esc** or × unpins.
-- The legend under the plot toggles each line; **+ Nifty 50** and the like add the other
-  indices. **Drawdown pane** adds the drawdown and 52-week-edge panes under the curve.
+- The legend under the plot toggles each line. Besides the picked benchmark, two comparison
+  lines are drawn from the start: **Nifty 200 Momentum 30** (the momentum index) and **Nifty
+  Midcap 150**, the bar the [evaluation review](https://github.com/RahulSunnyCS/ai-trading-agent/blob/main/packages/momentum-backtesting/docs/evaluation-review.md)
+  set for a strategy (whichever of them is the picked benchmark is drawn as the benchmark line
+  instead). **+ Nifty Smallcap 250**, **+ Nifty 500**, **+ Nifty 50** and the like add the
+  others; click a drawn one to take it off. Nifty 500 is a chart line only, not in the picker.
+  An index with no data for the run's whole period is not offered. **Drawdown pane** adds the
+  drawdown and 52-week-edge panes under the curve.
 
 Look for *when* the edge was earned: steadily, or in one lucky stretch? A result that comes
 from one year is fragile.
@@ -99,7 +116,7 @@ benchmark, not the one picked on the headline.
 
 | Section | What it shows |
 |---|---|
-| This week | The run's last week: each candidate's rank, score and action, beside the open positions. On a slower cadence a week the strategy does not trade says "Not a rebalance week" and names the next trading Friday. For Broad the actions are the engine's own, so a stock above "Max price to buy ₹" is never shown as a buy: one that ranks high enough to be bought shows **SKIP (above max price)** with its price, and the next-best stock takes its slot. Not for an **All (split)** run: it shows the open positions only (see below). |
+| This week | The run's last week: each candidate's rank, score and action, beside the open positions. On a slower cadence a week the strategy does not trade says "Not a rebalance week" and names the next trading Friday; a week it does trade says so and names the next one too ("Next rebalance Friday: …"). For Broad the actions are the engine's own, so a stock above "Max price to buy ₹" is never shown as a buy: one that ranks high enough to be bought shows **SKIP (above max price)** with its price, and the next-best stock takes its slot. Not for an **All (split)** run: it shows the open positions only (see below). |
 | Yearly returns | Each calendar year against the benchmark. Count the losing years. |
 | Rolling 1-year return | The return over every trailing 52 weeks, and how often the strategy was ahead. |
 | Friday luck | Only for an **All (split)** run. Each Friday set on its own (CAGR, max drawdown, Ulcer) next to the whole account, and the gap between the luckiest and unluckiest. |

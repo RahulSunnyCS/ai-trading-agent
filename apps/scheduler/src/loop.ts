@@ -1,4 +1,4 @@
-import { type AlertSink, alertMissed, alertResult } from './alerts.js';
+import { type AlertSink, alertMissedAll, alertResult } from './alerts.js';
 import type { History } from './history.js';
 import type { Job } from './jobs.js';
 import { type RunContext, runJob } from './runner.js';
@@ -112,23 +112,26 @@ export function startLoop({
     } catch (error) {
       console.error(`reap: ${String(error)}`);
     }
+    const missed: Array<{ job: Job; slot: Date }> = [];
     for (const { job, since } of watched) {
       if (inFlight.has(job.id)) continue;
       try {
-        handle(job, since);
+        handle(job, since, missed);
       } catch (error) {
         // A bookkeeping failure (say a locked database) must not take the whole scheduler down.
         console.error(`${job.id}: tick failed: ${String(error)}`);
       }
     }
+    // BL-173: one message for every slot this pass found missed
+    void alertMissedAll(alerts, missed);
   };
 
-  const handle = (job: Job, since: Date) => {
+  const handle = (job: Job, since: Date, missed: Array<{ job: Job; slot: Date }>) => {
     const decision = decide(job, now(), ctx.history, since);
     if (decision.kind === 'missed') {
       const reason = `missed: the scheduler was not running at ${formatIst(decision.slot)} IST`;
       ctx.history.recordMissed(job.id, decision.slot, now(), reason);
-      void alertMissed(alerts, job, decision.slot);
+      missed.push({ job, slot: decision.slot });
     } else if (decision.kind === 'run') {
       inFlight.add(job.id);
       console.log(`${formatIst(now())} start ${job.id} (${decision.trigger})`);

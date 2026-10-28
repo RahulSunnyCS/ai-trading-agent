@@ -1,6 +1,6 @@
 # Options: correlation between strategies
 
-**Status:** Descriptive · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-10-28
 
 ## What it is
 
@@ -13,7 +13,8 @@ mean less spread ([BL-065][bl065]), closest-premium variants are near-copies of 
 
 ## Live value
 
-No correlation rule in any list. The tool exists: `obt rotation corr` / `corr-list` / `corr-pick`,
+No correlation rule in any list, and none is planned: the registered cap was killed on the research
+history ([BL-090][bl090] Phase 3, 2026-10-28). The tool exists: `obt rotation corr` / `corr-list` / `corr-pick`,
 the API route and Options Lab › Correlation ([BL-090][bl090]). `corr-pick` is a diagnostic and ranks
 in-sample.
 
@@ -22,7 +23,7 @@ in-sample.
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
 | BL-090 Phases 1–2b | The 09:17 set of ten strategies | 486 common days, 2024-10-09 → 2026-10-09, in-sample, gross | Descriptive (below) | [BL-090][bl090] |
-| BL-090 Phase 3 | Cap "no two picks above trailing correlation c" at 0.5 / 0.6 / 0.7 (63-day Pearson) on lists A / B / C / REF | P1, P2, P3; forward hold-out | **Registered, not run** | [BL-090][bl090] |
+| BL-090 Phase 3 | Cap "no two picks above trailing correlation c" in `score.select` at 0.5 / 0.6 / 0.7 (63-day Pearson) on lists A / B / C / REF, 248 variants | BL-075's P1, P2, P3 (P3 NIFTY only), before charges, lists in-sample | **Killed** for all 12 cap x list cells (pass needed 2 of 3 periods; best was 1); the forward hold-out is not read | [BL-090][bl090], `research/bl090/phase3_history_2026-10-28.json` |
 | BL-101 | Long ATM straddle vs the fixed base | NIFTY, 2024-01 → 2026-10, after charges | Correlation −0.46, yet the hedge made the tail worse; **killed** | [BL-101][bl101] |
 
 First read on the 09:17 ten ([BL-090][bl090] Log):
@@ -47,16 +48,22 @@ The equal-lot basket of all ten drew down ₹1,64,531 against ₹3,19,113 for th
   every tail measure worse, because it paid little on the base's bad days and lost its premium on the
   quiet ones ([BL-101][bl101]). Loss-day overlap matters more than average correlation; `corr` prints it
   beside Pearson for that reason.
+- A trailing-correlation cap on the lists cuts drawdown more often than not (22 of 36 list x cap x
+  period cells at least 10% shallower) but costs net: only 5 of 36 keep net within 5%, and in P2
+  (Jan–Aug 2025) every cap loses 28% to 105% of net. Killed under the registered rule for every list and
+  cap ([BL-090][bl090] Phase 3; before charges, in-sample lists, P3 NIFTY only). Forcing look-alikes out
+  pushes the ranking down to picks it scores lower, and that cost more than the spread saved.
 - One `corr-pick` draw (09:17, k = 3, cap 0.6) cost P&L and did not cut drawdown against the uncapped
-  pick (net ₹5,10,846 / −₹59,504 vs ₹5,53,053 / −₹47,545). One draw, not evidence.
+  pick (net ₹5,10,846 / −₹59,504 vs ₹5,53,053 / −₹47,545). One draw, not evidence; Phase 3 above is
+  the test.
 - Buy's negative correlation may be why the Buy add-on helps the rotation's gross even though Buy
   loses alone; that link has not been tested ([Buy](../strategies/buy-breakout/README.md)).
 
 ## Not yet tested
 
-- Phase 3 of BL-090 (the cap on the lists), under its committed pre-registration: pass if drawdown falls
-  by at least 10% with net no more than 5% lower, in two of three periods; then once on the forward
-  journal after 60 days.
+- A cap on loss-day overlap rather than Pearson, or a cap on the 298-variant forward universe: not
+  registered (BL-090's Phase 0 rules out other measures for that test); a new item would need its own
+  pre-registration.
 - Whether to keep Buy as a named hedge or let the cap decide (BL-090 open question).
 
 ## Related

@@ -104,3 +104,59 @@ export function shapeLabel(s: LiveShape): string {
 export function shapeThin(s: LiveShape): boolean {
   return s.variant_days < 5;
 }
+
+/** The live state of one Daily log day, for one book (dashboard review, 2026-10-28). */
+export interface LogLive {
+  state: 'before' | 'waiting' | 'not_captured' | 'captured';
+  /** Σ slippage ÷ Σ strategies over the book's groups: live − paper per lot-day, after costs. */
+  perLotDay: number | null;
+  /** One line per platform + broker, and the day's flags, for the tooltip. */
+  detail: string;
+}
+
+/**
+ * Where a Daily log row stands against the 15:40 live capture, for `book` (`core` for Adaptive
+ * Classic): before the first captured day, waiting (today, its capture not run yet), not captured
+ * (any other day with no capture), or captured with the book's slippage per
+ * lot-day. Both sides are after the same estimated costs, which is why the log shows the gap and
+ * not live beside its gross paper figure. A missing figure is a state, never a zero.
+ */
+export function liveForLog(
+  data: RotationLiveResponse | null,
+  day: string,
+  book = 'core',
+  /** Today (IST): only today can still be waiting for its 15:40 capture. */
+  today: string | null = null,
+): LogLive | null {
+  // A response of another shape (an error page, a proxy reply) is no answer, never a crash.
+  if (data === null || !Array.isArray(data.captured_days) || !Array.isArray(data.days)) return null;
+  const captured = [...data.captured_days].sort();
+  const first = captured[0];
+  const last = captured[captured.length - 1];
+  const entry = data.days.find((d) => d.day === day);
+  if (!entry) {
+    if (first === undefined || day < first) {
+      return { state: 'before', perLotDay: null, detail: 'Before the live capture began' };
+    }
+    if (last !== undefined && day > last && (today === null || day >= today)) {
+      return { state: 'waiting', perLotDay: null, detail: 'The 15:40 capture has not read it yet' };
+    }
+    return { state: 'not_captured', perLotDay: null, detail: 'Not captured: no live file' };
+  }
+  if (!entry.captured) {
+    return { state: 'not_captured', perLotDay: null, detail: 'Not captured: no live file' };
+  }
+  const groups = entry.groups.filter((g) => g.book === book);
+  const variants = groups.reduce((n, g) => n + g.variants, 0);
+  const slip = groups.reduce((n, g) => n + g.slippage, 0);
+  const lines = groups.map(
+    (g) =>
+      `${groupLabel(g)}: live ${formatInr(g.live, { sign: true })}, paper ${formatInr(g.paper, { sign: true })}, slippage ${slippageText(g.slippage, g.slippage_pct)} over ${g.variants} ${g.variants === 1 ? 'strategy' : 'strategies'} (a lot each, after costs)`,
+  );
+  const badges = dayBadges(entry).map((b) => b.text);
+  const detail = [
+    ...(lines.length ? lines : ['None of this book’s strategies was compared that day']),
+    ...(badges.length ? [`The day's flags, every platform and list: ${badges.join(', ')}`] : []),
+  ].join('\n');
+  return { state: 'captured', perLotDay: variants > 0 ? slip / variants : null, detail };
+}

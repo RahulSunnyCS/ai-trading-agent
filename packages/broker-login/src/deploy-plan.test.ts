@@ -5,6 +5,7 @@ import {
   cardShows,
   istMinutes,
   minutesOf,
+  nothingOnAlgotest,
   parseCards,
   parseLive,
   planDeploy,
@@ -294,4 +295,22 @@ test('secondsUntil counts to the start of the entry minute in IST', () => {
   // 09:16:40 IST = 03:46:40 UTC
   assert.equal(secondsUntil(minutesOf('09:17'), new Date('2026-10-19T03:46:40Z')), 20);
   assert.ok(secondsUntil(minutesOf('09:17'), new Date('2026-10-19T03:47:05Z')) < 0);
+});
+
+test('nothingOnAlgotest: a deploy needs an AlgoTest row that uploads the book', () => {
+  assert.equal(nothingOnAlgotest(['t1'], 't1', false, [], '2026-10-27'), null);
+  assert.match(
+    nothingOnAlgotest([], 't1', false, ['2026-10-27'], '2026-10-27') ?? '',
+    /uploads the T1 list: nothing to deploy/,
+  );
+  assert.match(nothingOnAlgotest(['core'], 't1', false, [], '2026-10-27') ?? '', /T1/);
+});
+
+test('nothingOnAlgotest: the 15:35 check still runs after a deploy today', () => {
+  assert.equal(nothingOnAlgotest(['t1'], 't1', true, [], '2026-10-27'), null);
+  assert.equal(nothingOnAlgotest([], 't1', true, ['2026-10-27'], '2026-10-27'), null);
+  assert.match(
+    nothingOnAlgotest([], 't1', true, ['2026-10-26'], '2026-10-27') ?? '',
+    /deployed nothing today: nothing to check/,
+  );
 });

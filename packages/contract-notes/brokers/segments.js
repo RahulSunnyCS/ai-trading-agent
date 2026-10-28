@@ -48,7 +48,7 @@ function classifySegment(label) {
 //
 // Returns Decimal instances, not plain numbers: these are real-money rupee
 // amounts that get summed, subtracted and compared across several rows
-// downstream (brokers/finvasia.js, brokers/angelone.js, ../updateSheet.js),
+// downstream (brokers/finvasia.js, brokers/angelone.js, ../record.js),
 // and native JS number arithmetic is not exact for base-10 fractions (e.g.
 // 0.1 + 0.2 === 0.30000000000000004). Constructing the Decimal directly from
 // the matched digit string (after stripping thousands separators) — rather

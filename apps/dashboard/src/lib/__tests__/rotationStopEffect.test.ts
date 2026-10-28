@@ -11,7 +11,7 @@ import {
   amountOf,
   buttonLabel,
 } from '../portfolioStop';
-import { baseCard } from '../rotationListCards';
+import { baseBook } from '../rotationBooks';
 import { overlayBase, stopEffect, stopEffectRows } from '../rotationPortfolioView';
 
 function row(
@@ -124,27 +124,26 @@ const summary = {
   ],
 } as unknown as RotationSummary;
 
-describe('the Fixed base card', () => {
+describe('the Fixed base row', () => {
   it('reads the read-out’s base over the same sessions, with no gap to itself', () => {
-    const c = baseCard(summary);
-    expect(c).toMatchObject({ id: 'BASE', key: null, isBase: true, name: 'Fixed base' });
-    expect(c.note).toMatch(/2 × NIFTY Widesl OTM1 09:17 \+ 1 × NIFTY Dir ATM 09:24/);
+    const c = baseBook(summary);
+    expect(c.id).toBe('BASE');
     expect(c.latest).toEqual({ day: '2026-10-13', total: -600 });
     expect(c.total).toBe(600);
     expect(c.maxDrawdown).toBe(-50);
-    expect(c.vsBase).toBeNull();
-    const empty = baseCard({ ...summary, n_days: 0, days: [] } as RotationSummary);
+    expect(c.vsBenchmark).toBeNull();
+    const empty = baseBook({ ...summary, n_days: 0, days: [] } as RotationSummary);
     expect([empty.latest, empty.total, empty.maxDrawdown]).toEqual([null, null, null]);
   });
 
-  it('follows its own stop, and only its card: the list figures are left alone', () => {
+  it('follows its own stop, and only its row: the list figures are left alone', () => {
     const b = book('BASE', [['2026-10-13', row(-600, -400, '11:00')]]);
     const s = overlayBase(summary, b);
     expect(s.days?.[1]?.base_total).toBe(-400);
     expect(s.days?.[1]?.base).toBeCloseTo(-400 / 3, 6);
     expect(s.base?.total).toBe(1200 - 400);
     expect(s.base?.max_drawdown).toBe(-400);
-    expect(baseCard(s).total).toBe(800);
+    expect(baseBook(s).total).toBe(800);
     // a day that no longer replays to its stored figure keeps the registered one
     const stale = book('BASE', [['2026-10-13', row(-600, -400, '11:00', { matches_log: false })]]);
     expect(overlayBase(summary, stale)).toBe(summary);

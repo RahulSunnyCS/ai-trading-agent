@@ -99,7 +99,7 @@ def build_forensics(
                 "gross": round(pnl, 2),
                 "costs": round(costs, 2),
                 "net": round(pnl - costs, 2),
-                "sl_hits": sum(1 for t in mine if t.exit_reason == "SL"),
+                "sl_hits": sum(1 for t in mine if t.exit_reason in ("SL", "TRAIL")),
                 "target_hits": sum(1 for t in mine if t.exit_reason == "TARGET"),
                 "reentries": max(0, len(mine) - 1),
             }

@@ -4,7 +4,8 @@ a hash, so the picks, the journal and the scoring are exactly what they were; on
 changes.
 
 Morning (09:16): Adaptive, then the T1 track, in one vertical message. Evening (16:00): the day's
-result for both, then tomorrow's strategies in full. Strategy names come from `labels.label`, so
+result for both, then tomorrow's strategies in full. The owner and the friends' group get the same
+text, except the owner's evening live-vs-paper lines. Strategy names come from `labels.label`, so
 every line says what the strategy does (`N_widesl_OTM1` and its stop loss, trail, re-entry and
 overall stop) instead of an id.
 """
@@ -20,15 +21,17 @@ from .lists import DISPLAY_NAMES
 ADAPTIVE_KEY = "C"
 NUMBERS = ("1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣")
 SEPARATOR = "━━━━━━━━━━━━━━━"
-T1_HEAD = "🧪 T1 · TESTING PHASE · not traded"
-T1_NOT_RECORDED = "🧪 T1 · TESTING PHASE · not recorded today"
+#: what the messages call the T1 track (owner, 2026-10-28); alerts and logs still say T1
+T1_NAME = "Tuned Adaptive (In Testing phase)"
+T1_HEAD = f"🧪 {T1_NAME}"
+T1_NOT_RECORDED = f"{T1_HEAD} · not recorded today"
 #: the morning note when T1 is still being recorded (slow, or its results being caught up): it
 #: follows as a message of its own, or an alert says it failed
-T1_FOLLOWS = "🧪 T1 · TESTING PHASE · follows in a separate message"
+T1_FOLLOWS = f"{T1_HEAD} · follows in a separate message"
 #: the evening message's T1 notes
-T1_RESULT_NOT_READY = "🧪 T1 · result not ready"
-T1_RESULT_NOT_RECORDED = "🧪 T1 · not recorded today"
-T1_TOMORROW_NOT_READY = "🧪 T1 · not ready"
+T1_RESULT_NOT_READY = f"{T1_HEAD} · result not ready"
+T1_RESULT_NOT_RECORDED = T1_NOT_RECORDED
+T1_TOMORROW_NOT_READY = f"{T1_HEAD} · not ready"
 LATE_LINE = "⚠️ LATE · not a forward entry"
 MINUS = "−"
 
@@ -209,25 +212,21 @@ def render_morning(
     t1_options: dict[str, dict[str, str | None]] | None = None,
     t1_note: str = T1_NOT_RECORDED,
     previous: dict | None = None,
-) -> tuple[str, str]:
-    """(the owner's message, the group's copy). The owner sees Adaptive, then the T1 track (or,
-    with no T1 entry, `t1_note`: not recorded, or follows separately); the group sees Adaptive
-    alone. Both end with the Adaptive entry's chain hash. `previous` is the list the evening
-    message sent for this session (`result.read_tentative`): each list then says whether it
-    changed."""
+) -> str:
+    """The 09:16 message, the same for the owner and the friends' group: Adaptive, then the T1
+    track (or, with no T1 entry, `t1_note`: not recorded, or follows separately), ending with the
+    Adaptive entry's chain hash. `previous` is the list the evening message sent for this session
+    (`result.read_tentative`): each list then says whether it changed."""
     previous = previous or {}
     adaptive = _adaptive_block(
         live, (live_options or {}).get(ADAPTIVE_KEY), previous.get("adaptive")
     )
-    prefix = _late_prefix(live)
-    group = "\n".join([*prefix, *adaptive, "", footer(live)])
     t1_lines = (
         [t1_note]
         if t1 is None
         else _t1_block(t1, (t1_options or {}).get(ADAPTIVE_KEY), previous=previous.get("t1"))
     )
-    private = "\n".join([*prefix, *adaptive, "", SEPARATOR, *t1_lines, "", footer(live)])
-    return private, group
+    return "\n".join([*_late_prefix(live), *adaptive, "", SEPARATOR, *t1_lines, "", footer(live)])
 
 
 # -- evening ------------------------------------------------------------------------------------
@@ -269,8 +268,8 @@ def render_result(
     live: Sequence[str] | None = None,
 ) -> str:
     """The evening message. `adaptive` and `t1` are (total, [(strategy, rupees)]); either may be
-    None to leave that list out (the group's copy has no T1; the T1 follow-up has no Adaptive), and
-    `t1` may be a note (`🧪 T1 · result not ready`). `tomorrow_adaptive` / `tomorrow_t1` are
+    None to leave that list out (the T1 follow-up has no Adaptive), and
+    `t1` may be a note (`T1_RESULT_NOT_READY`). `tomorrow_adaptive` / `tomorrow_t1` are
     `tomorrow.NextPicks` (T1's may be a note); with neither there is no tomorrow section. `live` is
     BL-141's live-vs-paper block (`live_compare.message_lines`), for the owner's copy only."""
     lines = [f"📊 {day_text(day)} · {heading}", "1 lot per strategy, after costs"]
@@ -279,7 +278,7 @@ def render_result(
     if isinstance(t1, str):
         lines += ["", t1]
     elif t1 is not None:
-        lines += ["", *result_block("🧪", "T1", *t1)]
+        lines += ["", *result_block("🧪", T1_NAME, *t1)]
     if live:
         lines += ["", *live]
     first = tomorrow_adaptive or (None if isinstance(tomorrow_t1, str) else tomorrow_t1)
@@ -290,8 +289,10 @@ def render_result(
         lines.append("")
         if tomorrow_adaptive is not None:
             lines += _next_lines(_with_dte("🎯 Adaptive", tomorrow_adaptive.dte), tomorrow_adaptive)
+            if tomorrow_t1 is not None:
+                lines += ["", SEPARATOR]  # the two lists apart, as in the morning message
         if isinstance(tomorrow_t1, str):
             lines.append(tomorrow_t1)
         elif tomorrow_t1 is not None:
-            lines += _next_lines("🧪 T1", tomorrow_t1)
+            lines += _next_lines(T1_HEAD, tomorrow_t1)
     return "\n".join(lines)

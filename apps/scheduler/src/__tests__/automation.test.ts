@@ -85,6 +85,7 @@ describe('effective and the GitHub variables', () => {
       upload: false,
       multiplier: 1,
       addon: true,
+      mtmSl: 8000,
     });
     const { vars, withheld } = githubVariables(s);
     expect(vars).toMatchObject({
@@ -235,6 +236,7 @@ describe('API /settings/automation', () => {
       upload: true,
       multiplier: 1,
       addon: true,
+      mtmSl: 8000,
     });
     expect(body.github.QUANTIPLY_LOGIN).toBe('on');
   });
@@ -374,5 +376,37 @@ describe('multiplier, add-on and pause (BL-140 Phase 4)', () => {
     expect(snapshot.pause).toEqual({ until: null });
     expect(snapshot.rows['quantiply.angelone'].multiplier).toBe(1);
     store.close();
+  });
+});
+
+describe('MTM SL per Quantiply row (BL-172)', () => {
+  it('settings saved before the field read as the list stop on Quantiply, none on AlgoTest', () => {
+    const old = structuredClone(DEFAULT_SETTINGS) as unknown as {
+      rows: Record<string, Record<string, unknown>>;
+    };
+    for (const row of Object.values(old.rows)) row.mtmSl = undefined;
+    old.rows['quantiply.finvasia'] = { ...old.rows['quantiply.finvasia'], list: 't1' };
+    const read = withDefaults(old as unknown as AutomationSettings);
+    expect(read.rows['quantiply.angelone'].mtmSl).toBe(8000);
+    expect(read.rows['quantiply.finvasia'].mtmSl).toBe(9000);
+    expect(read.rows['algotest.finvasia'].mtmSl).toBeNull();
+  });
+
+  it('refuses a missing, fractional or out-of-range figure, and any figure on AlgoTest', () => {
+    for (const [key, bad] of [
+      ['quantiply.angelone', undefined],
+      ['quantiply.angelone', 8000.5],
+      ['quantiply.angelone', 100],
+      ['quantiply.angelone', '8000'],
+      ['algotest.finvasia', 8000],
+    ] as const) {
+      const s = structuredClone(DEFAULT_SETTINGS);
+      (s.rows[key] as unknown as Record<string, unknown>).mtmSl = bad;
+      const out = validate(s);
+      expect('errors' in out && out.errors.join()).toContain('mtmSl');
+    }
+    const ok = structuredClone(DEFAULT_SETTINGS);
+    ok.rows['quantiply.angelone'].mtmSl = null;
+    expect('settings' in validate(ok)).toBe(true);
   });
 });

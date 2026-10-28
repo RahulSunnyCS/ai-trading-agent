@@ -39,8 +39,13 @@ describe('Options Lab section metadata', () => {
     expect(seen).toEqual(['Today', 'Explore data', 'Build and test', 'Advanced']);
   });
 
-  it('lists every section in the sidebar, and no retired one', () => {
-    expect(children().some((child) => child.hidden)).toBe(false);
+  it('lists every section in the sidebar but the archived Regimes, and no retired one', () => {
+    expect(
+      children()
+        .filter((child) => child.hidden)
+        .map((child) => child.segment),
+    ).toEqual(['regimes']);
     expect(children().map((child) => child.segment)).not.toContain('results');
+    expect(children().map((child) => child.segment)).not.toContain('runs');
   });
 });

@@ -18,7 +18,7 @@ ITM1, ₹3,000 overall stop, 21% leg stop, one re-entry at cost, exit 15:28
 
 | Item | Values tried | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
-| BL-166 | ITM2, ITM3 x overall stop {3,000, 4,000, 5,000, 6,000, 8,000, 10,000}; 25 start times; NIFTY and SENSEX; against ITM1 at ₹3,000 | 2024-10-09 → 2026-10-23; stop matched on the fit year, judged on the hold-out year from 2025-10-09; net after charges, 1 lot | **POC passes on SENSEX** (ITM2 +₹54, ITM3 +₹78 per slot-day, intervals above zero); **NIFTY inconclusive** (+₹36 and +₹44, intervals include zero) | [BL-166][bl166] |
+| BL-181 | ITM2, ITM3 x overall stop {3,000, 4,000, 5,000, 6,000, 8,000, 10,000}; 25 start times; NIFTY and SENSEX; against ITM1 at ₹3,000 | 2024-10-09 → 2026-10-23; stop matched on the fit year, judged on the hold-out year from 2025-10-09; net after brokerage only (no STT or exchange fees), 1 lot | **POC passes on SENSEX** (ITM2 +₹54, ITM3 +₹78 per slot-day, intervals above zero); **NIFTY inconclusive** (+₹36 and +₹44, intervals include zero) | [BL-181][bl181] |
 
 ## What we know
 
@@ -40,6 +40,10 @@ ITM1, ₹3,000 overall stop, 21% leg stop, one re-entry at cost, exit 15:28
 - **Surviving four tests.** At a 97.5% interval (Bonferroni for the four comparisons) the SENSEX
   hold-out gains stay above zero: ITM2 +₹54 (+13 to +98), ITM3 +₹78 (+3 to +154), the latter only
   just. NIFTY stays inconclusive (+36: −41 to +119; +44: −68 to +165).
+- **Only brokerage was charged.** STT and the exchange fee grow with the premium sold, which favours the
+  deeper strikes. Under the BL-063 charge model (a sample: 3 slots, every third hold-out day) the extra
+  statutory charge against ITM1 is about ₹6 (ITM2) and ₹11 (ITM3) a slot-day on SENSEX and ₹10 and ₹21
+  on NIFTY. The 90% verdicts stand; SENSEX ITM3 no longer clears zero at 97.5% (lower bound about −₹8).
 - **Caveats:** the fit-year intervals all include zero; the engine fills with no spread, and nothing
   was checked about the zero-volume minutes it forward-fills on thin deep strikes, so ITM2 and ITM3 may
   look better than they would trade; ATM and ITM1 carry settings tuned for them; one hold-out year.
@@ -51,4 +55,4 @@ ITM1, ₹3,000 overall stop, 21% leg stop, one re-entry at cost, exit 15:28
 - Larger time frames (NIFTY 2022 → 2024 on the imported data), ITM4 and deeper, and putting ITM2 or
   ITM3 into the rotation's ranking: the next step if the owner wants it.
 
-[bl166]: ../../../../backlog/BL-166-directional-itm2-itm3-with-matched-stop.md
+[bl181]: ../../../../backlog/BL-181-directional-itm2-itm3-with-matched-stop.md

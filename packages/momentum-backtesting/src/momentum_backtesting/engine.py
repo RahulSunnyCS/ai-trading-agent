@@ -382,19 +382,28 @@ def ranked_universe(names: dict[str, str], config: Config) -> list[str]:
     return chosen
 
 
-def compute_ranks(prices: pd.DataFrame, config: Config) -> tuple[pd.DataFrame, pd.DataFrame]:
+def compute_ranks(
+    prices: pd.DataFrame, config: Config, cross_section: pd.DataFrame | None = None
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """(final rank, composite score) per instrument per week. Only uses prices up to each week.
-    Dispatches on `config.score`; see _compute_ranks_{ranksum,voladj,blend} below."""
+    Dispatches on `config.score`; see _compute_ranks_{ranksum,voladj,blend} below.
+
+    `cross_section` (week x instrument booleans, BL-001 F6): who may be ranked each week. The
+    ranks and the voladj z-scores are taken across the instruments that have a value that week;
+    with a table here, an instrument outside it that week gets no rank and takes no part in the
+    mean, spread or rank positions the others are measured against. Broad passes its point-in-time
+    members behind the tradability gate, so a stock that joins the universe years later cannot
+    move an earlier week's ranks. None (every other caller) ranks everything with a value."""
     if config.score == "ranksum":
-        return _compute_ranks_ranksum(prices, config)
+        return _compute_ranks_ranksum(prices, config, cross_section)
     if config.score == "voladj":
-        return _compute_ranks_voladj(prices, config)
+        return _compute_ranks_voladj(prices, config, cross_section)
     if config.score == "residual":
         raise ValueError(
             "score='residual' needs factor returns: Broad builds it in "
             "categories.residual (compute_universe_base)"
         )
-    return _compute_ranks_blend(prices, config)
+    return _compute_ranks_blend(prices, config, cross_section)
 
 
 def _rank_from_score(
@@ -428,13 +437,30 @@ def _rank_from_score(
     return pd.DataFrame(out, index=score.index, columns=score.columns)
 
 
+def _within(eligible: pd.DataFrame, cross_section: pd.DataFrame | None) -> pd.DataFrame:
+    """`eligible` limited to the week's cross-section (see `compute_ranks`)."""
+    if cross_section is None:
+        return eligible
+    missing_weeks = eligible.index.difference(cross_section.index)
+    missing_columns = eligible.columns.difference(cross_section.columns)
+    if len(missing_weeks) or len(missing_columns):
+        # Filling these with False would rank nobody that week and look like "no signal".
+        raise ValueError(
+            f"cross_section lacks {len(missing_weeks)} weeks and {len(missing_columns)} columns "
+            f"of the prices (first: {list(missing_weeks[:2])}, {list(missing_columns[:2])})"
+        )
+    return eligible & cross_section.reindex_like(eligible).fillna(False).astype(bool)
+
+
 def _compute_ranks_ranksum(
-    prices: pd.DataFrame, config: Config
+    prices: pd.DataFrame, config: Config, cross_section: pd.DataFrame | None = None
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Today's default: weighted sum of per-lookback ranks (1 = best return); lowest score wins."""
     weights = config.weights or tuple(1.0 for _ in config.lookbacks)
     returns = {k: prices / prices.shift(k) - 1 for k in config.lookbacks}
-    eligible = functools.reduce(operator.and_, (r.notna() for r in returns.values()))
+    eligible = _within(
+        functools.reduce(operator.and_, (r.notna() for r in returns.values())), cross_section
+    )
 
     score = pd.DataFrame(0.0, index=prices.index, columns=prices.columns)
     for weight, k in zip(weights, config.lookbacks, strict=True):
@@ -450,21 +476,23 @@ def _compute_ranks_ranksum(
 
 
 def _compute_ranks_voladj(
-    prices: pd.DataFrame, config: Config
+    prices: pd.DataFrame, config: Config, cross_section: pd.DataFrame | None = None
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """NSE-style volatility-adjusted momentum: 6m and 12m returns each divided by trailing 26-week
     return volatility, cross-sectionally z-scored, then summed. Higher composite = stronger
     momentum. `voladj_skip_recent_month` computes the returns as of 4 weeks ago (skip-the-most-
     recent-month convention); vol itself is always the latest trailing 26-week window."""
     if config.voladj_lookbacks:
-        return _compute_ranks_voladj_lookbacks(prices, config)
+        return _compute_ranks_voladj_lookbacks(prices, config, cross_section)
     s = 4 if config.voladj_skip_recent_month else 0
     ret_6m = prices / prices.shift(s + 26) - 1
     ret_12m = prices / prices.shift(s + 52) - 1
     vol = prices.pct_change().rolling(26).std()
     # Eligibility needs 52+s weeks of price history (the longer of the two lookbacks), the same
     # idea as the ranksum path's `eligible` mask.
-    eligible = functools.reduce(operator.and_, (r.notna() for r in (ret_6m, ret_12m, vol)))
+    eligible = _within(
+        functools.reduce(operator.and_, (r.notna() for r in (ret_6m, ret_12m, vol))), cross_section
+    )
 
     safe_vol = vol.where(vol > 0)  # 0 or NaN vol -> NaN component, never a divide-by-zero
     comp_6m = (ret_6m / safe_vol).where(eligible)
@@ -488,7 +516,7 @@ def _cross_zscore(component: pd.DataFrame) -> pd.DataFrame:
 
 
 def _compute_ranks_voladj_lookbacks(
-    prices: pd.DataFrame, config: Config
+    prices: pd.DataFrame, config: Config, cross_section: pd.DataFrame | None = None
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """BL-086 (`voladj_lookbacks=True`): one volatility-adjusted component per selected lookback
     L, the L-week return (measured 4 weeks back when L >= 26 and the skip-month flag is on, the
@@ -506,7 +534,9 @@ def _compute_ranks_voladj_lookbacks(
         # default voladj score above computes prices / prices.shift(skip + 26), a 30-week return
         # that still includes the latest month; see BL-086's log.)
         rets.append(prices.shift(skip) / prices.shift(skip + lookback) - 1)
-    eligible = functools.reduce(operator.and_, (r.notna() for r in (*rets, vol)))
+    eligible = _within(
+        functools.reduce(operator.and_, (r.notna() for r in (*rets, vol))), cross_section
+    )
     weights = config.weights or (1.0,) * len(rets)
     score = None
     for weight, ret in zip(weights, rets, strict=True):
@@ -517,11 +547,13 @@ def _compute_ranks_voladj_lookbacks(
     return final, score
 
 
-def _compute_ranks_blend(prices: pd.DataFrame, config: Config) -> tuple[pd.DataFrame, pd.DataFrame]:
+def _compute_ranks_blend(
+    prices: pd.DataFrame, config: Config, cross_section: pd.DataFrame | None = None
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Average of the ranksum and voladj final ranks (lower = better in both), re-ranked to a
     fresh 1..N ordering. Only instruments eligible in both sub-rankings get a blended rank."""
-    ranksum_final, _ = _compute_ranks_ranksum(prices, config)
-    voladj_final, _ = _compute_ranks_voladj(prices, config)
+    ranksum_final, _ = _compute_ranks_ranksum(prices, config, cross_section)
+    voladj_final, _ = _compute_ranks_voladj(prices, config, cross_section)
     both_eligible = ranksum_final.notna() & voladj_final.notna()
     avg_rank = ((ranksum_final + voladj_final) / 2).where(both_eligible)
     final = _rank_from_score(avg_rank, tie_break=None, higher_is_better=False)
@@ -869,6 +901,14 @@ def cadence_weeks(weeks: list[pd.Timestamp], every: int, offset: int) -> frozens
     return frozenset(w for w in weeks if round((w - CADENCE_EPOCH).days / 7) % every == offset)
 
 
+def _weights_frame(by_week: dict) -> pd.DataFrame:
+    """One row per week, one column per name held, in date order. `from_dict` orders rows by when
+    each column first appears (pandas 3), not by date, and readers walk the rows in order."""
+    weights = pd.DataFrame.from_dict(by_week, orient="index").sort_index().fillna(0.0)
+    weights.index.name = "week"
+    return weights
+
+
 def run_backtest(
     prices: pd.DataFrame,
     includes: dict[str, str],
@@ -1057,10 +1097,7 @@ def run_backtest(
     trades = pd.DataFrame(sim.trade_rows)
     if not trades.empty:
         trades["week"] = pd.to_datetime(trades["week"])
-    # from_dict orders rows by when each column first appears, not by date (pandas 3), and the
-    # circuit card and the weekly signal read the first and last rows.
-    weights = pd.DataFrame.from_dict(outcome.weights, orient="index").sort_index().fillna(0.0)
-    weights.index.name = "week"
+    weights = _weights_frame(outcome.weights)
     return Result(
         config=config,
         equity=equity_series,

@@ -219,3 +219,18 @@ Result.weights is sorted by week (pandas 3's from_dict ordered rows by first app
 | broad_eight_categories_one_pick | 26.32% -> 26.32% | -27.29% -> -27.29% |
 | broad_gates_loosened_and_tilted | 9.34% -> 9.34% | -27.78% -> -27.78% |
 | broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 13.94% | -18.09% -> -18.09% |
+
+## 2026-10-25 (on top of `f27ec207`)
+
+BL-001 F6: Broad ranks over the week's point-in-time members behind the gate only (engine.compute_ranks cross_section, also for the stock tilt), and only the weeks after a stale column's last real price are forward-filled; a Broad backtest at a past date no longer depends on later data. Owner decision 2026-10-25. The 8 Broad scenarios move; the 10 ETF, Stock and Custom Index scenarios do not.
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_default | 18.67% -> 18.79% | -26.72% -> -27.24% |
+| broad_monday_open | 16.91% -> 17.09% | -27.81% -> -28.17% |
+| broad_category_mode_off | 36.99% -> 36.66% | -28.58% -> -28.60% |
+| broad_one_category_three_picks_four_weekly | 32.13% -> 28.69% | -35.20% -> -35.50% |
+| broad_one_category_three_picks_four_weekly_all_fridays | 17.88% -> 16.71% | -35.50% -> -35.36% |
+| broad_eight_categories_one_pick | 26.32% -> 25.79% | -27.29% -> -26.92% |
+| broad_gates_loosened_and_tilted | 9.34% -> 8.31% | -27.78% -> -29.86% |
+| broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 14.29% | -18.09% -> -18.68% |

@@ -12,12 +12,16 @@ function interval(l: { mean: number; lower: number; upper: number }): string {
   return `${formatInr(l.mean, { sign: true })} per lot-day, 90% interval ${formatInr(l.lower, { sign: true })} to ${formatInr(l.upper, { sign: true })}`;
 }
 
-export function RotationVerdict({ verdict }: { verdict: Verdict }) {
+export function RotationVerdict({ verdict, plain = false }: { verdict: Verdict; plain?: boolean }) {
   if (verdict.lines.length === 0) return null;
   return (
     <section
       aria-label="Registered comparisons"
-      className="space-y-1.5 rounded-lg border border-border bg-surface px-4 py-3 text-sm"
+      className={
+        plain
+          ? 'space-y-1.5 text-sm'
+          : 'space-y-1.5 rounded-lg border border-border bg-surface px-4 py-3 text-sm'
+      }
     >
       <h3 className="text-xs font-medium uppercase tracking-wider text-faint">
         The registered comparisons

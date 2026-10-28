@@ -8,15 +8,20 @@ Personal preferences for this browser, what the daily automation does on AlgoTes
 |---|---|
 | Appearance | Light or dark theme, and density (how compact tables and cards are). |
 | Defaults | The landing tab, the Momentum dataset that opens first, and the default backtest period. |
-| Navigation | Show, hide and reorder sidebar tabs. Settings and this Guide cannot be hidden. |
+| Navigation | Show, hide and reorder sidebar tabs, section by section. Settings and this Guide cannot be hidden. The last section, **Archived engine** (Trades, P&L, Personalities, Regimes, Coverage, Billing), starts hidden; show any of them here. **Reset** puts the default back, archive hidden. |
 | Browser alerts | A warning in the dashboard before the Fyers token expires. |
 | Automation | What the daily jobs do (below). |
-| Telegram alerts | One switch per message type: broker logins, the momentum preview/final/journal, live-money rules status and problems, the options evening summary and problems, the morning summary, the trade monitor's margin check, deploy check and loss warning, the weekly digest and the backup. Scheduler failures, missed runs and the -₹8,000 loss alert always send. |
+| Telegram alerts | One level per message type: **On**, **Failures only** (its problems are sent, its routine "it worked" reports are not) or **Off**. Every message has a line here: broker logins, Quantiply, the 09:16 pick, the 16:00 result, the momentum messages, the options evening summary, the morning summary, the trade monitor, scheduler failures, missed runs and recoveries, the digest and the backup. Defaults: the momentum preview and "recovered" off; the momentum journal check, live-rules status, options evening summary and the 15:40 Quantiply switch-off failures only; the rest on. The -₹8,000 loss alert and a live-money rule that is hit always send. |
 | Account | The dashboard is protected by a single shared password when it runs on your own computer in production mode (`bun run start:prod`); when it is hosted behind Cloudflare Access, signing in is a Google sign-in or an emailed code instead. In local dev mode there is no sign-in. **Log out** ends your session. |
 | About | What the dashboard is connected to. **Developer mode** shows each screen's list of unfinished work next to its title. |
 
 > [!TIP]
-> If you never use the paused Live screens, hide them under Navigation to keep the sidebar short.
+> The Archived engine holds the paused paper-trading engine's screens and the two that read its
+> server (Coverage, Billing). They are kept, not developed, and fail with an error while that
+> server is not running. A hidden archived screen still opens by its link (for example `/trades`),
+> and the sidebar then shows it while you are on it. The sidebar's other sections are Overview,
+> Options Lab (with Live, the replay of a collected day), Momentum, Trade book and Operations
+> (Jobs, Broker logins, Settings and this Guide).
 
 ## Automation
 
@@ -39,6 +44,7 @@ Three master switches, then one block per platform and broker.
   - **Quantiply:** the uploader sets it on each algo it creates and reads it back; a different saved value is reported and nothing is enabled. A changed multiplier replaces the algo at the next evening upload.
   - **AlgoTest:** the deployer never sets the sheet's multiplier. With a row above 1 it deploys nothing and says so; you deploy by hand at that multiplier.
   - The 09:25 deploy check expects the row's multiplier instead of 1, and the 09:05 margin check counts it. **Raising it above 1 has not been tried live yet: watch the first upload.**
+- **Keep the clientwise MTM SL (Quantiply blocks):** the account's whole-day stop-loss, the "Clientwise P&L" SL in Quantiply, over every algo on that account, your own included. Each trading day at 08:00, after the login, the tool reads it and sets it to this figure only when it differs, then reads it back; the morning message says which. The default is the list's portfolio stop: ₹9,000 for Adaptive Tuned, ₹8,000 for Adaptive Classic. Off leaves whatever you set in Quantiply. A target or trailing option set there by hand is kept.
 - **Include the Buy add-on:** whether the Buy add-on picks go with the list. Off leaves them out of the export, so they are not uploaded, deployed or checked, and an add-on already uploaded counts as no longer picked: the evening run deletes it unless it is deployed on /live (then it is kept and reported). On AlgoTest and Quantiply an export serves every account that uploads that list, so the add-on stays in while any of them has it on.
 
 A warning badge on a block means its master switch holds it back.
@@ -61,14 +67,16 @@ A warning badge on a block means its master switch holds it back.
 
 **What follows these settings:**
 
-- **The 08:00 login:**
-  - With logins off, or no block logging in, the laptop does not start the login run, and the 08:15 GitHub backstop does nothing.
-  - With neither AlgoTest block on, the run skips the AlgoTest brokers.
-  - Quantiply · Shoonya logs in after the AlgoTest logins, when its block is on.
-- **The evening and 09:16 uploads:** AlgoTest gets every list its blocks choose. Each Quantiply account (Angel One, Shoonya) gets its own block's list. A block with upload off is left untouched.
+- **The 08:00 login (on this Mac, 08:02):**
+  - With logins off, or no block logging in, nothing logs in, and GitHub's 08:15 backup does nothing.
+  - With neither AlgoTest block on, AlgoTest is left out: no wait for AlgoTest's 08:15 window, Quantiply logs in at once, and the Telegram report names only Quantiply.
+  - Quantiply · Shoonya logs in after the AlgoTest logins (straight after Quantiply · Angel One when AlgoTest is off), when its block is on. Its result counts in the report's verdict.
+  - A part that fails for a reason another machine could fix is tried again on GitHub, that part only; a refused password or PIN never is. GitHub keeps its own copy of the passwords: when you change one in `.env`, change GitHub's too.
+- **The evening upload (16:45):** AlgoTest gets every list its blocks choose. Each Quantiply account (Angel One, Shoonya) gets its own block's list. A block with upload off is left untouched. On Quantiply the evening also deletes every finished, switched-off algo on the account, **your own included**; never one that is switched on or may still run. On Shoonya (a paid plan) it then sets the Subscription's algos a day to what the next session needs (3, or 4 with an add-on): it previews the change, raises it only when your credits cover it, and reads it back. Lowering returns the unused credits. Two algos a day come with the plan, so asking for 2 or fewer is left to you.
 - **Deploying:** it also needs Automated deployment on.
-  - AlgoTest deploys the day's T1 picks after 09:16.
-  - Quantiply switches on each account's picks at 16:55 for the next day, and at 09:21 any that changed. It only does this for an account whose block uploads a list.
+  - AlgoTest deploys the day's T1 picks after 09:16, only while an AlgoTest block uploads the T1 list (and Automated uploads is on: with uploads off nothing new is in AlgoTest to deploy). A block uploading Core is not deployed by any job; a Telegram message says so. With none, the deploy and its 15:35 check do not log in to AlgoTest (the check still runs on a day the tool deployed something).
+  - Quantiply: at 08:10, after the login, each account whose block uploads a list has its MTM SL kept (above) and last evening's algos for today switched on. One message for both accounts says so every morning.
+  - At 09:16 the real pick is recorded. It changes only what starts after 09:17: last evening's 09:17 strategy keeps running and a new 09:17 pick is not made; the rest is chosen again by the 09:16 score (2 Widesl and 1 directional, the highest scorers). At 09:19 the new strategy is created and at 09:21 it is switched on and the one it replaced switched off. You get messages only on a day something changed.
   - At 15:40 the tool's Quantiply algos are switched off again; otherwise they would run on the same weekday next week. This always runs, even with Automated deployment or `QUANTIPLY_DEPLOY` off.
   - Switching an algo off by hand after the tool switched it on is final for that day: the 09:21 run does not switch it back on.
 
