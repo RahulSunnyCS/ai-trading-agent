@@ -209,26 +209,26 @@ None for Phase 1.
 
   | Lot / week | Name | Signal | Orders | Done | Fill vs Fri close | vs Mon open | vs orders |
   |---|---|---|---|---|---|---|---|
-  | Lot 1, 16 Oct (new, ₹50,000; bought Mon 19 Oct) | CUPID | BUY 25% | — | 28 @ 345.25, +12 on 22 Oct | -239 bps | -239 bps | — |
-  | | NAZARA | BUY 25% | — | 24 @ 410.15, +9 on 22 Oct | -191 bps | -204 bps | — |
-  | | RATEGAIN | BUY 25% | — | 12 @ 794.25, +4 on 21 Oct | -398 bps | -393 bps | — |
+  | Lot 1, 16 Oct (new lot; bought Mon 19 Oct) | CUPID | BUY 25% | — | bought, topped up 22 Oct | -239 bps | -239 bps | — |
+  | | NAZARA | BUY 25% | — | bought, topped up 22 Oct | -191 bps | -204 bps | — |
+  | | RATEGAIN | BUY 25% | — | bought, topped up 21 Oct | -398 bps | -393 bps | — |
   | | Nasdaq 100 | BUY 25% | — | missed (premium gate) | | | |
-  | | GRWRHITECH | not in signal | — | extra: 1 @ 6,998 ("replaces Nasdaq 100 (premium)") | +40 bps | +40 bps | — |
-  | Lot 2, 23 Oct (new, ₹52,987; bought Fri 23 Oct 14:28) | ACMESOLAR | not in final | 35 @ 373.60 | 35 @ 373.00 | +31 bps | n/a | -16 bps |
-  | | CUPID | BUY 29% | 42 @ 310.45 | 42 @ 309.60 | +103 bps | n/a | -27 bps |
-  | | GRWRHITECH | BUY 24% | 1 @ 7,059 | 1 @ 7,065.50 | +45 bps | n/a | +9 bps |
-  | | NAZARA | BUY 24% | 33 @ 400.70 | 33 @ 401.53 | -15 bps | n/a | +21 bps |
+  | | GRWRHITECH | not in signal | — | extra ("replaces Nasdaq 100 (premium)") | +40 bps | +40 bps | — |
+  | Lot 2, 23 Oct (new lot; bought Fri 23 Oct 14:28) | ACMESOLAR | not in final | in the orders | bought as ordered | +31 bps | n/a | -16 bps |
+  | | CUPID | BUY 29% | in the orders | bought as ordered | +103 bps | n/a | -27 bps |
+  | | GRWRHITECH | BUY 24% | in the orders | bought as ordered | +45 bps | n/a | +9 bps |
+  | | NAZARA | BUY 24% | in the orders | bought as ordered | -15 bps | n/a | +21 bps |
   | | THELEELA | BUY 24% | — | missed | | | |
 
-  Charges: Lot 1 ₹54.13 on the notes vs ₹55.51 at the model's rates; Lot 2 ₹55.49 vs ₹55.19.
-  Lot 1's first-day fills came in ₹796 under Friday's close (Monday fell); Lot 2's ₹23 under the
-  orders' prices. Findings: (1) the 14:15 orders and the 19:30 final disagree for Lot 2
-  (ACMESOLAR in the orders, THELEELA in the final), so the trade followed the orders, not the
-  journalled final: the orders' week-ahead decision on 16 Oct's stored ranks and the final on the
-  data the 19:30 sync rewrote differ; (2) Lot 1 was under-funded on the day (₹36,039 of
-  strategy names plus 20MICRONS, sold 21 Oct, outside the lots) and topped up 21-22 Oct; (3) a
-  second GRWRHITECH (14:33, ₹7,119.50) is booked to no lot yet; Lot 2's shares are matched
-  through the 14:15 plan until the 30 Oct run books them.
+  Charges on the contract notes were within about 3% of the model's rates for both lots. (Share
+  counts, prices and rupee amounts are left out of this public file on the owner's instruction,
+  2026-10-28; the Real fills card on Momentum › Journal shows them.) Findings: (1) the 14:15 orders
+  and the 19:30 final disagree for Lot 2 (ACMESOLAR in the orders, THELEELA in the final), so the
+  trade followed the orders, not the journalled final: the orders' week-ahead decision on 16 Oct's
+  stored ranks and the final on the data the 19:30 sync rewrote differ; (2) Lot 1 was under-funded
+  on the day and topped up 21–22 Oct, and one non-strategy name was bought and sold outside the
+  lots; (3) a second GRWRHITECH share bought later on 23 Oct is booked to no lot yet; Lot 2's
+  shares are matched through the 14:15 plan until the 30 Oct run books them.
 - 2026-10-28 — **Done.** Follow-ups for the owner, not new items: the live-rules trailing rule
   and the money gate (BL-025) do not read the score or the fills yet; the 14:15-orders-vs-final
   disagreement deserves a look before more lots go in.
