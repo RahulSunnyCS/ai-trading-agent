@@ -97,7 +97,7 @@ function ForwardScoreCard({ view }: { view: ForwardView }) {
             week{score.scored_weeks.length === 1 ? '' : 's'} scored so far. "As recorded" is the
             change in the backtest that produced the two journal rows; "Today's code" re-runs the
             same settings now ({score.ranking_now}). Signals recorded before 28 Oct 2026 come from
-            the ranking before BL-001 F6, so the two can differ.
+            the ranking before the 28 Oct fix, so the two can differ.
           </p>
           <GroupTable groups={score.groups} />
           <Accordion

@@ -49,8 +49,8 @@ SCORE_FILE = "forward_scores.json"
 SCHEMA = 1
 #: BL-001 F6 (PR #322): Broad ranks over each week's point-in-time members from this merge on.
 F6_COMMIT = "778ba02e"
-F6_LABEL = "point-in-time ranking (BL-001 F6)"
-PRE_F6_LABEL = "ranking before BL-001 F6"
+F6_LABEL = "point-in-time ranking (from 28 Oct 2026)"
+PRE_F6_LABEL = "ranking before 28 Oct 2026"
 BENCHMARK_NAME = "Nifty200 Momentum 30 TRI"
 _IDLE = frozenset({IDLE, CASH, "__pool__"})
 

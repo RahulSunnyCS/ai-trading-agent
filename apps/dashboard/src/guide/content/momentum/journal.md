@@ -31,7 +31,7 @@ it. The Friday 20:30 job (`mbt journal score`) scores the week that has just fin
 | Live, Fri close | The signal's portfolio (the model's holdings after that week's trades) bought at that Friday's close and valued at the next Friday's close, after the backtest's own costs (its itemised charges and 15 bps slippage a side). The *ideal* fill: the final signal is recorded after the close. |
 | Live, Mon open | The same at the Monday opens after each Friday: the price you can actually get. It lands a week later than the Friday figure, once that Monday has happened. |
 | Backtest as recorded | How much the backtest that produced the two entries moved over the same week. Shown only when both entries come from the same ranking. |
-| Backtest, today's code | The same settings re-run now. Entries recorded before 28 Oct 2026 come from the ranking before the BL-001 F6 fix (Broad now ranks only the stocks that were in the universe that week), so this can differ from "as recorded". |
+| Backtest, today's code | The same settings re-run now. Entries recorded before 28 Oct 2026 come from the ranking before the 28 Oct fix (Broad now ranks only the stocks that were in the universe that week), so this can differ from "as recorded". |
 | Gap | Live at Friday close minus the backtest as recorded, in points. |
 | Mom30 TRI | The Nifty200 Momentum 30 TRI over the same week, from the journal's benchmark level. |
 
