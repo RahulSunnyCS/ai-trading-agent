@@ -25,11 +25,7 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-from option_backtesting.data.reference.loader import (
-    MissingReferenceData,
-    ReferenceData,
-    default_reference_data,
-)
+from option_backtesting.data.reference.loader import MissingReferenceData
 from option_backtesting.fyers.daily import data_dir
 from option_backtesting.legwise.engine import simulate_day
 from option_backtesting.legwise.market import backtest_days, load_day
@@ -37,6 +33,9 @@ from option_backtesting.legwise.schema import load_legwise
 from option_backtesting.ruletest.charges import day_charges, trade_values
 
 HERE = Path(__file__).parent
+sys.path.insert(0, str(HERE.parent / "common"))
+from early_ref import early_reference  # noqa: E402  (research/common, shared by items)
+
 STRATEGIES = HERE.parents[1] / "strategies"
 VARIANTS = HERE / "variants"
 RESULTS = HERE / "results"
@@ -58,30 +57,11 @@ DEFINITIONS: dict[str, tuple[str, Path, dict]] = {
 }
 PRIMARY = ("B_live_N", "C_live_S")
 RUNS = {"all": ("09:17", "15:28"), "am": ("09:17", "12:00"), "pm": ("13:00", "15:28")}
-#: the study's before-cost figures per day (Rs 222,681 + 510 x 80 and Rs 139,929 + 510 x 40 over 510 days)
-STUDY_PER_DAY = {"split": 477.0, "all": 314.0}
-
-
-class EarliestRowReference:
-    """Days before the first lot-size / strike-step row use that first row (BL-080, BL-181)."""
-
-    def __init__(self, ref: ReferenceData):
-        self._ref = ref
-
-    def __getattr__(self, name):
-        return getattr(self._ref, name)
-
-    def _early(self, call, underlying, when):
-        try:
-            return call(underlying, when)
-        except MissingReferenceData:
-            return call(underlying, date(2024, 10, 3))
-
-    def lot_size(self, underlying, expiry):
-        return self._early(self._ref.lot_size, underlying, expiry)
-
-    def strike_step(self, underlying, as_of):
-        return self._early(self._ref.strike_step, underlying, as_of)
+#: the study's before-cost figures per day over its 510 days: the split paid two sets of Rs 40
+#: (Rs 222,681 + 510 x 80 = Rs 517 a day), the whole day one (Rs 139,929 + 510 x 40 = Rs 314).
+#: Registered as Rs 477 by an arithmetic slip (one set's costs added back); corrected after the run,
+#: logged in the item. The verdict is the same either way.
+STUDY_PER_DAY = {"split": 517.0, "all": 314.0}
 
 
 def make_variants() -> dict[str, tuple[str, Path]]:
@@ -114,10 +94,11 @@ def make_variants() -> dict[str, tuple[str, Path]]:
 
 def simulate(underlying: str, files: dict[str, Path], lo: date, hi: date) -> dict[str, list[list]]:
     root = data_dir()
-    ref = EarliestRowReference(default_reference_data())
+    ref = early_reference()
     strategies = {n: load_legwise(p) for n, p in files.items()}
     days, _ = backtest_days(root, underlying, lo, hi)
     out: dict[str, list[list]] = {n: [] for n in strategies}
+    missing = dict.fromkeys(strategies, 0)
     t0 = time.time()
     for i, d in enumerate(days):
         try:
@@ -128,6 +109,7 @@ def simulate(underlying: str, files: dict[str, Path], lo: date, hi: date) -> dic
             try:
                 r = simulate_day(strat, data, ref, SIZING)
             except MissingReferenceData:
+                missing[name] += 1
                 continue
             orders, buy, sell = trade_values(r.trades)
             ch = day_charges(underlying, d.isoformat(), orders, buy, sell).total
@@ -137,6 +119,8 @@ def simulate(underlying: str, files: dict[str, Path], lo: date, hi: date) -> dic
             )  # fmt: skip
         if (i + 1) % 25 == 0:
             print(f"  {underlying} {i + 1}/{len(days)} days, {time.time() - t0:.0f} s", flush=True)
+    dropped = {n: k for n, k in missing.items() if k}
+    print(f"  {underlying}: variant-days dropped for missing reference data: {dropped or 'none'}")
     return out
 
 
@@ -284,8 +268,8 @@ def analyse() -> None:
         lines.append("")
         lines.append(
             f"MTM stops hit: whole day {stops['all']}, morning {stops['am']}, afternoon {stops['pm']} "
-            f"of {len(days)} days. Charges per day: whole day {n['all'].mean() - g['all'].mean():,.0f}, "
-            f"split {split_n.mean() - split_g.mean():,.0f}."
+            f"of {len(days)} days. Charges per day (gross − net): whole day {g['all'].mean() - n['all'].mean():,.0f}, "
+            f"split {split_g.mean() - split_n.mean():,.0f}."
         )
         lines.append("")
     with open(OUT / "daily.csv", "w", newline="") as f:

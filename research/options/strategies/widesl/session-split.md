@@ -24,9 +24,10 @@ One set a day, 09:17–15:28, in every live and rotation Widesl file.
 ## What we know
 
 - The friend's study is right about the shape and wrong only about charges: on our engine the split earns
-  about ₹120–180 a day more gross than the whole day for every OTM1/OTM2 definition, and the second set
-  costs ₹84 a day more than the study's ₹40 model allows, which takes the live files' net edge to ₹39–89
-  with intervals that include zero (BL-182, seen data).
+  about ₹120–180 a day more gross than the whole day for every OTM1/OTM2 definition; under our charge
+  model the second set adds ₹84 a day (₹171 for two sets against ₹87 for one), ₹44 more than the study's
+  ₹40 allows, which takes the live files' net edge to ₹39–89 with intervals that include zero (BL-182,
+  seen data).
 - The robust part is the drawdown: the afternoon set is stopped a third as often as a whole-day set
   (42–47 vs 144–166 MTM stops in 501 days) and a morning stop no longer ends the day, so the max drawdown
   per lot halves for every OTM1/OTM2 definition. Two MTM budgets a day, though (₹5,000 at ₹2,500 a set).

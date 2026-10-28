@@ -90,7 +90,7 @@ afternoon entries. Slippage beyond the engine's fills. Anything traded.
 - **Pass / kill rule:** definition B passes if the difference's 90 % lower bound is above zero after
   charges AND the split's max drawdown is no deeper than the whole day's. C is read by the same rule on
   its own. A passes as a reconciliation if our whole-day and split totals before charges are each within
-  15 % per day of the study's (₹314 and ₹477 a day). D is descriptive and decides only which settings
+  15 % per day of the study's (₹314 and ₹477 a day; corrected to ₹517 after the run, see the Log). D is descriptive and decides only which settings
   the Phase 2 pool keeps. B fails → not adopted; the Log records everything and Phase 2 is not run.
 - **Look-ahead:** every strike is chosen from the spot at its entry minute; stops and exits use bars
   up to that minute; the only free choices (12:00, 13:00) come from the friend's study, which was
@@ -131,7 +131,7 @@ bootstrap. Full tables: `research/bl182/out/summary.md` (git-ignored; `uv run py
 
 | Definition | Whole day net | Split net | Split − whole, net [90 %] | Split − whole, gross [90 %] | Max DD whole → split | Verdict |
 |---|---|---|---|---|---|---|
-| A study (NIFTY OTM1, no trail) | +236 | +331 | +95 [−62, +252] | +179 [+22, +336] | −43,252 → −22,685 | Reconciles: gross 323 / 502 a day vs the study's 314 / 477, both within 15 % |
+| A study (NIFTY OTM1, no trail) | +236 | +331 | +95 [−62, +252] | +179 [+22, +336] | −43,252 → −22,685 | Reconciles: gross 323 / 502 a day vs the study's 314 / 517, both within 15 % |
 | **B live NIFTY** (`N_wide_0917`) | +239 | +278 | **+39 [−107, +187]** | +123 [−22, +271] | −50,353 → −22,807 | **FAIL**: lower bound below zero (drawdown condition met) |
 | **C live SENSEX** (`S_wide_0917`) | +260 | +348 | **+89 [−63, +241]** | +171 [+21, +323] | −41,554 → −27,379 | **FAIL**: lower bound below zero (drawdown condition met) |
 | D `N_wide-t1s4` (SL 150, RE ×1, MTM 4,000) | +326 | +403 | +77 [−82, +237] | +162 [+3, +322] | −47,724 → −23,877 | descriptive |
@@ -185,3 +185,7 @@ an `override:` here if Phase 2 is to run anyway.
   FAIL the registered rule (lower bound not above zero after charges); D descriptive. Not adopted; Phase 2
   not run. Findings: `research/options/strategies/widesl/session-split.md`, rows in `exit-time.md`,
   `entry-time.md` and the Widesl README.
+- 2026-10-28 — correction (code review of PR 380): the study's split pays two sets of ₹40, so its
+  before-cost figure is (222,681 + 510 × 80) / 510 = ₹517 a day, not the ₹477 registered (one set's costs
+  added back). Ours is 502, 3 % off, still within the 15 % rule; the verdict is unchanged. The Phase 0 text
+  keeps the registered number with this note.
