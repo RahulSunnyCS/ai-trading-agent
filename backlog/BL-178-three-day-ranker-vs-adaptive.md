@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a direct owner question about the live ranking; one fixed rule, no search |
-| **Status** | In progress |
+| **Status** | Done (killed) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -69,7 +69,32 @@ dated block).
   scoring, other periods. Each needs a new block, or `override: <reason>` in the Log.
 
 #### Result
-(after the run)
+**Kill on both pools** (2026-10-28). 239 sessions, 2025-10-28 → 2026-10-27; net after estimated
+brokerage, the 3 core picks at one lot each. Adaptive's re-scored picks equalled the journal's list
+C on every recorded day checked (7 Core, 6 T1). 3 days had no same-weekday session in the previous
+14 days and used the two previous sessions only.
+
+| Pool | Ranker | Net a day | Per lot-strategy | Year | Days up | Max drawdown |
+|---|---|---|---|---|---|---|
+| Core | Adaptive | ₹993 | ₹331 | ₹2,37,394 | 60% | −₹35,929 |
+| Core | Three-day | ₹779 | ₹260 | ₹1,86,274 | 59% | −₹68,924 |
+| T1 | Adaptive | ₹1,674 | ₹558 | ₹4,00,100 | 68% | −₹25,672 |
+| T1 | Three-day | ₹821 | ₹274 | ₹1,96,174 | 62% | −₹43,435 |
+
+- Three-day minus Adaptive, per day: Core −₹214 [−₹632, +₹208] (mean ≤ 0: kill); T1 −₹853
+  [−₹1,324, −₹376] (wholly negative: kill).
+- The two rankers rarely agree: the same three picks on 4 (Core) and 3 (T1) days; 0.6 and 0.5 of
+  the three picks shared on an average day.
+- Buy add-on, apart: Core Adaptive +₹4,192 (35 days) vs three-day −₹4,501 (48); T1 −₹8,064 (32)
+  vs −₹4,908 (52).
+- Descriptive only, not tested: on Core the three-day ranker was ahead on NIFTY expiry days
+  (₹2,381 vs ₹1,913 a day, 52 days) and behind on SENSEX expiry days (₹566 vs ₹1,961, 50 days); on
+  T1 it was behind on every weekday except Friday.
+- Bias: Adaptive's weights were chosen on P1 (Dec 2025 – Oct 2026), most of this year, which favours
+  it; the T1 gap (interval wholly below zero) is larger than that bias is likely to explain, the Core
+  one is not.
+- Script and per-day picks: the session's scratchpad (`bl178/run.py`, `Core_daily.json`,
+  `T1_daily.json`), not committed.
 
 ## Risks
 
@@ -78,3 +103,4 @@ One year, one rule; a pass would still need forward days before any live change.
 ## Log
 
 - 2026-10-28 — created and pre-registered at the owner's request.
+- 2026-10-28 — run; killed on both pools (Result above); `research/options/common/rotation-ranking.md` updated.
