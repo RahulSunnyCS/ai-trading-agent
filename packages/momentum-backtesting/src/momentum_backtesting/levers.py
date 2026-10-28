@@ -68,6 +68,7 @@ def grouped_momentum_ranks(
     long_lookbacks: tuple[int, ...] = (26, 52),
     tilt: float = 0.3,
     screen_top_pct: float = 0.0,
+    cross_section: pd.DataFrame | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Owner's turnaround idea (TODO 3.9.23 follow-up), done as two SEPARATE rank-sums instead
     of one mixed-sign one. The original failure mode: a single rank-sum with a negative weight
@@ -97,6 +98,10 @@ def grouped_momentum_ranks(
     made a new 52-week low just as well as one that bottomed months ago and has started to
     recover - the falling-knife guard needs a separate mask, same reasoning as the reversal
     sleeve's own "not at a new 52-week low" turned condition in `reversal.py`.
+
+    `cross_section` (BL-001 F6): who is ranked against whom each week, as `engine.compute_ranks`
+    takes it. Broad passes its point-in-time members; the percentiles above are then taken across
+    those names only.
     """
     short_lookbacks = tuple(lb for lb in config.lookbacks if lb not in long_lookbacks)
     kept_long = tuple(lb for lb in config.lookbacks if lb in long_lookbacks)
@@ -109,8 +114,8 @@ def grouped_momentum_ranks(
         weights=tuple(-1.0 for _ in kept_long),
         score="ranksum",
     )
-    short_rank, _ = compute_ranks(prices, short_cfg)
-    long_rank, _ = compute_ranks(prices, long_cfg)
+    short_rank, _ = compute_ranks(prices, short_cfg, cross_section)
+    long_rank, _ = compute_ranks(prices, long_cfg, cross_section)
     eligible = short_rank.notna() & long_rank.notna()
 
     def to_pct(ranks: pd.DataFrame) -> pd.DataFrame:

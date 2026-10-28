@@ -187,7 +187,11 @@ class Runner:
             )
             if ranks is None:
                 ranks = grouped_momentum_ranks(
-                    ranking.prices, Config(lookbacks=lookbacks), tilt=tilt, screen_top_pct=screen
+                    ranking.prices,
+                    Config(lookbacks=lookbacks),
+                    tilt=tilt,
+                    screen_top_pct=screen,
+                    cross_section=ranking.cross_section(),
                 )
                 levers.tilt_cache_put(
                     self._tilt_cache, base.full_frame, lookbacks, tilt, screen, ranks, limit=4
