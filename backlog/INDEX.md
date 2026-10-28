@@ -84,6 +84,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-170](BL-170-sheet-vs-notes-differences.md) | Sheet against contract notes: explain the differences BL-168's reconciliation lists (owner's review; look for one systematic cause first) | P2 | Planned | chore | contract-notes |
 | [BL-175](BL-175-options-lake-2014-2024.md) | Options history lake: load the 2014–2024 expiry-week history (BL-034 Phase 5) | P2 | Planned | feature | trading-data |
 | [BL-177](BL-177-momentum-favourite-pinned-rerun.md) | Momentum: re-run each favourite with its end pinned to the history check's anchor (data changed, result same / changed) | P2 | Planned | improvement | momentum |
+| [BL-178](BL-178-three-day-ranker-vs-adaptive.md) | Rotation: rank by the last two sessions and last week's same weekday (a third each) vs Adaptive, on Core and T1 | P2 | In progress | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
