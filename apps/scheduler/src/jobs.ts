@@ -440,7 +440,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'options-rotation-pick',
     description:
-      "Record the day's rotation picks (lists A, B, C, REF) before 09:17 (BL-058) and the T1 parallel track's Adaptive pick in its own journal, and Telegram ONE message: Adaptive, then T1 labelled testing phase (BL-125). Adaptive is never held back by T1; the friends' group gets Adaptive alone",
+      "Record the day's rotation picks (lists A, B, C, REF) before 09:17 (BL-058) and the T1 parallel track's Adaptive pick in its own journal, and Telegram ONE message, to the owner and the friends' group alike: Adaptive, then T1 as Tuned Adaptive (In Testing phase) (BL-125). Adaptive is never held back past 09:16:50 by T1",
     // Needs the 09:15 VIX bar, which Fyers serves from 09:16, and yesterday's results (the evening
     // job above). A late entry is flagged (before_first_entry: false), never silently accepted,
     // and a missed slot is not caught up: it would not be forward.

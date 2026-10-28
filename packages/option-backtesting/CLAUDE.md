@@ -255,18 +255,21 @@ Otherwise:
   in `rotation/messages.py`; strategy names come from `rotation/labels.py` (`label(name)` -> head `N_widesl_OTM1` +
   params `SL115% · TSL15%/10% · REnone · MTMSL2500`, read from the variant's own YAML; an id with no file is shown
   raw, never an error) and `rotation/list_names.json` (also imported by the dashboard) for list names. `rotation/deliver.py`
-  decides when they go: `pick_and_send` (the 09:16 job: Adaptive recorded first and sent to the friends' group at once,
-  T1 right after reusing its VIX read; the owner's message carries both if T1 is in by `t1_deadline` (09:16:50 IST, or
-  20 s after Adaptive's entry), else Adaptive alone with `T1 · follows in a separate message` (or `not recorded today` when T1
-  failed) and T1 follows; a dry run writes nothing, not even the T1 catch-up)
+  decides when they go: `pick_and_send` (the 09:16 job: Adaptive recorded first, T1 right after reusing its VIX read; the
+  message carries both if T1 is in by `t1_deadline` (09:16:50 IST, or 20 s after Adaptive's entry), else Adaptive alone
+  with `· follows in a separate message` (or `· not recorded today` when T1 failed) and T1 follows; the owner and the
+  friends' group get every message alike (2026-10-28), alerts stay private; a dry run writes nothing, not even the T1
+  catch-up)
   and `send_result` (the evening message, under `result.sending_lock`, a per-day `flock`; any error reading T1 degrades
-  to `T1 · result not ready`, alerts the owner and never stops Adaptive's result; the owner's message goes first and a
-  failing group copy is retried on its own, never holding back the owner's T1 follow-up; `--not-before 16:00 --soft-fail` is
+  to `result not ready`, alerts the owner and never stops Adaptive's result; the owner's message goes first and a
+  failing group copy is retried on its own, never holding back the owner's T1 follow-up; the group's copy is the owner's
+  without BL-141's live lines, and a late T1 result follows to the group too (`group-t1-owed` / `group-t1` markers); `--not-before 16:00 --soft-fail` is
   the evening run's last step, so a run that succeeds only on a late retry still sends that evening). `obt rotation verify
-  --track t1` checks the T1 journal. Nothing in them touches a pick, a score, a hash or a journal field.
+  --track t1` checks the T1 journal. Nothing in them touches a pick, a score, a hash or a journal field. The messages
+  call T1 `messages.T1_NAME`, "Tuned Adaptive (In Testing phase)"; alerts and logs still say T1.
   `rotation/result.py` reads the completed picked variants' net results (after estimated costs) for the live list or
   `track="t1"`, one lot per strategy (`NoEntry` = never picked, `NotScored` = results still coming). Sent markers are per
-  destination and piece (`.sent` owner, `.group.sent`, `.t1.sent`; a pre-BL-125 `.sent`, recognised by its text, still
+  destination and piece (`.sent` owner, `.group.sent`, `.t1.sent`, `.group-t1-owed.sent`, `.group-t1.sent`; a pre-BL-125 `.sent`, recognised by its text, still
   covers owner + group), so a retry never double-sends and a late T1 result still follows as its own message; `obt rotation result --force` resends.
   Days to expiry in the rotation are **weekdays** (Monday to Friday dates after the session up to the expiry;
   holidays are not excluded; BL-109, 2026-10-15): `rotation/dte.py` holds the count, `live.py` builds the live
