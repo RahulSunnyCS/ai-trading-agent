@@ -259,6 +259,25 @@ const BASE_JOBS: Job[] = [
       'cd packages/momentum-backtesting && uv run mbt stocks sync && uv run mbt weekly --run final --only-dataset stock --only-dataset custom_index --only-dataset broad',
   },
   {
+    // BL-024 Phases 2-3: last week's journalled signals scored against this week (the 19:30
+    // run has just recorded the rows and prices it needs), each config re-run on today's code
+    // for the comparison, and the Kite fills reconciled. Writes forward_scores.json only and
+    // sends nothing: the headline's line rides in its 19:30 message.
+    id: 'momentum-journal-score',
+    description:
+      'Score the forward journal against the week after each signal, and reconcile the Kite fills',
+    schedule: { at: '20:30', on: FRIDAY, label: 'Fri 20:30' },
+    steps: [['uv', 'run', 'mbt', 'journal', 'score']],
+    cwd: MOMENTUM,
+    // One engine pass per favourite on cached rankings: about the 19:30 run's own backtests.
+    timeoutMinutes: 60,
+    retries: 1,
+    retryDelayMinutes: 15,
+    catchUpHours: 48,
+    group: 'catalog',
+    fixHint: 'cd packages/momentum-backtesting && uv run mbt journal score',
+  },
+  {
     id: 'momentum-journal-check',
     description: "Check this week's forward journal recorded every favourite",
     schedule: { at: '21:00', on: FRIDAY, label: 'Fri 21:00' },

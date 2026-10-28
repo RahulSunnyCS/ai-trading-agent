@@ -174,11 +174,23 @@ describe('Angel One login check', () => {
     expect(angel?.alertsItself).toBeFalsy();
   });
 
-  it('has 45 jobs', () => {
+  it('has 46 jobs', () => {
     // BL-141: + live-capture, live-capture-retry; BL-143: + trade-monitor; BL-168: + contract-notes, contract-notes-retry, contract-notes-capital; + contract-notes-retry-1030, -1530
     // BL-012: + check-expiry-calendar (Y4), check-blocked-dates (Y3), universe-refresh-reminder (S3)
+    // BL-024: + momentum-journal-score
     // BL-001 Phase 4: + momentum-history
-    expect(JOBS).toHaveLength(45);
+    expect(JOBS).toHaveLength(46);
+  });
+});
+
+describe('forward-journal score (BL-024 Phases 2-3)', () => {
+  const job = JOBS.find((j) => j.id === 'momentum-journal-score');
+  it('runs on Fridays after the 19:30 run and before the 21:00 check, in the catalog group', () => {
+    expect(job?.schedule.at).toBe('20:30');
+    expect(job?.group).toBe('catalog');
+    expect(job?.steps).toEqual([['uv', 'run', 'mbt', 'journal', 'score']]);
+    // it sends nothing itself, so the scheduler alerts a failure
+    expect(job?.alertsItself).toBeFalsy();
   });
 });
 

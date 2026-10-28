@@ -29,6 +29,7 @@ import { SkeletonRows } from '../ui/Skeleton';
 import { StatCard } from '../ui/StatCard';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
+import { MomentumForwardCards } from './MomentumForwardCards';
 
 /**
  * Momentum › Journal (BL-024): every weekly signal as it was recorded — unchangeable, so it can
@@ -95,6 +96,7 @@ export function MomentumJournalView() {
         {check ? <JournalSummary check={check} /> : null}
       </Card>
       {check ? <JournalCheckCard items={check.items} week={check.week} /> : null}
+      <MomentumForwardCards />
       <JournalEntriesCard entries={data.entries} firstWeek={data.first_week} />
     </div>
   );

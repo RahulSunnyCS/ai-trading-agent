@@ -562,11 +562,11 @@ The plan and the owner's decisions live in the backlog item; this table only tra
 
 | # | Task | Owner | State |
 |---|---|---|---|
-| 3.15.1 | Phase 1: append-only, hash-chained journal written by every weekly run | claude | **Code done 2026-10-06** (migration 007, `forward_journal.py`, `mbt journal show/verify`). Closes when Friday 2026-10-09's runs write their rows and `mbt journal verify` passes; needs this merged and the laptop checkout on `main` before 14:40 that day |
-| 3.15.5 | Phase 1b: Friday 21:00 `mbt journal check --send` job + Momentum › Journal page | claude | **Code done 2026-10-06.** Closes with 3.15.1 on Friday 2026-10-09 |
+| 3.15.1 | Phase 1: append-only, hash-chained journal written by every weekly run | claude | **Done 2026-10-28** (confirmed read-only on a copy of the live catalog: 9 Oct was recorded, then the chain was reset on 12 Oct with its 29 rows kept in `TRADING_DATA_ROOT/backups/momentum_forward_journal-2026-10-12-before-reset.parquet`; 16 and 23 Oct recorded 43 of 43 each; `mbt journal verify` passes on 86 entries) |
+| 3.15.5 | Phase 1b: Friday 21:00 `mbt journal check --send` job + Momentum › Journal page | claude | **Done 2026-10-28** (the 21:00 check ran on 9, 16 and 23 Oct; 23 Oct's failed on an unmounted volume and passed on the manual rerun on Sat 24 Oct) |
 | 3.15.2 | Install the 19:30 `momentum-weekly-stock-ingest` LaunchAgent (without it no Stock/Broad favourite is evaluated or journalled) | owner | **Done 2026-10-06** (installed with the owner's go-ahead) |
-| 3.15.3 | Phase 2: weekly scoring, Forward page, Telegram line | claude | Open — after four Fridays are recorded |
-| 3.15.4 | Phase 3: real fills | owner→claude | Open — when real money is in |
+| 3.15.3 | Phase 2: weekly scoring, Forward page, Telegram line | claude | **Done 2026-10-28.** `mbt journal score` (scheduler `momentum-journal-score`, Fri 20:30), the Forward score card on Momentum › Journal, one line in the headline's 19:30 message. Week of 16 Oct scored; the four-week check lands on the scheduler by itself (about 13 Nov) |
+| 3.15.4 | Phase 3: real fills | claude | **Done 2026-10-28** (owner: "Phase 2 + 3 from Kite"). Kite contract notes, the lot ledger and the 14:15 orders reconciled per lot rebalance; the Real fills card beside the score; Lot 1 (16 Oct) and Lot 2 (23 Oct) reconciled |
 
 ### 3.16 Product focus — [BL-019](backlog/BL-019-product-focus-and-freeze.md)
 

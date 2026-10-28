@@ -395,6 +395,7 @@ describe('momentum backtest proxy routes', () => {
     ['/api/momentum/weekly/status', 'http://127.0.0.1:8765/api/weekly/status'],
     ['/api/momentum/journal', 'http://127.0.0.1:8765/api/journal'],
     ['/api/momentum/journal?week=2026-10-09', 'http://127.0.0.1:8765/api/journal?week=2026-10-09'],
+    ['/api/momentum/journal/forward', 'http://127.0.0.1:8765/api/journal/forward'],
     [
       '/api/momentum/weekly/stock-sync/jobs/latest',
       'http://127.0.0.1:8765/api/weekly/stock-sync/jobs/latest',

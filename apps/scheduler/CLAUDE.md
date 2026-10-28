@@ -168,6 +168,12 @@ day against the last 1 Apr / 1 Oct, and this year's rows; `MOMENTUM_DATA_DIR` ho
   `restartIfInterruptedUntil: '15:25'` (a `Job` field, read by `loop.decide`): a run cut off by a
   scheduler or laptop restart (reaped as interrupted, exit -2, by `startLoop` before its first tick) is
   started again while the session lasts; every other job treats an interrupted slot as served. Each part waits for its `.env` switch.
+- `momentum-journal-score` (BL-024, Fri 20:30, `mbt journal score`) sits between the 19:30
+  stock-ingest run (which records the week's journal rows and prices it scores against) and the
+  21:00 journal check, in the `catalog` group so it waits for a late 19:30 run. It re-runs every
+  scored favourite on today's code (one engine pass each, cached rankings), writes only
+  `forward_scores.json` in the momentum state dir and sends nothing: the headline's score line is
+  added to its 19:30 message, so the scheduler's own failure alert is the only Telegram it causes.
 - `momentum-history` (BL-001 Phase 4, Fri 22:00) runs `mbt verify history --send`: read-only on the catalog,
   but in the `catalog` group because DuckDB will not open a read-only connection while another process
   writes. It `alertsItself`: a restated history is its own Telegram and exits 0 once Telegram took it (like

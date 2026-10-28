@@ -168,6 +168,10 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/journal`,
             },
             {
+              source: '/api/momentum/journal/forward',
+              destination: `${momentumDirectOrigin}/api/journal/forward`,
+            },
+            {
               source: '/api/momentum/week',
               destination: `${momentumDirectOrigin}/api/week`,
             },
