@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades Widesl with real money on Core and T1; a friend's study says the split earns ₹160 a day more per lot with half the drawdown |
-| **Status** | In progress — Phase 1 done 2026-10-28 (killed on its rule: +₹39 NIFTY / +₹89 SENSEX a day net, intervals include zero, drawdown halved); Phase 2 opened the same day on the owner's override, pre-registered below |
+| **Status** | Done 2026-10-28: not adopted. Phase 1 killed on its rule (+₹39 NIFTY / +₹89 SENSEX a day net, intervals include zero); Phase 2 (owner override: Adaptive two morning + two afternoon Widesl vs its top two whole-day, Core's six families) also failed its rule: +₹75 [−56, +205] net per margin lot-day, gross +₹158 [+27, +288], drawdown shallower, the gain confined to one of the two years |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -204,6 +204,48 @@ Lead, not a finding: a cheaper broker (the study's ₹40 a set) or a 1-lot owner
 drawdown over ₹40–90 a day of expected gain could still prefer the split; that is the owner's call, with
 an `override:` here if Phase 2 is to run anyway.
 
+## Result (2026-10-28, Phase 2)
+
+434 pick days 2025-01-10 → 2026-10-27 after the 63-day warm-up; pools of 66 morning, 54 afternoon and
+150 whole-day variants; list C's composite on each; per margin lot-day = book net ÷ 2. The 150 whole-day
+re-simulations match the stored rotation results on all 75,150 variant-days (no gross differs by ₹1).
+Full table: `research/bl182/out/phase2_summary.md` (git-ignored; `uv run python research/bl182/phase2.py
+--analyse-only` rebuilds it from `results2/`).
+
+| Book | Net / margin lot-day | Gross | Net at ₹5 an order | Days in profit | Max DD (net) |
+|---|---|---|---|---|---|
+| Top two whole-day Widesl (comparator) | +188 | +273 | +226 | 56 % | −16,987 |
+| Top two morning alone | +64 | +149 | +102 | 60 % | −16,609 |
+| Top two afternoon alone | +199 | +282 | +237 | 66 % | −15,775 |
+| Split: two morning + two afternoon | +263 | +431 | +338 | 58 % | −13,978 |
+
+Split − comparator per margin lot-day: **net +75 [−56, +205]**; gross +158 [+27, +288]; at ₹5 an order
++112 [−18, +243]. Max drawdown −13,978 vs −16,987. **FAIL** on the registered rule (the lower bound is
+below zero; the drawdown condition is met).
+
+| Period | Pick days | Split | Comparator | Difference [90 %] |
+|---|---|---|---|---|
+| T1 selection year (to 2025-10-08) | 184 | +255 | +77 | +178 [−28, +402] |
+| The year after | 250 | +269 | +270 | −1 [−154, +156] |
+
+What the numbers say:
+
+- **Same shape as Phase 1, with Adaptive picking:** the split earns about ₹160 a day more gross per margin
+  lot and clears zero before charges; after charges the edge is ₹75 and the interval runs through zero.
+- **The edge is not stable in time.** With both indices it sits entirely in T1's selection year (+178) and
+  is nil in the year after (−1). On NIFTY alone (an interim read before SENSEX finished) it was the
+  reverse: level in the first year, +112 in the second. Two halves that disagree on which year carries it
+  is the signature of noise, not of a rule.
+- **The morning leg is the weak one** (₹64 a day net alone, the morning slots 09:17–09:47 picked most);
+  the afternoon pair alone (₹199) beats two whole-day sets (₹188) with a shallower drawdown. The split's
+  gain is the afternoon re-entry.
+- **Against the real book:** Core Adaptive as traded (three picks, Dir allowed) makes ₹394 gross per
+  lot-day over the same days, well above either Widesl-only book (273 / 431 gross per margin lot-day).
+- Seen data throughout; the 12:00 / 13:02 times and the two-plus-two shape were chosen on these days.
+
+Not adopted. Phase 3 (a forward track) is not opened on this result. The one lead worth keeping is the
+afternoon-only Widesl pair, which would need its own pre-registration.
+
 ## Risks
 
 - Fills at 12:00 and 13:00 on 1-minute bars with no spread; the afternoon set's smaller premiums.
@@ -250,3 +292,8 @@ an `override:` here if Phase 2 is to run anyway.
   tuned on this period), comparator = Core Adaptive's top two whole-day Widesl from the same families,
   both half-day picks at 09:16, afternoon grid to 15:02, exit 15:28. Phase 2 block registered above and
   committed before any run.
+- 2026-10-28 — Phase 2 run (`research/bl182/phase2.py`, 216 variants × 501 days per index, then the
+  replay): split − comparator +₹75 [−56, +205] net per margin lot-day, gross +₹158 [+27, +288], drawdown
+  shallower; the gain entirely in the first year with both indices. **FAIL** on the registered rule; not
+  adopted; Phase 3 not opened. Interim NIFTY-only read (before SENSEX finished): +₹65 [−58, +187], gain in
+  the second year instead.

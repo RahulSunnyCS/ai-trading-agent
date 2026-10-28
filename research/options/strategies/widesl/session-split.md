@@ -20,6 +20,7 @@ One set a day, 09:17–15:28, in every live and rotation Widesl file.
 |---|---|---|---|---|
 | Friend's study (not this repo) | NIFTY OTM1, SL 115 %, no trail, MTM ₹2,500; split 09:17–12 + 13–15:29 vs 09:17–15:29 | 2024-09-25 → 2026-10-27, 510 days, ₹40 costs a set | Split +₹82,752 after its costs (₹162 a day), days in profit 60 % vs 53 %, max DD −₹18k vs −₹40k; no interval; the edge sits in two quarters | [BL-182][bl182] Context |
 | [BL-182][bl182] Phase 1 | The same split on our engine for the study's definition, the live `N_wide_0917` and `S_wide_0917`, and the four T1 Widesl settings | 2024-10-09 → 2026-10-27, 501 days each index, **after charges** (`ruletest/charges.py`, ₹87 a set), 90 % 5-day block bootstrap, all seen data | **Killed on the registered rule.** Live NIFTY +₹39 [−107, +187] net per lot-day, live SENSEX +₹89 [−63, +241]; gross +₹123 / +₹171; max drawdown halved (₹50k → ₹23k, ₹42k → ₹27k a lot). The study's definition reconciles within 15 % (gross +₹179 [+22, +336]). T1 OTM1 settings +₹77 / +₹84 net, intervals include zero; the ₹150-premium setting −₹115 | BL-182 Result |
+| [BL-182][bl182] Phase 2 (owner override) | Adaptive (list C) picking two morning Widesl (09:17–11:47 → 12:00) and two afternoon (13:02–15:02 → 15:28) from Core's six Widesl families, against its top two whole-day Widesl from the same families | 434 pick days 2025-01-10 → 2026-10-27, after charges, per margin lot-day (book net ÷ 2), 90 % block bootstrap, seen data | **Killed on the rule.** Net +₹75 [−56, +205], gross +₹158 [+27, +288], ₹5-brokerage +₹112 [−18, +243]; drawdown −14k vs −17k; the gain entirely in T1's selection year (+178) and nil after (−1); the afternoon pair alone (+199) beats two whole-day sets (+188) | BL-182 Result (Phase 2) |
 
 ## What we know
 
@@ -39,16 +40,20 @@ One set a day, 09:17–15:28, in every live and rotation Widesl file.
 - Brokerage does not decide it: re-read at Shoonya's ₹5 an order the live files read +77 (NIFTY) and +126
   (SENSEX) a day, at Angel One's ₹20 an order over two lots +53 and +103, and the 90 % interval stays
   about ±150 wide, so no live file clears zero at any rate (BL-182 Log, post-hoc, descriptive).
-- Not adopted; an owner who values the halved drawdown could still prefer it (an `override:` in BL-182
-  would open Phase 2).
+- Adaptive picking does not rescue it (Phase 2, owner override): two morning + two afternoon Widesl
+  against two whole-day from Core's six families reads +₹75 [−56, +205] net per margin lot-day; the gain
+  sits in one of the two years (and in the other year on NIFTY alone), the mark of noise. The morning
+  pair alone earns ₹64 a day; the afternoon pair alone ₹199, more than two whole-day sets (₹188) with a
+  shallower drawdown: the split's gain is the afternoon re-entry.
+- Not adopted after both phases. The afternoon-only Widesl pair is a lead that would need its own
+  pre-registration.
 
 ## Not yet tested
 
 - Other close or re-entry times (11:30, 12:30, 13:02, 13:30); an afternoon set conditional on the
   morning's result; skipping 12:00–13:00 only on some days to expiry. All registered as "will not run"
   in BL-182 Phase 0.
-- The Adaptive two-plus-two book (top two Widesl in the morning, top two in the afternoon) — BL-182
-  Phase 2, only on a Phase 1 pass.
+- An afternoon-only Widesl book (two 13:02–15:02 picks, no morning set) as a rule of its own.
 - Any unseen days: Phase 1 is on seen data; a forward track (Phase 3) is the only test.
 
 ## Related

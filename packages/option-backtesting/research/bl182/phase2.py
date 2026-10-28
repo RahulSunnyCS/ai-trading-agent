@@ -328,8 +328,8 @@ def analyse() -> None:
         ("pm", "Afternoon picks"),
         ("all", "Whole-day picks"),
     ):
-        fams = Counter(n.split("_")[0].split("-")[0] for p in picks[key] for n in p)
-        slots_ = Counter(n.split("_")[1] for p in picks[key] for n in p)
+        fams = Counter(n.split("_")[1].split("-")[0] for p in picks[key] for n in p)
+        slots_ = Counter(n.split("_")[2] for p in picks[key] for n in p)
         tot = sum(fams.values())
         L.append(f"- **{label}** by family: " + ", ".join(f"{k} {100 * v / tot:.0f} %" for k, v in fams.most_common())
                  + "; by slot: " + ", ".join(f"{k} {100 * v / tot:.0f} %" for k, v in slots_.most_common(6)))  # fmt: skip
