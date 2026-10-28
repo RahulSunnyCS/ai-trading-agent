@@ -95,6 +95,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-180](BL-180-evening-prediction-vs-0916-pick.md) | Evening prediction against the 09:16 pick: does the open change the return? | Done: the prediction names the same picks on 97% of days and earns the same (Core-298 +₹1 a day, interval −₹45 to +₹50; T1 in-sample −₹62 on 13 days); the open adds nothing measurable | 2026-10-26 |
 | [BL-024](BL-024-forward-signal-journal.md) | Forward-signal journal: record every weekly signal from now on | Done: every Friday recorded since 9 Oct (chain reset 12 Oct, backup kept); Phase 2 score (`mbt journal score`, Fri 20:30 job, Journal page, one Telegram line) and Phase 3 Kite fills (16 and 23 Oct lots reconciled). One week scored at close; the four-week check lands on the scheduler (~13 Nov) | 2026-10-28 |
 | [BL-142](BL-142-momentum-kite-weekly-lots.md) | Momentum on Zerodha Kite: weekly ₹50k lots read from Kite each Friday, each rebalanced on its own calendar with free cash; LIQUIDBEES and SGBs excluded | Done: Kite read-only, lot ledger, per-lot Friday orders, This week's Lots panel; free-cash cap deferred, Broad premium rule → BL-136 | 2026-10-28 |
 | [BL-001](BL-001-momentum-result-integrity.md) | Momentum result integrity: goldens, parameter coverage, drift alerts | Done: goldens, coverage, look-ahead and always-true checks; F1/F6/F7 fixed (F6 merged `778ba02e`); weekly restated-history check `momentum-history`; pinned favourite re-run → BL-177; F3/F4 deferred | 2026-10-28 |
