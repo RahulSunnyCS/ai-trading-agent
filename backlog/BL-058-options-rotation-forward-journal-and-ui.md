@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — owner, 2026-10-09: the forward record must start before Monday 2026-10-12 09:15 |
-| **Status** | In progress — journal built 2026-10-10 (Phases 0b, 1, 2); Phase 4 view built 2026-10-11 (widgets 1–9 and 11; widget 10 paper vs real waits for the charge model and the contract-notes cutover); day-60 read-out pending |
+| **Status** | Done (2026-10-28): journal and rotation view built; the day-60 read-out is [BL-174](BL-174-rotation-day-60-readout.md), paper vs real is [BL-093](BL-093-rotation-paper-vs-real.md) |
 | **Type** | feature |
 | **Area** | options / dashboard / scheduler |
 | **Created** | 2026-10-09 |
@@ -465,3 +465,4 @@ reference and answers "did the new weights beat the old rotation?". Nothing in t
     against 27%–59%), distinct variants (49 against 36–44) and Buy-qualified days (7 against 0–6). The three
     picks the rule gave on Fri 9 Oct (N_p100_0917, N_p80_0932, N_ditm1_1202) correlate −0.15 to +0.69 over P1;
     the base's Widesl and Dir ATM 09:24 +0.28 over P2.
+- 2026-10-28 — closed by the owner (asked 2026-10-28): everything built is live (journal since Mon 12 Oct, Phase 4 view, scheduler jobs). Phase 5, the read-out at 60 trading days (about early January 2027), is its own item [BL-174](BL-174-rotation-day-60-readout.md); widget 10 stays with BL-093. The open questions above were settled when the journal started. Status `Done`.

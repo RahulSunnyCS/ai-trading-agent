@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the 55–63% CAGR headline, the saved favourites and the weekly signal all rest on an evaluation with known leaks and engine bugs |
-| **Status** | In progress (Phases 0, 1a, 2, 4, 5 done; Phase 3 measured; Phase 6: ensemble frozen, live parity built, the one-shot 2012–2016 backcast FAILED; paper tracking awaits the owner's go) |
+| **Status** | Done (2026-10-28): closed by the owner without paper tracking — the frozen ensemble failed its one-shot 2012–2016 backcast and the real money follows Four Sectors Monthly (BL-142); re-running the search on the F6-fixed ranking is [BL-176](BL-176-momentum-search-on-f6-ranking.md) |
 | **Type** | research (+ bug fixes in the engine) |
 | **Area** | momentum (+ trading-data for corporate-action matching) |
 | **Created** | 2026-10-05 |
@@ -577,3 +577,4 @@ Also parked here (owner, 2026-10-06), priority P3:
   Monday fill alone is 0.7 points (0.83 in the engine option built for BL-036) and whole-share rounding
   on a Rs 50,000 sleeve is the other 1.2. The expected case (25.5%) includes both. Table in the doc.
 - 2026-10-22 — E13: the Monday-fill option is built for Broad (BL-036 Phase 2; `execution="mon_open"`, signal delay 0 only, a Friday-versus-Monday line on every Broad result). Stock and Custom Index are BL-036 Phase 2b.
+- 2026-10-28 — closed by the owner (asked 2026-10-28): no paper tracking of the Phase 6 ensemble (its backcast failed; the real money follows Four Sectors Monthly, No Tilt under BL-142). Open question 3 (category layer) and Phase 7 stay unbuilt; the BL-001 F6 fix changes the ranking every figure here was computed on, so the search is re-run under [BL-176](BL-176-momentum-search-on-f6-ranking.md). Status `Done`.

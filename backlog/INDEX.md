@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-27
+Last updated: 2026-10-28
 
 ## Open
 
@@ -12,12 +12,8 @@ Sorted by priority (P0 first), then ID.
 | ID | Title | Priority | Status | Type | Area |
 |---|---|---|---|---|---|
 | [BL-001](BL-001-momentum-result-integrity.md) | Momentum result integrity: goldens, parameter coverage, drift alerts | P0 | In progress | improvement | momentum |
-| [BL-010](BL-010-momentum-evaluation-review.md) | Momentum evaluation review: prove the arithmetic, remove hindsight, fix selection | P0 | In progress | research | momentum |
 | [BL-012](BL-012-scheduler-service.md) | Scheduler service: one home for every recurring ingestion and maintenance job (laptop now, hostable later) | P0 | In progress | feature | infra |
-| [BL-014](BL-014-ci-and-merge-gates.md) | CI and merge gates: nothing reaches `main` while checks are red | P0 | In progress | chore | infra |
 | [BL-024](BL-024-forward-signal-journal.md) | Forward-signal journal: record every weekly signal from now on | P0 | In progress | feature | momentum |
-| [BL-034](BL-034-options-history-lake.md) | Options history lake: two years of vendor 1-minute data in `trading-data`, derived tables for straddle backtests, daily top-up | P0 | In progress | feature | trading-data |
-| [BL-058](BL-058-options-rotation-forward-journal-and-ui.md) | Options rotation: forward paper journal from Mon 12 Oct (picks recorded before 09:17, scored nightly) and the Options Lab screens it needs | P0 | In progress: journal built, first entry Mon 12 Oct 09:16 (lists A, B, C, REF); Phase 4 view built 2026-10-11 (page, shadow, explain, matrix, daily log, basket mode, forward vs periods, drawdowns, drift, family pulse; paper vs real waits for the charge model and contract notes); day-60 read-out pending | feature | options |
 | [BL-089](BL-089-backlog-tracks-and-github-board.md) | Backlog restructure: research / product / platform tracks, a generated index and `DONE.md`, one issue per item and a GitHub Projects board with a "Needs me" view | P0 | Ready | chore | cross-cutting |
 | [BL-107](BL-107-nse-fo-bhavcopy-daily.md) | Daily NSE F&O bhavcopy: official end-of-day record and a cross-check on the Fyers data | P0 | Planned | feature | options |
 | [BL-142](BL-142-momentum-kite-weekly-lots.md) | Momentum on Zerodha Kite: weekly ₹50k lots read from Kite each Friday, each rebalanced on its own calendar with free cash; LIQUIDBEES and SGBs excluded | P0 | In progress | feature | momentum |
@@ -58,6 +54,8 @@ Sorted by priority (P0 first), then ID.
 | [BL-168](BL-168-contract-notes-trade-book.md) | Contract notes in the repo: the Gmail → PDF job as a scheduler job, a store under `TRADING_DATA_ROOT` (trades, itemised charges, the PDFs, ledger e-mails, Kite's notes for Momentum), analytics (trades by source, round trips, best / worst point, the sheet's ratios), a Trade book page designed first, the monthly backup | P1 | In progress (Phases 1–5 done; sheet differences → BL-170; 6 built, waits for a real backup run) | feature | contract-notes / scheduler / trading-data / dashboard |
 | [BL-172](BL-172-broker-login-on-the-mac.md) | The morning on the Mac: login, Quantiply MTM SL (T1 ₹9,000, Core ₹8,000) and enable at 08:00 through the shared locks; Shoonya's subscription set each evening to the next session's algos; the 09:16 pick changes only strategies after 09:17; GitHub only as the backup | P1 | In progress | improvement | broker-login |
 | [BL-173](BL-173-fewer-telegram-messages.md) | Fewer Telegram messages: one morning confirmation, the pick, the result and failures; a "failures only" level per type | P1 | In progress | improvement | notify |
+| [BL-174](BL-174-rotation-day-60-readout.md) | Options rotation: the registered read-out at 60 trading days of the forward journal (due ~early Jan 2027) | P1 | Planned | research | options |
+| [BL-176](BL-176-momentum-search-on-f6-ranking.md) | Momentum: re-run the strategy search on the F6-fixed (point-in-time) ranking | P1 | Planned | research | momentum |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |
@@ -87,6 +85,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-152](BL-152-margin-check-without-algotest.md) | Margin check: a free-margin read that does not need AlgoTest or Shoonya's login, the need estimate checked against what the broker blocks, then switched on (`MARGIN_CHECK`) | P2 | Planned | improvement | broker-login |
 | [BL-169](BL-169-discretionary-trade-journal.md) | Discretionary trade journal: one-tap reasons for manual trades, what overriding the algos cost in rupees, behaviour patterns (descriptive only) | P2 | Planned | feature | contract-notes / scheduler / dashboard |
 | [BL-170](BL-170-sheet-vs-notes-differences.md) | Sheet against contract notes: explain the differences BL-168's reconciliation lists (owner's review; look for one systematic cause first) | P2 | Planned | chore | contract-notes |
+| [BL-175](BL-175-options-lake-2014-2024.md) | Options history lake: load the 2014–2024 expiry-week history (BL-034 Phase 5) | P2 | Planned | feature | trading-data |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
@@ -100,6 +99,10 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-058](BL-058-options-rotation-forward-journal-and-ui.md) | Options rotation: forward paper journal and the Options Lab screens it needs | Done: journal live since 12 Oct, rotation view built; day-60 read-out → BL-174, paper vs real → BL-093 | 2026-10-28 |
+| [BL-034](BL-034-options-history-lake.md) | Options history lake: two years of vendor 1-minute data, derived tables, daily top-up | Done: Phases 0–4; 2014–2024 history → BL-175 | 2026-10-28 |
+| [BL-014](BL-014-ci-and-merge-gates.md) | CI and merge gates: nothing reaches `main` while checks are red | Done: branch protection (four required checks, not strict), pre-push checks, Claude merge guard | 2026-10-28 |
+| [BL-010](BL-010-momentum-evaluation-review.md) | Momentum evaluation review: prove the arithmetic, remove hindsight, fix selection | Closed without paper tracking: ensemble backcast failed; money follows Four Sectors Monthly (BL-142); search re-run on F6 ranking → BL-176 | 2026-10-28 |
 | [BL-166](BL-166-higher-high-higher-low-structure.md) | Higher-high / higher-low structure on 5-minute NIFTY swings: buy the weekly ATM on the break of the last swing, exit on the structure break | Killed: +₹27 a trade (t 0.20, 399 trades, 30% winners), negative at 0.5% slippage; confirmation never opened | 2026-10-25 |
 | [BL-165](BL-165-gap-and-go-leads-gap-down-and-expiry.md) | BL-164's two leads on the locked 2022–24 period: gap-and-go on gap-down days only, and on expiry days only | Killed: both positive but not significant — gap-down +₹485 a trade (t 1.01, 75 trades), expiry days +₹746 (t 1.21, 43); bar t ≥ 2.24; each mean rests on its three best trades (about zero without them) | 2026-10-25 |
 | [BL-164](BL-164-gap-and-go-williams-chain.md) | NIFTY gap-and-go 10% opening-range band → Williams back-up chain, 150-point ITM weekly buys, exactly as published (3 tests; POC) | Killed: no candidate — H1 gap-and-go +₹111 a trade (t 0.33, 147 trades, negative at 0.5% slippage), H2 Williams −₹119, the chain −₹10; entering at the first break beats a later minute, but the trade does not pay; confirmation period never opened | 2026-10-25 |
