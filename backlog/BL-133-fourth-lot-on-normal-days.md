@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the owner trades both books with real money (3 lots each, ₹8.5 lakh per account) |
-| **Status** | Done — informative: the Dir is the best home for the fourth lot in both books (Core and, by Amendment 1, T1), but the edge over an even spread rests on a few days; no Widesl placement beats it. Amendment 2 (book stop, expiry rule): "always the Dir" beats "the top score" and "the top Widesl" as the pick to double |
+| **Status** | Done — informative: the Dir is the best home for the fourth lot in both books (Core and, by Amendment 1, T1), but the edge over an even spread rests on a few days; no Widesl placement beats it. Amendment 2 (book stop, expiry rule): "always the Dir" is the best pick to double, at least as good as "the top score" (clearly better only in Core's last year) and better than "the top Widesl" |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-18 |
@@ -216,7 +216,8 @@ lots spread evenly; nothing live changes.
 - 2026-10-28 — **Amendment 2 run as registered** (`research/bl133/fourth_lot_a2.py`; `fourth_lot_a2_2026-10-28.json`;
   428 days per book, none skipped). Net per day after brokerage, under the book stop (₹8k Core / ₹9k T1, + the extra
   lot's MTM SL on 4-lot days), expiring-index rule applied, 3 lots on expiry days (181 of 428; 104 of 244).
-  R/DD = annualised net ÷ |max drawdown|.
+  R/DD = annualised net ÷ |max drawdown|. Differences are per day over all days, expiry days (difference 0) included:
+  per 4-lot day they are about 1.7× larger.
 
   | Book, window | Arm | Net / day | vs 3 lots (90 %) | vs even spread B4 (90 %) | Max DD | Worst day | Worst week | R/DD | DD per lot |
   |---|---|---|---|---|---|---|---|---|---|
@@ -269,10 +270,16 @@ lots spread evenly; nothing live changes.
 
   **Read under the rule (descriptive; arms chosen after BL-133 was read).** "Always the Dir" is the best doubling rule
   in both books: it earns its lot against the even spread in Core (both windows) and in T1's last year, and beats
-  "always the top Widesl" in Core and in T1's last year. "Whichever scores highest" sits between the two: it is the Dir
+  "always the top Widesl" in Core and in T1's last year. Against "whichever scores highest" it is clearly better only
+  in Core's last year; elsewhere the difference includes zero. "Whichever scores highest" sits between the two: it is the Dir
   on about three days in four, and the days it doubles a Widesl cost it (Core last year −103 [−195, −17] against the
   Dir). Every Widesl placement, doubled or added, is at or below the even spread. Add vs double: in Core doubling the
   Dir beats adding one; in T1 adding a Dir earns ₹89 a day less but has the shallowest 4-lot drawdown (−29k vs −36k)
   and the best R/DD. Across both accounts the overlap needs no rule: cutting or skipping it makes less and does not
   lower the drawdown. Weaknesses as before: in-sample, the edge over the even spread rests on a handful of days, gross
   paths with stored trade counts, minute-close stops.
+  - **Review (PR #379):** B4's stop is 4/3 × the book stop (₹10.7k / ₹12k) while the arms get the book stop + the
+    extra lot's MTM SL (₹10.5k–13k), so "vs B4" carries a small stop-level difference; brokerage is the stored trade
+    count even on book-stopped days (slightly against arms with more stop days); "lots open at once" counts a lot open
+    from its first to its last move, so re-entry strategies overstate it. The MTM SL is now read from the file the
+    replay runs (`portfolio.strategy_file`), raising if unreadable; results unchanged.

@@ -19,7 +19,8 @@ import numpy as np
 from fourth_lot import BROKERAGE, WINDOWS, read
 
 from option_backtesting.fyers.daily import data_dir
-from option_backtesting.rotation import daylog, expiry, labels, pick, portfolio
+from option_backtesting.legwise.schema import load_legwise
+from option_backtesting.rotation import daylog, expiry, pick, portfolio
 from option_backtesting.rotation.readout import block_bootstrap_mean, max_drawdown
 from option_backtesting.rotation.score import runners_up, vix_band
 from option_backtesting.rotation.variants import is_dir, is_wide, track_names, variant_names
@@ -34,8 +35,9 @@ HEAD_TO_HEAD = (("R1x2", "Dx2"), ("R1x2", "Wx2"), ("Dx2", "Wx2"))
 
 
 def mtmsl(name: str) -> float:
-    s = labels._load(name)
-    v = None if s is None else s.overall.stop_loss_inr
+    """The strategy's own MTM SL per lot (what the book stop rises by), from the file the replay
+    runs; ₹4,000 only when the file has none. A file that cannot be read raises."""
+    v = load_legwise(portfolio.strategy_file(name)).overall.stop_loss_inr
     return float(v) if v is not None else NO_MTMSL_ADD
 
 
