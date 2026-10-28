@@ -11,6 +11,7 @@ the variant's own index, other days) on the selection year S. Writes stageb/<par
 
 from __future__ import annotations
 
+import os
 import sys
 from datetime import date
 from pathlib import Path
@@ -165,8 +166,12 @@ def run_part(part_dir: Path, force: bool = False) -> bool:
             for k, m in enumerate(masks):
                 M[vi, ci, k] = stats(n[si][m], g[si][m], s[si][m], piece[m], entered[m])
     OUT.mkdir(parents=True, exist_ok=True)
-    np.savez(out, metrics=M, exits=np.array([c[0] for c in cfgs]), stops=np.array([-1 if c[1] is None else c[1] for c in cfgs]),
+    tmp = out.with_name(
+        f"{out.stem}.{os.getpid()}.tmp.npz"
+    )  # atomic: two scorers never share a file
+    np.savez(tmp, metrics=M, exits=np.array([c[0] for c in cfgs]), stops=np.array([-1 if c[1] is None else c[1] for c in cfgs]),
              cells=np.array([c.cid for c in cells]), days=first)  # fmt: skip
+    os.replace(tmp, out)
     return True
 
 
