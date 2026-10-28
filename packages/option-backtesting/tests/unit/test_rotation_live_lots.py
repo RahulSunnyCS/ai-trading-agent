@@ -270,3 +270,11 @@ def test_tomorrows_tentative_list_says_the_lots():
     )
     assert "🔢 4 lots · Dir ×2" in text and "N_dir_ITM1 · 2 lots" in text
     assert "lots ·" not in messages.render_result("2026-10-29", (0.0, []), None, nxt, None)
+
+
+def test_the_messages_follow_only_platforms_whose_uploads_are_switched_on():
+    on = _settings(quantiply_angelone={"dirBoost": True})
+    assert a.dir_boost_lists(on) == {"adaptive": True, "t1": False}
+    off = a.env_uploads_on({"QUANTIPLY_UPLOAD": "off", "ALGOTEST_UPLOAD": "on"})
+    assert a.dir_boost_lists(on, off) == {"adaptive": False, "t1": False}
+    assert a.env_uploads_on({"QUANTIPLY_UPLOAD": " On "}) == {"algotest": False, "quantiply": True}

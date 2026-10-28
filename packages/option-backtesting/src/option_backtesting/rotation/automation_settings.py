@@ -169,10 +169,19 @@ def dir_boost_mixed(settings: dict, platform: str, book: str) -> bool:
     return len({bool(r.get("dirBoost", False)) for r in rows}) > 1
 
 
-def dir_boost_lists(settings: dict) -> dict[str, bool]:
+def dir_boost_lists(settings: dict, uploads_on: dict[str, bool] | None = None) -> dict[str, bool]:
     """BL-183, for the messages: {'adaptive', 't1'} -> whether some platform's export of that list
-    trades the Dir ×2 rule (`dir_boost_wanted`), so its lines say the lots."""
+    trades the Dir ×2 rule (`dir_boost_wanted`) and reaches that platform (`uploads_on`, by
+    platform: its `.env` upload switch; unset = every platform), so its lines say the lots."""
+    on = uploads_on if uploads_on is not None else {p: True for p in PLATFORMS}
     return {
-        key: any(dir_boost_wanted(settings, p, book) for p in PLATFORMS)
+        key: any(on.get(p, False) and dir_boost_wanted(settings, p, book) for p in PLATFORMS)
         for key, book in (("adaptive", "core"), ("t1", "t1"))
     }
+
+
+def env_uploads_on(env: dict[str, str] | None = None) -> dict[str, bool]:
+    """The `.env` hard switches that let each platform's uploader change anything:
+    ALGOTEST_UPLOAD / QUANTIPLY_UPLOAD = on."""
+    env = os.environ if env is None else env
+    return {p: str(env.get(f"{p.upper()}_UPLOAD", "")).strip().lower() == "on" for p in PLATFORMS}

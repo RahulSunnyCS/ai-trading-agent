@@ -262,15 +262,16 @@ def pick_and_send(
 
 
 def message_boost() -> dict[str, bool]:
-    """BL-183: which lists' messages say the Dir ×2 lots, from Settings › Automation. A message
-    must always go: settings that cannot be read leave the lots out, never stop it."""
+    """BL-183: which lists' messages say the Dir ×2 lots: Settings › Automation, for a platform
+    whose `.env` upload switch is on. A message must always go: settings that cannot be read
+    leave the lots out, never stop it."""
     from . import automation_settings
 
     try:
         settings, _ = automation_settings.read()
     except Exception:  # noqa: BLE001
         return {}
-    return automation_settings.dir_boost_lists(settings)
+    return automation_settings.dir_boost_lists(settings, automation_settings.env_uploads_on())
 
 
 def _severity(entry: dict) -> str:

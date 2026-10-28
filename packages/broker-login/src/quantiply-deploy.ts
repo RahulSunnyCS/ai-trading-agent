@@ -476,10 +476,15 @@ async function main(): Promise<number> {
       // an algo never goes live under a wrong or unknown one. BL-183: on a day the export trades
       // the Dir at 2 lots the stop rises by the Dir's own stop; the 09:21 top-up only ever widens
       // it (for a Dir ×2 the 09:16 pick brought), never tightens it while algos are running.
-      const extra = mtmSl === null ? 0 : bookStopExtra(p.manifest, p.body);
-      const target = mtmSl === null ? null : mtmSl + extra;
-      const topupWiden = !values.morning && target !== null && extra > 0;
-      if ((values.morning || topupWiden) && target !== null && mtmSl !== null) {
+      const held = new Set(
+        [...ownedForSession(ledger, session, p.sha).values()]
+          .filter((r) => p.sha.get(r.name) === r.sha)
+          .map((r) => r.name),
+      );
+      const extra = mtmSl === null ? 0 : bookStopExtra(p.manifest, p.body, multiplier, held);
+      const topupWiden = !values.morning && extra > 0;
+      if ((values.morning || topupWiden) && mtmSl !== null) {
+        const target = mtmSl + extra;
         const want =
           `₹${target.toLocaleString('en-IN')}` +
           (extra

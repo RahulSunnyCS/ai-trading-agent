@@ -644,6 +644,15 @@ describe('the book stop on a Dir ×2 day (BL-183)', () => {
     assert.equal(bookStopExtra(m, b), 3000);
   });
 
+  it('counts the row multiplier, and only picks the account holds as exported', () => {
+    const m = manifest(true, [entry('Core · W', 1), entry('Core · D', 2)]);
+    const b = bodies({ 'Core · W': -2500, 'Core · D': -6000 });
+    assert.equal(bookStopExtra(m, b, 2), 6000);
+    // the Dir on the account is still last evening's 1-lot algo: no extra lot trades, no rise
+    assert.equal(bookStopExtra(m, b, 1, new Set(['Core · W'])), 0);
+    assert.equal(bookStopExtra(m, b, 1, new Set(['Core · W', 'Core · D'])), 3000);
+  });
+
   it('a doubled pick with no stop of its own adds ₹4,000 a lot (the owner’s rule)', () => {
     const m = manifest(true, [entry('Core · D', 2)]);
     assert.equal(bookStopExtra(m, bodies({ 'Core · D': null })), NO_STOP_EXTRA_INR);

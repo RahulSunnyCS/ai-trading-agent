@@ -211,7 +211,8 @@ def _total_and_rows(result: DailyResult) -> tuple[float, list[tuple[str, float]]
 def as_traded(result: DailyResult) -> tuple[int, float] | None:
     """BL-183: (lots, net rupees) of the day's Adaptive picks under the Dir ×2 rule, from the
     one-lot results; None when the rule doubles nothing that day (an expiry day, no Dir picked).
-    The costs scale with the lots, as the paper figure's own estimate does."""
+    The stored net is after each lot's estimated costs, brokerage included, so a doubled pick
+    counts its brokerage twice although its orders are the same: about ₹94 low on such a day."""
     from .live_lots import lots_for_day
 
     rows = result.strategies.get(RESULT_KEYS[0], [])

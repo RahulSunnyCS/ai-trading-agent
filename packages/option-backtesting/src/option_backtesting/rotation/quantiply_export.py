@@ -21,7 +21,8 @@ from pathlib import Path
 
 from ..legwise.quantiply import WEEKDAYS, Export, to_quantiply
 from ..legwise.schema import load_legwise
-from .algtst_export import DayPicks, _lots_block, _lots_field, strategy_name
+from .algtst_export import DayPicks, strategy_name
+from .live_lots import manifest_block, manifest_field
 from .variants import strategy_path
 
 #: the lists Quantiply can take (BL-140: the dashboard settings choose; core was the first)
@@ -84,11 +85,11 @@ def write(picks: DayPicks, built: list[Built], out: Path, extra: dict | None = N
                 "addon": b.addon,
                 "file": f"{b.variant}.json",
                 "unconfirmed": b.export.unconfirmed,
-                **_lots_field(picks, b.variant, b.addon),
+                **manifest_field(picks, b.variant, b.addon),
             }
             for b in built
         ],
-        **_lots_block(picks),
+        **manifest_block(picks),
         **(extra or {}),
     }
     old.write_text(json.dumps(manifest, indent=2) + "\n")

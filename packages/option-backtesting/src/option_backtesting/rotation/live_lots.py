@@ -77,3 +77,17 @@ def scaled(spec: LegwiseStrategy, lots: int) -> LegwiseStrategy:
     )
     legs = [leg.model_copy(update={"lots": leg.lots * lots}) for leg in spec.legs]
     return spec.model_copy(update={"legs": legs, "overall": overall})
+
+
+def manifest_block(picks) -> dict:
+    """The export manifest's record of the day's lots (both exports), only when the Dir ×2 rule
+    was asked for (`picks.lots` set): the days to expiry it read and whether a pick is doubled.
+    Without it the manifest is exactly what it was. `picks` is an `algtst_export.DayPicks`."""
+    if picks.lots is None:
+        return {}
+    return {"dte": picks.dte, "dir_boost": boosted(picks.lots)}
+
+
+def manifest_field(picks, variant: str, addon: bool) -> dict:
+    """A manifest strategy's `lots`, under the same condition (the add-on is always 1 lot)."""
+    return {} if picks.lots is None else {"lots": 1 if addon else picks.lots_of(variant)}

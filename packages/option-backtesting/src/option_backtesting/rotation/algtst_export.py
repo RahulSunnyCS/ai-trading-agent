@@ -21,7 +21,8 @@ from pathlib import Path
 
 from ..legwise.algtst import Export, to_algtst
 from ..legwise.schema import load_legwise
-from . import journal, store
+from . import journal, live_lots, store
+from .live_lots import manifest_block, manifest_field
 from .variants import strategy_path
 
 #: book -> (journal track, AlgoTest name prefix)
@@ -94,13 +95,11 @@ def preview_picks(day: date, book: str, root: Path | None = None) -> DayPicks | 
 def build(picks: DayPicks) -> list[tuple[str, Export]]:
     """(variant, export) for every pick, core first; raises `Unmappable` on a setting with no
     known form."""
-    from .live_lots import scaled
-
     out = []
     for variant, addon in [(v, False) for v in picks.core] + [(v, True) for v in picks.buy]:
         spec = load_legwise(strategy_path(variant))
         if not addon:
-            spec = scaled(spec, picks.lots_of(variant))
+            spec = live_lots.scaled(spec, picks.lots_of(variant))
         out.append((variant, to_algtst(spec, strategy_name(picks.book, variant, addon))))
     return out
 
@@ -136,11 +135,11 @@ def write(picks: DayPicks, exports: list[tuple[str, Export]], out: Path) -> Path
                 "name": export.name,
                 "addon": variant in picks.buy,
                 "file": f"{variant}.algtst",
-                **_lots_field(picks, variant, variant in picks.buy),
+                **manifest_field(picks, variant, variant in picks.buy),
             }
             for variant, export in exports
         ],
-        **_lots_block(picks),
+        **manifest_block(picks),
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     zip_path = out / f"{picks.day.isoformat()}-{picks.book}.zip"
@@ -148,19 +147,6 @@ def write(picks: DayPicks, exports: list[tuple[str, Export]], out: Path) -> Path
         for path in files:
             zf.write(path, path.name)
     return zip_path
-
-
-def _lots_block(picks: DayPicks) -> dict:
-    """BL-183: the manifest's record of the day's lots, only when the Dir ×2 rule was asked for
-    (`picks.lots` set): the days to expiry it read and whether a pick is doubled. Without it the
-    manifest is exactly what it was."""
-    if picks.lots is None:
-        return {}
-    return {"dte": picks.dte, "dir_boost": any(v > 1 for v in picks.lots.values())}
-
-
-def _lots_field(picks: DayPicks, variant: str, addon: bool) -> dict:
-    return {} if picks.lots is None else {"lots": 1 if addon else picks.lots_of(variant)}
 
 
 def write_latest(base: Path, picks: DayPicks, folder: Path) -> Path:

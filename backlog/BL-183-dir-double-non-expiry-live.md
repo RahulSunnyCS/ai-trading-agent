@@ -108,3 +108,14 @@ right. With every toggle off nothing changes, byte for byte.
   - **To go live:** merge, restart the scheduler (`deploy/launchd/install.sh` or the scheduler restart the owner
     uses), turn "Dir ×2 on non-expiry days" on in Settings › Automation for the rows wanted, then watch the first
     evening upload (16:45), the 08:10 MTM SL line and the 09:25 check on the first non-expiry day.
+- 2026-10-28 — **Code review (PR #381, high).** Fixed:
+  - The 09:21 top-up raised the book stop even when the account still held last evening's 1-lot Dir (the switch
+    turned on overnight; the morning never replaces changed content). The extra now counts only picks the account
+    holds as exported (ledger sha = export sha).
+  - The extra is multiplied by the row's multiplier.
+  - The Telegram lots lines need the platform's `.env` upload switch on as well as the setting.
+  - Manifest helpers moved to `live_lots`; a redundant null check removed.
+  Left, said: the "As traded" line counts a doubled pick's brokerage twice (about ₹94 low); the toggle and its
+  Guide page landed in different commits of the same PR. **Open, the owner to confirm:** whether AlgoTest scales
+  a strategy's overall MTM SL by its leg lots itself. The export sends LotConfig 2 with ₹6,000; if AlgoTest
+  doubles it again the stop is ₹12,000. Until confirmed, leave Dir ×2 off on AlgoTest rows (the Guide says so).
