@@ -162,6 +162,12 @@ def load_baseline(state: Path) -> dict | None:
     return data
 
 
+def _had_baseline(state: Path) -> bool:
+    """Whether the log records a baseline (the log is appended before every baseline write)."""
+    log = state / LOG_FILE
+    return log.exists() and bool(log.read_text().strip())
+
+
 def save_baseline(
     state: Path, anchor: date, labels: Fingerprint, *, event: str, reason: str | None = None
 ) -> None:
@@ -216,8 +222,14 @@ def run(
     target = default_anchor(today)
     stored = load_baseline(state)
     if stored is None:
+        if _had_baseline(state) and not accept:
+            # Recording a new one would silently accept every change since the lost one.
+            raise ValueError(
+                f"{baseline_path(state)} is missing but {LOG_FILE} records an earlier baseline: "
+                "restore the file, or start again with --accept --reason"
+            )
         labels = fingerprint(target, root, bars=bars)
-        save_baseline(state, target, labels, event="new_baseline")
+        save_baseline(state, target, labels, event="new_baseline", reason=reason)
         return Outcome("new_baseline", target)
 
     if stored.get("duckdb") != duckdb.__version__ and not accept:

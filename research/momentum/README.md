@@ -23,7 +23,8 @@ Findings here summarise the record; the record is the backlog item (`backlog/BL-
 All four run on the same engine (`packages/momentum-backtesting/src/momentum_backtesting/engine.py`).
 
 **Caveat (2026-10-28):** every Broad figure on these pages from BL-010 was computed on the ranking
-before BL-001's F6 fix (members z-scored against stocks outside that week's universe). BL-010 closed
+before BL-001's F6 fix (members z-scored against stocks outside that week's universe), merged on
+2026-10-28 (PRs #318, #319, #322, merge commit `778ba02e`). BL-010 closed
 on 2026-10-28 without paper tracking; the search is re-run on the fixed ranking under
 [BL-176](../../backlog/BL-176-momentum-search-on-f6-ranking.md), which updates the pages it re-tests.
 
