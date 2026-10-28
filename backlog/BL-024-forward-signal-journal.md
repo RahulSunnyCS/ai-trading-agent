@@ -92,6 +92,7 @@ benchmark.
   detection for an edited and a deleted row).
 - **Done when:** Friday 2026-10-09's runs write one row per favourite (preview for ETF, final for
   all 12) plus the benchmark, and `mbt journal verify` passes.
+- **Status: done** (confirmed 2026-10-28; see the Log).
 
 ### Phase 1b — Check and Journal page (added 2026-10-06, owner request)
 - **Tasks:** `mbt journal check [--send]` (expected vs recorded for the week, wrong-week labels,
@@ -99,6 +100,7 @@ benchmark.
   summary; a **Momentum › Journal** dashboard page showing the same check, the chain fingerprint
   and every entry by week (`GET /api/journal`).
 - **Done when:** Friday 2026-10-09's 21:00 summary arrives and the page shows that week.
+- **Status: done** (the 21:00 check ran on 9, 16 and 23 Oct).
 
 ### Phase 2 — Score
 - **Tasks:** each week, take the portfolio each journalled signal led to from the *next* week's
@@ -110,11 +112,18 @@ benchmark.
   recorded after the fill are shown as corrections, never scored in its place.
 - **Deliverables:** weekly scoring job (BL-012), a Momentum "Forward" page, one Telegram line.
 - **Done when:** four weeks are scored and the live-vs-backtest gap is shown per config.
+- **Status: built 2026-10-28**: `forward_score.py` + `forward_run.py`, `mbt journal score`, scheduler
+  `momentum-journal-score` (Fri 20:30), the Forward score card on Momentum › Journal (a section
+  there rather than a page of its own: it reads with the week's entries), and one line in the
+  headline's 19:30 message. One week (16 Oct) scored at close; the four-week check lands on the
+  scheduler by itself (weeks of 16, 23, 30 Oct and 6 Nov, scored by Fri 13 Nov).
 
 ### Phase 3 — Real fills (when money is in)
 - **Tasks:** let the owner record actual fills (manual entry or broker CSV) next to the journal,
   so slippage and missed trades are measured, not assumed.
 - **Done when:** one real rebalance is reconciled.
+- **Status: done 2026-10-28** from the Kite contract notes, the lot ledger and the 14:15 orders
+  (`forward_fills.py`; no manual entry): Lot 1 (16 Oct) and Lot 2 (23 Oct) reconciled.
 
 ## Risks
 

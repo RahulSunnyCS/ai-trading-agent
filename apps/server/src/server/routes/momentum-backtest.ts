@@ -495,6 +495,11 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     },
   );
 
+  // BL-024 Phases 2-3: the forward score and the real Kite fills (read-only).
+  fastify.get('/api/momentum/journal/forward', async (_request, reply) => {
+    await forward(reply, '/api/journal/forward');
+  });
+
   // BL-051: This week — every favourite's signal for one week, from the journal.
   fastify.get(
     '/api/momentum/week',

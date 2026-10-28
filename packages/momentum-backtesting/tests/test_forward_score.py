@@ -284,5 +284,7 @@ def test_backtest_week_runs_from_before_one_weeks_trades_to_before_the_next():
 
 def test_the_score_file_round_trips(tmp_path):
     forward_score.save({"items": [], "weeks": []}, tmp_path)
-    assert forward_score.load(tmp_path) == {"items": [], "weeks": []}
-    assert json.loads((tmp_path / forward_score.SCORE_FILE).read_text())["weeks"] == []
+    assert forward_score.load(tmp_path) == {"items": [], "weeks": [], "schema": 1}
+    # A file of another shape (an older one) is not read as this one.
+    (tmp_path / forward_score.SCORE_FILE).write_text(json.dumps({"items": [], "weeks": []}))
+    assert forward_score.load(tmp_path) is None

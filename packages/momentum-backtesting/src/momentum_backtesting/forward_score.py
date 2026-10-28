@@ -44,6 +44,9 @@ from .engine import CASH, IDLE
 
 IST = ZoneInfo("Asia/Kolkata")
 SCORE_FILE = "forward_scores.json"
+#: The stored file's shape; a file of another shape is ignored (the page waits for the next run)
+#: rather than read as this one.
+SCHEMA = 1
 #: BL-001 F6 (PR #322): Broad ranks over each week's point-in-time members from this merge on.
 F6_COMMIT = "778ba02e"
 F6_LABEL = "point-in-time ranking (BL-001 F6)"
@@ -511,16 +514,17 @@ def save(result: dict, folder: Path) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / SCORE_FILE
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(result, indent=1, default=str))
+    tmp.write_text(json.dumps({**result, "schema": SCHEMA}, indent=1, default=str))
     tmp.replace(path)
     return path
 
 
 def load(folder: Path) -> dict | None:
     try:
-        return json.loads((folder / SCORE_FILE).read_text())
+        stored = json.loads((folder / SCORE_FILE).read_text())
     except (OSError, ValueError):
         return None
+    return stored if isinstance(stored, dict) and stored.get("schema") == SCHEMA else None
 
 
 def _pct(value: float | None) -> str:
