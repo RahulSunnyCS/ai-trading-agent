@@ -478,3 +478,6 @@ the two would be tested together, not chosen between on this data.
 - 2026-10-28 — E3 run (`research/bl182/overlays.py`, nineteen overlays on the recorded paths): targets hurt at every
   level; the lock-trail armed at ₹3,000 (breakeven, 1:1) reads +91 / −13,836 against the plain +64 / −16,609 and
   never hurts by period; the fixed files do not gain. Lead for a registration with the setting fixed.
+- 2026-10-28 — E3 addition (owner, after the nineteen were read: "For widesl, lock at 0 when profit at 1500, and then
+  1:1"): a twentieth overlay, lock-and-trail armed at ₹1,500 (breakeven ₹1, 1:1 in ₹100 steps), registered
+  before its run; read as the others, descriptive.
