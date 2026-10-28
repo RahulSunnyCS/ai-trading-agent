@@ -295,3 +295,30 @@ a new file. A rule here is never edited after a run. A changed rule is a new dat
     look-ahead checks. **Nothing has run. It awaits the owner's sign-off** (open question 2).
     The strategy itself was chosen on the pre-F6 ranking; BL-176 re-runs that search.
 - 2026-10-28 — **signed off** by the owner (asked in chat): the Experiments block "Drawdown rules with a way back in" and `search_spaces/bl025_rules_criteria.json` stand as written at merge `a4045e3f`, with X = 3 points; run now, without waiting for BL-176. Nothing had run before this entry.
+- 2026-10-28 — **before the run: mechanical clarifications** of the block, written with the code
+  (`drawdown_rules.py`, `scripts/bl025_rule_test.py`) and committed before any candidate was
+  scored. None changes a line, a number or a candidate, and none was read from a result.
+  1. *Between size changes nothing trades* ("a size change sells or buys that share of every
+     holding"). After a cut the invested half follows the model curve and the other half earns
+     the cash series; there is no weekly rebalancing back to ½. Back to full puts all the cash
+     back in; ½ → 0 sells the rest.
+  2. *"The action"* is the latest size change: the cut while at half size, the exit while at
+     zero (the table's "back to full size after a cut, and re-entry after an exit"). *"Since the
+     action"* counts that Friday's own close (R4's low; R3 and R5's close below the average).
+  3. After a return to full size the high starts again at the close of the Friday the return
+     is decided.
+  4. A Friday at half size that meets both the exit line and the way back has no registered
+     order. The code stops the run and reports it rather than choose.
+  5. *Costs.* Each object's money starts at ₹2 lakh. A sale pays the engine's itemised sell
+     rates on the equity sold, ₹16 DP per scrip (capped as the engine caps it) and the liquid
+     fund's stamp duty on the proceeds; a return pays the itemised buy rates on the equity
+     bought. The model's own idle cash does not trade. Costs come out of the money held.
+  6. *Tax* (reported only): each sale's estimate uses the model's open lots on the decision
+     Friday, scaled to the money held; the sale's losses offset its gains; nothing carries
+     between sales.
+  7. The decision on the last Friday (2026-10-23) has no next return in the window and books no
+     trade.
+  8. *Per fall* (reported): a fall is a drawdown of the object's model curve of 20% or more; it
+     owns the weeks from its peak to the next fall's peak. The log-wealth gap to R0 that builds
+     up there is its share of the CAGR given up.
+  9. The one-week-late variant is the same decisions, each size change one week later.
