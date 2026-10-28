@@ -484,3 +484,8 @@ the two would be tested together, not chosen between on this data.
 - 2026-10-28 — E3 addition (owner, after the nineteen were read: "For widesl, lock at 0 when profit at 1500, and then
   1:1"): a twentieth overlay, lock-and-trail armed at ₹1,500 (breakeven ₹1, 1:1 in ₹100 steps), registered
   before its run; read as the others, descriptive.
+- 2026-10-28 — E3 addition run (lock-and-trail armed at ₹1,500, breakeven, 1:1): morning book +75 a margin lot-day,
+  max drawdown −17,527, fires on 0.37 pick-days; split − comparator +85 [−63, +228]; by period +90 / −17,527 in
+  T1's selection year (plain +17 / −15,288) and +63 / −11,208 after (plain +99 / −11,970). It lifts the first
+  year and gives up part of the second, and the fixed files lose (`N_wide` +99 against +141, `S_wide` +218
+  against +266). Weaker than the ₹3,000 arm (+91 / −13,836); not a lead on its own.

@@ -58,7 +58,9 @@ One set a day, 09:17–15:28, in every live and rotation Widesl file.
   recorded MTM paths): a morning Widesl earns by decay, and a target takes the good days off the top.
   Profit locks are neutral to mildly helpful; a lock-and-trail armed at ₹3,000 with a breakeven lock
   that rises 1:1 reads +91 a day with a −13,836 drawdown against the plain +64 / −16,609, helping in
-  the first period and tying in the second, while the fixed 09:17 files do not gain. A lead.
+  the first period and tying in the second, while the fixed 09:17 files do not gain. A lead. Armed earlier,
+  at ₹1,500, it reads +75 / −17,527: it lifts the first year (+90) and gives up part of the second (+63
+  against +99), and the fixed files lose, so ₹3,000 is the arm that holds.
 - Not adopted after both phases, E1, E2 and E3. Leads: the afternoon-only Widesl pair; the split with a
   ₹3,000–4,000 morning stop; the ₹3,000 lock-and-trail on the morning set.
 
