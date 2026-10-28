@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades Widesl with real money on Core and T1; a friend's study says the split earns ₹160 a day more per lot with half the drawdown |
-| **Status** | Done 2026-10-28: not adopted. The split beats the whole day on point for every live and T1 setting but one (+₹39 NIFTY, +₹89 SENSEX a day net) with the drawdown halved, but every net 90 % interval includes zero after our charges (the rule), so Phase 2 was not run |
+| **Status** | In progress — Phase 1 done 2026-10-28 (killed on its rule: +₹39 NIFTY / +₹89 SENSEX a day net, intervals include zero, drawdown halved); Phase 2 opened the same day on the owner's override, pre-registered below |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -111,12 +111,52 @@ afternoon entries. Slippage beyond the engine's fills. Anything traded.
 - **Deliverables:** `research/bl182/out/summary.md` and `daily.csv` (git-ignored), the verdicts here.
 - **Done when:** A, B, C and D each have their numbers against the rule and the pages are updated.
 
-### Phase 2 — Adaptive two-plus-two (only on a B pass; its own Phase 0 block before any run)
+### Phase 2 — Adaptive two-plus-two (pre-registered 2026-10-28, before any run; opened by the owner's override, Log)
 
-- Half-day variants of T1's Widesl families at the rotation's entry slots (09:17–11:47 → 12:00;
-  13:02–15:02 → 15:28), Adaptive's composite run on each half's pool, top two in the morning and top
-  two in the afternoon, both picks at 09:16, the expiry-only rule kept; against T1 Adaptive as recorded
-  and a whole-day Widesl-only book, BL-113's read-out. Pre-registered here before the backfill.
+- **Hypothesis:** Adaptive choosing two Widesl for the morning (entries 09:17–11:47, exit 12:00) and two
+  for the afternoon (entries 13:02–15:02, exit 15:28) earns more per margin lot-day after charges than
+  Adaptive choosing two whole-day Widesl (entries 09:17–15:17, exit 15:28) from the same families, with a
+  max drawdown no worse.
+- **Universe (owner, 2026-10-28):** Core's six Widesl families only — NIFTY OTM1, ₹80, ₹100; SENSEX OTM2,
+  ₹250, ₹320 (`strategies/rotation/N_wide, N_p80, N_p100, S_wide, S_p250, S_p320`); T1's own settings are
+  left out because they were chosen on this period. Half-day variants = the family's 09:17 file with only
+  `entry_time` / `exit_time` changed: 11 morning slots (09:17, 09:32 … 11:47; exit 12:00) and 9 afternoon
+  slots (13:02 … 15:02; exit 15:28) → 120 half-day variants; the comparator pool is the same six families'
+  25 whole-day slots (150, the Core-298 files themselves), re-simulated in the same batch so both sides
+  share one engine version (their gross is checked against the stored `rotation/results/` and any
+  variant-day that differs is counted and reported). Dir and Buy are out on both sides. Same engine, fills,
+  sizing (`current`, 2026-10-12) and charges as Phase 1.
+- **Ranking:** list C's composite exactly as the 09:16 job computes it (`score.composite` with C's weights
+  and lookbacks, `family_index` for the family-band criterion, attributes from `rotation/days.csv`, the
+  ranking read on gross as the live store's `net` is), run three times a day on three pools — morning
+  (66 variants), afternoon (54) and whole-day (150) — and in each the top two by composite (ties by name;
+  `score.select`'s order without the Dir swap or Buy). Both half-day picks are made at 09:16 on history up
+  to the previous day. No expiry-day rule on either side (the replay of history never applies it). The
+  first pick day is the 64th day of results (`WARMUP` = 63), so picks run from about 2025-01-10 to
+  2026-10-27.
+- **Measure:** book net per day = the sum of its picks' one-lot net after charges (split: 2 morning + 2
+  afternoon; comparator: 2 whole-day). Per margin lot-day = book net ÷ 2, since a morning and an afternoon
+  set use one lot of margin in turn (Phase 1's convention). Difference = split − comparator per margin
+  lot-day; its mean with the 90 % interval from `readout.block_bootstrap_mean` (circular 5-day blocks,
+  2,000 resamples, seed 20261028); max drawdown per margin lot (`readout.max_drawdown`); days in profit;
+  gross beside net; at ₹13 an order and, reported only, Shoonya's ₹5. Also reported, descriptive: the same
+  over T1's selection year (pick days to 2025-10-08) and the year after (2025-10-09 on), the morning and
+  afternoon books alone, the picks' family and slot shares, and the whole-day book against Core Adaptive
+  as traded (gross, from the stored results) for context.
+- **Pass / kill rule:** pass if the difference's 90 % lower bound is above zero after charges at ₹13 AND
+  the split's max drawdown per margin lot is no deeper than the comparator's, over the whole pick span.
+  A pass earns Phase 3 (a forward paper track), never a trade. Fail → recorded; the split stays not
+  adopted.
+- **Look-ahead:** every composite reads only rows before the pick day; attributes are the day's own
+  weekday, VIX band and days to expiry as the live job uses them. The 12:00 / 13:02 times and the two-plus-
+  two shape are fixed above, chosen from the friend's study and Phase 1, which saw these same days: the
+  whole phase is seen data.
+- **Will not run:** other close or re-entry times, three-plus-three or one-plus-one books, an afternoon
+  pick at 12:55, the expiry-day rule, T1's settings in the pool, any reweighting of the composite, a
+  per-period selection. Any of these needs `override: <reason>` in the Log.
+- **Tasks:** `research/bl182/phase2.py` (variants, simulation, parity check, replay, summary); the Log;
+  `session-split.md` and the Widesl README row.
+- **Done when:** the rule above has its verdict and the pages are updated.
 
 ### Phase 3 — Forward track (only on a Phase 2 pass)
 
@@ -204,3 +244,9 @@ an `override:` here if Phase 2 is to run anyway.
   Cheaper brokerage adds ₹14–38 a day to the split's edge; the interval is about ±150 wide at every rate,
   so neither live file clears zero even at ₹5, and only the T1 SL 60 % setting does, by ₹1. The verdict
   does not turn on the broker; it turns on the day-to-day noise of the difference.
+- 2026-10-28 — `override: owner — accepts Phase 1's point estimate (+₹50–125 a lot-day on the owner's
+  brokers, ~28 % more per lot on Shoonya) and the halved drawdown as reason to run Phase 2 although the
+  registered rule failed.` Owner's choices for Phase 2: Core's six Widesl families (not T1's, which were
+  tuned on this period), comparator = Core Adaptive's top two whole-day Widesl from the same families,
+  both half-day picks at 09:16, afternoon grid to 15:02, exit 15:28. Phase 2 block registered above and
+  committed before any run.
