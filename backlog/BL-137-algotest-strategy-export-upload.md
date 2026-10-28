@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner places 3 Core + 3 T1 picks a day by hand with real money; retyping six strategies before 09:17 is where a wrong SL or strike slips in |
-| **Status** | In progress |
+| **Status** | Done (2026-10-28): built, unused. Export, uploader, delete by id and the two jobs merged (#264, #272); Automation settings v6 (23 Oct) turned AlgoTest's upload and login off, so T1 and Core trade through Quantiply; still gated by `ALGOTEST_UPLOAD`; Phase 5 not run |
 | **Type** | feature |
 | **Area** | options (exporter), broker-login (uploader) |
 | **Created** | 2026-10-19 |
@@ -281,3 +281,9 @@ entry, so the strategies must already be in AlgoTest the evening before.
   with no id, repeated, or listed under another id is the owner's (exit 3); a strategy with a weekday ticked on
   /live is never deleted. `--record-ids` added the ids of earlier uploads once. The owner's hand delete of
   `T1 · N_p150-t1s11_0917` removed it from `GET /strategies` (10 -> 9, nothing else changed).
+- 2026-10-28 — **Closed as built, unused** (owner, asked in chat, 2026-10-28). Delivered: Phase 1 (the
+  `.algtst` exporter), Phase 2 (the website route), Phase 3 (the uploader, read-back, ledger, delete by id)
+  and Phase 4 (`algotest-evening` 16:40, `algotest-topup` 09:18), merged in #264 and #272. Automation
+  settings v6 (23 Oct, BL-140) turned AlgoTest's upload and login off; T1 and Core trade through Quantiply
+  (BL-139). The code stays and is still gated by `ALGOTEST_UPLOAD`. **Not run:** Phase 5 (the first week's
+  AlgoTest trades compared with the files). Status `Done`.

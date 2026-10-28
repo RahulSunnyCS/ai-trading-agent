@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner changes which list runs on which platform by asking for code changes; the daily jobs should follow a setting instead |
-| **Status** | In progress — started 2026-10-19; Phase 1 |
+| **Status** | Done (2026-10-28): Phases 1–4 merged (#267, #268, #283, #284, #288, #289; logins follow the settings, #347); the link to Settings › Notifications not built |
 | **Type** | feature |
 | **Area** | dashboard + scheduler + broker-login + options |
 | **Created** | 2026-10-19 |
@@ -128,7 +128,7 @@ Shoonya's own hosts:
   - "no uploads until <date>" for holidays and travel;
   - a one-click "skip tomorrow".
 - **Portfolio stop per row:** ₹8,000 for Classic and ₹9,000 for Tuned, matching the dashboard cards. On Quantiply this could become the client-wise daily stop (`/brokers/:id/config`, seen in the web app's code; capture it before use).
-- **Notifications per job:** on/off. This already exists for message types in Settings › Notifications; link it from here.
+- **Notifications per job:** on/off. This already exists for message types in Settings › Notifications; link it from here. *(Not built; item closed 2026-10-28.)*
 - **Morning check:** at 09:20, compare what is on each platform with the settings and the 09:16 picks, and alert on any gap. This catches a missed upload before the first entry.
 
 ## Risks
@@ -139,10 +139,17 @@ Shoonya's own hosts:
 
 ## Open questions
 
-- Should the page also hold the times (16:40, 16:45, 09:18, 09:19)? Proposed: no, schedules stay in `jobs.ts`.
+- ~~Should the page also hold the times (16:40, 16:45, 09:18, 09:19)?~~ **No** (2026-10-28, as proposed): schedules stay in `jobs.ts`.
 
 ## Log
 
+- 2026-10-28 — **Closed** (owner, asked in chat, 2026-10-28). Delivered: the versioned settings store, API,
+  CLI and GitHub variable sync (Phase 1), Settings › Automation (Phase 2), every upload, deploy and login job
+  following it with Quantiply through Shoonya (Phases 3, 3b; #267, #268), then multiplier, Buy add-on, pause
+  and the 09:25 gap check (Phase 4; #283, #284, #288, #289) and the morning logins following the settings
+  (#347). The per-row MTM SL was built under BL-172. **Not built:** the link from this page to Settings ›
+  Notifications (Phase 4's "Notifications per job"). The open question (should the page hold the job times?)
+  is answered no, as proposed: schedules stay in `jobs.ts`. Status `Done`.
 - 2026-10-27 — Owner: the morning logins should follow the settings and log in to only what they need. Settings v6
   had no AlgoTest block on, yet the 08:00 run still waited 15 minutes for AlgoTest's window and reported
   "AlgoTest + Quantiply · All logins ready (2/2)" while Quantiply · Shoonya had failed, and the 09:16

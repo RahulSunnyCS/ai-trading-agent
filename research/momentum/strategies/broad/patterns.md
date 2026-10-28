@@ -1,6 +1,6 @@
 # Broad Momentum: chart patterns (tight range, flag, cup and handle)
 
-**Status:** Tested · **Last updated:** 2026-10-14
+**Status:** Tested · **Last updated:** 2026-10-28
 
 ## What it is
 
@@ -44,7 +44,8 @@ None. The default ranking, favourites, goldens and the Friday signal were untouc
 - As simple 10-slot portfolios (exploratory), "all four kinds, 8% stop" made 20.0% with a -43.7%
   max drawdown in 2012-2023, tracking the mid/small-cap indices (Midcap 150 TRI 21.5%, Smallcap
   250 TRI 19.1%): mid/small-cap exposure, not a pattern edge.
-- The 2024-26 hold-out is still sealed and unclaimed by both items.
+- The 2024-26 hold-out is still sealed and unclaimed by both items. BL-043 was closed as killed on
+  2026-10-28 (owner) without running it.
 
 ## Not yet tested
 

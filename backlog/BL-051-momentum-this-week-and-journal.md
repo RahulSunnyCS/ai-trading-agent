@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the page the owner acts on every Friday; paper tracking starts 2026-10-09 and real money will follow the headline favourite (BL-025) |
-| **Status** | In progress (Phases 1, 2 and 5 done; Phase 3 in progress) |
+| **Status** | Done (2026-10-28): Phases 1, 2, 3 and 5 merged (#133, #135, #137, #143, #148, #149); Phase 4 superseded by BL-142, BL-150 and BL-024 Phase 3; Phase 6 and the deferred delay-0 items moved to [BL-179](BL-179-momentum-journal-redesign.md) |
 | **Type** | feature |
 | **Area** | momentum (backend + dashboard + scheduler) |
 | **Created** | 2026-10-08 |
@@ -337,3 +337,12 @@ Answered by the owner on 2026-10-08 (see the Log):
   decision is exact and both would show nothing new; build them when a delay-0 strategy becomes
   Paper or Invested. Retiring the Rebalance tab waits for the rebalance-preview job fix
   (`fix/rebalance-preview-job`) to land, so the two changes do not collide.
+- 2026-10-28 — **Closed** (owner, asked in chat, 2026-10-28). Delivered: favourite statuses, groups and the
+  headline (Phase 1, #133, #135); the This week page (Phase 2, #137); Your orders, holdings, the exact
+  week-ahead decision, the Fri 14:15 `momentum-orders` job and Friday live scores (Phase 3, #143, #149), with
+  the Rebalance tab retired (`/momentum/rebalance` redirects to This week); alerts, the bell and the pop-up
+  (Phase 5, #148). **Superseded:** Phase 4 (Fyers basket file and "I placed these"): the money is on Zerodha
+  Kite, read through BL-142; the one-tap Kite basket is BL-150; real fills are BL-024 Phase 3. **Moved** to
+  [BL-179](BL-179-momentum-journal-redesign.md) (P2): Phase 6 (the Journal redesign) and the two items
+  deferred on 2026-10-09 (delay-0 live estimates on This week, the "Since your 14:15 orders" card). Open
+  question 4 (Fyers basket format) lapses with Phase 4. Status `Done`.

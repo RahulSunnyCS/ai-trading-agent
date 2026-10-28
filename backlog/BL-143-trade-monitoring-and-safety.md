@@ -109,3 +109,6 @@ The seven, as proposed that day (item 3, real fills and slippage per strategy, i
   - what a switched-off `READY` algo shows.
   Each is matched loosely, and anything unexpected is reported "check". Phase 4 is done when the owner has
   pressed the button once on a day of their choice.
+- 2026-10-28 — Owner (asked in chat, 2026-10-28): the owner will switch on `MARGIN_CHECK`, `DEPLOY_CHECK`,
+  `LOSS_ALERTS` and `STOP_BUTTON` themselves and check each one live, the stop button included. The item stays
+  open until then. Status unchanged.

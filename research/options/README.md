@@ -46,7 +46,7 @@ data. Status words and the page template: [`../README.md`](../README.md).
 | Strategy | Status | Item |
 |---|---|---|
 | [Long straddle hedge](strategies/long-straddle-hedge/README.md) | Tested (killed) | BL-101, BL-124 |
-| [Straddle premium exhaustion](strategies/straddle-exhaustion/README.md) | Tested on the learning periods; P1 unread | BL-091, BL-123 |
+| [Straddle premium exhaustion](strategies/straddle-exhaustion/README.md) | Tested on the learning periods (closed: a lead, not a result); P1 unread | BL-091, BL-123 |
 | [ATM Widesl, SENSEX](strategies/atm-widesl-sensex/README.md) | Descriptive (side look, no item) | — |
 | [Five-minute breakout, hold, 1-minute entry (index)](strategies/breakout/README.md) | Tested (killed) | BL-152, BL-153 |
 | [Gap-and-go band → Williams back-up (NIFTY, ITM buys)](strategies/gap-and-go/README.md) | Tested (killed) | BL-164, BL-165 |
