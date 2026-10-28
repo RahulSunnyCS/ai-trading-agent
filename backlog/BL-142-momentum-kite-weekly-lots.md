@@ -159,8 +159,11 @@ Answered by the owner on 2026-10-19 (the item was started):
 1. **Strategy and K:** **Four Sectors Monthly, No Tilt · all Fridays** (owner, 2026-10-20): K = 4,
    so its four sleeves (Friday 1 to 4 of 4) are the owner's four weekly ₹50k lots, one sleeve
    per lot, no pairing logic. Nothing in the build may assume K = 4 (the choice can change).
-2. **Kite login:** a Login button and a Friday 13:30 reminder. **Manual only (owner,
-   2026-10-19):** the planned test of an unattended TOTP login is dropped. A Zerodha
+2. **Kite login:** a Login button and a Friday 13:30 reminder. **Reversed 2026-10-28 (owner):
+   automated** on Fridays and trading Mondays inside the 08:02 morning login (`mbt kite
+   auto-login`, off until `KITE_AUTO_LOGIN=on`; TODO 3.34.5), with the reminders kept as the
+   fallback. The owner accepts the risk below. Was: **manual only (owner, 2026-10-19):** the
+   planned test of an unattended TOTP login is dropped. A Zerodha
    representative states on the Kite developer forum that automating the login is not allowed
    under exchange regulations (https://kite.trade/forum/discussion/comment/19966/), and it would
    mean keeping the Kite password and TOTP secret in `.env`. The account ID Kite returns at login
@@ -287,3 +290,11 @@ Kite facts checked on 2026-10-19 ([portfolio](https://kite.trade/docs/connect/v3
   - **Not yet verifiable:** Phase 2's "four lots matching Kite to the share" and Phase 3's "first
     due Friday" hand check of a rebalancing lot. The ramp-up runs to Fri 6 Nov and Lot 1's first
     rebalance is Fri 13 Nov; the panel and `mbt lots show` are where to check them.
+- 2026-10-28 — The owner reversed open question 2: Kite now logs in by itself on Fridays and
+  trading Mondays, in the 08:02 morning login, its result in the same 08:10 message
+  (`kite_login.py`, `mbt kite auto-login`; `local-login.ts` starts it). Told first that Zerodha
+  says automating the login is not allowed and that it puts the Kite account (the Momentum money)
+  at risk; chose it anyway. Built to log in only as a person would on Kite's own page: no
+  undocumented endpoints, nothing that hides the scripted browser, a stop at any captcha, no retry
+  of a refused password and a hold until the credentials change. Off until `KITE_AUTO_LOGIN=on`;
+  needs `KITE_USER_ID`, `KITE_PASSWORD`, `KITE_TOTP_SECRET` in `.env`. Not yet run against Kite.

@@ -2043,6 +2043,28 @@ def kite_sync_cmd() -> None:
     )
 
 
+@kite_app.command("auto-login")
+def kite_auto_login_cmd(
+    headed: bool = typer.Option(False, help="Show the browser (a manual check of the flow)."),
+    json_out: Path | None = typer.Option(None, help="Also write the outcome here as JSON."),
+) -> None:
+    """Log in to Kite unattended (owner, 2026-10-28; off until KITE_AUTO_LOGIN=on): Kite's own
+    login page with KITE_USER_ID, KITE_PASSWORD and a code from KITE_TOTP_SECRET. Run by the
+    08:02 morning login on Fridays and trading Mondays. A refused password is never retried and
+    holds later runs until the credentials change. Exit 0 = logged in, already logged in or
+    off; 1 = failed."""
+    from . import kite_login
+
+    load_repo_env()
+    outcome = kite_login.auto_login(headed=headed)
+    text = kite_login.outcome_json(outcome)
+    if json_out is not None:
+        json_out.write_text(text + "\n")
+    typer.echo(f"Kite {outcome.status}: {outcome.detail}")
+    if outcome.status == "FAIL":
+        raise typer.Exit(1)
+
+
 KITE_REMINDERS = {
     # when -> (title, why)
     "friday": (

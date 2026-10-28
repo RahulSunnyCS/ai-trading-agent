@@ -34,7 +34,6 @@ from . import (
     kite,
     levers,
     metrics,
-    notify,
     rebalance,
     reference_benchmarks,
     runs_store,
@@ -5487,7 +5486,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/kite/callback")
     def kite_callback(state: str = "", request_token: str = "", status: str = "") -> HTMLResponse:
-        from . import holdings_store, holdings_sync
+        from . import kite_login
 
         now = datetime.now(IST)
         with _LOCAL_OAUTH_LOCK:
@@ -5498,20 +5497,10 @@ def create_app() -> FastAPI:
             raise HTTPException(400, "Kite did not complete the login.")
         load_repo_env()
         try:
-            creds = kite.exchange_request_token(request_token)
+            # Keeps the token and, when Kite is the holdings source, reads the holdings at once.
+            note = kite_login.finish_login(request_token)
         except (kite.KiteCredentialsError, RuntimeError) as error:
             raise HTTPException(502, str(error)) from None
-        kite.save_token(creds)
-        # Read the holdings at once when Kite is the holdings source, so the page has them.
-        note = "Kite connected."
-        try:
-            with open_catalog() as con:
-                source = holdings_store.settings(con, holdings_store.owner())["holdings_source"]
-            if source == "kite":
-                snapshot = holdings_sync.sync("kite")
-                note += f" Holdings read: {len(snapshot.get('rows', []))} names."
-        except Exception as error:  # noqa: BLE001 - the login worked; the read is best effort
-            note += f" Holdings not read: {notify.redact(str(error))}"
         return HTMLResponse(
             "<!doctype html><title>Kite connected</title>"
             f"<p>{html.escape(note)} You can return to the dashboard.</p>"
