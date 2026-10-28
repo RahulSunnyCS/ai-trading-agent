@@ -41,6 +41,7 @@ data. Status words and the page template: [`../README.md`](../README.md).
 | [Intraday state and event triggers](common/intraday-state.md) | Tested | BL-053, BL-081, BL-083, BL-022 |
 | [Correlation and diverse baskets](common/correlation.md) | Tested | BL-090 |
 | [Previous-session state (VRP, skew, put/call ratio)](common/previous-session-state.md) | Descriptive (screen, no lead) | BL-159 reads 1–3 |
+| [Two-session sweep (half-day sets)](common/two-session-sweep.md) | Tested (killed) | BL-185 |
 
 ## Other strategies
 
