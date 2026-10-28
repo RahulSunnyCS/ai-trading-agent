@@ -15,8 +15,8 @@ import {
   formatPct,
   formatPp,
 } from '../../../lib/format';
+import { LOT_ORDER_STATUS } from '../../../lib/momentumLots';
 import type {
-  MomentumLotOrders,
   MomentumOrderPreview,
   MomentumOrderPreviewJob,
   MomentumOrderRow,
@@ -142,7 +142,13 @@ type PlanSource = Pick<MomentumOrders, 'kind' | 'reason'> &
  */
 export function YourOrders({
   favourites = null,
-}: { favourites?: readonly OrderPreviewChoice[] | null } = {}) {
+  onChanged,
+}: {
+  favourites?: readonly OrderPreviewChoice[] | null;
+  /** Called when the orders, the holdings snapshot or the settings shown here change (the
+   * Lots panel reads the ledger again). */
+  onChanged?: () => void;
+} = {}) {
   const view = usePolledResource<MomentumOrdersView>('/api/momentum/orders', { cache: true });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const running = view.data?.job?.status === 'running';
@@ -155,6 +161,16 @@ export function YourOrders({
 
   const latest: MomentumOrders | null = view.data?.orders.at(-1) ?? null;
   const settings = view.data?.settings ?? null;
+  const stamp = view.data
+    ? `${latest?.created_at ?? ''}|${view.data.holdings?.synced_at ?? ''}|${settings?.holdings_source ?? ''}`
+    : null;
+  const lastStamp = useRef<string | null>(null);
+  useEffect(() => {
+    if (stamp === null) return;
+    const before = lastStamp.current;
+    lastStamp.current = stamp;
+    if (before !== null && before !== stamp) onChanged?.();
+  }, [stamp, onChanged]);
   const preview = useOrderPreview();
   const others = useMemo(() => (favourites ?? []).filter((f) => !f.headline), [favourites]);
   const previewing = preview.favourite !== null;
@@ -249,7 +265,7 @@ export function YourOrders({
               {latest.trigger === 'scheduled' ? 'the 14:15 job' : 'by hand'}).
             </>
           }
-          lots={latest.lots ? <LotsPanel orders={latest} /> : null}
+          lots={latest.lots ? <LotOrders orders={latest} /> : null}
         />
       )}
       <OrdersSettingsDrawer
@@ -464,16 +480,9 @@ function PlanBody({
   );
 }
 
-const LOT_STATUS: Record<MomentumLotOrders['status'], string> = {
-  new: 'New lot: buy',
-  rebalance: 'Rebalance',
-  exit: 'Sell only',
-  'not due': 'Not due',
-};
-
 /** BL-142: the strategy followed lot by lot: what each lot does this Friday, what to add to Kite,
  * the one order per stock, and any change in Kite no lot could take. */
-function LotsPanel({ orders }: { orders: MomentumOrders }) {
+function LotOrders({ orders }: { orders: MomentumOrders }) {
   const lots = orders.lots ?? [];
   const net = Object.entries(orders.net ?? {});
   const unexplained = orders.ledger?.unexplained ?? [];
@@ -484,7 +493,7 @@ function LotsPanel({ orders }: { orders: MomentumOrders }) {
           <li key={lot.id} className="flex flex-wrap items-baseline gap-x-2">
             <span className="font-semibold text-foreground">{lot.label}</span>
             <Badge tone={lot.status === 'not due' ? 'neutral' : 'primary'}>
-              {LOT_STATUS[lot.status]}
+              {LOT_ORDER_STATUS[lot.status]}
             </Badge>
             {lot.budget != null && lot.status !== 'not due' ? (
               <span className="text-muted">{formatInr(lot.budget)}</span>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useAppRoute } from '../../../hooks/useAppRoute';
 import type { MomentumWeeklyJobState } from '../../../hooks/useMomentumWeeklyJob';
@@ -35,6 +35,7 @@ import { toast } from '../../ui/Toast';
 import { StockDrawer } from '../scores/StockDrawer';
 import { type FavouriteKpis, Favourites } from './Favourites';
 import { FridayTimeline } from './FridayTimeline';
+import { LotsPanel } from './LotsPanel';
 import { RulesStrip } from './RulesStrip';
 import { EdgeNames, NeedsAttention, SincePreview, TelegramMessage } from './SidePanels';
 import { SignalCard } from './SignalCard';
@@ -45,7 +46,8 @@ import { YourOrders } from './YourOrders';
  * Momentum › This week (BL-051): the Friday timeline, what needs a person, the owner's
  * live-money rules, every favourite (headline first) and the selected one's trades, with what
  * changed since the preview, the names at the edge and the Telegram message. Replaces the
- * Weekly signal page; Your orders (Phase 3) replaces Rebalance preview below it.
+ * Weekly signal page; Your orders (Phase 3) replaces Rebalance preview below it, with the Lots
+ * panel (BL-142 Phase 4) above it when the headline is followed lot by lot.
  *
  * Everything that opens on top is in the URL: `?week=`, `?fav=`, `?panel=run`, `?review=SYMBOL`,
  * `?stock=SYMBOL`.
@@ -75,6 +77,9 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
   const favourites = usePolledResource<MomentumSavedRun[]>('/api/momentum/favorite-strategies', {
     cache: true,
   });
+  // Bumped when Your orders changed, so the Lots panel reads the ledger again.
+  const [ordersVersion, setOrdersVersion] = useState(0);
+  const onOrdersChanged = useCallback(() => setOrdersVersion((n) => n + 1), []);
   // The Scores payload (~300 KB) only when a card holds scored stocks; see ScoresFetcher.
   const [scoresData, setScoresData] = useState<MomentumScores | null>(null);
 
@@ -234,7 +239,8 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
       {card && card.dataset !== 'etf' && !scoresData ? (
         <ScoresFetcher onData={setScoresData} />
       ) : null}
-      <YourOrders favourites={cards} />
+      <LotsPanel shownWeek={week} ordersVersion={ordersVersion} />
+      <YourOrders favourites={cards} onChanged={onOrdersChanged} />
 
       <RunByHandDrawer open={panel === 'run'} onClose={() => setPanel(null)} weekly={weekly} />
       <ClassifySplitDrawer

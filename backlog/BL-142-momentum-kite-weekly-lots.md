@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — real money is already in (first ₹50k bought Mon 2026-10-19); the month's goal is Momentum the owner trusts with money (`overview.md`) |
-| **Status** | In progress — Phases 1–3 built; Phase 4 (Lots panel) planned |
+| **Status** | Done |
 | **Type** | feature |
 | **Area** | momentum / broker / dashboard / scheduler |
 | **Created** | 2026-10-19 |
@@ -255,4 +255,35 @@ Kite facts checked on 2026-10-19 ([portfolio](https://kite.trade/docs/connect/v3
   - a lot is *new* only if it never held a share: one that sold out is rebalanced (no deposit
     after the ramp);
   - the message states the free cash the plan used, and lists what was booked since the last run.
-
+- 2026-10-28 — Phase 4 built and the item closed (Done). Built:
+  - **Lots panel** on Momentum › This week (`LotsPanel.tsx`, `lib/momentumLots.ts`), above Your
+    orders and left out when the headline is not followed lot by lot. One row per lot: the shares
+    booked to it, their value at the last stored close (never a quote), its last and next
+    rebalance, *Due* for this Friday's lot, *last orders were for it* on the pending lot, and the
+    last Friday orders' line for it. Under it, **Kite minus the lots** beside what those orders told
+    each lot to buy, with any difference marked.
+  - `GET /api/lots` (`api.lots_view`, proxied at `/api/momentum/lots`): built on `lots_status`, so
+    it is the same ledger as `mbt lots show`. Read-only: every catalog open is read-only, no Kite
+    read, no quote, no booking (`tests/test_lot_orders.py` compares every table and state file
+    before and after, and refuses a sync or a quote).
+  - Your orders already showed the due lot's orders with Kite as the source (Phase 3); its status
+    words now come from the same place as the panel's.
+  - Guide (`momentum/this-week.md`, a *Your lots* section), `business.md` (Kite: holdings and
+    margins, never an order), `technical.md` (`/api/lots`; the `KITE_*` variables and `mbt lots`
+    were already there).
+  Checked on the live ledger (the worktree's `mbt serve` and dashboard on spare ports, the
+  owner's :8765 / :5190 untouched): every lot's shares and the Kite-minus-the-lots rows are the
+  same as `mbt lots show`, the per-lot lines are the 23 Oct 14:25 Telegram's, Lot 3 is due Fri
+  30 Oct, and the page load made GET requests only (the ledger, the pending lot and the Kite
+  snapshot were unchanged afterwards). One stock in Kite differs by a share from what the orders
+  said; the 30 Oct run books it under the attribution rule.
+  Not built, recorded here instead of a new item:
+  - **Dropped:** a separate "nothing due, next due Fri DD Mon" message. With one lot per Friday a
+    lot is always due, and when none is, the message's per-lot lines already say *not due · next …*.
+  - **Deferred:** a cap on the free cash a rebalance may use (Risks). Every message and the panel
+    show the cash used; add the setting if cash kept on Kite for something else is ever swept in.
+  - **Deferred to BL-136 Phase 1b:** the premium rule for Broad atomics (lots whose model holds
+    Nasdaq 100 still need the owner's swap by hand).
+  - **Not yet verifiable:** Phase 2's "four lots matching Kite to the share" and Phase 3's "first
+    due Friday" hand check of a rebalancing lot. The ramp-up runs to Fri 6 Nov and Lot 1's first
+    rebalance is Fri 13 Nov; the panel and `mbt lots show` are where to check them.
