@@ -52,7 +52,9 @@ class Recorder:
 
     def add(self, d: date, r: DayResult, charges: float, orders: int) -> None:
         self.days.append(d.isoformat())
-        self.paths.append(path_of(r))
+        self.paths.append(
+            to_paise(path_of(r))
+        )  # int32 at once: a part holds 360 variants x 500 days
         self.events.append(events_of(r))
         self.gross.append(r.gross)
         self.charges.append(charges)
@@ -64,9 +66,7 @@ class Recorder:
         np.savez(
             file,
             days=np.array(self.days),
-            path=to_paise(
-                np.array(self.paths, dtype=np.float64).reshape(len(self.days), N_MINUTES)
-            ),
+            path=np.array(self.paths, dtype=np.int32).reshape(len(self.days), N_MINUTES),
             events=np.array(self.events, dtype=np.float32).reshape(
                 len(self.days), MAX_TRADES, EV_COLS
             ),

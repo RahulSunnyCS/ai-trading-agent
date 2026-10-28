@@ -1,0 +1,36 @@
+# BL-182 Phase 2 E1: S_wide_1302.yaml with overall stop 2000
+strategy:
+  id: S_wide-pm_1302
+  underlying: SENSEX
+  entry_time: '13:02'
+  exit_time: '15:28'
+  square_off: partial
+  legs:
+  - id: ce
+    lots: 1
+    position: sell
+    option_type: CE
+    expiry: weekly
+    strike:
+      strike_type: OTM2
+    stop_loss:
+      percent: 114
+    trail_sl:
+      percent:
+      - 15
+      - 10
+  - id: pe
+    lots: 1
+    position: sell
+    option_type: PE
+    expiry: weekly
+    strike:
+      strike_type: OTM2
+    stop_loss:
+      percent: 115
+    trail_sl:
+      percent:
+      - 15
+      - 10
+  overall:
+    stop_loss_inr: 2000.0

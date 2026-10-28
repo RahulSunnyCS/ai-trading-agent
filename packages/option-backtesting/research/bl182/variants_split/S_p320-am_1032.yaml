@@ -1,0 +1,36 @@
+# bl182: S_p320_1032.yaml with the exit moved to 12:00
+strategy:
+  id: S_p320-am_1032
+  underlying: SENSEX
+  entry_time: '10:32'
+  exit_time: '12:00'
+  square_off: partial
+  legs:
+  - id: ce
+    lots: 1
+    position: sell
+    option_type: CE
+    expiry: weekly
+    strike:
+      closest_premium: 320
+    stop_loss:
+      percent: 114
+    trail_sl:
+      percent:
+      - 15
+      - 10
+  - id: pe
+    lots: 1
+    position: sell
+    option_type: PE
+    expiry: weekly
+    strike:
+      closest_premium: 320
+    stop_loss:
+      percent: 115
+    trail_sl:
+      percent:
+      - 15
+      - 10
+  overall:
+    stop_loss_inr: 2500

@@ -1,0 +1,34 @@
+# bl184: S_ditm1_1017.yaml with the exit moved to 13:00, overall stop 2500
+strategy:
+  id: S_ditm1-am_1017
+  underlying: SENSEX
+  entry_time: '10:17'
+  exit_time: '13:00'
+  square_off: partial
+  legs:
+  - id: ce
+    lots: 1
+    position: sell
+    option_type: CE
+    expiry: weekly
+    strike:
+      strike_type: ITM1
+    stop_loss:
+      percent: 21
+    reentry_on_sl:
+      mode: cost
+      count: 1
+  - id: pe
+    lots: 1
+    position: sell
+    option_type: PE
+    expiry: weekly
+    strike:
+      strike_type: ITM1
+    stop_loss:
+      percent: 21
+    reentry_on_sl:
+      mode: cost
+      count: 1
+  overall:
+    stop_loss_inr: 2500.0

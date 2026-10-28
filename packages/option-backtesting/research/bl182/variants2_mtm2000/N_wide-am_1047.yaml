@@ -1,0 +1,36 @@
+# BL-182 Phase 2 E1: N_wide_1047.yaml with the exit moved to 12:00, overall stop 2000
+strategy:
+  id: N_wide-am_1047
+  underlying: NIFTY
+  entry_time: '10:47'
+  exit_time: '12:00'
+  square_off: partial
+  legs:
+  - id: ce
+    lots: 1
+    position: sell
+    option_type: CE
+    expiry: weekly
+    strike:
+      strike_type: OTM1
+    stop_loss:
+      percent: 115
+    trail_sl:
+      percent:
+      - 15
+      - 10
+  - id: pe
+    lots: 1
+    position: sell
+    option_type: PE
+    expiry: weekly
+    strike:
+      strike_type: OTM1
+    stop_loss:
+      percent: 115
+    trail_sl:
+      percent:
+      - 15
+      - 10
+  overall:
+    stop_loss_inr: 2000.0

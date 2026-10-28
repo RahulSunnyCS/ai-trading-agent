@@ -29,3 +29,5 @@ results_smoke/
 # BL-185 (paths live under TRADING_DATA_ROOT/research/bl185; nothing of them here)
 bl185/logs/
 *.npz
+bl185/guard.log
+bl185/progress.txt

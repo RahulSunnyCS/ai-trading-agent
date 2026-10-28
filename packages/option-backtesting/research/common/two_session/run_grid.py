@@ -72,13 +72,32 @@ def run_part(
     )
 
 
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def claim(u: str, co: str, slot: str) -> bool:
     d = part_dir(u, co, slot)
     if (d / "DONE").exists():
         return False
     d.mkdir(parents=True, exist_ok=True)
+    lock = d / "LOCK"
+    if lock.exists():  # a killed worker leaves its lock: reclaim it when its pid is gone
+        try:
+            pid = int(lock.read_text().split()[0])
+        except (ValueError, IndexError, OSError):
+            pid = -1
+        if pid > 0 and _alive(pid):
+            return False
+        lock.unlink(missing_ok=True)
     try:
-        fd = os.open(d / "LOCK", os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
         return False
     os.write(fd, f"{os.getpid()} {datetime.now():%F %T}\n".encode())
