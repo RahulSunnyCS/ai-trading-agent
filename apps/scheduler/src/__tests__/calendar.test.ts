@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   type CalendarReaders,
+  checkBlockedDates,
   checkCalendars,
   checkHolidays,
   checkMargin,
@@ -106,6 +108,56 @@ describe('real reference data', () => {
     const readers = diskReaders(resolve(import.meta.dirname, '../../../..'));
     expect(checkHolidays('2026-10-07', readers).ok).toBe(true);
     expect(checkRbiDates('2026-10-07', readers).ok).toBe(true);
+  });
+});
+
+describe('checkBlockedDates (Y3)', () => {
+  const list = (...d: string[]) => JSON.stringify(d);
+  it('passes when unset or empty', () => {
+    expect(checkBlockedDates('2026-12-01', undefined).ok).toBe(true);
+    expect(checkBlockedDates('2026-12-01', '').ok).toBe(true);
+    expect(checkBlockedDates('2026-12-01', '[]').ok).toBe(true);
+  });
+  it('fails on a list the engine would ignore', () => {
+    expect(checkBlockedDates('2026-10-28', '2026-10-29').ok).toBe(false);
+    expect(checkBlockedDates('2026-10-28', '{"a":1}').detail).toContain('not a JSON array');
+    const r = checkBlockedDates('2026-10-28', '["2026-10-29", "29/10/2026"]');
+    expect(r.ok).toBe(false);
+    expect(r.detail).toContain('"29/10/2026"');
+  });
+  it('fails on impossible days of the right shape', () => {
+    for (const day of ['2027-13-45', '2027-02-30', '2027-00-10']) {
+      const r = checkBlockedDates('2026-10-28', list('2026-11-26', day));
+      expect(r.ok).toBe(false);
+      expect(r.detail).toContain(day);
+    }
+  });
+  it('notes upcoming closed days without failing (a weekend Budget session is legitimate)', () => {
+    const r = checkBlockedDates(
+      '2026-10-28',
+      list('2026-10-02', '2026-11-10', '2026-11-14', '2026-11-26'),
+    );
+    expect(r.ok).toBe(true);
+    expect(r.detail).toContain('closed: 2026-11-10, 2026-11-14');
+    expect(r.detail).not.toContain('2026-10-02');
+  });
+  it('is quiet before December and asks for next year from 1 Dec', () => {
+    const thisYear = list('2026-11-26', '2026-12-31');
+    expect(checkBlockedDates('2026-11-30', thisYear).ok).toBe(true);
+    const dec = checkBlockedDates('2026-12-01', thisYear);
+    expect(dec.ok).toBe(false);
+    expect(dec.detail).toContain('no 2027 days');
+    expect(checkBlockedDates('2026-12-01', list('2026-12-31', '2027-01-28')).ok).toBe(true);
+  });
+  it('fails when every day is past', () => {
+    expect(checkBlockedDates('2027-01-04', list('2026-12-31')).detail).toContain('in the past');
+  });
+  it('passes on the .env.example list until December', () => {
+    const example = readFileSync(resolve(import.meta.dirname, '../../../../.env.example'), 'utf8');
+    const raw = /^BLOCKED_DATES=(.*)$/m.exec(example)?.[1];
+    expect(raw).toBeDefined();
+    expect(checkBlockedDates('2026-10-28', raw).ok).toBe(true);
+    expect(checkBlockedDates('2026-12-01', raw).ok).toBe(false);
   });
 });
 

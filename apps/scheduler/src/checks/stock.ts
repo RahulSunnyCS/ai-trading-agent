@@ -1,14 +1,16 @@
 import { spawn } from 'node:child_process';
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Job } from '../jobs.js';
 import type { Builtin, BuiltinContext } from '../runner.js';
-import { tradingDays } from '../schedule.js';
+import { istDay, tradingDays } from '../schedule.js';
 import { type CheckResult, checkBuiltin, checkJob } from './types.js';
 
 /**
- * Stock-data deadlines (BL-012 inventory M2 and W3). Both read the output of the read-only
- * `mbt stocks deadlines` command, so the age rule lives in one place (`adjust.diff_ca_events`
- * + `guards.check_ca_diff_age`) and nothing here opens DuckDB or writes anything.
+ * Stock-data deadlines (BL-012 inventory M2, W3 and S3). M2 and W3 read the output of the
+ * read-only `mbt stocks deadlines` command, so the age rule lives in one place
+ * (`adjust.diff_ca_events` + `guards.check_ca_diff_age`) and nothing here opens DuckDB or
+ * writes anything. S3 reads the category files' dates and years.
  */
 
 /** `check_ca_diff_age` fails the Friday `mbt stocks sync` above this many days. */
@@ -118,7 +120,101 @@ export function reviewQueueCheck(read: DeadlinesReader = readDeadlines): Builtin
   return checkBuiltin(async (ctx) => evaluateReviews(await read(ctx)));
 }
 
+/**
+ * BL-012 inventory S3: Broad Momentum's Total Market universe and the sector/thematic category
+ * membership are fetched by hand (`mbt categories fetch-universe`, `mbt categories fetch`) and
+ * go stale at each NSE semi-annual index review, which takes effect at the end of March and of
+ * September. From 1 Apr and 1 Oct the file must have been rewritten since, and from 1 Jan it
+ * must hold the new year's rows. The files carry no fetch date, so "refreshed" is the file's
+ * modification day (IST); a copy that resets it can only hide a due refresh, never invent one.
+ * Momentum reads the catalog copy first (`category_membership`, filled from these CSVs by
+ * `mbt local migrate`); this check sees only the CSVs, so the fix hint runs the import in the
+ * same command line rather than leaving it as a separate step to forget.
+ */
+export const UNIVERSE_FILES = [
+  { file: 'total_market_membership.csv', label: 'Total Market universe' },
+  { file: 'category_membership.csv', label: 'category membership' },
+] as const;
+
+export interface UniverseFile {
+  /** IST day the file was last written. */
+  refreshedDay: string;
+  /** Highest `year` in the file, or null when it has no rows. */
+  newestYear: number | null;
+}
+
+/** Reads `<momentum data>/categories/<file>`; null when the file does not exist. */
+export type UniverseReader = (file: string) => UniverseFile | null;
+
+export function diskUniverseReader(dataDir: string): UniverseReader {
+  return (file) => {
+    const path = join(dataDir, 'categories', file);
+    let text: string;
+    let mtime: Date;
+    try {
+      mtime = statSync(path).mtime;
+      text = readFileSync(path, 'utf8');
+    } catch {
+      return null;
+    }
+    let newestYear: number | null = null;
+    for (const line of text.split('\n').slice(1)) {
+      const year = Number(line.split(',')[1]);
+      if (Number.isInteger(year) && year > 0 && (newestYear === null || year > newestYear)) {
+        newestYear = year;
+      }
+    }
+    return { refreshedDay: istDay(mtime), newestYear };
+  };
+}
+
+/** The latest 1 Apr or 1 Oct on or before `today`: the last index review's due day. */
+export function lastReviewDay(today: string): string {
+  const year = Number(today.slice(0, 4));
+  const candidates = [`${year}-10-01`, `${year}-04-01`, `${year - 1}-10-01`];
+  return candidates.find((d) => d <= today) ?? `${year - 1}-10-01`;
+}
+
+export function checkUniverseRefresh(today: string, read: UniverseReader): CheckResult {
+  const review = lastReviewDay(today);
+  const year = Number(today.slice(0, 4));
+  const problems: string[] = [];
+  const fine: string[] = [];
+  for (const { file, label } of UNIVERSE_FILES) {
+    const info = read(file);
+    if (!info) {
+      problems.push(`${label}: ${file} does not exist`);
+      continue;
+    }
+    const issues: string[] = [];
+    if (info.refreshedDay < review) {
+      issues.push(`last refreshed ${info.refreshedDay}, before the index review due ${review}`);
+    }
+    if (info.newestYear === null) issues.push('no rows');
+    else if (info.newestYear < year) issues.push(`no ${year} rows (newest ${info.newestYear})`);
+    if (issues.length > 0) problems.push(`${label} (${file}): ${issues.join(', ')}`);
+    else fine.push(`${label} refreshed ${info.refreshedDay}`);
+  }
+  if (problems.length > 0) {
+    return { ok: false, detail: `momentum universe refresh due — ${problems.join('; ')}` };
+  }
+  return { ok: true, detail: `${fine.join('; ')} (last index review due ${review})` };
+}
+
+export function momentumDataDir(ctx: BuiltinContext): string {
+  return ctx.env.MOMENTUM_DATA_DIR || join(ctx.repoRoot, 'packages/momentum-backtesting/data');
+}
+
 export const jobs: Job[] = [
+  checkJob({
+    id: 'universe-refresh-reminder',
+    description:
+      'Remind to refresh the Total Market universe and category membership after each NSE index review (S3)',
+    schedule: { at: '08:40', on: tradingDays, label: 'trading days 08:40' },
+    builtin: 'universe-refresh-reminder',
+    fixHint:
+      'On the home connection (NSE): cd packages/momentum-backtesting && uv run mbt categories fetch-universe && uv run mbt categories fetch && uv run mbt local migrate',
+  }),
   checkJob({
     id: 'check-stock-ca-baseline-age',
     description: 'Warn when a corporate-action change has waited 20+ days for review (M2)',
@@ -139,4 +235,7 @@ export const jobs: Job[] = [
 export const builtins: Record<string, Builtin> = {
   'check-stock-ca-baseline-age': caAgeCheck(),
   'check-stock-review-queue': reviewQueueCheck(),
+  'universe-refresh-reminder': checkBuiltin((ctx) =>
+    checkUniverseRefresh(istDay(ctx.now()), diskUniverseReader(momentumDataDir(ctx))),
+  ),
 };

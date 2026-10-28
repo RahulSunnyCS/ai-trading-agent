@@ -12,7 +12,6 @@ Sorted by priority (P0 first), then ID.
 | ID | Title | Priority | Status | Type | Area |
 |---|---|---|---|---|---|
 | [BL-001](BL-001-momentum-result-integrity.md) | Momentum result integrity: goldens, parameter coverage, drift alerts | P0 | In progress | improvement | momentum |
-| [BL-012](BL-012-scheduler-service.md) | Scheduler service: one home for every recurring ingestion and maintenance job (laptop now, hostable later) | P0 | In progress | feature | infra |
 | [BL-024](BL-024-forward-signal-journal.md) | Forward-signal journal: record every weekly signal from now on | P0 | In progress | feature | momentum |
 | [BL-089](BL-089-backlog-tracks-and-github-board.md) | Backlog restructure: research / product / platform tracks, a generated index and `DONE.md`, one issue per item and a GitHub Projects board with a "Needs me" view | P0 | Ready | chore | cross-cutting |
 | [BL-107](BL-107-nse-fo-bhavcopy-daily.md) | Daily NSE F&O bhavcopy: official end-of-day record and a cross-check on the Fyers data | P0 | Planned | feature | options |
@@ -99,6 +98,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-012](BL-012-scheduler-service.md) | Scheduler service: one home for every recurring ingestion and maintenance job (laptop now, hostable later) | Done: installed under launchd, 44 jobs; last checks Y3/Y4/S3 added; D5/D6 dropped (frozen engine), D4 done by BL-168, no container needed | 2026-10-28 |
 | [BL-058](BL-058-options-rotation-forward-journal-and-ui.md) | Options rotation: forward paper journal and the Options Lab screens it needs | Done: journal live since 12 Oct, rotation view built; day-60 read-out → BL-174, paper vs real → BL-093 | 2026-10-28 |
 | [BL-034](BL-034-options-history-lake.md) | Options history lake: two years of vendor 1-minute data, derived tables, daily top-up | Done: Phases 0–4; 2014–2024 history → BL-175 | 2026-10-28 |
 | [BL-014](BL-014-ci-and-merge-gates.md) | CI and merge gates: nothing reaches `main` while checks are red | Done: branch protection (four required checks, not strict), pre-push checks, Claude merge guard | 2026-10-28 |
