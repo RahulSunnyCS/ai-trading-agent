@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P0 — the owner's call (2026-10-28) |
-| **Status** | Planned |
+| **Status** | In progress (2026-10-28): Phase 1 built, Phase 2 running |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
 | **Depends on** | BL-096 (the leg-stop sweep), BL-156 Amendment 1 (leg stops on tick, not the candle close) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.10.47 |
 
 ## Context
 
@@ -132,3 +132,39 @@ None open; answered 2026-10-28 (Log).
   ₹5,000 too and is the primary comparator (₹3,000 reported beside it) — Claude's reading, recorded here; RE COST
   for a reversed leg: not re-sold (Claude's default, unopposed); expiry days included with an excluded line; the
   long's stop 30%, trail 150% / 80%, D halves the primary arm. To run overnight with one worker.
+- 2026-10-28 — Phase 1 built (`legwise/schema.py` `reverse_on_sl`, `legwise/engine.py`; refused by name by
+  `legwise/algtst.py` and `legwise/quantiply.py`): 7 engine tests (trend day, whipsaw, MTM, the long's 30%
+  stop, time stop, trail with half size and a gapped stop, the filter hook), the 30 leg-wise goldens
+  unchanged, the full suite green (1,823 passed), and stored T1 days re-simulated with the option off equal
+  their stored results (the first 86 Dir pick-days of Phase 2's A3 cell, 343 pick-days in all, 0 mismatches;
+  the full count is in the Result).
+- 2026-10-28 — how Phase 2 reads the registered rules, written before any result was read (no rule changed;
+  the engine and the data force these choices):
+  - **Dir picks** are the `dir` and `ditm1` families, including T1's own Dir settings (`N_dir-t1s29`,
+    `N_ditm1-t1s36`, `S_ditm1-t1s44`), each in its own file: their leg stops (40%, 20% and 15% with a trail),
+    RE COST ×2 and ₹4,000 stops stay. **A3** is each pick's file as it is (₹3,000 for Core's Dir; ₹3,000 or
+    ₹4,000 for T1's Dir settings); **A5** and every reversal arm set the overall stop to ₹5,000.
+  - The long is bought on any SL fill of a sold Dir leg (a trailed SL too), at most once per leg a day. A stop
+    the filter turns down arms RE COST as today, and a later stop of the re-sold leg is judged again.
+  - **"At the stop minute"**: the stop fills inside bar m, so every filter reads bars that end at or before
+    m − 1 (`research/bl186/sar.py`; `test_filters.py` shocks every bar from m on and checks that no decision
+    changes, 66 cases).
+  - **C1:** no 5-minute bar after 09:30 has closed yet = no reversal.
+  - **C2 VWAP:** the index has no traded volume and 1-minute futures are in the lake only from 2026-09, so
+    each minute's typical index price is weighted by that minute's traded volume of the stopped leg's expiry
+    across the collected chain (a volume proxy). A plain time-weighted mean (`C2twap_T30`) is reported beside
+    it, secondary.
+  - **C3:** ATM IV from bar m − 1's closes vs bar entry − 1's (the closes the pick entered on); ATM = the
+    collected strike nearest the index with both a call and a put, forward from put-call parity, Black-76 IV
+    of the call (`trading_data.derived.implied_vol`); no solution at either end = no reversal.
+  - **D:** the engine at `lots_ratio: 0.5` (a fractional quantity: the long's P&L and its weight in the
+    ₹5,000 stop halved), for every filter × exit; "the primary arm at 0.5×" is D-C1/C2/C3_T30.
+  - **Kill rule:** "beats A on net ₹ a day" = a positive mean difference significant under Holm (two-sided
+    bootstrap p, 2,000 circular 5-session blocks, α 0.10); "on max drawdown" = a shallower maximum drawdown
+    than A5. The long's standalone net is its P&L less ₹20 + GST on its two orders, per Dir pick-day.
+  - **Lines:** statutory = BL-063's charges less its brokerage, on top of the ₹20 + GST an order; slippage =
+    1% of the long's entry premium, taken off after the fact; expiry-excluded = the days a Dir pick trades
+    on its own index's expiry (weekday label 0) dropped from both sides. Stop rate = the share of Dir
+    pick-days whose overall MTM stop fired; CVaR = the mean of the worst 5% of days; Ulcer = the RMS of the
+    rupee underwater curve (BL-096's definitions).
+  - T1 only (the item's universe); Core is not run.

@@ -122,6 +122,29 @@ class TrailPeak(_Model):
     exit_percent: float = Field(gt=0, lt=100, allow_inf_nan=False)
 
 
+class ReverseOnSL(_Model):
+    """Stop-and-reverse for a SOLD leg (BL-186): when the leg's stop fills, buy the same
+    contract at that fill price (`lots_ratio` x the leg's lots; 0.5 gives a half-size long on
+    paper, a fractional quantity). The long has its own stop (`stop_loss_percent` below its
+    entry), an optional time stop (`time_stop_minutes` after the buy, filled at the price then)
+    and an optional peak trail; else it is held to the strategy's exit. It counts in the overall
+    MTM like any leg. A leg that has reversed is not sold again by `reentry_on_sl`; at most one
+    reversal per leg a day. Off unless set; no platform form is captured, so the AlgoTest and
+    Quantiply exports refuse it."""
+
+    lots_ratio: float = Field(default=1.0, allow_inf_nan=False)
+    stop_loss_percent: float | None = Field(default=30.0, gt=0, lt=100, allow_inf_nan=False)
+    time_stop_minutes: int | None = Field(default=None, ge=1, le=375)
+    trail_peak: TrailPeak | None = None
+
+    @field_validator("lots_ratio")
+    @classmethod
+    def _ratio(cls, value: float) -> float:
+        if value not in (0.5, 1.0):
+            raise ValueError("reverse_on_sl.lots_ratio must be 1.0 or 0.5")
+        return value
+
+
 class ReEntry(_Model):
     #: asap — re-select the strike by the leg's own criteria and enter at the
     #: next minute; cost — same contract, re-enter when its price returns to
@@ -210,14 +233,16 @@ class Leg(_Model):
     reentry_on_target: ReEntry | None = None
     range_breakout: RangeBreakout | None = None
     roll: RollSpec | None = None
+    #: BL-186: buy the same contract when this sold leg's stop fills, see ReverseOnSL
+    reverse_on_sl: ReverseOnSL | None = None
 
     @model_serializer(mode="wrap")
     def _omit_roll_when_unset(self, handler):
-        """Leave `roll`, `trail_peak` and `stop_on` out of the dump while at their defaults:
-        `store.spec_hash` is the hash of this dump, and adding a field must not give every saved
-        strategy a new version (BL-105, BL-164)."""
+        """Leave `roll`, `trail_peak`, `reverse_on_sl` and `stop_on` out of the dump while at their
+        defaults: `store.spec_hash` is the hash of this dump, and adding a field must not give every
+        saved strategy a new version (BL-105, BL-164, BL-186)."""
         data = handler(self)
-        for key in ("roll", "trail_peak"):
+        for key in ("roll", "trail_peak", "reverse_on_sl"):
             if data.get(key) is None:
                 data.pop(key, None)
         if data.get("stop_on") == "tick":
@@ -234,6 +259,11 @@ class Leg(_Model):
             raise ValueError(f"leg {self.id!r}: reentry_on_target needs a target")
         if self.trail_peak is not None and self.position != "buy":
             raise ValueError(f"leg {self.id!r}: trail_peak is for bought legs")
+        if self.reverse_on_sl is not None:
+            if self.position != "sell":
+                raise ValueError(f"leg {self.id!r}: reverse_on_sl is for sold legs")
+            if self.stop_loss is None:
+                raise ValueError(f"leg {self.id!r}: reverse_on_sl needs a stop_loss")
         if self.roll is not None:
             if self.position != "sell":
                 raise ValueError(f"leg {self.id!r}: roll is for sold legs (a decayed premium)")
@@ -298,6 +328,8 @@ class LegwiseStrategy(_Model):
                 raise ValueError("roll with square_off: complete is not supported yet")
             if self.square_off == "complete" and reentry is not None:
                 raise ValueError("re-entry with square_off: complete is not supported yet")
+            if self.square_off == "complete" and leg.reverse_on_sl is not None:
+                raise ValueError("reverse_on_sl with square_off: complete is not supported")
         return self
 
 

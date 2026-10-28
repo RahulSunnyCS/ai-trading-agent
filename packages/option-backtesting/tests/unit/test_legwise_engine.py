@@ -3,7 +3,7 @@ from datetime import date
 import pytest
 from pydantic import ValidationError
 
-from option_backtesting.legwise.engine import simulate_day
+from option_backtesting.legwise.engine import simulate_day, to_tick
 from option_backtesting.legwise.market import N_MINUTES, DayData, Series, minute_index, pick_expiry
 from option_backtesting.legwise.schema import LegwiseStrategy
 
@@ -486,3 +486,133 @@ def test_stop_on_close_names_the_higher_level_when_both_are_crossed():
     )
     [t] = simulate_day(strategy([leg]), data).trades
     assert (t.exit_price, t.exit_reason) == (65, "TRAIL")
+
+
+# --- BL-186: stop-and-reverse on a sold leg's stop -------------------------------------------
+
+
+def rising(base: float, overrides: dict, after: str, level: float) -> Series:
+    """`bars(base, overrides)`, then flat at `level` from the minute after `after`."""
+    s = bars(base, overrides)
+    for m in range(minute_index(after) + 1, N_MINUTES):
+        s.open[m] = s.high[m] = s.low[m] = s.close[m] = level
+    return s
+
+
+def sar_leg(**rev) -> dict:
+    return sell_leg(
+        stop_loss={"percent": 21},
+        reentry_on_sl={"mode": "cost", "count": 1},
+        reverse_on_sl=rev,
+    )
+
+
+STOP_BAR = {"10:00": (100, 125, 100, 124)}  # entry 100, SL 121 touched intrabar
+
+
+def test_reverse_on_sl_buys_the_stopped_contract_at_the_stop_on_a_trend_day():
+    data = day({(22000.0, "CE"): rising(100, STOP_BAR, "10:00", 180)})
+    result = simulate_day(strategy([sar_leg()]), data)
+    short, long = result.trades
+    assert (short.position, short.exit_price, short.exit_reason) == ("sell", 121, "SL")
+    assert (long.leg_id, long.position, long.contract) == ("ce_rev", "buy", short.contract)
+    assert (long.entry_min, long.entry_price, long.qty) == (minute_index("10:00"), 121, LOT)
+    assert (long.exit_price, long.exit_reason) == (180, "EXIT_TIME")
+    assert result.gross == pytest.approx((100 - 121) * LOT + (180 - 121) * LOT)
+
+
+def test_reverse_on_sl_whipsaw_hits_the_longs_own_30pct_stop_and_is_not_re_sold():
+    # back through the 100 entry (RE COST would re-sell there), down to 80: the long's 30% stop
+    whip = {**STOP_BAR, "10:30": (100, 100, 80, 82)}
+    data = day({(22000.0, "CE"): rising(110, whip, "10:30", 82)})
+    data.chain[(EXP, 22000.0, "CE")].close[minute_index("09:19")] = 100  # entry at 100
+    trades = simulate_day(strategy([sar_leg()]), data).trades
+    assert [(t.leg_id, t.exit_price, t.exit_reason) for t in trades] == [
+        ("ce", 121, "SL"),
+        ("ce_rev", to_tick(121 * 0.7), "SL"),
+    ]
+    # the same day without the option: RE COST re-sells at 100 instead
+    plain = sell_leg(stop_loss={"percent": 21}, reentry_on_sl={"mode": "cost", "count": 1})
+    assert [t.entry_price for t in simulate_day(strategy([plain]), data).trades] == [100, 100]
+
+
+def test_reverse_on_sl_long_counts_in_the_overall_stop():
+    # short -21 x 65 = -1365 realised; long from 121 to a 110 close = -715 open: -2080 <= -2000
+    ce = rising(100, STOP_BAR, "10:00", 118)  # the long holds 118 (-195 open) until 10:05
+    ce.open[minute_index("10:05")], ce.high[minute_index("10:05")] = 118, 118
+    ce.low[minute_index("10:05")], ce.close[minute_index("10:05")] = 109, 110
+    data = day({(22000.0, "CE"): ce})
+    result = simulate_day(strategy([sar_leg()], overall={"stop_loss_inr": 2000}), data)
+    assert result.stopped_by == "overall SL at 10:05"
+    assert [(t.leg_id, t.exit_reason, t.exit_price) for t in result.trades] == [
+        ("ce", "SL", 121),
+        ("ce_rev", "OVERALL_SL", 110),
+    ]
+    assert result.gross == pytest.approx(-2080)
+
+
+def test_reverse_on_sl_time_stop_exits_at_the_price_n_minutes_after_the_buy():
+    data = day({(22000.0, "CE"): rising(100, STOP_BAR, "10:00", 150)})
+    _, long = simulate_day(strategy([sar_leg(time_stop_minutes=30)]), data).trades
+    assert (long.exit_min, long.exit_price, long.exit_reason) == (
+        minute_index("10:30"),
+        150,
+        "TIME",
+    )
+
+
+def test_reverse_on_sl_trail_half_size_and_a_gapped_stop():
+    # gap: the stop fills at the 130 open; the long buys there and its own bar is judged
+    gap = {
+        "10:00": (130, 135, 128, 132),
+        "10:10": (170, 210, 170, 200),
+        "10:11": (200, 200, 150, 155),
+    }
+    data = day({(22000.0, "CE"): rising(100, gap, "10:11", 155)})
+    for m in range(minute_index("10:01"), minute_index("10:10")):
+        s = data.chain[(EXP, 22000.0, "CE")]
+        s.open[m] = s.high[m] = s.low[m] = s.close[m] = 132
+    leg = sar_leg(lots_ratio=0.5, trail_peak={"activate_percent": 150, "exit_percent": 80})
+    short, long = simulate_day(strategy([leg]), data).trades
+    assert (short.exit_price, long.entry_price, long.qty) == (130, 130, LOT * 0.5)
+    # peak 210 > 195 arms the trail after the 10:10 bar: out at 168 on the 10:11 bar
+    assert (long.exit_min, long.exit_price, long.exit_reason) == (
+        minute_index("10:11"),
+        168,
+        "TRAIL",
+    )
+    assert long.pnl == pytest.approx((168 - 130) * LOT * 0.5)
+
+
+def test_reverse_on_sl_filter_hook_falls_back_to_re_cost():
+    from option_backtesting.data.reference.loader import default_reference_data
+    from option_backtesting.legwise.engine import _DaySim
+
+    class NoReverse(_DaySim):
+        def _reverse_allowed(self, run, minute):
+            return False
+
+    whip = {**STOP_BAR, "10:30": (100, 100, 95, 97)}
+    data = day({(22000.0, "CE"): rising(110, whip, "10:30", 97)})
+    data.chain[(EXP, 22000.0, "CE")].close[minute_index("09:19")] = 100  # entry at 100
+    trades = NoReverse(strategy([sar_leg()]), data, default_reference_data()).run().trades
+    assert [(t.leg_id, t.position, t.entry_price) for t in trades] == [
+        ("ce", "sell", 100),
+        ("ce", "sell", 100),
+    ]
+
+
+def test_reverse_on_sl_validates_and_stays_out_of_the_dump_when_unset():
+    plain = strategy([sell_leg(stop_loss={"percent": 21})]).model_dump()["legs"][0]
+    assert "reverse_on_sl" not in plain
+    set_ = strategy([sar_leg(time_stop_minutes=30)]).model_dump()["legs"][0]
+    assert set_["reverse_on_sl"]["time_stop_minutes"] == 30
+    assert set_["reverse_on_sl"]["stop_loss_percent"] == 30
+    with pytest.raises(ValidationError, match="for sold legs"):
+        strategy([buy_leg(stop_loss={"percent": 30}, reverse_on_sl={})])
+    with pytest.raises(ValidationError, match="needs a stop_loss"):
+        strategy([sell_leg(reverse_on_sl={})])
+    with pytest.raises(ValidationError, match="1.0 or 0.5"):
+        strategy([sar_leg(lots_ratio=0.7)])
+    with pytest.raises(ValidationError, match="square_off: complete"):
+        strategy([sell_leg(stop_loss={"percent": 21}, reverse_on_sl={})], square_off="complete")
