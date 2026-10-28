@@ -239,6 +239,12 @@ Otherwise:
   `scripts/ruletest-acceptance.py` must print ACCEPTANCE OK: the four BL-083 triggers, said in
   the grammar (`tests/fixtures/rules/`), fire on the same days and stamps as `research/bl083/`, and T1 and T4 with the Dir
   template reproduce its event-study rows to the rupee. A leg with its own `range_breakout` is not supported yet.
+  Phase 2 (2026-10-28): `obt-mcp`'s `validate_rule` / `test_rule` / `list_rule_tests` (`mcp/server.py`) call the same
+  `spec.load_spec` / `read_back`, `study.run_test` and `store.ledger` / `counts`; `test_rule` takes the `spec_hash`
+  `validate_rule` returned (a mismatch runs nothing), always runs `mode="locked"` (no `open_all`, no reveal tool: a
+  confirmation test runs only for a rule the owner revealed with `obt rule reveal`) and returns the read-back, the result
+  (per-event `rows` / `equity` only with `include_rows`), the CLI's `render` text, its ledger row and the counts.
+  Synchronous: a new template's first test can take minutes. Tests: `tests/unit/test_mcp_rules.py`.
 - `notify.py` — Telegram sender (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID), a deliberate copy of
   `momentum-backtesting`'s notify.py mirroring `@trading/notify`'s contract (never `parse_mode`,
   redacts known secrets, never raises; prints when unconfigured). Tests must stub `send` —

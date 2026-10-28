@@ -206,6 +206,8 @@ uv run mbt stocks pin-manifest           # commit the raw cache + events as the 
 
 # option-backtesting MCP server (stdio) — registered in root .mcp.json as "option-backtesting";
 # a Claude Code session picks it up automatically, no manual start needed.
+# BL-120 Phase 2: validate_rule (read-back + spec_hash) -> test_rule(spec_text, spec_hash, period, tries) -> list_rule_tests;
+# the same ruletest/ functions as `obt rule`, every test in the ledger, the confirmation period locked (only `obt rule reveal` opens it)
 
 # Teardown
 docker compose down         # stop services, keep data volumes
@@ -430,7 +432,9 @@ ai-trading-agent/
         │   │   └── server.py             # `obt-mcp` stdio MCP server (M-4/M-5) — mcp 2.x's MCPServer (see
         │   │                             # DECISIONS.md); tools: plan_requests, validate_strategy,
         │   │                             # run_backtest, run_walkforward, run_sweep, check_overfit,
-        │   │                             # list_runs, critique_result, export_personality, propose_strategy
+        │   │                             # list_runs, critique_result, export_personality, propose_strategy;
+        │   │                             # BL-120 Phase 2: validate_rule, test_rule, list_rule_tests (the
+        │   │                             # rule tester over ruletest/, always locked mode, no reveal tool)
         │   └── cli.py                    # `obt` — ingest plan | ingest | validate | run | registry |
         │                                 # walkforward | sweep [--overfit] | export-personality
         ├── tests/{golden,parity,unit}/    # tests/golden/test_engine_golden.py is the M-3 exit gate —
