@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a direct owner question about the live picks; two fixed rules, no search |
-| **Status** | Done (killed: blocks a and b) |
+| **Status** | In progress (blocks a and b killed; block c pre-registered) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -85,6 +85,27 @@ window. Block (a) stands as run; this is a new test, not a change to it.
 - **Hold-out:** none, as block (a), and block (a)'s numbers were seen before this rule was set.
 - **Will not run:** other windows, 09:17 in the morning window, a different Directional.
 
+#### 2026-10-28 (c) — Block (b) on non-expiry days, Adaptive on expiry days
+The owner's follow-up to a descriptive line of Result (b): on non-expiry days block (b)'s rule was
+ahead of Adaptive on Core over 2025-10-28 → 2026-10-27, and behind on expiry days.
+- **Hypothesis:** the hybrid (block (b)'s rule on days when neither index expires, Adaptive's
+  picks unchanged on days when NIFTY or SENSEX expires) earns more than Adaptive.
+- **Expiry day:** `dte_n == "0"` or `dte_s == "0"` (weekday basis, `rotation/days.csv`).
+- **Windows:** HG = block (b) with afternoon 13:00–15:30; HN = afternoon 12:00–15:30. Everything
+  else as block (b).
+- **Test period (decides):** 2025-01-10 → 2025-10-27, the sessions before the year the idea came
+  from (Core-298's first scored day after 63 days of warm-up; P2 plus Sep–Oct 2025). Adaptive's
+  weights were chosen on P1 (Dec 2025 – Oct 2026), so this period is outside that too.
+- **The year the idea came from (reported, decides nothing):** 2025-10-28 → 2026-10-27. Its result
+  is known by construction from Result (b): about +₹42 (HG) and +₹62 (HN) a day on Core.
+- **Pools:** Core-298 decides. T1 is reported only: its variants were chosen on 2024-10-09 →
+  2025-10-08, which covers the test period, and on T1 the rule was behind on non-expiry days too.
+- **Pass / kill rule (Core, per window, test period):** difference = hybrid minus Adaptive, net a
+  day. Pass: mean > 0 and 5-day block-bootstrap 90% interval (5,000 resamples, seed 1793) above
+  zero. Kill: mean ≤ 0. Otherwise inconclusive. Two tests; blocks (a) and (b) count towards the
+  same family, so a pass of one of the two is weak evidence.
+- **Will not run:** other expiry definitions (one index only, DTE ≤ 1), other windows, a T1 verdict.
+
 #### Result (a)
 **Kill on all four** (2026-10-28). 239 sessions, 2025-10-28 → 2026-10-27, one lot each, net after
 estimated brokerage.
@@ -136,6 +157,9 @@ on both sides, one lot each, net after estimated brokerage.
 - Script: the session's scratchpad (`bl179/run_b.py`, `b/Core_daily.json`, `b/T1_daily.json`),
   not committed.
 
+#### Result (c)
+(after the run)
+
 ## Risks
 
 One year; the windows were proposed after a table of this same year.
@@ -146,3 +170,4 @@ One year; the windows were proposed after a table of this same year.
 - 2026-10-28 — run; killed on both pools, both rules (Result above); `research/options/common/rotation-ranking.md` updated.
 - 2026-10-28 — block (b) pre-registered at the owner's request: Adaptive's Directional kept, Wide SL by window.
 - 2026-10-28 — block (b) run; killed on both pools, both windows (Result (b)); findings page updated.
+- 2026-10-28 — block (c) pre-registered at the owner's request: block (b) on non-expiry days, Adaptive on expiry days, tested on 2025-01-10 → 2025-10-27.
