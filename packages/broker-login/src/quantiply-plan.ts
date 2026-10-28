@@ -29,6 +29,8 @@ export interface QManifestEntry {
   addon: boolean;
   file: string;
   unconfirmed: string[];
+  /** BL-183: the lots this pick trades, written only when the Dir ×2 rule was asked for */
+  lots?: number;
 }
 
 export interface QManifest {
@@ -37,6 +39,10 @@ export interface QManifest {
   book: string;
   source: string;
   strategies: QManifestEntry[];
+  /** BL-183: true when a pick trades more than 1 lot (the picked Dir on a non-expiry day) */
+  dir_boost?: boolean;
+  /** BL-183: the days to expiry the lots rule read, {NIFTY, SENSEX} */
+  dte?: Record<string, string> | null;
 }
 
 export interface QAlgo {

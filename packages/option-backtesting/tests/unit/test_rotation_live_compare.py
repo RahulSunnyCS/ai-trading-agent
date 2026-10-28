@@ -544,3 +544,41 @@ def test_the_live_route_cache_stays_small(root, monkeypatch):
     for n in range(1, 25):
         c.get("/legwise/rotation/live", params={"to": f"2026-11-{n:02d}"})
     assert len(rotation_live_routes._cache) <= rotation_live_routes.CACHE_ENTRIES
+
+
+def test_a_dir_the_export_doubled_is_two_lots_not_slippage(root):
+    """BL-183: the day's export gave the Dir 2 lots, so its live rupees are two lots' worth."""
+    folder = store.rotation_dir(root) / "algotest" / DAY.isoformat() / "t1"
+    folder.mkdir(parents=True)
+    (folder / "manifest.json").write_text(
+        json.dumps(
+            {
+                "day": DAY.isoformat(),
+                "book": "t1",
+                "source": "preview",
+                "dir_boost": True,
+                "strategies": [
+                    {"variant": T1[0], "name": f"T1 · {T1[0]}", "lots": 2, "file": "a"},
+                    {"variant": T1[2], "name": f"T1 · {T1[2]}", "lots": 1, "file": "b"},
+                ],
+            }
+        )
+    )
+    _capture(
+        root,
+        [
+            _section("algotest", "all"),
+            _line(
+                "T1 · N_ditm1-t1s36_0947",
+                5590.0,
+                fills=[_fill("2026-10-19 09:46:59", 100, qty=130)],
+            ),
+            _line("T1 · N_p150-t1s11_1317", 910.0, fills=[_fill("2026-10-19 13:16:59", 50)]),
+        ],
+    )
+    by = {x.variant: x for x in live_compare.compare(DAY, root).compared}
+    assert by[T1[0]].lots == 2.0
+    assert by[T1[0]].slippage == pytest.approx(81.25)  # 5590 / 2 − 2713.75
+    assert by[T1[2]].lots == 1.0
+    assert live_compare.export_lots("algotest", DAY, "t1", root) == {T1[0]: 2}
+    assert live_compare.export_lots("quantiply", DAY, "t1", root) == {}
