@@ -542,14 +542,18 @@ contract, not a shared service).
   (06:00 IST expiry, `fyers.token_expiry`) is cached 0600 in `data/.kite_token.json`. Login:
   `POST /api/kite/login` returns Kite's login URL (state in `redirect_params`, in memory like
   the Fyers states), Kite redirects to `GET /api/kite/callback` (the Kite app's registered
-  redirect URL `http://127.0.0.1:8765/api/kite/callback`), which stores the token and, when the
+  redirect URL is the hosted dashboard's `/api/momentum/kite/callback`, forwarded here through
+  the tunnel, so a phone login works), which stores the token and, when the
   holdings source is `kite`, reads a snapshot. `holdings_sync.sync('kite'|'fyers')` stores a
   snapshot (Kite with its free cash in `momentum_cash`, trading-data migration 013) for
   `mbt orders run`, `mbt kite sync`, the callback and `POST /api/holdings/sync`.
   `holdings_store.treatment` always leaves LIQUIDBEES and `SGB*` out as options margin (no rule
   overrides it); Your orders counts a Kite snapshot's free cash, which is `net` minus pledged
   collateral, never below 0. `mbt kite remind --send` is the Fri
-  13:30 `kite-login-reminder` job. The lot ledger and per-sleeve orders are BL-142 Phases 2–3.
+  13:30 `kite-login-reminder` job (`--when monday`: the Mon 08:45 `kite-login-reminder-monday`).
+  `login_nudge.py` gives it and `mbt token-remind` (the 08:05 / 15:30 Fyers reminders) the link to
+  the hosted Broker logins page (`DASHBOARD_PUBLIC_URL`) and the phone-login blockers (API port,
+  `cloudflared`). The lot ledger and per-sleeve orders are BL-142 Phases 2–3.
 - `lots.py` (BL-142 Phases 2-3) — the lot ledger and per-lot orders for a group followed with one
   lot per sleeve (BL-087). `momentum_lot_events` (append-only; a lot's shares are the sum of its
   deltas; trading-data migration 014) books shares to the saved-run id of a sleeve, never to the

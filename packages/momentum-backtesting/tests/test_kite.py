@@ -14,7 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
-from momentum_backtesting import api, cli, holdings_store, kite, notify
+from momentum_backtesting import api, cli, holdings_store, kite, login_nudge, notify
 from momentum_backtesting.db_read import open_catalog
 
 
@@ -240,3 +240,19 @@ def test_the_friday_reminder_speaks_only_when_kite_is_used_and_not_logged_in(mon
     monkeypatch.setattr(kite, "probe", lambda creds: True)
     out = runner.invoke(cli.app, ["kite", "remind", "--send"])
     assert out.exit_code == 0 and "nothing to remind" in out.output and len(sent) == 1
+
+
+def test_the_monday_reminder_has_its_own_wording_and_the_phone_link(monkeypatch):
+    sent = []
+    monkeypatch.setattr(notify, "send", lambda note: sent.append(note))
+    monkeypatch.setenv("DASHBOARD_PUBLIC_URL", "https://dash.example/")
+    monkeypatch.setattr(login_nudge, "phone_blockers", lambda: [])
+    with open_catalog() as con:
+        holdings_store.save_settings(con, holdings_store.owner(), holdings_source="kite")
+    out = CliRunner().invoke(cli.app, ["kite", "remind", "--send", "--when", "monday"])
+    assert out.exit_code == 0 and len(sent) == 1
+    assert sent[0].title == "Log in to Kite before the open"
+    assert sent[0].run_url == "https://dash.example/brokerLogins"
+    assert "From your phone" in sent[0].body
+    out = CliRunner().invoke(cli.app, ["kite", "remind", "--when", "sunday"])
+    assert out.exit_code != 0

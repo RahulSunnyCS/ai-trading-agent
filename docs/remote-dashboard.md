@@ -113,11 +113,29 @@ The laptop must be awake and online whenever you use the dashboard — `caffeina
 on power (closing the lid still sleeps it unless an external display is attached). A
 sleeping laptop shows up as proxy errors in the dashboard.
 
-**Fyers login:** run `uv run mbt login` on the backend laptop. The OAuth callback goes to
-the redirect URI registered with Fyers (localhost), so the dashboard's "Log in" button
-can't finish remotely. Alternative: register `https://<dashboard-host>/api/auth/fyers/callback`
-with Fyers and set `FYERS_REDIRECT_URI` to it on the backend laptop — the direct rewrite
-already forwards that path — at the cost of local-only logins.
+**Fyers and Kite logins from a phone.** Both logins end on the Momentum API on the backend
+laptop, and the dashboard's rewrites already forward `/api/auth/fyers/*` and
+`/api/momentum/kite/*` to it. So with the callbacks on the dashboard host, the Log in buttons
+work from anywhere, a phone included:
+
+1. Fyers: set the app's redirect URL (myapi.fyers.in › your app) to
+   `https://<dashboard-host>/api/auth/fyers/callback`, and `FYERS_REDIRECT_URI` in the repo `.env`
+   to the same. A login started on the laptop's own dashboard then also finishes through the
+   hosted host (the start handoff sends it there), so it needs the tunnel up too.
+2. Kite: set the Kite Connect app's redirect URL (developers.kite.trade) to
+   `https://<dashboard-host>/api/momentum/kite/callback`. `mbt kite login` goes the same way.
+3. `DASHBOARD_PUBLIC_URL=https://<dashboard-host>` in the repo `.env`: the login reminders
+   (Fyers trading days 08:05 and 15:30, Kite Fri 13:30 and Mon 08:45) link to
+   `<dashboard-host>/brokerLogins`.
+4. Keep the Momentum API and the tunnel running: `deploy/launchd/install.sh` installs the
+   `com.ai-trading-agent.momentum-api` and `com.ai-trading-agent.tunnel` agents
+   (`deploy/launchd/README.md`). A reminder says when either is down.
+5. Restart the scheduler and the API after the `.env` change:
+   `launchctl kickstart -k gui/$(id -u)/com.ai-trading-agent.scheduler` and the same for
+   `com.ai-trading-agent.momentum-api`.
+
+`uv run mbt login` still works: it shows the redirected URL to copy, wherever it points. Fyers'
+human check is always ticked by you; nothing here gets past it.
 
 ## 3. Dashboard host
 

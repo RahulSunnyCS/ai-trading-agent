@@ -71,6 +71,8 @@ const services = {
     command: 'uv',
     args: ['run', 'mbt', 'serve'],
     matches: /(?:^|[\s/])mbt\s+(?:serve|ui)(?:\s|$)/,
+    // Kept always on by launchd (deploy/launchd/), so a Fyers or Kite login works from a phone.
+    launchdLabel: 'com.ai-trading-agent.momentum-api',
   },
   options: {
     label: 'Options API',
@@ -95,6 +97,24 @@ export function serviceIds(mode) {
 export function belongsToService(info, service) {
   if (!info?.cwd || !info?.command) return false;
   return resolve(info.cwd) === resolve(service.cwd) && service.matches.test(info.command);
+}
+
+/** The `working directory = …` line of `launchctl print`, or null. */
+export function agentWorkingDirectory(printed) {
+  return /^\s*working directory = (.+)$/m.exec(printed)?.[1]?.trim() ?? null;
+}
+
+/**
+ * The launchd target (`gui/<uid>/<label>`) of the agent that keeps `service` running, and whether
+ * it runs this checkout's copy. null when no such agent is loaded.
+ */
+function launchdAgent(service) {
+  if (!service.launchdLabel || process.platform !== 'darwin') return null;
+  const target = `gui/${process.getuid()}/${service.launchdLabel}`;
+  const printed = spawnSync('launchctl', ['print', target], { encoding: 'utf8' });
+  if (printed.status !== 0) return null;
+  const dir = agentWorkingDirectory(printed.stdout ?? '');
+  return { target, ours: dir !== null && resolve(dir) === resolve(service.cwd) };
 }
 
 function capture(command, args) {
@@ -221,6 +241,25 @@ function pipeOutput(stream, label, destination) {
   stream.on('end', () => {
     if (pending) destination.write(`[${label}] ${pending}\n`);
   });
+}
+
+/** `launchctl kickstart -k`: launchd stops its copy and starts it again; wait for the port. */
+async function restartAgent(service) {
+  const { target } = launchdAgent(service);
+  const result = spawnSync('launchctl', ['kickstart', '-k', target], { encoding: 'utf8' });
+  if (result.status !== 0) {
+    throw new Error(`launchctl kickstart -k ${target} failed: ${result.stderr.trim()}`);
+  }
+  for (let attempt = 0; attempt < 240; attempt++) {
+    if (listeners(service.targetPort).some((pid) => belongsToService(processInfo(pid), service))) {
+      console.log(`[${service.label}] ready on http://localhost:${service.targetPort} (launchd)`);
+      return;
+    }
+    await pause(500);
+  }
+  throw new Error(
+    `${service.label} (launchd) did not open port ${service.targetPort} within 2 minutes.`,
+  );
 }
 
 async function waitReady(service, child) {
@@ -412,16 +451,32 @@ async function run() {
     for (const service of selected) {
       const foreignPid = foreignTargetListener(service);
       if (foreignPid) {
+        const agent = launchdAgent(service);
+        const hint = agent
+          ? ` It is the always-on ${service.label} of another checkout; to run this one, first: launchctl bootout ${agent.target}`
+          : '';
         throw new Error(
-          `Port ${service.targetPort} is held by unrelated PID ${foreignPid}; no processes were stopped.`,
+          `Port ${service.targetPort} is held by unrelated PID ${foreignPid}; no processes were stopped.${hint}`,
         );
       }
     }
   }
 
   if (!dryRun && mode !== 'stop' && selected.includes(services.options)) ensureOptionsCache();
-  for (const service of selected) await stopService(service, dryRun);
+  // A service launchd keeps up for this checkout is restarted through launchd, never stopped
+  // here: launchd would start it again and the two copies would fight over the port.
+  const kept = selected.filter((service) => launchdAgent(service)?.ours);
+  for (const service of selected) {
+    if (kept.includes(service)) {
+      const verb = mode === 'stop' ? 'leaving' : dryRun ? 'would restart' : 'restarting';
+      console.log(`[${service.label}] ${verb} the launchd agent ${service.launchdLabel}`);
+      continue;
+    }
+    await stopService(service, dryRun);
+  }
   if (dryRun || mode === 'stop') return;
+  for (const service of kept) await restartAgent(service);
+  const started = selected.filter((service) => !kept.includes(service));
   if (prodDashboard) ensureProdBuild(services.dashboard, rebuild);
   const children = [];
   let stopping = false;
@@ -438,7 +493,7 @@ async function run() {
   process.on('SIGTERM', () => void shutdown(0));
 
   try {
-    for (const service of selected) {
+    for (const service of started) {
       console.log(`[${service.label}] starting: ${service.command} ${service.args.join(' ')}`);
       const child = spawn(service.command, service.args, {
         cwd: service.cwd,

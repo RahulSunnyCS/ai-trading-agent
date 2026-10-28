@@ -19,7 +19,9 @@ not in plists. See [`apps/scheduler/CLAUDE.md`](../../apps/scheduler/CLAUDE.md).
 | `quantiply-deploy` | 16:55 trading days; never retried (catch-up 6 h) | `quantiply-deploy.ts --mode enable --apply` per account: enables the next session's picks the 16:45 upload made (it waits for that job and its retries), each read back and set to the account's broker first; re-reads the list to confirm. REAL MONEY. Needs `QUANTIPLY_DEPLOY=on`, Automated deployment and the account's row |
 | `quantiply-deploy-topup` | 09:21 trading days; never retried (catch-up 3 h) | The same for today after the 09:19 top-up: enables a pick 09:16 changed and switches off an enabled one it dropped, never an algo within 90 s of its start (TOO LATE, reported) |
 | `backup` | 1st Sunday of the month 10:00 (catch-up all week) | `tdata backup` to `/Volumes/RAHUL'S SSD/TradingData`; to `~/Downloads/TradingData-backup` with a Telegram warning when the SSD isn't plugged in |
-| `kite-login-reminder` | Fri 13:30 (catch-up 30 min) | `mbt kite remind --send`: when Kite is the Momentum holdings source and today has no valid Kite login, a Telegram reminder to log in before the 14:15 orders (BL-142); silent otherwise |
+| `fyers-login-reminder` / `fyers-login-recheck` | 08:05 / 15:30 trading days (catch-up 1 h / 15 min) | `mbt token-remind --send`: when Fyers does not accept today's token, a Telegram reminder with a link to the hosted Broker logins page for a phone login (and a warning if the Momentum API or the tunnel below is down); silent otherwise |
+| `kite-login-reminder` | Fri 13:30 (catch-up 30 min) | `mbt kite remind --send`: when Kite is the Momentum holdings source and today has no valid Kite login, a Telegram reminder to log in before the 14:15 orders (BL-142), with the same link; silent otherwise |
+| `kite-login-reminder-monday` | 08:45 trading Mondays (catch-up 30 min) | The same with `--when monday`, before the open |
 | `momentum-preview` / `-final` | Fri 14:40 / 16:45 | `mbt weekly --run preview|final` |
 | `momentum-stock-ingest` | Fri 19:30 | `mbt stocks sync`, then the stock/Custom Index/Broad final (needs the GUI session) |
 | `momentum-journal-check` | Fri 21:00 | `mbt journal check --send` |
@@ -40,6 +42,22 @@ enough. With the SSD unplugged it logs why (`~/Library/Logs/ai-trading-agent/tra
 and every reader and writer refuses the unmounted root instead of writing elsewhere. It needs
 `TRADING_DATA_ROOT` and `TRADING_DATA_IMAGE` in the repo `.env`; `install.sh` installs it with
 the scheduler.
+
+## The always-on Momentum API and tunnel
+
+Two more LaunchAgents, also not scheduler jobs, keep the pieces a phone login needs running
+(`docs/remote-dashboard.md`): `com.ai-trading-agent.momentum-api` runs `uv run mbt serve`
+(127.0.0.1:8765, from this checkout's `packages/momentum-backtesting`) and
+`com.ai-trading-agent.tunnel` runs `cloudflared tunnel run` (`~/.cloudflared/config.yml`). Both
+start at login and are restarted if they exit; logs `momentum-api.log` and `tunnel.log` in
+`~/Library/Logs/ai-trading-agent/`. Stop a hand-started `bun run start` stack or
+`bun run start:tunnel` before installing, or the agent's copy waits for the port.
+
+`bun run start` / `start:backend` from this checkout restart the API through launchd
+(`launchctl kickstart -k`) instead of starting a second copy, and `bun run stop:research` leaves it
+running. From another worktree the port is taken: `launchctl bootout gui/$(id -u)/com.ai-trading-agent.momentum-api`
+first, and `deploy/launchd/install.sh` (or `launchctl bootstrap`) afterwards. After pulling a
+Momentum API change: `launchctl kickstart -k gui/$(id -u)/com.ai-trading-agent.momentum-api`.
 
 ## Commands
 
