@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — a direct owner question about the live picks; two fixed rules, no search |
-| **Status** | Done (killed) |
+| **Status** | In progress (block a killed; block b pre-registered) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -61,7 +61,31 @@ Changing the live pick. Other windows, other ranks, a third strategy, lots other
 - **Will not run:** other window edges, 09:17 in the morning window, top-2 per window, other
   rankings. Each needs a new block, or `override: <reason>` in the Log.
 
-#### Result
+#### 2026-10-28 (b) — Adaptive's Directional kept, its Wide SL chosen by window
+The owner's clarification after block (a): keep Adaptive's Directional, and choose the Wide SL by
+window. Block (a) stands as run; this is a new test, not a change to it.
+- **Hypothesis:** Adaptive with its Wide SL replaced by the best morning and the best afternoon
+  Wide SL earns more than Adaptive as it is.
+- **Rule, each day, from Adaptive's three core picks:**
+  - Adaptive picked a Directional (it picks at most one, since it keeps at least two Wide SL):
+    keep it, and replace its two Wide SL with the best Wide SL entering in the morning window and
+    the best entering in the afternoon window.
+  - Adaptive picked three Wide SL (no Directional): the best morning, the best afternoon, and as
+    the third the best remaining Wide SL entering in either window.
+- **Windows:** morning 09:30–11:59 (0932–1147); afternoon G 13:00–15:30 (1302–1517) or N
+  12:00–15:30 (1202–1517). 09:17 is outside both.
+- **Everything else as block (a):** "best" = Adaptive's list C composite; Wide SL = `is_wide`; the
+  expiring-index rule restricts the Wide SL picks on the days it applies (the Directional is
+  Adaptive's, already restricted); Core-298 and T1; one lot each, net of estimated brokerage;
+  2025-10-28 to 2026-10-27; the Buy add-on is not part of either book.
+- **Measure:** net a day (three picks on both sides).
+- **Pass / kill rule (per pool, per window):** difference = rule minus Adaptive, net a day. Pass:
+  mean > 0 and 5-day block-bootstrap 90% interval (5,000 resamples, seed 1792) above zero. Kill:
+  mean ≤ 0. Otherwise inconclusive. Four tests; block (a)'s four count towards the same family.
+- **Hold-out:** none, as block (a), and block (a)'s numbers were seen before this rule was set.
+- **Will not run:** other windows, 09:17 in the morning window, a different Directional.
+
+#### Result (a)
 **Kill on all four** (2026-10-28). 239 sessions, 2025-10-28 → 2026-10-27, one lot each, net after
 estimated brokerage.
 
@@ -88,6 +112,9 @@ estimated brokerage.
 - Script and per-day picks: the session's scratchpad (`bl179/run.py`, `Core_daily.json`,
   `T1_daily.json`), not committed.
 
+#### Result (b)
+(after the run)
+
 ## Risks
 
 One year; the windows were proposed after a table of this same year.
@@ -96,3 +123,4 @@ One year; the windows were proposed after a table of this same year.
 
 - 2026-10-28 — created and pre-registered at the owner's request.
 - 2026-10-28 — run; killed on both pools, both rules (Result above); `research/options/common/rotation-ranking.md` updated.
+- 2026-10-28 — block (b) pre-registered at the owner's request: Adaptive's Directional kept, Wide SL by window.
