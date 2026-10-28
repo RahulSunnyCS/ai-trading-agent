@@ -35,9 +35,29 @@ from option_backtesting.rotation.readout import block_bootstrap_mean, max_drawdo
 from option_backtesting.rotation.score import composite, dte_matrix, family_index  # noqa: E402
 from option_backtesting.rotation.variants import variant_names  # noqa: E402
 
-VARIANTS = HERE / "variants2"
-RESULTS = HERE / "results2"
+#: E1 (`--mtm 2000`): every half-day set at this overall stop; None = the files' own (Phase 2 as registered)
+MTM: int | None = None
 OUT = HERE / "out"
+RESULTS = HERE / "results2"  # the whole-day pool, always
+
+
+def tag() -> str:
+    return f"_mtm{MTM}" if MTM else ""
+
+
+def variants_dir() -> Path:
+    return HERE / f"variants2{tag()}"
+
+
+def results_half() -> Path:
+    """Where the half-day pools' results live."""
+    return HERE / f"results2{tag()}"
+
+
+def result_dir(name: str) -> Path:
+    return results_half() if ("-am_" in name or "-pm_" in name) else RESULTS
+
+
 ROTATION = run.STRATEGIES / "rotation"
 FAMILIES = {"N_wide": "NIFTY", "N_p80": "NIFTY", "N_p100": "NIFTY",
             "S_wide": "SENSEX", "S_p250": "SENSEX", "S_p320": "SENSEX"}  # fmt: skip
@@ -67,42 +87,56 @@ def pools() -> dict[str, list[str]]:
     """Variant names of each pool: am (half-day files), pm and all (Core files)."""
     return {
         "am": [f"{fam}-am_{s}" for fam in FAMILIES for s in SLOTS_AM],
-        "pm": [f"{fam}_{s}" for fam in FAMILIES for s in SLOTS_PM],
+        "pm": [f"{fam}{'-pm' if MTM else ''}_{s}" for fam in FAMILIES for s in SLOTS_PM],
         "all": [f"{fam}_{s}" for fam in FAMILIES for s in SLOTS_ALL],
     }
 
 
 def make_variants() -> dict[str, tuple[str, Path]]:
     """name -> (underlying, strategy file): Core files as they are, morning files derived."""
-    VARIANTS.mkdir(exist_ok=True)
+    variants_dir().mkdir(exist_ok=True)
     files: dict[str, tuple[str, Path]] = {}
+
+    def derive(fam: str, s: str, half: str, underlying: str) -> None:
+        src = ROTATION / f"{fam}_{s}.yaml"
+        doc = yaml.safe_load(src.read_text())
+        assert doc["strategy"]["entry_time"] == f"{s[:2]}:{s[2:]}", src
+        doc["strategy"]["id"] = f"{fam}-{half}_{s}"
+        note = []
+        if half == "am":
+            doc["strategy"]["exit_time"] = "12:00"
+            note.append("the exit moved to 12:00")
+        if MTM:
+            doc["strategy"]["overall"]["stop_loss_inr"] = float(MTM)
+            note.append(f"overall stop {MTM}")
+        path = variants_dir() / f"{fam}-{half}_{s}.yaml"
+        path.write_text(
+            f"# BL-182 Phase 2{' E1' if MTM else ''}: {src.name} with {', '.join(note)}\n"
+            + yaml.safe_dump(doc, sort_keys=False)
+        )
+        load_legwise(path)
+        files[f"{fam}-{half}_{s}"] = (underlying, path)
+
     for fam, underlying in FAMILIES.items():
         for s in SLOTS_ALL:
             files[f"{fam}_{s}"] = (underlying, ROTATION / f"{fam}_{s}.yaml")
         for s in SLOTS_AM:
-            src = ROTATION / f"{fam}_{s}.yaml"
-            doc = yaml.safe_load(src.read_text())
-            assert doc["strategy"]["entry_time"] == f"{s[:2]}:{s[2:]}", src
-            doc["strategy"]["id"] = f"{fam}-am_{s}"
-            doc["strategy"]["exit_time"] = "12:00"
-            path = VARIANTS / f"{fam}-am_{s}.yaml"
-            path.write_text(
-                f"# BL-182 Phase 2: {src.name} with the exit moved to 12:00\n"
-                + yaml.safe_dump(doc, sort_keys=False)
-            )
-            load_legwise(path)
-            files[f"{fam}-am_{s}"] = (underlying, path)
+            derive(fam, s, "am", underlying)
+        if MTM:
+            for s in SLOTS_PM:
+                derive(fam, s, "pm", underlying)
     return files
 
 
 def run_all(smoke: bool) -> None:
     files = make_variants()
     RESULTS.mkdir(exist_ok=True)
+    results_half().mkdir(exist_ok=True)
     for underlying in ("NIFTY", "SENSEX"):
         todo = {
             n: p
             for n, (u, p) in files.items()
-            if u == underlying and not (RESULTS / f"{n}.csv").exists()
+            if u == underlying and not (result_dir(n) / f"{n}.csv").exists()
         }
         if not todo:
             continue
@@ -113,7 +147,7 @@ def run_all(smoke: bool) -> None:
             print(sorted(Counter(len(r) for r in results.values()).items()))
             continue
         for name, rows in results.items():
-            with open(RESULTS / f"{name}.csv", "w", newline="") as f:
+            with open(result_dir(name) / f"{name}.csv", "w", newline="") as f:
                 w = csv.writer(f)
                 w.writerow(run.COLUMNS)
                 w.writerows(rows)
@@ -124,7 +158,7 @@ def run_all(smoke: bool) -> None:
 
 
 def read(name: str) -> dict[date, dict]:
-    with open(RESULTS / f"{name}.csv") as f:
+    with open(result_dir(name) / f"{name}.csv") as f:
         return {date.fromisoformat(r["day"]): r for r in csv.DictReader(f)}
 
 
@@ -208,7 +242,7 @@ def analyse() -> None:
     OUT.mkdir(exist_ok=True)
     root = run.data_dir()
     pl = pools()
-    everything = sorted(set(pl["am"]) | set(pl["all"]))
+    everything = sorted(set(pl["am"]) | set(pl["pm"]) | set(pl["all"]))
     rows = {n: read(n) for n in everything}
     attrs = store.read_days(root, "weekdays")
     days = sorted(set.intersection(*(set(r) for r in rows.values())) & set(attrs))
@@ -253,10 +287,12 @@ def analyse() -> None:
     dd = {b: max_drawdown(per_lot[b]["net"]) for b in per_lot}
     passed = boot["net"][1] > 0 and dd["split"] >= dd["comparator"]
 
-    L = [
-        "# BL-182 Phase 2 — Adaptive two-plus-two vs top two whole-day (Core's Widesl families)",
-        "",
-    ]
+    title = "# BL-182 Phase 2 — Adaptive two-plus-two vs top two whole-day (Core's Widesl families)"
+    if MTM:
+        title += (
+            f" — E1: the split's sets at a ₹{MTM:,} overall stop (comparator at its files' ₹2,500)"
+        )
+    L = [title, ""]
     L.append(
         f"Pick days {pick_days[0]} → {pick_days[-1]} ({len(pick_days)}; {WARMUP}-day warm-up from {days[0]}). "
         f"Pools: morning {len(pl['am'])}, afternoon {len(pl['pm'])}, whole-day {len(pl['all'])} variants. "
@@ -341,7 +377,7 @@ def analyse() -> None:
                  f"{fmt(cd.mean())} per lot-day over {len(cd)} of these days, max DD {fmt(max_drawdown(cd))}; "
                  f"the whole-day Widesl-only comparator {fmt(per_lot['comparator']['gross'].mean())} gross per "
                  f"margin lot-day, the split {fmt(per_lot['split']['gross'].mean())}.")  # fmt: skip
-    with open(OUT / "phase2_daily.csv", "w", newline="") as f:
+    with open(OUT / f"phase2{tag()}_daily.csv", "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["day", "split_net", "split_gross", "comparator_net", "comparator_gross", "am_net", "pm_net",
                     "diff_net_per_mlot", "am_picks", "pm_picks", "all_picks"])  # fmt: skip
@@ -349,11 +385,14 @@ def analyse() -> None:
             w.writerow([d, books["split"]["net"][j], books["split"]["gross"][j], books["comparator"]["net"][j],
                         books["comparator"]["gross"][j], books["am"]["net"][j], books["pm"]["net"][j],
                         diff["net"][j], " ".join(picks["am"][j]), " ".join(picks["pm"][j]), " ".join(picks["all"][j])])  # fmt: skip
-    (OUT / "phase2_summary.md").write_text("\n".join(L) + "\n")
+    (OUT / f"phase2{tag()}_summary.md").write_text("\n".join(L) + "\n")
     print("\n".join(L))
 
 
 def main() -> None:
+    global MTM
+    if "--mtm" in sys.argv:
+        MTM = int(sys.argv[sys.argv.index("--mtm") + 1])
     smoke = "--smoke" in sys.argv
     if "--analyse-only" not in sys.argv:
         run_all(smoke)

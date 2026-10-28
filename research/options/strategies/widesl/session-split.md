@@ -45,7 +45,10 @@ One set a day, 09:17–15:28, in every live and rotation Widesl file.
   sits in one of the two years (and in the other year on NIFTY alone), the mark of noise. The morning
   pair alone earns ₹64 a day; the afternoon pair alone ₹199, more than two whole-day sets (₹188) with a
   shallower drawdown: the split's gain is the afternoon re-entry.
-- Not adopted after both phases. The afternoon-only Widesl pair is a lead that would need its own
+- A tighter stop on the two sets makes it worse (BL-182 E1, owner override): at ₹2,000 a set the Adaptive
+  split reads +₹82 [−61, +224] with a drawdown now deeper than the whole-day book's, and the fixed live
+  files +₹1 (NIFTY) / +₹37 (SENSEX) a day; the afternoon's smaller premiums hit a ₹2,000 stop more often.
+- Not adopted after both phases and E1. The afternoon-only Widesl pair is a lead that would need its own
   pre-registration.
 
 ## Not yet tested

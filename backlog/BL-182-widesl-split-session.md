@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner trades Widesl with real money on Core and T1; a friend's study says the split earns ₹160 a day more per lot with half the drawdown |
-| **Status** | Done 2026-10-28: not adopted. Phase 1 killed on its rule (+₹39 NIFTY / +₹89 SENSEX a day net, intervals include zero); Phase 2 (owner override: Adaptive two morning + two afternoon Widesl vs its top two whole-day, Core's six families) also failed its rule: +₹75 [−56, +205] net per margin lot-day, gross +₹158 [+27, +288], drawdown shallower, the gain confined to one of the two years |
+| **Status** | Done 2026-10-28: not adopted. Phase 1 killed on its rule (+₹39 NIFTY / +₹89 SENSEX a day net, intervals include zero); Phase 2 (owner override: Adaptive two morning + two afternoon Widesl vs its top two whole-day, Core's six families) also failed its rule: +₹75 [−56, +205] net per margin lot-day, gross +₹158 [+27, +288], drawdown shallower, the gain confined to one of the two years; E1 (the split's sets at a ₹2,000 stop) worse on both counts |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-28 |
@@ -261,6 +261,15 @@ afternoon-only Widesl pair, which would need its own pre-registration.
   days after a failed first look: a pass here is a lead for a forward track, never a result.
 - **Will not run:** other stop levels, a stop on one half only, re-entry after the stop.
 
+**Result (2026-10-28):** worse, not better. (a) Adaptive two-plus-two with ₹2,000 sets: split − comparator
+**+₹82 [−61, +224]** net per margin lot-day (gross +165 [+22, +307]); max drawdown −18,470 against the
+comparator's −16,987, so the split is now the deeper one; the gain again all in T1's selection year
+(+222 [−18, +482]) and negative after (−22 [−177, +136]). **FAIL on both conditions.** (b) The fixed live
+files split at ₹2,000: NIFTY +₹1 [−147, +149] net a day (was +39 at ₹2,500), SENSEX +₹37 [−121, +197]
+(was +89); their drawdowns stay about halved. The tighter stop takes more from the two sets than it saves:
+a ₹2,000 stop is hit more often in the afternoon's smaller premiums. Nothing more to try here without a
+new registration. Full table: `research/bl182/out/phase2_mtm2000_summary.md` (git-ignored).
+
 
 - Fills at 12:00 and 13:00 on 1-minute bars with no spread; the afternoon set's smaller premiums.
 - Two MTM budgets a day (₹5,000 at ₹2,500 a set) even if the drawdown reads shallower.
@@ -312,3 +321,5 @@ afternoon-only Widesl pair, which would need its own pre-registration.
   adopted; Phase 3 not opened. Interim NIFTY-only read (before SENSEX finished): +₹65 [−58, +187], gain in
   the second year instead.
 - 2026-10-28 — E1 registered (owner override: the split's sets at a ₹2,000 overall stop) before its run.
+- 2026-10-28 — E1 run: Adaptive two-plus-two at ₹2,000 sets +₹82 [−61, +224], drawdown now deeper than the
+  comparator's, FAIL; the fixed live files at ₹2,000 +₹1 (NIFTY) / +₹37 (SENSEX). Item closed: not adopted.
