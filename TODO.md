@@ -661,7 +661,7 @@ code change, show it in the UI later.
 |---|---|---|---|
 | 3.24.1 | Phase 1: `obt rotation corr` / `corr-list` (Pearson, Spearman, loss-day overlap, basket drawdown, rolling drift; variants and live legwise strategies found by enumeration) | claude | **Built 2026-10-10** (`analytics/correlation.py`, `rotation/series.py`, 23 tests). First read in the BL-090 Log |
 | 3.24.2 | Phase 2: `obt rotation corr-pick` (greedy basket under a correlation cap, shown against the uncapped top-k) | claude | **Built 2026-10-10.** Diagnostic only, in-sample |
-| 3.24.3 | Phase 3: does a trailing-correlation cap cut the lists' drawdown? | claude | **Pre-registered, not run.** Judge on the forward journal from 2026-10-12 after at least 60 trading days |
+| 3.24.3 | Phase 3: does a trailing-correlation cap cut the lists' drawdown? | claude | **Killed on the research history 2026-10-28:** 0 of 12 cap x list cells pass (best 1 of 3 periods; the cap costs more net than the 5% allowed). No cap goes to the forward hold-out, so it is not read; `score.select` unchanged. `research/bl090/cap_history.py`, result `phase3_history_2026-10-28.json`, table in the BL-090 Log. Open: owner to close Phase 3 |
 | 3.24.4 | `GET /legwise/correlation*` and an Options Lab › Correlation heatmap | claude | **Built 2026-10-10.** Three Python routes, three proxy routes, the tab (heatmap, pair readout, strategy table, basket builder, drift chart) and its Guide page; checked on live data at desktop and phone width |
 
 ### 3.25 Straddle heatmap — [BL-094](backlog/BL-094-straddle-heatmap.md)
