@@ -185,6 +185,21 @@ Reading: nothing here changes the Dir split's verdict. The ₹1,500 result is re
 sweep on seen data produces; it would need its own registration with the level fixed in advance, and the
 fixed-file reading argues against spending that on it.
 
+### E2 — the morning Dir's profit target and profit lock (registered 2026-10-28, before the run)
+
+- **Override:** `override: owner, 2026-10-28 — "Let's add targets also to the morning pick 500, 750, 1250
+  1500 1750 2000 2250 2500 ... I think that would be sufficient for the directional ... book the profit
+  [at 3k or 4k] ... Once it reaches 4k, maybe lock the profit at 2k"`: a sweep, listed under "will not
+  run".
+- **Change, on the morning Dir only (09:17–12:47 → 13:00) on top of its files' ₹3,000 stop; the
+  afternoon Dir and the whole-day comparator unchanged:** a profit target at ₹500, 750, 1,000, 1,250,
+  1,500, 1,750, 2,000, 2,250, 2,500, 3,000 and 4,000; a profit lock (arm, lock) at (2,000, 1,000),
+  (3,000, 1,500), (3,000, 2,000), (4,000, 2,000) and (4,000, 3,000). Method, read and caveats exactly as
+  BL-182 E3 (the recorded per-minute MTM series, every overlay applied as the engine applies an overall
+  target, the ranking re-run per overlay, charges the base run's); the fixed files read are `N_dir_0917`
+  and `S_dir_0917`.
+- **Will not run:** as BL-182 E3.
+
 ## Risks
 
 - A 13:00 exit on a 21 % stop shape: the morning set's re-entry has less time to recover; the afternoon
@@ -213,3 +228,5 @@ fixed-file reading argues against spending that on it.
   stop firing on expiry mornings; +5 / +125 at ₹1,500). So the split is worse on expiry days (+552 against
   +624) and better on other days (+258 against +171). A split only on non-expiry days would be a new,
   data-mined rule; a lead, not run.
+- 2026-10-28 — E2 registered (owner override: profit targets at eleven levels and five profit locks on the
+  morning Dir, on the recorded MTM paths, descriptive) before its run.

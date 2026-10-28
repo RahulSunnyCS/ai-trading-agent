@@ -332,6 +332,37 @@ Reading: the ₹2,500 overall stop, right for a whole-day set, is too tight for 
 this item that moved in the same direction at every level and in every half-year. It is not adopted; it
 needs a registration of its own with one level fixed in advance and a forward track.
 
+### E3 — the morning sets' profit target and profit lock (registered 2026-10-28, before the run)
+
+- **Override:** `override: owner, 2026-10-28 — "Let's add targets also to the morning pick 500, 750, 1250
+  1500 1750 2000 2250 2500 ... when we reach a particular profit, let's say 3k or 4k, ... book the profit
+  ... Once it reaches 4k, maybe lock the profit at 2k"`: a sweep, listed under "will not run".
+- **Change, applied to the morning sets only (09:17–11:47 → 12:00) on top of their files' ₹2,500 stop;
+  the afternoon sets and the whole-day comparator unchanged:**
+  - a profit **target** at ₹500, 750, 1,000, 1,250, 1,500, 1,750, 2,000, 2,250, 2,500, 3,000 and 4,000:
+    the set closes at the first minute its combined MTM at the bar's close is at or above the level;
+  - a profit **lock** (arm, lock) at (2,000, 1,000), (3,000, 1,500), (3,000, 2,000), (4,000, 2,000) and
+    (4,000, 3,000): once the MTM has reached *arm*, the set closes at the first later minute it is at or
+    below *lock* (the portfolio stop's `lock:A,B`, BL-095, on one strategy).
+- **Method:** the engine judges its overall stop and target on the combined MTM at each bar's close
+  (`legwise/engine.py` `_mtm`), and records that series per day (`DayResult.mtm`). The morning variants
+  are simulated once at the files' stop with the series kept (`research/common/split_replay.py`
+  `simulate_paths`), and every target and lock is applied to the recorded series exactly as the engine
+  would apply an overall target — the exit at that minute's close, the day's gross the MTM there — so
+  no engine change and one simulation per family. A day that never reaches the level keeps its result.
+  Charges are the base run's (the same legs close either way; a leg already stopped before the level is
+  unchanged). Each overlay changes every variant's history, so Adaptive's morning ranking is re-run per
+  overlay as in E2.
+- **Read, descriptive (no pass rule; sixteen looks at the same seen days):** per overlay, Adaptive's
+  morning book alone (net per margin lot-day, gross, days in profit, max drawdown, how often the level
+  fires), the split with that morning against the comparator, and the fixed `N_wide_0917` /
+  `S_wide_0917` morning half. An overlay "helps" if the morning book's net rises AND its drawdown is
+  shallower than the plain ₹2,500 morning, over the whole span and in both periods. The owner asked for
+  "the optimum number": none is chosen here; the best of sixteen on seen data is expected to look good by
+  chance, and a level that helps is a lead for a registration with that one level fixed in advance.
+- **Will not run:** targets or locks on the afternoon sets or the whole day, other levels, a trailing
+  lock (`locktrail`), a target by family or index.
+
 ## Risks
 
 - Fills at 12:00 and 13:00 on 1-minute bars with no spread; the afternoon set's smaller premiums.
@@ -397,3 +428,5 @@ needs a registration of its own with one level fixed in advance and a forward tr
   non-expiry days (morning + afternoon +131 a pair against +10 whole-day; +173 with a ₹3,000 morning
   stop), and on expiry days the two are level (+521 against +511). A split only on non-expiry days would be
   a new, data-mined rule; recorded as a lead, not run.
+- 2026-10-28 — E3 registered (owner override: profit targets at eleven levels and five profit locks on the
+  morning sets, on the recorded MTM paths, descriptive) before its run.
