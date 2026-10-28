@@ -9,6 +9,7 @@
 
 import type { MomentumCompanion, MomentumFillCompanion } from '../types/momentum';
 import { formatNumber, formatPct, formatPp } from './format';
+import { cadenceRule } from './momentumCadence';
 import { BROAD_UNIVERSES, broadUniverse, isGatedUniverse } from './momentumUniverse';
 
 /**
@@ -31,6 +32,8 @@ export interface MomentumConfigChip {
   id: string;
   label: string;
   section: MomentumSettingsSection;
+  /** What the chip means, for its tooltip (the cadence chip: which Fridays trade). */
+  title?: string;
 }
 
 export interface MomentumConfigDescription {
@@ -84,6 +87,7 @@ export function describeConfig(
       : everyN
         ? `Every ${every} weeks (phase ${Number(config.rebalance_offset ?? 0) + 1})`
         : 'Weekly rebalance';
+  const cadenceTitle = cadenceRule(config);
 
   let selection: string;
   let selectionShort: string;
@@ -134,7 +138,12 @@ export function describeConfig(
       label: selectionShort,
       section: broad ? 'selection' : 'portfolio',
     },
-    { id: 'cadence', label: cadenceChip, section: 'portfolio' },
+    {
+      id: 'cadence',
+      label: cadenceChip,
+      section: 'portfolio',
+      ...(cadenceTitle ? { title: cadenceTitle } : {}),
+    },
     {
       id: 'portfolio',
       label: config.portfolio === 'slots' ? 'Fixed slots' : 'Buffer rule',

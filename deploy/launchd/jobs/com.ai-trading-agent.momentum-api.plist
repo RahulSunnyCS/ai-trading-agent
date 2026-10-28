@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The Momentum API (`mbt serve`, 127.0.0.1:8765), always on. The Fyers and Kite logins end
+  here, and the hosted dashboard reaches it through the tunnel (com.ai-trading-agent.tunnel),
+  so a login from a phone works whenever the Mac is awake (the 08:05 / 15:30 Fyers and the
+  Fri 13:30 / Mon 08:45 Kite reminders link to it). It also serves the dashboard's Momentum pages.
+
+  `mbt` reads the repo .env itself; launchd only provides PATH (uv lives in ~/.local/bin).
+  `bun run start` / `start:backend` restart this agent (launchctl kickstart) instead of starting
+  a second copy, and `stop:research` leaves it running (scripts/dev-stack.mjs).
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ai-trading-agent.momentum-api</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/rahul/.local/bin/uv</string>
+        <string>run</string>
+        <string>mbt</string>
+        <string>serve</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/rahul/Projects/ai-trading-agent/packages/momentum-backtesting</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/rahul/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>StandardOutPath</key>
+    <string>/Users/rahul/Library/Logs/ai-trading-agent/momentum-api.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/rahul/Library/Logs/ai-trading-agent/momentum-api.log</string>
+</dict>
+</plist>

@@ -22,6 +22,7 @@ export function PortfolioStopButton({
   onChange,
   defaults = DEFAULT_SETTING,
   dialogTitle,
+  compact = false,
 }: {
   setting: PortfolioStopSetting;
   onChange: (next: PortfolioStopSetting) => void;
@@ -29,9 +30,16 @@ export function PortfolioStopButton({
   defaults?: PortfolioStopSetting;
   /** The pop-up's title, e.g. "Portfolio stop · Adaptive Tuned". */
   dialogTitle?: string;
+  /** A table cell's button: the level alone ("₹8,000", "Off"), the column says what it is. */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const on = isOn(setting);
+  const label = compact
+    ? buttonLabel(setting)
+        .replace(/^Portfolio stop /, '')
+        .replace(/^off$/, 'Off')
+    : buttonLabel(setting);
   return (
     <>
       <Button
@@ -42,7 +50,7 @@ export function PortfolioStopButton({
         title={`Show ${SEVERAL_LISTS_VISIBLE ? 'the lists' : 'the list'} with a portfolio stop applied. Changes what is shown, not what is recorded.`}
       >
         <ShieldHalf className="h-3.5 w-3.5" aria-hidden="true" />
-        {buttonLabel(setting)}
+        {label}
       </Button>
       <PortfolioStopDialog
         open={open}

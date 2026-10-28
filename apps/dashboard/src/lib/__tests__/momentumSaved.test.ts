@@ -8,6 +8,7 @@ import {
   changeSentence,
   extendedKpis,
   extendedSentence,
+  headlineSaved,
   matchesStrategy,
   saveToast,
   shortVersion,
@@ -266,5 +267,44 @@ describe('extendedKpis', () => {
       'With extended tags: 33.4% CAGR',
     );
     expect(extendedSentence({ cagr: 0.334, maxDrawdown: null })).not.toContain('max DD');
+  });
+});
+
+describe('headlineSaved', () => {
+  it("is the headline's own latest run, which Backtest can open", () => {
+    const headline = strategy({ id: 'h', active: true });
+    const got = headlineSaved([strategy(), headline]);
+    expect(got?.openable?.id).toBe('h');
+    expect(got?.savedAt).toBe('2026-10-07T22:22:00+0530');
+    expect(got?.values).toEqual([100, 101]);
+  });
+
+  it("is a group's blend, with nothing to open, unless it follows an All Fridays run", () => {
+    const member = strategy({
+      id: 'm',
+      latest: { ...strategy().latest, created_at: '2026-10-16T20:00:00+0530' },
+    });
+    const group = strategy({
+      id: 'g',
+      active: true,
+      group: ['m'],
+      members: [member],
+      blend: {
+        kpis: { cagr: 0.45 },
+        dates: ['2026-10-09', '2026-10-16'],
+        strategy: [1, 2],
+        members: 2,
+      },
+    });
+    const blend = headlineSaved([group, member]);
+    expect(blend?.openable).toBeNull();
+    expect(blend?.kpis.cagr).toBe(0.45);
+    expect(blend?.savedAt).toBe('2026-10-16T20:00:00+0530');
+    const split = strategy({ id: 's', followed_by: 'g' });
+    expect(headlineSaved([group, member, split])?.openable?.id).toBe('s');
+  });
+
+  it('is nothing without a headline', () => {
+    expect(headlineSaved([strategy()])).toBeNull();
   });
 });

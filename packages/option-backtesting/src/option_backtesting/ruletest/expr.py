@@ -16,6 +16,8 @@ Leaves
                                    R1 = 2P-L, S1 = 2P-H
     atr14                          mean true range of the previous 14 completed sessions
     minute                         the stamp index (0 = 09:15)
+    expiry_day                     true all session when its nearest listed weekly expiry is
+                                   that session (BL-165; known before the open)
     {clock: "10:30"}               the stamp index of a clock time
     {straddle: {at: "09:20"}}      CE + PE close of the strike that was ATM at that bar's spot
                                    close, nearest expiry; NaN before that bar (its strike is not
@@ -37,6 +39,12 @@ Leaves
                                    from then on (NaN before, and all day if it never holds)
     {min_since_first: {x, when}}   the running min / max of x from (inclusive) that first stamp;
     {max_since_first: {x, when}}   NaN before it
+    {swing: {kind: high, back: 0, minutes: 5, n: 2}}
+                                   the latest (back 0) or the one-before (back 1) confirmed swing
+                                   high / low of the session's `minutes`-minute bars: a bar whose
+                                   high (low) is strictly above (below) the n bars on each side,
+                                   known from the close of the n-th bar after it; NaN before
+                                   (BL-166). Swings do not carry across sessions
     {bar_close: 5}                 true only at the stamps where a 5-minute bar completes
                                    (j + 1 is a multiple of 5), so a rule can act on bar closes
     a name from `define:`          an earlier definition of the same rule
@@ -48,6 +56,7 @@ Operators (a list of arguments, or a mapping with the named parameters)
     crosses_up [a, b]          a[j-1] < b[j] <= a[j]
     crosses_down [a, b]        a[j-1] > b[j] >= a[j]
     first [b]                  true only at the first stamp of the session where b is true
+    ever [b]                   true from the first stamp of the session where b is true on
     lag {x, n}                 x at j-n
     pct_change {x, n}          x[j] / x[j-n] - 1
     roll_max roll_min roll_mean {x, n}     over the n stamps ending at j (NaN until n exist)
@@ -56,6 +65,14 @@ Operators (a list of arguments, or a mapping with the named parameters)
     max_since min_since {x, from | after}  running extreme from (inclusive) or after (exclusive)
                                            a clock time
     prior_median prior_mean {x, sessions}  of x at the same stamp over the previous sessions
+    prev_at {x, clock}                     the previous session's x at that clock stamp,
+                                           constant over the session (BL-164); like
+                                           prev_close, "previous" is the frame's previous
+                                           row, so a session the frame dropped (strict_open:
+                                           the Muhurat sessions, three Angel One days in
+                                           2026-09) is skipped over
+    prev_agg {x, how: max | min}           the previous session's highest / lowest x over its
+                                           375 stamps, constant over the session (BL-164)
 
 Trade-relative (only in a rule's `exit_when`, and only under the elementwise operators add sub mul
 div abs max min gt ge lt le all any not; each trade evaluates them from its own entry)
@@ -151,6 +168,7 @@ _POSITIONAL: dict[str, tuple[tuple[str, ...], str, str]] = {
     "crosses_down": (("a", "b"), "bool", "num"),
     "not": (("a",), "bool", "bool"),
     "first": (("a",), "bool", "bool"),
+    "ever": (("a",), "bool", "bool"),
 }
 _VARIADIC = {"all", "any"}
 # op -> (parameter names, required, result kind); `x` is always a num expression
@@ -167,8 +185,19 @@ _PARAMETRIC: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "min_since": (("x", "from", "after"), ("x",)),
     "prior_median": (("x", "sessions"), ("x", "sessions")),
     "prior_mean": (("x", "sessions"), ("x", "sessions")),
+    "prev_at": (("x", "clock"), ("x", "clock")),
+    "prev_agg": (("x", "how"), ("x", "how")),
 }
-_LEAF_OPS = {"clock", "straddle", "rsi", "bar_close", "supertrend", "supertrend_dir", "bollinger"}
+_LEAF_OPS = {
+    "clock",
+    "straddle",
+    "rsi",
+    "bar_close",
+    "supertrend",
+    "supertrend_dir",
+    "bollinger",
+    "swing",
+}
 _SINCE_FIRST = {"at_first", "min_since_first", "max_since_first"}
 _TRADE_OPS = {"at_entry"}
 #: the operators a trade-relative value may sit under (they work on one session's row alone)
@@ -178,6 +207,7 @@ ELEMENTWISE = {"add", "sub", "mul", "div", "abs", "max", "min", "gt", "ge", "lt"
     "not",
 }
 TRADE_LEAF = "minutes_in_trade"
+EXPIRY_LEAF = "expiry_day"
 BANDS = ("upper", "middle", "lower")
 ALL_OPS = set(_POSITIONAL) | _VARIADIC | set(_PARAMETRIC) | _LEAF_OPS | _SINCE_FIRST | _TRADE_OPS
 
@@ -223,9 +253,11 @@ def _parse_node(expr: Any, defs: dict[str, Node] | None, path: str) -> Node:
             return defs[expr]
         if expr == TRADE_LEAF:
             return Node(TRADE_LEAF, kind="num", path=path)
+        if expr == EXPIRY_LEAF:
+            return Node(EXPIRY_LEAF, kind="bool", path=path)
         if expr in FEATURES:
             return Node("feature", (expr,), kind="num", path=path)
-        known = ", ".join(sorted(FEATURES | set(defs) | {TRADE_LEAF}))
+        known = ", ".join(sorted(FEATURES | set(defs) | {TRADE_LEAF, EXPIRY_LEAF}))
         raise RuleError(f"{path}: unknown name {expr!r} (known: {known})")
     if not isinstance(expr, dict) or len(expr) != 1:
         raise RuleError(f"{path}: expected a number, a name or a one-key mapping, got {expr!r}")
@@ -270,6 +302,19 @@ def _parse_node(expr: Any, defs: dict[str, Node] | None, path: str) -> Node:
             "k": _float_param(body.get("k", 2), f"{here}.k", 0, 10),
             "minutes": _int_param(body.get("minutes", 5), f"{here}.minutes", 1, 125),
             "band": band,
+        }
+        return Node(op, params=params, kind="num", path=path)
+    if op == "swing":
+        if not isinstance(body, dict) or set(body) - {"kind", "back", "minutes", "n"}:
+            raise RuleError(f"{here}: write {{swing: {{kind: high, back: 0, minutes: 5, n: 2}}}}")
+        kind = body.get("kind")
+        if kind not in ("high", "low"):
+            raise RuleError(f"{here}.kind: expected high or low, got {kind!r}")
+        params = {
+            "kind": kind,
+            "back": _int_param(body.get("back", 0), f"{here}.back", 0, 5),
+            "minutes": _int_param(body.get("minutes", 5), f"{here}.minutes", 1, 125),
+            "n": _int_param(body.get("n", 2), f"{here}.n", 1, 10),
         }
         return Node(op, params=params, kind="num", path=path)
     if op in _SINCE_FIRST:
@@ -325,6 +370,10 @@ def _parse_node(expr: Any, defs: dict[str, Node] | None, path: str) -> Node:
         params["sessions"] = _int_param(body["sessions"], f"{here}.sessions", 1, 600)
     if "clock" in body:
         params["clock"] = clock_to_stamp(body["clock"], f"{here}.clock")
+    if "how" in body:
+        if body["how"] not in ("max", "min"):
+            raise RuleError(f"{here}.how: expected max or min, got {body['how']!r}")
+        params["how"] = body["how"]
     if op in ("max_since", "min_since"):
         if ("from" in body) == ("after" in body):
             raise RuleError(f"{here}: give exactly one of from / after")
@@ -363,7 +412,7 @@ def parse_rule(when: Any, define: dict[str, Any] | None = None) -> tuple[Node, d
     """Parse `define:` in order (a definition may use the ones before it) and then `when:`."""
     defs: dict[str, Node] = {}
     for name, body in (define or {}).items():
-        if name in FEATURES or name in ALL_OPS or name == TRADE_LEAF:
+        if name in FEATURES or name in ALL_OPS or name in (TRADE_LEAF, EXPIRY_LEAF):
             raise RuleError(f"define.{name}: the name is already taken")
         defs[name] = parse(body, defs, f"define.{name}")
         if defs[name].label is None:
@@ -392,6 +441,8 @@ class Frame:
     vix_close: np.ndarray | None = None
     vix_open: np.ndarray | None = None
     straddle_loader: Any = None
+    #: () -> (sessions,) bool, the session is its own nearest weekly expiry (`expiry_day`)
+    expiry_loader: Any = None
     _cache: dict[Any, np.ndarray] = field(default_factory=dict, repr=False)
 
     @property
@@ -573,6 +624,34 @@ def _indicator(frame: Frame, node: Node) -> np.ndarray:
     return _on_grid(frame, m, frame._cache[key]["line" if node.op == "supertrend" else "dir"])
 
 
+def _swing(frame: Frame, node: Node) -> np.ndarray:
+    """`{swing: ...}`: per session, the back-th latest confirmed fractal swing, held from the stamp
+    its n-th following bar completes until the next swing of that kind is confirmed."""
+    p = node.params
+    m, n, back = p["minutes"], p["n"], p["back"]
+    key = ("swing", p["kind"], m, n)
+    if key not in frame._cache:
+        high, low, _close = _bars(frame, m)
+        bars = high if p["kind"] == "high" else low
+        sign = 1.0 if p["kind"] == "high" else -1.0
+        found: list[list[tuple[int, float]]] = []
+        for row in bars:
+            mine = []
+            for k in range(n, len(row) - n):
+                side = np.concatenate([row[k - n : k], row[k + 1 : k + n + 1]])
+                if not np.isnan(row[k]) and bool(np.all(sign * row[k] > sign * side)):
+                    mine.append(((k + n + 1) * m - 1, float(row[k])))
+            found.append(mine)
+        frame._cache[key] = found
+    out = _full(frame)
+    for s, mine in enumerate(frame._cache[key]):
+        for idx in range(back, len(mine)):
+            start = mine[idx][0]
+            end = mine[idx + 1][0] if idx + 1 < len(mine) else N_BARS
+            out[s, start:end] = mine[idx - back][1]
+    return out
+
+
 def _ffill(a: np.ndarray) -> np.ndarray:
     """Hold the last valid value along each row (stamps)."""
     out = a.copy()
@@ -633,6 +712,11 @@ def _evaluate(node: Node, frame: Frame, memo: dict[Node, np.ndarray]) -> np.ndar
         # bar: every earlier stamp is unavailable, and a window opening before `at` cannot see it.
         out[:, :at] = np.nan
         return out
+    if op == EXPIRY_LEAF:
+        if frame.expiry_loader is None:
+            raise RuleError(f"{node.path}: expiry_day needs the expiry calendar, not loaded")
+        days = np.asarray(frame.expiry_loader(), dtype=bool)
+        return np.repeat(days[:, None], N_BARS, axis=1)
     if op == "bar_close":
         m = node.params["minutes"]
         out = np.zeros((frame.n, N_BARS), dtype=bool)
@@ -647,6 +731,8 @@ def _evaluate(node: Node, frame: Frame, memo: dict[Node, np.ndarray]) -> np.ndar
         return _ffill(out)
     if op in ("supertrend", "supertrend_dir", "bollinger"):
         return _indicator(frame, node)
+    if op == "swing":
+        return _swing(frame, node)
     if node.trade:
         raise RuleError(f"{node.path}: at_entry / minutes_in_trade belong in exit_when only")
     args = [evaluate(a, frame, memo) for a in node.args]
@@ -669,6 +755,8 @@ def _evaluate(node: Node, frame: Frame, memo: dict[Node, np.ndarray]) -> np.ndar
             rows = x.any(axis=1)
             out[rows, x[rows].argmax(axis=1)] = True
             return out
+        if op == "ever":
+            return np.logical_or.accumulate(args[0], axis=1)
         x = args[0]
         if op == "lag":
             return _lag(x, node.params["n"])
@@ -695,6 +783,11 @@ def _evaluate(node: Node, frame: Frame, memo: dict[Node, np.ndarray]) -> np.ndar
             return out
         if op in ("prior_median", "prior_mean"):
             return _prior(x, node.params["sessions"], op.split("_")[1])
+        if op == "prev_at":
+            return _per_session(frame, _prev(frame, x[:, node.params["clock"]]))
+        if op == "prev_agg":
+            acc = np.fmax if node.params["how"] == "max" else np.fmin
+            return _per_session(frame, _prev(frame, acc.reduce(x, axis=1)))
     raise RuleError(f"{node.path}: cannot evaluate {op!r}")  # pragma: no cover
 
 
@@ -814,10 +907,16 @@ def describe(node: Node, top: bool = True) -> str:
         return (
             f"the {p['band']} Bollinger band ({p['n']}, {p['k']:g}) of {p['minutes']}-minute bars"
         )
+    if op == "swing":
+        p = node.params
+        which = "latest" if p["back"] == 0 else f"{p['back']} before the latest"
+        return f"the {which} swing {p['kind']} ({p['n']} each side, {p['minutes']}-minute bars)"
     if op == "bar_close":
         return f"a {node.params['minutes']}-minute bar has just completed"
     if op == TRADE_LEAF:
         return "minutes in the trade"
+    if op == EXPIRY_LEAF:
+        return "today is a weekly expiry day"
     kids = [describe(a, False) for a in node.args]
     if op in _WORDS:
         return f"({kids[0]} {_WORDS[op]} {kids[1]})"
@@ -845,6 +944,8 @@ def describe(node: Node, top: bool = True) -> str:
         return f"{kids[0]} crosses below {kids[1]}"
     if op == "first":
         return f"{kids[0]} for the first time today"
+    if op == "ever":
+        return f"{kids[0]} at some minute today so far"
     p = node.params
     if op == "lag":
         return f"{kids[0]} {p['n']} minutes ago"
@@ -863,6 +964,11 @@ def describe(node: Node, top: bool = True) -> str:
     if op in ("prior_median", "prior_mean"):
         word = "median" if op == "prior_median" else "average"
         return f"the {word} of {kids[0]} at this minute over the last {p['sessions']} sessions"
+    if op == "prev_at":
+        return f"the previous session's {kids[0]} at {stamp_to_clock(p['clock'])}"
+    if op == "prev_agg":
+        word = "highest" if p["how"] == "max" else "lowest"
+        return f"the previous session's {word} {kids[0]}"
     return op  # pragma: no cover
 
 

@@ -19,6 +19,7 @@ import type {
   MomentumJournalCheckItem,
   MomentumJournalEntry,
 } from '../../types/momentum';
+import { Accordion } from '../ui/Accordion';
 import { Badge } from '../ui/Badge';
 import { Card, CardHeader } from '../ui/Card';
 import { CopyButton } from '../ui/CopyButton';
@@ -28,6 +29,7 @@ import { SkeletonRows } from '../ui/Skeleton';
 import { StatCard } from '../ui/StatCard';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
+import { MomentumForwardCards } from './MomentumForwardCards';
 
 /**
  * Momentum › Journal (BL-024): every weekly signal as it was recorded — unchangeable, so it can
@@ -94,6 +96,7 @@ export function MomentumJournalView() {
         {check ? <JournalSummary check={check} /> : null}
       </Card>
       {check ? <JournalCheckCard items={check.items} week={check.week} /> : null}
+      <MomentumForwardCards />
       <JournalEntriesCard entries={data.entries} firstWeek={data.first_week} />
     </div>
   );
@@ -160,13 +163,24 @@ const STATUS_BADGE: Record<
   missing: { label: 'Missing', tone: 'negative' },
 };
 
+/** The week's expected signals. Collapsed to its counter while every one is recorded; open by
+ * itself when any is missing or labelled another week. */
 function JournalCheckCard({ items, week }: { items: MomentumJournalCheckItem[]; week: string }) {
+  const recorded = items.filter((item) => item.status === 'recorded').length;
+  const complete = recorded === items.length;
   return (
-    <Card>
-      <CardHeader
-        title={`Week of ${formatDay(week)}: what should be here`}
-        description="One row per expected signal. Stock and Broad favourites only get a final (they have no preview); they are evaluated by the 19:30 run."
-      />
+    <Accordion
+      // A new week, or a change between complete and not, sets it open or closed afresh.
+      key={`${week}-${complete}`}
+      defaultOpen={!complete}
+      title={`Week of ${formatDay(week)}: what should be here`}
+      badge={
+        <Badge tone={complete ? 'positive' : 'negative'} dot>
+          {formatInt(recorded)} / {formatInt(items.length)} recorded
+        </Badge>
+      }
+      description="One row per expected signal. Stock and Broad favourites only get a final (they have no preview); they are evaluated by the 19:30 run."
+    >
       <Table>
         <THead>
           <Th>Strategy</Th>
@@ -204,7 +218,7 @@ function JournalCheckCard({ items, week }: { items: MomentumJournalCheckItem[]; 
           })}
         </tbody>
       </Table>
-    </Card>
+    </Accordion>
   );
 }
 

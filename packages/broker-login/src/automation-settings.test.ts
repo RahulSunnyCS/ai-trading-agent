@@ -43,6 +43,7 @@ describe('automation settings for the jobs (BL-140)', () => {
           upload: true,
           multiplier: 1,
           addon: true,
+          mtmSl: null,
         };
       }),
     );
@@ -140,5 +141,37 @@ describe('the AlgoTest deployer and a multiplier it cannot set (BL-140 Phase 4)'
     assert.equal(algotestMultiplierRefusal(a), null);
     a.rows['quantiply.angelone'].multiplier = 4;
     assert.equal(algotestMultiplierRefusal(a), null);
+  });
+});
+
+describe('MTM SL per Quantiply row (BL-172)', () => {
+  it('a snapshot without the field reads as the list stop on Quantiply, none on AlgoTest', () => {
+    const s = JSON.parse(JSON.stringify(DEFAULT_AUTOMATION)) as {
+      rows: Record<string, Record<string, unknown>>;
+    };
+    const rowOf = (k: string) => s.rows[k] as Record<string, unknown>;
+    for (const row of Object.values(s.rows) as Record<string, unknown>[]) delete row.mtmSl;
+    rowOf('quantiply.finvasia').list = 't1';
+    write(s);
+    const a = readAutomation(file);
+    assert.equal(a.rows['quantiply.angelone'].mtmSl, 8000);
+    assert.equal(a.rows['quantiply.finvasia'].mtmSl, 9000);
+    assert.equal(a.rows['algotest.finvasia'].mtmSl, null);
+  });
+
+  it('a bad figure, or one on AlgoTest, is an error, never a guess', () => {
+    for (const [key, bad] of [
+      ['quantiply.angelone', 80.5],
+      ['quantiply.angelone', '8000'],
+      ['algotest.finvasia', 8000],
+    ] as const) {
+      const s = JSON.parse(JSON.stringify(DEFAULT_AUTOMATION)) as {
+        rows: Record<string, Record<string, unknown>>;
+      };
+      const rowOf = (k: string) => s.rows[k] as Record<string, unknown>;
+      rowOf(key).mtmSl = bad;
+      write(s);
+      assert.throws(() => readAutomation(file), /mtmSl/);
+    }
   });
 });

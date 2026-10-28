@@ -1,5 +1,6 @@
 import {
   Activity,
+  Archive,
   BookOpen,
   Building2,
   CalendarClock,
@@ -9,6 +10,7 @@ import {
   LayoutDashboard,
   LineChart,
   type LucideIcon,
+  NotebookText,
   Repeat,
   Settings,
   Tag,
@@ -29,6 +31,7 @@ export type Tab =
   | 'jobs'
   | 'optionslab'
   | 'momentum'
+  | 'tradebook'
   | 'brokerLogins'
   | 'pricing'
   | 'settings'
@@ -66,12 +69,11 @@ export interface NavItem {
 
 export type NavGroupId =
   | 'overview'
-  | 'live'
   | 'optionslab'
   | 'momentum'
-  | 'data'
-  | 'account'
-  | 'help';
+  | 'tradebook'
+  | 'operations'
+  | 'archived';
 
 export interface NavGroup {
   id: NavGroupId;
@@ -79,19 +81,27 @@ export interface NavGroup {
   /** Stands for the whole section in the mobile bottom bar. */
   icon: LucideIcon;
   items: NavItem[];
+  /** One line under the section's heading in Settings › Navigation. */
+  note?: string;
 }
 
 /**
  * Navigation grouped by product. Drives the sidebar, the mobile drawer, the
  * mobile bottom bar and the Settings tab list.
  *
- * Overview (the landing view) is its own first group. The YAML backtest is no
- * longer a tab: it is the Options Lab builder's YAML mode (/optionslab/builder/yaml),
- * and /backtest redirects there. Backfill and Replay are the two sections of Data ›
- * Coverage (/coverage/backfill, /coverage/replay); their old paths redirect. Pricing is
- * labelled Billing and lives at /billing, keeping its `pricing` id (see TAB_SEGMENT in
- * lib/routes.ts) so stored preferences and existing callers need no change. The Guide (BL-041)
- * is the last group; its children are the guide's chapters (guide/registry.ts, a test checks).
+ * The pages used every day come first: Overview (the landing view), Options Lab (with Live, the
+ * replay of a collected day, whose data comes from the options API), Momentum, Trade book, then
+ * Operations (Jobs, Broker logins, Settings and the Guide). The last group, Archived engine, holds
+ * the frozen personality engine's screens and the two that read the same frozen server (Coverage,
+ * Billing); its tabs start hidden (store/navigation.ts), Settings › Navigation shows them again,
+ * and each still opens by its link.
+ *
+ * The YAML backtest is no longer a tab: it is the Options Lab builder's YAML mode
+ * (/optionslab/builder/yaml), and /backtest redirects there. Backfill and Replay are the two
+ * sections of Coverage (/coverage/backfill, /coverage/replay); their old paths redirect. Pricing
+ * is labelled Billing and lives at /billing, keeping its `pricing` id (see TAB_SEGMENT in
+ * lib/routes.ts) so stored preferences and existing callers need no change. The Guide's children
+ * are the guide's chapters (guide/registry.ts, a test checks).
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -99,18 +109,6 @@ export const NAV_GROUPS: NavGroup[] = [
     heading: 'Overview',
     icon: LayoutDashboard,
     items: [{ id: 'overview', label: 'Overview', icon: LayoutDashboard }],
-  },
-  {
-    id: 'live',
-    heading: 'Live',
-    icon: Activity,
-    items: [
-      { id: 'live', label: 'Live', icon: Activity },
-      { id: 'trades', label: 'Trades', icon: Repeat },
-      { id: 'pnl', label: 'P&L', icon: Wallet },
-      { id: 'personalities', label: 'Personalities', icon: Users },
-      { id: 'regime', label: 'Regimes', icon: Tag },
-    ],
   },
   {
     id: 'optionslab',
@@ -130,11 +128,13 @@ export const NAV_GROUPS: NavGroup[] = [
           { segment: 'correlation', label: 'Correlation', group: 'Explore data' },
           { segment: 'strategies', label: 'Strategies and baskets', group: 'Build and test' },
           { segment: 'builder', label: 'Builder', group: 'Build and test' },
-          { segment: 'runs', label: 'Runs', group: 'Build and test' },
-          // Kept, but out of the daily path (BL-102): index regimes are only known after the day.
-          { segment: 'regimes', label: 'Regimes', group: 'Advanced' },
+          // Archived: out of the sidebar (index regimes are only known after the day), still routed.
+          { segment: 'regimes', label: 'Regimes', group: 'Advanced', hidden: true },
         ],
       },
+      // The replay of a collected day, read from the options API until live capture exists.
+      // Its path stays /live.
+      { id: 'live', label: 'Live', icon: Activity },
     ],
   },
   {
@@ -151,44 +151,38 @@ export const NAV_GROUPS: NavGroup[] = [
           { segment: 'scores', label: 'Scores' },
           { segment: 'saved', label: 'Saved runs' },
           { segment: 'week', label: 'This week' },
-          { segment: 'rebalance', label: 'Rebalance' },
           { segment: 'journal', label: 'Journal' },
         ],
       },
     ],
   },
   {
-    id: 'data',
-    heading: 'Data',
-    icon: Database,
+    id: 'tradebook',
+    heading: 'Trade book',
+    icon: NotebookText,
     items: [
       {
-        id: 'coverage',
-        label: 'Coverage',
-        icon: Database,
+        id: 'tradebook',
+        label: 'Trade book',
+        icon: NotebookText,
+        // The realised book from the brokers' contract notes (BL-168): F&O opens first.
         children: [
-          { segment: 'backfill', label: 'Backfill' },
-          { segment: 'replay', label: 'Replay' },
+          { segment: 'fno', label: 'F&O' },
+          { segment: 'trades', label: 'Trades' },
+          { segment: 'money', label: 'Money' },
+          { segment: 'momentum', label: 'Momentum' },
         ],
       },
+    ],
+  },
+  {
+    id: 'operations',
+    heading: 'Operations',
+    icon: CalendarClock,
+    items: [
       { id: 'jobs', label: 'Jobs', icon: CalendarClock },
-    ],
-  },
-  {
-    id: 'account',
-    heading: 'Account',
-    icon: Settings,
-    items: [
       { id: 'brokerLogins', label: 'Broker logins', icon: Building2 },
-      { id: 'pricing', label: 'Billing', icon: CreditCard },
       { id: 'settings', label: 'Settings', icon: Settings },
-    ],
-  },
-  {
-    id: 'help',
-    heading: 'Help',
-    icon: BookOpen,
-    items: [
       {
         id: 'guide',
         label: 'Guide',
@@ -203,7 +197,33 @@ export const NAV_GROUPS: NavGroup[] = [
       },
     ],
   },
+  {
+    id: 'archived',
+    heading: 'Archived engine',
+    icon: Archive,
+    note: 'The frozen paper-trading engine and the screens that read its server (Coverage, Billing). Hidden until you show them here; each still opens by its link.',
+    items: [
+      { id: 'trades', label: 'Trades', icon: Repeat },
+      { id: 'pnl', label: 'P&L', icon: Wallet },
+      { id: 'personalities', label: 'Personalities', icon: Users },
+      { id: 'regime', label: 'Regimes', icon: Tag },
+      {
+        id: 'coverage',
+        label: 'Coverage',
+        icon: Database,
+        children: [
+          { segment: 'backfill', label: 'Backfill' },
+          { segment: 'replay', label: 'Replay' },
+        ],
+      },
+      { id: 'pricing', label: 'Billing', icon: CreditCard },
+    ],
+  },
 ];
+
+/** The Archived engine's tabs: hidden from the sidebar by default, still opened by their URL. */
+export const ARCHIVED_TABS: readonly Tab[] =
+  NAV_GROUPS.find((group) => group.id === 'archived')?.items.map((item) => item.id) ?? [];
 
 /**
  * Tabs that cannot be hidden: Settings, so users can always restore tabs they have hidden, and

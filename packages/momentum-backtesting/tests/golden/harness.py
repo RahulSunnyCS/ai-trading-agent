@@ -132,6 +132,28 @@ def without_universe(request: dict, names: set[str]) -> dict:
     return {**request, "universe": [n for n in request["universe"] if n not in names]}
 
 
+def _record_weights() -> list:
+    """Wrap `engine.run_backtest` everywhere it was imported, collecting each returned
+    `Result.weights.index` in the list that is returned (only with GOLDEN_RECORD_WEIGHTS)."""
+    from momentum_backtesting import engine
+
+    seen: list = []
+    original = engine.run_backtest
+
+    def recording(*args, **kwargs):
+        result = original(*args, **kwargs)
+        seen.append(result.weights.index)
+        return result
+
+    for module in list(sys.modules.values()):
+        if (
+            getattr(module, "__name__", "").startswith("momentum_backtesting")
+            and getattr(module, "run_backtest", None) is original
+        ):
+            module.run_backtest = recording
+    return seen
+
+
 def _child(scenario_file: Path, out_file: Path) -> None:
     from fastapi.testclient import TestClient
 
@@ -142,8 +164,11 @@ def _child(scenario_file: Path, out_file: Path) -> None:
         Path(os.environ["TRADING_DATA_ROOT"]), Path(os.environ["MOMENTUM_DATA_DIR"]), cutoff
     )
     client = TestClient(api.create_app())
+    frames = _record_weights() if os.environ.get("GOLDEN_RECORD_WEIGHTS") else None
     results = {}
     for name, scenario in json.loads(scenario_file.read_text()).items():
+        if frames is not None:
+            frames.clear()
         request = expand(client, scenario)
         response = client.post("/api/backtest", json=request)
         if missing := missing_categories(response.status_code, response.json()):
@@ -156,12 +181,24 @@ def _child(scenario_file: Path, out_file: Path) -> None:
             "status": response.status_code,
             "response": normalise(response.json()),
         }
+        if frames is not None:
+            results[name]["weights_frames"] = [
+                {
+                    "rows": len(i),
+                    "sorted": bool(i.is_monotonic_increasing),
+                    "unique": bool(i.is_unique),
+                }
+                for i in frames
+            ]
     out_file.write_text(json.dumps(results))
 
 
-def run_scenarios(scenarios: dict[str, dict], cutoff: str | None = None) -> dict[str, dict]:
+def run_scenarios(
+    scenarios: dict[str, dict], cutoff: str | None = None, record_weights: bool = False
+) -> dict[str, dict]:
     """name -> {request, status, response} for each scenario, from a fresh process and a fresh
-    database built from the fixture."""
+    database built from the fixture. `record_weights` adds `weights_frames` to each result: the
+    row count, sortedness and uniqueness of every `Result.weights` index the engine returned."""
     with tempfile.TemporaryDirectory(prefix="mbt-golden-") as tmp:
         work = Path(tmp)
         (work / "scenarios.json").write_text(json.dumps(scenarios))
@@ -171,6 +208,7 @@ def run_scenarios(scenarios: dict[str, dict], cutoff: str | None = None) -> dict
             "MOMENTUM_DATA_DIR": str(work / "data"),
             "GOLDEN_CUTOFF": cutoff or "",
             "PYTHONHASHSEED": "0",
+            "GOLDEN_RECORD_WEIGHTS": "1" if record_weights else "",
         }
         for secret in ("DATABASE_URL", "FYERS_ACCESS_TOKEN", "FYERS_APP_ID"):
             env.pop(secret, None)

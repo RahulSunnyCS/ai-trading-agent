@@ -3,8 +3,8 @@ import type { NextConfig } from 'next';
 /**
  * Browser calls remain same-origin. In local development Next forwards REST
  * calls to Fastify; production can set DASHBOARD_API_URL to its private API
- * origin. WebSocket upgrades use NEXT_PUBLIC_WS_URL instead (see
- * useLiveTicks), because Next rewrites only cover HTTP requests.
+ * origin. (Next rewrites cover HTTP only; the dashboard opens no WebSocket since the frozen
+ * server's tick socket client was removed.)
  */
 const apiOrigin = process.env.DASHBOARD_API_URL ?? 'http://localhost:3000';
 const momentumDirectOrigin = process.env.MOMENTUM_DIRECT_API_URL ?? 'http://127.0.0.1:8765';
@@ -23,6 +23,9 @@ const SECURITY_HEADERS = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Next 16's `next dev` otherwise appends its own rules to AGENTS.md, which here only points
+  // at CLAUDE.md (one fact, one file).
+  agentRules: false,
   async headers() {
     return [{ source: '/:path*', headers: SECURITY_HEADERS }];
   },
@@ -32,10 +35,10 @@ const nextConfig: NextConfig = {
   // 30s rewrite-proxy timeout would drop it as a 500. Matches the Fastify proxy's 180s.
   experimental: { proxyTimeout: 180_000 },
   // The Guide's pages are Markdown files imported as strings (`import body from './x.md?raw'`,
-  // BL-041). Vitest understands `?raw` natively; webpack needs this one rule.
-  webpack(config) {
-    config.module.rules.push({ resourceQuery: /raw/, type: 'asset/source' });
-    return config;
+  // BL-041). Vitest understands `?raw` natively; Turbopack (Next 16's bundler for `next dev`
+  // and `next build`) needs this one rule.
+  turbopack: {
+    rules: { '*.md': { condition: { query: /raw/ }, type: 'raw' } },
   },
   async rewrites() {
     return [
@@ -165,6 +168,10 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/journal`,
             },
             {
+              source: '/api/momentum/journal/forward',
+              destination: `${momentumDirectOrigin}/api/journal/forward`,
+            },
+            {
               source: '/api/momentum/week',
               destination: `${momentumDirectOrigin}/api/week`,
             },
@@ -181,6 +188,11 @@ const nextConfig: NextConfig = {
               // BL-142: status, login (read-only Kite)
               source: '/api/momentum/kite/:path*',
               destination: `${momentumDirectOrigin}/api/kite/:path*`,
+            },
+            {
+              // BL-142 Phase 4: the Lots panel (read-only)
+              source: '/api/momentum/lots',
+              destination: `${momentumDirectOrigin}/api/lots`,
             },
             {
               // sync, paste, rules

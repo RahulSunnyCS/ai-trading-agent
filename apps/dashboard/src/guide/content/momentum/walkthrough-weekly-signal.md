@@ -22,8 +22,9 @@ candidate's rank, and why a name was sold (its rank fell past the exit rank) or 
 
 ## 4. Compare with what you hold
 
-Open [Rebalance](app:/momentum/rebalance), choose the strategy, and enter your current
-holdings. The **indicative changes** are the trades that would bring you in line.
+On [This week](app:/momentum/week), **Your orders** shows the headline's trades in whole shares
+against your holdings read from Kite (or your paper portfolio). To see what another favourite
+would trade against the same holdings, pick it under **Preview for…**; nothing is saved.
 
 ## 5. Decide
 

@@ -33,7 +33,7 @@ do not need to know anything about this tool. Terms with a dotted underline, lik
   [limits](guide:start/limits).
 - **Momentum** and **Options Lab**: first an explainer of how the strategy works, then one page
   per screen, then step-by-step walkthroughs.
-- **Data & operations**: the Overview, Jobs, Broker logins, Coverage and Settings screens.
+- **Data & operations**: the Overview, Jobs, Broker logins, Live, Trade book and Settings screens.
 - **Glossary**: every term in plain words.
 
 Every screen page follows the same order: what it is for, what it needs before you start, the
@@ -45,7 +45,6 @@ controls, how to read the results, common questions, and what it does not tell y
 
 ## Screens you can ignore
 
-The **Live** group in the sidebar (Live, Trades, P&L, Personalities, Regimes) and **Billing**
-belong to an earlier experiment, an automatic paper-trading engine, that is paused. They still
-work but are not developed and are not covered here. You can hide them in
-[Settings](app:/settings).
+The sidebar's **Archived engine** section (Trades, P&L, Personalities, Regimes, Coverage,
+Billing) belongs to an earlier experiment, an automatic paper-trading engine, that is paused. It
+is hidden by default; [Settings](app:/settings) › Navigation shows it again.

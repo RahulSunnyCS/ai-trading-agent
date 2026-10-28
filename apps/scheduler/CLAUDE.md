@@ -4,11 +4,12 @@ Guidance for coding agents working in `apps/scheduler` (`@ata/scheduler`).
 
 ## What this app does
 
-One home for every recurring job (BL-012): broker logins, the Friday momentum runs and,
-in later PRs, the evening options collection, backups and maintenance checks. It replaces
-the one-plist-per-job launchd setup. Every run is recorded, and missed or failed runs
-raise a Telegram alert at once. launchd only keeps this process alive
-(`deploy/launchd/jobs/com.ai-trading-agent.scheduler.plist`); jobs run from the main
+One home for every recurring job (BL-012, done 2026-10-28): broker logins, the Friday momentum
+runs, the evening options collection, contract notes, the AlgoTest/Quantiply jobs, backups and
+the alert-only maintenance checks. It replaced the one-plist-per-job launchd setup. Every run is
+recorded, and missed or failed runs raise a Telegram alert at once. launchd only keeps this
+process alive (`deploy/launchd/jobs/com.ai-trading-agent.scheduler.plist`, installed and running
+as `com.ai-trading-agent.scheduler`); jobs run from the main
 checkout's working tree, so its checked-out branch is the code that runs (the morning
 summary flags anything but `main`).
 
@@ -122,19 +123,30 @@ detail as its error, so the normal failure alert goes out with the job's `fixHin
 daily, so an unfixed problem repeats at most once a day. Inject anything that touches the
 network or disk so the test needs neither. One group per file keeps parallel PRs from clashing.
 
+What each file holds (BL-012 inventory numbers): `drift` S1 Nifty 50 list, S2 lot sizes, Y4
+`check-expiry-calendar` (the Fyers NSE + BSE masters' listed option expiries against
+`expiry_calendar.csv`, holiday shifts from `holidays.csv`, years with no holiday rows skipped,
+and the nearest expiry's commonest strike gap against `strike_step.csv`); `calendar` Y1
+holidays, Y2 RBI dates, M3 margin, Y3 `check-blocked-dates` (`.env`'s `BLOCKED_DATES` from
+`ctx.env`); `stock` M2, W3, S3 `universe-refresh-reminder` (the category CSVs' modification
+day against the last 1 Apr / 1 Oct, and this year's rows; `MOMENTUM_DATA_DIR` honoured);
+`credentials`; `digest`.
+
 ## Gotchas
 
 - Tests use `bun test`, not vitest, because `bun:sqlite` only exists under Bun.
 - `group: 'catalog'` is for anything that writes the DuckDB catalog (`TRADING_DATA_ROOT`).
 - `group: 'quantiply'` holds the Quantiply jobs (upload, enable, disable), so an enable runs after the upload
-  before it, retries included (`quantiply-deploy` 16:55 waits for `quantiply-evening` 16:45;
+  before it, retries included (`quantiply-deploy` 08:10 waits for the 08:02 `broker-login`, BL-172;
   `quantiply-deploy-topup` 09:21 for `quantiply-topup` 09:19). It does not space their TOTP logins (the next job
   starts the moment one ends): `packages/broker-login/src/quantiply-session.ts` waits out the last window each
   account typed a code in (a file stamp), and the deployer retries a refused code once. The enables have
   `retries: 0` like `algotest-deploy`: a second attempt could act on a half-finished first. `quantiply-disable`
   is the safety net and runs whatever `QUANTIPLY_DEPLOY` and the deploy switch say.
-- `broker-login` has `retries: 0` on purpose: `dispatch.ts` retries itself and must never
-  dispatch the GitHub workflow twice.
+- `broker-login` (BL-172, 08:02) runs the login on the Mac (`packages/broker-login/src/local-login.ts`), in the
+  `quantiply` group so the 08:10 `quantiply-deploy` starts after it; `retries: 0` on purpose: a second run would
+  resend a refused PIN, and the job hands what failed to GitHub itself. The 09:00 summary reads its
+  `<state>/broker-login/<day>.json` first, GitHub's runs only when the Mac did not run or handed parts over.
 - `angel-login-check` (trading days 08:00) runs `obt angel test --scheduled`: one Angel One
   SmartAPI login through the same guard as the dashboard's Test connection and the collector
   (one login at a time, 60 s cool-down). Its single retry is 5 minutes later, past its own
@@ -156,6 +168,19 @@ network or disk so the test needs neither. One group per file keeps parallel PRs
   `restartIfInterruptedUntil: '15:25'` (a `Job` field, read by `loop.decide`): a run cut off by a
   scheduler or laptop restart (reaped as interrupted, exit -2, by `startLoop` before its first tick) is
   started again while the session lasts; every other job treats an interrupted slot as served. Each part waits for its `.env` switch.
+- `momentum-journal-score` (BL-024, Fri 20:30, `mbt journal score`) sits between the 19:30
+  stock-ingest run (which records the week's journal rows and prices it scores against) and the
+  21:00 journal check, in the `catalog` group so it waits for a late 19:30 run. It re-runs every
+  scored favourite on today's code (one engine pass each, cached rankings), writes only
+  `forward_scores.json` in the momentum state dir and sends nothing: the headline's score line is
+  added to its 19:30 message, so the scheduler's own failure alert is the only Telegram it causes.
+- `momentum-history` (BL-001 Phase 4, Fri 22:00) runs `mbt verify history --send`: read-only on the catalog,
+  but in the `catalog` group because DuckDB will not open a read-only connection while another process
+  writes. It `alertsItself`: a restated history is its own Telegram and exits 0 once Telegram took it (like
+  `momentum-live-rules` on a breach), so the scheduler does not alert twice; an undelivered one exits 1 (the
+  retry sends it again, the Jobs page shows it red), as does a check that cannot run (also sent by the command).
+  Like every `alertsItself` job, an exit the command never reached (a `uv` environment that will not build)
+  is silent apart from the Jobs page, unless it is 124 or 127.
 - The scheduler reads `jobs.ts` once at start: a new or changed job needs a restart of the
   service (`launchctl kickstart -k gui/$(id -u)/com.ai-trading-agent.scheduler`, see
   `deploy/launchd/README.md`).

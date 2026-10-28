@@ -471,6 +471,21 @@ def _proxied(proxy: pd.DataFrame | None, asset: str, *weeks) -> bool:
     return any(w in proxy.index and bool(proxy.at[w, asset]) for w in weeks if pd.notna(w))
 
 
+def _comparison_rows(entries: list[dict]) -> list[dict]:
+    """`reference_benchmarks.compare` entries as the payload carries them: the curve in rupees."""
+    return [
+        {
+            "name": c["name"],
+            "cagr": c["cagr"],
+            "excess_cagr": c["excess_cagr"],
+            "max_drawdown": c["max_drawdown"],
+            "note": c["note"],
+            "series": (c["curve"] * CAPITAL).tolist(),
+        }
+        for c in entries
+    ]
+
+
 def payload_parts(
     result: Result,
     prices: pd.DataFrame,
@@ -506,7 +521,9 @@ def payload_parts(
     lines the strategy is also measured against, whatever the dataset's own benchmark is; and
     `benchmarks`: the dashboard picker's five indices (`reference_benchmarks.picker`), each with
     its curve on `series.dates` and headline statistics, so the page can switch benchmark
-    without a re-run."""
+    without a re-run; and, only when it covers the run, `extra_comparisons`: the chart's extra
+    lines (`reference_benchmarks.CHART_ONLY`, Nifty 500 TRI; BL-036), in the shape of
+    `comparisons`."""
     closed = closed_trades(result)
     eq, bench, cash = result.equity, result.benchmark, result.cash
     rolling = (eq / eq.shift(52)) - (bench / bench.shift(52))
@@ -563,17 +580,7 @@ def payload_parts(
         {
             "benchmark_name": config.benchmark,
             "kpis": kpis(result, closed),
-            "comparisons": [
-                {
-                    "name": c["name"],
-                    "cagr": c["cagr"],
-                    "excess_cagr": c["excess_cagr"],
-                    "max_drawdown": c["max_drawdown"],
-                    "note": c["note"],
-                    "series": (c["curve"] * CAPITAL).tolist(),
-                }
-                for c in reference_benchmarks.compare(eq, references)
-            ],
+            "comparisons": _comparison_rows(reference_benchmarks.compare(eq, references)),
             "benchmarks": [
                 {
                     **{key: value for key, value in entry.items() if key != "curve"},
@@ -598,6 +605,11 @@ def payload_parts(
             "universe": result.ranked_names,
         }
     )
+    # BL-036: the chart's extra comparison lines (Nifty 500 TRI), present only when one covers the
+    # run, so a result computed without their data (every golden scenario) is unchanged.
+    extra = reference_benchmarks.compare(eq, references, names=reference_benchmarks.CHART_ONLY)
+    if extra:
+        core["extra_comparisons"] = _clean(_comparison_rows(extra))
     lazy: dict[str, Callable[[], object]] = {
         "trades": lambda: _clean(trade_rows),
         "instruments": lambda: _clean(instrument_table(result, closed, groups)),

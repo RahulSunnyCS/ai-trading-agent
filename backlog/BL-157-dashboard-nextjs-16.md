@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P0 — the hosted dashboard cannot deploy at all until this lands; friends see Momentum through it |
-| **Status** | Planned |
+| **Status** | Done (2026-10-28) |
 | **Type** | chore |
 | **Area** | dashboard / infra |
 | **Created** | 2026-10-24 |
 | **Depends on** | none |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.46 |
 
 ## Context
 
@@ -150,9 +150,15 @@ the login gate and the API rewrites behaving as before.
 
 ## Open questions
 
-- Should Phase 3's React 19 bump follow straight after, or wait?
-- Is `cf:preview` against the real tunnel hostnames fine to run from the laptop (it needs the
-  Access service token in the shell), or should Phase 2 use the local APIs?
+Answered by the owner on 2026-10-26:
+
+- **After Phase 1 merges:** go straight on to Phase 2 and promote `main` to `release` if the
+  preview checks pass; stop and report if one fails.
+- **Phase 2 preview backends:** the local APIs (127.0.0.1), not the tunnel hostnames. This checks
+  the login gate and the rewrites, not the tunnel path.
+- **React 19 (Phase 3):** waits.
+- **Phase 1's local checks:** the worktree's dashboard on a spare port against the APIs already
+  running on :8765 / :8000; nothing of the owner's is restarted.
 
 ## Log
 
@@ -163,3 +169,100 @@ the login gate and the API rewrites behaving as before.
   Node server, not the Worker); the e2e step names its address and the spec that fails by design;
   `--webpack` goes on dev-stack's `dev` branch only; the cut-off is 2026-10-21; Next 16's
   `.next/dev/types` and `next-env.d.ts` rewrites named.
+- 2026-10-26 — started; owner answers recorded above; TODO 3.46.
+- 2026-10-26 — Phase 1 built: `next` 16.4.3, `@opennextjs/cloudflare` 1.20.13 (`@opennextjs/aws`
+  4.1.12), React 18 kept. `--webpack` on the `dev` / `build` scripts and on dev-stack's `next dev`
+  and `next build`. `agentRules: false` in `next.config.ts`: `next dev` otherwise appends its own
+  rules to `apps/dashboard/AGENTS.md`, which only points at CLAUDE.md. `next-env.d.ts` is Next 16's
+  form (side-effect imports of `.next/types/*`); typecheck passes with and without a built `.next`.
+  Build warnings, both Phase 3 items: React 18 is deprecated in 16, and `middleware` should become
+  `proxy`. `experimental.proxyTimeout` is accepted. Checks: build, typecheck, 140 files / 1,980
+  unit tests. E2E on a spare port (5191) against the running APIs, with `personalities-api.spec.ts`
+  left out: 39 of 41 pass, and the same two Live-view tests (128, 165: `getByText('NIFTY spot')`
+  matches two elements) fail on `main` under Next 15 too, so they are stale tests, not this change.
+  A first cold run showed five more failures, which pass once the dev server has compiled (about
+  60 s per first page). Proxy timeout: a stub API that answers after 45 s came back 200 in 45 s
+  through `/api/momentum/meta` under `next dev` and under `next start` (production build with a
+  throwaway `DASHBOARD_PASSWORD`: 401 without it, 200 with it).
+- 2026-10-26 — Phase 1 merged (#327, reviewed: no blocking findings; the reviewer also ran
+  `cf:build` on the branch). OpenNext's build runs the package's `build` script, so `--webpack`
+  reaches the Worker build with no OpenNext config; the Next 16 webpack build still emits edge
+  middleware, which OpenNext bundles into `.open-next/middleware/handler.mjs`. Next did not need a
+  `tsconfig.json` change (task 3 expected one). Review notes, not fixed here: `next dev` rewrites
+  the tracked `next-env.d.ts` to `.next/dev/types` (written into `apps/dashboard/CLAUDE.md`), and
+  `cf-build.mjs`'s reason for refusing to build while `next dev` runs no longer holds in 16
+  (`.next/dev` is kept by `next build`); reword or drop that guard in Phase 3.
+- 2026-10-26 — Phase 2 done, on `main` at f6c38149. `cf:build` (Node 20, bun 1.3): Next 16.4.3
+  (webpack), cloudflare 1.20.13, aws 4.1.12; the support check and the no-env-bundled check pass;
+  no tracked file changed. `wrangler dev` needs Node 22 (the deploy job's version; this laptop's
+  default is 20, so it ran with fnm's 22.23.3). Built with `MOMENTUM_DIRECT_API_URL` = the running
+  Momentum API on :8765 and `OBT_DIRECT_API_URL` = a local header-echo stub, to see what reaches
+  upstream. Results:
+  - Access mode (the live `wrangler.jsonc` vars): `/`, `/login`, `/api/*` all 403 without a
+    token, and 403 with a forged `Cf-Access-Jwt-Assertion`.
+  - Password mode (Access vars blanked, a throwaway `DASHBOARD_PASSWORD`): a page without a
+    session redirects to `/login?next=…` (302) and `/api/*` answers 401; a wrong password
+    redirects to `?error=invalid`; the right one sets `ata_session` and redirects to `next`; the
+    page and `/api/momentum/meta` (real JSON from :8765) then load; Basic auth on `/api/*` works;
+    `/logout` clears the session (back to 401); repeated wrong passwords lock the client out
+    (429, even for the right password).
+  - Upstream: the echo stub got `cf-access-client-id` / `-secret` with the Worker's values, not
+    the spoofed ones the client sent, and no `Authorization` header.
+  - No password and no Access vars: every path 503.
+- 2026-10-26 — promoted (#329, `main` at f6c38149). `deploy-dashboard.yml` run 40268605293
+  succeeded: OpenNext built Next.js 16.4.3 (webpack) with cloudflare 1.20.13 and deployed
+  `ata-dashboard`. `dashboard.codifie.dev` answers with the Cloudflare Access sign-in redirect, as
+  before; the signed-in page was not opened from here. Phases 1–2 done; Phase 3 (React 19,
+  `proxy.ts`, Turbopack, the cf-build dev-server guard) waits for the owner.
+- 2026-10-28 — Phase 3 started (owner: "Do Phase 3 now"), each follow-up its own PR.
+- 2026-10-28 — React 19: `react` / `react-dom` 19.3.1, `@types/react` / `@types/react-dom` 19.3.0.
+  Radix (1.x/2.x), `react-markdown` 9, `zustand` 4.5 (`use-sync-external-store` 1.6),
+  `lucide-react` 1.17 and `@testing-library/react` 16.3 already accept 19 in their peer ranges, so
+  none was bumped; Lightweight Charts has no React dependency. Typecheck found only the ref change
+  (`useRef<T>(null)` is now `RefObject<T | null>`): five helper signatures widened. No global `JSX`,
+  `defaultProps`, string refs or `react-dom/test-utils` in the app; `forwardRef` still works in 19
+  and was left. The lockfile also dedupes `postcss` to Next's 8.5.23 (bun had flipped which copy it
+  hoisted, so Tailwind's nested 8.5.15 broke the Tailwind class test's types). Checks: typecheck,
+  139 files / 1,975 unit tests, `next build --webpack` (React 18's deprecation warning gone),
+  `cf:build` (Node 24) with the no-env check, and a smoke test of Overview, Options Lab › Today,
+  Momentum › This week and Backtest, Trade book › F&O, Jobs, Settings, Broker logins and the Guide
+  on a spare port (5191) against the running APIs: no React error or warning in the console; the
+  only failures are `/api/meta` and `/api/payment/*`, which go to the frozen `apps/server` (not
+  running), as before.
+- 2026-10-28 — React 19 merged (#363).
+- 2026-10-28 — `proxy.ts`: kept `middleware.ts`, no PR. Next 16's `proxy.ts` runs on the Node.js
+  runtime only. `@opennextjs/cloudflare` 1.20.13 does build a Node middleware (`useNodeMiddleware`,
+  `bundle-node-middleware.js`), but its own source calls that path experimental and "not supported
+  by the OpenNext maintainers" (it re-bundles Next's internal compiled middleware, which can change
+  between Next versions), and every build warns "Use at your own risk". Tried on a throwaway branch
+  (`middleware.ts` renamed, export `proxy`): `cf:build` passed with that warning (the Node handler is
+  0.8 MB) and `wrangler dev` passed every gate check (password, Basic, lock-out, logout, CSRF 403,
+  Access 403, no-password 503). It works today, but the login gate is the one security boundary
+  of the hosted dashboard, and the edge `middleware.ts` is the path OpenNext supports. Revisit when
+  OpenNext declares Node middleware supported, or when a Next release drops `middleware.ts`: the
+  switch is the file rename, the export name and the two test imports.
+- 2026-10-28 — Turbopack: the Guide's `?raw` rule moved to `turbopack.rules`
+  (`'*.md'` + `condition: { query: /raw/ }` + `type: 'raw'`); the `webpack()` hook and every
+  `--webpack` (package `dev` / `build`, dev-stack's `next dev` and `next build`) are gone. CI's
+  Dashboard job and OpenNext both run the package's `build` script, so they follow. Build times on
+  this laptop (Node 20, bun 1.3, clean `.next`, two runs each): `next build` 31.3 s / 31.0 s on
+  webpack (compile 12.1–12.4 s) against 17.1 s / 16.8 s on Turbopack (compile 5.3–5.4 s; the
+  ~10 s TypeScript step is the same); `cf:build` 37 s against 25 s; the first page of `next dev`
+  17.4 s against 4.8 s. The Markdown is in the built chunks as a string. OpenNext built the
+  Turbopack output (Next 16.4.3 (Turbopack), "OpenNext build complete", the no-env check passed),
+  and `wrangler dev` (port 8788; 8787 was held by an earlier session's preview) passed every
+  password-mode gate check, served the Guide's text in the page and its chunk, and Momentum and
+  Options Lab APIs through the rewrites against the running APIs. `start:prod`'s build
+  (`NEXT_DIST_DIR=.next-prod`, under `bun --bun`) built with Turbopack and `next start` passed the
+  gate checks. A smoke test of every main screen under Turbopack `next dev` logged no console error
+  beyond the frozen `apps/server` calls.
+- 2026-10-28 — cf-build dev-server guard dropped: with a Turbopack `next dev` running from the same
+  folder, `cf:build` built the Worker and the dev server kept serving (it writes `.next/dev`, which
+  `next build` leaves alone). The `NEXT_DIST_DIR` refusal stays. `docs/remote-dashboard.md` says so.
+- 2026-10-28 — review (#364) notes: `cf:build` hides `apps/dashboard`'s `.env` files while it runs, and
+  a running `next dev` reloads its env when they move, so for the build's length it runs without
+  them (the gate stays open in dev either way); written into `docs/remote-dashboard.md`. The `?raw`
+  rule matches `*.md` only, as `src/guide/markdown.d.ts` declares only `*.md?raw`: a new raw file
+  type needs both.
+- 2026-10-28 — closed. Phases 1–3 done; Phase 3 merged as #363 (React 19) and #364 (Turbopack, the
+  guard, the `proxy.ts` finding).

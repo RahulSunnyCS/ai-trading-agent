@@ -6,6 +6,13 @@ import { WINDOW_OPENS_MINUTES, exitCode, istMinutesNow, quantiplyOrder } from '.
 const at = (hh: number, mm: number) => hh * 60 + mm;
 
 describe('quantiplyOrder', () => {
+  it('runs Quantiply at once when the settings ask for no AlgoTest login (ONLY=none)', () => {
+    assert.equal(quantiplyOrder(true, false, at(8, 0), false), 'now');
+    assert.equal(quantiplyOrder(true, false, at(8, 15), false), 'now');
+    assert.equal(quantiplyOrder(true, true, at(9, 0), false), 'now');
+    assert.equal(quantiplyOrder(false, false, at(8, 0), false), 'off');
+  });
+
   it('is off when Quantiply is off or cannot run', () => {
     assert.equal(quantiplyOrder(false, false, at(8, 0)), 'off');
     assert.equal(quantiplyOrder(false, true, at(9, 0)), 'off');

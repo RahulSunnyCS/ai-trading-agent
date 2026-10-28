@@ -141,6 +141,16 @@ def _base(**over) -> dict:
         ({"leg": {"expiry": "monthly"}}, "expiry monthly"),
         ({"leg": {"reentry_on_sl": {"mode": "asap", "count": 1}}}, "mode asap"),
         ({"leg": {"roll": {"decay": 0.5}}}, "roll"),
+        (
+            {
+                "leg": {
+                    "position": "buy",
+                    "trail_peak": {"activate_percent": 105, "exit_percent": 80},
+                }
+            },
+            "trail_peak",
+        ),
+        ({"leg": {"stop_on": "close"}}, "stop_on: close"),
         ({"square_off": "complete"}, "square_off complete"),
         ({"no_reentry_after": "14:00"}, "no_reentry_after"),
         ({"overall": {"target_inr": 3000}}, "overall target_inr"),

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — turns a risk written down three times (BL-054, BL-065, BL-080) into a number |
-| **Status** | In progress |
+| **Status** | In progress — Phase 3 history run 2026-10-28: no cap passes (0 of 12) |
 | **Type** | feature |
 | **Area** | options |
 | **Created** | 2026-10-10 |
@@ -64,7 +64,7 @@ numbers; correlations themselves are scale-free).
   and the basket builder returns a basket. **Met 2026-10-10** (checked in the browser on live data, desktop and
   phone width).
 
-### Phase 3 — Does a cap help the forward lists? (research; not run)
+### Phase 3 — Does a cap help the forward lists? (research; history run 2026-10-28: killed, see Log)
 
 #### Phase 0 — Pre-register (filled in before any run; committed with this item, 2026-10-10)
 - **Hypothesis:** adding "no two picks above trailing correlation c" to `score.select` lowers each list's
@@ -116,3 +116,86 @@ numbers; correlations themselves are scale-free).
   (wide / p80 / p100), the SENSEX one (wide / p250 / p320), the two Buy variants and the two Dir variants as
   blocks; Buy against Widesl shows as the only opposite-tinted cells. A request over 80 strategies is refused
   with advice to narrow by start time, family or index; 75 strategies answer in about 0.4 s and 200 KB.
+- 2026-10-28 — **Phase 3, research history: red-team before the run** (written and committed before any
+  capped run is scored; the pre-registration is the Phase 0 block above, committed in `ed3616f3` on
+  2026-10-10, unchanged). Scope: the research history only; the forward journal (from 2026-10-12) stays
+  unread until a cap passes here.
+  - **Look-ahead.** Day i's picks read only rows before i: the composite is `rotation/score.py`'s
+    (row i contributes only its weekday, VIX band and days to expiry, known before 09:15), and the cap's
+    correlation is `analytics/correlation.analyse(start = day i-63, end = day i-1)` on the trailing 63
+    trading days of the period's own rows. Day i's P&L is used only to score the list. The replay at
+    cap = off must reproduce rotate.py's recorded picks (the `scripts/rotation-parity.py` check, run inside
+    the runner so the hold-out is never loaded; the script itself loads every stored day) for every
+    picks file the BL-075 runs left (A, B, C, REF in P1; REF in P2 and P3), and BL-075's gross and max
+    drawdown for A, B and C in all three periods (`research/bl075/out/runs/o{5,0,15}_f5_baseline_P*.txt`).
+    Any difference stops the run before a cap is scored.
+  - **Hold-out.** The loader drops every row after 2026-10-08 (BL-075's P1 end) while reading, and
+    asserts no later day is held; nothing from 2026-10-09 on enters any computation.
+  - **Survivorship.** The universe is the fixed 248 variant files (the pre-registration's; the 50 Dir
+    ITM1 and 100 extension closest-premium variants are out), none dropped or added by outcome. P3 is
+    NIFTY-only (124 variants) because SENSEX options are not in the lake before 2024-10: a coverage
+    limit BL-075 already had, not a selection, but the cap there chooses among half as many variants.
+  - **Data-snooping.** The cap grid (0.5 / 0.6 / 0.7), the 63-day window, the measure (Pearson of daily
+    net P&L) and the pass rule were fixed on 2026-10-10 before any capped run; 12 cap x list tests are
+    run and all are reported, so one pass in 12 is weak on its own (the hold-out is the guard). The lists'
+    weights were themselves chosen on these three periods (BL-075), so the history is in-sample for the
+    lists; the comparison is capped against uncapped on the same in-sample lists, which shares that bias
+    but does not remove it. Variants carry no costs: "net" is before charges, for both arms.
+  - **Mechanical clarifications (the rule leaves them open; none chosen from a result):**
+    1. Periods are BL-075's exactly: P1 history 2025-09-01 to 2026-10-08, selections 2025-12-03 on (202
+       days); P2 history 2024-10-09 to 2025-08-29, selections 2025-01-10 on (157); P3 NIFTY-only history
+       2022-01-03 to 2024-10-08 (`research/bl071/results`), selections 2022-04-05 on (618). The first 63
+       rows of each period are the warm-up of both the composite and the cap.
+    2. The cap goes inside `score.select`: the non-Buy variants in composite order, each kept only when its
+       trailing Pearson with every pick already kept is below c (Phase 2's `pick_diverse` rule: an equal
+       or incomputable correlation blocks); then the Widesl minimum as now (the lowest Dir dropped, the
+       next-best Widesl added), the added Widesl also under the cap with every remaining pick. When nothing
+       qualifies the list holds fewer picks that day (short, never padded, as Phase 2); short days are
+       counted and reported.
+    3. The Buy add-on is unchanged and never compared with the core (the pre-registration's "will not
+       run: applying a cap to the Buy add-on").
+    4. "Lower by at least 10%" = capped max drawdown no deeper than 0.9 x the uncapped; "no more than 5%
+       lower" = capped net >= uncapped net - 0.05 x |uncapped net|; both in the same period, in at least
+       two of P1 / P2 / P3. Drawdown is on the cumulative 2-lot list P&L from 0 over the selection days.
+  - Result goes once to `packages/option-backtesting/research/bl090/phase3_history_2026-10-28.json`.
+- 2026-10-28 — **Phase 3, research history: result. No cap passes for any list (0 of 12); every cell is
+  killed, so no cap goes to the forward hold-out.** Runner `packages/option-backtesting/research/bl090/cap_history.py`
+  (after the red-team entry above, commit `b0bda86f`), result `research/bl090/phase3_history_2026-10-28.json`
+  (written once), per-day rows in `research/bl090/out/` (git-ignored). The uncapped replay reproduced
+  rotate.py's recorded picks on every day of every picks file the BL-075 runs left (A / B / C / REF in P1,
+  REF in P2 and P3: 202, 157 and 618 days, no difference), BL-075's gross and max drawdown for A, B and C in
+  all three periods to the rupee, and `score.select` itself on every day with the cap set to infinity. No
+  capped day was short and no incomputable correlation blocked a pick, so clarification 2's edge cases never
+  applied. Change against the same list uncapped, max drawdown / net (2-lot list P&L, before charges;
+  a period "meets" when drawdown is at least 10% shallower and net at most 5% lower):
+
+  | List | Cap | P1 (202 days) DD / net | P2 (157) DD / net | P3 NIFTY (618) DD / net | Periods met | Verdict |
+  |---|---|---|---|---|---|---|
+  | A | 0.5 | −29% / −14% | +5% / −60% | −31% / −13% | 0 | killed |
+  | A | 0.6 | +11% / −22% | −21% / −38% | −32% / −13% | 0 | killed |
+  | A | 0.7 | +12% / +4% | −10% / −28% | −11% / −13% | 0 | killed |
+  | B | 0.5 | −37% / −10% | +7% / −57% | −30% / −11% | 0 | killed |
+  | B | 0.6 | +1% / −11% | −20% / −37% | −14% / −16% | 0 | killed |
+  | B | 0.7 | −2% / +1% | −17% / −29% | +2% / −12% | 0 | killed |
+  | C | 0.5 | −37% / −14% | +2% / −100% | −38% / −15% | 0 | killed |
+  | C | 0.6 | −18% / −15% | −15% / −84% | −24% / −11% | 0 | killed |
+  | C | 0.7 | **−27% / +3%** | −9% / −54% | −9% / −7% | 1 | killed |
+  | REF | 0.5 | −31% / −8% | +24% / −103% | **−16% / −3%** | 1 | killed |
+  | REF | 0.6 | −23% / −13% | +20% / −105% | −4% / −8% | 0 | killed |
+  | REF | 0.7 | **−40% / +2%** | +6% / −66% | −13% / −9% | 1 | killed |
+
+  Uncapped (the comparator), net / max DD: A ₹3,89,900 / −₹71,672 (P1), ₹3,18,652 / −₹66,797 (P2),
+  ₹12,20,482 / −₹66,632 (P3); B ₹3,52,327 / −₹81,365, ₹3,51,201 / −₹70,285, ₹12,39,935 / −₹64,402;
+  C ₹4,27,782 / −₹73,792, ₹2,98,124 / −₹83,817, ₹11,58,525 / −₹55,282; REF ₹4,30,868 / −₹68,294,
+  ₹1,70,015 / −₹88,366, ₹10,13,627 / −₹56,329.
+  - **What the cap does:** it often cuts drawdown (22 of 36 cells at least 10% shallower), but it pays
+    for it in net: only 5 of 36 cells keep net within 5% (the 0.7 cap in P1 for all four lists, +1% to
+    +4%, and REF at 0.5 in P3, −3%), and in P2 (Jan to Aug 2025) every cap loses 28% to 105% of net,
+    often with a deeper drawdown too. The cap changes the core on 56% to 89% of selection days.
+  - **Decision:** under the registered rule the correlation cap is killed on the research history for all
+    four lists at all three caps; `score.select` is unchanged. The hold-out is read only for a cap that
+    passed (Phase 0), so there is nothing to read on the forward journal. The item stays In progress for the
+    owner to close Phase 3 (or keep the hold-out step on record); no list, journal entry or strategy changed.
+  - Caveats: in-sample lists (BL-075 chose their weights on these periods), before charges, P3 NIFTY-only.
+    A note for anyone re-opening it: the forward lists rank 298 variants (Dir ITM1 added) and weekday DTE
+    labels (BL-109); this test used the registered 248 and BL-075's calendar-day labels.

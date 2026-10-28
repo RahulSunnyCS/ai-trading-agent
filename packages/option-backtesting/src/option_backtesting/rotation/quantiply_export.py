@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 from ..legwise.quantiply import WEEKDAYS, Export, to_quantiply
@@ -52,7 +53,7 @@ def build(picks: DayPicks) -> list[Built]:
     return out
 
 
-def write(picks: DayPicks, built: list[Built], out: Path) -> Path:
+def write(picks: DayPicks, built: list[Built], out: Path, extra: dict | None = None) -> Path:
     """Write `<variant>.json` per pick and `manifest.json` into `out`; returns the manifest's path.
     Files an earlier export wrote there (its manifest lists them) are replaced; a folder holding
     `.json` files with no manifest is refused (`FileExistsError`), never overwritten or merged."""
@@ -82,9 +83,28 @@ def write(picks: DayPicks, built: list[Built], out: Path) -> Path:
             }
             for b in built
         ],
+        **(extra or {}),
     }
     old.write_text(json.dumps(manifest, indent=2) + "\n")
     return old
+
+
+def evening_of(folder: Path) -> DayPicks | None:
+    """BL-172: the list the evening uploaded for this folder's day, from its manifest: the
+    evening's own (`source: preview`), or the `evening` block an earlier morning export kept."""
+    path = folder / MANIFEST
+    if not path.exists():
+        return None
+    m = json.loads(path.read_text())
+    day = date.fromisoformat(m["day"])
+    if m.get("source") == "preview":
+        core = [s["variant"] for s in m["strategies"] if not s.get("addon")]
+        buy = [s["variant"] for s in m["strategies"] if s.get("addon")]
+        return DayPicks(day, m["book"], "preview", core, buy)
+    if isinstance(m.get("evening"), dict):
+        e = m["evening"]
+        return DayPicks(day, m["book"], "preview", list(e["core"]), list(e["buy"]))
+    return None
 
 
 def write_latest(base: Path, picks: DayPicks, folder: Path) -> Path:

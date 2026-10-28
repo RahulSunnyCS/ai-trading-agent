@@ -57,7 +57,7 @@ export function Sidebar({
   onNavigate,
   compact = false,
 }: SidebarProps) {
-  const groups = visibleNavigationGroups(preferences);
+  const groups = visibleNavigationGroups(preferences, activeTab);
 
   function go(event: MouseEvent, tab: Tab, ...rest: string[]): void {
     if (!isPlainClick(event)) return;

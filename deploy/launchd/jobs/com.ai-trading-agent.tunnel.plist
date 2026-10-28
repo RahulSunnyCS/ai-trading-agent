@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The Cloudflare tunnel (`cloudflared tunnel run`, what `bun run start:tunnel` runs), always on,
+  so the hosted dashboard reaches the research APIs and a Fyers or Kite login works from a phone.
+  The config is ~/.cloudflared/config.yml (momentum-api.<domain> -> :8765, options-api.<domain>
+  -> :8000). The tunnel hostnames stay behind the Cloudflare Access service token, as before:
+  nothing here opens a port (docs/remote-dashboard.md).
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ai-trading-agent.tunnel</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/cloudflared</string>
+        <string>tunnel</string>
+        <string>run</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>StandardOutPath</key>
+    <string>/Users/rahul/Library/Logs/ai-trading-agent/tunnel.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/rahul/Library/Logs/ai-trading-agent/tunnel.log</string>
+</dict>
+</plist>

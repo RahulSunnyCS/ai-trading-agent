@@ -80,7 +80,14 @@ def test_weights_are_expanded_the_way_the_search_expands_them():
 def _stub_ranking():
     prices = pd.DataFrame({"AAA": [1.0, 2.0]}, index=pd.to_datetime(["2020-01-03", "2020-01-10"]))
     return type(
-        "Ranking", (), {"prices": prices, "column_to_base_symbol": {"AAA": "AAA"}, "name": "R"}
+        "Ranking",
+        (),
+        {
+            "prices": prices,
+            "column_to_base_symbol": {"AAA": "AAA"},
+            "name": "R",
+            "cross_section": lambda self: None,  # BL-001 F6: the point-in-time cross-section
+        },
     )()
 
 

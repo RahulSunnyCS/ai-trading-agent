@@ -322,7 +322,7 @@ def test_the_owner_gets_the_live_lines_and_the_group_never_does(evening):
     assert "💹 Live vs paper\nAlgoTest · Shoonya T1  +₹910 vs +₹790 a lot · slip +₹120" in owner[0]
     assert "💹" not in group[0]
     # after T1's result, before tomorrow
-    assert owner[0].index("🧪 T1") < owner[0].index("💹")
+    assert owner[0].index("🧪 Tuned Adaptive") < owner[0].index("💹")
 
 
 def test_a_day_with_no_capture_says_live_not_captured(evening):

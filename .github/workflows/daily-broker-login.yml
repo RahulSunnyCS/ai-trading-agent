@@ -1,8 +1,11 @@
 name: Daily broker login
 
 on:
-  # PRIMARY TRIGGER IS NOT HERE: since 2026-10-05 the owner's laptop dispatches this
-  # workflow at 08:00 IST trading days (apps/scheduler, packages/broker-login/src/dispatch.ts),
+  # PRIMARY TRIGGER IS NOT HERE. Since 2026-10-28 (BL-172) the login runs on the owner's Mac
+  # (apps/scheduler's broker-login job, packages/broker-login/src/local-login.ts), which dispatches
+  # this workflow only for the parts that failed there for a reason another machine could fix, and
+  # sets LOCAL_LOGIN_DONE so the crons below skip. From 2026-10-05 to then the laptop dispatched it
+  # at 08:00 IST trading days (packages/broker-login/src/dispatch.ts),
   # because GitHub delivered these crons ~6 hours late. They stay as a late backstop
   # for days the laptop is off, and skip entirely once a run succeeded that day, or
   # a run's AlgoTest step did (backstop-check below); brokers already logged in are
@@ -24,11 +27,17 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: 'Single broker to run (angelone or finvasia). Blank uses the BROKER_LOGIN_ONLY repository variable; both blank runs both.'
+        description: 'AlgoTest brokers: angelone, finvasia, both or none. Blank uses the BROKER_LOGIN_ONLY repository variable (blank there = both).'
         required: false
         default: ''
       quantiply:
         description: 'Quantiply login via Angel One. "default" uses the QUANTIPLY_LOGIN repository variable (unset = off).'
+        type: choice
+        options: ['default', 'on', 'off']
+        required: false
+        default: 'default'
+      quantiply_shoonya:
+        description: 'Quantiply login via Shoonya. "default" uses the QUANTIPLY_BROKERS repository variable (BL-172: the Mac''s fallback asks on or off).'
         type: choice
         options: ['default', 'on', 'off']
         required: false
@@ -79,12 +88,18 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           # BL-140: the dashboard's "Automated logins" switch, synced here by the laptop's scheduler.
           ENABLED: ${{ vars.BROKER_LOGIN_ENABLED }}
+          # BL-172: the day (UTC) the Mac ran the login itself; anything left is its fallback run's.
+          LOCAL_DONE: ${{ vars.LOCAL_LOGIN_DONE }}
         run: |
           skip=false
           quantiply_off=false
           if [ "${{ github.event_name }}" = "schedule" ] && [ "${ENABLED}" = "off" ]; then
             skip=true
             echo "Automated logins are off in the dashboard's settings; the backstop does nothing."
+          elif [ "${{ github.event_name }}" = "schedule" ] && [ "${LOCAL_DONE}" = "$(date -u +%Y-%m-%d)" ]; then
+            skip=true
+            quantiply_off=true
+            echo "The Mac ran today's login (BL-172); the backstop does nothing."
           elif [ "${{ github.event_name }}" = "schedule" ]; then
             today=$(date -u +%Y-%m-%d)
             runs=$(gh api "repos/${REPO}/actions/workflows/daily-broker-login.yml/runs?created=>=${today}&per_page=50" \
@@ -180,6 +195,8 @@ jobs:
           # Logged in after the AlgoTest logins, one attempt, its own report line, never the exit
           # code; like Angel One's Quantiply, a backstop never repeats it once a run happened today.
           QUANTIPLY_BROKERS: ${{ needs.backstop-check.outputs.quantiply_off != 'true' && vars.QUANTIPLY_BROKERS || '' }}
+          # BL-172: a dispatch's on / off wins over the variable (config.ts); blank on a cron run.
+          QUANTIPLY_SHOONYA_INPUT: ${{ inputs.quantiply_shoonya || 'default' }}
           TRACE: ${{ inputs.trace && '1' || '' }}
           SKIP_WINDOW_GUARD: ${{ inputs.skip_window_guard && '1' || '' }}
         run: bun run login

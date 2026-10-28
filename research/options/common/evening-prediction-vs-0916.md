@@ -7,8 +7,10 @@
 Each evening the result message lists tomorrow's strategies: the 09:16 ranking re-run on the stored
 results with the market's last VIX close standing in for the opening VIX (`rotation/tomorrow.py`).
 The 09:16 job (`rotation/pick.py`) runs the same ranking with the real 09:15 VIX open. History
-through the previous session and the weekday and days-to-expiry labels are the same, so the only
-difference is which VIX band the day is put in. The evening uploads (16:40 AlgoTest, 16:45
+through the previous session and the weekday and days-to-expiry labels are the same in this study, so
+the only difference is which VIX band the day is put in. Live, days to expiry also come from different
+sources (the reference calendar in the evening, the listed contracts at 09:16), which differed on 1 of
+476 days here. The evening uploads (16:40 AlgoTest, 16:45
 Quantiply) act on the prediction; the 09:18 / 09:19 top-ups act on the real pick.
 
 ## Live value
@@ -20,8 +22,8 @@ List C (Adaptive) on Core-298, three core strategies a day. The expiring-index r
 
 | Item | Question | Data / period | Verdict | Evidence |
 |---|---|---|---|---|
-| BL-165 | Does the pick made on the real open earn more than the one made on the previous close? | Core-298, 431 days, 2025-01-10 → 2026-10-23, net, 1 lot a strategy | **The open does not help.** Mean difference +₹1 a day, 90% interval −₹45 to +₹50; halves −₹4 and +₹9 | [BL-165][bl165] |
-| BL-165 | Same on Core-298 plus the T1 variants (in-sample) | 431 days, same window | **The open does not help.** −₹62 a day, interval −₹127 to −₹7, driven by 13 days | [BL-165][bl165] |
+| BL-180 | Does the pick made on the real open earn more than the one made on the previous close? | Core-298, 431 days, 2025-01-10 → 2026-10-23, net, 1 lot a strategy | **The open does not help.** Mean difference +₹1 a day, 90% interval −₹45 to +₹50; halves −₹4 and +₹9 | [BL-180][bl180] |
+| BL-180 | Same on Core-298 plus the T1 variants (in-sample) | 431 days, same window | **The open does not help.** −₹62 a day, interval −₹127 to −₹7, driven by 13 days | [BL-180][bl180] |
 
 ## What we know
 
@@ -68,8 +70,9 @@ Mean difference per half-year (days, changed days), the open minus the predictio
 | 2026 H1 (119) | +₹25 (2) | −₹119 (3) |
 | 2026 H2 so far (72) | −₹18 (2) | −₹51 (2) |
 
-- **The open never wins.** In both universes the pooled difference is zero or negative, and no
-  half-year is clearly positive for both. The short-history stretch drives most of the Core move
+- **The open does not win overall.** In both universes the pooled difference is zero or negative;
+  Core is slightly positive in two half-years (+₹70, +₹25) and no half-year is clearly positive for
+  both. The short-history stretch drives most of the Core move
   (−₹221 a day over 42 days with 2 changed days; the registered stretch alone is +₹1.3).
 - **T1 leans negative.** The open does worse than the evening picks in four of five half-years. 15
   changed days carry it, so it is a lean, not a finding.
@@ -85,4 +88,4 @@ The first run (2026-10-26) took the previous *stored* day as the "previous sessi
 Nothing blocking. The rotation store begins on 2024-10-09, so two years is the longest window.
 
 [bl122]: ../../../backlog/BL-122-expiring-index-only-rule.md
-[bl165]: ../../../backlog/BL-165-evening-prediction-vs-0916-pick.md
+[bl180]: ../../../backlog/BL-180-evening-prediction-vs-0916-pick.md
